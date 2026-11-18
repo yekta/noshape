@@ -67,7 +67,9 @@ impl List {
         draw(cx, self.window);
     }
 
+    /// A click a person's pause after the last one (past the list's 400 ms double-click).
     fn click(&self, cx: &mut TestAppContext, row: &str, m: Modifiers) {
+        cx.executor().advance_clock(std::time::Duration::from_millis(500));
         let at = self.at(cx, row);
         self.press(cx, at, MouseButton::Left, m, 1);
     }
@@ -345,6 +347,39 @@ fn rows() -> Vec<Row> {
             let b = l.bounds(cx, "feature:Extrude 1").ok_or("no row")?;
             l.double_click_at(cx, point(b.origin.x + b.size.width - px(40.), b.center().y));
             expect(l.editing(cx), Some("Extrude 1".to_string()), "editing")
+        } },
+        Row { id: "double-click / the list's own: a second click 80 px along within 400 ms", live: "two clicks on the same row within ≈370–400 ms open its dialog anywhere on the row (no native dblclick); 420 ms apart or on another row never (live2 consts-1118, pinned 07:26)", gap: false, check: |l, cx| {
+            let a = l.at(cx, "feature:Extrude 1");
+            let b = point(a.x + px(80.), a.y);
+            l.press(cx, a, MouseButton::Left, NONE, 1);
+            cx.executor().advance_clock(std::time::Duration::from_millis(350));
+            l.press(cx, b, MouseButton::Left, NONE, 1);
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy());
+            let near = l.editing(cx);
+            l.keys(cx, "escape");
+            cx.executor().advance_clock(std::time::Duration::from_millis(600));
+            l.press(cx, a, MouseButton::Left, NONE, 1);
+            cx.executor().advance_clock(std::time::Duration::from_millis(420));
+            l.press(cx, b, MouseButton::Left, NONE, 1);
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy());
+            let late = l.editing(cx);
+            // The second click on the next row: two clicks, no dialog.
+            cx.executor().advance_clock(std::time::Duration::from_millis(600));
+            l.press(cx, a, MouseButton::Left, NONE, 1);
+            cx.executor().advance_clock(std::time::Duration::from_millis(200));
+            let next = l.at(cx, "feature:Sketch 2");
+            l.press(cx, next, MouseButton::Left, NONE, 1);
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy());
+            expect((near, late, l.editing(cx)), (Some("Extrude 1".to_string()), None, None), "(editing after two clicks 80 px and 350 ms apart, 420 ms apart, on the next row)")
+        } },
+        Row { id: "dialog / a new feature's row shows while its dialog is open", live: "Extrude from the toolbar: the list shows the new \"Extrude 4\" row at the rollback bar while the dialog is open (live workflow-1118)", gap: false, check: |l, cx| {
+            cx.update_window(l.window, |_, w, cx| l.view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+            draw(cx, l.window);
+            let new = l.bounds(cx, "feature:new").ok_or("no row for the new feature")?;
+            let last = l.bounds(cx, "feature:Extrude 3").ok_or("no Extrude 3 row")?;
+            let name = cx.update(|cx| l.view.read(cx).placeholder_name(cx));
+            l.keys(cx, "escape");
+            expect((name, new.top() >= last.bottom()), ("Extrude 4".to_string(), true), "(the new row's name, below the last feature)")
         } },
         Row { id: "double-click / a sketch: sketch mode", live: "edits Sketch 1", gap: false, check: |l, cx| {
             l.double_click(cx, "feature:Sketch 1");

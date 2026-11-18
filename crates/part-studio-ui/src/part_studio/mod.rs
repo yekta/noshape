@@ -5697,6 +5697,7 @@ impl PartStudioView {
         let type_name = self.edit.as_ref().map(|e| e.dialog.read(cx).ty.name).unwrap_or_default();
         let head = if needs_type_tag(&name, type_name) { format!("{name} [{type_name}]") } else { name.clone() };
         let row = crate::ui::tree_row("editing-placeholder", true)
+            .debug_selector(|| "feature:new".into())
             .mr(px(5.))
             .bg(pal.accent_soft)
             .font_weight(FontWeight::SEMIBOLD)
@@ -6106,7 +6107,10 @@ impl PartStudioView {
                     }
                     return;
                 }
-                if ev.click_count() >= 2 {
+                let now = cx.background_executor().now();
+                let again = this.ui.row_last_click.is_some_and(|(r, t)| r == id && now.saturating_duration_since(t) <= behaviors::ROW_DOUBLE_CLICK);
+                this.ui.row_last_click = (!again).then_some((id, now));
+                if ev.click_count() >= 2 || again {
                     this.edit_feature(id, window, cx);
                     return;
                 }

@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-18 06:27 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-18 07:35 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -138,10 +138,13 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - interaction-feel.md "Captures 11-17 / 11-18 (audit)": 214 finding rows with their test or "missing". New tests:
   only_radius_and_measurement_carry_and_a_cancel_remembers_nothing (dialog memory, USER P0),
   a_list_scrolled_under_a_still_drag_drops_at_its_line (drops at the slot, live2 fl-autoscroll-1118; fixed).
-- In progress (patch /root/psui-scratch/pick-on-move.patch + mod-all.patch): live2 hover-time-1118: every move picks at
-  once only while a sketch creation tool is active (`Viewport::pick_on_move`, separate from tool_captures_left). It
-  broke sketch_box midpoint_glyph_and_plane_clicks_in_a_sketch_as_live: after the first glyph click a fast move's
-  stale pick hovers another line (glyph_entity 6) and glyph 2's row goes. Settle that first.
+- 07:35: landing the list's own row double-click (same row within 400 ms, anywhere on it: live2 consts-1118 pinned) and
+  a test for the new feature's row while its dialog is open (live workflow-1118). FEEL-FL-AUTOSCROLL-DROP verified by qa.
+- In progress: hover-time-1118 (patch /root/psui-scratch/pick-on-move2.patch: `Viewport::pick_on_move` only with a sketch
+  tool, move and pick times on the executor clock, glyph boxes take the hover). Blocker: sketch_box
+  midpoint_glyph_and_plane_clicks fails ~1 in 3 full runs: on the way to a glyph the editor's own hit test
+  (`pointer_move` → `apply_outcome`) lights the line under the row, whose `glyph_entity` replaces the first line's
+  lingering row (one slot). Next: keep a lingering row while another line is crossed (or two slots), then land.
 - Next: the audit's missing P0 rows (manipulator arrow drag: nothing lit, Depth focused; sel-feel box drag / relations;
   hover-pick-1120 connector reach; measure-mass panel place / add-remove / no summary).
 

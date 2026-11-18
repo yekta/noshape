@@ -86,7 +86,7 @@ two zooms, A 0.2754 / B 0.2316 mm/px; where they differ both are given).
 | Sketch state while editing (live2 sketch-state 11-17) | a free line: blue, the row's blue "−" badge; Fix on the line: the line black, its ends blue (free along it), the badge stays; a HORIZONTAL on that slanted line: the row red "Sketch could not be solved.", no badge, the yellow bubble, the line where it was; deleting it: back to fixed (the bubble gone); deleting the Fix: back to free | the same (Fix on a line holds the line, not its ends; the message was "Sketch has conflicting constraints") | part-studio-ui `an_open_sketchs_state_follows_its_constraints` | = (fixed) |
 | Constraint glyph selection (live2 glyph-select 11-17) | one glyph at a time: a click (Shift too) on another replaces it, Delete takes only it; a glyph click drops selected curves, a curve click drops the glyph; Shift+click on the selected glyph or an empty click deselects | the same (were additive, kept with curves) | scene `constraint_glyphs_select_one_at_a_time_as_lives` | = (fixed) |
 | A point and a circle / ellipse made coincident | the point fixed (a model vertex, a Fix): the curve shifts the shortest way, radii kept; the point free: the point moves onto the curve (live2 11-17, REQUESTS (d)) | the same (`what_moves`: the curve's centre or the point is what the solve moves) | scene `a_circle_coincident_with_a_fixed_point_shifts_and_a_free_point_moves` | = (fixed 11-17) |
-| Hover timing (no tool) | the highlight ≈ 270–300 ms after the pointer stops; with the Dimension tool ≈ 30 ms: live's rule (live2 hover-time-1118: `alwaysPreHighlightOnMouseMove` only while a sketch creation tool is active) | every sketch move picks at once (`tool_captures_left` is set for the whole sketch session, a plane ring and assembly parts too) | missing | ≠ (fix in progress: a glyph row's fast-move case to settle first) |
+| Hover timing (no tool) | the highlight ≈ 270–300 ms after the pointer stops; with the Dimension tool ≈ 30 ms: live's rule (live2 hover-time-1118: `alwaysPreHighlightOnMouseMove` only while a sketch creation tool is active) | every sketch move picks at once (`tool_captures_left` is set for the whole sketch session, a plane ring and assembly parts too) | missing | ≠ (in progress: the fix waits on a glyph row the editor's own hit test replaces) |
 | Nothing recoloured under the pointer mid-draw | the target line doesn't recolour | the same (`SketchEditor::mid_draw`) | – | = |
 | Hovered point look | a 10–11 px translucent orange disc, centred | the same; whole on a slanted plane | offscreen `a_hovered_sketch_point_on_a_slanted_face_draws_its_whole_disc`, `a_sketch_point_is_drawn_as_lives_in_each_state` | = |
 | Per-entity colour: a line | the line black, its free end blue; black once dimensioned; a construction line through the origin black, ends blue | a line by its own geometry (`line_motion_queries`) | sketch `a_line_with_a_free_length_is_defined_and_its_free_end_is_not`, `a_line_whose_end_moves_off_it_is_under_defined` | = |
@@ -1155,6 +1155,14 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | The dialog shows no count | ? | missing |
 | Coincident of a circle / ellipse with a fixed point translates the curve the shortest way, size kept; a free point moves onto it [skasm] | ? | missing |
 
+### consts-1118 (feel constants: context-menu timing, double-click windows, live 11-18 06:48)
+
+| Finding | Ours | Test |
+|---|---|---|
+| A feature row's double-click is the list's own: the same row again within ≈ 400 ms anywhere on the row (its far end, its icon; 420 ms or another row never) | = (fixed 11-18: ours needed the OS's 5 px) | list matrix "double-click / the list's own: a second click 80 px along within 400 ms" |
+| A list row's menu opens on the right press; the graphics menu on the release within 4 device px | = | list matrix "menu / one feature"; app-core viewport tests::presses_drag_and_open_the_menu_as_live |
+| The graphics double-click is the OS's (2 px, ≈ 400 ms on Linux) | = | GPUI's click count (no test) |
+
 ### hover-time-1118 (P0, hover timing with no tool and why a sketch tool hovers at once, live 11-18 06:11)
 
 | Finding | Ours | Test |
@@ -1162,7 +1170,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | 3D, no tool, any entity: a fast sweep lights at stop + min(5 × average pick, 250 ms) + one pick | = | app-core viewport::prehighlight_tests::prehighlight_waits_for_a_pause_as_live |
 | A fast move off clears at once (remove-only pick); nothing new until the pause | = | sketch_hover_feel_tests::a_quick_sweep_off_a_line_leaves_nothing_lit |
 | Slow (< 0.15 px/ms): the highlight follows the pointer, one pick per move | = | app-core viewport::prehighlight_tests::prehighlight_waits_for_a_pause_as_live |
-| Every move picks at once only while a sketch creation tool (Line, Dimension) is active; a sketch with no tool, feature dialogs, mates and Measure keep the pause | ≠ (ours picks at once in a sketch with no tool, over a draggable plane ring and over assembly parts; fix in progress) | missing |
+| Every move picks at once only while a sketch creation tool (Line, Dimension) is active; a sketch with no tool, feature dialogs, mates and Measure keep the pause | ≠ (ours picks at once in a sketch with no tool, over a draggable plane ring and over assembly parts; in progress) | missing |
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;

@@ -488,6 +488,8 @@ pub struct UiState {
     pub mass_faces: bool,
     /// Mass properties values clicked to the unit's highest precision (live: a second click turns it back).
     pub mass_precise: std::collections::HashSet<&'static str>,
+    /// The feature row clicked last and when (executor clock): the list's own double-click ([`ROW_DOUBLE_CLICK`]).
+    pub row_last_click: Option<(FeatureId, std::time::Instant)>,
     /// The Measure, Analysis tools and Mass properties buttons' keyboard focus, Tab's stops from the graphics.
     pub eval_stops: Vec<FocusHandle>,
     /// Mass properties: "Mate connector for reference frame" is the active
@@ -931,6 +933,7 @@ impl UiState {
             list_collapsed: false,
             mass_faces: false,
             mass_precise: Default::default(),
+            row_last_click: None,
             eval_stops: Vec::new(),
             com: None,
             com_task: None,
@@ -4832,6 +4835,11 @@ pub(super) fn roll_items(i: usize, rollback_at: usize, n_features: usize) -> (bo
 /// scrolling down. Only the vertical distance counts, also with the pointer
 /// beside the panel. Live's measured speeds (± 15 %), by the distance inside
 /// the edge (negative = past it), mean of the top and bottom edges.
+/// A feature row clicked again within this is a double-click, anywhere on the row (live2 consts-1118, pinned 07:26: the
+/// list's own rule, not the OS's 5 px: 150–370 ms opened the dialog up to the row's far end and on its icon; 420 ms
+/// never did, nor a second click on another row).
+pub(super) const ROW_DOUBLE_CLICK: std::time::Duration = std::time::Duration::from_millis(400);
+
 pub(super) fn list_autoscroll_speed(y: f32, top: f32, bottom: f32) -> f32 {
     const TABLE: [(f32, f32); 12] = [
         (-192.0, 600.0),
