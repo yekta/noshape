@@ -1268,6 +1268,32 @@ fn feature_pattern_of_through_holes_without_reapply_copies_them() {
     assert!(near(removed, 4.0 * one, 1e-4), "removed {removed}, 4 holes {}", 4.0 * one);
 }
 
+/// qa PATTERN-AFTER-INSERTED-CHAMFER (live session-1118): a Ø10 hole through a 10 mm plate with a 1 mm chamfer on its
+/// rim, the plate shelled 2 mm with the top open (a boss round the hole), then a Feature pattern of the hole (no
+/// reapply) 3 × 20 mm: live's instances cut the 2 mm floor. The hole's rim, now the chamfer's, lands in the empty tray
+/// at the instances; ours refused the pattern ("Could not create all instances…").
+#[test]
+fn feature_pattern_of_a_chamfered_hole_in_a_tray_cuts_the_floor() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.1, 0.05, "10 mm");
+    let pl = t.top_plane("10 mm");
+    let cs = t.sketch(Reference::FeaturePlane(pl), circle(DVec2::new(0.02, 0.025), 0.005));
+    let r = t.regions(cs)[0].clone();
+    let cut = t.extrude(r, "10 mm", "REMOVE");
+    t.set(cut, "oppositeDirection", b(true));
+    t.set(cut, "endBound", en("THROUGH_ALL"));
+    let body = t.ok().context.bodies[0].clone();
+    t.add("chamfer", &[("entities", q(vec![edge_near(&body, DVec3::new(0.02, 0.03, 0.01))])), ("width", e("1 mm"))]);
+    let body = t.ok().context.bodies[0].clone();
+    let top = body.shape.faces().iter().position(|f| (f.centroid().unwrap().z - 0.01).abs() < 1e-9 && f.area().unwrap() > 1e-3).expect("top face");
+    t.add("shell", &[("entities", q(vec![Reference::Face((*body.faces[top]).clone())])), ("thickness", e("2 mm"))]);
+    let before = total_volume(&t.ok().context);
+    feature_pattern(&mut t, vec![cut], "3", false);
+    let res = t.ok();
+    let floor_hole = std::f64::consts::PI * 0.005 * 0.005 * 0.002;
+    assert!(near(before - total_volume(&res.context), 2.0 * floor_hole, 1e-6), "{} removed", (before - total_volume(&res.context)) * 1e9);
+}
+
 /// qa4 F12: a Feature-type linear pattern of a Hole cuts holes into the
 /// part (it doesn't turn it into a shell with cylinders), and keeps doing so
 /// after the block's depth changes.

@@ -1495,9 +1495,16 @@ fn face_pattern_fails(body: &Body, faces: &[usize], instances: &[Instance], merg
             let near = |b: &k::BoundingBox| (b.min - DVec3::splat(tol)).cmple(p).all() && p.cmple(b.max + DVec3::splat(tol)).all();
             others.iter().any(|(b, f)| near(b) && k::make_vertex(p).and_then(|v| k::distance(f, &v)).is_ok_and(|d| d.distance < tol))
         };
+        // (A convex edge, a cut's rim, may land in empty space: there the cut removes nothing (qa
+        // PATTERN-AFTER-INSERTED-CHAMFER: a hole whose rim a chamfer took, patterned into a shelled tray's cavity: live
+        // cuts the floor). A boss's foot there would float.)
+        let convex_edge = std::cell::OnceCell::new();
+        let outside = |p: DVec3| {
+            *convex_edge.get_or_init(|| edge_convexity(body, e, s as usize, o as usize) == 1) && body.shape.classify_point(p, tol).is_ok_and(|c| c == k::PointClass::Outside)
+        };
         if probes.iter().any(|m| {
             let p = m.transform_point3(mid);
-            !on_surface(&other, p, tol) && !on_part(p)
+            !on_surface(&other, p, tol) && !on_part(p) && !outside(p)
         }) {
             return true;
         }
