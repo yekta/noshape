@@ -685,16 +685,18 @@ the line 6 -> 10 (6-7 -> 8-10); circle centre 4 -> 7 (5-8 -> 7-12). The yellow s
 frame behind here). Own H / V band: lights at 7 px off the axis, lets go at 8 (H) / 9-10 (V), the same at 40, 80 and 160 px, with
 the dashed preview and "—" / "|" by the pointer (= live). Shift held: no snap, a line 2 px off H stays tilted, an end 1 px from a
 point gets no coincident (= live). Ending on a point / midpoint: COINCIDENT (shared point) / MIDPOINT created (= live).
-- [ ] (qa 01:25 on 5076e98c, 085fa6af1: the on-edge glyph shows while drawing and a coincident glyph stays after the click; reach sweep re-running on vibex8) **P0 SKSNAP-MODEL-EDGE (skasm)**: a model edge on the sketch plane lights (orange) within 4-5 px but shows no coincident glyph
+- [x] 085fa6af1 **verified 5076e98c** (qa 01:46, vibex8: on-edge glyph while drawing, coincident glyph kept after the click; the edge lights at 5 px, its midpoint at 6 px (live 7 / 6): the 2 px short is SKSNAP-REACH) **P0 SKSNAP-MODEL-EDGE (skasm)**: a model edge on the sketch plane lights (orange) within 4-5 px but shows no coincident glyph
   by the pointer, offers no midpoint at its middle, and a click 2 px off it leaves the end 0.5 mm off the edge with no constraint
   (live row 1 / 3: coincident on the edge at 7 px, midpoint at the middle at 6 px; COINCIDENT (end, edge) after the click).
-- [ ] **P0 SKSNAP-ALIGN-WOKEN-POINT (skasm)**: after resting on Sketch 2's point, no vertical alignment to it is offered at 60 or
+- [x] b8234063a **verified 5076e98c** (qa 01:46: after resting on P, a yellow dashed line to it within ±5 px at 60 and 150 px below, gone at 7; live ±6-7: SKSNAP-REACH) **P0 SKSNAP-ALIGN-WOKEN-POINT (skasm)**: after resting on Sketch 2's point, no vertical alignment to it is offered at 60 or
   150 px below, 0-14 px off its vertical (no dashed line, no glyph) (live row 2: a ±6-7 px band, yellow dashed line to the point).
 - [x] not a bug **P1 SKSNAP-GLYPHS-AFTER (skasm)**: after the click no constraint glyph is drawn (H, V, coincident, midpoint, edge) (live row
   3: "—" under the line's middle, "|" beside it, coincident / midpoint glyphs above-left of the end).
   qa 11-18 00:31 (green 0f7610c83, Show constraints ticked, sk/run4): "—", "|", coincident and midpoint glyphs stay after each line
   as live; it was Show constraints off in our start. The model-edge end shows none here: re-check with SKSNAP-MODEL-EDGE (085fa6af1).
 - [ ] **P2 SKSNAP-REACH (skasm)**: a point lights at 5 px along x (live 6-7) and a circle centre at 4 px (live 5-8).
+  qa 01:46 on 5076e98c (vibex8, sk/sw6, sw7, hv7): circle centre 6 px (in live's band); still short: point 5 px along x / y (live
+  6-7), a model edge 5 px (live 7), the alignment band ±5 (live ±6-7); lines as before (end 7, middle 5, off-end 6).
 - [ ] b6f5e810 (skasm 01:33: one Coincident, no use glyph, per live2 use-glyph-1118; re-check on its green) **P2 SKSNAP-SHIFT-ICON (skasm)**: with Shift held near the point a black cube icon shows by the pointer (live: nothing).
 - Not run: a local point beating an external one 1 px apart.
 
