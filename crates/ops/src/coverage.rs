@@ -477,6 +477,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("assembly:Where used…", Op("part_where_used")),
     ("assembly:Unpin reference", Op("assembly_pin_reference")),
     ("drawing:Pin reference", Op("drawing_pin_reference")),
+    ("drawing:Unmerge", Op("drawing_table_edit")),
     ("drawing:Unpin reference", Op("drawing_pin_reference")),
     ("drawing:Update linked document...", Op("drawing_update_references")),
     ("drawing:Table properties...", Op("drawing_table_properties")),
