@@ -5741,6 +5741,8 @@ impl PartStudioView {
             .group("rollback")
             .tip("Rollback bar", crate::ui::TipSide::Below)
             .child(div().w_full().h(px(7.)).bg(if focused { gpui_kit::rgb(0xa0c7dd) } else { pal.rollback }).group_hover("rollback", |d| d.bg(gpui_kit::rgb(0xc8d9e2))))
+            // Live (ps-feel2-1118): the drag starts past 6 px (no drop line at 6, one at 9).
+            .drag_threshold(ROLLBACK_DRAG_PX)
             .on_drag(RollbackDrag, {
                 let (slot, xs) = (self.ui.feature_drop.clone(), self.ui.feature_drop_x.clone());
                 move |_, grab, _, cx| {
@@ -8255,3 +8257,6 @@ mod tool_tooltip_tests {
         assert_eq!((tip("sketch"), tip("extrude")), ("Create new sketch (shift+s)".to_string(), "Extrude (shift+e)".to_string()));
     }
 }
+
+/// How far the rollback bar's press moves before it drags (live ps-feel2-1118: no drop line at 6 px, one at 9).
+const ROLLBACK_DRAG_PX: f32 = 7.5;

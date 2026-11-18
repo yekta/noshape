@@ -737,6 +737,20 @@ fn rows() -> Vec<Row> {
             l.drag(cx, from, to, true);
             expect(l.rolled_to(cx), Some("Sketch 2".to_string()), "rolled to")
         } },
+        Row { id: "rollback bar / the drag starts past 6 px", live: "3 px steps from the bar: no drop line at 3 or 6 px, a line at 9 (live2 ps-feel2-1118)", gap: false, check: |l, cx| {
+            let from = l.at(cx, "rollback");
+            l.event(cx, MouseMoveEvent { position: from, pressed_button: None, modifiers: NONE });
+            l.event(cx, MouseDownEvent { button: MouseButton::Left, position: from, modifiers: NONE, click_count: 1, first_mouse: false });
+            let mut got = Vec::new();
+            for dy in [3., 6., 9.] {
+                l.event(cx, MouseMoveEvent { position: point(from.x, from.y - px(dy)), pressed_button: Some(MouseButton::Left), modifiers: NONE });
+                draw(cx, l.window);
+                got.push(l.dragging(cx));
+            }
+            l.keys(cx, "escape");
+            l.release(cx, point(from.x, from.y - px(9.)));
+            expect(got, vec![false, false, true], "dragging at 3, 6, 9 px")
+        } },
         Row { id: "rollback bar / while held nothing moves or greys", live: "the 'Rollback bar' chip follows the pointer, the insertion line shows the slot; the bar stays at its old place, nothing greys (live2 featurelist-feel 1)", gap: false, check: |l, cx| {
             let (from, to) = (l.at(cx, "rollback"), l.at_y(cx, "feature:Extrude 1", 6.));
             l.drag(cx, from, to, false);
@@ -827,6 +841,34 @@ fn rows() -> Vec<Row> {
             wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy() && l.view.read(cx).display.bodies.len() == 3);
             let on = (cx.update(|cx| suppressed(cx)), cx.update(|cx| l.view.read(cx).display.bodies.len()));
             expect((off, on), ((Some(true), 2), (Some(false), 3)), "(suppressed, parts) after Suppress, after Unsuppress")
+        } },
+        Row { id: "suppress / the parts left renumber, the consumed sketch drawn", live: "Extrude 2 suppressed: Parts (2) named Part 1, Part 2 (the old Part 3 now Part 2); Sketch 2 drawn (live2 ps-feel2-1118)", gap: false, check: |l, cx| {
+            l.right_click(cx, "feature:Extrude 2");
+            let at = l.bounds(cx, "menu:Suppress").ok_or("no Suppress row")?.center();
+            l.press(cx, at, MouseButton::Left, NONE, 1);
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy() && l.view.read(cx).display.bodies.len() == 2);
+            let got = cx.update(|cx| {
+                let v = l.view.read(cx);
+                let mut parts: Vec<String> = v.display.bodies.iter().map(|b| b.name.clone()).collect();
+                parts.sort();
+                let sketch2 = v.studio(cx).and_then(|s| s.features.iter().find(|f| f.name == "Sketch 2").map(|f| f.id));
+                let drawn = v.display.sketches.iter().find(|s| Some(s.feature) == sketch2).map(|s| !s.hidden);
+                (parts, drawn)
+            });
+            expect(got, (names(&["Part 1", "Part 2"]), Some(true)), "(parts, Sketch 2 drawn)")
+        } },
+        Row { id: "suppress / two features from one menu: one undo step", live: "Extrude 1 and Extrude 3 selected, Suppress: both struck through, Parts (1); Ctrl+Z restores both (live2 ps-feel2-1118)", gap: false, check: |l, cx| {
+            let suppressed = |cx: &mut TestAppContext| cx.update(|cx| l.view.read(cx).studio(cx).map(|s| s.features.iter().filter(|f| f.suppressed).map(|f| f.name.clone()).collect::<Vec<_>>()).unwrap_or_default());
+            l.click(cx, "feature:Extrude 1", NONE);
+            l.click(cx, "feature:Extrude 3", NONE);
+            l.right_click(cx, "feature:Extrude 1");
+            let at = l.bounds(cx, "menu:Suppress").ok_or("no Suppress row")?.center();
+            l.press(cx, at, MouseButton::Left, NONE, 1);
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy() && l.view.read(cx).display.bodies.len() == 1);
+            let off = suppressed(cx);
+            l.undo(cx);
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy() && l.view.read(cx).display.bodies.len() == 3);
+            expect((off, suppressed(cx)), (names(&["Extrude 1", "Extrude 3"]), Vec::new()), "(suppressed after the menu, after one Ctrl+Z)")
         } },
         Row { id: "double-click / the dialog right of the list, 220 px wide", live: "Extrude 1's dialog at (246, 79) 220 x 352, right of the list (live2 featurelist-feel 3)", gap: false, check: |l, cx| {
             l.double_click(cx, "feature:Extrude 1");
