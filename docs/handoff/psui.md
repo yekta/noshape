@@ -98,67 +98,36 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Landed 11-17 09:54: 498b96a8 (leak fixes + NOSHAPE_SOAK + spawn_guard allow).
 - The Mac's one build slot can hold a test 10+ min: for a quick single test use NOSHAPE_RB_HOST=vibex6.
 
-## P0 now: USER-HOVER-STAYS-LIT (TICKETS 3022a352f; lead 11-17 22:2x)
+## State 11-18 00:2x (lead's P0 queue after compaction)
 
-The user's bug, still in green 592b0fc9. qa's flow (vibex6, load ~25, software GL, real xdotool moves, a shot 700 ms
-after each rest; script /root/qa-scratch/uh/uh2.sh, my copy ~/agents/psui-keep/hover/uh2.sh on :664 with extra
-shots 3 s after each rest; sheet /root/qa-scratch/tickets/hover-x-sheet.png): the hover shows what was under the
-pointer somewhere along its path, not where it rests. The off point (window 873, 740) is empty background, yet the
-loop or the Right plane lights; resting on the bottom line lights the Front plane; going back to a line lights
-nothing.
-- Lead's fix (mine, the viewport): latest wins. Tag each pick with the pointer position / a generation, drop a
-  result for a position that isn't the current one, and when a pick finishes after the pointer moved, pick again at
-  once at the current position; empty background clears the hover. Code: app-core viewport.rs `request_hover`,
-  `on_pick` (PickPurpose::Hover), the fast-move pause (`paused_hover`, `prehighlight_delay`), `pick_at` against
-  `pick_cache` (a rect around an older position), `set_hover` (emits only on an id change).
-- Feel scenario: fast moves region → empty, line → plane area → line, with the pick slowed (a sleep in the pick /
-  frames delivered late), asserting only the hover at rest. A harness test without the delay passes (mine and
-  skasm's a_quick_sweep_off_a_line_leaves_nothing_lit), so the delay is what has to be simulated.
-- skasm (18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6): sketch_hover_id re-resolves from vp.pointer_position() on every
-  PointerMove and re-tests a region id under the pointer (their next batch). Plane / non-sketch ids pass through as
-  the GPU gave them, so a stale plane pick is the viewport's. The glyph rows' linger is mine.
-- Measured (vibex6, load 26–37): every 3 s shot is right; a frame takes 350–450 ms to the screen, a hover pick
-  250–390 ms. The 0.7 s shots show hovers from along the path.
-- Done (landed 5e498ffb 23:13): viewport `pick_layout_epoch` (a hover's own redraw doesn't void a hover pick asked before it;
-  the camera, size, geometry or filter do), a hover result applied where the pointer is now, and a new pick asked as
-  soon as the pointer leaves the in-flight pick's rectangle (the render thread batches them). GPU test
-  sketch_hover::the_first_pick_at_rest_lights_what_is_under_the_pointer (the GPU answers only at rest).
-- Next, the same class (lead 22:4x): qa's selection-feel run (TICKETS 208ca8549, vibex6 ~/agents/qa-keep/sel-feel/,
-  re-run qa-scratch/sf/mini.sh): a Part 2 row click selects but Part 2 isn't drawn selected, and Part 1 keeps a stale
-  hover outline from the pointer crossing its row. skasm has the list / double-click rows of that run.
-- SELFEEL-PART-ROW: GPUI test feel::a_part_row_clicked_after_passing_another_leaves_no_stale_hover (Part 1 row →
-  Part 2 row → click, real GPUI events) passes on main: Part 2 lit and selected, Part 1 not. qa's state had Part 2
-  selected while the shot showed Part 1's outline: the frame on screen trails the state at load ~24 (350–450 ms per
-  frame). Re-check on a release build in a quiet window before changing anything.
-- Then: re-run qa's flow (~/agents/psui-keep/hover/uh2.sh, 0.7 s and 3 s shots) on the first green with 5e498ffb
-  (qa asked to do the same with 1.5 s / 3 s shots).
-- Also landed 23:20 (f03552c2): feel::a_part_row_clicked_after_passing_another_leaves_no_stale_hover,
-  feel::a_dialogs_active_box_filters_what_lights (live feature-dialogs-1117: Extrude edge → face, Fillet / Chamfer
-  vertex → edge, Boolean face → part, plane spot nothing), dialogs matrix 23 / 23 (empty click, Radius focused + edge
-  click, Boolean Subtract no auto-advance).
-- Queued 23:2x (6f9f391f): below 20 fps a view change jumps (`navigation::view_change_duration`, live nav-1117);
-  wheel / Ctrl+wheel / pinch already live's (matrix rows).
-- Red main at 22:06 (sketch_glyph tests, also CI on 592b0fc9 21:22) predates f2348fa9 (22:12: linger on the app's
-  clock, tests on the test clock); 3 / 3 green on vibex6 with 2 threads.
-- Left from live's feature-dialogs-1117: list-row hover timing (121–181 ms, ours not measured).
-- 23:26 queued with this handoff: graphics part menus' "Where used for Part 1…" in its own group after Export… (live
-  ctx-menus-1117; test where_used_for_the_part_has_its_own_group_after_export). The Parts list row already has
-  "Where used…"; the Top plane row already has "Section view…" (live's row also lists Rename, Offset plane…, Add
-  comment, Show dependencies…: not compared row by row yet, do it next with menus-a.json "row-top-plane").
+- USER-HOVER-STAYS-LIT: latest-wins (5e498ffb) verified by qa on green 7187ac75 (uh3 ×3, 0.7 / 1.5 / 3 s shots: every
+  1.5 / 3 s shot right, one 0.7 s shot trailed; qa-scratch/uh/g5e/lit.txt). Closed on my side.
+- the_first_pick_at_rest… flaked under load (skasm): it now waits for the GPU's answer with the test clock held
+  (landed c5959e26; 4 / 4 on vibex6 at load 24–36).
+- Landed 0f7610c8 (23:51): below 20 fps a view jumps, "Where used for Part 1…" own group, handoff.
+- Queued 2234f511 (00:2x): feature list as live2 featurelist-feel + qa's 3 P2s (rollback bar: stays over Default
+  geometry rows, blue-grey only while rolled back, menu "Roll to end"); rename commits on any press outside; face + edge
+  graphics menu = live ctx-menus-1117; list matrix 76 / 76 (new rows: bar held / released / above first / menu,
+  refused reorder red, rename Enter / click / F2, renamed tooltip, suppress / Unsuppress, dialog place, undo steps
+  (rename, Hide; selection and Shift+5 none), Cmd+click on parts); sketch_ui_tests graphics_menus_over_a_selection_as_live.
+- Asked live2 (00:0x): the bar released over the collapsed Default geometry header (10-24 capture said: to the top; ours
+  still does that for the header); confirm the blue-grey with the pointer away.
+- Main RED 23:53 on asm's a_mate_glyph_wins… (assembly_feel_tests.rs:233, click → selected_mate None). It failed on
+  core's land and mine before; no commit since the last green touches assembly-ui or app-core; passes 3 / 3 on the
+  Mac. A load flake for asm (its settle() exits on hover_settled; the click may beat the overlay hover).
+- Already live's (no change): undo / redo keys (app-core actions tests), Ctrl+Z in a dialog field
+  (undo_does_nothing_while_a_dialog_control_has_the_keyboard), wheel 2^(1/12) = ×1.0595 a notch about the pointer,
+  500 / 250 / 125 ms animations, part rows toggle on Ctrl or Cmd; live2's (b) Ctrl-only box deselect (ours Ctrl or
+  Cmd; live's Cmd unverified): left.
 
-## Next queue (lead 23:2x)
-1. Re-run qa's hover flow on the first green with 5e498ffb (uh2.sh, 0.7 / 3 s shots); qa reruns too.
-2. SELFEEL-PART-ROW stale outline: test passes on main; re-check on a release build in a quiet window (qa's state had
-   Part 2 selected: screen lag at load).
-3. Graphics / row menus against live2's ctx-menus-1117 (menus-a.json, menus-sk.json): the Top plane row in full,
-   then every context in the dump; open times rows 66–95 ms, graphics 150–270 ms.
-4. live2's feature-list feel (behaviours "psui (11-17, interaction feel): feature list: rollback bar drags, refused
-   reorder, edit dialog place, rename keys, suppress", live/psui/featurelist-feel/steps.json) against the list
-   matrix (list_feel_tests): rollback chip while held, rolled-back colours rgb(200,217,226) / end rgb(184,184,184),
-   Fillet dragged above its Extrude accepted then red + triangle, dialog at (246,79) 220×352, rename 178×24 all
-   selected (Enter / click commit, F2 nothing), renamed tooltip "Bar [Extrude] <- Sketch 1", suppress strike-through.
-5. Done tonight, for reference: nav gaps (below 20 fps a view jumps: 6f9f391f; wheel / Ctrl+wheel / pinch were live's),
-   dialogs matrix 23 / 23 + hover filter test (f03552c2).
+## Next queue
+1. live2's document-level rows still open: the regeneration spinner (from ~0.75 s a 50 × 50 box at the viewport's
+   bottom centre, blue arc pulsing 30 ↔ 42 px, until the display catches up; old model drawn, rows grey italic);
+   the tab-switch order is studios'.
+2. Graphics / row menus vs ctx-menus-1117 menus-a.json, case by case (row-top-plane, row-part, edge, vertex, empty,
+   plane-top-graphics, sketch2-line) and menus-sk.json (sketch mode, skasm's tools); open times are faster than live.
+3. SELFEEL-PART-ROW: qa re-checks in the quiet window.
+4. Rollback bar colour has no matrix row (a colour readout of the bar's 7 px strip would do).
 
 ## Current order (lead 11-17 ~14:05)
 
