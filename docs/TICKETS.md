@@ -6,12 +6,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## qa, 2026-11-18 (heavy-model feel prep)
-- [ ] **P1 (decision needed: P0?) HEAVY-ASM-SOFTWARE-FRAME (psui / render)**: asm-xdev-subs (asm's saved rebuild, 266 occurrences),
+- [ ] **P0 HEAVY-ASM-SOFTWARE-FRAME (asm leads: assembly load / instancing / LOD; psui joins on the renderer after the tab-return P0; lead 11:45)**: asm-xdev-subs (asm's saved rebuild, 266 occurrences),
   ours on this host's Xvfb with llvmpipe, release build of 80a64725, 1920x1080, vs live on SwiftShader on the same host (live 11-18
   heavy-1118): one wheel-zoom notch shows on screen after **42.5 s and 68 s** (live 3.4 s screen, 3.1 s page); the app logs "GPU frame
   still running after 10s" on every view change; a 2 s orbit shows 0-1 screen frames (live ~0.4 fps). The tab click -> assembly drawn
   took 43-200 s and the app stays busy ~5 min (11 min CPU) before going idle; the frame log's presents (UI) don't show the 3D view's lag.
   Load 8-25 (live's Chrome runs alongside). Data qa-scratch/heavy (x1, p1, p2; perf1 with NOSHAPE_PERF=1 follows).
+  **Timing heavy scenes: NOSHAPE_FRAME_LOG's "present" lines are the window's (UI) frames, not the 3D view's**: here they showed 2 fps
+  / 513 ms frames while the screen's graphics didn't change for 40-70 s (the viewport frame is read back later). Time heavy scenes on
+  the screen (crop diffs), as live does.
 - [ ] **P1 DRIVEN-PATTERN-SWEEP (core)**: c2-loft-guide-curves-driven-pattern's last feature Sweep 1 fails on ours ("Could not create
   valid swept body, check input."; green 80a64725's release build and v0.4.57 alike), live makes it OK (125 bodies after it, ours 124:
   122 surfaces + 2 curves). It is live's heavy-model feel reference (live 11-18), so the feel rows compare 124 vs 125 bodies.
