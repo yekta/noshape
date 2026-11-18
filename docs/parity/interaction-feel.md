@@ -342,7 +342,7 @@ device pixel ratio of 1 and 2: part-studio-ui `list::the_feature_list_matrix_mat
 canvas click is the viewport's empty pick). Like the snaps matrix it prints matched / total and fails when a row's
 status moves. `LIST_ROW=<part of an id>` runs some rows.
 
-**Matched: 76 / 76** (11-18 00:20 UTC, live2 featurelist-feel / doc-level-1117 rows added; 57 / 57 11-13 15:51 UTC; 20 / 42 at the first run; 3 folder rows added 15:51: 1 / 3 matched, 2 fixed). ui-parity: the 78 list and tooltip scenarios 75 / 78 before the last fixes, the 3 left on green too or fixed since (feature-row-drag-above).
+**Matched: 78 / 78** (11-18 00:40 UTC, live2 featurelist-feel / doc-level-1117 rows added; 57 / 57 11-13 15:51 UTC; 20 / 42 at the first run; 3 folder rows added 15:51: 1 / 3 matched, 2 fixed). ui-parity: the 78 list and tooltip scenarios 75 / 78 before the last fixes, the 3 left on green too or fixed since (feature-row-drag-above).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -378,7 +378,7 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | Suppress / Unsuppress from the menu | grey italic struck through, the part gone; Unsuppress restores it | the same | = (new) |
 | Edit dialog place | Extrude 1's dialog right of the list, 220 px wide (live (246, 79) 220 × 352; qa 11-18: ours (246, 80)) | the same | = (new) |
 | Undo steps (live2 doc-level-1117) | a rename and a part's Hide are one step each, with no toast; a selection and Shift+5 are none; Ctrl+Y redoes, Ctrl+Shift+Z doesn't (app-core `actions` tests); Ctrl+Z in a dialog's field does nothing (`undo_does_nothing_while_a_dialog_control_has_the_keyboard`) | the same | = (new) |
-| Graphics menu over a selection (live ctx-menus-1117) | the face clicked selected: Clear selection above Select; two faces: "Add appearance to 2 faces…", no New sketch… / Offset plane… / Extrude… / Revolve… / Export as DXF/DWG…; a face and an edge: the faces' menu without View normal to, Delete Part 1…, the part's material and appearance rows, Fillet… / Chamfer… or analysis | the same (sketch_ui_tests `graphics_menus_over_a_selection_as_live`; a face + an edge gave the edge's menu) | = (fixed) |
+| Graphics menu over a selection (live ctx-menus-1117) | the face clicked selected: Clear selection above Select; two faces: "Add appearance to 2 faces…", no New sketch… / Offset plane… / Extrude… / Revolve… / Export as DXF/DWG…; a face and an edge: the faces' menu without View normal to, Delete Part 1…, the part's material and appearance rows, Fillet… / Chamfer… or analysis ; a face with Part 1's row selected: no New sketch… … Revolve…, no Export as DXF/DWG…; a vertex: no Section view…, Zoom to selection; the Top plane and Origin rows | the same (sketch_ui_tests `graphics_menus_over_a_selection_as_live`, list matrix rows; a face + an edge gave the edge's menu, a face with the part selected its creation rows) | = (fixed) |
 | Parts list: Cmd+click | toggles like Ctrl (metaKey or ctrlKey on every OS) | the same | = (new) |
 | Hover: the row tooltip | "Extrude 1 <- Sketch 1"; fades in from 160 ms, full by 390 | the text as before; shown at 160 ms with a 230 ms fade (was GPUI's 500 ms, no fade: `ui::ROW_TIP_DELAY`) | = (fixed) |
 | Hover: the geometry | lit 100 ms after the pointer arrives, cleared 100 ms after it leaves; a sweep lights only where it rests | the same (`LIST_HOVER_DEBOUNCE`; was at once) | = (fixed) |

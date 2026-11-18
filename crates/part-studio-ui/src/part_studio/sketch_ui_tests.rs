@@ -3382,6 +3382,14 @@ fn graphics_menus_over_a_selection_as_live(cx: &mut TestAppContext) {
     assert_eq!(two, live(&format!("Edit Extrude 1… · Edit Sketch 1… · Show dimensions · Show dependencies of Extrude 1… · Hide Part 1 · Isolate… · Make transparent… · Section view… · {tail} · View normal to · Delete Part 1… · Delete Extrude 1 · Assign material for Part 1… · Edit appearance for Part 1… · Add appearance to 2 faces…")), "two faces");
     let mixed = menu(cx, vec![top.clone(), edge.clone()], edge, noshape_scene::builder::PickKind::Edge);
     assert_eq!(mixed, live(&format!("Edit Extrude 1… · Edit Sketch 1… · Show dimensions · Show dependencies of Extrude 1… · Hide Part 1 · Isolate… · Make transparent… · Section view… · {tail} · Delete Extrude 1 · Add appearance to face…")), "a face and an edge");
+    // part-selected-graphics: Part 1's row selected, its top face right-clicked: no creation tools, no DXF.
+    let body = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone()))).expect("the part");
+    let part = menu(cx, vec![body], top.clone(), noshape_scene::builder::PickKind::Face);
+    assert_eq!(part, live(&format!("Edit Extrude 1… · Edit Sketch 1… · Show dimensions · Show dependencies of Extrude 1… · Hide Part 1 · Isolate… · Make transparent… · Section view… · {tail} · View normal to · Delete Part 1… · Delete Extrude 1 · Assign material for Part 1… · Edit appearance for Part 1… · Add appearance to face…")), "a face with the part selected");
+    // vertex: nothing selected.
+    let vertex = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).and_then(|b| b.vertex_refs.first().cloned())).expect("a vertex");
+    let corner = menu(cx, vec![], vertex, noshape_scene::builder::PickKind::Vertex);
+    assert_eq!(corner, live("Edit Extrude 1… · Edit Sketch 1… · Show dimensions · Show dependencies of Extrude 1… · Hide Part 1 · Isolate… · Make transparent… · Copy Part 1 · Create Drawing of Part 1… · Export… · Where used for Part 1… · Select · Select other… · Zoom to fit · Delete Part 1… · Delete Extrude 1 · Assign material for Part 1… · Edit appearance for Part 1…"), "a vertex");
 }
 
 /// IN-FEATURE-MATE-CONNECTOR (live 1851): with "Sketch points to place holes"' mate connector button on, a face

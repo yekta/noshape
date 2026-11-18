@@ -433,6 +433,14 @@ fn rows() -> Vec<Row> {
             l.right_click(cx, "part:Part 2");
             expect(l.menu(cx), names(&["Properties…", "Assign material for 2 parts…", "Edit appearance for 2 parts…", "Check interference for 2 parts…", "Boolean", "Copy 2 items", "Hide", "Hide other parts", "Hide all parts", "Isolate…", "Make transparent…", "Export…", "Delete"]), "rows")
         } },
+        Row { id: "menu / the Top plane row", live: "Rename | New sketch… | Offset plane… | Size to Part Studio | Hide | Hide other planes | Hide all planes | Section view… | Zoom to selection | View normal to | Show dependencies… (Add comment: cloud; live ctx-menus-1117 row-top-plane)", gap: false, check: |l, cx| {
+            l.right_click(cx, "feature:Top");
+            expect(l.menu(cx), names(&["Rename", "New sketch…", "Offset plane…", "Size to Part Studio", "Hide", "Hide other planes", "Hide all planes", "Section view…", "Zoom to selection", "View normal to", "Show dependencies…"]), "rows")
+        } },
+        Row { id: "menu / the Origin row", live: "Rename | Hide | Show dependencies… (live ctx-menus-1117 row-origin)", gap: false, check: |l, cx| {
+            l.right_click(cx, "feature:Origin");
+            expect(l.menu(cx), names(&["Rename", "Hide", "Show dependencies…"]), "rows")
+        } },
         Row { id: "menu / the rollback bar", live: "no menu", gap: false, check: |l, cx| {
             let at = l.bounds(cx, "rollback").ok_or("no rollback bar")?.center();
             l.press(cx, at, MouseButton::Right, NONE, 1);

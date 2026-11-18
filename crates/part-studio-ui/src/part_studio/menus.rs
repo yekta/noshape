@@ -110,6 +110,9 @@ impl PartStudioView {
             && self.selection.iter().any(|r| matches!(r, Reference::Edge(_) | Reference::Vertex(_)));
         let kind = if mixed && matches!(kind, Some(PickKind::Edge | PickKind::Vertex)) { Some(PickKind::Face) } else { kind };
         let (planar, linear_edge) = (planar && !mixed, linear_edge && !mixed);
+        // A face's own rows (New sketch… … Revolve…, Export as DXF/DWG…) only while nothing else is selected (live
+        // ctx-menus-1117 part-selected-graphics: Part 1's row selected, its face right-clicked, has neither).
+        let lone = self.selection.iter().all(|r| Some(r) == target_ref.as_ref());
         let plane_name = target_ref.as_ref().map(|r| self.labeler(cx)(r)).unwrap_or_default();
         let paste_sketch = Self::clipboard_has_sketch(cx);
         // Shown sketches besides the clicked one's (sketch region menus).
@@ -479,7 +482,7 @@ impl PartStudioView {
                             .separator();
                     }
                     // Creation tools for this entity.
-                    if k == PickKind::Face && planar && faces.len() <= 1 {
+                    if k == PickKind::Face && planar && faces.len() <= 1 && lone {
                         m = m
                             .item(tool("New sketch…", "sketch", "sketch", &r))
                             .item(tool("Offset plane…", "plane", "cPlane", &r))
@@ -574,7 +577,7 @@ impl PartStudioView {
                                 let source = Some(noshape_model::drawing::create::DrawingSource { tab: this.tab, part: Some(b7.clone()), config: Default::default(), sketch: None, flat: false });
                                 crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { external: None, source, name: Some(name.clone()) }, w, cx);
                             })));
-                        if k == PickKind::Face && planar && faces.len() <= 1 {
+                        if k == PickKind::Face && planar && faces.len() <= 1 && lone {
                             let rf = r.clone();
                             m = m.item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| this.open_cad_export(super::flat_export::CadSource::Face(rf.clone()), w, cx))));
                         }
