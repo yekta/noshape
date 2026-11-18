@@ -599,7 +599,7 @@ fn rows() -> Vec<Row> {
             let at = l.canvas(cx);
             l.press(cx, at, MouseButton::Left, NONE, 1);
             // The rename regenerates the studio before the list shows it (a loaded host: not within the press).
-            wait_until(cx, l.window, |cx| l.view.read(cx).display.bodies.iter().any(|b| b.name == "Bar"));
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy() && l.view.read(cx).display.bodies.iter().any(|b| b.name == "Bar"));
             let parts = cx.update(|cx| l.view.read(cx).display.bodies.iter().map(|b| b.name.clone()).collect::<Vec<_>>());
             expect((cx.update(|cx| l.view.read(cx).ui.part_renaming.is_some()), parts), (false, names(&["Part 1", "Bar", "Part 3"])), "(still renaming, names)")
         } },
@@ -1196,7 +1196,7 @@ fn the_feature_list_matrix_matches_live(cx: &mut TestAppContext) {
         let ok = why.is_empty();
         report.push(format!("{} {} (live: {}){}", if ok { "=" } else { "≠" }, r.id, r.live, if ok { String::new() } else { format!("\n    {}", why.join("\n    ")) }));
         if ok == r.gap {
-            moved.push(r.id);
+            moved.push(format!("{}{}", r.id, if ok { String::new() } else { format!(": {}", why.join("; ")) }));
         }
     }
     let matched = report.iter().filter(|l| l.starts_with('=')).count();
