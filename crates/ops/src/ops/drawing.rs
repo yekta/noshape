@@ -723,6 +723,11 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
 }
 
 pub(super) fn reply(od: &mut OpenDoc, tab: TabId, sheet: usize, edges: bool) -> Result<Value, OpError> {
+    reply_and_model(od, tab, sheet, edges).map(|(v, _)| v)
+}
+
+/// [`reply`] and the sheet model it was read from.
+fn reply_and_model(od: &mut OpenDoc, tab: TabId, sheet: usize, edges: bool) -> Result<(Value, SheetModel), OpError> {
     let d = dr::drawing_of(od.doc(), tab).cloned().ok_or_else(|| OpError::not_found("the drawing tab is gone"))?;
     let m = SheetModel::build(od, tab, d.clone(), sheet, &[]);
     let mut v = sheet_json(&m, edges);
@@ -730,7 +735,7 @@ pub(super) fn reply(od: &mut OpenDoc, tab: TabId, sheet: usize, edges: bool) -> 
     v["tab"] = json!(tab.to_string());
     v["sheets"] = json!(d.sheets.iter().map(|s| s.name.clone()).collect::<Vec<_>>());
     v["out_of_date"] = json!(m.out_of_date);
-    Ok(v)
+    Ok((v, m))
 }
 
 // ------------------------------------------------------------ handlers
@@ -1096,10 +1101,9 @@ fn dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut d = d;
     d.sheets[sheet].annotations.extend(anns);
     commit(od, tab, sheet, d, kind.name())?;
-    let mut out = reply(od, tab, sheet, false)?;
+    let (mut out, m) = reply_and_model(od, tab, sheet, false)?;
     out["annotation"] = json!(id);
     // The value as the sheet shows it.
-    let m = SheetModel::build(od, tab, dr::drawing_of(od.doc(), tab).cloned().expect("drawing"), sheet, &[]);
     if let Some(b) = &m.built {
         let texts: Vec<String> = b.geometry.texts.iter().filter(|t| matches!(b.picks.get(t.pick as usize), Some(noshape_model::drawing::build::PickTarget::Annotation(x)) if *x == id)).map(|t| t.text.clone()).collect();
         out["text"] = json!(texts.join(" "));

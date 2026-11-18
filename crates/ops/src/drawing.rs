@@ -75,16 +75,33 @@ pub fn old_state(session: &crate::session::Session, drawing: &Drawing) -> Option
     if head == mv {
         return None;
     }
+    let referenced = views::referenced_sources(drawing);
+    // Stored states never change: each pair is compared once (an agent op asks on every build and commit; reading
+    // both states of a 1000-part document takes 60 ms).
+    let memo = (mv, head, referenced.clone());
+    if let Some(known) = OLD_STATES.lock().get(&memo) {
+        return known.as_ref().map(|(d, k)| ((**d).clone(), k.clone()));
+    }
     // Both states as stored, so a document never written back from memory
     // (a new or imported one) compares like with like.
     let old = Document::from_blobs(&session.store.read_all(mv).ok()?).ok()?;
     let current = Document::from_blobs(&session.store.read_all(head).ok()?).ok()?;
-    let keys: Vec<SourceKey> = views::referenced_sources(drawing)
+    let keys: Vec<SourceKey> = referenced
         .into_iter()
         .filter(|k| k.version.is_none() && old.tab(k.tab).is_some() && views::source_hash(&old, k).is_some_and(|h| views::source_hash(&current, k) != Some(h)))
         .collect();
-    (!keys.is_empty()).then_some((old, keys))
+    let found = (!keys.is_empty()).then_some((old, keys));
+    let mut known = OLD_STATES.lock();
+    if known.len() > 16 {
+        known.clear();
+    }
+    known.insert(memo, found.as_ref().map(|(d, k)| (Arc::new(d.clone()), k.clone())));
+    found
 }
+
+/// [`old_state`]'s answers by (the drawing's state, the document's head, the sources it shows).
+type OldStates = HashMap<(noshape_store::MicroversionId, noshape_store::MicroversionId, Vec<SourceKey>), Option<(Arc<Document>, Vec<SourceKey>)>>;
+static OLD_STATES: std::sync::LazyLock<parking_lot::Mutex<OldStates>> = std::sync::LazyLock::new(Default::default);
 
 /// Before a drawing edit is committed: up-to-date views were made from the
 /// current document state (an out-of-date drawing keeps its `sources_at`).
@@ -177,6 +194,13 @@ impl SheetModel {
 /// the source Part Studios and projects every view on each call.
 static SOURCES: std::sync::LazyLock<parking_lot::Mutex<HashMap<(SourceKey, u64), views::SourceModel>>> = std::sync::LazyLock::new(Default::default);
 static VIEWS: std::sync::LazyLock<parking_lot::Mutex<(usize, Arc<ViewCache>)>> = std::sync::LazyLock::new(|| parking_lot::Mutex::new((0, Arc::new(ViewCache::new()))));
+
+/// Empty the drawing sources, view geometry and out-of-date answers kept between calls (a cold start's timing: dx_perf).
+pub fn drop_cached_views() {
+    SOURCES.lock().clear();
+    OLD_STATES.lock().clear();
+    *VIEWS.lock() = (0, Arc::new(ViewCache::new()));
+}
 
 /// The shared view cache (started afresh every 200 uses, to bound it).
 pub(crate) fn view_cache() -> Arc<ViewCache> {

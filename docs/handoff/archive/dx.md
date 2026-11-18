@@ -3506,3 +3506,16 @@ Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live i
    geometry on asm-partorigin (Thicken then makes 11 tiny parts: sent to core).
 5b. asm-isaac-ball 8f5622 GearLab: landed bc58c02b; gear teeth caps (core, 15:0x) and its fuses' time (bool) sent;
    detail in the archive.
+
+## 11-17 evening / 11-18 night (moved 11-18 07:2x)
+- Landed (vibex7 queue, before its move): 41f2a2da9 t_work after a recovered fault (the mesher crash: ASan
+  stack-buffer-overflow in work_step under mesh_prepare; the crash guard's longjmp skipped ScopedWork's destructor),
+  5015b2e95 / 40a03567d / 8cf411708 x_t mesh export 28.1+ (MESH + .xmm_txt, "minimum version 2801000", <28.1 refused),
+  PART_XMT_BLOCK per version (live2: ours at 25.0 / 28.1 / 30.0 / 38.1 import as live's own).
+- Landed 11-17 23:13 (18150e9a): 6151d88cd suite (IGES/ACIS drop mesh parts), 2 mrad ACIS guard,
+  LIVE_MESH_SHEETS + PARITY-SUITES note, suite part renames, Parasolid import B-surface -> analytic (cone as live;
+  only surfaces just faces / intersections use). Proof: exchange suite A/B on vibex6 (A = main + t_work/x_t, B = the
+  stack; logs vibex6 ~/agents/dx-keep/exch-{mainA,fix2}.log, /root/dx-scratch/bin/exdiff.py): ours imports live's
+  109 -> 114/130, ours reads ours 148/154 both; only bottle-split / duct-multipart mesh rows, hex-bookcase IGES/SAT
+  and hose 0.524m SAT (12/12/0 as live) differ; 0 crashes in 4 full-suite runs and 3 first-six reruns. A first B
+  had cf-snap-hook x_t reading back as no parts (offset surface over a converted base): fixed (cbe833343).

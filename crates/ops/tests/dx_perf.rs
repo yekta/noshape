@@ -57,7 +57,8 @@ fn feature(ctx: &mut Ctx, ty: &str, params: Value) -> String {
 
 /// The qa5 bracket (docs/parity/workflow-bracket.md; live "qa5 bracket"),
 /// as qa5's mkbracket.py builds it: 67191.3275 mm³.
-fn bracket(ctx: &mut Ctx, path: &str) {
+/// Returns Fillet 1's id.
+fn bracket(ctx: &mut Ctx, path: &str) -> String {
     call(ctx, "document_create", json!({ "path": path }));
     let s = sketch(ctx, "plane:top", &[("corner_rectangle", json!([[0, 0], [80, 50]]))]);
     let r = regions(ctx, &s);
@@ -71,7 +72,7 @@ fn bracket(ctx: &mut Ctx, path: &str) {
     feature(ctx, "extrude", json!({ "entities": r, "operationType": "REMOVE", "endBound": "THROUGH_ALL", "oppositeDirection": false }));
     let mut f = edges_at(ctx, [0.0, 50.0, 4.0]);
     f.extend(edges_at(ctx, [80.0, 50.0, 4.0]));
-    feature(ctx, "fillet", json!({ "entities": f, "radius": "5 mm" }));
+    let fillet = feature(ctx, "fillet", json!({ "entities": f, "radius": "5 mm" }));
     let c = edges_at(ctx, [40.0, 0.0, 60.0]);
     feature(ctx, "chamfer", json!({ "entities": c, "width": "1 mm" }));
     let s = sketch(ctx, "plane:front", &[("circle", json!([[15, 45], [18, 45]]))]);
@@ -94,6 +95,7 @@ fn bracket(ctx: &mut Ctx, path: &str) {
     let parts = call(ctx, "query_parts", json!({}));
     let v = parts["parts"][0]["volume"].as_f64().unwrap();
     assert!((v - 67191.3275).abs() < 1e-3, "the bracket: {v} mm³ (live 67191.3275)");
+    fillet
 }
 
 /// PLAN 2.7 dx: Create drawing of the bracket with its standard views
@@ -101,28 +103,64 @@ fn bracket(ctx: &mut Ctx, path: &str) {
 /// dialog's OK to every view computed (`drawing_create` builds the sheet:
 /// hidden-line views, tangent edges, projections). The Part Studio is
 /// already regenerated, as when the user right-clicks its tab.
+/// Then, as live's "speed: drawings" (studios 2605): a Fillet 1 change and the drawing's Update (live 16.9 s), and
+/// the document reopened with its drawing's views computed (live: a drawing tab 3.2–3.7 s on a revisit, 23 s first).
+/// `NOSHAPE_PERF_KEEP=<file>` keeps the document (its drawing tab active) for the app's open time.
 #[test]
 #[ignore]
 fn timed_bracket_drawing_four_views() {
     let dir = std::env::temp_dir().join(format!("noshape-dx-perf-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let mut ctx = Ctx::new();
-    bracket(&mut ctx, dir.join("bracket.noshape").to_str().unwrap());
-    let mut runs = Vec::new();
-    let mut one = Vec::new();
+    let path = dir.join("bracket.noshape");
+    let fillet = bracket(&mut ctx, path.to_str().unwrap());
+    // Each run on a model not drawn before (Fillet 1 5.1, 5.2… mm) with the kept sources and views emptied: nothing
+    // is a cache hit.
+    let mut radius = 5.0;
+    let mut fresh = |ctx: &mut Ctx| {
+        radius += 0.1;
+        call(ctx, "feature_edit", json!({ "tab": "Part Studio 1", "feature": fillet, "params": { "radius": format!("{radius:.1} mm") } }));
+        noshape_ops::drawing::drop_cached_views();
+    };
+    let (mut runs, mut one, mut update) = (Vec::new(), Vec::new(), Vec::new());
+    let mut drawing = String::new();
     for _ in 0..5 {
+        fresh(&mut ctx);
         let t = Instant::now();
         let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ANSI_A_INCH.dwt", "suggested_views": true }));
         runs.push(t.elapsed().as_secs_f64() * 1000.0);
         let views = d["views"].as_array().map(|v| v.len()).unwrap_or(0);
         assert_eq!(views, 4, "{d}");
-        let drawing = d["drawing"].as_str().unwrap().to_string();
+        drawing = d["drawing"].as_str().unwrap().to_string();
         let t = Instant::now();
-        call(&mut ctx, "drawing_insert_view", json!({ "drawing": drawing, "source": "Part Studio 1", "orientation": "front", "position": [60, 60] }));
+        call(&mut ctx, "drawing_insert_view", json!({ "drawing": drawing, "source": "Part Studio 1", "orientation": "bottom", "position": [60, 60] }));
         one.push(t.elapsed().as_secs_f64() * 1000.0);
+        fresh(&mut ctx);
+        let t = Instant::now();
+        call(&mut ctx, "drawing_update", json!({ "drawing": drawing }));
+        let g = call(&mut ctx, "drawing_get", json!({ "drawing": drawing, "edges": false }));
+        update.push(t.elapsed().as_secs_f64() * 1000.0);
+        assert_eq!(g["views"].as_array().map_or(0, |v| v.len()), 5, "{g}");
     }
     report("bracket drawing, 4 standard views", runs);
-    report("bracket drawing, insert one Front view", one);
+    report("bracket drawing, insert one Bottom view", one);
+    report("bracket drawing, Update after a Fillet 1 change (views redrawn)", update);
+    call(&mut ctx, "tab_activate", json!({ "tab": drawing }));
+    drop(ctx);
+    let mut open = Vec::new();
+    for _ in 0..5 {
+        noshape_ops::drawing::drop_cached_views();
+        let mut ctx = Ctx::new();
+        let t = Instant::now();
+        call(&mut ctx, "document_open", json!({ "path": path.to_str().unwrap() }));
+        let g = call(&mut ctx, "drawing_get", json!({ "drawing": drawing, "edges": false }));
+        open.push(t.elapsed().as_secs_f64() * 1000.0);
+        assert_eq!(g["views"].as_array().map_or(0, |v| v.len()), 5, "{g}");
+    }
+    report("bracket drawing, document opened and the drawing's views computed", open);
+    if let Some(keep) = std::env::var_os("NOSHAPE_PERF_KEEP") {
+        std::fs::copy(&path, keep).unwrap();
+    }
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -498,3 +536,4 @@ export const big1755Parts = defineFeature(function(context is Context, id is Id,
         }
     });
 "#;
+

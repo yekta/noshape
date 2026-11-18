@@ -138,19 +138,25 @@ Open, ranked:
   a configured part). Run them alone once in, sort first differences to owners.
 
 ## Next, in order
-1. x1117c (vibex6 04:46, main + 59c0be35 + 9a19e358): ours imports live's 59/75, live imports ours 46/48, ours reads
-   ours 114/119, DXF 0/4, times 49/50. Queued abb5303e (lead 11-17 decision 1): an import row passes when ours splits
-   no more than live's own import of the file (counts between the model's and live's, volume / area as live's import
-   is held; PARITY-SUITES.md): rings-loft live.igs now passes (ours 275, live's own 279/787/524 with its ring 565.6 mm³
-   for 440.8, model 273). Waiting on live2's own SAT imports (REQUESTS 01:47): rings-loft / sm-louver live.sat.
-   Parked (lead 11-17 decision 2, "not now"): rings-loft live.step's revolved ring reads 1450.036 mm² for the model's
-   1449.943 (band +-0.044): live.step has no pcurves and its plane / extrusion edges are B-splines ~3 µm off the true
-   intersection (18 small planes 1.8157 mm² each for 1.8108); live's import gets the model's area, so it re-derives
-   them. Re-deriving such edges from their two faces on import would be a healing feature: wait for more cases.
-   extension-spring live.sat area +0.016 % (ACIS procedural approximations); hose SAT.
-   Drawings: all four follow model differences (extension-spring Fillet 1 10/24/16 for live's 11/27/18: blend;
-   rings-loft walls) or live rules without evidence (housing-draft lug chords, hole rim: lead, wait for more docs).
-   View placement waits (lead).
+0. Speed vs live (lead 11-18 06:1x; release, vibex8, dx_perf, same run; live behaviours "speed: drawings", "dx speed:
+   drawing creation and NIST import", "dx (2026-11-02, P1 drawing speed on big models)"):
+   - bracket drawing, cold (no cached view): create 10 ms (live 30.1 s, server 3.0), insert view 7 ms (3.0 s),
+     Update after a Fillet 1 change 12 ms (16.9 s), reopen + views 11 ms (tab revisit 3.2 s).
+   - big: 2000-instance assembly views 2.95 s (19.7 s), BOM 0.34 s (13.1 s), dimension 540 -> 212 ms (0.8 s:
+     old_state memoized, the reply's sheet model reused), 1000-part studio views 1.3 s, Update 1.5 s, export PDF 0.43 /
+     DWG 0.16 / DXF 0.22 / PNG 1.05 s (7.2-18.3 s).
+   - imports: NIST STEP 4.15 / x_t 2.16 s (38.7 / 24.5 s); live big asm STEP 2.8 / x_t 1.7 / IGES 7.1 s (33.5 / 12.9 /
+     69.3 s); exchange suite 173/174 at or under live's.
+   - Open: c2-rings-loft live.x_t "import" 17 s (live 8.6): import_files 5.2 s (read 4.9 s: the blend tubes), then
+     query_parts 22 s: two rolling-ball blend tubes round an ellipse (xt_read.cpp tube(): 205 x 9 rational, periodic
+     both ways) take ~10 s each in face_moments' Green integral (STEP's 18 x 3 copy 0.8 s). Next: count its boundary
+     pieces / G calls, then integrate the inner along the shorter direction or cap pieces at pcurve knots.
+1. Exchange m5 (vibex8 06:0x): imports 114/130, live imports ours 46/48, ours reads ours 148/154, DXF 1/10 (duct).
+   DXF rows left follow model differences: faceblend full-round fillet edges B-spline in live (blend told 06:1x),
+   extension-spring Fillet 1 10/24/16 vs 11/27/18 (blend), rings-loft walls, hex mesh outline splits (live's breaks
+   follow its facets' normals noise: no rule), housing-draft lug chords, hole rim (lead: wait for more docs).
+   Parked (lead 11-17 decision 2): rings-loft live.step revolved ring area (+0.093 mm², edges ~3 um off); extension-
+   spring live.sat area +0.016 %.
 2. Queued 4dd4d7ef: MCP-QUOTED-VALUE (sketch dimension values sent in quotes). P1 PARITY-CUSTOM-RUN-FAILURES
    (custom features 105/121), 14 of the 16 in config-parts (wait for live's retake), and:
    - cf-surface-pattern Surface Pattern 3 129/386/259 for 131/387/258: the same 85 sphere dimples (Part 2, r 14.3 mm;
@@ -166,17 +172,6 @@ Open, ranked:
 6. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
 ## Since 19:50 (this thread)
-- Landed (vibex7 queue, before its move): 41f2a2da9 t_work after a recovered fault (the mesher crash: ASan
-  stack-buffer-overflow in work_step under mesh_prepare; the crash guard's longjmp skipped ScopedWork's destructor),
-  5015b2e95 / 40a03567d / 8cf411708 x_t mesh export 28.1+ (MESH + .xmm_txt, "minimum version 2801000", <28.1 refused),
-  PART_XMT_BLOCK per version (live2: ours at 25.0 / 28.1 / 30.0 / 38.1 import as live's own).
-- Landed 11-17 23:13 (18150e9a): 6151d88cd suite (IGES/ACIS drop mesh parts), 2 mrad ACIS guard,
-  LIVE_MESH_SHEETS + PARITY-SUITES note, suite part renames, Parasolid import B-surface -> analytic (cone as live;
-  only surfaces just faces / intersections use). Proof: exchange suite A/B on vibex6 (A = main + t_work/x_t, B = the
-  stack; logs vibex6 ~/agents/dx-keep/exch-{mainA,fix2}.log, /root/dx-scratch/bin/exdiff.py): ours imports live's
-  109 -> 114/130, ours reads ours 148/154 both; only bottle-split / duct-multipart mesh rows, hex-bookcase IGES/SAT
-  and hose 0.524m SAT (12/12/0 as live) differ; 0 crashes in 4 full-suite runs and 3 first-six reruns. A first B
-  had cf-snap-hook x_t reading back as no parts (offset surface over a converted base): fixed (cbe833343).
 - DXF rows (lead 23:0x), exchange suite drawings 0/10 (vibex6 exch-dxf / exch-fix2 logs, /root/dx-scratch/bin/
   dxflayercount.py, dxfanntext.py, dxfents.py, dxfsheet.py (two DXFs side by side), hlrplot.py / hlrgrid.py).
   Landed 5076e98c (view-label MTEXT, tangent-only circles, mesh crash; archive) and 12a38f9e (03:23):
@@ -195,8 +190,8 @@ Open, ranked:
   Lead 11-18: the suite takes each drawing's stored scale and view positions (place_as_live in parity.rs); the
   suggested-views rule is judged only by live's Create Drawing captures (clamp Part 3 1:1 = ours; live's Iso centre
   7.786-8.061 in varies by part, ours fixed 7.810: rule unknown). clamp-guillem now 271 / 268 LINE only. sm-louver ARC/CIRCLE now match.
-  Queued 05:32 as 1b62e831 (with 59d761674 no mark on a wholly hidden hole: hex CENTERMARKS gone, as live; c284709fa
-  suite views placed by their silhouette box centre, live2 iso-place-1118).
+  Landed 05:55 (7db466c6) with 59d761674 no mark on a wholly hidden hole: hex CENTERMARKS gone, as live; c284709fa
+  suite views placed by their silhouette box centre, live2 iso-place-1118); 943e05e14 landed 06:26 (8a74d626).
 - Export feel (live2 export-feel-1118, behaviours "dx (lead 11-18 ~02:38, feel)"): in a1bc5ce3: solid exports
   (Part Studio, part, assembly) show the "<file name> is being prepared…" bubble (~5 s; assembly's message fades at
   4 s) and the bell's "Export completed" / "<name> was exported successfully." (no extension); drawing Options
