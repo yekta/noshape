@@ -49,11 +49,11 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
   ~/tmp/asm/perf, probe /root/tmp/render.rs.main). Handed to psui 11-18 12:3x; assembly side doesn't scale it.
 - Triad grab-point fix re-QUEUED 3ab78c25 (worktree asm-triad; 05b77104 failed on a test-file conflict).
 - Suite pair main vs 28-commit stack (lead: land on the light 20 if none worse): ~/agents/asm-keep/pairlist.sh <tag>
-  <dirs>: vibe2 tag a (9: clamp … keyboard), vibex8 tag b (10: linear-limits … welding-config) -> pair/{mainbase,stack}
-  -<tag>.log, done-<tag>; bjr-config done (BOM 20->22/23). Heavy 4 (xdev, isaac, infento, scissor) tag c tonight 02:00
-  on vibe2 (night.sh).
-- suspension + scissor-lift refetched 11-18 14:11. scissor Top <3>: 4ce5c7 derives fed22d's RpJH, which fed22d's failing
-  fillets / holes / move faces never build: model side, lead asked (vibe2 ~/agents/asm-keep/trace-scissor.out).
+  <dirs>: vibe2 tag a (9: clamp … keyboard; 8 done, none worse, corexy 21->22 mates), vibex8 tag b (linear-limits …
+  robot-relations), vibe2 tag b2 (welding, tvc, suspension, robotic-arm; stop b on vibex8 before those) -> pair/
+  {mainbase,stack}-<tag>.log, done-<tag>; bjr done (BOM 20->22/23). Heavy 4 tag c 02:00 on vibe2 (night.sh). On the
+  stack after the pair's binary (UI / scorer only): 5ef547724 BOM scorer, ddf4bab7a Insert sort menus (live insert-sort-1118).
+  Insert from a release (▲ view, live i9–i10): live shows it on company-owned docs only; ours has none -> lead asked.
 - Thread ids (11-18 lead): core e8af89fe-d460-49b3-b0bb-9572da230fed, blend 0672fa20-964d-4fde-a19c-c5b4363729ba,
   qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b (old core 6692ae35 / blend 0e6e9942 stopped: never message them).
 - LANDED 11-18: asm-feel3 52c050e1, asm-views2 916b2d59, qa's save switch b2473af7, solver reorient d9fce0c0,
@@ -155,7 +155,7 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
    -> skasm taking it. bjr OPG006 Description: 5e35bf's "Wire clip 1" imports an FS missing from the corpus -> REQUESTS
    13:55. bjr grubs (UJ <2> 4 mm): live's 103_06_ASM flexible inside each flexible UJ (per-copy angles); ours keeps a sub
    holding a flexible sub rigid (eval.rs prepare_subassembly), `nested` one level -> nested flexible = work item (lead).
-   robot-relations ×6: 6 sheets vs our solid, as ruled (11-17). scissor Top <3>: fed22d model side (lead). isaac
+   robot-relations ×6: 6 sheets vs our solid, as ruled (11-17). scissor Top <3>: fed22d model side (lead; vibe2 asm-keep/trace-scissor.out). isaac
    Helical: GearLabFeature unregistered -> FS owner. infento Wheellock: f0eedd sketch/fillets, model side. welding
    "Part 2"/"Part 6": ours one part fewer in 9c7704, tracing (vibex8 asm-keep/trace-welding.out; one.sh <bin> <dir> <out>).
 2. Lost mates still mine: tvc (c10 on vibex8: 11/12 mates, 26/26 BOM; alike-volume parts now settled by their mate
