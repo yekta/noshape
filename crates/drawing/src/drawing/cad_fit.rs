@@ -325,8 +325,10 @@ pub fn on_conic(points: &[[f64; 2]], closed: bool, conic: [[f64; 2]; 3], tol: f6
     }) {
         return None;
     }
-    // (Ends a tenth of `tol` apart meet: a nearly full arc stays an arc.)
-    let first_last = (points[0][0] - points[points.len() - 1][0]).hypot(points[0][1] - points[points.len() - 1][1]) < tol * 0.1;
+    // (Ends a tenth of `tol` apart meet: a nearly full arc stays an arc. A speck whose ends meet is no circle:
+    // c2-hex-bookcase-derived's hole rims glimpsed past a mesh's facets were 14 whole CIRCLEs.)
+    let length: f64 = points.windows(2).map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])).sum();
+    let first_last = (points[0][0] - points[points.len() - 1][0]).hypot(points[0][1] - points[points.len() - 1][1]) < tol * 0.1 && length > std::f64::consts::PI * rb;
     let round = rb >= ra * (1.0 - 1e-9);
     if closed || first_last {
         return Some(if round { FitCurve::Circle { center: c, radius: ra } } else { FitCurve::Ellipse { center: c, major, ratio: rb / ra, start: 0.0, end: TAU } });
@@ -344,6 +346,18 @@ pub fn on_conic(points: &[[f64; 2]], closed: bool, conic: [[f64; 2]; 3], tol: f6
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A circle's piece whose ends meet is the whole circle only when it runs round it: a speck of a hole's rim
+    /// (c2-hex-bookcase-derived, its ends 3 um apart) is an arc, not a CIRCLE.
+    #[test]
+    fn a_speck_of_a_circle_is_no_circle() {
+        let conic = [[0.0, 0.0], [0.5, 0.0], [0.0, 0.5]];
+        let at = |t: f64| [0.5 * t.cos(), 0.5 * t.sin()];
+        let speck = [at(1.0), at(1.000_002)];
+        assert!(matches!(on_conic(&speck, false, conic, 1e-4), Some(FitCurve::Arc { .. })), "{:?}", on_conic(&speck, false, conic, 1e-4));
+        let round: Vec<[f64; 2]> = (0..=64).map(|i| at(1.0 + TAU * i as f64 / 64.0)).collect();
+        assert!(matches!(on_conic(&round, false, conic, 1e-4), Some(FitCurve::Circle { .. })));
+    }
 
     /// A callout's hexagon and octagon borders stay polylines; its 40-point circle is a CIRCLE.
     #[test]

@@ -1914,6 +1914,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     if e.profile {
                         g.polyline_lines.extend(l0..g.lines.len());
                     }
+                    if e.mesh {
+                        g.mesh_lines.extend(l0..g.lines.len());
+                    }
                     if v.editing_edges && (marked || !e.visible) {
                         let lines = l0..g.lines.len();
                         if marked {
@@ -3128,6 +3131,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     g.conic_lines.dedup_by_key(|c| c.0);
     g.polyline_lines.sort_unstable();
     g.polyline_lines.dedup();
+    g.mesh_lines.sort_unstable();
+    g.mesh_lines.dedup();
     BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, lost, tables: table_layouts, title_rect, title_cells, title_hits }
 }
 

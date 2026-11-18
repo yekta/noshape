@@ -15,7 +15,7 @@ use super::cad_layers::{CadLayer, CadTextStyle};
 use super::cad_objects::{CadDim, CadDimKind, CadObject};
 use acadrust::entities::table::Table as AcadTable;
 use acadrust::entities::{Dimension, DimensionAngular3Pt, DimensionDiameter, DimensionLinear, DimensionOrdinate, DimensionRadius, Insert, Tolerance};
-use acadrust::entities::{Polyline2D, PolylineFlags, Vertex2D};
+use acadrust::entities::{LwPolyline, Polyline2D, PolylineFlags, Vertex2D};
 use acadrust::compound_file::{BinaryRecord, CompoundEntry, CompoundFile, CompoundStorage, CompoundStream, CompoundStreamContent, StructuredStoragePayload};
 use acadrust::entities::{Ole2Frame, OleFrameEnvelope, OleObjectType};
 use acadrust::xdata::{ExtendedDataRecord, XDataValue};
@@ -798,11 +798,14 @@ impl Sheet<'_> {
         // ellipse (live 1857: a fillet's B-spline edges are SPLINEs).
         let free = l.points.len() > 2 && self.g.freeform_lines.binary_search(&li).is_ok();
         let poly = l.points.len() > 2 && self.g.polyline_lines.binary_search(&li).is_ok();
+        // A mesh part's silhouette or fold: an LWPOLYLINE as live's (with its continuous-linetype flag), a LINE when
+        // straight; never fitted.
+        let mesh = self.g.mesh_lines.binary_search(&li).is_ok();
         // Live writes a detail view's border as its closed polyline, not a CIRCLE.
-        let fitted = !free && !poly && self.g.cad_line_layer(li) != CadLayer::DetailViewBorder;
+        let fitted = !free && !poly && !mesh && self.g.cad_line_layer(li) != CadLayer::DetailViewBorder;
         // A model edge on a circle or ellipse: that conic's piece, as live writes them (exact, however few points;
         // c2-sm-louver's bends: ARC 101 for 68, ELLIPSE 50 for 86 when fitted).
-        let exact = (!free && !poly)
+        let exact = (!free && !poly && !mesh)
             .then(|| self.g.conic_lines.binary_search_by_key(&li, |c| c.0).ok())
             .flatten()
             .and_then(|i| crate::drawing::cad_fit::on_conic(&l.points, l.closed, self.g.conic_lines[i].1, CONIC_TOL));
@@ -819,6 +822,11 @@ impl Sheet<'_> {
                 EntityType::Ellipse(e)
             }
             None if l.points.len() == 2 && !l.closed => EntityType::Line(Line::from_points(p3(l.points[0]), p3(l.points[1]))),
+            None if mesh => {
+                let mut e = LwPolyline::from_points(l.points.iter().map(|p| self.p2(*p)).collect());
+                (e.is_closed, e.plinegen) = (l.closed, true);
+                EntityType::LwPolyline(e)
+            }
             None if poly => EntityType::Polyline2D(self.polyline(&l.points, l.closed, true)),
             // A model edge straight in the view (a curve seen edge-on: c2-sm-louver's bend edges at the louvers' ends):
             // a LINE between its extremes, as live's (it had 31 short SPLINEs there, live none).

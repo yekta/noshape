@@ -1315,6 +1315,9 @@ pub struct ViewEdge {
     pub sketch: SketchEdge,
     /// A crop's profile drawn where it runs through material: written as a POLYLINE (live drw-crop-spline.dxf).
     pub profile: bool,
+    /// A mesh part's silhouette or fold, joined from its facets' edges: written as an LWPOLYLINE, or a LINE when
+    /// straight (live's drawings of mesh parts).
+    pub mesh: bool,
 }
 
 /// What kind of sketch line a view edge is.
@@ -1566,9 +1569,10 @@ impl ViewGeometry {
     pub fn full_circles(&self) -> Vec<([f64; 2], f64, Option<PointRef>)> {
         let drawn = self.drawn_model_edges();
         // Not a circle drawn only as a tangent edge (a fillet's rim round a bump: live's cf-snap-hook and
-        // c2-variable-fillet-faceblend drawings mark none).
+        // c2-variable-fillet-faceblend drawings mark none), nor one wholly hidden (c2-hex-bookcase-derived's holes
+        // behind its mesh part).
         let mut sharp = vec![false; self.model_edges.len()];
-        for e in self.edges.iter().filter(|e| e.class != EdgeClass::Smooth) {
+        for e in self.edges.iter().filter(|e| e.visible && e.class != EdgeClass::Smooth) {
             if let Some(x) = e.model.and_then(|m| sharp.get_mut(m as usize)) {
                 *x = true;
             }
@@ -2411,7 +2415,7 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
             for e in b.shape.edges() {
                 let pts: Vec<[f64; 2]> = sample_edge(&e, 48).into_iter().map(|p| frame.project(p)).collect();
                 if pts.len() >= 2 {
-                    g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Outline, model: None, sketch: SketchEdge::Solid, profile: false });
+                    g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Outline, model: None, sketch: SketchEdge::Solid, profile: false, mesh: false });
                 }
             }
         }
@@ -2515,11 +2519,11 @@ fn apply_crop(g: &mut ViewGeometry, crop: &Crop) {
     let boundary = crop_boundary_in_material(&edges, crop);
     for e in &edges {
         for piece in clip_to_crop(&e.points, crop) {
-            g.edges.push(ViewEdge { points: piece, visible: e.visible, class: e.class, model: e.model, sketch: e.sketch, profile: e.profile });
+            g.edges.push(ViewEdge { points: piece, visible: e.visible, class: e.class, model: e.model, sketch: e.sketch, profile: e.profile, mesh: e.mesh });
         }
     }
     // The profile is drawn where it runs through material (live drw-crop-spline, live2 crop-snap-reach: any profile).
-    g.edges.extend(boundary.into_iter().map(|points| ViewEdge { points, visible: true, class: EdgeClass::Sharp, model: None, sketch: SketchEdge::None, profile: true }));
+    g.edges.extend(boundary.into_iter().map(|points| ViewEdge { points, visible: true, class: EdgeClass::Sharp, model: None, sketch: SketchEdge::None, profile: true, mesh: false }));
     let poly = crop_polygon(crop);
     let inside = |p: [f64; 2]| match (crop, &poly) {
         (Crop::Circle { center, radius }, _) => (p[0] - center[0]).powi(2) + (p[1] - center[1]).powi(2) <= radius * radius * (1.0 + 1e-9),
@@ -2909,6 +2913,88 @@ fn angular_coverage(iv: &[(f64, f64)]) -> f64 {
     total
 }
 
+/// A mesh facet faces the viewer when its normal is against the view direction by more than this (unit vectors):
+/// a facet seen edge on (a wall in a view along it) does not.
+const MESH_FACING: f64 = 1e-6;
+
+/// Of the faceted mesh parts' edges (compound edge index): whether a view along `dir` draws it, a silhouette (one of
+/// its facets faces the viewer, the other doesn't) or an open mesh's border. Live draws a mesh part by its silhouettes
+/// only, no folds between facets that both face the viewer (q-mesh-drawing: c2-hex-bookcase-derived's 75 and 53 degree
+/// folds, the far half of a ring's 90 degree hole rim in Iso).
+fn mesh_edges_drawn(compound: &Shape, faceted: &[Option<Shape>], dir: DVec3) -> HashMap<usize, bool> {
+    let mut out = HashMap::new();
+    for f in faceted.iter().flatten() {
+        let (Ok(ef), faces) = (f.edge_faces(), f.faces()) else { continue };
+        let facing: Vec<Option<bool>> = faces.iter().map(|x| x.face_plane().ok().flatten().map(|p| p.normal.dot(dir) < -MESH_FACING)).collect();
+        for (i, e) in f.edges().iter().enumerate() {
+            let Some(ci) = compound.index_of(e, ShapeType::Edge) else { continue };
+            let sides: Vec<bool> = ef.get(i).into_iter().flatten().filter_map(|fi| facing.get(*fi as usize).copied().flatten()).collect();
+            let drawn = match sides[..] {
+                [a, b] => a != b,
+                _ => true,
+            };
+            out.insert(ci, drawn);
+        }
+    }
+    out
+}
+
+/// Pieces of a mesh part's lines joined end to end where exactly two meet (within `tol`), runs on one line collapsed:
+/// live draws a mesh's silhouettes and folds as polylines.
+fn chain_pieces(pieces: Vec<Vec<[f64; 2]>>, tol: f64) -> Vec<Vec<[f64; 2]>> {
+    let key = |p: [f64; 2]| ((p[0] / tol).round() as i64, (p[1] / tol).round() as i64);
+    let mut at: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
+    for (i, p) in pieces.iter().enumerate() {
+        at.entry(key(p[0])).or_default().push(i);
+        at.entry(key(p[p.len() - 1])).or_default().push(i);
+    }
+    let mut used = vec![false; pieces.len()];
+    let mut out = Vec::new();
+    // The piece joined to `i` at end point `p`, when that point joins exactly two.
+    let next = |i: usize, p: [f64; 2], used: &[bool]| at.get(&key(p)).filter(|v| v.len() == 2).and_then(|v| v.iter().copied().find(|j| *j != i && !used[*j]));
+    for start in 0..pieces.len() {
+        if used[start] {
+            continue;
+        }
+        used[start] = true;
+        let mut line = pieces[start].clone();
+        for forward in [true, false] {
+            let mut cur = start;
+            loop {
+                let end = if forward { line[line.len() - 1] } else { line[0] };
+                let Some(j) = next(cur, end, &used) else { break };
+                used[j] = true;
+                let mut q = pieces[j].clone();
+                if key(q[0]) != key(end) {
+                    q.reverse();
+                }
+                if forward {
+                    line.extend(q.into_iter().skip(1));
+                } else {
+                    q.pop();
+                    q.extend(line);
+                    line = q;
+                }
+                cur = j;
+            }
+        }
+        // Points on the line between their neighbours dropped.
+        let mut kept: Vec<[f64; 2]> = Vec::with_capacity(line.len());
+        for p in line {
+            if kept.len() >= 2 {
+                let (a, b) = (kept[kept.len() - 2], kept[kept.len() - 1]);
+                let cross = (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+                if cross.abs() <= tol * (p[0] - a[0]).hypot(p[1] - a[1]) {
+                    kept.pop();
+                }
+            }
+            kept.push(p);
+        }
+        out.push(kept);
+    }
+    out
+}
+
 /// HLR projection of bodies (optionally pre-cut) into a view.
 /// `keep(body index, point)` filters the vertex snap points.
 fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: bool, keep: &dyn Fn(usize, DVec3) -> bool) -> ViewGeometry {
@@ -2918,17 +3004,20 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
         g.update_bounds();
         return g;
     }
-    // Mesh parts (an imported STL's) left out of the hidden line removal, which crashed on their faces' missing
-    // surfaces and failed the whole view (c2-hex-bookcase-derived's drawing: all four views an error box).
-    let shapes: Vec<Shape> = bodies.iter().filter(|b| !b.shape.is_mesh()).map(|b| b.shape.clone()).collect();
+    // Mesh parts (an imported STL's) go through the hidden line removal as their facets (their own faces have no
+    // surface: it crashed on them, c2-hex-bookcase-derived's drawing); of the facets' edges a view draws the folds and
+    // silhouettes only (below).
+    let faceted: Vec<Option<Shape>> = bodies.iter().map(|b| if b.shape.is_mesh() { b.shape.faceted().ok() } else { None }).collect();
+    let shapes: Vec<Shape> = bodies.iter().zip(&faceted).filter_map(|(b, f)| if b.shape.is_mesh() { f.clone() } else { Some(b.shape.clone()) }).collect();
     if shapes.is_empty() {
         g.update_bounds();
         return g;
     }
     let compound = if shapes.len() == 1 { shapes[0].clone() } else { Shape::compound(&shapes) };
+    let mesh_drawn = mesh_edges_drawn(&compound, &faceted, frame.dir);
     // Compound edge index -> (body index, body edge index).
     let mut cmap: HashMap<usize, (usize, usize)> = HashMap::new();
-    for (bi, pb) in bodies.iter().enumerate() {
+    for (bi, pb) in bodies.iter().enumerate().filter(|(bi, _)| faceted[*bi].is_none()) {
         for (i, e) in pb.shape.edges().iter().enumerate() {
             let src = match &pb.edge_map {
                 Some(m) => match m.get(&i) {
@@ -2954,8 +3043,22 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
     };
     let mut topo_cache: HashMap<usize, BodyTopo> = HashMap::new();
     let mut me_index: HashMap<(usize, usize), u32> = HashMap::new();
+    let mut mesh_pieces: Vec<(bool, Vec<[f64; 2]>)> = Vec::new();
+    // A part's edge behind a mesh glimpsed past the facets' corners, in pieces shorter than the projection's own
+    // deflection, is hidden (live: c2-hex-bookcase-derived's hole rims under its mesh's polygonal holes).
+    let edges = if faceted.iter().any(Option::is_some) { compound.edges() } else { Vec::new() };
+    let glimpse = |pe: &noshape_kernel::ProjectedEdge| {
+        let length: f64 = pe.polyline.windows(2).map(|w| w[0].distance(w[1])).sum();
+        pe.visibility == Visibility::Visible && length < defl && pe.source_edge.filter(|ci| !mesh_drawn.contains_key(&(*ci as usize))).and_then(|ci| edges.get(ci as usize)).and_then(|e| e.length().ok()).is_some_and(|l| l > defl)
+    };
     for pe in projected {
-        if pe.polyline.len() < 2 {
+        if pe.polyline.len() < 2 || glimpse(&pe) {
+            continue;
+        }
+        if let Some(drawn) = pe.source_edge.and_then(|ci| mesh_drawn.get(&(ci as usize))) {
+            if *drawn {
+                mesh_pieces.push((pe.visibility == Visibility::Visible, pe.polyline.iter().map(|p| [p.x, p.y]).collect()));
+            }
             continue;
         }
         let model = pe.source_edge.and_then(|ci| cmap.get(&(ci as usize)).copied()).and_then(|(bi, ei)| {
@@ -2977,7 +3080,15 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
             model,
             sketch: SketchEdge::None,
             profile: false,
+            mesh: false,
         });
+    }
+    let size = compound.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    for visible in [true, false] {
+        let pieces: Vec<Vec<[f64; 2]>> = mesh_pieces.iter().filter(|p| p.0 == visible).map(|p| p.1.clone()).collect();
+        for points in chain_pieces(pieces, size * 1e-7) {
+            g.edges.push(ViewEdge { points, visible, class: EdgeClass::Sharp, model: None, sketch: SketchEdge::None, profile: false, mesh: true });
+        }
     }
     // Snap points: vertices (on the kept side of a section) and centers of
     // face-on circles.
@@ -3662,7 +3773,7 @@ fn detail_geometry(id: ViewId, parent: &ViewGeometry, center: [f64; 2], radius: 
                     (g.model_edges.len() - 1) as u32
                 })
             });
-            g.edges.push(ViewEdge { points: piece, visible: e.visible, class: e.class, model, sketch: e.sketch, profile: e.profile });
+            g.edges.push(ViewEdge { points: piece, visible: e.visible, class: e.class, model, sketch: e.sketch, profile: e.profile, mesh: e.mesh });
         }
     }
     let inside = |p: [f64; 2]| match poly {
@@ -3796,7 +3907,7 @@ fn flat_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewF
         for w in pts.windows(2) {
             g.snaps.push(Snap { p: w[0], kind: SnapKind::Vertex, point: None });
         }
-        g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Outline, model: None, sketch: SketchEdge::None, profile: false });
+        g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Outline, model: None, sketch: SketchEdge::None, profile: false, mesh: false });
     }
     for f in &flat.forms {
         for l in f.loops.iter().filter(|l| l.len() >= 2) {
@@ -3865,7 +3976,7 @@ fn sketch_geometry(id: ViewId, ctx: &Context, feature: &crate::FeatureId, frame:
             if let Some(c) = color {
                 g.sketch_colors.push((g.edges.len(), c));
             }
-            g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Sharp, model: None, sketch, profile: false });
+            g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Sharp, model: None, sketch, profile: false, mesh: false });
         }
     }
     let (mut lo, mut hi) = ([f64::MAX; 2], [f64::MIN; 2]);
@@ -3900,16 +4011,30 @@ mod tests {
         assert!(conic_of(&free, j.first_param, j.last_param).is_none());
     }
 
-    /// A view of a part beside a mesh part (an imported STL's) draws the part: the hidden line removal crashed on the
-    /// mesh's faces and every view failed (c2-hex-bookcase-derived's drawing).
+    /// A view of a part beside a mesh part (an imported STL's) draws both, the mesh as live: its silhouettes and folds
+    /// (a faceted cylinder's rims and outermost wall lines), not the facet edges on its wall, joined into polylines.
+    /// (The hidden line removal crashed on the mesh's faces and every view failed: c2-hex-bookcase-derived's drawing.)
     #[test]
-    fn a_mesh_part_leaves_its_view_drawn() {
+    fn a_mesh_part_is_drawn_by_its_silhouettes_and_folds() {
         let dir = std::env::temp_dir().join(format!("noshape-view-mesh-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let stl = dir.join("tet.stl");
-        let tri = |a: [i32; 3], b: [i32; 3], c: [i32; 3]| format!(" facet normal 0 0 0\n  outer loop\n   vertex {} {} {}\n   vertex {} {} {}\n   vertex {} {} {}\n  endloop\n endfacet\n", a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
-        let (o, x, y, z) = ([0, 0, 0], [10, 0, 0], [0, 10, 0], [0, 0, 10]);
-        std::fs::write(&stl, format!("solid t\n{}{}{}{}endsolid t\n", tri(o, y, x), tri(o, x, z), tri(o, z, y), tri(x, y, z))).unwrap();
+        let stl = dir.join("cyl.stl");
+        // A cylinder r 10 mm, 20 mm high, 24 sides, its axis along z.
+        let n = 24;
+        let rim = |k: usize, z: f64| {
+            let a = std::f64::consts::TAU * (k % n) as f64 / n as f64;
+            [10.0 * a.cos(), 10.0 * a.sin(), z]
+        };
+        let tri = |a: [f64; 3], b: [f64; 3], c: [f64; 3]| format!(" facet normal 0 0 0\n  outer loop\n   vertex {} {} {}\n   vertex {} {} {}\n   vertex {} {} {}\n  endloop\n endfacet\n", a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+        let mut text = String::from("solid c\n");
+        for k in 0..n {
+            text += &tri([0.0, 0.0, 0.0], rim(k + 1, 0.0), rim(k, 0.0));
+            text += &tri([0.0, 0.0, 20.0], rim(k, 20.0), rim(k + 1, 20.0));
+            text += &tri(rim(k, 0.0), rim(k + 1, 0.0), rim(k + 1, 20.0));
+            text += &tri(rim(k, 0.0), rim(k + 1, 20.0), rim(k, 20.0));
+        }
+        text += "endsolid c\n";
+        std::fs::write(&stl, text).unwrap();
         let mesh = noshape_kernel::read_mesh_bodies(&stl, noshape_kernel::LengthUnit::Millimeter).unwrap();
         assert!(mesh.is_mesh());
         let block = noshape_kernel::make_box_corners(DVec3::new(0.02, 0.0, 0.0), DVec3::new(0.03, 0.01, 0.01)).unwrap();
@@ -3920,8 +4045,52 @@ mod tests {
         let frame = ViewFrame::new(DVec3::NEG_Y, DVec3::Z);
         let g = project_bodies(ViewId(1), &pbs, &frame, true, &|_, _| true);
         assert!(g.error.is_none(), "{:?}", g.error);
-        assert_eq!(g.edges.iter().filter(|e| e.visible).count(), 4, "the block's front outline");
+        assert_eq!(g.edges.iter().filter(|e| e.visible && !e.mesh).count(), 4, "the block's front outline");
+        let mesh_lines: Vec<&ViewEdge> = g.edges.iter().filter(|e| e.visible && e.mesh).collect();
+        assert!(!mesh_lines.is_empty() && mesh_lines.len() <= 2, "{mesh_lines:?}");
+        // Every visible mesh point on the cylinder's outline (|x| 10 mm, z 0 or 20 mm): no wall facet edge inside.
+        let (lo, hi) = (mesh_lines.iter().flat_map(|e| &e.points).fold([f64::MAX; 2], |m, p| [m[0].min(p[0]), m[1].min(p[1])]), mesh_lines.iter().flat_map(|e| &e.points).fold([f64::MIN; 2], |m, p| [m[0].max(p[0]), m[1].max(p[1])]));
+        let on_border = |p: &[f64; 2]| (p[0] - lo[0]).abs() < 1e-7 || (p[0] - hi[0]).abs() < 1e-7 || (p[1] - lo[1]).abs() < 1e-7 || (p[1] - hi[1]).abs() < 1e-7;
+        assert!(((hi[0] - lo[0]) - 0.02).abs() < 1e-7 && ((hi[1] - lo[1]) - 0.02).abs() < 1e-7, "{lo:?} {hi:?}");
+        assert!(mesh_lines.iter().all(|e| e.points.iter().all(on_border)), "{mesh_lines:?}");
+        assert!(mesh_lines.iter().map(|e| e.points.len()).sum::<usize>() <= 6, "runs on one line collapsed: {mesh_lines:?}");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Live draws a mesh part by its silhouettes only: an Iso view of a mesh cube is its hexagonal outline, without
+    /// the three folds between the faces toward the viewer (q-mesh-drawing: c2-hex-bookcase-derived's 75 and 53 degree
+    /// folds and the far half of a ring's hole rim are not drawn).
+    #[test]
+    fn a_mesh_part_has_no_folds_between_faces_toward_the_viewer() {
+        let dir = std::env::temp_dir().join(format!("noshape-view-mesh-cube-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let stl = dir.join("cube.stl");
+        let c = |i: usize| [(i & 1) as f64 * 10.0, (i >> 1 & 1) as f64 * 10.0, (i >> 2 & 1) as f64 * 10.0];
+        let tri = |a: [f64; 3], b: [f64; 3], c: [f64; 3]| format!(" facet normal 0 0 0\n  outer loop\n   vertex {} {} {}\n   vertex {} {} {}\n   vertex {} {} {}\n  endloop\n endfacet\n", a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+        let mut text = String::from("solid c\n");
+        // Each side as two triangles wound outward.
+        for q in [[0, 2, 3, 1], [4, 5, 7, 6], [0, 1, 5, 4], [2, 6, 7, 3], [0, 4, 6, 2], [1, 3, 7, 5]] {
+            text += &tri(c(q[0]), c(q[1]), c(q[2]));
+            text += &tri(c(q[0]), c(q[2]), c(q[3]));
+        }
+        text += "endsolid c\n";
+        std::fs::write(&stl, text).unwrap();
+        let mesh = noshape_kernel::read_mesh_bodies(&stl, noshape_kernel::LengthUnit::Millimeter).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(mesh.is_mesh());
+        let f = crate::reference::FeatureId(1);
+        let body = Arc::new(Body::new(BodyId { feature: f, index: 0 }, "Part 1".into(), BodyKind::Solid, mesh, Vec::new(), 0, f));
+        let pbs = [ProjBody { body: &body, shape: body.shape.clone(), edge_map: None }];
+        let frame = ViewFrame::new(DVec3::new(-1.0, -1.0, -1.0).normalize(), DVec3::Z);
+        let g = project_bodies(ViewId(1), &pbs, &frame, true, &|_, _| true);
+        assert!(g.error.is_none(), "{:?}", g.error);
+        let lines: Vec<&ViewEdge> = g.edges.iter().filter(|e| e.visible && e.mesh).collect();
+        assert!(!lines.is_empty());
+        // The corner toward the viewer projects to the hexagon's centre: no line reaches it.
+        let centre = frame.project(DVec3::splat(0.01));
+        let near = lines.iter().flat_map(|e| e.points.windows(2)).map(|w| dist_to_segment(centre, w[0], w[1])).fold(f64::MAX, f64::min);
+        assert!(near > 0.004, "a fold drawn {near}: {lines:?}");
+        assert_eq!(lines.iter().map(|e| e.points.len() - 1).sum::<usize>(), 6, "the hexagon's six sides: {lines:?}");
     }
 
     /// Centermarks: a hole whole or in pieces, a radial hole's half bore; not a quarter round, nor c2-sm-louver's two
@@ -3941,7 +4110,7 @@ mod tests {
     /// inside the block is drawn whole.
     #[test]
     fn a_crop_profile_is_drawn_where_it_crosses_material() {
-        let edge = |a: [f64; 2], b: [f64; 2]| ViewEdge { points: vec![a, b], visible: true, class: EdgeClass::Sharp, model: None, sketch: SketchEdge::None, profile: false };
+        let edge = |a: [f64; 2], b: [f64; 2]| ViewEdge { points: vec![a, b], visible: true, class: EdgeClass::Sharp, model: None, sketch: SketchEdge::None, profile: false, mesh: false };
         let block = vec![edge([0.0, 0.0], [40.0, 0.0]), edge([40.0, 0.0], [40.0, 10.0]), edge([40.0, 10.0], [0.0, 10.0]), edge([0.0, 10.0], [0.0, 0.0])];
         assert!(inside_material(&block, [20.0, 5.0]) && !inside_material(&block, [20.0, 12.0]));
         let snapped = Crop::Spline(vec![[5.0, 0.0], [25.0, 0.0], [25.0, 10.0], [5.0, 10.0]]);

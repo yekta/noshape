@@ -4086,10 +4086,11 @@ fn concentric_circles_share_one_centermark() {
     }
 }
 
-/// A circle drawn only as a tangent edge (a fillet's rim round a bump) is no centermark's circle: live's cf-snap-hook and
-/// c2-variable-fillet-faceblend drawings mark none. The demo's Top view with its circles' edges made smooth.
+/// A circle drawn only as a tangent edge (a fillet's rim round a bump) or wholly hidden is no centermark's circle: live's
+/// cf-snap-hook and c2-variable-fillet-faceblend drawings mark none. The demo's Top view with its circles' edges made
+/// smooth, then hidden.
 #[test]
-fn tangent_circles_get_no_centermark() {
+fn tangent_and_hidden_circles_get_no_centermark() {
     let (doc, drawing) = demo();
     let sources = regenerate_sources(&doc, &drawing);
     let sheet = &drawing.sheets[0];
@@ -4102,6 +4103,12 @@ fn tangent_circles_get_no_centermark() {
         e.class = EdgeClass::Smooth;
     }
     assert!(smooth.full_circles().is_empty(), "{:?}", smooth.full_circles());
+    // Nor one wholly hidden (c2-hex-bookcase-derived's holes behind its mesh part).
+    let mut hidden = (*geo).clone();
+    for e in hidden.edges.iter_mut().filter(|e| e.model.is_some_and(|m| circle_edges.contains(&m))) {
+        e.visible = false;
+    }
+    assert!(hidden.full_circles().is_empty(), "{:?}", hidden.full_circles());
 }
 
 /// A base view and a pictorial projection at a scale other than 1:1 keep their label in the DXF when it says nothing,

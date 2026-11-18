@@ -161,6 +161,10 @@ pub struct SheetGeometry {
     /// sorted.
     #[serde(default)]
     pub polyline_lines: Vec<usize>,
+    /// Lines of a mesh part's silhouettes and folds (sorted): a CAD file writes them as an LWPOLYLINE, or a LINE when
+    /// straight (live's drawings of mesh parts).
+    #[serde(default)]
+    pub mesh_lines: Vec<usize>,
     /// Template format lines (sorted): the screen runs them on half their
     /// pen width past their ends so corners stay closed; exports keep
     /// live's exact ends.
