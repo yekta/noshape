@@ -1671,7 +1671,14 @@ pub fn region_profile_with(s: &SketchResult, region: &noshape_sketch::regions::R
             let (d0, d) = ((b0 - a0).normalize_or_zero(), (b - a).normalize_or_zero());
             (b0 - a).length() < 1e-12 && d0.perp_dot(d).abs() < 1e-9 && d0.dot(d) > 0.0 && (e0 == e || alone(a, e0, e) || one_line(a0, b)) && !twice(a)
         };
-        for (seg, src) in lp.segments.iter().zip(lp.sources.iter()) {
+        // (Not at an imprinted face arc's end the loop's circle lies along ([`SketchResult::joints`]); the loop then
+        // starts at one, so its first and last arcs stay apart there.)
+        let joint = |p: DVec2| s.joints.iter().any(|q| (*q - p).length() <= 1e-7);
+        let first = lp.segments.iter().position(|g| matches!(g, P::Arc { .. }) && joint(g.start()));
+        let n = lp.segments.len();
+        for k in 0..n {
+            let k = (k + first.unwrap_or(0)) % n;
+            let (seg, src) = (&lp.segments[k], &lp.sources[k]);
             // (Arcs of other entities on one circle too, whatever else of the sketch meets them at the joint: live joins
             // three arcs of a circle and a line ending at one joint into one side face; c2-fan-blade-sweep's "klammer",
             // two R13 fillets that ate the side between them, one half cylinder.)
@@ -1681,6 +1688,7 @@ pub fn region_profile_with(s: &SketchResult, region: &noshape_sketch::regions::R
                 && (*c0 - *center).length() < 1e-12
                 && (*r0 - *radius).abs() < 1e-12
                 && *w0 == *ccw
+                && !joint(seg.start())
             {
                 let sweep_prev = *e0 - *s0;
                 let mut add = *end_angle - (*e0 - 0.0);
@@ -1716,7 +1724,9 @@ pub fn region_profile_with(s: &SketchResult, region: &noshape_sketch::regions::R
                 *fa = a;
             }
         }
-        out = whole_closed(out);
+        if first.is_none() {
+            out = whole_closed(out);
+        }
         // Likewise a closed spline (a periodic fit spline, split at its
         // seam): one edge, so its extrusion is one face (live's lobed recess).
         if out.len() == 2
@@ -1756,6 +1766,17 @@ pub fn region_profile_with(s: &SketchResult, region: &noshape_sketch::regions::R
     let outer: Vec<k::Segment2d> = outer_m.iter().map(|(sg, _)| to_segment(sg)).collect();
     let holes: Vec<Vec<k::Segment2d>> = holes_m.iter().map(|h| h.iter().map(|(sg, _)| to_segment(sg)).collect()).collect();
     let tracked = k::make_face_2d_tracked(&plane, &outer, &holes)?;
+    // The arcs ending at a joint keep their ends: a prism of the face keeps its walls apart there.
+    if !s.joints.is_empty() {
+        let at_joint = |p: DVec3| {
+            let q = s.frame.to_local(p);
+            s.joints.iter().any(|j| (*j - q).length() <= 1e-7)
+        };
+        let along: Vec<Shape> = tracked.shape.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| !i.closed && (at_joint(i.start) || at_joint(i.end)))).collect();
+        if !along.is_empty() {
+            k::mark_kept_edges(&tracked.shape, &along, true)?;
+        }
+    }
     let mut sources_in: Vec<Source> = Vec::new();
     let mut count: BTreeMap<u32, u16> = BTreeMap::new();
     for lp in std::iter::once(&outer_m).chain(holes_m.iter()) {
@@ -2136,7 +2157,7 @@ mod region_area_tests {
         r.holes.push(ProfileLoop { segments: vec![arc(0.0, 1.0, true), arc(1.0, 0.0, false)], sources: vec![glyph(true), glyph(false)] });
         let mut sketch = noshape_sketch::Sketch::new();
         let report = sketch.solve();
-        let s = super::SketchResult { feature: super::FeatureId(1), name: "Sketch 1".into(), frame: crate::display::PlaneFrame::TOP, sketch, report, regions: vec![r.clone()], imprinted: Vec::new(), split: Vec::new(), wires: Vec::new(), dimension_text: Default::default(), images: Vec::new(), legacy_edge_directions: false, bodies: None };
+        let s = super::SketchResult { feature: super::FeatureId(1), name: "Sketch 1".into(), frame: crate::display::PlaneFrame::TOP, sketch, report, regions: vec![r.clone()], imprinted: Vec::new(), split: Vec::new(), joints: Vec::new(), wires: Vec::new(), dimension_text: Default::default(), images: Vec::new(), legacy_edge_directions: false, bodies: None };
         let p = super::region_profile(&s, &r, super::Source::Index(0)).unwrap();
         assert_eq!(p.shape.count(noshape_kernel::ShapeType::Edge), 4);
     }

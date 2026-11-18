@@ -1030,6 +1030,10 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
       if (two.size() != 2)
         continue;
       const TopoDS_Edge& e  = TopoDS::Edge(em(i));
+      // (Not across a split made on purpose: a wall kept apart at a sketch circle's joint, c2-impeller-loft's Extrude
+      // impellerraum, its seam on one of them.)
+      if (kept_edge(e))
+        continue;
       const TopoDS_Face& fa = TopoDS::Face(fm((int)two[0] + 1));
       const TopoDS_Face& fb = TopoDS::Face(fm((int)two[1] + 1));
       TopLoc_Location    la, lb;

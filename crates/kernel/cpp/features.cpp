@@ -541,6 +541,39 @@ OpOut op_prism(const OcShape& profile, P3 start, P3 end, double draft_angle)
   if (!prism.IsDone())
     fail_op("extrude failed");
   TopoDS_Shape result = prism.Shape();
+  // A profile edge whose ends are kept (a sketch circle's split where it runs along a face's rim of arcs, live's
+  // c2-impeller-loft Extrude impellerraum): the side edges swept from those ends are kept, so no unify merges the walls.
+  {
+    std::vector<gp_Pnt> ends;
+    for (TopExp_Explorer x(profile.shape, TopAbs_EDGE); x.More(); x.Next())
+      if (kept_ends(x.Current()))
+        for (TopExp_Explorer v(x.Current(), TopAbs_VERTEX); v.More(); v.Next())
+          ends.push_back(BRep_Tool::Pnt(TopoDS::Vertex(v.Current())));
+    if (!ends.empty())
+    {
+      const gp_Dir dir(d);
+      auto         on = [&](const gp_Pnt& q) {
+        return std::any_of(ends.begin(), ends.end(), [&](const gp_Pnt& p) { return gp_Lin(p, dir).Distance(q) <= 1e-7; });
+      };
+      // (The caps' edges ending there keep their ends too: a prism of a cap face keeps its walls apart as well,
+      // c2-impeller-loft's Extrude 6.)
+      for (TopExp_Explorer x(result, TopAbs_EDGE); x.More(); x.Next())
+      {
+        const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+        if (BRep_Tool::Degenerated(e))
+          continue;
+        TopoDS_Vertex a, b;
+        TopExp::Vertices(e, a, b);
+        if (a.IsNull() || b.IsNull())
+          continue;
+        const bool ea = on(BRep_Tool::Pnt(a)), eb = on(BRep_Tool::Pnt(b));
+        if (BRepAdaptor_Curve(e).GetType() == GeomAbs_Line && ea && eb)
+          mark_kept_edge(e);
+        else if (ea || eb)
+          mark_kept_ends(e);
+      }
+    }
+  }
   merge_into(hist, history_of({base}, prism));
   // A sheet's cylinders keep the sweep's frame: origin at the sketch, z along the extrude (live core/q-cylframe: a
   // surface extrude's face z +1, a solid's -1 from the far cap; dx's c2-loft-guide-curves-driven-pattern's Linear

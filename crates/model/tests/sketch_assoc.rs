@@ -203,6 +203,71 @@ fn text_style_edit_regenerates_with_a_cached_regenerator() {
     assert!(w2 > w1 * 1.02, "bold glyphs are wider after regen: {w1} -> {w2}");
 }
 
+/// A sketch circle lying along a face's rim of arcs keeps the rim's splits: its wall is split there, as live's
+/// (c2-impeller-loft's Extrude impellerraum: a circle over the flange face's rim of 4 arcs, 4 side faces, which its Move
+/// face 1 picks). Here half a cylinder (r10, 10 mm) and half a cone (r12 at its foot, r10 at its
+/// top), each revolved 180 deg: the top face's rim is two arcs, so the circle drawn over it extrudes to 2 walls.
+#[test]
+fn a_circle_along_a_faces_split_rim_keeps_the_split_in_its_wall() {
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let mm = |x: f64, y: f64| DVec2::new(x, y) * 1e-3;
+    let front = Reference::Plane(DatumPlane::Front);
+    let add_sketch = |ps: &mut PartStudio, plane: Reference, sk: noshape_sketch::Sketch| {
+        let mut f = ps.new_feature("sketch", &units).unwrap();
+        f.params.set("sketchPlane", ParamValue::Query(vec![plane]));
+        f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+        let id = f.id;
+        ps.features.push(f);
+        id
+    };
+    let mut axis = noshape_sketch::Sketch::new();
+    let line = axis.add_line(mm(0.0, 0.0), mm(0.0, 20.0));
+    let axis_id = add_sketch(&mut ps, front.clone(), axis);
+    let axis = Reference::SketchEntity { sketch: axis_id, entity: line.0 };
+    let mut body = noshape_sketch::Sketch::new();
+    body.corner_rectangle(mm(0.0, 0.0), mm(10.0, 10.0));
+    let mut cone = noshape_sketch::Sketch::new();
+    cone.add_line(mm(0.0, 0.0), mm(-12.0, 0.0));
+    cone.add_line(mm(-12.0, 0.0), mm(-10.0, 10.0));
+    cone.add_line(mm(-10.0, 10.0), mm(0.0, 10.0));
+    cone.add_line(mm(0.0, 10.0), mm(0.0, 0.0));
+    // (The cone's profile on the axis's other side: the same turn sweeps the other half.)
+    for (sk, op) in [(body, "NEW"), (cone, "ADD")] {
+        let region = sk.regions()[0].id.clone();
+        let id = add_sketch(&mut ps, front.clone(), sk);
+        let mut rv = ps.new_feature("revolve", &units).unwrap();
+        rv.params.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: id, key: noshape_model::regen::eval::encode_region_key(&region) }]));
+        rv.params.set("axis", ParamValue::Query(vec![axis.clone()]));
+        rv.params.set("fullRevolve", ParamValue::Bool(false));
+        rv.params.set("angle", ParamValue::Expr(ExprValue::new("180 deg")));
+        rv.params.set("operationType", ParamValue::Enum(op.into()));
+        rv.params.set("defaultScope", ParamValue::Bool(true));
+        ps.features.push(rv);
+    }
+    let r = regen(&ps, &units);
+    let part = &r.context.bodies[0];
+    let top = (0..part.faces.len())
+        .find(|&i| part.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok().and_then(|f| f.bounding_box(true).ok()).is_some_and(|b| (b.min.z - 0.01).abs() < 1e-7 && (b.max.z - 0.01).abs() < 1e-7))
+        .expect("the top face");
+    let top = Reference::Face((*part.faces[top]).clone());
+    let mut circle = noshape_sketch::Sketch::new();
+    circle.add_circle(mm(0.0, 0.0), 0.01);
+    let disc = noshape_model::regen::eval::encode_region_key(&circle.regions()[0].id);
+    let id = add_sketch(&mut ps, top, circle);
+    let mut ex = ps.new_feature("extrude", &units).unwrap();
+    ex.params.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: id, key: disc }]));
+    ex.params.set("operationType", ParamValue::Enum("NEW".into()));
+    ex.params.set("depth", ParamValue::Expr(ExprValue::new("5 mm")));
+    ps.features.push(ex);
+    let r = regen(&ps, &units);
+    let new = r.context.bodies.last().unwrap();
+    let v = new.shape.volume().unwrap() * 1e9;
+    assert!((v - std::f64::consts::PI * 100.0 * 5.0).abs() < 1e-3, "the disc, 5 mm: {v} mm³");
+    let shown = new.shape.shown_topology().unwrap();
+    assert_eq!(shown.face_count(), 4, "two caps and the wall in two, split where the rim is");
+}
+
 /// An empty sketch on a frame's face (a 60 x 40 mm plate with a 40 x 20 mm opening, 10 mm): the face and the
 /// opening's inside are both sketch faces, as live's (asm-robotic-arm's Sketch 3: JPG the frame's face, JPC inside
 /// it, which its Extrude 4 picks), neither of them qSketchRegion's.

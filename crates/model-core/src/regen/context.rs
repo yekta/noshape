@@ -269,6 +269,9 @@ pub struct SketchResult {
     pub imprinted: Vec<bool>,
     /// The sketch's own regions the imprinted face edges split: references made before imprinting still resolve.
     pub split: Vec<noshape_sketch::regions::Region>,
+    /// Points where a region's arcs of one circle stay apart: the ends of an imprinted face arc the circle lies along.
+    #[serde(default)]
+    pub joints: Vec<glam::DVec2>,
     pub wires: Vec<noshape_sketch::regions::Wire>,
     /// Dimension label texts by constraint id.
     pub dimension_text: BTreeMap<u32, String>,
