@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 00:56 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30.
+Updated 2026-11-18 01:37 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30.
 
 ## In flight
 
@@ -17,12 +17,14 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE
 tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/rb.sh`; drawing runs vibex8.
 - Landed 11-17: ec42bd22 22:23, a4502066 23:37 (Edge condition symbols, weld centered joints, hatch Esc, hole callout
   dual row), 4014c1fd 23:43 (mate glyph press = its click; deterministic test).
-- To land (committed, takes checking on vibex6): 4ea1aa5d (leader right-click selects the note, Add / Remove node keep
-  it; Cell panel for ranges / merged cells as live; revision Cell panel sizes only; tables' Send to back; reader
-  emulation: lines clipped to the view box at 2 px, a hovered note not counted), 740891f7 (documents list Ctrl or Cmd
-  toggles), 7077f4c2 (VS: invalid name red / Enter nothing / Esc drops; foreign length shown in document unit; error
-  tooltip "Error regenerating." + red border), b91c30b4 (view drag alone + aligned follow on release, Esc mid-drag puts
-  back, 200 ms double-click on views, Esc mid-box nothing, Add revision callout unlit until placed).
+- Queued on vibe2 01:36: e55271ab = 6fa3c795 (failed 01:14 on menu coverage: "drawing:Unmerge" now listed) + the
+  history change bar / change-row keys / config row click. Contents: leader right-click and Add / Remove node; Cell
+  panel for ranges and merged cells; revision Cell panel; tables' Send to back; reader emulation (2 px, clipped, hovered
+  note); documents list Ctrl or Cmd; VS name red / Esc, foreign length, error tooltip and border; view drag alone, Esc
+  mid-drag, 200 ms view double-click, Esc mid-box, revision callout table unlit; history: change rows keyed by full id
+  (8-digit prefixes collided, clicks lost), "History changes are view only. Viewing <change>" bar with Restore / Return,
+  navbar the version a change is under, header only compare and x while viewing; config row click doesn't switch.
+  Checked: drawing takes 33/36 then the rest, vs-* 20/20, ver-* 21/21, feel tests, clippy.
 - Full drawing run 11-18 00:00 on vibex8 (~/agents/studios-keep/drw1118a, build before the cell / VS / feel fixes;
   memguard pgid verified): its selection diffs came from a wider hover rule since narrowed to notes.
 - Still differing (next, in order): drw-revision-table-delete s8 (after Delete live reads Top lit, ours Front: the
