@@ -363,6 +363,8 @@ impl PartStudioView {
                 // plane is picked).
             }
         }
+        // (The entering regeneration may have come in before the editor existed: its solve is in the context.)
+        self.take_solved_draft(cx);
         self.place_sketch_frame(plane.as_ref(), cx);
         self.update_conflicts();
         self.opts.editing_sketch = Some(id);
@@ -453,8 +455,12 @@ impl PartStudioView {
     /// Regenerate immediately on the UI thread (sketch edits are cheap: only
     /// the sketch is evaluated, upstream results come from the cache).
     pub(super) fn regen_sync(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        // Every sketch edit regenerates through here: record it for Ctrl+Z.
+        // Every sketch edit regenerates through here: record it for Ctrl+Z. (An edit before the opening's solve came
+        // in: the draft is what the user works on.)
         self.draft_checkpoint(cx);
+        if let Some(ed) = self.sketch.as_mut() {
+            ed.draft_solved = true;
+        }
         let Some((studio, upto)) = self.effective_studio(cx) else { return };
         let units = self.doc.read(cx).session.doc.settings.units;
         let config = self.current_config(&studio);
@@ -471,6 +477,7 @@ impl PartStudioView {
         self.pending = None;
         self.pending_timer = None;
         self.context = Some(result.context.clone());
+        self.take_solved_draft(cx);
         self.update_conflicts();
         self.apply_display(Arc::new(result.display), window, cx);
         // The profile inspector follows every edit (resolved issues disappear).
@@ -481,6 +488,23 @@ impl PartStudioView {
             && self.display.feature_state(id).is_some_and(|s| s.status != noshape_model::display::FeatureStatus::Error)
         {
             self.message = None;
+        }
+    }
+
+    /// The opened sketch's draft takes the geometry the regeneration solved and shows (hat15b's Sketch 1, 1.1 mm off
+    /// its stored place after an upstream change: its line lit with the pointer 30 px beside it, a click on it took the
+    /// region), once, before any edit.
+    pub(super) fn take_solved_draft(&mut self, cx: &mut Context<Self>) {
+        let Some(ed) = self.sketch.as_mut().filter(|ed| !ed.draft_solved) else { return };
+        let Some(solved) = self.context.as_ref().and_then(|c| c.sketches.iter().find(|s| s.feature == ed.feature)).map(|s| s.sketch.clone()) else { return };
+        ed.draft_solved = true;
+        let Some(dialog) = self.edit.as_ref().map(|e| e.dialog.clone()) else { return };
+        // (The draft's starting state, as the handle arms: not an undo step.)
+        if dialog.update(cx, |d, _| d.sketch_data_mut().is_some_and(|data| data.sketch.adopt_geometry(&solved))) {
+            let f = dialog.read(cx).feature.clone();
+            if let Some(e) = &mut self.edit {
+                e.history.rebase(&f);
+            }
         }
     }
 

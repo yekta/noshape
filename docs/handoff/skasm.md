@@ -15,7 +15,9 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - Sticky snap target (live getInference lastInferenceTarget): `SketchEditor::snap_target` + `Inference::targets`;
   scene test `the_line_snapped_to_last_stays_over_a_point_by_it`; feel row. live REQUESTS 11-18 03:46 asks for the
   real-pointer check (a line slid into its own end).
-- Queued (re-queued 04:4x after the export test was parked): the sticky target above.
+- Landed 4b4e4915 (05:04): sticky target, held-point solver fix.
+- Queued: an opened sketch's draft takes the regeneration's solve (hat15b Sketch 1 was 1.1 mm off its stored place:
+  hover / snaps / drags on the stored lines); `take_solved_draft`, `Sketch::adopt_geometry`.
 - Solver (regeneration's constructive pass): a circle / ellipse Coincident with a Fixed point / model vertex
   translates with its size kept, a free point comes onto the curve (live coincident.json); was carried centre-onto-
   point (r 0). `carry_onto_placed` carries only point-point Coincidents; `kept_first_in` keeps a Fixed member and the

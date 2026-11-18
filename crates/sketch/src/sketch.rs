@@ -323,6 +323,25 @@ impl Sketch {
         self.touch();
     }
 
+    /// Takes `solved`'s geometry for every entity of the same id and kind here (a regeneration's solve of this
+    /// sketch); whether anything moved.
+    pub fn adopt_geometry(&mut self, solved: &Sketch) -> bool {
+        let mut moved = false;
+        for (id, e) in self.entities.iter_mut() {
+            if let Some(s) = solved.entities.get(id)
+                && std::mem::discriminant(&s.geometry) == std::mem::discriminant(&e.geometry)
+                && s.geometry != e.geometry
+            {
+                e.geometry = s.geometry.clone();
+                moved = true;
+            }
+        }
+        if moved {
+            self.touch();
+        }
+        moved
+    }
+
     /// Every curve's missing handle lines ([`Self::add_handle_arms`]); whether any was missing.
     pub fn add_all_handle_arms(&mut self) -> bool {
         let curves: Vec<EntityId> = self.entities.values().filter(|e| matches!(e.geometry, Geometry::FitSpline { handles: Some(_), .. } | Geometry::BSpline { .. })).filter(|e| self.handle_arms(e.id).iter().any(Option::is_none)).map(|e| e.id).collect();

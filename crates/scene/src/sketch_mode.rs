@@ -743,6 +743,9 @@ pub struct SketchEditor {
     pub extend_from: Option<EntityId>,
     /// Extend on a line: the end picked (the nearer one), which follows the pointer (live 11-18 sketch-tools t4-ext).
     pub extend_end: Option<EntityId>,
+    /// The draft holds the regeneration's solve of the sketch (taken on opening, or an edit came first): live edits
+    /// the geometry it shows, not the stored one an upstream change has since moved.
+    pub draft_solved: bool,
     /// On-the-fly dimension boxes of the geometry created last.
     pub otf: Option<OnTheFly>,
     /// The user started typing into the active on-the-fly box.
@@ -1384,6 +1387,7 @@ impl SketchEditor {
             cursor: None,
             inference: None,
             snap_target: std::cell::Cell::new(None),
+            draft_solved: false,
             external_snap: None,
             model_centres: std::sync::OnceLock::new(),
             model_lines: std::sync::OnceLock::new(),

@@ -4646,6 +4646,63 @@ fn a_spline_from_before_handle_arms_shows_its_arms_on_entering_its_sketch(cx: &m
     assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (false, false), "not an undo step");
 }
 
+/// psui / skasm 11-18 (the user's hat15b, Sketch 1): a sketch whose stored geometry its regeneration solves elsewhere (an
+/// upstream change moved it 1.1 mm) is edited where it is shown: the dialog's draft takes the solve on entering, so
+/// hover, snaps and drags act on the drawn lines (its line lit with the pointer 30 px beside it, a click on it took the
+/// region). Not an undo step.
+#[gpui::test]
+fn an_opened_sketch_is_edited_where_its_solve_shows_it(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "line": [[0, 0], [40, 10]] }] }
+    ] });
+    let (window, view) = part_studio_from(cx, "solved-draft", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    // Stored as drawn, with a Horizontal its line doesn't hold yet (as a sketch whose upstream moved).
+    let (id, line) = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let tab = v.tab;
+            let id = v.studio(cx).unwrap().features.iter().find(|f| f.name == "Sketch 1").unwrap().id;
+            let mut line = None;
+            v.doc.update(cx, |doc, cx| {
+                doc.edit_studio(tab, "Horizontal", cx, |ps| {
+                    let f = ps.features.iter_mut().find(|f| f.id == id).unwrap();
+                    let Some(noshape_model::params::ParamValue::Sketch(mut arc)) = f.params.get("sketch").cloned() else { panic!("a sketch") };
+                    let d = std::sync::Arc::make_mut(&mut arc);
+                    let l = d.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).unwrap().id;
+                    d.sketch.add_constraint(noshape_sketch::ConstraintKind::Horizontal { a: l, b: None }).unwrap();
+                    line = Some(l);
+                    f.params.set("sketch", noshape_model::params::ParamValue::Sketch(arc));
+                })
+            });
+            (id, line.unwrap())
+        })
+    });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let ends = |sk: &noshape_sketch::Sketch| match sk.curve(line) {
+        Some(noshape_sketch::Curve2::Line { a, b }) => (a, b),
+        _ => panic!("the line"),
+    };
+    let stored = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.studio(cx).unwrap().features.iter().find(|f| f.id == id).and_then(|f| match f.params.get("sketch") {
+            Some(noshape_model::params::ParamValue::Sketch(d)) => Some(ends(&d.sketch)),
+            _ => None,
+        });
+        d.unwrap()
+    });
+    assert!((stored.1.y - stored.0.y).abs() > 1e-3, "stored slanted: {stored:?}");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.as_ref().is_some_and(|ed| ed.draft_solved));
+    let (draft, solved) = cx.update(|cx| {
+        let v = view.read(cx);
+        let solved = v.context.as_ref().and_then(|c| c.sketches.iter().find(|s| s.feature == id)).map(|s| ends(&s.sketch)).unwrap();
+        (ends(&v.sketch_data(cx).unwrap().sketch), solved)
+    });
+    assert!((solved.1.y - solved.0.y).abs() < 1e-9, "the solve levels it: {solved:?}");
+    assert!(draft.0.distance(solved.0) < 1e-12 && draft.1.distance(solved.1) < 1e-12, "the draft is the solve: {draft:?} vs {solved:?}");
+    assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (false, false), "not an undo step");
+}
+
 /// User P0 (lead 11-09, help "Custom features"): a feature clicked in Add custom features joins the toolbar with
 /// live's toast and shows as added; clicked again it comes off (no second entry); a Feature Studio's row adds all its
 /// features; the list is alphabetical and every open Part Studio follows it (an account setting).
