@@ -216,7 +216,7 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Ring snap | 5° / 1° / 0.1° by the arc at the pointer's radius ≤ 50 px, within 0.4 × (1 + level/3) of a step | the same (asm 641ab465, `ring_snap`) | asm's tests | = |
 | Snap mode ghost | the source part at 0.3 opacity | the same (17:18) | – | = |
 | Snap mode lines | none: no dashed line or 8 px box in 3 snap-mode drags over 23 pointer stops (live2 snapmode-1118); the client's INFERENCE_SNAP_* constants aren't drawn there | none | – | = |
-| Snap mode drag (live2 snapmode-1118) | a press-drag on the hovered face's connector: a translucent ghost carries it, the connector follows the pointer and jumps onto a target dot (a corner, an edge midpoint, a face centre) when the pointer is within 57 px of it in x and in y (a square: COORDINATESYSTEM_INFERENCE_PICK_RADIUS_PX 50 + the 15 px dot); release: connector on connector, frames aligned (not flipped), then an uncommitted "Fastened 1" mate dialog with both chips and the HUD; Esc closes it with no mate and the part stays snapped | the same: press-drag, the connector jumps within a 57 px square, release aligns the frames and opens the uncommitted Fastened dialog (Esc: no mate, the part stays; Ctrl+Z in it does nothing) (assembly_panels `snap_target` / `finish_snap_drag`); the pointer must be over the target part (qa: 74 px on a 45° diagonal, live's diagonal not captured yet) | a_snap_drags_reach_is_a_57_px_square, a_snap_mode_drag_lands_aligned_and_opens_an_uncommitted_fastened | ≈ |
+| Snap mode drag (live2 snapmode-1118) | a press-drag on the hovered face's connector: a translucent ghost carries it, the connector follows the pointer and jumps onto a target dot (a corner, an edge midpoint, a face centre) when the pointer is within 50–72 px of it depending on the face under the pointer and the direction (not a square: live2 snap-diag-1118, which corrects the earlier "57 px in x and in y"); release: connector on connector, frames aligned (not flipped), then an uncommitted "Fastened 1" mate dialog with both chips and the HUD; Esc closes it with no mate and the part stays snapped | the same: press-drag, the connector jumps within a 57 px square, release aligns the frames and opens the uncommitted Fastened dialog (Esc: no mate, the part stays; Ctrl+Z in it does nothing) (assembly_panels `snap_target` / `finish_snap_drag`); the pointer must be over the target part (qa: 74 px on a 45° diagonal, live's diagonal not captured yet) | a_snap_drags_reach_is_a_57_px_square, a_snap_mode_drag_lands_aligned_and_opens_an_uncommitted_fastened | ≈ |
 
 ### Exploded, section and named views (asm-views.json): 15 / 15
 
@@ -1278,6 +1278,29 @@ feel): Hole dialog follow-up"; times on live's software-GL lane (preview times a
 | Hole Simple / Counterbore / Countersink and Inch / Metric tabs: the title changes at 0.8–0.9 s, the preview at 2.5–2.8 s; Counterbore adds diameter 10 mm and depth 5 mm rows; Metric makes Ø 5 mm | ? | missing |
 | Hole depth typed: nothing until Enter; Enter: the title at 0.5 s, the preview at 2.8 s | ? | missing |
 | Mirror: a side face in the Mirror plane box ("Face of Extrude 1"); the preview at 1.8 s; the operation turns to Add with "Merge with all" and Merge scope "Part 1" when the mirror touches the seed | ? | missing |
+
+### asm-dstates-1118 + sm-form-1118 (Display states, Form placement, live2 11-18 09:25) [asm, skasm]
+
+| Finding | Ours | Test |
+|---|---|---|
+| Display states: a toolbar tool; a floating panel at (246, 79) with "New display state name" focused, "+", "No display states created"; name + Enter saves the current visibility; then a native select "Select a display state" with ↻ / ✎ / ⊗; Esc closes the panel | ? | missing |
+| Applying a display state: the instance rows at ~0.3 s, the graphics in one frame at ~0.85 s, not animated | ? | missing |
+| Form: the dialog at 0.95 s, "Preparing form…" with a spinner at the graphics' bottom centre for ~4.4 s; a sketch point fills Location(s) and Target face(s) by itself; the emboss preview ~5 s after the first point, ~1.5 s after the next; a placed location can't be dragged | ? | missing |
+
+### studios-1118 answers (drawing feel, live2 11-18 11:22) [studios]
+
+| Finding | Ours | Test |
+|---|---|---|
+| BOM table properties closed by Esc, ✕ or ✓: the table stays selected (grips, tan outline) | ? | ui-parity drw-bom-table-properties (reader) |
+| Drawing toolbar: the title tooltip at ~0.47 s, then the help popover at ~3.1 s (400 px wide at the frame's left, 37 px down, title bar + text, stays while resting); every tool but Undo / Redo has one | ? | missing (ours has none) |
+| Hatch Pattern list: under the field (1 px), its width + 2, 30 px rows, at most 341 px then scrolls; opens upward when the field is low; a second click on the field closes it and keeps the value | ? | ui-parity drw-hatch-panel |
+| Sheet properties › Custom: zones 4 × 4 (ANSI) / 6 × 4 (ISO) whatever the size before; width / height fields take the previous size's dimensions | ? | ui-parity drw-sheet-properties-custom-zones |
+
+### snap-diag-1118 (assembly Snap mode reach by direction, live2 11-18 11:40) [asm]
+
+| Finding | Ours | Test |
+|---|---|---|
+| Snap mode corner reach is not a square: over the top face 45° up-left 72 px (51, 51), straight up 50; over the side face along the face diagonal 56 (26, 49), 45° down-right 49 (both land side-face aligned); off the part 50, the connector frozen at its last face spot and a release there moves nothing (corrects "57 px square") | ? (74 / 70, qa) | missing |
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
