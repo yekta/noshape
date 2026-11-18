@@ -1719,9 +1719,9 @@ impl PartStudioView {
                         // A plain click doesn't switch: only the row menu's Switch to and the feature list's box do (live2
                         // cfg-1118, qa CFGFEEL-ROW-CLICK-SWITCHES).
                         .when(matches!(input.kind, ConfigInputKind::List { .. }), |d| {
-                            // Live 1717: Switch to "X" (not the current row), Set
-                            // as default (not the default), Duplicate row, Move up /
-                            // down by position, Delete row (not the default).
+                            // Live 1717, ps-feel2-1118 follow-up: Switch to "X" and Delete row (not the current row; the
+                            // default row too while another is current), Set as default (not the default), Duplicate
+                            // row, Move up / down by position.
                             let ri = rows.iter().position(|(k, _)| k == rk).unwrap_or(0);
                             let n = rows.len();
                             let is_default = matches!(&input.kind, ConfigInputKind::List { default, .. } if default == rk);
@@ -1772,7 +1772,7 @@ impl PartStudioView {
                                 }))
                                 .when(ri > 0, |m| m.item(mv("Move up", -1)))
                                 .when(ri + 1 < n, |m| m.item(mv("Move down", 1)))
-                                .when(!is_default, |m| m.item(op("Delete row".into(), noshape_ops::config::DELETE_OPTION, noshape_ops::config::delete_option).icon_name("menu-delete")))
+                                .when(!active, |m| m.item(op("Delete row".into(), noshape_ops::config::DELETE_OPTION, noshape_ops::config::delete_option).icon_name("menu-delete")))
                             })
                         });
                     for (q, (ci, c)) in columns.iter().enumerate() {
