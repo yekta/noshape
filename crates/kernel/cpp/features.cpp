@@ -4497,8 +4497,9 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
       fail_op("the loft can't follow the path");
     along   = true;
     natural = allow_natural && !ruled && !closed;
-    if (natural)
-      ts.SetParType(Approx_IsoParametric);
+    // (Centripetal: by section spacing the side ran back behind the first profile, c2-loft-paths-guides' Loft 3 0.96 mm
+    // past its start cap, and its fuse with Mirror 1's copy dropped the loft.)
+    ts.SetParType(Approx_Centripetal);
   }
   const bool matched = circles || counts || connected || along;
   ts.CheckCompatibility(!matched);
@@ -4574,8 +4575,9 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
     std::vector<TopoDS_Shape> wargs(wires.begin(), wires.end());
     h = compose(compound_of(args), split, history_of(wargs, ts));
   }
-  // Live 1784: through three or more sections, or between sections of different topology, faces meeting smoothly
-  // are one side face (two matching sections: a face per segment).
+  // Live 1784: through three or more sections (a path's too: c2-loft-paths-guides' Loft 3, two slots along an arc, one
+  // side face), or between sections of different topology, faces meeting smoothly are one side face (two matching
+  // sections: a face per segment).
   TopoDS_Shape out = ts.Shape();
   // natural_loft's surfaces between sections on perpendicular planes with a start condition (live 2276's G: a circle
   // on Top to one on x = 15) came out with every face facing in: the solid turned the right way out.
@@ -4597,7 +4599,7 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
       real += s.ShapeType() != TopAbs_VERTEX;
     HHist        mh;
     TopoDS_Shape m;
-    if (!ruled && !closed && !points && (real >= 3 || circles || counts || connected) && !std::getenv("NOSHAPE_LOFT_NO_MERGE") && merge_tangent_sides(out, m, mh))
+    if (!ruled && !closed && !points && (real >= 3 || circles || counts || connected || along) && !std::getenv("NOSHAPE_LOFT_NO_MERGE") && merge_tangent_sides(out, m, mh))
     {
       h   = compose(compound_of(args), h, mh);
       out = m;

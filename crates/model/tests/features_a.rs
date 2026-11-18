@@ -3617,3 +3617,49 @@ fn subtract_with_offset_moves_a_tools_spline_face() {
     let want = area / 0.02 * 1e-3 * 0.01;
     assert!(((plain - moved) - want).abs() < 0.05 * want, "{} mm3 more cut, about {}", (plain - moved) * 1e9, want * 1e9);
 }
+
+/// A loft along a path runs through its sections like a loft through three or more profiles: sides meeting smoothly
+/// are one face (live c2-loft-paths-guides' Loft 3: two slots along an arc, one side face; ours 4), and its side stays
+/// on the path's side of the first profile (spaced by section, it ran 0.96 mm back past Loft 3's start and the fuse
+/// with Mirror 1's copy dropped the loft).
+#[test]
+fn a_path_loft_of_two_slots_has_one_side_face() {
+    let slot = |c: DVec2| {
+        let (h, r) = (0.005, 0.005);
+        let mut sk = noshape_sketch::Sketch::new();
+        sk.add_line(c + DVec2::new(-h, -r), c + DVec2::new(h, -r));
+        sk.add_arc(c + DVec2::new(h, 0.0), c + DVec2::new(h, -r), c + DVec2::new(h, r));
+        sk.add_line(c + DVec2::new(h, r), c + DVec2::new(-h, r));
+        sk.add_arc(c + DVec2::new(-h, 0.0), c + DVec2::new(-h, r), c + DVec2::new(-h, -r));
+        sk
+    };
+    let mut t = T::new();
+    let s1 = t.sketch(Reference::Plane(DatumPlane::Top), slot(DVec2::ZERO));
+    let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Right)])), ("cplaneType", en("OFFSET")), ("offset", e("40 mm"))]);
+    // Right offset: sketch x = world Y, y = Z.
+    let s2 = t.sketch(Reference::FeaturePlane(pl), slot(DVec2::new(0.0, 0.04)));
+    let mut sk = noshape_sketch::Sketch::new();
+    // Front: sketch x = X, y = Z; centre (40, 0), from the origin up and over.
+    let arc = sk.add_arc(DVec2::new(0.04, 0.0), DVec2::new(0.04, 0.04), DVec2::ZERO);
+    let path = t.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let item = |r: Reference| {
+        let mut v = ParamValues::default();
+        v.set("sheetProfileEntities", q(vec![r]));
+        v
+    };
+    let (r1, r2) = (t.regions(s1)[0].clone(), t.regions(s2)[0].clone());
+    t.add(
+        "loft",
+        &[
+            ("sheetProfilesArray", ParamValue::Array(vec![item(r1), item(r2)])),
+            ("addSections", b(true)),
+            ("spine", q(vec![Reference::SketchEntity { sketch: path, entity: arc.0 }])),
+            ("sectionCount", e("5")),
+        ],
+    );
+    let res = t.ok();
+    assert_eq!(res.context.bodies[0].faces.len(), 3, "one side face and the two slots");
+    let bb = res.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(bb.min.z > -1e-6, "the side below the first profile's plane: {} mm", bb.min.z * 1e3);
+}
+
