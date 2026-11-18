@@ -1110,7 +1110,7 @@ pub fn mirrored_studios(doc: &noshape_model::Document, a: &Assembly, derived: &[
 pub const SNAP_DESCRIPTION: &str = "Insert : Fastened (snap)";
 
 /// Snap mode (Shift+S; a mate connector on each of two instances): the
-/// first pick's instance moves face to face onto the second (the second
+/// first pick's instance moves onto the second, frames aligned (the second
 /// moves instead when the first is fixed and it isn't), and a Fastened mate
 /// joins them. Refused with the app's message. The new mate.
 pub fn snap(a: &mut Assembly, result: &AssemblyResult, src: MateConnectorRef, dst: MateConnectorRef, units: &noshape_units::UnitPrefs) -> Result<MateId, &'static str> {
@@ -1132,7 +1132,10 @@ pub fn snap(a: &mut Assembly, result: &AssemblyResult, src: MateConnectorRef, ds
     }
     let id = MateId(a.next_id());
     let name = a.next_feature_name("Fastened");
-    a.mates.push(Mate::new(id, name, MateType::Fastened, moving, stay));
+    // The snap leaves the frames aligned, so the Fastened holds them flipped (its own alignment is face to face).
+    let mut m = Mate::new(id, name, MateType::Fastened, moving, stay);
+    m.flip_primary = true;
+    a.mates.push(m);
     Ok(id)
 }
 

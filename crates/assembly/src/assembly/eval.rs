@@ -406,11 +406,12 @@ fn relation_kind(t: RelationType) -> RelationKind {
 }
 
 /// New placement of an instance so that its connector (`source`, world)
-/// lands face-to-face on `target` (world), as a fastened mate would place it.
+/// lands on `target` (world) with the frames aligned, not flipped (live
+/// snapmode-1118: a block's top-face connector onto another's top face sinks
+/// it in, the tops flush; the 11-03 audit's pin likewise).
 pub fn snap_placement(pose: &Placement, source: &Frame, target: &Frame) -> Placement {
-    let r0 = Frame::new(DVec3::ZERO, DQuat::from_rotation_x(std::f64::consts::PI));
     let p = placement_to_frame(pose);
-    let np = target.mul(&r0.inverse()).mul(&source.inverse()).mul(&p);
+    let np = target.mul(&source.inverse()).mul(&p);
     frame_to_placement(&np)
 }
 

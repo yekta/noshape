@@ -1295,6 +1295,53 @@ fn a_snap_mode_drag_keeps_its_move_through_esc_and_stays_in_snap_mode(cx: &mut T
     .unwrap();
 }
 
+/// Live snapmode-1118: a snap-mode drag of the pin's top-face connector onto the block's top-face centre lands it there
+/// with the frames aligned (the tops flush, the pin sunk in), opens an uncommitted Fastened dialog with both
+/// connectors, and Esc closes it with no mate, the pin staying where it snapped.
+#[gpui::test]
+fn a_snap_mode_drag_lands_aligned_and_opens_an_uncommitted_fastened(cx: &mut TestAppContext) {
+    use noshape_scene::{asm_scene::AsmPickTarget, builder::PickKind};
+    let (window, view) = pattern_assembly(cx, "snap-onto");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let pin = instance(v, "Part 2 <1>", cx);
+            let mates = v.assembly(cx).unwrap().mates.len();
+            v.toggle_snap(w, cx);
+            let top = face_connector(v, "Part 2 <1>", true, cx);
+            let Reference::Implicit { on, .. } = &top.reference else { panic!("an implicit connector") };
+            let occ = v.result.occurrences.iter().position(|o| o.top() == pin).unwrap();
+            v.hover = Some(AsmPickTarget { path: vec![pin], reference: (**on).clone(), kind: PickKind::Face, occ, anchor: None });
+            let units = v.units(cx);
+            let from = v.viewport.read(cx).project(v.result.connector_world(&top, &units).unwrap().origin).unwrap();
+            v.pointer = from;
+            v.start_snap_drag(from, cx);
+            let target = face_connector(v, "Part 1 <1>", true, cx);
+            let onto = v.viewport.read(cx).project(v.result.connector_world(&target, &units).unwrap().origin).unwrap();
+            v.update_snap_drag(onto + glam::DVec2::new(5.0, 5.0), cx);
+            v.finish_snap_drag(w, cx);
+            let (a, b) = (v.result.connector_world(&top, &units).unwrap(), v.result.connector_world(&target, &units).unwrap());
+            assert!(a.origin.distance(b.origin) < 1e-9 && a.z().dot(b.z()) > 0.999, "aligned onto the centre: {a:?} {b:?}");
+            let s = v.mate.as_ref().expect("the Fastened dialog");
+            let d = s.dialog.read(cx);
+            assert!(d.mate_type() == MateType::Fastened && d.connectors_complete());
+            assert_eq!(v.assembly(cx).unwrap().mates.len(), mates, "nothing committed");
+            assert!(v.snap.is_some(), "snap mode stays on");
+            v.on_cancel(&crate::actions::Cancel, w, cx);
+            assert!(v.mate.is_none());
+            assert_eq!(v.assembly(cx).unwrap().mates.len(), mates, "no mate");
+        });
+    })
+    .unwrap();
+    cx.executor().advance_clock(std::time::Duration::from_millis(100));
+    cx.run_until_parked();
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let units = v.units(cx);
+        let (a, b) = (face_connector(v, "Part 2 <1>", true, cx), face_connector(v, "Part 1 <1>", true, cx));
+        assert!(v.result.connector_world(&a, &units).unwrap().origin.distance(v.result.connector_world(&b, &units).unwrap().origin) < 1e-9, "stays where it snapped");
+    });
+}
+
 /// Live asm/feel-1117 c-a-rowhover: hovering an instance's row outlines the part in the graphics, in hover orange, with
 /// no tint on its faces (was: the accent fill).
 #[gpui::test]

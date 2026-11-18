@@ -3893,11 +3893,13 @@ impl AssemblyView {
         let units = self.units(cx);
         let t = noshape_model::assembly::eval::matrix_frame(&o.transform);
         let mut best: Option<(f64, MateConnectorRef)> = None;
+        // Live (snapmode-1118): a face's point within 57 px of the pointer takes the dragged connector (a corner at
+        // 57 px, free at 58); farther, it follows the pointer.
         for p in inference_candidates(&o.context, Some(&o.body), &hit.reference, &units) {
             let w = t.mul(&p.frame).origin;
             if let Some(s) = vp.project(w) {
                 let d = s.distance(position);
-                if best.as_ref().is_none_or(|(b, _)| d < *b) {
+                if d <= SNAP_DRAG_REACH_PX && best.as_ref().is_none_or(|(b, _)| d < *b) {
                     best = Some((d, p.connector(&hit.path)));
                 }
             }
@@ -3985,14 +3987,18 @@ impl AssemblyView {
             cx.notify();
             return;
         }
-        // Live (behaviours "skasm (2026-11-03 23:11, P3) assembly parity
-        // audit" (6)): the instance stays where it snapped; no mate dialog, no mate. Dropped with no snap it stays
-        // where it followed the pointer (live snapmode-1118 runs 2-3: moved, no message).
-        // Snap mode stays on (live snapmode-1118: it persists across drags).
+        // Live (snapmode-1118): the instance stays where it snapped (or, with no snap, where it followed the pointer)
+        // and snap mode stays on. A snap opens an uncommitted "Fastened 1" between the two connectors; Esc closes it
+        // with no mate, the instance staying put.
         self.snap = Some(None);
         self.message = None;
         let name = self.assembly(cx).and_then(|a| a.instance(s.top).map(|i| i.name.clone())).unwrap_or_default();
         self.edit(&format!("Move : {name}"), cx, |_| {});
+        if let (Some(src), Some(dst)) = (s.sources.get(s.source_ix).cloned(), s.target) {
+            self.start_mate_inner(MateType::Fastened, window, cx);
+            self.deliver_connector(src, window, cx);
+            self.deliver_connector(dst, window, cx);
+        }
         self.schedule_eval(window, cx);
         cx.notify();
     }
@@ -4366,6 +4372,9 @@ impl AssemblyView {
 }
 
 /// Insert › Other documents categories (live assembly/71).
+/// How far from a face's point (corner, edge midpoint, centre) a snap-mode drag takes it (live snapmode-1118).
+const SNAP_DRAG_REACH_PX: f64 = 57.0;
+
 const OTHER_SOURCES: [(&str, &str); 5] = [("Owned by me", "src-owned"), ("Recently opened", "src-recent"), ("Created by me", "src-created"), ("Shared with me", "src-shared"), ("Public", "src-public")];
 
 /// A document opened in Insert › Other documents (live assembly/612–619):

@@ -123,8 +123,8 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "assembly",
             verb: "snap",
-            summary: "Snap mode: move an instance face to face onto another and fasten them",
-            description: Box::leak(format!("Snap mode (Shift+S): a mate connector on each of two instances; the first one's instance moves face to face onto the second (the second moves when the first is fixed and it isn't), and a Fastened mate joins them. One edit (\"Insert : Fastened (snap)\"). Refused as the app refuses: the same instance, both instances fixed. {CONNECTOR_DOC}").into_boxed_str()),
+            summary: "Snap mode: move an instance's connector onto another's and fasten them",
+            description: Box::leak(format!("Snap mode (Shift+S): a mate connector on each of two instances; the first one's instance moves its connector onto the second, the frames aligned (not flipped: top face onto top face sinks it in, the tops flush), (the second moves when the first is fixed and it isn't), and a Fastened mate joins them. One edit (\"Insert : Fastened (snap)\"). Refused as the app refuses: the same instance, both instances fixed. {CONNECTOR_DOC}").into_boxed_str()),
             fields: vec![doc_field(), asm_field(), req("a", json!({ "type": "object" }), "The connector on the instance to move."), req("b", json!({ "type": "object" }), "The connector to snap onto.")],
             mutates: true,
             destructive: false,

@@ -7957,23 +7957,25 @@ fn drawing_orientation_flip_and_cutting_line_angle() {
     assert_eq!(e.param.as_deref(), Some("view"), "{e:?}");
 }
 
-/// Snap mode through the API: the pin's bottom face onto the block's top
-/// face, face to face, fastened (one edit, as the window's).
+/// Snap mode through the API: the pin's top face onto the block's top face, the frames aligned (live snapmode-1118:
+/// the tops flush, the pin sunk in), fastened (one edit, as the window's).
 #[test]
-fn assembly_snap_fastens_face_to_face() {
+fn assembly_snap_lands_aligned_and_fastens() {
     let mut ctx = Ctx::new();
     let (b, p) = two_part_assembly(&mut ctx, "snap.noshape");
     let face = |ctx: &mut Ctx, inst: &str, n: [f64; 3]| call(ctx, "assembly_entities", json!({ "instance": inst, "kind": "faces", "surface": "plane", "normal": n }))["faces"][0].clone();
-    let (pin_bottom, block_top) = (face(&mut ctx, &p, [0.0, 0.0, -1.0]), face(&mut ctx, &b, [0.0, 0.0, 1.0]));
-    let r = call(&mut ctx, "assembly_snap", json!({ "a": { "instance": p, "entity": pin_bottom["id"] }, "b": { "instance": b, "entity": block_top["id"] } }));
+    let (pin_top, block_top) = (face(&mut ctx, &p, [0.0, 0.0, 1.0]), face(&mut ctx, &b, [0.0, 0.0, 1.0]));
+    let r = call(&mut ctx, "assembly_snap", json!({ "a": { "instance": p, "entity": pin_top["id"] }, "b": { "instance": b, "entity": block_top["id"] } }));
     assert!(r["mate"].as_str().is_some_and(|m| m.starts_with("mate:")), "{r}");
     let h = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
     assert_eq!(h, "Assembly 1 :: Insert : Fastened (snap)");
     let mates = r["mates"].as_array().unwrap();
     assert!(mates.iter().any(|m| m["name"] == "Fastened 1" && m["type"] == "fastened"), "{r}");
-    let now = face(&mut ctx, &p, [0.0, 0.0, -1.0]);
-    assert!((num(&now["centroid"][2]) - num(&block_top["centroid"][2])).abs() < 1e-6, "face to face: {now} vs {block_top}");
-    let e = try_call(&mut ctx, "assembly_snap", json!({ "a": { "instance": p, "entity": pin_bottom["id"] }, "b": { "instance": p, "entity": pin_bottom["id"] } })).unwrap_err();
+    let now = face(&mut ctx, &p, [0.0, 0.0, 1.0]);
+    for k in 0..3 {
+        assert!((num(&now["centroid"][k]) - num(&block_top["centroid"][k])).abs() < 1e-6, "onto the top's centre, tops flush: {now} vs {block_top}");
+    }
+    let e = try_call(&mut ctx, "assembly_snap", json!({ "a": { "instance": p, "entity": pin_top["id"] }, "b": { "instance": p, "entity": pin_top["id"] } })).unwrap_err();
     assert!(e.message.contains("different instance"), "{e:?}");
 }
 

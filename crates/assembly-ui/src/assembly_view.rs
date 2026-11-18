@@ -2940,7 +2940,7 @@ impl AssemblyView {
         }
     }
 
-    /// Move the source connector's instance face-to-face onto the target and fasten them.
+    /// Move the source connector's instance onto the target, frames aligned, and fasten them.
     fn perform_snap(&mut self, src: MateConnectorRef, dst: MateConnectorRef, cx: &mut Context<Self>) {
         let units = self.units(cx);
         let Some(mut next) = self.assembly(cx).cloned() else { return };

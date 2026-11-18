@@ -1603,12 +1603,19 @@ fn snap_explode_progress_replace_and_config() {
     };
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     let units = UnitPrefs::default();
-    // Snap block 2's bottom face onto block 1's top face.
+    // Snap block 2's bottom face onto block 1's top face: the frames aligned (live snapmode-1118), so block 2 turns
+    // over, its bottom face on block 1's top and its body down inside block 1.
     let src = res.connector_world(&conn(2, bottom.clone(), Inference::Centroid), &units).unwrap();
     let dst = res.connector_world(&conn(1, top.clone(), Inference::Centroid), &units).unwrap();
     let np = eval::snap_placement(&asm.instances[1].placement, &src, &dst);
-    assert!((DVec3::from(np.translation) - DVec3::new(0.0, 0.0, 0.01)).length() < 1e-9, "{np:?}");
-    asm.instances[1].placement = np;
+    let (q, t) = (DQuat::from_xyzw(np.rotation[0], np.rotation[1], np.rotation[2], np.rotation[3]), DVec3::from(np.translation));
+    assert!((q * DVec3::Z).z < -0.999 && ((q * DVec3::new(0.02, 0.01, 0.0) + t) - DVec3::new(0.02, 0.01, 0.01)).length() < 1e-9, "{np:?}");
+    // Top face onto top face: the same block lands on block 1 exactly (live: the tops flush).
+    let src = res.connector_world(&conn(2, top.clone(), Inference::Centroid), &units).unwrap();
+    let np = eval::snap_placement(&asm.instances[1].placement, &src, &dst);
+    assert!(DVec3::from(np.translation).length() < 1e-9, "{np:?}");
+    // (Block 2 stacked on block 1 for what follows, fastened bottom to top.)
+    asm.instances[1].placement = Placement { translation: [0.0, 0.0, 0.01], rotation: [0.0, 0.0, 0.0, 1.0] };
     asm.mates.push(mate(10, MateType::Fastened, conn(2, bottom.clone(), Inference::Centroid), conn(1, top.clone(), Inference::Centroid)));
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     assert!(res.mates[0].ok);
