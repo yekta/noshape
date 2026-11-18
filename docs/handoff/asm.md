@@ -6,7 +6,10 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
 
 ## State (2026-11-17 09:25 UTC, restarted after the 11-16 pause)
 
-### Committed on branch, NOT landed (worktree /root/projects/noshape-wt/asm, branch asm-partorigin; feel commits landed via asm-feel cherry-picks: drop them at the rebase)
+### Committed on branch, NOT landed (worktree /root/projects/noshape-wt/asm, branch asm-partorigin)
+- 11-18 ~11:00: the 28 code commits below rebased onto main (conflicts: core's joint rule in region_profile_with, the
+  model runner's volume bands, LiveRef.center); testing on vibex8, then land. b8d2d867e held (bool's 8ba7c6dcc first;
+  old branch kept as asm-partorigin-old).
 1. Mate connector on a mesh part's node (refgeom.rs origin_csys: MeshPoint as a vertex, world axes). corexy studios
    4a6a96 / 6d4503 / d8befc. Test features_b::a_mate_connector_on_a_mesh_node.
 2. Feature pattern of a Boolean subtraction (pattern.rs boolean_tool_faces; core handed it over).
@@ -29,11 +32,6 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
    valid solid); `merge_refs` keeps a line's Surface kind under refs.jsonl BODY lines (also the 3 model-runner sites in
    tests/parity.rs, so models need a pair too). Thicken then makes 11 tiny parts vs live's one 223.99 mm³ -> core
    (repro vibex7 ~/agents/asm-keep/m0c, model dir name holds 0c3466 for dx's LIVE_IMPORT_FAILURES).
-- Gate 2: main's 24 assemblies on vibex8 (p08/asm-base08.log, ops-base08 = main bc58c02b). Branch (ops-c22 = c08,
-  b8d2d867e): 9 on vibex8 (p08/asm-c08.log), the other 15 moved to vibe2 00:31 (lead: vibex8 at 26):
-  vibe2 ~/agents/asm-keep/g2b.sh on a copy of the p08 snapshot -> p08/asm-c08b.log, p08/doneb. Merge on vibex8:
-  asm-c08all.log; `python3 ../cmp.py asm-base08.log asm-c08all.log`. Gate 2's model phase was dropped: the validity
-  pair below covers it (models base + check vs branch + check).
 - Gate 2 done (02:59, vibex8 p08/asm-c08all.log): better xdev 244->266/266 occ, tvc 8->12/12 mates, corexy 22/22,
   pattern-std mates 50->92, pinslot BOM 21/21; worse: (a) isaac mates 90->89, BOM 59->58 + "Part 2" from b8d2d867e
   (a04711's right inputs hit bool's Extrude 4 cut; bool fixed it in bool-shared2 8ba7c6dcc: b8d2d867e lands after it,

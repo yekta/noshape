@@ -785,3 +785,8 @@ Where everything stood:
 - Live (ui-parity named-views-add): saving a named view is no Undo step. The Part Studio's save / delete now use
   `edit_tab_not_undoable` (view_tools.rs); the assembly's (assembly_view.rs, `self.edit("Save view : …")`) still makes
   one, if you want it the same.
+- Gate 2: main's 24 assemblies on vibex8 (p08/asm-base08.log, ops-base08 = main bc58c02b). Branch (ops-c22 = c08,
+  b8d2d867e): 9 on vibex8 (p08/asm-c08.log), the other 15 moved to vibe2 00:31 (lead: vibex8 at 26):
+  vibe2 ~/agents/asm-keep/g2b.sh on a copy of the p08 snapshot -> p08/asm-c08b.log, p08/doneb. Merge on vibex8:
+  asm-c08all.log; `python3 ../cmp.py asm-base08.log asm-c08all.log`. Gate 2's model phase was dropped: the validity
+  pair below covers it (models base + check vs branch + check).
