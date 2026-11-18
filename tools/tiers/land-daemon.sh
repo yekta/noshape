@@ -507,8 +507,10 @@ while [ ! -e "$LD/stop" ]; do
     last_update=$(date +%s)
     if git -C "$repo" fetch -q origin "+refs/heads/$TARGET:refs/landq/$inst/self" 2>/dev/null; then
       new=$(git -C "$repo" show "refs/landq/$inst/self:tools/tiers/land-daemon.sh" 2>/dev/null)
-      if [ -n "$new" ] && [ "$new" != "$(cat "$me")" ] && bash -n <(echo "$new"); then
-        git -C "$repo" show "refs/landq/$inst/self:tools/tiers/slots.sh" > "$bin/slots.sh.new" && mv "$bin/slots.sh.new" "$bin/slots.sh"
+      slots=$(git -C "$repo" show "refs/landq/$inst/self:tools/tiers/slots.sh" 2>/dev/null)
+      # (slots.sh alone changing restarts it too: e62c33dbf's slots.sh fix waited for a daemon change.)
+      if [ -n "$new" ] && [ -n "$slots" ] && { [ "$new" != "$(cat "$me")" ] || [ "$slots" != "$(cat "$bin/slots.sh")" ]; } && bash -n <(echo "$new") && bash -n <(echo "$slots"); then
+        echo "$slots" > "$bin/slots.sh.new" && mv "$bin/slots.sh.new" "$bin/slots.sh"
         echo "$new" > "$me.new" && mv "$me.new" "$me"
         log "updated from origin/$TARGET: restarting"; exec 9>&-; exec bash "$me"
       fi
