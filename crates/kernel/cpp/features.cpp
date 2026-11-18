@@ -88,6 +88,7 @@
 #include <ShapeBuild_Edge.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
+#include <OSD_Parallel.hxx>
 #include <Geom2d_Line.hxx>
 #include <Geom_ConicalSurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
@@ -3808,7 +3809,7 @@ static bool straight_path_square_to(const TopoDS_Shape& path, const std::vector<
 // through them all (live "psb (10-24 f)": a □20 along a quarter arc gives
 // 25100.80 with 5 sections, 25128.64 with 10, the exact sweep 25132.74).
 // False when the sections can't be made (the wires are left as they were).
-static bool path_sections(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& spine, int count)
+static bool path_sections_built(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& spine, int count)
 {
   if (wires.size() < 2 || count < 1)
     return false;
@@ -3882,6 +3883,51 @@ static bool path_sections(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& sp
     return rotate_wire_start(w, BRep_Tool::Pnt(first.CurrentVertex()));
   };
   const double gap = 1e-6 * (1 + total);
+  // Each section's loop (the one nearest its path point), cut in parallel: the pipe shared, left as it is.
+  std::vector<TopoDS_Wire>       cut((size_t)count + 1);
+  const std::atomic<bool>*       flag = thread_cancel_flag();
+  OSD_Parallel::For(1, count + 1, [&](int i) {
+    if (flag != nullptr && flag->load(std::memory_order_relaxed))
+      return;
+    try
+    {
+      const double         s = s0 + (s1 - s0) * i / (count + 1);
+      GCPnts_AbscissaPoint ap(cc, s, cc.FirstParameter());
+      if (!ap.IsDone())
+        return;
+      gp_Pnt P;
+      gp_Vec T;
+      cc.D1(ap.Parameter(), P, T);
+      if (T.Magnitude() < 1e-12)
+        return;
+      BRepAlgoAPI_Section sec(carried, gp_Pln(P, gp_Dir(T)), false);
+      sec.Approximation(true);
+      sec.SetNonDestructive(true);
+      sec.Build();
+      if (!sec.IsDone())
+        return;
+      occ::handle<TopTools_HSequenceOfShape> edges = new TopTools_HSequenceOfShape;
+      for (TopExp_Explorer ex(sec.Shape(), TopAbs_EDGE); ex.More(); ex.Next())
+        edges->Append(ex.Current());
+      occ::handle<TopTools_HSequenceOfShape> found;
+      ShapeAnalysis_FreeBounds::ConnectEdgesToWires(edges, 1e-6, false, found);
+      if (found.IsNull() || found->Length() == 0)
+        return;
+      double bd = 1e300;
+      for (int k = 1; k <= found->Length(); ++k)
+      {
+        BRepExtrema_DistShapeShape d(BRepBuilderAPI_MakeVertex(P).Vertex(), found->Value(k));
+        if (d.IsDone() && d.Value() < bd)
+          bd = d.Value(), cut[(size_t)i] = TopoDS::Wire(found->Value(k));
+      }
+    }
+    catch (const Standard_Failure&)
+    {
+      cut[(size_t)i] = TopoDS_Wire();
+    }
+  });
+  if (flag != nullptr && flag->load(std::memory_order_relaxed))
+    fail_op("cancelled");
   for (int i = 1; i <= count; ++i)
   {
     const double s = s0 + (s1 - s0) * i / (count + 1);
@@ -3894,36 +3940,9 @@ static bool path_sections(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& sp
     }
     if (!out.empty() && next > 0 && std::abs(s - middle[next - 1].first) < gap)
       continue;
-    GCPnts_AbscissaPoint ap(cc, s, cc.FirstParameter());
-    if (!ap.IsDone())
+    if (cut[(size_t)i].IsNull())
       return false;
-    gp_Pnt P;
-    gp_Vec T;
-    cc.D1(ap.Parameter(), P, T);
-    if (T.Magnitude() < 1e-12)
-      return false;
-    BRepAlgoAPI_Section sec(carried, gp_Pln(P, gp_Dir(T)), false);
-    sec.Approximation(true);
-    sec.Build(new_cancel_indicator()->Start());
-    if (!sec.IsDone())
-      return false;
-    occ::handle<TopTools_HSequenceOfShape> edges = new TopTools_HSequenceOfShape;
-    for (TopExp_Explorer ex(sec.Shape(), TopAbs_EDGE); ex.More(); ex.Next())
-      edges->Append(ex.Current());
-    occ::handle<TopTools_HSequenceOfShape> found;
-    ShapeAnalysis_FreeBounds::ConnectEdgesToWires(edges, 1e-6, false, found);
-    if (found.IsNull() || found->Length() == 0)
-      return false;
-    // The loop nearest the path point.
-    TopoDS_Wire best;
-    double      bd = 1e300;
-    for (int k = 1; k <= found->Length(); ++k)
-    {
-      BRepExtrema_DistShapeShape d(BRepBuilderAPI_MakeVertex(P).Vertex(), found->Value(k));
-      if (d.IsDone() && d.Value() < bd)
-        bd = d.Value(), best = TopoDS::Wire(found->Value(k));
-    }
-    out.push_back(align(best));
+    out.push_back(align(cut[(size_t)i]));
   }
   while (next < middle.size())
     out.push_back(align(middle[next++].second));
@@ -3931,6 +3950,32 @@ static bool path_sections(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& sp
   out.push_back(align(wires.back()));
   wires = out;
   return true;
+}
+
+// path_sections_built, remembered for the last call on this thread (loft_impl builds again without its smooth ends
+// when they fail: the same sections, c2-loft-paths-guides' Loft 3 cut twice).
+static bool path_sections(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& spine, int count)
+{
+  struct Last
+  {
+    TopoDS_Shape              spine;
+    std::vector<TopoDS_Wire>  in, out;
+    int                       count = 0;
+    bool                      ok    = false;
+  };
+  thread_local Last last;
+  const bool same = last.count == count && last.spine.IsEqual(spine) && last.in.size() == wires.size() &&
+                    std::equal(wires.begin(), wires.end(), last.in.begin(), [](const TopoDS_Wire& a, const TopoDS_Wire& b) { return a.IsEqual(b); });
+  if (!same)
+  {
+    // (Kept only once built: a cancelled build throws.)
+    std::vector<TopoDS_Wire> out = wires;
+    const bool               ok  = path_sections_built(out, spine, count);
+    last                         = Last{spine, wires, out, count, ok};
+  }
+  if (last.ok)
+    wires = last.out;
+  return last.ok;
 }
 
 // Side faces that meet tangentially in every section made one face (live 1782 / 1784: a loft through three or more
