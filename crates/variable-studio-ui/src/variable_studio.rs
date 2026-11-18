@@ -538,6 +538,7 @@ impl VariableStudioView {
                 let v = st.read(cx).value().to_string();
                 // A cell's editor closes: Enter keeps the cell focused, a
                 // click away leaves it.
+                let entered = matches!(ev, InputEvent::PressEnter { .. }) && this.cell_editing.as_deref() == Some(k.as_str());
                 if this.cell_editing.as_deref() == Some(k.as_str()) {
                     this.cell_editing = None;
                     if matches!(ev, InputEvent::PressEnter { .. }) {
@@ -553,6 +554,9 @@ impl VariableStudioView {
                 // Unchanged text commits nothing (no empty undo step; Esc's
                 // revert then blur stays a no-op).
                 if !add_row && this.inputs.get(&k).is_some_and(|(_, last)| *last == v) {
+                    if entered {
+                        this.keep_failing_value(&k, window, cx);
+                    }
                     return;
                 }
                 // The add row empties once used: Enter then the blur that
@@ -568,11 +572,26 @@ impl VariableStudioView {
                     e.1 = v.clone();
                 }
                 commit(this, v, cx);
+                if entered {
+                    this.keep_failing_value(&k, window, cx);
+                }
             }
         });
         self.subs.push(sub);
         self.inputs.insert(key, (st.clone(), value));
         st
+    }
+}
+
+impl VariableStudioView {
+    /// Enter on a value that fails keeps that cell selected, its border red, instead of moving down a row (live2
+    /// errors-1118).
+    fn keep_failing_value(&mut self, k: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(row) = k.strip_prefix('e').and_then(|n| n.parse::<usize>().ok()) else { return };
+        let eval = noshape_model::variables::studio_evaluation(&self.doc.read(cx).session.doc, self.tab);
+        if matches!(eval.results.get(row), Some(Err(_))) {
+            self.select_cell(k, window, cx);
+        }
     }
 }
 

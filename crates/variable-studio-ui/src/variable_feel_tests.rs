@@ -143,3 +143,27 @@ fn a_value_cells_tooltip_sits_over_the_cell(cx: &mut TestAppContext) {
     assert!((tip.bottom() - (cell.top() - px(4.))).abs() < px(1.), "4 px above the cell: {tip:?} {cell:?}");
     assert!((tip.center().x - cell.center().x).abs() < px(1.), "centred on it, not on the pointer: {tip:?} {cell:?}");
 }
+
+/// Live2 errors-1118: Enter on a value that fails ("1 +") keeps that cell selected with its red border; a good value
+/// moves down a row as before.
+#[gpui::test]
+fn enter_on_a_failing_value_keeps_its_cell_selected(cx: &mut TestAppContext) {
+    let (window, view) = studio(cx, "enter-failing");
+    keys(cx, window, &["h", "enter"]);
+    assert_eq!(names(cx, &view), ["w", "h"], "a second row");
+    let enter_value = |cx: &mut TestAppContext, text: &str| {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                v.start_cell_edit("e0", None, w, cx);
+                let st = v.inputs.get("e0").map(|(st, _)| st.clone()).expect("the value cell");
+                st.update(cx, |s, cx| s.set_value(text.to_string(), w, cx));
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+        keys(cx, window, &["enter"]);
+        cx.update(|cx| view.read(cx).cell_selected.clone())
+    };
+    assert_eq!(enter_value(cx, "1 +").as_deref(), Some("e0"), "the failing cell stays selected");
+    assert_eq!(enter_value(cx, "12 mm").as_deref(), Some("e1"), "a good value moves down a row");
+}
