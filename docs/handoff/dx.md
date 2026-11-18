@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-18 00:37 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-18 02:14 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -189,17 +189,21 @@ Open, ranked:
 - DXF rows (lead 23:0x), exchange suite drawings 0/10 (vibex6 exch-dxf / exch-fix2 logs, /root/dx-scratch/bin/
   dxflayercount.py, dxfanntext.py, dxfents.py, dxfsheet.py (two DXFs side by side), hlrplot.py / hlrgrid.py).
   Landed 00:47 as 5076e98c: empty view-label MTEXT for base / pictorial views off 1:1, no centermark on tangent-only
-  circles, mesh parts out of HLR (crash). Committed in dx-land (46d2c427d, to queue after its proof): mesh parts drawn
-  as live, silhouettes only (live2 q-mesh-drawing: hex-bookcase "imported" alone and the rings Iso show no folds between
-  facets toward the viewer, not even 90 deg: the far half of a hole rim), edge-on facets count as away (MESH_FACING);
-  a B-rep edge glimpsed past mesh facet corners (piece < deflection of a longer edge) dropped; no centermark on a
-  wholly hidden circle; on_conic: ends meeting make a whole circle only past half its length. hex-bookcase now
-  0 CIRCLE / 0 ELLIPSE / 212 LINE / 15 LWPOLYLINE for live's 0 / 2 / 206 / 25. Open: live splits each silhouette loop
-  into ~4 open LWPOLYLINEs at its extremes (ours one per loop; rule unknown), live's 2 Iso ELLIPSEs are B-rep hole rim
-  quarters seen inside the mesh hole (ours hidden: our mesh hole is a polygon inside the true circle). Proof running
-  vibex8 unit dx-mesh2 (~/agents/dx-keep/mesh2.sh: full ops e2e, then the exchange suite; mesh2.out, exch-mesh2.log;
-  baseline drawing rows: exch-fix2 on vibex6).
-  Next: faceblend CENTERMARKS (maybe the hidden-circle rule fixes it), per-document entity counts (archive notes).
+  circles, mesh parts out of HLR (crash). In dx-land, proof running (vibex8 held ssh, ~/agents/dx-keep/mesh2.sh:
+  e2e then the exchange suite; mesh2.out, exch-mesh2.log), then queue:
+  - 46d2c427d mesh parts drawn as live, silhouettes only (live2 q-mesh-drawing: hex "imported" alone and the rings Iso
+    show no folds between facets toward the viewer, not even 90 deg: the far half of a hole rim), edge-on facets
+    count as away (MESH_FACING); a B-rep edge glimpsed past mesh facet corners (piece < deflection of a longer edge)
+    dropped; no centermark on a wholly hidden circle; on_conic: ends meeting make a whole circle only past half its
+    length. hex-bookcase 0 CIRCLE / 0 ELLIPSE / 211 LINE / 17 LWPOLYLINE for live's 0 / 2 / 206 / 25.
+  - be583d88d edges two parts share in 3D (ModelEdge::shared, SheetGeometry::shared_lines) written for each part:
+    duct-multipart matches (live 26 LINEs doubled); 2D-only coincidences still once (drw-bom-table pin). Centermarks:
+    a part-way wall marks only if a hole's (faceblend's convex ends); arcs' union, not sum, for full circles.
+  Open: live splits each mesh silhouette loop into ~4 open LWPOLYLINEs (ours one per loop; rule unknown); live's 2
+  Iso ELLIPSEs in hex are B-rep hole rim quarters inside the mesh hole (ours hidden). faceblend: 2 marks left on
+  concave ~250 deg walls (pocket ends?) where live 1857 marks a radial hole's half bore: needs a live capture.
+  clamp-guillem: live 1:1 (views overflow the A sheet, not at the suggested spots) for our 1:3 suggested scale: the
+  suite drawings may come from another creation path (decision asked of the lead). sm-louver ARC/CIRCLE now match.
 - Queued for later (live 11-18, behaviours "studios + dx (lead 11-18, P0 feel)", live/studios/docs-import-feel-1118/):
   Import into a document feel: + > Import... opens the OS picker at once (multi), 400 px "Import to Onshape" modal with
   focus on [Import], folder tab "CAD Imports" at the end at 1.8 s, the Part Studio tab at 6.9 s, active tab unchanged,
@@ -207,8 +211,7 @@ Open, ranked:
 - config-parts at live's 18:0x retake: 4/6 to the end (143/156); nuts Sweep 1: core; pulleys Circular pattern 1:
   core's 06ecaff5a (refs are live's); standoffs Threads=true time: bool2 (profile vibex8
   ~/agents/dx-keep/stoff-prof.log).
-- Tools: /root/dx-scratch/bin/xtdump.py dumps a text x_t / xmm with an embedded schema (live's), not native ones (ours).
-  vibex8 ~/agents/dx-land/target/debug/noshape-cli (current dx-land) + ~/tmp/dx/xmmv/*.jsonl batches.
+- Tools: /root/dx-scratch/bin/xtdump.py (text x_t / xmm with live's embedded schema); vibex8 ~/agents/dx-land.
 
 ## How to run
 - Builds, crate tests and exchange runs on vibex8 (lead 11-17 17:00; ~/parity/exchange + its 22 models copied there);
