@@ -485,13 +485,14 @@ pub struct PlacedTooltip {
     fade: Option<std::time::Duration>,
 }
 
-/// A feature list row's tooltip: shown 160 ms after the pointer arrives, fully by 390 ms (live feel/featurelist.json).
+/// A feature list row's tooltip: shown 80 ms after the pointer arrives, fully by ~210 ms (live feel/list-1118, three runs:
+/// fading in from 65–100 ms, opaque at 166–209; 11-13's "from 160, full by 390" was a slower lane).
 /// A menu row's side tooltip unfolds sooner (live fs-ps-ws-feature-tooltip: unfolded within a 1.5 s hover).
 const SIDE_TIP_EXPAND_DELAY: std::time::Duration = std::time::Duration::from_millis(1500);
 /// A toolbar tooltip's longer help unfolds this long after it shows (live: `data-expand-delay` 2000 ms, feel/chrome.json).
 pub const TOOLTIP_EXPAND_DELAY: std::time::Duration = std::time::Duration::from_millis(2000);
-pub const ROW_TIP_DELAY: std::time::Duration = std::time::Duration::from_millis(160);
-const ROW_TIP_FADE: std::time::Duration = std::time::Duration::from_millis(230);
+pub const ROW_TIP_DELAY: std::time::Duration = std::time::Duration::from_millis(80);
+const ROW_TIP_FADE: std::time::Duration = std::time::Duration::from_millis(130);
 /// Tooltips fade in (live feel/chrome.json "tooltips": fully shown 470-545 ms after the pointer arrives, the 400 ms
 /// delay and ~150 ms of Bootstrap's fade).
 pub const TOOLTIP_FADE_IN: std::time::Duration = std::time::Duration::from_millis(150);

@@ -30,16 +30,16 @@ GPU `feel::presses_orbit_box_and_open_the_menu_as_live`).
 | Pick area | a square of 5 px each way | the same (`PickBuffer::pick`, `PICK_RADIUS`) | matrix | = |
 | A part hidden behind another, selected or hovered | its orange silhouette (selected) or light-orange outline (list-row hover, a face's hover) is drawn through the part in front; the fill only where it shows (live2 11-14, feel/hidden-part-selection.png) | the same: selected, `outline_through` on the part's meshes (studios' renderer flag); hovered, the hover mask takes the part's whole image, depth ignored | GPUI `a_selected_part_outlines_through_parts_in_front`, offscreen `a_hovered_part_is_outlined_through_the_part_in_front` | = |
 | Priority | sketch point > sketch line > mate connector > vertex > edge > origin > sketch region > face > plane; the nearest within it | the same (`PickKind::priority`) | matrix (a sketch line over a part edge, a sketch point on a vertex) | = |
-| Edge (over the background or its face) | lights at 6–7 px; stays lit to 9–10 | 6; 9 (a line picks at least 3 px wide, 9 hovered itself; the shaders' `picking`) | matrix; GPU `feel::a_click_beside_an_edge_selects_what_is_lit` | = |
+| Edge (over the background or its face) | lights at 7 px; stays lit to 9–10 (retaken 11-18 16:29, live/feel/reach-1118; 6–7 on 11-13) | 7; 9 (a line picks at least 5 px wide, 9 hovered itself; the shaders' `picking`) | matrix; GPU `feel::a_click_beside_an_edge_selects_what_is_lit` | = |
 | Vertex | 7 px across, 9 diagonally; stays lit to 7–8 | 7 / 9; 7 (a point picks at most 5 px wide) | matrix | = |
-| Sketch line / point, not editing | 5–6, lit to 9 / 7, lit to 8 | 6, 9 / 7, 7 | matrix | = |
+| Sketch line / point, not editing | 7, lit to 9–11 / 7–8, lit to 7–8 (retaken 11-18; the line 5–6 on 11-13) | 7, 9 / 7, 7 | matrix | = |
 | A part in iso with the planes behind and through it (user P0 11-17) | the part lights, never a plane behind it: each face's middle (a face, or a seen edge by it), a top corner 5 px out its vertex; beside it a plane | the same | GPU `feel::part_faces_and_vertices_light_over_the_planes_behind` | = |
 | A block wholly behind the Front plane (live psui/hover-pick-1120, 11-17) | a transparent plane never wins over geometry behind it: every face's middle lights the block; an edge with only the plane beyond lights at 5–6 and holds to 9 from the plane side, 4 / 8 from its face; the plane lights only where nothing is behind it | the same (planes see-through in the pick, priority 0) | GPU `feel::a_block_behind_the_front_plane_lights_through_it` | = |
 | A sketch point vs its line, not editing (live hover-pick-1120 row 2) | moving along the line inward the point takes over 8 px before the end, the line back at 9; beyond the end / across 6–7 | the point's square: 7 along, 7 across | – | ≈ (1 px along the line) |
 | Plane border | 7–8, no hold | 7, no hold (`LineSegment::WIDE_PICK`, `NO_HOLD`) | matrix | = |
 | Assembly instance edge / vertex | 6 / 7, no hold | 6, no hold (`NO_HOLD`) / 7 | matrix | = |
-| Silhouette edge | lights at 6, stays lit to 9–10 | as an edge | – | ≈ |
-| Mate connector | its triad and ring: 23 px across, 14 down | drawn at Onshape's MATE_CONNECTOR_DIAMETER_PX 36 (`MC_R_OUT_PX` 18) with the 5 px pick: 23 across, ~15 down in the iso view | – | ≈ |
+| Silhouette edge | lights at 7, stays lit to 9–11 (retaken 11-18) | as an edge: 7, 9 | – | ≈ |
+| Mate connector | its triad and ring: 22–23 px across, 14–15 down on a face's centre; on a vertex 22 across, 16–21 down, and it wins over the vertex throughout (retaken 11-18) | drawn at Onshape's MATE_CONNECTOR_DIAMETER_PX 36 (`MC_R_OUT_PX` 18) with the 5 px pick: 23 across, ~15 down in the iso view | – | ≈ |
 | Vertex vs its edge; edge vs edge 5.6 px apart | the vertex anywhere in its reach (a lit edge holds against it to ~4 px); the lit edge holds 3–4 px past the other | the vertex in its reach; the held band wins by distance | – | ≈ |
 | Hover timing | a pick on every move below 0.15 px/ms; faster: after a pause of min(5 × the average pick, 250 ms) | the same (`prehighlight_delay`) | app-core `prehighlight_waits_for_a_pause_as_live` | = |
 | Edge midpoint target after a rest | live 1954: 9 px square, a short dwell | `update_hover`, `MIDPOINT_DWELL` | existing midpoint tests | = |
@@ -243,7 +243,7 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
 | Hovered row | light blue, an eye at the right end | the same | – | = |
-| Row tooltip | only for a cut-off name (a row whose name fits has none; the fix icon's "Part is fixed"), live2 11-14 | the same (the name measured against its room), at 160 ms (`ROW_TIP_DELAY`) | – | = (fixed) |
+| Row tooltip | only for a cut-off name (a row whose name fits has none; the fix icon's "Part is fixed"), live2 11-14 | the same (the name measured against its room), at 80 ms (`ROW_TIP_DELAY`) | – | = (fixed) |
 | 3D highlight on hover | ~0.85 s after the pointer arrives on live2's software-GL host; its graphics hover takes ~0.73 s too (live2 18:20 (6)): the host, not a delay of Onshape's | at once | – | = |
 | Plain click | toggles the row | the same (`list_click`) | ui-parity asm-select-mate-row | = |
 | Ctrl+click | opens the context menu (live2 18:20; behaviours "skb (10-24)" (3)) | the same | – | = |
@@ -363,7 +363,7 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | Clearing | an empty canvas click clears; Escape and empty list space don't | the same | = |
 | Double-click a feature (name or blank right side) / a sketch | its dialog / sketch mode | the same | = |
 | Hover a hidden sketch's row / click a default plane | the sketch drawn in place, light orange, while hovered / the plane's row selected, the Default geometry folder related (live2 11-17 sel-feel 4, 2, 5) | the same (`sketches_shown_for_now`, `default_geometry_related`; were: nothing drawn / the folder unlit, qa 208ca8549) | = (fixed 11-17) |
-| Double-click a default plane / a part | nothing / two toggles, no rename | the same (a part's name renamed: removed; ui-parity parts-row-dblclick agrees) | = (fixed) |
+| Double-click a default plane / a part | the plane left selected (retaken 11-18, live/feel/list-1118) / two toggles, no rename | the same (a part's name renamed: removed; ui-parity parts-row-dblclick agrees) | = (fixed) |
 | Rename | only the menu's: inline, the whole name selected; Escape cancels | the same | = |
 | Y over a part row, nothing selected (after its double-click) | hides that part | the same | = (new) |
 | Menus: one feature; two features; two selected and a third right-clicked (counts 3) | live's rows (Add comment left out: cloud) | the same | = |
@@ -388,7 +388,7 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | Undo steps (live2 doc-level-1117) | a rename and a part's Hide are one step each, with no toast; a selection and Shift+5 are none; Ctrl+Y redoes, Ctrl+Shift+Z doesn't (app-core `actions` tests); Ctrl+Z in a dialog's field does nothing (`undo_does_nothing_while_a_dialog_control_has_the_keyboard`) | the same | = (new) |
 | Graphics menu over a selection (live ctx-menus-1117) | the face clicked selected: Clear selection above Select; two faces: "Add appearance to 2 faces…", no New sketch… / Offset plane… / Extrude… / Revolve… / Export as DXF/DWG…; a face and an edge: the faces' menu without View normal to, Delete Part 1…, the part's material and appearance rows, Fillet… / Chamfer… or analysis ; a face with Part 1's row selected: no New sketch… … Revolve…, no Export as DXF/DWG…; a vertex: no Section view…, Zoom to selection; the Top plane and Origin rows | the same (sketch_ui_tests `graphics_menus_over_a_selection_as_live`, list matrix rows; a face + an edge gave the edge's menu, a face with the part selected its creation rows) | = (fixed) |
 | Parts list: Cmd+click | toggles like Ctrl (metaKey or ctrlKey on every OS) | the same | = (new) |
-| Hover: the row tooltip | "Extrude 1 <- Sketch 1"; fades in from 160 ms, full by 390 | the text as before; shown at 160 ms with a 230 ms fade (was GPUI's 500 ms, no fade: `ui::ROW_TIP_DELAY`) | = (fixed) |
+| Hover: the row tooltip | "Extrude 1 <- Sketch 1"; fades in from 65–100 ms, opaque at 166–209 (retaken 11-18, live/feel/list-1118, 3 runs; 11-13: from 160, full by 390) | the text as before; shown at 80 ms with a 130 ms fade (`ui::ROW_TIP_DELAY`) | = (fixed) |
 | Hover: the geometry | lit 100 ms after the pointer arrives, cleared 100 ms after it leaves; a sweep lights only where it rests | the same (`LIST_HOVER_DEBOUNCE`; was at once) | = (fixed) |
 | Folders: New folder | nothing selected: an empty folder above the rollback bar; features and a part: the features; only default geometry: nothing; Escape: none | the same (default geometry alone opened the popover) | = (fixed) |
 | Folders: dropping on a collapsed folder | top third before it, middle inside at its end, bottom third after it | the same (every drop went inside, first) | = (fixed) |
@@ -682,6 +682,9 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 | Row | Live | Ours | Status |
 |---|---|---|---|
 | Which features have a manipulator | Extrude one arrow; Chamfer, Shell none | the same | = |
+| Handles beyond Extrude (live manip-1118b, 11-18 17:33) | Fillet: a small white-outlined triangle (~16 px) on the edge's middle; Move face, Offset surface: an arrow up from the face centre; Chamfer, Shell: none; Draft: none with only the neutral plane picked | Fillet an arrow on the last edge where the round meets the faces' bisector (std addFilletControlManipulator), not a triangle; Move face / Offset surface arrows; Chamfer, Shell none | ≠ (Fillet's look) |
+| Fillet's handle drag | unstepped (R5 → 23.41787, 28.97056, 41.52447 mm 5 px apart), a ~5 px dead zone, no value box; toward the edge no less than 0.02414 mm (std BLEND_BOUNDS 0.01 mm of offset); Ctrl+Z in the dialog doesn't undo a drag | unstepped to 5 decimals, the same floor (`fillet` in the arrow drag); no dead zone yet (dialogs matrix "manipulators / Fillet's handle drags unstepped") | ≈ |
+| Offset surface's arrow | the length step rule (4 → 18.2 mm over 40 px, 0.1 mm steps), no value box | the length step rule | = |
 | An arrow's grab reach | within 14 px across (16 no), from 4 px behind its base to its tip, nothing past the tip | 8 px of the shaft or 14 px round the tip (past it too); now live's (`Viewport::manipulator_index_at`) | = (fixed) |
 | The arrow | shaft 30 + head 30 px, head radius 10 | shaft 29; now 30 | = (fixed) |
 | A dragged length's step | 10^(round(log10(100 px in the unit)) − 2) of the unit at the arrow (0.1 mm at 0.25 mm/px, 1 mm from 0.316); Shift: free | always 0.1 mm / 0.01 in, Shift ignored; now live's (`manipulators::linear_step`, our own and std arrows) | = (fixed) |

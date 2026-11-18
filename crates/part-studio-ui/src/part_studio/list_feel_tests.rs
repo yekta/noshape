@@ -385,10 +385,10 @@ fn rows() -> Vec<Row> {
             l.double_click(cx, "feature:Sketch 1");
             expect(cx.update(|cx| l.view.read(cx).sketch.is_some()), true, "in sketch mode")
         } },
-        Row { id: "double-click / a default plane: nothing", live: "no dialog, no rename (live's document had no Plane feature: its plane row is Top)", gap: false, check: |l, cx| {
+        Row { id: "double-click / a default plane: left selected", live: "no dialog, no rename, the plane left selected, not two toggles (live list-1118; live's document had no Plane feature: its plane row is Top)", gap: false, check: |l, cx| {
             l.double_click(cx, "feature:Top");
             let renaming = cx.update(|cx| l.view.read(cx).ui.dg_renaming.is_some());
-            expect((l.editing(cx), renaming), (None, false), "editing, renaming")
+            expect((l.editing(cx), renaming, l.selected(cx)), (None, false, names(&["Top"])), "editing, renaming, selected")
         } },
         Row { id: "double-click / a part: two toggles", live: "nothing selected after, no rename", gap: false, check: |l, cx| {
             l.double_click(cx, "part:Part 1");
@@ -924,11 +924,11 @@ fn rows() -> Vec<Row> {
             l.hover(cx, "feature:Extrude 1", 450);
             expect(crate::ui_script::shown_tooltip(), Some("Extrude 1 <- Sketch 1".to_string()), "tooltip")
         } },
-        Row { id: "hover / the tooltip from 160 ms", live: "fades in from about 160 ms, fully shown by about 390 ms (ours: shown at 160 ms, a 230 ms fade)", gap: false, check: |l, cx| {
-            l.hover(cx, "feature:Extrude 1", 120);
+        Row { id: "hover / the tooltip from 80 ms", live: "fades in from 65–100 ms, opaque at 166–209 ms (live list-1118, 3 runs; ours: shown at 80 ms, a 130 ms fade)", gap: false, check: |l, cx| {
+            l.hover(cx, "feature:Extrude 1", 50);
             let early = crate::ui_script::shown_tooltip();
-            l.wait(cx, 80);
-            expect((early, crate::ui_script::shown_tooltip().is_some()), (None, true), "at 120 ms, at 200 ms")
+            l.wait(cx, 70);
+            expect((early, crate::ui_script::shown_tooltip().is_some()), (None, true), "at 50 ms, at 120 ms")
         } },
         Row { id: "hover / the geometry lit 100 ms after, cleared 100 ms after leaving", live: "featureHoverIn / featureHoverOut debounced 100 ms", gap: false, check: |l, cx| {
             l.hover(cx, "feature:Extrude 1", 60);

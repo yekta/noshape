@@ -974,14 +974,15 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     let own_edge = (l.style & 64u) != 0u && (st & (HOVER | SELECTED)) != 0u && !face_band;
     if (face_band) { width = 2.0 / max(g.viewport.z, 1.0); }
     if (own_edge) { width = 5.0; }
-    // The pick pass (`g.viewport.w` > 0), live's footprints (live/feel/3d.json; with the 10 px pick square): a line at
-    // least 3 px wide (an edge or a sketch line lights from 6 px off it); hovered itself, 9 px (it stays lit to 9–10,
-    // live's lit overlay), but not a line marked NO_HOLD (style 128: a plane's border, an assembly's edges); a plane's
-    // border (WIDE_PICK, style 256) 5 px (from 7 px).
+    // The pick pass (`g.viewport.w` > 0), live's footprints (live/feel/3d.json, retaken reach-1118; with the 10 px
+    // pick square): a line at least 5 px wide (an edge, a silhouette or a sketch line lights from 7 px off it, as a
+    // plane's border, WIDE_PICK style 256), an assembly's edge (NO_HOLD, style 128) 3 px (from 6 px); hovered itself,
+    // 9 px (it stays lit to 9–10, live's lit overlay), but not a NO_HOLD line.
     let picking = g.viewport.w > 0.0;
     if (picking) {
         let held = (st & (HOVER | OUTLINE)) == HOVER && (l.style & 128u) == 0u;
-        width = select(select(max(l.width * inst.extra.x, 3.0), 5.0, (l.style & 256u) != 0u), 9.0, held);
+        let least = select(5.0, 3.0, (l.style & (128u | 256u)) == 128u);
+        width = select(max(l.width * inst.extra.x, least), 9.0, held);
     }
     let half = max(width * g.viewport.z * 0.5, 0.5);
 
@@ -993,7 +994,8 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     // Lifted lines too (a hovered part's silhouette over its own faces).
     var lift = 0.0;
     // (Picked lines too: the face side of an edge's pick band is in reach as much as the background side.)
-    if (lit || picking || (l.style & 32u) != 0u) { lift = 1.5 * half; }
+    // (A picked band no nearer than a 3 px one's: a vertex's pick disc at the line's end stays in front of it.)
+    if (lit || picking || (l.style & 32u) != 0u) { lift = 1.5 * select(half, min(half, max(1.5 * g.viewport.z, 0.5)), picking && width < 9.0); }
     var ca = g.view_proj * vec4(wa, 1.0);
     var cb = g.view_proj * vec4(wb, 1.0);
     if (lift > 0.0) {
@@ -1188,6 +1190,11 @@ fn vs_point(@builtin(vertex_index) index: u32, p: PointIn) -> PointOut {
         let px_per_unit = length((cr.xy / cr.w - c.xy / c.w) * g.viewport.xy * 0.5) / step;
         let lifted = g.view_proj * vec4(w + toward * 2.0 * (half + 0.75) / max(px_per_unit, 1e-6), 1.0);
         c.z = lifted.z / lifted.w * c.w;
+    }
+    // The pick pass: a point in front of the lines through it (lifted 2.25 px), whose 5 px bands cover its disc.
+    if (g.viewport.w > 0.0 && (p.style & 2u) == 0u) {
+        let lp = g.view_proj * vec4(toward_eye(w, 4.0 * g.viewport.z), 1.0);
+        c.z = max(c.z, lp.z / lp.w * c.w);
     }
     c = vec4(c.xy + uv * (half + 0.75) / (g.viewport.xy * 0.5) * c.w, c.z, c.w);
     // Onshape's offsets: points 9 units, faces 27.

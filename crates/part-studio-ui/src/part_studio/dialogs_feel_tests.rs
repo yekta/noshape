@@ -176,6 +176,35 @@ fn rows() -> Vec<Row> {
             let open = cx.update(|cx| view.read(cx).edit.is_some());
             expect((dragged, open, depth(cx) == before), (true, false, true), "(the drag changed Depth, the dialog open after Esc, Extrude 1 as before)")
         } },
+        Row { id: "manipulators / Fillet's handle drags unstepped", live: "live manip-1118b: from R5, 5 px moves give 23.41787, 28.97056, 41.52447 mm (not the arrows' 0.1 mm steps); toward the edge no less than 0.02414 mm", gap: false, check: |cx| {
+            let (window, view, dialog, _) = fillet_on_an_edge(cx, "dlg-fillet-drag")?;
+            let vp = cx.update(|cx| view.read(cx).viewport.clone());
+            let (at, along) = cx
+                .update(|cx| {
+                    let vp = vp.read(cx);
+                    let &(a, b, _) = vp.manipulators.first()?;
+                    let (a, b) = (vp.project(a)?, vp.project(b)?);
+                    let o = vp.origin();
+                    Some((gpui_kit::point(o.x + px(a.x as f32), o.y + px(a.y as f32)), (b - a).normalize_or_zero()))
+                })
+                .ok_or("no fillet handle")?;
+            let radius = |cx: &mut TestAppContext| cx.update(|cx| dialog.read(cx).input_text("radius", cx)).map(|(t, _)| t).unwrap_or_default();
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            vcx.simulate_event(gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() });
+            vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
+            let mut seen = Vec::new();
+            for k in 1..=4 {
+                let p = gpui_kit::point(at.x + px((along.x * 7.0 * k as f64) as f32), at.y + px((along.y * 7.0 * k as f64) as f32));
+                gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseMoveEvent { position: p, pressed_button: Some(gpui_kit::MouseButton::Left), modifiers: Modifiers::default() });
+                draw(cx, window);
+                seen.push(radius(cx));
+            }
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1 });
+            draw(cx, window);
+            let mm = |t: &String| t.trim_end_matches(" mm").parse::<f64>().ok();
+            let off_grid = seen.iter().filter_map(mm).filter(|v| ((v * 10.0) - (v * 10.0).round()).abs() > 1e-6).count();
+            expect(off_grid > 0, true, &format!("a radius off the 0.1 mm grid while dragging: {seen:?}"))
+        } },
         Row { id: "manipulators / an arrow drag lights nothing; Depth has the keyboard, its text selected", live: "live manip-feel-1118 (1, 2): nothing lights under the pointer while the arrow is dragged; Depth focused with its whole text selected, rewritten each update, and so after the release", gap: false, check: |cx| {
             let (window, view, dialog) = edit_extrude(cx, "dlg-arrow-keys");
             wait_until(cx, window, |cx| !view.read(cx).ui_busy());

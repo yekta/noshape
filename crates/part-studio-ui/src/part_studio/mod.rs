@@ -4052,7 +4052,12 @@ impl PartStudioView {
                             this.refresh_scene(false, cx);
                         }
                     }))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                    .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
+                        // A double-click's second click leaves the row as the first left it (live list-1118: a
+                        // default plane double-clicked stays selected; a part's row toggles twice).
+                        if ev.click_count() >= 2 {
+                            return;
+                        }
                         // The section view dialog takes planes from the list too.
                         if this.ui.section_dialog.is_some() {
                             this.section_pick(&r3, window, cx);

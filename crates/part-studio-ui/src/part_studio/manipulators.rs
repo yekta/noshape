@@ -769,13 +769,19 @@ impl PartStudioView {
                 let m_per_px = view.world_per_px(a.base + a.dir * len).unwrap_or(0.00025);
                 // (The parameter the length stands for: a fillet's radius is its offset over 1 / cos(φ/2) - 1.)
                 let (len, m_per_px) = (len / a.scale, m_per_px / a.scale);
-                let len = if window.modifiers().shift {
+                // A fillet's handle isn't stepped (live manip-1118b: 23.41787, 28.97056 mm 5 px apart), its offset no
+                // less than std's BLEND_BOUNDS 0.01 mm (0.02414 mm of radius on a square edge).
+                let fillet = self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.type_id == "fillet");
+                let len = if fillet {
+                    len.abs().max(1e-5 / a.scale)
+                } else if window.modifiers().shift {
                     len.abs()
                 } else {
                     let step = linear_step(m_per_px, units.length.meters());
                     ((len.abs() / step).round() * step).max(step)
                 };
-                let text = noshape_units::format_quantity(Quantity::new(len, Dim::LENGTH), &units);
+                let q = Quantity::new(len, Dim::LENGTH);
+                let text = if fillet { noshape_units::format_quantity_with(q, &units, 5) } else { noshape_units::format_quantity(q, &units) };
                 if let Some(e) = &self.edit {
                     e.dialog.update(cx, |dlg, cx| {
                         if flip && let Some(f) = a.flip {

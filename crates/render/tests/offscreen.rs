@@ -604,8 +604,8 @@ fn a_point_picks_round_its_drawn_centre_at_any_pixel_ratio() {
 
 /// Our 3D pick reach outside sketch mode, as the viewport picks (in the square of PICK_RADIUS 5 CSS px round the
 /// pointer, vertices before edges before faces, then the nearest), measured on the pick buffer at a pixel ratio of 1
-/// and 2, against live/feel/3d.json: a part edge (drawn 1 px, picked 3 px wide) lights from 6–7 px off it on either
-/// side; a vertex (a 6 px disc, picked 5 px wide) from 7 px across, 9 diagonally, and
+/// and 2, against live/feel/3d.json and its retake reach-1118: a part edge (drawn 1 px, picked 5 px wide) lights from
+/// 7 px off it on either side; a vertex (a 6 px disc, picked 5 px wide) from 7 px across, 9 diagonally, and
 /// beats the edge it ends. docs/parity/interaction-feel.md.
 #[test]
 fn our_3d_pick_reach_for_edges_and_vertices() {
@@ -654,7 +654,7 @@ fn our_3d_pick_reach_for_edges_and_vertices() {
         let inward = (screen([0.0, 0.0, hi[2]]) - mid).normalize();
         let reach = |dir: glam::DVec2, id: u32| (0..40).take_while(|k| at(mid + dir * (*k as f64 * dpr as f64)) == Some(id)).count() as i32 - 1;
         let (out, inn) = (reach(-inward, 50), reach(inward, 50));
-        assert!((6..=7).contains(&out) && (6..=7).contains(&inn), "dpr {dpr}: an edge lights from {out} px off it over the background, {inn} over its face");
+        assert!(out == 7 && inn == 7, "dpr {dpr}: an edge lights from {out} px off it over the background, {inn} over its face");
         // The vertex straight out (left of the part) and along the diagonal away from it; it beats the edge where both
         // are in reach.
         let corner = screen([lo[0], lo[1], hi[2]]);
@@ -2930,13 +2930,13 @@ fn the_3d_pick_matrix_matches_live() {
     type Row = (&'static str, u32, [f32; 3], (f64, f64), bool, (i32, i32), bool);
     let d = std::f64::consts::FRAC_1_SQRT_2;
     let rows: Vec<Row> = vec![
-        ("edge / across (over the background and its face)", edge, [-0.01, lo[1], hi[2]], (0.0, 1.0), false, (6, 7), false),
+        ("edge / across (over the background and its face)", edge, [-0.01, lo[1], hi[2]], (0.0, 1.0), false, (7, 7), false),
         ("edge, lit / holds", edge, [-0.01, lo[1], hi[2]], (0.0, 1.0), true, (9, 10), false),
         ("vertex / straight out", vertex, [lo[0], lo[1], hi[2]], (1.0, 0.0), false, (7, 7), false),
         ("vertex / diagonally", vertex, [lo[0], lo[1], hi[2]], (d, d), false, (8, 10), false),
         ("vertex, lit / stays lit", vertex, [lo[0], lo[1], hi[2]], (1.0, 0.0), true, (7, 8), false),
-        ("sketch line (not editing)", line, [-0.015, 0.03, 0.0], (0.0, 1.0), false, (5, 6), false),
-        ("sketch line, lit / stays lit", line, [-0.015, 0.03, 0.0], (0.0, 1.0), true, (8, 10), false),
+        ("sketch line (not editing)", line, [-0.015, 0.03, 0.0], (0.0, 1.0), false, (7, 7), false),
+        ("sketch line, lit / stays lit", line, [-0.015, 0.03, 0.0], (0.0, 1.0), true, (9, 11), false),
         ("sketch point (not editing)", point, [0.015, 0.03, 0.0], (1.0, 0.0), false, (7, 7), false),
         ("sketch point, lit / stays lit", point, [0.015, 0.03, 0.0], (1.0, 0.0), true, (7, 8), false),
         ("plane border", border, [0.0, 0.045, 0.0], (0.0, 1.0), false, (7, 8), false),
