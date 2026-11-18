@@ -600,12 +600,12 @@ Configurations box with "Configuration [Default ▾]"; a duplicate "A" typed + E
 nothing; the row menu Switch to "A" · Set as default · Duplicate row · Move up · Move down · Delete row (no Move down on the last
 row); "abc" / "-5" in an inactive row show plain, no error; switched to the "abc" row: Extrude 1 red, error mark by Features,
 Parts (1), cell bold; switching back clears at once and never greys rows (6 shots in the first second).
-- [ ] **P1 CFGFEEL-ROW-CLICK-SWITCHES (studios)**: a plain click on a row's name switches to it (row B: the box says B, Depth 40 mm
+- [ ] (studios fixed 8f6c7a463, on main; to verify) **P1 CFGFEEL-ROW-CLICK-SWITCHES (studios)**: a plain click on a row's name switches to it (row B: the box says B, Depth 40 mm
   applied); live: a row click doesn't switch, only the row menu's Switch to or the feature list's box.
-- [ ] **P2 CFGFEEL-BAD-CELL-PINK (studios)**: the active row's "abc" cell stays white (bold only); live tints it pink.
-- [ ] **P2 CFGFEEL-CELL-LOOK (studios)**: configured cells show the bare value; live's read "› 10 mm" with a ± dimension icon at the
+- [ ] (studios fixed 2cf308c1d, on main; to verify) **P2 CFGFEEL-BAD-CELL-PINK (studios)**: the active row's "abc" cell stays white (bold only); live tints it pink.
+- [ ] (studios fixed 2cf308c1d, on main; to verify) **P2 CFGFEEL-CELL-LOOK (studios)**: configured cells show the bare value; live's read "› 10 mm" with a ± dimension icon at the
   right.
-- [ ] **P3 CFGFEEL-DUP-ID (studios)**: CLI config add_option "A" twice gives the id "A_2"; live stores "A0" (FeatureScript ids).
+- [ ] (studios fixed 2cf308c1d, on main; to verify) **P3 CFGFEEL-DUP-ID (studios)**: CLI config add_option "A" twice gives the id "A_2"; live stores "A0" (FeatureScript ids).
 - Not judged: a row added after a parameter is configured shows an empty Depth cell in ours (live2 added its rows before configuring).
 
 ## Workflow feel vs live's 11-18 07:09-07:22 timings (qa 07:38, green b5c4ccc4, live's host and method: Xvfb, real pointer, polled crops at live's 139 ms, n 10, medians)
@@ -662,7 +662,7 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 - [x] (dropped qa 13:10: a remembered value; live2's fresh config had none yet, after one Form ours opens with Circle emboss as live; row 1288 = in 792d2e7b8) **P1 FORM-DEFAULT-STUDIO (skasm)**: the sheet-metal Form dialog opens with "Form Part Studio" empty; live's opens with Circle emboss. The rest matches.
 
 ## Interaction feel: live2's "Ours" cells, batch 7 (studios rows 1294-1297: 3 equal, 1 not; live2 13:2x, green 9021eeb7a)
-- [ ] (studios 6b91ebbd8 set 450 ms; live2 17:5x on 87edba24, which has it, 3 fresh launches: first hover 687 / 610 / 636 ms, second 629 / 622 / 589, live ~470: still open; the help popover = 3.19-3.29 s, live ~3.1) **P1 DRW-TOOLBAR-TOOLTIP-DELAY (studios)**: a drawing toolbar button's title tooltip appears 0.70 s after the hover; live's at
+- [ ] (studios 11-18 23:31, local: the editor wasn't redrawn when the tip's 450 ms ran out, so it was read on the next unrelated frame; now it redraws then; to verify) (studios 6b91ebbd8 set 450 ms; live2 17:5x on 87edba24, which has it, 3 fresh launches: first hover 687 / 610 / 636 ms, second 629 / 622 / 589, live ~470: still open; the help popover = 3.19-3.29 s, live ~3.1) **P1 DRW-TOOLBAR-TOOLTIP-DELAY (studios)**: a drawing toolbar button's title tooltip appears 0.70 s after the hover; live's at
   ~0.47 s. (studios told by live2.)
 - Equal to live (live2): 1294, 1296, 1297. live2 next: the non-P0 "?" rows (ui-speed 1088-1093, prefs, numfmt, 1199, 1236, 893,
   1114, 1163); snap-diag 1303 stays qa's (Snap reach, on hold for asm).
