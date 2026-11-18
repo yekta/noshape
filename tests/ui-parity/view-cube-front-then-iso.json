@@ -1,8 +1,8 @@
 {
  "name": "view-cube-front-then-iso",
- "about": "With the top face selected, click the view cube's Front, then the view cube's Isometric (home): the selection stays",
+ "about": "With the top face selected, click the view cube's Front, then the view menu's Isometric: the selection stays",
  "area": "psui",
- "source": "psui coverage audit 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
+ "source": "psui coverage audit 2026-11-12 (lead: every toolbar dialog's open, fields, preview, \u2713/\u2717, edit and re-edit)",
  "start": "block",
  "steps": [
   {
@@ -24,7 +24,13 @@
   {
    "do": "click",
    "on": {
-    "view_cube": "Isometric"
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Isometric"
    }
   }
  ]

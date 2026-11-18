@@ -13,8 +13,8 @@ use noshape_render::{Drawable, Instance, LineData, LineSegment, MeshData};
 
 /// Screen sizes (px) measured on the live capture.
 const CAP_PX: f64 = 11.0;
-const LEADER_PX: f64 = 150.0;
-const MIN_LEADER_PX: f64 = 20.0;
+/// From the hole's rim to the knee.
+const LEADER_PX: f64 = 14.0;
 const ARROW_PX: f64 = 10.0;
 const GAP_PX: f64 = 3.0;
 
@@ -45,23 +45,9 @@ impl PartStudioView {
         let w = (u * 0.385 + v * 0.923).normalize_or_zero();
         let r = h.diameter * 0.5;
         let tip = h.start + w * r;
-        // Live (part-studio/433–435): the knee and shelf sit at the edge of
-        // the part, where the leader leaves it.
-        // (The parts' drawn boxes: OCCT's quick box bounds a B-spline face by its control points.)
-        let edge = self
-            .display
-            .bodies
-            .iter()
-            .filter_map(|b| b.bounds)
-            .find(|(lo, hi)| (0..3).all(|i| h.start[i] >= lo[i] - 1e-6 && h.start[i] <= hi[i] + 1e-6))
-            .map(|(lo, hi)| {
-                (0..3)
-                    .filter(|&i| w[i].abs() > 1e-9)
-                    .map(|i| ((if w[i] > 0.0 { hi[i] } else { lo[i] }) - h.start[i]) / w[i])
-                    .fold(f64::INFINITY, f64::min)
-            })
-            .filter(|t| t.is_finite());
-        let reach = edge.map(|t| t * 0.97).unwrap_or(r + LEADER_PX * wpp).max(r + MIN_LEADER_PX * wpp);
+        // Live (pattern-hole-1118 h1-p0 / h1-depth5 / h1-cbore): a short leader, the knee just past the arrowhead
+        // by the hole, the text on the face beside it (was: run out to the part's edge, part-studio/433).
+        let reach = r + LEADER_PX * wpp;
         let knee = h.start + w * reach;
         let cap = CAP_PX * wpp;
         let lift = n * (0.5 * wpp);
@@ -142,7 +128,9 @@ impl PartStudioView {
             out.push(Instance::new(Drawable::Lines(up.upload_lines(&strokes))).per_primitive_color().unpickable().ignore_clip().layer(30));
         }
         if !mesh.indices.is_empty() {
-            out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([0.0, 0.0, 0.0, 1.0]).unlit().unpickable().ignore_clip().layer(30));
+            // Through everything as its leader, not depth-tested half a pixel over the face: there it lost most of
+            // its fill and read pale and hollow (live's glyphs solid black).
+            out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([0.0, 0.0, 0.0, 1.0]).unlit().unpickable().ignore_clip().on_top().layer(30));
         }
         out
     }

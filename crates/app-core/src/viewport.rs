@@ -2941,6 +2941,19 @@ fn converted_ctrl_click() -> bool {
     false
 }
 
+/// The newest mouse press's number and the time since the press before it by the platform's own event times, where
+/// the platform gives them (X11; elsewhere `(0, None)`): a double-click rule of the app's own measures this, not when its
+/// handler runs (a busy UI thread handles the second click late: qa ROW-DBLCLICK, 330 ms apart read as over 400).
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+pub fn platform_last_press() -> (u64, Option<std::time::Duration>) {
+    gpui_linux::last_press()
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
+pub fn platform_last_press() -> (u64, Option<std::time::Duration>) {
+    (0, None)
+}
+
 /// How [`box_overlay`] draws a box.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum BoxStyle {

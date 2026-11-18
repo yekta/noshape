@@ -1359,6 +1359,8 @@ impl X11Client {
                             state.current_count = 1;
                         }
 
+                        // NOSHAPE PATCH: the press interval by the server's times, for the app (gpui_linux.rs).
+                        crate::set_last_press(state.last_click_time.map(|t| std::time::Duration::from_millis(u64::from(event.time.wrapping_sub(t)))));
                         state.last_click = Instant::now();
                         state.last_click_time = Some(event.time);
                         state.last_mouse_button = Some(button);

@@ -3028,6 +3028,34 @@ fn a_shelled_face_is_highlighted_as_before(cx: &mut TestAppContext) {
     assert_eq!(drawn, Some(vec![(true, 0.47), (false, 1.0)]), "the removed face's fill, then its outline");
 }
 
+/// Live manip-feel-1118 m6: a Transform that moves a part leaves its old place light grey and see-through with no
+/// edges, and shows the moved part dark grey and see-through.
+#[gpui::test]
+fn a_transforms_old_place_is_a_light_grey_ghost(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "transform-ghost");
+    let body = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part").id.clone());
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_feature("transform", w, cx);
+            let d = v.edit.as_ref().expect("the Transform dialog").dialog.clone();
+            d.update(cx, |d, cx| {
+                d.set_value("entities", noshape_model::ParamValue::Query(vec![Reference::Body(body.clone())]), cx);
+                d.set_value("transformType", noshape_model::ParamValue::Enum("TRANSLATION_3D".into()), cx);
+                d.set_value("dx", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("30 mm")), cx);
+            });
+        })
+    })
+    .unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui.transform_ghost.is_empty());
+    let shown = cx.update(|cx| view.read(cx).display_for_scene_inner());
+    let lin = crate::theme::lin;
+    let near = |c: [f32; 4], want: [f32; 4], a: f32| (0..3).all(|i| (c[i] - want[i]).abs() < 1e-4) && (c[3] - a).abs() < 1e-4;
+    let ghost = shown.bodies.iter().find(|b| b.id.index & (1 << 31) != 0).expect("the old place's ghost");
+    assert!(near(ghost.color, lin(0xc9ced2), 0.6) && ghost.mesh.edges.is_empty(), "the ghost light grey at 0.6 with no edges: {:?}", ghost.color);
+    let moved = shown.bodies.iter().find(|b| b.id == body).expect("the moved part");
+    assert!(near(moved.color, lin(crate::theme::viewport::TOOL_PREVIEW), 0.6), "the moved part dark grey at 0.6: {:?}", moved.color);
+}
+
 /// Fillet's drag arrow as std edgeBlendCommon.fs addFilletControlManipulator: on a block's top edge (a 90° convex edge)
 /// its tip where the round crosses the faces' bisector (offset radius × (1/cos 45° − 1)), into the material; Width
 /// drives the width (offset × |n₀ − n₁| = √2 per width), a conic section its own radius; none for a variable radius.
@@ -5617,6 +5645,67 @@ fn enter_in_a_configured_value_moves_down_a_row(cx: &mut TestAppContext) {
     });
     assert!(value.map(|p| format!("{p:?}")).is_some_and(|t| t.contains("40 mm")), "committed as 40 mm");
     assert_eq!(framed, Some(format!("cp-0-{}", rows[1])), "the cell below framed");
+}
+
+/// Live2 ps-feel2-1118: a List's rows by keys. A name + Tab in the add row adds the row and frames the first row's
+/// name; typing on a framed name replaces it and Return commits and frames the row below; Up / Down move the frame;
+/// Down from the last row gives the add row the keyboard.
+#[gpui::test]
+fn configuration_names_take_spreadsheet_keys(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_variables(cx, "cfg-names", &[("width", "30 mm")]);
+    let input = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let mut input = String::new();
+            v.edit_config("Configure", cx, |ps| {
+                input = noshape_ops::config::add_input(ps, "List");
+                noshape_ops::config::add_option(ps, &input, "A".into());
+            });
+            v.right_panel = Some(crate::part_studio::config_panel::RightPanel::Configurations);
+            input
+        })
+    });
+    let rows = |cx: &mut TestAppContext| -> Vec<(String, String)> {
+        cx.update(|cx| match view.read(cx).studio(cx).and_then(|s| s.configuration.inputs.iter().find(|i| i.id == input)).map(|i| &i.kind) {
+            Some(noshape_model::configuration::ConfigInputKind::List { options, .. }) => options.iter().map(|o| (o.id.clone(), o.name.clone())).collect(),
+            _ => Vec::new(),
+        })
+    };
+    let framed = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).ui.cfg_framed.as_ref().map(|(k, _)| k.clone()));
+    let name_key = |rk: &str| format!("opt-{input}-{rk}");
+    draw(cx, window);
+    view.update(cx, |v, cx| {
+        v.ui.cfg_focus_new_row = Some(input.clone());
+        cx.notify();
+    });
+    draw(cx, window);
+    keys(cx, window, &["b", "tab"]);
+    draw(cx, window);
+    let after_tab = (rows(cx).iter().map(|r| r.1.clone()).collect::<Vec<_>>(), framed(cx));
+    let first = rows(cx)[0].0.clone();
+    keys(cx, window, &["c", "enter"]);
+    draw(cx, window);
+    let r = rows(cx);
+    let after_return = (r[0].1.clone(), framed(cx));
+    keys(cx, window, &["down"]);
+    draw(cx, window);
+    let after_down = framed(cx);
+    keys(cx, window, &["up"]);
+    draw(cx, window);
+    let after_up = framed(cx);
+    keys(cx, window, &["down", "down"]);
+    draw(cx, window);
+    let past_last = framed(cx);
+    assert_eq!(
+        (after_tab, after_return, after_down, after_up, past_last),
+        (
+            (vec!["Default".to_string(), "A".into(), "b".into()], Some(name_key(&first))),
+            ("c".to_string(), Some(name_key(&r[1].0))),
+            Some(name_key(&r[2].0)),
+            Some(name_key(&r[1].0)),
+            None,
+        ),
+        "(rows and frame after name + Tab, first name and frame after typing + Return, the frame after Down, Up, Down twice)"
+    );
 }
 
 /// Live2 cfg-1118: a second configuration named like the first is accepted (option id "A0", name "A"); a value it can't

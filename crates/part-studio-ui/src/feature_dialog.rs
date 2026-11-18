@@ -1672,7 +1672,13 @@ impl FeatureDialog {
                     ParamKind::Num(n) => Some(n.kind.dim()),
                     _ => None,
                 });
+                let was_open = this.completion.is_some();
                 this.completion = dim.filter(|_| !applied).and_then(|d| crate::var_complete::VarCompletion::compute(&path_s, state.read(cx), &this.variables, Some(d)));
+                // The list shows on the next frame (live), not with the next redraw for some other reason (a bare "#"
+                // changes no value: it waited for the caret's blink, ~0.7 s, qa FEEL-HASH-LIST-DELAY).
+                if was_open || this.completion.is_some() {
+                    cx.notify();
+                }
             }
             InputEvent::PressEnter { shift, .. } => {
                 // Onshape: Enter in a changed field applies the value (the
@@ -3286,8 +3292,9 @@ impl FeatureDialog {
                             // The ui-parity driver's `{"chip": row, "field": label}` (a right-click on a pick).
                             .map(|d| crate::ui_script::mark(d, || format!("chip:{}:{row}", crate::i18n::spec(s.label))))
                             .on_hover(cx.listener(move |_, h: &bool, _, cx| cx.emit(DialogEvent::HoverRef(h.then(|| hover_ref.clone())))))
-                            // Chips name entities: user text in every language.
-                            .tooltip(crate::ui::user_tooltip(tip))
+                            // Chips name entities: user text in every language, the tooltip to the chip's right (live2
+                            // ours-1118 c2, qa FEEL-CHIP-TOOLTIP-PLACE; it showed under the pointer, over the next chip).
+                            .map(|d| crate::ui::with_user_side_tooltip(d, tip))
                             .w_full()
                             .h(px(24.))
                             .pl(px(6.))

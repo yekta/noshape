@@ -1037,6 +1037,18 @@ fn section_caps_pick_as_their_plane_and_hover_orange() {
         let want = plain[k] as f32 + 0.33 * ([255.0, 198.0, 133.0][k] - plain[k] as f32);
         assert!((hovered[k] as f32 - want).abs() <= 3.0, "hovered cap {hovered:?}, want {plain:?} 33 % toward #FFC685");
     }
+    // The Section view dialog's plane (selected): Part 1's #91BEDE caps read live's #E9C497 between the lines, 80 %
+    // toward #FFC685 (live view-tools-1118; its grey #999A9E part's #EBBD8A).
+    let lin = |c: u32| {
+        let f = |v: u32| (((v & 0xff) as f32 / 255.0 + 0.055) / 1.055).powf(2.4);
+        [f(c >> 16), f(c >> 8), f(c), 1.0]
+    };
+    scene.clip_hovered[0] = false;
+    scene.clip_selected[0] = true;
+    scene.instances[0].color = lin(0x91bede);
+    let selected = light(&render(&mut r, &scene));
+    let live = [0xe9, 0xc4, 0x97];
+    assert!((0..3).all(|k| (selected[k] as i32 - live[k]).abs() <= 6), "the selected plane's cap {selected:?}, live {live:?}");
 }
 
 /// Zebra stripes: a shaded box face turns into black and white stripes

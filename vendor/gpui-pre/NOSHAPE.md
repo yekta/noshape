@@ -11,3 +11,7 @@ a compile error:
   app-core `ui::tests::box_shadow_blur_is_css`.
 - **Tooltips fade out over 150 ms** (`TOOLTIP_FADE_OUT`, elements/div.rs; `prepaint_tooltip` returns its opacity,
   window.rs). Pinned by the chrome feel row "tooltip / fades out".
+- **X11 press times** (vendor/gpui-pre-linux: `last_press`, gpui_linux.rs; set in linux/x11/client.rs's button
+  press): each press's number and the time since the one before by the X server's event times. The feature list's
+  double-click (part_studio `ROW_DOUBLE_CLICK`, via app-core `viewport::platform_last_press`) uses it, because a
+  busy UI thread handles a second click late (qa ROW-DBLCLICK).

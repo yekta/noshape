@@ -158,7 +158,7 @@ take's placement) carries the same control by name for ours, which runs `ours_on
 - `{"face": [x, y, z]}`, `{"edge": [x, y, z]}`, `{"vertex": [x, y, z]}`: the entity through that model point (mm),
   picked where it shows in the current view; `{"sketch_point": [x, y]}` on the active sketch plane (mm);
   `{"plane": "Top"}`, `{"origin": true}`, `{"empty": true}` (empty graphics area).
-- `{"view_cube": "Top"}`, `{"view_cube": "Isometric"}`.
+- `{"view_cube": "Top"}` (a face: Top, Bottom, Front, Back, Right, Left; the view menu's Isometric is `{"button": "Camera and render options"}`, then `{"menu": "Isometric"}`).
 - `{"flat_bend": 0, "frac": 0.4}`: the Sheet metal panel's flat view, inside bend line n's zone, `frac` of the way
   from its centre line to its edge (ours only, for one-off scenarios: live's recorder has no flat view target yet).
 - The move triad (asm, 11-07), shown at the pick once a part is clicked: `{"triad": "x" | "y" | "z"}` an arrow's shaft,

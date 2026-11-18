@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-18 21:30 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-18 23:00 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -35,36 +35,22 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (lead order after the 21:1x compaction)
+## Now (lead order after the 22:5x compaction)
 
-1. Watch 404f2e1f (queued 21:13, #1): Coarse level for big assemblies (> 1 M triangles; xdev-subs A/B: first frame
-   unchanged, orbit 10.5 → 13 frames / 4 s, RSS +0.4 GB; the regen result key includes coarser_levels), Fillet's
-   triangle handle + 5 px dead zone, no sketch-line midpoint with no tool, Tag "Standard content".
-2. In the worktree, tests run on vibe2, to land next (WIP commit eb1ef8894 + later edits):
-   - live dialogs-1118: Tab orders of Chamfer / Shell / Hole / Revolve / Linear / Circular all = (new matrix row);
-     Esc after Tab left the dialog now does nothing (`FeatureDialog::tabbed_out`, set on `LeaveFocus`, cleared by a
-     graphics press; the studio's Cancel skips it while the focus is outside the dialog). Checked = earlier: a tool
-     click commits the open dialog, no auto-advance between boxes, first box focused, Hole title = its callout,
-     Revolve's Full revolve checkbox.
-   - live recheck 11-18 (b5b664aaa) ≠ fixed: a held edge picks 11 px wide (was 9; matrix now 10 px, live 9–10); the
-     row tooltip's fade starts at 0.2 over 110 ms (`ROW_TIP_FADE`; it showed 150–167 ms after the row lit); a Part
-     Studio box selects at the release (`Viewport::box_by_pick` off: it waited for a GPU readback it never used).
-   - View cube corners: live's Trimetric view turned to the corner's quarter (azimuth corner − 15°, elevation ±30°;
-     vc.json from iso), was the diagonal (misread ui-parity step: its "Isometric" was the home button). New test
-     `cube_hover_map::the_cube_click_grid_from_iso_matches_live` (vc.json's 15 × 15 grid, centre ~(1828, 167)).
-3. Next: view cube press/drag rows (≤ 2 px a click, 3+ nothing, a 40 px drag neither orbits nor clicks, a 1.2 s hold
-   nothing); the Section arrow turning blue while dragged.
-4. live2's ≠ rows: Translate ghost (old place light grey #D6DADD see-through + orange silhouette, the moved part dark
-   grey see-through); section preview cap (#E3C9A7 vs live #EBBD8A); Hole callout placement (text by the hole). Our
-   frame beside live's: one app session on vibe2 Xvfb.
-5. live2 UI speed: rollback bar after a drop 0.24 / 0.14 s (live ~0.1); Mass values 313 ms (live 154). Under the
-   11-18 ruling only gaps ≥ 100 ms and ≥ 2× on a whole action count: check against it first.
-6. live's other recheck ≠ (not mine unless the lead says): Symmetric on two lines, Trim past a chain's corner (skasm);
-   the dimension box's selected text not drawn highlighted (skasm).
-7. Queue: suppress row lag, "#" list 0.7 s, chip tooltip to the chip's right, panel offsets shared between studios,
-   Mass ~12 px shorter, FEEL-EDGE-VS-FACE-HOLD, Roll to here, press-interval patch
-   (/root/psui-scratch/press-interval2.patch), config table keys, chips-expr rows, plane reach decision, asm in-context
-   pane strings when live2's capture lands (live/asm/insert-1118/). Not to build: 3D Sketch, Fault analysis.
+1. Landed 22:28 as fea9cbbe (9662a162 + 404f2e1f). Live retakes once /root/green passes it (green is df6be9b6 now).
+2. Queued (land 23:xx, see `land.sh --status`): view cube hold ≥ 490 ms no click; view-cube-iso scenarios via the
+   view menu; Transform ghost (test a_transforms_old_place_is_a_light_grey_ghost); Hole callout leader 14 px and its
+   glyph mesh `on_top` (in-app recheck shot: /root/psui-scratch/mk-hole-shot.py makes the scratch scenario); tooltips
+   wrap at 400 px; a hidden sketch's eye only on hover; chip tooltip right; "#" list redraw; configuration names
+   spreadsheet keys (Tab out of the add row is the input's IndentInline action, not a key event); X11 press-interval
+   double-click; selected cap colour render test. Part Studio lib 273 passed, app-core, render caps, clippy clean.
+3. Speed rows (rollback drop 0.24 s, Mass values 313 ms): frame log 23:00 (/root/psui-scratch/lat, green on a local
+   Xvfb, NOSHAPE_UI_TIMING): handlers < 1 ms, frame layout+paint 8 ms, but presents 100–150 ms apart (software
+   Vulkan): both gaps are two software-rendered frames. Decision asked of the lead: measure on a GPU.
+4. live's other recheck ≠ (skasm's): Symmetric on two lines, Trim past a chain's corner.
+5. Queue: plane reach decision, asm in-context pane strings when live2's capture lands (live/asm/insert-1118/),
+   Roll to here (on hold for live2), live's answer on the cap over a shown plane (REQUESTS 22:48). Not to build: 3D
+   Sketch, Fault analysis.
 - Agent ids (11-18 20:xx): core d30002ca-d013-4435-b7d9-7da9cb564cec, blend de66e481-56e2-4005-a5d3-9fa897ca5fde.
 - Landed today: 270e489b (72 a turn, drill-point fans), 933d8e41 (apex grid), 45f2d798 + 548d795f (box-drag red
   main), 3fa69088 (Section dialog place, arrow dead zone), 9595bbf05 (tab return), e7d9df8c (Windows nav).

@@ -499,8 +499,9 @@ pub struct UiState {
     pub mass_faces: bool,
     /// Mass properties values clicked to the unit's highest precision (live: a second click turns it back).
     pub mass_precise: std::collections::HashSet<&'static str>,
-    /// The feature row clicked last and when (executor clock): the list's own double-click ([`ROW_DOUBLE_CLICK`]).
-    pub row_last_click: Option<(FeatureId, std::time::Instant)>,
+    /// The feature row clicked last, when (executor clock) and its platform press number: the list's own double-click
+    /// ([`ROW_DOUBLE_CLICK`]).
+    pub row_last_click: Option<(FeatureId, std::time::Instant, u64)>,
     /// The Measure, Analysis tools and Mass properties buttons' keyboard focus, Tab's stops from the graphics.
     pub eval_stops: Vec<FocusHandle>,
     /// Mass properties: "Mate connector for reference frame" is the active
@@ -769,6 +770,11 @@ pub struct UiState {
     pub cfg_enter_next: std::collections::HashMap<String, String>,
     /// What typing on the framed cell put in (replacing its value), for the input it opens.
     pub cfg_edit_initial: Option<String>,
+    /// A cell to frame at the next render (it needs the window to take the keyboard): a List's first row after its
+    /// add row's name + Tab (live2 ps-feel2-1118).
+    pub cfg_frame_pending: Option<String>,
+    /// The List input whose add row Tab left (its commit then frames the first row).
+    pub cfg_tab_from_new: Option<String>,
     pub cfg_filter: Option<Entity<InputState>>,
     /// Feature list "Configurations" box: one select per List input.
     pub cfg_selects: std::collections::HashMap<String, (Entity<crate::os_select::OsSelect>, Subscription)>,
@@ -1068,6 +1074,8 @@ impl UiState {
             cfg_framed: None,
             cfg_enter_next: Default::default(),
             cfg_edit_initial: None,
+            cfg_frame_pending: None,
+            cfg_tab_from_new: None,
             cfg_filter: None,
             cfg_selects: Default::default(),
             zebra: None,
@@ -1097,6 +1105,9 @@ pub(super) const NO_INTERSECTION: &str = "Selected tools and targets do not inte
 
 /// Marks a Transform ghost's body id (scene only).
 const GHOST_INDEX_BIT: u32 = 1 << 31;
+/// A Transform's old place (live manip-feel-1118 m6: #D6DADD on top, (198, 202, 205) on the sides over white).
+const GHOST_GREY: u32 = 0xc9ced2;
+const GHOST_ALPHA: f32 = 0.6;
 
 impl PartStudioView {
     // ------------------------------------------------------------ helpers
@@ -2942,6 +2953,27 @@ impl PartStudioView {
         self.display.bodies.iter().filter(|b| !old.contains(&b.id)).map(|b| b.id.clone()).collect()
     }
 
+    /// A Transform's ghost (its old place) shows its selection only as the part's orange band, no amber tint (live
+    /// manip-feel-1118 m6).
+    pub(super) fn ghost_outline_only(&self, scene: &mut noshape_render::Scene, built: &crate::scene_builder::BuiltScene) {
+        use noshape_render::scene::state;
+        let Some(before) = &self.ui.preview_before else { return };
+        let mut any = false;
+        // (The moved copy is display-only: a face's pick ids are the ghost's.)
+        for b in before.bodies.iter().filter(|b| self.ui.transform_ghost.contains(&b.id)) {
+            for f in &b.face_refs {
+                for &id in built.picks.ids_for(f) {
+                    let st = scene.states.get(id as usize).copied().unwrap_or(0);
+                    if st & state::SELECTED != 0 {
+                        scene.set_state(id, (st & !(state::SELECTED | state::BODY | state::TINT)) | state::OUTLINE | state::BAND);
+                        any = true;
+                    }
+                }
+            }
+        }
+        scene.body_outline |= any;
+    }
+
     /// The parts an open Transform moves away from where they were (no
     /// ghost while they still coincide, or when it copies them).
     pub(super) fn transform_ghost(&self, cx: &App) -> Vec<BodyId> {
@@ -3009,10 +3041,19 @@ impl PartStudioView {
         if let Some(before) = &self.ui.preview_before
             && !self.ui.transform_ghost.is_empty()
         {
+            // Live (manip-feel-1118 m6): the old place light grey and see-through with no edges, outlined orange
+            // while selected (`ghost_outline_only`); the moved part dark grey and see-through with its edges.
             let mut d = (*self.display).clone();
+            let moved = crate::theme::lin(crate::theme::viewport::TOOL_PREVIEW);
+            for b in d.bodies.iter_mut().filter(|b| self.ui.transform_ghost.contains(&b.id)) {
+                b.color = [moved[0], moved[1], moved[2], 0.6];
+            }
+            let grey = crate::theme::lin(GHOST_GREY);
             for b in before.bodies.iter().filter(|b| self.ui.transform_ghost.contains(&b.id)) {
                 let mut b = b.clone();
-                b.color[3] *= 0.3;
+                b.color = [grey[0], grey[1], grey[2], GHOST_ALPHA];
+                b.mesh = Arc::new(noshape_model::display::MeshBuffers { edges: Vec::new(), vertices: Vec::new(), ..(*b.mesh).clone() });
+                b.coarser.clear();
                 // Its own id, so `display_only` (the moved copy) skips only the copy.
                 b.id.index |= GHOST_INDEX_BIT;
                 d.bodies.push(b);
@@ -4873,16 +4914,43 @@ pub(super) fn roll_items(i: usize, rollback_at: usize, n_features: usize) -> (bo
     (rollback_at != i + 1, rollback_at < n_features)
 }
 
-/// The feature list's drag autoscroll (live "psb (10-24 k)"): px/s for a
-/// pointer at `y` over a list spanning `top..bottom` (window px), positive
-/// scrolling down. Only the vertical distance counts, also with the pointer
-/// beside the panel. Live's measured speeds (± 15 %), by the distance inside
-/// the edge (negative = past it), mean of the top and bottom edges.
 /// A feature row clicked again within this is a double-click, anywhere on the row (live2 consts-1118, pinned 07:26: the
 /// list's own rule, not the OS's 5 px: 150–370 ms opened the dialog up to the row's far end and on its icon; 420 ms
 /// never did, nor a second click on another row).
 pub(super) const ROW_DOUBLE_CLICK: std::time::Duration = std::time::Duration::from_millis(400);
 
+/// Whether a click on a row clicked `since` ago is its double-click: within [`ROW_DOUBLE_CLICK`] by when the handlers
+/// ran, or by the platform's own press times (`press`: the newest press's number and the time since the one before)
+/// when the first click was the press just before (`first_press`): a busy UI thread handles the second click late.
+pub(super) fn row_clicked_again(since: std::time::Duration, press: (u64, Option<std::time::Duration>), first_press: u64) -> bool {
+    let pressed = press.1.filter(|_| press.0 > 0 && press.0 == first_press + 1);
+    since <= ROW_DOUBLE_CLICK || pressed.is_some_and(|d| d <= ROW_DOUBLE_CLICK)
+}
+
+#[cfg(test)]
+mod row_clicked_again_tests {
+    use super::*;
+    use std::prelude::v1::test;
+    use std::time::Duration;
+
+    /// qa ROW-DBLCLICK: presses 330 ms apart handled 450 ms apart (a busy UI thread) are a double-click; a press between
+    /// them (elsewhere) or presses 420 ms apart are not; without press times the handlers' times decide.
+    #[test]
+    fn a_late_second_click_counts_by_its_press_time() {
+        let ms = Duration::from_millis;
+        assert!(row_clicked_again(ms(450), (8, Some(ms(330))), 7));
+        assert!(!row_clicked_again(ms(450), (9, Some(ms(330))), 7));
+        assert!(!row_clicked_again(ms(450), (8, Some(ms(420))), 7));
+        assert!(row_clicked_again(ms(300), (0, None), 0));
+        assert!(!row_clicked_again(ms(450), (0, None), 0));
+    }
+}
+
+/// The feature list's drag autoscroll (live "psb (10-24 k)"): px/s for a
+/// pointer at `y` over a list spanning `top..bottom` (window px), positive
+/// scrolling down. Only the vertical distance counts, also with the pointer
+/// beside the panel. Live's measured speeds (± 15 %), by the distance inside
+/// the edge (negative = past it), mean of the top and bottom edges.
 pub(super) fn list_autoscroll_speed(y: f32, top: f32, bottom: f32) -> f32 {
     const TABLE: [(f32, f32); 12] = [
         (-192.0, 600.0),

@@ -32,6 +32,9 @@ pub(super) type CellCommit = std::rc::Rc<dyn Fn(&mut PartStudioView, String, &mu
 /// An input ⋯ menu entry's action.
 type MenuAction = Box<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)>;
 
+/// `cfg_enter_next`'s mark for "below a List's last row": its add row (followed by the input's id).
+const CFG_ADD_ROW: &str = "add-row:";
+
 impl PartStudioView {
     /// Commit the cell that had the focus at the last render if the focus has
     /// left it (clicking another cell or elsewhere), like Onshape's commit on
@@ -171,6 +174,13 @@ impl PartStudioView {
                 if matches!(ev, InputEvent::PressEnter { .. })
                     && let Some(next) = this.ui.cfg_enter_next.get(&k).cloned()
                 {
+                    // Below a List's last row: its add row takes the keyboard.
+                    if let Some(iid) = next.strip_prefix(CFG_ADD_ROW) {
+                        this.ui.cfg_framed = None;
+                        this.ui.cfg_focus_new_row = Some(iid.to_string());
+                        cx.notify();
+                        return;
+                    }
                     let f = cx.focus_handle();
                     window.focus(&f, cx);
                     this.ui.cfg_framed = Some((next, f));
@@ -1679,11 +1689,8 @@ impl PartStudioView {
                 for (rk, rname) in &rows {
                     let active = *rk == current;
                     let name_el: AnyElement = if matches!(input.kind, ConfigInputKind::List { .. }) {
-                        let (a, b) = (iid.clone(), rk.clone());
-                        self.config_name_cell(format!("opt-{iid}-{rk}"), rname.clone(), (px(13.33), if active { FontWeight::MEDIUM } else { FontWeight::NORMAL }), window, cx, move |this, v, cx| {
-                            let (a, b) = (a.clone(), b.clone());
-                            this.edit_config(noshape_ops::config::RENAME_OPTION, cx, |ps| noshape_ops::config::rename_option(ps, &a, &b, v));
-                        })
+                        let i = rows.iter().position(|(k, _)| k == rk).unwrap_or(0);
+                        self.option_name_cell(&iid, &rows, i, active, window, cx)
                     } else {
                         // A checkbox's rows show its states as read-only boxes
                         // (live 433: #999 filled, a white check for true).
@@ -1786,6 +1793,7 @@ impl PartStudioView {
                     let a = iid.clone();
                     // Keyed by the row count, so the row is empty again after adding.
                     let key = format!("opt-new-{iid}-{}", rows.len());
+                    let first = rows.first().map(|(k, _)| format!("opt-{iid}-{k}"));
                     let st = self.cell_input(key, String::new(), window, cx, move |this, v, cx| {
                         let name = v.trim().to_string();
                         if name.is_empty() {
@@ -1795,15 +1803,24 @@ impl PartStudioView {
                         this.edit_config(noshape_ops::config::ADD_OPTION, cx, |ps| {
                             noshape_ops::config::add_option(ps, &a, name);
                         });
+                        // Live2 ps-feel2-1118: name + Tab adds the row and frames the first row's name.
+                        if this.ui.cfg_tab_from_new.take().as_deref() == Some(a.as_str()) {
+                            this.ui.cfg_frame_pending.clone_from(&first);
+                        }
                     });
                     if self.ui.cfg_focus_new_row.as_ref() == Some(&iid) {
                         self.ui.cfg_focus_new_row = None;
                         st.update(cx, |s, cx| s.focus(window, cx));
                     }
+                    let tab_from = iid.clone();
                     section = section.child(
                         h_flex().border_l_1().border_color(grid).child(
                             cell(name_w)
                                 .relative()
+                                // Tab reaches the input as its IndentInline action (no key listener sees it).
+                                .capture_action(cx.listener(move |this, _: &gpui_kit::component::input::IndentInline, _, _| {
+                                    this.ui.cfg_tab_from_new = Some(tab_from.clone());
+                                }))
                                 .child(crate::ui::input_with_placeholder(&st, "Name", cx).appearance(false).text_size(px(13.33)).pl(px(3.))),
                         ),
                     );
@@ -1829,6 +1846,105 @@ impl PartStudioView {
             }
         }
         section.into_any_element()
+    }
+
+    /// A List row's name, spreadsheet style (live2 ps-feel2-1118): a click frames the cell (blue 2 px), typing on it
+    /// replaces the name, Return commits and frames the row below (below the last: the add row takes the keyboard),
+    /// Up / Down move the frame, Esc unframes or restores, a double-click edits the name; no switch.
+    fn option_name_cell(&mut self, iid: &str, rows: &[(String, String)], i: usize, active: bool, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let (rk, rname) = &rows[i];
+        let cell = format!("opt-{iid}-{rk}");
+        let key_of = |j: usize| format!("opt-{iid}-{}", rows[j].0);
+        let up = i.checked_sub(1).map(key_of);
+        let down = (i + 1 < rows.len()).then(|| key_of(i + 1));
+        self.ui.cfg_enter_next.insert(cell.clone(), down.clone().unwrap_or_else(|| format!("{CFG_ADD_ROW}{iid}")));
+        let weight = if active { FontWeight::MEDIUM } else { FontWeight::NORMAL };
+        if self.ui.cfg_editing.as_deref() == Some(cell.as_str()) {
+            let (a, b) = (iid.to_string(), rk.clone());
+            return self.config_name_cell(cell.clone(), rname.clone(), (px(13.33), weight), window, cx, move |this, v, cx| {
+                let (a, b) = (a.clone(), b.clone());
+                this.edit_config(noshape_ops::config::RENAME_OPTION, cx, |ps| noshape_ops::config::rename_option(ps, &a, &b, v));
+            });
+        }
+        if self.ui.cfg_frame_pending.as_deref() == Some(cell.as_str()) {
+            self.ui.cfg_frame_pending = None;
+            let f = cx.focus_handle();
+            window.focus(&f, cx);
+            self.ui.cfg_framed = Some((cell.clone(), f));
+        } else if self.ui.cfg_framed.as_ref().is_some_and(|(k, f)| *k == cell && !f.is_focused(window)) {
+            self.ui.cfg_framed = None;
+        }
+        let framed = self.ui.cfg_framed.as_ref().filter(|(k, _)| *k == cell).map(|(_, f)| f.clone());
+        let (c1, c2, list) = (cell.clone(), cell.clone(), iid.to_string());
+        div()
+            .id(SharedString::from(format!("cfgname-{cell}")))
+            .debug_selector({
+                let c = cell.clone();
+                move || format!("cfgname {c}")
+            })
+            .flex_1()
+            .min_w_0()
+            .h_full()
+            .flex()
+            .items_center()
+            .ml(px(-6.))
+            .pl(px(4.))
+            .border_2()
+            .border_color(if framed.is_some() { p().accent } else { gpui_kit::rgba(0x00000000) })
+            .when_some(framed, |d, f| {
+                d.key_context("Input").track_focus(&f).on_key_down(cx.listener(move |this, e: &KeyDownEvent, window, cx| {
+                    let k = &e.keystroke;
+                    let plain = !(k.modifiers.control || k.modifiers.alt || k.modifiers.platform);
+                    let frame = |this: &mut Self, key: String, window: &mut Window, cx: &mut Context<Self>| {
+                        let f = cx.focus_handle();
+                        window.focus(&f, cx);
+                        this.ui.cfg_framed = Some((key, f));
+                    };
+                    match k.key.as_str() {
+                        "escape" => this.ui.cfg_framed = None,
+                        "enter" => {
+                            this.ui.cfg_editing = Some(c1.clone());
+                            this.ui.cfg_editing_focus = true;
+                        }
+                        "up" => match up.clone() {
+                            Some(u) => frame(this, u, window, cx),
+                            None => return,
+                        },
+                        "down" => match down.clone() {
+                            Some(d) => frame(this, d, window, cx),
+                            None => {
+                                this.ui.cfg_framed = None;
+                                this.ui.cfg_focus_new_row = Some(list.clone());
+                            }
+                        },
+                        _ => match k.key_char.clone().filter(|_| plain) {
+                            Some(ch) => {
+                                this.ui.cfg_editing = Some(c1.clone());
+                                this.ui.cfg_editing_focus = true;
+                                this.ui.cfg_edit_initial = Some(ch);
+                            }
+                            None => return,
+                        },
+                    }
+                    cx.stop_propagation();
+                    cx.notify();
+                }))
+            })
+            .child(div().flex_1().min_w_0().truncate().text_size(px(13.33)).font_weight(weight).child(rname.clone()))
+            .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
+                cx.stop_propagation();
+                if e.click_count() >= 2 {
+                    this.ui.cfg_editing = Some(c2.clone());
+                    this.ui.cfg_editing_focus = true;
+                    this.ui.cfg_framed = None;
+                } else {
+                    let f = cx.focus_handle();
+                    window.focus(&f, cx);
+                    this.ui.cfg_framed = Some((c2.clone(), f));
+                }
+                cx.notify();
+            }))
+            .into_any_element()
     }
 
     /// A table/title text that turns into an input on double-click (or from
@@ -1957,8 +2073,11 @@ impl PartStudioView {
             Some(ConfigInputKind::List { options, .. }) => options.iter().map(|o| o.id.clone()).collect(),
             _ => Vec::new(),
         };
-        if let Some(below) = rows.iter().position(|r| r == key).and_then(|i| rows.get(i + 1)) {
-            self.ui.cfg_enter_next.insert(cell.clone(), format!("cp-{ci}-{below}"));
+        let at = rows.iter().position(|r| r == key);
+        let below = at.and_then(|i| rows.get(i + 1)).map(|b| format!("cp-{ci}-{b}"));
+        let above = at.and_then(|i| i.checked_sub(1)).and_then(|i| rows.get(i)).map(|a| format!("cp-{ci}-{a}"));
+        if let Some(b) = &below {
+            self.ui.cfg_enter_next.insert(cell.clone(), b.clone());
         }
         // A plain number in a length or angle cell takes the workspace unit, as a quantity field writes it ("40" →
         // "40 mm").
@@ -2000,10 +2119,22 @@ impl PartStudioView {
             .border_color(if framed.is_some() { pal.accent } else { gpui_kit::rgba(0x00000000) })
             .when_some(framed, |d, f| {
                 // An "Input" context: the Part Studio's single-key shortcuts stay quiet while typing here.
-                d.key_context("Input").track_focus(&f).on_key_down(cx.listener(move |this, e: &KeyDownEvent, _, cx| {
+                d.key_context("Input").track_focus(&f).on_key_down(cx.listener(move |this, e: &KeyDownEvent, window, cx| {
                     let k = &e.keystroke;
                     let plain = !(k.modifiers.control || k.modifiers.alt || k.modifiers.platform);
-                    if k.key == "escape" {
+                    // Up / Down move the frame (live2 ps-feel2-1118).
+                    let step = match k.key.as_str() {
+                        "up" => Some(above.clone()),
+                        "down" => Some(below.clone()),
+                        _ => None,
+                    };
+                    if let Some(to) = step {
+                        if let Some(to) = to {
+                            let f = cx.focus_handle();
+                            window.focus(&f, cx);
+                            this.ui.cfg_framed = Some((to, f));
+                        }
+                    } else if k.key == "escape" {
                         this.ui.cfg_framed = None;
                     } else if k.key == "enter" {
                         this.ui.cfg_editing = Some(c1.clone());

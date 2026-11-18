@@ -1602,6 +1602,7 @@ impl PartStudioView {
             *slot = true;
         }
         self.tint_selected_owners(&mut scene, &selection, cx);
+        self.ghost_outline_only(&mut scene, built);
         // with_highlights' overlays, then the extra ones (see the preview's POST tags).
         let (highlights_end, extra_end) = (scene.instances.len() - extra_len, scene.instances.len());
         // A selected Decal row tints its image like a selected face (live).
@@ -6130,7 +6131,9 @@ impl PartStudioView {
                             move || format!("feat-eye-{id:?}")
                         })
                         .map(|d| crate::ui_script::mark(d, || format!("button:eye:{}", f.name)))
-                        .when(!hidden, |d| crate::ui::hover_reveal(d, "feature-row"))
+                        // Hidden or not, the eye shows only while the row is hovered (live errors-1118 list.png: a
+                        // hidden sketch's row has no icon at rest).
+                        .map(|d| crate::ui::hover_reveal(d, "feature-row"))
                         .cursor_pointer()
                         .child(crate::assets::icon(if hidden { "eye-off" } else { "eye" }, 16., cx))
                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -6180,8 +6183,9 @@ impl PartStudioView {
                     return;
                 }
                 let now = cx.background_executor().now();
-                let again = this.ui.row_last_click.is_some_and(|(r, t)| r == id && now.saturating_duration_since(t) <= behaviors::ROW_DOUBLE_CLICK);
-                this.ui.row_last_click = (!again).then_some((id, now));
+                let press = crate::viewport::platform_last_press();
+                let again = this.ui.row_last_click.is_some_and(|(r, t, p)| r == id && behaviors::row_clicked_again(now.saturating_duration_since(t), press, p));
+                this.ui.row_last_click = (!again).then_some((id, now, press.0));
                 if ev.click_count() >= 2 || again {
                     this.edit_feature(id, window, cx);
                     return;

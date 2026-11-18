@@ -521,15 +521,17 @@ impl Render for PlacedTooltip {
         let a = self.anchor;
         let h = px(26.);
         let measured = self.width.clone();
+        // Live (errors-1118 tip-chamfer-full): at most 400 px wide, a longer text wraps (18 px lines, 4 px padding:
+        // two lines 44 px high).
         let title = div()
             .font_weight(FontWeight::MEDIUM)
-            .h(h)
+            .min_h(h)
+            .max_w(px(RICH_TOOLTIP_W))
             .px(px(4.))
-            .flex()
+            .py(px(4.))
+            .line_height(px(18.))
             .flex_none()
-            .items_center()
             .bg(pal.tooltip)
-            .whitespace_nowrap()
             .map(|d| if self.user { d.child(user_text(self.text.clone())) } else { d.child(self.text.clone()) });
         // Live `.tooltip-expand`: the expanded fill, 4 px padding, at most
         // 400 px wide, under the title.

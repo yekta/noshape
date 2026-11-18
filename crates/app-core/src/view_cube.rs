@@ -5,7 +5,7 @@
 //! cube moves it (webgl bundle `updateDragPosition`): it keeps its offset
 //! from the graphics area's top-right corner, at least 15 px from the left,
 //! right and top and 40 px from the bottom (`updateCenter`); a press that
-//! moves at most LEFT_MOUSE_DRAG_DISTANCE_TOLERANCE (2 px) is a click.
+//! moves at most LEFT_MOUSE_DRAG_DISTANCE_TOLERANCE (2 px) and is let go within ~0.5 s is a click.
 
 use glam::{DQuat, DVec2};
 use gpui_kit::*;
@@ -16,6 +16,8 @@ pub use noshape_render::overlay::view_cube::{Arrow, CubeCell, WIDGET_PX, widget_
 
 /// Onshape's LEFT_MOUSE_DRAG_DISTANCE_TOLERANCE (px moved, |dx| + |dy|).
 const CLICK_TOLERANCE: f32 = 2.0;
+/// A press held this long is no click (live viewcube-1118: 480 ms still went to the face, 500 ms did nothing).
+const CLICK_HOLD: std::time::Duration = std::time::Duration::from_millis(490);
 /// VIEW_CUBE_LEFT/RIGHT/TOP/BOTTOM_MARGIN_PX.
 const MARGINS: [f32; 4] = [15.0, 15.0, 15.0, 40.0];
 
@@ -23,8 +25,8 @@ const MARGINS: [f32; 4] = [15.0, 15.0, 15.0, 40.0];
 #[derive(Default)]
 struct CubeDrag {
     offset: Point<Pixels>,
-    /// Last pointer position, px moved, and the cell and modifiers pressed.
-    press: Option<(Point<Pixels>, f32, CubeCell, Modifiers)>,
+    /// Last pointer position, px moved, the cell and modifiers pressed, and when.
+    press: Option<(Point<Pixels>, f32, CubeCell, Modifiers, std::time::Instant)>,
 }
 
 thread_local! {
@@ -42,7 +44,6 @@ pub fn ui_cell_point(name: &str, origin: Option<Point<Pixels>>, rotation: DQuat)
         "Back" => [0, 1, 0],
         "Right" => [1, 0, 0],
         "Left" => [-1, 0, 0],
-        "Isometric" => [1, -1, 1],
         _ => return Err(format!("no view cube cell {name}")),
     };
     let origin = origin.ok_or("the view cube isn't drawn")?;
@@ -171,7 +172,7 @@ pub fn view_cube<V: 'static>(menu: AnyElement, hooks: CubeHooks<V>, viewport: DV
                         }
                         let moved = DRAGS.with_borrow_mut(|d| {
                             let d = d.entry(id).or_default();
-                            let Some((last, dist, _, _)) = &mut d.press else { return false };
+                            let Some((last, dist, ..)) = &mut d.press else { return false };
                             let delta = e.position - *last;
                             *last = e.position;
                             *dist += f32::from(delta.x).abs() + f32::from(delta.y).abs();
@@ -214,7 +215,7 @@ pub fn view_cube<V: 'static>(menu: AnyElement, hooks: CubeHooks<V>, viewport: DV
                 // Anything but the cube and its arrows is the graphics area's.
                 let Some(cell) = widget_hit(rot, local(e.position, o)) else { return };
                 cx.stop_propagation();
-                DRAGS.with_borrow_mut(|d| d.entry(id).or_default().press = Some((e.position, 0.0, cell, e.modifiers)));
+                DRAGS.with_borrow_mut(|d| d.entry(id).or_default().press = Some((e.position, 0.0, cell, e.modifiers, std::time::Instant::now())));
                 cx.notify();
             }),
         )
@@ -222,9 +223,9 @@ pub fn view_cube<V: 'static>(menu: AnyElement, hooks: CubeHooks<V>, viewport: DV
             MouseButton::Left,
             cx.listener(move |this, _: &MouseUpEvent, _, cx| {
                 let press = DRAGS.with_borrow_mut(|d| d.entry(id).or_default().press.take());
-                if let Some((_, dist, cell, modifiers)) = press {
+                if let Some((_, dist, cell, modifiers, at)) = press {
                     cx.stop_propagation();
-                    if dist <= CLICK_TOLERANCE {
+                    if dist <= CLICK_TOLERANCE && at.elapsed() < CLICK_HOLD {
                         act(this, cell, modifiers, cx);
                     }
                     cx.notify();
