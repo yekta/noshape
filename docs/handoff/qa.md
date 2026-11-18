@@ -137,8 +137,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    guard 5/5. Selection latency (v0.4.57 release, polled crop): face 216 / plane 153 / list row 163 / box release 218 ms medians.
    Tab A/B at load < 1.2: return to an open tab settles 73-87 ms on 0.4.53 vs ~700 ms in 4 of 6 on 0.4.57 (sent to psui 03:08).
    SELFEEL-PART-ROW verified on 08597f71 at load 0.2.
-0q. **17:00 cut must carry** psui's fix for P0 DOCK-TAB-SWITCH-TRAILING-FRAMES (first slow v0.4.54; rerun lat/tabbis.sh-style A/B on vibex7
-   with its build vs 0.4.53, 3 rounds). Known on 05:00 (lead 03:28). Add it to cut-must.txt once psui names the commit.
+0q. **17:00 cut must carry** psui 67ebc10a (P0 DOCK-TAB-SWITCH-TRAILING-FRAMES, from 2219c4373; unit qa-wait-67eb reruns the A/B on vibex7
+   on its first green vs 0.4.53, 3 rounds -> nightly/tab67-*.txt). Known on 05:00 (lead 03:28). Put 67ebc10a in cut-must.txt after the 05:00 cut.
 0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
    + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
    nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).
