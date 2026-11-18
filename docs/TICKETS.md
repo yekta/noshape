@@ -559,6 +559,26 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Sheet metal, right-click menus and navigation vs live's 11-17 captures (qa 00:33, green 7187ac751, vibex6 Xvfb, real pointer and keys)
+Documents sm-box (plate + Flange 1 / 2, mitred corner) and block-fillet (qa-scratch/fl: sm.sh, menu.sh, anim.sh; sheets
+tickets/sm-menu-sheet.png, vibex6 ~/agents/qa-keep/sm-menu-nav/).
+Pass, sheet metal: Flange lights rim edges and the corner's thin side face (filled orange), never a plane; its dialog is live's row for
+row (alignment Inner, End type Blind, 25 mm, Bend angle ▾ + the flip arrow, 90 deg, Automatic miter, Use model bend radius, Partial
+flange); the pick shows the edge at once and the translucent wall bent inward by 1 s; Corner lights the bend end's corner as an
+orange disc, not the broad faces; the table and flat view button opens table + flat + "Sheet metal context" in one frame, no slide.
+Menus: two faces add "Clear selection" above Select ▸ and "Add appearance to 2 faces…"; face + edge drops material / part appearance /
+Delete Part 1… and keeps Delete Extrude 1; "Where used for Part 1…" after Export…; the Top row has Section view…; in a sketch every
+menu starts "Confirm Sketch 1", with the Line tool "Escape line" above it; long menus flip up at the window's bottom.
+Navigation: one wheel event = x1.058-1.059 about the pointer (5 events x1.333; live x1.0595 / x1.335); Shift+1 / Shift+5 / Shift+7 / F
+animate ~550-690 ms from the first frame to the last (500 ms + a frame on this debug build), arrows ~300 ms (250 ms + a frame).
+- [ ] **P1 SMFEEL-FLANGE-BROAD-FACE (skasm)**: in Flange's "Edges or side faces to flange" the front wall's broad face lights (outlined
+  orange) at its centre; live never lights the walls' or the bottom's broad faces there.
+- [ ] **P2 MENUFEEL-FACE-EDGE (psui)**: a face + an edge selected: no "Add appearance to face…" (live keeps it). psui: fixed in 2234f511.
+- [ ] **P2 HOVER-LEAVES-WINDOW (psui)**: a face hovered just before the pointer leaves the window stays outlined (twice, sm-box and
+  block-fillet).
+- Not judged: hover per box in the Sheet metal model dialog (our start is a Thicken model, live's a Convert); joint row hover and the
+  Type change (sm-box's mitred corner lists no "Other joints" row; live's converted box had 4 rips; skasm to say whether it should).
+
 ## Feature list, document and Variable / Feature Studio feel vs live2's / live's 11-17 captures (qa 00:04, green 7187ac751, vibex6 Xvfb, real pointer and keys)
 Documents built from starts block-fillet / two-blocks and the louver corpus copy, opened without the runner (qa-scratch/fl: build.sh,
 fls.sh, fl2.py, fl3.sh, fl4.sh, vs.sh, vs2.sh, fs.sh; sheets tickets/fl-vs-sheet.png and vibex6 ~/agents/qa-keep/fl-vs/).
