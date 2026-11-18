@@ -2500,7 +2500,7 @@ fn a_zero_centroid_is_unknown() {
 fn an_invalid_solid_of_ours_is_a_difference() {
     let live = PartState { name: "Part 1".into(), body_type: "solid".into(), faces: 6, edges: 12, vertices: 8, volume: Some(1.0e-6), ..Default::default() };
     let ours = |valid: bool| parts_from_query(&json!({ "units": { "length": "mm" }, "parts": [{ "name": "Part 1", "kind": "Solid", "faces": 6, "edges": 12, "vertices": 8, "volume": 1000.0, "valid": valid }] }));
-    assert!(differences(&[live.clone()], &ours(true)).is_empty());
+    assert!(differences(std::slice::from_ref(&live), &ours(true)).is_empty());
     assert_eq!(differences(&[live], &ours(false)), ["\"Part 1\": not a valid solid (OCCT's shape check)"]);
 }
 
