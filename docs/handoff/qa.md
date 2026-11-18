@@ -142,6 +142,13 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    SNAPMODE-REACH (70 vs 57 px), P1 SNAPMODE-RELEASE-DIALOG; psui P1 ROW-DBLCLICK-DISTANCE. Runner-built docs reopened without the
    runner (vibex8 ~/tmp/qa/fl/docs: asm-feel, hole-plate-drawing): stable views. Drivers qa-scratch/af/snapm2.py, hv2/rowk.py, hv2/drw.py.
    qa-wait-33c5 re-runs FEEL-FL-AUTOSCROLL-DROP on psui's 33c57541 green.
+0z. **Heavy-model feel (lead 09:10)**: live measures c2-loft-guide-curves-driven-pattern (Part Studio, live 125 bodies; ours 124, Sweep 1
+   fails: P1 DRIVEN-PATTERN-SWEEP core) + asm-xdev-subs (ours only exists in the assembly suite's scratch: not prepared). Ours:
+   qa-scratch/heavy (heavy.py: live's moves / offsets / 600x400 poll at 140 ms + NOSHAPE_FRAME_LOG; hvs.sh on :154 1920x1080 with
+   vibe2's release build of 80a64725 at ~/tmp/qa/hv/noshape-rel; run.sh as unit qa-heavy). First run r1-0914 (host load 22, live's
+   Chrome running): orbit first 123 ms, 8 fps; pan 7 fps; zoom / fit / Shift+5 / Shift+7 last frame 793 / 829 / 722 / 724 ms; list
+   scroll 8 fps. The model is long and thin: at fit its surfaces are sub-pixel, so screen polls and the hover point find nothing
+   (same for live, probably). Re-run right after live's numbers land, then compare row by row; != -> psui.
 0y. **Dock tab return P0 (lead 09:00)**: fff088e5 didn't fix v0.4.54's regression (09:01 same-run: v0.4.53 settle A / B-again
    137 / 189 ms, release build of 80a64725 829 / 813; speed/tab-80a64725.txt, sent to psui). bin/tabrel.sh <sha> [nobuild]
    (release build on vibe2, tabab vs v0.4.53 on vibex7, lock speed/tabrel.lock); unit qa-tabwatch runs it on the green of every
