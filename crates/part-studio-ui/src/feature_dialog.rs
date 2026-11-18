@@ -3237,6 +3237,8 @@ impl FeatureDialog {
                         let p2 = path_s.clone();
                         let hover_ref = r.clone();
                         let tip = label.clone();
+                        // Live2 ours-1118 (qa CHIP-X-TOOLTIP): the × says "Delete Edge of Extrude 1".
+                        let x_tip = format!("Delete {label}");
                         // Onshape selection rows: 24 px plain text, the entity name as
                         // tooltip; every second row under a 35 % white overlay
                         // (woolsthorpe.css `.os-param-selection-list-entry:nth-of-type(2n)`;
@@ -3278,6 +3280,7 @@ impl FeatureDialog {
                                 div()
                                     .id(SharedString::from(format!("chipx-{path}-{row}")))
                                     .map(|d| crate::ui_script::mark(d, || format!("button:x:{}:{row}", crate::i18n::spec(s.label))))
+                                    .tooltip(crate::ui::user_tooltip(x_tip))
                                     // Live (woolsthorpe.css .os-param-selection-list-entry-delete:
                                     // a 20 px cell, 5 px padding, 5 px in): the ink 12 px from
                                     // the field's border (extrude-03, sketch/01).
