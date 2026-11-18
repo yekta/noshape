@@ -85,7 +85,7 @@ Live 2026-11-18 22:03–22:13 UTC (sketches by REST, then the third dimension ty
 | An unsolvable dimension (a triangle 100 / 100, the third side typed 300) | accepted: the bubble, the row red | the box's Enter adds the dimension at its measured value (10) without a word; the CLI refuses: "Sketch could not be solved." (invalid_argument) | ≠ [skasm] |
 | A self-intersecting profile (a bowtie of 4 lines) extruded | no error: two triangle regions, both extruded (2000 mm³) | the same (2 regions, 2000 mm³) | = |
 | Extrude of an open profile's regions (there are none) | "Extrude open did not regenerate properly: Select face or sketch region to extrude. 1 missing selection"; the extrude icon gets a warning overlay; the dialog's box reads "Missing Faces of Sketch open" in red | the same text (the CLI's selection was empty, so no "missing selection" line) | = text |
-| Sketch dialog, Show expressions | off in every live sketch dialog seen 11-18 (new and edited; Show constraints varied: off in a new sketch at 21:28, on later) | on | ≠ [skasm] |
+| Sketch dialog options (Show constraints / expressions / errors) | remembered: accepting a sketch with one changed opens the next sketch with it (live 22:4x, both Show errors and Show expressions); baseline Show constraints on, the others off. **Show errors changes nothing visible** (over-constrained line, overlapping lines, a 0.3 mm gap, crossing lines, a tiny line; in and out of sketch mode): conflicts are red either way | the same memory (saveSketchOptions); my app's saved file had Show expressions on (withdrawn ≠) | = |
 
 ## Sheet metal (live)
 
