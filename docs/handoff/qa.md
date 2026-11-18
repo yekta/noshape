@@ -127,7 +127,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    DRIVEN-PATTERN-SWEEP (live's 723k-triangle solid is missing in ours).
    asm 12:2x: cause = the angle-based display mesh (7.76 M triangles, 3 bodies blow up; a chord mesh is 1.05 M, render 15-18 s ->
    2.95 s headless), handed to psui. Re-run heavy/runperf.sh + probe.py on psui's mesh fix. Snap reach: asm's live2-retake rule (51 px
-   box of the face under the pointer) queued; unit qa-wait-reach (af/wait-reach.sh) re-runs up / 45 deg on the first green with an asm
+   box of the face under the pointer) queued; HOLD (lead 12:28: asm pulls / redoes e2c20cb2, which froze off-part): qa-wait-reach stopped;
+   start af/wait-reach.sh again only when asm says (it re-runs up / 45 deg on the first green with an asm
    snap/reach commit after 12:20 (live 50-51 / 72 px).
 0z. **Heavy-model feel (lead 09:10)**: live measures c2-loft-guide-curves-driven-pattern (Part Studio, live 125 bodies; ours 124, Sweep 1
    fails: P1 DRIVEN-PATTERN-SWEEP core) + asm-xdev-subs (ours only exists in the assembly suite's scratch: not prepared). Ours:
