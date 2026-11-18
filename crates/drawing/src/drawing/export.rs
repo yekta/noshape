@@ -82,7 +82,7 @@ fn drop_coincident_edges(g: &mut SheetGeometry) {
         type Key = (usize, (i64, i64), (i64, i64));
         let mut seen: std::collections::HashMap<Key, Vec<usize>> = std::collections::HashMap::new();
         let n = g.lines.len();
-        for li in r.filter(|i| *i < n) {
+        for li in r.clone().filter(|i| *i < n) {
             let pts = g.lines[li].points.clone();
             let (Some(a), Some(b)) = (pts.first(), pts.last()) else { continue };
             let (a, b) = (q(*a).min(q(*b)), q(*a).max(q(*b)));
@@ -95,6 +95,66 @@ fn drop_coincident_edges(g: &mut SheetGeometry) {
             } else {
                 seen.entry(key).or_default().push(li);
             }
+        }
+        drop_lines_on_longer(g, r);
+    }
+}
+
+/// A view's straight line lying wholly on a longer one of the same style written once too (c2-sm-louver's Front: the
+/// louver slots' edges in the plate's face seen edge-on lie on its front edge, 144 such pieces, live none; one only
+/// 0.9 µm off the line stays, as live's).
+fn drop_lines_on_longer(g: &mut SheetGeometry, r: std::ops::Range<usize>) {
+    const TOL: f64 = 1e-5;
+    let n = g.lines.len();
+    let ends = |l: &Polyline2| -> Option<([f64; 2], [f64; 2], f64)> {
+        let [a, b] = l.points[..] else { return None };
+        let len = (b[0] - a[0]).hypot(b[1] - a[1]);
+        (!l.closed && len > TOL).then_some((a, b, len))
+    };
+    // Each straight line by its slope and intercept along its main axis (x for flat ones, y for steep ones; both near
+    // 45°), in buckets wider than TOL.
+    let keys = |a: [f64; 2], b: [f64; 2]| -> Vec<(bool, i64, i64)> {
+        let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+        let mut k = Vec::new();
+        for steep in [false, true] {
+            let (du, dv, u, v) = if steep { (dy, dx, a[1], a[0]) } else { (dx, dy, a[0], a[1]) };
+            if du.abs() >= dv.abs() * (1.0 - 1e-6) {
+                let slope = dv / du;
+                k.push((steep, (slope * 1e6).floor() as i64, ((v - slope * u) * 1e3).floor() as i64));
+            }
+        }
+        k
+    };
+    let lines: Vec<usize> = r.filter(|i| *i < n && g.shared_lines.binary_search(i).is_err()).collect();
+    let mut buckets: std::collections::HashMap<(bool, i64, i64), Vec<usize>> = std::collections::HashMap::new();
+    for &i in &lines {
+        if let Some((a, b, _)) = ends(&g.lines[i]) {
+            for k in keys(a, b) {
+                buckets.entry(k).or_default().push(i);
+            }
+        }
+    }
+    for &i in &lines {
+        let Some((a, b, len)) = ends(&g.lines[i]) else { continue };
+        let style = g.lines[i].style;
+        let near = keys(a, b).into_iter().flat_map(|(s, ks, ki)| (ks - 1..=ks + 1).flat_map(move |x| (ki - 1..=ki + 1).map(move |y| (s, x, y))));
+        let covered = near.filter_map(|k| buckets.get(&k)).flatten().any(|&j| {
+            let o = &g.lines[j];
+            let Some((c, d, lj)) = ends(o) else { return false };
+            if j == i || o.style != style || lj < len + TOL {
+                return false;
+            }
+            // Both ends on line j, within its extent.
+            let e = [(d[0] - c[0]) / lj, (d[1] - c[1]) / lj];
+            let on = |p: [f64; 2]| {
+                let (px, py) = (p[0] - c[0], p[1] - c[1]);
+                let t = px * e[0] + py * e[1];
+                (px * e[1] - py * e[0]).abs() <= TOL && t >= -TOL && t <= lj + TOL
+            };
+            on(a) && on(b)
+        });
+        if covered {
+            g.lines[i].points.clear();
         }
     }
 }
@@ -1266,6 +1326,30 @@ mod tests {
         g.shared_lines = vec![0, 1];
         let p = prepare(&g, &ExportOptions::default());
         assert_eq!(p.lines.iter().map(|l| l.points.len()).collect::<Vec<_>>(), [2, 2, 2]);
+    }
+
+    /// c2-sm-louver's Front (live2 drw-truth-1118): a straight line wholly on a longer one of the same view and style
+    /// is written once (the louver slots' edges seen edge-on on the plate's front edge); one 0.9 µm or 12.7 µm off the
+    /// line, one running past its end, one of another style, a steep one and another view's stay.
+    #[test]
+    fn lines_on_a_longer_one_are_written_once() {
+        use crate::drawing::sheet::LineStyle;
+        let mut g = SheetGeometry::new(420.0, 297.0);
+        g.line([70.7372, 71.25], [70.7372, 89.79], LineStyle::Visible);
+        g.line([70.7372, 71.30], [70.7372, 71.60], LineStyle::Visible);
+        g.line([70.7372, 75.00], [70.7372, 74.70], LineStyle::Visible);
+        g.line([70.7381, 72.00], [70.7381, 72.30], LineStyle::Visible);
+        g.line([70.7499, 73.00], [70.7499, 73.30], LineStyle::Visible);
+        g.line([70.7372, 89.50], [70.7372, 90.10], LineStyle::Visible);
+        g.line([70.7372, 80.00], [70.7372, 80.30], LineStyle::Hidden);
+        // A slanted line and a piece on it.
+        g.line([10.0, 10.0], [30.0, 50.0], LineStyle::Visible);
+        g.line([15.0, 20.0], [20.0, 30.0], LineStyle::Visible);
+        g.view_edges.push((crate::drawing::ViewId(1), 0..9));
+        g.line([70.7372, 76.00], [70.7372, 76.30], LineStyle::Visible);
+        g.view_edges.push((crate::drawing::ViewId(2), 9..10));
+        let p = prepare(&g, &ExportOptions::default());
+        assert_eq!(p.lines.iter().map(|l| l.points.len()).collect::<Vec<_>>(), [2, 0, 0, 2, 2, 2, 2, 2, 0, 2]);
     }
 
     /// Live drw-inspection-item.pdf / .dxf: on paper a dimension's line runs between its arrows' bases; the sheet

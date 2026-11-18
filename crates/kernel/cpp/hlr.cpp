@@ -296,27 +296,17 @@ void draw_edge_data(Emitter& em, HLRBRep_EdgeData& ed, bool visible, uint8_t cls
   }
 }
 
-// A face whose outline seen along `view` is no line or conic: a torus at a slant (along its axis or across it, its
-// outlines are circles and lines), a free-form surface. Live's CAD files write such outlines as SPLINEs, however close
-// to an ellipse (c2-bottle-split's shoulder, c2-snap-hook's tori).
+// A torus seen along `view` at a slant: its outline is no line or conic (along its axis or across it, they are circles
+// and lines). Live's CAD files write it as a SPLINE, however close to an ellipse (c2-bottle-split's shoulder). A
+// B-spline face's outline is left to the fit: ours can stand for live's torus or cylinder (c2-snap-hook's fillets,
+// whose outlines live writes as ARCs).
 bool freeform_outline(HLRBRep_FaceData& fd, const gp_Dir& view)
 {
   const BRepAdaptor_Surface& s = fd.Geometry().Surface();
-  switch (s.GetType())
-  {
-    case GeomAbs_Plane:
-    case GeomAbs_Cylinder:
-    case GeomAbs_Cone:
-    case GeomAbs_Sphere:
-      return false;
-    case GeomAbs_Torus:
-    {
-      const double c = std::abs(s.Torus().Axis().Direction().Dot(view));
-      return c > 1e-9 && c < 1 - 1e-9;
-    }
-    default:
-      return true;
-  }
+  if (s.GetType() != GeomAbs_Torus)
+    return false;
+  const double c = std::abs(s.Torus().Axis().Direction().Dot(view));
+  return c > 1e-9 && c < 1 - 1e-9;
 }
 
 // Mirrors HLRBRep_HLRToShape::InternalCompound/DrawFace/DrawEdge for the

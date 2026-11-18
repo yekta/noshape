@@ -1322,8 +1322,8 @@ pub struct ViewEdge {
     /// A mesh part's silhouette or fold, joined from its facets' edges: written as an LWPOLYLINE, or a LINE when
     /// straight (live's drawings of mesh parts).
     pub mesh: bool,
-    /// A silhouette that is no line or conic in the view (`noshape_kernel::ProjectedEdge::freeform`): a SPLINE in CAD
-    /// files.
+    /// A silhouette that is no line or conic in the view (a torus at a slant, `noshape_kernel::ProjectedEdge::freeform`):
+    /// a SPLINE in CAD files.
     pub freeform: bool,
 }
 

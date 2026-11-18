@@ -41,8 +41,8 @@ pub struct ProjectedEdge {
     /// Index of the source edge in the projected shape's edges (MapShapes
     /// order), when known (`None` for silhouettes).
     pub source_edge: Option<u32>,
-    /// A silhouette that is no line or conic in this view (a torus seen at a slant, a free-form face's): live's CAD
-    /// files write it as a SPLINE however close to an ellipse. Exact HLR only.
+    /// A silhouette that is no line or conic in this view (a torus seen at a slant): live's CAD files write it as a
+    /// SPLINE however close to an ellipse. Exact HLR only.
     #[serde(default)]
     pub freeform: bool,
 }

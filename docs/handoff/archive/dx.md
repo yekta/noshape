@@ -3531,3 +3531,7 @@ Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live i
   REST at M4 148.47): asked live 07:5x to retake lines at defaultValue. Rerun (ops-cp, current branch) then: linear-rail
   19, links 10, nuts 8, pulleys 9, sprockets 11, standoffs 11 (~/tmp/dx/cfgparts-cp.log). live: screws 34 / links 28 refs absent at
   the default configuration, standoffs Hole 2 ERROR in live.
+
+## 11-18 16:2x: moved from the handoff
+- blend: impeller f26 matches on its 12b25c47e (not landed); f27 Fillet 3 next (blend). core: side-cuts-tab Corner break
+  fix queued (7 -> 13/18).

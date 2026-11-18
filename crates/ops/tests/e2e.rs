@@ -9298,7 +9298,7 @@ fn a_parts_inspection_list_is_its_characteristics() {
     assert_eq!(csv(&mut ctx, "cleared.csv"), header, "the tolerance cleared");
 }
 
-/// Live (live2 drw-truth-1118: c2-bottle-split's shoulder, c2-snap-hook's tori): a torus's outline seen at a slant is
+/// Live (live2 drw-truth-1118: c2-bottle-split's shoulder): a torus's outline seen at a slant is
 /// a SPLINE in a drawing's DXF, never an ELLIPSE however close it comes to one. A filleted cylinder's isometric view.
 #[test]
 fn a_slanted_torus_outline_is_a_dxf_spline() {

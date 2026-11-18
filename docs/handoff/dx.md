@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-18 11:00 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-18 16:42 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -43,10 +43,7 @@ Open, ranked:
 
 ## Other in flight
 - config-parts: see "config-parts at live's 18:0x retake" below (the 11-17 vibe5 runs: archive).
-- driven-pattern 6/11: f6 Linear pattern 1 direction from Extrude 1's cylinder face: ours axis -z (origin at top), live
-  +z: sent to core 06:35 (vibe5 ~/tmp/dx/qdp, mode 700).
-- blend: impeller f26 matches on its 12b25c47e (not landed); f27 Fillet 3 next (blend). core: side-cuts-tab Corner break
-  fix queued (7 -> 13/18).
+- driven-pattern 6/11: f6 Linear pattern 1 direction (ours -z, live +z): core's (11-17 06:35).
 - Hole internal bodies (committed 48a5ef471, asm OK, lands after the plane fix with its own corpus A/B): a SWEPT_FACE of
   `<hole>.holeBodies.*.opRevolve` maps to our Hole's faces by geometry (hole.fs' `core_line_2` THROUGH_FACE: narrowest
   cylinders; `start_line_2` counterbore wall: widest), every location (hole_body_faces in named_faces); a three-face
@@ -145,17 +142,24 @@ Open, ranked:
      single cubic spans with ~10 um tolerances (ours 10 nm). Next lever if needed: pcurves on the tube from on_both's
      (u, v) at the 3D curve's parameters instead of ShapeFix's projection. A/B tool: vibex8 ~/agents/dx-keep/xtab
      (run.sh, ~/tmp/dx/xtcmp.py), dump patch idea in /root/dx-scratch.
-1. DXF rows vs live2's model truth (behaviours "dx + studios (lead 11-18 ~13:45)", live/dx/drw-truth-1118): torus outlines
-   at a slant and free-form faces' outlines now SPLINE (hlr.cpp freeform_outline, queued with the stack); exchange run
-   m8 (vibex8 ~/agents/dx-keep/exch-m8.log) gives the new counts. bottle-split's rest is live's own noise (its lip
-   outline in ~18 bits). Import dialog: live's gated "Preserve source IDs" / "Upload only" are not shown to our account
-   (imp2-good.json): nothing to add.
+1. DXF rows vs live2's model truth (behaviours "dx + studios (lead 11-18 ~13:45)", live/dx/drw-truth-1118); m8 run
+   vibex8 ~/agents/dx-keep/exch-m8.log, files ~/tmp/dx/exs-m8, tools /root/dx-scratch/bin/dxfdiff.py / dxfplot2.py:
+   - Torus outlines at a slant are SPLINEs (hlr.cpp freeform_outline, landed 15:18); m8 also flagged every B-spline
+     face's outline, which turned snap-hook's 8 fillet ARCs (live tori, ours B-spline) and 4 faceblend ARCs into
+     SPLINEs: narrowed to tori only (uncommitted at 16:1x, m9 to confirm: bottle-split ELLIPSE matches, snap-hook ARC 82).
+   - sm-louver Front 608 / 465 Visible: 144 short LINEs lie exactly on the plate's front edge line (x 2.785 in),
+     live writes 1: export.rs drop_lines_on_longer writes a line wholly on a longer one once (landing 16:4x; m10 to
+     confirm). The 31 pieces 12.7 um off are in live too.
+   - Model-side (not the writer): housing-draft's 0.499 in edges bow 0.5 mm in ours (live LINEs) and its Right hole
+     rim isn't an exact circle (core's Draft, sent 16:2x with numbers); extension-spring's Top has a second end rectangle (x 2.230 / 2.268) and
+     Fillet 1 (blend); bottle-split's lip outline is live's noise (18 tiny pieces); hex mesh splits (no rule).
+   - Import: "Upload only" for a bare assembly (live upload-only-1118) queued 6cddcbf2; "Preserve source IDs" is
+     server-off for live's users (behaviours 15:00): nothing to build.
 1. Exchange m5 (vibex8 06:0x): imports 114/130, live imports ours 46/48, ours reads ours 148/154, DXF 1/10 (duct).
    DXF rows left follow model differences: faceblend full-round fillet edges B-spline in live (blend told 06:1x),
    extension-spring Fillet 1 10/24/16 vs 11/27/18 (blend), rings-loft walls, hex mesh outline splits (live's breaks
    follow its facets' normals noise: no rule), housing-draft lug chords, hole rim (lead: wait for more docs).
-   Parked (lead 11-17 decision 2): rings-loft live.step revolved ring area (+0.093 mm², edges ~3 um off); extension-
-   spring live.sat area +0.016 %.
+   Parked (lead 11-17 #2): rings-loft live.step ring area +0.093 mm²; extension-spring live.sat area +0.016 %.
 2. Queued 4dd4d7ef: MCP-QUOTED-VALUE (sketch dimension values sent in quotes). P1 PARITY-CUSTOM-RUN-FAILURES
    (custom features 105/121), 14 of the 16 in config-parts (wait for live's retake), and:
    - cf-surface-pattern Surface Pattern 3 129/386/259 for 131/387/258: the same 85 sphere dimples (Part 2, r 14.3 mm;
