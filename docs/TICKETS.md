@@ -748,7 +748,7 @@ point gets no coincident (= live). Ending on a point / midpoint: COINCIDENT (sha
   6-7), a model edge 5 px (live 7), the alignment band ±5 (live ±6-7); lines as before (end 7, middle 5, off-end 6).
   Slow steps (skasm: our radius 7.5 px; the light comes late on llvmpipe): 0.8 s and 2.2 s per step both light at 6 px (point x / y /
   diagonal, edge, alignment; edge midpoint 7 at 0.8 s), never at 7 (sk/ss1, ss2, hs1, hs2).
-- [ ] b6f5e810 (skasm 01:33: one Coincident, no use glyph, per live2 use-glyph-1118; re-check on its green) **P2 SKSNAP-SHIFT-ICON (skasm)**: with Shift held near the point a black cube icon shows by the pointer (live: nothing).
+- [x] b6f5e810 (verified qa 08:16 on green 850ae7f3 = b6f5e8106: Shift held over a line's end shows no icon by the pointer, as live; without Shift the Coincident square; qa-scratch/sel-c2/shift-icon.png) **P2 SKSNAP-SHIFT-ICON (skasm)**: with Shift held near the point a black cube icon shows by the pointer (live: nothing).
 - Not run: a local point beating an external one 1 px apart.
 
 ## Part Studio selection feel vs live2's 11-17 capture (qa 22:47, green 592b0fc9, vibex6 Xvfb, load ~24, real xdotool pointer)
