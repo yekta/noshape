@@ -1076,6 +1076,9 @@ struct Ctx<'a> {
     solids: Vec<GSolid>,
     side_cache: HashMap<(u32, usize), i8>,
     in_face_done: HashSet<(usize, usize)>,
+    /// Ends of OCCT's sections taken as an edge they run along ([`Self::nurbs_pair`]): where that edge leaves the
+    /// free-form face, its crossing at such an end, as OCCT's vertex there.
+    crossing_hints: Vec<DVec3>,
     /// Sections' new end vertices with their pairs of faces, by cell ([`Self::end_on_edge`]).
     section_ends: SectionEnds,
     /// Curves added to each face.
@@ -2354,7 +2357,28 @@ impl Ctx<'_> {
         let x = self.faces[f].edges.iter().map(|&(x, _)| x).min_by(|&x, &y| self.edge_point_near(x, p).0.total_cmp(&self.edge_point_near(y, p).0))?;
         let h = 2.0 * (onto - off).abs();
         let (t, d, q) = self.nearest_to_edge(x, point, b - h, b + h);
-        (d <= self.pool.pair(self.edges[e].t, self.edges[x].t)).then(|| (t, (point(t) + q) * 0.5, (0.5 * d).max(self.tol)))
+        let reach = self.pool.pair(self.edges[e].t, self.edges[x].t);
+        if d > reach {
+            return None;
+        }
+        // (At the end of an OCCT section the edge was taken for ([`Self::crossing_hints`]), within the grey band: there,
+        // at its foot on the edge (a rim grazing a thread crest's edge: their nearest points 0.65 um from OCCT's vertex
+        // along them).)
+        let m = (point(t) + q) * 0.5;
+        if let Some(&c) = self.crossing_hints.iter().filter(|&&c| (c - m).length() <= GREY * reach.max(self.tol)).min_by(|a, b| (**a - m).length().total_cmp(&(**b - m).length())) {
+            let (mut lo, mut hi) = (b - h, b + h);
+            for _ in 0..100 {
+                let (m1, m2) = (lo + (hi - lo) / 3.0, hi - (hi - lo) / 3.0);
+                if (point(m1) - c).length() < (point(m2) - c).length() {
+                    hi = m2;
+                } else {
+                    lo = m1;
+                }
+            }
+            let tc = 0.5 * (lo + hi);
+            return Some((tc, c, (point(tc) - c).length().max(self.edge_point_near(x, c).0).max(self.tol)));
+        }
+        Some((t, m, (0.5 * d).max(self.tol)))
     }
 
     /// Edge `x`'s point nearest `p`, and its distance.
@@ -3079,6 +3103,39 @@ impl Ctx<'_> {
             }
         }
         froms.resize(secs.len(), None);
+        // (A curve along a circle of the plane's, cylinder's or cone's face, within the two's tolerances all along, that
+        // circle only partly on the free-form face: the circle, where it lies on that face (c2-fan-blade-sweep's
+        // Boolean 2: a bolt's thread crest, r 4.0000 to 4.0002 mm, through the r 4 rims of the bosses' countersinks;
+        // OCCT's sections 0.2 um off the rims, its result the rims' arcs). Where the circle can't be laid on it before
+        // anything is made, the curve as it was.)
+        let mut keep = vec![true; secs.len()];
+        for (f, g) in [(fs, ft), (ft, fs)] {
+            if !matches!(self.faces[f].s, Surf::Nurbs { .. }) || matches!(self.faces[g].s, Surf::Nurbs { .. }) {
+                continue;
+            }
+            for (i, c) in secs.iter().enumerate() {
+                let rim = self.faces[g].edges.iter().map(|x| x.0).find(|&e| {
+                    let s = Seg { v: self.edges[e].v, g: self.edges[e].g };
+                    let near = GREY * self.pool.pair(self.edges[e].t, self.faces[f].t);
+                    matches!(s.g, Geo::Arc { .. }) && (0..=8).all(|k| self.seg_param(&s, c.curve.at(c.t0 + (c.t1 - c.t0) * k as f64 / 8.0)).1 <= near)
+                });
+                let Some(e) = rim else { continue };
+                if self.edge_on_surface(e, f)? {
+                    continue;
+                }
+                let (hints, points, pending) = (self.crossing_hints.len(), self.pool.p.len(), self.pending.len());
+                self.crossing_hints.extend([c.curve.at(c.t0), c.curve.at(c.t1)]);
+                match self.edge_over_free_face(e, f) {
+                    Ok(()) => keep[i] = false,
+                    Err(_) if self.pool.p.len() == points && self.pending.len() == pending => self.crossing_hints.truncate(hints),
+                    Err(x) => return Err(x),
+                }
+            }
+        }
+        let mut k = 0;
+        secs.retain(|_| (keep[k], k += 1).0);
+        let mut k = 0;
+        froms.retain(|_| (keep[k], k += 1).0);
         // (An end of one where another of them ends: OCCT's curves of one loop in parts; a vertex there.)
         let ends: Vec<[DVec3; 2]> = secs.iter().map(|c| [c.curve.at(c.t0), c.curve.at(c.t1)]).collect();
         let joined = |i: usize, k: usize| ends.iter().enumerate().any(|(j, e)| j != i && e.iter().any(|q| (*q - ends[i][k]).length() <= self.tol));
@@ -4588,6 +4645,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         solids: Vec::new(),
         side_cache: HashMap::default(),
         in_face_done: Default::default(),
+        crossing_hints: Vec::new(),
         section_ends: Default::default(),
         face_segs: Vec::new(),
         seg_section: Vec::new(),

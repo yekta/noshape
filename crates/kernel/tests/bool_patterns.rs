@@ -3058,6 +3058,16 @@ fn a_line_through_a_free_form_solid_is_cut_as_occt() {
     recorded_as_occt("091cf0f95b46fa8a", 1e-9);
 }
 
+/// Two bolts cut from a base (c2-fan-blade-sweep's Boolean 2, recorded, OCCT's 748 ms): each bolt's 0.2 mm offset
+/// thread crest, r 4.0000 to 4.0002 mm, runs through the r 4 rims of the bosses' countersinks. OCCT's sections there lie
+/// within 0.2 um of the rims and its result has the rims' arcs: the rims go into the crest between their crossings
+/// with its edges, at those sections' ends; the bolt's shank, cut into a helical band whose seam's line is in pieces
+/// either side, keeps its angles from 0 (the volume within 1e-8: OCCT's sections on the cones are 5 um curves).
+#[test]
+fn a_thread_crest_through_countersink_rims_cut_as_occt() {
+    recorded_as_occt("3e8c1e09636d4fd7", 1e-8);
+}
+
 /// A wedge of a cone cut into a counterbore above a bore whose seam's line is in pieces (a slot's side running along
 /// it, the slot just past the seam, wider and reaching back before the seam at the bore's top), the wedge rising from
 /// the bore's hole and ending at the seam's angle: it meets the bore's cylinder 1 mm above the bore's wall, outside it,

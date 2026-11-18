@@ -2134,6 +2134,10 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           continue;
         // Its angles: from where the Boolean's start, by whole turns to where the input's edges' curves are
         // (not a seam's: it lies at either end; not an apex's: it spans them).
+        // (Nor one along the seam's line, a whole turn from the start: either side's (c2-fan-blade-sweep's Boolean 2: a
+        // bolt's shank cut into a helical band, the seam's line in pieces at u 0 and at 2π, each its own edge).)
+        if (const double ua = pc->Value(f0).X(), uz = pc->Value(f1).X(); std::abs(ua - uz) < eps && std::abs(std::remainder(ua - umin, 2 * M_PI)) < eps)
+          continue;
         if (!placed && !BRep_Tool::Degenerated(es[k]))
         {
           const double um = pc->Value(0.5 * (f0 + f1)).X();
