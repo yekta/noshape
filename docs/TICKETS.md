@@ -559,6 +559,35 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Feature list, document and Variable / Feature Studio feel vs live2's / live's 11-17 captures (qa 00:04, green 7187ac751, vibex6 Xvfb, real pointer and keys)
+Documents built from starts block-fillet / two-blocks and the louver corpus copy, opened without the runner (qa-scratch/fl: build.sh,
+fls.sh, fl2.py, fl3.sh, fl4.sh, vs.sh, vs2.sh, fs.sh; sheets tickets/fl-vs-sheet.png and vibex6 ~/agents/qa-keep/fl-vs/).
+Pass, feature list: while the bar is dragged a dark "Rollback bar" chip and the insertion line, the bar drawn at its old place, nothing
+greyed; on release the rows below go grey italic and Parts (1) -> (0) by 0.1 s, the rolled-back bar light blue-grey (200,217,226),
+the hidden Sketch 1 drawn shown; above the first feature all grey, Parts (0); Fillet 1 dragged above Extrude 1 moves, then red text
+(170,37,45) with the warning triangle, no message; Ctrl+Z puts it back; double-click Extrude 1: dialog at (246, 80), 220 x 352, row
+selected, sketch related; Rename: inline input, name selected, Enter commits, a click away commits, F2 does nothing, tooltip
+"Bar [Extrude] <- Sketch 1"; Suppress: grey italic struck-through, the menu then offers Unsuppress. Document: tab switches are
+instant (one shot), no spinner; tooltips "Undo (cmd+z/ctrl+z)", "Redo (ctrl+y/shift+cmd+z)"; Ctrl+Y redoes, Ctrl+Shift+Z doesn't;
+a rename is one step; a view change and a selection are none; in a dialog value field Ctrl+Z x2 keeps "50 mm" and the dialog.
+Variable Studio: Enter on a name makes "w | Length | 0 mm |" and moves to the next Name; Enter on an invalid name does nothing; Esc
+while typing drops it; a duplicate becomes "w_0"; "10" -> "10 mm" and the keyboard moves down; an error value turns pink; "2 i"
+lists in / isInteger(x). Feature Studio: "op" lists opMoveCurveBoundary first with the doc panel, Down moves, Enter inserts the
+snippet, Tab closes and inserts a tab, Esc keeps "op"; Commit solid blue while edited, pale right after Ctrl+S, the error kept.
+- [ ] **P2 FLFEEL-BAR-DEFAULT-GEOMETRY (psui)**: the rollback bar released over the Top row moves above the first feature (all grey);
+  live leaves it where it was (no drop into Default geometry).
+- [ ] **P2 FLFEEL-BAR-END-COLOUR (psui)**: the bar dragged back to the end stays light blue-grey (200,217,226) 2 s later; live turns
+  it grey (184,184,184) at the end (as ours draws it in a fresh document).
+- [ ] **P2 FLFEEL-BAR-MENU (psui)**: a right-click on the rollback bar opens no menu; live's has "Roll to end".
+- [ ] **P1 VSFEEL-NAME-RED (studios)**: an invalid name ("10", "1x") isn't marked while typed (live: red border, pink fill at once);
+  after an Enter on it, Esc keeps the text (live throws it away).
+- [ ] **P1 VSFEEL-UNITS (studios)**: "2 in" in a Length (mm document) stays "2 in" in the cell (live: "50.8 mm"); a selected value cell
+  shows no expression bubble over the Value header (live: "2 in" / "10 mm").
+- [ ] **P2 VSFEEL-ERROR-BUBBLE (studios)**: a selected error value has the blue border and no bubble (live: red border, grey "Error
+  regenerating." over the Value header).
+- Not judged: the regeneration spinner (the louver's roll back to the end finished in under 0.8 s here); undo of Hide; the FS gutter
+  marker came 0.5-1.5 s after typing (debug build at load 24; live within 0.5 s) and the grey "out of date" step.
+
 ## Assembly feel vs live's 11-17 capture (qa 23:37, green 16588aca3, vibex6 Xvfb, real xdotool pointer)
 live's set-up rebuilt as starts asm-feel (Part 1 40x30x10, Part 2 Ø16x20, Part 3 20x20x5, nothing fixed) and asm-feel-mated (+ Slider
 Part 2 / Part 1 along Z, Fastened Part 3 / Part 1); transforms and mates from the runner's state (qa-scratch/af: af.py, afrun.sh,
