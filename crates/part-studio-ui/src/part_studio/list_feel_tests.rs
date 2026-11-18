@@ -549,10 +549,10 @@ fn rows() -> Vec<Row> {
             wait_until(cx, l.window, |cx| l.view.read(cx).display.bodies.is_empty());
             expect((l.rolled_to(cx), cx.update(|cx| l.view.read(cx).display.bodies.len())), (None, 0), "(rolled to, parts)")
         } },
-        Row { id: "rollback bar / onto default geometry: stays", live: "released over Top it stays where it was (live2 featurelist-feel 1, qa 11-18)", gap: false, check: |l, cx| {
+        Row { id: "rollback bar / onto default geometry: the top", live: "released over Top it lands above the first feature, everything rolled back (live2 rb-followup 11-18)", gap: false, check: |l, cx| {
             let (from, to) = (l.at(cx, "rollback"), l.at(cx, "feature:Top"));
             l.drag(cx, from, to, true);
-            expect(l.rolled_to(cx), Some("Extrude 3".to_string()), "rolled to")
+            expect(l.rolled_to(cx), None, "rolled to")
         } },
         Row { id: "rollback bar / its menu while rolled back: Roll to end", live: "a right-click on a rolled-back bar: 'Roll to end' alone, which rolls to the end (live2 doc-level-1117 3)", gap: false, check: |l, cx| {
             let (from, to) = (l.at(cx, "rollback"), l.at_y(cx, "feature:Extrude 2", 6.));

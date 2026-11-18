@@ -273,3 +273,59 @@ fn a_quick_sweep_off_a_line_leaves_nothing_lit(cx: &mut TestAppContext) {
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
+
+/// skasm 11-18 (the user's hat15b, a 1440 × 900 window, its 145-feature list scrolled to the end, a sketch edited, n,
+/// 14 wheel steps in): a line lit with the pointer ~10 px left of it. In windows of several sizes, the list at its top
+/// and scrolled to the end: the viewport's origin is where its element is laid out, and the pointer on a line, placed
+/// from that element, lights the line.
+#[gpui::test]
+fn the_pointer_lights_the_line_under_it_whatever_the_window_and_list(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let mut features = vec![serde_json::json!({ "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] })];
+    for n in 1..=144 {
+        features.push(serde_json::json!({ "type": "cPlane", "name": format!("Plane {n}"), "params": { "entities": ["plane:top"], "cplaneType": "OFFSET", "offset": format!("{n} mm") } }));
+    }
+    let mut wrong = Vec::new();
+    for (w, h) in [(1440.0f32, 900.0f32), (1919.0, 1000.0), (1100.0, 700.0)] {
+        for scrolled in [false, true] {
+            let (window, view) = part_studio_from(cx, "pointer-origin", Some(serde_json::json!({ "units": "mm", "features": features })));
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_resize(gpui_kit::size(px(w), px(h)));
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            if scrolled {
+                cx.update(|cx| view.read(cx).ui.list_scroll.set_offset(gpui_kit::point(px(0.), px(-100_000.))));
+                draw(cx, window);
+            }
+            let (window, view) = sketch_in(cx, window, view, Tool::CornerRect);
+            click(cx, window, &view, (300., 200.));
+            click(cx, window, &view, (420., 330.));
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+            keys(cx, window, &["n"]);
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).viewport.read(cx).animation().is_none());
+            let pointer = Pointer::new(cx, window, &view);
+            pointer.frames(cx, &view);
+            let laid = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("viewport-area").expect("the viewport's area").origin;
+            let origin = cx.update(|cx| view.read(cx).viewport.read(cx).origin());
+            if (f32::from(origin.x - laid.x)).abs() > 0.5 || (f32::from(origin.y - laid.y)).abs() > 0.5 {
+                wrong.push(format!("{w}x{h} scrolled {scrolled}: viewport origin {origin:?}, laid out at {laid:?}"));
+            }
+            let feature = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().feature);
+            for (id, a, b) in lines_on_screen(cx, &view).into_iter().filter(|(_, a, b)| (a.x - b.x).abs() < 1.0) {
+                let on = (a + b) * 0.5;
+                let at = gpui_kit::point(laid.x + px(on.x as f32), laid.y + px(on.y as f32));
+                gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(at, None, Modifiers::default());
+                let t = std::time::Instant::now();
+                while !cx.update(|cx| view.read(cx).viewport.read(cx).hover_settled()) && t.elapsed() < std::time::Duration::from_secs(15) {
+                    pointer.frames(cx, &view);
+                }
+                pointer.frames(cx, &view);
+                let got = hovered(cx, &view);
+                if got != Some(Reference::SketchEntity { sketch: feature, entity: id }) {
+                    wrong.push(format!("{w}x{h} scrolled {scrolled}: on vertical line {id} at ({:.0}, {:.0}): lit {got:?}", on.x, on.y));
+                }
+            }
+            cx.update_window(window, |_, w, _| w.remove_window()).unwrap();
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}

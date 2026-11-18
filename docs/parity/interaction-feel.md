@@ -371,8 +371,8 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | Rollback bar: the whole 26 px row grabs; top / bottom half | before / after the row | the same (its drop ignored the half) | = (fixed) |
 | Rollback bar held (live2 featurelist-feel 11-17) | the "Rollback bar" chip and the insertion line; the bar stays at its old place, nothing greys until the release | the same | = (new) |
 | Rollback bar released | the rows below grey, the Parts list follows (Parts (0) above Extrude 1); above the first feature: everything; back at the end all again | the same | = (new) |
-| Rollback bar over Default geometry | released over Origin / Top it stays where it was (live2, qa 11-18) | it rolled back to the top (an older 10-24 capture; the collapsed header still does, pending live2's recheck) | = (fixed) |
-| Rollback bar look and menu | light blue-grey rgb(200,217,226) while rolled back, grey rgb(184,184,184) at the end, the pointer over it or not; right-click: "Roll to end" alone while rolled back, no menu at the end | blue-grey only on hover, no menu (qa 11-18) | = (fixed; the colour has no matrix row) |
+| Rollback bar over Default geometry | released over Origin, a plane or the header (expanded or collapsed) it lands at the top, everything rolled back; the drop line keeps the last legal slot (live2 rb-followup 11-18, correcting featurelist-feel and qa 11-18) | the same | = |
+| Rollback bar look and menu | #b8b8b8, rgb(200,217,226) only while hovered (live2 rb-followup); right-click: "Roll to end" alone while rolled back, no menu at the end | the colour the same; no menu (qa 11-18) | = (menu fixed; the colour has no matrix row) |
 | A reorder the history can't take | accepted, then the row red rgb(170,37,45) with a warning triangle; no message | the same | = (new) |
 | Rename keys | Enter commits; a click elsewhere commits; F2 does nothing; the renamed row's tooltip "Bar [Extrude] <- Sketch 1" | a click in the graphics left the input open (it kept the keyboard); now any press outside commits | = (fixed) |
 | Suppress / Unsuppress from the menu | grey italic struck through, the part gone; Unsuppress restores it | the same | = (new) |
@@ -418,6 +418,15 @@ entities found with `query_entities` by a point on them); `MEASURE_ROW=<part of 
 | The panel's size | 220 × 345 with a distance and its X / Y / Z rows | 220 × 347 (6 px above the footer); now 4 px, 345 | = (fixed) |
 | A second entity hovered | no preview: the first one's readout | the same | = |
 | Not yet in the matrix | a click near an edge's middle takes its midpoint: live measure-gaps (11-16) 8–9 px either side along the edge (10 px takes the edge), the mark from the first shot (~100 ms, no dwell needed); ours the 9 px window (`midpoint_target_tests`) and a 60 ms dwell (was 250; 60 ms is Onshape's hover wake, live sketch-gaps) | – | – |
+
+Added 11-18 (live2 measure-mass-1118; part-studio-ui `measure::measure_pairs_on_lives_wedges_and_cylinder`, 22 pairs
+on live's own studio, all as live): two faces or two edges read the angle between the directions from where they meet
+toward each one's middle (a sloped face and y = 0: 33.690°, was 146.310°); a cylinder and a face across it read
+"Perp axes angle" alone (was with Max / Min dist); a circle and its face keep the distances after "Face tangent angle".
+Mass properties (`mass_stays_open_and_bracket_opens_an_empty_measure`): its button again leaves it open (was a toggle);
+`[` over it opens Measure empty, the parts deselected (the selection was kept).
+Working spinner (live2 11-18, live's JS and CSS): 900 ms after the request (was 1.1 s), a 50 × 50 box white at 75 %,
+radius 10, 40 px above the bottom, the 30 px ring rgb(215,215,215) with its blue quarter turning in 1.1 s (was 0.9 s).
 
 ## Navigation (matrix)
 

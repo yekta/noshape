@@ -94,14 +94,19 @@ pub fn contains(dir: &Path, key: &str) -> bool {
 
 /// The spinner in a `size` px box (the overlay's 41 px; a list row's smaller).
 pub fn spinner(size: f32) -> impl IntoElement {
-    let scale = size / 41.;
-    div().size(px(size)).flex_none().with_animation(SharedString::from(format!("pending-spinner-{size}")), Animation::new(Duration::from_millis(900)).repeat(), move |d, t| {
+    spinner_ring(size, 13.5 * size / 41.)
+}
+
+/// Onshape's spinner (live2 11-18, computed CSS): a 30 px circle, its 3 px ring rgb(215,215,215) with a quarter in
+/// rgb(22,81,176), turning once in 1.1 s; `r` the ring's middle radius in a `size` px box.
+pub fn spinner_ring(size: f32, r: f32) -> impl IntoElement {
+    let scale = r / 13.5;
+    div().size(px(size)).flex_none().with_animation(SharedString::from(format!("pending-spinner-{size}")), Animation::new(Duration::from_millis(1100)).repeat(), move |d, t| {
         d.child(
             canvas(
                 |_, _, _| {},
                 move |bounds, _, window, _| {
                     let c = bounds.center();
-                    let r = 13.5_f32 * scale;
                     let ring = |from: f32, to: f32, color: Rgba, window: &mut Window| {
                         let steps = 48;
                         let mut pb = PathBuilder::stroke(px((3. * scale).max(1.5)));
@@ -115,7 +120,7 @@ pub fn spinner(size: f32) -> impl IntoElement {
                         }
                     };
                     let tau = std::f32::consts::TAU;
-                    ring(0., tau, rgb(0xdddddd), window);
+                    ring(0., tau, rgb(0xd7d7d7), window);
                     let start = t * tau - tau / 4.;
                     ring(start, start + tau / 4., rgb(0x1651b0), window);
                 },

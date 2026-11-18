@@ -17,8 +17,9 @@ use super::PartStudioView;
 use gpui_kit::*;
 use std::time::{Duration, Instant};
 
-/// Live: the working overlay appears 1.1 s after the edit (live2 feedback.json progress.commit: at 1119 ms after ✓).
-pub(super) const OVERLAY_DELAY: Duration = Duration::from_millis(1100);
+/// Live: the working overlay appears 900 ms after the request (live2 11-18: `BEEPER_START_DELAY_IN_MS`; 1119 ms after
+/// ✓ in feedback.json was the request leaving + 900).
+pub(super) const OVERLAY_DELAY: Duration = Duration::from_millis(900);
 
 /// A regeneration whose result isn't shown yet.
 pub(super) struct Pending {
@@ -36,11 +37,12 @@ pub(super) struct Spinner;
 
 impl Render for Spinner {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        spinner(41.)
+        // A 50 × 50 box, white at 75 %, radius 10, padding 10, round the 30 px spinner (live2 11-18, computed CSS).
+        div().size(px(50.)).p(px(10.)).rounded(px(10.)).bg(rgba(0xffffffbf)).child(spinner_ring(30., 13.5))
     }
 }
 
-use crate::display_cache::spinner;
+use crate::display_cache::spinner_ring;
 
 impl PartStudioView {
     /// A regeneration started: pending from now (or still pending from an
@@ -80,11 +82,11 @@ impl PartStudioView {
     pub(super) fn render_pending_overlay(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let p = self.pending.as_ref().filter(|p| p.since.elapsed() >= OVERLAY_DELAY)?;
         let pal = crate::theme::p();
-        // Live (1879×973 graphics): the 41 px spinner box ends 85 px above
-        // the bottom; the text is centred 49 px under the spinner's centre.
+        // Live: the 50 px box 40 px above the bottom, centred (live2 11-18); while a dialog opens, its centre where
+        // the 1879×973 capture had it (105 px up) with the text centred 49 px under it.
         let row = |bottom: f32| div().absolute().left_0().right_0().bottom(px(bottom)).flex().justify_center();
         let spinner = self.pending_spinner.get_or_insert_with(|| cx.new(|_| Spinner)).clone();
-        let mut layer = div().absolute().top_0().left_0().size_full().child(row(85.).child(spinner));
+        let mut layer = div().absolute().top_0().left_0().size_full().child(row(if p.opening.is_some() { 80. } else { 40. }).child(spinner));
         if let Some(name) = p.opening.clone() {
             layer = layer.child(row(47.).child(div().h(px(18.)).text_size(px(14.)).text_color(pal.text).child(format!("Opening {name}…"))));
         }

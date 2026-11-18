@@ -4042,9 +4042,11 @@ impl PartStudioView {
                     v_flex()
                         .relative()
                         .id("dg-rows")
-                        // (The rollback bar released over Origin or a plane stays where it was: live2 featurelist-feel 1,
-                        // qa 11-18.)
+                        // The rollback bar released over Origin, a plane or the header lands at the top (live2 rb-followup
+                        // 11-18, expanded or collapsed).
                         .children(dg_rows)
+                        .drag_over::<RollbackDrag>(|s, _, _, _| s.border_b_2().border_color(p().accent))
+                        .on_drop(cx.listener(|this, _: &RollbackDrag, _, cx| this.set_rollback(Some(0), cx)))
                         // Live: the line ends in a 9 px tick; drawn over the rows.
                         .child(div().absolute().left(px(9.)).top(px(2.)).bottom(px(1.)).w(px(1.)).bg(pal.border))
                         .child(div().absolute().left(px(5.)).bottom(px(1.)).w(px(9.)).h(px(1.)).bg(pal.border))
@@ -5648,8 +5650,8 @@ impl PartStudioView {
         // Light blue once a click gave it the keyboard, until the selection
         // changes; selecting a row leaves it gray (live 31, 32).
         let focused = self.ui.list_focus.is_focused(window) && self.ui.rollback_keyboard.as_ref() == Some(&self.selected_features);
-        // Live (live2 featurelist-feel 1, qa 11-18): light blue-grey while it rolls features back, grey at the end,
-        // the pointer over it or not; its menu is "Roll to end" while rolled back, none at the end.
+        // Live (live2 rb-followup 11-18): grey, light blue-grey only while hovered; its menu is "Roll to end" while
+        // rolled back, none at the end.
         let rolled_back = self.studio(cx).is_some_and(|s| s.rollback_index() < s.features.len());
         let view = cx.entity();
         let bar = div()
@@ -5664,14 +5666,9 @@ impl PartStudioView {
             .flex_none()
             .items_center()
             // Live (dom/cursors.txt): the default arrow, also while dragging.
+            .group("rollback")
             .tip("Rollback bar", crate::ui::TipSide::Below)
-            .child(div().w_full().h(px(7.)).bg(if focused {
-                gpui_kit::rgb(0xa0c7dd)
-            } else if rolled_back {
-                gpui_kit::rgb(0xc8d9e2)
-            } else {
-                pal.rollback
-            }))
+            .child(div().w_full().h(px(7.)).bg(if focused { gpui_kit::rgb(0xa0c7dd) } else { pal.rollback }).group_hover("rollback", |d| d.bg(gpui_kit::rgb(0xc8d9e2))))
             .on_drag(RollbackDrag, {
                 let (slot, xs) = (self.ui.feature_drop.clone(), self.ui.feature_drop_x.clone());
                 move |_, grab, _, cx| {
@@ -7377,8 +7374,17 @@ impl Render for PartStudioView {
             .on_action(cx.listener(|this, _: &SelectOther, _, cx| this.select_other(false, cx)))
             .on_action(cx.listener(|this, _: &SelectOtherPrevious, _, cx| this.select_other(true, cx)))
             .on_action(cx.listener(|this, _: &MeasureTool, _, cx| {
-                this.ui.measure_pinned = !this.ui.measure_pinned;
-                this.set_show_mass(false, cx);
+                // Live (measure-mass-1118): over the Mass properties panel `[` closes it and opens Measure empty, the
+                // measured parts deselected.
+                if this.show_mass {
+                    this.set_show_mass(false, cx);
+                    this.ui.measure_pinned = true;
+                    this.selection.clear();
+                    this.selected_features.clear();
+                    this.refresh_scene(false, cx);
+                } else {
+                    this.ui.measure_pinned = !this.ui.measure_pinned;
+                }
                 cx.notify();
             }))
             .on_action(cx.listener(|this, _: &MateConnectorTool, window, cx| {
@@ -7551,6 +7557,7 @@ impl Render for PartStudioView {
                     .child(
                         div()
                             .id("viewport-area")
+                            .debug_selector(|| "viewport-area".into())
                             .flex_1()
                             .h_full()
                             .relative()
