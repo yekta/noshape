@@ -18,22 +18,32 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
 - Landed 11-18: e55271ab as 882a3ecd 01:57 (leader right-click / nodes, Cell panels, reader emulation, documents Ctrl
   or Cmd, VS name / units / error looks, view drag / Esc / 200 ms double-click / box, history change bar + full-id
   row keys, config row click).
-- Local, to land (6089631b9 + working tree): configurations: the active row's failing value pink, "›" + ± number
+- Queued on vibe2 03:30 as bfc56d3e (6 commits): configurations: the active row's failing value pink, "›" + ± number
   cells, row ids A0 (qa CFGFEEL P2/P3); history: "⌄ N changes", grey 30 px change rows without time, their tooltip
   "<name>: Change by <user> at <time>", one scroll container with the Name | Modified header pinned and the legend
   at the end (qa HISTFEEL P2s); custom features: title tooltip appends " A parameter value is not valid." when the
   error names fields; a linked custom feature behind a newer version: blue row indicator "Change version of linked
   document" -> Reference manager, row menu Update linked document… / Open linked document, the Reference manager and
   document_update_references move it (the app's dialog now uses ops' workspace_update, no copy). Checks: ver-* +
-  hist* 135/136 (723/723 states; one without recording), config-* takes, feel tests per item.
+  hist* 135/136 (723/723 states), workspace / merge takes 45/45, config-* takes, ops e2e 227, feel tests per item.
+  Also in it: workspaces (see the rows below), fractional units and pick constants, Create Drawing options, 24 h time.
 - Still differing (drawings, in order): drw-revision-table-delete s8 (hover-after-menu rule), ordinate add-to-group /
   Reset ordinate, note copy-paste menu, note editor closing, sheet properties zones, view adjust linestyle rows,
   replicate region panel, detail-id label position, section exclude-from-cut, synchronize-breaks Gap distance,
   simplification-absolute BOM row name, toolbar Undo tip take, drw-gtol-type-list, drw-hatch-panel s29.
-- Run when landed (vibex8): live2's drw-hole-table-empty-tips, drw-view-properties-projected-from-section,
-  drw-view-replicate-region-place; the full drawing run again on the newest build.
+- Full drawing run drw1118b on vibex8 (started 03:38, build of bfc56d3e; ~/agents/studios-keep/drw1118b, memguard on
+  pgid 1876976): compare against drw1118a's diffs; includes live2's newer takes.
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
+- live2 drawing tables (behaviours "studios (lead 11-18 ~03:36, feel): drawing tables", live/studios/tables-1118/):
+  (1) hovering a BOM row shades it darker grey and draws its part tan in every view; a selected table has a small "︿"
+  chevron centred under it. (2) the BOM tool places on one click (no ✓), panel closes, table stays selected. (3)
+  double-click a BOM cell: blue cell outline + floating Cell panel (Override), focus on its Font select, no in-place
+  typing. (4) Split below (row 1): header + row 1 stay; a second table, header repeated + row 2, ~12 px below, same x
+  and width. (5) the assembly's BOM changed: the sheet waits; ~3.1 s later "Update from this workspace (ctrl+q)"
+  turns enabled (yellow); a click updates (qty 1 -> 2), keeps the split, disables it again; no toast.
+- live near-snap retake (bm 4092, live/studios/near-snap-1118/): nearer vertex wins at the midpoint, no stickiness,
+  reach 6.8 px: ours the same (row stays "=").
 - live drawing constants + number formats (behaviours "… drawing pick/snap constants", "server-side number formats by
   experiment" §3; live/psui/numfmt-1118/). Done locally: tools pick within PICKBOX 7 px (hover_at, hovered_edge_sel,
   centermark_point, section edge), grips GRIPSIZE 6 px (detail circle resize, aux indicator); fractional inches round

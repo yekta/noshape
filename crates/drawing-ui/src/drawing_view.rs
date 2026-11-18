@@ -1656,7 +1656,8 @@ impl DrawingEditor {
             // A selected view label has its own look (push_label_highlights),
             // and so does a selected datum (push_datum_selection).
             let datums: Vec<u32> = self.datum_selection_picks().into_iter().chain(self.hole_callout_selection_picks()).collect();
-            for s in self.selection.iter().chain(self.panel_highlight.iter()).chain(self.lit_tool_edge().iter()).filter(|s| !matches!(s, Sel::ViewLabel(_))) {
+            // A table's ink stays black: its look is a grey fill and a tan frame (push_table_looks).
+            for s in self.selection.iter().chain(self.panel_highlight.iter()).chain(self.lit_tool_edge().iter()).filter(|s| !matches!(s, Sel::ViewLabel(_) | Sel::Table(_))) {
                 for p in self.picks_of(*s).into_iter().filter(|p| !datums.contains(p)) {
                     scene.add_flag(p, state::SELECTED);
                 }
@@ -1671,6 +1672,7 @@ impl DrawingEditor {
                     Some(Sel::View(_) | Sel::Edge(..)) if matches!(self.tool, Tool::Select) => {}
                     // Hovered labels and indicators show their dots only.
                     Some(Sel::ViewLabel(_) | Sel::AuxIndicator(_)) if !single => {}
+                    Some(Sel::Table(_)) if matches!(self.tool, Tool::Select) => {}
                     _ => {
                         let group = if single { vec![h] } else { self.sel_of_pick(h).map(|s| self.picks_of(s)).unwrap_or_else(|| vec![h]) };
                         for p in group {
@@ -1680,6 +1682,7 @@ impl DrawingEditor {
                 }
             }
             self.push_view_frames(&mut scene);
+            self.push_table_looks(&mut scene);
             // The hovered / selected annotations' referenced edges (blue) and
             // group members (yellow).
             self.push_related_highlights(&mut scene);
@@ -1760,6 +1763,92 @@ impl DrawingEditor {
             }
         }
         frames
+    }
+
+    /// The tables hovered (in Select) or selected, each with the row (or a general table's cell) under the pointer.
+    pub(crate) fn lit_tables(&self) -> Vec<(u64, Option<(usize, usize)>)> {
+        let hovered = self.hover.and_then(|h| self.sel_of_pick(h)).and_then(|s| match s {
+            Sel::Table(t) if matches!(self.tool, Tool::Select) => Some(t),
+            _ => None,
+        });
+        let mut out: Vec<(u64, Option<(usize, usize)>)> = Vec::new();
+        if let Some(t) = hovered {
+            let cell = self.built.as_ref().and_then(|b| b.table_layout(t)).and_then(|l| l.cell_at(self.cursor));
+            out.push((t, cell));
+        }
+        for s in &self.selection {
+            if let Sel::Table(t) = s
+                && Some(*t) != hovered
+            {
+                out.push((*t, None));
+            }
+        }
+        out
+    }
+
+    /// A hovered or selected table's look (live tables-1118 h-stack, behaviours 1482 / 26614): its ink as it is, rows
+    /// #f1f1f1 and the header #ebebeb under it, the hovered row (a general table's cell) #e2e2e2, and a tan #ccb292
+    /// frame round it.
+    fn push_table_looks(&self, scene: &mut Scene) {
+        use noshape_model::drawing::TableKind;
+        use noshape_render::{LineData, LineSegment, MeshData};
+        let Some(b) = &self.built else { return };
+        let tables = self.lit_tables();
+        if tables.is_empty() {
+            return;
+        }
+        let quad = |m: &mut MeshData, lo: [f64; 2], hi: [f64; 2]| {
+            let base = m.positions.len() as u32;
+            for p in [[lo[0], lo[1]], [hi[0], lo[1]], [hi[0], hi[1]], [lo[0], hi[1]]] {
+                m.positions.push([p[0] as f32, p[1] as f32, 0.0]);
+                m.normals.push([0.0, 0.0, 1.0]);
+                m.pick_ids.push(0);
+            }
+            m.indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
+        };
+        let (mut rows, mut header, mut lit) = (MeshData::default(), MeshData::default(), MeshData::default());
+        let mut frame = LineData::default();
+        const TAN: [u8; 4] = [0xcc, 0xb2, 0x92, 255];
+        for (id, cell) in tables {
+            let (Some(t), Some(l)) = (self.current_sheet().table(id), b.table_layout(id)) else { continue };
+            let n = l.ys.len().saturating_sub(1);
+            if n == 0 || l.xs.len() < 2 {
+                continue;
+            }
+            let (x0, x1) = (l.xs[0], l.xs[l.xs.len() - 1]);
+            let row_box = |r: usize| ([x0, l.ys[r + 1]], [x1, l.ys[r]]);
+            let first = l.title as usize;
+            let header_row = match &t.kind {
+                TableKind::General { header, .. } => header.then_some(first),
+                TableKind::Bom { bottom_to_top, .. } | TableKind::Hole { bottom_to_top, .. } | TableKind::CutList { bottom_to_top, .. } | TableKind::Custom { bottom_to_top, .. } => Some(if *bottom_to_top { n - 1 } else { first }),
+                TableKind::Revision { .. } => None,
+            };
+            let by_row = !matches!(t.kind, TableKind::General { .. });
+            for r in 0..n {
+                let (lo, hi) = row_box(r);
+                // (`cell_at` counts rows under the title row.)
+                let lit_row = by_row && cell.is_some_and(|(cr, _)| cr + first == r) && Some(r) != header_row;
+                quad(if lit_row { &mut lit } else if Some(r) == header_row { &mut header } else { &mut rows }, lo, hi);
+            }
+            if let (false, Some((r, c))) = (by_row, cell.map(|(r, c)| (r + first, c)))
+                && r + 1 < l.ys.len()
+                && c + 1 < l.xs.len()
+            {
+                quad(&mut lit, [l.xs[c], l.ys[r + 1]], [l.xs[c + 1], l.ys[r]]);
+            }
+            let (lo, hi) = (l.min(), l.max());
+            let q = [[lo[0], lo[1]], [hi[0], lo[1]], [hi[0], hi[1]], [lo[0], hi[1]], [lo[0], lo[1]]];
+            for w in q.windows(2) {
+                frame.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: TAN, pick_id: 0, width: LIT_LINE_PX, style: LineSegment::ON_TOP });
+            }
+        }
+        let up = self.gpu.uploader();
+        for (m, rgb) in [(rows, 0xf1f1f1), (header, 0xebebeb), (lit, 0xe2e2e2)] {
+            if !m.indices.is_empty() {
+                scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color(crate::theme::lin(rgb)).unlit().unpickable().layer(-1));
+            }
+        }
+        scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&frame))).per_primitive_color().unpickable().layer(18));
     }
 
     /// Onshape's hovered-annotation look (live, drawing/14): its lines in

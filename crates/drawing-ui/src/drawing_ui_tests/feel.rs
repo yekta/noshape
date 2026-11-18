@@ -527,6 +527,43 @@ fn a_tool_picks_an_edge_within_7_px(cx: &mut TestAppContext) {
     }
 }
 
+/// Live tables-1118 (h-stack; behaviours 1482): a hovered table keeps its ink black (no hover tint on its lines or
+/// text); its look is the grey rows, the hovered row or cell darker, and a tan frame.
+#[gpui::test]
+fn a_hovered_table_keeps_its_ink_and_shades_the_cell_under_the_pointer(cx: &mut TestAppContext) {
+    use noshape_render::state;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-table-hover");
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let id = e.current_sheet().tables.iter().map(|t| t.id).max().unwrap_or(0) + 1;
+            e.edit_sheet("Table", cx, |s| {
+                s.tables.push(noshape_model::drawing::Table::new(id, noshape_model::drawing::TableKind::General { cells: vec![vec!["a".into(), "b".into()], vec!["c".into(), "d".into()]], title: None, header: false }, [60.0, 200.0]));
+            });
+            id
+        })
+    });
+    draw(cx, window);
+    let (centre, picks) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        let l = b.table_layout(id).expect("the table laid out");
+        let centre = [(l.xs[0] + l.xs[1]) / 2.0, (l.ys[0] + l.ys[1]) / 2.0];
+        let picks: Vec<u32> = b.picks.iter().enumerate().filter(|(_, p)| matches!(p, noshape_model::drawing::build::PickTarget::Table(t) if *t == id)).map(|(i, _)| i as u32).collect();
+        (centre, picks)
+    });
+    let lit = lit_at(cx, window, &editor, centre);
+    assert_eq!(lit, Some(Sel::Table(id)), "the table is under the pointer");
+    let (tinted, tables) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let states = e.build_scene().states;
+        (picks.iter().any(|p| states.get(*p as usize).is_some_and(|s| s & (state::HOVER | state::SELECTED) != 0)), e.lit_tables())
+    });
+    assert!(!tinted, "its ink keeps its colour");
+    assert_eq!(tables, vec![(id, Some((0, 0)))], "the table and the cell under the pointer are shaded");
+}
+
 /// Live2 feel/drawing.json D5: a dimension's text moves from 5 px of drag (4 px is a click, which selects it); no hold
 /// needed.
 #[gpui::test]
