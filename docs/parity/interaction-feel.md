@@ -1258,6 +1258,27 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | Display states: a toolbar tool, not a right-strip panel | the same: a toolbar tool (`tb-display-states`), its panel on the left | missing |
 | Assembly section arrow drag: a focused value box at the arrow during the drag (0.1 mm steps), tan hatched caps on every instance; the box stays after release, text selected | the same (asm, 11-18: the 0.1 mm steps and tan hatched caps while dragged were missing): the value box at the arrow during the drag, after release focused with its text selected | missing |
 
+### pattern-hole-1118 (P0, Linear / Circular pattern, Hole, Mirror dialogs, live2 11-18 09:27 + live 11:17)
+
+behaviours "psui (lead 11-18 ~09:21, P0 feel): Linear / Circular pattern, Hole, Mirror" and "psui (lead 11-18 ~11:15, P0
+feel): Hole dialog follow-up"; times on live's software-GL lane (preview times are its regeneration, ±150 ms polling).
+
+| Finding | Ours | Test |
+|---|---|---|
+| Linear and Circular pattern: no manipulator, no distance / count / angle arrow in the graphics | ? | missing |
+| A typed count or distance changes nothing until Enter (3–4 s watched); Enter: the preview at 0.8–1.5 s | ? | missing |
+| Linear pattern: the preview instance (translucent) after the Direction edge is picked (3.0 s on live's lane) | ? | missing |
+| Skip instances ☑: "Instances to skip" and a small white ring at each instance's centroid (the seed a dot); a hovered ring turns blue | ? | missing |
+| A ring click adds the chip "(1, 0)" with a CLEAR link and drops the instance from the preview; a second click on it removes the chip | ? | missing |
+| Circular pattern fields: Entities, Axis of pattern, Angle 360 deg, Instance count 4, Equal spacing ☑, Centered, Skip instances | ? | missing |
+| Hole: the dialog title (and the feature-list row) is the size summary "Ø 6.35 mm ↧ 12 mm", "… \| ⌴Ø 10 mm ↧ 5 mm" (Counterbore), "… \| ⌵Ø 10 mm X 90°" (Countersink); with no point its tooltip "[Hole] did not regenerate properly: No hole points selected." | ? | missing |
+| Hole picks: only sketch points light (0.31–0.47 s after the pointer stops) and take; a part vertex or a face never lights and adds nothing | ? | missing |
+| Hole: each point click adds a chip "Vertex of Hole points" (with the click), a click on a picked point removes it; the first pick fills Merge scope "Part 1" | ? | missing |
+| Hole callout: one "Ø6.35 THRU" label on a leader to the first hole, in the face's plane (a second line "⌴Ø10 ↧5" with Counterbore); it covers points behind it | ? | missing |
+| Hole Simple / Counterbore / Countersink and Inch / Metric tabs: the title changes at 0.8–0.9 s, the preview at 2.5–2.8 s; Counterbore adds diameter 10 mm and depth 5 mm rows; Metric makes Ø 5 mm | ? | missing |
+| Hole depth typed: nothing until Enter; Enter: the title at 0.5 s, the preview at 2.8 s | ? | missing |
+| Mirror: a side face in the Mirror plane box ("Face of Extrude 1"); the preview at 1.8 s; the operation turns to Add with "Merge with all" and Merge scope "Part 1" when the mirror touches the seed | ? | missing |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
