@@ -575,6 +575,25 @@ Parts (1), cell bold; switching back clears at once and never greys rows (6 shot
 - [ ] **P3 CFGFEEL-DUP-ID (studios)**: CLI config add_option "A" twice gives the id "A_2"; live stores "A0" (FeatureScript ids).
 - Not judged: a row added after a parameter is configured shows an empty Depth cell in ours (live2 added its rows before configuring).
 
+## Interaction feel vs live2's 11-18 06:0x numbers (qa 06:55, green cafe3c2af, vibex8 Xvfb at load 8-14, real xdotool pointer; llvmpipe)
+Method: the block (block-fillet) and a sketch-only document, fast sweeps of 4 moves 8 ms apart, one screen crop d ms after the stop per
+run (import takes ~60-100 ms), lit = the light-orange outline; feature list: 45 sketches built by CLI. Data qa-scratch/hv2 (r1-r6).
+- 3D hover, no tool, fast sweep in + stop: lit between ~250 and ~500 ms (once 150-180 ms), never at 50-200 ms in most runs. Live:
+  stop + min(5 x average pick, 250 ms) + one pick (248-273 ms; 532-937 ms with slow picks): the same rule on a slow renderer. Pass.
+- 3D slow approach (2 px / 16 ms): follows the pointer, lit at rest; no stale hover at rest after leaving (1.2 s). Pass.
+- Selection latency: ours face 216 / plane 153 / row 163 / box 218 ms (v0.4.57 release, polled crops) vs live's 964 / 955 / 693 / 15321
+  with the same method (software). Ours faster on every row. Pass.
+- [ ] **P1 FEEL-FAST-OFF-CLEAR (psui)**: after a fast move off a lit face (4 moves in 32 ms) the outline is still drawn in a crop taken
+  ~0-40 ms after the stop (2/2 runs, and 3/3 in r1), gone by the crop ending 157 ms. Live clears it during the move (the first fast
+  move runs a remove-only pick, behaviours "hover timing with no tool").
+- [ ] **P1 FEEL-SKETCH-TOOL-PICK (psui)**: on a sketch line, a fast sweep in lights it at the same time with the Line tool active as with
+  no tool: unlit at 450 ms, lit from 600-800 ms in both (2 runs each, same session, load 14). Live: with a sketch tool every move picks
+  at once (lit 17-28 ms after the move); with no tool ~270 ms. Check tool_captures_left for the Line tool (behaviours, same section).
+- [ ] **P0 FEEL-FL-AUTOSCROLL-DROP (psui)**: Sketch 2 dragged to 20 px above the feature list's bottom and held still 1 s: the list
+  scrolls and the insertion line scrolls with the rows (between Sketch 11 and 12), as live; released without moving, Sketch 2 lands
+  after Sketch 23 (the row under the pointer by then). Live drops it at the line (behaviours "feature-list drag autoscroll":
+  after Sketch 16 in its run). Sheet tickets/fl-autoscroll-drop.png (vibex8 ~/agents/qa-keep/feel-1118/).
+
 ## Versions and history panel vs live's 11-17 capture (qa 00:45, green 0f7610c83, vibex6 Xvfb, real pointer)
 Document as live's set-up (CLI: 40 Extrude depth edits, V1 / V2 / V3 at 6 / 16 / 31, branch B1 from V1; qa-scratch/hi his.sh, :670).
 Sheet: qa-scratch/tickets/history-feel-sheet.png (vibex6 ~/agents/qa-keep/history-feel). Match live: rows B1, Main, V3, V2, V1,
@@ -731,7 +750,7 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
 ## Release blockers for the 2026-11-18 17:00 release (qa list 06:25, newest checked green 8b4812511; the latest release is v0.4.58)
 - **Must carry (qa-cut-1615 blocks the cut if the candidate lacks one; list in qa-scratch cut-must.txt)**: psui fff088e5, the fix of
   P0 DOCK-TAB-SWITCH-TRAILING-FRAMES (returns to an open tab settled ~700 ms from v0.4.54, 2219c4373); psui's macOS Ctrl+Enter fix
-  once it lands (v0.4.58 marks that matrix row a gap).
+  7b8bb249 with 2549be00 (v0.4.58 marks that matrix row a gap).
 - **Must carry (lead 06:40)**: skasm 120ee19c, the fix of the v0.4.58 regression from 2f93c018c (a sheet metal model with a rolled wall
   joined by a bend: "Sheet metal model cannot be unfolded.", no flat; cf-sheet-metal-model-plus "Sheet Metal Up to Part" was Info in
   0.4.57). qa's compat missed it: the document is a parity-corpus model, in none of the compat sets (user / ticket / authored). Closed
