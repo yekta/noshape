@@ -9,10 +9,10 @@ live/errors-1118/. Status: **=** same, **≠** differs (owner in brackets).
 | Situation | Live | Ours | Status |
 |---|---|---|---|
 | Over-defined mate (a Fastened on top of a Revolute, pin-block) | both mates: "Fastened 1 has error: Mate overdefines the assembly. (Hidden)" / "Revolute 1 has error: …"; rows red, Mate features header red ⬇ circle, the root's icon red ! | the same words (green 548d795fb) | = text |
-| …its tooltip | a bold grey-blue title bar with the message, right of the list, then the mate's parameters with checkbox marks | a plain white popup under the row, no title bar or checkboxes; (the parameter list itself matches live 10-22: Revolute / Offset / Limits / Simulation connection) | ≠ [asm] |
-| …a hidden error mate's row text | faded red rgb(196,139,148) | strong red rgb(170,37,45) | ≠ [asm] |
+| …its tooltip | a bold grey-blue title bar with the message, right of the list, then the mate's parameters with checkbox marks | the mate flyout (an error mate too): the message as its title bar, then the parameters with their checkboxes; a Fastened lists Offset and Simulation connection (33d8db32, test a_hidden_mate_in_error_is_faded_red / the flyout assertion in assembly_ui_tests) | = [asm] |
+| …a hidden error mate's row text | faded red rgb(196,139,148) | the same (33d8db32, `feature_row_color`) | = [asm] |
 | Mate that can't resolve its connectors | "Fastened 1 has error: Mate cannot resolve mate connectors. (Hidden)" (behaviours l.1946) | not checked yet | – |
-| Part deleted in its Part Studio (instance can't resolve) | instance row red #aa252d with a red ! badge on its icon; tooltip "Part 2 <1> has error: Failed to resolve instance."; gone from the graphics (behaviours E15, l.8741) | the same words, red row, gone from the graphics (green 548d795fb, pin-block: Extrude 2 deleted); ≠ no ! badge on the part icon, a red dot after the DOF icon instead (errors-1118/oe15.png) | = text, ≠ badge [asm] |
+| Part deleted in its Part Studio (instance can't resolve) | instance row red #aa252d with a red ! badge on its icon; tooltip "Part 2 <1> has error: Failed to resolve instance."; gone from the graphics (behaviours E15, l.8741) | the same words, red row, gone from the graphics (green 548d795fb, pin-block: Extrude 2 deleted); its icon carries the red ! badge (10 px at its bottom right), no dot (33d8db32; was a red dot after the DOF icon, errors-1118/oe15.png) | = [asm] |
 | …a mate on the lost instance | "Cylindrical 1 has error: Failed to resolve the instance for mate. (Hidden)" then its parameters (E15) | "Revolute 1 has error: Failed to resolve the instance for mate. (Hidden)", Revolute / Offset / Limits / Simulation connection | = |
 
 ## Drawings (live2)
