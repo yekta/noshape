@@ -7,6 +7,8 @@
 //! individual files, ☐ Include hidden instances in export; Export | Cancel.
 
 use super::PartStudioView;
+use crate::export_store::{ExportJob, export_in_background};
+pub use crate::export_store::{store_export, store_written};
 use gpui_kit::component::{Disableable as _, WindowExt as _, h_flex};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -131,35 +133,25 @@ impl PartStudioView {
         self.flash_info(format!("{name} is being prepared for export. You will receive a notification with its status."), cx);
     }
 
-    /// Save `parts` as the dialog's Options say: to a file the user picks, or stored in a new tab. The result goes to
-    /// the Notifications bell, "<name> was exported successfully." without the file's extension (live2
-    /// export-feel-1118: "l2 exp was exported successfully."; a drawing's names its ".pdf").
+    /// Save `parts` as the dialog's Options say: to a file the user picks, or stored in a new tab, written off the UI
+    /// thread. The result goes to the Notifications bell, "<name> was exported successfully." without the file's
+    /// extension (live2 export-feel-1118: "l2 exp was exported successfully."; a drawing's names its ".pdf").
     fn save_parts_export(&mut self, s: ExportSettings, name: String, parts: Vec<(String, k::Shape, [f32; 4])>, several: bool, window: &mut Window, cx: &mut Context<Self>) {
         let name = if name.is_empty() { self.studio_name(cx) } else { name };
         // The saved file's own extension (OBJ downloads a .zip, as live).
         let ext = s.file_ext(several);
-        let notify = move |name: &str, done: anyhow::Result<()>, cx: &mut App| match done {
-            Ok(()) => crate::notifications::push(cx, "Export completed", format!("{name} was exported successfully."), false),
-            Err(e) => crate::notifications::push(cx, "Export failed", format!("{name} could not be exported: {e:#}"), true),
-        };
+        let file = format!("{name}.{ext}");
         // Options › Store file in a new tab: no download.
         if s.options == 2 {
             self.export_preparing(&name, cx);
-            let done = store_export(&self.doc, self.tab, &format!("{name}.{ext}"), |p| write_export(&s, p, parts), cx).map(|_| ());
-            notify(&name, done, cx);
+            export_in_background(self.doc.clone(), self.tab, ExportJob { name, file, options: s.options, download: None }, move |p| write_export(&s, p, parts), cx);
             return;
         }
         let view = cx.entity();
-        crate::file_dialogs::request_save_path("Export", format!("{name}.{ext}"), ext, window, cx, move |path, cx| {
+        crate::file_dialogs::request_save_path("Export", file.clone(), ext, window, cx, move |path, cx| {
             view.update(cx, |this, cx| {
                 this.export_preparing(&name, cx);
-                let done = write_export(&s, &path, parts).map(|p| {
-                    // Download and store file in a new tab.
-                    if s.options == 1 {
-                        store_written(&this.doc, this.tab, &p, cx);
-                    }
-                });
-                notify(&name, done, cx);
+                export_in_background(this.doc.clone(), this.tab, ExportJob { name, file, options: s.options, download: Some(path) }, move |p| write_export(&s, p, parts), cx);
             });
         });
     }
@@ -607,28 +599,4 @@ pub(super) fn modal_checkbox(id: &'static str, label: &'static str, on: bool) ->
                 .when(on, |d| d.child(crate::ui::glyph("check", 10., gpui_kit::rgb_static(0xffffff)))),
         )
         .child(label)
-}
-
-/// Options › Store file in a new tab: write the export to a temporary file
-/// (`write` returns the file written: a .zip for individual files) and keep
-/// it as a file tab after `tab` (shared with the agent API:
-/// `noshape_ops::export::store_file_tab`). Returns the stored file's name.
-pub fn store_export(doc: &Entity<crate::doc_model::DocModel>, tab: noshape_model::document::TabId, file: &str, write: impl FnOnce(&std::path::Path) -> anyhow::Result<std::path::PathBuf>, cx: &mut App) -> anyhow::Result<String> {
-    let dir = std::env::temp_dir().join(format!("noshape-store-{}", std::process::id()));
-    std::fs::create_dir_all(&dir)?;
-    let written = write(&dir.join(file))?;
-    let name = store_written(doc, tab, &written, cx);
-    let _ = std::fs::remove_file(&written);
-    Ok(name)
-}
-
-/// Keep an exported file (already written to `path`) as a file tab after `tab`.
-pub fn store_written(doc: &Entity<crate::doc_model::DocModel>, tab: noshape_model::document::TabId, path: &std::path::Path, cx: &mut App) -> String {
-    let name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
-    if let Ok(bytes) = std::fs::read(path) {
-        doc.update(cx, |d, cx| d.edit_document(&noshape_ops::export::store_description(&name), cx, |d| {
-            noshape_ops::export::store_file_tab(d, &name, &bytes, tab);
-        }));
-    }
-    name
 }

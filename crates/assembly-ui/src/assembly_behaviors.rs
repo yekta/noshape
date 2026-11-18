@@ -5972,43 +5972,30 @@ impl AssemblyView {
                 });
                 return;
             }
-            // The saved file's own extension (OBJ downloads a .zip, as live).
-            let ext = s.file_ext(true);
-            let file = format!("{name}.{ext}");
-            // Live (live2 export-feel-1118, as a drawing's): a blue bubble while the export is prepared, then the
-            // result in the Notifications bell, "<name> was exported successfully." without the extension.
-            let preparing = format!("{name} is being prepared for export. You will receive a notification with its status.");
-            let notify = move |name: &str, done: anyhow::Result<()>, cx: &mut App| match done {
-                Ok(()) => crate::notifications::push(cx, "Export completed", format!("{name} was exported successfully."), false),
-                Err(e) => crate::notifications::push(cx, "Export failed", format!("{name} could not be exported: {e:#}"), true),
-            };
             // Options › Store file in a new tab: no download.
             if s.options == 2 {
-                v.update(cx, |this, cx| {
-                    this.message = Some((false, preparing));
-                    let asm = this.export_assembly(ids.as_deref(), s.hidden, cx);
-                    let done = crate::assembly_hooks::store_export(&this.doc, this.tab, &file, |p| noshape_ops::export::write_assembly_export(&s, p, &asm), cx).map(|_| ());
-                    notify(&name, done, cx);
-                    cx.notify();
-                });
+                v.update(cx, |this, cx| this.run_asm_export(s, name, ids, None, cx));
                 return;
             }
-            crate::file_dialogs::request_save_path("Export", file, ext, window, cx, move |path, cx| {
-                v.update(cx, |this, cx| {
-                    this.message = Some((false, preparing));
-                    let asm = this.export_assembly(ids.as_deref(), s.hidden, cx);
-                    let done = noshape_ops::export::write_assembly_export(&s, &path, &asm).map(|p| {
-                        // Download and store file in a new tab.
-                        if s.options == 1 {
-                            crate::assembly_hooks::store_written(&this.doc, this.tab, &p, cx);
-                        }
-                    });
-                    notify(&name, done, cx);
-                    cx.notify();
-                });
+            // The saved file's own extension (OBJ downloads a .zip, as live).
+            let ext = s.file_ext(true);
+            crate::file_dialogs::request_save_path("Export", format!("{name}.{ext}"), ext, window, cx, move |path, cx| {
+                v.update(cx, |this, cx| this.run_asm_export(s, name, ids, Some(path), cx));
             });
         });
         crate::assembly_hooks::open_export_modal(base, true, parts_only, run, window, cx);
+    }
+
+    /// Export instances `ids` (None: all) as `s` says, to `download` (None: Options › Store file in a new tab). Live
+    /// (live2 export-feel-1118, asm-export-1150, as a Part Studio's): the blue bubble "<name> is being prepared for
+    /// export…" while the file is written off the UI thread, then "<name> was exported successfully." (no extension)
+    /// in the Notifications bell.
+    pub(crate) fn run_asm_export(&mut self, s: noshape_ops::export::ExportSettings, name: String, ids: Option<Vec<Vec<InstanceId>>>, download: Option<std::path::PathBuf>, cx: &mut Context<Self>) {
+        self.message = Some((false, format!("{name} is being prepared for export. You will receive a notification with its status.")));
+        cx.notify();
+        let asm = self.export_assembly(ids.as_deref(), s.hidden, cx);
+        let file = format!("{name}.{}", s.file_ext(true));
+        crate::export_store::export_in_background(self.doc.clone(), self.tab, crate::export_store::ExportJob { name, file, options: s.options, download }, move |p| noshape_ops::export::write_assembly_export(&s, p, &asm), cx);
     }
 
     /// Tab › Export… of an Assembly tab: the whole assembly.

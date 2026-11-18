@@ -1725,3 +1725,29 @@ fn every_instance_row_tooltips_its_name(cx: &mut TestAppContext) {
         assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some(name), "{name}: its name");
     }
 }
+
+/// Live asm-export-1150: an assembly's Export shows "<name> is being prepared for export…" while its file is written
+/// off the UI thread; the bell's "Export completed" and (Options › Store file in a new tab) the file's tab right after
+/// the assembly's come when it is done.
+#[gpui::test]
+fn an_assembly_export_is_written_off_the_ui_thread(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "export-off-thread");
+    let s = noshape_ops::export::ExportSettings { format: noshape_ops::export::PartFormat::Step, options: 2, ..Default::default() };
+    cx.update(|cx| view.update(cx, |v, cx| v.run_asm_export(s, "l2 exp asm".into(), None, None, cx)));
+    let bell = |cx: &gpui_kit::App| cx.try_global::<crate::notifications::Notifications>().map(|n| n.items.iter().map(|i| (i.title.clone(), i.body.clone())).collect::<Vec<_>>()).unwrap_or_default();
+    cx.update(|cx| {
+        let shown = view.read(cx).message.clone().map(|m| m.1);
+        assert_eq!(shown.as_deref(), Some("l2 exp asm is being prepared for export. You will receive a notification with its status."));
+        assert!(bell(cx).is_empty(), "written on the UI thread: {:?}", bell(cx));
+    });
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| bell(cx)), vec![("Export completed".to_string(), "l2 exp asm was exported successfully.".to_string())]);
+    let tabs: Vec<String> = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = &v.doc.read(cx).session.doc;
+        let ordered = d.ordered_tabs();
+        let at = ordered.iter().position(|t| t.id == v.tab).expect("the assembly's tab");
+        ordered[at..].iter().take(2).map(|t| t.name.clone()).collect()
+    });
+    assert_eq!(tabs, ["Assembly 1", "l2 exp asm.step"]);
+}

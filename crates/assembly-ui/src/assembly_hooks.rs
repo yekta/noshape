@@ -21,12 +21,6 @@ use std::sync::{Arc, OnceLock};
 /// What Export does with the chosen settings and file name (the Part Studio's `export::RunExport`).
 pub type RunExport = Rc<dyn Fn(ExportSettings, String, &mut Window, &mut App)>;
 
-/// [`Hooks::store_export`]'s writer: writes the export to a path, returns the file written.
-pub type StoreWrite<'a> = Box<dyn FnOnce(&Path) -> anyhow::Result<PathBuf> + 'a>;
-
-/// [`Hooks::store_export`]: the document, the tab the file tab goes after, the file name, the writer.
-pub type StoreExport = fn(&Entity<DocModel>, TabId, &str, StoreWrite<'_>, &mut App) -> anyhow::Result<String>;
-
 /// Rows of the Input propagation dialog: (row key, reference name, per input: None = can't propagate, Some(already
 /// propagated)).
 pub type PropagationRows = Vec<(FeatureId, String, Vec<Option<bool>>)>;
@@ -74,11 +68,6 @@ pub struct Hooks {
     pub set_instance_list_properties: fn(bool),
     /// The Export modal (file name, `assembly`: the Assembly's options, `parts_only`: without the assembly's checkboxes).
     pub open_export_modal: fn(String, bool, bool, RunExport, &mut Window, &mut App),
-    /// Options › Store file in a new tab: write the export to a temporary file and keep it as a file tab after a
-    /// tab. Returns the stored file's name.
-    pub store_export: StoreExport,
-    /// Keep an exported file (already written) as a file tab after a tab.
-    pub store_written: fn(&Entity<DocModel>, TabId, &Path, &mut App) -> String,
     /// The Input propagation dialog.
     pub open_propagation_dialog: OpenPropagation,
     /// A Variable Studio's table shown in an element's Variable table panel (document, studio, host element).
@@ -160,14 +149,6 @@ pub fn open_export_modal(base: String, assembly: bool, parts_only: bool, run: Ru
     (hooks().open_export_modal)(base, assembly, parts_only, run, window, cx)
 }
 
-pub fn store_export(doc: &Entity<DocModel>, tab: TabId, file: &str, write: impl FnOnce(&Path) -> anyhow::Result<PathBuf>, cx: &mut App) -> anyhow::Result<String> {
-    (hooks().store_export)(doc, tab, file, Box::new(write), cx)
-}
-
-pub fn store_written(doc: &Entity<DocModel>, tab: TabId, path: &Path, cx: &mut App) -> String {
-    (hooks().store_written)(doc, tab, path, cx)
-}
-
 pub fn open_propagation_dialog(owner_name: String, inputs: Vec<(String, String)>, rows: PropagationRows, checked: Vec<Vec<bool>>, on_confirm: OnConfirm, window: &mut Window, cx: &mut App) {
     (hooks().open_propagation_dialog)(owner_name, inputs, rows, checked, on_confirm, window, cx)
 }
@@ -204,8 +185,6 @@ pub fn register_for_tests() {
         instance_list_properties: || false,
         set_instance_list_properties: |_| {},
         open_export_modal: |_, _, _, _, _, _| {},
-        store_export: |_, _, _, _, _| Err(anyhow::anyhow!("no stored exports in UI tests")),
-        store_written: |_, _, _, _| String::new(),
         open_propagation_dialog: |_, _, _, _, _, _, _| {},
         variable_table: |_, _, _, _, cx| cx.new(|_| gpui_kit::Empty).into(),
         readonly_variable_table: |_, _, _, _, _, _| None,

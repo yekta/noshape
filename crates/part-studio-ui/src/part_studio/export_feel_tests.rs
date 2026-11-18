@@ -17,6 +17,8 @@ fn a_stored_export_says_it_is_prepared_and_rings_the_bell(cx: &mut TestAppContex
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.run_part_export(s, "l2 exp - Part 1".into(), Vec::new(), w, cx))).unwrap();
     let shown = cx.update(|cx| view.read(cx).ui.flashed.clone().map(|f| f.1));
     assert_eq!(shown.as_deref(), Some("l2 exp - Part 1 is being prepared for export. You will receive a notification with its status."));
+    // Written off the UI thread: the bell's result comes when the file is done.
+    wait_until(cx, window, |cx| cx.try_global::<crate::notifications::Notifications>().is_some_and(|n| !n.items.is_empty()));
     let bell: Vec<(String, String, bool)> = cx.update(|cx| cx.try_global::<crate::notifications::Notifications>().map(|n| n.items.iter().map(|i| (i.title.clone(), i.body.clone(), i.failed)).collect()).unwrap_or_default());
     assert!(bell.contains(&("Export completed".into(), "l2 exp - Part 1 was exported successfully.".into(), false)), "{bell:?}");
     let (tabs, studio) = cx.update(|cx| {

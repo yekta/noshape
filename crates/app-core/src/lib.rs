@@ -19,6 +19,7 @@ pub mod result_store;
 pub mod doc_files;
 pub mod doc_model;
 pub mod export_naming;
+pub mod export_store;
 pub mod feature_settings;
 pub mod file_dialogs;
 pub mod file_tab_view;

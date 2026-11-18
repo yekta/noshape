@@ -274,8 +274,6 @@ fn register_assembly_hooks() {
         instance_list_properties: || preferences_window::ListPrefs::load().instance_list_properties,
         set_instance_list_properties: preferences_window::set_instance_list_properties,
         open_export_modal: part_studio::export::open_export_modal_with,
-        store_export: |doc, tab, file, write, cx| part_studio::export::store_export(doc, tab, file, write, cx),
-        store_written: part_studio::export::store_written,
         open_propagation_dialog: part_studio::input_propagation::open_propagation_dialog,
         variable_table: |doc, studio, host, window, cx| cx.new(|cx| variable_studio::VariableStudioView::new_in_panel(doc, studio, host, window, cx)).into(),
         readonly_variable_table: |doc, element, r, k, n, cx| variable_insert::readonly_table(doc, variable_insert::InsertTarget::Element(element), r, k, n, cx),

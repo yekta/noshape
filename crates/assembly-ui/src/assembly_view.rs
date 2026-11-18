@@ -6484,13 +6484,13 @@ impl AssemblyView {
             out.push(div().absolute().bottom_3().right_3().px_2().py_1().rounded_md().bg(with_alpha(pal.accent, 0.25)).text_xs().child("Exploded view").into_any_element());
         }
         if let Some((err, msg)) = self.message.clone() {
-            // Info notices fade after 4 s like the Part Studio's (errors stay
-            // until dismissed; qa4: a notice must not linger).
+            // Info notices fade after 5 s like the Part Studio's (errors stay until dismissed; qa4: a notice must not
+            // linger; live asm-export-1150: the export's bubble 4.9 s).
             if !err && self.ui.msg_fading.as_deref() != Some(msg.as_str()) {
                 self.ui.msg_fading = Some(msg.clone());
                 let m = msg.clone();
                 cx.spawn(async move |this, cx| {
-                    cx.background_executor().timer(Duration::from_secs(4)).await;
+                    cx.background_executor().timer(Duration::from_secs(5)).await;
                     let _ = this.update(cx, |this: &mut Self, cx| {
                         if this.message.as_ref().is_some_and(|(e, t)| !*e && *t == m) {
                             this.message = None;
