@@ -145,6 +145,22 @@ fn rows() -> Vec<Row> {
             }
             Ok(())
         } },
+        Row { id: "table / a joint row hovered lights its rip", live: "hovering Joint A (a rip) lights it in the 3D view (live 11-17 sm-feel-1117; its flat edges too: not yet)", gap: false, check: |s, cx| {
+            s.press(cx, "sm-cell-0-0-0", MouseButton::Right)?;
+            let label = cx
+                .update(|cx| s.view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_else(|| crate::os_menu::open_labels(cx)))
+                .into_iter()
+                .find(|l| l.ends_with(" to rip"))
+                .ok_or("no Convert row")?;
+            s.press(cx, &format!("menu:{label}"), MouseButton::Left)?;
+            wait_until(cx, s.window, |cx| !s.view.read(cx).ui_busy());
+            s.frames(cx);
+            let at = s.bounds(cx, "sm-cell-1-0-0").ok_or("no row in Other joints")?.center();
+            gpui_kit::VisualTestContext::from_window(s.window, cx).simulate_event(gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: NONE });
+            s.frames(cx);
+            let lit = cx.update(|cx| s.view.read(cx).sm_hover_refs());
+            expect(!lit.is_empty() && lit.iter().all(|r| matches!(r, Reference::Face(_))), true, "the rip's faces lit")
+        } },
         Row { id: "flange / no manipulator", live: "the Flange dialog shows a preview wall and no length arrow", gap: false, check: |s, cx| {
             cx.update_window(s.window, |_, w, cx| s.view.update(cx, |v, cx| v.start_feature("sheetMetalFlange", w, cx))).unwrap();
             s.frames(cx);

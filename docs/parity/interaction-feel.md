@@ -534,7 +534,8 @@ panel open, a fresh document per row; cells carry `sm-cell-<table>-<row>-<column
 | A row hovered | lights its bend in the 3D and flat views | the same | = |
 | Flange | no length arrow, a preview wall | the same | = |
 | Flange / Hem edges box hover (live 11-17 sm-feel-1117) | rim and bend edges and a rip's thin side face light; a wall's broad faces and planes never | the same (`pick_muted`: the walls' faces out of the picks while that box is active; were lit) | = (fixed 11-17) |
-| Not yet (live 11-17 sm-feel-1117) | Bend relief / Corner boxes lighting a rip's side face and a bend end's corner as an orange disc; the Flange flip button at the right of the Bend angle row; a joint row hovered lighting both flat edges; Type Rip → Bend making Modify joint 1 and Bend A, the unfold failure toast and a blank flat view | – | ? |
+| A joint row hovered (live 11-17 sm-feel-1117) | lights the rip in the 3D view (and both its edges in the flat view) | the 3D rip (`sm_rip_refs`; was nothing); the flat edges not yet | ≠ (3D fixed 11-17) |
+| Not yet (live 11-17 sm-feel-1117) | Bend relief / Corner boxes lighting a rip's side face and a bend end's corner as an orange disc; the Flange flip button at the right of the Bend angle row; Type Rip → Bend making Modify joint 1 and Bend A, the unfold failure toast and a blank flat view | – | ? |
 | The flat view | its own camera: the wheel zooms it alone | the same | = |
 | The flat view's start | looking straight down (Top) | the same | = |
 | A click inside a bend's zone in the flat view | selects that bend in both views and its Bends row | only the centre line (5 px) took a click, else the whole flat face; now the bend's face, line and row (`FlatViewEvent::BendZone`, as Select other's "Face of …") | = (fixed) |

@@ -578,8 +578,18 @@ impl PartStudioView {
         }
         match self.ui.sm_hover {
             Some((0, row, _)) => self.sm_bend_refs(row),
+            // Live 11-17 sm-feel-1117: a joint row hovered lights its rip.
+            Some((1, row, _)) => self.sm_rip_refs(row),
             _ => self.ui.sm_flat_hover.map(|row| self.sm_bend_refs(row)).unwrap_or_default(),
         }
+    }
+
+    /// The faces of the rip in Other joints' row `row` (rows in the model's rip order, `joint_rows`).
+    fn sm_rip_refs(&self, row: usize) -> Vec<noshape_model::reference::Reference> {
+        let Some(ctx) = self.context.as_ref() else { return Vec::new() };
+        let model = self.ui.sm_context.filter(|m| ctx.sheet_metal.values().any(|d| d.model == *m)).or_else(|| noshape_model::sheetmetal::models_of(ctx).first().copied());
+        let Some(data) = model.and_then(|m| self.sm_model_data(m)) else { return Vec::new() };
+        data.rips.get(row).map(|r| r.faces.iter().map(|n| noshape_model::reference::Reference::Face((**n).clone())).collect()).unwrap_or_default()
     }
 
     /// Right-click on a Bends row. Live: Move up / Move down (not the first
