@@ -1053,7 +1053,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 |---|---|---|
 | Orbit 3 turns per canvas diagonal, speeds averaged, inertia 0.77 a frame | = | nav matrix "right drag / orbits 3 turns per canvas diagonal"; app-core navigation::tests::inertia_decays_like_onshape |
 | Wheel 2^(1/12) a notch (Windows ×3), about the pointer; pinch as Ctrl+wheel | = | nav matrix "wheel / a notch in" (Windows, pinch: missing) |
-| Zoom refused past 100 px model size or 2^24 px per unit; perspective eye 0.05–50 diameters | ? | missing |
+| Zoom refused past 100 px model size or 2^24 px per unit; perspective eye 0.05–50 diameters | = (qa 23:4x, code: `can_zoom` with MIN_MODEL_PIXEL_SIZE 100, MAX_PIXELS_PER_METRE 2^24, PERSPECTIVE_MIN / MAX_SCALE 0.05 / 50) | app-core navigation::tests::zoom_limits_like_can_zoom, perspective_zoom_dollies_by_a_sixth_of_the_distance |
 | Z / Shift+Z ×1.75; Ctrl+Shift+arrows 150 px; drag zoom −dy/10; arrows 15° / 5° / 90°; fit padding 1.05; FOV 45 | = | nav matrix "keys / Ctrl+Shift+arrows pan 150 px in 250 ms", "keys / arrows: 15°, Shift 90°, Ctrl 5°, in 250 ms" (Z keys, fit padding, FOV: missing) |
 | Detail drops under 20 fps, back over 30 fps | = | app-core navigation::tests::a_view_change_jumps_below_20_fps (the 30 fps return: missing) |
 | Inference keeps the previous target while it is still under the pointer [skasm] | ≠ | missing (skasm's #6) |
@@ -1146,10 +1146,10 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | Exponent form at ≥ 1e6, ≤ 1e-5 or rounding to 0 ("4.643e+7"); below the zero tolerance "0" | = | units format::live_format_tests::exponents_and_compound_units_as_live |
 | Compound units sorted and spaced ("deg mm", "mm⁴") | = | units format::live_format_tests::exponents_and_compound_units_as_live |
 | Measure readouts (v ± 1e-10).toFixed(p): zeros kept, ties away from zero | = | units format::live_format_tests::readouts_round_ties_away_as_live |
-| A compound unit takes its units' largest precision | ? | missing |
+| A compound unit takes its units' largest precision | ≠ [psui] (qa 23:4x, code: `format_quantity` uses the angle precision only for a pure angle, the length precision for everything else, so "deg mm" with length 2 / angle 4 shows 2 decimals where live shows 4; equal precisions (the default 3 / 3) look the same) | missing |
 | A dragged angle written at the workspace precision (3) | = | missing (manipulators.rs `format_number(deg, angle_precision)`) |
 | A clicked Mass value: the unit's maximum precision, again back | = | measure_feel_tests::a_clicked_mass_value_toggles_the_highest_precision |
-| Value-only parameters: {mm 5, in 6, cm 6, m / ft / yd 8, deg / rad 7} decimals, zeros dropped | ? | missing |
+| Value-only parameters: {mm 5, in 6, cm 6, m / ft / yd 8, deg / rad 7} decimals, zeros dropped | n/a (qa 23:4x): every quantity in ours is stored as an expression (`ParamValue::Expr`) and shown as typed; the parity translator refuses a BTMParameterQuantity with no expression ("no expression"), so a live value-only parameter would fail to import rather than show | missing |
 | Drawing PICKBOX 7 for every tool; grips 6 px [studios] | = (ef2dfdfd, 9f629e6f: every tool's pick, the detail loop, the hole table's X direction; the centre mark, detail circle, aux indicator and leader anchor grips) | GPUI feel `a_tool_picks_an_edge_within_7_px` |
 
 ### server-numfmt (server number formats by experiment, live 11-18 03:05) [core + studios]
