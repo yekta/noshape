@@ -180,8 +180,7 @@ Open, ranked:
 - DXF rows (lead 23:0x), exchange suite drawings 0/10 (vibex6 exch-dxf / exch-fix2 logs, /root/dx-scratch/bin/
   dxflayercount.py, dxfanntext.py, dxfents.py, dxfsheet.py (two DXFs side by side), hlrplot.py / hlrgrid.py).
   Landed 00:47 as 5076e98c: empty view-label MTEXT for base / pictorial views off 1:1, no centermark on tangent-only
-  circles, mesh parts out of HLR (crash). QUEUED 03:2x as a1bc5ce3 via vibe2 (ops e2e 226/226; drawing rows from the
-  full run + single-doc reruns on vibex8):
+  circles, mesh parts out of HLR (crash). LANDED 03:23 as 12a38f9e:
   - 46d2c427d mesh parts drawn as live, silhouettes only (live2 q-mesh-drawing: hex "imported" alone and the rings Iso
     show no folds between facets toward the viewer, not even 90 deg: the far half of a hole rim), edge-on facets
     count as away (MESH_FACING); a B-rep edge glimpsed past mesh facet corners (piece < deflection of a longer edge)
@@ -193,15 +192,16 @@ Open, ranked:
   Open: live splits each mesh silhouette loop into ~4 open LWPOLYLINEs (ours one per loop; rule unknown); live's 2
   Iso ELLIPSEs in hex are B-rep hole rim quarters inside the mesh hole (ours hidden). faceblend: 2 marks left on
   concave ~250 deg walls (pocket ends?) where live 1857 marks a radial hole's half bore: needs a live capture.
-  clamp-guillem: live 1:1 (views overflow the A sheet, not at the suggested spots) for our 1:3 suggested scale: the
-  suite drawings may come from another creation path (decision asked of the lead). sm-louver ARC/CIRCLE now match.
+  Lead 11-18: the suite takes each drawing's stored scale and view positions (place_as_live in parity.rs); the
+  suggested-views rule is judged only by live's Create Drawing captures (clamp Part 3 1:1 = ours; live's Iso centre
+  7.786-8.061 in varies by part, ours fixed 7.810: rule unknown). clamp-guillem now 271 / 268 LINE only. sm-louver ARC/CIRCLE now match.
   hex still writes CENTERMARKS: cylinder_ends marks shrunk's holes wholly hidden behind the mesh (live none).
 - Export feel (live2 export-feel-1118, behaviours "dx (lead 11-18 ~02:38, feel)"): in a1bc5ce3: solid exports
   (Part Studio, part, assembly) show the "<file name> is being prepared…" bubble (~5 s; assembly's message fades at
   4 s) and the bell's "Export completed" / "<name> was exported successfully." (no extension); drawing Options
   "Download and store file in a new tab". Open: a part row's Format "Inspection list" (needs live's file: ask live2);
-  the assembly bubble and part › Store result are live2's to confirm (translate quota). Our import op switches to the
-  first new tab; live keeps the active tab (import feel below).
+  the assembly bubble is live2's to confirm (translate quota). Queued 04:0x: import_files keeps the active tab; the
+  export UI test (export_feel_tests.rs); the suite placement.
 - Queued for later (live 11-18, behaviours "studios + dx (lead 11-18, P0 feel)", live/studios/docs-import-feel-1118/):
   Import into a document feel: + > Import... opens the OS picker at once (multi), 400 px "Import to Onshape" modal with
   focus on [Import], folder tab "CAD Imports" at the end at 1.8 s, the Part Studio tab at 6.9 s, active tab unchanged,
