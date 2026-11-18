@@ -40,19 +40,9 @@ Open, ranked:
   2": ours reads the zip by groups (live refuses zips), live was given the bare .obj.
 - c2-config-parts-screws: hang fixed (b777cbd1), still in tests/parity-models/unscored.json: Sweep 1's 14.8 GB
   Boolean is bool's P0 (lead 11-16). Score it once fixed. Remove vibe5 ~/agents/dx/target-g13 when no longer needed.
-- Exchange suite x1116n running (above); set 2 again when live2 refetches.
 
 ## Other in flight
-- config-parts (vibe5 07:4x, ops-hx2, screws skipped; ~/tmp/dx/cfgparts-hx2.log): linear-rail 19/26, links 10/35, nuts
-  8/17, pulleys 9/22, sprockets 10/24, standoffs 11/32. Landed 69b8e51c (Any variable = string), 5ee5d266 (std 736).
-  Queued 16c51e2a (expressions compare strings: `"text"` where a value is expected, string variables via
-  VariableScope::get_text / ctx.fs_variables; nuts' `#name2 == "Nyloc" ? …`) and 8d3a0ec2 (a configuration checkbox is
-  a variable: sprockets' #Default_Thickness, pulleys' #Flanges). Left: live's sketches.json is at the workspace's
-  current configuration: refetched at defaultValue 07:39 (sketches.json capturedConfiguration). But live.jsonl's
-  per-feature lines are at the current configuration (nuts: Extrude 1 41.569 mm³ = M2 hex; final "M4 Nyloc" 31.406,
-  REST at M4 148.47): asked live 07:5x to retake lines at defaultValue. Rerun (ops-cp, current branch) then: linear-rail
-  19, links 10, nuts 8, pulleys 9, sprockets 11, standoffs 11 (~/tmp/dx/cfgparts-cp.log). live: screws 34 / links 28 refs absent at
-  the default configuration, standoffs Hole 2 ERROR in live.
+- config-parts: see "config-parts at live's 18:0x retake" below (the 11-17 vibe5 runs: archive).
 - driven-pattern 6/11: f6 Linear pattern 1 direction from Extrude 1's cylinder face: ours axis -z (origin at top), live
   +z: sent to core 06:35 (vibe5 ~/tmp/dx/qdp, mode 700).
 - blend: impeller f26 matches on its 12b25c47e (not landed); f27 Fillet 3 next (blend). core: side-cuts-tab Corner break
@@ -147,12 +137,19 @@ Open, ranked:
      DWG 0.16 / DXF 0.22 / PNG 1.05 s (7.2-18.3 s).
    - imports: NIST STEP 4.15 / x_t 2.16 s (38.7 / 24.5 s); live big asm STEP 2.8 / x_t 1.7 / IGES 7.1 s (33.5 / 12.9 /
      69.3 s); exchange suite 173/174 at or under live's.
-   - c2-rings-loft live.x_t import 17.5 -> 7.9 s (live 8.6; STEP 2.7): tube at 10 nm (f91b8d66) and intersection curves
+   - Mac (11-18 17:1x, release, median of 3): c2-rings-loft x_t import 2.28 s (live 8.6), STEP 0.95; cf-spur-gear
+     regenerates in 467 ms (live's full-regen per-feature sum 697 ms; qa's TICKETS row was loaded vibe2).
+   - c2-rings-loft live.x_t import 17.5 -> 7.9 s on vibex8 (live 8.6; STEP 2.7): tube at 10 nm (f91b8d66) and intersection curves
      fit to 10 nm segment by segment (aad79780, queued fbf75841; blend faces' pcurves 13.7k -> 4.6k knots, STEP 2.4k).
      Left vs STEP: ShapeFix projects every pcurve with >= 23 knots and our 11-point curves with 45; STEP's edges are
      single cubic spans with ~10 um tolerances (ours 10 nm). Next lever if needed: pcurves on the tube from on_both's
      (u, v) at the 3D curve's parameters instead of ShapeFix's projection. A/B tool: vibex8 ~/agents/dx-keep/xtab
      (run.sh, ~/tmp/dx/xtcmp.py), dump patch idea in /root/dx-scratch.
+1. DXF rows vs live2's model truth (behaviours "dx + studios (lead 11-18 ~13:45)", live/dx/drw-truth-1118): torus outlines
+   at a slant and free-form faces' outlines now SPLINE (hlr.cpp freeform_outline, queued with the stack); exchange run
+   m8 (vibex8 ~/agents/dx-keep/exch-m8.log) gives the new counts. bottle-split's rest is live's own noise (its lip
+   outline in ~18 bits). Import dialog: live's gated "Preserve source IDs" / "Upload only" are not shown to our account
+   (imp2-good.json): nothing to add.
 1. Exchange m5 (vibex8 06:0x): imports 114/130, live imports ours 46/48, ours reads ours 148/154, DXF 1/10 (duct).
    DXF rows left follow model differences: faceblend full-round fillet edges B-spline in live (blend told 06:1x),
    extension-spring Fillet 1 10/24/16 vs 11/27/18 (blend), rings-loft walls, hex mesh outline splits (live's breaks
@@ -169,8 +166,6 @@ Open, ranked:
      our loft surface +2.31 mm², core's natural_loft); after Surface Pattern 3 85 SPHERE / 45 SPLINE / 1 OTHER (ours
      86 / 42 / 1), its 13 faces under 1 mm² all SPLINE, no sphere sliver. Follows the loft: core's, parked here.
    - cf-setback-fillet: parked (lead 11-05, skasm's RABC fill patch; TICKETS SETBACK-FILL-PATCH).
-2. After ~10:17: live's answers to REQUESTS 01:47 (sm-louver scale, live's own SAT import) and 05:46; set 2 after
-   live2's refetch.
 6. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
 ## Since 19:50 (this thread)

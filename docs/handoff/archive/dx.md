@@ -3519,3 +3519,15 @@ Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live i
   109 -> 114/130, ours reads ours 148/154 both; only bottle-split / duct-multipart mesh rows, hex-bookcase IGES/SAT
   and hose 0.524m SAT (12/12/0 as live) differ; 0 crashes in 4 full-suite runs and 3 first-six reruns. A first B
   had cf-snap-hook x_t reading back as no parts (offset surface over a converted base): fixed (cbe833343).
+
+## 11-18 15:0x: config-parts block moved from the handoff
+- config-parts (vibe5 07:4x, ops-hx2, screws skipped; ~/tmp/dx/cfgparts-hx2.log): linear-rail 19/26, links 10/35, nuts
+  8/17, pulleys 9/22, sprockets 10/24, standoffs 11/32. Landed 69b8e51c (Any variable = string), 5ee5d266 (std 736).
+  Queued 16c51e2a (expressions compare strings: `"text"` where a value is expected, string variables via
+  VariableScope::get_text / ctx.fs_variables; nuts' `#name2 == "Nyloc" ? …`) and 8d3a0ec2 (a configuration checkbox is
+  a variable: sprockets' #Default_Thickness, pulleys' #Flanges). Left: live's sketches.json is at the workspace's
+  current configuration: refetched at defaultValue 07:39 (sketches.json capturedConfiguration). But live.jsonl's
+  per-feature lines are at the current configuration (nuts: Extrude 1 41.569 mm³ = M2 hex; final "M4 Nyloc" 31.406,
+  REST at M4 148.47): asked live 07:5x to retake lines at defaultValue. Rerun (ops-cp, current branch) then: linear-rail
+  19, links 10, nuts 8, pulleys 9, sprockets 11, standoffs 11 (~/tmp/dx/cfgparts-cp.log). live: screws 34 / links 28 refs absent at
+  the default configuration, standoffs Hole 2 ERROR in live.
