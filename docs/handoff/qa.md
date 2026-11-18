@@ -174,9 +174,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    skips speed lines and tags timing scenarios "(LOADED)"; qa-suites.sh touches <run>/LOADED and alerts. Absolute speed only from
    the 02:00-04:00 nightly. The 21:03 run (vibex7, load ~60) and 11:19 run (load 19) are LOADED.
 1. **17:00 cut (11-18)**: TICKETS "Release blockers for the 2026-11-18 17:00 release". The qa-cut-1615 timer runs cut-verdict.sh at
-   16:15 (cut-must.txt: fff088e5, 120ee19c, 7b8bb249, 2549be00; missing -> HOLD) -> qa-alerts + compat/cut-1118-1615.txt. Read the
+   16:15 (cut-must.txt by subject, "subject:<text>|<label>": fff088e5, 7b8bb2491, 8f6424b40, 459976266; missing -> HOLD) -> qa-alerts + compat/cut-1118-1615.txt. Read the
    ticket and corpus sections (a status that gets worse is a HOLD unless in compat/accepted.txt; cf-sheet-metal-model-plus's
-   unfold Warning is the 120ee19c regression), update the entry with GO / HOLD and its green, commit docs-only. After the publish:
+   unfold Warning was a stale app copy: SAME on 6dbd91f3), update the entry with GO / HOLD and its green, commit docs-only. After the publish:
    `systemd-run --unit qa-pub-<v> -E HOME=/root -E PATH=$PATH bash /root/qa-scratch/bin/rel-pub-all.sh 0.4.58 <v> <cand on vibex7>`.
 3. Suites: the qa-suites loop's next run picks the newest green (4-hourly). Compare each finished run with the previous one
    (suites/<run>/worse.txt from bin/suites-diff.py: models, scenarios, `failure`, `speed`, `newdiff`; assemblies.log
