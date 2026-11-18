@@ -609,27 +609,27 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 ## Interaction feel: live2's "Ours" cells on the P0 rows (live2 12:1x, green 4a69d55b, Xvfb :125, real pointer; evidence live/psui/ours-1118/)
 - [ ] **P1 FEEL-EDGE-VS-FACE-HOLD (psui)** (hover-pick-1120): a part edge over the face behind it lights at 6 px but the face takes
   over at 8 px (the edge holds only to 7); live lights at 5-6 and holds to 8-10 px.
-- [ ] (psui 12:4x: fixed with a test, land queue; qa re-runs on its green) **P1 FEEL-PLANE-FIRST-MOVE (psui)** (sel-feel): press on empty space, first move onto a default plane: ours draws the crossing
+- [x] (verified live2 20:2x on green 548d795fb / main 7302f8bd4, psui 17:09 batch: a press on empty space, first move onto Front: the plane lights, no box; the next move draws it) (psui 12:4x: fixed with a test, land queue; qa re-runs on its green) **P1 FEEL-PLANE-FIRST-MOVE (psui)** (sel-feel): press on empty space, first move onto a default plane: ours draws the crossing
   box on that move and no plane lights; live lights the plane and shows no box until the next move.
-- [ ] (live2 12:33 fresh config: opens beside the list at (246, 80), 440 x ~533; live over the list at (214, 79), 440 x 521: 32 px in x, ~12 px taller. psui 12:4x: the saved offset is shared across studios and a panel moved over the list draws under it) **P1 FEEL-MASS-PANEL-PLACE (psui)** (measure-mass-1118): Mass properties opens under the feature list, only its right part
+- [x] (verified live2 20:2x on green 548d795fb / main 7302f8bd4, psui 17:09 batch: fresh config opens at (213, ~79), 442 x ~528 (live 214, 79, 440 x 521)) (live2 12:33 fresh config: opens beside the list at (246, 80), 440 x ~533; live over the list at (214, 79), 440 x 521: 32 px in x, ~12 px taller. psui 12:4x: the saved offset is shared across studios and a panel moved over the list draws under it) **P1 FEEL-MASS-PANEL-PLACE (psui)** (measure-mass-1118): Mass properties opens under the feature list, only its right part
   showing (right edge x 405, bottom ~y 288); live puts it over the list at (214, 79), 440 x 521.
-- [ ] (psui 12:4x: fixed with a test, land queue; qa re-runs on its green) **P1 FEEL-HIDE-TIMING (psui)** (ps-feel2-1118, 60 fps capture): Y: row 269 ms, part gone 669 ms (live 73 / 436); Shift+Y 408 /
+- [x] (verified live2 20:2x on green 548d795fb / main 7302f8bd4, psui 17:09 batch: HIDE: Y row 128-139 ms, part gone 228-339 (live 73 / 436); Shift+Y row 145, back 329 (live 108 / 562)) (psui 12:4x: fixed with a test, land queue; qa re-runs on its green) **P1 FEEL-HIDE-TIMING (psui)** (ps-feel2-1118, 60 fps capture): Y: row 269 ms, part gone 669 ms (live 73 / 436); Shift+Y 408 /
   774 ms (live 108 / 562).
 - [ ] (skasm 13:05: fixed in 6389133a, queued; live2 re-measures on its green, then close) **P1 FEEL-SKETCH-REACH-OUTSIDE (psui + skasm)** (hover-p0): outside sketch mode a sketch line lights from 8 px and holds to 9; at
   a corner the whole line lights at 6 and the point never lights alone; live: line 6-7 px, point 9 px (the point beats the line).
 
 ## Interaction feel: live2's "Ours" cells, batch 2 (live2 12:3x, landed 8b5439895 / 1eae71e40; evidence live/psui/ours-1118/)
-- [ ] **P1 FEEL-ISOLATE-DEFAULT-GREY (psui)**: while a part is isolated, our Default geometry rows grey out; live's lists don't change.
+- [x] (verified live2 20:2x on green 548d795fb / main 7302f8bd4, psui 17:09 batch: Default geometry rows stay black while isolated) **P1 FEEL-ISOLATE-DEFAULT-GREY (psui)**: while a part is isolated, our Default geometry rows grey out; live's lists don't change.
 - [ ] **P1 FEEL-SUPPRESS-TIMING (psui)**: Suppress: list row 253 ms, Parts 403 ms; live 208 / 332.
 - [ ] **P2 FEEL-CHIP-TOOLTIP-PLACE (psui)**: a selection chip's tooltip shows under the pointer, over the next chip; live puts it to the chip's right.
-- [ ] **P2 FEEL-CHIP-X-TOOLTIP (psui)**: the chip's × tooltip reads the chip's name; live "Delete Edge of Extrude 1".
+- [x] (verified live2 20:2x on green 548d795fb / main 7302f8bd4, psui 17:09 batch: "Delete Edge of Extrude 1") **P2 FEEL-CHIP-X-TOOLTIP (psui)**: the chip's × tooltip reads the chip's name; live "Delete Edge of Extrude 1".
 - [ ] **P1 FEEL-HASH-LIST-DELAY (psui)**: the "#" variable list opens ~0.7 s after the key; live on the next frame.
 - [ ] (ON HOLD qa 12:33: live2 right-clicked Extrude 2, the LAST feature; live's menu with Roll to here was on a feature that wasn't last; live2 checks live's menu on a last feature first) **P1 FEEL-ROW-MENU-ROLL-TO-HERE (psui)**: a feature row's menu has no "Roll to here"; live has it.
 - [x] (closed qa 12:33: live2's fresh-config retake: 220 px (x 246-466), as live; the 392 came from /root's shared config) **P1 FEEL-FILLET-DIALOG-WIDTH (psui)**: the Fillet dialog is ~394 px wide; live 220.
 - Equal to live (live2): the two-feature suppress, the rollback release, chip click / Delete, expressions, Tab in the "#" list.
 
 ## Interaction feel: live2's "Ours" cells, batch 3 (manip-feel-1118 rows 981-983; live2 12:42, green e503ca2f, landed 9a3a9c645)
-- [ ] **P1 TRANSFORM-TRIAD-CENTRE (psui)**: the Transform triad sits on the top face's centre; live (and std findCenter) puts it at the
+- [x] (verified live2 20:2x on green 548d795fb / main 7302f8bd4, psui 17:09 batch: Translate by XYZ's triad at the bounding-box centre) **P1 TRANSFORM-TRIAD-CENTRE (psui)**: the Transform triad sits on the top face's centre; live (and std findCenter) puts it at the
   bounding-box centre (~24 px lower on the block).
 - [ ] **P1 TRANSFORM-GHOST-LOOK (psui)**: our old place is a tan translucent copy with all edges brown and the preview is the part's
   blue; live: a light grey ghost with an orange silhouette, the preview dark grey.
@@ -637,14 +637,14 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
   at 0 mm and keeps the grab offset. Minor: the last handle used stays blue after the release.
 
 ## Interaction feel: live2's "Ours" cells, batch 4 (view-tools 992-995, field-keys 1309-1313; live2 12:50, green e503ca2f, landed 422aacaa7 / ae075b8eb)
-- [ ] **P1 NAMED-VIEW-RESTORE-ANIM (psui)**: a named view restores in one step at 0.24-0.40 s; live animates, 3 frames over ~240 ms.
+- [x] (verified live2 20:2x on green 548d795fb / main 7302f8bd4, psui 17:09 batch: 3 frames over 150-230 ms, 3 runs (live 3 over ~240)) **P1 NAMED-VIEW-RESTORE-ANIM (psui)**: a named view restores in one step at 0.24-0.40 s; live animates, 3 frames over ~240 ms.
 - [ ] **P2 SECTION-PREVIEW-COLOUR (psui)**: our section view's preview cap is #E3C9A7; live's #EBBD8A / #E9C497.
 - [ ] (skasm 13:05: fixed in 6389133a, queued; live2 re-measures on its green, then close) **P1 SEARCH-TOOLS-TOOLBAR-HIGHLIGHT (skasm)**: with "Highlight tool" on in Search tools, no toolbar button lights; live lights the
   match #FCDA7F.
 - Equal to live (live2): view-tools 992, field-keys 1309-1312.
 
 ## Interaction feel: live2's "Ours" cells, batch 5 (pattern-hole-1118 rows 1268-1280: 11 equal, 2 not; live2 13:05, green e503ca2f, landed 4f4dc4df3)
-- [ ] **P2 HOLE-NOPOINT-TOOLTIP (psui)**: the Hole's no-point tooltip appends "A parameter value is not valid."; live's doesn't.
+- [x] (verified live2 20:2x on green 548d795fb / main 7302f8bd4, psui 17:09 batch: "… did not regenerate properly: No hole points selected.", nothing appended) **P2 HOLE-NOPOINT-TOOLTIP (psui)**: the Hole's no-point tooltip appends "A parameter value is not valid."; live's doesn't.
 - [ ] **P1 HOLE-CALLOUT-PLACE (psui)**: our hole callout runs on a long leader along the face's far edge; live's lies by the hole.
 
 ## Interaction feel: live2's "Ours" cells, batch 6 (sm-form row 1288; live2 13:09, green)
