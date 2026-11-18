@@ -612,7 +612,7 @@ Navigation: one wheel event = x1.058-1.059 about the pointer (5 events x1.333; l
 animate ~550-690 ms from the first frame to the last (500 ms + a frame on this debug build), arrows ~300 ms (250 ms + a frame).
 - [x] a3974c745 **verified 5076e98c** (qa 01:22: the wall's broad face hovered in Flange lights nothing, its bend strip lights) **P1 SMFEEL-FLANGE-BROAD-FACE (skasm)**: in Flange's "Edges or side faces to flange" the front wall's broad face lights (outlined
   orange) at its centre; live never lights the walls' or the bottom's broad faces there.
-- [x] 591643fc4 **verified 5076e98c** (qa 01:55, vibex8: face + edge menu ends "Add appearance to face…") **P2 MENUFEEL-FACE-EDGE (psui)**: a face + an edge selected: no "Add appearance to face…" (live keeps it). psui: fixed in 2234f511.
+- [x] 591643fc4 **verified 5076e98c** (qa 01:52, vibex8: face + edge menu ends "Add appearance to face…") **P2 MENUFEEL-FACE-EDGE (psui)**: a face + an edge selected: no "Add appearance to face…" (live keeps it). psui: fixed in 2234f511.
 - [ ] **P2 HOVER-LEAVES-WINDOW (psui)**: a face hovered just before the pointer leaves the window stays outlined (twice, sm-box and
   block-fillet).
 - Joint rows (skasm's route: Bend A's row menu › "Convert Bend A to rip"): "Modify joint 1" added, Joint A | Rip ▾ | Edge joint ▾ under
