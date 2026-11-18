@@ -912,6 +912,12 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
   Circular pattern 1 Error -> Ok, part as live (155 / 350 / 192, 7182.19 mm3); cf-sheet-metal-model-plus back to 0.4.57's Info (skasm
   7b8bb2491); c2-surf-intro-simple 3 -> 4 bodies (core 4ca9526a1 "one surface per chain", live 6); c2-loft-paths-guides Part 1 44/103/65
   -> 34/93/67, volume +20 mm3 (core e841ff485 path loft; live 38/94/64, 6388074 mm3: neither build matches live yet).
+- **Verdict 16:40 (qa): GO on green 515102325** (the 16:15 timer's NO VERDICT: the green moved to 51510232 mid-check). All 8 must-carry
+  in (incl. a98d25431, 0a50fd4b5, core's bcbe6b0f0 + 125e4d410). Impeller vs 0.4.58: core's 27b7836e0 had left 16 parts and no main body
+  (feature 47; bisected 14:58, core reverted it in 125e4d410); on 515102325 every status as 0.4.58 except Fillet 4 Error -> Ok (blend
+  7c60d5ea8: 105929.52 mm3, live 105929.03), Part 1 10 parts 95574 mm3 (0.4.58 95842; follows Fillet 4). hats / the dock SAME. Dock tab
+  return (125e4d41 release build, vibex7 load 16-22): tab drawn 164 vs v0.4.53 134 ms, no trailing frames (all <= 208; 0.4.53 806 / 730).
+  CI 44311059310 Windows Test success. Open, not blocking: P0 FORM-PREVIEW-SLOWER (live2, skasm); 51510232's corpus section still running.
 - No other open release blocker at 06:25. v0.4.58 = 9c015658 + docs (qa GO 04:46); its published check runs when release.yml publishes.
 - Re-checks owed on the candidate: the dock tab return at vibex7 load < 2 (qa-wait-67eb: fff088e5 green vs 0.4.53), the hover flow
   (uh/uh2.sh, release check 4), user documents + f197 + tickets vs 0.4.58 (cut-check at 16:15).
