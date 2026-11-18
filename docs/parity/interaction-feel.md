@@ -1322,6 +1322,13 @@ feel): Hole dialog follow-up"; times on live's software-GL lane (preview times a
 | Dimension placement (D, one edge): the line at the pointer's height (text middle on the pointer) either side of the edge and inside the view; the text follows the pointer's x everywhere, inside the extension lines too | ≠ (green 1000e2a3f): the line follows the pointer's height (=, ~2 px lower), the text stays centred between the extension lines wherever the pointer is (900 px, 87 px past the end: still centred) | missing |
 | Dimension placement arrows: text clear inside: arrows inside; text against an extension line (pointer 13 / 19 px inside an end): both arrows outside pointing in (53 / 59 px: inside); text past an end: arrows inside, the line carried out under the text | ≠ (green 1000e2a3f): arrows always inside, the text never leaves the middle | missing |
 
+### asm-fixed-drag-1118 (dragging a fixed instance, live icons2 10-23 + green 87edba241, live2 11-18) [asm]
+
+| Finding | Ours | Test |
+|---|---|---|
+| A press-drag on a fixed instance: the cursor `no-drop` and a small fix glyph at the pointer, nothing moves, no toast; hovering it (no press) keeps the default cursor (behaviours "icons2 (10-23)" (b)) | = during the drag (two-blocks, Part 1 <1>: the arrow with ⊘ and the fix glyph, the block stays); ≠ after it: the ⊘ cursor stays after the release, through moves over that instance and empty space, until the pointer next reaches an instance's face (live: back to the default at the release) | missing |
+| A free instance's drag keeps the default cursor, no snap without Snap mode (icons2 (a)) | = (the default arrow) | missing |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
