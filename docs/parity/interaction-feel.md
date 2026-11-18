@@ -989,10 +989,10 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | Keys: Y hide selected, Shift+Y show selected, P, Shift+P, Shift+H, K, Shift+I, Shift+V, Shift+X | = | app-core shortcut_sheet::tests::shortcut_sheet_lists_every_part_studio_key |
 | Shift+Y with nothing selected does nothing; with a hidden part's row selected shows it | = | editing matrix "Y / Shift+Y with nothing selected or under the pointer" (the selected-row case: missing) |
 | A hidden part's row menu: Show, Show all parts; the empty-space menu with hidden parts: Show all, Show all parts | = | list matrix "menu / a hidden part" (the empty-space menu: missing) |
-| Render-mode and perspective switches change the picture in one step, not animated; perspective 45° | ? | missing |
-| Named views: a 237 px panel; a restore animated (~240 ms on live's slow lane) | ? | missing |
+| Render-mode and perspective switches change the picture in one step, not animated; perspective 45° | = (green e503ca2f, live2 ours-1118 view: one changed frame at 60 fps for Perspective on / off at 224 / 264 ms, Translucent / Shaded at 367 / 288 ms; Field of view default 45°) | missing |
+| Named views: a 237 px panel; a restore animated (~240 ms on live's slow lane) | ≠ (green e503ca2f): the panel 265 px wide as live's (live's screenshot n1-dialog: 240–505; the 237 px was its title element), "Select a view" + ⊗ after a save: =; a restore is one step (one changed frame at 0.24 / 0.40 s), live animates it (3 frames over ~240 ms) | missing |
 | Section view: the plane's icon is "Select default plane"; one drag arrow, a value box at it while dragging (0.1 mm steps), typing in it moves the plane | = | sketch_ui_tests::another_section_planes_arrow_drags_it (the box and typing: missing) |
-| While the dialog is open the cut faces are a flat light-orange preview; after ✓ the caps are hatched in the part's colour | ? | missing |
+| While the dialog is open the cut faces are a flat light-orange preview; after ✓ the caps are hatched in the part's colour | ≠ (green e503ca2f): flat preview with faint lines and a black outline, the committed caps hatched in the part's colour (=); but our preview is paler, #E3C9A7, live #EBBD8A / #E9C497 | missing |
 | Turn off section view; Shift+X again reopens with the last plane and offset | = | sketch_ui_tests::shift_x_after_turning_off_restores_the_last_section |
 
 ### sketch-entry-1118 (sketch entry and exit, live 11-18 02:06) [psui + skasm]
