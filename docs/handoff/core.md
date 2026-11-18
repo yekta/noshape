@@ -1,65 +1,65 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-18 09:09 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-18 10:38 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: core builds on vibex7 (rb-hosts); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
 ## In flight
-- **Impeller upstream P0 (lead): QUEUED ea269148 (09:05, vibe2).** A sketch circle running
-  along imprinted face arcs that go all round it keeps the arcs' ends as joints (SketchResult::joints): the profile isn't
-  merged there, its arcs are kept-edge marked, op_prism marks the swept side edges kept, face_joins skips kept edges.
-  Extrude impellerraum 41/106/66 (live 59/158/100: inner wall's 15 spline pieces not chased), Extrude 6 Part 2 7/14/8
-  (live 21/57/38), Move face 1 OK at live's volume, Boolean 3 43/108/66 at live's volume and area. Fillet 4 still ERROR
-  "Failed to fillet selections." (blend's; f35 input volume 106197.8 vs live 105929.0). T1 sketch_assoc::a_circle_along_
-  a_faces_split_rim_keeps_the_split_in_its_wall. Pair mb vs ij CLEAN 08:41 (only impeller changes, 0 newly invalid;
-  after it: Fillet 4 ERROR (blend's), Move face 2 ERROR, Delete face 2 ERROR (was a wrong OK)); g++-13 OK.
-  Move face 2 waits on Fillet 4: its pick = JOy (226.35 mm2) + a 0.47 mm2 sliver on x 6 mm at z -3.96 beside JOV
-  that live's fillet rounds (blend told). Dump vibex7 ~/tmp/core/mf2dump/offsetfaces-33, probe vibex8 ./offp. Fillet 4 check for blend: dump vibex7 ~/tmp/core/f4dump (ops binary all-93b192dee51da682), compare
-  the picked edge with live JOV (OTHER, 54.867 mm, mid (23.724, 0.003, -4.0) mm) via probe vibex8 ~/tmp/core/probefan/ed;
-  match -> send blend the dump, else upstream = mine. Then Move face 2.
-- **Landed 11-18:** core-oc c703c330 + b42f699a8 (05:55, adaptive offset check + sweep start cap); pulleys gated
-  406422d74 + Loft 3 e841ff485 (06:27; skasm told).
-- **Fan-blade P0 (fix forward):** main after core-oc 1484 ms vs 0.4.56 730 (vibex8, same run); Boolean 2 877 vs 122
-  (live 364). bool's b5b566884 drops the wasted Rust attempt; my lever: per-tool offsets' edges 52 + check 24 ms
-  (NOSHAPE_OFFSET_DEBUG=1). A/B: vibex8 ~/tmp/core/{rel56/noshape-cli,udoc/cli-main,fansaved}, qa's ab-feat.py.
-- **Nuts: bool2's graze fix ebc58e0be (not landed, gates after its stack) alone makes Sweep 1 OK with live's counts
-  (one face a B-spline where live has a cylinder).** When bool2 says it landed: re-run nuts on main, compare
-  volume/area with live (135.268 mm3, 29 faces). The crest move (core-rp nuts3 59df02227) is DROPPED: without bool2's
-  fix OCCT then returns the uncut part as OK (143.88 mm3, wrong), and with it bool measured 35 faces vs live 29.
-  Exact cylinders (nuts2 7fec58496) dropped too. Cases vibex8 ~/agents/core-keep/nuts/.
-- **Pair 6 (vibex7 slot, full suite): mb (main 33c575415) vs ms = core-oc msx (33c575415 + 81de7a342 + 62525922e)**
-  (~/tmp/core/pair6.sh, p6-cmp.out, p6.done; land the branch commits below after it's clean):
-  - core-oc movepl f4bee47f1 (on main a8b7f0d6c): Move face Offset of planes facing one way = k::tweak_faces translation,
-    every face named Offset(its old name) as OCCT's offset; tried before the freeform booleans. Flansch (vorne)
-    verbreitern 835 -> 11 ms (live 6); Flansch verbreitern still booleans 136 ms (tweak declines; live 10). T1
-    features_a::move_face_offset_of_a_plane_between_sloping_sides.
-  - surf1 461305f33 (core-rv; = 9f5245ac0 on movepl): surface Extrude one surface per chain (surf-intro-simple
-    Extrude 1 = live; Revolve 1 ERROR on main too). T1 features_a::a_surface_extrude_makes_one_surface_per_chain_of_curves.
-- **Fill 1 (surf-intro-examples) research, parked:** edges dumped (core-tw uncommitted fill-dump: the dump now holds
-  the edges; vibex8 ~/tmp/core/probefan/fill1.brep, probe ./fillp = /root/core-scratch/brepq/fillp.cpp). Live's centre
-  (1.62, 68.57, 20.92) mm; all ours sit 9-15 mm lower: plate 61909 mm2 (balloons), Coons 23786 (box z 89.6),
-  harmonic 22552 / biharmonic 22708 (box = live's, centre z 6.1). Parasolid's G0 fill isn't any of those.
+- **Background jobs (11-18 10:37), results land on vibex7 ~/tmp/core:**
+  - Pair 7 `pair7.sh ms mt` (slot queue, full suite): logs p7-ms.log / p7-mt.log, comparison p7-cmp.out, p7.done.
+    ms = core-oc msx (33c575415 + 81de7a342 + 62525922e = the landed pair-6 commits); mt = + e9caeead0 (offset_planes).
+  - Pair `pair5.sh pm pt <42 sheet/wire docs>` (slot queue): logs p4-pm.log / p4-pt.log, comparison p5-cmp.out, p5.done.
+    pm = main 485943a92, pt = + core-rv pairtype 37b1b5cad (parity pairing by body kind).
+  - Kill nothing of these by pid unless it is yours and checked (pid > 1, cmdline mine).
+- **LANDED 11-18:** impeller rim splits 27b7836e0 (09:33); Move face Offset of planes facing one way 77ba403e7 + surface
+  Extrude one surface per chain 4ca9526a1 (pair 6 clean, ~10:30); handoff 3057abcf0.
+- **Impeller (lead P0) after 27b7836e0:** Move face 1 and Boolean 3 at live's volume (Boolean 3 43/108/66 vs live 64/189:
+  the inner wall's 15 spline pieces not chased). Fillet 4 ERROR = blend's (its input edge JOV + faces JOm/JOW match
+  live within 0.05 mm2; dump vibex7 ~/agents/core-keep/f4/fillet-32.*). **Move face 2 waits on Fillet 4:** its pick =
+  JOy (226.35 mm2, live 226.37) + a 0.47 mm2 sliver on x 6 mm at z -3.96 beside JOV that live's fillet rounds (blend
+  told; dump vibex7 ~/tmp/core/mf2dump/offsetfaces-33, probe vibex8 ~/tmp/core/probefan/offp). Delete face 2 now ERROR
+  (was a wrong OK); re-time Delete face 2 / Extrude Bohrungssitz once the 65-face part reaches them.
+- **Pair 7 -> land e9caeead0 (= core-oc movepl ba85efd8c, rebase on main; C++: g++-13 first):** k::offset_planes (planes
+  of any normals offset one after another, a FaceTweak each) + FaceTweak runs a staying edge's trimmed curve (an
+  earlier tweak's) on to the moved face. Without it a +x then +y offset lost a corner wedge (5833 vs 6250 mm3, VALID):
+  any tweak on an already tweaked part could. T1 features_a::move_face_offset_of_three_sides.
+- **Flansch verbreitern (impeller, qa speed list: 126-283 ms, live 10):** offsets 3 faces, 2 planes + 1 linear
+  extrusion, so offset_planes doesn't apply; it stays on the booleans (offset_by_booleans). Next: offset an extrusion
+  face in the tweak (its profile curve offset, extruded). Flansch (vorne) verbreitern done: 835 -> 7-11 ms (live 6).
+- **Parity pairing (core-rv pairtype 37b1b5cad, on main 485943a92):** differences() pairs a live part with ours of its
+  body kind first. manualblend Sweep 2 (skasm via lead): live's wire "Curve 2" was paired with our sheet swept along it
+  (both volume 0, the sheet's box nearer); our own Curve 2 wire is > 13 mm off live's box: that is the real first
+  difference (skasm's translator / Sketch 5). T1 parity::a_wire_pairs_with_our_wire_before_a_sheet_beside_it. If pm/pt
+  shows only expected report changes: land, tell skasm (18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6).
+- **Nuts: waits for bool2's graze fix ebc58e0be** (not landed; bool2 tells me). Alone it makes Sweep 1 OK with live's
+  counts (one face a B-spline where live has a cylinder). Then re-run nuts on main vs live 135.268 mm3 / 29 faces. My
+  crest move (core-rp nuts3 59df02227) and exact cylinders (nuts2 7fec58496) are DROPPED (wrong OK without bool2's fix).
+  Cases vibex8 ~/agents/core-keep/nuts/ (cutp).
+- **DRIVEN-PATTERN-SWEEP (P1, live 11-18 geo-1118/sweep1-loft-guide-driven-pattern.json):** c2-loft-guide-curves-driven-
+  pattern matches to the end on our 11-18 binary (11/11, Sweep 1 66 ms; live: 3 faces, 0.0798489 mm3, profile 21.7°
+  off normal, profileControl NONE). Nothing open unless someone reports a case.
+- **Fan-blade P0 (fix forward):** main after core-oc 1484 ms vs 0.4.56 730; Boolean 2 877 vs 122 (live 364). bool's
+  b5b566884 drops the wasted Rust attempt; my lever: per-tool offsets' edges 52 + check 24 ms (NOSHAPE_OFFSET_DEBUG=1).
+- **Extrude 4 (impeller, 490 ms vs 41):** op_prism_until's split on one face, a -3 mm offset of a 117x10 bicubic B-spline
+  (footprint_patch declines: the face's boundary runs inside the footprint box; probe vibex8 ./pup). Parked.
+- **Fill 1 (surf-intro-examples) research, parked:** live 11-18 (live/core/geo-1118/fill1-surf-intro.json): a trimmed
+  patch of a larger bicubic 14x18 B-spline (uv (0,0) = pole 1, outside the boundary), face edges OTHER on it, box z up
+  to 54.32 > every boundary point (overshoots 13 mm). Our edges = live's (ends, lengths). Tries vs live's centre
+  (1.624, 68.572, 20.921): OCCT plate balloons (61909 mm2); Coons 23786 but box z 89.6; harmonic / biharmonic on the
+  Coons square z 6.1; thin-plate spline z(x,y) over the boundary samples 17.14 (grid median 2.6 mm, max 15):
+  closest, still not it. Probes vibex8 ~/tmp/core/probefan ./fillp, ./edgs; scratch fill1-edges.txt.
 - **Loft 4 PARKED (core-tw 7eb54c0e5):** plane-crossing retry gives live's volume but area +0.35 %, box y -452.45 vs
   -444.55: wrong rule, not landable. (core-tw also holds the uncommitted fill-dump edit.)
-- **Re-time once the 65-face part reaches them:** impeller Delete face 2 (live 12 ms; 4.8 s ours = op_defeature, 3.0 s
-  Edge-Face) and Extrude Bohrungssitz Ansaugflansch (live 155; 3.2 s ours = op_boolean).
 - knifehandle left: Fillet 3 7/15/10 vs 6/12/8 -> Chamfer 1 wrong as Ok (9286 vs 10424 mm3): blend's (agreed 11-18 03:0x).
   Sweep 2 area 18225.81 vs 18227.26 mm2 (mine, small). TRANSLATE's rigid branch through the tweak; Delete face 2.
-- **Shipped in v0.4.57:** scissor-lift revert + rack-pinion frame fix (on main since 7a174ae2). Re-land the pattern
-  surface join later with fed22d as its test (/root/core-scratch/sl-makesolid-wip.patch).
 - **(4) local Delete face rebuild** once Delete face 2 sees live's faces (blend's Halter build feeds it); src
   /root/core-scratch/brepq/lr*.cpp (B-spline neighbour 1.55 mm2 off). Projection WIP parked:
   /root/core-scratch/proj-tight.patch.
-- **qa 11-18 per-feature >5x live (release main 7db466c62 vibex8, raw /root/qa-scratch/feat3/ab.jsonl):** impeller
-  Flansch (vorne) verbreitern 817 vs 6.5 ms, Flansch verbreitern 289 vs 8 (early moveFaces: input = live's, do these
-  first), Extrude 4 693 vs 41.5, Extrude 3 251 vs 23, Extrude 1 171 vs 25; Delete face 2 4032 vs 12 and Extrude
-  Bohrungssitz Ansaugflansch 5632 vs 154.5 wait for the right input (lead); valve Extrude 1 95 vs 10, Extrude 2 71 vs 11;
-  knife Extrude 8 89 vs 10, Revolve 1 54 vs 10.5.
-- **skasm via lead 11-18 (after impeller upstream / fan-blade / nuts):** (1) c2-surf-intro-simple Extrude 1 (surface
-  extrude of a spline + a separate rectangle): live one surface body per connected chain (3 parts, the rectangle a
-  4/12/8 tube), ours one body 5/16/12 (2 parts). (2) c2-surf-intro-examples Fill 1, inputs now = live's: area 61911 vs
-  live 23827 mm2, box z -105..54 vs live -33..55 (see Fill G0 notes below).
+- **qa 11-18 speed list (live ms):** impeller Flansch (vorne) verbreitern fixed (land1); Flansch verbreitern (pair 7 note);
+  Extrude 4 690 vs 41 = prism_until split on a -3 mm offset B-spline (mine, parked); Extrude 3 / 1 = bool's Boolean;
+  valve Extrude 1/2, knife Extrude 8 / Revolve 1: not looked at. Raw /root/qa-scratch/feat3/ab.jsonl.
+- **skasm 11-18:** surf-intro-simple Extrude 1 fixed (land1); Fill 1 parked (above); manualblend Sweep 2 naming = parity pairing (above).
 - **Queue after those:**
   1. qa: c2-fan-blade-sweep Boolean 2 (~1.2 s loaded vs live 364; 75-88 ms before my exact offsets, which fixed the
      volume): offsets 2 x ~176 ms in parallel (edges 73, volume check 62 -> ~17 with adaptive GProp: core-oc 482163a60), noshape Boolean decline ~300 ms + OCCT ~1.3 s on the exact offset faces (bool's). B-spline
@@ -113,8 +113,8 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   corners, 10293.9930 mm2, centre (50,50,7.5). Next after the impeller.
 - fan-blade Boolean 2: 56/139/84 with core-next (live 56/143/88): +2 edges +2 vertices per hole need live's x_t
   (now at /root/parity/models/c2-fan-blade-sweep/live-base.x_t, 11-17). Probe vibe5 (down 11-17) ~/tmp/core/probefan (src /root/core-scratch/brepq).
-- Worktrees: core-bis (impeller a08b41153; docs lands, Mac timing .mac.sh), core-oc (main base binaries),
-  core-rp (nuts, clean 56328dd0b), core-tw (Loft 4 7eb54c0e5), core-trace (core-pipe2), core-rv (landed, free).
+- Worktrees: core-bis (docs lands, Mac timing), core-oc (movepl / msx: offset_planes), core-rv (pairtype parity),
+  core-rp (free: nuts dropped), core-tw (Loft 4 + uncommitted fill dump), core-trace (core-pipe2).
 - rocker-enclosure-sm Extrude 2 (next): Sketch 4's four Use circles (PROJECTED, live's external edges at x 45-60 mm,
   not on our part) come out as two: Extrude 2 names one region twice and cuts 2 holes of 4. Sketch translation:
   written into docs/handoff/skasm.md (landed 11-16).
