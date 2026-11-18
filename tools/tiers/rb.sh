@@ -23,6 +23,8 @@ if [ -z "$host" ]; then
 fi
 host=${host:-vibex7}
 [ "$host" != vibex7 ] && ! ssh -o BatchMode=yes -o ConnectTimeout=5 "$host" true 2>/dev/null && { echo "== rb: $host unreachable, using vibex7" >&2; host=vibex7; }
+# On the user's Mac everything of ours lives in ~/noshape-host (no links in its home folder).
+env=noshape-env.sh; [ "$host" = mac ] && { dir="noshape-host/$dir"; env=noshape-host/env.sh; }
 get=()
 while [ "${1:-}" = --get ]; do get+=("$2"); shift 2; done
 [ $# -gt 0 ] || { echo "usage: rb.sh [--get <bin>]... <command...>"; exit 2; }
@@ -36,7 +38,7 @@ cmd=$(printf '%q ' "$@")
 # The remote run stops when this ssh does (-tt gives it a terminal, so a killed rb.sh kills the build there too).
 # On the user's Mac our runs take the lowest priority: the user's own apps (and Noshape itself) stay responsive.
 nl=5; [ "$host" = mac ] && nl=19
-ssh -q -tt -o BatchMode=yes "$host" ". ~/noshape-env.sh; export CARGO_TARGET_DIR=~/$dir/target; \
+ssh -q -tt -o BatchMode=yes "$host" ". ~/$env; export CARGO_TARGET_DIR=~/$dir/target; \
   [ -n \"\${NOSHAPE_CONFIG_DIR:-}\" ] || export NOSHAPE_CONFIG_DIR=\$(mktemp -d -t noshape-config-XXXXXX); \
   cd ~/$dir/src && nice -n $nl $cmd" 2>&1 | tr -d '\r'
 rc=${PIPESTATUS[0]}
