@@ -2451,13 +2451,16 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 }
             }
             stop_if_cancelled()?;
+            // (The walls a loop of bends can't lay flat.)
+            let clashes = unfold(def, def.k_factor, &topo).map(|u| u.clashes).unwrap_or_default();
             for (k, p) in parts.into_iter().enumerate() {
                 let walls: Vec<(usize, Shape)> = wall_flats.iter().filter(|w| p.members.contains(&w.0)).cloned().collect();
                 let own: Vec<Strip> = strips.iter().filter(|s| p.members.contains(&s.wall_a)).cloned().collect();
                 let own_forms: Vec<FormShapes> = form_shapes.iter().filter(|f| p.members.contains(&f.0)).cloned().collect();
                 let own_cuts: Vec<(usize, Vec<Shape>)> = cut_shapes.iter().filter(|f| p.members.contains(&f.0)).cloned().collect();
-                // Bends joining the part's walls round a loop: no flat (live: "Sheet metal model cannot be unfolded.").
-                let looped = bends_close_a_loop(def, &topo, &p.members);
+                // Bends joining the part's walls round a loop that can't lie flat: no flat (live: "Sheet metal model
+                // cannot be unfolded.").
+                let looped = clashes.iter().any(|w| p.members.contains(w));
                 let flat = if looped { None } else { flat_of(def, &topo, &walls, &own, &own_forms, &own_cuts) };
                 // A centerline wire per bend, in the flat (live 2015: "Bend line 1", hidden), for std (pcbEnd).
                 let mut wires = Vec::new();
@@ -2925,22 +2928,6 @@ fn sketch_curves(s: &crate::regen::context::SketchResult) -> Vec<(Vec<DVec3>, bo
         .collect()
 }
 
-/// The definition's bends join `members` (a part's walls) round a loop.
-fn bends_close_a_loop(def: &Definition, topo: &Topo, members: &[usize]) -> bool {
-    let mut root: BTreeMap<usize, usize> = BTreeMap::new();
-    fn find(root: &mut BTreeMap<usize, usize>, mut i: usize) -> usize {
-        while let Some(&r) = root.get(&i).filter(|r| **r != i) {
-            i = r;
-        }
-        i
-    }
-    def.bends.keys().filter_map(|e| topo.edge_faces.get(*e)).filter(|fs| fs.len() == 2).map(|fs| (fs[0] as usize, fs[1] as usize)).filter(|(a, b)| a != b && members.contains(a) && members.contains(b)).any(|(a, b)| {
-        let (ra, rb) = (find(&mut root, a), find(&mut root, b));
-        root.insert(ra, rb);
-        ra == rb
-    })
-}
-
 fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips: &[Strip], forms: &[FormShapes], cuts: &[(usize, Vec<Shape>)]) -> Option<crate::sheetmetal::FlatPattern> {
     let unfolded = unfold(def, def.k_factor, topo).ok()?;
     let thickness = def.front + def.back;
@@ -3158,6 +3145,10 @@ fn flat_place(def: &Definition, topo: &Topo, unfolded: &Unfolded) -> Option<crat
 struct Unfolded {
     walls: BTreeMap<usize, glam::DMat4>,
     bends: BTreeMap<usize, glam::DMat4>,
+    /// Walls a second bend path places elsewhere than the first: the bends close a loop that can't lie flat (live
+    /// sm-feel-1117: a box's corner rip made a bend). A consistent loop (a cut splitting the plate between two flanges'
+    /// bends, qa4 S1) places them alike.
+    clashes: Vec<usize>,
 }
 
 fn rotation_about(point: DVec3, axis: DVec3, angle: f64) -> glam::DMat4 {
@@ -3167,8 +3158,9 @@ fn rotation_about(point: DVec3, axis: DVec3, angle: f64) -> glam::DMat4 {
 fn unfold(def: &Definition, k_factor: f64, topo: &Topo) -> FResult<Unfolded> {
     let mut walls = BTreeMap::new();
     let mut bends = BTreeMap::new();
+    let mut clashes = Vec::new();
     if topo.faces.is_empty() {
-        return Ok(Unfolded { walls, bends });
+        return Ok(Unfolded { walls, bends, clashes });
     }
     // Each part's first wall (walls only joined by rips are separate parts):
     // its definition normal to -z, its plane to z = 0.
@@ -3177,14 +3169,14 @@ fn unfold(def: &Definition, k_factor: f64, topo: &Topo) -> FResult<Unfolded> {
         if walls.contains_key(&root) || def.rolled.contains_key(&root) || !matches!(topo.faces[root].face_plane(), Ok(Some(_))) {
             continue;
         }
-        place_from(def, k_factor, topo, root, &mut walls, &mut bends)?;
+        place_from(def, k_factor, topo, root, &mut walls, &mut bends, &mut clashes)?;
     }
-    Ok(Unfolded { walls, bends })
+    Ok(Unfolded { walls, bends, clashes })
 }
 
 /// Place wall `root` (normal to -z, plane z = 0) and every wall reached from
 /// it across bends.
-fn place_from(def: &Definition, k_factor: f64, topo: &Topo, root: usize, walls: &mut BTreeMap<usize, glam::DMat4>, bends: &mut BTreeMap<usize, glam::DMat4>) -> FResult<()> {
+fn place_from(def: &Definition, k_factor: f64, topo: &Topo, root: usize, walls: &mut BTreeMap<usize, glam::DMat4>, bends: &mut BTreeMap<usize, glam::DMat4>, clashes: &mut Vec<usize>) -> FResult<()> {
     let thickness = def.front + def.back;
     let (p0, n0) = face_normal(&topo.faces[root])?;
     let target = DVec3::NEG_Z;
@@ -3220,9 +3212,16 @@ fn place_from(def: &Definition, k_factor: f64, topo: &Topo, root: usize, walls: 
             let sign = if turned(1.0) >= turned(-1.0) { 1.0 } else { -1.0 };
             let step = |f: f64| glam::DMat4::from_translation(-a1 * developed * f) * rotation_about(b.axis_point, b.dir, sign * b.angle * f);
             bends.entry(e).or_insert(base * step(0.5));
-            if let std::collections::btree_map::Entry::Vacant(v) = walls.entry(w2) {
-                v.insert(base * step(1.0));
-                queue.push(w2);
+            match walls.entry(w2) {
+                std::collections::btree_map::Entry::Vacant(v) => {
+                    v.insert(base * step(1.0));
+                    queue.push(w2);
+                }
+                std::collections::btree_map::Entry::Occupied(o) => {
+                    if !base.mul_mat4(&step(1.0)).abs_diff_eq(*o.get(), 1e-6) && !clashes.contains(&w2) {
+                        clashes.push(w2);
+                    }
+                }
             }
         }
         // Coplanar neighbours (a rip splitting a wall) lie where they are.

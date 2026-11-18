@@ -478,14 +478,26 @@ impl SheetMetalData {
             }
             i
         }
-        self.bends.iter().filter_map(|b| Some((b.parent, b.child?))).any(|(a, b)| {
-            if a >= root.len() || b >= root.len() {
-                return false;
+        // (Pieces of one bend, split by a cut, join the same walls about one axis: one joint.)
+        let mut joined: Vec<((usize, usize), glam::DVec3, glam::DVec3)> = Vec::new();
+        let same_axis = |o: glam::DVec3, a: glam::DVec3, p: glam::DVec3, d: glam::DVec3| (o - p).cross(d).length() <= 1e-9 && a.cross(d).length() <= 1e-9 * d.length().max(1e-12);
+        for bend in &self.bends {
+            let Some(child) = bend.child else { continue };
+            let (a, b) = (bend.parent.min(child), bend.parent.max(child));
+            if a == b || b >= root.len() {
+                continue;
             }
+            if joined.iter().any(|(pair, p, d)| *pair == (a, b) && same_axis(bend.origin, bend.axis, *p, *d)) {
+                continue;
+            }
+            joined.push(((a, b), bend.origin, bend.axis));
             let (ra, rb) = (find(&mut root, a), find(&mut root, b));
+            if ra == rb {
+                return true;
+            }
             root[ra] = rb;
-            ra == rb
-        })
+        }
+        false
     }
 
     /// Wall owning a face: (wall index, face is on the reference side).
