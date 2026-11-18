@@ -106,6 +106,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    56.31 / 146.31); the Mass button leaves its panel open; `[` over Mass opens Measure empty; the spinner (900 ms delay, 50 px box).
    Selection re-run 00:57 on 591643fc: RELATED-STAYS / HIDDEN-SKETCH-HOVER / PLANE-DEFAULT-GEOMETRY verified; DBLCLICK-FACE-SKETCH
    still open (sent to skasm 01:03). 05:00 must-carry also: core P0 FACES-PATTERN-SLOTS (grep fix / revert of 2c51590b0, 215c12d6b).
+0k. **Configurations feel (lead 01:05)**: TICKETS "Configurations vs live2's 11-18 capture" (1 P1 + 2 P2 + 1 P3 studios); doc built by
+   CLI (config add_input --kind list / add_option / configure / set_value), session his.sh (:670) with docs/cfg.noshape.
+   Green 5076e98c (01:15) has psui 8d2e0056, skasm a6236ed3a stack, psui 591643fc: run the owed re-checks (0i, 0j) on it.
+   Loft: qa-lp-verify done 01:10 on 0f7610c8 (revert in): Mirror 1 37/83/51 vs live 27/67/47 (Loft 3 20/42/26 vs 15/33/23);
+   volume not measured.
 0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
    + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
    nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).
