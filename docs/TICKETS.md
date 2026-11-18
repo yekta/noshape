@@ -559,6 +559,22 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Configurations vs live2's 11-18 capture (qa 01:25, green 5076e98c, vibex6 Xvfb, real pointer and keys)
+two-blocks with a List "Configuration" (Default / A / B, Extrude 1 Depth 20 / 25 / 40 mm, CLI), then the UI. Sheet: qa-scratch/
+tickets/cfg-feel-sheet.png (vibex6 ~/agents/qa-keep/cfg-feel). Match live: the panel docks at the right, ~695 of 1440 px, full height,
+the strip at its left edge (it is the strip's 2nd button, as live's highlighted one; live2's "3rd" is a miscount); the feature list's
+Configurations box with "Configuration [Default ▾]"; a duplicate "A" typed + Enter is added silently; Enter on an empty name adds
+nothing; the row menu Switch to "A" · Set as default · Duplicate row · Move up · Move down · Delete row (no Move down on the last
+row); "abc" / "-5" in an inactive row show plain, no error; switched to the "abc" row: Extrude 1 red, error mark by Features,
+Parts (1), cell bold; switching back clears at once and never greys rows (6 shots in the first second).
+- [ ] **P1 CFGFEEL-ROW-CLICK-SWITCHES (studios)**: a plain click on a row's name switches to it (row B: the box says B, Depth 40 mm
+  applied); live: a row click doesn't switch, only the row menu's Switch to or the feature list's box.
+- [ ] **P2 CFGFEEL-BAD-CELL-PINK (studios)**: the active row's "abc" cell stays white (bold only); live tints it pink.
+- [ ] **P2 CFGFEEL-CELL-LOOK (studios)**: configured cells show the bare value; live's read "› 10 mm" with a ± dimension icon at the
+  right.
+- [ ] **P3 CFGFEEL-DUP-ID (studios)**: CLI config add_option "A" twice gives the id "A_2"; live stores "A0" (FeatureScript ids).
+- Not judged: a row added after a parameter is configured shows an empty Depth cell in ours (live2 added its rows before configuring).
+
 ## Versions and history panel vs live's 11-17 capture (qa 00:45, green 0f7610c83, vibex6 Xvfb, real pointer)
 Document as live's set-up (CLI: 40 Extrude depth edits, V1 / V2 / V3 at 6 / 16 / 31, branch B1 from V1; qa-scratch/hi his.sh, :670).
 Sheet: qa-scratch/tickets/history-feel-sheet.png (vibex6 ~/agents/qa-keep/history-feel). Match live: rows B1, Main, V3, V2, V1,
