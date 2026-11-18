@@ -6795,6 +6795,109 @@ static bool edges_apart(const OcShape& a, const OcShape& b)
   return true;
 }
 
+// An offset face of one argument grazing another's circle: its farthest or nearest point from the circle's axis within
+// 1 um of its radius, across the circle's plane (c2-fan-blade-sweep's Boolean 2: a bolt's 0.2 mm offset thread, its
+// crest at r 4.0000 to 4.0002 mm, through the r 4 rims of the bosses' countersinks). A tangent contact, OCCT's (lead
+// 11-15); ours found it only at its end, the result non-manifold (36 ms on a Mac, 168 on a loaded host). By points
+// over the face (9 x 9) and along its edges (17 each). (Offset faces only: a thread's B-spline faces on a nut's bore,
+// c2-config-parts-nuts' Sweep 1, are ours.)
+static bool offset_grazes_a_circle(const std::vector<TopoDS_Shape>& args)
+{
+  struct Circle
+  {
+    gp_Circ c;
+    Bnd_Box box;
+    size_t  arg;
+  };
+  std::vector<Circle> circles;
+  bool                free = false;
+  for (size_t i = 0; i < args.size(); ++i)
+  {
+    for (TopExp_Explorer e(args[i], TopAbs_FACE); e.More() && !free; e.Next())
+    {
+      const GeomAbs_SurfaceType t = BRepAdaptor_Surface(TopoDS::Face(e.Current()), false).GetType();
+      free                        = t == GeomAbs_OffsetSurface;
+    }
+  }
+  if (!free)
+    return false;
+  for (size_t i = 0; i < args.size(); ++i)
+  {
+    ShapeIMap edges;
+    TopExp::MapShapes(args[i], TopAbs_EDGE, edges);
+    for (int k = 1; k <= edges.Extent(); ++k)
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(edges(k));
+      if (BRep_Tool::Degenerated(e))
+        continue;
+      const BRepAdaptor_Curve c(e);
+      if (c.GetType() != GeomAbs_Circle)
+        continue;
+      Bnd_Box b;
+      BRepBndLib::Add(e, b, false);
+      circles.push_back({c.Circle(), b, i});
+    }
+  }
+  if (circles.empty())
+    return false;
+  for (size_t i = 0; i < args.size(); ++i)
+    for (TopExp_Explorer e(args[i], TopAbs_FACE); e.More(); e.Next())
+    {
+      const TopoDS_Face&        f = TopoDS::Face(e.Current());
+      const BRepAdaptor_Surface s(f);
+      if (s.GetType() != GeomAbs_OffsetSurface)
+        continue;
+      Bnd_Box fb;
+      BRepBndLib::Add(f, fb, false);
+      std::vector<gp_Pnt>              pts;
+      std::vector<std::vector<gp_Pnt>> along;
+      for (const Circle& c : circles)
+      {
+        if (c.arg == i || fb.IsOut(c.box))
+          continue;
+        if (pts.empty())
+        {
+          double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+          BRepTools::UVBounds(f, u0, u1, v0, v1);
+          for (int a = 0; a <= 8; ++a)
+            for (int b = 0; b <= 8; ++b)
+              pts.push_back(s.Value(u0 + (u1 - u0) * a / 8, v0 + (v1 - v0) * b / 8));
+          for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+          {
+            if (BRep_Tool::Degenerated(TopoDS::Edge(x.Current())))
+              continue;
+            const BRepAdaptor_Curve ec(TopoDS::Edge(x.Current()));
+            along.emplace_back();
+            for (int k = 0; k <= 16; ++k)
+            {
+              pts.push_back(ec.Value(ec.FirstParameter() + (ec.LastParameter() - ec.FirstParameter()) * k / 16));
+              along.back().push_back(pts.back());
+            }
+          }
+        }
+        const gp_Ax1 ax = c.c.Axis();
+        const gp_Lin axis(ax);
+        // (Not a circle one of its edges lies on: a shared edge, as c2-impeller-loft's mirrored halves' r 32.5 mm.)
+        const auto on = [&](const gp_Pnt& p) { return std::abs(axis.Distance(p) - c.c.Radius()) <= 1e-6 && std::abs(gp_Vec(ax.Location(), p).Dot(gp_Vec(ax.Direction()))) <= 1e-6; };
+        if (std::any_of(along.begin(), along.end(), [&](const std::vector<gp_Pnt>& l) { return std::all_of(l.begin(), l.end(), on); }))
+          continue;
+        double       lo = std::numeric_limits<double>::infinity(), hi = 0;
+        double       a0 = std::numeric_limits<double>::infinity(), a1 = -a0;
+        for (const gp_Pnt& p : pts)
+        {
+          const double r = axis.Distance(p), h = gp_Vec(ax.Location(), p).Dot(gp_Vec(ax.Direction()));
+          lo             = std::min(lo, r);
+          hi             = std::max(hi, r);
+          a0             = std::min(a0, h);
+          a1             = std::max(a1, h);
+        }
+        if (a0 < 0 && a1 > 0 && (std::abs(hi - c.c.Radius()) <= 1e-6 || std::abs(lo - c.c.Radius()) <= 1e-6))
+          return true;
+      }
+    }
+  return false;
+}
+
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
                   double fuzzy, bool touching_only, bool scaled_inputs)
@@ -6852,6 +6955,8 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
     if (inside_out == 1)
       return decline("an inside-out tool");
   }
+  if (offset_grazes_a_circle(args))
+    return decline("an offset face grazing a circle");
   std::vector<BrepBody> bodies(args.size());
   double                max_tol = 0;
   {
