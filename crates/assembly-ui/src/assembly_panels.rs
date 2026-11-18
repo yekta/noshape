@@ -3888,7 +3888,7 @@ impl AssemblyView {
         if let Some((_, c)) = best {
             return Some(c);
         }
-        let hit = self.raycast(position, &[top], cx)?;
+        let hit = self.raycast_within(position, &[top], SNAP_PICK_RECT_PX, cx)?;
         let o = self.result.occurrences.get(hit.occ)?;
         let units = self.units(cx);
         let t = noshape_model::assembly::eval::matrix_frame(&o.transform);
@@ -3903,6 +3903,22 @@ impl AssemblyView {
             }
         }
         best.map(|(_, c)| c)
+    }
+
+    /// The face under the pointer, else the nearest one within a `rect` px square around it (rings of samples 10 px
+    /// apart, nearest first).
+    pub(super) fn raycast_within(&self, position: DVec2, exclude: &[InstanceId], rect: f64, cx: &App) -> Option<AsmPickTarget> {
+        if let Some(hit) = self.raycast(position, exclude, cx) {
+            return Some(hit);
+        }
+        let steps = (rect / 10.0).floor() as i32;
+        (1..=steps).find_map(|r| {
+            let ring = (-r..=r).flat_map(|i| [(i, -r), (i, r), (-r, i), (r, i)]);
+            let mut offs: Vec<DVec2> = ring.map(|(x, y)| DVec2::new(x as f64, y as f64) * 10.0).collect();
+            offs.sort_by(|a, b| a.length_squared().total_cmp(&b.length_squared()));
+            offs.dedup();
+            offs.into_iter().find_map(|o| self.raycast(position + o, exclude, cx))
+        })
     }
 
     /// Placement of the dragged instance for the current source / target.
@@ -4375,6 +4391,9 @@ impl AssemblyView {
 /// Insert › Other documents categories (live assembly/71).
 /// How far from a face's point (corner, edge midpoint, centre) a snap-mode drag takes it (live snapmode-1118).
 const SNAP_DRAG_REACH_PX: f64 = 57.0;
+/// Live's pick rectangle around the pointer (COORDINATESYSTEM_INFERENCE_PICK_RADIUS_PX): a face within it offers its
+/// dots though the pointer is off the part.
+const SNAP_PICK_RECT_PX: f64 = 50.0;
 
 /// Live (snapmode-1118): a face's point takes the dragged connector within 57 px of the pointer in x and in y (a square:
 /// a corner at 57 px straight up, an edge midpoint at (57, −33)); farther, the part follows the pointer.
