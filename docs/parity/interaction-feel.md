@@ -167,14 +167,14 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (D1–D6, F3, F4
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
 | VS grid keys | click selects a cell; Enter / typing edits; Backspace clears; arrows move, ↑/↓ wrap; editing: Enter commits and moves down, Tab right (studios.json `variableStudioGrid`) | the same (`grid_key`, `grid_tab_action`, the `VariableGrid` key context) | `arrows_move_a_cell_and_wrap_up_and_down`, `tab_walks_the_rows_and_the_add_row`; ui-parity vs-grid-keys (live take asked) | = |
-| VS row drag | a round blue badge of the first letter, a blue drop line with a dot; one undo step | the same (`VsRowDrag`, `row_drop`) | ui-parity vs-row-drag (live take asked); e2e `variable_studio_table` (`by` > 1) | = |
+| VS row drag | a round blue badge of the first letter, a blue drop line with a dot; one undo step | the same (`VsRowDrag`, `row_drop`) | ui-parity vs-row-drag (live take: recorded 11-14, REQUESTS 3006); e2e `variable_studio_table` (`by` > 1) | = |
 | VS column resize | grab 3–6 px inside a header's right edge; min 40 px | the same | ui-parity vs-column-resize | = |
 | Versions rows | 50 px; hover #def1fb; selected #b2ddf6; a version row tooltips "Open version V1"; a single click on its name or date opens it (a double click too); the graph column clicks nothing; "Show changes…" lists the changes without opening the row; Main goes back to the workspace (`versionsPanel`) | the same (`graph_column`) | GPUI feel `version_rows_open_on_a_click_of_their_name_and_the_graph_column_opens_nothing`; ui-parity ver-* | = |
 | Compare from a version row's menu | enters compare mode at once, no dialog: the workspace the base (blue row), the version the target (pink) (`versionsPanel.compare`) | the same (`compare_with_current`) | GPUI feel `compare_from_a_version_rows_menu_starts_at_once_against_the_workspace`; ui-parity ver-compare-* | = |
 | Release candidate › Add to Release… | the Part Studio's row opens expanded with its parts; a click on a part's row picks it (blue), again puts it back (live2 rel-flow-two-parts) | the same (`AddItemsDialog`) | GPUI `add_items_opens_with_the_parts_listed_and_a_row_click_picks_one`; ui-parity rel-flow-two-parts | = |
 | FS editor line keys | Ctrl+/, Ctrl+D, Ctrl+Shift+D, Alt+↑/↓, Alt+Shift+↑/↓ (Mac: Cmd, Cmd+Option) (fs0.json) | the same (`fs_lines`) | `ace_line_keys_comment_move_duplicate_and_remove` and unit tests | = |
 | FS editor navigation keys | Ctrl+K / Ctrl+Shift+K (Mac Cmd+G), Ctrl+\\, Alt+E / Alt+Shift+E (Mac F4) | the same | `find_next_and_previous_wrap`, `ctrl_backslash_jumps_to_the_matching_bracket`, the keystroke test | = |
-| FS autocomplete | keywords and snippets at the top level, std inside a function; opens 250–500 ms after a letter | the same lists; opens on the keystroke | fs_complete tests | timing asked (REQUESTS 12:58) |
+| FS autocomplete | keywords and snippets at the top level, std inside a function; opens 250–500 ms after a letter | the same lists; opens on the keystroke | fs_complete tests | timing: live opens 250–500 ms after a letter (the REQUESTS 12:58 row was answered 11-13) |
 
 ## Assembly (studios, from 2026-11-13)
 
@@ -210,9 +210,9 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Insert dialog | tabs, Part Studios / Assemblies, search, "Undo to remove instances", "Inserted: N" | the same | ui-parity asm-insert-* | = |
 | Insert preview | the instance follows the pointer, solid orange; a click drops it | the same | – | = |
 | Insert preview's hidden edges | outlined orange through other parts; nothing lit under the pointer | the same (`xray_tops`, hidden-only #ffc04c edges, `Instance::see_through_self`: not through the preview itself) | render `see_through_self_lines_skip_their_own_mesh` | = (fixed) |
-| Insert Esc, pending | drops only the instance on the pointer, keeps the dialog | the same (asm e9941770) | asm-insert-esc-pending (live take asked) | = |
+| Insert Esc, pending | drops only the instance on the pointer, keeps the dialog | the same (asm e9941770) | asm-insert-esc-pending (live take: REQUESTS 2985, answered) | = |
 | Insert Esc, none pending | closes and removes the session's instances | the same (`cancel_insert`) | – | = |
-| Insert ✓ | keeps all, the pending one at identity; one undo step | the same (asm e9941770) | asm-insert-ok-pending (live take asked) | = |
+| Insert ✓ | keeps all, the pending one at identity; one undo step | the same (asm e9941770) | asm-insert-ok-pending (live take: REQUESTS 2985, answered) | = |
 | Ring snap | 5° / 1° / 0.1° by the arc at the pointer's radius ≤ 50 px, within 0.4 × (1 + level/3) of a step | the same (asm 641ab465, `ring_snap`) | asm's tests | = |
 | Snap mode ghost | the source part at 0.3 opacity | the same (17:18) | – | = |
 | Snap mode lines | none: no dashed line or 8 px box in 3 snap-mode drags over 23 pointer stops (live2 snapmode-1118); the client's INFERENCE_SNAP_* constants aren't drawn there | none | – | = |
@@ -632,7 +632,7 @@ live2's sketchtools.json (11-13 09:12, Sketch 2 on Top of a block copy). part-st
 | Space mid-chain | nothing; the chain continues | the same | = |
 | Enter mid-chain | the length box becomes a driving dimension on the segment; the chain continues | the same | = |
 | The menu mid-chain | Escape line, Confirm Sketch 1, …; the tool stays | the same | = |
-| Esc with that menu open | sketch/405–408: the first Esc exits the tool, the menu stays, a second closes it (live2's note reads otherwise: asked, REQUESTS 12:33) | the same as sketch/405–408 | = |
+| Esc with that menu open | sketch/405–408: the first Esc exits the tool, the menu stays, a second closes it (live2's earlier note read otherwise: REQUESTS 12:33 answered, sketch/405–408 stands) | the same as sketch/405–408 | = |
 | Shift+F | the sketch fillet | the same | = |
 | Trim, a click | removes the piece between the crossings | the same | = |
 | Trim, hover | the piece up to the nearest crossings lit tan, orange dots at its ends | the same | = |
@@ -685,7 +685,7 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 | An arrow's grab reach | within 14 px across (16 no), from 4 px behind its base to its tip, nothing past the tip | 8 px of the shaft or 14 px round the tip (past it too); now live's (`Viewport::manipulator_index_at`) | = (fixed) |
 | The arrow | shaft 30 + head 30 px, head radius 10 | shaft 29; now 30 | = (fixed) |
 | A dragged length's step | 10^(round(log10(100 px in the unit)) − 2) of the unit at the arrow (0.1 mm at 0.25 mm/px, 1 mm from 0.316); Shift: free | always 0.1 mm / 0.01 in, Shift ignored; now live's (`manipulators::linear_step`, our own and std arrows) | = (fixed) |
-| A dragged angle's step | 5° within 2° up to a 573 px radius, 1° up to 2865 px, then 0.1°; free between; Shift: free | always 5° within 2°; now by radius (the finer windows divided by 1 + level / 3: asked, REQUESTS 12:48) | = (fixed) |
+| A dragged angle's step | 5° within 2° up to a 573 px radius, 1° up to 2865 px, then 0.1°; free between; Shift: free | always 5° within 2°; now by radius (the finer windows divided by 1 + level / 3: REQUESTS 12:48 answered) | = (fixed) |
 | Properties on opening | no field has the keyboard (live's recordings: a div / ul); typing does nothing | Name focused; now the modal itself (`MetaForm::focus`), document keys still off behind it | = (fixed) |
 | A selected entity clicked again | leaves the field (in, out, in) | the same; a consumed edge keeps a pick-only line under the preview (`builder::add_consumed_edge_picks`): it had none once the preview was built | = (fixed) |
 | Enter on a retyped, unchanged value | an undo step all the same ("5" over "5 mm": Undo turns on; live external-thread-new-edit-reedit, move-face-tool) | the same (`DraftHistory::step_unchanged`); was no step | = (fixed; ui-parity) |
@@ -742,7 +742,7 @@ live2's fields.json "numericFields" (11-13 10:07, Extrude 1's Depth and Draft an
 | Arrow keys, more (live2 dialog-keys-1118) | Ctrl+Up +0.1; a committed "1 in" Up "26.4 mm" (a workspace unit, rewritten in it); typed text not yet Entered: arrows do nothing | the same | = (new) |
 | "5+" (live2 dialog-keys-1118 a1-a2) | no error while typing; Enter: the box pink, the title red, so after blur too | the same | = (new) |
 | An unknown variable (live2 dialog-keys-1118 a3) | "#zz" + Enter opens Create variable | the same | = (new) |
-| Not yet in the matrix | Ctrl+Up ×0.1 (an existing test), the wheel over a focused field, the "#" list's New variable… and its popover, Tab taking the highlighted entry | – | – |
+| Not yet in the matrix | Ctrl+Up ×0.1 (an existing test), the wheel over a focused field, the "#" list's New variable… and its popover, Tab taking the highlighted entry (live2 field-keys-1118 / chips-expr-1118: all measured, rows below) | – | – |
 
 ## Feedback (matrix, Part Studio rows)
 
@@ -1301,6 +1301,16 @@ feel): Hole dialog follow-up"; times on live's software-GL lane (preview times a
 | Finding | Ours | Test |
 |---|---|---|
 | Snap mode corner reach is not a square: over the top face 45° up-left 72 px (51, 51), straight up 50; over the side face along the face diagonal 56 (26, 49), 45° down-right 49 (both land side-face aligned); off the part 50, the connector frozen at its last face spot and a release there moves nothing (corrects "57 px square") | ? (74 / 70, qa) | missing |
+
+### field-keys-1118 + search-tools-1118 (value field keys, the "#" list's Tab, Search tools, live2 11-18 11:55) [psui, skasm]
+
+| Finding | Ours | Test |
+|---|---|---|
+| A focused length field: wheel ±1 unit per notch, Up / Down ±1, Ctrl ±0.1, Shift ±10, Alt as plain, PageUp nothing; the text stays selected | ? | missing |
+| The wheel over an unfocused value field changes nothing | ? | missing |
+| The "#" list: Tab takes the highlighted entry (as Enter), closes the list, the keyboard stays in the field | ? | missing |
+| Search tools (Alt+C): a 600 px panel under the toolbar box (which turns "Close search [escape]"), the input focused, "Start typing to search tools", footer hint and ☑ Highlight tool in toolbar (on) | ? | missing [skasm] |
+| Search tools filtering: every key, ~60–90 ms; rows icon / name / shortcut badge; the first highlighted with an info pane (icon, name, help text); its toolbar button lit yellow while Highlight tool is on | ? | missing [skasm] |
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
