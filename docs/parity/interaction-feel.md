@@ -1087,10 +1087,10 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | Extrude dialog from the toolbar: shown 221 ms, settled 1.3 s; first preview after a pick 2.0 s; ✓ → regenerated 1.1 s | = | latency_tests::everyday_interactions_beat_live_on_the_30_feature_part (T2: "dialog", "✓" targets) |
 | Open a document: shaded 7.6 s, list 11.4 s | ? | missing (qa's speed suite measures it) |
 | Tab A → B: list 1.7 s, settled 2.7 s; back 1.5 / 2.3 s | ? | missing as a psui test (qa's dock flow; workspace a_clicked_tabs_card_picture_redraws_nothing guards the trailing frames) |
-| Enter a sketch 226 ms / 1.3 s; exit (✓) 117 ms / 0.9 s; undo 107 ms / 1.0 s | ? | missing |
-| Rollback bar drop: in place ~0.1 s, settled ~1.0 s | ? | missing |
-| Context menu on a face: shown 117 ms | ? | missing |
-| Mass properties: the dialog 161 ms; values 154 ms after the pick | ? | missing (sketch_ui_tests::mass_properties_dont_hold_up_the_frame checks only that the frame isn't held) |
+| Enter a sketch 226 ms / 1.3 s; exit (✓) 117 ms / 0.9 s; undo 107 ms / 1.0 s | = (green c7d388e8, live2 ours-1118 speed: block, xdotool input → 60 fps screen frames, one round each: enter (face selected, Sketch) first change 31 ms, graphics settled 0.58 s; exit ✓ the list at 0.12 s, settled 0.79 s; undo the list at 0.10 s, settled 0.42 s) | missing |
+| Rollback bar drop: in place ~0.1 s, settled ~1.0 s | ≠ (green c7d388e8, live2 ours-1118 speed: block, xdotool input → 60 fps screen frames, one round each: the bar in place 0.24 s after an up-2-rows drop, 0.14 s back to the end, live ~0.1 s; the model settled at 0.35 / 0.27 s, live ~1.0 s) | missing |
+| Context menu on a face: shown 117 ms | = (green c7d388e8, live2 ours-1118 speed: block, xdotool input → 60 fps screen frames, one round each: shown 134 ms after the right-click, within a capture frame of live's 117) | missing |
+| Mass properties: the dialog 161 ms; values 154 ms after the pick | ≠ (green c7d388e8, live2 ours-1118 speed: block, xdotool input → 60 fps screen frames, one round each: the dialog 94 ms (=); Volume / Surface area 313 ms after picking the part, live 154 ms) | missing (sketch_ui_tests::mass_properties_dont_hold_up_the_frame checks only that the frame isn't held) |
 
 ### cfg-1118 (Configurations, live 11-18 01:03) [psui + studios]
 
