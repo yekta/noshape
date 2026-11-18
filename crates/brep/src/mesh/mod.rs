@@ -1634,14 +1634,20 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
         // The surface's bending: the second derivatives across it (along it they only speed the parameters up: a
         // draft's B-spline wall, flat, took 3,792 triangles against BRepMesh's 32); at a pole, all of them.
         // (None where the parameters all but collapse, a tip or pole: its direction there is noise.)
+        // (Nor where a derivative all but vanishes: at a cone's apex the ring's radius rounds to ±1e-18 and its normal
+        // flipped there, a half turn across the first row of cells that asked for rows µm apart: 25k triangles on a
+        // 1 mm drill point, lead 11-18.)
         let cross = d[1].cross(d[2]);
-        let n = if cross.length() > 1e-6 * d[1].length() * d[2].length() { cross.normalize() } else { DVec3::ZERO };
+        let collapsed = d[1].length().min(d[2].length()) <= 1e-9 * (1.0 + d[0].abs().max_element());
+        let n = if !collapsed && cross.length() > 1e-6 * d[1].length() * d[2].length() { cross.normalize() } else { DVec3::ZERO };
         normal[k] = n;
         let across = |x: DVec3| if n == DVec3::ZERO { x.length() } else { x.dot(n).abs() };
         let (mut hu, mut hv) = (step(d[1].length(), across(d[3])), step(d[2].length(), across(d[5])));
-        // A twist (a saddle, flat both ways): cells square on the surface, their sides' product within it.
+        // A twist (a saddle, flat both ways): cells square on the surface, their sides' product within it. (Not at an
+        // apex or pole: there the whole mixed derivative counted, and over a side that collapses to nothing it asked
+        // for rows µm apart.)
         let twist = across(d[4]);
-        if twist > 0.0 && d[1].length() > 0.0 && d[2].length() > 0.0 {
+        if n != DVec3::ZERO && twist > 0.0 && d[1].length() > 0.0 && d[2].length() > 0.0 {
             let c = 4.0 * defl.linear / twist;
             hu = hu.min((c * d[2].length() / d[1].length()).sqrt());
             hv = hv.min((c * d[1].length() / d[2].length()).sqrt());

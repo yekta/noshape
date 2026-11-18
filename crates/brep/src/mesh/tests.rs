@@ -488,3 +488,44 @@ fn a_revolved_band_with_a_hole_past_half_a_turn_is_meshed() {
         assert!(!((195.0..205.0).contains(&deg) && (0.014..0.016).contains(&c.z)), "a triangle in the hole at {deg}°, z {}", c.z);
     }
 }
+
+/// A drill point as imported (a user's gripper housing, lead 11-18): a ~1 mm cone from its apex up to a rim, its seam a
+/// straight B-spline, so not a strip: the grid takes it with the rim's columns and a few rows. At the apex the ring's
+/// radius rounds to ±1e-18 and the normal flipped with it there: rows µm apart toward the apex, 25k triangles. Several
+/// radii and drill angles, so the rounding goes both ways.
+#[test]
+fn a_cone_ending_at_its_apex_is_meshed_without_rows_crowding_the_apex() {
+    use crate::nurbs::NurbsCurve;
+    use std::f64::consts::TAU;
+    for r in [0.001f64, 0.001007, 0.0007, 0.0013] {
+        for deg in [59.0f64, 60.5, 62.0] {
+            let a = deg.to_radians();
+            let apex = DVec3::new(0.0, 0.0, -r / a.tan());
+            let seam = NurbsCurve { degree: 1, knots: vec![0.0, 0.0, 1.0, 1.0], poles: vec![apex, DVec3::new(r, 0.0, 0.0)], weights: Vec::new(), spans: Default::default() };
+            let v = vec![apex, DVec3::new(r, 0.0, 0.0)];
+            let e = vec![
+                MeshEdge { curve: Some(Curve::Degenerate), v: [0, 0], t0: 0.0, t1: TAU },
+                MeshEdge { curve: Some(Curve::Nurbs { index: 0, t0: 0.0, t1: 1.0 }), v: [0, 1], t0: 0.0, t1: 1.0 },
+                MeshEdge { curve: Some(Curve::Circle { center: DVec3::ZERO, normal: DVec3::Z, xdir: DVec3::X, radius: r }), v: [1, 1], t0: 0.0, t1: TAU },
+            ];
+            let surface = MeshSurface::Cone { origin: DVec3::ZERO, axis: DVec3::Z, xdir: DVec3::X, direct: true, radius: r, angle: a };
+            let loops = [
+                vec![Use { edge: 0, reversed: false }, Use { edge: 1, reversed: false }, Use { edge: 2, reversed: true }, Use { edge: 1, reversed: true }],
+                vec![Use { edge: 0, reversed: true }, Use { edge: 1, reversed: false }, Use { edge: 2, reversed: false }, Use { edge: 1, reversed: true }],
+            ];
+            // The display's deflections: the body's size, 72 segments a turn (BRepMesh's angle twice the turn).
+            let defl = Deflection { linear: 3.0 * r, angular: 2.0 * TAU / 72.0 };
+            let curves = [seam];
+            let mut meshed = 0;
+            for l in loops {
+                let face = MeshFace { surface, loops: vec![l] };
+                let out = mesh_body_with(&v, &e, std::slice::from_ref(&face), defl, MeshNurbs { curves: &curves, surfaces: &[], face_pcurves: &[] });
+                let Some(m) = out.faces[0].as_ref() else { continue };
+                meshed += 1;
+                let rim = out.edges[2].as_ref().unwrap().points.len();
+                assert!(m.triangles.len() <= 4 * rim, "r {r}, {deg}°: {} triangles for a rim of {rim} nodes", m.triangles.len());
+            }
+            assert!(meshed > 0, "r {r}, {deg}°: the cone meshed here");
+        }
+    }
+}
