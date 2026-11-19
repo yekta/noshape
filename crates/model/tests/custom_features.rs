@@ -1962,6 +1962,34 @@ fn routing_curve_process_reads_csv_points() {
     assert!(matches!(points[1].get("dx"), Some(ParamValue::Expr(e)) if e.text.contains("30")), "{:?}", points[1]);
 }
 
+/// Routing curve › Point edit type Multiple: std's triad for the selected points keeps its offset in the hidden multiDx /
+/// multiDy / multiDz (live's featurespec, live2 audit-1119); Reset triad puts it back on the reference (std's resetTriad).
+#[test]
+fn routing_curve_reset_triad_clears_the_multi_edit_offset() {
+    let fx = Fixture::new(&studio(""));
+    let ps = PartStudio::new();
+    let ctx = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &fx.units, &RegenOptions::default()).context;
+    let f = PartStudio::new().new_feature("routingCurve", &fx.units).unwrap();
+    let mut p = f.params.clone();
+    let seeded = custom::std_feature::editing_logic_in((*ctx).clone(), "routingCurve", f.id, &f.name, &fx.units, &noshape_model::params::ParamValues::default(), &p, &[], true).expect("editing logic ran");
+    for (k, v) in seeded.0 {
+        p.set(&k, v);
+    }
+    p.set("pointsEditType", ParamValue::Enum("MULTI".into()));
+    p.set("multiDx", ParamValue::Expr(ExprValue::new("5 mm")));
+    p.set("multiDz", ParamValue::Expr(ExprValue::new("-2 mm")));
+    let changed = custom::std_feature::editing_logic_in_clicked((*ctx).clone(), "routingCurve", f.id, &f.name, &fx.units, &p, &p, &[], false, "resetTriad").expect("editing logic ran");
+    // (The editing logic returns what it changed: multiDy was 0 already.)
+    for id in ["multiDx", "multiDy", "multiDz"] {
+        let v = match changed.get(id) {
+            Some(ParamValue::Expr(e)) => e.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&e.text, noshape_units::Dim::LENGTH, &fx.units, &noshape_units::EmptyScope).ok().map(|q| q.value)),
+            None if id == "multiDy" => Some(0.0),
+            other => panic!("{id}: {other:?}"),
+        };
+        assert!(v.is_some_and(|v| v.abs() < 1e-12), "{id}: {:?}", changed.get(id));
+    }
+}
+
 /// Reference parameters (live dom/fs-refparams.txt): CSV / image / JSON file
 /// tabs as TableData / ImageData / JSONData; an unset one is `{}`.
 #[test]

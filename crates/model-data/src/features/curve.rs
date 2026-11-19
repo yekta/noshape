@@ -390,6 +390,11 @@ pub fn routing_curve() -> FeatureType {
             .item_template("Selected point #indexValue")
             .hints(Hints::PREVENT_ARRAY_REORDER | Hints::ALLOW_ARRAY_FOCUS)
             .visible(move |v| points(v) && !single(v)),
+        // std's multi-point triad: its offset from the edit reference and its turn (live's featurespec, always hidden).
+        hidden(ParamSpec::num("multiDx", "Multi X offset", ZERO_DEFAULT_LENGTH)),
+        hidden(ParamSpec::num("multiDy", "Multi Y offset", ZERO_DEFAULT_LENGTH)),
+        hidden(ParamSpec::num("multiDz", "Multi Z offset", ZERO_DEFAULT_LENGTH)),
+        hidden(ParamSpec::text("multiRotationMatrix", "Multi rotation matrix", "")),
         hidden(ParamSpec::num("pointIndex", "Selected point", NumSpec::integer(0, 0, 10_000))),
         // Item visibility below only sees the item's own values; the
         // polyline/spline-only fields are therefore always shown in items.
