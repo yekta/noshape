@@ -9758,6 +9758,7 @@ export const nut = defineFeature(function(context is Context, id is Id, definiti
         })
         .unwrap();
     assert_eq!(row(&mut ctx), (json!(""), json!("")), "standard content's row: no Description or Part number from its feature");
+}
 
 /// Live (skasm 11-19 split / trim of a used line): a used edge's line trimmed at a crossing keeps a point at the cut-off
 /// end (its `.orphan`) on the line; moved along its length, the line's start and that point follow the edge's ends
