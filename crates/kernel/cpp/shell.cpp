@@ -10129,13 +10129,13 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
   if (dbg)
     std::fprintf(stderr, "slabs: common volume %.6g valid %d\n", volume_of(r), (int)valid_solid(r));
   // Merge the faces split up by the slab construction.
-  ShapeUpgrade_UnifySameDomain usd(r, true, true, false);
-  usd.SetLinearTolerance(1e-7);
-  usd.Build();
-  HHist hs = usd.History();
+  // (In another order where USD's left two faces on one cylinder apart: 8eebe1e2's R14 wall halves, OCCT's common
+  // gives them the other way round and USD merges them.)
+  HHist              hs;
+  const TopoDS_Shape unified = usd_any_order(r, 1e-7, hs);
   lap("unify");
   const TopoDS_Shape split = single_solid(r);
-  r = single_solid(usd.Shape());
+  r = single_solid(unified);
   // Unify can break a valid result (qa5 P1-16 at 1 mm): keep the split one.
   if (!valid_solid(r) && valid_solid(split))
   {

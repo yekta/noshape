@@ -276,6 +276,9 @@ bool quick_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, bo
                    occ::handle<BRepTools_History>& hist, bool slab_union = false);
 // The kernel's unify of a whole shape (op_unify's; boolean.cpp).
 TopoDS_Shape unify_shape(const TopoDS_Shape& s, occ::handle<BRepTools_History>& hist);
+// ShapeUpgrade_UnifySameDomain (linear tolerance `tol`), again with the faces in other orders where it left two faces
+// on one cylinder apart (its merge depends on the order it meets them): the fewest faces of the same volume, valid.
+TopoDS_Shape usd_any_order(const TopoDS_Shape& s, double tol, occ::handle<BRepTools_History>& hist);
 // A hole's cylinder between two rounded rims: the three seams at a vertex both tori's outer loops share, the pieces
 // the old seams split joined (boolean.cpp rim_chain_seams).
 TopoDS_Shape rim_chain_seams_joined(const TopoDS_Shape& s, occ::handle<BRepTools_History>& hist);

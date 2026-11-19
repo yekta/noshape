@@ -10929,6 +10929,39 @@ TopoDS_Shape unify_shape(const TopoDS_Shape& s, HHist& hist)
   return unify(s, hist);
 }
 
+TopoDS_Shape usd_any_order(const TopoDS_Shape& s, double tol, HHist& hist)
+{
+  auto run = [&](const TopoDS_Shape& x, HHist& h) {
+    ShapeUpgrade_UnifySameDomain u(x, true, true, false);
+    u.SetLinearTolerance(tol);
+    u.Build();
+    h = u.History();
+    return u.Shape();
+  };
+  TopoDS_Shape r = run(s, hist);
+  if (!cylinder_faces_apart(r))
+    return r;
+  std::optional<double> v0;
+  for (int k = 1; k <= 3 && cylinder_faces_apart(r); ++k)
+  {
+    const TopoDS_Shape sk = faces_reordered(s, k);
+    if (sk.IsNull())
+      break;
+    HHist              hk;
+    const TopoDS_Shape rk = run(sk, hk);
+    if (face_count(rk) >= face_count(r))
+      continue;
+    if (!v0)
+      v0 = volume_of(r);
+    if (std::abs(volume_of(rk) - *v0) <= 1e-9 * std::abs(*v0) && BRepCheck_Analyzer(rk).IsValid())
+    {
+      r    = rk;
+      hist = hk;
+    }
+  }
+  return r;
+}
+
 // Only the pieces of loops joined (join_loop_pieces: where a seam or a blend left a vertex between two pieces of one
 // curve), nothing unified; none in a studio saved before (legacy topology).
 OpOut op_join_edges(const OcShape& s)
