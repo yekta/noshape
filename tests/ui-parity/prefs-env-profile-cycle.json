@@ -39,6 +39,10 @@
    "on": {
     "field": "Environment profile settings › Environment profile",
     "pick": "Onshape (default)"
+   },
+   "ours_on": {
+    "field": "Environment profile settings › Environment profile",
+    "pick": "Noshape (default)"
    }
   },
   {

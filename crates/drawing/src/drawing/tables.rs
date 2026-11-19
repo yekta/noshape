@@ -193,12 +193,12 @@ const REVISION_COLUMN_WIDTHS: [(&str, f64); 4] = [("Revision", 11.044), ("Revisi
 /// A revision table's rows in text heights, plus the padding: title, header, content (live2 feel/revtable).
 const REVISION_ROWS: [f64; 3] = [1.333, 1.395, 5.0 / 3.0];
 
-/// The Onshape default template's columns (help image relmgmt-workflows-14).
+/// The default template's columns (help image relmgmt-workflows-14).
 pub const DEFAULT_REVISION_COLUMNS: [&str; 4] = ["Revision", "Revision description", "Date approved", "Approver"];
 
 impl Default for RevisionTemplate {
     fn default() -> Self {
-        Self { name: "Onshape Default revision table".into(), columns: DEFAULT_REVISION_COLUMNS.map(String::from).to_vec(), all_caps: false }
+        Self { name: "Noshape Default revision table".into(), columns: DEFAULT_REVISION_COLUMNS.map(String::from).to_vec(), all_caps: false }
     }
 }
 

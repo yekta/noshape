@@ -1,6 +1,6 @@
 //! Material libraries added to the account (Onshape keeps them in account
 //! preferences; here a preferences file): the Material panel's library
-//! select lists the Onshape Material Library, these, and the open
+//! select lists the Noshape Material Library, these, and the open
 //! document's Material Library tabs. The "Add material library" modal
 //! (live dom/dialog-add-material-library.txt): an 800 px modal with a left
 //! filter list (Onshape, Owned by me, Recently opened, Created by me, Shared
@@ -35,7 +35,7 @@ pub fn materials_of(lib: &AddedLibrary) -> MaterialLibrary {
 }
 
 /// Filters of the left list, in Onshape's order.
-const FILTERS: [&str; 6] = ["Onshape", "Owned by me", "Recently opened", "Created by me", "Shared with me", "Public"];
+const FILTERS: [&str; 6] = ["Noshape", "Owned by me", "Recently opened", "Created by me", "Shared with me", "Public"];
 
 /// The Onshape filter's mark, Shared with me and Public (the others are the
 /// documents page's glyphs).
@@ -81,7 +81,7 @@ pub fn open(on_add: impl Fn(Option<AddedLibrary>, &mut Window, &mut App) + 'stat
 }
 
 impl AddLibraryDialog {
-    /// Rows of the current filter: None = the Onshape Material Library.
+    /// Rows of the current filter: None = the Noshape Material Library.
     fn rows(&self) -> Vec<Option<AddedLibrary>> {
         let mine = |l: &AddedLibrary| l.owner == self.me || l.owner.is_empty();
         match self.filter {
@@ -118,7 +118,7 @@ impl Render for AddLibraryDialog {
         let cell = |t: String| div().w(px(181.)).pl(px(10.)).truncate().child(t);
         let table_rows = rows.iter().enumerate().map(|(i, r)| {
             let (lib, doc, owner) = match r {
-                None => ("Onshape Material Library".to_string(), "std.mat".to_string(), "Onshape".to_string()),
+                None => ("Noshape Material Library".to_string(), "std.mat".to_string(), "Noshape".to_string()),
                 Some(l) => (l.name.clone(), l.document.clone(), l.owner.clone()),
             };
             let on = self.selected == Some(i);

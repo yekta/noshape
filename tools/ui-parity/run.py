@@ -356,6 +356,13 @@ LIVE_BRAND = [
     ("within Onshape on your behalf", "within Noshape on your behalf"),
     ("Onshape does not warrant", "Noshape does not warrant"),
     ("color scheme for Onshape featuring", "color scheme for Noshape featuring"),
+    ("Onshape (default)", "Noshape (default)"),
+    ("Onshape (Standard)", "Noshape (Standard)"),
+    ("Onshape Material Library", "Noshape Material Library"),
+    ("Onshape Default BOM", "Noshape Default BOM"),
+    ("Onshape Default revision table", "Noshape Default revision table"),
+    ("Onshape default", "Noshape default"),
+    ("Onshape controlled", "Noshape controlled"),
 ]
 
 

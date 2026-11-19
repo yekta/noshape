@@ -5208,7 +5208,7 @@ Only show mappings with errors	エラーが発生したマッピングのみを�
 Only show unread	未読のみ表示
 Only some instances will be highlighted.	一部のインスタンスのみ強調表示されます。
 Only vertices	頂点のみ
-Onshape (default)	Onshape (既定)
+Noshape (default)	Noshape (既定)
 Onshape AI Advisor cannot see your data.	Onshape AI アドバイザーはユーザーのデータを見ることはできません。
 Onshape API Keys Connection	Onshape API キー接続
 Onshape Access Key	Onshape アクセスキー
@@ -5236,9 +5236,9 @@ Onshape category	Onshape カテゴリー
 Onshape category __name__ is inactive.	Onshape カテゴリー __name__ は非アクティブです。
 Onshape company categories cannot be edited here	Onshape 一般法人向けカテゴリーはこちらでは編集できません
 Onshape company properties cannot be edited here.	Onshape 一般法人向けプロパティはこちらでは編集できません。
-Onshape controlled	Onshape で制御
+Noshape controlled	Noshape で制御
 Onshape date values synced to Windchill will not include a time component.	Windchill に同期される Onshape の日付値には、時刻情報は含まれません。
-Onshape default	Onshape の既定
+Noshape default	Noshape の既定
 Onshape default tolerances	Onshape の既定の許容差
 Onshape default workflows	Onshape の既定のワークフロー
 Noshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose.	Noshape は、生成された出力が第三者の権利を侵害していないこと、または特定の目的に適合していることを保証しません。

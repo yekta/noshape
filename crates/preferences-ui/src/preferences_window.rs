@@ -65,7 +65,7 @@ pub struct ListPrefs {
     #[serde(default)]
     pub labs_co_complete: bool,
     /// Environment profile settings: the user's profiles (the default one is
-    /// implicit) and the selected one (None: "Onshape (default)").
+    /// implicit) and the selected one (None: "Noshape (default)").
     #[serde(default)]
     pub env_profiles: Vec<crate::prefs_general::EnvProfile>,
     #[serde(default)]
@@ -730,7 +730,7 @@ impl PreferencesView {
             .border_color(pal.text)
             .rounded(px(4.))
             .child(row(key_chip("example", KeyStyle::Customized).into_any_element(), "Customized"))
-            .child(row(key_chip("example", KeyStyle::Default).into_any_element(), "Onshape default"))
+            .child(row(key_chip("example", KeyStyle::Default).into_any_element(), "Noshape default"))
             .child(row(key_chip("example", KeyStyle::Disabled).into_any_element(), "Disabled"))
             .child(row(crate::assets::icon("shortcut-conflict", 18., cx), "Has conflict").mt(px(-4.)))
             .child(h_flex().mt(px(-4.)).gap(px(5.)).text_size(px(13.33)).text_color(pal.text).child("*").child(div().font_weight(FontWeight::SEMIBOLD).child("applies in drawing sketches")))

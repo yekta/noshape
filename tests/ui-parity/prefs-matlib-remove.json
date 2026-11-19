@@ -9,6 +9,9 @@
    "do": "click",
    "on": {
     "button": "Material libraries › Remove Onshape Material Library"
+   },
+   "ours_on": {
+    "button": "Material libraries › Remove Noshape Material Library"
    }
   }
  ]

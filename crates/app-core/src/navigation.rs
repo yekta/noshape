@@ -736,7 +736,7 @@ impl Preset {
     /// The dropdown label.
     pub fn label(self) -> &'static str {
         match self {
-            Preset::Onshape => "Onshape (default)",
+            Preset::Onshape => "Noshape (default)",
             Preset::Solidworks => "SOLIDWORKS",
             Preset::Nx => "NX 10",
             Preset::Creo => "Creo",
@@ -1637,6 +1637,6 @@ mod tests {
         let t = serde_json::to_string(&c).unwrap();
         assert_eq!(serde_json::from_str::<MouseControls>(&t).unwrap(), c);
         assert_eq!(serde_json::from_str::<MouseControls>("{}").unwrap(), MouseControls::default());
-        assert_eq!(Preset::ALL.map(Preset::label), ["Onshape (default)", "SOLIDWORKS", "NX 10", "Creo", "AutoCAD"]);
+        assert_eq!(Preset::ALL.map(Preset::label), ["Noshape (default)", "SOLIDWORKS", "NX 10", "Creo", "AutoCAD"]);
     }
 }

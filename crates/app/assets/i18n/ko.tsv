@@ -5207,7 +5207,7 @@ Only show mappings with errors	오류가 있는 매핑만 표시
 Only show unread	읽지 않은 내용만 표시
 Only some instances will be highlighted.	일부 부품만 강조 표시됩니다.
 Only vertices	꼭지점만
-Onshape (default)	Onshape(기본값)
+Noshape (default)	Noshape(기본값)
 Onshape AI Advisor cannot see your data.	Onshape AI Advisor는 사용자의 데이터를 볼 수 없습니다.
 Onshape API Keys Connection	Onshape API 키 연결
 Onshape Access Key	Onshape 액세스 키
@@ -5236,9 +5236,9 @@ Onshape category	Onshape 범주
 Onshape category __name__ is inactive.	Onshape 범주 __name__이(가) 비활성 상태입니다.
 Onshape company categories cannot be edited here	여기서 Onshape 컴퍼니 범주를 편집할 수 없습니다
 Onshape company properties cannot be edited here.	여기서 Onshape 회사 속성을 편집할 수 없습니다.
-Onshape controlled	Onshape 제어
+Noshape controlled	Noshape 제어
 Onshape date values synced to Windchill will not include a time component.	Windchill에 동기화된 Onshape 날짜 값은 시간 구성 요소에 포함되지 않습니다.
-Onshape default	Onshape 기본값
+Noshape default	Noshape 기본값
 Onshape default tolerances	Onshape 기본 공차
 Onshape default workflows	Onshape 기본 워크플로
 Noshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose.	Noshape는 생성된 결과물이 제3자 권리를 침해하지 않거나 특정 목적에 적합함을 보증하지 않습니다.

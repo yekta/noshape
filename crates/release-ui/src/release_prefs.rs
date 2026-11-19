@@ -285,15 +285,15 @@ impl Render for ReleasePrefsView {
         };
         let workflow = if self.workflow_tab == 0 {
             v_flex()
-                .child(div().pt(px(12.)).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Onshape default release workflow"))
+                .child(div().pt(px(12.)).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Noshape default release workflow"))
                 .children(self.chart.as_ref().map(|(_, _, img)| img_el(img.clone()).mt(px(8.))))
-                .child(div().pt(px(8.)).text_size(px(13.)).text_color(pal.text).child("This is Onshape's default release workflow."))
+                .child(div().pt(px(8.)).text_size(px(13.)).text_color(pal.text).child("This is Noshape's default release workflow."))
                 .child(div().pt(px(14.)).max_w(px(700.)).text_size(px(13.)).text_color(pal.text).child("The creator of a Release candidate specifies a set of approvers and a set of observers who will be notified when the Release candidate is transitioned. Observers are optional, and approvers may be optional or required depending on company settings."))
         } else {
             v_flex()
-                .child(div().pt(px(12.)).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Onshape default obsoletion workflow"))
+                .child(div().pt(px(12.)).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Noshape default obsoletion workflow"))
                 .children(self.chart.as_ref().map(|(_, _, img)| img_el(img.clone()).mt(px(8.))))
-                .child(div().pt(px(8.)).text_size(px(13.)).text_color(pal.text).child("This is Onshape's default obsoletion workflow."))
+                .child(div().pt(px(8.)).text_size(px(13.)).text_color(pal.text).child("This is Noshape's default obsoletion workflow."))
         };
         let workflows = section("Workflows", Some(crate::assets::icon("help-gray", 20., cx)))
             .child(

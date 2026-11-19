@@ -35,7 +35,7 @@ impl Render for MaterialLibrariesView {
         crate::ui_script::set_section("Material libraries");
         let mut listed: Vec<String> = Vec::new();
         if crate::material_libraries::onshape_listed() {
-            listed.push("Onshape Material Library".into());
+            listed.push("Noshape Material Library".into());
         }
         listed.extend(libs.iter().map(|l| l.name.clone()));
         crate::ui_script::note_control("Libraries", "list", serde_json::json!(listed));
@@ -78,8 +78,8 @@ impl Render for MaterialLibrariesView {
         let row = |name: String, document: String, owner: String, button: Stateful<Div>| h_flex().h(px(42.)).text_size(px(14.)).text_color(pal.text).child(cell(name)).child(cell(document)).child(cell(owner)).child(div().flex_1()).child(action().justify_end().child(button));
         let mut lib_rows: Vec<AnyElement> = Vec::new();
         if crate::material_libraries::onshape_listed() {
-            let b = remove("matlib-remove-onshape".into(), "Onshape Material Library", cx, Box::new(|| crate::material_libraries::set_onshape_listed(false)));
-            lib_rows.push(row("Onshape Material Library".into(), "std.mat".into(), "Onshape".into(), b).into_any_element());
+            let b = remove("matlib-remove-onshape".into(), "Noshape Material Library", cx, Box::new(|| crate::material_libraries::set_onshape_listed(false)));
+            lib_rows.push(row("Noshape Material Library".into(), "std.mat".into(), "Noshape".into(), b).into_any_element());
         }
         for (i, l) in libs.iter().enumerate() {
             let b = remove(

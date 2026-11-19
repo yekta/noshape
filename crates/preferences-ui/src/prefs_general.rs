@@ -285,7 +285,7 @@ pub struct EnvProfile {
 }
 
 /// The default profile's name.
-const DEFAULT_PROFILE: &str = "Onshape (default)";
+const DEFAULT_PROFILE: &str = "Noshape (default)";
 
 #[derive(Default)]
 pub struct EnvProfilePrefsView {

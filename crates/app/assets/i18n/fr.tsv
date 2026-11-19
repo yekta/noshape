@@ -5139,7 +5139,7 @@ Only show mappings with errors	Afficher uniquement les mappings comportant des e
 Only show unread	Afficher uniquement les non lus
 Only some instances will be highlighted.	Seules certaines instances seront mises en évidence.
 Only vertices	Sommets seulement
-Onshape (default)	Onshape (par défaut)
+Noshape (default)	Noshape (par défaut)
 Onshape AI Advisor cannot see your data.	Onshape AI Advisor ne peut pas voir vos données.
 Onshape API Keys Connection	Connexion des clés d'API Onshape
 Onshape Access Key	Clé d'accès Onshape
@@ -5167,9 +5167,9 @@ Onshape category	Catégorie Onshape
 Onshape category __name__ is inactive.	La catégorie Onshape __name__ est inactive.
 Onshape company categories cannot be edited here	Les catégories de société Onshape ne peuvent pas être modifiées ici
 Onshape company properties cannot be edited here.	Les propriétés de société Onshape ne peuvent pas être modifiées ici.
-Onshape controlled	Contrôle par Onshape
+Noshape controlled	Contrôle par Noshape
 Onshape date values synced to Windchill will not include a time component.	Les valeurs de date Onshape synchronisées avec Windchill ne seront pas incluses dans un composant temporel.
-Onshape default	Défaut d'Onshape
+Noshape default	Défaut d'Noshape
 Onshape default tolerances	Tolérances Onshape par défaut
 Onshape default workflows	Workflows Onshape par défaut
 Noshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose.	Noshape ne garantit pas que les résultats générés soient exempts de droits associés à des tiers ou adaptés à un usage particulier.

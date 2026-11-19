@@ -26,6 +26,9 @@
       "do": "click",
       "on": {
         "menu": "Onshape Default BOM"
+      },
+      "ours_on": {
+        "menu": "Noshape Default BOM"
       }
     },
     {

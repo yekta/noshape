@@ -2,7 +2,7 @@
 //! dialogs/assign-material-01…08, dom/dialog-assign-material*.txt): 280 px at
 //! the bottom left of the graphics area, ✓ (enabled once a material is
 //! picked) and ✕; tabs Library | Custom. Library: the library select
-//! ("Onshape Material Library" and the document's Material Library tabs)
+//! ("Noshape Material Library" and the document's Material Library tabs)
 //! with "+" (Add material library…), a searchable picker ("- None -",
 //! two-line rows "Name" / "Density: 2.836e-1 lb/in³") and the picked
 //! material's read-only properties. Custom: the same fields, editable.
@@ -39,7 +39,7 @@ pub struct MaterialPanel {
     /// instead of the parts' own material (live psb 10-20 q, 634).
     pub cp_cell: Option<(BodyId, usize)>,
     custom: bool,
-    /// 0 = Onshape Material Library, then the document's library tabs.
+    /// 0 = Noshape Material Library, then the document's library tabs.
     library: usize,
     picked: Option<Entry>,
     list_open: bool,
@@ -79,7 +79,7 @@ impl PartStudioView {
     /// The libraries of the select, in order, with their names.
     fn material_sources(&self, cx: &App) -> Vec<(Source, String)> {
         // Removed in Preferences › Material libraries: not listed.
-        let mut out = if crate::material_libraries::onshape_listed() { vec![(Source::Onshape, "Onshape Material Library".to_string())] } else { Vec::new() };
+        let mut out = if crate::material_libraries::onshape_listed() { vec![(Source::Onshape, "Noshape Material Library".to_string())] } else { Vec::new() };
         out.extend(crate::material_libraries::added().into_iter().map(|l| {
             let n = l.name.clone();
             (Source::Added(l), n)

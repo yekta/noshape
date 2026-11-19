@@ -5194,7 +5194,7 @@ Only show mappings with errors	僅顯示有錯誤的對應
 Only show unread	僅顯示未讀的
 Only some instances will be highlighted.	僅會強調顯示某些實例。
 Only vertices	僅頂點
-Onshape (default)	Onshape (預設)
+Noshape (default)	Noshape (預設)
 Onshape AI Advisor cannot see your data.	Onshape AI 顧問無法查看您的資料。
 Onshape API Keys Connection	Onshape API 金鑰連線
 Onshape Access Key	Onshape 存取金鑰
@@ -5220,9 +5220,9 @@ Onshape category	Onshape 類別
 Onshape category __name__ is inactive.	Onshape 類別 __name__ 是非使用中的。
 Onshape company categories cannot be edited here	無法於此處編輯 Onshape 公司類別
 Onshape company properties cannot be edited here.	無法於此處編輯 Onshape 公司屬性。
-Onshape controlled	Onshape 所控制
+Noshape controlled	Noshape 所控制
 Onshape date values synced to Windchill will not include a time component.	同步至 Windchill 的 Onshape 日期值將不包含時間組成。
-Onshape default	Onshape 預設
+Noshape default	Noshape 預設
 Onshape default tolerances	Onshape 預設公差
 Onshape default workflows	Onshape 預設工作流程
 Noshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose.	Noshape 不保證產生的輸出不會侵犯第三方權利或適用於任何特定用途。

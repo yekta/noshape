@@ -30,7 +30,7 @@ pub struct TableDlg {
     pub top_level: bool,
     pub bottom_to_top: bool,
     pub corner: TableCorner,
-    /// Template: "Onshape Default BOM" (else "Follow assembly").
+    /// Template: "Noshape Default BOM" (else "Follow assembly").
     pub default_template: bool,
     /// A BOM of an assembly no view of the sheet shows (this document's or
     /// another one's; drawing.md TB14), instead of `view`'s.
@@ -535,7 +535,7 @@ impl DrawingEditor {
         type Set = std::rc::Rc<dyn Fn(&mut TableDlg)>;
         let select = |id: &'static str, label: String, w: f32, items: Vec<(String, bool, Set)>| {
             let ed = ed.clone();
-            // "Onshape Default BOM" is wider than the button: that list
+            // "Noshape Default BOM" is wider than the button: that list
             // takes its own width.
             let as_select = id != "table-dlg-template";
             let shown = label.clone();
@@ -586,7 +586,7 @@ impl DrawingEditor {
         // Live request 1627: exactly these two.
         let templates: Vec<(String, bool, Set)> = vec![
             ("Follow assembly".into(), !d.default_template, std::rc::Rc::new(|d: &mut TableDlg| d.default_template = false) as Set),
-            ("Onshape Default BOM".into(), d.default_template, std::rc::Rc::new(|d: &mut TableDlg| d.default_template = true) as Set),
+            ("Noshape Default BOM".into(), d.default_template, std::rc::Rc::new(|d: &mut TableDlg| d.default_template = true) as Set),
         ];
         let orders: Vec<(String, bool, Set)> = vec![
             ("Top to bottom".into(), !d.bottom_to_top, std::rc::Rc::new(|d: &mut TableDlg| d.bottom_to_top = false) as Set),
@@ -657,8 +657,8 @@ impl DrawingEditor {
             // properties, whose Sheet select reads "").
             let source_at = text.iter().position(|t| *t == source_label).filter(|_| !editing);
             let mut lines = crate::drawing_panels::PanelText(text.into_iter().enumerate().map(|(i, t)| (t, Some(i) == source_at)).collect());
-            lines.text("Template").options(["Follow assembly", "Onshape Default BOM"]).text("BOM type").options(["Flattened", "Structured - Top level", "Structured - Multi level"]).text("Order").options(["Top to bottom", "Bottom to top"]).text("Select fixed corner");
-            let template = if d.default_template { "Onshape Default BOM" } else { "Follow assembly" };
+            lines.text("Template").options(["Follow assembly", "Noshape Default BOM"]).text("BOM type").options(["Flattened", "Structured - Top level", "Structured - Multi level"]).text("Order").options(["Top to bottom", "Bottom to top"]).text("Select fixed corner");
+            let template = if d.default_template { "Noshape Default BOM" } else { "Follow assembly" };
             let order = if d.bottom_to_top { "Bottom to top" } else { "Top to bottom" };
             let field = |label: &str, value: &str| serde_json::json!({ "label": label, "kind": "select", "value": value });
             let fields = if editing {
@@ -810,7 +810,7 @@ impl DrawingEditor {
                     });
                     v.child(row("Sheet", sheet.into_any_element()))
                 })
-                .when(bom, |v| v.child(row("Template", select("table-dlg-template", if d.default_template { "Onshape Default BOM".into() } else { "Follow assembly".into() }, 120., templates).into_any_element())).child(row("BOM type", select("table-dlg-type", type_label.clone(), 120., types).into_any_element())))
+                .when(bom, |v| v.child(row("Template", select("table-dlg-template", if d.default_template { "Noshape Default BOM".into() } else { "Follow assembly".into() }, 120., templates).into_any_element())).child(row("BOM type", select("table-dlg-type", type_label.clone(), 120., types).into_any_element())))
                 .child(row("Order", select("table-dlg-order", if d.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, 120., orders).into_any_element()))
                 .child(div().px(px(8.)).pt(px(4.)).text_size(px(11.)).child("Select fixed corner"))
                 .child(h_flex().px(px(8.)).pt(px(4.)).gap(px(26.)).children(corners))
