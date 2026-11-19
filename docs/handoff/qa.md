@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 22:59)
+# QA handoff (agent qa; current state only, updated 2026-11-19 23:13)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -110,7 +110,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    Walk 22:5x: Slider (slides on axis), Planar (moves in plane), Exploded view (step dialog, Done -> assembled) = live; BOM Part number
    edit (Enter moves down, written to Part 1's Properties) = live (Tab keeps the cell: live's BOM Tab not recorded); drawing Note, Hole
    table (Origin gate, A1 tag, Ø.250 ↧.472, corner placement) = live. BRAND-IN-UI-TEXT += Properties categories "Onshape Part" (dx told).
-   Next: Feature Studio edit + custom feature, versions / branches / merge, then a hover sweep in drawings. App runs: units qa-xvfb110 + qa-walk*-app
+   23:0x: Feature Studio custom feature (QA Box: template, commit, tool search, Size field, builds), version V1, branch B1, edit,
+   merge (dialog, toast, graph) = live; P2 HISTORY-ROW-NAME-OVERLAP (studios, told). Hole table: ✓ only starts placing, a click
+   places it (= live; my DRW-HOLE-TABLE-NOT-SAVED closed). Drawing hover (view tan frame, dimension) = rows 130. To verify on
+   their greens: asm b146b56f (drag group, typed limits), dx BRAND-IN-UI-TEXT, skasm Simulation connection dropped.
+   Next: sketch tools walk (arcs, spline, slot, polygon, sketch fillet / mirror, angle + radius dims). App runs: units qa-xvfb110 + qa-walk*-app
    (systemd-run, NOSHAPE_CONFIG_DIR per doc), tool search alt+c + name + Return; Esc keeps selection, Space clears.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
