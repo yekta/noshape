@@ -28,6 +28,14 @@ lines to "name N/M", LC_ALL=C sort, join, awk $2!=$3). None worse -> land.sh. Th
 - Offset distance (81be4f10, qa P1 OFFSET-EDIT-SCALES-SKETCH): an OffsetPair's Distance is no first dimension; its
   edit moves the sources, copies stay (live psb 10-24 j (c)). scene `an_offsets_new_distance_moves_the_source_...`.
 - Search tools Alt+C row test (e9643735, sketch tools matrix).
+- Closed-box SM extrude (996d8438, qa P2 SMM-EXTRUDE-CLOSED-PROFILE): the 4 lines already built live's box (32 faces,
+  12843.115 mm³, red "cannot be unfolded"); qa's failure was the whole sketch picked ("Edges of Sketch 1" -> host got
+  the sketch's bodies, sheet included). custom run.rs: a Reference::Sketch in a curve-only field = its curves.
+  Pin `an_extruded_closed_rectangle_is_a_box_that_cannot_unfold` (both picks). Not in suite N (no parity doc hits it).
+  Left: sketch points passed through ops into sketchCurves say "Cannot compute tangent line." (the app's filter blocks them).
+- Simulation connection removed (77fa48ed, lead; DECISIONS 11-16): mate dialog field + flyout row + model-data/ops
+  fields, run.py drops the two labels, scenario asm-slider-simulation-connection deleted. ops e2e assembly 14, coverage,
+  assembly-ui 97, clippy clean (vibex8).
 - sketch-vertical-key: psui's (lead 21:2x): the start view is live's Trimetric; the 11-06 take's zoom differs. After
   cf70e676 lands psui reruns; a gap left is the reach measure, mine with psui. No re-baseline.
 
