@@ -609,12 +609,12 @@ Configurations box with "Configuration [Default ▾]"; a duplicate "A" typed + E
 nothing; the row menu Switch to "A" · Set as default · Duplicate row · Move up · Move down · Delete row (no Move down on the last
 row); "abc" / "-5" in an inactive row show plain, no error; switched to the "abc" row: Extrude 1 red, error mark by Features,
 Parts (1), cell bold; switching back clears at once and never greys rows (6 shots in the first second).
-- [ ] (studios fixed 8f6c7a463, on main; to verify) **P1 CFGFEEL-ROW-CLICK-SWITCHES (studios)**: a plain click on a row's name switches to it (row B: the box says B, Depth 40 mm
+- [x] (studios 8f6c7a463; qa verified 11-19 03:35 on green 3d422009, vibe2 Xvfb, shots qa-scratch/stv: a click on Large's name keeps Small active) **P1 CFGFEEL-ROW-CLICK-SWITCHES (studios)**: a plain click on a row's name switches to it (row B: the box says B, Depth 40 mm
   applied); live: a row click doesn't switch, only the row menu's Switch to or the feature list's box.
-- [ ] (studios fixed 2cf308c1d, on main; to verify) **P2 CFGFEEL-BAD-CELL-PINK (studios)**: the active row's "abc" cell stays white (bold only); live tints it pink.
-- [ ] (studios fixed 2cf308c1d, on main; to verify) **P2 CFGFEEL-CELL-LOOK (studios)**: configured cells show the bare value; live's read "› 10 mm" with a ± dimension icon at the
+- [x] (studios 2cf308c1d; qa verified 11-19 03:35 on green 3d422009, vibe2 Xvfb, shots qa-scratch/stv: Small's failing "#abc" cell pink) **P2 CFGFEEL-BAD-CELL-PINK (studios)**: the active row's "abc" cell stays white (bold only); live tints it pink.
+- [x] (studios 2cf308c1d; qa verified 11-19 03:35 on green 3d422009, vibe2 Xvfb, shots qa-scratch/stv: "› 40 mm" with the ± icon) **P2 CFGFEEL-CELL-LOOK (studios)**: configured cells show the bare value; live's read "› 10 mm" with a ± dimension icon at the
   right.
-- [ ] (studios fixed 2cf308c1d, on main; to verify) **P3 CFGFEEL-DUP-ID (studios)**: CLI config add_option "A" twice gives the id "A_2"; live stores "A0" (FeatureScript ids).
+- [x] (studios 2cf308c1d; qa verified 11-19 03:35 on green 3d422009, vibe2 Xvfb, shots qa-scratch/stv: ids A, A0) **P3 CFGFEEL-DUP-ID (studios)**: CLI config add_option "A" twice gives the id "A_2"; live stores "A0" (FeatureScript ids).
 - Not judged: a row added after a parameter is configured shows an empty Depth cell in ours (live2 added its rows before configuring).
 
 ## Workflow feel vs live's 11-18 07:09-07:22 timings (qa 07:38, green b5c4ccc4, live's host and method: Xvfb, real pointer, polled crops at live's 139 ms, n 10, medians)
@@ -834,15 +834,15 @@ edits say the same; "Update feature" is its API). Not judged: open / scroll timi
   hist-v3-click.png). The last hovered row also keeps its tint after the pointer leaves the panel.
   Live: the click opens that microversion, the row selected #b2ddf6, with "History changes are view only. Viewing <change>"
   [Restore to Main] [Return to Main].
-- [ ] (studios fixed c5c79882f, on main; to verify) **P1 HISTFEEL-CHANGE-BAR (studios)**: right-click › Open on a change row opens it (row selected, model changes) but shows an
+- [x] (studios c5c79882f; qa verified 11-19 03:35 on green 3d422009, vibe2 Xvfb, shots qa-scratch/stv: an older change: navbar V1, "History changes are view only. Viewing …" with Restore / Return; the version's last change opens as V1; header compare and × only) **P1 HISTFEEL-CHANGE-BAR (studios)**: right-click › Open on a change row opens it (row selected, model changes) but shows an
   orange "VIEWING HISTORY" badge after "Main" in the navbar and no bar; live: the navbar says the version it belongs to ("V3") and
   the white bar above; the panel header keeps only the compare icon and × (ours keeps all four icons, for a version too).
 - [x] (verified qa 09:24 on green 83922ad8: an expanded version reads "⌄ 15 changes") **P2 HISTFEEL-EXPANDED (studios)**: an expanded version reads "⌄ Hide changes…" (live "⌄ 15 changes", the count); its change
   rows are 26 px, white, with a time in Modified (live 30 px, grey background, Modified empty).
-- [ ] (studios fixed f7bf434a2, on main; to verify) **P2 HISTFEEL-SCROLL (studios)**: the search box and toggles stay put while the rows scroll, and the legend (Workspace, Version,
+- [x] (studios f7bf434a2; qa verified 11-19 03:35 on green 3d422009, vibe2 Xvfb, shots qa-scratch/stv, 25 versions: search and toggles scroll away, Name | Modified pinned, legend after Start) **P2 HISTFEEL-SCROLL (studios)**: the search box and toggles stay put while the rows scroll, and the legend (Workspace, Version,
   Change, …) is pinned at the panel's bottom with the graph lines drawn over it; live scrolls search, toggles and rows in one
   container with only "Name | Modified" pinned, and the legend comes after Start at the end of the list.
-- [ ] (studios: the change row's tooltip f7bf434a2, on main; the version row's beside the panel 11-19 01:45; to verify) **P2 HISTFEEL-CHANGE-TOOLTIP (studios)**: a change row hovered 2 s shows no tooltip (live "<change>: Change by <user> at 11:42 PM
+- [x] (studios f7bf434a2 + e07c03bc0; qa verified 11-19 03:35 on green 3d422009, vibe2 Xvfb, shots qa-scratch/stv: "Part Studio 1 :: Insert feature : Extrude 1: Change by … at 3:24 AM Today"; the version row's "Open version V1" beside the panel) **P2 HISTFEEL-CHANGE-TOOLTIP (studios)**: a change row hovered 2 s shows no tooltip (live "<change>: Change by <user> at 11:42 PM
   Today"); a version row's tooltip sits under the pointer (live: beside the panel's right edge).
 
 ## Sheet metal, right-click menus and navigation vs live's 11-17 captures (qa 00:16, green 7187ac751, vibex6 Xvfb, real pointer and keys)
@@ -893,11 +893,11 @@ snippet, Tab closes and inserts a tab, Esc keeps "op"; Commit solid blue while e
   it grey (184,184,184) at the end (as ours draws it in a fresh document). Recapture: #b8b8b8 with the pointer away, rolled back or
   not; (200,217,226) only while hovered: my 2 s shot had the pointer still on it. 8d2e0056 restores ours.
 - [ ] **P2 FLFEEL-BAR-MENU (psui)**: a right-click on the rollback bar opens no menu; live's has "Roll to end".
-- [ ] (studios fixed d94834aa7, on main; to verify) **P1 VSFEEL-NAME-RED (studios)**: an invalid name ("10", "1x") isn't marked while typed (live: red border, pink fill at once);
+- [ ] (studios d94834aa7; qa 11-19 03:35 on green 3d422009, vibe2 Xvfb, shots qa-scratch/stv: Enter adds nothing and Esc then empties the row =; STILL ≠: "1x" typed in the add row's Name has no red border or pink fill, typed as text or as keys; the feel test checks the text, not the drawn cell) **P1 VSFEEL-NAME-RED (studios)**: an invalid name ("10", "1x") isn't marked while typed (live: red border, pink fill at once);
   after an Enter on it, Esc keeps the text (live throws it away).
-- [ ] (studios fixed d94834aa7, on main; to verify) **P1 VSFEEL-UNITS (studios)**: "2 in" in a Length (mm document) stays "2 in" in the cell (live: "50.8 mm"); a selected value cell
+- [x] (studios d94834aa7; qa verified 11-19 03:35 on green 3d422009, vibe2 Xvfb, shots qa-scratch/stv: "2 in" -> 50.8 mm; a hovered value shows "2 in" over the Value header) **P1 VSFEEL-UNITS (studios)**: "2 in" in a Length (mm document) stays "2 in" in the cell (live: "50.8 mm"); a selected value cell
   shows no expression bubble over the Value header (live: "2 in" / "10 mm").
-- [ ] (studios fixed d94834aa7, on main; to verify) **P2 VSFEEL-ERROR-BUBBLE (studios)**: a selected error value has the blue border and no bubble (live: red border, grey "Error
+- [x] (studios d94834aa7; qa verified 11-19 03:35 on green 3d422009, vibe2 Xvfb, shots qa-scratch/stv: selected "#nosuch" red border, pink fill; hovered "Error regenerating.") **P2 VSFEEL-ERROR-BUBBLE (studios)**: a selected error value has the blue border and no bubble (live: red border, grey "Error
   regenerating." over the Value header).
 - Not judged: the regeneration spinner (the louver's roll back to the end finished in under 0.8 s here); undo of Hide; the FS gutter
   marker came 0.5-1.5 s after typing (debug build at load 24; live within 0.5 s) and the grey "out of date" step.
