@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-19 21:20 UTC (fresh dx thread, 11-19 21:0x). Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-19 22:21 UTC (fresh dx thread, 11-19 21:0x). Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -9,12 +9,23 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
-## Now (21:20)
+## Now (22:21)
 - C (fan-blade HLR sampling) PARKED by the lead (1.66x < 2x): TICKETS FAN-BLADE-VIEWS-HLR-SAMPLING (P3).
-- Running: surf-intro rerun with live2's Isocline refs on the Mac (unit dx-sisurf on this host, from dx-main at
-  406dd8eb; out /root/dx-scratch/sisurf.out; Mac ~/noshape-host/dx-keep/si.sum). Next: why our derived "Car" is live's
-  "Instructions" (220/612/408; live's Car JWD 7/14/9): parity.rs derived_source maps live's part ids by
-  t.resolve(JWD), else by name.
+- surf-intro rerun with live2's refs (Mac, dx-main): all 5 (boundary / fill / mutualtrim / offset / ruled) still stop
+  at "Derived 1". Cause 1: live's refs for queries inside an array item ("wireProfilesArray[1].wireProfileEntities")
+  never matched (pid lacked the item path), so the source's Loft 3 went by query text to a wrong edge. Cause 2: our
+  Loft refused coplanar OPEN profiles ("Could not determine loft direction."; live only refuses closed ones). Both fixed
+  in fb8f84f42 (+ model test engine::surface_loft_between_coplanar_open_curves): the derived Car is now the closed
+  5/9/6 car of live's Loft 4. Left: the source's Fillet 1 (r 0.6 in, tangent chain from the right top edge) fails
+  in ours (live 7/14/9): sent to blend 22:2x with repro /root/dx-scratch/si-save/c2-surf-intro-offset.noshape (needs
+  fb8f84f42). Rebuild 130 ms -> ~1.5 s (live 0.36-1.2 s): the lofts now build + the failing fillet; recheck after
+  blend's fix. Mac scripts: ~/noshape-host/dx-keep/sitrace.sh (copy /tmp/sitrace.sh), sisurf.sh.
+- QUEUED to land after asm's gate: fb8f84f42. asm (22:1x): run asm-pattern-std A/B myself, land if it keeps "162/162
+  occurrences, 92/92 mates, 17/17 BOM rows" and adds no "difference:" lines: vibex8 ~/agents/dx-keep/pstd.sh (ops-pA
+  = main 8403d168, ops-pB = fb8f84f42; out pstd-{A,B}.out), running.
+- hex-bookcase DXF counts vs live after the determinism fix (d864cf7e1): vibex7 ~/agents/dx-keep/exhb.sh (slot, out
+  ~/tmp/dx/exch-hb.log), queued.
+- Next: the rest of "Next, in order".
 - The Mac's dx-main release target links a PRIVATE TKHLR (OCCT_ROOT=~/noshape-host/dx-keep/hlr/root, counters only
   with DXHLR=1); rebuild with the normal OCCT_ROOT for timings.
 
@@ -102,25 +113,8 @@ Open, ranked:
 ## Next, in order
 P. Parked (lead 21:2x: no OCCT class layout change): FClass2d per-wire boxes (/root/dx-scratch/occt-patch/
    0034-fclass2d-wire-boxes.patch, adds a member): fill-pattern Iso 11.3 -> 1.98 s; land only ABI-neutral.
-N. Drawings not deterministic: fixed, QUEUED ba3d6cc1 (23:2x; d8ace4d34..6b1a7bc72). OCCT patch 0035 (Contap sample
-   bounds thread_local; libs installed by the lead on every host + Mac, backups .bak-0034) and mesh_body.cpp facet
-   edges by vertex creation order. Proof: Mac dvp35.sh, identical over 3 parallel runs + one thread. After the land:
-   hex-bookcase's DXF counts vs live (was LINE 211/206, LWPOLYLINE 17/25; its mesh edges now run one fixed way).
-C. UN-PARKED (lead 11-19 16:2x: 3.4 s and 2.6-3.4x live's per view) fan-blade (~2.6x live a view): Hide in 8 threads over one body's edges was not identical (4 / 17
-   corpus drawings) and slower (Front 5.3 -> 9.8 s, Update 6.5 -> 37 s); attempt in /root/dx-scratch/p36.
-   11-19 (Mac private TKHLR, /root/dx-scratch/hlr-retry, dvhlr*.sh): fan-blade's 5 timed items = 3.16M exact line /
-   surface calls (all fan-blade's), 7.7M solves; rejected solves 6.65M = 37.8 s, accepted 0.98M = 2.3 s (max 77 iters,
-   rejects mostly 5-10 iters: no iteration cap to win). One try per start point: views identical, slower (dropped).
-   Classify's line clipped at wLim - TolZ (DXHLR_CLIP): views identical, calls 3.16 -> 2.94M, no faster (dropped).
-   Cause found: 5576 line / surface calls make all 6.45M start points (~1160 each, no tangent zones), every call's ~200
-   results one root at the line's end (the edge's own face: discarded by Classify). The face: a long thin B-spline strip
-   (u 0.0001-0.0009, v 4-47); HLRBRep_Surface types every B-spline OtherSurface, sampled 10 x 10 -> deflection 3.7 mm,
-   so every triangle is a candidate. (Also: NbSamplesU/V(s, u1, u2) divide by first - last: any nbs > 10 becomes 5.)
-   The strip is 0.83 mm x 57 mm (the blade's edge face): 10 x 10 gives deflection 3.7 mm = 4.5x its width.
-   DXHLR_SAMPLES (B-spline faces n x n): 20 identical but no faster; 40: Front 5.8 -> 3.5 s, Top 5.3 -> 3.2, Right / Iso
-   / Update ~unchanged, and fan-blade's views CHANGE (9993 -> 8875 dump lines; other 16 drawings identical). No live
-   fan-blade drawing to judge which is right. Decision asked of the lead (11-19 17:2x): pursue (live2 DXF of fan-blade's
-   4 views + size-based sampling, an OCCT TKHLR patch) or park C.
+N. Drawings deterministic: landed d864cf7e1 (OCCT patch 0035 + mesh_body facet order); hex-bookcase recheck in Now.
+C. PARKED (lead 11-19 21:0x): TICKETS FAN-BLADE-VIEWS-HLR-SAMPLING has the numbers; work in /root/dx-scratch/hlr-retry.
 Q. asm-robot-relations studio 0c3466's Import 1 (REV-21-1650.STEP): live's stored import = six SURFACE parts, ours one
    valid 174-face solid (OCCT: valid, 171,983 mm3; live's six sheets = that shell less plane face #5090). live2
    rr-import-1118 (02:3x): live's own re-import of the same file today gives ONE solid "Combine1" (154 faces), Import 1
@@ -132,10 +126,7 @@ H. Hidden lines vs live (live2 02:32, live/dx/louver-hidden-1119/: sm-louver Fro
    edge): live 188 LINE 244.43 in, ours 244.42 in, each on the other's. /root/dx-scratch/bin/hidcmp2.py ours live tol
    LAYER. Hidden curves: live's 75 ELLIPSE / 3 ARC are noise (0.0002 in long, r <= 0.003 in: edges seen end-on), skipped. Runs: Mac exsh2.sh with
    /root/dx-scratch/dxhidden.patch applied (the exchange suite with DXHIDDEN=1), dumps /root/dx-scratch/dxfm/.
-R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "Import failed: <path>: i/o error: could
-   not read STEP file <path>" (live: "bad.step uploaded but failed to translate."; the app's bubble already said so).
-   In progress: ops import's translation failures say failed_to_translate(file) (upload-only's unreadable file keeps
-   its path); app import_name reads it; e2e a_broken_step_failed_to_translate_as_live. Testing on the Mac (dvimp.sh).
+R. Broken STEP answers live's "<file> uploaded but failed to translate.": landed cf5c3d00.
 0. Speed vs live (lead 11-18 06:1x; release, vibex8, dx_perf, same run; live behaviours "speed: drawings", "dx speed:
    drawing creation and NIST import", "dx (2026-11-02, P1 drawing speed on big models)"):
    - bracket drawing, cold (no cached view): create 10 ms (live 30.1 s, server 3.0), insert view 7 ms (3.0 s),
