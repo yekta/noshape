@@ -154,6 +154,52 @@ fn a_face_a_later_flange_exposes_keeps_its_walls_creator() {
     assert!(creators.iter().all(|c| *c == Some(f1)), "{creators:?} (Flange 1 {f1:?})");
 }
 
+/// Live2 q-sm-creators-1119 A-rect: sm-box (Flange 1 front, Flange 2 right) and a Rectangle Corner at the vertex nearest
+/// (60, 0, 2): the corner relief's cut faces are Corner 1's; the trimmed walls and the bend ends keep their flange.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_corner_reliefs_cut_faces_are_the_corner_features() {
+    let mut s = Studio::new();
+    let region = s.rectangle(60.0, 40.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    let r = s.ok();
+    let front = edge_at(&r, DVec3::new(20.0, 0.0, 2.0));
+    let f1 = s.add("sheetMetalFlange", |p| p.set("edges", ParamValue::Query(vec![front])));
+    let r = s.ok();
+    let right = edge_at(&r, DVec3::new(60.0, 25.0, 2.0));
+    let f2 = s.add("sheetMetalFlange", |p| p.set("edges", ParamValue::Query(vec![right])));
+    let r = s.ok();
+    let b = &r.context.bodies[part(&r)];
+    let at = DVec3::new(60.0, 0.0, 2.0) * 1e-3;
+    let near = b.shape.vertices().iter().enumerate().filter_map(|(i, v)| Some((i, v.vertex_point().ok()?.distance(at)))).min_by(|a, b| a.1.total_cmp(&b.1)).expect("a vertex").0;
+    let v = Reference::Vertex((*b.vertices[near]).clone());
+    let corner = s.add("sheetMetalCorner", |p| {
+        p.set("corner", ParamValue::Query(vec![v]));
+        p.set("cornerStyle", en("RECTANGLE"));
+    });
+    let r = s.ok();
+    let pins = [
+        ((56.8611727, -1.0, 4.5694137), corner),
+        ((56.8611727, 2.5694137, 1.0), corner),
+        ((57.4305863, 3.1388273, 1.0), corner),
+        ((61.0, 3.1388273, 4.5694137), corner),
+        ((60.0, -1.0, 15.0694137), f1),
+        ((61.0, 2.0, 15.0694137), f2),
+        ((56.8611727, 0.0194052, 2.0194052), f1),
+        ((59.9805948, 3.1388273, 2.0194052), f2),
+    ];
+    let got: Vec<_> = pins.iter().map(|((x, y, z), _)| creator_at(&r, DVec3::new(*x, *y, *z))).collect();
+    let want: Vec<_> = pins.iter().map(|(_, f)| Some(*f)).collect();
+    assert_eq!(got, want, "Corner 1 {corner:?}, Flange 1 {f1:?}, Flange 2 {f2:?}");
+    let sh = &r.context.bodies[part(&r)].shape;
+    assert_eq!((sh.faces().len(), sh.edges().len(), sh.vertices().len()), (28, 62, 36), "live's faces, edges, vertices");
+}
+
 /// The creator of the face through `p` (mm), within 1 µm.
 fn creator_at(r: &RegenResult, p: DVec3) -> Option<FeatureId> {
     let b = &r.context.bodies[part(r)];

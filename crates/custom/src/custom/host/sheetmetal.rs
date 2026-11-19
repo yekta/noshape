@@ -1162,9 +1162,26 @@ fn corner_reliefs(def: &Definition, topo: &Topo, outlines: &[Outline], bends: &B
         let Some((l, _, _)) = outline else { continue };
         let m = l.pts.len();
         for k in 0..m {
-            let (e1, e2) = (l.side[(k + m - 1) % m], l.side[k]);
+            let (mut e1, mut e2) = (l.side[(k + m - 1) % m], l.side[k]);
             let v = l.pts[k];
             let vi = topo.nearest_vertex(v);
+            // An automatic miter's corner (live sm-box, q-sm-creators-1119 A-rect: a Rectangle Corner on Flange 1's bend
+            // end): a thickness-long stub of the sheet's edge runs on to the other bend, which carries on in its line;
+            // the relief is the two bends' corner at this end, the other bend clipped from its own end.
+            let mut mate: Option<(usize, DVec3, f64)> = None;
+            if def.corners.get(&vi).is_some_and(|c| matches!(c.style.as_str(), "RECTANGLE" | "SIZED_RECTANGLE")) {
+                let bent = |e: usize| setbacks.contains_key(&e);
+                let in_line = |a: DVec3, b: DVec3| a.normalize_or_zero().cross(b.normalize_or_zero()).length() < 1e-6;
+                let (next, after) = (l.pts[(k + 1) % m], l.pts[(k + 2) % m]);
+                let (prev, before) = (l.pts[(k + m - 1) % m], l.pts[(k + m - 2) % m]);
+                if bent(e1) && !bent(e2) && bent(l.side[(k + 1) % m]) && next.distance(v) <= thickness + TOL && in_line(after - next, next - v) {
+                    e2 = l.side[(k + 1) % m];
+                    mate = Some((e2, next, next.distance(v)));
+                } else if bent(e2) && !bent(e1) && bent(l.side[(k + m - 2) % m]) && prev.distance(v) <= thickness + TOL && in_line(before - prev, prev - v) {
+                    e1 = l.side[(k + m - 2) % m];
+                    mate = Some((e1, prev, prev.distance(v)));
+                }
+            }
             // The Corner feature's setting at this vertex, else the model's
             // (its three-bend style where three bends meet).
             let three = def.bends.keys().filter(|&&e| e < topo.edge_ends.len() && [topo.edge_ends[e].0, topo.edge_ends[e].1].iter().any(|p| p.distance(topo.vertices[vi]) < TOL)).count() >= 3;
@@ -1264,8 +1281,12 @@ fn corner_reliefs(def: &Definition, topo: &Topo, outlines: &[Outline], bends: &B
                 continue;
             }
             let (a, b) = (s2 + x2, s1 + x1);
-            clips.push((e1, v, a));
-            clips.push((e2, v, b));
+            let from_end = |e: usize, d: f64| match mate {
+                Some((me, end, stub)) if me == e => (e, end, d - stub),
+                _ => (e, v, d),
+            };
+            clips.push(from_end(e1, a));
+            clips.push(from_end(e2, b));
             prism(&mut cuts, p, &[v, v + d1 * a, v + d1 * a + d2 * b, v + d2 * b], vi)?;
             // Each flange: along its bend as far as the wall's cut, into it past the bend.
             for (e, d, along, depth) in [(e1, d1, a, b), (e2, d2, b, a)] {
@@ -2603,8 +2624,10 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     && let Some(db) = ev.ctx.bodies.iter().find(|b| b.id == def.body)
                 {
                     let kept: Vec<&Def> = p.sources.0.iter().enumerate().filter(|(fi, _)| p.names.get(*fi) != fresh_names.get(*fi)).map(|(_, d)| d).collect();
+                    // (A bend's end a corner relief moved: beside its bend's faces, live A-rect: Flange 1's.)
+                    let beside = |d: &Def| kept.contains(&d) || matches!(d, Def::Vertex(v) if kept.iter().any(|k| matches!(k, Def::Edge(e) if def.bends.contains_key(e) && topo.edge_ends.get(*e).is_some_and(|(a, b)| a.distance(topo.vertices[*v]) < TOL || b.distance(topo.vertices[*v]) < TOL))));
                     for (fi, n) in p.names.iter_mut().enumerate() {
-                        let Some(src) = p.sources.0.get(fi).filter(|d| *n == fresh_names[fi] && kept.contains(d) && p.relief.get(fi) != Some(&true)) else { continue };
+                        let Some(src) = p.sources.0.get(fi).filter(|d| *n == fresh_names[fi] && beside(d) && p.relief.get(fi) != Some(&true)) else { continue };
                         let Some(c) = definition_creator(db, src, &order).filter(|c| *c != studio_feature) else { continue };
                         *n = Arc::new(crate::reference::TopoName::face(c, crate::reference::Role::Generated(n.clone())));
                     }
@@ -3599,14 +3622,41 @@ fn ev_corner_type(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             ve.get(fv).into_iter().flatten().filter(|e| **e != step && sm_attribute(q.st, &q.to_ref(&Ent::Edge(*b, **e as usize)), "JOINT").is_none()).filter_map(|e| leaving(*e, far)).any(|f| f.dot(d) < -1.0 + 1e-6)
         };
         let carries_on = |bend: u32| away(bend).is_some_and(|d| free.iter().any(|e| away(*e).is_some_and(|f| f.dot(d) < -1.0 + 1e-6) || past_step(*e, d)));
+        // An automatic miter ends the other bend one thickness on along the sheet's edge (live sm-box, q-sm-creators-1119
+        // A-rect: a Corner at Flange 1's bend end): both ends are the corner, open.
+        let mitred = |bend: u32| -> Option<Vec<usize>> {
+            let model = sm_attribute(q.st, &q.to_ref(&Ent::Body(*b)), "MODEL")?;
+            let thickness = length_field(&model, "frontThickness") + length_field(&model, "backThickness");
+            let d = away(bend)?;
+            free.iter().find_map(|e| {
+                let info = shape.sub_shape(k::ShapeType::Edge, *e as usize).ok()?.edge_info().ok()?;
+                let far = if info.start.distance(at) < info.end.distance(at) { info.end } else { info.start };
+                if far.distance(at) > thickness + TOL {
+                    return None;
+                }
+                let there: Vec<usize> = shape.vertices().iter().enumerate().filter(|(_, x)| x.vertex_point().is_ok_and(|p| p.distance(far) < TOL)).map(|(n, _)| n).collect();
+                let bent = there.iter().flat_map(|n| ve.get(*n).cloned().unwrap_or_default()).filter(|f| f != e).any(|f| {
+                    let joint = sm_attribute(q.st, &q.to_ref(&Ent::Edge(*b, f as usize)), "JOINT");
+                    joint.is_some_and(|j| j.get("jointType").get("value").as_str().as_deref() == Some("BEND")) && leaving(f, far).is_some_and(|g| g.dot(d).abs() < 1.0 - 1e-6)
+                });
+                bent.then_some(there)
+            })
+        };
+        let mut mate = Vec::new();
         let kind = match (bends.as_slice(), rips) {
             ([], _) => "NOT_A_CORNER",
             ([bend], 0) if carries_on(*bend) => "BEND_END",
-            ([_], 0) => "NOT_A_CORNER",
+            ([bend], 0) => match mitred(*bend) {
+                Some(there) => {
+                    mate = there;
+                    "OPEN_CORNER"
+                }
+                None => "NOT_A_CORNER",
+            },
             ([_, _, ..], 1..) => "CLOSED_CORNER",
             _ => "OPEN_CORNER",
         };
-        Ok((kind, verts.iter().map(|n| q.to_ref(&Ent::Vertex(*b, *n))).collect::<Vec<Reference>>()))
+        Ok((kind, verts.iter().chain(&mate).map(|n| q.to_ref(&Ent::Vertex(*b, *n))).collect::<Vec<Reference>>()))
     })?;
     // Transient ids (std's wrapper makes them queries).
     let mut st = cx.state.lock();
