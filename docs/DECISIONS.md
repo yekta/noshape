@@ -43,6 +43,10 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-15 A bool replay flag (1e-9 volume, history hash) from a more exact curve than OCCT's is accepted when the end-to-end
   check is identical (every suite document's topology and feature status, hats/dock SAME, corner-break 42 faces) and
   the volume is within live's band; any end-to-end difference parks it (rings-loft / knife Mirror 11-15).
+- 11-19 (lead) A gate case with no live document may be an exception without a live capture only when OCCT
+  contradicts itself on an exact symmetry (the same arguments rotated or mirrored) and ours gives both copies OCCT's
+  other answer (bool2-exact shfall 5101adb8 = 6bb081c8 turned 90°: OCCT 1.93 mm³ off on one). Any other OCCT
+  difference still needs live.
 - 11-16 A vertex live leaves splitting one edge into two pieces of the same curve (no new geometry; e.g. impeller f24's
   split 47 µm from a corner) is a known live difference when the faces match, the volume is within tolerance and no
   later feature references it. Record it with its measurements in the suite's known-differences table.
