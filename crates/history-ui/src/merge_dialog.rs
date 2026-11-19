@@ -207,9 +207,10 @@ fn plan(doc: &Entity<DocModel>, source: Side, source_name: String, restore: bool
     let base = if restore { from } else { store.merge_base(ours, from)?.ok_or_else(|| anyhow::anyhow!("These workspaces share no history."))? };
     let (bb, ob, tb) = (store.read_all(base)?, store.read_all(ours)?, store.read_all(from)?);
     let tab_of = |m: &BTreeMap<String, Vec<u8>>, n: &str| m.get(n).and_then(|b| serde_json::from_slice::<Tab>(b).ok());
-    // The target's tab order, then tabs only in the source.
+    // The target's tab order as its tab bar shows it (live 49-merge-dialog: Part Studio 1 / Variable Studio 1 /
+    // Assembly 1), then tabs only in the source.
     let current = &s.doc;
-    let mut names: Vec<String> = current.tabs.iter().map(|t| noshape_model::document::Document::blob_name(t.id)).collect();
+    let mut names: Vec<String> = current.ordered_tabs().iter().map(|t| noshape_model::document::Document::blob_name(t.id)).collect();
     for n in bb.keys().chain(ob.keys()).chain(tb.keys()).filter(|n| n.starts_with("tab/")) {
         if !names.contains(n) {
             names.push(n.clone());
@@ -771,6 +772,8 @@ mod tests {
             call(&mut ctx, "variable_studio_settings", json!({ "tab": "Variable Studio 1", "insert_into_all": true }));
             call(&mut ctx, "variable_create", json!({ "tab": "Variable Studio 1", "name": "width", "value": "30 mm" }));
             call(&mut ctx, "tab_create", json!({ "kind": "assembly" }));
+            // The tab bar's order, not the order the tabs were made in.
+            call(&mut ctx, "tab_move", json!({ "tab": "Variable Studio 1", "before": "Assembly 1" }));
             call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
             let b = call(&mut ctx, "history_create_branch", json!({ "name": "B1", "version": "V1" }));
             call(&mut ctx, "history_switch_branch", json!({ "branch": "B1" }));
@@ -786,6 +789,8 @@ mod tests {
         for name in ["Part Studio 1", "Variable Studio 1", "Assembly 1"] {
             assert!(rows.iter().any(|r| r.0 == name && r.1 == Change::None && r.2 == Change::Edited), "{name} edited in B1 only: {rows:?}");
         }
+        // In the tab bar's order (qa 11-19 retake: ours listed Assembly 1 first).
+        assert_eq!(rows.iter().map(|r| r.0.as_str()).collect::<Vec<_>>(), ["Part Studio 1", "Variable Studio 1", "Assembly 1", "Assembly 2"]);
         assert_eq!(plan.opening(), (Strategy::Replace, false), "opens on Replace with B1, no merge card");
         let _ = std::fs::remove_dir_all(&dir);
     }
