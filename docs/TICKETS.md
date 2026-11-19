@@ -852,6 +852,14 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   tooltip on click", live/qa/dialog-tip-1119 B): shows ~40 ms after hover, fades in over ~250 ms, stays during the press (80 and
   600 ms holds), gone the first frame after release, no fade-out. (qa 11-19, green a58eee8c)
 
+- [ ] P1 **SKETCH-DXF-EXPORT-POLYLINES (skasm)**: a sketch's (or planar face's) Export as DXF/DWG… writes every curve as a
+  tessellated POLYLINE in f32 (crates/ops/src/sketch_export.rs plane_sheet; the app's modal uses the same sketch_sheet / face_sheet).
+  A Ø33 circle comes out as one 85-vertex POLYLINE; inserted back (Insert DXF or DWG) it is 84 lines, region 856.84 mm² vs the
+  circle's 857.64. Lines round-trip exactly. The flat pattern's export already writes exact ARC / CIRCLE / ELLIPSE / SPLINE
+  entities (1021a0c19; = live's a-defaults.dxf), so a laser-cut part exported from a sketch is worse than from a flat. Live's
+  sketch DXF capture requested (REQUESTS "qa (2026-11-19 23:57 UTC)"); expect exact entities as in the flat export.
+  Files: qa-scratch/tickets/sketch-dxf-1119/. (qa 23:58, green f6f8069f)
+
 - [ ] P2 **ERROR-CHIP-RED-NO-FIELD (psui)**: Thicken on a box face, Thickness 1 = 0 and Thickness 2 = 0 (behaviours L19): title red,
   "Thicken 1 did not regenerate properly: Invalid input selections." = live, but ours also draws the "Face of Move face 1" chip in red
   text. Live flags no field for this error: title red only, the chip stays dark (live/part-studio/2059-psbL16-ThickenL19bothzero.png).
