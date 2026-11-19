@@ -91,16 +91,15 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    qa-psui-lod (heavy/psui-lod.sh: asm's LOD change 46edfa849 by subject "<agent>: HEAVY-ASM-SOFTWARE-FRAME, LOD side" -> vibex7 release
    builds of it + parent, runq.sh x5 alternating on local :154, wheel zoom / orbit first frame medians -> qa-alerts; P0 rule).
    Kept vibe2 ~/agents/qa-keep/{session-ps2-1119,studio-1119-recheck}.
-0000. **11-19 16:50 state (thread 40e853dc since 13:28; old 132756b3 stopped, Ubeyd limit).** Ids: lead 818534eb, psui
-   7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, live2 d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1; live stopped till ~21:00 (requests to live/REQUESTS.md).
-   Done: LOD A/B (asm 08ac528e6 vs parent): zoom 530 -> 240, orbit 1191 -> 681 ms, faster (psui-lod.sh builds through vibex7's slot now,
-   after earlyoom killed a build). Merge-dialog tab order verified (17c26dc1). Feel suite 1119-1242-223cec7e: 2110/2172; the 67 failures
-   re-run on eb3b06a8 (bin/uip-rerun.sh <names> <run>: vibe2, qa-bisect checkout, 2 apps under ~/tmp/qa/uip.lock): 39 still fail ->
-   owners P0 (list suites/1119-1610-eb3b06a8-uipr/rows.txt, live2 is retaking live's side); TICKETS "Interaction feel suite 11-19".
-   17:00 cut: GO 16:45 on eb3b06a8 (split / singularities final parts -> core). qa-session-night's failure = night window over (night-seq
-   replaced it), cleared. Waiters: qa-rows-dxf (bin/wait-rows.sh <subject regex> <since> <label> <scenarios>: re-runs rows on the first
-   green with the commit) for dx's face-rclick-export-dxf fix; note: dx changed run.py to compare that dialog's fields by label: check.
-   After the publish: rel-pub-all.sh 0.4.60 <new> as in item 1. bin/evwait.sh <units> wakes the agent when one ends.
+0000. **11-19 21:05 state (thread 40e853dc since 13:28).** Ids: lead 818534eb, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, live2
+   d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1. v0.4.61 = eb3b06a8 (cut GO 16:45 / 17:20), published 20:04; qa-pub-0461 running (candidate step
+   = released CLI vs itself: eb3b06a8's binary is gone; compare compat/rel-0.4.61.txt with compat/cut-1119-1615.txt by hand). Then the
+   spot-check rows 17-24 and the hover flow (Release checks 3-4).
+   Feel 11-19: 39 rows to owners (suites/1119-1610-eb3b06a8-uipr/rows.txt, live2 verdict per row): 33 confirmed, 4 stale takes retaken
+   (trims ae7a6d55 = ours on re-check 18:22; dimension-variable 1da77c2a), line-chain with skasm + live2, drw-constraint-tangent retake
+   60784916. dx export dialog verified 3/3 on 64566cd2 (17:38). Re-check tools: bin/uip-rerun.sh <names> <run> (vibe2 :691/692, qa-bisect),
+   bin/wait-rows.sh <subject regex> <since> <label> <scenarios> (waiter unit). LOD A/B done (faster). Corpus split re-saved 17:17
+   (= live 12/12); singularities / pipe wording noted in compat/accepted.txt. qa-night-seq-1120 armed for tonight; re-arm 1121 tomorrow.
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
    with NOSHAPE_PARITY_VALIDITY=1 (bin/suites-models.sh exports it) models.log prints per feature "CHECK <doc> feature <k>:
    <part> valid <true|false> raw f/e/v; ..." (PartState.check, query parts' "check"; not in report.json). suites-diff.py
