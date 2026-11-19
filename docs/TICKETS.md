@@ -895,6 +895,11 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   a closed box of 4 walls with bends at all 4 corners (32 faces: 8 cylinder + 24 plane, 64 edges, 12843.115 mm³); the
   feature ends in a warning, name red, tooltip "Sheet metal model 1 did not regenerate properly: Sheet metal model cannot
   be unfolded." and no flat pattern. Green 624c6db77, walk 22:45. The open L and a Flange on it are = live.
+- [ ] P2 **HISTORY-ROW-NAME-OVERLAP (studios)**: Versions and history, after a branch edit merged into Main: the change row
+  "Part Studio 2 :: Edit : QA Box 1" is wider than the Name column and is drawn over the Modified column's "root"
+  ("Edi‹root›QA Box 1"); nothing clips it. It should end at the column (live ellipsises long names in its lists; this
+  row's exact cut isn't recorded, ask live if needed). Green 624c6db77, walk 23:02. Branch from V1, edit in B1,
+  merge dialog (1 tab changed, Replace with B1), toast "Merged B1 into Main. Revert to before this merge" = live.
 
 ## Interaction feel suite 11-19 (qa 16:20: run 1119-1242-223cec7e on vibex8, failures re-run on green eb3b06a8 on vibe2)
 2110/2172 scenarios (05:51 run on a67911be: 2126). 67 failing; 28 pass on the re-run (load flakes or fixed). The 39 still failing
