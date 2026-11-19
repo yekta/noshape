@@ -1,19 +1,23 @@
 {
  "scenario": "asm-revolute-pin-hole-flip",
- "recorded": "2026-11-08T03:25:55.163Z",
+ "recorded": "2026-11-19T22:33:15.370Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "c725493aa56d056858e43e76",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "3f263d815aae472f31fc2861",
   "start": "pin-block-apart",
-  "startElement": "ed211f3bd9ad0f1f27da328a",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "053ebdbfbec70e9ea2ad6480",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -134,7 +138,34 @@
    ],
    "mates": []
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    15.034,
+    12.932,
+    6.379
+   ],
+   "eye_mm": [
+    48.121,
+    -44.377,
+    44.585
+   ],
+   "width_mm": 127.984,
+   "height_mm": 67.779,
+   "mmPerPixel": 0.0765,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -387,9 +418,36 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      48.121,
+      -44.377,
+      44.585
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 48969
+   "t": 34483
   },
   {
    "step": 2,
@@ -407,8 +465,8 @@
    "ok": true,
    "hover": [],
    "at": [
-    1499,
-    664
+    1524,
+    673
    ],
    "state": {
     "focus": {
@@ -534,7 +592,7 @@
       {
        "kind": "FEATURE",
        "owner": null,
-       "id": "MqTADR8NqZX+bqx4A"
+       "id": "MFs2DASMY9LyinZHk"
       }
      ]
     },
@@ -654,9 +712,36 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      48.121,
+      -44.377,
+      44.585
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 69179
+   "t": 43912
   },
   {
    "step": 3,
@@ -674,8 +759,8 @@
    "ok": true,
    "hover": [],
    "at": [
-    826,
-    388
+    811,
+    380
    ],
    "state": {
     "focus": {
@@ -803,12 +888,12 @@
       {
        "kind": "FEATURE",
        "owner": null,
-       "id": "MqTADR8NqZX+bqx4A"
+       "id": "MFs2DASMY9LyinZHk"
       },
       {
        "kind": "FEATURE",
        "owner": null,
-       "id": "MHHHNqWURD5tbd5RB"
+       "id": "MzPsGJkuSl8t+2QQN"
       }
      ]
     },
@@ -928,9 +1013,36 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      36.105,
+      -23.565,
+      30.71
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 86666
+   "t": 53520
   },
   {
    "step": 4,
@@ -941,8 +1053,8 @@
    "ok": true,
    "pointer": {
     "at": [
-     826,
-     387
+     810,
+     379
     ],
     "hover": [],
     "element": "canvas#canvas"
@@ -1066,9 +1178,36 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      48.121,
+      -44.377,
+      44.585
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 92750
+   "t": 57326
   }
  ]
 }
