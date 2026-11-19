@@ -1,6 +1,6 @@
 # Commands and options live has that Noshape lacks or only partly has (live2 completeness audit, 11-19)
 
-Method (live 10:00–10:40 UTC, a scratch doc with a plate, a pin, an assembly and a drawing; captures in
+Method (live 09:55–10:12 UTC, a scratch doc with a plate, a pin, an assembly and a drawing; captures in
 `onshape-research/live/audit-1119/`):
 - **Commands:** every Part Studio, Assembly and Drawing command from live's Customize toolbar (with "Show items
   already in toolbar"), the toolbar and its dropdowns, and Search tools swept a–z in the Part Studio and in a
