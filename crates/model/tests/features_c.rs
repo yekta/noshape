@@ -5168,3 +5168,31 @@ fn a_cars_top_edges_round_along_their_tangent_chain_as_live() {
     let v = volume(&r, 0) * 1e9;
     assert!((v - 1289903.86).abs() < 1289903.86 * 3e-4, "{v} mm³ (live 1289903.86)");
 }
+
+/// asm-suspension's Joint (805e29) Fillet 1 on the Knuckle as Extrude 3 leaves it: r 40 on four concave lines where
+/// parallel cylinders meet, each round a cylinder. Live: 17/34/16, 395393.54 mm³, its edges exact: 8 lines along the
+/// rounds and circles on the end planes (ours were OCCT's B-splines, the faces already cylinders).
+#[test]
+fn rounds_between_parallel_cylinders_have_exact_edges_as_live() {
+    let brep = include_str!("data/suspension-knuckle-fillet1-input.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let picked: Vec<Reference> = b.shape.edges().iter().enumerate().filter(|(_, e)| e.edge_info().is_ok_and(|i| matches!(i.curve, noshape_kernel::Curve::Line { .. }) && near(i.length, mm(60.0), mm(1e-3)) && near(i.start.y.abs(), mm(13.642), mm(1e-2)))).map(|(k, _)| Reference::Edge((*b.edges[k]).clone())).collect();
+    assert_eq!(picked.len(), 4);
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(picked));
+        p.set("radius", expr("40 mm"));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    let shown = shape.shown_topology().unwrap();
+    assert_eq!((shape.faces().len(), shown.edge_count(), shown.vertices.iter().filter(|v| **v).count()), (17, 34, 16));
+    let v = volume(&r, 0) * 1e9;
+    assert!((v - 395393.54).abs() < 0.05, "{v} mm³");
+    let ef = shape.edge_faces().unwrap();
+    let kinds: Vec<_> = shape.edges().iter().enumerate().filter(|(k, _)| ef[*k].len() == 2).filter_map(|(_, e)| e.edge_info().ok()).map(|i| i.curve).collect();
+    assert!(kinds.iter().all(|c| matches!(c, noshape_kernel::Curve::Line { .. } | noshape_kernel::Curve::Circle { .. })), "{kinds:?}");
+    assert_eq!(kinds.iter().filter(|c| matches!(c, noshape_kernel::Curve::Line { .. })).count(), 8);
+}

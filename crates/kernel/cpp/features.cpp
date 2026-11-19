@@ -60,6 +60,7 @@
 #include <math_Jacobi.hxx>
 #include <math_Gauss.hxx>
 #include <BSplCLib.hxx>
+#include <GeomConvert_CurveToAnaCurve.hxx>
 #include <GeomConvert_SurfToAnaSurf.hxx>
 #include <GeomProjLib.hxx>
 #include <Geom2dAPI_PointsToBSpline.hxx>
@@ -6564,6 +6565,66 @@ static double tighten_new_tolerances(const TopoDS_Shape& input, const TopoDS_Sha
   return std::numeric_limits<double>::infinity();
 }
 
+// A blend's edges between faces made analytic (OCCT's approximations kept from the B-spline faces) that are lines or
+// circles within `tol`: rebuilt exact, as Parasolid's (asm-suspension's Joint 805e29 Fillet 1: r 40 between parallel
+// cylinders, live's lines along them and circles on the end planes). Kept only when the solid stays valid and its volume
+// the same.
+static void analytic_blend_edges(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h, double tol)
+{
+  ShapeIMap old;
+  TopExp::MapShapes(input, TopAbs_EDGE, old);
+  ShapeAncMap ef;
+  TopExp::MapShapesAndAncestors(r, TopAbs_EDGE, TopAbs_FACE, ef);
+  occ::handle<BRepTools_ReShape> rs  = new BRepTools_ReShape();
+  bool                           any = false;
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const TopoDS_Edge e = TopoDS::Edge(ef.FindKey(i).Oriented(TopAbs_FORWARD));
+    if (old.Contains(e) || BRep_Tool::Degenerated(e) || ef(i).Extent() != 2)
+      continue;
+    const GeomAbs_CurveType type = BRepAdaptor_Curve(e).GetType();
+    if (type != GeomAbs_BSplineCurve && type != GeomAbs_BezierCurve)
+      continue;
+    bool elementary = true;
+    for (const TopoDS_Shape& f : ef(i))
+    {
+      const GeomAbs_SurfaceType t = BRepAdaptor_Surface(TopoDS::Face(f), false).GetType();
+      elementary = elementary && (t == GeomAbs_Plane || t == GeomAbs_Cylinder || t == GeomAbs_Cone || t == GeomAbs_Sphere || t == GeomAbs_Torus);
+    }
+    if (!elementary)
+      continue;
+    double                  f = 0, l = 0;
+    TopLoc_Location         loc;
+    occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, loc, f, l);
+    if (c.IsNull())
+      continue;
+    if (!loc.IsIdentity())
+      c = occ::down_cast<Geom_Curve>(c->Transformed(loc.Transformation()));
+    GeomConvert_CurveToAnaCurve conv(c);
+    occ::handle<Geom_Curve>     ana;
+    double                      nf = 0, nl = 0;
+    if (!conv.ConvertToAnalytical(tol, ana, f, l, nf, nl) || ana.IsNull() || conv.Gap() > tol)
+      continue;
+    if (!ana->IsKind(STANDARD_TYPE(Geom_Line)) && !ana->IsKind(STANDARD_TYPE(Geom_Circle)))
+      continue;
+    any = edge_on_curve(e, ana, ef(i), rs, tol) || any;
+  }
+  if (!any)
+    return;
+  const TopoDS_Shape out = rs->Apply(r);
+  if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+    return;
+  GProp_GProps a, b;
+  BRepGProp::VolumeProperties(r, a);
+  BRepGProp::VolumeProperties(out, b);
+  if (std::abs(a.Mass() - b.Mass()) > 1e-8 * std::abs(a.Mass()))
+    return;
+  if (h.IsNull())
+    h = new BRepTools_History();
+  h->Merge(rs->History());
+  r = out;
+}
+
 // A blend's new faces that OCCT approximated (B-splines) but that are planes, cylinders, cones, spheres or tori within
 // `accurate` of the part: rebuilt on that surface, as Parasolid makes them (the Spur Gear's root fillets between its
 // root cylinder and an extruded involute are cylinders in live: FILLET-PRISMATIC-CYLINDER). Kept only when the
@@ -6673,8 +6734,12 @@ static void analytic_blend_faces(const TopoDS_Shape& input, TopoDS_Shape& r, HHi
     rs->Replace(f, flip ? nf.Reversed() : nf);
     any = true;
   }
+  // (Faces OCCT already made analytic keep its approximated edges otherwise: asm-suspension's Joint 805e29 Fillet 1.)
   if (!any)
+  {
+    analytic_blend_edges(input, r, h, tol);
     return;
+  }
   const TopoDS_Shape out = rs->Apply(r);
   if (!BRepCheck_Analyzer(out).IsValid())
     return;
@@ -6687,6 +6752,7 @@ static void analytic_blend_faces(const TopoDS_Shape& input, TopoDS_Shape& r, HHi
     h = new BRepTools_History();
   h->Merge(rs->History());
   r = out;
+  analytic_blend_edges(input, r, h, tol);
 }
 
 // A hole's seams where they split a rim the blend trimmed (pipeflange-steven's countersinks: the cone's seam ended

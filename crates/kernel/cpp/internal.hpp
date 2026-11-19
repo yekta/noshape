@@ -19,7 +19,9 @@
 #include <TopLoc_Location.hxx>
 #include <vector>
 #include <GProp_GProps.hxx>
+#include <BRepTools_ReShape.hxx>
 #include <Geom_BSplineSurface.hxx>
+#include <Geom_Curve.hxx>
 #include <Geom_Surface.hxx>
 #include <TopExp.hxx>
 #include <gp_Trsf.hxx>
@@ -105,6 +107,8 @@ enum Relation : uint8_t
 // sides.
 // Writes an op's input for a kernel test when NOSHAPE_DUMP_OPS is set (common.cpp).
 void dump_op(const char* name, const TopoDS_Shape& s, const std::vector<TopoDS_Shape>& subs, const std::string& params);
+// Edge `e` (forward, its faces `faces`) rebuilt on curve `g`, which it lies on within `tol` (boolean.cpp).
+bool edge_on_curve(const TopoDS_Edge& e, occ::handle<Geom_Curve> g, const ShapeList& faces, const occ::handle<BRepTools_ReShape>& rs, double tol);
 
 // Whether OCCT's booleans may run in parallel: only with NOSHAPE_BOP_PARALLEL=1
 // (qa BOOL-THREAD-CRASH, common.cpp).

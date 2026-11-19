@@ -10970,6 +10970,77 @@ OpOut op_unify_edges(const OcShape& s)
 // tolerance reaching both old ends, as Parasolid leaves a blend's sliver end (c2-hunting-knife's Chamfer 1: a strip
 // 0.011 mm wide where the chamfer meets the slope ends in one vertex, live 2462's JZQ). Edges between two faces;
 // unchanged when the result isn't valid.
+// Edge `e` (forward, its faces `faces`) rebuilt on curve `g`, which it lies on within `tol`: g's range between e's
+// vertices, along e, the vertices widened to reach g's ends, pcurves made again; recorded in `rs`.
+bool edge_on_curve(const TopoDS_Edge& e, occ::handle<Geom_Curve> g, const ShapeList& faces, const occ::handle<BRepTools_ReShape>& rs, double tol)
+{
+  BRep_Builder            B;
+  const BRepAdaptor_Curve c(e);
+  TopoDS_Vertex v0, v1;
+  TopExp::Vertices(e, v0, v1);
+  GeomAPI_ProjectPointOnCurve p0(BRep_Tool::Pnt(v0), g), p1(BRep_Tool::Pnt(v1), g);
+  if (p0.NbPoints() == 0 || p1.NbPoints() == 0)
+    return false;
+  double a = p0.LowerDistanceParameter(), b = p1.LowerDistanceParameter();
+  // Along the old curve.
+  gp_Pnt q;
+  gp_Vec d, d_old;
+  g->D1(a, q, d);
+  c.D1(c.FirstParameter(), q, d_old);
+  if (d.Dot(d_old) < 0)
+  {
+    a = g->ReversedParameter(a);
+    b = g->ReversedParameter(b);
+    g = g->Reversed();
+  }
+  if (b <= a && !g->IsPeriodic())
+    return false;
+  while (b <= a)
+    b += g->Period();
+  const double gap = std::max(BRep_Tool::Pnt(v0).Distance(g->Value(a)), BRep_Tool::Pnt(v1).Distance(g->Value(b)));
+  const double te  = std::max(BRep_Tool::Tolerance(e), 1.5 * gap);
+  TopoDS_Edge  ne;
+  B.MakeEdge(ne, g, te);
+  // The vertices widened to reach the new curve's ends.
+  auto vertex = [&](const TopoDS_Vertex& v) {
+    const TopoDS_Shape fv = v.Oriented(TopAbs_FORWARD);
+    if (rs->IsRecorded(fv))
+      return TopoDS::Vertex(rs->Value(fv));
+    if (BRep_Tool::Tolerance(v) >= te)
+      return v;
+    TopoDS_Vertex nv;
+    B.MakeVertex(nv, BRep_Tool::Pnt(v), te);
+    rs->Replace(fv, nv);
+    return nv;
+  };
+  B.Add(ne, vertex(v0).Oriented(TopAbs_FORWARD));
+  B.Add(ne, vertex(v1).Oriented(TopAbs_REVERSED));
+  B.Range(ne, a, b);
+  ShapeFix_Edge fix;
+  for (const TopoDS_Shape& f : faces)
+  {
+    const TopoDS_Face& F = TopoDS::Face(f);
+    fix.FixAddPCurve(ne, F, false, tol);
+    // (On a periodic surface the new pcurve in the old one's period, else the face's wire breaks there.)
+    double                    of = 0, ol = 0, nf = 0, nl = 0;
+    occ::handle<Geom2d_Curve> oc = BRep_Tool::CurveOnSurface(e, F, of, ol), nc = BRep_Tool::CurveOnSurface(ne, F, nf, nl);
+    if (oc.IsNull() || nc.IsNull() || BRep_Tool::IsClosed(e, F))
+      continue;
+    const BRepAdaptor_Surface S(F, false);
+    const gp_Vec2d            off(oc->Value(of).XY() - nc->Value(nf).XY());
+    const double              du  = S.IsUPeriodic() ? std::round(off.X() / S.UPeriod()) * S.UPeriod() : 0.0;
+    const double              dv  = S.IsVPeriodic() ? std::round(off.Y() / S.VPeriod()) * S.VPeriod() : 0.0;
+    if (du == 0.0 && dv == 0.0)
+      continue;
+    occ::handle<Geom2d_Curve> moved = occ::down_cast<Geom2d_Curve>(nc->Translated(gp_Vec2d(du, dv)));
+    B.UpdateEdge(ne, moved, F, BRep_Tool::Tolerance(ne));
+  }
+  fix.FixSameParameter(ne);
+  fix.FixVertexTolerance(ne);
+  rs->Replace(e, ne);
+  return true;
+}
+
 // The edges with their middle within `tol` of one of `pts` lying within `tol` of one of `conics` (11 numbers each:
 // centre, normal, major axis direction, major and minor radius), rebuilt on it on the same vertices with their
 // pcurves anew: a blend's contact curves built as B-splines where they are conics (c2-hunting-knife's Fillet 3: a
@@ -11030,52 +11101,8 @@ OpOut op_canonical_edges(const OcShape& s, rust::Slice<const double> pts, rust::
         break;
       }
     }
-    if (g.IsNull())
+    if (g.IsNull() || !edge_on_curve(e, g, ef(i), rs, tol))
       continue;
-    TopoDS_Vertex v0, v1;
-    TopExp::Vertices(e, v0, v1);
-    GeomAPI_ProjectPointOnCurve p0(BRep_Tool::Pnt(v0), g), p1(BRep_Tool::Pnt(v1), g);
-    if (p0.NbPoints() == 0 || p1.NbPoints() == 0)
-      continue;
-    double a = p0.LowerDistanceParameter(), b = p1.LowerDistanceParameter();
-    // Along the old curve.
-    gp_Pnt q;
-    gp_Vec d, d_old;
-    g->D1(a, q, d);
-    c.D1(f0, q, d_old);
-    if (d.Dot(d_old) < 0)
-    {
-      a = g->ReversedParameter(a);
-      b = g->ReversedParameter(b);
-      g = g->Reversed();
-    }
-    while (b <= a)
-      b += g->Period();
-    const double gap = std::max(BRep_Tool::Pnt(v0).Distance(g->Value(a)), BRep_Tool::Pnt(v1).Distance(g->Value(b)));
-    const double te  = std::max(BRep_Tool::Tolerance(e), 1.5 * gap);
-    TopoDS_Edge  ne;
-    B.MakeEdge(ne, g, te);
-    // The vertices widened to reach the new curve's ends.
-    auto vertex = [&](const TopoDS_Vertex& v) {
-      const TopoDS_Shape fv = v.Oriented(TopAbs_FORWARD);
-      if (rs->IsRecorded(fv))
-        return TopoDS::Vertex(rs->Value(fv));
-      if (BRep_Tool::Tolerance(v) >= te)
-        return v;
-      TopoDS_Vertex nv;
-      B.MakeVertex(nv, BRep_Tool::Pnt(v), te);
-      rs->Replace(fv, nv);
-      return nv;
-    };
-    B.Add(ne, vertex(v0).Oriented(TopAbs_FORWARD));
-    B.Add(ne, vertex(v1).Oriented(TopAbs_REVERSED));
-    B.Range(ne, a, b);
-    ShapeFix_Edge fix;
-    for (const TopoDS_Shape& f : ef(i))
-      fix.FixAddPCurve(ne, TopoDS::Face(f), false, tol);
-    fix.FixSameParameter(ne);
-    fix.FixVertexTolerance(ne);
-    rs->Replace(e, ne);
     any = true;
   }
   if (!any)
