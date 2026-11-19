@@ -158,6 +158,25 @@ struct Plan {
     protected_with_changes: bool,
 }
 
+impl Plan {
+    /// The overall strategy the dialog opens on and whether "Merge changes from both" is offered: it is when both
+    /// workspaces changed something (live session-studio-1119: B1 alone changed, only Keep and Replace); a target that
+    /// changed nothing opens on Replace, a restore too.
+    fn opening(&self) -> (Strategy, bool) {
+        let target_changed = self.changed.iter().any(|r| r.ours != Change::None);
+        let source_changed = self.changed.iter().any(|r| r.theirs != Change::None);
+        let merge_offered = !self.restore && target_changed && source_changed && self.changed.iter().any(|r| r.mergeable);
+        let overall = if self.restore || (source_changed && !target_changed) {
+            Strategy::Replace
+        } else if merge_offered {
+            Strategy::Merge
+        } else {
+            Strategy::Keep
+        };
+        (overall, merge_offered)
+    }
+}
+
 struct State {
     overall: Strategy,
     per_tab: HashMap<String, Strategy>,
@@ -196,10 +215,27 @@ fn plan(doc: &Entity<DocModel>, source: Side, source_name: String, restore: bool
             names.push(n.clone());
         }
     }
+    // The tabs using a Variable Studio changed on a side count as edited there too (live session-studio-1119: width
+    // changed in B1's Variable Studio 1, Part Studio 1 and Assembly 1 "Edited" in B1 as well).
+    let vs_users = |side: &BTreeMap<String, Vec<u8>>| -> Vec<String> {
+        current
+            .tabs
+            .iter()
+            .filter(|t| matches!(t.content, TabContent::VariableStudio(_)))
+            .filter(|t| {
+                let n = noshape_model::document::Document::blob_name(t.id);
+                Change::of(bb.get(&n), side.get(&n)) == Change::Edited
+            })
+            .flat_map(|t| current.tab_users(t.id))
+            .map(noshape_model::document::Document::blob_name)
+            .collect()
+    };
+    let (ours_vs, theirs_vs) = (vs_users(&ob), vs_users(&tb));
+    let via = |c: Change, users: &[String], n: &str| if c == Change::None && users.iter().any(|u| u == n) { Change::Edited } else { c };
     let (mut changed, mut unchanged) = (Vec::new(), Vec::new());
     for n in names {
         let Some(tab) = tab_of(&ob, &n).or_else(|| tab_of(&tb, &n)).or_else(|| tab_of(&bb, &n)) else { continue };
-        let (oc, tc) = (Change::of(bb.get(&n), ob.get(&n)), Change::of(bb.get(&n), tb.get(&n)));
+        let (oc, tc) = (via(Change::of(bb.get(&n), ob.get(&n)), &ours_vs, &n), via(Change::of(bb.get(&n), tb.get(&n)), &theirs_vs, &n));
         let icon = tab_icon(&tab.content);
         if oc == Change::None && tc == Change::None {
             unchanged.push((tab.name, icon));
@@ -310,9 +346,7 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
             return;
         }
     };
-    let merge_offered = plan.changed.iter().any(|r| r.mergeable);
-    let merge_offered = merge_offered && !restore;
-    let overall = if restore { Strategy::Replace } else if merge_offered { Strategy::Merge } else { Strategy::Keep };
+    let (overall, merge_offered) = plan.opening();
     let state = Rc::new(RefCell::new(State { overall, per_tab: HashMap::new(), unchanged_open: true }));
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
@@ -716,5 +750,43 @@ mod tests {
         assert_eq!(super::last_change(store, head, base, &blob("Part Studio 1")), Some((newest.author, newest.created)), "the second variable");
         assert_eq!(super::last_change(store, head, base, &blob("Vars")), None, "not touched since V1");
         assert_eq!(super::last_change(store, base, base, &blob("Part Studio 1")), None, "nothing since the base");
+    }
+
+    /// Live session-studio-1119 (qa 49-merge-dialog): B1 changed only its Variable Studio's width; merging it into an
+    /// unchanged Main lists the Part Studio and Assembly using it as edited in B1 too, and opens on "Replace with B1"
+    /// with no "Merge changes from both".
+    #[gpui::test]
+    fn a_variable_studio_changed_in_the_source_edits_its_users_and_opens_on_replace(cx: &mut gpui_kit::TestAppContext) {
+        use super::{Change, Side, Strategy, plan};
+        use gpui_kit::AppContext as _;
+        let dir = std::env::temp_dir().join(format!("noshape-merge-plan-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("merge.noshape");
+        let _ = std::fs::remove_file(&path);
+        let b1 = {
+            let mut ctx = noshape_ops::Ctx::new();
+            let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+            call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+            call(&mut ctx, "tab_create", json!({ "kind": "variablestudio" }));
+            call(&mut ctx, "variable_studio_settings", json!({ "tab": "Variable Studio 1", "insert_into_all": true }));
+            call(&mut ctx, "variable_create", json!({ "tab": "Variable Studio 1", "name": "width", "value": "30 mm" }));
+            call(&mut ctx, "tab_create", json!({ "kind": "assembly" }));
+            call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+            let b = call(&mut ctx, "history_create_branch", json!({ "name": "B1", "version": "V1" }));
+            call(&mut ctx, "history_switch_branch", json!({ "branch": "B1" }));
+            call(&mut ctx, "variable_set", json!({ "tab": "Variable Studio 1", "name": "width", "value": "60 mm" }));
+            call(&mut ctx, "history_switch_branch", json!({ "branch": "Main" }));
+            b
+        };
+        let session = crate::session::Session::open(&path).unwrap();
+        let b1 = session.store.list_branches().unwrap().into_iter().find(|b| b.name == "B1").map(|b| b.id).unwrap_or_else(|| panic!("B1 in {b1}"));
+        let doc = cx.update(|cx| cx.new(|_| crate::doc_model::DocModel::new(session)));
+        let plan = cx.update(|cx| plan(&doc, Side::Workspace(b1), "B1".into(), false, cx)).unwrap();
+        let rows: Vec<(String, Change, Change)> = plan.changed.iter().map(|r| (r.name.clone(), r.ours, r.theirs)).collect();
+        for name in ["Part Studio 1", "Variable Studio 1", "Assembly 1"] {
+            assert!(rows.iter().any(|r| r.0 == name && r.1 == Change::None && r.2 == Change::Edited), "{name} edited in B1 only: {rows:?}");
+        }
+        assert_eq!(plan.opening(), (Strategy::Replace, false), "opens on Replace with B1, no merge card");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
