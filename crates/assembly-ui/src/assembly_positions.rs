@@ -445,7 +445,7 @@ impl AssemblyView {
         cx.notify();
     }
 
-    fn np_row_menu(&self, i: usize, name: String) -> Vec<MenuEntry> {
+    pub(super) fn np_row_menu(&self, i: usize, name: String) -> Vec<MenuEntry> {
         let n = self.ui.np_count;
         let mut m = Vec::new();
         if self.ui.np_applied != Some(i) {

@@ -4228,6 +4228,14 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// Choosing a state in the select applies it at once.
+    pub(super) fn choose_display_state(&mut self, i: usize, cx: &mut Context<Self>) {
+        self.ui.ds_selected = Some(i);
+        let name = self.assembly(cx).and_then(|a| a.display_states.get(i).map(|d| d.name.clone())).unwrap_or_default();
+        self.edit(&format!("Apply display state : {name}"), cx, |a| a.apply_display_state(i));
+        cx.notify();
+    }
+
     fn add_display_state(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(st) = self.ui.ds_name.clone() else { return };
         let name = st.read(cx).value().trim().to_string();
@@ -4319,13 +4327,7 @@ impl AssemblyView {
                         .w(px(160.))
                         .child(crate::os_ui::select_field_flat("ds-select", options, vec![0], 1, current, move |k, _, cx| {
                             let Some(&i) = k.checked_sub(1).and_then(|k| order2.get(k)) else { return };
-                            view.update(cx, |this, cx| {
-                                // Choosing a state applies it at once.
-                                this.ui.ds_selected = Some(i);
-                                let name = this.assembly(cx).and_then(|a| a.display_states.get(i).map(|d| d.name.clone())).unwrap_or_default();
-                                this.edit(&format!("Apply display state : {name}"), cx, |a| a.apply_display_state(i));
-                                cx.notify();
-                            })
+                            view.update(cx, |this, cx| this.choose_display_state(i, cx))
                         }))
                         .into_any_element()
                 }

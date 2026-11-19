@@ -2602,3 +2602,103 @@ fn a_short_explode_arrow_drag_makes_a_0_mm_step(cx: &mut TestAppContext) {
     })
     .unwrap();
 }
+
+/// Live asm-views2-1118 / 156–161: a named position's row menu is Apply / Edit / Duplicate / Update named position,
+/// Move down / up (with two or more), Delete <name>, Apply left out on the applied row; Apply moves the parts in one
+/// step, no animation, the row marked applied with the "<name> is applied." toast.
+#[gpui::test]
+fn a_named_positions_menu_and_apply_act_as_live(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "np-apply");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Revolute, w, cx);
+            let (a, b) = (face_connector(v, "Part 2 <1>", false, cx), face_connector(v, "Part 1 <1>", true, cx));
+            v.deliver_connector(a, w, cx);
+            v.deliver_connector(b, w, cx);
+            v.accept_mate(w, cx);
+        });
+    })
+    .unwrap();
+    cx.executor().advance_clock(std::time::Duration::from_millis(100));
+    cx.run_until_parked();
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let m = v.assembly(cx).unwrap().mates.iter().find(|m| m.name == "Revolute 1").expect("Revolute 1").id;
+            v.open_np_driver(m, cx);
+            v.toggle_np_driver(m, 0, cx);
+            v.accept_np_driver(cx);
+            // Named position 2: Revolute 1 turned 90° on from Named position 1.
+            v.edit("Named position 2", cx, |a| {
+                let mut np = a.named_positions[0].clone();
+                np.name = "Named position 2".into();
+                for (_, val) in np.mate_values.iter_mut().filter(|(x, _)| *x == m) {
+                    val[0] += std::f64::consts::FRAC_PI_2;
+                }
+                a.named_positions.push(np);
+            });
+            v.ui.np_count = 2;
+            v.apply_np(0, cx);
+            let labels = |v: &AssemblyView, i: usize| {
+                v.np_row_menu(i, format!("Named position {}", i + 1))
+                    .iter()
+                    .filter_map(|e| match e {
+                        super::behaviors::MenuEntry::Item { label, .. } => Some(label.clone()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(labels(v, 0), ["Edit named position", "Duplicate named position", "Update named position", "Move down", "Delete Named position 1"], "the applied row: no Apply");
+            assert_eq!(labels(v, 1), ["Apply named position", "Edit named position", "Duplicate named position", "Update named position", "Move up", "Delete Named position 2"]);
+            // (Both blocks are free: the turn is Part 2's relative to Part 1.)
+            let relative = |v: &AssemblyView, cx: &gpui_kit::App| {
+                let q = |name: &str| glam::DQuat::from_array(v.result.solved.placement(instance(v, name, cx)).unwrap().rotation);
+                q("Part 2 <1>") * q("Part 1 <1>").inverse()
+            };
+            let before = relative(v, cx);
+            v.apply_np(1, cx);
+            let turned = relative(v, cx) * before.inverse();
+            assert!((turned.angle_between(glam::DQuat::IDENTITY) - std::f64::consts::FRAC_PI_2).abs() < 1e-6, "turned 90° at once: {turned:?}");
+            assert!(v.viewport.read(cx).animation().is_none(), "no animation");
+            assert_eq!(v.ui.np_applied, Some(1), "the row marked applied");
+            assert_eq!(v.ui.np_toast.as_deref(), Some("Named position 2 is applied."));
+        });
+    });
+}
+
+/// Live asm-dstates-1118: Display states is a toolbar tool (its panel on the left), and choosing a state in its
+/// select applies it at once: the instance rows and the graphics together, not animated.
+#[gpui::test]
+fn choosing_a_display_state_applies_it_at_once(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "ds-apply");
+    let settle = |cx: &mut TestAppContext| {
+        cx.executor().advance_clock(std::time::Duration::from_millis(100));
+        cx.run_until_parked();
+    };
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            assert!(noshape_ops::prefs::ASM_TOOLSETS.iter().any(|set| set.contains(&"tb-display-states")), "a toolbar tool");
+            v.run_toolbar_tool("tb-display-states", w, cx);
+            assert!(v.ui.display_states, "the toolbar tool opens the panel");
+            let pin = instance(v, "Part 2 <1>", cx);
+            v.set_hidden(vec![pin], true, cx);
+            v.edit("Add display state : Pin hidden", cx, |a| a.save_display_state("Pin hidden"));
+            v.set_hidden(vec![pin], false, cx);
+        })
+    })
+    .unwrap();
+    settle(cx);
+    let shown = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let pin = instance(v, "Part 2 <1>", cx);
+            let row = v.assembly(cx).unwrap().instance(pin).unwrap().hidden;
+            let drawn = v.result.occurrences.iter().filter(|o| o.top() == pin).all(|o| o.hidden);
+            (row, drawn)
+        })
+    };
+    assert_eq!(shown(cx), (false, false), "the pin shown");
+    cx.update_window(window, |_, _, cx| view.update(cx, |v, cx| v.choose_display_state(0, cx))).unwrap();
+    settle(cx);
+    assert_eq!(shown(cx), (true, true), "the row and the graphics both hidden");
+    assert!(cx.update(|cx| view.read(cx).viewport.read(cx).animation().is_none()), "no animation");
+}
