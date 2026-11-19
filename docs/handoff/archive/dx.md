@@ -3589,3 +3589,10 @@ Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live i
   7.786-8.061 in varies by part, ours fixed 7.810: rule unknown). clamp-guillem now 271 / 268 LINE only. sm-louver ARC/CIRCLE now match.
   Landed 05:55 (7db466c6) with 59d761674 no mark on a wholly hidden hole: hex CENTERMARKS gone, as live; c284709fa
   suite views placed by their silhouette box centre, live2 iso-place-1118); 943e05e14 landed 06:26 (8a74d626).
+
+## 11-19 07:4x: moved from the handoff (landed)
+- Import / Export dialogs (live import-export-1118): queued 15790a91: import reads its files off the UI
+  thread, tabs come when done, bubble "<file> has been imported." / "<file> uploaded but failed to translate." with
+  Open document (file kept in CAD Imports); Export dialog keys test (focus on the dialog, Esc, Enter in File name).
+  Assembly export (live2 asm-export-1150): queued 15790a91: written off the UI thread (app-core export_store, the
+  Part Studio's too), bubble 5 s (was 4); format list / PARASOLID default already live's.

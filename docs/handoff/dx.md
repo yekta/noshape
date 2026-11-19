@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-18 16:42 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-19 07:41 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -193,14 +193,16 @@ R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "I
 6. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
 ## Since 19:50 (this thread)
+- QUEUED c8fa7d93 (07:4x, 6 commits): ACIS face merge, inside-part revert, the macOS CI hang fix (assembly prewarm on
+  scoped std threads, fillet ball tools under rayon::in_place_scope; also queued alone as f1e0c74e, on release/v0.4.60
+  as 5e04baac1), qa's session-drw-1119 DXF rows (section letter codes, R14 note text, labels top-centre, a section's
+  hole rim one line), and tool-placed views' empty label (DrawingView.placed). Left: empty labels' y offsets vary in
+  live (1-4 mm off ours); live's dialog views gain empty labels after property edits (dx1684 vs dx1644, which edit
+  unknown).
+- Waiting: live's meshparts-1119 (c2-duct-multipart 3MF / OBJ imports).
 - DXF rows (lead 23:0x), exchange suite drawings: landed through 8a74d626 (archive 11-18 22:3x). Open: live splits
   each mesh silhouette loop into ~4 open LWPOLYLINEs (rule unknown); live's 2 hex Iso ELLIPSEs (B-rep hole rim quarters
   inside the mesh hole, ours hidden); live's Iso centre varies by part (rule unknown). Tools /root/dx-scratch/bin/dxf*.py.
-- Import / Export dialogs (live import-export-1118): queued 15790a91: import reads its files off the UI
-  thread, tabs come when done, bubble "<file> has been imported." / "<file> uploaded but failed to translate." with
-  Open document (file kept in CAD Imports); Export dialog keys test (focus on the dialog, Esc, Enter in File name).
-  Assembly export (live2 asm-export-1150): queued 15790a91: written off the UI thread (app-core export_store, the
-  Part Studio's too), bubble 5 s (was 4); format list / PARASOLID default already live's.
 - Inspection list (live inspection-list-1118): a part row's Export… Format "Inspection list" (last, after STL), note
   row, CSV with BOM / quoted / CRLF, rows = Model definitions characteristics; ops export_parts format "Inspection
   list" needs `parts`; feature params take `<param>__tolerance` {type, upper, lower, precision} (null clears) when
