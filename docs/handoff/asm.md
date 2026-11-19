@@ -5,7 +5,7 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-19 19:54 UTC)
+## State (2026-11-19 20:14 UTC)
 
 ### Landed today (6686624b as 702c9878: Display states Esc, driver-mate named position, paste; d671313d; 335f8e43; 9f52415c)
 - LOD (91478e2c), Derived mirror of an assembly complete (e87a2b3e, 17c26dc1; left: live's exact node icon, symmetry
@@ -28,17 +28,10 @@ not reproduced off CI (15 runs of the unfixed binary on vibe2, all exit 0); TICK
 - isaac (98/129 mates; lead 19:2x: fix the off connectors that aren't core's Chamfer 2). Off ends in the 31
   differences: 7 on Part 1 <12> (a2e4a2 Chamfer 2: sent to core 19:5x for 21:00) and Fastened 43's b on Part 1 <1>
   (studio 00f1d4). Fastened 26 / 32 and Revolute 7 / 17 OFF lines are intermediate picks; they end as live.
-- Fastened 43 (in progress): 00f1d4's Extrude 38 (REMOVE, Ø6 circle at (-27.06, 23.6) mm, from y = 0 toward -Y
-  25 mm) cuts nothing in ours ("Selected tools and targets do not intersect"; live removes 303.7 mm³ = 10.74 mm of
-  it), so the hole whose edge Fastened 43 takes (CENTER, live Z -Y at y = -7) doesn't exist. Checked: sketch plane,
-  region (d 4e-8 m), scope and tool position match live; OCCT's Boolean (NOSHAPE_BOOL_RUST=0) gives the same; an
-  INTERSECTION of the tool with Part 1 is empty. So our part has no material on that axis for y in [-25, 0] while
-  live's does, though volumes match live up to Fillet 7 and the half kept by Extrude 23 is live's. Around the axis
-  ours has Fillet 5's R4 round (axis exactly the hole's, y -7..0), concave in ours. Next: find the feature whose
-  material sits elsewhere (compare face sets near (-27.06, y, 23.6) per feature; Extrude 36's +1902 mm³ and Fillets
-  3 / 5 first). Repro: vibex7 ~/tmp/asm/stu/i00f1d4 (model dir; NOSHAPE_PARITY_MODELS=~/tmp/asm/stu, bin
-  ops-bomfix, 20 s), saved doc vibex8 ~/tmp/asm/save00/i00f1d4.noshape, current CLI vibex8
-  ~/agents/asm/target/debug/noshape-cli (feature_rollback / feature_add / query_parts on a copy).
+- Fastened 43: a Boolean bug, not translation (TICKETS HOLE-THROUGH-ROUND-POLE [bool], routed via the lead 20:1x).
+  00f1d4's Extrude 38 Ø6 hole runs coaxially through an R4 corner round and the corner ball's pole; ours (and OCCT)
+  can't cut it, live does. Our geometry before it is live's (a column probe finds material on the axis, z 15.6–27.6).
+  Minimal repro vibex8 ~/agents/asm-keep/t-mini-false.sh (current CLI ~/agents/asm/target/debug/noshape-cli).
 - Others': robot-relations BOM 36/42 (dx); scissor-lift Top <3>; psui coplanar depth tie.
 
 ### isaac-ball connector cases (traced run 07:26, 98/129 mates)

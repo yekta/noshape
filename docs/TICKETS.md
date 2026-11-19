@@ -6,6 +6,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## asm, 2026-11-19
+- [ ] **P2 HOLE-THROUGH-ROUND-POLE [bool]** (asm 20:1x, isaac-ball Fastened 43): a Ø6 REMOVE extrude coaxial with an
+  R4 corner round, whose axis passes through the corner ball's pole (the ball touching the bottom face at the axis,
+  that face's corner vertex), isn't cut: noshape's Boolean declines ("a non-manifold result") and OCCT's returns
+  non-manifold ("Boolean operation would result in non-manifold body."); live cuts it. Minimal repro (current CLI):
+  vibex8 ~/agents/asm-keep/t-mini-false.sh: an 11 mm 40 × 40 plate, R4 on the corner's vertical edge and its two
+  bottom edges, a Ø6 circle at (4, 4) on Top extruded 25 mm Remove (the same circle at (20, 20) cuts 311 mm³). In
+  isaac studio 00f1d4 its Extrude 38 ("Selected tools and targets do not intersect"; live removes 303.7 mm³), so the
+  hole edge Fastened 43 mates to is missing (isaac 98/129 mates).
 - [x] (asm d671313d) **P1 ASM-UI-SIGSEGV-AT-EXIT [asm]** (lead 17:2x, main CI 44554083714 on eb3b06a88, Linux, first seen):
   `-p noshape-assembly-ui --lib` passed all 97, then the test process died with SIGSEGV at exit. Cause read from the code:
   each headless `Gpu` spawns a detached "noshape-render" thread that compiles its pipelines (lavapipe / LLVM) before it
