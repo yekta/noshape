@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 02:57 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 03:36 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -45,16 +45,14 @@ quadrant's snap wakes no alignment source (ours aligns with points only).
 ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
 Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live to recheck on green.
 
-## Landing 02:35: sketch_dimension P1 (5f08d65e): a value acts as typed into a new dimension's box (redundant /
-conflicting kept driving, unsolvable taken; warning "Sketch could not be solved."); translator reads `driving`.
-Live's "not applied after an earlier failing sketch" was `failed` listing every failing feature (dims do apply).
-
-## In flight: parity Use on live's refs geometry (stale stored entity, same chord length; `LiveUse`, `stale_uses` keeps
-the solve). UNCOMMITTED in crates/ops/src/parity.rs (patch copy /root/skasm-scratch/use-only.patch). rocker-enclosure-sm
-Sketch 2 now Uses its 4 edges; its Extrude 2 difference is Sketch 4 (in-context, no live frame: REQUESTS 02:20
-sketches.json for both rocker models). Full suite B queued on vibe2 slot (after asm, ~03:26):
-~/agents/skasm-keep/suite-B-*.log vs A suite-1119-0125.log (90/126, 1325/1585). Land if no document loses features.
-
+## State 03:40
+- Landed 373dd5b9: sketch_dimension takes a value as typed (redundant / conflicting driving, unsolvable taken, red).
+  It regressed the translator (live-driving dims ours over-defines came out driving: Part grid ERROR); fixed in local
+  commit "translator: a live driving dimension ours can't take ... set driven again" (Part grid matches again).
+- Queued 0b44497a (P0 REGION-PICK-SKETCH-SHOWN), checking since 03:13.
+- Local, to land after 0b44497a + suite C: Trim/Split used lines (use_ends), translator stale-Use on refs geometry
+  (suite B: = A, unfound PROJECTED 45 -> 43), the translator driven fix. Suite C (all of them) on vibe2 since 03:36:
+  ~/agents/skasm-keep/suite-C-*.log; land if 90/126, 1325/1585 as A (suite-1119-0125.log).
 Split / Trim of a Use'd line (live 11-19, behaviours "skasm (11-19): split / trim of a used line"): queued 02:57.
 SketchData `use_ends` (point -> end of its ref's edge); Trim keeps live's .orphan point (external, on the line), Split's
 far piece's end follows; regen moves only a used curve's still-external ends. Next: the translator's split Uses
