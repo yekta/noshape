@@ -1244,10 +1244,40 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         let end = loft_end(ev, vals, ["endCondition", "endMagnitude", "endDirection"], &last.shape, normal(last), "end")?;
         guides_leave_within(&first.shape, &guides, start)?;
         guides_leave_within(&last.shape, &guides, end)?;
+        // From an open profile to a point between two guides from its ends (live core q-singularity-loft-1119,
+        // c2-surf-workshop-singularities' Problem loft): live's Coons face, Default or Normal to profile (magnitude 1)
+        // at the profile, the guides' conditions as live's. Other conditions there aren't live's yet: as before.
+        if !solid
+            && let [from, to] = sections.as_slice()
+            && from.profile.is_some()
+            && to.profile.is_none()
+            && from.shape.is_closed().is_ok_and(|c| !c)
+            && matches!(end, k::LoftEnd::Free)
+        {
+            let start_normal = match &start {
+                k::LoftEnd::Free => Some(None),
+                k::LoftEnd::Normal(m) if (m - 1.0).abs() < 1e-9 => normal(from).map(Some),
+                _ => None,
+            };
+            let mut each = Vec::new();
+            for g in ev.params.array("guidesArray") {
+                if let Some(w) = wires_from(&resolve_curves(ev, g.query("guideEntities"))?)?.into_iter().next() {
+                    each.push((w, g.enum_("guideDerivativeType") != "DEFAULT"));
+                }
+            }
+            if let Some(start_normal) = start_normal
+                && each.len() == 2
+            {
+                let apex = to.shape.vertex_point()?;
+                let (wires, conditions): (Vec<Shape>, Vec<bool>) = each.into_iter().unzip();
+                let shape = k::loft_to_point(&from.shape, apex, &wires, start_normal, &conditions).map_err(guided_error)?;
+                let names = name_new(ev, &shape);
+                return super::bshared::surface_result(ev, NamedShape::new(shape, names));
+            }
+        }
         // Surface lofts of open profiles (live "psb (10-26 c)"): Trim guides
-        // and Trim profiles.
-        // (Not yet to a point profile: the kernel's surface there lacks the end and guide conditions, c2-surf-workshop-
-        // singularities' Problem loft 2678.7 mm², live 3425.0; it fails as before rather than build a wrong face.)
+        // and Trim profiles. (A point profile otherwise fails as before: c2-surf-workshop-singularities' Problem loft
+        // came out 2678.7 mm² there, live 3425.0.)
         let open = !solid && shapes.iter().all(|s| s.shape_type() != ShapeType::Face && s.is_closed().is_ok_and(|c| !c));
         // (Through more than two profiles only without end conditions: they aren't applied there yet. A guide's
         // derivative doesn't shape live's face there: c2-surf-workshop-pipe's Loft, the same poles with None or Normal

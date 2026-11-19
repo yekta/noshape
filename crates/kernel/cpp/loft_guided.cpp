@@ -1894,4 +1894,104 @@ std::unique_ptr<OcShape> loft_guided_open(const OcShapeList& profiles, const OcS
   return wrap(sew.SewedShape());
 }
 
+// A surface loft from an open profile to a point between two guides from the profile's ends to it (live core
+// q-singularity-loft-1119, c2-surf-workshop-singularities' Problem loft). Live's face is the Coons sum of the profile,
+// the point and the guides, each curve by its own parameter: across the guides the smoothstep W(u) = 3u^2 - 2u^3,
+// toward the point straight. A start Normal to profile adds phi(v) T(u), phi = v (1 - v)(1 - v / 2), T turning the
+// start derivative onto the normal at the guides' own (blended by W); a guide with a condition then takes that term's
+// turn off its side: psi(v) h(u) P'(end), h the cubic Hermite of that side, psi = phi with C1 caps to rest over
+// v in [0, 1/32] and [7/8, 1]. (Live's three variants within 0.2 mm; live adds a small slope along the normal of a rule
+// not known.)
+std::unique_ptr<OcShape> loft_to_point(const OcShape& profile, P3 apex, const OcShapeList& guides, P3 start_normal,
+                                       rust::Slice<const bool> guide_conditions)
+{
+  if (guides.items.size() != 2 || guide_conditions.size() != 2)
+    fail_invalid("loft to a point: two guides");
+  struct Par
+  {
+    std::unique_ptr<BRepAdaptor_CompCurve> c;
+    bool                                   rev = false;
+    double                                 a = 0, b = 1;
+    explicit Par(const TopoDS_Wire& w) : c(std::make_unique<BRepAdaptor_CompCurve>(w)), a(c->FirstParameter()), b(c->LastParameter()) {}
+    double t_of(double t) const { return rev ? b - (b - a) * t : a + (b - a) * t; }
+    gp_Pnt at(double t) const { return c->Value(t_of(t)); }
+    gp_Vec d1(double t) const
+    {
+      gp_Pnt p;
+      gp_Vec v;
+      c->D1(t_of(t), p, v);
+      return v * (rev ? a - b : b - a);
+    }
+  };
+  const Par    P(as_wire(profile.shape, "loft profile"));
+  const gp_Pnt C(apex.x, apex.y, apex.z);
+  const gp_Pnt P0 = P.at(0), P1 = P.at(1);
+  Bnd_Box      box;
+  BRepBndLib::Add(profile.shape, box);
+  const double tol = 1e-7 * (1 + std::sqrt(box.SquareExtent()) + P0.Distance(C));
+  // Each guide from the profile to the point, the one from the profile's start first.
+  std::vector<Par> G;
+  bool             cond[2] = {false, false};
+  for (size_t i = 0; i < 2; ++i)
+  {
+    Par g(as_wire(guides.items[i], "loft guide"));
+    g.rev = g.at(0).Distance(C) < g.at(1).Distance(C);
+    if (g.at(1).Distance(C) > tol)
+      fail_op("loft to a point: a guide doesn't reach the point");
+    G.push_back(std::move(g));
+    cond[i] = guide_conditions[i];
+  }
+  if (G[0].at(0).Distance(P0) > G[1].at(0).Distance(P0))
+  {
+    std::swap(G[0], G[1]);
+    std::swap(cond[0], cond[1]);
+  }
+  if (G[0].at(0).Distance(P0) > tol || G[1].at(0).Distance(P1) > tol)
+    fail_op("loft to a point: the guides don't leave from the profile's ends");
+  const gp_Vec n = to_vec(start_normal);
+  const bool   normal = n.Magnitude() > 1e-12;
+  const gp_Dir nd = normal ? gp_Dir(n) : gp_Dir(0, 0, 1);
+  const gp_Vec g0 = G[0].d1(0), g1 = G[1].d1(0), dp0 = P.d1(0), dp1 = P.d1(1);
+  auto W   = [](double u) { return u * u * (3 - 2 * u); };
+  auto phi = [](double v) { return v * (1 - v) * (1 - v / 2); };
+  auto psi = [&](double v) {
+    auto cap = [&](double x, double from, double to) {
+      const double L = to - from, t = (x - from) / L, e = 1e-7;
+      const double dphi = (phi(from + e) - phi(from - e)) / (2 * e);
+      return (2 * t * t * t - 3 * t * t + 1) * phi(from) + (t * t * t - 2 * t * t + t) * L * dphi;
+    };
+    if (v < 1.0 / 32)
+      return cap(v, 1.0 / 32, 0.0);
+    if (v > 7.0 / 8)
+      return cap(v, 7.0 / 8, 1.0);
+    return phi(v);
+  };
+  const int NU = 48, NV = 64;
+  std::vector<std::vector<gp_Pnt>> grid(NU + 1, std::vector<gp_Pnt>(NV + 1));
+  for (int i = 0; i <= NU; ++i)
+  {
+    const double u = (double)i / NU, w = W(u);
+    const gp_XYZ d = P.at(u).XYZ() - P0.XYZ() * (1 - w) - P1.XYZ() * w;
+    // The start term: the start derivative onto the normal at the guides' own there.
+    gp_XYZ T(0, 0, 0);
+    if (normal)
+    {
+      const gp_Vec guides_d = g0 * (1 - w) + g1 * w;
+      T = (gp_Vec(nd) * guides_d.Dot(gp_Vec(nd))).XYZ() - guides_d.XYZ() + d;
+    }
+    gp_XYZ side(0, 0, 0);
+    if (normal && cond[0])
+      side += dp0.XYZ() * (u * (1 - u) * (1 - u));
+    if (normal && cond[1])
+      side += dp1.XYZ() * (u * u * (u - 1));
+    for (int j = 0; j <= NV; ++j)
+    {
+      const double v = (double)j / NV;
+      const gp_XYZ s = G[0].at(v).XYZ() * (1 - w) + G[1].at(v).XYZ() * w + d * (1 - v) + T * phi(v) - side * psi(v);
+      grid[i][j] = gp_Pnt(s);
+    }
+  }
+  return wrap(simplest_face(grid, 1e-6 * (1 + std::sqrt(box.SquareExtent()))));
+}
+
 } // namespace noshape

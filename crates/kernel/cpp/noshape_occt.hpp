@@ -998,6 +998,8 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
                                             bool make_solid);
 std::unique_ptr<OcShape> loft_guided_open(const OcShapeList& profiles, const OcShapeList& guides, bool trim_guides,
                                           bool trim_profiles);
+std::unique_ptr<OcShape> loft_to_point(const OcShape& profile, P3 apex, const OcShapeList& guides, P3 start_normal,
+                                       rust::Slice<const bool> guide_conditions);
 OpOut op_draft_parting_curve(const OcShape& solid, const OcShapeList& faces, const OcShapeList& edges, P3 pull,
                              rust::Slice<const double> angles);
 OpOut op_draft(const OcShape& s, const OcShapeList& faces, P3 dir,

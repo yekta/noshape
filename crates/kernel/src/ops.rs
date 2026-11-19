@@ -799,6 +799,14 @@ pub fn loft_guided_open(profiles: &[Shape], guides: &[Shape], trim_guides: bool,
     Shape::from_res(ffi::loft_guided_open(&p, &g, trim_guides, trim_profiles))
 }
 
+/// A surface loft from an open `profile` to the point `apex` between two `guides` from the profile's ends to it, as
+/// live's: the Coons sum of the four by their own parameters, smoothstep across the guides. `start_normal` (Normal to
+/// profile) turns the start onto that normal; `guide_conditions` (one per guide) mark guides with a condition.
+pub fn loft_to_point(profile: &Shape, apex: DVec3, guides: &[Shape], start_normal: Option<DVec3>, guide_conditions: &[bool]) -> Result<Shape> {
+    let n = start_normal.unwrap_or(DVec3::ZERO);
+    Shape::from_res(ffi::loft_to_point(profile.raw(), p3(apex), &vec_to_list(guides), p3(n), guide_conditions))
+}
+
 /// Parting-line draft about curved parting `edges` (OCCT's draft can't: the
 /// drafted face is a general ruled surface): each of `faces` is replaced by
 /// the ruled surface leaving its parting edges on its side, every ruling at

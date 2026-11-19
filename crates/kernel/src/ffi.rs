@@ -724,6 +724,7 @@ pub(crate) mod ffi {
         fn op_thicken_loft_out(sheet: &OcShape, t: f64, t_inner: f64, p0: &PlaneF, p1: &PlaneF, trim_ends: bool) -> Result<OpOut>;
         fn loft_guided_curved(profile_a: &OcShape, profile_b: &OcShape, guides: &OcShapeList, make_solid: bool) -> Result<UniquePtr<OcShape>>;
         fn loft_guided_open(profiles: &OcShapeList, guides: &OcShapeList, trim_guides: bool, trim_profiles: bool) -> Result<UniquePtr<OcShape>>;
+        fn loft_to_point(profile: &OcShape, apex: P3, guides: &OcShapeList, start_normal: P3, guide_conditions: &[bool]) -> Result<UniquePtr<OcShape>>;
         fn op_draft_parting_curve(solid: &OcShape, faces: &OcShapeList, edges: &OcShapeList, pull: P3, angles: &[f64]) -> Result<OpOut>;
         fn op_draft(
             s: &OcShape,

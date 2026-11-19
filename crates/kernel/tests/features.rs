@@ -202,6 +202,32 @@ fn a_surface_loft_to_a_point_between_guides_pinches_there() {
     assert!(thicken(&r, 1.0, 0.0).is_err());
 }
 
+/// c2-surf-workshop-singularities' Problem loft (live core q-singularity-loft-1119): a surface loft from a sketch spline in
+/// x = 0 to the point (42.24, 0, 0) mm along two guides from its ends. Live's face is the Coons sum of the four by their
+/// own parameters: with every condition Default 3413.191 mm²; Normal to profile at the start 3532.206 (ours 3531.64:
+/// live adds a small slope along the normal); that and the guides' conditions 3425.038.
+#[test]
+fn a_surface_loft_to_a_point_between_guides_is_live_s_coons_face() {
+    let bezier = |poles: &[[f64; 3]]| {
+        let poles: Vec<DVec3> = poles.iter().map(|&p| DVec3::from(p) * 1e-3).collect();
+        let n = poles.len() as u32;
+        make_wire(&[make_bspline(&poles, None, &[0.0, 1.0], &[n, n], n - 1, false).unwrap()]).unwrap()
+    };
+    let profile = bezier(&[[0.0, 0.0, 35.78460456736769], [0.0, -22.302460851664072, 35.78460456736769], [0.0, -34.25874797233713, 35.78460456736769], [0.0, -46.237605789267965, 29.16596008208981], [0.0, -56.62633387394886, 12.059001269031755], [0.0, -56.62633387394886, 0.0]]);
+    let along_y0 = bezier(&[[0.0, 0.0, 35.78460456736769], [12.00984122853579, 0.0, 35.78460456736769], [24.34474309482446, 0.0, 32.8699251219102], [34.9961191519124, 0.0, 26.902055173893324], [42.236550154599685, 0.0, 16.69413535307554], [42.236550154599685, 0.0, 0.0]]);
+    let along_z0 = bezier(&[[0.0, -56.62633387394886, 0.0], [42.23655015459985, -56.62633387394886, 0.0], [42.23655015459969, -30.348583069398027, 0.0], [42.236550154599685, 0.0, 0.0]]);
+    let apex = DVec3::new(42.236550154599685, 0.0, 0.0) * 1e-3;
+    let guides = [along_z0, along_y0];
+    for (normal, conditions, live, tol) in [(None, [false, false], 3413.191, 2e-5), (Some(DVec3::X), [false, false], 3532.206, 3e-4), (Some(DVec3::X), [true, true], 3425.038, 1e-4)] {
+        let r = loft_to_point(&profile, apex, &guides, normal, &conditions).unwrap();
+        let faces = r.faces();
+        assert!(faces.len() == 1 && faces[0].is_valid());
+        let area = faces[0].area().unwrap() * 1e6;
+        assert!(close(area, live, tol), "{normal:?} {conditions:?}: {area} mm², live {live}");
+        assert!(faces[0].project_point(apex).unwrap().distance < 1e-7);
+    }
+}
+
 /// A surface loft through three open profiles along two guides (c2-surf-workshop-pipe's Loft): one face through every
 /// profile. Half circles along straight guides make half a cylinder, π·5·10 mm².
 #[test]
