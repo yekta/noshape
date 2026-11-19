@@ -53,7 +53,7 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
     visible sketches" on MODELSKETCH_VISIBLE via `flat_sketch_curves`, `FlatPattern::sketches`; sheetmetal_export_flat
     options DWG / version / scope / units / checkboxes; insunits shared; µm scale fix). Live truth:
     live/skasm/q-flat-dxf-1119 (ARC corner, CIRCLE hole, slot 2 LINE + 2 ARC, hole across a bend 2 ELLIPSE + 2 LINE,
-    bend centreline split around that hole: NOT done yet, small follow-up).
+    bend centreline split around that hole: LOCAL a1a00fce4 `FlatPattern::clip_to_flat`, test; lands with #3).
   - LOCAL 63eb8b124 #3: pattern / mirror of active sheet metal forms each copy (live q-sm-pattern-1119: 80x60 plate,
     hole, emboss, each part 9638.003952 mm³). opPattern records `body_moves`; set_attribute (`moved_form_tools`,
     status.rs) rewrites a copied wall attribute's form tool ids to moved ids (`moved_tools`: id -> (tool, transform));
