@@ -27,27 +27,21 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   merge of the refaced faces), Fillet 2 13/41/30 (that retry now builds an invalid solid, the Boolean leaves 13 faces).
   Next: retry the direct build only where the Boolean fails, merge the refaced faces after it, check the new run-on
   pieces (bin/khboth.sh -> logs/khboth.out).
-- 805e29 exact edges (blend2, uncommitted on 61320d427): analytic_blend_edges now also runs when no face was converted
-  (the edges between OCCT's own cylinders); all 16 convert (8 lines, 8 circles, lengths equal) but the reshaped solid is
-  invalid: one cylinder face's area negative (ZZ_ANA trace, bin/805t1.sh). Next: that face's pcurves / orientation.
-- NOW (lead 22:50, outranks the splice): dx's car Fillet 1 (blocks c2-surf-intro-boundary / -fill / -mutualtrim /
-  -offset / -ruled at "Derived 1"). Car Part Studio Fillet 1: EDGE 0.6 in, tangent on, one edge (right top B-spline
-  296.776 mm, (0,0,10.728) -> (50.517,254,30.343) mm) of a closed 5-face solid (4 surface lofts + mirror, Add). Ours
-  "Failed to fillet selections." ~1.5 s; live OK 7/14/9, 1289903.86 mm3, 81475.79 mm2 (before: 5/9/6, 1316056.85 /
-  85055.72). Repro /root/dx-scratch/si-save/c2-surf-intro-offset.noshape (2nd Part Studio), needs dx fb8f84f42 (blend5
-  branch blend-car = main + it). Live per-rollback: /root/parity/models/c2-surf-intro-boundary/derived/
-  b7635b82f8e8a430971f91c9/live.jsonl index 16. bin/car-dump.sh <host> -> host ~/tmp/blend/cdump, logs/car-dump.out.
+- Car Fillet 1 (dx's, blocks 5 c2-surf-intro docs at "Derived 1"): FIXED in blend5 d1124ae95 (on 227468d9a, without
+  dx's fb8f84f42: the T1 reads data/car-fillet1-input.brep). OCCT's fillet came out inside out with a face's pcurves
+  off; checked_blend's last fallback `repaired` (ShapeFix_Shape + ShapeBuild_ReShape history, kept only as one valid
+  solid of the same faces, volume > 0). T1 a_cars_top_edges_round_along_their_tangent_chain_as_live: 7/14/9, area
+  81479.1 vs live 81479.51 mm2 (live.jsonl index 16), volume +0.023% (input loft 2.1 mm2 off live already). Gate unit
+  blend-gatecar (bin/gatecar.sh vibex8): logs/gcar-tests.out, g13-car.log, ud-car.log, suite-ecar.cmp. Land when clean.
 - 805e29 exact edges (blend2 62616b568, rebased): pcurves moved into the old edge's period (edge_on_curve), volume
-  check 1e-8 for edges only; T1 passes, kernel 531 / features_c 103 ok. Gate unit blend-gate805 (bin/gate805.sh):
-  g13-805.log, ud-805.log (vibex7), suite-e805.cmp (vibe2). Land when clean.
-- Suspension splice (blend13, uncommitted on 8d9420223 = step 1 make_edge_on; diff is all this thread's, checked
-  22:35): step 2 face_with_edge_replaced passed (kernel 56 ok, g13 OK). Step 3 canal_corners in blend_section.rs +
-  detail.rs hook; T1 features_c::rounds_running_into_a_tube_close_on_canals_as_live (data brep untracked: add it).
-  Fixed: compile, patch found by its 4 corners (was by area: all 8 are 241.324). Now 3 of 8 corners splice (z -15);
-  z +15 fail: round / tube face_with_edge_replaced invalid (wire self-intersecting 18 + face 27; UV u -1.59..6.28,
-  tube 0..11.5: the run's pcurves a period off / crossing the seam), canal face_on status 32 (also on good corners,
-  sew fixes it). Next: pcurves of the run in the period of the kept wire (FixShifted isn't enough), seam of the pipe
-  profile opposite the canal. Debug: ZZ_CANAL (blend_section.rs eprintln, build.cpp zz_statuses): strip before land.
+  check 1e-8 for edges only; kernel 531 / features_c 103 ok, g13 OK. Userdocs unit blend-g805-ud2 (bin/ud805.sh;
+  ud-gate.sh's pgrep matched itself, fixed with [d]) -> ud-805.log; suite pair in blend-gate805 -> suite-e805.cmp.
+- Suspension splice (blend13, uncommitted on 8d9420223 = step 1 make_edge_on; diff all this thread's): step 3
+  canal_corners; 3 of 8 corners spliced (z -15). z +15 cause: make_edge_on's UV not unwrapped from a point on the
+  round's seam (2pi, then -0.09): the contact edge looped round. Fixed (unwrap in make_edge_on) + face_with_edge_replaced
+  now walks each piece's pcurve from the run's start (in_period). T1 rerun blend-lca-t1l (vibex8). Next: canal
+  face_on status 32/18 if still there, then all 8, strip ZZ_CANAL/ZZK debug (blend_section.rs, build.cpp zz_statuses,
+  piece prints, BRepCheck_Result/Geom2d_Curve includes), kernel + T1 + g13 + gate, land steps 1-3.
   bin/lca-t1.sh [host] -> logs/lca-t1.out + lca-full.log. Probe parked/zz-lca-splice-probe.patch (drop from land).
 - Mutualtrim Fillet 1 (blend4, parked): split_on turns closed touch loops into zero-area faces.
 - Agent ids: only in /root/lead-scratch/roster.md; read it before every message_agent, never copy ids here.
