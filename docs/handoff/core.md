@@ -40,8 +40,13 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   Live's sections (core-scratch/ring/sec.py, knots.py): at the 4 profiles + at 61.6 / 118.8 / 241.4 / 298.6 deg; each
   extra one = the 90/270 (JM) profile carried along the path by a rotation-minimising frame (zc 5.01 vs RMF 5.03, r
   19.394 vs 19.393, rin/rout 13.71/25.08 exact; bank 5.9 vs 5.5); banks up to 6.5 deg between profiles. Our routing
-  curve = live's (162.936 mm). Open: why +-28.8 deg about JM and none about JK. live2 asked 17:07 (REQUESTS "wave-washer
-  Loft 1, where live puts its path sections": Section count 1/3/10, profiles reordered, 2-profile loft).
+  curve = live's (162.936 mm). live2 q-wave-washer-sections-1119 (scratch doc 30252aa1, kept till core says): SECTION RULE:
+  Section count N = N sections at equal arc lengths from the FIRST profile (N+1 pieces of the closed path); one landing
+  on a profile is dropped (N 1 / 3: none added, 4 spans 2091.69 mm3; N 5: 60/120/[180]/240/300 -> 4 added; N 10: all 10;
+  reordered: same offsets from JMC; 2 profiles: 5 added). SECTION SHAPE (core-scratch/ring/shape.py, RMF over
+  spine.txt from vibex8 ~/tmp/core/spine.brep): JK carried by RMF reaches 90 deg upright (no twist), 2.286 below JM, so a
+  section = JK carried + lift f x 2.286 in the frame (fits to 0.04 mm); f(angle): 0:0 31.9:.59 67.4:.97 90:1 96.7:.945
+  130.7:.515 164.2:.09 180:0, asymmetric (not linear / smoothstep / sine in arc): UNKNOWN; then the skin (C1 cubics?).
 - **11-19 afternoon:** guided-loft conditions e02fe92f (queued/landed: Normal to guide aslant -> BSURF_INCONSISTENT text;
   start/end conditions checked against guides; T1 a_guided_loft_with_guide_and_end_conditions_as_live). f197 closed
   (Mirror 3 splits one B-spline edge at (1.2061,39,20): DECISIONS 11-16). surf-intro Derived 1 +0.1 in = asm's
