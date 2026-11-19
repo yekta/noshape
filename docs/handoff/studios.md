@@ -35,12 +35,17 @@ vibex7 goes vibex7 -> here -> vibe2 (no host-to-host ssh). Run the full ops e2e 
 - live2 versions-1119: (b) was live2's artefact; (c)-(e) already as live.
 
 ## Next, in order
-1. drw-view-replicate-region-place (feel row, partly fixed): ours replicates and shows live's message, but onto the
-   Top view's front 40 mm edge (y 153.5); live puts it at y 184, 8.2 mm above the Top view's back edge (model y 30),
-   the same offset the Front original has above its edge. live2 (d7f4a0c2) is capturing four replicate-region takes
-   to settle the rule; then change the candidate choice in `replicate_into` (crates/scene/src/drawing_tools/
-   replicate.rs: today nearest candidate under which every ref lands) and verify with the take on vibe2.
-2. drw-constraint-tangent: run live2's retake when it arrives.
+1. drw-view-replicate-region-place (feel row, partly fixed): live2's rule takes are in (live/studios/replicate-rule-1119/;
+   behaviours "studios (11-19): Replicate region onto Top, which edge"). The Front 1.575 dimension (vertex (0,0,10) to
+   (40,0,10)) sits 8.2 mm above Front's top edge; a place click on Top's back edge, front edge or middle always puts
+   the copy at (81, 184): 8.2 mm above Top's back edge (model y 30, sheet y 175.8), never the front edge (y 0, 145.8).
+   Not nearest to the click, not the box centre, not the same model edge (ours picks y 0: 153.5). Find the rule that
+   gives y 30 (likely: the copy keeps the original's offset from the view's outer edge on the dimension's side, i.e.
+   the top silhouette edge of the target view), change the candidate choice in `replicate_into`
+   (crates/scene/src/drawing_tools/replicate.rs), add the e2e, verify with drw-view-replicate-region-place on vibe2.
+2. drw-constraint-tangent: live2 retook it; live picks Tangent fine and ours "fails as the other dropdown rows". The
+   ▾-label fix landed in 6055ccb5: check which build live2 compared (likely older), rerun the take on a build from main,
+   and fix if it still fails.
 3. The lead's answer on the not-target takes above (DECISIONS / ui-parity `live_defects`).
 4. Open: the Measure readout of a point / circle pick ("Point 1", "Circle 1" names and rows are our guess).
 5. Then the feel rows below and the lead's queue (11-17).
@@ -126,7 +131,7 @@ bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0. live is paused until ~21:00 11-19: c
 Paused agents are not messaged (DECISIONS 11-17); stopped: qa 132756b3, psui 4973e295, live2 79ae5cdb.
 
 ## Waiting on others
-- live2 (d7f4a0c2): four replicate-region takes; drw-constraint-tangent retake; the weld retake (metric positions); retakes of 4fc2ea4f's rows and
+- live2 (d7f4a0c2): the weld retake (metric positions); retakes of 4fc2ea4f's rows and
   Callout once green. live (e8549719): the 8 drw-revision-* and drw-styles-dimension retakes; titleblock / holecallout
   / holetable / export-1119; the Feature Studio retake of f4e766b8 once green.
 
