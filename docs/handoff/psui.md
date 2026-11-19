@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-19 12:06 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-19 12:44 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -35,23 +35,22 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (updated 12:06 UTC 11-19; Ubeyd at 97 % weekly: keep this current, land small)
+## Now (updated 12:44 UTC 11-19; Ubeyd at 98 % weekly: keep this current, land small)
 
 1. LANDED 10:11 (03a8f126): HEAVY-ASM-SOFTWARE-FRAME renderer side (no 3D frame for a refresh that changes nothing:
    `CameraGeometry::key`, `small_content_key` in `Scene::same_as`; `Style::software` = 1x MSAA + each body's coarsest
    level), the list-1119 / nav-feel-1119 / tools-1119 rows, Shift+C. 1aef7f70 (coplanar on Metal/D3D12) landed 08:32.
    asm owns the LOD meshes / load path.
-2. HEAVY-ASM timing, vibe2 llvmpipe, release, asm-xdev-subs Assembly 1 tab (/root/psui-scratch/hv.sh, hvparse.py;
-   out dirs in /root/psui-scratch/out-{base,new,pre}): steady frame 1.2 s -> 0.11-0.12 s; first frame after the tab
-   5.97 -> 1.95 s; a wheel notch on screen 3.62 -> 0.72 s. Assembly evaluate 4.1 s (base) vs 9.2 s (new) in one run:
-   not touched by the change; rerunning base/new x2 (hve.sh -> vibe2 ~/tmp/psui/hv/e-{b1,n1,b2,n2}, queued in slot
-   behind asm) to confirm it is load. Report to the lead once in. Prewarm timing: dropped (qa: no regression).
-3. live tools-1119 swatch recheck (484-678 ms on loaded vibex6): measured on vibe2 llvmpipe with a 2 ms X pixel
-   watcher (/root/psui-scratch/pxwatch.c, swclick2.sh; app on MY display :394 only, :393 is asm's): the part
-   recolours 60-120 ms after the swatch's own tick = the next software 3D frame. Row updated "to retake on a GPU".
-4. Next feel rows (≠ in my area, by frequency): section view preview caps (row 1160), Hole callout (1463), then
-   core's Routing curve Point edit type Multiple (needs FeatureManipulator TOGGLE_POINTS / FULL_TRIAD kinds,
-   custom/host/status.rs; std routingCurve.fs 787-1002; aeb0cc0a7 added the params; low priority).
+2. HEAVY-ASM: done. vibe2 llvmpipe asm-xdev-subs: steady frame 1.2 -> 0.11 s, first frame after the tab 5.97 -> 1.95 s,
+   wheel notch 3.62 -> 0.72 s; the one 9.2 s evaluate was load (reruns: base 6.2 / 3.0 s, new 3.6 / 3.9 s). asm's
+   d7691003 (software proxy at the coarsest level) on top: frames 0.04-0.07 s. Prewarm timing dropped (qa).
+3. Appearance swatch: = on vibe2 (next 3D frame, 60-120 ms after the swatch tick on llvmpipe; pxwatch.c / swclick2.sh
+   in /root/psui-scratch; app on MY display :394 only, :393 is asm's). Row says retake on a GPU.
+4. Routing curve Point edit type Multiple (core's missing-commands row 4), native in triad.rs: a click on a point
+   toggles it in selectedIndices, the triad at the selected points' centre moves each one's dx/dy/dz
+   (dialogs_feel_tests::a_routing_curves_multiple_triad_moves_the_selected_points). Test note: point items set
+   directly are reset by the editing logic; type offsets via set_expr_text. Not done: the triad's rotation rings,
+   an Edit reference's triad (only if live has a capture). NEXT (lead, P0): qa's interaction-feel rows from its suite.
 5. Open with live: Hole callout glyph size (REQUESTS 23:33), section preview over a shown plane (REQUESTS 22:48).
    live is stopped until ~21:00 UTC: recheck asks go to live2.
 6. Not to build: 3D Sketch, Fault analysis. Cleanup: vibex7 ~/tmp/psui/priv/dock.noshape when the tab work is over;

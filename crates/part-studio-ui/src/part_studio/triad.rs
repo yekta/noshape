@@ -5,7 +5,10 @@
 //! translation. Dragging an arrow sets its X / Y / Z translation, dragging a
 //! planar handle the two in its plane. Routing curve's Single mode puts it on
 //! the active point (live 1722), whose offsets it drags; clicking another
-//! point makes that one active.
+//! point makes that one active. Its Multiple mode (std routingCurve.fs
+//! addMultiPointsManipulator / addMultiTriadManipulator): a click on a point
+//! toggles it in Selected points, the triad sits at the selected points'
+//! centre and moves them all.
 
 use super::PartStudioView;
 use super::manipulators::Manip;
@@ -33,6 +36,10 @@ pub(super) struct Triad {
     pub offset: DVec3,
     /// The array item whose dx / dy / dz it sets (Routing curve's point).
     pub item: Option<(&'static str, usize)>,
+    /// Routing curve's Multiple mode: the triad moves every selected point.
+    pub multi: bool,
+    /// Drawn and grabbable (Multiple mode with no point selected has only the points).
+    pub shown: bool,
 }
 
 impl Triad {
@@ -53,6 +60,8 @@ pub(super) struct TriadDrag {
     pub start: DVec3,
     pub grab: DVec3,
     pub item: Option<(&'static str, usize)>,
+    /// Multiple mode: each selected point's index and its offsets when the drag started.
+    pub points: Vec<(usize, DVec3)>,
 }
 
 fn axis(i: usize) -> DVec3 {
@@ -101,7 +110,7 @@ impl PartStudioView {
         let value = |id: &str| p.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok().map(|q| q.value))).unwrap_or(0.0);
         let offset = DVec3::new(value("dx"), value("dy"), value("dz"));
         // At the parts' bounding box's centre: std's transformCopy.fs findCenter (box3dCenter), live2 manip-feel-1118 m6.
-        Some(Triad { origin: (lo + hi) * 0.5 + offset, offset, item: None })
+        Some(Triad { origin: (lo + hi) * 0.5 + offset, offset, item: None, multi: false, shown: true })
     }
 
     /// Routing curve's points (index, position) whose reference ours can
@@ -110,7 +119,7 @@ impl PartStudioView {
         let Some(e) = self.edit.as_ref() else { return Vec::new() };
         let d = e.dialog.read(cx);
         let p = &d.feature.params;
-        if d.feature.type_id != "routingCurve" || !p.is("pointsEditType", "SINGLE") || !p.query("curveBaseCSys").is_empty() {
+        if d.feature.type_id != "routingCurve" || !p.query("curveBaseCSys").is_empty() {
             return Vec::new();
         }
         let units = self.doc.read(cx).session.doc.settings.units;
@@ -131,6 +140,44 @@ impl PartStudioView {
             .collect()
     }
 
+    /// Routing curve in Multiple mode (std's triad in it moves the selected points).
+    fn routing_multi(&self, cx: &App) -> bool {
+        self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.params.is("pointsEditType", "MULTI"))
+    }
+
+    /// Multiple mode's Selected points (`selectedIndices`' `indexValue`s).
+    pub(super) fn routing_selected(&self, cx: &App) -> Vec<usize> {
+        let Some(e) = self.edit.as_ref() else { return Vec::new() };
+        e.dialog.read(cx).feature.params.array("selectedIndices").iter().filter_map(index_value).collect()
+    }
+
+    /// A point's own offsets (its `dx`, `dy`, `dz`).
+    fn routing_offset(&self, k: usize, cx: &App) -> Option<DVec3> {
+        let e = self.edit.as_ref()?;
+        let d = e.dialog.read(cx);
+        let it = d.feature.params.array("points").get(k)?;
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let num = |id: &str| it.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok().map(|q| q.value))).unwrap_or(0.0);
+        Some(DVec3::new(num("dx"), num("dy"), num("dz")))
+    }
+
+    /// Multiple mode: a click on point `k` adds it to Selected points or takes it out.
+    fn routing_toggle(&mut self, k: usize, cx: &mut Context<Self>) {
+        let Some(e) = &self.edit else { return };
+        let mut items = e.dialog.read(cx).feature.params.array("selectedIndices").to_vec();
+        match items.iter().position(|it| index_value(it) == Some(k)) {
+            Some(i) => {
+                items.remove(i);
+            }
+            None => {
+                let mut it = noshape_model::params::ParamValues::default();
+                it.set("indexValue", ParamValue::Expr(noshape_units::ExprValue::new(k.to_string())));
+                items.push(it);
+            }
+        }
+        e.dialog.update(cx, |dlg, cx| dlg.set_value("selectedIndices", ParamValue::Array(items), cx));
+    }
+
     /// The active point of a routing curve in Single mode (`pointIndex`).
     fn routing_active(&self, cx: &App) -> usize {
         let Some(e) = self.edit.as_ref() else { return 0 };
@@ -140,6 +187,16 @@ impl PartStudioView {
     /// Routing curve, Single mode: the triad on the active point.
     pub(super) fn routing_triad(&self, cx: &App) -> Option<Triad> {
         let pts = self.routing_points(cx);
+        if self.routing_multi(cx) {
+            // Std's: at the selected points' centre of mass (an Edit reference moves it off them: not drawn here).
+            if !self.edit.as_ref()?.dialog.read(cx).feature.params.query("multiEditReference").is_empty() || pts.is_empty() {
+                return None;
+            }
+            let sel = self.routing_selected(cx);
+            let chosen: Vec<DVec3> = pts.iter().filter(|(i, _)| sel.contains(i)).map(|(_, p)| *p).collect();
+            let centre = chosen.iter().copied().sum::<DVec3>() / chosen.len().max(1) as f64;
+            return Some(Triad { origin: centre, offset: centre, item: None, multi: true, shown: !chosen.is_empty() });
+        }
         let k = self.routing_active(cx);
         let &(_, at) = pts.iter().find(|(i, _)| *i == k)?;
         let e = self.edit.as_ref()?;
@@ -148,12 +205,12 @@ impl PartStudioView {
             "VERTEX" => self.vertex_position(it.query("vertex").first()?)?,
             _ => DVec3::ZERO,
         };
-        Some(Triad { origin: at, offset: at - base, item: Some(("points", k)) })
+        Some(Triad { origin: at, offset: at - base, item: Some(("points", k)), multi: false, shown: true })
     }
 
-    /// Routing curve: the point (other than the active one) under the cursor.
+    /// Routing curve: the point (other than Single mode's active one) under the cursor.
     fn routing_point_at(&self, p: DVec2, cx: &App) -> Option<usize> {
-        let k = self.routing_active(cx);
+        let k = if self.routing_multi(cx) { usize::MAX } else { self.routing_active(cx) };
         let vp = self.viewport.read(cx);
         self.routing_points(cx).into_iter().filter(|(i, _)| *i != k).filter_map(|(i, w)| Some((i, (vp.project(w)? - p).length()))).filter(|(_, d)| *d < 8.0).min_by(|a, b| a.1.total_cmp(&b.1)).map(|(i, _)| i)
     }
@@ -168,6 +225,9 @@ impl PartStudioView {
 
     /// The handle under a viewport position.
     pub(super) fn triad_handle_at(&self, t: &Triad, p: DVec2, cx: &App) -> Option<usize> {
+        if !t.shown {
+            return None;
+        }
         let wpp = self.triad_wpp(t, cx)?;
         let vp = self.viewport.read(cx);
         let s = |w: DVec3| vp.project(w);
@@ -199,7 +259,7 @@ impl PartStudioView {
 
     /// Hit segments for the viewport (it starts a tool drag on them).
     pub(super) fn triad_hit_segments(&self, t: &Triad, cx: &App) -> Vec<(DVec3, DVec3, f64)> {
-        let Some(wpp) = self.triad_wpp(t, cx) else { return Vec::new() };
+        let Some(wpp) = self.triad_wpp(t, cx).filter(|_| t.shown) else { return Vec::new() };
         let o = t.origin;
         let mut out: Vec<(DVec3, DVec3, f64)> = (0..3).map(|i| (o + axis(i) * 0.15 * SHAFT_PX * wpp, o + axis(i) * (SHAFT_PX + HEAD_PX) * wpp, 0.0)).collect();
         for h in 3..6 {
@@ -233,7 +293,9 @@ impl PartStudioView {
             ViewportEvent::ToolDown { position, .. } => {
                 // Routing curve: a click on another point makes it the active one.
                 if let Some(k) = self.routing_point_at(*position, cx) {
-                    if let Some(e) = &self.edit {
+                    if t.multi {
+                        self.routing_toggle(k, cx);
+                    } else if let Some(e) = &self.edit {
                         e.dialog.update(cx, |dlg, cx| dlg.set_value("pointIndex", ParamValue::Expr(noshape_units::ExprValue::new(k.to_string())), cx));
                     }
                     self.rebuild_scene(cx);
@@ -241,7 +303,8 @@ impl PartStudioView {
                 }
                 let Some(handle) = self.triad_handle_at(&t, *position, cx) else { return false };
                 let Some(grab) = self.triad_point(t.origin, handle, *position, cx) else { return false };
-                self.ui.triad_drag = Some(TriadDrag { handle, start: t.offset, grab, item: t.item });
+                let points = if t.multi { self.routing_selected(cx).into_iter().filter_map(|k| Some((k, self.routing_offset(k, cx)?))).collect() } else { Vec::new() };
+                self.ui.triad_drag = Some(TriadDrag { handle, start: t.offset, grab, item: t.item, points });
                 true
             }
             ViewportEvent::ToolDrag { position, .. } => {
@@ -254,13 +317,20 @@ impl PartStudioView {
                 let units = self.doc.read(cx).session.doc.settings.units;
                 if let Some(e) = &self.edit {
                     e.dialog.update(cx, |dlg, cx| {
+                        // Live (dom/transform-xyz-after-x-drag.txt): one decimal
+                        // of the workspace unit ("13.9 mm").
+                        let unit = units.si_factor(Dim::LENGTH);
+                        let text = |v: f64| noshape_units::format_quantity_with(Quantity::new((v / unit * 10.0).round() / 10.0 * unit, Dim::LENGTH), &units, 1);
                         for i in axes {
-                            // Live (dom/transform-xyz-after-x-drag.txt): one decimal
-                            // of the workspace unit ("13.9 mm").
-                            let unit = units.si_factor(Dim::LENGTH);
-                            let v = ((d.start[i] + delta[i]) / unit * 10.0).round() / 10.0 * unit;
-                            let text = noshape_units::format_quantity_with(Quantity::new(v, Dim::LENGTH), &units, 1);
-                            dlg.set_expr_text(&t.path(i), &text, window, cx);
+                            if !t.multi {
+                                dlg.set_expr_text(&t.path(i), &text(d.start[i] + delta[i]), window, cx);
+                                continue;
+                            }
+                            // Std's multiTriadManipulatorHandler: each selected point's offsets move by the drag (its
+                            // frame is the world's: origin or vertex based).
+                            for (k, start) in &d.points {
+                                dlg.set_expr_text(&format!("points.{k}.{}", PARAMS[i]), &text(start[i] + delta[i]), window, cx);
+                            }
                         }
                     });
                 }
@@ -268,6 +338,10 @@ impl PartStudioView {
             }
             ViewportEvent::ToolUp { .. } => {
                 let Some(d) = self.ui.triad_drag.take() else { return false };
+                if t.multi {
+                    self.rebuild_scene(cx);
+                    return true;
+                }
                 let i = if d.handle < 3 { d.handle } else { plane_axes(d.handle).0 };
                 let field = Triad { item: d.item, ..t }.path(i);
                 if let Some(e) = &self.edit {
@@ -280,6 +354,11 @@ impl PartStudioView {
             _ => false,
         }
     }
+}
+
+/// A Selected points item's point index.
+fn index_value(it: &noshape_model::params::ParamValues) -> Option<usize> {
+    it.expr("indexValue").and_then(|x| x.cached.map(|q| q.value).or_else(|| x.text.trim().parse().ok())).map(|v: f64| v.max(0.0) as usize)
 }
 
 /// Whether `p` is inside the convex quad `q`.
@@ -313,7 +392,7 @@ impl Manip {
 /// The triad's glyph for a frame's view (built by the renderer, see
 /// `manipulators::ManipGeometry`): `hover` the hovered or dragged handle.
 pub(super) fn triad_glyph(t: &Triad, hover: Option<usize>, dragging: bool, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
-    let Some(wpp) = view.world_per_px(t.origin) else { return Vec::new() };
+    let Some(wpp) = view.world_per_px(t.origin).filter(|_| t.shown) else { return Vec::new() };
     let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
     let view_dir = view.direction();
     let o = t.origin;

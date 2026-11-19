@@ -967,3 +967,69 @@ fn a_hole_without_points_says_only_that(cx: &mut TestAppContext) {
     let tip = crate::ui_script::shown_tooltip().unwrap_or_default();
     assert!(tip.ends_with("did not regenerate properly: No hole points selected."), "the title's tooltip: {tip:?}");
 }
+
+/// Routing curve's Point edit type Multiple (std routingCurve.fs addMultiPointsManipulator / multiTriadManipulator,
+/// live2 audit-1119 missing-commands row 4): a click on a point toggles it in Selected points; the triad sits at the
+/// selected points' centre and its X arrow moves each of them by the drag, the others stay.
+#[gpui::test]
+fn a_routing_curves_multiple_triad_moves_the_selected_points(cx: &mut TestAppContext) {
+    use noshape_model::params::{ParamValue, ParamValues};
+    let (window, view) = block(cx, "dlg-routing-multi");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("routingCurve", w, cx))).unwrap();
+    draw(cx, window);
+    let item = || {
+        let mut it = ParamValues::default();
+        it.set("referenceType", ParamValue::Enum("ORIGIN".into()));
+        it
+    };
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Routing curve dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.set_value("pointsEditType", ParamValue::Enum("MULTI".into()), cx);
+        d.set_value("points", ParamValue::Array(vec![item(), item(), item()]), cx);
+    }));
+    draw(cx, window);
+    // Typed in the points' fields (std's editing logic places a new point itself).
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| {
+        d.set_expr_text("points.1.dx", "40 mm", w, cx);
+        d.set_expr_text("points.2.dy", "40 mm", w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    let triad = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).routing_triad(cx)).expect("Multiple mode's manipulator");
+    assert!(!triad(cx).shown, "no triad before a point is selected");
+    let at = |cx: &mut TestAppContext, w: glam::DVec3| cx.update(|cx| view.read(cx).viewport.read(cx).project(w)).expect("on screen");
+    let event = |cx: &mut TestAppContext, ev: ViewportEvent| {
+        let t = triad(cx);
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.triad_event(t, &ev, w, cx))).unwrap();
+        draw(cx, window);
+    };
+    let click = |cx: &mut TestAppContext, w: glam::DVec3| {
+        let position = at(cx, w);
+        event(cx, ViewportEvent::ToolDown { position, modifiers: Modifiers::default(), click_count: 1 });
+        event(cx, ViewportEvent::ToolUp { position, modifiers: Modifiers::default() });
+    };
+    let mm = 1e-3;
+    let typed = cx.update(|cx| view.read(cx).routing_points(cx));
+    assert!(typed.len() == 3 && typed[1].1.distance(glam::DVec3::new(40.0 * mm, 0.0, 0.0)) < 1e-9 && typed[2].1.distance(glam::DVec3::new(0.0, 40.0 * mm, 0.0)) < 1e-9, "the points typed: {typed:?}");
+    click(cx, glam::DVec3::new(40.0 * mm, 0.0, 0.0));
+    click(cx, glam::DVec3::new(0.0, 40.0 * mm, 0.0));
+    let selected = cx.update(|cx| view.read(cx).routing_selected(cx));
+    let t = triad(cx);
+    assert_eq!(selected, vec![1, 2], "the two points clicked");
+    assert!(t.shown && t.origin.distance(glam::DVec3::new(20.0 * mm, 20.0 * mm, 0.0)) < 1e-9, "the triad at their centre: {:?}", t.origin);
+    // The X arrow's middle, dragged 30 px along it.
+    let segs = cx.update(|cx| view.read(cx).triad_hit_segments(&t, cx));
+    let (a, b) = (at(cx, segs[0].0), at(cx, segs[0].1));
+    let (grab, dir) = ((a + b) * 0.5, (b - a).normalize());
+    event(cx, ViewportEvent::ToolDown { position: grab, modifiers: Modifiers::default(), click_count: 1 });
+    event(cx, ViewportEvent::ToolDrag { position: grab + dir * 30.0 });
+    event(cx, ViewportEvent::ToolUp { position: grab + dir * 30.0, modifiers: Modifiers::default() });
+    let pts = cx.update(|cx| view.read(cx).routing_points(cx));
+    let moved = pts[1].1.x - 40.0 * mm;
+    assert!(moved > 1.0 * mm, "point 1 moved along X: {pts:?}");
+    assert!((pts[2].1.x - moved).abs() < 1e-9 && (pts[2].1.y - 40.0 * mm).abs() < 1e-9 && pts[1].1.y.abs() < 1e-9, "point 2 by the same X only: {pts:?}");
+    assert!(pts[0].1.length() < 1e-9, "the unselected point stays: {pts:?}");
+    // A second click on a selected point takes it out.
+    click(cx, pts[1].1);
+    assert_eq!(cx.update(|cx| view.read(cx).routing_selected(cx)), vec![2], "point 1 deselected");
+}
