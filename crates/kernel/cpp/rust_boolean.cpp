@@ -6135,6 +6135,34 @@ static std::vector<IntTools_Curve> seeded_sections(const TopoDS_Face& fa, const 
     if (!seen)
       out.push_back(refined_section(ic, fa, fb));
   }
+  if (!out.empty())
+    return out;
+  // (Still none where the faces' edges say they cross: two quadrics' analytic section ignores the seeds (a hole's wall
+  // and a corner round's cylinder at right angles, isaac-ball's Fastened 43). On their surfaces over each face's
+  // parameter box grown by a tenth each way (a period at most); the Boolean keeps what lies on the faces.)
+  auto grown = [](const TopoDS_Face& f) {
+    const occ::handle<Geom_Surface> sf = BRep_Tool::Surface(f);
+    double                          u0, u1, v0, v1;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    double du = 0.1 * (u1 - u0), dv = 0.1 * (v1 - v0);
+    if (sf->IsUPeriodic() && u1 - u0 + 2 * du > sf->UPeriod())
+      du = 0.5 * (sf->UPeriod() - (u1 - u0));
+    if (sf->IsVPeriodic() && v1 - v0 + 2 * dv > sf->VPeriod())
+      dv = 0.5 * (sf->VPeriod() - (v1 - v0));
+    BRepBuilderAPI_MakeFace mk(sf, u0 - du, u1 + du, v0 - dv, v1 + dv, Precision::Confusion());
+    return mk.IsDone() ? TopoDS::Face(mk.Shape()) : TopoDS_Face();
+  };
+  const TopoDS_Face ga = grown(fa), gb = grown(fb);
+  if (ga.IsNull() || gb.IsNull())
+    return out;
+  IntTools_FaceFace wide;
+  wide.SetParameters(true, true, true, 1e-7);
+  wide.Perform(ga, gb);
+  if (!wide.IsDone())
+    return out;
+  for (const IntTools_Curve& ic : wide.Lines())
+    if (!ic.Curve().IsNull())
+      out.push_back(ic);
   return out;
 }
 

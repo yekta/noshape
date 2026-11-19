@@ -978,6 +978,26 @@ fn a_rulings_pieces_unify_into_one_edge_as_occt() {
     assert_eq!([u.count(k::ShapeType::Face), u.count(k::ShapeType::Edge)], [11, 24]);
 }
 
+/// A Ø6 hole cut down the axis of a plate's R4 corner round, through the corner ball's pole (asm's isaac-ball Fastened 43,
+/// recorded): OCCT's section of the hole's wall and one bottom round is empty, and OCCT's result keeps pieces inside the
+/// hole (an edge of four faces, the whole π r² h removed). Ours: the section found over the surfaces, the exact volume
+/// (the rounded corner's material inside r 3, integrated: 302.234 mm³), no edge bounding more than two faces.
+#[test]
+fn a_hole_down_a_corner_rounds_axis_through_its_ball() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "0ea218c03ac1f745").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let removed = c.objects[0].volume().unwrap() - r.shape.volume().unwrap();
+    assert!(r.shape.is_valid() && (removed - 302.234e-9).abs() <= 1e-3 * 1e-9, "valid {}, removed {} mm³", r.shape.is_valid(), removed * 1e9);
+    let most = r.shape.edge_faces().unwrap().into_iter().map(|mut f| { f.sort_unstable(); f.dedup(); f.len() }).max();
+    assert_eq!((r.shape.count(k::ShapeType::Face), most), (11, Some(2)));
+}
+
 /// prize-wheel-tim's fuse of three tools with flats at x ±1.2 mm into the hub under its sphere knob (recorded): OCCT's
 /// result. The sphere's sections by the flats lie outside the sphere's face: the two faces' parts of a section were
 /// apart, and an edge was made backwards between their ends (a 0.2 mm arc splitting a flat; "no point inside a face
