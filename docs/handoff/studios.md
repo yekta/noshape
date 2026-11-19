@@ -16,33 +16,20 @@ Updated 2026-11-18 22:34 UTC. Restarted 11-17 09:20 after the lead's pause; comp
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2
 tools/tiers/land.sh --no-precheck`; builds / drawing-ui tests `NOSHAPE_RB_HOST=vibex8 tools/tiers/rb.sh`; ops e2e on
 the Mac; ui-parity on vibex7 / vibe2 via ~/bin/slot (vibex6 = watcher), one run per host.
-- Landed 11-19: the 11-18 stack (21d8f791), live2 wake-1118 woken points / crop band / Measure units (9b5a7736),
-  Versions row tooltip (b03c752d), Measure units fixed order on a mm drawing (56357496).
-- Queued 11-19 03:35 166b521c: Measure readout as live (Line 1, Length: 40.00 mm, dual [1.575 in], Relation: Line);
-  Create Drawing of an assembly reads other documents (qa session-asm-1119: the bare regeneration was cached in
-  RECENT_SOURCES and reused: scale 1:2, BOM item 5 and its callout missing); VS Tab adds a typed name; view reach 13 px
-  (3.45 sheet mm); Checkbox input dialog; runner: a menu name never matches the start of a longer row; Insert view
-  no-match message; Dimension on an edge-on circle is linear.
-- Local, after 166b521c: a dimension on corners a chamfer cut away follows the replacing (outer) corners
-  (`Body::find_replaced_vertices`, drawings only); drawing_get "lost".
-- qa session-studio-1119 merge / restore: not a dialog bug. Ours reopens a document on its default workspace, so the
-  script's "Main › Open" fell back to "Open in new browser tab" (a second window). Asked live (REQUESTS 03:19) which
-  workspace live reopens on.
-- Live answers: custom feature ✓ with a field-naming error off, plain regenError on (ours already). VSFEEL-NAME-RED
-  is live's after-Enter mark (qa [x]).
-- Local 11-19 (after c2574db3): live2 drw-tools-1119 (12 rows) + rad-note (3) + doc-feel-1119 (6): fixed but these left:
-  the + marks on other dimensions' extension-line ends while a radial pick is held; the Documents header's ⋮ menu (items not captured); Callout's edge reach: +1 px (lead 11-19), live2 to retake.
-- Lead 11-19 missing-functionality sweep: no tool / menu row missing (matrix, coverage, D20, TB14, 13.40 done). Top 5
-  (uncompared depth): Drawing properties / Styles, Note panel, Title block, Hole callout + hole table, Export Drawing.
-  #1: drw1119a matrix: Drawing properties 0 ≠ (80 =, 113 present); every property read by the builder except the hole
-  callout Fit standard (fixed: `hole_fit_ansi`). Next: live2 takes of the present options' effects. live 11-19: a new drawing's tab goes after
-  the active tab (fixed); a document reopens on the workspace and tab last viewed (fixed: app `last_viewed`, the
-  user's config last-viewed.json). qa's 225.0° withdrawn.
-- drw1119a (vibex8, 02:47 build with the woken points): 334/341, 3371/3389 states; no regression. drw-geometric-
-  tolerance ≠ is the 11-07 take (edge click places a frame) against live2's 11-18 retake (edge click attaches a
-  leader; ours): retake asked in REQUESTS 11-19 ~04:00. drw-note-insert-drawing-property: live's doc copy "(1)".
-- Local: a replicated region placed by hand attaches anywhere inside the placed box, not 3 mm (replicate-region-place
-  replicated nothing: the box ~7 mm off); e2e fails without it.
+- Landed 11-19: 166b521c, c2574db3 (replicate region snap), 478458bf (drw-tools / rad-note / doc-feel), 1aef7f70
+  (Callout reach 5 px, hole callout Fit standard). live2 retakes Callout once green carries 1aef7f70.
+- Queued 11-19 ~08:45, one stack: ebd542cf (new drawing tab after the ACTIVE tab; reopen on the last-viewed workspace
+  and tab, app `last_viewed`), f4e766b8 (Feature Studio error marked ~900 ms, Ace's red-square marker; live tools-1119),
+  4fc2ea4f (live2 recheck-1119: cut line hover tan + arrow grips + blue anchor, grips while a selected parent is under
+  the pointer; a selected view's centre mark: orange dot, no grips; Edge to edge always two edges (app + op); no
+  centre dot on circle hover; note ruler in inches; rename border rgb(22,81,176); version tooltip 300 px).
+- Next: the + marks after any dimension pick (live2 08:30, rad-note/plus-*.png: every dimension of the sheet; linear:
+  text centre + the end arrow tip at the 2nd extension line; Ø / angle: text centre; snap points while placing, pink
+  lines + red ✕); a plain click on a cut line selects the line itself (centermark-sel case 2; ours the section view);
+  the Documents header ⋮ menu (live2 L40–L44 now in the row).
+- Lead 11-19 missing-functionality sweep: nothing missing; top 5 are uncompared depth. Captures asked: live2 #1
+  Drawing properties (drawprops-1119, building) and #2 Note panel (note-opts-1119); live #3 Title block, #4 hole
+  callouts + hole table, #5 Export Drawing on "studios hole plate" (REQUESTS 08:15), after skasm's flat DXFs.
 - fs1118b (vibex7 22:38 build): 116/116 scenarios, 602/602 states. drw1118g: 336/341 (known non-targets).
 - cf-spur-gear 0.4.58 → 0.4.59 (lead 11-18): cold-only, in our Boolean's free-form face grids (Once::call in rayon
   workers 50 → 1028 samples); bool's batch in the range; qa bisects (told). Scratch /root/studios-scratch/prof/s.
@@ -133,8 +120,9 @@ live e8549719-ef9a-42de-960c-e24b29f142a6, live2 79ae5cdb-42a4-4025-b43a-da61a4f
 Paused agents are not messaged (DECISIONS 11-17).
 
 ## Waiting on others
-- live2 (79ae5cdb): the weld retake (metric positions). live (e8549719): the 8
-  drw-revision-* and drw-styles-dimension retakes (failed: no Revision table tool, .6 dropdowns).
+- live2 (79ae5cdb): the weld retake (metric positions); drawprops-1119, note-opts-1119; retakes of 4fc2ea4f's rows and
+  Callout once green. live (e8549719): the 8 drw-revision-* and drw-styles-dimension retakes; titleblock / holecallout
+  / holetable / export-1119; the Feature Studio retake of f4e766b8 once green.
 
 ## Open (no owner action possible yet)
 - live's drw-hole-callout-palette retake (23:03, q-hcp-shots/record.json) has the same states as the take: kept;
