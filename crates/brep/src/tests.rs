@@ -403,6 +403,22 @@ fn a_tiny_arc_at_a_vertex_merges_no_directions() {
     assert_eq!(regions.len(), 2);
 }
 
+#[test]
+fn an_arc_and_a_side_leaving_a_vertex_either_side_of_minus_pi_are_one_direction() {
+    use crate::curve2::C2;
+    use glam::DVec2;
+    use std::f64::consts::FRAC_PI_2;
+    // A rectangle's corner cut off by a quarter arc tangent to its bottom side, leaving the vertex there at 1e-8 - π
+    // and the side going back at π (a block's end face under a cylinder tangent to its walls, 553beda0): one direction,
+    // the arc turning in; the arc was taken for one leaving the other way round, and a piece was lost.
+    let pts = [DVec2::ZERO, DVec2::new(2.0, 0.0), DVec2::new(10.0, 0.0), DVec2::new(10.0, 4.0), DVec2::new(0.0, 4.0), DVec2::new(0.0, 2.0)];
+    let seg = |a: usize, b: usize| ([a as u32, b as u32], C2::Seg { a: pts[a], b: pts[b] });
+    let arc = ([1, 5], C2::Arc { c: DVec2::new(2.0, 2.0), r: 2.0, a0: 1e-8 - FRAC_PI_2, sweep: -FRAC_PI_2 - 1e-8 });
+    let segs = [seg(0, 1), seg(1, 2), seg(2, 3), seg(3, 4), seg(4, 5), seg(5, 0), arc];
+    let regions = crate::arrange::regions(&pts, &segs).expect("the regions");
+    assert_eq!(regions.len(), 2);
+}
+
 fn segment(a: DVec3, b: DVec3) -> Body {
     Body { vertices: vec![a, b], edges: vec![Edge { v: [0, 1], curve: Curve::Line }], ..Default::default() }
 }

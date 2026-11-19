@@ -46,13 +46,22 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
         // knurl section's curvature at its end, 5.5e6 on its curve in the flank's parameters, merged opposite
         // directions).)
         list.sort_by(|a, b| a.0.total_cmp(&b.0));
+        // (Counted round from the widest gap between them: two a rounding either side of -π are one too (a block's
+        // end face, its wall leaving its corner at π and the tangent arc of a cylinder at 1e-8 - π).)
+        let n = list.len();
+        let gap = |i: usize| list[(i + 1) % n].0 - list[i].0 + if i + 1 == n { TAU } else { 0.0 };
+        if let Some(w) = (0..n).max_by(|&i, &j| gap(i).total_cmp(&gap(j))).filter(|&w| w + 1 < n) {
+            for x in &mut list[..=w] {
+                x.0 += TAU;
+            }
+            list.rotate_left(w + 1);
+        }
         for i in 1..list.len() {
             if list[i].0 - list[i - 1].0 < 1e-9 + (1e-6 * (list[i].1.abs() + list[i - 1].1.abs())).min(1e-3) {
                 list[i].0 = list[i - 1].0;
             }
         }
         list.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)).then(a.2.total_cmp(&b.2)));
-        let n = list.len();
         for i in 0..n {
             if n > 1 {
                 let j = (i + 1) % n;

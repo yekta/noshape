@@ -3118,3 +3118,11 @@ fn a_patch_of_a_cylinder_in_one_closed_curve_fuses_as_occt() {
 fn a_cylinder_sheet_and_a_plane_sheet_have_no_common() {
     recorded_as_occt("ec7cc4c1dd560d64", 1e-9);
 }
+
+/// A block's top rounded by a cut whose half-round hollow (r 2 mm) is tangent to the block's walls and top (recorded,
+/// bool-corpus): on one end face the hollow's arc leaves the wall's end at 1e-8 - π and the wall at π, one direction;
+/// that end face kept a corner piece only and the result declined "a non-manifold result".
+#[test]
+fn a_rounding_cut_tangent_to_a_blocks_walls_keeps_both_end_faces_as_occt() {
+    recorded_as_occt("553beda0e7f5810f", 1e-9);
+}
