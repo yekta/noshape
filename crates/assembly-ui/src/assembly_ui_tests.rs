@@ -2838,3 +2838,57 @@ fn a_drag_with_nothing_fixed_carries_the_mated_group(cx: &mut TestAppContext) {
         assert!(turn < 1e-6, "{} not turned: {turn}", names[i]);
     }
 }
+
+/// Live new-mate-preview-1119 (asm REQUESTS 22:49, qa's ASM-NEW-MATE-PREVIEW-GROUP): in a new Revolute's preview the
+/// first pick moves alone (unless it is fixed), splitting it from its Fastened twin; after ✓ the twin follows rigidly.
+/// Part 2 picked first: Part 2 moves and the pair stays, before and after ✓.
+#[gpui::test]
+fn a_new_mates_preview_moves_the_first_pick_alone_and_its_group_after_the_check(cx: &mut TestAppContext) {
+    let names = ["Part 1 <1>", "Part 1 <2>", "Part 2 <1>"];
+    for part1_first in [true, false] {
+        let path = two_parts_document(cx, if part1_first { "preview-group-a" } else { "preview-group-b" }, |ctx| {
+            call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+            let face = |ctx: &mut Ctx, i: &str, z: i32| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "normal": [0, 0, z] }))["faces"][0]["id"].clone();
+            let (a, b) = (face(ctx, "Part 1 <1>", -1), face(ctx, "Part 1 <2>", 1));
+            call(ctx, "assembly_mate", json!({ "type": "fastened", "a": { "instance": "Part 1 <1>", "entity": a }, "b": { "instance": "Part 1 <2>", "entity": b } }));
+            call(ctx, "assembly_set_state", json!({ "instances": names, "fixed": false }));
+        });
+        let (window, view) = open_assembly(cx, &path);
+        let poses = |cx: &mut TestAppContext| {
+            cx.executor().advance_clock(std::time::Duration::from_millis(100));
+            cx.run_until_parked();
+            cx.update(|cx| {
+                let v = view.read(cx);
+                names.map(|n| v.result.solved.placement(instance(v, n, cx)).unwrap())
+            })
+        };
+        let before = poses(cx);
+        let moved = |p: &[noshape_model::assembly::Placement; 3], i: usize| {
+            let dt = (glam::DVec3::from(p[i].translation) - glam::DVec3::from(before[i].translation)).length();
+            dt > 1e-6 || glam::DQuat::from_array(p[i].rotation).angle_between(glam::DQuat::from_array(before[i].rotation)) > 1e-6
+        };
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                v.start_mate(MateType::Revolute, w, cx);
+                let (p1, p2) = (face_connector(v, "Part 1 <1>", true, cx), face_connector(v, "Part 2 <1>", false, cx));
+                let (a, b) = if part1_first { (p1, p2) } else { (p2, p1) };
+                v.deliver_connector(a, w, cx);
+                v.deliver_connector(b, w, cx);
+            });
+        })
+        .unwrap();
+        let preview = poses(cx);
+        let expect = if part1_first { [true, false, false] } else { [false, false, true] };
+        assert_eq!([0, 1, 2].map(|i| moved(&preview, i)), expect, "preview, Part 1 first: {part1_first}");
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_mate(w, cx))).unwrap();
+        let after = poses(cx);
+        let expect = if part1_first { [true, true, false] } else { [false, false, true] };
+        assert_eq!([0, 1, 2].map(|i| moved(&after, i)), expect, "after ✓, Part 1 first: {part1_first}");
+        let rel = |p: &[noshape_model::assembly::Placement; 3]| {
+            let (q0, q1) = (glam::DQuat::from_array(p[0].rotation), glam::DQuat::from_array(p[1].rotation));
+            (q1.inverse() * q0, q1.inverse() * (glam::DVec3::from(p[0].translation) - glam::DVec3::from(p[1].translation)))
+        };
+        let ((qa, ta), (qb, tb)) = (rel(&before), rel(&after));
+        assert!(qa.angle_between(qb) < 1e-6 && (ta - tb).length() < 1e-6, "the Fastened pair kept together after ✓");
+    }
+}

@@ -2479,8 +2479,24 @@ impl AssemblyView {
         }
         let desc = noshape_ops::assembly::mate_description(&m, editing.is_some());
         let values = self.ui.config_values.clone();
+        // A new mate's preview moved its moving part alone; its mated group follows it rigidly (live
+        // new-mate-preview-1119), so the full solve leaves the other side where it is.
+        let carry = editing.is_none().then(|| self.assembly(cx)).flatten().and_then(|a| {
+            let moving = noshape_ops::assembly::mate_preview_moving(a, &m);
+            let other = if moving == m.a.instance { m.b.instance } else { m.a.instance };
+            let group = self.result.prepared.mated_group(&moving, m.id, &other)?;
+            let to = self.result.solved.placement(moving)?.to_dmat4() * a.instance(moving)?.placement.to_dmat4().inverse();
+            Some(group.into_iter().filter_map(|g| Some((g, Placement::from_dmat4(&(to * a.instance(g)?.placement.to_dmat4()))))).collect::<Vec<_>>())
+        });
         // Solved placements of the preview (which includes this mate) are folded in.
-        self.edit(&desc, cx, |a| noshape_ops::assembly::commit_mate(a, m, editing, &values));
+        self.edit(&desc, cx, |a| {
+            noshape_ops::assembly::commit_mate(a, m, editing, &values);
+            for (g, p) in carry.into_iter().flatten() {
+                if let Some(i) = a.instance_mut(g) {
+                    i.placement = p;
+                }
+            }
+        });
         window.focus(&self.focus, cx);
         self.infer = None;
         cx.notify();

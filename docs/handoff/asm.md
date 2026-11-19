@@ -5,7 +5,7 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-19 23:00 UTC)
+## State (2026-11-19 23:42 UTC)
 
 ### Landed today (702c9878: Display states Esc, driver-mate named position, paste; d671313d; 335f8e43; 9f52415c; 123ca4b3 free drag)
 - LOD (91478e2c), Derived mirror of an assembly complete (e87a2b3e, 17c26dc1; left: live's exact node icon, symmetry
@@ -27,21 +27,27 @@ TICKETS ASM-UI-SIGSEGV-AT-EXIT [x].
 - Not mine (my old list was wrong): 1452–1457 are psui's Part Studio pattern rows; 699 is psui's Dialogs matrix.
 - Named position row click (edits the cell, applies nothing): landed 9bbc3f11.
 
-### qa P1s 11-19 (queued 23:0x)
+### qa P1s 11-19 (landed 23:21 as d67512a3)
 - ASM-DRAG-UNFIXED-GROUP: my eedeede50 free-drag path took any 6-DOF instance, so a mated group with nothing fixed
   didn't move; now `Prepared::moves_alone` (no mate, pattern or group). Test fails without the fix.
 - ASM-LIMIT-TYPED-NO-PREVIEW: an edited mate's held values go through `eval::held_in_limits`. Test fails without it.
-- Open, next: ASM-NEW-MATE-PREVIEW-GROUP (a new mate's preview moves only the moving part; live the whole group).
+- ASM-NEW-MATE-PREVIEW-GROUP: preview = live (first pick alone); after ✓ ours moved the other part too, now the moving
+  part's group follows it (`Prepared::mated_group`, accept_mate). Test fails without it. Queued 23:42.
 
-### Lead rows 11-19 22:2x (after infento / scissor)
-1. isaac on a green with bb667320d: h1119 (built 17:25, has bb667320d) still fails the Chamfer 2 block (Fastened
-   7/8/9/57/79/88, Ball 1/7, Fastened 33): only the feature's error line went. Traced run with the current tree on
-   vibe2 (`one-save.sh ops-along asm-isaac-ball ~/agents/asm-keep/isaac-main.out`, document kept in
-   ~/tmp/asm/save) for core's volume line; core told the first answer was wrong.
+### Lead rows 11-19 (after infento / scissor)
+1. isaac: Chamfer 2 is fixed (current tree, traced: a2e4a2 Part 1 39921.440468 mm³, "volume fits"; core told).
+   The block (Fastened 7/8/9/57/79/88, Ball 1/7, Fastened 33) still fails in h1119: connectors 50–114 mm off live's
+   in plane (mine, the translator). Traced rerun on vibe2 with a 7200 s timeout (`one-save.sh ops-along
+   asm-isaac-ball ~/agents/asm-keep/isaac-main.out 7200`; 3000 s ran out in the studios), document kept in
+   ~/tmp/asm/save.
 2. Speed: `big_assembly_perf::suite_assemblies_speed` (NOSHAPE_PERF_DOCS=<saved suite docs>) in tagged stash
-   asm-suite-speed-1119 (c2bc6c6e), not run yet. Live's numbers (behaviours 21425 asm200, 30512 A200): drag
+   asm-suite-speed-1119 (c2bc6c6e, applied in the worktree), waiting for the saved isaac document. Live's numbers (behaviours 21425 asm200, 30512 A200): drag
    0.4–1 update/s, insert 4.96 s, add mate 1.94 s, open 11.8 s.
-3. Then the suite's next differences (xdev-subs, infento, scissor), P0/P1 first.
+3. Then the suite's next differences (xdev-subs 266/266 7/7 74/74 = live; infento timed out at 3600 s in h1119,
+   rerun with ≥7200 s; scissor running in h1119 on vibex7). Infento (06:37 base): 5 Wheel 7inch instances whose
+   subassembly is DeletedElement in live; missing parts (pulleys R8DD/RsDD, Seatboard <2>, Wheellock rings);
+   74d3d6 Plane 1 "three faces have no common vertex of ours" (translator, mine) → Sketch 15 / Extrude 24; the
+   fillets / chamfers (1dc32b, f0eedd, a3f7a1, 74d3d6) to blend after a trace.
 - Find open rows: `awk -F'|' 'NF>4 { st=$(NF-1); t=$(NF-2); if (st ~ /≠|≈/ || t ~ /missing/) print NR": "$2 }'
   docs/parity/interaction-feel.md | grep -iE "asm|assembl|mate|instance|explode|named|display|section|drag"`.
 
@@ -95,12 +101,8 @@ TICKETS ASM-UI-SIGSEGV-AT-EXIT [x].
 - Worktrees: asm (branch asm-fs; asm-live1119 holds the dropped keep rule), asm-feel / asm-cursor (landed), asm-docs.
 - Hosts (lead DECISIONS a67911bef): pick the lowest 1-min load of vibex7 / vibex8 / vibe2 (or the Mac slot) each time.
 - Private documents (hat8 / hat15 / dock on vibex7 ~/lead-private): mode-700 copies in ~/tmp/asm only, deleted after.
-- Live data: REQUESTS.md (times from `date -u`); live2 d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1, live
-  e8549719-ef9a-42de-960c-e24b29f142a6.
-- Agent ids (lead 21:4x, only these): lead 818534eb-f6b1-4a00-bb48-ebf0f7cdbd8a, core 08a98761-3bbe-47ce-a91a-32b208f5c6b2,
-  blend 459f6c19-c460-4ebf-96ca-bf92455f2e1e, bool abdebc8b-6b39-4794-8390-eb02d6fa37e6, live
-  349fe81d-db78-4931-8032-6dc3edc5d558, studios 91339202-41f1-4465-91f4-65ccd26ea1b1, dx 6cfc89bd-1196-43ef-9225-0014546fee1e,
-  qa ac50e7f2-4677-4cab-a57a-fd068a0c07bf, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6.
+- Live data: REQUESTS.md (times from `date -u`).
+- Agent ids: only /root/lead-scratch/roster.md, read right before every message (lead rule 11-19); never copied here.
 
 ## Assembly model suite (what it does)
 - T2 `parity_assemblies` (crates/ops/tests/parity.rs) over ~/parity/models/asm-* (NOSHAPE_PARITY_ASSEMBLIES).

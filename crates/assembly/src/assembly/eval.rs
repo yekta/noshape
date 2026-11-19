@@ -573,6 +573,33 @@ impl Prepared {
         !self.fixed[b] && self.body_of.values().filter(|(x, _)| *x == b).count() == 1 && !self.mates.iter().any(|(_, _, m)| touches(m))
     }
 
+    /// The top instances mated to `id`'s body through mates other than `without`, not on its body; None when that
+    /// group holds a fixed body or `stop`'s (live new-mate-preview-1119: after ✓ the group follows the previewed part).
+    pub fn mated_group(&self, id: &InstanceId, without: MateId, stop: &InstanceId) -> Option<Vec<InstanceId>> {
+        let &(b0, _) = self.body_of.get(id)?;
+        let mut seen = vec![false; self.fixed.len()];
+        seen[b0] = true;
+        let mut todo = vec![b0];
+        while let Some(b) = todo.pop() {
+            for (_, _, m) in self.mates.iter().filter(|(mid, _, _)| *mid != without) {
+                let ends: Vec<usize> = [m.a, m.b].into_iter().chain(m.extra.iter().map(|(x, _)| *x)).collect();
+                if !ends.contains(&b) {
+                    continue;
+                }
+                for e in ends {
+                    if !seen[e] {
+                        seen[e] = true;
+                        todo.push(e);
+                    }
+                }
+            }
+        }
+        if (0..seen.len()).any(|b| seen[b] && b != b0 && self.fixed[b]) || self.body_of.get(stop).is_some_and(|(b, _)| seen[*b]) {
+            return None;
+        }
+        Some(self.body_of.iter().filter(|(_, (b, _))| *b != b0 && seen[*b]).map(|(i, _)| *i).collect())
+    }
+
     /// A part whose only mate is a Ball to fixed geometry turns as an arcball
     /// about the ball's centre (live asm drag probes 4, request 1870: six
     /// drags within 0.12 mm). The sphere passes through the grabbed point's

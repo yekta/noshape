@@ -906,6 +906,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   free source grows to r 7 (the solver moves the source). The first-dimension scaling (behaviours 34917) is live's for the
   Dimension tool / typed box. Offset's default 5 mm box, arrow and pointer-independent preview are = live.
 - [x] verified d67512a3 (qa 23:42 on green 2574b5b5: Part 2 unfixed, a 75 px drag on Part 1 moves the plate, its Fastened twin and the Revolute disk together, angle unchanged; the unmated cone stays) (asm 11-19 22:5x: the free-instance drag path was taken by a mated group's 6 DOF (eedeede50); now only an instance no mate, pattern or group holds; test `a_drag_with_nothing_fixed_carries_the_mated_group`; the creation preview's split: ASM-NEW-MATE-PREVIEW-GROUP) P1 **ASM-DRAG-UNFIXED-GROUP (asm)**: an assembly with nothing fixed (walk3 Assembly 1: Part 1 <1> + <2> Fastened, Part 1
+- [x] (asm 11-19 22:48: the free-instance drag path was taken by a mated group's 6 DOF (eedeede50); now only an instance no mate, pattern or group holds; test `a_drag_with_nothing_fixed_carries_the_mated_group`; the creation preview's split: ASM-NEW-MATE-PREVIEW-GROUP) P1 **ASM-DRAG-UNFIXED-GROUP (asm)**: an assembly with nothing fixed (walk3 Assembly 1: Part 1 <1> + <2> Fastened, Part 1
   Revolute to Part 2 <1>; green 624c6db77, :110, real pointer 3 px / 40 ms): pressing on Part 1 and dragging 75 px moves
   nothing (outline lit, no motion during or after). With Part 2 › Fix the same drag turns Part 1 about the Revolute axis (=).
   Live (behaviours 42244, 42565): with nothing fixed a drag moves the grabbed part's whole mated group as one rigid set
@@ -913,6 +914,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   moved Part 1 <1> onto the ring while its Fastened twin <2> stayed put (after ✓ the pair is together again); live's edit
   preview moves the whole connected group (behaviours 1214), so the creation preview likely should too.
 - [x] verified d67512a3 (qa 23:42 on green 2574b5b5: Edit Revolute 1, limits 90 / 95 typed: the preview turns the part into the range within 1.2 s) (asm 11-19 22:5x: an edited mate's held free values are brought into its typed limits; test `a_typed_limit_turns_the_edited_mates_preview_into_range`) P1 **ASM-LIMIT-TYPED-NO-PREVIEW (asm)**: Edit Revolute 1 › ☑ Limits (rows "No minimum" / "No maximum" = live), type min
+- [x] (asm 11-19 22:48: an edited mate's held free values are brought into its typed limits; test `a_typed_limit_turns_the_edited_mates_preview_into_range`) P1 **ASM-LIMIT-TYPED-NO-PREVIEW (asm)**: Edit Revolute 1 › ☑ Limits (rows "No minimum" / "No maximum" = live), type min
   30 / max 35, then min 0 / max 5 (disjoint ranges): the part never moves in the preview; it turns only on Solve or ✓.
   Live (behaviours "asm (lead 11-18 ~01:15 …) mate limits", r1-r4): a typed limit applies to the preview at once, the part
   turning into the range within ~1 s. Drag clamping at the limit after ✓ is = live. Green 624c6db77, walk 22:4x.
@@ -946,6 +948,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   Table's ✓ its placement guide (pink dashed line at the ✓ button's x, red × at the sheet top) stayed drawn with the pointer
   elsewhere, until the next pointer action.
 - [ ] P1 **ASM-NEW-MATE-PREVIEW-GROUP (asm)**: a new mate's preview moves only the moving part, not the group mated to it
+- [x] (asm 11-19 23:42: the preview was = live (live new-mate-preview-1119: the first pick moves ALONE, its Fastened twin left until ✓; Part 2 first: Part 2 moves, the pair stays); after ✓ ours moved Part 2 as well (the full solve spread the split pair), now the moving part's mated group follows it and the other side stays as live; test `a_new_mates_preview_moves_the_first_pick_alone_and_its_group_after_the_check`, fails without the fix) P1 **ASM-NEW-MATE-PREVIEW-GROUP (asm)**: a new mate's preview moves only the moving part, not the group mated to it
   (qa walk 11-19: Revolute 1's preview took Part 1 <1> onto the ring, its Fastened twin <2> stayed; together again after ✓);
   live's preview moves the whole connected group (behaviours 1214).
 
