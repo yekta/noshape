@@ -1479,12 +1479,12 @@ These are what the user sees; reach-1118 (16:29) read the viewer's own pick and 
 | Target (iso, fit) | Live, drawn: lights at / still lit to | Ours | Status |
 |---|---|---|---|
 | A block's silhouette edge over the background (vertical, "start two-blocks" Part 1) | **5 / 5** (6 out: nothing), 2 rounds; a click 4 px out selects the edge, at 5 nothing (2 rounds) | 7 / 10 (green 88545e5d7, clean config, the same pixel method) | ≠ [psui]: live's drawn reach is 2 px shorter with no hold (reach-1118's pick-based 7 / 9–11 doesn't match what live draws or clicks) |
-| The same edge in the assembly ("start two-blocks asm") | 5 lit, 6 not, 2 rounds | – | [asm] the same as the Part Studio |
+| The same edge in the assembly ("start two-blocks asm") | 5 lit, 6 not, 2 rounds | the Part Studio's (the assembly hovers through the shared Viewport pick, `pick_radius_px`; by the code, not measured): 7 / 10 until psui's change | ≠ [psui]: follows the shared pick |
 | An edge between two faces, approached over its own face (the side face, at a quarter of the edge, away from its midpoint ⊙) | **7 / 7**: the face is hovered (thin boundary) to 8, the edge (thick) from 7 in, and back at 8 on the way out, 3 rounds (one at the midpoint, 2 at the quarter). A click 6 px inside the face takes the edge, 8 px takes the face (2 clean rounds) | – | [psui] over a face 7, over the background 5 |
 | A vertex, approached along the screen diagonal over the background | lit at 8.5, not 9.9; held to 8.5 | – | (3d.json's 8–10 holds) |
 | A plane's vertical outer edge (Front / Right in iso, over the background) | **6 / 6** (7: nothing) | – | (3d.json's "level border 7–8" read 1–2 px long) |
 | A plane's slanted outer edge (Top in iso) | 7.2 lit, 8.05 not (row "A plane hovers…") | 9.1 / 9.9 | ≠ [psui] |
-| Assembly hover timing ("start two-blocks asm", the pointer jumped onto Part 1's top face, 10 rounds) | the first draw 93–261 ms after the pointer stops (median 255), a second at ~515 ms more; the Part Studio the same (99–263, median 260) | – | [asm] = the Part Studio's pause rule (row "Hover timing") |
+| Assembly hover timing ("start two-blocks asm", the pointer jumped onto Part 1's top face, 10 rounds) | the first draw 93–261 ms after the pointer stops (median 255), a second at ~515 ms more; the Part Studio the same (99–263, median 260) | the Part Studio's: the assembly's hover is the shared Viewport's (`prehighlight_delay`, app-core `prehighlight_waits_for_a_pause_as_live`; by the code) | = [asm] |
 | Drawing: a click beside a view selects it (Top view of "start two-blocks", 1:2, left edge, 2 rounds) | selected out to 13 px, not at 14; hover lights at 13, not 14, with no hold (1 px steps, 450 ms, full-page shots, 2 rounds; row "View edge / inside hover reach" has 14–16) | – | [studios] |
 
 ## Fix queue (biggest feel impact first)
