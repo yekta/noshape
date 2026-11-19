@@ -36,6 +36,15 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   NOSHAPE_RING_MODE):** path reopened at the first profile, a pipe per profile pair, binormal = ring axis, upright
   cuts, smoothing on. T1 a_path_loft_round_four_profiles_on_a_closed_path_is_a_ring passes; wave-washer Loft 1 2126.10
   vs live 2080.82 mm3 (+2.2 %, live banks its mid sections ~6 deg), 1.5 s vs live 67 ms: not landable (wrong Ok).
+- **11-19 afternoon:** guided-loft conditions e02fe92f (queued/landed: Normal to guide aslant -> BSURF_INCONSISTENT text;
+  start/end conditions checked against guides; T1 a_guided_loft_with_guide_and_end_conditions_as_live). f197 closed
+  (Mirror 3 splits one B-spline edge at (1.2061,39,20): DECISIONS 11-16). surf-intro Derived 1 +0.1 in = asm's
+  90d254008 (handed to asm; live's body differs, can't judge). qa re-saved cpcurves/mutualtrim: left cpcurves Split 5
+  Info + extra 1227.58 mm3 part (= Split 3 keeps the wrong piece) -> after pipe.
+- **Pipe Loft (P1, core-oc branch core-nloft = 3e106dca0 cherry-picked + WIP env NOSHAPE_TRY_NLOFT):** 3 profiles, both
+  guides NORMAL_TO_GUIDE. Unconstrained N-profile loft: Surface 2 582.195 mm2 vs live 596.660 (-2.4 %): the guide
+  condition must shape the surface along the guides (not only at profiles). Next: apply Normal to guide in
+  loft_guided.cpp's N-profile Gordon build (cross-derivative at the guide boundaries = guide plane normal).
 - **Ring, live's sections (q-wave-washer-loft-1119 probe.json, evaluated at its v knots):** knots 0 / .1722 / .2519 /
   .3339 / .5 … = sections at the profiles (0, 90, 180, 270 deg) and at +-61.0 / +-119.4 deg: +-29 deg either side of the
   JM profiles (90 / 270), none near JK; the routing curve's 8 points are at 0, 45, 90 … (z 0 at the profiles, 3.81 at
