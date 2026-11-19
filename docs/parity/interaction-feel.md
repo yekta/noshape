@@ -952,6 +952,32 @@ changed frame (the same recorder for both), one run each. Evidence live/feel/asm
 | Two perpendicular faces selected (bottom-right summary) | "Perp planes angle: 90.000 deg" | "Perp planes angle: 90°" (the Part Studio says "90.000 deg") (mz.png, opsz.png) | ≠ [asm] |
 | Measure panel ([) with the same two faces | top at y ≈ 355, left of the right strip; Perp planes angle, Area 1600.000 mm², Max dist 60.000 mm with X / Y / Z, then Min dist 0.000 mm with no components | top at y ≈ 545 (190 px lower); Min dist first with X / Y / Z all 0.000, then Max dist (mpz.png) | ≠ [asm] |
 
+### drw-tools-1119 (P0, everyday drawing tools, live2 11-19 04:24–04:39) [studios]
+
+hole-plate (40 × 40 × 20 mm, Ø10 through) › Create Drawing of Part 1…, ANSI_A_INCH.dwt, Suggested views; live on lane 2
+(software GL), ours green bd38f88d3 on :125. Only gaps the Drawings rows above don't cover. Times: a 60 fps x11grab of each
+display from the input to the first changed frame (the same recorder for both). Evidence live/feel/drw-tools-1119/.
+
+| Item | Live | Ours | Status |
+|---|---|---|---|
+| Suggested views (OK → views) | Top, Front, Right, Isometric in the same places, 1:1, the hole's centre mark added in the Top view; the sheet at 5.05–5.25 s, the views at 5.25 s, the centre mark at 15.5 s | the same layout and centre mark, all at 0.38–0.46 s (cc.png) | = (faster) |
+| Dimension, point to point (two vertices of the Front view): the vertex hovered | a tan disc on the vertex only | the disc, and the vertex's edge lit orange (p2p.png) | ≠ [studios] |
+| …the view's edges while the tool is on | nothing on them (midpoints only after Shift+Q) | small red ticks at the edges' midpoints | ≠ [studios] |
+| …the picked points while placing | tan discs on both; the value bold; the preview 232 ms after the pointer moves | the second point a red ✕, the first a red +; the value regular; 209 ms | ≠ [studios] |
+| …after the placement click | placed 0.63–0.76 s after the click; the new dimension stays selected (bold) with a small "±0.1" button above it | placed 0.22 s after it; not selected, no button | ≠ [studios] |
+| Diameter (the hole's circle in the Top view) | the circle lit orange, the leader and "Ø.394" bold following the pointer (237 ms); placed with a jogged leader | the circle lit blue-violet, the text regular (169 ms); placed the same (dimg.png) | ≠ [studios] (preview look) |
+| Dragging a placed dimension's text (80 px right, 32 up) | the line follows up, the text along it to the right end over the arrow; drawn plain black while dragging | the same place; drawn highlighted tan with grips and the ±0.1 button while dragging (dt.png) | ≠ [studios] (look while dragging) |
+| Double-click → the palette; "2X " typed + Enter | the palette under the text (prefix box, value 1.575 ▾, tolerance, Ø ←X→ (XX) [XX] row); "2X 1.575" | the same palette and result (ov.png) | = |
+| Callout: an edge's reach for the leader | the edge lights orange from 5 px (6: not) | from 4 px (5: not) | ≈ (1 px) |
+| Right-click a dimension | Edit…, Paste as table, Unbreak dimension, Add jog │ Add comment │ Clear selection, Zoom to fit, Delete | the same without Add comment (cloud) (vm.png) | = |
+| Dragging the Front view 60 px right, 36 down | its dimension follows; Top follows in x, Right in y; the Isometric view stays where it is | the dimension, Top and Right the same; the Isometric view also moves 60 px right (vmv.png) | ≠ [studios] |
+| Section view: the cut on the Top view's top-edge midpoint, placed left | preview 251 ms after the move; after the click a grey box at 3.4–3.7 s, hatched only after >10 s; "SECTION A - A" under it, A arrows on the cut | preview 199 ms; hatched at 0.34 s; the same label and arrows (svp.png, svz.png) | = (faster) |
+| The cut line hovered (inside the parent view) | the line lit tan with grips at its ends and arrows; the section view framed light blue | the line not lit; the section view framed tan (sl.png) | ≠ [studios] |
+| A press-drag on the cut line's body (40 px left) | the line doesn't move (the press selects the parent view) | the cut moves 40 px and the section is cut again | ≠ [studios] |
+| Hatch region: hovering inside the Front view | no feedback | the view's tan hover frame (hc.png) | ≠ [studios] |
+| …the click | the region hatched tan, no outline, 1.12 s; Esc cancels | hatched tan with a pale-yellow region outline, 0.37 s; Esc cancels | ≠ [studios] (outline) |
+| Edge to edge centerline (the Front view's left then right edge) | no preview while the second edge is hovered (only the edge lit); after the click the centerline midway, ~10 px past the view top and bottom, kept selected with blue grips | the centerline previewed while hovering the second edge; the same line, not selected | ≠ [studios] |
+
 ### featurelist-feel (feature list, live2 11-17 23:25)
 
 | Finding | Ours | Test |
