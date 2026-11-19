@@ -26,6 +26,10 @@
 #include <Poly_Triangulation.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS_Iterator.hxx>
+#include <TopoDS.hxx>
+#include <TopTools_ShapeMapHasher.hxx>
+#include <NCollection_Map.hxx>
+#include <NCollection_DataMap.hxx>
 
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Shell.hxx>
@@ -452,6 +456,79 @@ TopoDS_Shape mesh_compound(const std::vector<MeshPiece>& pieces)
   return c;
 }
 
+
+// A file's objects or groups that are meshes of their own (3MF, OBJ) as Onshape imports them: a part each, never joined
+// by shared edges, but one wholly inside another that one's hollow (live meshparts-1119: c2-duct-multipart's touching
+// and overlapping parts stay 4; cf-sheet-metal-model-plus's bare OBJ, Part 3 inside Part 2: 2 parts). A part's closed
+// pieces are one solid; a part left with nothing (all hollows) an empty compound.
+std::vector<TopoDS_Shape> mesh_group_parts(const std::vector<std::vector<MeshPiece>>& groups)
+{
+  std::vector<MeshPiece>                                          all;
+  NCollection_DataMap<TopoDS_Shape, size_t, TopTools_ShapeMapHasher> group_of;
+  for (size_t g = 0; g < groups.size(); ++g)
+    for (const MeshPiece& p : groups[g])
+    {
+      all.push_back(p);
+      group_of.Bind(p.face, g);
+    }
+  std::vector<std::vector<TopoDS_Shape>> per(groups.size());
+  const TopoDS_Shape                     c = mesh_compound(all);
+  for (TopoDS_Iterator it(c); it.More(); it.Next())
+  {
+    TopExp_Explorer f(it.Value(), TopAbs_FACE);
+    if (f.More() && group_of.IsBound(f.Current()))
+      per[group_of.Find(f.Current())].push_back(it.Value());
+  }
+  BRep_Builder              b;
+  std::vector<TopoDS_Shape> out;
+  for (const auto& shapes : per)
+  {
+    const bool solids = !shapes.empty() && std::all_of(shapes.begin(), shapes.end(), [](const TopoDS_Shape& x) { return x.ShapeType() == TopAbs_SOLID; });
+    if (shapes.size() == 1)
+      out.push_back(shapes[0]);
+    else if (solids)
+    {
+      TopoDS_Solid one;
+      b.MakeSolid(one);
+      for (const TopoDS_Shape& x : shapes)
+        for (TopoDS_Iterator sh(x); sh.More(); sh.Next())
+          b.Add(one, sh.Value());
+      out.push_back(one);
+    }
+    else
+    {
+      TopoDS_Compound part;
+      b.MakeCompound(part);
+      for (const TopoDS_Shape& x : shapes)
+        b.Add(part, x);
+      out.push_back(part);
+    }
+  }
+  return out;
+}
+
+// Mesh parts read one per group (an OBJ's groups) as mesh_group_parts makes them: each part's faces its pieces (closed
+// where a solid holds them).
+std::unique_ptr<OcShapeList> mesh_group_parts_of(const OcShapeList& parts)
+{
+  std::vector<std::vector<MeshPiece>> groups;
+  for (const TopoDS_Shape& s : parts.items)
+  {
+    NCollection_Map<TopoDS_Shape, TopTools_ShapeMapHasher> in_solid;
+    for (TopExp_Explorer so(s, TopAbs_SOLID); so.More(); so.Next())
+      for (TopExp_Explorer f(so.Current(), TopAbs_FACE); f.More(); f.Next())
+        in_solid.Add(f.Current());
+    auto& g = groups.emplace_back();
+    NCollection_Map<TopoDS_Shape, TopTools_ShapeMapHasher> seen;
+    for (TopExp_Explorer f(s, TopAbs_FACE); f.More(); f.Next())
+      if (seen.Add(f.Current()))
+        g.push_back({TopoDS::Face(f.Current().Oriented(TopAbs_FORWARD)), in_solid.Contains(f.Current())});
+  }
+  auto out = std::make_unique<OcShapeList>();
+  for (TopoDS_Shape& s : mesh_group_parts(groups))
+    out->items.push_back(s);
+  return out;
+}
 
 // ---- booleans and splits with mesh bodies
 //

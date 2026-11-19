@@ -289,6 +289,32 @@ fn a_spindle_round_and_its_shell_offset_write_to_xt_as_whole_tori() {
     assert!((v1 - v0).abs() < 1e-6 * v0, "{v1} vs {v0}");
 }
 
+/// Meshes of one file read one per object or group (3MF, OBJ) are a part each, never joined by shared edges, one wholly
+/// inside another that one's hollow (live meshparts-1119: c2-duct-multipart's touching parts stay apart; live's import
+/// of cf-sheet-metal-model-plus's bare OBJ: Part 3 inside Part 2, 2 parts).
+#[test]
+fn mesh_groups_are_parts_one_inside_another_its_hollow() {
+    let dir = std::env::temp_dir().join(format!("noshape-mesh-groups-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let boxes = [(DVec3::ZERO, DVec3::splat(20.0)), (DVec3::splat(5.0), DVec3::splat(15.0)), (DVec3::new(20.0, 0.0, 0.0), DVec3::new(30.0, 20.0, 20.0))];
+    let groups: Vec<Shape> = boxes
+        .iter()
+        .enumerate()
+        .map(|(i, (a, b))| {
+            let path = dir.join(format!("g{i}.stl"));
+            write_stl(&make_box_corners(*a, *b).unwrap(), &path, 0.1, StlFormat::Binary).unwrap();
+            read_mesh_bodies(&path, LengthUnit::Millimeter).unwrap()
+        })
+        .collect();
+    let _ = std::fs::remove_dir_all(&dir);
+    let parts = mesh_group_parts(&groups).unwrap();
+    assert_eq!(parts.len(), 3);
+    let volume = |s: &Shape| volume_properties(s).unwrap().mass * 1e9;
+    assert!((volume(&parts[0]) - 7000.0).abs() < 1e-6, "the big box less its hollow: {}", volume(&parts[0]));
+    assert_eq!(parts[1].count(ShapeType::Face), 0, "the inner box is the big one's hollow");
+    assert!((volume(&parts[2]) - 4000.0).abs() < 1e-6, "the touching box its own part: {}", volume(&parts[2]));
+}
+
 /// A sphere written as a B-spline surface (an IGES writer's rational surfaces: live's o-ring) reads as a sphere, as
 /// Onshape's import.
 #[test]

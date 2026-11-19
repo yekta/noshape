@@ -920,6 +920,8 @@ pub(crate) mod ffi {
         fn write_pvz(shapes: &OcShapeList, names: &[String], path: &str) -> Result<()>;
         fn read_pvz(path: &str) -> Result<UniquePtr<OcShape>>;
         fn read_pvz_parts(path: &str) -> Result<StepImport>;
+        fn read_3mf_parts(path: &str) -> Result<StepImport>;
+        fn mesh_group_parts_of(parts: &OcShapeList) -> Result<UniquePtr<OcShapeList>>;
         fn read_pvz_instances(path: &str) -> Result<Vec<PvzInstance>>;
         fn read_mesh_bodies(path: &str) -> Result<UniquePtr<OcShape>>;
         fn is_mesh(s: &OcShape) -> bool;

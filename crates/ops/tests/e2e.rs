@@ -3164,6 +3164,42 @@ fn import_every_format() {
     }
 }
 
+/// A 3MF's objects and a bare OBJ's groups import as a mesh part each, named by them, even where they touch (live
+/// meshparts-1119: c2-duct-multipart's 4 objects, 4 parts in file order; ours joined three that touch into one).
+#[test]
+fn mesh_files_import_a_part_per_object_or_group() {
+    let mut ctx = Ctx::new();
+    let a = new_sketch(&mut ctx, "mesh_objects.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": a, "tool": "corner_rectangle", "points": [[0, 0], [20, 10]] }));
+    let ra = call(&mut ctx, "sketch_get", json!({ "sketch": a }))["regions"][0]["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [ra], "depth": "10 mm", "operationType": "NEW" } }));
+    let b = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": b, "tool": "corner_rectangle", "points": [[20, 0], [40, 10]] }));
+    let rb = call(&mut ctx, "sketch_get", json!({ "sketch": b }))["regions"][0]["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [rb], "depth": "10 mm", "operationType": "NEW" } }));
+    assert_eq!(call(&mut ctx, "query_parts", json!({}))["parts"].as_array().unwrap().len(), 2, "two boxes, touching");
+    let threemf = call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "3MF", "file": scratch("mesh_objects").to_str().unwrap(), "units": "Millimeter" }))["file"].as_str().unwrap().to_string();
+    let zip = call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "OBJ", "file": scratch("mesh_objects_obj").to_str().unwrap(), "units": "Millimeter" }))["file"].as_str().unwrap().to_string();
+    let dir = scratch("mesh_objects_bare");
+    let _ = std::fs::create_dir_all(&dir);
+    let names = noshape_kernel::extract_zip(std::path::Path::new(&zip), &dir).unwrap();
+    for n in names.iter().filter(|n| n.ends_with(".mtl")) {
+        std::fs::remove_file(dir.join(n)).unwrap();
+    }
+    let obj = dir.join(names.iter().find(|n| n.ends_with(".obj")).unwrap()).to_string_lossy().to_string();
+    for file in [threemf, obj] {
+        let r = call(&mut ctx, "import_files", json!({ "files": [file.clone()], "mesh_unit": "Millimeter" }));
+        let studio = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap_or_else(|| panic!("{r}"))["name"].as_str().unwrap().to_string();
+        let q = call(&mut ctx, "query_parts", json!({ "tab": studio }));
+        let parts: Vec<(String, f64)> = q["parts"].as_array().unwrap().iter().map(|p| (p["name"].as_str().unwrap().to_string(), num(&p["volume"]))).collect();
+        assert_eq!(parts.iter().map(|p| p.0.as_str()).collect::<Vec<_>>(), ["Part 1", "Part 2"], "{file}: {q}");
+        for (name, v) in &parts {
+            assert!((v - 2000.0).abs() < 1.0, "{file}: {name} {v} mm³");
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// Export Resolution (audit X2, live 1745): STL's chordal tolerance and
 /// angular deviation drive the mesh (a finer one has more triangles); the
 /// presets are absolute (Medium = 0.12 mm / 6.25°, Custom's first values);

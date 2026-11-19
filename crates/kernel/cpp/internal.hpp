@@ -389,6 +389,8 @@ std::vector<MeshPiece> mesh_bodies(const std::vector<gp_Pnt>& nodes, std::vector
 // A body per closed piece (the closed pieces inside it its cavities) and per
 // open piece (a shell); returned as a compound of them.
 TopoDS_Shape mesh_compound(const std::vector<MeshPiece>& pieces);
+// Separate meshes of one file (3MF objects, OBJ groups): a part each, one wholly inside another its hollow (mesh_body.cpp).
+std::vector<TopoDS_Shape> mesh_group_parts(const std::vector<std::vector<MeshPiece>>& groups);
 // A shape of mesh faces only (a STEP file's tessellated shell) as the mesh import makes it, a solid per closed piece;
 // any other shape as it is.
 TopoDS_Shape mesh_rebodied(const TopoDS_Shape& s);

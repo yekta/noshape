@@ -934,6 +934,19 @@ pub fn read_pvz(path: &Path, unit: LengthUnit) -> Result<Shape> {
     scaled(&s, 1e3 / unit.mm_per_unit())
 }
 
+/// A 3MF file's build items as Onshape imports them: a mesh part each, named by its object, never joined (live
+/// meshparts-1119: c2-duct-multipart's 4 objects, two overlapping, 4 parts in file order), in metres.
+pub fn read_3mf_parts(path: &Path) -> Result<Vec<ImportedShape>> {
+    imported(ck(ffi::read_3mf_parts(path_str(path)?))?, LengthUnit::Meter)
+}
+
+/// Mesh parts read one per group (an OBJ's groups) as Onshape imports them: a part each, never joined, one wholly
+/// inside another that one's hollow (an empty compound where a part is left with nothing).
+pub fn mesh_group_parts(parts: &[Shape]) -> Result<Vec<Shape>> {
+    let list = ck(ffi::mesh_group_parts_of(&vec_to_list(parts)))?;
+    Ok(list_to_vec(&list))
+}
+
 /// A .pvz file's distinct parts as mesh bodies, each in its own
 /// coordinates and named like its first instance, in Onshape's order (the
 /// part files' numbers, highest first), in `unit`. See [`read_pvz_instances`]

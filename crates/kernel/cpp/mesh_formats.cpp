@@ -8,6 +8,8 @@
 #include "internal.hpp"
 #include "pvz_reader.hpp"
 
+#include <TopoDS_Iterator.hxx>
+
 #include <cmath>
 #include <functional>
 #include <cstring>
@@ -28,11 +30,13 @@ std::string read_file(const std::string& path)
   return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 }
 
-// Triangles of every placed object: points in millimetres.
+// Triangles of every placed object: points in millimetres. 3MF: each build item's name (its object's) and first
+// triangle.
 struct Mesh
 {
-  std::vector<gp_Pnt>             nodes;
-  std::vector<std::array<int, 3>> tris;
+  std::vector<gp_Pnt>                          nodes;
+  std::vector<std::array<int, 3>>              tris;
+  std::vector<std::pair<std::string, size_t>> items;
 };
 
 // A 3D affine map: p' = R p + t (row-major 3x4).
@@ -139,6 +143,7 @@ Mesh read_3mf(const std::string& bytes)
     std::vector<gp_XYZ>                           v;
     std::vector<std::array<int, 3>>               t;
     std::vector<std::pair<std::string, Affine>>   components;
+    std::string                                   name;
   };
   std::map<std::string, Object>               objects;
   std::vector<std::pair<std::string, Affine>> items;
@@ -158,7 +163,11 @@ Mesh read_3mf(const std::string& bytes)
       mm = u == "micron" ? 1e-3 : u == "centimeter" ? 10 : u == "inch" ? 25.4 : u == "foot" ? 304.8 : u == "meter" ? 1000 : 1;
     }
     else if (n == "object")
-      cur = &objects[attributes(xml, at, end)["id"]];
+    {
+      auto a    = attributes(xml, at, end);
+      cur       = &objects[a["id"]];
+      cur->name = a["name"];
+    }
     else if (n == "vertex" && cur)
     {
       auto a = attributes(xml, at, end);
@@ -209,6 +218,8 @@ Mesh read_3mf(const std::string& bytes)
     Affine scaled = tf;
     for (int i : {3, 7, 11})
       scaled.m[i] *= mm;
+    const auto it = objects.find(id);
+    out.items.emplace_back(it == objects.end() ? std::string() : it->second.name, out.tris.size());
     place(id, scaled, 0);
   }
   return out;
@@ -629,6 +640,63 @@ bool read_mesh_format(const std::string& path, std::vector<gp_Pnt>& nodes, std::
   nodes = std::move(m.nodes);
   tris  = std::move(m.tris);
   return true;
+}
+
+// A 3MF file's build items as Onshape imports them: a mesh part each, named by its object, never joined (live
+// meshparts-1119: c2-duct-multipart's 4 objects, two overlapping, are 4 parts in file order), in metres.
+StepImport read_3mf_parts(rust::Str path)
+{
+  Mesh m;
+  try
+  {
+    m = read_3mf(read_file(std::string(path.data(), path.size())));
+  }
+  catch (const std::runtime_error& e)
+  {
+    fail_invalid(e.what());
+  }
+  std::vector<std::vector<MeshPiece>> groups;
+  std::vector<std::string>            names;
+  for (size_t i = 0; i < m.items.size(); ++i)
+  {
+    const size_t from = m.items[i].second, to = i + 1 < m.items.size() ? m.items[i + 1].second : m.tris.size();
+    if (from == to)
+      continue;
+    std::vector<gp_Pnt>             nodes;
+    std::vector<std::array<int, 3>> tris;
+    std::map<int, int>              index;
+    for (size_t k = from; k < to; ++k)
+    {
+      std::array<int, 3> t{};
+      for (int j = 0; j < 3; ++j)
+      {
+        const auto [at, fresh] = index.emplace(m.tris[k][(size_t)j], (int)nodes.size());
+        if (fresh)
+          nodes.push_back(gp_Pnt(m.nodes[(size_t)m.tris[k][(size_t)j]].XYZ() * 1e-3));
+        t[(size_t)j] = at->second;
+      }
+      tris.push_back(t);
+    }
+    groups.push_back(mesh_bodies(nodes, std::move(tris), 0.0));
+    names.push_back(m.items[i].first);
+  }
+  StepImport                      out;
+  out.shapes                      = std::make_unique<OcShapeList>();
+  const std::vector<TopoDS_Shape> parts = mesh_group_parts(groups);
+  for (size_t i = 0; i < parts.size(); ++i)
+  {
+    if (!TopoDS_Iterator(parts[i]).More())
+      continue;
+    out.shapes->items.push_back(parts[i]);
+    out.names.push_back(rust::String(names[i]));
+    for (int k = 0; k < 3; ++k)
+      out.colors.push_back(0);
+    out.has_color.push_back(false);
+    out.opacity.push_back(1);
+  }
+  if (out.shapes->items.empty())
+    fail_invalid("the file has no triangles");
+  return out;
 }
 
 } // namespace noshape

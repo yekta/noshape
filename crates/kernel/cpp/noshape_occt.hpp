@@ -1133,6 +1133,8 @@ void     write_jt(const OcShapeList& shapes, rust::Slice<const rust::String> nam
 void     write_pvz(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Str path);
 std::unique_ptr<OcShape> read_pvz(rust::Str path);
 StepImport               read_pvz_parts(rust::Str path);
+StepImport               read_3mf_parts(rust::Str path);
+std::unique_ptr<OcShapeList> mesh_group_parts_of(const OcShapeList& parts);
 rust::Vec<PvzInstance>   read_pvz_instances(rust::Str path);
 std::unique_ptr<OcShape> read_mesh_bodies(rust::Str path);
 bool                     is_mesh(const OcShape& s);

@@ -205,8 +205,8 @@ fn read_xt_zip(zip: &Path, units: &UnitPrefs, iges_post: bool) -> anyhow::Result
 }
 
 /// An .obj's groups as parts (each read as the mesh reader reads a file), named by the group and coloured by its
-/// material's `Kd` from the .mtl in `dir` (sRGB 0..1), in metres when its header says so; the whole file as one mesh
-/// when it has no groups or materials.
+/// material's `Kd` from the .mtl in `dir` (sRGB 0..1) when there is one, in metres when its header says so; the whole
+/// file as one mesh when it has no groups. (Live meshparts-1119: a bare .obj's 4 groups are 4 parts, never joined.)
 fn read_obj_groups(obj: &Path, dir: &Path, unit: noshape_kernel::LengthUnit) -> anyhow::Result<(noshape_kernel::Shape, Vec<noshape_model::features::importing::ImportPartInfo>)> {
     use noshape_kernel as k;
     let text = std::fs::read_to_string(obj)?;
@@ -240,10 +240,12 @@ fn read_obj_groups(obj: &Path, dir: &Path, unit: noshape_kernel::LengthUnit) -> 
     }
     let mtl = mtllib.and_then(|m| std::fs::read_to_string(dir.join(m)).ok());
     groups.retain(|g| !g.2.is_empty());
-    let (Some(mtl), false) = (mtl, groups.is_empty()) else { return Ok((k::read_mesh_bodies(obj, unit)?, Vec::new())) };
+    if groups.is_empty() {
+        return Ok((k::read_mesh_bodies(obj, unit)?, Vec::new()));
+    }
     let mut kd: std::collections::HashMap<String, [f32; 3]> = std::collections::HashMap::new();
     let mut current = None;
-    for line in mtl.lines() {
+    for line in mtl.as_deref().unwrap_or("").lines() {
         let w: Vec<&str> = line.split_whitespace().collect();
         match w.as_slice() {
             ["newmtl", name, ..] => current = Some(name.to_string()),
@@ -255,15 +257,30 @@ fn read_obj_groups(obj: &Path, dir: &Path, unit: noshape_kernel::LengthUnit) -> 
             _ => {}
         }
     }
-    let mut parts = Vec::new();
-    let mut info = Vec::new();
-    for (i, (name, material, faces)) in groups.iter().enumerate() {
-        let part = dir.join(format!("group-{i}.obj"));
-        std::fs::write(&part, format!("{shared}{faces}"))?;
-        parts.push(k::read_mesh_bodies(&part, unit)?);
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+    let tmp = std::env::temp_dir().join(format!("noshape-obj-groups-{}-{stamp}", std::process::id()));
+    std::fs::create_dir_all(&tmp)?;
+    let parts = (|| {
+        let mut parts = Vec::new();
+        for (i, (_, _, faces)) in groups.iter().enumerate() {
+            let part = tmp.join(format!("group-{i}.obj"));
+            std::fs::write(&part, format!("{shared}{faces}"))?;
+            parts.push(k::read_mesh_bodies(&part, unit)?);
+        }
+        anyhow::Ok(parts)
+    })();
+    let _ = std::fs::remove_dir_all(&tmp);
+    // (Never joined; one wholly inside another its hollow, as live's import of a bare .obj.)
+    let parts = k::mesh_group_parts(&parts?)?;
+    let (mut shapes, mut info) = (Vec::new(), Vec::new());
+    for ((name, material, _), part) in groups.iter().zip(parts) {
+        if part.count(k::ShapeType::Face) == 0 {
+            continue;
+        }
+        shapes.push(part);
         info.push(noshape_model::features::importing::ImportPartInfo { name: Some(name.clone()), color: material.as_ref().and_then(|m| kd.get(m).copied()), opacity: None, faces: Vec::new() });
     }
-    Ok((k::Shape::compound(&parts), info))
+    Ok((k::Shape::compound(&shapes), info))
 }
 
 /// The file read as the Import reads it: one shape (its named and coloured parts a compound's children, described in
@@ -287,10 +304,21 @@ fn read_shape(path: &Path, units: &UnitPrefs, iges_post: bool) -> anyhow::Result
         "iges" | "igs" if iges_post => k::straighten_edges(&compound(k::read_iges_parts(path, k::LengthUnit::Meter)?), 1e-6)?,
         "iges" | "igs" => compound(k::read_iges_parts(path, k::LengthUnit::Meter)?),
         "brep" => k::read_brep(path)?,
-        // Onshape imports STL, OBJ and PVZ as mesh parts (PVZ is in metres).
-        "stl" | "obj" => k::read_mesh_bodies(path, mesh_unit)?,
-        // 3MF and glTF carry their units (read in millimetres).
-        "3mf" | "gltf" | "glb" => k::read_mesh_bodies(path, k::LengthUnit::Millimeter)?,
+        // Onshape imports STL, OBJ and PVZ as mesh parts (PVZ is in metres); an OBJ a part per group, named by it.
+        "stl" => k::read_mesh_bodies(path, mesh_unit)?,
+        "obj" => {
+            let (shape, parts) = read_obj_groups(path, path.parent().unwrap_or(Path::new(".")), mesh_unit)?;
+            info = parts;
+            shape
+        }
+        // 3MF a part per build item, named by its object (its unit in the file).
+        "3mf" => {
+            let parts = k::read_3mf_parts(path)?;
+            info = parts.iter().map(|p| noshape_model::features::importing::ImportPartInfo { name: p.name.clone(), color: None, opacity: None, faces: Vec::new() }).collect();
+            k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>())
+        }
+        // glTF carries its unit (read in millimetres).
+        "gltf" | "glb" => k::read_mesh_bodies(path, k::LengthUnit::Millimeter)?,
         // Every placed instance, named like it (a single instance, or Combine).
         "pvz" => {
             let parts = k::read_pvz_parts(path, k::LengthUnit::Meter)?;

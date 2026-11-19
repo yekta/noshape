@@ -44,22 +44,16 @@ Open, ranked:
 ## Other in flight
 - config-parts: see "config-parts at live's 18:0x retake" below (the 11-17 vibe5 runs: archive).
 - driven-pattern 6/11: f6 Linear pattern 1 direction (ours -z, live +z): core's (11-17 06:35).
-- Hole internal bodies (committed 48a5ef471, asm OK, lands after the plane fix with its own corpus A/B): a SWEPT_FACE of
-  `<hole>.holeBodies.*.opRevolve` maps to our Hole's faces by geometry (hole.fs' `core_line_2` THROUGH_FACE: narrowest
-  cylinders; `start_line_2` counterbore wall: widest), every location (hole_body_faces in named_faces); a three-face
-  INTERSECT vertex resolves sides through named_faces and common_vertex intersects the sets (gate: this also lets
-  loft side sets in). TRACE lines "TRACE INTERSECT side / faces". 74d3d6 Plane 1 (vibe5 st74.sh, builds Q/S): all three
-  sides translate (bore = Hole 8's cylinder, right), but no common vertex: our Multi angle joint sits near y 560 mm,
-  live's centroid (20.3, 80.0, -4.7) mm, and our bore stops at the hexagon pocket (x 18) where live's crosses the
-  Extrude 18 slot (y 560 ± 0.9): upstream placement (live's fetch of 74d3d6 is incomplete: 53 lines from Transform 16
-  unfetched). Not mine until upstream matches. Not done: SWEPT_EDGE of holeBodies (1dc32b Fillet 5, refs cover it),
-  start_line_1 (cbore floor vs csink cone).
-- Plane feature planes before refs (committed, not landed): a `….planeOp` query (plain or packed DUMMY) maps to our
-  plane before any refs geometry (live's all-feature refs read it as the plane body's face, which by_geometry can't
-  find: c2-loft-guide-curves-wave-washer 2 -> 6/7). Gate: vibex6 corpus3.sh A/B (A build L, B build P md5 5e1d31c239eb)
-  over corpus3 + live's newer corpora (~/tmp/dx/corpus3-{A,B}.{log,sum,untr}, out corpus3.out), queued in the slot
-  since before 01:41 behind blend; land if SUM-SAME but for the planeOp documents improving. Then sort corpus3's first
-  differences to owners.
+- Landed: Hole internal bodies (8fd592298) and Plane feature planes before refs. corpus3 on main (vibex8 15:28,
+  ~/tmp/dx/corpus3-A.{log,sum,untr}; corpus3.sh <ops-main-1119>): 14/39 to the end, 436/638 features. Mine: surf-intro
+  boundary / fill / offset / ruled stop at 5 "Derived 1" (the derived source b7635b82… has no refs.jsonl: live's FS
+  evaluation refused on a linked version; REQUESTS 16:1x to live2) and mutualtrim's Derived 1 (source not fetched).
+  Others' (to the lead): lofts (wave-washer 6, paths-guides 16, surf-workshop-pipe 9 >2 profiles with guides,
+  surf-intro-simple 14), fills (surf-intro-examples 5, surf-workshop-fill 3), Move boundary non-planar (moveboundary 6),
+  surface split / sweep / mirror topology (britatap 4, cpcurves 9, singularities 2 Mirror 3: 2 parts for 1), sweep / loft
+  area tails (knifehandle 3, manualblend 11, workshop-loft 6, workshop-sweep 2), Boundary surface conditions (bridging 7),
+  parting-line Rib 1 (13), rib-wrap Wrap 1 (10), nuts Sweep 1 (14): core; mutualtrim Fillet 1 BOP (7): blend;
+  rocker-enclosure-sm Extrude 2 (8): skasm.
 - Second search (live, by sets): c2-parting-line-draft-tutorial 3/3; c2-parting-line-draft-parting-line 5/17, Draft 1
   (PARTING_LINE TWO_SIDED 20/20°): core's fix queued (the ruled sheet runs past the curve's ends; 367243.7 mm³, live
   367268.5): 9/17, next Extrude 2 surface 12113.30 mm² vs live 12115.66 (core's). c2-sm-hem-plus: sheetMetalStart / sheetMetalHem are custom (Feature Studios da39db76…,
@@ -104,7 +98,7 @@ N. Drawings not deterministic: fixed, QUEUED ba3d6cc1 (23:2x; d8ace4d34..6b1a7bc
    bounds thread_local; libs installed by the lead on every host + Mac, backups .bak-0034) and mesh_body.cpp facet
    edges by vertex creation order. Proof: Mac dvp35.sh, identical over 3 parallel runs + one thread. After the land:
    hex-bookcase's DXF counts vs live (was LINE 211/206, LWPOLYLINE 17/25; its mesh edges now run one fixed way).
-C. PARKED (lead 23:2x) fan-blade (~2.6x live a view): Hide in 8 threads over one body's edges was not identical (4 / 17
+C. UN-PARKED (lead 11-19 16:2x: 3.4 s and 2.6-3.4x live's per view) fan-blade (~2.6x live a view): Hide in 8 threads over one body's edges was not identical (4 / 17
    corpus drawings) and slower (Front 5.3 -> 9.8 s, Update 6.5 -> 37 s); attempt in /root/dx-scratch/p36.
 Q. asm-robot-relations studio 0c3466's Import 1 (REV-21-1650.STEP): live's stored import = six SURFACE parts, ours one
    valid 174-face solid (OCCT: valid, 171,983 mm3; live's six sheets = that shell less plane face #5090). live2
@@ -140,8 +134,9 @@ R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "I
      per call: OCCT patch, wire-box grid); fan-blade-sweep ~5.5 s each, Update 8.6 (HLRBRep_Data::Classify's exact
      line / B-spline intersections); straight-spline 0.7-1.7 s, Update 2.0; drive-train 1.3-2.0 s; surface-pattern
      0.6-0.7; spur-gear 0.4-0.6; sm-louver < 0.14; socket-head < 0.01. Profiles: Mac dx-keep/dvs-<doc>.txt
-     (dvsample.sh, /root/skasm-scratch/bin/sample_under.py). Waiting on live2's times (REQUESTS 18:07). Rule (DECISIONS
-     9e5b481d4): only views >= 100 ms and >= 2x over live's count.
+     (dvsample.sh, /root/skasm-scratch/bin/sample_under.py). live2's times (behaviours "dx drawing views on corpus parts"): impeller / rings / snap-hook / xDev
+     1.3-2.6 s a view, Update 4.4-4.9 (ours 10-20x faster); fill-pattern 7.7 / 4.0 / 3.9 / 7.2, Update 9.6 (ours Iso 11.3 =
+     1.6x: under 9e5b481d4's 2x); fan-blade 2.0 / 1.7 / 1.6 / 2.1, Update 4.4 (ours ~5.5 / 8.6 = 2.6-3.4x: the one gap; C).
    - Mac (11-18, release, median of 3): c2-rings-loft x_t import 2.28 s (live 8.6), STEP 0.95; cf-o-ring ACIS 0.63 s
      (live 10.6; vibex8 4.3-13 s by load); cf-spur-gear regenerates in 467 ms (live's full-regen per-feature sum 697 ms; qa's TICKETS row was loaded vibe2).
    - c2-rings-loft live.x_t import 17.5 -> 7.9 s on vibex8 (live 8.6; STEP 2.7): tube at 10 nm (f91b8d66) and intersection curves
@@ -201,10 +196,14 @@ R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "I
   as that surface (spindle_torus / spindle_pcurve now shared in internal.hpp). Suite exs-all5 (Mac): snap-hook x_t
   read-back 128/284/160 = live (was 136), nothing else changed; ours reads ours 152/154. Hose: 6 of 12 rings whole; its
   other 6 are 10-20 nm off their walls in our model (tolerant, must stay cut; a ring refit / tangent-walls attempt rescued
-  none: /root/dx-scratch/xt-ringrefit-attempt.cpp). Asked live2 (12:2x) to import /root/dx-scratch/xt-check-1119/*.x_t:
-  live must keep all 4 hoses as solids (Parasolid dropped hoses with tolerant whole rings before). If it drops any: revert
-  the edge half of 8b276faa.
-- Waiting: meshparts-1119 (c2-duct-multipart 3MF / OBJ imports), asked of live2 11:4x (live paused till ~21:00).
+  none: /root/dx-scratch/xt-ringrefit-attempt.cpp). live2 xt-check-1119 (13:19): live imports our new files fine:
+  snap-hook 128/284/160 = live; the 4 hoses solids 12/18/12 (was 12/24/24), no warnings.
+- Mesh parts (live2 meshparts-1119, 13:18): a 3MF is a part per build item named by its object, a bare OBJ a part per
+  group "g" (its "o"s face groups), never joined (c2-duct-multipart 4 parts in file order; ours joined 3 touching
+  ones). Queued 16:2x: kernel read_3mf_parts / mesh_group_parts, import.rs .3mf by
+  build item and bare .obj by groups; one wholly inside another stays its hollow (as before; live2 asked 13:5x with
+  /root/dx-scratch/meshcheck-1119: follow-up if live keeps it a part). Suite: imports 117 -> 119/130. STL rows stay (live's own STL import of it fails:
+  9 open sheets, live-self.json stlNote; the row expects the model's 4, ours joins the touching meshes by shared edges).
 - Spindle tori (08:1x): RevolutionToElementary makes them tori with their pcurves mapped exactly (v shifted or
   mirrored); snap-hook live.igs 128/300/184 for live's 128/310/202 (live's own IGES splits edges past its model's
   284/160). Suite run exs-all4 (Mac dx-keep): only that row changed; clamp-guillem LINE 265/268 (Top hiding + Iso piece,
@@ -245,10 +244,11 @@ R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "I
   temporary backtrace build.
 - vibex7 → vibex6 scp fails: relay through /root/dx-scratch/bin-relay. Host ~/tmp is pruned after 6-12 h: keep scripts
   and binaries in ~/agents/dx-keep.
-- Agent ids (11-19 11:3x): core d30002ca-d013-4435-b7d9-7da9cb564cec, blend de66e481-56e2-4005-a5d3-9fa897ca5fde, bool
+- Agent ids (11-19 13:4x): core d30002ca-d013-4435-b7d9-7da9cb564cec, blend de66e481-56e2-4005-a5d3-9fa897ca5fde, bool
   754a9804-feb1-4153-b32a-acf9b2a6d94d, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, asm d8d597e0-675c-497b-a804-544ceab99bbd,
-  skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b, psui
-  4973e295-9e92-463f-a13f-2ec5258bc5f9, live2 79ae5cdb-42a4-4025-b43a-da61a4f92ad7 (live paused till ~21:00).
+  skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, qa 40e853dc-757f-4498-878f-00b41fd8af75, psui
+  7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, live2 d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1 (old qa / psui / live2 threads stopped:
+  never message them; live paused till ~21:00).
 - Mac exchange runs: ~/noshape-host/dx-keep/exx.sh <dir> <log> (kernel tests, release build, suite; stops on a build
   error); dirs exs-all (all docs), exs-x (hose + snap-hook).
 - The archive's "Parity translator changes by asm" section lists asm's translator fixes one line each (lead 11-07).
