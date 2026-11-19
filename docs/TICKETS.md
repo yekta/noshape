@@ -852,6 +852,11 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   tooltip on click", live/qa/dialog-tip-1119 B): shows ~40 ms after hover, fades in over ~250 ms, stays during the press (80 and
   600 ms holds), gone the first frame after release, no fade-out. (qa 11-19, green a58eee8c)
 
+- [ ] P2 **BRAND-IN-UI-TEXT (dx; prefs line: studios)**: + › Import… › a STEP file: the options modal is titled "Import to Onshape"
+  (crates/app/src/import_dialog.rs:230); Preferences asks "Enable access to Onshape Labs features?" (prefs_general.rs:476). The app
+  is Noshape in all user-facing text (no Onshape brand marks): "Import to Noshape" etc., layout as live. Walk 22:0x, green a58eee8c;
+  the STEP round trip itself is fine (8 faces out, Import 1 + Part 1 back, "CAD Imports" folder, info toast).
+
 ## Interaction feel suite 11-19 (qa 16:20: run 1119-1242-223cec7e on vibex8, failures re-run on green eb3b06a8 on vibe2)
 2110/2172 scenarios (05:51 run on a67911be: 2126). 67 failing; 28 pass on the re-run (load flakes or fixed). The 39 still failing
 went to owners as P0 (skasm 14, studios 15, psui 7, asm 2, dx 1); the regressions since 05:51 are ticketed here. Scores:
