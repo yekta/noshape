@@ -1101,6 +1101,38 @@ fn extruded_l_keeps_its_end_faces_in_pieces() {
     assert!((volume_mm3(&r) - 3211.3274).abs() < 1e-3 && faces == 14, "{} mm³, {} faces", volume_mm3(&r), faces);
 }
 
+/// qa SMM-EXTRUDE-CLOSED-PROFILE (live "qa (11-19): sheet metal extrude of a closed rectangle"): Sheet metal model ›
+/// Extrude of a closed 100 × 60 rectangle, Blind 25, defaults (1.6 / 2.3 mm): one closed box, bends at all 4 corners
+/// (32 faces, 12843.115 mm³), the feature's row red "Sheet metal model cannot be unfolded." (no flat).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn an_extruded_closed_rectangle_is_a_box_that_cannot_unfold() {
+    // Its 4 lines, or the whole sketch clicked in the list ("Edges of Sketch 1"; ours said "Failed to extrude selections").
+    for whole in [false, true] {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let p = [(0.0, 0.0), (100.0, 0.0), (100.0, 60.0), (0.0, 60.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+        let lines: Vec<_> = (0..4).map(|k| sk.add_line_between(p[k], p[(k + 1) % 4]).unwrap()).collect();
+        let sketch = s.add("sketch", |pv| {
+            pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+            pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+        });
+        s.ok();
+        let curves = if whole { vec![Reference::Sketch(sketch)] } else { lines.iter().map(|e| Reference::SketchEntity { sketch, entity: e.0 }).collect() };
+        s.add("sheetMetalStart", |pv| {
+            pv.set("process", en("EXTRUDE"));
+            pv.set("sketchCurves", ParamValue::Query(curves));
+            pv.set("depth", expr("25 mm"));
+        });
+        let r = s.ok();
+        let last = r.display.features.last().unwrap();
+        // (A WARNING on the server that the list draws as failed, as sm-rip-1118.)
+        assert_eq!((last.status, last.message.as_deref()), (FeatureStatus::Error, Some(noshape_model::regen::features::sheetmetal_ops::CANNOT_UNFOLD)), "whole {whole}");
+        let faces = r.context.bodies[part(&r)].shape.faces().len();
+        assert!((volume_mm3(&r) - 12843.115).abs() < 1e-3 && faces == 32, "whole {whole}: {} mm³, {} faces", volume_mm3(&r), faces);
+    }
+}
+
 /// Sheet metal model › Extrude of a line, a tangent arc and a line: the arc is a rolled wall (no bend), developed in
 /// the flat between the two walls at the rolled k-factor, not left out with the walls on each other (live
 /// c2-sm-tablet-stand's Sheet metal model 1: OK; ours said "Collision in sheet metal flat pattern.").

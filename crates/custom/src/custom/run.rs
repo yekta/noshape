@@ -90,6 +90,18 @@ pub fn output_of(feature: FeatureId) -> Option<FeatureOutput> {
     OUTPUTS.lock().get(&feature).cloned()
 }
 
+/// `refs` with each whole sketch replaced by its curves (not its points).
+fn sketch_curves(sketches: &[Arc<crate::regen::context::SketchResult>], refs: &[crate::reference::Reference]) -> Vec<crate::reference::Reference> {
+    use crate::reference::Reference;
+    refs.iter().flat_map(|r| match r {
+        Reference::Sketch(f) => sketches.iter().filter(|s| s.feature == *f).flat_map(|s| {
+            s.held().entities.into_iter().filter(|&e| !matches!(s.sketch.kind(noshape_sketch::EntityId(e)), Some(noshape_sketch::EntityKind::Point) | None))
+                .map(|entity| Reference::SketchEntity { sketch: *f, entity }).collect::<Vec<_>>()
+        }).collect(),
+        _ => vec![r.clone()],
+    }).collect()
+}
+
 /// Build the definition map for `params`.
 fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev: &EvalCtx, provider: Option<&dyn super::CustomFeatureProvider>) -> FResult<Value> {
     let mut m = Map::new();
@@ -112,9 +124,17 @@ fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev
                 let o = info.ordinal(s).or_else(|| info.ordinal(default)).unwrap_or(0);
                 Value::Enum(*tag, o)
             }
-            ParamKindFs::Query { .. } => {
+            ParamKindFs::Query { filter, .. } => {
                 let refs = values.query(&d.id);
-                query_of_refs(cx, refs)
+                // A whole sketch in a curve field ("Edges of Sketch 1"): its curves, as live's qCreatedBy(sketch, EDGE).
+                use crate::params::QueryFilter as F;
+                let curves_only = filter.intersects(F::SKETCH_EDGE) && !filter.intersects(F(F::SKETCH.0 | F::BODY.0 | F::WIRE_BODY.0));
+                if !curves_only || !refs.iter().any(|r| matches!(r, crate::reference::Reference::Sketch(_))) {
+                    query_of_refs(cx, refs)
+                } else {
+                    let curves = sketch_curves(&cx.state.lock().ctx.sketches, refs);
+                    query_of_refs(cx, &curves)
+                }
             }
             ParamKindFs::FeatureList { .. } => {
                 let refs = values.query(&d.id);
