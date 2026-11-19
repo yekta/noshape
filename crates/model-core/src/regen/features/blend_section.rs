@@ -947,11 +947,23 @@ pub fn partial_point(shape: &Shape, edges: &[usize], fraction: f64) -> Option<(D
 
 /// Blend `edges` of body `bi` with `spec` (see the module docs).
 pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec) -> FResult<()> {
+    let conic = matches!(spec.section, Section::Conic(_)) && spec.r1 == spec.r2 && spec.width.is_none() && spec.partial.is_none() && spec.sides.is_none() && spec.reference.is_none();
+    // A conic round beside a curved face: sections from the faces' tangents put its contact off that face, so rolling
+    // balls on the faces first (c2-surf-workshop-knifehandle's Fillet 3: on the blade's tip the tangent plane's contact
+    // lay 2 mm out along the curved spine, and the tool's flat side was left as a face).
+    let curved = conic && {
+        let shape = &ev.ctx.bodies[bi].shape;
+        let (ef, faces) = (shape.edge_faces()?, shape.faces());
+        edges.iter().any(|&e| ef.get(e).is_some_and(|fs| fs.iter().any(|&f| !faces[f as usize].is_planar())))
+    };
+    if curved {
+        let balls = sections(ev, bi, edges, spec, true, None);
+        return if balls.is_ok() { balls } else { sections(ev, bi, edges, spec, false, None).or(balls) };
+    }
     let first = sections(ev, bi, edges, spec, false, None);
     // A conic round whose sections from the faces' tangents at the edge fail: rolling balls on the faces themselves, the
     // conic between their contacts (c2-impeller-loft's Fillet 3: R 3 on a rib's 30 deg lips curving away, each ball
     // past the rib's middle, the two rounds meeting in a ridge as live's).
-    let conic = matches!(spec.section, Section::Conic(_)) && spec.r1 == spec.r2 && spec.width.is_none() && spec.partial.is_none() && spec.sides.is_none() && spec.reference.is_none();
     if !conic || first.is_ok() {
         return first;
     }

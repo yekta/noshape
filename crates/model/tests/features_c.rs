@@ -4413,6 +4413,34 @@ fn a_plates_outline_round_ending_under_a_tubes_rim_as_live() {
     assert!(bottom.len() == 1 && (bottom[0] - 890.0).abs() < 1.0, "the tube's bottom: {bottom:?} mm² (live one face, 890)");
 }
 
+/// c2-surf-workshop-knifehandle's Fillet 3 on the Blade as Split 1 leaves it: a conic round (R 1, rho 0.6) of the blade
+/// tip's 4 mm edge, the curved spine on one side. Live: one face, 6/12/8, 1.59 mm³ off between its mass properties
+/// (15805.89 -> 15804.30 mm³, their accuracy some tenths); our tangent-plane sections put the contact off the spine and
+/// left the tool's flat side as a seventh face.
+#[test]
+fn a_conic_round_beside_a_curved_face_lies_on_it_as_live() {
+    let brep = include_str!("data/knifehandle-fillet3-input.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let before = volume(&r, 0) * 1e9;
+    let b = &r.context.bodies[0];
+    let e = b.shape.edges().iter().position(|e| e.edge_info().is_ok_and(|i| near(i.length, mm(4.0), mm(1e-3)) && i.start.x < mm(-218.0))).expect("the tip edge");
+    let edge = Reference::Edge((*b.edges[e]).clone());
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(vec![edge]));
+        p.set("crossSection", en("CONIC"));
+        p.set("nonCircularRadius", expr("1 mm"));
+        p.set("rho", expr("0.6"));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    let shown = shape.shown_topology().unwrap();
+    assert_eq!((shape.faces().len(), shown.edge_count(), shown.vertices.iter().filter(|v| **v).count()), (6, 12, 8));
+    let removed = before - volume(&r, 0) * 1e9;
+    assert!((1.2..1.8).contains(&removed), "{removed} mm³ off (live 1.59)");
+}
+
 /// c2-impeller-loft's Fillet 4 on its part as feature 32 leaves it (live geo-1118): r 5 on the 54.87 mm B-spline rim
 /// of a 4 mm flange, overflow off. The ball is wider than the flange's side, so the round takes that whole side and
 /// rests on its top edge: one face from z -4 to 0, live's 372.45 mm² and 270.11 mm³ off (this input's side is 2.1 mm
