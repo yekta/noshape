@@ -817,6 +817,10 @@ pub fn gusset(ev: &mut EvalCtx) -> FResult<()> {
     if len <= 0.0 || th <= 0.0 {
         return crate::regen::eval::err_at(&["length", "thickness"], "Error regenerating: a parameter is out of range.");
     }
+    // std getAlignedOffset (live ui-parity gusset-rectangle-aligned: Aligned with no entity fails, its field red).
+    if ev.is("gussetPosition", "ALIGNED") && ev.query("alignedReference").is_empty() {
+        return crate::regen::eval::err_at(&["alignedReference"], "Select a linear edge to align to.");
+    }
     let feature = ev.feature;
     let mut count = 0u32;
     for r in refs.iter().rev() {

@@ -1,7 +1,24 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 15:54 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 18:07 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
+
+## In flight 11-19 18:07: qa's feel P0 (rows /root/qa-scratch/suites/1119-1610-eb3b06a8-uipr/rows.txt)
+- QUEUED (this land): line-from-midpoint (a line started at a held line's midpoint, square to it, is Perpendicular:
+  inference.rs `square_at_mid`); a chain's square corner Vertical again (live2's sketch-line-chain variants; the one
+  11-19 Perpendicular take unexplained, live2 offered a pixel sweep); spline / bezier menu takes the plane under the
+  pointer while drawing (sketch.rs `picked`); Aligned gusset with no entity fails "Select a linear edge to align to.";
+  a point wakes when the pointer arrives on it, not the one it rests on at the tool's start (`snapped_point`;
+  mirror-undo-midway). 144 sketch scenarios: all match but the stale trim / dimension-variable takes (live2 retakes:
+  today's live = ours) and vertical-key.
+- vertical-key: ours puts (3, 30) at (+64, -45) px from the start, live (+61, -42): our default camera differs a little
+  (7.47 px off plumb vs live's 7.78, reach 7.5). Camera = psui's.
+- bend-relief x3 (P0, next): live's vertex (60,-2,4) and its 3 faces / 3 edges are all qCreatedBy Flange 1 (last
+  modified by Flange 2: copyWalls / foldedBoolean; live2 /root/live2-scratch/qa39/brv-flat.json). Ours: the 2x2 face
+  (z 4, x 58..60, y -2..0) is Face{Flange 2, Generated(Face{op marker, New 12})}: the relief-exposed wall face is
+  named by Flange 2's op, live keeps it with Flange 1's wall. Needs the SM host to name a rebuilt wall's new side faces
+  after the wall's creator. Probe: ~/tmp/skasm/br/q.py, q2.py, dec.py (decodes ids).
+- LANDED 5bd05e2f as 575aba2a: rocker-enclosure-sm (translator + host). Suite I 94/126, 1346/1585, none worse than G.
 
 ## Landed 11-18 (since the morning)
 - b5c4ccc4 Corner / Bend relief side face; decal image. cfb07d1c pierce at a touching circle. 52c050e1 / e9e27edc:

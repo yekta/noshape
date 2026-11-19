@@ -195,6 +195,32 @@ impl Inference {
     }
 }
 
+/// Whether a constraint holds line `l`'s direction: its own Horizontal / Vertical or Fix, or a Parallel /
+/// Perpendicular to a line so held (a rectangle's sides); an external line's is held too.
+fn direction_held(sk: &Sketch, l: EntityId) -> bool {
+    let mut seen = vec![l];
+    let mut i = 0;
+    while let Some(&x) = seen.get(i) {
+        i += 1;
+        if sk.entity(x).is_some_and(|e| e.external) {
+            return true;
+        }
+        for c in sk.constraints() {
+            match c.kind {
+                ConstraintKind::Horizontal { a, b: None } | ConstraintKind::Vertical { a, b: None } | ConstraintKind::Fix { entity: a } if a == x => return true,
+                ConstraintKind::Parallel { a, b } | ConstraintKind::Perpendicular { a, b } if a == x || b == x => {
+                    let o = if a == x { b } else { a };
+                    if !seen.contains(&o) {
+                        seen.push(o);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    false
+}
+
 fn excluded(sk: &Sketch, ctx: &InferenceContext, id: EntityId) -> bool {
     // (A spline's handle arm: no inference to or along it.)
     if ctx.exclude.contains(&id) || sk.entity(id).is_some_and(|e| e.handle_of.is_some()) {
@@ -412,18 +438,20 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
             // A woken line the new line starts on (its midpoint or a point inside it): live2 "feel (sketch)" (1)
             // infers perpendicular only from a line the start is on, never to one elsewhere, and parallel never.
             let starts_on = |w: EntityId| sk.curve(w).is_some_and(|c| c.closest(a).2 <= 1e-9 * (1.0 + a.length()));
-            // A chain's segment square to the line it goes on from: Perpendicular to that line, not Horizontal / Vertical
-            // (live sketch-tools-1119: COINCIDENT + PERPENDICULAR to the previous segment, no VERTICAL).
-            let chain_square = |horizontal: bool| {
-                let ap = ctx.anchor_point?;
-                sk.entities().find(|e| {
-                    !excluded(sk, ctx, e.id)
-                        && e.endpoints().is_some_and(|(s, en)| s == ap || en == ap)
-                        && matches!(sk.curve(e.id), Some(Curve2::Line { a: la, b: lb }) if { let t = (lb - la).normalize_or_zero(); if horizontal { t.x.abs() < 1e-12 && t.y != 0.0 } else { t.y.abs() < 1e-12 && t.x != 0.0 } })
-                }).map(|e| e.id)
+            // Started at a held line's midpoint, square to it: Perpendicular to it (live sketch-line-from-midpoint, retaken
+            // 11-19 16:4x). Across it, both ends clear, or started on it off the midpoint: Vertical, as a free one (live
+            // sketch-tools-1119 cross; the 11-19 retakes of sketch-trim-key / -undo-trim).
+            let square_at_mid = |horizontal: bool| {
+                sk.entities().map(|e| e.id).find(|&w| {
+                    let Some(Curve2::Line { a: la, b: lb }) = sk.curve(w) else { return false };
+                    let t = (lb - la).normalize_or_zero();
+                    !excluded(sk, ctx, w)
+                        && ((la + lb) * 0.5 - a).length() <= 1e-9 * (1.0 + a.length())
+                        && if horizontal { t.y.abs() > 1.0 - 1e-12 } else { t.x.abs() > 1.0 - 1e-12 }
+                        && direction_held(sk, w)
+                })
             };
-            // (A line across a held line, both ends clear, or started on it: Vertical, as a free one; live sketch-tools-1119 cross.)
-            let line_kind = |horizontal: bool| match chain_square(horizontal) {
+            let line_kind = |horizontal: bool| match square_at_mid(horizontal) {
                 Some(w) => (InferenceKind::Perpendicular, Some(w), AutoConstraint::PerpendicularTo(w)),
                 None if horizontal => (InferenceKind::Horizontal, None, AutoConstraint::HorizontalLine),
                 None => (InferenceKind::Vertical, None, AutoConstraint::VerticalLine),
@@ -574,33 +602,38 @@ mod tests {
         DVec2::new(x, y)
     }
 
-    /// Live sketch-tools-1119: a line square to a held line (the Line tool's Horizontal), started on it or drawn
-    /// across it with both ends clear (the retake of 1866's crossing, 06:47), is Vertical, as on a free line; only a
-    /// chain's square corner is Perpendicular to the segment before.
+    /// A line square to a held line (the Line tool's Horizontal): started on it off its midpoint, drawn across it or
+    /// going on from its end as a chain, Vertical, as on a free line (live sketch-tools-1119, its cross retake, the
+    /// 11-19 trim retakes, live2's sketch-line-chain variants 11-19 17:xx); started at its midpoint, Perpendicular to it
+    /// (live sketch-line-from-midpoint).
     #[test]
-    fn square_to_a_held_line_is_vertical_but_at_a_chains_corner() {
+    fn square_to_a_held_line_is_perpendicular_only_from_its_midpoint() {
         let mut sk = Sketch::new();
         let held = sk.add_line(v(0.0, 0.0), v(4.0, 0.0));
         sk.add_constraint(ConstraintKind::Horizontal { a: held, b: None }).unwrap();
         let free = sk.add_line(v(0.0, 2.0), v(4.0, 2.0));
-        let up = |sk: &Sketch, base: EntityId, y: f64| {
-            let ctx = InferenceContext { tool: SketchTool::Line, anchor: Some(v(2.0, y)), snap_radius: 0.05, woken: vec![base], ..Default::default() };
-            infer(sk, v(2.01, y + 1.5), &ctx).into_iter().next().unwrap()
+        let up = |sk: &Sketch, base: EntityId, x: f64, y: f64| {
+            let ctx = InferenceContext { tool: SketchTool::Line, anchor: Some(v(x, y)), snap_radius: 0.05, woken: vec![base], ..Default::default() };
+            infer(sk, v(x + 0.01, y + 1.5), &ctx).into_iter().next().unwrap()
         };
-        // Started on it: Vertical (live sketch-tools-1119).
-        assert_eq!(up(&sk, held, 0.0).kind, InferenceKind::Vertical);
-        assert_eq!(up(&sk, free, 2.0).kind, InferenceKind::Vertical);
-        // From the held line's end, as a chain: Perpendicular to it (live sketch-tools-1119), at its square.
+        // Started on it: Vertical; at its midpoint: Perpendicular; on a free line's midpoint: Vertical.
+        assert_eq!(up(&sk, held, 1.0, 0.0).kind, InferenceKind::Vertical);
+        let r = up(&sk, held, 2.0, 0.0);
+        assert_eq!((r.kind, r.constraints), (InferenceKind::Perpendicular, vec![AutoConstraint::PerpendicularTo(held)]));
+        assert_eq!(up(&sk, free, 2.0, 2.0).kind, InferenceKind::Vertical);
+        // From the held line's end, as a chain: Vertical (live sketch-line-chain, retaken 11-19), at its square.
         let (_, end) = sk.endpoints(held).unwrap();
         let ctx = InferenceContext { tool: SketchTool::Line, anchor: Some(v(4.0, 0.0)), anchor_point: Some(end), snap_radius: 0.05, woken: vec![held], ..Default::default() };
         let r = infer(&sk, v(4.01, 1.5), &ctx).into_iter().next().unwrap();
-        assert_eq!((r.kind, r.constraints.clone()), (InferenceKind::Perpendicular, vec![AutoConstraint::PerpendicularTo(held)]));
+        assert_eq!((r.kind, r.constraints.clone()), (InferenceKind::Vertical, vec![AutoConstraint::VerticalLine]));
         assert!((r.position.x - 4.0).abs() < 1e-12);
-        // Across it, woken on the way or not: Vertical.
+        // Across it, woken on the way or not, through its midpoint too: Vertical.
         let across = InferenceContext { tool: SketchTool::Line, anchor: Some(v(1.0, -1.0)), snap_radius: 0.05, woken: vec![held], ..Default::default() };
         assert_eq!(infer(&sk, v(1.01, 1.0), &across)[0].constraints, vec![AutoConstraint::VerticalLine]);
-        let unwoken = InferenceContext { woken: Vec::new(), ..across };
+        let unwoken = InferenceContext { woken: Vec::new(), ..across.clone() };
         assert_eq!(infer(&sk, v(1.01, 1.0), &unwoken)[0].kind, InferenceKind::Vertical);
+        let mid = InferenceContext { anchor: Some(v(2.0, -1.0)), ..across };
+        assert_eq!(infer(&sk, v(2.01, 1.0), &mid)[0].constraints, vec![AutoConstraint::VerticalLine]);
     }
 
     #[test]
@@ -632,13 +665,13 @@ mod tests {
         let r = infer(&sk, v(2.05, 3.0), &InferenceContext { woken: vec![le], ..ctx.clone() });
         assert_eq!(r[0].kind, InferenceKind::AlignVertical);
         assert!((r[0].position.x - 2.0).abs() < 1e-12);
-        // line tool: horizontal and perpendicular from an endpoint; square to the chain, Perpendicular, not Vertical
-        // (live sketch-tools-1119)
+        // line tool: horizontal and perpendicular from an endpoint; square to the chain, Vertical first (live
+        // sketch-line-chain, retaken 11-19)
         let (_, e) = sk.endpoints(l).unwrap();
         let ctx2 = InferenceContext { tool: SketchTool::Line, anchor: Some(v(2.0, 0.0)), anchor_point: Some(e), snap_radius: 0.1, ..Default::default() };
         let r = infer(&sk, v(2.02, 3.0), &ctx2);
+        assert_eq!(r[0].kind, InferenceKind::Vertical, "{r:?}");
         assert!(r.iter().any(|x| x.kind == InferenceKind::Perpendicular));
-        assert!(!r.iter().any(|x| x.kind == InferenceKind::Vertical));
         let r = infer(&sk, v(3.0, 3.0 * 0.01), &ctx2);
         assert!(r.iter().any(|x| x.kind == InferenceKind::Horizontal));
         let k = AutoConstraint::HorizontalLine.to_constraint(EntityId(99), Some(l)).unwrap();

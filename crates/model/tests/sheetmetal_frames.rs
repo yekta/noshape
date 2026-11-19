@@ -830,6 +830,25 @@ fn gusset_manipulators_as_std() {
     assert!(near(l, mm(45.0), 1e-9), "length {l}");
 }
 
+/// Live ui-parity gusset-rectangle-aligned: a gusset set to Aligned with no alignment entity fails (std
+/// getAlignedOffset), its Alignment entity field at fault.
+#[test]
+fn an_aligned_gusset_needs_its_alignment_entity() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let ids = polyline(&mut sk, &[(0.0, 0.0), (200.0, 0.0), (200.0, 100.0)], false);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    frame_on(&mut s, sid, &ids, "SHS 40x40x3", "BUTT");
+    let r = s.ok();
+    let corner_edge = edge_at(&r, 1, DVec3::new(mm(180.0), mm(20.0), 0.0));
+    s.add("gusset", move |p| {
+        p.set("edges", ParamValue::Query(vec![corner_edge]));
+        p.set("gussetType", ParamValue::Enum("RECTANGLE".into()));
+        p.set("gussetPosition", ParamValue::Enum("ALIGNED".into()));
+    });
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Select a linear edge to align to.".to_string()));
+}
+
 /// End cap's manipulators as std's (audit-part-studio M15): a 5 mm cap on the free end at the origin of an SHS
 /// 40x40 member: the thickness arrow from the end face, its tip on the cap's far face (x = -5 mm), and the side's
 /// offset arrow; dragging the thickness to 8 mm runs std's change function (8 mm, the same side).

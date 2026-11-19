@@ -803,6 +803,10 @@ pub struct SketchEditor {
     /// Lines whose midpoint a snap landed on while drawing, the newest first ([`WOKEN_MIDS`]; live align-mid-1118: it
     /// gives alignment, the click making a point there, MIDPOINT on the line).
     pub woken_mids: Vec<EntityId>,
+    /// The point snapped onto at the last move (at a tool's start, the one hovered): a point wakes when the pointer
+    /// arrives on it, not while it stays (live ui-parity revolve-dialog-axis, sketch-mirror-undo-midway: the corner the
+    /// pointer rests on when Line starts gives no alignment).
+    snapped_point: Option<EntityId>,
     /// The straight model edge the pointer is on while drawing, and since when ([`EDGE_WAKE_REST`]); the edge snapped
     /// since the last move.
     edge_acquiring: Option<(noshape_model::reference::Reference, std::time::Instant)>,
@@ -1531,6 +1535,7 @@ impl SketchEditor {
             otf_typing: false,
             woken: Vec::new(),
             woken_mids: Vec::new(),
+            snapped_point: None,
             no_point_snap: false,
             edge_acquiring: None,
             edge_seen: None,
@@ -1612,6 +1617,7 @@ impl SketchEditor {
         self.otf_typing = false;
         self.woken.clear();
         self.woken_mids.clear();
+        self.snapped_point = self.hover;
         self.edge_acquiring = None;
         self.woken_edge = None;
         self.woken_point = None;
@@ -2119,9 +2125,11 @@ impl SketchEditor {
             self.inference = self.infer(&data.sketch, p, shift);
             // Live (feel retaken 11-18): a point wakes for alignment as soon as a snap lands on it (its
             // wakeupInferenceSource, no rest time: a 10 ms rest or a slow pass wakes it) and stays woken for the line.
-            if let Some(e) = self.inference.as_ref().filter(|i| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Center)).and_then(|i| i.entity).filter(|e| is_point(&data.sketch, *e)) {
+            let snapped = self.inference.as_ref().filter(|i| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Center)).and_then(|i| i.entity).filter(|e| is_point(&data.sketch, *e));
+            if let Some(e) = snapped.filter(|e| self.snapped_point != Some(*e)) {
                 self.wake(e);
             }
+            self.snapped_point = snapped;
             // A line's midpoint snapped onto wakes too (live align-mid-1118: MIDPOINT, then HORIZONTAL with it later).
             if let Some(l) = self.inference.as_ref().filter(|i| i.kind == InferenceKind::Midpoint).and_then(|i| i.entity).filter(|l| data.sketch.kind(*l) == Some(EntityKind::Line)) {
                 self.woken_mids.retain(|x| *x != l);
@@ -11097,6 +11105,24 @@ mod tests {
             let aligned = ed.inference.as_ref().is_some_and(|i| i.constraints.iter().any(|c| matches!(c, AutoConstraint::VerticalWith(p) if *p == pt)));
             assert_eq!(aligned, snapped, "passed {off} px off the point: {:?}", ed.inference);
         }
+    }
+
+    /// Live ui-parity revolve-dialog-axis / sketch-mirror-undo-midway: the point the pointer rests on when the tool
+    /// starts doesn't wake while the pointer stays on it; it does once the pointer comes back onto it.
+    #[test]
+    fn a_point_under_the_pointer_at_the_tools_start_wakes_only_on_arriving() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let pt = d.sketch.add_point(v(200.0 * PX, 300.0 * PX));
+        ed.hover = Some(pt);
+        ed.set_tool(Tool::Line);
+        ed.pointer_move(&mut d, v(202.0 * PX, 301.0 * PX), false, false);
+        click(&mut ed, &mut d, v(500.0 * PX, 100.0 * PX));
+        ed.pointer_move(&mut d, v(203.0 * PX, 120.0 * PX), false, false);
+        let aligned = |ed: &SketchEditor| ed.inference.as_ref().is_some_and(|i| i.constraints.iter().any(|c| matches!(c, AutoConstraint::VerticalWith(p) if *p == pt)));
+        assert!(!aligned(&ed), "{:?}", ed.inference);
+        ed.pointer_move(&mut d, v(200.0 * PX, 300.0 * PX), false, false);
+        ed.pointer_move(&mut d, v(203.0 * PX, 120.0 * PX), false, false);
+        assert!(aligned(&ed), "{:?}", ed.inference);
     }
 
     /// Live errors-1118: a dimension the Dimension tool added driven (it over-defines a dimensioned rectangle) takes a

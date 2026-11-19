@@ -5095,7 +5095,11 @@ impl PartStudioView {
             let (Some(a), Some(b)) = (self.frame_of_ref(r), sketch_frame) else { return false };
             a.normal.dot(b.normal).abs() > 1.0 - 1e-9 && (a.origin - b.origin).dot(b.normal).abs() < 1e-9
         };
-        let plane_ref = self.hover.clone().filter(|r| hovered.is_none() && dim.is_none() && matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }) && !own_plane(r));
+        // While a spline is drawn no plane is lit (live2 11-17 tools-planes), yet its menu is the plane's under the
+        // pointer (live sketch-spline-menu-confirm: Hide Front plane): the pick there.
+        let drawing = self.sketch.as_ref().is_some_and(|s| s.tool.draws());
+        let picked = || self.ui.sketch_gpu_hover.filter(|_| drawing).and_then(|(_, id)| self.built.as_ref()?.picks.get(id?).map(|t| t.reference.clone()));
+        let plane_ref = self.hover.clone().or_else(picked).filter(|r| hovered.is_none() && dim.is_none() && matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }) && !own_plane(r));
         let plane_name = plane_ref.as_ref().map(|r| self.labeler(cx)(r)).unwrap_or_default();
         let sketch_name = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.name.clone()).unwrap_or_else(|| "sketch".into());
         // Other sketches shown (live: Hide other sketches / Hide all sketches).
