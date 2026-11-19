@@ -1512,7 +1512,7 @@ These are what the user sees; reach-1118 (16:29) read the viewer's own pick and 
 | A plane's vertical outer edge (Front / Right in iso, over the background) | **6 / 6** (7: nothing) | – | (3d.json's "level border 7–8" read 1–2 px long) |
 | A plane's slanted outer edge (Top in iso) | 7.2 lit, 8.05 not (row "A plane hovers…") | 9.1 / 9.9 | ≠ [psui] |
 | Assembly hover timing ("start two-blocks asm", the pointer jumped onto Part 1's top face, 10 rounds) | the first draw 93–261 ms after the pointer stops (median 255), a second at ~515 ms more; the Part Studio the same (99–263, median 260) | the Part Studio's: the assembly's hover is the shared Viewport's (`prehighlight_delay`, app-core `prehighlight_waits_for_a_pause_as_live`; by the code) | = [asm] |
-| Drawing: a click beside a view selects it (Top view of "start two-blocks", 1:2, left edge, 2 rounds) | selected out to 13 px, not at 14; hover lights at 13, not 14, with no hold (1 px steps, 450 ms, full-page shots, 2 rounds; row "View edge / inside hover reach" has 14–16) | – | [studios] |
+| Drawing: a click beside a view selects it (Top view of "start two-blocks", 1:2, left edge, 2 rounds) | selected out to 13 px, not at 14; hover lights at 13, not 14, with no hold (1 px steps, 450 ms, full-page shots, 2 rounds; row "View edge / inside hover reach" has 14–16) | = (fixed 11-19: a reach of 3.45 sheet mm, 13.6 px at the fit's ~3.93 px/mm: lit and taken at 13, not 14; GPUI feel `a_view_lights_and_is_taken_within_its_reach_in_sheet_mm`) | = [studios] |
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
