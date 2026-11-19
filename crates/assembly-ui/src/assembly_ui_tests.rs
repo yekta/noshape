@@ -247,9 +247,9 @@ fn the_instance_and_top_row_menus_are_lives(cx: &mut TestAppContext) {
                 [
                     "Properties…", "Instance properties…", sep,
                     "Hide", "Hide other instances", "Hide all instances", "Show center of mass", "Isolate…", "Make transparent…", "Suppress", "Dynamic suppression ▸", "Fix", "Use best available tessellation", sep,
-                    "Edit in context", "Add mate connector to instance origin…", "Replace instances…", "Switch to Part Studio 1", "Where used for Part 1…", sep,
+                    "Edit in context", "Add mate connector to instance origin…", "Replace instances…", "Switch to Part Studio 1", sep,
                     "Copy Part 1 <1>", sep,
-                    "Move to new subassembly", "Change to version…", "Export…", sep,
+                    "Move to new subassembly", "Change to version…", "Export…", "Where used…", sep,
                     "Zoom to selection", sep,
                     "Create Drawing of Part 1…", sep,
                     "Add selection to folder…", "Create empty subassembly", sep,
@@ -312,9 +312,9 @@ fn the_pattern_and_copy_row_menus_are_lives(cx: &mut TestAppContext) {
                 [
                     "Properties…", "Instance properties…", sep,
                     "Hide", "Hide other instances", "Hide all instances", "Isolate…", "Make transparent…", "Suppress", "Fix", "Use best available tessellation", sep,
-                    "Add mate connector to instance origin…", "Switch to Part Studio 1", "Where used for Part 2…", sep,
+                    "Add mate connector to instance origin…", "Switch to Part Studio 1", sep,
                     "Copy Part 2 <2>", sep,
-                    "Export…", sep,
+                    "Export…", "Where used…", sep,
                     "Zoom to selection", sep,
                     "Create Drawing of Part 2…",
                 ]
@@ -995,14 +995,15 @@ fn switch_to_part_studio_carries_the_part(cx: &mut TestAppContext) {
         view.update(cx, |v, cx| {
             let id = instance(v, "Part 2 <1>", cx);
             let menu = v.instance_menu(id, false, cx);
-            // Live (Professional, asm-triad-move-to-origin-free): Where used for <part>… right after Switch to.
+            // Live Pro (asm-menu-release 11-19): the list's Where used… right after Export…, no Release….
             let labels: Vec<&str> = menu.iter().filter_map(|e| match e {
                 super::behaviors::MenuEntry::Item { label, .. } => Some(label.as_str()),
                 _ => None,
             }).collect();
-            let at = labels.iter().position(|l| *l == "Switch to Part Studio 1").expect("Switch to Part Studio 1");
-            assert_eq!(labels.get(at + 1), Some(&"Where used for Part 2…"), "{labels:?}");
-            for name in ["Switch to Part Studio 1", "Where used for Part 2…"] {
+            let at = labels.iter().position(|l| *l == "Export…").expect("Export…");
+            assert_eq!(labels.get(at + 1), Some(&"Where used…"), "{labels:?}");
+            assert!(!labels.contains(&"Release…"), "{labels:?}");
+            for name in ["Switch to Part Studio 1", "Where used…"] {
                 let Some(super::behaviors::MenuEntry::Item { act, .. }) = menu.iter().find(|e| matches!(e, super::behaviors::MenuEntry::Item { label, .. } if label == name)) else { panic!("{name}") };
                 let act = act.clone();
                 act(v, w, cx);

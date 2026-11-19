@@ -1427,8 +1427,9 @@ impl AssemblyView {
                 Some(body) => cx.emit(AssemblyViewEvent::ShowPart(tab, body.clone())),
                 None => cx.emit(AssemblyViewEvent::ActivateTab(tab)),
             }));
-            // Live (Professional, asm-triad-move-to-origin-free): a part's Where used, after Switch to.
-            if let InstanceSource::Part { body, .. } = &inst.source {
+            // Live (Professional, asm-triad-move-to-origin-free): the graphics menu has a part's Where used after
+            // Switch to; the list's has Where used… after Export… (live Pro asm-menu-release 11-19).
+            if graphics && let InstanceSource::Part { body, .. } = &inst.source {
                 let pname = inst.name.rsplit_once(" <").map_or(inst.name.as_str(), |(n, _)| n).to_string();
                 let body = body.clone();
                 edit.push(item(format!("Where used for {pname}…"), move |_, _, cx| cx.emit(AssemblyViewEvent::WhereUsed(tab, body.clone()))));
@@ -1539,16 +1540,21 @@ impl AssemblyView {
             m.push(if pinned { item("Unpin reference", pin) } else { item("Pin reference", pin) });
         }
         // Live (asm-instance-suppress-unsuppress): no Export… or Zoom to selection on a suppressed instance.
+        // Live Pro (asm-menu-release 11-19, managed workflows on): a part's Where used… and Revision history… after
+        // Export…, and no Release… (the Free plan's Release… [Upgrade] was an upsell).
+        let part = match &inst.source {
+            InstanceSource::Part { studio, body, .. } if !multi => Some((*studio, body.clone())),
+            _ => None,
+        };
         if !suppressed {
             m.push(export);
+            if let Some((studio, body)) = part.clone() {
+                where_used = Some(item("Where used…", move |_, _, cx| cx.emit(AssemblyViewEvent::WhereUsed(studio, body.clone()))));
+            }
             m.extend(where_used);
         }
-        // Live qa5 CA2: Release… after Export… (the instances' parts; a subassembly's own release items, live
-        // asm-menu-dissolve-subassembly).
-        // (Another document's part too, at its version: live 2464, without the Free plan's [Upgrade].)
-        if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::Assembly { .. } | InstanceSource::External { body: Some(_), .. }) && noshape_ops::release_settings::managed_workflows() {
-            let tg = targets.clone();
-            m.push(item("Release…", move |t, w, cx| t.release_instances(tg.clone(), w, cx)));
+        if let Some((studio, body)) = part.filter(|_| noshape_ops::release_settings::managed_workflows()) {
+            m.push(item("Revision history…", move |t, w, cx| crate::assembly_hooks::open_part_revision_history(t.doc.clone(), studio, body.clone(), w, cx)));
         }
         m.push(MenuEntry::Sep);
         let tg = targets.clone();

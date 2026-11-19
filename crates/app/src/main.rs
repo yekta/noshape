@@ -269,6 +269,7 @@ fn register_assembly_hooks() {
         release_part_items: release_dialog::part_items,
         release_tab_items: release_dialog::tab_items,
         open_release_candidate: release_dialog::open_release_candidate,
+        open_part_revision_history: release_dialog::open_part_revision_history,
         last_viewed_config: release_dialog::last_viewed_config,
         create_version: history_panel::open_create_version,
         tab_properties: |doc, tab, window, cx| doc_dialogs::tab_properties(doc, tab, None, window, cx),

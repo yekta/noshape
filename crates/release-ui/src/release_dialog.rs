@@ -3052,6 +3052,15 @@ impl Render for ReleaseDraftsPanel {
 
 /// "Revision history" of a part number: its revisions, newest first, with
 /// View release and Obsolete revision.
+/// Revision history… of a Part Studio's part (an assembly instance's menu): its part number, else the one it was
+/// released with.
+pub fn open_part_revision_history(doc: Entity<DocModel>, studio: TabId, body: noshape_model::reference::BodyId, window: &mut Window, cx: &mut App) {
+    let d = doc.read(cx);
+    let own = d.studio(studio).and_then(|s| s.part_properties.get(&body)).and_then(|p| p.part_number.clone()).filter(|p| !p.is_empty());
+    let pn = own.or_else(|| release_log(d).part_number_released(studio, Some(&body))).unwrap_or_default();
+    open_revision_history(doc, pn, window, cx);
+}
+
 pub fn open_revision_history(doc: Entity<DocModel>, part_number: String, window: &mut Window, cx: &mut App) {
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();

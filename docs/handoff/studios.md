@@ -13,31 +13,31 @@ Updated 2026-11-19 21:20 UTC (new thread on another account, 21:00).
 
 ## In flight
 
-Worktree /root/projects/noshape-wt/studios, branch studios-0811a, on main. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2
+Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2
 tools/tiers/land.sh` (`--no-precheck` only when the code was clippy-checked unchanged); read `git diff --stat
 origin/main` first. Builds / tests on the lowest 1-min load of vibex7 / vibex8 / vibe2 (`NOSHAPE_RB_HOST=… tools/tiers/rb.sh`;
-`awk` the load, the hosts alias `cut`). rb.sh skips a file edited during a running sync: `touch` edited files before
-the next run. Run the full ops e2e before any drawing land.
-- Uncommitted: Replicate region onto a view of another shape maps each point by its place in the view's box and
-  ignores the click (live2 replicate-rule-1119; live 651's View-mode Top→Front fits the same rule): `reshaped` in
-  `replicate_into` (crates/scene/src/drawing_tools/replicate.rs), `Replication::src_box`; e2e
-  `a_region_replicated_onto_another_view_keeps_its_place_in_the_view_box`. Testing on vibex8
-  (/root/studios-scratch/logs/rep1.log), then the app + drw-view-replicate-region-place, drw-constraint-tangent,
-  drw-constraint-parallel with /root/studios-scratch/bin/x8app-uip.sh <out> <names…> (vibex8, slot, :391).
-- drw-constraint-tangent: live2's 18:29 retake (/root/live2-scratch/qa39/out, queued 60784916) equals the old take;
-  qa's failing run was on eb3b06a8, before 6055ccb5's ▾-label fix: confirm on the new build.
-- drw-revision-table-delete step 8 wait 1000 -> 3000 ms (live drew the deleted table 1 s late), retake asked.
-- Lead's ruling 11-19 on the not-target takes: retake on Pro what live can capture. Asked of live in REQUESTS
-  (21:02): drw-note-insert-drawing-property (drawing named "Part 1 Drawing 1"), part-/asm-menu-release(-workflows-off)
-  on Pro (Esc), drw-revision-table-delete, drw-canvas-zoom-to-sheet, drw-ref-pin-reference,
-  drw-inspection-table-iso-scrolled (with sheet points). Nothing left as a known difference yet.
-- interaction-feel rows 984 (note ruler ◁▷, f96abd03) and 999 (pinned columns, b5440871) set to "= to retake".
+read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edited during a running sync: `touch` edited files before
+the next run. Run the full ops e2e before any drawing land. A few app runs don't take ~/bin/slot (DECISIONS 11-15).
+- Queued 9d50ae60 (21:40): Replicate region onto a view of another shape keeps each point's place in the view's box
+  (`reshaped` in replicate_into; e2e a_region_replicated_onto_another_view_keeps_its_place_in_the_view_box).
+- Committed 4e9b50b9 (not queued): drawing Measure readouts as live measure-1119 (`measure_rows`, drawing_keys.rs;
+  empty click keeps the picks, another view's pick ignored; feel test). Open: line+circle, two circles, oblique
+  lines, a third pick: asked of live (REQUESTS ~22:00); ours guesses "Center distance" for the first two, no
+  Relation for oblique lines.
+- Uncommitted: the assembly instance list menu as live Pro (asm-menu-release 11-19): Where used… (in-document parts
+  too) and Revision history… (managed workflows) after Export…, no Release…; "Where used for <part>…" only in the
+  graphics menu; hook `open_part_revision_history` (release_dialog.rs, app main.rs). asm-menu-release retargeted to
+  Revision history… (retake asked); drw-inspection-table-iso-scrolled clicks now sheet_point (live's mapping). Tests
+  on vibex7 (/root/studios-scratch/logs/asm1.log). The pattern copy / nested occurrence menus still have Release…
+  (no Pro capture of them yet).
+- Scenario run on vibex8 (~/tmp/studios/rep1119, app of 9d5e1aa1): replicate-place, constraint-tangent / -parallel,
+  live's 8 Pro retakes (copied from /root/live-scratch/wt, queued 667ef537).
+- drw-revision-table-delete: ours after Delete lights an edge of Front under the still pointer (every rebuild calls
+  update_hover, drawing_view.rs:1362); compare with live's 3 s retake.
 
 ## Next, in order
-1. Land the replicate change (with the scenario result).
-2. On live's Pro retakes: compare, fix (the Release dialog's Esc if live ignores it).
-3. The drawing Measure readout of points / circles / pairs: asked of live (REQUESTS 11-19 21:06); then match.
-4. Then the feel rows below and the lead's queue (11-17).
+1. Land the assembly menu change and 4e9b50b9 with the scenario results.
+2. The remaining Measure pairs (live), then the feel rows below and the lead's queue (11-17).
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
 - live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell
@@ -119,7 +119,7 @@ asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182
 (~21:10); live2 (d7f4a0c2) lane 2. bool2 / live2 merged into bool / live (11-19). Older ids are dead.
 
 ## Waiting on others
-- live (349fe81d-db78-4931-8032-6dc3edc5d558; live2 stopped): the weld retake, the Measure picks (REQUESTS 21:06): the Pro retakes
+- live (349fe81d-db78-4931-8032-6dc3edc5d558; live2 stopped): the weld retake, the Measure pairs F-I, asm-menu-release: the Pro retakes
   (REQUESTS 21:02), the 8 drw-revision-* and drw-styles-dimension retakes; titleblock / holecallout / holetable /
   export-1119; the Feature Studio retake of f4e766b8.
 

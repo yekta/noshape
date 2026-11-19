@@ -1,6 +1,6 @@
 {
  "name": "asm-menu-release",
- "about": "Part 2's row menu: Release… opens; Esc.",
+ "about": "Part 2's row menu with managed workflows on: Revision history… opens (live Pro has no Release… there, 11-19); Esc.",
  "area": "asm",
  "source": "lead 11-06: assembly coverage, batch 3",
  "start": "two-blocks",
@@ -14,8 +14,13 @@
   {
    "do": "click",
    "on": {
-    "menu": "Release…"
+    "menu": "Revision history…"
    }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
   },
   {
    "do": "key",
