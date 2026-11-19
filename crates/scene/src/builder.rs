@@ -1893,13 +1893,21 @@ pub struct ConnectorGlyphs {
     /// Each glyph's pick id (none: unpickable): the whole disc takes the pointer, in its plane (an assembly's
     /// connectors: live 3d.json, a reach of 23 px across and 14 up and down at a tilt).
     picks: Vec<u32>,
+    /// Every part's opacity: a mate dialog's first pick 0.2 (live2 recheck-1119 asm2: its blue axis (183,146,71) over
+    /// the picked face's (229,183,37), full-strength (0,0,208)).
+    opacity: f32,
 }
 
 impl ConnectorGlyphs {
     /// Glyphs at frames `(origin, x, z)`, each with its look and pick id.
     pub fn picked(items: impl IntoIterator<Item = (DVec3, DVec3, DVec3, ConnectorLook, u32)>) -> Arc<Self> {
+        Self::faded(items, 1.0)
+    }
+
+    /// [`Self::picked`] at `opacity` (disc, rim and axes alike).
+    pub fn faded(items: impl IntoIterator<Item = (DVec3, DVec3, DVec3, ConnectorLook, u32)>, opacity: f32) -> Arc<Self> {
         let (items, picks) = items.into_iter().map(|(o, x, z, look, pick)| ((o, x, z.cross(x), z, look), pick)).unzip();
-        Arc::new(Self { items, picks })
+        Arc::new(Self { items, picks, opacity })
     }
 }
 
@@ -1965,13 +1973,14 @@ impl noshape_render::camera_geometry::CameraGeometry for ConnectorGlyphs {
                 ConnectorLook::Selected => MC_FILL_SELECTED,
             };
             let c = theme::lin(u32::from(rgb[0]) << 16 | u32::from(rgb[1]) << 8 | u32::from(rgb[2]));
-            out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([c[0], c[1], c[2], alpha]).unlit().unpickable().ignore_clip().on_top().layer(30));
+            out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([c[0], c[1], c[2], alpha * self.opacity]).unlit().unpickable().ignore_clip().on_top().layer(30));
             if let Some(&pick) = self.picks.get(i).filter(|p| **p != 0) {
                 out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&pick_disc(o, x, y, z, ro, pick)))).pick_only().ignore_clip().on_top().layer(30));
             }
             // Outline: outer circle, the inner circle outside the wedge, the
             // wedge's two sides.
-            let rim = if look == ConnectorLook::Rest { MC_RIM_REST } else { MC_RIM_LIT };
+            let fade = |[r, g, b, a]: [u8; 4]| [r, g, b, (f32::from(a) * self.opacity).round() as u8];
+            let rim = fade(if look == ConnectorLook::Rest { MC_RIM_REST } else { MC_RIM_LIT });
             let mut l = LineData::default();
             let outer: Vec<[f32; 3]> = (0..=n).map(|k| f(at(ro, ang(k)))).collect();
             let inner: Vec<[f32; 3]> = (n / 4..=n).map(|k| f(at(ri, ang(k)))).collect();
@@ -1980,7 +1989,7 @@ impl noshape_render::camera_geometry::CameraGeometry for ConnectorGlyphs {
             l.push_polyline(&[f(o), f(at(ro, 0.0))], rim, 0, MC_RIM_PX, LineSegment::ON_TOP);
             l.push_polyline(&[f(o), f(at(ro, std::f64::consts::FRAC_PI_2))], rim, 0, MC_RIM_PX, LineSegment::ON_TOP);
             // Axes: Z up from the centre, X / Y ticks outside the ring.
-            let axis = |hex: u32| theme::rgb8(hex);
+            let axis = |hex: u32| fade(theme::rgb8(hex));
             l.push_polyline(&[f(o), f(o + z * (18.0 * px))], axis(theme::pick(theme::viewport::AXIS_Z, theme::viewport_dark::AXIS_Z)), 0, 3.0, LineSegment::ON_TOP);
             l.push_polyline(&[f(o + x * (19.5 * px)), f(o + x * (29.0 * px))], axis(theme::pick(theme::viewport::AXIS_X, theme::viewport_dark::AXIS_X)), 0, 2.5, LineSegment::ON_TOP);
             l.push_polyline(&[f(o + y * (19.5 * px)), f(o + y * (29.0 * px))], axis(theme::pick(theme::viewport::AXIS_Y, theme::viewport_dark::AXIS_Y)), 0, 2.5, LineSegment::ON_TOP);
@@ -2040,7 +2049,7 @@ fn sketch_curve_style(c: &noshape_model::display::SketchCurveDisplay, editing: b
 /// pointer, as in an assembly (live hover-pick-1120: 22 px across, 13–14 up and down in the iso view).
 pub fn connector_glyphs(display: &StudioDisplay, lit: impl Fn(&Reference) -> ConnectorLook, pick: impl Fn(&Reference) -> u32) -> Option<Arc<ConnectorGlyphs>> {
     let (items, picks): (Vec<_>, Vec<_>) = display.connectors.iter().map(|c| ((c.origin, c.x, c.z.cross(c.x), c.z, lit(&c.reference)), pick(&c.reference))).unzip();
-    (!items.is_empty()).then(|| Arc::new(ConnectorGlyphs { items, picks }))
+    (!items.is_empty()).then(|| Arc::new(ConnectorGlyphs { items, picks, opacity: 1.0 }))
 }
 
 /// Mate connector inference while hovering (live behaviours 1327, 33725, psui/hole-mc-1851/4): the hovered
@@ -2084,7 +2093,7 @@ impl InferenceMarks {
                 marks.push(m);
             }
         }
-        Arc::new(Self { marks, glyph: ConnectorGlyphs { items, picks: Vec::new() } })
+        Arc::new(Self { marks, glyph: ConnectorGlyphs { items, picks: Vec::new(), opacity: 1.0 } })
     }
 }
 
@@ -2352,7 +2361,7 @@ mod connector_zoom_tests {
     #[test]
     fn connector_glyph_extent_counts_for_the_zoom_limits() {
         let o = DVec3::new(0.0, 0.0, 0.01);
-        let glyphs = ConnectorGlyphs { items: vec![(o, DVec3::X, DVec3::Y, DVec3::Z, ConnectorLook::Rest)], picks: Vec::new() };
+        let glyphs = ConnectorGlyphs { items: vec![(o, DVec3::X, DVec3::Y, DVec3::Z, ConnectorLook::Rest)], picks: Vec::new(), opacity: 1.0 };
         let view = View { camera: Default::default(), size: DVec2::new(1200.0, 800.0) };
         let px = view.world_per_px(o).unwrap();
         let pts = glyphs.zoom_points(&view);

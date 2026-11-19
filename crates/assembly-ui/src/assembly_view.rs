@@ -181,6 +181,8 @@ pub fn bind_keys(cx: &mut App) {
 /// W's prompt while the zoom-window mode is armed (live keys-1118, as the Part Studio's).
 const ZOOM_WINDOW_PROMPT: &str = "Drag to create zoom bounding box.";
 const INFERENCE_PICK_RADIUS_PX: f64 = 47.5;
+/// A mate dialog's first-picked connector, faded (live2 recheck-1119 asm2: alpha 0.20 on all three channels).
+const FIRST_PICK_OPACITY: f32 = 0.2;
 const EDGE_END_PICK_RADIUS_PX: f64 = 15.0;
 const RELATION_KINDS: [RelationType; 4] = [RelationType::Gear, RelationType::RackAndPinion, RelationType::Screw, RelationType::Linear];
 
@@ -1458,23 +1460,25 @@ impl AssemblyView {
         self.ui.overlay_mates = overlay_mates;
         // Dialog connectors + inference preview.
         let mut chosen: Vec<MateConnectorRef> = Vec::new();
-        // A mate dialog's first pick alone: its connector's disc, not the triad, and its whole instance outlined (live2
-        // asm-dialogs-1119 hz row 2).
+        // A mate dialog's first pick alone: its connector at 20 % (disc and axes), its entity selected yellow and its
+        // whole instance outlined (live2 asm-dialogs-1119 hz row 2, recheck-1119 asm2 (2)).
         let mut first_pick: Vec<Frame> = Vec::new();
         if let Some(s) = &self.mate {
             let d = s.dialog.read(cx);
-            // A hovered chip's entity, yellow-green (live2 asm-dialogs-1119 chip).
-            if let Some(c) = d.hovered_field.and_then(|f| d.slots().get(f).cloned().flatten()) {
-                let entity = match &c.reference {
-                    Reference::Implicit { on, .. } if matches!(**on, Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_)) => Some((**on).clone()),
-                    r @ (Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_)) => Some(r.clone()),
-                    _ => None,
+            // The entity a connector sits on, with its instance path.
+            let entity_of = |c: &MateConnectorRef| {
+                let e = match &c.reference {
+                    Reference::Implicit { on, .. } if matches!(**on, Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_)) => (**on).clone(),
+                    r @ (Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_)) => r.clone(),
+                    _ => return None,
                 };
-                if let Some(e) = entity {
-                    let mut path = vec![c.instance];
-                    path.extend(c.path.iter().copied());
-                    h.query_entities.push((path, e));
-                }
+                let mut path = vec![c.instance];
+                path.extend(c.path.iter().copied());
+                Some((path, e))
+            };
+            // A hovered chip's entity, yellow-green (live2 asm-dialogs-1119 chip).
+            if let Some(e) = d.hovered_field.and_then(|f| d.slots().get(f).cloned().flatten()).and_then(|c| entity_of(&c)) {
+                h.query_entities.push(e);
             }
             match d.connectors().as_slice() {
                 [c] if !d.connectors_complete() => {
@@ -1482,6 +1486,7 @@ impl AssemblyView {
                     if !c.is_origin() {
                         h.hover_tops.push(c.instance);
                     }
+                    h.selected_entities.extend(entity_of(c));
                 }
                 cs => chosen.extend(cs.iter().map(|c| (*c).clone())),
             }
@@ -1613,7 +1618,7 @@ impl AssemblyView {
         self.overlay_sig = sig;
         // Live 3d.json explicit_mate_connector: the 36 px disc of the Part Studio's connectors, its pick the disc.
         let first_pick: Option<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = (!first_pick.is_empty()).then(|| {
-            crate::scene_builder::ConnectorGlyphs::picked(first_pick.iter().map(|f| (f.origin, f.x(), f.z(), crate::scene_builder::ConnectorLook::Rest, 0))) as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>
+            crate::scene_builder::ConnectorGlyphs::faded(first_pick.iter().map(|f| (f.origin, f.x(), f.z(), crate::scene_builder::ConnectorLook::Rest, 0)), FIRST_PICK_OPACITY) as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>
         });
         let connector_glyphs: Option<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = (!h.connectors.is_empty()).then(|| {
             let items = h.connectors.iter().enumerate().map(|(i, (f, _, hl, _))| {

@@ -501,7 +501,7 @@ fn frame_pixels(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<
 }
 
 /// Live2 asm-dialogs-1119 hz: with the mate dialog open, a hovered face's corner dots are filled white (the disc lost
-/// to the face's depth: hollow rings); after the first pick the connector's instance is outlined.
+/// to the face's depth: hollow rings); after the first pick the connector's instance is outlined and its face selected.
 #[gpui::test]
 fn a_mate_dialogs_dots_are_white_and_the_first_pick_outlines_its_instance(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
@@ -561,4 +561,11 @@ fn a_mate_dialogs_dots_are_white_and_the_first_pick_outlines_its_instance(cx: &m
     move_to(cx, window, &view, on_top + DVec2::new(400.0, 200.0));
     settle(cx, window, &view);
     assert!(cx.update(|cx| view.read(cx).viewport.read(cx).scene().hover_outline), "its instance outlined");
+    // Live2 recheck-1119 asm2 (2): the picked face stays filled yellow with the pointer away (its connector at 20 %).
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let (scene, built) = (v.viewport.read(cx).scene(), v.built.as_ref().unwrap());
+        let selected = (1..scene.states.len() as u32).filter(|id| scene.states[*id as usize] & noshape_render::state::SELECTED != 0 && built.picks.get(*id).is_some_and(|t| t.kind == crate::scene_builder::PickKind::Face)).count();
+        assert_eq!(selected, 1, "the picked face selected");
+    });
 }
