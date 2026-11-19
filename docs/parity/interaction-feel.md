@@ -1595,15 +1595,15 @@ Evidence: live/feel/sketch-tools-1119/ (shots, sketch1-constraints.json); ours /
 | Line, press-drag | one segment from the press to the release (dashed preview with its length while held), then the chain ends: no rubber band after the release, the tool stays; first moved frame 6 ms | the same | = |
 | Line, double-click | ends a click-click chain at that point: the segment to it is made, no rubber band follows, the tool stays | the same | = |
 | Line, press-drag from the chain's last end | no tangent arc: the drag only moves the rubber band, the release adds no point, the chain goes on from the same end | the same | = |
-| Line chain: a second segment square to the first | COINCIDENT + PERPENDICULAR to the previous segment, no VERTICAL (H on the first) | VERTICAL, no PERPENDICULAR | ≠ [skasm] |
-| A lone vertical line drawn across a horizontal line (end landing on it) | VERTICAL + COINCIDENT (on the line), no PERPENDICULAR | PERPENDICULAR to the crossed line + COINCIDENT, no VERTICAL | ≠ [skasm] |
+| Line chain: a second segment square to the first | COINCIDENT + PERPENDICULAR to the previous segment, no VERTICAL (H on the first) | the same (fixed 11-19, `square_to_a_held_line_is_perpendicular`) | = |
+| A lone vertical line drawn across a horizontal line (end landing on it) | VERTICAL + COINCIDENT (on the line), no PERPENDICULAR | the same (fixed 11-19; a line crossing a held line, both ends clear, stays Perpendicular, live 1866 (e)) | = |
 | Corner rectangle (g): click-click or press-drag | both make it; light-blue preview with its width above and height left; made: 4 corner COINCIDENT, PARALLEL × 2, PERPENDICULAR (top–left), HORIZONTAL (top), the width's value box shown; first frame after the first corner 6 ms | the same (corners share points) | = |
 | Centre point rectangle (r) | the same set plus a construction centre point with two MIDPOINT (each diagonal's corners) | the same | = |
 | Esc after the first corner / the circle's centre | nothing is made and the tool ends (toolbar button off) | the same | = |
 | Circle (c): click-click or press-drag | both make it; Ø label left of it while drawn, the Ø value box after; no constraint; a radius point at a line's height takes TANGENT to the line even 150 mm past its end | the same | = |
 | Tangent arc: where it can start | only on a curve's end: the end lights 8 px straight off it (not 10), 7 px diagonally (not 9), not 8 px past it along the line; a click outside starts nothing | 6 px yes, 8 no (the point square) | ≈ (1–2 px) |
-| Tangent arc: made | R label while drawn, then COINCIDENT + TANGENT and the R box; the tool stays but nothing follows the pointer: the next arc needs a new start click on an end | a new tangent arc starts at once from the arc's end and follows the pointer | ≠ [skasm] |
-| Tangent arc preview | a smooth arc | a coarse polyline (about 5 straight pieces), also the next arc | ≠ [skasm] |
+| Tangent arc: made | R label while drawn, then COINCIDENT + TANGENT and the R box; the tool stays but nothing follows the pointer: the next arc needs a new start click on an end | the same (fixed 11-19, `a_tangent_arc_ends_its_run_and_previews_smoothly`; a Line chain's Shift+A arc still goes on) | = |
+| Tangent arc preview | a smooth arc | the same (fixed 11-19: within 0.05 px of the arc) | = |
 | Dimension: the placement click | the value box (palette) opens 494 ms after the click (first frame 14 ms), the value selected; Enter applies (frame 48 ms), the tool stays | the same box, the value selected, open 120–180 ms after the click (60 fps recording); Enter closes it within a frame and applies (about 80 ms later) | = (ours faster) |
 | Dimension: press on a line and drag | nothing: no preview, no box, no dimension on release | the same | = |
 | Trim, a drag from empty space | a thin grey trail from the press; each piece goes the moment the trail crosses it (mid-drag, not on release); first trail frame 6 ms | the same | = |
