@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 19:38 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 20:29 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Next (lead 19:3x): welding 9c7704 Extrude 8's part order (core handed it; asm's asm-bom 9f52415c has the BOM evidence)
@@ -24,15 +24,13 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - vertical-key: ours puts (3, 30) at (+64, -45) px from the start, live (+61, -42): our default camera differs a little
   (7.47 px off plumb vs live's 7.78, reach 7.5). Camera = psui's.
 - bend-relief x3 (lead 18:0x: go; land after SM matrix + suite, no document worse; stop and tell the lead if a
-  capture contradicts): QUEUED 2b72c4eb (suite J vibex7 95/126, 1354/1585; per document vs I only
-  overcut-dogbone 2 -> 10, vibe2's model copy). A face a sheet metal rebuild exposes for the first time (on no face of the part
-  before: `keep_names` left it fresh) is named Face{creator, Generated(fresh)}, the creator its definition source's
-  (`definition_creator`: a wall's creator; a bend's / vertex's, the later of its walls' by the Part Studio order,
-  `CtxState::feature_order` from `Features::order`). sm-box's 2x2 face comes from Flange 1's bend edge -> Flange 1
-  (live2 brv-flat.json). T2 `a_face_a_later_flange_exposes_keeps_its_walls_creator`; SM 100/100, matrix 17/17,
-  custom 16, clippy clean. Running: suite J on vibex7 (/root/skasm-scratch/suitej.out; compare per document with
-  suite I, vibe2 ~/agents/skasm-keep/suite-I-1119-1600.log), the 19 sheet metal ui-parity scenarios on vibex8
-  (feel5.sh). Captures for the rule: REQUESTS "skasm (2026-11-19 18:10 UTC)" (cases A-C, live / live2 at 21:00).
+  capture contradicts): 2b72c4eb FAILED in the queue (ops e2e a_bends_second_edit_and_its_rip_reuse_its_modify_joint:
+  a radius edit's re-made bend face went to the Flange, the Modify joint wasn't found). Fixed forward 643d96753: an
+  exposed face (fresh after `keep_names`) takes its definition source's creator (`definition_creator`; a bend's /
+  vertex's the later of its walls' by `CtxState::feature_order`) only beside a face that source kept. SM 100/100, ops
+  e2e 259, matrix 17/17. Running: suite K on vibex7 (/root/skasm-scratch/suitek.out; compare per document with J,
+  vibex7 ~/agents/skasm-keep/suite-J-1119-1831.log), SM ui-parity on vibex8 (feel5.sh). Then land.sh (carries the
+  matrix / UI test commits c037340a, 015418cc, ac537f94, 6aba85b6). Captures for the rule: REQUESTS 18:10 (A-C).
 - LANDED bb4585b8 as 9a872f69: the 5 feel rows above. Open feel rows: vertical-key (camera, psui's); stale
   trim / dimension-variable takes (live2 / qa retaking).
 - LANDED 5bd05e2f as 575aba2a: rocker-enclosure-sm (translator + host). Suite I 94/126, 1346/1585, none worse than G.
