@@ -22,6 +22,9 @@ the Mac; ui-parity on vibex7 / vibe2 via ~/bin/slot (vibex6 = watcher), one run 
   Enter, Configurations box, release notice / Submit tooltip, session-1118 14a/b, toolbar tooltip redraw, shortcuts-1118).
 - Queued 11-19: live2 wake-1118: woken points while placing a GTOL / note (red ✕ stays, lines up 8 px not 12, only
   woken points; INFER_REACH_PX 8.5), crop ✕ + line only in line with the first point (8 px), Measure units dropdown.
+- Queued 11-19 01:46 d9d1942f: Versions row tooltip beside the panel (HISTFEEL-CHANGE-TOOLTIP); tickets HISTFEEL /
+  VSFEEL / CFGFEEL / DRW-TOOLBAR-TOOLTIP-DELAY marked fixed, qa told to verify.
+- Asked live2 (REQUESTS 11-19): Measure units on a mm drawing; custom feature ✓ with an error.
 - fs1118b (vibex7 22:38 build): 116/116 scenarios, 602/602 states.
 - drw1118g (vibex7, 11-18 21:5x): 336/341; the rest are the known non-targets below and two with no recording
   (drw-break-view-straight, drw-broken-out-offset). Running: fs-* rerun with the ui_busy wait (fs1118b, vibex7).
@@ -81,8 +84,8 @@ the Mac; ui-parity on vibex7 / vibe2 via ~/bin/slot (vibex6 = watcher), one run 
 - live2 custom features (behaviours "studios (lead 11-18 ~01:53, feel): custom features", live/studios/
   custom-feature-1118/): dialog rows, conditional field, red title / pink field: ours already (test
   a_custom_features_dialog_is_generated_and_fails_as_live). Left: ✓ is pale in both while the error names a number
-  field, live2 says a click still commits (ours: disabled; the hem capture said off): ask live2 to confirm. FS save ->
-  Part Studio regenerates by itself ~1.1 s, an open dialog does NOT relabel: check ours.
+  field, live2 says a click still commits (ours: disabled; the hem capture said off): asked in REQUESTS 11-19 01:46.
+  FS save -> Part Studio regenerates, an open dialog keeps its labels: ours already (tested).
 - live VS / FS (live/studios/vs-fs-feel-1117/): VS add-row focus to the next Name, duplicate -> "w_0"; FS
   autocomplete Enter inserts, Tab closes + inserts a tab, Esc keeps text; FS errors while typing (<0.5 s) red x at
   gutter line 1 + squiggle, Ctrl/Cmd+S commits, Commit pales, a fixed error greys ~150 ms, gone ~500 ms. VSFEEL bubble:
@@ -135,7 +138,7 @@ Builds and crate tests on the Mac:
 - `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh cargo test -p <crate> --lib <filter> > log 2>&1`, then grep the log for
   `^test |panicked|test result|^error|  left|  right`. Never pipe into `head`: the kernel's and vendor's warnings
   fill it.
-- The Mac target (~/agents/studios/target there) must stay under 20 GB (lead 11-15: the Mac folder's cap is 180 GB).
+- The Mac target (~/noshape-host/agents/studios/target there; env ~/noshape-host/env.sh, lead 11-19) must stay under 20 GB (lead 11-15: the Mac folder's cap is 180 GB).
   tools/tiers/prune-target.py reads /proc and fails on macOS, so between builds delete target/debug/deps
   and target/debug/incremental (16 of 24 GB on 11-16) once `du -sh` passes ~15 GB.
 
