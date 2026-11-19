@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-18 20:12 UTC. Hosts (lead 11-18): builds + probes on the Mac (NOSHAPE_RB_HOST=mac), gates on vibex7
+Updated 11-19 00:20 UTC. Hosts (lead 11-18): builds + probes on the Mac (NOSHAPE_RB_HOST=mac), gates on vibex7
 (NOSHAPE_GATE_HOST=vibex7 via /root/bool-scratch/gate-chain-own.sh <sha> as a systemd-run unit; off 02:00-04:00);
 land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs vibex7 ~/lead-private (hat8, hat15, hat15b,
 AppleWatchDock). Never kill a process tree from a computed pid: `systemctl stop <unit>`; kill only own pids > 1.
@@ -25,8 +25,22 @@ live (e8549719) captures at feature level ("bool truth (11-18)" in behaviours.md
 Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are internal Booleans (no live analogue).
 
 ## In flight
-- GATE unit bool-gate-d7721f84a on vibex7 (19:53) -> /root/bool-hat-scratch/chain-d7721f84a.out; wait:
-  /root/bool-scratch/gate-wait.sh. bool-hat (branch bool-shared2) on main 57e701c03: the commits below + d04c232c8
+- GATE unit bool-gate-a6a83073f on vibex7 (23:14; slot queue, branch build 00:09) -> /root/bool-hat-scratch/chain-a6a83073f.out;
+  wait task gate-wait.sh. = the stack below + a6a83073f, the spur-gear P0 fix (qa's bisect named afe2cbe90: the free
+  grid's fold test ran on every face; now lazy, only on a long thin strip; CPU over the 8 Spur Gear Booleans 6.3 -> 5.33
+  s Mac, = before afe2cbe90; results identical). On land: tell qa (qa-sg-fixwait re-times on subject "fold") + lead.
+- NEXT GATE after it (lead: spur first): bool-hat bool-shared2 = a6a83073f + 6 wire-clip layers: c494ed1c6 coaxial
+  cylinders by OCCT's rule, edb18e819 seam arc slightly off axis, 902861ae1 lies_on, 171c911f6 narrow coincident strip,
+  efe97ef34 cylinder piece's other points first, b3dcbb078 fuse piece on faces not found coincident is covered by them.
+  Mac replay vs a6a83073f: all corpora same statuses (shfall +1 equivalent). c2-wire-clip/gamma Boolean 2 (6f38f, 23
+  tools) ours 128 vs OCCT 444 ms Mac: 945/2879 vs OCCT 946/2880 (OCCT's extra face: a 2.5 x 50 um sliver where two
+  parts' r4 corners overlap 50 um, 2.5 um apart); live 884/2405. Lead 00:15: lands as a gate exception for 6f38f only
+  if live's capture (asked 00:10, -> live/bool/wire-clip-sliver.txt) shows no such face; record it in the gate's
+  exception list with the path. Then flag live's 884 vs our 945 faces to core (merging / construction).
+  Boolean 1 (882bad, 87 tools) is SUPPRESSED in live: no document value. Its declines: tangency tests use the Boolean's
+  max input tolerance (4.9 um from one imported part) not the pair's faces' (OCCT's rule); pair version
+  /root/bool-scratch/touch-dbg.diff (DBGTOUCH) fixes 2 of 3 clusters, replay-neutral; parked.
+- Older stack (in the gate above): bool-hat (branch bool-shared2) on main 57e701c03: the commits below + d04c232c8
   (pattern checked glue reaching in -> plain fuse at once; impeller Bohrungssitz Ansaugflansch 1000 -> 295 ms Mac) +
   8086f188b (offset_grazes_a_circle only within 1 um of the radius: parity56) + 619037c8c (a union that lost its
   biggest argument's body: fuzzy retry, else error, never Ok: core's walls) + 123e6b177 (Shell's tangent-extension try
