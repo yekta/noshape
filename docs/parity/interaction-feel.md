@@ -1462,13 +1462,6 @@ Ctrl+V on, which doesn't change the keys after it.
 | ` Select other | the Select other box "(No selections found)" at the pointer | the same (fixed 11-19) | = |
 | Shift+V Named views | the sketch closes (Part Studio toolbar back) and the Named views box opens | the same (fixed 11-19, the sketch kept as ✓) | = |
 | C, R, G, L, A, Shift+A, Shift+S (a draw tool from the key, pointer still) | nothing drawn at the pointer until it moves | the same (fixed 11-19, `a_draw_tool_from_its_key_draws_nothing_until_the_pointer_moves`) | = |
-| Shift+C Curve/surface analysis | "Edge of Sketch 2" in the field, the line drawn orange, "Length: 36.856 mm" at the bottom right | the same field; the line stays blue, no length | ≠ [psui] |
-| Ctrl+M | nothing; the sketch stays open | closes the sketch and opens Mate connector 1 | ≠ [skasm] |
-| Shift+N Rename | the sketch dialog's name becomes an edit box with "Sketch 2" selected | nothing | ≠ [skasm] |
-| Shift+X Section view | the Section view dialog over the sketch (the sketch dialog greyed behind it) | nothing | ≠ [skasm] |
-| ` Select other | the Select other box "(No selections found)" at the pointer | nothing | ≠ [skasm] |
-| Shift+V Named views | the sketch closes (Part Studio toolbar back) and the Named views box opens | the Named views box opens over the sketch dialog; the sketch stays open | ≠ [skasm] |
-| C, R, G, L, A, Shift+A, Shift+S (a draw tool from the key, pointer still) | nothing drawn at the pointer until it moves | a blue dot at the resting pointer | ≠ [skasm] |
 | Shift+C Curve/surface analysis | "Edge of Sketch 2" in the field, the line drawn orange, "Length: 36.856 mm" at the bottom right | the same field; the line stayed blue, no length; fixed psui 11-19: the analysed curves are selected in the sketch (orange, the readout), as any sketch selection (live sketch-readout-1119) | = (test curve_analysis_in_a_sketch_selects_the_analysed_line) |
 | The rest: views 1–7, arrows, Shift / Ctrl / Ctrl+Shift arrows, Z / Shift+Z / F / W / N, constraints (I, Shift+O, E, H, V, B, Shift+L, Shift+K, T, Shift+M, Shift+Q, Shift+G, Shift+J), D, X, M, O, U, Q, Shift+A, Shift+U, Shift+F, S mini toolbar, Shift+E / Shift+W (close the sketch, open the feature), Shift+D, [, Shift+R, Shift+P / P / Shift+H / K / Y / Shift+Y / Shift+I / Shift+T, Delete / Backspace, Space, Ctrl+C | the same | = |
 

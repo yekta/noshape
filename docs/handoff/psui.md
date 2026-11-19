@@ -35,7 +35,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (updated 02:16 UTC 11-19)
+## Now (updated 02:27 UTC 11-19)
+
+0. a46fd345's land check showed planar_face_mesh::the_checks_catch_a_triangle_turned_over_or_across_a_hole failing:
+   mesh_pixels flipped `set_rust_mesh_everywhere` (all threads) while it ran. Fixed in ff75f1a27 (BRepMesh meshes
+   made on the test's own thread; the T2 triangle-count test too). If a46fd345 FAILS: rebase on origin/main and queue
+   the whole stack (a46 + ada54f008 + ff75f1a27) as ONE land. If it LANDS: queue ada54f008 + ff75f1a27.
 
 1. Queued 00:4x as a46fd345 (6 commits, one land): view cube hold ≥ 490 ms no click; Transform ghost; Hole callout
    leader 14 px, glyphs `on_top`; tooltips wrap 400 px; hidden sketch eye on hover; configuration names spreadsheet
