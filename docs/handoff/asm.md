@@ -5,59 +5,61 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-19 01:58 UTC)
+## State (2026-11-19 04:19 UTC)
 
 ### Landed 11-18 / 11-19
-- Nested flexible step 1 0fd15c9a2, step 2 a1f3a7933 (paths from the top-level instance as keys; xdev-subs unchanged).
-- d9ed9fc8a translator sliver guard (tvc-mount 12/12 mates; the drop was my df22f92c mapping, not the model).
-- f4de8cf5 stack: live2 shortcuts-1118 keys (high quality bar shared as os_ui::high_quality_bar, W prompt, N, Shift+P
-  origin ring + dot, Ctrl+C / Ctrl+V, Shift+S, Isolate clears the selection), mate row double-click, face entry
-  centroid, error flyout / faded red / lost ! badge, error-wording rows.
-- d12e3025 translator: a live part nothing of ours fits takes its feature's own body, a sliver too (asm-suspension's
-  Knuckle <1>, uninserted since d9ed9fc8a: 805e29's Fillet 3 / 4 fail; suspension 25/28, 8/8, 21/21 on vibex8).
+- Nested flexible step 1 0fd15c9a2, step 2 a1f3a7933 (paths from the top-level instance as keys).
+- d9ed9fc8a translator sliver guard; d12e3025 a live part nothing of ours fits takes its feature's own body
+  (asm-suspension Knuckle <1>: 25/28, 8/8, 21/21).
+- f4de8cf5 live2 shortcuts-1118 keys stack; 7599cd64 qa session-asm-1119 (a new mate's type switch takes that
+  type's next name, Esc on an insertion offers Restore, ui_script markers for Insert rows / search, limit fields,
+  exploded Done).
+- c75f1894 config-assembly BOM: PartStudio::standard_content on the translator's copies of std studios; the BOM's
+  feature-property fallback skips them (12/12 on vibex8).
+
+### Queued / in flight
+- fd0740e4 (asm-feel, branch asm-err1119): live2 errors-1119 rows (error flyout bold title / width / grey field
+  values, list rows full width so the flyout opens at the list's edge, fixed ⚠ on the fixed and root icons with
+  live's bubble, crossed limits disable ✓ / Enter + field tooltip, inactive mate italic only, "(Suppressed)" tooltip,
+  Insert leaves out empty studios + "No Part Studios match current search."), Select other's reach (edge 8 px, the
+  face behind 11 px; live selother-ball-1119; app-core Viewport::pick_at_pointer_within). 86/86 assembly-ui.
+- asm worktree, branch asm-live1119 (not queued): translator keeps a sketch solve that lands on live's probed
+  sketch vertices (bjr's std screw 5b44a0 / nut bfc58c: #Length / #HexSize were taken back -> Revolve 2 missed,
+  Fillet 1 no edges, Washer Face non-manifold). Test passes; bjr run with it queued on vibex8 (ops-probe ->
+  asm-keep/bjr-probe.out). Land if the std studios' differences go and nothing else moves. Note for the lead: the
+  rule also applies to Part Studio corpora with probe sketches.json (only toward live's vertices).
 
 ### Runs
-- Night run tag c 02:00 on vibex8 (lead: vibex8 via slot), held by the local unit asm-night-vibex8 (ssh): ops-stack =
-  main at d12e3025, ops-mainbase = 11:35 main; pair/{mainbase,stack}-c.log, done-c. vibe2's copy stopped.
-- Light 20 pair tag m19 on vibe2 (same binaries): pair/{mainbase,stack}-m19.log, done-m19. First 6: corexy 21 -> 22/22
-  mates; config-assembly BOM 12 -> 10/12 (below); the rest equal.
-- Traced isaac-ball queued after m19 on vibe2 (isaac-m19.out).
-- xDev drag: solve 0.3 ms / step, scene 0.4 ms, release re-eval 76 ms (headless): the 13.3 s is the frame (psui).
+- Night run tag c on vibex8 (asm-night-vibex8 unit, ssh-held): xdev-subs 244 -> 266/266 occ, BOM 58 -> 74/74 on the
+  stack; isaac-ball, infento-subs, scissor-lift running. pair/{mainbase,stack}-c.log, done-c.
+- Light 20 pair m19 on vibe2 (slow, load 25): 9 / 8 of 20 done; corexy 21 -> 22 mates; config-assembly 12 -> 10 BOM
+  (fixed by c75f1894). Traced isaac-ball queued after it (isaac-m19.out); the night run's isaac comes first.
 
 ### Open (mine)
-- config-assembly BOM: a8dedfc1's feature-property fallback fills the std nuts' Description from their library Feature
-  Studio's setProperty (live's BOM: empty for standard content; bjr OPG006's custom feature: shown). Only the translator's
-  copies of std studios hit it (BomSource::Part); the app's std content is BomSource::Standard. Needs a mark on translated
-  std parts (or inserting them as standard content), not done.
-- isaac-ball mates (11-18 02:59 data, before the live-point fallback): CAP_EDGE / SWEPT_FACE connectors name sketch
-  curves the studio no longer has (a2e4a2 Sketch 5 has no 9MZ2WnAZbZgZ): a stale query live resolves by history; ours
-  should fall back to live's connector point. "overdefines" Ball 3-6 etc. are on loops with "not consistent" Fastened
-  whose connectors are 2-26 mm off live's (model). Confirm and rank with the traced run.
-- bjr std studios 5b44a0 Revolve 2 / Fillet 1, bfc58c chamfers / Washer Face: their sketches were fetched at the default
-  configuration (live 22:35) while bjr uses other sizes: likely the corpus copy, not the model. Occurrences 137/137.
+- isaac-ball connectors (CAP_EDGE / SWEPT_FACE stale queries fall back to live's connector point; INTERSECT and
+  edge centres): confirm and rank from the night run's / traced output, fix translator ones with T1 tests.
+- Ctrl+V's see-through: which instance is translucent in live (REQUESTS 11-19 03:29 to live2); ours draws the copy
+  orange and opaque.
+- asm-suspension Cap <2> / Cup <1>: live can't resolve them either (live 11-19: no Cap / Cup in 995636 at that
+  microversion; red rows "Failed to resolve instance.", mates Cup distance / Fastened 1 red). Already scored as live
+  defects; the rebuild leaves them out instead of inserting them unresolved (cosmetic).
+- bjr by-configuration data (live 11-19): studios/<eid>.sketches-by-config.json, feature states + volumes per instance
+  configuration (5b44a0: 36.578 / 75.091 / 148.443 mm³; bfc58c 50.064 mm³): use to check our instances' volumes.
 
-### Others' items (sent 11-18)
-- bjr std studios (configs added by live 22:35): 5b44a0 Fillet 1 "Select edges or faces to fillet.", bfc58c Washer Face
-  non-manifold: model side, not yet routed.
-- robot-relations BOM 36/42: 0c3466 Import 1 makes 6 sheet parts in live, ours sews one 171987 mm³ solid (dx, via lead).
-- suspension: 805e29 Sketch 2 fixed (skasm 7a8ca3b2 on main); Fillet 3 / 4 are core's B-spline edges;
-  995636 Fillet 3 from core's lopsided Loft 1 (blend -> core). Rerun suspension when they land. Cap <2> / Cup <1>:
-  empty partIds in live's data.
-- pattern-std BOM 13/17: Linear pattern 5 is ERROR in live -> the scorer rule covers it; confirm in the night run.
-- welding-config 9c7704 Part 5 = live Part 5 + 6 -> core (lead). scissor-lift Top <3>: fed22d fillets/holes (model side).
-- psui: Coarse level for big assemblies (assembly_open refine pass + eval best_occ); psui edits eval.rs and
-  assembly_open.rs, I agreed (keep best_tessellation Fine and the mesh sharing test at assembly_open :445).
+### Others' items
+- suspension Body / Joint / Lower Control Arm: core's B-spline / r40 offsets (Fillet 3 / 4 of 805e29, 995636 Loft 1).
+- robot-relations BOM 36/42 (dx: live's own re-import makes one faulty solid). pattern-std BOM 13/17 (Linear pattern
+  5 ERROR in live: scorer rule). welding-config Part 5 (core). scissor-lift Top <3> (model side).
+- psui: Coarse level for big assemblies (eval best_occ, assembly_open refine): agreed, theirs.
 
 ### Open asks
-- live2: REQUESTS 17:02 Select other + triad ball reach (pending).
 - Decision pending with the lead: Insert from a release (▲) for local documents (live shows it on company docs only).
 
 ### Next, in order
-1. Report m19 to the lead when done-m19 appears (short); then the traced isaac-ball run: confirm and rank the
-   connector cases (live-point fallback, INTERSECT, edge centres), fix the translator ones with T1 tests.
-2. Night run tag c results (vibex8): infento-subs' occurrences and isaac-ball's mates first.
-3. live2's assembly rows as they arrive (feel first); REQUESTS 11-19 01:22 (H with a hover, Ctrl+V see-through).
-4. config-assembly's std nut Description (above).
+1. Report fd0740e4 when it lands; bjr probe result -> land asm-live1119 or fix.
+2. isaac-ball connectors from the night run (vibex8 pair-c) / traced run.
+3. m19 short report; night run c results (infento-subs occurrences, isaac mates).
+4. live2's answer on Ctrl+V; then the paste look.
 
 ## Scores (last measured, stack / main 11-18)
 - bjr-config 137/137 occ (step 2), 31/31 mates, BOM 22/23 before a8dedfc1 (OPG006 Description; rerun). pinslot 42/42, 16/16.
@@ -76,12 +78,13 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
 - Pairs: `~/agents/asm-keep/pairlist.sh <tag> <dirs>` (ops-mainbase vs ops-stack) -> pair/{mainbase,stack}-<tag>.log.
 - Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh` (LAND_BIG_DELETE=1 only for the reviewed standard JSON);
   never from a worktree with commits still queued.
-- Worktrees: asm (main + parity binaries), asm-feel (main), asm-cursor (branch asm-keys, the stack), asm-docs (docs-only).
+- Worktrees: asm (parity binaries; branch asm-live1119), asm-feel (asm-err1119, queued), asm-cursor (landed), asm-docs
+  (docs-only).
 - Private documents (hat8 / hat15 / dock on vibex7 ~/lead-private): mode-700 copies in ~/tmp/asm only, deleted after.
 - Live data: REQUESTS.md (times from `date -u`); live2 79ae5cdb-42a4-4025-b43a-da61a4f92ad7, live
   e8549719-ef9a-42de-960c-e24b29f142a6.
 - Agent ids: psui 4973e295-9e92-463f-a13f-2ec5258bc5f9, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, core
-  d30002ca-d013-4435-b7d9-7da9cb564cec, blend de66e481-56e2-4005-a5d3-9fa897ca5fde, qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b
+  d30002ca-d013-4435-b7d9-7da9cb564cec, blend de66e481-56e2-4005-a5d3-9fa897ca5fde, qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b, bool 754a9804-feb1-4153-b32a-acf9b2a6d94d
   (old core e8af89fe / blend 0672fa20 stopped: never message them).
 
 ## Assembly model suite (what it does)
