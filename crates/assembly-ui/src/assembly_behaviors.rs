@@ -549,6 +549,8 @@ pub struct AsmUi {
     pub value_edit: Option<(MateId, usize, Entity<InputState>, Subscription)>,
     /// Mass and section properties dialog.
     pub mass: Option<super::mass::AsmMassUi>,
+    /// A "Derived mirror" node's dialog (its Edit…).
+    pub derived_mirror: Option<super::panels::DerivedMirrorDialog>,
     /// Its values, worked out off the UI thread (`crate::bg_job`): the selected instances' mass properties and
     /// variance (keyed by them, the result and the parts' densities), and the picked faces' section.
     pub mass_job: Option<crate::bg_job::BgJob<super::mass::AsmMassKey, super::mass::AsmMassValue>>,
@@ -1229,6 +1231,9 @@ impl AssemblyView {
     fn full_instance_menu(&self, top: InstanceId, graphics: bool, cx: &App) -> Vec<MenuEntry> {
         let Some(asm) = self.assembly(cx) else { return vec![] };
         let Some(inst) = asm.instance(top).cloned() else { return vec![] };
+        if matches!(inst.source, InstanceSource::DerivedMirror { .. }) {
+            return self.derived_mirror_menu(&inst);
+        }
         let targets = self.targets(Some(top));
         let multi = targets.len() > 1;
         // Dynamically suppressed counts as suppressed (live asm-menu-edit-dynamic-suppression).
@@ -2773,6 +2778,57 @@ impl AssemblyView {
     /// subassembly (a Replicate: Dissolve <name>; a Mirror: neither) ·
     /// Release… | Zoom to selection | Add selection to folder… · Expand ▸ ·
     /// Collapse ▸ | Delete. Its instances are the generated copies.
+    /// A "-Mirrored" assembly's Derived mirror node (live2 audit-1119 m10, less "Add comment", cloud).
+    pub(super) fn derived_mirror_menu(&self, inst: &noshape_model::assembly::Instance) -> Vec<MenuEntry> {
+        let top = inst.id;
+        let (hidden, suppressed) = (inst.hidden, inst.suppressed);
+        let com_on = self.ui.com_ids.as_ref().is_some_and(|c| *c == [top]);
+        let key = vec![top];
+        let k2 = key.clone();
+        vec![
+            item("Rename", move |t, w, cx| t.start_row_rename(RenameRow::Instance(top), w, cx)),
+            item("Edit…", move |t, _, cx| t.open_derived_mirror(top, cx)),
+            icon_item(if hidden { "Show" } else { "Hide" }, "eye-off", move |t, _, cx| t.set_hidden(vec![top], !hidden, cx)),
+            item(crate::i18n::template("Hide other __label__", &[("label", "instances")]), move |t, _, cx| t.hide_other_instances(vec![top], cx)),
+            item(crate::i18n::template("Hide all __label__", &[("label", "instances")]), |t, _, cx| t.hide_all_instances(cx)),
+            icon_item(if com_on { "Hide center of mass" } else { "Show center of mass" }, "com-indicator", move |t, _, cx| t.toggle_center_of_mass(vec![top], cx)),
+            item("Isolate…", move |t, _, cx| t.isolate_cmd(false, vec![top], cx)),
+            item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, vec![top], cx)),
+            item(if suppressed { "Unsuppress" } else { "Suppress" }, move |t, _, cx| t.set_suppressed(vec![top], !suppressed, cx)),
+        ]
+        .into_iter()
+        .chain(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Instance(top), false))
+        .chain([
+            MenuEntry::Sep,
+            item("Zoom to selection", move |t, _, cx| t.zoom_to_instances(vec![top], cx)),
+            MenuEntry::Sep,
+            item("Add selection to folder…", move |t, w, cx| t.folder_from_instances(vec![top], w, cx)),
+            MenuEntry::Sub {
+                label: "Expand".into(),
+                children: vec![
+                    item("Expand selected", move |t, _, cx| {
+                        t.expanded.insert(key.clone());
+                        cx.notify();
+                    }),
+                    item("Expand all", |t, _, cx| t.expand_all(true, cx)),
+                ],
+            },
+            MenuEntry::Sub {
+                label: "Collapse".into(),
+                children: vec![
+                    item("Collapse selected", move |t, _, cx| {
+                        t.expanded.remove(&k2);
+                        cx.notify();
+                    }),
+                    item("Collapse all", |t, _, cx| t.expand_all(false, cx)),
+                ],
+            },
+            MenuEntry::Sep,
+            icon_item("Delete", "delete", move |t, _, cx| t.delete_instances(vec![top], cx)),
+        ])
+        .collect()
+    }
+
     pub(super) fn pattern_menu(&self, id: MateId, cx: &App) -> Vec<MenuEntry> {
         let Some(asm) = self.assembly(cx) else { return vec![] };
         let Some(p) = asm.patterns.iter().find(|p| p.id == id).cloned() else { return vec![] };

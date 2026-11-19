@@ -291,6 +291,21 @@ pub struct PatternSession {
     pub strategy_open: bool,
 }
 
+/// Whose Mirror strategy table: the Mirror dialog's (its seeds) or a "Derived mirror" node's (its source's parts).
+#[derive(Clone, Copy, PartialEq)]
+pub enum StrategyHost {
+    Pattern,
+    Node,
+}
+
+/// A "Derived mirror" node's dialog (live2 audit-1119 m10–m12): Assembly to mirror and its Mirror strategy per part.
+pub struct DerivedMirrorDialog {
+    pub node: InstanceId,
+    pub source: TabId,
+    pub rows: HashMap<InstanceId, MirrorRow>,
+    pub strategy_open: bool,
+}
+
 /// One row of live's Mirror strategy table.
 #[derive(Clone, Copy, Default)]
 pub struct MirrorRow {
@@ -1579,7 +1594,7 @@ impl AssemblyView {
             }
             self.update_pattern_preview(cx);
         }
-        let strategy = self.render_mirror_strategy(cx);
+        let strategy = self.render_mirror_strategy(StrategyHost::Pattern, cx);
         let pal = p();
         let Some(s) = &self.pattern else { return div().into_any_element() };
         let kind = s.kind;
@@ -2241,35 +2256,185 @@ impl AssemblyView {
     /// reference | Placement type (columns 140 / 80 / 80 / 160 / 180 / 140,
     /// `#aaa` grid, header `#eaeaea`, read-only cells `#f5f5f5`, 33 px rows),
     /// then the status and Update.
-    fn render_mirror_strategy(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    /// A "Derived mirror" node's Edit… (live2 audit-1119 m10): its dialog, rows from the node's strategy.
+    pub(super) fn open_derived_mirror(&mut self, node: InstanceId, cx: &mut Context<Self>) {
+        let Some(InstanceSource::DerivedMirror { assembly, derived, placement, .. }) = self.assembly(cx).and_then(|a| a.instance(node)).map(|i| i.source.clone()) else { return };
+        let mut rows: HashMap<InstanceId, MirrorRow> = derived.iter().map(|id| (*id, MirrorRow { derived: true, created: true, ..Default::default() })).collect();
+        for (id, p) in &placement {
+            rows.entry(*id).or_default().placement = *p;
+        }
+        self.ui.derived_mirror = Some(DerivedMirrorDialog { node, source: assembly, rows, strategy_open: false });
+        cx.notify();
+    }
+
+    /// ✓: the node's strategy as the dialog's rows (one edit, "Edit : Derived mirror").
+    fn accept_derived_mirror(&mut self, cx: &mut Context<Self>) {
+        let Some(d) = self.ui.derived_mirror.take() else { return };
+        let Some((_, src)) = self.strategy_seeds_of(&d, cx) else { return };
+        let derived: Vec<InstanceId> = d.rows.iter().filter(|(_, r)| r.derived).map(|(id, _)| *id).collect();
+        let placement: Vec<(InstanceId, noshape_model::assembly::MirrorPlacement)> = d.rows.iter().filter(|(_, r)| r.placement != Default::default()).map(|(id, r)| (*id, r.placement)).collect();
+        let mirrored_studios = noshape_ops::assembly::mirrored_studios(&self.doc.read(cx).session.doc, &src, &derived);
+        let name = self.assembly(cx).and_then(|a| a.instance(d.node)).map(|i| i.name.clone()).unwrap_or_default();
+        let (node, source) = (d.node, d.source);
+        self.edit(&format!("Edit : {name}"), cx, move |a| {
+            if let Some(n) = a.instance_mut(node) {
+                n.source = InstanceSource::DerivedMirror { assembly: source, derived, placement, mirrored_studios };
+            }
+        });
+        cx.notify();
+    }
+
+    fn strategy_seeds_of(&self, d: &DerivedMirrorDialog, cx: &App) -> Option<(Vec<InstanceId>, Assembly)> {
+        let TabContent::Assembly(src) = &self.doc.read(cx).session.doc.tab(d.source)?.content else { return None };
+        Some((src.instances.iter().filter(|i| matches!(i.source, InstanceSource::Part { .. })).map(|i| i.id).collect(), (**src).clone()))
+    }
+
+    /// The node's dialog (live2 m10): "Derived mirror", ✓ ✕, Assembly to mirror and Mirror strategy… (its table over
+    /// the dialog, as the Mirror's).
+    pub(super) fn render_derived_mirror_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let d = self.ui.derived_mirror.as_ref()?;
+        let pal = p();
+        let doc = &self.doc.read(cx).session.doc;
+        let source = doc.tab(d.source).map(|t| t.name.clone()).unwrap_or_default();
+        let name = self.assembly(cx).and_then(|a| a.instance(d.node)).map(|i| i.name.clone()).unwrap_or_else(|| "Derived mirror".into());
+        let (open, pending) = (d.strategy_open, d.rows.values().any(|r| r.derived && !r.created));
+        let strategy = self.render_mirror_strategy(StrategyHost::Node, cx);
+        let close = |this: &mut Self, cx: &mut Context<Self>| {
+            this.ui.derived_mirror = None;
+            cx.notify();
+        };
+        let button = |id: &'static str, icon: &'static str, bg: Hsla| div().id(id).size(px(28.)).flex().items_center().justify_center().cursor_pointer().bg(bg).child(crate::assets::icon(icon, 24., cx));
+        Some(
+            v_flex()
+                .id("derived-mirror-dialog")
+                .occlude()
+                .key_context("FeatureDialog")
+                .on_action(cx.listener(move |this, _: &crate::actions::Accept, _, cx| {
+                    if !pending {
+                        this.accept_derived_mirror(cx);
+                    }
+                }))
+                .on_action(cx.listener(move |this, _: &crate::actions::Cancel, _, cx| close(this, cx)))
+                .w(px(220.))
+                .bg(pal.dialog_bg)
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .text_color(pal.text)
+                .child(
+                    h_flex()
+                        .h(px(29.))
+                        .bg(pal.panel)
+                        .border_b_1()
+                        .border_color(pal.border)
+                        .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).truncate().child(crate::ui::user_text(name)))
+                        .child(
+                            button("dm-ok", "dialog-ok", pal.accept.into())
+                                .when(pending, crate::ui::disabled_accept)
+                                .debug_selector(|| "dm-ok".into())
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    if !pending {
+                                        this.accept_derived_mirror(cx);
+                                    }
+                                })),
+                        )
+                        .child(button("dm-cancel", "dialog-cancel", gpui_kit::transparent_black()).hover(|d| d.bg(pal.panel_hover)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| close(this, cx)))),
+                )
+                .child(
+                    v_flex()
+                        .p(px(3.))
+                        .gap(px(5.))
+                        .child(div().text_size(px(12.)).text_color(pal.text_muted).child("Assembly to mirror"))
+                        .child(h_flex().h(px(27.)).px(px(4.)).gap(px(4.)).border_1().border_color(pal.border).rounded(px(2.)).child(crate::assets::icon("tab-assembly", 16., cx)).child(div().text_size(px(13.33)).truncate().child(source)))
+                        .child(
+                            h_flex()
+                                .id("dm-strategy")
+                                .debug_selector(|| "dm-strategy".into())
+                                .h(px(27.))
+                                .px(px(2.))
+                                .gap(px(4.))
+                                .border_1()
+                                .border_color(if pending { pal.error } else if open { pal.accent } else { pal.border })
+                                .when(pending, |d| d.bg(pal.error_fill).text_color(pal.text_invalid))
+                                .rounded(px(2.))
+                                .cursor_pointer()
+                                .hover(|d| d.bg(pal.panel_hover))
+                                .tooltip(crate::ui::tooltip("Select how instances are mirrored."))
+                                .child(crate::assets::icon("mirror", 20., cx))
+                                .child(div().text_size(px(14.)).child("Mirror strategy…"))
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    if let Some(d) = &mut this.ui.derived_mirror {
+                                        d.strategy_open = !d.strategy_open;
+                                    }
+                                    cx.notify();
+                                })),
+                        ),
+                )
+                .relative()
+                .children(strategy)
+                .into_any_element(),
+        )
+    }
+
+    /// Whether `host`'s Mirror strategy table is open.
+    fn strategy_open(&self, host: StrategyHost) -> bool {
+        match host {
+            StrategyHost::Pattern => self.pattern.as_ref().is_some_and(|p| p.kind == PatternDialogKind::Mirror && p.strategy_open),
+            StrategyHost::Node => self.ui.derived_mirror.as_ref().is_some_and(|d| d.strategy_open),
+        }
+    }
+
+    /// `host`'s table rows' instances and the assembly they are in: the Mirror's seeds, or the node's source's parts.
+    fn strategy_seeds(&self, host: StrategyHost, cx: &App) -> Option<(Vec<InstanceId>, Assembly)> {
+        match host {
+            StrategyHost::Pattern => Some((self.pattern.as_ref()?.seeds.clone(), self.assembly(cx)?.clone())),
+            StrategyHost::Node => self.strategy_seeds_of(self.ui.derived_mirror.as_ref()?, cx),
+        }
+    }
+
+    fn strategy_rows(&self, host: StrategyHost) -> Option<&HashMap<InstanceId, MirrorRow>> {
+        match host {
+            StrategyHost::Pattern => self.pattern.as_ref().map(|p| &p.mirror_rows),
+            StrategyHost::Node => self.ui.derived_mirror.as_ref().map(|d| &d.rows),
+        }
+    }
+
+    fn strategy_rows_mut(&mut self, host: StrategyHost) -> Option<&mut HashMap<InstanceId, MirrorRow>> {
+        match host {
+            StrategyHost::Pattern => self.pattern.as_mut().map(|p| &mut p.mirror_rows),
+            StrategyHost::Node => self.ui.derived_mirror.as_mut().map(|d| &mut d.rows),
+        }
+    }
+
+    fn render_mirror_strategy(&mut self, host: StrategyHost, cx: &mut Context<Self>) -> Option<AnyElement> {
         use noshape_model::assembly::MirrorPlacement;
         // The Symmetry column: each listed part's mirror symmetry, detected
         // once (live: as soon as the instance is listed, no plane needed);
         // a new row's Mirror action follows it (Non-symmetric -> Derived).
-        if let Some(seeds) = self.pattern.as_ref().filter(|p| p.kind == PatternDialogKind::Mirror && p.strategy_open).map(|p| p.seeds.clone()) {
-            let todo: Vec<InstanceId> = seeds.into_iter().filter(|id| self.pattern.as_ref().and_then(|p| p.mirror_rows.get(id)).is_none_or(|r| r.symmetric.is_none())).collect();
-            if !todo.is_empty()
-                && let Some(asm) = self.assembly(cx).cloned()
-                && let Some(mut ev) = self.evaluator.try_lock()
-            {
-                let doc = &self.doc.read(cx).session.doc;
-                let found: Vec<(InstanceId, bool)> = todo.iter().filter_map(|id| ev.instance_symmetric(doc, &asm, *id).map(|s| (*id, s))).collect();
-                drop(ev);
-                if let Some(p) = &mut self.pattern {
-                    for (id, sym) in found {
-                        let new = !p.mirror_rows.contains_key(&id);
-                        let r = p.mirror_rows.entry(id).or_default();
-                        r.symmetric = Some(sym);
-                        if new && !sym {
-                            r.derived = true;
-                        }
+        if let Some((seeds, asm)) = self.strategy_seeds(host, cx).filter(|_| self.strategy_open(host)) {
+            let todo: Vec<InstanceId> = seeds.into_iter().filter(|id| self.strategy_rows(host).and_then(|r| r.get(id)).is_none_or(|r| r.symmetric.is_none())).collect();
+            let found: Vec<(InstanceId, bool)> = match self.evaluator.try_lock().filter(|_| !todo.is_empty()) {
+                Some(mut ev) => {
+                    let doc = &self.doc.read(cx).session.doc;
+                    todo.iter().filter_map(|id| ev.instance_symmetric(doc, &asm, *id).map(|s| (*id, s))).collect()
+                }
+                None => Vec::new(),
+            };
+            if let Some(rows) = self.strategy_rows_mut(host) {
+                for (id, sym) in found {
+                    let new = !rows.contains_key(&id);
+                    let r = rows.entry(id).or_default();
+                    r.symmetric = Some(sym);
+                    if new && !sym {
+                        r.derived = true;
                     }
                 }
             }
         }
-        let s = self.pattern.as_ref().filter(|p| p.kind == PatternDialogKind::Mirror && p.strategy_open)?;
+        if !self.strategy_open(host) {
+            return None;
+        }
+        let (seeds, asm) = self.strategy_seeds(host, cx)?;
+        let rows = self.strategy_rows(host)?.clone();
         let pal = p();
-        let asm = self.assembly(cx)?;
         let doc = &self.doc.read(cx).session.doc;
         let grid = rgb(0xaaaaaa);
         const WIDTHS: [f32; 6] = [140., 80., 80., 160., 180., 140.];
@@ -2282,9 +2447,9 @@ impl AssemblyView {
                 .map(|(k, t)| div().w(px(WIDTHS[k])).h_full().flex_none().flex().items_center().justify_center().border_r_1().border_color(grid).text_size(px(12.)).font_weight(FontWeight::SEMIBOLD).child(*t)),
         );
         let mut table = v_flex().border_l_1().border_color(grid).child(header);
-        for (k, id) in s.seeds.iter().enumerate() {
+        for (k, id) in seeds.iter().enumerate() {
             let Some(inst) = asm.instance(*id) else { continue };
-            let row = s.mirror_rows.get(id).copied().unwrap_or_default();
+            let row = rows.get(id).copied().unwrap_or_default();
             // A subassembly's Derived is its "<assembly>-Mirrored" assembly (live2 audit-1119 m2–m14).
             let sub = matches!(inst.source, InstanceSource::Assembly { .. });
             let studio = match &inst.source {
@@ -2299,8 +2464,8 @@ impl AssemblyView {
                 move |i, _, cx| {
                     if let Some(v) = view.upgrade() {
                         v.update(cx, |this, cx| {
-                            if let Some(p) = &mut this.pattern {
-                                let r = p.mirror_rows.entry(id).or_default();
+                            if let Some(rows) = this.strategy_rows_mut(host) {
+                                let r = rows.entry(id).or_default();
                                 r.derived = i == 1;
                                 r.created = false;
                             }
@@ -2321,8 +2486,8 @@ impl AssemblyView {
                 os::select_field_flat(SharedString::from(format!("ms-pl-{k}")), MirrorPlacement::ALL.iter().map(|p| p.label().to_string()).collect(), Vec::new(), usize::MAX, MirrorPlacement::ALL.iter().position(|p| *p == row.placement).unwrap_or(0), move |i, _, cx| {
                     if let Some(v) = view.upgrade() {
                         v.update(cx, |this, cx| {
-                            if let Some(p) = &mut this.pattern {
-                                p.mirror_rows.entry(id).or_default().placement = MirrorPlacement::ALL[i];
+                            if let Some(rows) = this.strategy_rows_mut(host) {
+                                rows.entry(id).or_default().placement = MirrorPlacement::ALL[i];
                             }
                             cx.notify();
                         });
@@ -2365,7 +2530,7 @@ impl AssemblyView {
                     .child(cell(5, !row.derived).when(!row.derived, |d| d.bg(rgb(0xffffff)).px_0()).child(div().size_full().child(placement))),
             );
         }
-        let pending = s.seeds.iter().filter(|id| s.mirror_rows.get(id).is_some_and(|r| r.derived && !r.created)).count();
+        let pending = seeds.iter().filter(|id| rows.get(id).is_some_and(|r| r.derived && !r.created)).count();
         // Live: "1 instance needs to be created." (the plural form is
         // assumed: "2 instances need to be created.").
         let status: AnyElement = if pending > 0 {
@@ -2404,9 +2569,18 @@ impl AssemblyView {
                                 .items_center()
                                 .cursor_pointer()
                                 .child(crate::ui::glyph("panel-close", 22., rgb(0x999999)))
-                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                    if let Some(p) = &mut this.pattern {
-                                        p.strategy_open = false;
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    match host {
+                                        StrategyHost::Pattern => {
+                                            if let Some(p) = &mut this.pattern {
+                                                p.strategy_open = false;
+                                            }
+                                        }
+                                        StrategyHost::Node => {
+                                            if let Some(d) = &mut this.ui.derived_mirror {
+                                                d.strategy_open = false;
+                                            }
+                                        }
                                     }
                                     cx.notify();
                                 })),
@@ -2434,13 +2608,13 @@ impl AssemblyView {
                                 .when(pending == 0, |d| d.opacity(0.42))
                                 .when(pending > 0, |d| d.cursor_pointer())
                                 .child("Update")
-                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     // Live: Update makes (or reuses) each Derived part's "<Part Studio>-Mirrored" Part
                                     // Studio and each Derived subassembly's "<assembly>-Mirrored" assembly.
-                                    let sources: Vec<TabId> = match (&this.pattern, this.assembly(cx)) {
-                                        (Some(p), Some(asm)) => {
-                                            let ids: Vec<InstanceId> = p.mirror_rows.iter().filter(|(_, r)| r.derived && !r.created).map(|(id, _)| *id).collect();
-                                            noshape_ops::assembly::derived_seed_studios(asm, &ids)
+                                    let sources: Vec<TabId> = match (this.strategy_seeds(host, cx), this.strategy_rows(host)) {
+                                        (Some((_, asm)), Some(rows)) => {
+                                            let ids: Vec<InstanceId> = rows.iter().filter(|(_, r)| r.derived && !r.created).map(|(id, _)| *id).collect();
+                                            noshape_ops::assembly::derived_seed_studios(&asm, &ids)
                                         }
                                         _ => Vec::new(),
                                     };
@@ -2457,14 +2631,16 @@ impl AssemblyView {
                                             })
                                         });
                                     }
-                                    if let Some(p) = &mut this.pattern {
-                                        for r in p.mirror_rows.values_mut() {
+                                    if let Some(rows) = this.strategy_rows_mut(host) {
+                                        for r in rows.values_mut() {
                                             if r.derived {
                                                 r.created = true;
                                             }
                                         }
                                     }
-                                    this.update_pattern_preview(cx);
+                                    if host == StrategyHost::Pattern {
+                                        this.update_pattern_preview(cx);
+                                    }
                                     cx.notify();
                                 })),
                         ),

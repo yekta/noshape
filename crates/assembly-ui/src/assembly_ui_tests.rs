@@ -89,9 +89,14 @@ impl gpui_kit::Render for FrontHost {
 
 /// [`open_assembly`] with the front layer drawn, so the left dialogs can be clicked.
 fn open_assembly_with_front(cx: &mut TestAppContext, path: &std::path::Path) -> (AnyWindowHandle, Entity<AssemblyView>) {
+    open_tab_with_front(cx, path, "Assembly 1")
+}
+
+/// [`open_assembly_with_front`] on the assembly `name` (else the first).
+fn open_tab_with_front(cx: &mut TestAppContext, path: &std::path::Path, name: &str) -> (AnyWindowHandle, Entity<AssemblyView>) {
     let session = crate::session::Session::open(path).unwrap();
     let asm = |t: &&noshape_model::document::Tab| matches!(t.content, noshape_model::TabContent::Assembly(_));
-    let tab = session.doc.tabs.iter().filter(asm).find(|t| t.name == "Assembly 1").or_else(|| session.doc.tabs.iter().find(asm)).unwrap().id;
+    let tab = session.doc.tabs.iter().filter(asm).find(|t| t.name == name).or_else(|| session.doc.tabs.iter().find(asm)).unwrap().id;
     let gpu = Gpu::headless().unwrap();
     let (window, view) = cx.update(|cx| {
         let doc = cx.new(|_| DocModel::new(session));
@@ -2363,5 +2368,87 @@ fn mirror_strategy_update_on_a_subassembly_makes_its_mirrored_assembly(cx: &mut 
         let m = doc.mirrored_assembly(sub).expect("Sub's mirrored assembly");
         assert_eq!(doc.tab(m).unwrap().name, "Sub-Mirrored");
         assert!(v.pattern.as_ref().unwrap().mirror_rows.values().all(|r| r.created), "the row's reference is the new assembly");
+    });
+}
+
+/// Live2 audit-1119 m10–m12: a "-Mirrored" assembly's Derived mirror node: its row menu as live's, and Edit… › Mirror
+/// strategy… › Derived on its part › Update › ✓ makes "Part Studio 1-Mirrored" and writes the node's strategy.
+#[gpui::test]
+fn a_derived_mirror_nodes_menu_and_dialog(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::init);
+    crate::assembly_hooks::register_for_tests();
+    let dir = std::env::temp_dir().join(format!("noshape-asm-ui-derived-node-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("asm.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+    }
+    {
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+        let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [d["regions"][0]["id"].clone()], "depth": "10 mm", "operationType": "NEW" } }));
+        call(&mut ctx, "tab_create", json!({ "kind": "assembly", "name": "Sub" }));
+        call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 1" }));
+        call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Sub" }));
+        call(&mut ctx, "assembly_pattern", json!({ "tab": "Assembly 1", "kind": "mirror", "seeds": ["Sub <1>"], "direction": { "origin": true }, "strategy": [{ "instance": "Sub <1>", "action": "derived" }] }));
+    }
+    let (window, view) = open_tab_with_front(cx, &path, "Sub-Mirrored");
+    let sep = "—";
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let node = instance(v, "Derived mirror", cx);
+        assert_eq!(
+            labels(&v.instance_menu(node, false, cx)),
+            [
+                "Rename", "Edit…", "Hide", "Hide other instances", "Hide all instances", "Show center of mass", "Isolate…", "Make transparent…", "Suppress", "Dynamic suppression ▸", sep,
+                "Zoom to selection", sep,
+                "Add selection to folder…", "Expand ▸", "Collapse ▸", sep,
+                "Delete",
+            ]
+        );
+    });
+    cx.update(|cx| view.update(cx, |v, cx| {
+        let node = instance(v, "Derived mirror", cx);
+        v.open_derived_mirror(node, cx);
+    }));
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let b = vcx.debug_bounds("dm-strategy").expect("Mirror strategy…");
+    vcx.simulate_click(b.center(), gpui_kit::Modifiers::default());
+    draw(cx, window);
+    cx.update(|cx| view.update(cx, |v, cx| {
+        let d = v.ui.derived_mirror.as_mut().unwrap();
+        assert!(d.strategy_open);
+        let part = d.rows.keys().copied().next().expect("the source's part listed");
+        d.rows.get_mut(&part).unwrap().derived = true;
+        cx.notify();
+    }));
+    draw(cx, window);
+    for id in ["ms-update", "dm-ok"] {
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        let b = vcx.debug_bounds(id).unwrap_or_else(|| panic!("{id}"));
+        vcx.simulate_click(b.center(), gpui_kit::Modifiers::default());
+        draw(cx, window);
+        // (The table lies over the dialog, as live's: closed before ✓.)
+        cx.update(|cx| view.update(cx, |v, cx| {
+            if let Some(d) = v.ui.derived_mirror.as_mut() {
+                assert!(d.rows.values().all(|r| !r.derived || r.created), "Update made it");
+                d.strategy_open = false;
+            }
+            cx.notify();
+        }));
+        draw(cx, window);
+    }
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.ui.derived_mirror.is_none(), "✓ closed it");
+        let doc = &v.doc.read(cx).session.doc;
+        let ps = doc.tabs.iter().find(|t| t.name == "Part Studio 1").unwrap().id;
+        let m = doc.mirrored_studio(ps).expect("Part Studio 1-Mirrored");
+        let node = v.assembly(cx).unwrap().instances.iter().find(|i| i.name == "Derived mirror").unwrap().source.clone();
+        let noshape_model::assembly::InstanceSource::DerivedMirror { derived, mirrored_studios, .. } = node else { panic!("the node") };
+        assert_eq!((derived.len(), mirrored_studios), (1, vec![(ps, m)]));
     });
 }

@@ -4325,6 +4325,8 @@ impl AssemblyView {
             NodeKind::Part if inst.is_some_and(|i| self.is_configured_source(&i.source, cx)) => "part-configured",
             NodeKind::Part => "part",
             NodeKind::PartStudio => "part-studio",
+            // Live2 m10: a "-Mirrored" assembly's Derived mirror node.
+            NodeKind::Assembly if inst.is_some_and(|i| matches!(i.source, InstanceSource::DerivedMirror { .. })) => "derived-mirror",
             NodeKind::Assembly if node.is_some_and(|n| n.rigid) => "sub-assembly-rigid",
             NodeKind::Assembly => "sub-assembly",
         };
@@ -6562,6 +6564,10 @@ impl AssemblyView {
         }
         if self.pattern.is_some() {
             left = left.child(self.render_pattern_panel(cx));
+            any_left = true;
+        }
+        if let Some(d) = self.render_derived_mirror_panel(cx) {
+            left = left.child(d);
             any_left = true;
         }
         if self.config_panel.is_some() {
