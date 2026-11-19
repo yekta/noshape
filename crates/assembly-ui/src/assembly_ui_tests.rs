@@ -1982,3 +1982,108 @@ fn cancelling_an_insertion_offers_restore(cx: &mut TestAppContext) {
     assert_eq!(count(cx), before + 1, "Restore brings it back");
     assert!(cx.update(|cx| view.read(cx).ui.insert_restore.is_none()), "the bubble gone");
 }
+
+/// A block (Part 1) and a pin (Part 2) inserted into Assembly 1, then `make`.
+fn two_parts_document(cx: &mut TestAppContext, name: &str, make: impl FnOnce(&mut Ctx)) -> std::path::PathBuf {
+    cx.update(gpui_kit::init);
+    crate::assembly_hooks::register_for_tests();
+    let dir = std::env::temp_dir().join(format!("noshape-asm-ui-{name}-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("asm.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+    }
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }, { "tool": "circle", "points": [[70, 10], [75, 10]] }] }));
+    let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    make(&mut ctx);
+    path
+}
+
+/// Live2 errors-1119 a2: with two parts fixed, the amber warning sits on each fixed icon and on the root row's (its name
+/// cut short so the icon shows), with no second warning beside; the rows span the list, so a row's flyout starts at the
+/// list's right edge.
+#[gpui::test]
+fn two_fixed_parts_warn_on_their_fixed_icons_and_the_root(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "fixed-warn", |ctx| {
+        call(ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>", "Part 2 <1>"], "fixed": true }));
+        call(ctx, "tab_rename", json!({ "tab": "Assembly 1", "name": "start pin-block-asm-drawing assembly with a long name" }));
+    });
+    let (window, view) = open_assembly(cx, &path);
+    draw(cx, window);
+    let list_w = cx.update(|cx| crate::ui::left_panel_w(view.read(cx).tab));
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    for part in ["Part 1 <1>", "Part 2 <1>"] {
+        let icon = vcx.debug_bounds(format!("fixed {part}").leak()).unwrap_or_else(|| panic!("{part}'s fixed icon"));
+        let badge = vcx.debug_bounds(format!("fixed-warning {part}").leak()).unwrap_or_else(|| panic!("{part}'s warning on its fixed icon"));
+        assert!(icon.contains(&badge.origin), "{part}: the warning on the icon ({icon:?}, {badge:?})");
+        assert!(vcx.debug_bounds(format!("warn {part}").leak()).is_none(), "{part}: no second warning beside");
+        let row = vcx.debug_bounds(format!("inst-row {part}").leak()).unwrap();
+        eprintln!("row {row:?} list_w {list_w}");
+        assert!((f32::from(row.right()) - list_w).abs() <= 1., "{part}'s row spans the list ({row:?}, list {list_w})");
+    }
+    assert!(vcx.debug_bounds("asm-grounded-warning").is_some(), "the root's grounded icon carries the warning");
+    let grounded = vcx.debug_bounds("asm-grounded").expect("the root's grounded icon");
+    assert!(f32::from(grounded.right()) <= list_w, "the root's name is cut short so its icon shows ({grounded:?}, list {list_w})");
+}
+
+/// Live2 errors-1119 a5: a Revolute's minimum above its maximum disables ✓ and Enter (the dialog stays, nothing made).
+#[gpui::test]
+fn crossed_limits_keep_the_mate_dialog_open(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "crossed-limits");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Revolute, w, cx);
+            let (a, b) = (face_connector(v, "Part 2 <1>", false, cx), face_connector(v, "Part 1 <1>", true, cx));
+            v.deliver_connector(a, w, cx);
+            v.deliver_connector(b, w, cx);
+            let dialog = v.mate.as_ref().unwrap().dialog.clone();
+            dialog.update(cx, |d, cx| {
+                d.type_limit("rz", false, "90", true, w, cx);
+                d.type_limit("rz", true, "10", true, w, cx);
+            });
+        });
+    })
+    .unwrap();
+    cx.executor().advance_clock(std::time::Duration::from_millis(100));
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            assert!(!v.mate.as_ref().unwrap().dialog.read(cx).can_accept(cx), "✓ disabled");
+            v.accept_mate(w, cx);
+            assert!(v.mate.is_some(), "Enter / ✓ leaves the dialog open");
+            assert!(v.assembly(cx).unwrap().mates.is_empty(), "no mate made");
+        });
+    })
+    .unwrap();
+}
+
+/// Live2 errors-1119 q3: the Insert dialog leaves out a Part Studio with no parts, its name searched for too, and a
+/// search matching nothing says "No Part Studios match current search.".
+#[gpui::test]
+fn the_insert_dialog_leaves_out_an_empty_part_studio(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "insert-empty", |ctx| {
+        call(ctx, "tab_create", json!({ "kind": "partstudio", "name": "start empty" }));
+    });
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_insert(w, cx))).unwrap();
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    assert!(vcx.debug_bounds("ins-row Part Studio 1").is_some(), "Part Studio 1 listed");
+    assert!(vcx.debug_bounds("ins-row start empty").is_none(), "the empty studio left out");
+    for (query, none) in [("empty", true), ("zzz", true), ("part", false)] {
+        cx.update(|cx| view.update(cx, |v, cx| {
+            v.ui.insert_query = query.into();
+            cx.notify();
+        }));
+        draw(cx, window);
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        assert!(vcx.debug_bounds("ins-row start empty").is_none(), "{query}: the empty studio left out");
+        assert_eq!(vcx.debug_bounds("ins-no-match").is_some(), none, "{query}: the no-match line");
+    }
+}

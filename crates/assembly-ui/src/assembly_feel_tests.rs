@@ -450,3 +450,37 @@ fn a_mate_rows_double_click_edits_the_mate(cx: &mut TestAppContext) {
     draw(cx, window);
     cx.update(|cx| assert_eq!(view.read(cx).mate.as_ref().and_then(|m| m.editing), Some(id), "a double-click opens Fastened 1's dialog"));
 }
+
+/// Live selother-ball-1119: Select other (`) with the pointer over the background off a part's silhouette edge lists
+/// "Edge of Part 1 <1>" and the part out to 8 px, the face behind that edge and the part from 9 to 11 px, and nothing
+/// from 12 px.
+#[gpui::test]
+fn select_other_reaches_an_edge_to_8_px_and_its_face_to_11(cx: &mut TestAppContext) {
+    use crate::scene_builder::PickKind;
+    use super::behaviors::SelectOtherRow;
+    const SELECT_OTHER_REACH: f64 = 14.0;
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (window, view) = mated_blocks(cx, "selother-reach");
+    let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
+    let part1 = cx.update(|cx| view.read(cx).assembly(cx).unwrap().instances.iter().find(|i| i.name == "Part 1 <1>").unwrap().id);
+    // (Clear of the 8 / 11 px boundaries: an edge's pick pixels lie a pixel nearer or farther on another GPU.)
+    for (off, want) in [(6.5, Some(PickKind::Edge)), (10., Some(PickKind::Face)), (13.5, None)] {
+        move_to(cx, window, &view, DVec2::new(lo.x - off, (lo.y + hi.y) / 2.));
+        // (The pick rectangle around the pointer in, as after a pause.)
+        wait_until(cx, window, &view, |v, cx| v.viewport.read(cx).pick_at_pointer_within(SELECT_OTHER_REACH, &|_| false).is_some());
+        cx.update(|cx| view.update(cx, |v, cx| {
+            v.ui.select_other = None;
+            v.select_other(false, cx);
+        }));
+        cx.update(|cx| {
+            let rows = &view.read(cx).ui.select_other.as_ref().unwrap().0;
+            let kind = rows.iter().find_map(|r| match r {
+                SelectOtherRow::Entity(t) => Some(t.kind),
+                SelectOtherRow::Instance(_) => None,
+            });
+            assert_eq!(kind, want, "{off} px off the edge");
+            let has_part = rows.iter().any(|r| matches!(r, SelectOtherRow::Instance(id) if *id == part1));
+            assert_eq!(has_part, want.is_some(), "{off} px: Part 1 <1> listed with its entity");
+        });
+    }
+}

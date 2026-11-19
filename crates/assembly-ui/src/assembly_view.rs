@@ -315,6 +315,17 @@ fn feature_row_color(inactive: bool, ok: bool, hidden: bool) -> Rgba {
     }
 }
 
+/// The Insert dialog's line when a search matches nothing: bold dark 12 px at the list's top left (live2 errors-1119 q3).
+fn insert_no_match(text: &'static str) -> Div {
+    div().debug_selector(|| "ins-no-match".into()).px(px(12.)).py(px(14.)).text_size(px(12.)).font_weight(gpui_kit::FontWeight::BOLD).text_color(gpui_kit::rgb(0x333333)).child(text)
+}
+
+/// The amber warning on a fixed (or grounded) icon's lower right while more than one part is fixed (live2 errors-1119
+/// a2-p1warn).
+fn fixed_warning_badge(selector: String, cx: &App) -> Div {
+    div().debug_selector(move || selector).absolute().left(px(9.)).top(px(8.)).child(crate::assets::icon(&icon_path("list-warning-overlay"), 12., cx))
+}
+
 /// Live's "related-highlight" list row (live 305): #ecf0f4 with a
 /// #90cef1 line under it.
 fn related_row<E: Styled>(d: E) -> E {
@@ -338,6 +349,9 @@ struct FeatureRow {
     name: String,
     ok: bool,
     inactive: bool,
+    /// Suppressed itself (struck through); only inactive (an instance it uses is suppressed): italic alone (live2
+    /// errors-1119 a6).
+    suppressed: bool,
     message: Option<String>,
     has_limits: bool,
     /// Mate indicator hidden (None: no eye icon).
@@ -2377,8 +2391,9 @@ impl AssemblyView {
 
     fn accept_mate(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(s) = &self.mate else { return };
-        // Incomplete: ✓ is disabled and Enter does nothing, no message (live asm-cylindrical-pin-hole).
-        let Some(m) = s.dialog.read(cx).to_mate(cx) else { return };
+        // Incomplete or limits crossed: ✓ is disabled and Enter does nothing, no message (live asm-cylindrical-pin-hole,
+        // live2 errors-1119 a5).
+        let Some(m) = s.dialog.read(cx).to_mate(cx).filter(|_| s.dialog.read(cx).can_accept(cx)) else { return };
         let editing = s.editing;
         self.mate = None;
         self.ui.checkbox_focus = None;
@@ -2398,7 +2413,7 @@ impl AssemblyView {
     /// of the same type (the dialog stays open).
     fn accept_mate_and_new(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(t) = self.mate.as_ref().map(|s| s.dialog.read(cx).mate_type) else { return };
-        let ok = self.mate.as_ref().is_some_and(|s| s.dialog.read(cx).to_mate(cx).is_some());
+        let ok = self.mate.as_ref().is_some_and(|s| s.dialog.read(cx).can_accept(cx));
         self.accept_mate(window, cx);
         if ok {
             self.start_mate(t, window, cx);
@@ -4204,12 +4219,16 @@ impl AssemblyView {
             format!("{name} has error: {e}").into()
         } else if dyn_suppressed {
             format!("{name} (Suppressed with expression)").into()
+        } else if suppressed {
+            // Live2 errors-1119 a6: "Part 2 <1> (Suppressed)".
+            format!("{name} (Suppressed)").into()
         } else {
             name.clone().into()
         };
-        // Onshape warns when more than one part is fixed.
+        // More than one part fixed: the warning sits on the fixed icon, its tooltip live's words alone (live2
+        // errors-1119 a2-p1warn).
         let fixed_warn = is_top && fixed && self.assembly(cx).is_some_and(|a| a.fixed_instances().len() > 1);
-        let fixed_tip: SharedString = if fixed_warn { format!("{name} has warning: More than one part is fixed").into() } else { "Part is fixed".into() };
+        let fixed_tip = if fixed_warn { "More than one part is fixed" } else { "Part is fixed" };
         let ext_key = inst.and_then(|i| i.source.external_key().map(|k| k.to_string()));
         let update = ext_key.as_ref().and_then(|k| self.ext_updates.get(k).cloned().flatten()).zip(ext_key.clone());
         // Version references (live 617, 620): ⋮ "Versioned part from current /
@@ -4244,7 +4263,7 @@ impl AssemblyView {
             NodeKind::Assembly if node.is_some_and(|n| n.rigid) => "sub-assembly-rigid",
             NodeKind::Assembly => "sub-assembly",
         };
-        let warning = if is_top { self.instance_warning(top, cx) } else { None }.map(|w| SharedString::from(format!("{name} has warning: {w}")));
+        let warning = if is_top && !fixed_warn { self.instance_warning(top, cx) } else { None }.map(|w| SharedString::from(format!("{name} has warning: {w}")));
         let color = if suppressed || hidden {
             pal.text_faint
         } else if error.is_some() {
@@ -4261,6 +4280,9 @@ impl AssemblyView {
                 let name = name.clone();
                 move || format!("inst-row {name}")
             })
+            // Rows span the list: a name is cut short before its icons, and the flyout starts at the list's edge
+            // (live2 errors-1119 a1 x 243, a2).
+            .w_full()
             .h(px(crate::ui::ROW_H))
             // Live assembly/10: part icon x 66, name x 86.
             .pl(px(7. + depth as f32 * 22.))
@@ -4293,18 +4315,20 @@ impl AssemblyView {
                 None => suppressed_text(div().min_w_0().truncate().mr(px(2.)), suppressed || dyn_suppressed).child(crate::ui::user_text(name.clone())).into_any_element(),
             })
             .when_some(state, |d, s| d.child(Self::state_pill(s)))
-            // Live (assembly/530, E3): with two or more fixed, the fix icon
-            // carries a small yellow ⚠.
             .when(fixed, |d| {
-                d.child(
+                d.child(crate::assembly_flyout::with_row_tip(
                     div()
                         .id(SharedString::from(format!("fixed-{}", top.0)))
+                        .debug_selector({
+                            let s = format!("fixed {name}");
+                            move || s
+                        })
                         .relative()
                         .flex_none()
                         .child(crate::assets::icon(&icon_path("list-fixed"), 20., cx))
-                        .when(fixed_warn, |d| d.child(div().absolute().right(px(0.)).bottom(px(1.)).text_size(px(9.)).line_height(px(9.)).text_color(gpui::rgb(0xf0b400)).child("⚠")))
-                        .tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(fixed_tip.clone()).build(w, cx)),
-                )
+                        .when(fixed_warn, |d| d.child(fixed_warning_badge(format!("fixed-warning {name}"), cx))),
+                    fixed_tip.to_string(),
+                ))
             })
             .when_some(inst.map(|i| i.lock.clone()).filter(|l| is_top && !l.is_flexible()), |d, lock| {
                 // Lock icon of a locked subassembly (click to unlock).
@@ -4331,7 +4355,10 @@ impl AssemblyView {
             })
             // In-context arrows (Assembly contexts of its Part Studio).
             .when(is_top, |d| d.children(self.context_icons(top, cx)))
-            .when_some(warning.filter(|_| error.is_none()), |d, w| d.child(div().id(SharedString::from(format!("warn-{}", top.0))).child(crate::assets::icon(&icon_path("warning"), 12., cx)).tooltip(move |win, cx| gpui_kit::component::tooltip::Tooltip::new(w.clone()).build(win, cx))))
+            .when_some(warning.filter(|_| error.is_none()), |d, w| d.child(div().id(SharedString::from(format!("warn-{}", top.0))).debug_selector({
+                let s = format!("warn {name}");
+                move || s
+            }).child(crate::assets::icon(&icon_path("warning"), 12., cx)).tooltip(move |win, cx| gpui_kit::component::tooltip::Tooltip::new(w.clone()).build(win, cx))))
             .when_some(versioned.filter(|_| is_top), |d, own| {
                 // Another document's Assembly (live 1742 (B)): "Versioned assembly from other document".
                 let noun = if node.is_some_and(|n| n.linked.is_some()) { "assembly" } else { "part" };
@@ -4607,7 +4634,7 @@ impl AssemblyView {
 
     fn feature_row(&self, f: FeatureRow, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let FeatureRow { id, icon, name, ok, inactive, message, has_limits, hidden, tooltip, flyout, implicit } = f;
+        let FeatureRow { id, icon, name, ok, inactive, suppressed, message, has_limits, hidden, tooltip, flyout, implicit } = f;
         // The added mates only count beside a selected one (clicks that
         // clear `selected_mate` leave them).
         // (And the mate whose dialog is open, live asm-mate-menu-edit.)
@@ -4634,6 +4661,7 @@ impl AssemblyView {
                 let name = name.clone();
                 move || format!("mate-row {name}")
             })
+            .w_full()
             .h(px(crate::ui::ROW_H))
             .pl(px(5.))
             .pr(px(3.))
@@ -4663,7 +4691,7 @@ impl AssemblyView {
             )
             .child(match self.rename_field(behaviors::RenameRow::Feature(id), cx) {
                 Some(field) => field,
-                None => suppressed_text(div().flex_1().truncate(), inactive).child(crate::ui::user_text(name.clone())).into_any_element(),
+                None => suppressed_text(div().flex_1().truncate().when(inactive, |d| d.italic()), suppressed).child(crate::ui::user_text(name.clone())).into_any_element(),
             })
             .when(has_limits, |d| {
                 let n = name.clone();
@@ -4812,6 +4840,7 @@ impl AssemblyView {
         let view = cx.entity();
         h_flex()
             .id("asm-top-row")
+            .w_full()
             .h(px(crate::ui::ROW_H))
             // Live assembly/10: no caret column; icon x 47, name x 66.
             .pl(px(5.))
@@ -4838,7 +4867,18 @@ impl AssemblyView {
                 None => div().min_w_0().truncate().child(crate::ui::user_text(name)).into_any_element(),
             })
             // Grounded: something in the assembly is fixed (Onshape's arrow onto ground).
-            .when_some(grounded, |d, tip| d.child(div().id("asm-grounded").flex_none().child(crate::assets::icon(&icon_path("list-grounded"), 20., cx)).tooltip(crate::ui::tooltip(tip))))
+            .when_some(grounded, |d, tip| {
+                d.child(crate::assembly_flyout::with_row_tip(
+                    div()
+                        .id("asm-grounded")
+                        .debug_selector(|| "asm-grounded".into())
+                        .relative()
+                        .flex_none()
+                        .child(crate::assets::icon(&icon_path("list-grounded"), 20., cx))
+                        .when(tip == "More than one part inside is fixed", |d| d.child(fixed_warning_badge("asm-grounded-warning".into(), cx))),
+                    tip.to_string(),
+                ))
+            })
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.selected = this.assembly(cx).map(|a| a.instances.iter().filter(|i| a.generated_by(i.id).is_none()).map(|i| i.id).collect()).unwrap_or_default();
                 this.selected_mate = None;
@@ -4959,7 +4999,7 @@ impl AssemblyView {
         // Live (asm-root-menu-expand-all): the children read "Mate connector".
         let implicit: Vec<(String, MateConnectorRef)> = m.connectors().filter(|c| c.connector.is_none() && !c.is_origin()).map(|c| ("Mate connector".to_string(), c.clone())).collect();
         Some(self.feature_row(
-            FeatureRow { id: m.id, icon: mate_icon(m.mate_type), name: m.name.clone(), ok, inactive, message: st.and_then(|s| s.message.clone()), has_limits: !m.limits.is_empty(), hidden: Some(hidden), tooltip: Some(self.mate_tooltip(m)), flyout: Some(self.mate_flyout(m)), implicit },
+            FeatureRow { id: m.id, icon: mate_icon(m.mate_type), name: m.name.clone(), ok, inactive, suppressed: m.suppressed, message: st.and_then(|s| s.message.clone()), has_limits: !m.limits.is_empty(), hidden: Some(hidden), tooltip: Some(self.mate_tooltip(m)), flyout: Some(self.mate_flyout(m)), implicit },
             cx,
         ))
     }
@@ -5286,7 +5326,7 @@ impl AssemblyView {
                 continue;
             }
             let icon = icon_path(relation_icon(r.relation_type));
-            let row = self.feature_row(FeatureRow { id: r.id, icon, name: r.name.clone(), ok, inactive, message: st.and_then(|s| s.message.clone()), has_limits: false, hidden: None, tooltip: None, flyout: None, implicit: vec![] }, cx);
+            let row = self.feature_row(FeatureRow { id: r.id, icon, name: r.name.clone(), ok, inactive, suppressed: r.suppressed, message: st.and_then(|s| s.message.clone()), has_limits: false, hidden: None, tooltip: None, flyout: None, implicit: vec![] }, cx);
             items.push((r.id, crate::ui_script::wrap(row, || format!("mate:{}", r.name))));
         }
         // Live (behaviours "qa (2026-10-28, P3) assembly E2 follow-up"; GROUP-ROW-ERROR):
@@ -5308,7 +5348,7 @@ impl AssemblyView {
             let hidden = (g.hidden || !self.show_mates) && !editing;
             let tail = if hidden { " (Hidden)" } else { "" };
             let tooltip = Some(if err { format!("{} has error: {SAME_GROUP}{tail}", g.name) } else { format!("{}{tail}", g.name) });
-            let row = self.feature_row(FeatureRow { id: g.id, icon: icon_path("group"), name: g.name.clone(), ok: !err, inactive: g.suppressed, message: err.then(|| SAME_GROUP.to_string()), has_limits: false, hidden: Some(hidden), tooltip, flyout: None, implicit: vec![] }, cx);
+            let row = self.feature_row(FeatureRow { id: g.id, icon: icon_path("group"), name: g.name.clone(), ok: !err, inactive: g.suppressed, suppressed: g.suppressed, message: err.then(|| SAME_GROUP.to_string()), has_limits: false, hidden: Some(hidden), tooltip, flyout: None, implicit: vec![] }, cx);
             let row = if editing { div().bg(pal.accent_soft).font_weight(FontWeight::BOLD).child(row).into_any_element() } else { row };
             items.push((g.id, crate::ui_script::wrap(row, || format!("mate:{}", g.name))));
         }
@@ -5333,7 +5373,7 @@ impl AssemblyView {
         let new_mate = self.mate.as_ref().filter(|m| m.editing.is_none()).map(|m| m.dialog.read(cx)).filter(|d| !asm.mates.iter().any(|m| m.id == d.id)).map(|d| (d.id, d.mate_type, d.name.clone(), d.a.is_some() && d.b.is_some() && !d.same_instance(), d.a.is_some() || d.b.is_some(), d.same_instance()));
         if let Some((id, mate_type, name, complete, _, same)) = new_mate.clone() {
             let message = if same { Some(crate::assembly_mate_dialog::SAME_INSTANCE.to_string()) } else { (!complete).then(|| "Mate cannot resolve mate connectors.".to_string()) };
-            let row = self.feature_row(FeatureRow { id, icon: mate_icon(mate_type), name, ok: complete, inactive: false, message, has_limits: false, hidden: None, tooltip: None, flyout: None, implicit: vec![] }, cx);
+            let row = self.feature_row(FeatureRow { id, icon: mate_icon(mate_type), name, ok: complete, inactive: false, suppressed: false, message, has_limits: false, hidden: None, tooltip: None, flyout: None, implicit: vec![] }, cx);
             mate_rows.push(div().bg(pal.accent_soft).child(row).into_any_element());
             mate_ids.push(id);
         }
@@ -5341,7 +5381,7 @@ impl AssemblyView {
         // origin is picked) is in the list while its dialog is open (not one opened from a mate's chip).
         let new_mc = self.mc.as_ref().filter(|s| !s.editing && s.for_mate.is_none() && !asm.connectors.iter().any(|c| c.id == s.id)).map(|s| (s.id, s.name.clone(), s.on.is_some()));
         if let Some((id, name, ok)) = new_mc.clone() {
-            let row = self.feature_row(FeatureRow { id, icon: icon_path("mate-connector-assembly"), name, ok, inactive: false, message: None, has_limits: false, hidden: None, tooltip: None, flyout: None, implicit: vec![] }, cx);
+            let row = self.feature_row(FeatureRow { id, icon: icon_path("mate-connector-assembly"), name, ok, inactive: false, suppressed: false, message: None, has_limits: false, hidden: None, tooltip: None, flyout: None, implicit: vec![] }, cx);
             mate_rows.push(div().bg(pal.accent_soft).child(row).into_any_element());
             mate_ids.push(id);
         }
@@ -5673,8 +5713,10 @@ impl AssemblyView {
         self.request_insert_thumbs(cx);
         let item_row = |id: SharedString, indent: f32, expander: Option<AnyElement>, icon: &'static str, thumb: Option<Arc<RenderImage>>, name: String, cx: &App| {
             let row_name = name.clone();
+            let selector = format!("ins-row {name}");
             h_flex()
                 .id(id)
+                .debug_selector(move || selector)
                 .map(|d| crate::ui_script::mark(d, move || format!("list_row:{row_name}")))
                 .flex_none()
                 .h(px(40.))
@@ -5712,7 +5754,8 @@ impl AssemblyView {
                 let mut parts: Vec<CatalogPart> = s.parts.iter().filter(|p| (studio_hit || hit(&p.1)) && kind_ok(p)).cloned().collect();
                 parts.sort_by_key(|p| !is_composite(p));
                 let sketches: Vec<(FeatureId, String)> = if !any_filter || only_sketches { s.sketches.iter().filter(|k| studio_hit || hit(&k.1)).cloned().collect() } else { Vec::new() };
-                if !studio_hit && parts.is_empty() && sketches.is_empty() {
+                // A studio with no parts or sketches isn't listed, its name searched for or not (live2 errors-1119 q3).
+                if parts.is_empty() && sketches.is_empty() && (!studio_hit || (s.parts.is_empty() && s.sketches.is_empty())) {
                     continue;
                 }
                 any = true;
@@ -5764,12 +5807,12 @@ impl AssemblyView {
                 }
             }
             if !any {
-                body = body.child(div().p_2().text_xs().text_color(pal.text_faint).child(if query.is_empty() { "No Part Studios with parts." } else { "No results." }));
+                body = body.child(if query.is_empty() { div().p_2().text_xs().text_color(pal.text_faint).child("No Part Studios with parts.") } else { insert_no_match("No Part Studios match current search.") });
             }
         } else {
             let list: Vec<(TabId, String)> = self.catalog.assemblies.iter().filter(|(_, n)| hit(n)).cloned().collect();
             if list.is_empty() {
-                body = body.child(div().p_2().text_xs().text_color(pal.text_faint).child(if query.is_empty() { "No Assemblies available." } else { "No assemblies match current search." }));
+                body = body.child(if query.is_empty() { div().p_2().text_xs().text_color(pal.text_faint).child("No Assemblies available.") } else { insert_no_match("No assemblies match current search.") });
             }
             for (tab, name) in list {
                 let n2 = name.clone();

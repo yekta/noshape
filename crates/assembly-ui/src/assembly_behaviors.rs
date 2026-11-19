@@ -245,6 +245,9 @@ pub struct SectionSnap {
 /// Snap distances in pixels (live: an edge of the face under the pointer
 /// from ≈30–35 px, a vertex from ≈22 px).
 const SECTION_SNAP_EDGE_PX: f64 = 35.0;
+/// Select other's reach off a part (live selother-ball-1119): an edge out to 8 px, a face out to 11 px.
+const SELECT_OTHER_EDGE_PX: f64 = 8.0;
+const SELECT_OTHER_FACE_PX: f64 = 11.0;
 const SECTION_SNAP_VERTEX_PX: f64 = 22.0;
 
 /// The value box after a section drag (live: Onshape's canvas number box,
@@ -4540,8 +4543,19 @@ impl AssemblyView {
                 (rows, ix, at)
             }
             _ => {
-                let mut rows: Vec<SelectOtherRow> = self.hover.clone().filter(|t| matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex)).map(SelectOtherRow::Entity).into_iter().collect();
-                rows.extend(self.instances_under(self.pointer, cx).into_iter().map(SelectOtherRow::Instance));
+                // Off a part, an edge out to 8 px of the pointer, else out to 11 px the face behind that edge, and its
+                // part (live selother-ball-1119).
+                let vp = self.viewport.read(cx);
+                let kind_of = |id: u32| self.pick(Some(id)).map(|t| t.kind);
+                let edge_within = |px: f64| self.pick(vp.pick_at_pointer_within(px, &|id| !matches!(kind_of(id), Some(PickKind::Edge | PickKind::Vertex))).flatten());
+                let face_behind = || self.pick(vp.pick_at_pointer_within(SELECT_OTHER_FACE_PX + 3.0, &|id| kind_of(id) != Some(PickKind::Face)).flatten());
+                let entity = self.hover.clone().filter(|t| matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex)).or_else(|| edge_within(SELECT_OTHER_EDGE_PX)).or_else(|| edge_within(SELECT_OTHER_FACE_PX).and_then(|_| face_behind()));
+                let mut under = self.instances_under(self.pointer, cx);
+                if let Some(top) = entity.as_ref().and_then(|t| t.path.first().copied()).filter(|top| !under.contains(top)) {
+                    under.push(top);
+                }
+                let mut rows: Vec<SelectOtherRow> = entity.map(SelectOtherRow::Entity).into_iter().collect();
+                rows.extend(under.into_iter().map(SelectOtherRow::Instance));
                 let ix = if backwards { rows.len().saturating_sub(1) } else { 1 % rows.len().max(1) };
                 (rows, ix, self.pointer)
             }

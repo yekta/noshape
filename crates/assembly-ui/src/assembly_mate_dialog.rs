@@ -161,6 +161,8 @@ struct PickState {
 pub const SAME_INSTANCE: &str = "Mate connectors are on same instance.";
 
 /// What an unset limit field reads (live).
+/// A limit field's tooltip while its minimum is above its maximum (live2 errors-1119 a5).
+const CROSSED_LIMITS: &str = "Minimum mate limit should be smaller than maximum limit.";
 const NO_LIMIT: [&str; 2] = ["No minimum", "No maximum"];
 
 /// The unit kind of a mate limit: rotations (`rz`, the ball's `cone`) are
@@ -672,8 +674,14 @@ impl MateDialog {
             _ if self.same_instance() => Some(SAME_INSTANCE),
             _ => None,
         };
-        let msg = incomplete.map(str::to_string).or_else(|| (!self.crossed_limits(cx).is_empty()).then(|| "Minimum mate limit should be smaller than maximum limit. A parameter value is not valid.".to_string())).or_else(|| self.status.clone())?;
+        let msg = incomplete.map(str::to_string).or_else(|| (!self.crossed_limits(cx).is_empty()).then(|| format!("{CROSSED_LIMITS} A parameter value is not valid."))).or_else(|| self.status.clone())?;
         Some(format!("{} did not regenerate properly: {msg}", self.name))
+    }
+
+    /// ✓ and Enter take the mate: both connectors set and no minimum limit above its maximum (live2 errors-1119 a5: ✓
+    /// disabled while they cross).
+    pub fn can_accept(&self, cx: &App) -> bool {
+        self.to_mate(cx).is_some() && self.crossed_limits(cx).is_empty()
     }
 
     /// The mate as currently defined (None until both connectors are set).
@@ -1032,7 +1040,8 @@ impl Render for MateDialog {
                     // Live: a 194 x 29 row, the field ends 26 px before the dialog's edge.
                     .w(px(194.))
                     .h(px(29.))
-                    .tooltip(crate::ui::tooltip(format!("{} {}", if max { "Maximum" } else { "Minimum" }, limit_label(key))))
+                    // Crossed, the field's tooltip is the error (live2 errors-1119 a5).
+                    .tooltip(crate::ui::tooltip(if crossed.contains(&key) { CROSSED_LIMITS.to_string() } else { format!("{} {}", if max { "Maximum" } else { "Minimum" }, limit_label(key)) }))
                     .child(crate::assets::icon(&icon_path(icon), 26., cx))
                     .child(gpui_kit::base::input::input_frame(
                         div()
@@ -1055,6 +1064,7 @@ impl Render for MateDialog {
         }
         let regen_error = self.regen_error(cx);
         let invalid = self.to_mate(cx).is_none();
+        let crossed = !self.crossed_limits(cx).is_empty();
         let query_boxes = match t {
             // Live (dom/dialog-mate-tangent-*): one "Face, edge or vertex" field per entity.
             MateType::Tangent => vec![self.query_box("mate-q-ent-a", "Face, edge or vertex", &[0], cx), self.query_box("mate-q-ent-b", "Face, edge or vertex", &[1], cx)],
@@ -1122,8 +1132,8 @@ impl Render for MateDialog {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .bg(pal.accept).when(invalid && !self.touched, crate::ui::disabled_accept)
-                            .when(!invalid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))))
+                            .bg(pal.accept).when((invalid && !self.touched) || crossed, crate::ui::disabled_accept)
+                            .when(!invalid && !crossed, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))))
                             .cursor_pointer()
                             .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                             .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Accept))),

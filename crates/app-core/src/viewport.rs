@@ -1276,6 +1276,19 @@ impl Viewport {
         Some(pick.pick_reaching(x, y, r, edge_reach_px(self.scale), |id| class(id), |id| if skip(id) { i32::MIN } else { prio(id) }))
     }
 
+    /// The pick at the pointer within `css_px` of it (Select other's reach, wider than hover's) with the ids `skip`
+    /// holds never picked, from the last pick rectangle; None when none covers that.
+    pub fn pick_at_pointer_within(&self, css_px: f64, skip: &dyn Fn(u32) -> bool) -> Option<Option<u32>> {
+        let pick = self.pick_cache.as_ref()?;
+        let (x, y) = self.device_px(self.last_pos);
+        let r = (css_px * f64::from(self.scale)).round() as i32;
+        if !pick.covers(x, y, r) {
+            return None;
+        }
+        let prio = self.pick_priority.clone();
+        Some(pick.pick(x, y, r, |id| if skip(id) { i32::MIN } else { prio(id) }))
+    }
+
     fn pick_at(&self, local: DVec2) -> Option<Option<u32>> {
         let pick = self.pick_cache.as_ref()?;
         let (x, y) = self.device_px(local);

@@ -1,6 +1,6 @@
-//! A mate row's flyout (live2 asm-feel 11-17 (1)): the row's tooltip, right of the list and centred on the row, 228 px
-//! wide: the mate's name and state over `#D0DBE5`, then its parameters read-only as in its dialog (only the type while
-//! they are all at their defaults). It fades in from about 110 ms after the pointer arrives; the next row's replaces it
+//! A mate row's flyout (live2 asm-feel 11-17 (1), errors-1119 lo): the row's tooltip, right of the list and centred on
+//! the row, 228 px wide or as wide as its title: the mate's name and state bold over `#D0DBE5`, then its parameters
+//! read-only as in its dialog, a value grey on its field's line (only the type while they are all at their defaults). It fades in from about 110 ms after the pointer arrives; the next row's replaces it
 //! at once (a warm tooltip).
 
 use gpui_kit::prelude::FluentBuilder as _;
@@ -14,6 +14,9 @@ const WIDTH: f32 = 228.;
 const HEAD_H: f32 = 26.;
 const ROW_H: f32 = 26.;
 const PAD: f32 = 4.;
+/// The body's left edge and a read-only field's width (live2 errors-1119 lo: "Revolute" 11 px in, its line 212 px).
+const BODY_X: f32 = 11.;
+const FIELD_W: f32 = 212.;
 
 /// One read-only row of the flyout's body.
 #[derive(Clone, Debug, PartialEq)]
@@ -48,19 +51,29 @@ impl Render for MateFlyout {
             div().size(px(13.)).flex_none().border_1().border_color(gpui_kit::rgb(0x999999)).rounded(px(2.)).bg(gpui_kit::rgb(0xffffff)).flex().items_center().justify_center().when(on, |d| d.child(div().size(px(7.)).bg(gpui_kit::rgb(0x555555))))
         };
         let body = (!self.rows.is_empty()).then(|| {
-            div().p(px(PAD)).bg(gpui_kit::rgb(0xffffff)).flex().flex_col().children(self.rows.iter().map(|r| match r {
-                FlyRow::Text(t) => div().h(px(ROW_H)).flex().items_center().text_size(px(14.)).child(crate::ui::user_text(t.clone())).into_any_element(),
+            div().py(px(PAD)).pl(px(BODY_X)).pr(px(PAD)).bg(gpui_kit::rgb(0xffffff)).flex().flex_col().children(self.rows.iter().map(|r| match r {
+                FlyRow::Text(t) => div()
+                    .h(px(ROW_H))
+                    .w(px(FIELD_W))
+                    .flex()
+                    .items_center()
+                    .border_b_1()
+                    .border_color(gpui_kit::rgb(0xdddddd))
+                    .text_size(px(13.))
+                    .text_color(gpui_kit::rgb(0x999999))
+                    .child(crate::ui::user_text(t.clone()))
+                    .into_any_element(),
                 FlyRow::Check(t, on) => div().h(px(ROW_H)).flex().items_center().gap(px(6.)).text_size(px(14.)).child(check(*on)).child(t.clone()).into_any_element(),
             }))
         });
         // A name-only tip (an instance row's) is as wide as its text (live2 13:05: "Part 1 <1>" 63 wide).
         let content = div()
-            .when(!self.rows.is_empty(), |d| d.w(px(WIDTH)))
+            .when(!self.rows.is_empty(), |d| d.min_w(px(WIDTH)))
             .whitespace_nowrap()
             .text_size(px(12.))
             .text_color(ink)
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(1.)), blur_radius: px(2.), spread_radius: px(0.), inset: false }])
-            .child(div().h(px(HEAD_H)).px(px(PAD)).flex().items_center().bg(gpui_kit::rgb(0xd0dbe5)).font_weight(FontWeight::MEDIUM).line_height(px(18.)).child(crate::ui::user_text(self.head.clone())))
+            .child(div().h(px(HEAD_H)).px(px(PAD)).flex().items_center().bg(gpui_kit::rgb(0xd0dbe5)).font_weight(FontWeight::BOLD).line_height(px(18.)).child(crate::ui::user_text(self.head.clone())))
             .children(body)
             .with_animation("mate-flyout-fade", Animation::new(FADE), |c, t| c.opacity(t));
         let a = self.anchor;
