@@ -5736,8 +5736,9 @@ impl<'a> Translator<'a> {
         ordered.sort_by_key(|c| !matches!(c["constraintType"].as_str(), Some("CIRCULAR_PATTERN" | "LINEAR_PATTERN")));
         for c in ordered {
             let ty = c["constraintType"].as_str().unwrap_or("");
+            // (One to geometry live's sketch no longer finds pins its point where it is: in order, clamp-guillem's Boceto 6.)
             let anchor = ty == "COINCIDENT"
-                && c["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("external")) && p["queries"].as_array().is_some_and(|q| !q.is_empty()));
+                && c["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("external")) && p["queries"].as_array().is_some_and(|q| !q.is_empty() && !q.iter().all(empty_live_query)));
             if anchor != anchors {
                 continue;
             }
