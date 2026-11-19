@@ -1,19 +1,23 @@
 {
  "scenario": "asm-explode-row-menu",
- "recorded": "2026-11-07T01:42:43.255Z",
+ "recorded": "2026-11-19T23:12:13.261Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.2"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 9683cf28 + live2 2026-11-18.1"
  },
  "live": {
-  "document": "d434fb734585b9e3f85b1cca",
-  "workspace": "e46def584afd02d0b1b2ea03",
-  "element": "93cdc38f2a4e0168ceb8a764",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "5bf8f5e7b760a9ca78ed5f32",
   "start": "two-blocks",
-  "startElement": "17925cad4a23714ccd49b367",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "593cbc316fd295523e79fef3",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -21,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -133,7 +138,34 @@
    ],
    "mates": []
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    36.83,
+    25.49,
+    6.34
+   ],
+   "eye_mm": [
+    63.812,
+    -21.243,
+    37.495
+   ],
+   "width_mm": 98.649,
+   "height_mm": 57.373,
+   "mmPerPixel": 0.058965,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -147,7 +179,7 @@
    "ok": true,
    "at": [
     1904,
-    494
+    538
    ],
    "state": {
     "focus": {
@@ -155,6 +187,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -268,13 +301,40 @@
      "mates": []
     },
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 57.373,
+     "height_mm": 58.454,
+     "mmPerPixel": 0.060077,
+     "orthographic": true
+    },
+    "measure": null,
     "panel": {
      "title": "Exploded views",
      "rows": [],
      "banner": null
     }
    },
-   "t": 26913
+   "t": 32918
   },
   {
    "step": 2,
@@ -295,6 +355,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -303,7 +364,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -408,6 +469,33 @@
      "mates": []
     },
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 57.373,
+     "height_mm": 58.454,
+     "mmPerPixel": 0.060077,
+     "orthographic": true
+    },
+    "measure": null,
     "panel": {
      "title": "Exploded views",
      "rows": [
@@ -419,7 +507,7 @@
      "banner": "Editing Explode 1"
     }
    },
-   "t": 29611
+   "t": 35670
   },
   {
    "step": 3,
@@ -428,12 +516,21 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1563,
+     125
+    ],
+    "hover": [],
+    "element": "span.os-list-item-name"
+   },
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -442,7 +539,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -547,6 +644,33 @@
      "mates": []
     },
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 57.373,
+     "height_mm": 58.454,
+     "mmPerPixel": 0.060077,
+     "orthographic": true
+    },
+    "measure": null,
     "panel": {
      "title": "Exploded views",
      "rows": [
@@ -558,7 +682,7 @@
      "banner": null
     }
    },
-   "t": 33414
+   "t": 39424
   },
   {
    "step": 4,
@@ -579,6 +703,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -598,7 +723,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -703,6 +828,33 @@
      "mates": []
     },
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 57.373,
+     "height_mm": 58.454,
+     "mmPerPixel": 0.060077,
+     "orthographic": true
+    },
+    "measure": null,
     "panel": {
      "title": "Exploded views",
      "rows": [
@@ -714,7 +866,7 @@
      "banner": null
     }
    },
-   "t": 35951
+   "t": 42034
   },
   {
    "step": 5,
@@ -723,12 +875,21 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1272,
+     120
+    ],
+    "hover": [],
+    "element": "div#context-menu-layer"
+   },
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -737,7 +898,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -842,6 +1003,33 @@
      "mates": []
     },
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 57.373,
+     "height_mm": 58.454,
+     "mmPerPixel": 0.060077,
+     "orthographic": true
+    },
+    "measure": null,
     "panel": {
      "title": "Exploded views",
      "rows": [
@@ -853,7 +1041,7 @@
      "banner": null
     }
    },
-   "t": 39713
+   "t": 45862
   }
  ]
 }

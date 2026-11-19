@@ -1,18 +1,23 @@
 {
  "scenario": "folder-rclick-menu",
- "recorded": "2026-11-06T14:40:58.747Z",
+ "recorded": "2026-11-19T23:09:02.768Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.4 c2684ac9"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 9683cf28 + live2 2026-11-18.1"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "500f22749089935462f2168c",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "cbac2d9a3720e78e51ea8635",
   "start": "block",
-  "startElement": "23614b0537e04a173a620e75"
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -20,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -59,7 +65,34 @@
   "message": null,
   "tooltip": null,
   "sketch": null,
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 419.494,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.250744,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -81,6 +114,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 1,
@@ -126,9 +160,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 28684
+   "t": 29882
   },
   {
    "step": 2,
@@ -150,6 +211,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 2,
@@ -200,9 +262,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 31667
+   "t": 32694
   },
   {
    "step": 3,
@@ -229,8 +318,34 @@
      ],
      "all": true
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "panel",
+     "title": "Folder name",
+     "text": [
+      "New folder"
+     ],
+     "fields": [
+      {
+       "label": "Folder name",
+       "kind": "input",
+       "value": "New folder"
+      }
+     ]
+    },
     "dialogs": [],
+    "panels": [
+     {
+      "id": "name-dialog",
+      "title": "Folder name",
+      "text": "Folder name",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": "New folder"
+       }
+      ]
+     }
+    ],
     "list": null,
     "selection": {
      "count": 2,
@@ -281,9 +396,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 33857
+   "t": 35045
   },
   {
    "step": 4,
@@ -292,12 +434,21 @@
     "key": "Enter"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     155,
+     129
+    ],
+    "hover": [],
+    "element": "use"
+   },
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 2,
@@ -339,9 +490,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 36951
+   "t": 37442
   },
   {
    "step": 5,
@@ -362,6 +540,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -418,9 +597,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 39524
+   "t": 40105
   },
   {
    "step": 6,
@@ -429,12 +635,21 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     90,
+     287
+    ],
+    "hover": [],
+    "element": "div#context-menu-layer"
+   },
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 2,
@@ -476,9 +691,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 42809
+   "t": 43417
   }
  ]
 }

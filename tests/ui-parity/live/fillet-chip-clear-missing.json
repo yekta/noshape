@@ -1,18 +1,23 @@
 {
  "scenario": "fillet-chip-clear-missing",
- "recorded": "2026-11-07T15:45:06.263Z",
+ "recorded": "2026-11-19T23:17:00.413Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.6 ade395e0"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 9683cf28 + live2 2026-11-18.1"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "8687f439f47b2de7401d5ad6",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "1ad8d236205f0ff74674be9d",
   "start": "block-fillet",
-  "startElement": "f52d62d96bea15774711c619"
+  "startElement": "8ef4b24dee8da1135e478009",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -69,7 +74,34 @@
   "message": null,
   "tooltip": null,
   "sketch": null,
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 419.494,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.250744,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -159,9 +191,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 74131
+   "t": 29525
   },
   {
    "step": 2,
@@ -220,9 +279,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 78341
+   "t": 33627
   },
   {
    "step": 3,
@@ -263,7 +349,7 @@
        "label": "Entities to fillet",
        "kind": "query",
        "items": [
-        "Missing Edge"
+        "Unknown of"
        ],
        "active": true,
        "state": "error"
@@ -347,7 +433,7 @@
         "label": "Entities to fillet",
         "kind": "query",
         "items": [
-         "Missing Edge"
+         "Unknown of"
         ],
         "active": true,
         "state": "error"
@@ -415,14 +501,8 @@
     "panels": null,
     "list": null,
     "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "FEATURE",
-       "owner": "Extrude 1",
-       "id": "FjG0FuOCHCdbGWQ_0"
-      }
-     ]
+     "count": 0,
+     "items": []
     },
     "features": {
      "rows": [
@@ -456,9 +536,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 95332
+   "t": 38877
   },
   {
    "step": 4,
@@ -500,7 +607,7 @@
        "label": "Entities to fillet",
        "kind": "query",
        "items": [
-        "Missing Edge"
+        "Unknown of"
        ],
        "active": true,
        "state": "error"
@@ -584,7 +691,7 @@
         "label": "Entities to fillet",
         "kind": "query",
         "items": [
-         "Missing Edge"
+         "Unknown of"
         ],
         "active": true,
         "state": "error"
@@ -654,21 +761,14 @@
      "kind": "context-menu",
      "rows": [
       "Clear all",
-      "Clear missing references",
       "Edit healthy moment"
      ],
      "highlighted": null,
      "disabled": []
     },
     "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "FEATURE",
-       "owner": "Extrude 1",
-       "id": "FjG0FuOCHCdbGWQ_0"
-      }
-     ]
+     "count": 0,
+     "items": []
     },
     "features": {
      "rows": [
@@ -702,9 +802,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 98362
+   "t": 41115
   },
   {
    "step": 5,
@@ -714,14 +841,14 @@
      "menu": "Clear missing references"
     }
    },
-   "ok": true,
-   "at": [
-    440,
-    199
-   ],
+   "ok": false,
+   "error": "target not found: {\"menu\":\"Clear missing references\"}",
    "state": {
     "focus": {
-     "kind": "none"
+     "kind": "field",
+     "tag": "div",
+     "label": "Entities to fillet",
+     "dialog": "Fillet 1"
     },
     "dialog": {
      "title": "Fillet 1",
@@ -741,7 +868,9 @@
       {
        "label": "Entities to fillet",
        "kind": "query",
-       "items": [],
+       "items": [
+        "Unknown of"
+       ],
        "active": true,
        "state": "error"
       },
@@ -823,7 +952,9 @@
        {
         "label": "Entities to fillet",
         "kind": "query",
-        "items": [],
+        "items": [
+         "Unknown of"
+        ],
         "active": true,
         "state": "error"
        },
@@ -888,7 +1019,15 @@
      }
     ],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Clear all",
+      "Edit healthy moment"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -919,15 +1058,42 @@
     "parts": [],
     "partsHeading": "Parts (0)",
     "undo": {
-     "undo": true,
+     "undo": false,
      "redo": false
     },
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 102352
+   "t": 42941
   },
   {
    "step": 6,
@@ -936,6 +1102,16 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     356,
+     162
+    ],
+    "hover": [
+     "FcxbBAttmKCrWsB_1"
+    ],
+    "element": "div.angular-bootstrap-contextmenu.dropdown"
+   },
    "state": {
     "focus": {
      "kind": "none"
@@ -980,9 +1156,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 109110
+   "t": 46645
   }
  ]
 }

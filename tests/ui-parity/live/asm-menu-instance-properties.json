@@ -1,18 +1,23 @@
 {
  "scenario": "asm-menu-instance-properties",
- "recorded": "2026-11-07T00:28:00.002Z",
+ "recorded": "2026-11-19T23:15:22.421Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 9683cf28 + live2 2026-11-18.1"
  },
  "live": {
   "document": "a1e7207bcd206771836609af",
   "workspace": "6d6324b30f07aa9904363635",
-  "element": "56d557be62a07cffcbb0c0c7",
+  "element": "fd689807bf9c298bd766e5a5",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3"
+  "startElement": "593cbc316fd295523e79fef3",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -20,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -132,7 +138,34 @@
    ],
    "mates": []
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    36.83,
+    25.49,
+    6.34
+   ],
+   "eye_mm": [
+    63.812,
+    -21.243,
+    37.495
+   ],
+   "width_mm": 98.649,
+   "height_mm": 57.373,
+   "mmPerPixel": 0.058965,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -154,6 +187,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -177,7 +211,8 @@
       "Move to new subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 2…",
@@ -299,9 +334,36 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 98.649,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.058965,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 25943
+   "t": 35899
   },
   {
    "step": 2,
@@ -330,13 +392,21 @@
     "dialog": {
      "kind": "modal",
      "title": "Instance properties",
-     "fields": [],
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": ""
+      }
+     ],
      "buttons": [
       "Save",
       "Close"
-     ]
+     ],
+     "text": "Part 2 <1> Reference designator"
     },
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -449,9 +519,36 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 98.649,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.058965,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 28618
+   "t": 39353
   },
   {
    "step": 3,
@@ -460,12 +557,21 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     225,
+     281
+    ],
+    "hover": [],
+    "element": "div.modal.instance-properties-dialog"
+   },
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -578,9 +684,36 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 98.649,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.058965,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 32258
+   "t": 43129
   }
  ]
 }

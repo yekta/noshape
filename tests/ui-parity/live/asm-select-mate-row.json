@@ -1,18 +1,23 @@
 {
  "scenario": "asm-select-mate-row",
- "recorded": "2026-11-03T23:09:17.201Z",
+ "recorded": "2026-11-19T23:04:48.478Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-05.0 backfilled"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "ad8fc0a2db30a7a645b40fd0",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "c2a3356721d004fb47eebfda",
   "start": "pin-block",
-  "startElement": "9e8b7f196e8cee81ff4a1105"
+  "startElement": "7425731ef03d2b9db73c3efb",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -20,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -146,7 +152,35 @@
      "status": "OK"
     }
    ]
-  }
+  },
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    -2.165,
+    3.75,
+    7.5
+   ],
+   "eye_mm": [
+    16.636,
+    -28.814,
+    29.209
+   ],
+   "width_mm": 96.23,
+   "height_mm": 55.966,
+   "mmPerPixel": 0.057519,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -160,7 +194,7 @@
    "ok": true,
    "at": [
     109,
-    287
+    313
    ],
    "state": {
     "focus": {
@@ -168,6 +202,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 1,
@@ -300,9 +335,37 @@
        "status": "OK"
       }
      ]
-    }
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      -2.165,
+      3.75,
+      7.5
+     ],
+     "eye_mm": [
+      16.636,
+      -28.814,
+      29.209
+     ],
+     "width_mm": 96.23,
+     "height_mm": 55.966,
+     "mmPerPixel": 0.057519,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 26803
+   "t": 37846
   },
   {
    "step": 2,
@@ -323,6 +386,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 2,
@@ -460,9 +524,37 @@
        "status": "OK"
       }
      ]
-    }
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      -2.165,
+      3.75,
+      7.5
+     ],
+     "eye_mm": [
+      16.636,
+      -28.814,
+      29.209
+     ],
+     "width_mm": 96.23,
+     "height_mm": 55.966,
+     "mmPerPixel": 0.057519,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 30376
+   "t": 41501
   },
   {
    "step": 3,
@@ -471,12 +563,28 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     90,
+     235
+    ],
+    "hover": [
+     {
+      "_serializedByteLength": 0,
+      "path": [
+       "MDTE15eL0WXOvAQBi"
+      ]
+     }
+    ],
+    "element": "span.assemblyTreeName.os-list-item-name"
+   },
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 2,
@@ -614,9 +722,37 @@
        "status": "OK"
       }
      ]
-    }
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      -2.165,
+      3.75,
+      7.5
+     ],
+     "eye_mm": [
+      16.636,
+      -28.814,
+      29.209
+     ],
+     "width_mm": 96.23,
+     "height_mm": 55.966,
+     "mmPerPixel": 0.057519,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 33973
+   "t": 45290
   }
  ]
 }
