@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 21:15)
+# QA handoff (agent qa; current state only, updated 2026-11-19 21:38)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -66,18 +66,21 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    everyday flows, then nightly/flows-done-<mmdd>; qa-w7-nightly waits for that flag (03:20 at the latest) before hat15 / dock;
    user flows after NIGHTLY-DONE. Re-arm each night with the next date. Cut verdict: a must-carry still queued reads PENDING
    at :15 and HOLD only if missing at :50 (timers qa-cut-0450 / 1650). qa-big-after fetches tonight's big run and fixes its fetch line.
-0000. **11-19 21:15 state (thread on Bbedward since 21:08).** Ids: as in the lead's prompt (dx / live get new ids from the lead).
-   **In flight:** qa-pub-0461 (bin/rel-pub-all.sh 0.4.60 0.4.61): SHA OK, USERDOCS ALL-SAME (hats, dock, f197), now QUIT-ABORT-DOCK x5,
-   then rel-compat -> compat/published-0.4.61.txt (PUB-DONE), compat/rel-0.4.61.txt: compare rel with compat/cut-1119-1615.txt by hand;
-   any user-document change = P0 to the lead. qa-uh61 (uh/uh61.sh: hover flow uh3.sh x3 on the released v0.4.61 app, vibex8 :663,
-   out uh/r61/{1,2,3}, lit.py -> uh/r61/lit.txt, ends UH61-DONE; compare with g87's 11-18 numbers).
-   Suite 1119-1302-291c74b0: ui 2120/2172 (1242 run 2110); models done; assemblies / exchange still on vibex8 (remote-rest.log). The 4
-   "new" failures re-run on green 233519a8 (suites/1119-2120-233519a8-rr): dihedral / flatten / asm select-other pass (load 36 flakes);
-   sketch-vertical-key fails since 11-18 (ours + VERTICAL) -> skasm told 21:12. Owners' fixes verified there: line-from-midpoint,
-   ver-row-tooltip, drw-copy-drag, line-chain, drw-constraint-tangent (8aaff5ae9); select-fillet-faces still ≠ (psui).
-   Next: spot-check rows 17-24 (archive list) on v0.4.61; compare the full 291c74b0 run with suites-diff.py once models.log /
-   rest are fetched; qa-night-seq-1120 armed for tonight (re-arm 1121 tomorrow). Tools: bin/uip-rerun.sh needs ABSOLUTE names paths
-   (it cd's to qa-bisect); systemd-run units have no cwd: give absolute script paths. vibe2 ~/tmp/qa/apps/noshape-green = 233519a8.
+0000. **11-19 21:38 state (thread on Bbedward since 21:08).** Ids: as in the lead's prompt (dx / live get new ids from the lead).
+   **v0.4.61 post-release done 21:2x: clean** (qa-alerts line): SHA OK, user docs ALL-SAME (candidate and vs 0.4.60), ticket docs = the
+   cut's 3 (draft-hang, shell-hang-pre, suppress-segv), quit-abort 5/5, hover flow uh/r61 108/108 shots right, spot rows 17-22 on the
+   released app 12/13 (suites/1119-2120-v0461-spot; line-from-midpoint fixed after the release). Compat baseline 0.4.61. Next spot
+   rows: 23-24 (sticky snap, hat15b moved sketch: no scenario, check by hand) then 25-32 of interaction-feel.md's "=" rows.
+   **In flight:** qa-wait-e196 (bin/wait-rows.sh on subject "psui: Routing curve's Multiple" = psui's land job e196bc5a, which carries
+   their 6 feel fixes): on its green re-runs face-rclick-select-fillet-faces, dialog-checkbox-convert-back, dialog-checkbox-rclick-convert,
+   dialog-query-rclick-clear-all, fillet-chip-clear-missing, fillet-chip-edit-healthy-moment, analysis-interference -> one qa-alerts line;
+   mark the TICKETS rows. Suite 1119-1302-291c74b0: ui 2120/2172, models done, assemblies / exchange in vibex8's slot: suites-diff.py
+   vs the last full run when done. sketch-vertical-key: not the camera (lead); psui re-runs it on live2's cf70e676 (TICKETS ~5523).
+   P1 walk 21:36 on a58eee8c (sketch -> extrude -> fillet -> pattern -> edit -> undo -> suppress): all build; P2 PATTERN-CHECK-STAYS-
+   ENABLED (psui) + live request (REQUESTS qa 11-19 21:36: ✓ after emptying, tooltip on click). Next walk: rollback bar, reorder,
+   mirror / boolean / hole / shell, measure, mass properties, section view, view cube.
+   Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
+   needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
    with NOSHAPE_PARITY_VALIDITY=1 (bin/suites-models.sh exports it) models.log prints per feature "CHECK <doc> feature <k>:
    <part> valid <true|false> raw f/e/v; ..." (PartState.check, query parts' "check"; not in report.json). suites-diff.py
