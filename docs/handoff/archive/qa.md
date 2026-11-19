@@ -2153,3 +2153,13 @@ selection, measure, section view; then P2 assembly and drawing passes; verify th
    qa-feat3 (bin/feat3.sh): release CLI of main 7db466c62 built on vibex8 (slot), ab-feat.py 3 runs vs 0.4.57 on impeller /
    valve-config / hunting-knife, then bin/feat3-pair.py vs live's rbstep-1118 tables: features > 5x live go to blend / core / bool.
    ASMFEEL x4 verified on 8b4812511 (06:20). 17:00 list written (TICKETS); cut-must.txt: fff088e5 + Ctrl+Enter fix when it lands.
+
+## Moved from the handoff 11-19 03:55
+0l. **Suites off the watcher host (lead 01:30)**: run 1117-2103-592b0fc9's assembly stage was on vibex6 (7/24 done): qa-suites stopped,
+   own orphaned test killed, stage rerun on vibex8 by unit qa-rest-redo (bin/rest-redo.sh <run> <host>: rest stage + qa-suites.sh's
+   collection / diff / index). qa-suites.sh defaults now H=vibex8 (and SH=vibex8 at night). **The loop (qa-suites) is stopped: restart
+   after the 05:00 cut** (systemd-run -E HOME=/root -E PATH=$PATH --unit=qa-suites --collect bash -c 'cd /root/qa-scratch && exec bash
+   bin/qa-suites-loop.sh'); its UI stage still uses vibex6 21:30-04:05 (UH): ask the lead before the next night.
+   Re-checks done 01:20-01:32 on 5076e98c: Flange broad face + joint-row hover fixed (skasm); bar / Mass / `[` pass, measure angle
+   x=40 pair open with live2 (psui: live's 123.69 was the second wedge); model-edge glyph after the click fixed; sweep / hv analysis
+   pending (sk/sw5, hv5: python3 ana.py sw sw5 / hv hv5).
