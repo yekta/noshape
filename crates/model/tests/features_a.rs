@@ -3798,3 +3798,20 @@ fn a_path_loft_of_two_slots_has_one_side_face() {
     assert!(bb.min.z > -1e-6, "the side below the first profile's plane: {} mm", bb.min.z * 1e3);
 }
 
+/// A surface mirrored with Add joins its mirror where they meet (live c2-surf-workshop-singularities' Mirror 3: one
+/// sheet of the extruded face and its mirror, 2/7/6); with New the mirror is a surface of its own.
+#[test]
+fn a_surface_mirrored_with_add_joins_its_mirror() {
+    for (op, bodies, faces) in [("ADD", 1, 2), ("NEW", 2, 1)] {
+        let mut t = T::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let ln = sk.add_line(DVec2::new(0.0, 0.0), DVec2::new(0.03, 0.01));
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let x = t.add("extrude", &[("bodyType", en("SURFACE")), ("surfaceEntities", q(vec![Reference::SketchEntity { sketch: s, entity: ln.0 }])), ("depth", e("20 mm"))]);
+        let id = BodyId { feature: x, index: 0 };
+        t.add("mirror", &[("entities", q(vec![body_ref(&id)])), ("mirrorPlane", q(vec![Reference::Plane(DatumPlane::Right)])), ("operationType", en(op)), ("defaultScope", b(false)), ("booleanScope", q(vec![body_ref(&id)]))]);
+        let res = t.ok();
+        assert_eq!(res.context.bodies.len(), bodies, "{op}");
+        assert!(res.context.bodies.iter().all(|b| b.kind == noshape_model::display::BodyKind::Surface && b.shape.faces().len() == faces), "{op}");
+    }
+}

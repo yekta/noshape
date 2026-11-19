@@ -670,9 +670,24 @@ fn part_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     let copies = copy_bodies(ev, &bodies, instances)?;
     pattern_connectors(ev, refs, instances);
     if op == "NEW" || copies.iter().all(|c| c.2 != BodyKind::Solid) {
+        // An Add joins a surface's copies to the surfaces they touch of its merge scope and the seeds (live
+        // c2-surf-workshop-singularities' Mirror 3: the mirrored sheet and its seed one 2-face sheet, behaviours 11-18).
+        let join_to: Vec<BodyId> = if op == "ADD" {
+            let scope = if ev.bool("defaultScope") { (0..ev.ctx.bodies.len()).collect() } else { ev.resolve_bodies(ev.query("booleanScope")) };
+            scope.into_iter().chain(bodies.iter().copied()).filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Surface).map(|i| ev.ctx.bodies[i].id.clone()).collect()
+        } else {
+            Vec::new()
+        };
         // Live (qa5 P1-13): the instances keep the seed's colour.
         let nb = bodies.len().max(1);
         for (ii, bj, kind, ns) in copies {
+            if kind == BodyKind::Surface && !join_to.is_empty() {
+                let scope: Vec<usize> = (0..ev.ctx.bodies.len()).filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Surface && (join_to.contains(&ev.ctx.bodies[i].id) || ev.ctx.bodies[i].id.feature == ev.feature)).collect();
+                if scope.iter().any(|&i| k::distance(&ev.ctx.bodies[i].shape, &ns.shape).is_ok_and(|d| d.distance < 1e-6)) {
+                    super::bshared::join_surface(ev, ns, scope)?;
+                    continue;
+                }
+            }
             let color = ev.ctx.bodies[bodies[bj]].color;
             push_body_colored(ev, BodyId { feature: ev.feature, index: (ii * nb + bj) as u32 }, kind, ns.shape, ns.names.faces, color);
         }
