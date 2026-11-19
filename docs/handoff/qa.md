@@ -89,7 +89,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    P2 assemblies 21:58 (walk2 Assembly 1): Insert dialog, 2 instances, fit, free drag, Fastened between hole faces (HUD, Solve),
    BOM panel = live (Item | Quantity | Part number | Description, "1 | 2"). Decision needed (to the lead): the mate dialog draws
    "☐ Simulation connection" (skasm audit S24 added it to match live) vs DECISIONS 11-16 (left-out features' rows not drawn).
-   Next: drawings (create from part, views, dimension, export PDF/DXF), import / export (STEP round trip). App runs: units qa-xvfb110 + qa-walk*-app
+   Drawings 22:00: Create Drawing dialog = live (No views default, ANSI_A_INCH), Suggested views (Top/Front/Right/iso, hole centre
+   mark), tab after the active tab, tab menu Export… -> PDF 1.5 one page = the sheet. Next: import / export (STEP round trip of
+   walk2's Part 1), then dimension placement in the drawing, then the next spot rows 25-32. App runs: units qa-xvfb110 + qa-walk*-app
    (systemd-run, NOSHAPE_CONFIG_DIR per doc), tool search alt+c + name + Return; Esc keeps selection, Space clears.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
