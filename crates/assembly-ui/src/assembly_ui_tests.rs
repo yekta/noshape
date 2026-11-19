@@ -90,7 +90,8 @@ impl gpui_kit::Render for FrontHost {
 /// [`open_assembly`] with the front layer drawn, so the left dialogs can be clicked.
 fn open_assembly_with_front(cx: &mut TestAppContext, path: &std::path::Path) -> (AnyWindowHandle, Entity<AssemblyView>) {
     let session = crate::session::Session::open(path).unwrap();
-    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::Assembly(_))).unwrap().id;
+    let asm = |t: &&noshape_model::document::Tab| matches!(t.content, noshape_model::TabContent::Assembly(_));
+    let tab = session.doc.tabs.iter().filter(asm).find(|t| t.name == "Assembly 1").or_else(|| session.doc.tabs.iter().find(asm)).unwrap().id;
     let gpu = Gpu::headless().unwrap();
     let (window, view) = cx.update(|cx| {
         let doc = cx.new(|_| DocModel::new(session));
@@ -2313,4 +2314,54 @@ fn a_hovered_connector_chip_lights_its_face(cx: &mut TestAppContext) {
         v.refresh_scene(false, cx);
     }));
     assert!(query_lit(cx), "the first chip's face lit");
+}
+
+/// Live2 audit-1119 (m2–m7): Mirror strategy on a subassembly: Derived reads "Create new instance", and Update makes
+/// the assembly "Sub-Mirrored" (its "Derived mirror" node of Sub's instances) and the row's reference.
+#[gpui::test]
+fn mirror_strategy_update_on_a_subassembly_makes_its_mirrored_assembly(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::init);
+    crate::assembly_hooks::register_for_tests();
+    let dir = std::env::temp_dir().join(format!("noshape-asm-ui-derived-mirror-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("asm.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+    }
+    {
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+        let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [d["regions"][0]["id"].clone()], "depth": "10 mm", "operationType": "NEW" } }));
+        call(&mut ctx, "tab_create", json!({ "kind": "assembly", "name": "Sub" }));
+        call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 1" }));
+        call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Sub" }));
+    }
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_pattern(super::panels::PatternDialogKind::Mirror, w, cx))).unwrap();
+
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let sub = instance(v, "Sub <1>", cx);
+            let p = v.pattern.as_mut().unwrap();
+            p.seeds = vec![sub];
+            p.strategy_open = true;
+            p.mirror_rows.entry(sub).or_default().derived = true;
+            cx.notify();
+        })
+    });
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let update = vcx.debug_bounds("ms-update").expect("Update");
+    vcx.simulate_click(update.center(), gpui_kit::Modifiers::default());
+    draw(cx, window);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let doc = &v.doc.read(cx).session.doc;
+        let sub = doc.tabs.iter().find(|t| t.name == "Sub").unwrap().id;
+        let m = doc.mirrored_assembly(sub).expect("Sub's mirrored assembly");
+        assert_eq!(doc.tab(m).unwrap().name, "Sub-Mirrored");
+        assert!(v.pattern.as_ref().unwrap().mirror_rows.values().all(|r| r.created), "the row's reference is the new assembly");
+    });
 }

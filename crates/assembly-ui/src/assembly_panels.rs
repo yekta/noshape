@@ -2285,8 +2285,10 @@ impl AssemblyView {
         for (k, id) in s.seeds.iter().enumerate() {
             let Some(inst) = asm.instance(*id) else { continue };
             let row = s.mirror_rows.get(id).copied().unwrap_or_default();
+            // A subassembly's Derived is its "<assembly>-Mirrored" assembly (live2 audit-1119 m2–m14).
+            let sub = matches!(inst.source, InstanceSource::Assembly { .. });
             let studio = match &inst.source {
-                InstanceSource::Part { studio, .. } | InstanceSource::MirroredPart { studio, .. } => doc.tab(*studio).map(|t| t.name.clone()),
+                InstanceSource::Part { studio: tab, .. } | InstanceSource::MirroredPart { studio: tab, .. } | InstanceSource::Assembly { assembly: tab, .. } => doc.tab(*tab).map(|t| t.name.clone()),
                 _ => None,
             }
             .unwrap_or_default();
@@ -2309,7 +2311,7 @@ impl AssemblyView {
             });
             let reference: AnyElement = match (row.derived, row.created) {
                 (true, false) => h_flex().gap(px(4.)).child(crate::assets::icon("performance-info", 16., cx)).child("Create new instance").into_any_element(),
-                (true, true) => h_flex().gap(px(4.)).text_color(pal.accent).child(crate::assets::icon("tab-part-studio", 16., cx)).child(format!("{studio}-Mirrored")).into_any_element(),
+                (true, true) => h_flex().gap(px(4.)).text_color(pal.accent).child(crate::assets::icon(if sub { "tab-assembly" } else { "tab-part-studio" }, 16., cx)).child(format!("{studio}-Mirrored")).into_any_element(),
                 _ => div().into_any_element(),
             };
             let placement: AnyElement = if row.derived {
@@ -2344,7 +2346,7 @@ impl AssemblyView {
                             this.refresh_scene(false, cx);
                         }
                     }))
-                    .child(cell(0, true).justify_center().gap(px(4.)).child(crate::assets::icon("part", 20., cx)).child(inst.name.clone()))
+                    .child(cell(0, true).justify_center().gap(px(4.)).child(crate::assets::icon(if sub { "assembly" } else { "part" }, 20., cx)).child(inst.name.clone()))
                     // Live: the source workspace ("Main").
                     .child(cell(1, true).justify_center().gap(px(4.)).child(crate::assets::icon("legend-workspace", 18., cx)).child("Main"))
                     // Live: the part's detected symmetry, "Symmetric" /
@@ -2420,6 +2422,7 @@ impl AssemblyView {
                         .child(
                             div()
                                 .id("ms-update")
+                                .debug_selector(|| "ms-update".into())
                                 .h(px(34.))
                                 .px(px(12.))
                                 .flex()
