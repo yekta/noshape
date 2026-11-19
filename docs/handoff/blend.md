@@ -1,38 +1,42 @@
 # Blends (agent "blend"): current state
 
-Updated 11-19 10:35 UTC (blend thread 2fc420a3). History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-19 13:40 UTC (blend thread 2fc420a3). History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-19 10:35)
+## Now (11-19 13:40)
 
-- Queue (lead 11-19 09:20): (1) knifehandle Fillet 2, (2) land welding Fillet 5 (LANDED 92c8595b) and knifehandle
-  Fillet 3 as gates clear, (3) suspension LCA Fillet 3 face-level splice in landable steps, (4) core's
-  c2-surf-workshop-mutualtrim Fillet 1. Hosts by load (DECISIONS 11-19): bin/pickhost; userdocs only vibex7. Units via
-  `systemd-run -E HOME=/root -E PATH=$PATH`. No std::thread joins on rayon workers (dx f1e0c74ef).
-- Gates running (units): blend-gateseq (bin/gate-seq.sh: isaac CLI / suite / userdocs, 805e29 T1, suspension pair on
-  main), blend-khgate (knifehandle Fillet 3 suite, T1/clippy/CLI, userdocs after isaac), blend-dockseq
-  (AppleWatchDock for isaac; gate-seq's old dock path is gone). Compare: bin/cmp-strict.py suite-v2-base.log.
-- Waiting to land: isaac chamfers (blend11 da24d5264 a2e4a2 Chamfer 2 + bf9b93533 e54410 Chamfer 1), knifehandle
-  Fillet 3 (blend7 8bb9824b9), 805e29 exact edges (blend2 c96c49f82; tell asm after).
-- Welding's userdocs: two qa ticket documents change with it (no live truth): cli-shell-hang-pre Fillet 1 now builds
-  (Shell 3 then fails), cli-draft-hang Fillet 3's message 'Unfilleted edge overlapped by fillet.'.
-- Suspension splice (blend13 / branch blend-susp; probe crash_inputs::zz_lca_splice, bin/splice.sh, input vibe2
-  ~/agents/blend-keep/susp-dbd-f3.brep): step 1 make_edge_on (8d9420223) queued 4a5d28a2. The corner rebuilt as live:
-  contact edges 28.659 / 28.523 mm (= live), canal face 158.807 mm2 (live 158.817), whole part -130.38 mm3 a corner vs
-  OCCT (live -131.3), valid after ShapeFix (split_on's pieces and the canal face need it). Next: the splice on OCCT's
-  result face by face (its corner patch 241.32 mm2 + the bottom's triangle under the round run on -> canal, round run on
-  to x 0, tube piece), then the model code (detect the corner from OCCT's patch's 4 neighbours) + T1. split_on loses
-  area when a curve crosses a cylinder's seam (not needed here; noted).
-- Knifehandle Fillet 2 (blend12 / blend-khf2, WIP 8c25b1eab; T1 a_conic_round_of_a_blades_long_top_edges_as_live): balls
-  now run on past a free end over free-form faces (extended), closed_run_on trims them (4 pieces), but the direct build
-  fails ("a touch curve with no curve on its face", GeomProjLib on the refaced side) and the Boolean leaves 2 invalid
-  solids. Live's run follows JRl -> JRN (tangent in live, 21 deg in ours: Sweep 2's tip, core's).
-- Mutualtrim Fillet 1 (blend4 / blend-sheetfillet): a sheet's round: cut the surface by the tools, sew in the tools'
-  faces off the sheet (sheet_blend in blend_section.rs); repro bin/mutual.sh <host>.
+- Queue (lead 11-19): knifehandle Fillet 2 time box to 15:00 (done: 11 faces), land gated work, suspension LCA
+  Fillet 3 face-level splice in landable steps, core's c2-surf-workshop-mutualtrim Fillet 1 (parked). Hosts by load
+  (bin/pickhost); userdocs only vibex7. Units via `systemd-run -E HOME=/root -E PATH=$PATH`. No std::thread joins on
+  rayon workers (dx f1e0c74ef).
+- Knifehandle Fillet 3 (b62503313 + inside-out decline b56aeb170): suite/T1/clippy/userdocs clean; QUEUED b56aeb17.
+- Knifehandle Fillet 2 (blend12 c87fec635 on b56aeb170; T1 a_conic_round_of_a_blades_long_top_edges_as_live): 11/27/18
+  as live. The tip's small rounds run on over the free-form sides (extended, shorter steps where the ball leaves them:
+  0.653 mm2, live 0.595, our input's tip is Sweep 2's 2.045 vs 1.850 mm2), the direct build retried on the refaced
+  part (touch curves by points' feet where GeomProjLib fails), tools fused when the joint Boolean fails, and at x 15.4
+  the last section's contacts moved into the square end plane (end face 90.374, live 90.377; a carried-past tool broke
+  the direct build). 30.46 mm3 off vs live 31.026 (band 0.6). Gate running: blend-khf2gate (bin/khf2-gate.sh ->
+  logs/khf2-t1.out, suite-khf2.cmp, g13-khf2.log, ud-khf2.log). Probes: blend-scratch/khf2-with-probes.patch.
+- Isaac chamfers (blend11 fa9c2a100 + 6c09e08c6): userdocs found cli-draft-hang Chamfer 4 failing (planar concave
+  check's error propagated); now falls back to OCCT's. Re-gate blend-isaac2 (logs/isaac-t1.out, ud-isaac2.log; the hat
+  docs too: the first run stopped at a stale dock path). crash957 Chamfer 3 builds now where main fails (no live).
+  Suite: only main's dogbone fix differs.
+- 805e29 exact edges (blend2 61320d427): its T1 fails (16 B-spline edges, between faces OCCT already made analytic:
+  analytic_blend_edges only ran after a face conversion). Fix in progress (uncommitted, ZZ_ANA trace, bin/805t1.sh).
+- Suspension splice (blend13; probe crash_inputs::zz_lca_splice, bin/splice.sh): the round run on rebuilt as one face
+  with OCCT's round (its edge A..D replaced by the contact curve + D..B): 3890.942 mm2 = live. 71 faces vs live 70:
+  the tube piece (45.5 mm2) should join the tube face the same way (3 wires; make_face_on now takes a compound of
+  wires, uncommitted; Bnd_Box void so far). Edge tolerance 57 um on the contact edges (the pipe's approximated canal).
+  Then: model code (find OCCT's corner patch by its 4 neighbours), T1 (158.817 canal, 3890.94 round, -131.3 mm3).
+- Mutualtrim Fillet 1 (blend4, parked): split_on turns closed touch loops into zero-area faces.
+- Agent ids changed 11-19: studios 31c9b9ba-e7f8-40f7-85cb-242bab86dbe6, dx aad5e825-f86c-432d-b4ac-3aab402e7052, qa
+  40e853dc-757f-4498-878f-00b41fd8af75, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, live2
+  d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1 (old qa/psui/live2/studios/dx threads stopped). live off until ~21:00: captures
+  to live2 or live/REQUESTS.md.
 
 ## In flight (older)
 
@@ -61,11 +65,11 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   x 1.502 vs live 0.097 (live JfR curves to -x). GeomLib C2 extension changes nothing. Dumps Mac
   ~/noshape-host/agents/blend10/zzdump/sections-{31,34,35}.brep (+.txt edges); probes kernel blend.rs zz_halter /
   zz_extdev; ZZ_TOL / ZZ_DUMP / ZZ_FRAME prints in blend_section.rs (blend10, uncommitted). Next: f26's bevel.
-- Agent ids (11-18 11:45): asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm
+- Agent ids (11-19 13:40): asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm
   18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios
-  58e9bca8-346c-4847-8012-e15006ae61ef, live e8549719-ef9a-42de-960c-e24b29f142a6, live2
-  79ae5cdb-42a4-4025-b43a-da61a4f92ad7, bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, core e8af89fe-d460-49b3-b0bb-9572da230fed,
-  qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b, psui 4973e295-9e92-463f-a13f-2ec5258bc5f9, dx 2108c2b7-2f48-43a7-87a0-3f652e3cda6d.
+  31c9b9ba-e7f8-40f7-85cb-242bab86dbe6, live e8549719-ef9a-42de-960c-e24b29f142a6, live2
+  d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1, bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, core e8af89fe-d460-49b3-b0bb-9572da230fed,
+  qa 40e853dc-757f-4498-878f-00b41fd8af75, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, dx aad5e825-f86c-432d-b4ac-3aab402e7052.
 - Queued from asm (after the current items): asm-gearbox-std 6a912b / a470167 Fillet 2 (EDGE fillet of 2 faces' edges,
   tangent, 0.125 in: ours 38/92/56, live 38/88/52, -12.1 mm3; repro vibex6/7 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/mgb
   NOSHAPE_PARITY_ONLY=m6a912b); asm-scissor-lift fed22d Fillet 3 (Top - Side 2 45/110/64 vs 48/116/64; Motor Mount Live (q-gearbox-f2/corner.json): each corner a torus (27.55 mm2, its edge on the vertical round the
