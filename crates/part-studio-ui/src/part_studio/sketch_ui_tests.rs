@@ -4285,6 +4285,47 @@ fn opening_the_configuration_select_moves_nothing(cx: &mut TestAppContext) {
     }
 }
 
+/// Live2 ps-feel2-1118 (cfg): the feature list's configuration box takes Down + Return: the next row becomes the
+/// configuration, the box closes, the feature list stays as it was.
+#[gpui::test]
+fn the_configuration_box_switches_by_down_and_return(cx: &mut TestAppContext) {
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "cfg-switch-keys", Some(block));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let input = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let mut input = String::new();
+            v.edit_config("Configure", cx, |ps| {
+                input = noshape_ops::config::add_input(ps, "List");
+                noshape_ops::config::add_option(ps, &input, "A".into());
+            });
+            input
+        })
+    });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let rows: Vec<String> = cx.update(|cx| match view.read(cx).studio(cx).and_then(|s| s.configuration.inputs.iter().find(|i| i.id == input)).map(|i| i.kind.clone()) {
+        Some(noshape_model::configuration::ConfigInputKind::List { options, .. }) => options.iter().map(|o| o.id.clone()).collect(),
+        _ => Vec::new(),
+    });
+    let features = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).map(|s| s.features.iter().map(|f| f.name.clone()).collect::<Vec<_>>()));
+    let before = features(cx);
+    let select = cx.update(|cx| view.read(cx).ui.cfg_selects.get(&input).map(|(s, _)| s.clone()).expect("the box"));
+    let field = format!("os-select:cfgsel-{input}");
+    let at = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(Box::leak(field.into_boxed_str())).expect("the box drawn").center();
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at, Modifiers::default());
+    draw(cx, window);
+    assert!(cx.update(|cx| select.read(cx).is_open()), "the list opened");
+    keys(cx, window, &["down", "enter"]);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let now = cx.update(|cx| view.read(cx).config_values.0.get(&input).cloned());
+    assert_eq!((now.as_deref(), cx.update(|cx| select.read(cx).is_open())), (rows.get(1).map(String::as_str), false), "(the configuration, the box open)");
+    assert_eq!(features(cx), before, "the feature list as it was");
+}
+
 /// Cached list rows span the list (the hover highlight from edge to edge), with the eye at the row's right end
 /// (live): a part row was sized to its content, the eye right after the name.
 #[gpui::test]
