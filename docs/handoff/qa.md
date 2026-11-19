@@ -119,7 +119,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    Split toast), Thicken 23:29, Delete face (CLI: Heal/Cap/Leave open/all), drawing Section view, asm linear pattern, Ball limits
    = live; P2 ERROR-CHIP-RED-NO-FIELD (psui). asm d67512a33 both P1s VERIFIED 23:42 (green 2574b5b5). App runs: qa-xvfb110 +
    qa-walk*-app, `xdotool windowfocus` FIRST (else Tab never previews); drawings have no alt+c (letters are shortcuts: n = Note).
-   tabrel.sh builds via vibe2 slot, 1 retry on SIGTERM (earlyoom 23:01); 4fee rerun queued 23:33.
+   tabrel.sh: vibe2 slot + 1 retry on SIGTERM (earlyoom 23:01); 4fee queued. Waiters: qa-wait-{dx-brand,studios-hist,skasm-sim}.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
