@@ -9235,6 +9235,25 @@ mod tests {
         assert!((lo - v(0.005, 0.0075)).length() < 1e-9 && (hi - v(0.055, 0.0325)).length() < 1e-9, "{lo:?} {hi:?}");
     }
 
+    /// Live (psb 10-24 j (c), qa OFFSET-EDIT-SCALES-SKETCH): a free circle r5 offset 5 mm, its distance typed 3: no
+    /// scaling (the offset's distance is no first dimension); the copy keeps r10, the free source moves to r7.
+    #[test]
+    fn an_offsets_new_distance_moves_the_source_and_scales_nothing() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let source = d.sketch.add_circle(v(0.0, 0.0), 0.005);
+        let r = d.sketch.offset(&[source], -0.005).unwrap();
+        assert!(d.sketch.solve().is_solved());
+        let radius = |d: &SketchData, e: EntityId| match d.sketch.curve(e) {
+            Some(Curve2::Circle { radius, .. }) => radius,
+            c => panic!("{c:?}"),
+        };
+        let copy = r.created.iter().copied().find(|e| d.sketch.kind(*e) == Some(EntityKind::Circle)).expect("the copy");
+        let dist = r.constraints_added.iter().copied().find(|c| matches!(d.sketch.constraint(*c).map(|c| &c.kind), Some(ConstraintKind::Distance { .. }))).expect("its distance");
+        assert!((radius(&d, copy) - 0.010).abs() < 1e-9, "the copy r10 before: {}", radius(&d, copy));
+        ed.apply_dimension(&mut d, dist, "3", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
+        assert_eq!(((radius(&d, source) * 1e6).round() / 1e3, (radius(&d, copy) * 1e6).round() / 1e3), (7.0, 10.0), "source, copy radius (mm)");
+    }
+
     /// Live (qa sellat-1118): a horizontal line off the origin with only its length, 40 -> 50 typed in the editor,
     /// moves both ends equally (start -5, end +5 mm); the label stays where it was, on the unchanged midpoint.
     #[test]

@@ -1403,6 +1403,21 @@ impl Sketch {
     pub fn dimension_edit_options(&self, cid: ConstraintId) -> SolveOptions {
         let mut opts = SolveOptions { allow_collapse: true, constructive: true, ..Default::default() };
         let Some(c) = self.constraint(cid) else { return opts };
+        // An offset's distance: its sources take the change, the copies stay (live psb 10-24 j (c): 5 -> 3 on a free
+        // r5 circle's copy, the copy keeps r10, the source grows to r7).
+        if let ConstraintKind::Distance { a, b, .. } = c.kind {
+            let sources: Vec<EntityId> = self
+                .constraints()
+                .filter_map(|o| match o.kind {
+                    ConstraintKind::OffsetPair { source, master_source, master_copy, .. } if (master_source, master_copy) == (a, b) || (master_source, master_copy) == (b, a) => Some(source),
+                    _ => None,
+                })
+                .collect();
+            if !sources.is_empty() {
+                opts.light = sources;
+                return opts;
+            }
+        }
         let (ConstraintKind::Radius { curve, .. } | ConstraintKind::Diameter { curve, .. }) = c.kind else { return opts };
         let Some(Geometry::Arc { start, end, .. }) = self.entity(curve).map(|e| &e.geometry) else { return opts };
         let (start, end) = (*start, *end);
@@ -1454,6 +1469,12 @@ impl Sketch {
     pub fn scale_for_edit(&mut self, cid: ConstraintId) -> bool {
         let Some(c) = self.constraint(cid).filter(|c| c.driving).cloned() else { return false };
         let (ConstraintKind::Length { value, .. } | ConstraintKind::Distance { value, .. }) = c.kind else { return false };
+        // An offset's distance is no first dimension (live psb 10-24 j (c): the free source moves, nothing scales).
+        if let ConstraintKind::Distance { a, b, .. } = c.kind
+            && self.constraints().any(|o| matches!(o.kind, ConstraintKind::OffsetPair { source, copy, .. } if (source, copy) == (a, b) || (source, copy) == (b, a)))
+        {
+            return false;
+        }
         let Some(now) = self.measure_new(&c.kind).filter(|m| *m > 1e-12) else { return false };
         let k = value / now;
         if !k.is_finite() || k <= 0.0 || (k - 1.0).abs() < 1e-12 {
