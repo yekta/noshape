@@ -708,7 +708,7 @@ fn rows() -> Vec<Row> {
             });
             expect(flags, (true, Some((false, false))), "(hovered, Part 2's row (selected, related))")
         } },
-        Row { id: "sketching / later rows grey and the Parts list follows, ✗ brings them back", live: "Sketch 2 edited: Extrude 2 and the rows after it grey italic (not computed), Parts (2) -> Parts (1); ✗ brings everything back (live2 sketch-entry-1118 e1)", gap: false, check: |l, cx| {
+        Row { id: "sketching / later rows grey and the Parts list follows, ✗ brings them back", live: "Sketch 2 edited: Extrude 2 and the rows after it grey italic (not computed), Parts (2) -> Parts (1), Final offered; ✗ brings everything back (live2 sketch-entry-1118 e1)", gap: false, check: |l, cx| {
             l.double_click(cx, "feature:Sketch 2");
             wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy() && l.view.read(cx).sketch.is_some());
             draw(cx, l.window);
@@ -717,12 +717,13 @@ fn rows() -> Vec<Row> {
                 v.studio(cx).map(|s| s.features.iter().enumerate().filter(|(i, _)| *i >= v.row_ctx.rollback).map(|(_, f)| f.name.clone()).collect::<Vec<_>>()).unwrap_or_default()
             });
             let parts = |cx: &mut TestAppContext| cx.update(|cx| l.view.read(cx).display.bodies.len());
-            let editing = (l.editing(cx), greyed(cx), parts(cx));
+            let offered = cx.update(|cx| l.view.read(cx).edit.as_ref().map(|e| e.dialog.read(cx).final_available));
+            let editing = (l.editing(cx), greyed(cx), parts(cx), offered);
             cx.update_window(l.window, |_, w, cx| l.view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
             wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy() && l.view.read(cx).display.bodies.len() == 3);
             draw(cx, l.window);
             let after = (l.editing(cx), greyed(cx), parts(cx));
-            expect((editing, after), ((Some("Sketch 2".to_string()), names(&["Extrude 2", "Plane 1", "Sketch 3", "Extrude 3"]), 1), (None, names(&[]), 3)), "(editing, grey rows, parts) while Sketch 2 is edited, after ✗")
+            expect((editing, after), ((Some("Sketch 2".to_string()), names(&["Extrude 2", "Plane 1", "Sketch 3", "Extrude 3"]), 1, Some(true)), (None, names(&[]), 3)), "(editing, grey rows, parts, Final offered) while Sketch 2 is edited, after ✗")
         } },
         Row { id: "sketching / another row clicked does nothing", live: "Extrude 1 clicked while Sketch 2 is edited: the sketch stays open, nothing selected, no dialog (live2 sketch-entry-1118)", gap: false, check: |l, cx| {
             l.double_click(cx, "feature:Sketch 2");
