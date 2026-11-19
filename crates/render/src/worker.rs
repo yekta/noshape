@@ -62,12 +62,12 @@ pub fn low_priority_compile() {
     }
 }
 
-fn wait_for_prewarm() {
+fn wait_for_prewarm(closing: &AtomicBool) {
     if !PREWARM_HELD.load(Ordering::Relaxed) || prewarm_early() {
         return;
     }
     let deadline = Instant::now() + PREWARM_MAX_HOLD;
-    while !PREWARM_RELEASED.load(Ordering::Relaxed) && Instant::now() < deadline {
+    while !PREWARM_RELEASED.load(Ordering::Relaxed) && !closing.load(Ordering::Relaxed) && Instant::now() < deadline {
         std::thread::sleep(Duration::from_millis(2));
     }
 }
@@ -102,6 +102,11 @@ enum Msg {
 
 pub struct RenderWorker {
     tx: mpsc::Sender<Msg>,
+    /// The render thread, joined on drop: its device torn down before its owner goes on (a test binary's exit ran
+    /// Mesa's and LLVM's destructors under a thread still compiling: assembly-ui's SIGSEGV after its tests, CI 11-19).
+    thread: Option<std::thread::JoinHandle<()>>,
+    /// Set on drop: a thread not yet past its shader compile skips it.
+    closing: Arc<AtomicBool>,
     uploader: Uploader,
     adapter: String,
     software: bool,
@@ -123,11 +128,15 @@ impl RenderWorker {
         let software = renderer.is_software();
         let frames_in_flight = renderer.frames_in_flight();
         let (tx, rx) = mpsc::channel::<Msg>();
-        std::thread::Builder::new()
+        let closing = Arc::new(AtomicBool::new(false));
+        let closed = closing.clone();
+        let thread = std::thread::Builder::new()
             .name("noshape-render".into())
             .spawn(move || {
-                wait_for_prewarm();
-                renderer.prewarm(Style::default().msaa);
+                wait_for_prewarm(&closed);
+                if !closed.load(Ordering::Relaxed) {
+                    renderer.prewarm(Style::default().msaa);
+                }
                 let mut jobs: Vec<RenderJob> = Vec::new();
                 let mut picks: Vec<(u64, u64, PickRect)> = Vec::new();
                 let mut connected = true;
@@ -158,6 +167,11 @@ impl RenderWorker {
                     }
                 };
                 loop {
+                    // No one left to deliver to: only the GPU's frames in flight are seen to the end.
+                    if !connected {
+                        jobs.clear();
+                        picks.clear();
+                    }
                     // Block for input only when there is nothing else to do.
                     if jobs.is_empty() && picks.is_empty() && !renderer.has_pending() {
                         if !connected {
@@ -256,7 +270,7 @@ impl RenderWorker {
                 }
             })
             .expect("spawn render thread");
-        Self { tx, uploader, adapter, software, frames_in_flight }
+        Self { tx, thread: Some(thread), closing, uploader, adapter, software, frames_in_flight }
     }
 
     pub fn submit(&self, job: RenderJob) {
@@ -310,5 +324,16 @@ impl RenderWorker {
     /// Frames a target may have in flight (submitting more only queues them).
     pub fn frames_in_flight(&self) -> usize {
         self.frames_in_flight
+    }
+}
+
+impl Drop for RenderWorker {
+    fn drop(&mut self) {
+        self.closing.store(true, Ordering::Relaxed);
+        // Disconnect the thread's channel, then wait for it (never from the render thread itself).
+        drop(std::mem::replace(&mut self.tx, mpsc::channel().0));
+        if let Some(thread) = self.thread.take().filter(|t| t.thread().id() != std::thread::current().id()) {
+            let _ = thread.join();
+        }
     }
 }

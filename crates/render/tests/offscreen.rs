@@ -3219,3 +3219,29 @@ fn a_datum_plane_on_the_section_plane_leaves_its_cap_as_it_is() {
         assert_ne!(px(&bare, outside), px(&shown, outside), "from {from:?}: the plane still shows beside the part");
     }
 }
+
+/// A dropped render worker's thread has ended, its device and the frame callback with it, before the drop returns
+/// (a test binary's exit tore Mesa's and LLVM's state down under a worker still compiling: assembly-ui's SIGSEGV after
+/// its tests passed, CI 11-19), even with a frame of a target never presented still waiting.
+#[test]
+fn a_dropped_render_worker_has_ended_its_thread() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let held = std::sync::Arc::new(());
+    let in_callback = held.clone();
+    let worker = worker::RenderWorker::spawn_with(r, move |_| {
+        let _ = &in_callback;
+    });
+    let mut cam = Camera::default();
+    cam.fit_sphere(glam::DVec3::ZERO, 0.01, 1.0);
+    worker.set_present(7, Present::Texture);
+    worker.submit(worker::RenderJob { target: 7, scene: std::sync::Arc::new(Scene::default()), camera: cam, width: 32, height: 32, device_pixel_ratio: 1.0, style: Style::default(), seq: 1, pick: false });
+    drop(worker);
+    assert_eq!(std::sync::Arc::strong_count(&held), 1, "the render thread outlived its worker");
+}
