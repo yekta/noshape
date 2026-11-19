@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-19 11:30 UTC (new thread 20:05 after the account limit; ids: see How to run). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-19 13:30 UTC (new thread 20:05 after the account limit; ids: see How to run). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
@@ -41,10 +41,14 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   (Mirror 3 splits one B-spline edge at (1.2061,39,20): DECISIONS 11-16). surf-intro Derived 1 +0.1 in = asm's
   90d254008 (handed to asm; live's body differs, can't judge). qa re-saved cpcurves/mutualtrim: left cpcurves Split 5
   Info + extra 1227.58 mm3 part (= Split 3 keeps the wrong piece) -> after pipe.
-- **Pipe Loft (P1, core-oc branch core-nloft = 3e106dca0 cherry-picked + WIP env NOSHAPE_TRY_NLOFT):** 3 profiles, both
-  guides NORMAL_TO_GUIDE. Unconstrained N-profile loft: Surface 2 582.195 mm2 vs live 596.660 (-2.4 %): the guide
-  condition must shape the surface along the guides (not only at profiles). Next: apply Normal to guide in
-  loft_guided.cpp's N-profile Gordon build (cross-derivative at the guide boundaries = guide plane normal).
+- **Pipe Loft (P1, core-oc branch core-nloft = 3e106dca0 cherry-picked + WIP env NOSHAPE_TRY_NLOFT; probe in core-loft
+  core-nloft2 with a dump_op):** live2 q-pipe-loft-1119 (probe-10.json): one face 32 x 24 poles, 596.6602 mm2; guide
+  Normal-to-guide magnitude 1/2/10/None give IDENTICAL poles: the guide derivative doesn't shape it. Ours unconstrained
+  582.195 (-2.4 %): the base surface differs (live v knots: 4 even steps to profile 2 at v .2365, then even). Probe
+  vibex7 ~/tmp/core/devlive <dump.brep> pipe-live-samples.txt (distance of live's 11x11 points to our face).
+- **cpcurves Split 3 (core-oc branch core-closedface, uncommitted):** surface sweep facing for closed sketch profiles (CCW
+  about the sketch normal x path direction); T1 features_c::a_surface_swept_from_a_circle_faces_by_its_sketch_and_the_path;
+  30-doc subset running (gls2.log). asm: Derived 1 +0.1 in is right (live's Title body x -25.4..2.54).
 - **Ring, live's sections (q-wave-washer-loft-1119 probe.json, evaluated at its v knots):** knots 0 / .1722 / .2519 /
   .3339 / .5 … = sections at the profiles (0, 90, 180, 270 deg) and at +-61.0 / +-119.4 deg: +-29 deg either side of the
   JM profiles (90 / 270), none near JK; the routing curve's 8 points are at 0, 45, 90 … (z 0 at the profiles, 3.81 at
@@ -236,10 +240,11 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
 - E1 Govde (dock) 539/304 -> 538/303 accepted by the lead (bf26f8759's 0.5 mm seam line).
 
 ## How to run
-- Agent ids (11-17): lead 818534eb-f6b1-4a00-bb48-ebf0f7cdbd8a, blend 0e6e9942-0713-46c1-ae55-132fbbb4a14b, bool
-  7fa8ceab-4549-499f-9b01-3a289c2c95b4, qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6,
-  live e8549719-ef9a-42de-960c-e24b29f142a6, live2 79ae5cdb-42a4-4025-b43a-da61a4f92ad7, asm
-  d8d597e0-675c-497b-a804-544ceab99bbd, dx (ask the lead), psui 4973e295-9e92-463f-a13f-2ec5258bc5f9 (old ids stopped; never message a paused agent: DECISIONS 11-17).
+- Agent ids (11-19 afternoon): lead 818534eb-f6b1-4a00-bb48-ebf0f7cdbd8a, blend de66e481-56e2-4005-a5d3-9fa897ca5fde, bool
+  754a9804-feb1-4153-b32a-acf9b2a6d94d, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, qa 40e853dc-757f-4498-878f-00b41fd8af75,
+  psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, live2 d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6,
+  asm d8d597e0-675c-497b-a804-544ceab99bbd, studios 31c9b9ba-e7f8-40f7-85cb-242bab86dbe6, dx aad5e825-f86c-432d-b4ac-3aab402e7052;
+  live stopped till ~21:00 (REQUESTS.md / live2). Old ids stopped: never message them or a paused agent (DECISIONS 11-17).
 - Builds / tests: `NOSHAPE_RB_HOST=<host> tools/tiers/rb.sh bash <script>` from the worktree (env prefixes don't
   reach the host: put them in the script). Mac: builds and crate tests only, one worktree of mine at a time.
 - Heavy runs on a vibe host (suites, gates, pairs) through `~/bin/slot <cmd>` there (one per host).
