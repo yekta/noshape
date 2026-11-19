@@ -780,22 +780,32 @@ fn wall_sweep_direction(path: &Shape, m: DVec3) -> Option<DVec3> {
     }
 }
 
-/// A sheet swept from an open profile turned to face along the profile's tangent x the sweep direction, as live's (live
-/// q-sweep-normals-1119; c2-surf-workshop-cpcurves' Sweep 6 faced the other way and Split 3 kept the wrong piece). A
-/// closed profile's tube keeps its own (c2-surf-workshop-manualblend's Sweep 2 faces as live's).
+/// A sheet swept from a profile turned to face as live's (live q-sweep-normals-1119): an open profile's along its
+/// tangent x the sweep direction (c2-surf-workshop-cpcurves' Sweep 6 faced the other way); a closed profile's tube
+/// outward, whichever way the path leaves its sketch (manualblend's Sweep 2 against its sketch's normal, cpcurves' Main
+/// pipe along it: Split 3 kept the wrong piece).
 fn sheet_facing_as_live(sheet: Shape, profile: &Shape, path: &Shape) -> FResult<Shape> {
     let ends: Vec<DVec3> = profile.edges().iter().filter_map(|e| e.endpoints().ok()).flat_map(|(a, b)| [a, b]).collect();
     let closed = ends.iter().all(|p| ends.iter().filter(|q| q.distance(*p) < 1e-7).count() % 2 == 0);
-    if closed {
-        return Ok(sheet);
-    }
     let Some(e) = profile.edges().into_iter().next() else { return Ok(sheet) };
     let i = e.edge_info()?;
     let u = 0.5 * (i.first_param + i.last_param);
     let (m, t) = (e.point_at(u)?, e.tangent_at(u)?);
     let t = if e.orientation() == k::Orientation::Reversed { -t } else { t };
-    let Some(d) = wall_sweep_direction(path, m) else { return Ok(sheet) };
-    let want = t.cross(d);
+    let want = if closed {
+        // Outward: the loop's tangent x its area vector (1/2 the sum of p x dp along each edge as the loop runs).
+        let mut area = DVec3::ZERO;
+        for e in profile.edges() {
+            let i = e.edge_info()?;
+            let pts: Vec<DVec3> = (0..=64).filter_map(|j| e.point_at(i.first_param + (i.last_param - i.first_param) * j as f64 / 64.0).ok()).collect();
+            let run = pts.windows(2).fold(DVec3::ZERO, |a, w| a + w[0].cross(w[1]));
+            area += if e.orientation() == k::Orientation::Reversed { -run } else { run };
+        }
+        t.cross(area)
+    } else {
+        let Some(d) = wall_sweep_direction(path, m) else { return Ok(sheet) };
+        t.cross(d)
+    };
     let near = sheet.faces().iter().filter_map(|f| super::helpers_a::face_normal_near(f, m)).min_by(|a, b| a.0.distance(m).total_cmp(&b.0.distance(m)));
     match near {
         Some((_, n)) if n.dot(want) < 0.0 => Ok(sheet.reversed()?),

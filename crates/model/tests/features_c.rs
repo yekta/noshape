@@ -2440,6 +2440,33 @@ fn a_surface_swept_from_a_line_faces_along_its_direction_times_the_paths() {
     }
 }
 
+/// A surface swept from a closed profile faces out of its tube as live's (q-sweep-normals-1119: manualblend's Sweep 2,
+/// its path against its sketch's normal; cpcurves' Main pipe along it): a Ø20 circle on Top swept 20 mm up or down.
+#[test]
+fn a_surface_swept_from_a_circle_faces_out_of_its_tube() {
+    for up in [1.0, -1.0] {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let c = sk.add_circle(DVec2::ZERO, 0.01).0;
+        let profile = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let mut sk = noshape_sketch::Sketch::new();
+        let l = sk.add_line(DVec2::new(0.01, 0.0), DVec2::new(0.01, 0.02 * up)).0;
+        let path = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+        s.add("sweep", |p| {
+            p.set("bodyType", en("SURFACE"));
+            p.set("surfaceProfiles", q(Reference::SketchEntity { sketch: profile, entity: c }));
+            p.set("path", q(Reference::SketchEntity { sketch: path, entity: l }));
+        });
+        let r = s.ok();
+        let faces: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Surface).flat_map(|b| b.shape.faces()).collect();
+        let at = DVec3::new(-0.01, 0.0, 0.01 * up);
+        let f = faces.iter().find(|f| f.project_point(at).is_ok_and(|p| p.point.distance(at) < 1e-7)).expect("the tube's face there");
+        let pr = f.project_point(at).unwrap();
+        let n = f.normal_at_uv(pr.u, pr.v).unwrap();
+        assert!(n.dot(DVec3::NEG_X) > 1.0 - 1e-9, "up {up}: {n:?}");
+    }
+}
+
 /// Live "psb (10-24 c) thin sweep": a Ø20 circle (or a 20 mm line) on Top
 /// swept Thin 50 up, Thickness 1 = 2: outward / on −y; Flip wall inward;
 /// Mid plane both sides; Scale 2 keeps the wall 2 thick normal to the cone;
