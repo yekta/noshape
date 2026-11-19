@@ -3251,13 +3251,63 @@ impl Ctx<'_> {
         if !secs.is_empty() && !(copied(a.0) && copied(b.0)) {
             return Ok(secs);
         }
-        let ends: Vec<DVec3> = self.boundaries_meet(fa, fb).into_iter().filter(|q| secs.iter().all(|c| (c.curve.at(c.t0) - *q).length() > 10.0 * tol && (c.curve.at(c.t1) - *q).length() > 10.0 * tol)).collect();
+        let mut ends: Vec<DVec3> = self.boundaries_meet(fa, fb).into_iter().filter(|q| secs.iter().all(|c| (c.curve.at(c.t0) - *q).length() > 10.0 * tol && (c.curve.at(c.t1) - *q).length() > 10.0 * tol)).collect();
+        // (None found and the boundaries meeting once: where either's edges pierce the other face too (a hole's wall
+        // through a corner round, coaxial with it: OCCT's section of the wall and one bottom round empty, isaac-ball's
+        // Fastened 43).)
+        if secs.is_empty() && ends.len() == 1 {
+            for q in self.edges_piercing(fa, fb)?.into_iter().chain(self.edges_piercing(fb, fa)?) {
+                if ends.iter().all(|e| (*e - q).length() > 10.0 * tol) {
+                    ends.push(q);
+                }
+            }
+        }
         if ends.len() < 2 || ends.len() > 4 {
             return Ok(secs);
         }
         let more: Vec<SectionCurve> = src.seeded(a, b, &ends)?.into_iter().filter(|c| c.t1 > c.t0 && secs.iter().all(|o| o.curve.param_of(c.curve.at(0.5 * (c.t0 + c.t1))).1 > 10.0 * tol)).collect();
         secs.extend(more);
         Ok(secs)
+    }
+
+    /// Where face `f`'s edges cross face `g`'s cylinder or cone inside `g`, clear of its boundary: sign changes of the
+    /// distance from that surface over 64 steps along each edge, halved down.
+    fn edges_piercing(&self, f: usize, g: usize) -> R<Vec<DVec3>> {
+        let Surf::Cyl { o, a, r0, k, .. } = self.faces[g].s else { return Ok(Vec::new()) };
+        let off = |p: DVec3| {
+            let w = p - o;
+            let s = w.dot(a);
+            (w - a * s).length() - (r0 + k * s)
+        };
+        let (bound, spans) = (self.bound(g)?, self.bound_spans(g)?);
+        const N: usize = 64;
+        let mut out = Vec::new();
+        for &(e, _) in &self.faces[f].edges {
+            let s = self.edge_seg(e);
+            let mut prev = off(self.seg_at(&s, 0.0));
+            for i in 1..=N {
+                let (mut lo, mut hi) = ((i - 1) as f64 / N as f64, i as f64 / N as f64);
+                let (below, d) = (prev < 0.0, off(self.seg_at(&s, hi)));
+                prev = d;
+                if below == (d < 0.0) {
+                    continue;
+                }
+                for _ in 0..60 {
+                    let m = 0.5 * (lo + hi);
+                    if (off(self.seg_at(&s, m)) < 0.0) == below {
+                        lo = m;
+                    } else {
+                        hi = m;
+                    }
+                }
+                let p = self.seg_at(&s, 0.5 * (lo + hi));
+                let q = self.faces[g].to2(p);
+                if inside_with(q, bound, spans) && distance_with(q, bound, spans) > 10.0 * self.tol {
+                    out.push(p);
+                }
+            }
+        }
+        Ok(out)
     }
 
     /// Edge `e` as a polyline of 64 chords, and how far the curve may be from it (the largest of the chords'
