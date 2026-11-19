@@ -379,6 +379,8 @@ struct FormTools {
     cut: bool,
     /// Its flat sketches (the form studio Tag's flatFormSketch, placed with the tools).
     sketches: Vec<FeatureId>,
+    /// Where its tools go from where they are: a patterned wall's copy of the seed's form ([`CtxState::moved_tools`]).
+    moved: glam::DMat4,
 }
 
 /// The body ids a wall attribute's `formedToolBodyIds` name, by role, and every
@@ -404,7 +406,8 @@ fn form_tools(st: &CtxState, wall: &Value, face: usize, ids: &mut Vec<(Arc<str>,
                 sketches.push(f);
             }
         }
-        out.push(FormTools { face, add, remove, cut: false, sketches });
+        let moved = [item.get("positiveBodyId"), item.get("negativeBodyId")].iter().find_map(|v| v.as_str().and_then(|s| st.moved_tools.get(&s).map(|t| t.1))).unwrap_or(glam::DMat4::IDENTITY);
+        out.push(FormTools { face, add, remove, cut: false, sketches, moved });
     }
     // Tools std registered to cut the wall (registerSheetMetalBooleanTools:
     // a Hole through it, counterbores too).
@@ -413,14 +416,14 @@ fn form_tools(st: &CtxState, wall: &Value, face: usize, ids: &mut Vec<(Arc<str>,
         let Some(r) = st.transient_ref(&s).cloned() else { continue };
         ids.push((s, r.clone()));
         if let Reference::Body(b) = r {
-            out.push(FormTools { face, add: Vec::new(), remove: vec![b], cut: true, sketches: Vec::new() });
+            out.push(FormTools { face, add: Vec::new(), remove: vec![b], cut: true, sketches: Vec::new(), moved: glam::DMat4::IDENTITY });
         }
     }
     out
 }
 
 /// `v` with the strings `map` renames replaced (a wall attribute's tool ids).
-fn rename_strings(v: &Value, map: &HashMap<Arc<str>, Arc<str>>) -> Value {
+pub(super) fn rename_strings(v: &Value, map: &HashMap<Arc<str>, Arc<str>>) -> Value {
     match v {
         Value::Str(s, t) => match map.get(s) {
             Some(n) => Value::Str(n.clone(), *t),
@@ -2380,7 +2383,12 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let mut form_shapes: Vec<FormShapes> = Vec::new();
             let mut cut_shapes: Vec<(usize, Vec<Shape>)> = Vec::new();
             for ft in &def.forms {
-                let shapes = |ids: &[BodyId]| -> Vec<Shape> { ids.iter().filter_map(|id| ev.ctx.bodies.iter().find(|b| &b.id == id)).map(|b| b.shape.clone()).collect() };
+                let moved = (!ft.moved.abs_diff_eq(glam::DMat4::IDENTITY, 1e-12)).then_some(ft.moved);
+                let place = |s: Shape| match moved {
+                    Some(m) => k::transform(&s, &k::Transform::Matrix(m), true).map(|r| r.shape).unwrap_or(s),
+                    None => s,
+                };
+                let shapes = |ids: &[BodyId]| -> Vec<Shape> { ids.iter().filter_map(|id| ev.ctx.bodies.iter().find(|b| &b.id == id)).map(|b| place(b.shape.clone())).collect() };
                 let (adds, removes) = (shapes(&ft.add), shapes(&ft.remove));
                 if !removes.is_empty() {
                     part = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&part), &removes, &k::BooleanOptions::default()).map_err(|e| fe(format!("The form failed: {e}")))?.shape;
@@ -2395,7 +2403,11 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     cut_shapes.push((ft.face, tools));
                 } else {
                     let sketches: Vec<_> = ft.sketches.iter().filter_map(|f| ev.ctx.sketches.iter().find(|s| s.feature == *f)).collect();
-                    let sketch = FormSketch { curves: sketches.iter().flat_map(|s| sketch_curves(s)).collect(), origin: sketches.first().map(|s| s.frame.origin) };
+                    let at = |p: DVec3| moved.map_or(p, |m| m.transform_point3(p));
+                    let sketch = FormSketch {
+                        curves: sketches.iter().flat_map(|s| sketch_curves(s)).map(|(pts, tear)| (pts.into_iter().map(at).collect(), tear)).collect(),
+                        origin: sketches.first().map(|s| at(s.frame.origin)),
+                    };
                     form_shapes.push((ft.face, tools, sketch, n_removes));
                 }
             }
@@ -2501,7 +2513,10 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let mut renamed: HashMap<Arc<str>, Arc<str>> = HashMap::new();
     for (old, r) in &tool_ids {
         let new = st.persist_transient(r);
-        if *old != new {
+        // A moved tool's id stays (its transform with it); the tool it stands for takes the lasting id.
+        if let Some(moved) = st.moved_tools.get_mut(old) {
+            moved.0 = new;
+        } else if *old != new {
             renamed.insert(old.clone(), new);
         }
         if let Reference::Body(b) = r {

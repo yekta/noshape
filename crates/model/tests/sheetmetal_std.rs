@@ -2220,6 +2220,73 @@ fn a_pattern_of_active_sheet_metal_is_stds() {
     assert_eq!((last.status, last.message.as_deref()), (FeatureStatus::Error, Some("Only Remove can be used with sheet metal. Add Finish sheet metal model to allow other operations.")), "{:?}", last.message);
 }
 
+/// Live q-sm-pattern-1119: an 80 x 60 plate (Thicken 2) with a Ø6 sheet metal Hole at (25, 30) and a Circle emboss at
+/// (55, 30), 9638.003952 mm³; a Linear pattern of the part (x2, 100 mm) and a Mirror of it about Right each make a
+/// second sheet metal part, formed and holed as the first: the copy carries its form (std's wall pattern copies the
+/// seed wall's attribute; its form tools move with the copy, `moved_tools`).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_pattern_or_mirror_of_sheet_metal_carries_its_form_and_hole() {
+    for mirror in [false, true] {
+        let mut s = Studio::new();
+        let region = s.rectangle(80.0, 60.0);
+        s.add("sheetMetalStart", move |p| {
+            p.set("process", en("THICKEN"));
+            p.set("regions", ParamValue::Query(vec![region]));
+            p.set("thickness", expr("2 mm"));
+        });
+        let r = s.ok();
+        let body = r.context.bodies[part(&r)].id.clone();
+        let top = face_at(&r, DVec3::new(40.0, 10.0, 2.0));
+        let mut sk = noshape_sketch::Sketch::new();
+        let (hole_at, form_at) = (sk.add_point(glam::DVec2::new(mm(25.0), mm(30.0))), sk.add_point(glam::DVec2::new(mm(55.0), mm(30.0))));
+        let sketch = s.add("sketch", |pv| {
+            pv.set("sketchPlane", ParamValue::Query(vec![top.clone()]));
+            pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+        });
+        s.ok();
+        s.add("hole", |h| {
+            h.set("scope", ParamValue::Query(vec![Reference::Body(body.clone())]));
+            h.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: hole_at.0 }]));
+            h.set("unitsSystem", en("METRIC"));
+            h.set("styleV2", en("SIMPLE"));
+            h.set("endStyleV2", en("THROUGH"));
+            h.set("holeDiameterV3", expr("6 mm"));
+        });
+        s.add("sheetMetalFormed", |p| {
+            p.set("formPartStudio", ParamValue::Text("library:circle-emboss".into()));
+            p.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: form_at.0 }]));
+            p.set("targetFaces", ParamValue::Query(vec![top]));
+        });
+        let r = s.ok();
+        assert!((volume_mm3(&r) - 9638.003952).abs() < 1e-3, "the formed plate {} mm³", volume_mm3(&r));
+        let body = r.context.bodies[part(&r)].id.clone();
+        if mirror {
+            s.add("mirror", |p| {
+                p.set("patternType", en("PART"));
+                p.set("mirrorPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Right)]));
+                p.set("entities", ParamValue::Query(vec![Reference::Body(body)]));
+            });
+        } else {
+            s.add("linearPattern", |p| {
+                p.set("patternType", en("PART"));
+                p.set("directionOne", ParamValue::Query(vec![Reference::Plane(DatumPlane::Right)]));
+                p.set("distance", expr("100 mm"));
+                p.set("instanceCount", expr("2"));
+                p.set("entities", ParamValue::Query(vec![Reference::Body(body)]));
+            });
+        }
+        let r = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions::default());
+        let last = r.display.features.last().unwrap();
+        assert_eq!(last.status, FeatureStatus::Ok, "mirror {mirror}: {:?}", last.message);
+        let solids: Vec<f64> = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| b.shape.volume().unwrap_or(0.0) * 1e9).collect();
+        assert!(solids.len() == 2 && solids.iter().all(|v| (v - 9638.003952).abs() < 1e-3), "mirror {mirror}: each part as live's 9638.003952 mm³: {solids:?}");
+        // Each part's flat as the other's: the outline and the hole, the same forms.
+        let flats: Vec<(usize, usize)> = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| noshape_model::sheetmetal::flat_pattern_for(&r.context, &b.id).map(|f| (f.loops.len(), f.forms.len())).expect("its flat")).collect();
+        assert!(flats.len() == 2 && flats[0] == flats[1] && flats[0].0 == 2, "mirror {mirror}: (loops, forms) per flat {flats:?}");
+    }
+}
+
 /// SM-FACES with the L's first leg drawn as two collinear lines (c2-sm-louver's Louver, live 22 faces): the two are
 /// one wall, unified apart from the rest, so its ends stay in wall / bend / wall pieces: the L's 3211.3274 mm³ and
 /// 14 faces (a unify of the whole part made each end one face: 10).

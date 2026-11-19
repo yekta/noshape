@@ -1161,7 +1161,7 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
         let sketches = copy_sketches(ev, &id, sources.into_iter(), false);
         let mut n = 0u32;
-        let mut made: Vec<(String, BodyId, BodyId)> = Vec::new();
+        let mut made: Vec<(String, BodyId, BodyId, DMat4)> = Vec::new();
         for bi in bodies {
             let body = ev.ctx.bodies[bi].clone();
             for (k_, m) in transforms.iter().enumerate() {
@@ -1171,7 +1171,7 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 let inst = instance_number(names.get(k_).map(|s| s.as_str()).unwrap_or(""), k_);
                 let faces = copy_names(ev, &body.faces, &res, inst);
                 push_body(ev, BodyId { feature: ev.feature, index: n }, body.kind, res.shape, faces);
-                made.push((names.get(k_).cloned().unwrap_or_default(), body.id.clone(), BodyId { feature: ev.feature, index: n }));
+                made.push((names.get(k_).cloned().unwrap_or_default(), body.id.clone(), BodyId { feature: ev.feature, index: n }, *m));
                 n += 1;
             }
         }
@@ -1188,8 +1188,11 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     for (source, copy) in &sketches {
         copy_sketch_attributes(&mut st, *source, *copy);
     }
-    for (name, source, b) in made {
+    for (name, source, b, m) in made {
         let inst = super::wrap_body_id(&b, marker, st.op_bits(marker), feature);
+        if !m.abs_diff_eq(DMat4::IDENTITY, 1e-12) {
+            st.body_moves.insert(inst.clone(), m);
+        }
         // A copy keeps its body's attributes (std Form's tool instances keep the Tag's form attributes).
         let copied: Vec<Value> = st.attributes_of(&Reference::Body(source.clone())).into_iter().cloned().collect();
         for v in copied {
@@ -1203,7 +1206,7 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 /// The instances of a sheet's hole loops (`edges`: closed loops within one of its planar faces): each cut out of
 /// the sheet where its transform puts it, all at once. Faces keep their names, edges theirs where they stay; the
 /// holes' edges are new. `None`: not a sheet's hole loops (copies of their bodies instead).
-type PatternMade = (Vec<(String, BodyId, BodyId)>, Vec<(crate::reference::FeatureId, crate::reference::FeatureId)>);
+type PatternMade = (Vec<(String, BodyId, BodyId, DMat4)>, Vec<(crate::reference::FeatureId, crate::reference::FeatureId)>);
 fn pattern_sheet_holes(ev: &mut EvalCtx, refs: &[Reference], transforms: &[DMat4]) -> FResult<Option<PatternMade>> {
     let edges = ev.resolve_edges(refs);
     let Some(&(b, _)) = edges.first() else { return Ok(None) };

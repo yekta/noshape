@@ -1,11 +1,14 @@
 //! Feature lifecycle and status, variables, attributes, debug output and
 //! the other context natives that do no modeling.
 
-use super::{FsContext, FsId, context_arg, convert::*, query};
+use super::{CtxState, FsContext, FsId, context_arg, convert::*, query};
 use crate::reference::Reference;
+use glam::DMat4;
 use noshape_featurescript::interp::{Interp, NativeFn, R};
 use noshape_featurescript::value::{Map, Value};
 use noshape_units::{Dim, Quantity};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 pub const NATIVES: &[(&str, NativeFn)] = &[
     ("getTolerantParameterIds", get_tolerant_parameter_ids),
@@ -719,9 +722,51 @@ fn set_attribute(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         if !name.is_undefined() {
             st.retain_attributes(|(e, v)| !(*e == r && *v.get("name") == name));
         }
-        st.push_attribute(r, Value::map_from([("name", name.clone()), ("attribute", attribute.clone())]));
+        let attribute = moved_form_tools(&mut st, &r, &attribute);
+        st.push_attribute(r, Value::map_from([("name", name.clone()), ("attribute", attribute)]));
     }
     Ok(Value::Undefined)
+}
+
+/// A sheet metal wall attribute set on a face of a body `opPattern` copied (std's wall pattern reapplying the seed
+/// wall's attribute): its form tool ids stand for the tools moved as the body was ([`CtxState::moved_tools`]), so the
+/// copy is formed where it lies, not where the seed was.
+fn moved_form_tools(st: &mut CtxState, r: &Reference, attribute: &Value) -> Value {
+    let Some(formed) = attribute.get("formedToolBodyIds").as_array().filter(|f| !f.is_empty()) else { return attribute.clone() };
+    let owner = {
+        let q = query::QueryCx::new(st);
+        q.from_ref(r).into_iter().find_map(|e| q.owner(&e)).and_then(|o| match o {
+            query::Ent::Body(b) => st.ctx.bodies.get(b).map(|x| x.id.clone()),
+            _ => None,
+        })
+    };
+    let Some(m) = owner.and_then(|b| st.body_moves.get(&b).copied()) else { return attribute.clone() };
+    let mut ids: Vec<Arc<str>> = Vec::new();
+    fn strings(v: &Value, out: &mut Vec<Arc<str>>) {
+        match v {
+            Value::Str(s, _) => out.push(s.clone()),
+            Value::Array(a, _) => a.iter().for_each(|x| strings(x, out)),
+            Value::Map(m, _) => m.values().for_each(|x| strings(x, out)),
+            _ => {}
+        }
+    }
+    formed.iter().for_each(|f| strings(f, &mut ids));
+    let mut rename: HashMap<Arc<str>, Arc<str>> = HashMap::new();
+    for id in ids {
+        let (tool, before) = st.moved_tools.get(&id).cloned().unwrap_or((id.clone(), DMat4::IDENTITY));
+        if st.transient_ref(&tool).is_none() {
+            continue;
+        }
+        let moved: Arc<str> = format!("{tool}~{}", st.moved_tools.len()).into();
+        st.moved_tools.insert(moved.clone(), (tool, m * before));
+        rename.insert(id, moved);
+    }
+    let mut out = attribute.clone();
+    if let Value::Map(map, _) = &mut out {
+        let formed = super::sheetmetal::rename_strings(attribute.get("formedToolBodyIds"), &rename);
+        Arc::make_mut(map).insert(Value::str("formedToolBodyIds"), formed);
+    }
+    out
 }
 
 /// Whether `attribute` matches `pattern`: same type tag, and for maps every

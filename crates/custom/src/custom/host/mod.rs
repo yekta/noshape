@@ -272,6 +272,12 @@ pub struct CtxState {
     /// The transforms `opPattern` copied bodies by, with the sequence number after it: a tracked entity is found on
     /// its copies too (std sheet metal's part pattern puts the seed's joints on its copies' edges by tracking).
     pub pattern_moves: Vec<(u32, DMat4)>,
+    /// Each body `opPattern` copied and the transform that placed it: its sheet metal walls' form tools go with it.
+    pub body_moves: HashMap<BodyId, DMat4>,
+    /// Form tool ids of a patterned wall's attribute: the tool each stands for and the transform its copy is at (std's
+    /// wall pattern copies the seed wall's attribute; live's tools are wall-relative and follow the copy:
+    /// q-sm-pattern-1119).
+    pub moved_tools: HashMap<Arc<str>, (Arc<str>, DMat4)>,
     /// The same for the vertices an operation made where its new edges end (a localized opBoolean: the corner
     /// overcut's corner breaks go on `qCreatedBy(<its Boolean>, VERTEX)`), by their points.
     pub made_vertices: Vec<(FsId, Vec<BodyId>, Vec<DVec3>)>,
@@ -377,6 +383,8 @@ impl FsContext {
                 split_face_edges: Vec::new(),
                 edge_moves: Vec::new(),
                 pattern_moves: Vec::new(),
+                body_moves: HashMap::new(),
+                moved_tools: HashMap::new(),
                 made_vertices: Vec::new(),
                 attr_snapshots: HashMap::new(),
                 body_versions: HashMap::new(),
@@ -695,6 +703,9 @@ impl CtxState {
     }
 
     pub fn transient_ref(&self, id: &str) -> Option<&Reference> {
+        if let Some((tool, _)) = self.moved_tools.get(id) {
+            return self.transient_ref(tool);
+        }
         self.transient_ids.get(id).or_else(|| self.persistent.iter().find(|(s, _)| &**s == id).map(|(_, r)| r))
     }
 
