@@ -4284,6 +4284,39 @@ fn a_round_running_off_its_edge_meets_the_grind_face_extended_as_live() {
     assert!((x_max - -3.1588).abs() < 2e-3, "grind face to x {x_max} (live -3.1588)");
 }
 
+/// asm-welding-config's Fillet 5 (Part Studio 5c8dc1) on Part 2 as Extrude 6 leaves it (live's 32 faces, 15029.7 mm³):
+/// R 0.1 in on both plates' outer outlines, picked as live's three edges, tangent chains of 8. Each chain's ends run up
+/// to the plate's top corner, under the tube's rounded rim (r 19.05), where OCCT's fillet fails. Live (q-weld-f5): 42
+/// faces, 16 of them the rounds (one an edge), 14709.66 mm³; each top round ends on the tube's bottom plane (890 mm², one
+/// face) along a quarter circle and never reaches the rim's torus.
+#[test]
+fn a_plates_outline_round_ending_under_a_tubes_rim_as_live() {
+    let brep = include_str!("data/welding-fillet5-input.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let pick = |x: f64, y: f64, z: f64, len: f64| {
+        let e = b.shape.edges().iter().position(|e| e.edge_info().is_ok_and(|i| near(i.length, mm(len), mm(1e-3)) && i.start.distance(DVec3::new(mm(x), mm(y), mm(z))) < mm(1e-3))).expect("the edge");
+        Reference::Edge((*b.edges[e]).clone())
+    };
+    let picked = vec![pick(14.942, -11.817, -6.35, 7.7222), pick(14.942, -11.946, -14.622, 19.2479), pick(-14.942, -11.946, -14.622, 19.2479)];
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(picked));
+        p.set("radius", expr("0.1 in"));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    assert!(shape.is_valid() && shape.solids().len() == 1);
+    let v = volume(&r, 0) * 1e9;
+    assert!((14695.33..14724.13).contains(&v), "{v} mm³ (live 14709.73)");
+    let top = shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { radius, .. }) if near(radius, mm(2.54), 1e-9))).map(|f| f.bounding_box(true).unwrap().max.z).fold(f64::MIN, f64::max);
+    assert!(near(top, mm(-6.35), mm(1e-3)), "rounds up to z {} mm", top / mm(1.0));
+    assert_eq!(shape.faces().len(), 42);
+    let bottom = shape.faces().iter().filter(|f| f.face_plane().ok().flatten().is_some_and(|p| near(p.origin.z, mm(-6.35), mm(1e-6)) && p.normal.z.abs() > 0.999)).map(|f| f.area().unwrap() / (mm(1.0) * mm(1.0))).collect::<Vec<_>>();
+    assert!(bottom.len() == 1 && (bottom[0] - 890.0).abs() < 1.0, "the tube's bottom: {bottom:?} mm² (live one face, 890)");
+}
+
 /// c2-impeller-loft's Fillet 4 on its part as feature 32 leaves it (live geo-1118): r 5 on the 54.87 mm B-spline rim
 /// of a 4 mm flange, overflow off. The ball is wider than the flange's side, so the round takes that whole side and
 /// rests on its top edge: one face from z -4 to 0, live's 372.45 mm² and 270.11 mm³ off (this input's side is 2.1 mm

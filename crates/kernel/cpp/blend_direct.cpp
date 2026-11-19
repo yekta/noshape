@@ -1496,8 +1496,39 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
     }
     return false;
   };
+  // Whether part face `j` supports another tool whose rim runs on from tool `i`'s, tangent, at a vertex they share: the
+  // tangent chain's next support, which tool i's blend touches only at that vertex and whose section with it fails
+  // (asm-welding-config's Fillet 5: a line's round beside the next B-spline edge's extruded side).
+  auto supports_next_in_chain = [&](int j, size_t i) {
+    for (size_t i2 = 0; i2 < tools.size(); ++i2)
+    {
+      if (i2 == i || std::find(coincident[i2].begin(), coincident[i2].end(), j) == coincident[i2].end())
+        continue;
+      for (TopExp_Explorer a(rim[i], TopAbs_VERTEX); a.More(); a.Next())
+        for (TopExp_Explorer b(rim[i2], TopAbs_VERTEX); b.More(); b.Next())
+        {
+          if (!a.Current().IsSame(b.Current()))
+            continue;
+          const TopoDS_Vertex& v = TopoDS::Vertex(a.Current());
+          const TopoDS_Edge &  e1 = TopoDS::Edge(rim[i]), &e2 = TopoDS::Edge(rim[i2]);
+          gp_Pnt               q;
+          gp_Vec               t1, t2;
+          BRepAdaptor_Curve(e1).D1(BRep_Tool::Parameter(v, e1), q, t1);
+          BRepAdaptor_Curve(e2).D1(BRep_Tool::Parameter(v, e2), q, t2);
+          if (t1.Magnitude() > 0 && t2.Magnitude() > 0 && t1.IsParallel(t2, 1e-6))
+            return true;
+        }
+    }
+    return false;
+  };
   for (Pair& pr : pairs)
   {
+    if (!pr.ok && supports_next_in_chain(pr.j, blend_tool[pr.k]))
+    {
+      if (dbg)
+        std::fprintf(stderr, "blend direct: part face %d supports blend %zu's tangent neighbour: they touch only at its end\n", pr.j, pr.k);
+      continue;
+    }
     if (!pr.ok && meets_along_edge(TopoDS::Face(pfaces(pr.j)), all_blends[pr.k]))
     {
       if (dbg)

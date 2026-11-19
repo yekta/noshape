@@ -1529,8 +1529,9 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                 if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
                     eprintln!("section blend: direct build declined: {:?}", other.map(|r| (r.shape.is_valid(), r.shape.count(ShapeType::Solid))).map_err(|e| e.to_string()));
                 }
-                // (A rolling ball's sides only approximate its curved faces: a boolean by them leaves slivers.)
-                if ball && !matches!(spec.section, Section::Conic(_)) {
+                // (A rolling ball's sides only approximate its curved faces: a boolean by them leaves slivers. Run on past a
+                // free end, they're trimmed below and built directly again.)
+                if ball && !matches!(spec.section, Section::Conic(_)) && !free_end {
                     return Err(fail("the rolling balls' direct build declined"));
                 }
             }
@@ -1540,11 +1541,15 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     // there, extended (c2-impeller-loft's Fillet 3: run on through the lips' collar it cut that off; live's rounds end on
     // the chamfer faces).
     // (The faces a concave round's run-on extended: their old edge joins the new piece; a convex one's ends stay.)
+    // A round's rolling-ball tools the direct build declined, run on past a free end the same way, then built directly
+    // again (asm-welding-config's Fillet 5: R 0.1 in round a plate's outline whose ends run under a tube's rim).
     let joined_refaced = refaced.len();
-    if ball && matches!(spec.section, Section::Conic(_)) {
+    let circular = !matches!(spec.section, Section::Conic(_));
+    if ball && (!circular || (adds.is_empty() && !cuts.is_empty())) {
         let near = |a: DVec3, b: DVec3| (a - b).length() < scale * 1e-9;
         let mut trimmed = Vec::new();
         let mut running = Vec::new();
+        let (mut rims_trimmed, mut rims_running) = (Vec::new(), Vec::new());
         for (tool, &ei) in cuts.iter().zip(&cut_edges) {
             let Some(c) = chain.iter().find(|c| c.index == ei) else { return Err(fail("a tool with no chain edge")) };
             let fs = &ef[c.index];
@@ -1563,17 +1568,43 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
             }
             if run_on.is_empty() {
                 trimmed.push(tool.clone());
+                rims_trimmed.push(ei);
                 continue;
             }
             let generated = Arc::new(TopoName::face(feature, Role::Generated(body.edges[c.index].clone())));
+            rims_running.push(ei);
             running.push(RunOnTool { tool: tool.shape.clone(), names: tool.names.faces.clone(), supports, generated, run_on, len: c.length });
         }
+        let n_running = running.len();
         if !running.is_empty() {
             let (kept, faces_on) = closed_run_on(shape, &ef, running, scale)?;
+            if circular && kept.len() != n_running {
+                return Err(fail("a run-on round left in pieces"));
+            }
             trimmed.extend(kept);
             refaced.extend(faces_on);
         }
         cuts = trimmed;
+        if circular {
+            if n_running == 0 || refaced.len() > joined_refaced {
+                return Err(fail("the rolling balls' direct build declined"));
+            }
+            let tools: Vec<Shape> = cuts.iter().map(|t| t.shape.clone()).collect();
+            let rims = rims_trimmed.iter().chain(&rims_running).map(|&e| shape.sub_shape(ShapeType::Edge, e)).collect::<Result<Vec<_>, _>>()?;
+            let res = match k::blend_direct(shape, &tools, &rims) {
+                Ok(res) if res.shape.count(ShapeType::Solid) == 1 => res,
+                _ => return Err(fail("the rolling balls' direct build declined, run on")),
+            };
+            let names = body.shape_names();
+            let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&|n: &Name| Role::Blend(n.clone())));
+            // (The pieces of a face the run-ons end on, split where the part's slivers were, one face again: live's
+            // 890 mm² tube bottom, 7 pieces in ours.)
+            let un = k::unify_same_domain(&res.shape)?;
+            let face_names = ev.name_result(&[&crate::regen::eval::names_for(&res.shape, face_names)], &un.history, &un.shape, &BTreeMap::new(), None);
+            let (shape, face_names) = conic_contacts(ev, shape, &chain.iter().map(|c| c.shape.clone()).collect::<Vec<_>>(), &conics, un.shape, face_names, spec.r1)?;
+            ev.replace_body(bi, shape, face_names);
+            return Ok(());
+        }
     }
     // (Where convex rounds end on faces, the faces they reach keep their edges away from the rounds as they were: the
     // unify joined the three arcs round c2-impeller-loft's front face, live's three. The rounds' tight boxes: a lofted

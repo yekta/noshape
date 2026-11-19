@@ -586,6 +586,10 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             // Concave lines whose round runs off their ends over other faces, overflow on: run on, trimmed by those
             // faces extended (c2-hunting-knife's Fillet 2, where OCCT's patch over the grind face leaves a bad solid).
             Err(_) if !width && ev.bool("allowEdgeOverflow") && all_lines(&shapes) && super::blend_section::section_blend(ev, bi, &edges, &super::blend_section::BlendSpec { overflow: true, ..unpropagated(radius) }).is_ok() => continue,
+            // A chain OCCT can't end where its free ends run into a wall: rolling balls, run on and trimmed by the faces
+            // they meet there (asm-welding-config's Fillet 5: a plate's outline whose ends run under a tube's rim). (The
+            // tools made beside OCCT's try were given up when it failed.)
+            Err(_) if !width && super::blend_section::rolling_ball_blend(ev, bi, &edges, radius, None).is_ok() => continue,
             Err(e) => return Err(fillet_failed(e)),
         };
         // OCCT's round of an edge in several faces (a tip's pinched at its apex, a corner's split where it runs past the
