@@ -3939,12 +3939,14 @@ static bool path_sections_built(std::vector<TopoDS_Wire>& wires, const TopoDS_Wi
     try
     {
       const double         s = s0 + (s1 - s0) * i / (count + 1);
-      GCPnts_AbscissaPoint ap(cc, s, cc.FirstParameter());
+      // (Its own adaptor: a composite curve's keeps the edge it last evaluated, not to be shared between threads.)
+      BRepAdaptor_CompCurve own(spine);
+      GCPnts_AbscissaPoint ap(own, s, own.FirstParameter());
       if (!ap.IsDone())
         return;
       gp_Pnt P;
       gp_Vec T;
-      cc.D1(ap.Parameter(), P, T);
+      own.D1(ap.Parameter(), P, T);
       if (T.Magnitude() < 1e-12)
         return;
       BRepAlgoAPI_Section sec(carried, gp_Pln(P, gp_Dir(T)), false);
