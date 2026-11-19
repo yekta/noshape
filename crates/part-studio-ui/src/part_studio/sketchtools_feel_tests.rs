@@ -258,6 +258,21 @@ fn rows() -> Vec<Row> {
             let (open, text) = cx.update(|cx| view.read(cx).sketch.as_ref().map(|s| (s.text_dialog_open(), s.text_string.clone())).unwrap());
             expect((after_one, open, text.as_str()), (false, true, "Default text"), "dialog after one click, after two, its text")
         } },
+        Row { id: "insert image / its dialog, then a box at the image's aspect", live: "sk-tool-insert-image, 1715: 'Insert an image' with Current document | Other documents | Libraries, Libraries open; after the pick two clicks set opposite corners of a box with the image's aspect", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-image", Tool::InsertImage);
+            let dialog = cx.update(|cx| view.read(cx).ui_ref().and_then(|u| u.insert_panel.as_ref()).map(|(p, _)| (p.read(cx).title, p.read(cx).in_libraries())));
+            cx.update(|cx| view.update(cx, |v, _| v.sketch.as_mut().unwrap().pending_image = Some(("guide.png".into(), vec![1, 2, 3], 2.0))));
+            draw(cx, window);
+            click(cx, window, &view, (300., 300.));
+            click(cx, window, &view, (500., 330.));
+            let aspect = cx.update(|cx| {
+                let d = view.read(cx).sketch_data(cx)?;
+                let ps: Vec<glam::DVec2> = d.images.first()?.box_points.iter().filter_map(|p| d.sketch.point(noshape_sketch::EntityId(*p))).collect();
+                let (lo, hi) = ps.iter().fold((ps[0], ps[0]), |(lo, hi), p| (lo.min(*p), hi.max(*p)));
+                Some(((hi.x - lo.x) / (hi.y - lo.y) * 1000.).round() / 1000.)
+            });
+            expect((dialog, aspect), (Some((Some("Insert an image"), true)), Some(2.0)), "the dialog's title and Libraries tab, the box's width / height")
+        } },
         Row { id: "search / the found tool lit in the sketch toolbar", live: "search-tools-1118: Alt+C in a sketch; 'f' lights Fillet's button yellow (its group's face), a member under a ⌄ lights the ⌄ (Fix: the test window's collapsed constraints), Highlight tool in toolbar off lights nothing", gap: false, check: |cx| {
             let (window, view) = sketch_with(cx, "st-search-lit", Tool::Select);
             cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_palette(w, cx))).unwrap();

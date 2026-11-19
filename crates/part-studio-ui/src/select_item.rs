@@ -435,6 +435,11 @@ impl SelectItemPanel {
     }
 
     /// The keyboard is in the panel, outside its boxes (live: a focused div, a "field" without a label).
+    #[cfg(test)]
+    pub fn in_libraries(&self) -> bool {
+        self.in_libraries
+    }
+
     pub fn has_keyboard(&self, window: &Window) -> bool {
         self.focus.is_focused(window)
     }
