@@ -2070,14 +2070,26 @@ fn drawing_keys_as_lives_shortcut_sweep(cx: &mut TestAppContext) {
     let panel = VisualTestContext::from_window(window, cx).debug_bounds("dr-measure-panel").expect("the Measure panel");
     let canvas = cx.update(|cx| editor.read(cx).bounds);
     assert!((panel.left() - canvas.left()).abs() < px(0.5) && (panel.top() - canvas.top()).abs() < px(0.5), "top left: {panel:?} in {canvas:?}");
-    // Its units (live2 wake-1118): Feet reads a foot as 1 ft; Show dual unit adds the other unit.
+    // Its readout (live2 wake-1118 mu-mm-edge-*.png): a 40 mm edge on a millimetre drawing reads "40.00 mm", "1.57 in"
+    // in Inches; Show dual unit adds "[1.575 in]" to either; Feet reads a foot as "1.00 ft"; a line lists as "Line 1".
     cx.update(|cx| {
         editor.update(cx, |e, _| {
-            e.measure_unit = Some(3);
-            assert_eq!(e.measure_text(0.3048), "1.000 ft");
+            let units_mm = e.drawing.units_mm;
+            e.drawing.units_mm = true;
+            assert_eq!(e.measure_text(0.04), "40.00 mm");
+            e.measure_unit = Some(0);
+            assert_eq!(e.measure_text(0.04), "1.57 in");
             e.measure_dual = true;
-            assert!(e.measure_text(0.0254).starts_with("0.083 ft ["), "{}", e.measure_text(0.0254));
-            (e.measure_unit, e.measure_dual) = (None, false);
+            assert_eq!(e.measure_text(0.04), "1.57 in [1.575 in]");
+            e.measure_unit = None;
+            assert_eq!(e.measure_text(0.04), "40.00 mm [1.575 in]");
+            (e.measure_unit, e.measure_dual) = (Some(3), false);
+            assert_eq!(e.measure_text(0.3048), "1.00 ft");
+            (e.measure_unit, e.drawing.units_mm) = (None, units_mm);
+            let end = |x: f64| noshape_scene::drawing_tools::PickedPoint { view: noshape_model::drawing::ViewId(1), p: [x, 0.0], r: None };
+            let picks = e.measure.replace(vec![crate::drawing_keys::MeasurePick::Line(end(0.0), end(0.04))]);
+            assert_eq!(e.measure_pick_names(), ["Line 1"]);
+            e.measure = picks;
         })
     });
     act(cx, Box::new(crate::actions::MeasureTool));

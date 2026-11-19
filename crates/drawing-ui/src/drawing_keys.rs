@@ -9,6 +9,7 @@ use crate::theme::p;
 use gpui_kit::*;
 use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 
 /// A drawing's Control-only shortcuts (live's key list, behaviours "Keys on macOS"): the Control key on every OS,
@@ -353,15 +354,30 @@ impl DrawingEditor {
     /// Model length of a view-coordinate length (view coordinates are model meters); with Show dual unit, the other
     /// unit after it in brackets.
     pub(crate) fn measure_text(&self, meters: f64) -> String {
-        let main = match self.measure_unit {
-            Some(i) => format!("{:.3} {}", meters / MEASURE_UNITS[i].1, MEASURE_UNITS[i].2),
-            None => noshape_model::drawing::build::format_length(&self.drawing, meters) + if self.drawing.units_mm { " mm" } else { " in" },
-        };
+        // Live2 wake-1118 (mu-mm-edge-*.png): two decimals in the chosen unit ("40.00 mm", "1.57 in"); Show dual unit
+        // adds the drawing's other system with three ("[1.575 in]"), whatever unit is chosen.
+        let own = if self.drawing.units_mm { 1 } else { 0 };
+        let (_, per, abbr) = MEASURE_UNITS[self.measure_unit.unwrap_or(own)];
+        let main = format!("{:.2} {abbr}", meters / per);
         if !self.measure_dual {
             return main;
         }
-        let other = if self.drawing.units_mm { format!("{:.3} in", meters / 0.0254) } else { format!("{:.2} mm", meters * 1000.0) };
+        let other = if self.drawing.units_mm { format!("{:.3} in", meters / 0.0254) } else { format!("{:.3} mm", meters * 1000.0) };
         format!("{main} [{other}]")
+    }
+
+    /// The Measure panel's picks as its selection box lists them ("Line 1": live2 wake-1118), numbered per kind.
+    pub(crate) fn measure_pick_names(&self) -> Vec<String> {
+        let mut count = [0usize; 3];
+        self.measure.iter().flatten().map(|m| {
+            let (k, name) = match m {
+                MeasurePick::Point(_) => (0, "Point"),
+                MeasurePick::Line(..) => (1, "Line"),
+                MeasurePick::Circle { .. } => (2, "Circle"),
+            };
+            count[k] += 1;
+            format!("{name} {}", count[k])
+        }).collect()
     }
 
     /// The Measure button at the drawing's bottom right (live keys-1118 hov-measure: "Measure ([)"), pressed while
@@ -392,7 +408,7 @@ impl DrawingEditor {
                 rows.push(("Diameter".into(), self.measure_text(radius * 2.0)));
                 rows.push(("Radius".into(), self.measure_text(*radius)));
             }
-            [MeasurePick::Point(_)] => rows.push(("Point".into(), "select another entity".into())),
+            [MeasurePick::Point(_)] => {}
             [x, y] => {
                 let point = |m: &MeasurePick| match m {
                     MeasurePick::Point(p) => Some((p.view, p.p)),
@@ -431,10 +447,27 @@ impl DrawingEditor {
         }
         // Live2 shortcuts-1118 (measure.png): a drawing panel at the top left: "Measure" with the red ✕, the blue
         // selection box "Select entities to measure", the unit "Inches (Drawing)" and Show dual unit.
-        let field = rows.iter().fold(
-            v_flex().mx(px(4.)).my(px(3.)).p(px(3.)).border_1().border_color(pal.accent).bg(gpui_kit::rgb(0xe8f1fb)).text_size(px(12.)).child(div().text_color(pal.text_muted).child("Select entities to measure")),
-            |f, (k, v)| f.child(gpui_kit::component::h_flex().gap_3().child(div().w(px(70.)).text_color(pal.text_muted).child(k.clone())).child(div().child(v.clone()))),
+        // The selection box: its caption, then a row per pick with its ✕ (live2 mu-mm-edge-mm-dual.png).
+        let field = self.measure_pick_names().into_iter().enumerate().fold(
+            v_flex().mx(px(4.)).my(px(3.)).px(px(6.)).py(px(4.)).border_1().border_color(pal.accent).bg(gpui_kit::rgb(0xe8f1fb)).child(div().text_size(px(11.)).text_color(pal.text_muted).child("Select entities to measure")),
+            |f, (i, name)| {
+                f.child(h_flex().h(px(22.)).text_size(px(13.)).child(div().flex_1().child(name)).child(div().id(("measure-pick-x", i)).px(px(4.)).cursor_pointer().text_color(pal.text_muted).child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if let Some(m) = &mut this.measure
+                        && i < m.len()
+                    {
+                        m.remove(i);
+                    }
+                    cx.notify();
+                }))))
+            },
         );
+        // Under Show dual unit: "Measurements (Projected geometry)", the values indented as "Length:  40.00 mm", and a
+        // line's "Relation: Line".
+        let relation = matches!(picks.as_slice(), [MeasurePick::Line(..)]).then_some("Relation: Line");
+        let results = (!rows.is_empty()).then(|| {
+            rows.iter().fold(v_flex().px(px(8.)).pt(px(4.)).pb(px(6.)).text_size(px(13.)).child(div().child("Measurements (Projected geometry)")), |c, (k, v)| c.child(h_flex().pl(px(10.)).gap(px(8.)).child(format!("{k}:")).child(v.clone())))
+                .when_some(relation, |c, r| c.child(div().pt(px(18.)).child(r)))
+        });
         // Live2 wake-1118 (mu1c.png, mu-mm-units.png): live's fixed order, the drawing's own unit suffixed "(Drawing)"
         // in its place; the box's tooltip "Units".
         let own = if self.drawing.units_mm { 1 } else { 0 };
@@ -482,7 +515,7 @@ impl DrawingEditor {
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Measure"))
                         .child(div().id("measure-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_measure(cx)))),
                 )
-                .child(v_flex().p(px(3.)).child(field).child(div().h(px(26.)).flex().items_center().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(12.)).child(units)).child(dual_box))
+                .child(v_flex().p(px(3.)).child(field).child(div().h(px(26.)).flex().items_center().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(12.)).child(units)).child(dual_box).children(results))
                 .into_any_element(),
         )
     }
