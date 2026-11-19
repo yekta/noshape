@@ -149,6 +149,9 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-19 (lead) Build hosts by load, not by name: before a build or test run, read the 1-min load of vibex7, vibex8 and vibe2
   (`ssh <h> cut -d" " -f1 /proc/loadavg`) and use the lowest that has your worktree (or the Mac's free slot). Naming one host
   for everyone moved the pile-up (vibex7 26 / vibex8 4 at 05:00, then 7 / 34 at 05:30). Private documents stay on vibex7.
+- 11-19 (lead) Where live builds a feature and ours errors, a result within 0.1 mm of live's that changes no other
+  document lands (pipe Loft: 0.093 mm inside the span, boundaries exact); its parity row stays open for the rest. An
+  honest error is not the goal when live succeeds.
 - 11-19 (lead) A case where ours differs from OCCT is worse than one it declines: a rule that removes differing cases lands
   even when it also declines correct ones (bool's 50 µm slab rule: 5 differences gone, ~20 correct cases back to OCCT);
   the declined cases are listed in the handoff as the next ones to win back. History-only differences are fixed, not
