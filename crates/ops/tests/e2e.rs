@@ -8521,6 +8521,39 @@ fn a_radial_hole_gets_its_centermark() {
     assert_eq!(marks, 12, "two marks of six lines");
 }
 
+/// An automatic centermark is sized to the widest circle seen on its axis, not to a counterbore hidden on the far side,
+/// and shrinks to 0.7 r only for a circle smaller than its cross and gap (0.09 in at the defaults): live's clamp-guillem
+/// (r 2 mm with a r 3.5 mm counterbore behind: arms to r + 0.7 r; r 2.75 mm: ±0.045 in, arms to r + 0.09 in),
+/// pipeflange-steven, drw2-k.
+#[test]
+fn centermarks_are_sized_to_the_circles_seen() {
+    let mut ctx = Ctx::new();
+    let sketch = new_sketch(&mut ctx, "centermark-sizes.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "shapes": [{ "tool": "corner_rectangle", "points": [[-25, -25], [25, 25]] }, { "tool": "circle", "points": [[-12, 0], [-10, 0]] }, { "tool": "circle", "points": [[12, 0], [15, 0]] }] }));
+    let regions = call(&mut ctx, "sketch_get", json!({ "sketch": sketch }))["regions"].as_array().unwrap().clone();
+    let outer = regions.iter().max_by(|a, b| num(&a["area"]).abs().total_cmp(&num(&b["area"]).abs())).unwrap()["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [outer], "depth": "10 mm" } }));
+    let volume = |ctx: &mut Ctx| num(&call(ctx, "query_parts", json!({}))["parts"][0]["volume"]);
+    let plain = volume(&mut ctx);
+    // The counterbore from the bottom face, 4 mm up round the left hole.
+    let cb = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": cb, "tool": "circle", "points": [[-12, 0], [-8.5, 0]] }));
+    let disc = call(&mut ctx, "sketch_get", json!({ "sketch": cb }))["regions"].as_array().unwrap().iter().min_by(|a, b| num(&a["area"]).abs().total_cmp(&num(&b["area"]).abs())).unwrap()["id"].clone();
+    let r = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [disc], "operationType": "REMOVE", "oppositeDirection": false, "depth": "4 mm" } }));
+    assert_eq!(r["feature_status"]["status"], "Ok", "{r}");
+    let ring = std::f64::consts::PI * (3.5f64.powi(2) - 2.0f64.powi(2)) * 4.0;
+    assert!((plain - volume(&mut ctx) - ring).abs() < 1e-3, "the counterbore cut: {} -> {}", plain, volume(&mut ctx));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "suggested_views": true }));
+    let got = call(&mut ctx, "drawing_get", json!({ "drawing": d["drawing"], "edges": false }));
+    let top = got["views"].as_array().unwrap().iter().find(|v| v["centermarks"].as_array().is_some_and(|m| m.len() == 2)).expect("the Top view's two marks").clone();
+    let k = num(&top["scale"]);
+    let mut reach: Vec<f64> = top["centermarks"].as_array().unwrap().iter().map(|m| num(&m["reach"]) / k).collect();
+    reach.sort_by(f64::total_cmp);
+    let mark = 0.09 * 25.4 / k;
+    let want = |r: f64| if r < mark { 1.7 * r } else { r + mark };
+    assert!((reach[0] - want(2.0)).abs() < 1e-2 && (reach[1] - want(3.0)).abs() < 1e-2, "scale {k}: {reach:?}, want {} and {}", want(2.0), want(3.0));
+}
+
 /// A centermark's arms dragged by a grip (live2 drw-centermark follow-up): an automatic mark lengthens and comes back,
 /// never shorter than its default, and keeps its length on reopening; a Single mark shortens below it too.
 #[test]

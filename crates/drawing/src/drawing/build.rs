@@ -2244,11 +2244,13 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     const HIDDEN: f64 = 0.045 * 25.4;
                     let (c, r) = (pl.to_sheet(c), pl.len_to_sheet(r));
                     let (a, gap) = (vt.centermark_mark_size + HIDDEN, vt.centermark_gap_size + HIDDEN);
-                    // At the default sizes a small circle's mark shrinks to
-                    // leave the cross and gap 0.7 r (live 1857: r 2 mm, cross
-                    // ±0.028 in, gap 0.027; set sizes stay, live asb 10-22 b).
+                    // At the default sizes a circle smaller than the cross and
+                    // gap shrinks them to 0.7 r (live 1857: r 2 mm, cross ±0.028
+                    // in, gap 0.027); one larger keeps them (clamp-guillem's
+                    // r 0.108 in, drw2-k's 0.098: ±0.045, gap 0.045); set sizes
+                    // stay (live asb 10-22 b).
                     let auto = vt.centermark_mark_size == 0.0 && vt.centermark_gap_size == 0.0;
-                    let k = if auto { (0.7 * r / (a + gap)).min(1.0) } else { 1.0 };
+                    let k = if auto && r < a + gap { 0.7 * r / (a + gap) } else { 1.0 };
                     let (a, gap) = (a * k, gap * k);
                     let at = |u: [f64; 2], t: f64| [c[0] + u[0] * t, c[1] + u[1] * t];
                     let first = g.lines.len();

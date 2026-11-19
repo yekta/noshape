@@ -3220,16 +3220,21 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
     g.ends = cylinder_ends(&shapes, frame);
     // A hole wholly hidden gets no automatic mark: some visible edge of a part runs round its axis (a rim, or a radial
     // hole's saddle seen end-on) at most its radius out (c2-hex-bookcase-derived's holes behind its mesh part: live
-    // none).
+    // none). The mark is sized to the widest of those, not to a hidden counterbore behind (clamp-guillem's r 2 mm
+    // holes, a r 3.5 mm counterbore on the far side: live's arms reach r 2 mm).
     let tol = diag * 1e-6;
     let edges = &g.edges;
-    g.ends.retain(|(c, r)| {
-        edges.iter().filter(|e| e.visible && !e.mesh && e.points.len() >= 2).any(|e| {
-            let d: Vec<f64> = e.points.iter().map(|p| (p[0] - c[0]).hypot(p[1] - c[1])).collect();
-            let (lo, hi) = d.iter().fold((f64::MAX, f64::MIN), |(lo, hi), x| (lo.min(*x), hi.max(*x)));
-            hi <= r + tol && hi - lo <= tol.max(hi * 1e-4) && hi > tol
+    g.ends = std::mem::take(&mut g.ends)
+        .into_iter()
+        .filter_map(|(c, r)| {
+            let round = edges.iter().filter(|e| e.visible && !e.mesh && e.points.len() >= 2).filter_map(|e| {
+                let d: Vec<f64> = e.points.iter().map(|p| (p[0] - c[0]).hypot(p[1] - c[1])).collect();
+                let (lo, hi) = d.iter().fold((f64::MAX, f64::MIN), |(lo, hi), x| (lo.min(*x), hi.max(*x)));
+                (hi <= r + tol && hi - lo <= tol.max(hi * 1e-4) && hi > tol).then_some(hi)
+            });
+            round.reduce(f64::max).map(|seen| (c, seen.min(r)))
         })
-    });
+        .collect();
     g
 }
 

@@ -111,12 +111,12 @@ Q. asm-robot-relations studio 0c3466's Import 1 (REV-21-1650.STEP): live's store
    rr-import-1118 (02:3x): live's own re-import of the same file today gives ONE solid "Combine1" (154 faces), Import 1
    WARNING "Imported parts contained faults." (Allow faulty parts on), or no parts at all (off). So the six sheets are
    an old stored translation live no longer makes. Decision asked of the lead (11-19 03:1x): keep ours (one solid).
-H. Hidden lines vs live (live + live2 02:3x, live/dx/louver-hidden-1119/: sm-louver Front + Top with Show hidden lines,
-   DXF 2018). Live: Front Hidden 882 LINE + 33 ELLIPSE, TANGENT_HIDDEN 81; Top 466 LINE + 42 ELLIPSE + 3 ARC,
-   TANGENT_HIDDEN 107. Ours before cadc2e12: Front 393 / Top 37 LINE; after: 462 / 312 (toward live). Gaps: we never
-   draw hidden tangent edges (build.rs: (false, Smooth) => continue; live's TANGENT_HIDDEN layer), hidden curves
-   aren't fitted to ELLIPSE / ARC, Front still ~420 lines short. Dumps: /root/dx-scratch/dxfm/louver-hidden-*.dxf
-   (exsh.sh + /root/dx-scratch/dxhidden.patch: the exchange suite with DXHIDDEN=1).
+H. Hidden lines vs live (live2 02:32, live/dx/louver-hidden-1119/: sm-louver Front + Top, Show hidden lines, DXF 2018).
+   Live Hidden 1348 LINE + 3 ARC + 75 ELLIPSE (105.85 in), TANGENT_HIDDEN 188 LINE (244.4 in). Ours on main (e86fcb6e)
+   Hidden 774 LINE, 105.34 in: every piece on live's Hidden geometry, and live's Hidden all on ours but 0.010 in
+   (/root/dx-scratch/bin/hidcmp.py ours live). Counts differ by splitting only. Gaps: no TANGENT_HIDDEN layer (build.rs:
+   (false, Smooth) => continue), hidden curves written as LINEs not ELLIPSE / ARC. Dumps /root/dx-scratch/dxfm/
+   louver-hidden-*.dxf (Mac exsh.sh + /root/dx-scratch/dxhidden.patch: the exchange suite with DXHIDDEN=1).
 R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "Import failed: <path>: i/o error: could
    not read STEP file <path>" (live: "bad.step uploaded but failed to translate."; the app's bubble already said so).
    In progress: ops import's translation failures say failed_to_translate(file) (upload-only's unreadable file keeps
