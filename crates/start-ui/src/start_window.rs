@@ -355,6 +355,8 @@ pub struct StartView {
     /// keystroke or caret blink in the search box re-renders only the title
     /// bar (see `crate::cached_slice`); the search notifies it.
     body: Option<Entity<crate::cached_slice::Slice<StartView>>>,
+    /// The documents table's sideways scroll (its pinned columns stay put).
+    table_scroll: ScrollHandle,
     library: Library,
     /// The folders set as the user's libraries (library key → folder): their icon is the library's, their menu
     /// ‹Type› library ▸ (live 2497, 2508).
@@ -607,6 +609,7 @@ impl StartView {
             create_focus,
             create_press: false,
             body: None,
+            table_scroll: ScrollHandle::new(),
             library: Library::default(),
             docs: Vec::new(),
             loaded: false,
@@ -3843,6 +3846,16 @@ impl StartView {
         pinned_order(&self.columns, &self.pins)
     }
 
+    /// The shown columns split by pin, and how far the table is scrolled sideways.
+    fn pins_layout(&self, cols: &[Col]) -> Pins {
+        let pin = |c: &Col| self.pins.iter().find(|p| p.0 == *c).map(|p| p.1);
+        let side = |want: Option<Pin>| cols.iter().copied().filter(|c| pin(c) == want).collect::<Vec<Col>>();
+        let (left, center, right) = (side(Some(Pin::Left)), side(None), side(Some(Pin::Right)));
+        let width = |cs: &[Col]| cs.iter().map(|c| self.col_width(c.label())).sum::<f32>();
+        let (scrolled, max) = (-f32::from(self.table_scroll.offset().x), f32::from(self.table_scroll.max_offset().x));
+        Pins { left_w: width(&left), right_w: width(&right), left, center, right, scrolled: scrolled.clamp(0., max.max(0.)), max: max.max(0.) }
+    }
+
     /// A column's width: its Autosize one, else Name 350 px and the others 200.
     fn col_width(&self, label: &str) -> f32 {
         self.col_w.iter().find(|w| w.0 == label).map(|w| w.1).unwrap_or(if label == "Name" { 350. } else { 200. })
@@ -4158,7 +4171,7 @@ impl StartView {
     /// text in bold, ⚲ the workspace, a part's state badge; the document's
     /// Modified / Modified by / Owned by, a part's Part number and Revision.
     /// A double click opens the document at the item's tab.
-    fn hit_rows(&self, hits: &[(DocEntry, crate::start_search::Hit)], cols: &[Col], cx: &mut Context<Self>) -> Vec<AnyElement> {
+    fn hit_rows(&self, hits: &[(DocEntry, crate::start_search::Hit)], pins: &Pins, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let pal = p();
         let me = self.me.clone();
         let who = move |name: &str| if name.is_empty() || me.iter().any(|m| m == name) { "me".to_string() } else { name.to_string() };
@@ -4188,8 +4201,22 @@ impl StartView {
                 let props = h.props.clone().unwrap_or_default();
                 let state = (h.kind == "Part").then(|| props.meta.state().to_string());
                 let (path, tab) = (d.path.clone(), h.tab);
+                let col_cell = |c: &Col| {
+                    cell(self.col_width(c.label()))
+                        .child(match c {
+                            Col::Modified => lib::format_onshape_time(d.modified),
+                            Col::ModifiedBy => who(&d.modified_by),
+                            Col::OwnedBy => who(&d.owner),
+                            Col::Type => h.kind.to_string(),
+                            Col::Description => props.description.clone().unwrap_or_default(),
+                        })
+                        .into_any_element()
+                };
+                let (left, right) = (pins.block(true, pins.left.iter().map(col_cell).collect(), pal.app_bg, Some(pal.row_hover)), pins.block(false, pins.right.iter().map(col_cell).collect(), pal.app_bg, Some(pal.row_hover)));
                 h_flex()
                     .id(SharedString::from(format!("hit-{ix}")))
+                    .group(PIN_ROW)
+                    .relative()
                     .h(px(42.))
                     .flex_none()
                     .cursor_pointer()
@@ -4198,6 +4225,7 @@ impl StartView {
                     .border_b_1()
                     .border_color(rgb(0xececec))
                     .hover(|r| r.bg(pal.row_hover))
+                    .child(Pins::room(pins.left_w))
                     .child(
                         h_flex()
                             .w(px(self.col_width("Name")))
@@ -4211,19 +4239,12 @@ impl StartView {
                             .child(h_flex().flex_none().gap(px(1.)).text_size(px(11.)).text_color(pal.text).child(os::glyph(os::GLYPH_WORKSPACE, 14., pal.text)).child(crate::ui::user_text(h.at.clone())))
                             .children(state.map(|s| div().flex_none().px(px(4.)).rounded(px(3.)).bg(rgb(0xe2e2e2)).text_size(px(11.)).text_color(rgb(0x666666)).child(s))),
                     )
-                    .children(cols.iter().map(|c| {
-                        cell(self.col_width(c.label()))
-                            .child(match c {
-                                Col::Modified => lib::format_onshape_time(d.modified),
-                                Col::ModifiedBy => who(&d.modified_by),
-                                Col::OwnedBy => who(&d.owner),
-                                Col::Type => h.kind.to_string(),
-                                Col::Description => props.description.clone().unwrap_or_default(),
-                            })
-                            .into_any_element()
-                    }))
+                    .children(pins.center.iter().map(col_cell))
                     .child(cell(200.).child(props.part_number.clone().unwrap_or_default()))
                     .child(cell(200.).child(props.revision.clone().unwrap_or_default()))
+                    .child(Pins::room(pins.right_w))
+                    .children(left)
+                    .children(right)
                     .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                         if ev.click_count() >= 2 {
                             let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
@@ -4245,23 +4266,34 @@ impl StartView {
         let searching = !self.query.trim().is_empty() || self.adv_query.is_some();
         let search_cols: &[&'static str] = if searching { &["Part number", "Revision"] } else { &[] };
         let hits = self.item_hits();
-        let mut header = h_flex()
-            .h(px(32.))
-            .flex_none()
-            .border_b_1()
-            .border_color(pal.border_strong)
-            .child(self.list_header_cell("h-name", "Name", Some(SortKey::Name), None, cx).w(px(self.col_width("Name"))).flex_none());
-        for c in &cols {
+        let pins = self.pins_layout(&cols);
+        let head_cell = |c: &Col, cx: &mut Context<Self>| {
             let key = match c {
                 Col::Modified => Some(SortKey::Modified),
                 Col::ModifiedBy => Some(SortKey::ModifiedBy),
                 _ => None,
             };
-            header = header.child(self.list_header_cell(c.label(), c.label(), key, Some(*c), cx).w(px(self.col_width(c.label()))).flex_none());
+            self.list_header_cell(c.label(), c.label(), key, Some(*c), cx).w(px(self.col_width(c.label()))).flex_none().into_any_element()
+        };
+        let mut header = h_flex()
+            .relative()
+            .h(px(32.))
+            .flex_none()
+            .border_b_1()
+            .border_color(pal.border_strong)
+            .child(Pins::room(pins.left_w))
+            .child(self.list_header_cell("h-name", "Name", Some(SortKey::Name), None, cx).w(px(self.col_width("Name"))).flex_none().debug_selector(|| "doc-head-name".into()));
+        for c in &pins.center {
+            header = header.child(head_cell(c, cx));
         }
         for c in search_cols {
             header = header.child(self.list_header_cell(c, c, None, None, cx).w(px(200.)).flex_none());
         }
+        let (left, right): (Vec<AnyElement>, Vec<AnyElement>) = (pins.left.iter().map(|c| head_cell(c, cx)).collect(), pins.right.iter().map(|c| head_cell(c, cx)).collect());
+        header = header
+            .child(Pins::room(pins.right_w))
+            .children(pins.block(true, left, pal.app_bg, None).map(|b| b.debug_selector(|| "doc-head-pinned-left".into())))
+            .children(pins.block(false, right, pal.app_bg, None).map(|b| b.debug_selector(|| "doc-head-pinned-right".into())));
         // Onshape writes the signed-in user as "me".
         let me = self.me.clone();
         let who = move |name: &str| if name.is_empty() || me.iter().any(|m| m == name) { "me".to_string() } else { name.to_string() };
@@ -4269,7 +4301,7 @@ impl StartView {
         let on_screen = rows_on_screen(self.rows_clip.get());
         let mut skipped = 0usize;
         let rows: Vec<AnyElement> = if let Some(hits) = &hits {
-            self.hit_rows(hits, &cols, cx)
+            self.hit_rows(hits, &pins, cx)
         } else {
             let mut rows = Vec::new();
             let sel = self.selection_set();
@@ -4294,9 +4326,25 @@ impl StartView {
                 let (d1, d2) = (d.clone(), d.clone());
                 let p1 = d.path.clone();
                 let cell = |w: f32| div().w(px(w)).flex_none().pl(px(16.)).truncate();
+                let col_cell = |c: &Col| {
+                    cell(self.col_width(c.label()))
+                        .child(match c {
+                            Col::Modified => lib::format_onshape_time(d.modified),
+                            Col::ModifiedBy => who(&d.modified_by),
+                            Col::OwnedBy => who(&d.owner),
+                            Col::Type => "Document".to_string(),
+                            Col::Description => d.description.clone(),
+                        })
+                        .into_any_element()
+                };
+                let bg = if selected { pal.accent_soft } else { pal.app_bg };
+                let hover = (!selected).then_some(pal.row_hover);
+                let (left, right) = (pins.block(true, pins.left.iter().map(col_cell).collect(), bg, hover), pins.block(false, pins.right.iter().map(col_cell).collect(), bg, hover));
                 h_flex()
                     // A row is its document (a row that slides up under the pointer is another one: its tooltip shows).
                     .id(SharedString::from(format!("row-{}", d.path.display())))
+                    .group(PIN_ROW)
+                    .relative()
                     .map(|r| crate::ui_script::mark(r, || format!("doc_row:{}", d.name)))
                     .h(px(DOC_ROW_H))
                     .flex_none()
@@ -4310,6 +4358,7 @@ impl StartView {
                     // Dragged: faded in place (live docs-f2-onto-document-row).
                     .when(self.dragging.contains(&d.path), |r| r.opacity(0.55))
                     .when(d.trashed, |r| r.tooltip(crate::ui::tooltip("This document is in the trash and cannot be opened.")))
+                    .child(Pins::room(pins.left_w))
                     .child(
                         h_flex()
                             .w(px(self.col_width("Name")))
@@ -4346,17 +4395,7 @@ impl StartView {
                             })
                             .when(open, |r| r.child(Self::open_badge())),
                     )
-                    .children(cols.iter().map(|c| {
-                        cell(self.col_width(c.label()))
-                            .child(match c {
-                                Col::Modified => lib::format_onshape_time(d.modified),
-                                Col::ModifiedBy => who(&d.modified_by),
-                                Col::OwnedBy => who(&d.owner),
-                                Col::Type => "Document".to_string(),
-                                Col::Description => d.description.clone(),
-                            })
-                            .into_any_element()
-                    }))
+                    .children(pins.center.iter().map(col_cell))
                     .children(search_cols.iter().map(|_| cell(200.).into_any_element()))
                     // Live documents/112: the selected row shows its quick actions at the
                     // right end (share is cloud-only): Send to trash, Labels.
@@ -4380,6 +4419,9 @@ impl StartView {
                                 }))),
                         )
                     })
+                    .child(Pins::room(pins.right_w))
+                    .children(left)
+                    .children(right)
                     .when(!d.trashed, |r| r.drag_threshold(DOCS_DRAG_PX).on_drag(self.drag_items(selected, &d.path, &d.name, false), start_docs_drag(cx.entity().downgrade())))
                     .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| this.on_doc_click(&d1, ev, window, cx)))
                     // Right-click selects the row too (live documents/25); the
@@ -4437,11 +4479,21 @@ impl StartView {
             .child(h_flex().h(px(42.)).flex_none().items_start().pt(px(4.)).pr(px(14.)).child(div().flex_1()).child(self.render_add_columns(cx)))
             // Wider than the pane (more columns): the table scrolls sideways.
             .child(
-                div().id("doc-table").flex_1().min_h_0().w_full().overflow_x_scroll().child(
+                div()
+                    .id("doc-table")
+                    .flex_1()
+                    .min_h_0()
+                    .w_full()
+                    .overflow_x_scroll()
+                    .track_scroll(&self.table_scroll)
+                    .debug_selector(|| "doc-table".into())
+                    // Pinned columns follow a sideways scroll in the same frame (the body is a cached slice).
+                    .when(!pins.left.is_empty() || !pins.right.is_empty(), |t| t.on_scroll_wheel(cx.listener(|this, _: &ScrollWheelEvent, _, cx| this.refresh_body(cx))))
+                    .child(
                     v_flex()
                         .h_full()
                         .min_w_full()
-                        .w(px(350. + 200. * (cols.len() + search_cols.len()) as f32))
+                        .w(px(pins.left_w + pins.right_w + self.col_width("Name") + pins.center.iter().map(|c| self.col_width(c.label())).sum::<f32>() + 200. * search_cols.len() as f32))
                         .child(header)
                         .child(if empty {
                             self.render_empty(cx)
@@ -5559,6 +5611,39 @@ fn header_menu_items(sortable: bool, optional: bool, sorted: Option<bool>) -> Ve
     out
 }
 
+/// The group a documents table row's pinned cells take its hover from.
+const PIN_ROW: &str = "doc-row";
+
+/// The documents table's columns by pin, as live's ag-grid lays them out: those pinned left before Name, held at the
+/// table's left edge while it scrolls sideways; those pinned right held at its right edge; the rest scroll.
+struct Pins {
+    left: Vec<Col>,
+    center: Vec<Col>,
+    right: Vec<Col>,
+    left_w: f32,
+    right_w: f32,
+    /// How far the table is scrolled sideways, and at most.
+    scrolled: f32,
+    max: f32,
+}
+
+impl Pins {
+    /// The room a pinned block takes in the row's flow.
+    fn room(w: f32) -> Div {
+        div().w(px(w)).flex_none()
+    }
+
+    /// The left or right pinned cells over the row (above its bottom border), on its background (`hover` when the row
+    /// is hovered).
+    fn block(&self, left: bool, cells: Vec<AnyElement>, bg: Rgba, hover: Option<Rgba>) -> Option<Div> {
+        if cells.is_empty() {
+            return None;
+        }
+        let b = h_flex().absolute().top_0().bottom_0().bg(bg).children(cells).when_some(hover, |b, h| b.group_hover(PIN_ROW, move |s| s.bg(h)));
+        Some(if left { b.left(px(self.scrolled)) } else { b.right(px(self.max - self.scrolled)) })
+    }
+}
+
 /// The shown columns in order: those pinned left, the others, those pinned right.
 fn pinned_order(columns: &[(Col, bool)], pins: &[(Col, Pin)]) -> Vec<Col> {
     let pin = |c: Col| pins.iter().find(|p| p.0 == c).map(|p| p.1);
@@ -5572,6 +5657,67 @@ mod tests {
     use super::{Col, Pin, SelectAllRows, SelectNext, SelectPrev, ToggleRow, bold_match, default_columns, header_menu_items, pinned_order, click_rows, history_change_matches, import_failed, key_bindings, lib, move_rows, rows_to_move, toggles};
     use gpui_kit::Modifiers;
     use std::path::PathBuf;
+
+    /// Live's ag-grid (live2 doc-feel-1119 L42): a column pinned left stays at the table's left edge, before Name, and one
+    /// pinned right at its right edge, while the table scrolls sideways under them.
+    #[gpui::test]
+    fn pinned_columns_stay_put_while_the_table_scrolls_sideways(cx: &mut gpui::TestAppContext) {
+        use super::{DocEntry, Source, StartView, ViewMode};
+        use gpui_kit::{AppContext as _, Bounds, Pixels, Point, ScrollDelta, ScrollWheelEvent, VisualTestContext, WindowBounds, WindowOptions, point, px, size};
+        cx.update(gpui_kit::init);
+        crate::start_hooks::register(crate::start_hooks::Hooks {
+            open_document_window: |_, _, _, _| Ok(()),
+            open_document_at: |_, _, _, _| Ok(()),
+            open_document_history: |_, _, _| Ok(()),
+            build_label: String::new,
+            import_dialog: |_, _, _, _| {},
+            help_items: |m| m,
+        });
+        let dir = std::env::temp_dir().join(format!("noshape-start-pins-{}", std::process::id()));
+        let docs: Vec<DocEntry> = (0..5)
+            .map(|i| DocEntry { path: dir.join(format!("Doc {i}.noshape")), name: format!("Doc {i}"), modified: 1_760_000_000_000 + i * 60_000, modified_by: "me".into(), owner: "me".into(), description: "d".into(), workspace: "Main".into(), thumbnail: None, recent_rank: None, broken: false, trashed: false })
+            .collect();
+        let mut view = None;
+        let (window, _) = cx
+            .update(|cx| {
+                crate::os_menu::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(Bounds { origin: Point::default(), size: size(px(1100.), px(700.)) })), ..Default::default() }, cx, |window, cx| {
+                    let v = cx.new(|cx| StartView::new(window, cx));
+                    view = Some(v.clone());
+                    v
+                })
+            })
+            .unwrap();
+        let view = view.unwrap();
+        cx.update(|cx| {
+            view.update(cx, |v, cx| {
+                (v.source, v.view, v.loaded, v.docs) = (Source::All, ViewMode::List, true, docs);
+                v.columns.iter_mut().for_each(|c| c.1 = true);
+                v.pins = vec![(Col::OwnedBy, Pin::Left), (Col::Modified, Pin::Right)];
+                v.refresh_body(cx);
+            })
+        });
+        let mut vcx = VisualTestContext::from_window(window, cx);
+        let draw = |vcx: &mut VisualTestContext| {
+            vcx.update_window(window, |_, w, cx| {
+                w.refresh();
+                w.draw(cx).clear(cx)
+            })
+            .unwrap();
+            vcx.run_until_parked();
+        };
+        draw(&mut vcx);
+        let at = |vcx: &mut VisualTestContext, s: &'static str| vcx.debug_bounds(s).unwrap_or_else(|| panic!("{s} not drawn"));
+        let (table, left, right, name) = (at(&mut vcx, "doc-table"), at(&mut vcx, "doc-head-pinned-left"), at(&mut vcx, "doc-head-pinned-right"), at(&mut vcx, "doc-head-name"));
+        let near = |a: Pixels, b: Pixels| (f32::from(a) - f32::from(b)).abs() < 0.5;
+        // Owned by before Name; Modified at the right edge of a table wider than its pane.
+        assert!(near(left.left(), table.left()) && near(name.left(), left.right()), "{table:?} {left:?} {name:?}");
+        assert!(near(right.right(), table.right()), "{table:?} {right:?}");
+        vcx.simulate_event(ScrollWheelEvent { position: point(name.center().x, name.center().y), delta: ScrollDelta::Pixels(point(px(-150.), px(0.))), ..Default::default() });
+        draw(&mut vcx);
+        let (left2, right2, name2) = (at(&mut vcx, "doc-head-pinned-left"), at(&mut vcx, "doc-head-pinned-right"), at(&mut vcx, "doc-head-name"));
+        assert!(near(name2.left(), name.left() - px(150.)), "Name scrolled: {name:?} -> {name2:?}");
+        assert!(near(left2.left(), table.left()) && near(right2.right(), table.right()), "the pinned columns held: {left2:?} {right2:?} in {table:?}");
+    }
 
     /// Live2 doc-feel-1119 L41: the ⋮ menus of Name (sorted descending), Modified (unsorted), Owned by (not sortable).
     #[test]
