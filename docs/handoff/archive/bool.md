@@ -4837,3 +4837,24 @@ instances on one plate either way: yours if you'll take it.
   13. b5b566884 fan-blade P0: an offset face grazing another argument's circle declined first (offset_grazes_a_circle,
      rust_boolean.cpp): 36 -> 0.4 ms on the Mac; not where one of its edges lies on the circle (impeller halves).
   cf-surface-pattern 385 vs 386 edges: its Booleans identical branch vs main (the gate's same-base pair decides).
+
+## Moved from the handoff 11-19 09:30
+- SCISSOR-LIFT-BOM-ROWS: culprit core's 41f62884a; core's revert ddfea0eb restores 59/87. Done on my side.
+- vibe3's ~/agents/bool-cases copy went to vibe5 (gone): lost.
+- Not mine (11-17): impeller 38073a30 (bool2: live wins, OCCT's the outlier), impeller Extrude impellerraum (core).
+- Landed 11-17: bool-knife (ecf8c33a), OCCT 0033 (9ece8f66), bool-knife2 (cf5a9aff), bool-march (d3f24a83), nuts
+  (43335ce3: thread turn helix gap; gate clean, hats/dock/hat15b SAME), MSVC fix (01c5c13e: fitted's p static
+  constexpr; CI 44039545068 green on all three OSes).
+- bool-march's 4 replay cases "equivalent" (74acee2ff54886eb, e001fa8eb5dbfe24): ours the exact one (cap area x height =
+  our volume exactly; OCCT's caps disagree): accepted per DECISIONS 11-15; told the lead.
+- Mac 11-17 (loaded, hints): every qa-list document of mine under live (louver 1195/4987, rings 1387/1557, snap-hook
+  206/274, housing 46/105, lighten 61/114, bottle 29/40, shaped-flange 455/1026); over live only features: rings Extrude 5
+  71/39 (boolean.rust.brep 33: mapped-curve chords), knife Fillet 2 74-81/9 (op_split 18 OCCT EF on the grind B-spline;
+  sections ahead 16), michael Fillet 2, tpd Fillet 1 (blend's). Parked: /root/bool-scratch/parked-offedge-boxes.diff
+  (off_shared_edges box pre-check, identical, no gain).
+- Gate 2c6b920fc (with 129100d95): replays clean (bool-corpus 865 -> 910 ...), suite total 96.4 -> 118.8 s on a
+  loaded vibex8 (hint), cf-surface-pattern the only change. /root/bool-tube-scratch/gate-2c6b920fc.log.
+- impeller 02f2f58d (bool2's): Linux "unified differently" only; on the Mac history differs with or without my change
+  (platform). 7cb79697: seam placement only.
+- GATE GAP: the knurl corpora need a 48 GB host (none); ours-only replay instead (lead 11-17 ok):
+  NOSHAPE_BOOL_CORPUS=~/agents/bool-corpora/<k> NOSHAPE_BREP_OURS_ONLY=1 <kernel tests> brep_replay::brep_corpus_replay.

@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-19 07:10 UTC (new bool thread on the Motile account since 03:5x). Hosts (lead 11-18/19): builds + probes on the Mac (NOSHAPE_RB_HOST=mac; corpus replays / A-Bs
+Updated 11-19 09:30 UTC (new bool thread on the Motile account since 03:5x). Hosts (lead 11-18/19): builds + probes on the Mac (NOSHAPE_RB_HOST=mac; corpus replays / A-Bs
 there only inside an rb.sh slot, else vibex8; Mac paths ~/noshape-host/...), gates on vibex7
 (NOSHAPE_GATE_HOST=vibex7 via /root/bool-scratch/gate-chain-own.sh <sha> as a systemd-run unit; off 02:00-04:00);
 land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs vibex7 ~/lead-private (hat8, hat15, hat15b,
@@ -15,21 +15,31 @@ Our Boolean lands on correctness (identical on corpora + hats/dock); speed count
 action / document (no ms A/Bs). Order (lead): 1. decline reasons ranked (posted 18:1x, below); 2. work them down: bool
 takes Shell + offset (shfall), bool2 free-form sections + B-spline faces; 3. impeller (37.8 s vs live 2.6 s): Extrude
 Bohrungssitz fuse (d04c232c8) and Shell Gehaeuse. Daily report: share taken (count) + differing cases.
-Ranking (replay 118bf5b52eaa636b, 3477 distinct: same 2926, declined 378, differ 6, equivalent 119, relabelled 46):
-not tried 120 (95 our own direct builds: on_face 67, through_holes 24; local 23, slabs 2), non-manifold 33 (shfall 14),
-short section from a corner 30, point near two vertices 19 (shfall 17), sheets that meet 17, line + curved edge 16,
-inside-out tool 15 (shfall 12), a face lost 14 (shfall 10), coincident pieces differ 11, piece's point on another
-solid's face 11 (shfall 11), two edges leave a vertex 10, edge on another argument's free-form face 10 (shfall 10).
-shfall's "near two vertices" 17: fuses of a slab + 84-93 tools (most OCCT results invalid) and 6 commons; probing with
-a DBG_NEAR2 trace (scratch) in Pool::find_tol / boolean_with's 4th round.
+Ranking on the stack (Mac replay-sph, summed over corpora, so corpus2-6 repeats count again): not tried 212,
+non-manifold 42, short section from a corner 30, near two vertices 21, inside-out tool 17, tiny arc 12, piece's point on
+another solid's face 12, fuzzy / mesh 11, face's vertex off its plane 11 (7 shfall). Outside shfall and bool2's shared
+shape, every reason is now 1-4 distinct cases. Looked at 11-19 and parked (diffs in /root/bool-scratch):
+- Shell slabs built tight (parked-shell-tight-slabs.diff: ShapeFix_ShapeTolerance to Confusion, each edge back to
+  1.05x its CheckSameParameter deviation, restored when invalid; on slab tools and the fused tool): on the 211-shell
+  fuzz corpus (/root/core-scratch/shellcorpus, Mac bool-keep/shellcorpus, /root/bool-scratch/shc-ab.sh) Shell's own
+  results change in 13 (4 failures now built, 2 built ones now fail, 1 kernel crash bf37be35, 6 volumes / face counts),
+  ours takes 108/156 vs 103/159. Not landable. shfall's 93 are recordings: no source change moves them.
+- Short section from a corner, 30 (parity56; parked-stub-corner.diff merges the corner and the branch point, group
+  centred on the corner): 7 taken but differing (5 history, 2 with 3 more edges), 15 to "two edges leave a vertex in
+  one direction", 7 "seam off a ruling". The section runs along the tool's closed seam edge (tangent to it at the
+  branch): tangent contact, OCCT's (ruling 11-15).
+- Non-manifold (15 distinct outside shfall; nm-trace.diff, DBGNM): 6 have OCCT results non-manifold too (declined on
+  purpose); cdd336b4 a box corner at a sphere's centre (the loop passes through the pole: free-form path, bool2's);
+  4a71ecd0 / 62565707 a 31 um tolerant tool only touching; 301238ec / 23a4e56c tools' corners exactly on the part's
+  wall with tori around a horizontal axis; 9f262529 / b0c36850 1e-5 tolerant mirror twins (volumes 3e-5 apart).
+- "a line and a curved edge" (16) went with bool2's 4b68bdb0b; "sheets that meet" bool-corpus ones are on the stack.
 live (e8549719) captures at feature level ("bool truth (11-18)" in behaviours.md): sent impeller Bohrungssitz /
 Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are internal Booleans (no live analogue).
 
 ## In flight
 - Share (DECISIONS 15c2c6406, report this way): ours 3121/3477 (89.8%: general Boolean 3026, direct builds 95), OCCT
   356, differing 6 (main 548d795fb's gate replay; local = OCCT on fewer faces, counted as OCCT).
-- LANDED 03:13: the fold fix alone (spur-gear P0): 373dd5b9 (e2b5c3c0e + c8d3a4734). qa re-times cf-spur-gear on the
-  first green with c8d3a4734 after vibex7's quiet window (~04:00), 7 alternating runs vs v0.4.58, numbers to bool.
+- Spur-gear P0 closed (lead 11-19): the fold fix 373dd5b9, qa 1.03x v0.4.58 (+99 ms; 1.28 before); ships v0.4.60.
 - LEAD 11-19 05:4x: 129100d95 (the unify's tolerant-edge room; cf-surface-pattern 386 -> 385 edges, live 387) out
   of the stack, parked with 846db3d0c (branch bool-stack3-with-usd keeps it); land the rest. Speed: land if the
   alternating A/B shows load only; else find the commit. Shell slabs: see shfall below.
@@ -39,16 +49,14 @@ Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are interna
   (bool2's 4b68bdb0b supersedes it), offset_grazes_a_circle (086d69a12 + dcd7121b6: bool2's crest fix takes fan-blade).
   With: 85957b9a9's fix (a thread turn's seam rulings stay where `right` put them: the nut T1). Kernel 516 + brep pass
   (Mac). Older branches kept: bool-stack3, bool-stack3-with-usd, bool-stack4, bool-stack5. Before land, on fb1269481:
-  - GATE unit bool-gate-fb1269481 (vibex8, 07:04) -> /root/bool-hat-scratch/chain-fb1269481.out.
-  - private docs unit bool-udoc-fb1269481 (clis on vibe2, compare vibex7) -> udoc-fb1269481.out (dock must be SAME).
-  - A/B: /root/bool-scratch/ab-doc.sh 5 <docs> on vibex8 with the gate's binaries, via its slot, as a systemd unit
-    holding the ssh.
+  - GATE unit bool-gate-fb1269481b (vibex7, 08:41; vibex8's slot queue held it 1.5 h) -> chain-fb1269481.out.
+  - private docs: all SAME (hats 8 / 15 / 15b, dock A-E2) -> /root/bool-hat-scratch/udoc-fb1269481.out.
+  - A/B: /root/bool-scratch/ab-doc.sh 5 <docs> on the gate's host with its binaries, via its slot, as a systemd
+    unit holding the ssh.
   Clean -> land bool-stack6 (diff --stat; bool-hat's traces: /root/bool-scratch/wip-1119-0640.diff, retol hook
   /root/bool-scratch/retol-slabs-hook.diff, probes /root/bool-scratch/probes/xprobe.rs; never commit them). On land:
   tell dx / core / blend / asm / bool2 (bool2-sheets rebases on it). Dock tools: /root/bool-scratch/udoc-bisect.sh
   (rollback bisect over a tab's features), /root/bool-hat-scratch/udoc-br-only.sh, udoc-abh.sh.
-- Gate 2c6b920fc (with 129100d95): replays clean (bool-corpus 865 -> 910 ...), suite total 96.4 -> 118.8 s on a
-  loaded vibex8 (hint), cf-surface-pattern the only change. /root/bool-tube-scratch/gate-2c6b920fc.log.
 - New on bool-stack3 (Mac all-corpora A/B each, vs the commit below it; only these cases changed, 0 differ):
   7663bee14 a cylinder face's angles from curves going out and back (bool-corpus 34b7e564 / 76c804e8 / 8658a028:
   ours); 191e83607 one whole sphere / torus face's shell by its face's normal (corpus2-6 6cf25eee / a3bfaa87 /
@@ -161,23 +169,6 @@ Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are interna
   Cases Mac ~/noshape-host/agents/bool-hat/gear, vibex6 ~/agents/dx-keep/gearlab/booleans.
 - blend: c2-impeller-loft Fillet 3's OCCT cut 9602f671f8528c1a (~650-800 ms, PerformEF 481): vibex7
   ~/agents/blend-keep/rec-f3, Mac ~/noshape-host/agents/blend10/rec-f3.
-- SCISSOR-LIFT-BOM-ROWS: culprit core's 41f62884a; core's revert ddfea0eb restores 59/87. Done on my side.
-- impeller 02f2f58d (bool2's): Linux "unified differently" only; on the Mac history differs with or without my change
-  (platform). 7cb79697: seam placement only.
-- vibe3's ~/agents/bool-cases copy went to vibe5 (gone): lost.
-- Not mine (11-17): impeller 38073a30 (bool2: live wins, OCCT's the outlier), impeller Extrude impellerraum (core).
-- Landed 11-17: bool-knife (ecf8c33a), OCCT 0033 (9ece8f66), bool-knife2 (cf5a9aff), bool-march (d3f24a83), nuts
-  (43335ce3: thread turn helix gap; gate clean, hats/dock/hat15b SAME), MSVC fix (01c5c13e: fitted's p static
-  constexpr; CI 44039545068 green on all three OSes).
-- bool-march's 4 replay cases "equivalent" (74acee2ff54886eb, e001fa8eb5dbfe24): ours the exact one (cap area x height =
-  our volume exactly; OCCT's caps disagree): accepted per DECISIONS 11-15; told the lead.
-- Mac 11-17 (loaded, hints): every qa-list document of mine under live (louver 1195/4987, rings 1387/1557, snap-hook
-  206/274, housing 46/105, lighten 61/114, bottle 29/40, shaped-flange 455/1026); over live only features: rings Extrude 5
-  71/39 (boolean.rust.brep 33: mapped-curve chords), knife Fillet 2 74-81/9 (op_split 18 OCCT EF on the grind B-spline;
-  sections ahead 16), michael Fillet 2, tpd Fillet 1 (blend's). Parked: /root/bool-scratch/parked-offedge-boxes.diff
-  (off_shared_edges box pre-check, identical, no gain).
-- GATE GAP: the knurl corpora need a 48 GB host (none); ours-only replay instead (lead 11-17 ok):
-  NOSHAPE_BOOL_CORPUS=~/agents/bool-corpora/<k> NOSHAPE_BREP_OURS_ONLY=1 <kernel tests> brep_replay::brep_corpus_replay.
 - Knife cases: vibe5 ~/tmp/bool/knrec, Mac ~/noshape-host/agents/bool-hat/knrec (17b8 c1d9 Fillet 2, a3f9 Chamfer 1, 682a
   Mirror 1); knife Fillet 2's split dump Mac ~/noshape-host/agents/bool-hat/kdump2/split-11.
 
