@@ -1079,7 +1079,8 @@ fn grooves_crossing_just_above_the_end() {
     assert!(r.shape.is_valid());
     // (Where they cross: a sliver of ~1e-4 mm³.)
     assert!(v >= want && v - want <= 1e-3 * 1e-9, "volume {v}, the two grooves' own {want}");
-    assert_eq!(r.shape.count(k::ShapeType::Face), 9);
+    // (The cylinder's two pieces sharing an edge one face: USD's merge, its pieces on the merged cylinder itself.)
+    assert_eq!(r.shape.count(k::ShapeType::Face), 8);
 }
 
 /// Two grooves of the Ø25 × 34 knurl at 45° / 45° (its tools 30 and 51; recorded) crossing 37 µm above the end face,
