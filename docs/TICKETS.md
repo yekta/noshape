@@ -866,6 +866,8 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   22:4x: (b) is a one-event lag, also in sketch mode: draw a line, Esc, ONE pointer move to empty space → its end stays lit
   (still at 1.8 s); a second move clears it. So the hover shown is the previous pointer event's; a pointer that stops right
   after leaving keeps a stale hover. (a) is separate: it survives several moves after ✓ (seen a 3rd time on Sketch 6).
+  (c) Worst case: that lit line end stays drawn after the sketch is CANCELLED (✕, toast "Sketch 9 has been canceled"): an
+  orange dot over empty viewport where no entity exists, through moves and the + menu, until a part face is hovered.
 - [ ] P1 **OFFSET-EDIT-SCALES-SKETCH (skasm)**: in a sketch with no dimensions yet, Offset (O) a free circle, Enter, type 3,
   Enter: ours treats the offset's distance as the sketch's first dimension and scales the whole sketch by 3/5 about its
   centre (green f3bc85da, walk 22:3x: copy r 56 -> 33 px, source r 40 -> 24 px, any other free geometry shrinks too).
