@@ -1,201 +1,117 @@
-# bool2: current state (11-18 09:12 UTC)
+# bool2: handed over to bool (11-19 20:45 UTC)
 
-Second agent on noshape's own Boolean (crates/brep, crates/kernel/cpp/rust_boolean.cpp, boolean.cpp's unify). A case
-is taken only where it equals OCCT (or live, with a capture); results identical end to end (docs/DECISIONS.md 11-14).
-History: docs/handoff/archive/bool2.md. Rulings: docs/DECISIONS.md (read it first).
+bool2 is merged into bool (the user's decision, lead 11-19 20:40); this thread stops. bool owns everything below. Scope
+was the tail of declined cases in noshape's own Boolean: crates/brep, crates/kernel/cpp/rust_boolean.cpp and the unify
+in boolean.cpp. Rules: docs/DECISIONS.md, especially 9e5b481d4 (land on correctness), 0e603d4c9 (a case that differs
+is worse than one declined) and "live over OCCT" (a gate exception needs a live capture). Older state:
+docs/handoff/archive/bool2.md.
 
-## Unlanded work (11-18 08:45 UTC)
-### Stack bool2-xscan = c5a70b8c5 (c26so e62420bb2 + 0d9abe23e + c9c3759aa + xscan 728c3d989 + usd fe3d4411f + warm
-start bd0f00fc6 + 9c7f1e399 and its revert c5a70b8c5), worktree bool2-xs
-- gate71 (unit bool2-gate71, vibex7, gate71.out, from 09:09), udoc12 hats/dock (unit bool2-udoc12, vibex7,
-  udoc12.out), land unit bool2-landxs2
-  (land-xs2.sh: gate71 PASS + udoc11 SAME -> land.sh, queue vibe2, all.rs out and back). NOLAND -> fix, re-gate.
-- gate70 (c9c3759aa) FAILED: impeller 29 -> 27, cf-surface-pattern SP3 129 -> 116 (live 131), sp-cut 990256f0 74 vs
-  77. Kernel bisect: 9c7f1e399 (drop_same_regions: a B-spline group 4 -> 1 with the same boundary edges within 1e-7
-  but area 6e-7 larger skipped the volume check). Reverted (c5a70b8c5): sp-cut 77, impeller 29/48, SP3 129/386/259 =
-  main. Revolve 2's unify speedup (200 -> 45 ms) is lost; redo with an exact test (pcurve-exact / area-equal) later.
-- Gate68's shfall diffs and k25-15 slowdown fixed by 0d9abe23e; cf-spur-gear's by c9c3759aa (main 5738, c9c3759aa 5774 ms).
-- Chamfer 26 (bool2-ch26x): stays gated. Fillet 3 ERROR after it is blend's (lead 03:30; our 33-face body = live's;
-  dumps vibex8 ~/agents/bool2-keep/fillet3). f3bd95bc (impeller, OCCT chamfer 26's sliver) waits for our chamfer 26.
-### Fan-blade fix: branch bool2-fanb2 = ebc58e0be (on c9c3759aa), worktree bool2-ab
-- c2-fan-blade-sweep Boolean 2 (3e8c1e09) ours: see Gate exceptions. Gate it after the stack lands (rebase), vibex8.
-  Then tell bool (narrows offset_grazes_a_circle) and core (nuts3 lands after it). Rebase on bool's bool-shared2 when it lands.
-- Nuts (bool's hand-off, core's Sweep 1): ebc58e0be already takes bool's recorded nutcrest cut (135.2676 mm3, live
-  135.268; OCCT 143.88 removes nothing); in the document (ops-fanb2) Sweep 1 ERROR -> OK with live's counts (one
-  cylinder face is a B-spline: core's input). core's nuts3 T1 (59df02227) passes with and without the fix (vibe2):
-  without, ours declines and OCCT cuts (570 ms); with ebc58e0be ours (105 ms). Told core 08:52 (old thread) and again its new thread e8af89fe (nuts3 needn't wait); tell e8af89fe when ebc58e0be lands.
-### Exact unify drop: branch bool2-usd2 = 017fa3a86 (on bool2-fanb3 f9f8c11ff = ebc58e0be rebased on c5a70b8c5)
-- drop_same_regions again, exact: a group (one non-closed free-form surface, handle + placement + orientation) is
-  left out of the volume check only when its edges around use the very same pcurve handles over the same parameter
-  stretches (joined where contiguous) on both sides. sp-cut 990256f0 77 faces (main); standoffs unify inputs (vibe2,
-  5 rounds alternating, load 22-30) 88 -> 45, 236 -> 139, 103 -> 40, 212 -> 122 ms, identical faces/edges/volumes;
-  Revolve 2 (usd-2/5, 250 ms) not dropped: USD approximates one merged end curve (two B-splines -> one) and splits
-  the long iso-lines into new pieces. Kernel bool_/usd/unify tests 147 pass; fanb3: bool_ 140/140, brep 62.
-- Gate fanb3 + usd2 together (017fa3a86) after the stack lands; scripts scratch/usd2.sh, usd2d.sh (BOOL2_DROPDBG).
-- 11:15: gate71 VERDICT CHECK only for the knurls (vibex7 31 GB; replay 0 new differences, suite 90/90 and 1283
-  features, crate tests pass, speed 1.02-1.05x); udoc12 13 tabs SAME; knurls ours-only main vs branch (unit bool2-kn71,
-  vibex7 ~/tmp/bool2/kn, outside the slot: core's pair7 holds it); land unit bool2-landxs3 waits for it.
-- 09:09 (lead): gate71 moved to vibex7 (main cache hit there), hats/dock as udoc12 on vibex7 (udoc-x7.sh: cli-base
-  copied from vibe2, cli-br built in vibex7's slot, private docs mode-700 copies deleted on exit); landxs2 re-armed on
-  gate71 + udoc12. vibex8/vibe2 entries cancelled (no tickets, vibe2 copies deleted).
-- Scratch (uncommitted in bool2-ab): xprobe probe_case_box_edges / probe_case_unify_both / probe_case_diff; debug patch
-  fanb2-debug.patch.
+## Landed 11-19
+- 41fcfd2c (15:54) bool2-cbs: closed B-spline faces' period, and a flat closed B-spline's seam as a slit of its plane.
+  2284dd9c, 1a2a8447 and d0e4644e are ours and match OCCT. 2a5740b0 differs from OCCT as a gate exception: in live's
+  capture live/bool2/q-fb-ell-asym-1119 the boss edge is one closed edge, as in ours. Knurls 0 diff, hats/dock SAME.
+- 09ad4e81 (20:20) bool2-rim: a B-spline edge lying along another argument's face rim (between the same vertices)
+  lays nothing inside the face. Shell's common f9b29e1d now matches OCCT (T1
+  an_edge_along_another_arguments_face_rim_stays_whole). gate85: 0 new differing; knurls 0, hats/dock SAME. The first
+  version (all curve kinds) broke shell::a_sunk_boss_keeps_its_wall_as_live and took shfall b5c954ea wrongly; the
+  B-spline-only form passes both.
 
-### bool2-c26b (39917ca1d, on main b87dd3dcf)
-- c26 without chamfer 26: d082638e4 Illinois ray-crossing roots (sphere cuts 4-5 % faster), d267d27d3 + 5910f9967
-  sprockets (Extrude 2's cut OCCT 169 ms -> 30-45, Circular pattern 1's 382 -> 80-97, as OCCT), 0008db3a2 standoffs'
-  thread cut 5608f662 (same_surface one way), 39917ca1d gate.sh locks a host by `ssh $host hostname -s` (lead 11-17).
-- Gate66 (old bool2-c26 with chamfer 26) FAILED: shfall commons 5fb3d16c, e8d9bacb, 3748a133 taken but an input edge
-  Deleted where OCCT says Modified; c2-impeller-loft's Fillet 3 ERROR. Both chamfer 26's (now bool2-ch26).
+## Measurement left running (vibex8; it finishes on its own)
+- Unit bool2-tdbg53b, script /root/bool2-scratch/tdbg53.sh, output /root/bool2-scratch/tdbg53b.out (this machine).
+  It builds bool2-exact plus `mod xprobe;` (uncommitted in bool2-ab's crates/kernel/tests/all.rs) as
+  vibex8:~/tmp/bool2/ab/kp-exact3, then runs xprobe::probe_case_volumes. Each case prints two lines, "VOL ours" and
+  "VOL occt": faces, edges, vertices, valid, volume.
+  - B997 (fz1144 b997c4c389ff7abe): in gate86 ours gave 4.0555e-6 against the recorded 4.05697e-6 (0.036 % off,
+    T1 failed), yet the earlier replay (tdbg40) took it without flagging a difference. If "VOL occt" now gives ~4.0555e-6, the recording
+    is stale (an older OCCT) and ours matches OCCT as it is today. If it gives 4.05697e-6, the exact plane lines alone
+    leave ours 0.036 % off, and b997 needs the rest of the tail stack (split_params ends allowance + cycle-area chords,
+    on bool2-taildbg).
+  - CASE 6bb081c8e7192051 / 5101adb84ed0a575 (shfall, Fuse with 32 tools, recorded path direct; the same part twice).
+    Ours gives 5.295354594164e-4 for both. The recordings say 5.2953546335e-4 (7.4e-9 relative) and 5.2953739068e-4
+    (3.6e-6 relative), so OCCT's two runs already disagree with each other. "VOL occt" shows today's OCCT. Where it
+    equals ours, only history is left: the replay diff (/root/bool2-scratch/tdbg53.out) lists the "rust only"
+    records: arg0/arg1/arg10 Edge0 Generated Vertex at (57467, 39967, 18000) and (57467, 39967, 18967) mm, Modified
+    Edges along x 57500, arg1 Face0 Modified Face. Main declines both as "an edge off a plane past its tolerance";
+    bool2-exact's relaxed off-plane check takes them.
 
-### Branch bool2-so2b (f88694662, rebased on bool2-c26b 39917ca1d): standoffs' three thread Booleans
-- Gated with c26b as bool2-c26so (above).
-- 12d98f285: GFace::uv_of retries Newton stopped on the box edge off the surface from the nearest sample of each of the
-  8 nearest rows each way (the root strip: 17 x 65 samples, 5 a turn, turns 0.5 mm apart). edge_in_face's trim past
-  a free-form face's edge cuts where it comes nearest that edge (nearest_to_edge) when within the edges' tolerances;
-  stretches_over / edge_crossing for an edge leaving the surface between its ends.
-- f88694662: edge_over_free_face: an analytic face's edges go into a coincident free-form face in stretches (the
-  bore's seam and end circles across the strip each turn); a distance bound skips projections; a sliver's side of a
-  coincident face's boundary by points inside its edge (an end on a closed edge's vertex was read as either end).
-- All three ours: cut dd85b48f 28/71/45 vol 1e-12, cut 5608f662 45/120/77 vol equal, common 2a11cb1b 30/83/55 vol
-  1.1e-6 rel (gate-equivalent: 2.1e-14 m3 vs allowed 2.1e-11; two section edges' midpoints differ, same ends);
-  history identical for the cuts. Alternating A/B (then vibe5, 6 rounds, load 31), ms, ours+fallback as the app:
-  dd85 c26 1260 / so2a 151 / so2b 260 / OCCT 1133; 5608 154 / 186 / 285 / 1367; 2a11 2122 / 2288 / 336 / 1960.
-  Lead 11-17: land as is; cuts skipping the bore-edge stretches is a later speed item.
-- T1 (bool_patterns): a_thread_root_strip_cut_where_a_circle_crosses_its_run_out, a_circle_grazing_a_thread_run_out_
-  edge_is_cut_where_it_crosses_it, a_thread_root_strip_on_a_bore_split_at_its_seam_each_turn (data in
-  tests/data/booleans; copies vibex6 ~/agents/bool2-keep/so-rec2). Kernel 493/493, brep 62, clippy clean.
+## bool2-exact: not landable (gate86 FAILED 19:58)
+- Worktree /root/projects/noshape-wt/bool2-ab, branch bool2-exact, tip 2a8da63d4, base main e2abe938a. Commits:
+  819a9c81d off-plane check by curve ends and vertex tolerance (bridge); 9b9c09518 a piece keeps its edge's own end within its
+  merged vertex's tolerance (bridge); 957b0f4b9 new plane-plane straight edges on the planes' exact line (brep
+  Output.edge_line, ffi edge_line, bridge Geom_Line); 50a079ef6 a new arc ending at a tolerant vertex ends where it
+  crosses an input line ending there; 79eb8832f the tangent case of that; 2a8da63d4 T1 b997c4c3 changed from "declines" to
+  recorded_as_occt (1e-9). That T1 was never run before the gate; it fails (see B997 above).
+- gate86 (vibe2, /root/bool2-ab-scratch/gate-2a8da63d4.log): +2 taken, differing 6 -> 8 (the two shfall fuses above),
+  T1 fails, and one document moved closer to live (c2-parting-line-draft Rib 1: edges 234 -> 225, live 214).
+- Lead's plan 20:30: find why the plane lines take the shfall fuses and differ, fix that on bool2-exact, rerun the gate
+  on vibex8 through the slot, and land the whole stack at 0 differing. If the two VOL lines show today's OCCT equal
+  to ours, the differences are recording drift and history only. In that case re-record those cases (or fix the
+  history) rather than declining (DECISIONS 0e603d4c9: history differences are fixed).
+- The full tail stack: branch bool2-taildbg (same worktree) = WIP debug commits + real ones. b02a9be42 (split_params
+  ends allowance; Line only), 62e8ccdad (arrange: cycle areas with chords between curves' ends), 43eebd26d,
+  38bad0785, f1bf78ea5, 855863591, 7b7052072 (= bool2-exact's), 07df21fea (rim skip, landed in its B-spline form).
+  With all of it, 11cc92b2/dbc28f46 and b997c4c3 match OCCT in volume and history, but 11cc92b2/dbc28f46 are "unified
+  differently": ours 25 faces, OCCT 27. OCCT's own ShapeUpgrade_UnifySameDomain merges two 0.052 mm2 cylinder
+  slivers on our shape but not on OCCT's (BOOL2_USD print: same cylinders bit for bit; most likely its pcurve
+  u-origin relocation fails on OCCT's pcurves). Ours is probably live's, but this corpus case has no document, so no
+  capture is possible. Landing the full stack needs those two kept declined, or a live document showing the same.
 
-### Chamfer 26: branch bool2-ch26 (f8d871570 = 9545d4a03 on the old bool2-so2b 532da2deb; rebase later)
-- The own-neighbour rule (a piece on another solid's face takes its own-solid neighbour's states across an edge with
-  no section and no other solid's user) is now only for a cut's tool pieces: the shfall commons decline again as on
-  main; chamfer 26 still ours (36/95/62, 1.2e-10). Kernel 494/494.
-- But the impeller's Fillet 3 still ERROR with it (parity on c2-impeller-loft alone, vibex6: 33/86/54 vs live
-  34/95/62). Chamfer 26's records: tool edges 7 and 16 Deleted in ours, Modified in OCCT (output edges at (1.5,
-  +-2.759, -43.05) mm) = the two slivers (pieces 37, 45) the own rule calls Out; in the shfall commons too OCCT keeps
-  the sliver's own edge. Experiment (uncommitted in the bool2 worktree): BOOL2_OWNIN (own rule gives In), BOOL2_OWNALL
-  (commons too). Mac run 20:50 (ch26-mac.out): "In" makes chamfer 26 decline (non-manifold -> OCCT), so the impeller's
-  Fillet 3 goes back to main's 34/93/60 (live 34/95/62): no fix, it only undoes chamfer 26. OWNALL: commons decline
-  non-manifold too. Dropped.
-- Mac vs Linux (lead 11-17): found and fixed. own_sections' crossings2d (rust_boolean.cpp, our C++; OCCT's
-  Geom2dAPI_InterCurveCurve) found the profile of arg0 face 3 crossing the tool's circle (cyl faces 37/38) twice
-  0.3 mm apart on Linux, once on macOS (shallow crossing at u 0.99999127), so face 3 x 37/38 had no section there.
-  Fix: branch bool2-xscan (728c3d989 on bool2-c26so, with T1 a_profile_crossing_a_cylinder_twice_close_by_is_cut_at_both: fails on macOS without the scan, passes on both with it, worktree /root/projects/noshape-wt/bool2-xs): the B-spline's
-  signed distance from the circle / line scanned (64 a span), missed sign changes bisected. Mac now 36/95/62 with
-  Linux's volume to the last digit; Linux unchanged. Gate69 = xscan + usd + warm start (bd0f00fc6; unit bool2-gate69, vibex6, starts when gate68 ends).
-  Debug dumps (BOOL2_DUMP: pool, split edges, pieces, states, sections, OCCT/own sections):
-  /root/bool2-scratch/ch26-plat-debug.patch; scratch-docs/ch26-dump.sh runs it (Mac and vibex6).
-- Tried and dropped: OCCT's ComputeState (an own edge's middle): those middles lie on the other face too.
-- Debug patches: /root/bool2-scratch/ch26-history-dbg.patch (BOOL2_EH=arg,idx: an input edge's pieces, get_sedge
-  merges), the DBGOWN prints (in git history of this session's experiments only).
+## Worktrees and branches (all mine; bool may delete them)
+- /root/projects/noshape-wt/bool2-ab: branches bool2-exact (above), bool2-taildbg (debug + tail work, tip
+  "WIP debug: SEAMARC"), bool2-rimdbg (debug). rb.sh target on vibex8 ~/agents/bool2-ab; probe binaries in
+  vibex8:~/tmp/bool2/ab (kp-*), corpus subsets c42..c53 there. Uncommitted: `mod xprobe;` in crates/kernel/tests/all.rs.
+  Untracked crates/kernel/tests/xprobe.rs holds the probes (probe_small_faces with PROBE_NB, probe_case_volumes,
+  probe_case_faces2 with PROBE_UNIFY, probe_arg_faces).
+- /root/projects/noshape-wt/bool2-xs (bool2-rim, landed), bool2-k25 (bool2-cbs, landed), bool2 (old; dirty with
+  11-18 work, 1084 commits behind), bool2-ho (this handoff).
+- Gate trees: vibe2 ~/agents/bool2-ab-gate (gate86), vibex8 ~/agents/bool2-ab-gate (gate84, stopped). Scratch dirs:
+  /root/bool2-scratch (gate*.out, tdbg*.sh/out, kn*/udoc* scripts), /root/bool2-{ab,xs,k25}-scratch (gate logs).
+- Env debug prints on bool2-taildbg: BOOL2_ARR / ARRAT (arrange's vertex fan), BOOL2_COINC (coincident pieces),
+  BOOL2_TOUCH (section touching a boundary), BOOL2_SAME (section with both ends on one vertex), BOOL2_LONGELL (lets a
+  plane nearly along a cylinder through, prints |n.a|), BOOL2_SEAMARC (arc across a seam), BOOL2_USD (unify attempts,
+  boolean.cpp), BOOL2_SLIT / FLATSEAM / OFFPL / TWICE / CROSS / ELT (bridge), PN2, APEX, ROUNDS, SHORT, VOFF.
 
-### Both
-- Uncommitted on purpose: crates/kernel/tests/all.rs registers the scratch probes (copy /root/bool2-scratch/all-with-
-  probe.rs), crates/kernel/tests/{xprobe,sampler}.rs, scratch-docs/. Take all.rs out before land.sh, put it back after.
-- Landed 11-17: bool2-chamfer as 3844e0a5 (valve Extrude 3 own sections, unify reordered tries).
-
-## Model-suite speed list (lead 11-17): where each stands
-- c2-loft-paths-guides Mirror 1: input differs (Loft 3 17 vs live 15 faces, core); Mirror 1 Ok but wrong (13/33/25,
-  5.27e6 mm^3 vs live 27/67/47, 6.33e6): OCCT's fuse with the mirror (2.75 s; ours declines "an edge without its curve
-  on a free-form face"). Told core. Case (were on vibe5, lost: record again) ~/agents/bool2-keep/lp-rec/61b92e93c065aeed.
-- c2-parting-line-draft-parting-line Split 3: 1829 -> 599 ms on main (core's 85010cc40) but still "does not split"
-  (live 13/34/24 x 2): the tool runs through the body's parting edges, which our drafted B-spline walls put a few um
-  off it (body 25 mm^3 under live's). OCCT's Splitter with fuzzy 1e-5 splits (13/49/39 + 17/53/39). Draft is core's.
-  Dumps (were vibe5 ~/tmp/bool2/spd, lost) (split-2-*), probes probe_split_pair / probe_split_ab / probe_split_fuzzy.
-- c2-surf-workshop-knifehandle Split 1: 971 -> 98 ms on main (core's fix), live 7; OCCT's Splitter ~50 ms of it. A
-  half-space split by our Boolean (extrusion surface swept across) isn't faster: shelved,
-  /root/bool2-scratch/split-extrusion-halfspace.patch.
-- c2-config-parts-sprockets: Extrude 2's and Circular pattern 1's cuts ours on bool2-c26 (0ffab0d52, bd9710453).
-  Cases (were on vibe5, lost: record again) ~/agents/bool2-keep/spr-rec.
-- c2-config-parts-nuts Sweep 1: bool's (nuts thread turn); c2-sm-rocker-enclosure-body: input differs at Extrude 6.
-
-## Valve Circular pattern 1 (case rec-valve 52970b93111ac42b, ours)
-- Cone pairs: the part's 60 deg ring (z axis, r 70 at z 0, two halves u 0-90 / 90-360 deg) x 8 hole cones on parallel
-  axes at 71.3 mm (r 1.5 at z 3, -30 deg, 2.3 m long). 9 of 14 pairs have curves; bool's parked-cones-apart.diff
-  (mine now, /root/bool2-scratch) proves none of the 5 empty ones (they reach the half's boundary angle): dropped.
-  Only lever left: own parallel-axis cone x cone sections, matching OCCT's splits (bool's cyl x cyl parked on that).
-- Raw cut: ours 47/143/94, OCCT 47/142/93 (OCCT merges two crossings 36 um apart into one vertex; ours keeps a 71 um
-  edge). The document's part after the pattern: 46/122/72, live's exactly (vol 46868.68 vs 46868.59): ours is right.
-
-## Other
-- Impeller 38073a30d2ffbc3e (Boolean Flansch+Gehaeuse fuse): ours 20/57/40 raw, 5.913847e-5 m^3; live 19/56/39,
-  5.913789e-5; OCCT 16/47/36, 5.911132e-5 (27 mm^3 off live): ours is right (told bool 11-17). 02f2f58d / 7cb79697 by
-  an edge after the replay's unify, not looked at. Cases (were on vibe5, lost: record again) ~/agents/bool2-keep/imp-cur.
-
-## Agents
-- Roster (lead 11-17 10:30; only these ids): psui 4973e295-9e92-463f-a13f-2ec5258bc5f9 (11-17), core
-  e8af89fe-d460-49b3-b0bb-9572da230fed (11-18; 6692ae35 stopped), blend 0672fa20-964d-4fde-a19c-c5b4363729ba (11-18; 0e6e9942 stopped), bool 7fa8ceab-4549-499f-9b01-
-  3a289c2c95b4, dx f93a1292-5bb7-406f-9a25-59767e01878e, qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b, asm d8d597e0-675c-
-  497b-a804-544ceab99bbd, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0,
-  studios 58e9bca8-346c-4847-8012-e15006ae61ef, live e8549719-ef9a-42de-960c-e24b29f142a6, live2 79ae5cdb-42a4-4025-
-  b43a-da61a4f92ad7 (11-17).
-
-## Gate exceptions (lead 11-18 07:15, this case only; the gate's 1e-9 stays for everything else)
-- 3e8c1e09636d4fd7 (c2-fan-blade-sweep Boolean 2, base cut by two bolts; ebc58e0be, T1
-  bool_patterns::a_thread_crest_through_countersink_rims_cut_as_occt at 1e-8): ours 87773.867193 mm3, OCCT 87773.867457
-  (3e-9 relative). Same 66/174/106, identical history (probe_case_records), every face's area within 1e-6 and centroid
-  within 0.1 um; the gap is on the countersink cones, whose OCCT sections are 5 um-tolerance curves (offset surfaces).
-  Live (bool 11-18, suite-0545 #48, /root/onshape-research/live/suite-truth-1118/c2-fan-blade-sweep.json): base
-  56/143/88, V 87773.8660 mm3; ours/OCCT after unify 56/139/84, 87773.867 (1.4e-8 apart). Live's 4 more edges and
-  vertices: created faces 2 B-splines (deg 1x2, 3x121 poles) 60.3612, 2 cylinders r 3.2 31.8332, 4 other 55.2344 /
-  60.3844 x2. (The earlier 87773.636 was wrong.)
-
-## Open decisions (with the lead)
-- None open. parting-line Split 3 went to core (11-17).
-
-## Next items, in order (lead 11-17)
-1. Land bool2-c26so (gate68 + hats/dock udoc9; 5608 at 285 ms accepted, cuts skipping the bore-edge stretches is a
-   later speed item).
-2. Land bool2-xscan (gate69). Then chamfer 26 (bool2-ch26): its history (tool edges 7/16 Deleted, OCCT Modified) and
-   the impeller's Fillet 3 ERROR remain.
-3. Standoffs (dx 11-17): on c26so all three thread Booleans are ours (32/32, doc 13.5 s -> 3.7 s, hosts differ). Unify
-   check speed: fe3d4411f on bool2-xscan (faces_volume per face on all threads, bit-identical sums; the fallback
-   passes reuse the memo): Revolve 2 421 -> 237 ms, Boolean 1 204 -> 78, Boolean 2 503 -> 193 (vibex6 alternating,
-   probe crates/kernel/tests/usdprobe.rs uncommitted in bool2-xs, inputs vibex6 ~/agents/bool2-keep/usd-stoff,
-   scratch/usdab.sh; debug build /root/bool2-scratch/boolean-usd-debug.cpp). Left: Revolve 2's check counts all 30
-   faces changed: fixed by 9c7f1e399 (faces on one free-form non-closed surface whose merged face has the parts'
-   boundary left out of the integral; Revolve 2's unify ~200 -> ~45 ms, same results, kernel 506/506). Our Boolean
-   (standoffs cases, 1 thread, vibex6: dd85 238, 5608 263, 2a11 303 ms): samples ~25 % stretches_over -> edge_crossing
-   -> nearest_to_edge -> seg_param (Nurbs param_of, 70 a crossing), ~30 % occt_ahead (IntTools_FaceFace, its
-   ComputeTolerance PSO). Tried: edge_crossing's min_by keyed once: no gain (dropped).
-   Lead 11-17: keep the bore-edge passes (no skip for cuts; dd85's test stays at 1e-9). Warm start: bd0f00fc6
-   (nearest_to_edge's golden steps find the B-spline foot from the last one's, NurbsCurve::param_from): 10-13 %
-   faster (dd85 422 -> 379, 5608 452 -> 399, 2a11 533 -> 462 ms loaded), counts/history same, volumes within 1e-11.
-   Tried: stretches_over's samples seeded from the last on-surface uv: bit-identical but no gain (dropped).
-   A/B binaries vibex6 ~/tmp/bool2/ab (k-old = 9c7f1e399, k-warm = bd0f00fc6), scratch/boolab.sh, warmchk.sh.
-4. (loft-paths-guides Mirror 1: moot, core's f824d120 reverted the loft change; back to live's volume.)
-5. Sprockets end to end (document A/B) after the land; the next documents from qa's speed report whose inputs match
-   live (re-run speed-gaps.py on the newest suite).
-6. Parked: valve cone x cone sections (OCCT's splits), helical Sweep 1 (cylinders in analytic_freeform_sections give
-   one curve where OCCT gives 10, slower), impeller Extrude 4 (OCCT internals).
-
-## Recent facts
-- qa's P0s: helical Sweep 1 0.4.48 -> 0.4.53 2.2x slower = 0.4.53 lacked 895c8e3b (fixed on main; vibe7 same run:
-  0.4.48 341-557 ms, 0.4.53 873-977, main 257-326). Dock tab B Puck Huni: fixed by bool's 7ac4debfa + b27a78c40.
-- core's housing unify: Rotieren 1 / Boolesch 1 / Bohrung 1 each a USD merge rejected at 4.9e-15 m^3 vs 1e-9 V
-  (borderline), three memo-hit tries + one volume: no identical-result cut without moving that threshold.
-- gate.sh landed: builds through ~/bin/slot with SLOT_MIN_GB=12 (19afd619), models snapshot per run (a2952b32).
+## Parked tail reasons (all on bool2-taildbg; none produce an OCCT difference)
+1. "two edges leave a vertex in one direction":
+   - 11cc92b2/dbc28f46: the unify slivers above.
+   - gpf ee95f96d / b7a02f84: need more than 4 regroup rounds (BOOL2_ROUNDS=12); then vertices 4 and 5 at one place
+     never merge (two identical lines).
+   - 9f0b0c04 / 54630d70: see 2.
+2. "coincident pieces differ" (gpf 9f0b0c04, 54630d70; corpus4 3cca316c), gear commons with a drill-tip cone.
+   - Fix 1: piece_key keys a cone's Apex sedge by its vertex (one piece has a half turn there, the other the input's
+     whole apex edge). All 3 then pass this check; corpus4 0 differ. This doesn't touch `rank` / `tree`; bool asked to
+     be told before anyone changes those.
+   - Then 3cca316c stops at "a non-manifold result"; 9f0b0c04 and 54630d70 stop at a 0.5 um sliver on the cone face
+     (arrange seg 35: a circle cut at the face's 2D x = 0, with vertex 11 5e-7 from it; the boundary rulings at u
+     -5.0e-7 / -4.25e-7 are skewed). Next: why th0 (gap() midpoint / round()) puts x = 0 that close to a ruling; snap
+     the cut to the vertex.
+   - Also on taildbg: section_from drops a curve with both ends on one vertex shorter than 2x that vertex's tolerance
+     (was lines only). No regression, but it isn't this cause.
+3. "a plane nearly along a cylinder" (gpf 1b0a04c4 fuse, OCCT 1.3 s; eee70623 common, 0.4 s): |n.a| 6.6e-4, r 25.9 mm,
+   so OCCT's ellipse is 39 m long, tilting 61 um across the face. BOOL2_LONGELL lets it through with 0 differences.
+   1b0a04c4 then stops at "two edges leave a vertex": a 3.8 um line to vertex 14 runs the same way as a 0.5 mm line
+   that isn't split at 14. eee70623 stops at "no point inside a face piece".
+4. "an arc across a cylinder's seam" (parity56 ce4e3c99 cut, 45 ms): a whole circle (r 14.35, z 114, vertex at angle
+   2.25 pi) on a face whose th0 is exactly pi, so the circle is never cut at the seam. Next: why th0 isn't the face's
+   seam line (round() / gap()).
+5. "a section touching a face's boundary" (bool-corpus c38a6db8, 890acd4d): c38a6db8 also has a real slit (passes
+   with BOOL2_SLIT), but the decline is a tangency: the tool ring's r 10 cylinder touches the box's y 0 / y 20 walls.
+   Its own reason; not started.
+6. Short sections (30, parity56, one sprocket-like family): parked by the lead 09:45. Cause and notes in the archive
+   (17.7 um sections where tooth-gap tools' round tips bulge 25 um past the blank's cylinder).
+7. OCCT's result invalid, so there is nothing to match: "a tiny arc" (63bd60d0, b70f339a, fda1114a, 91923f72), "an
+   internal face" (b25113011, addb9a14), "no clean ray" 09489f90, "a closed edge" 0c6f868e, "a face's vertex off its
+   plane" (f516559d, 1ba3f24a).
+8. Others: "an inside-out tool" (869aabac, 5059c49e, 269c06e4: needs OCCT's complement semantics); "a shell whose
+   orientation is unclear" (a3bfaa87, adeba320, 6cf25eee: near-zero shells); "cones meeting at an apex" (ba2e862f:
+   invalid shell, InvalidMultiConnexity; 620253d9); 50a8ad1c (a 1 mm vertex group, declined by design); fz1144
+   a46cf4d0 differs on main too (OCCT's result is one degenerate face).
 
 ## How to run
-- Builds, crate tests, probes: vibex6 again after gate68 (lead 21:23; vibe2 only finishes gate68 + udoc9): `NOSHAPE_RB_HOST=vibex6 tools/tiers/rb.sh bash -c 'export CARGO_BUILD_JOBS=4;
-  cargo test --release -p noshape-kernel --test all <f>'`; rb.sh drops env prefixes (env inside `bash -c`). Don't
-  rb.sh from a worktree while a binary another unit still needs is being built from it (rb.sh resyncs the sources).
-- Gate (vibex6, one of mine at a time; never kill a process tree from a computed pid, stop units with systemctl): `systemd-run --unit=bool2-gateNN --collect -p WorkingDirectory=/root/projects/
-  noshape-wt/bool2 bash -c 'bash tools/bool/gate.sh <sha> --jobs 4 --host vibex6 > /root/bool2-scratch/gateNN.out
-  2>&1'`. hats/dock: /root/bool2-scratch/udoc-v7b.sh <branch sha> (cli-base on vibex7 must be the branch's main).
-- My own suite pairs: through ~/bin/slot on a `cp -al ~/parity/models` snapshot (NOSHAPE_GATE_MODELS for gate-host.py,
-  DECISIONS 11-16); model files change under long runs otherwise.
-- Land: clean gate + main green (`/tmp/lead/main-status`), all.rs out, `NOSHAPE_LAND_QUEUE_HOST=vibe2
-  tools/tiers/land.sh`; `--status`.
-- Probes (crates/kernel/tests/xprobe.rs, `--ignored --exact xprobe::<name> --nocapture`, PROBE_CORPUS=<dir>
-  PROBE_CASE=<full id>): probe_case_repeat (PROBE_N, NOSHAPE_KERNEL_PROFILE=1, PROBE_SAMPLE=<file> -> /root/bool2-scratch
-  samples.py, callers.py), probe_case_volumes (ours vs OCCT). DBG_AHEAD per-pair OCCT section
-  times: /root/bool2-scratch/valve-ahead-dbg.patch. NOSHAPE_OWN_SECTIONS=0 turns our own sections off for A/Bs.
-- Recordings: vibex6 ~/agents/bool2-keep/{hel-new (helical 9b68aa2b07dc2986), imp-new (impeller f10ce62e55f0fd49,
-  f37371b831c5339f), so-rec2 (standoffs' three)}; vibe5's (rec-valve, spr-rec, imp-cur, lp-rec) are lost.
-- Doc timing: qa's saved docs vibex6 ~/qa-parity/saved (copy + -wal/-shm each run); `noshape-cli feature list`,
-  regen_ms; under load use user CPU (`/usr/bin/time -f %U`, RAYON_NUM_THREADS=1). Private docs (hats, dock): mode-700
-  copies in ~/tmp/bool2, deleted after (udoc-cmp.sh does it). gdb only on a child (ptrace_scope 1): `gdb -batch -ex run
-  -ex "thread apply all bt" --args ...` under `timeout -s INT`.
-
-- qa 11-17: in the clean A/B (vibe7, load at most 0.06, v0.4.48 to v0.4.53, median of 3), c2-helical-sweep Sweep 1 took 157 ms on 0.4.48 and 396 ms on 0.4.53 (Ok in both). Your 895c8e3b / e47268f2 are meant to fix this on main. The 11-18 nightly pair (v0.4.55 vs v0.4.56, alternating) will confirm or reopen it.
+- Gate: `systemd-run --unit=<u> -E HOME=/root -E PATH=$PATH --working-directory=<worktree> bash -c "bash
+  tools/bool/gate.sh <sha> --jobs 4 --host <h> > out 2>&1"`. One gate per host (a lock in /root/projects/noshape-wt/
+  .bool-gate-<host>.lock). vibe2's release ops link was SIGTERMed twice under other builds; check `free -g` >= 15 GB.
+  The gate skips the knurls and the private docs; run those as kn*.sh / udoc*.sh do (/root/bool2-scratch/kn85.sh,
+  udoc85.sh). Private docs are read-only (mode 400): udoc-cmp.sh chmods its copies.
+- Probe/replay runs: tdbg*.sh pattern (rb.sh build on vibex8 + scratch/buildcp.sh, then ssh with
+  NOSHAPE_BOOL_CORPUS=<dir> NOSHAPE_BREP_VS_OCCT=1 NOSHAPE_BREP_WHY=" " ... brep_replay::brep_corpus_replay).
