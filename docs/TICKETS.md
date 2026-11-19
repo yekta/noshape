@@ -874,6 +874,13 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   Live (behaviours psb 10-24 j (c), same flow on a free Ø-r5 circle, 5 -> 3): no scaling; the copy keeps r 10 and the
   free source grows to r 7 (the solver moves the source). The first-dimension scaling (behaviours 34917) is live's for the
   Dimension tool / typed box. Offset's default 5 mm box, arrow and pointer-independent preview are = live.
+- [ ] P1 **ASM-DRAG-UNFIXED-GROUP (asm)**: an assembly with nothing fixed (walk3 Assembly 1: Part 1 <1> + <2> Fastened, Part 1
+  Revolute to Part 2 <1>; green 624c6db77, :110, real pointer 3 px / 40 ms): pressing on Part 1 and dragging 75 px moves
+  nothing (outline lit, no motion during or after). With Part 2 › Fix the same drag turns Part 1 about the Revolute axis (=).
+  Live (behaviours 42244, 42565): with nothing fixed a drag moves the grabbed part's whole mated group as one rigid set
+  (translation; a free mate direction absorbs its share), the angle unchanged. Also seen: the Revolute 1 creation preview
+  moved Part 1 <1> onto the ring while its Fastened twin <2> stayed put (after ✓ the pair is together again); live's edit
+  preview moves the whole connected group (behaviours 1214), so the creation preview likely should too.
 
 ## Interaction feel suite 11-19 (qa 16:20: run 1119-1242-223cec7e on vibex8, failures re-run on green eb3b06a8 on vibe2)
 2110/2172 scenarios (05:51 run on a67911be: 2126). 67 failing; 28 pass on the re-run (load flakes or fixed). The 39 still failing
