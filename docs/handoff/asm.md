@@ -5,30 +5,28 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-19 21:01 UTC)
+## State (2026-11-19 21:45 UTC)
 
-### Landed today (6686624b as 702c9878: Display states Esc, driver-mate named position, paste; d671313d; 335f8e43; 9f52415c; free drag c9a6822d queued)
+### Landed today (702c9878: Display states Esc, driver-mate named position, paste; d671313d; 335f8e43; 9f52415c; 123ca4b3 free drag)
 - LOD (91478e2c), Derived mirror of an assembly complete (e87a2b3e, 17c26dc1; left: live's exact node icon, symmetry
   detection on child rows), mass overrides (17c26dc1; left: psui's Part Studio panel CoM / Inertia ☑ Override rows,
   several parts measured with overrides, not captured), surf-intro translator steps (8c6ec107, eb3b06a8).
 - rb.sh clippy can report clean on stale synced mtimes: `git diff --name-only origin/main -- crates | xargs touch`
-  before the final clippy.
+  locally before the final clippy (the build host's copy has no origin/main).
 
 ### P1 done: assembly-ui SIGSEGV at exit (main CI 44554083714): RenderWorker joins its thread on drop (d671313d);
-not reproduced off CI (15 runs of the unfixed binary on vibe2, all exit 0); TICKETS ASM-UI-SIGSEGV-AT-EXIT [x].
+TICKETS ASM-UI-SIGSEGV-AT-EXIT [x].
 
-### In flight: interaction feel (lead 20:4x: feel is P0; drags, mate hover and select first)
-- Queued c9a6822d: a free (6-DOF) instance dragged by its face moves in the plane of the screen without turning
-  (`run_drag_solve`: targets from the drag-start placement; the point drag had turned it 1–2° on 20 px); test
-  `a_free_instances_drag_keeps_the_default_cursor_and_follows_the_pointer`; feel rows: the free drag tested, Ctrl+V
-  `=` (fixed 702c9878).
-- Open assembly rows in docs/parity/interaction-feel.md, next in this order: line 42 Mate connector reach `≈` (live:
-  22–23 px across, 14–15 down on a face's centre; on a vertex 22 across, 16–21 down and wins over the vertex
-  throughout: a GPU feel test in assembly_feel_tests.rs); 1424 assembly section arrow drag (value box at the arrow,
-  0.1 mm steps, tan hatched caps: test missing); 1418 explode drag's 0 mm step (test missing); 1568 Y Hide `≈` (live
-  leaves the hover outline until the pointer moves); 1421–1423 / 1471 named positions and display states (tests
-  missing); 1454–1457 assembly pattern previews (tests missing).
-- Find them: `awk -F'|' 'NF>4 { st=$(NF-1); t=$(NF-2); if (st ~ /≠|≈/ || t ~ /missing/) print NR": "$2 }'
+### Interaction feel (lead 20:4x: feel is P0): my assembly rows are all tested
+- Landed 123ca4b3: free drag in the screen plane without turning.
+- Queued 21:5x: 7bc96ec56 mate connector reach row 42
+  (22–23 across, 15 down, over the vertex; live's 16–21 down is a Part Studio hold), e2211fcb4 section arrow drag
+  (row 1424; the caps stay tan while the dialog is open, live 16303), 88b65b70f explode short drag 0 mm step (1418),
+  8bf03e7b3 named positions' menu + Apply (1421–1422), display state choice (1423, 1471; `choose_display_state`
+  factored out of the select), Y Hide `=` (live's leftover outline is its redraw lag).
+- Not mine (my old list was wrong): 1452–1457 are psui's Part Studio pattern rows; 699 is psui's Dialogs matrix.
+- Left: a named position row's click applies nothing (not tested; needs a GPUI click on the cell).
+- Find open rows: `awk -F'|' 'NF>4 { st=$(NF-1); t=$(NF-2); if (st ~ /≠|≈/ || t ~ /missing/) print NR": "$2 }'
   docs/parity/interaction-feel.md | grep -iE "asm|assembl|mate|instance|explode|named|display|section|drag"`.
 
 ### parity_assemblies (lead 11-19: rank by documents, one land each)
