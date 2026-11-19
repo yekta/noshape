@@ -1479,7 +1479,11 @@ impl Render for HistoryPanel {
                             .when(self.doc.read(cx).session.branch_protected(b), |d| d.child(crate::assets::icon("lock", 12., cx)))
                             .child(crate::ui::user_text(r.name.clone())),
                     ),
-                    _ => div().font_weight(FontWeight::MEDIUM).text_color(pal.text).child(crate::ui::user_text(r.name.clone())),
+                    // A long name ends at the Name column with an ellipsis (qa HISTORY-ROW-NAME-OVERLAP).
+                    _ => div().debug_selector({
+                        let selector = format!("hist-name {}", r.name);
+                        move || selector
+                    }).min_w_0().truncate().font_weight(FontWeight::MEDIUM).text_color(pal.text).child(crate::ui::user_text(r.name.clone())),
                 };
                 let selector = format!("hist-row {}", r.name);
                 h_flex()
@@ -1514,7 +1518,7 @@ impl Render for HistoryPanel {
                         v_flex()
                             .w(px(115.))
                             .flex_none()
-                            .child(h_flex().h(px(21.)).child(name_el))
+                            .child(h_flex().h(px(21.)).min_w_0().overflow_hidden().child(name_el))
                             .when(changes > 0, |d| {
                                 d.child(
                                     h_flex()

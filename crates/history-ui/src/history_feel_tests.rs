@@ -25,6 +25,11 @@ fn panel(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Histor
 
 /// Main with V1 and V2, `edits` changes before each.
 fn panel_with(cx: &mut TestAppContext, name: &str, edits: usize) -> (AnyWindowHandle, Entity<HistoryPanel>, Entity<DocModel>) {
+    panel_versions(cx, name, edits, ["V1", "V2"])
+}
+
+/// Main with two versions named `versions`, `edits` changes before each.
+fn panel_versions(cx: &mut TestAppContext, name: &str, edits: usize, versions: [&str; 2]) -> (AnyWindowHandle, Entity<HistoryPanel>, Entity<DocModel>) {
     cx.update(gpui_kit::init);
     let dir = std::env::temp_dir().join(format!("noshape-history-feel-{name}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -40,7 +45,7 @@ fn panel_with(cx: &mut TestAppContext, name: &str, edits: usize) -> (AnyWindowHa
             call("variable_create", json!({ "name": format!("v{k}_{e}"), "value": format!("{k} mm") }));
         }
         let description = if k == 1 { "block and routing curve" } else { "" };
-        call("history_create_version", json!({ "name": format!("V{k}"), "description": description }));
+        call("history_create_version", json!({ "name": versions[k - 1], "description": description }));
     }
     let session = crate::session::Session::open(&path).unwrap();
     let (window, view, doc) = cx.update(|cx| {
@@ -201,6 +206,20 @@ fn the_history_scrolls_as_one_under_a_pinned_header(cx: &mut TestAppContext) {
             assert_eq!(f32::from(row.size.height), 30., "a change row is 30 px");
         }
     }
+}
+
+/// qa HISTORY-ROW-NAME-OVERLAP: a name wider than the Name column ends at it (cut with an ellipsis), never over the
+/// Modified column.
+#[gpui::test]
+fn a_long_row_name_ends_at_the_name_column(cx: &mut TestAppContext) {
+    let long = "Part Studio 2 :: Edit : QA Box 1";
+    let (window, _view, _doc) = panel_versions(cx, "long-name", 1, ["V1", long]);
+    let (row, name) = (bounds(cx, window, Box::leak(format!("hist-row {long}").into_boxed_str())), bounds(cx, window, Box::leak(format!("hist-name {long}").into_boxed_str())));
+    let short = bounds(cx, window, "hist-name V1");
+    assert_eq!(name.origin.x, short.origin.x, "the name starts where the others do");
+    let end = f32::from(name.origin.x + name.size.width - row.origin.x);
+    let column = f32::from(short.origin.x - row.origin.x) + 115.;
+    assert!(end <= column + 0.5, "the name ends at the Name column ({end} > {column})");
 }
 
 /// Live ws-1118: the default workspace's row has no Delete; the current non-default one's has, and deleting it lands

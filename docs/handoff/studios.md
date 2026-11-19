@@ -18,30 +18,25 @@ tools/tiers/land.sh` (`--no-precheck` only when the code was clippy-checked unch
 origin/main` first. Builds / tests on the lowest 1-min load of vibex7 / vibex8 / vibe2 (`NOSHAPE_RB_HOST=… tools/tiers/rb.sh`;
 read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edited during a running sync: `touch` edited files before
 the next run. Run the full ops e2e before any drawing land. A few app runs don't take ~/bin/slot (DECISIONS 11-15).
-- Queued 9d50ae60 (21:40) and c655e5de (22:2x, 4 commits): Replicate region onto another view's shape (view-box
-  rule); drawing Measure readouts as live measure-1119 rounds 1-2 (`measure_rows` / `Measured`, drawing_keys.rs; a
-  third pick adds a row and shows the summed Length only); the assembly instance list menu as live Pro (Where used…,
-  Revision history… after Export…, no Release…; hook `open_part_revision_history`); asm-menu-release retargeted to
-  Revision history… (retake asked); drw-inspection-table-iso-scrolled at live's sheet points.
-- Scenario run on vibex8 (~/tmp/studios/rep1119; app of 9d5e1aa1, with live's 667ef537 takes): match:
-  replicate-region-place, constraint-tangent / -parallel, note-insert-drawing-property, canvas-zoom-to-sheet,
-  part-menu-release-workflows-off. Asked of live 22:2x (message): drw-ref-pin-reference's retake has no "V1" (wrong
-  start; ours matches the 11-13 take 7/7: keep that one); part-menu-release s3 is live's new recorder reading input
-  labels differently from all 20 rel-* takes (retake with the old reader, or a runner rule); drw-revision-table-delete
-  s8 (live still reads EDGE Top 3 s after Delete: screenshot asked; ours lights a Front edge under the still pointer,
-  every rebuild calls update_hover, drawing_view.rs:1362); ISO_A4_Portrait's "40.00" vs ours "40" (our mm templates
-  drop trailing zeros, templates.rs template_precisions; live's Units settings asked).
-- drw-inspection-table-iso-scrolled s2: live reads no selection after the Dimension tool's first click, ours EDGE
-  Front (live's reader count?); recheck with the sheet points once landed. The pattern copy / nested occurrence
-  menus still have Release… (no Pro capture yet).
+- Landed 9d50ae60 (Replicate region). Queued 9f21ecfb (22:59, carries 22d4ea61; c655e5de failed on a missing
+  coverage entry "assembly:Revision history…", fixed): Measure rounds 1-2, the Pro instance menus (Where used… /
+  Revision history…, no Release…; hook `open_part_revision_history`), ANSI_A_MM fit precision 4 (units-1119),
+  `data_value` (ui-parity reads a dimension as live's drawing JSON: "40.00"), the two scenario fixes, note feel test.
+- Uncommitted: BRAND-IN-UI-TEXT prefs line ("Noshape Labs" in prefs, FS co-complete, help, 8 catalogs;
+  prefs-labs-consent-cancel `ours_on`; run.py `LIVE_BRAND` maps live's wording in `normalize_live`). Tests on vibex6
+  (logs/brand-tests.log), scenarios on vibex8 (~/tmp/studios/brand1). Then HISTORY-ROW-NAME-OVERLAP (qa P2): a
+  long history row name truncates at the 115 px Name column (history_panel.rs name_el; test
+  a_long_row_name_ends_at_the_name_column; logs/history-tests.log).
+- live's 48d3fc9d (asm-/part-menu-release retakes, ref-pin back to 11-13) is on my branch: run on vibex8
+  (~/tmp/studios/retakes1, after brand1); tell live the result (they keep a scratch copy until then).
 
 ## Next, in order
-1. live's retakes asked 11-19 22:xx: drw-revision-table-delete (s9 hover [140,120] + s10 wait added: live's stale
-   table frame after Delete is a repaint lag, not a target), drw-inspection-table-iso-scrolled (sheet points were
-   off: now (60.91, 226.2) on Front's top edge, (60.91, 237.8) placing; live's s2 reads no EDGE: asked why),
-   part-menu-release / asm-menu-release (e807ca07, recorder 2026-11-19.1).
-2. qa 291c74b0 rows in my areas: all match on this branch except the two above (vibex8 22:40, 9/10 + iso).
-   Next: the newest suite log's rows once qa runs again.
+1. live's retakes asked 11-19 ~22:40: drw-revision-table-delete (s9 hover + s10 wait; live's stale frame after
+   Delete is a repaint lag), drw-inspection-table-iso-scrolled (points (60.91, 226.2) / (60.91, 237.8); why live's
+   s2 reads no EDGE).
+2. qa 291c74b0 rows in my areas: all match except the two above. Next: the newest suite log once qa runs again.
+   Brand strings left for the lead (decision asked 23:0x): "Onshape (default)" profile / mouse preset, "Onshape
+   default" key legend, "Onshape Material Library", "Onshape Default BOM".
 3. Then the feel rows below and the lead's queue (11-17).
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
@@ -90,8 +85,8 @@ the next run. Run the full ops e2e before any drawing land. A few app runs don't
   First view (No views): the preview's centre on the pointer, no snap to the sheet centre. No Auto-dimension tool.
 - live2 custom features (behaviours "studios (lead 11-18 ~01:53, feel): custom features", live/studios/
   custom-feature-1118/): dialog rows, conditional field, red title / pink field: ours already (test
-  a_custom_features_dialog_is_generated_and_fails_as_live). Left: ✓ is pale in both while the error names a number
-  field, live2 says a click still commits (ours: disabled; the hem capture said off): asked in REQUESTS 11-19 01:46.
+  a_custom_features_dialog_is_generated_and_fails_as_live). ✓ disabled while the error names a field, click / Enter
+  do nothing: ours (live2 11-19 03:26 corrected its 11-18 note).
   FS save -> Part Studio regenerates, an open dialog keeps its labels: ours already (tested).
 - live VS / FS (live/studios/vs-fs-feel-1117/): VS add-row focus to the next Name, duplicate -> "w_0"; FS
   autocomplete Enter inserts, Tab closes + inserts a tab, Esc keeps text; FS errors while typing (<0.5 s) red x at
