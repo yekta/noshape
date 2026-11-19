@@ -1682,6 +1682,32 @@ Evidence: live/feel/list-1119/ (p*.json, shots); ours /root/live-scratch/fl19/ou
 | Parts list row look | the part icon and the name; no appearance swatch (the colour is only in the graphics and Edit appearance…) | the same | = |
 | A hole edge hovered in the graphics | lit; no feature row tinted (every row's class unchanged) | – (not taken) | – |
 
+### sm-cfg-io-1119 (sheet metal tools, configurations, import / export: gaps, live 11-18 / 11-19) [skasm, studios, dx]
+
+Only what the sheet metal matrix, sm-feel2-1118, cfg-1118 and ps-feel2-1118 don't already cover. Live times are first / settled ms from the
+input (dom = the dialog or list changed). They come from three places: the recorded session live/qa/session-sm-1119 (11-19 03:40), new
+captures 11-19 06:45–06:55 (live/feel/sm-1119/) and the import / export capture 11-18 (live/dx/import-export-1118/). Ours: qa's replay of
+that session on vibe2 (~/tmp/qa/smsess/r4, first / settle) and green eedbe40e on :127 (clean config, xdotool, 60 fps screen recording,
+the same 100 × 60 plate with a 20 mm flange, r 15).
+
+| Item | Live | Ours | Status |
+|---|---|---|---|
+| Sheet metal model: toolbar button → dialog; Thicken tab; a region picked | 220 / 681 (dom 383); 221 / 2009; preview 160 / 815 | 166 / 925; 117 / 573; 162 / 851 | = |
+| Flange: dropdown item → dialog; an edge picked; Distance + Enter | 281 / 1980; preview 14 / 2571 (chip at 114); 181 / 2028 | 115; 176 / 1078; 91 / 186 | = |
+| Partial flange ticked; Second bound ticked | 286 / 1972; 257 / 2164 | 84 / 752; 81 / 376 | = |
+| Tab: dropdown item → dialog; a profile region picked | dialog at 289 (graphics 2.0 s); the pick fills Tab profile and Flange to merge ("Face of Sheet metal model 1") at 135, preview settled 2.7 s | dialog 149; both chips 162, preview 0.83 s | = |
+| Bend: dropdown item → dialog; a sketch line picked | dialog at 240: Bend line, Sheet metal face to bend, Bend alignment [Bend line], [Bend angle] 90 deg, Use model bend radius ✓, Use model K Factor ✓; the line fills Bend line and "Face of Sheet metal model 1" at 411, preview 2.4 s | the same fields; 105; both chips 104, preview 0.94 s | = |
+| Bend relief type changed in the Sheet metal model dialog | edit (double-click the row) 249 / 3055; the type picked 146 (dom), preview 1.9 s; ✓ 91 / 1658 | edit 84 / 382; the type picked 186 (no relief to redraw on this model); ✓ 68 / 159 | = |
+| A bend face clicked in the 3D view, the Sheet metal table open | the face selected, its Bends row outlined blue and its zone lit orange in the flat view; hovering the face changes no row (p3-bend-clicked-zoom.png) | the face selected; the row and the flat view unchanged | ≠ [skasm] |
+| Configurations: a name typed in the empty Name row + Enter (a row added) | 214 / 1486 (dom 31) | 101 | = |
+| Configurations: a cell of an inactive row edited + Enter | dom 21, nothing rebuilds, the cell stays outlined | 9, the same | = |
+| Configurations: a cell of the active row edited + Enter | rebuilt, settled 1.5 s (dom 19) | panel 40–106, rebuilt 0.27–0.32 s | = |
+| Configuration switched from the Configuration dropdown | 362 / 1384 (dom 108) | panel 118–339, graphics 0.37–0.57 s | = |
+| Export… (part row) | the modal at 485–939, the format list ready at 1.6–2.1 s, on the remembered format | shown with its list at 112 (settled 0.41 s), on Parasolid (fresh config) | = |
+| Export: Esc; Enter in File name | closed in 95–143; Enter exports at once ("… is being prepared for export" bubble) | 97; Enter goes on to the save step (the OS save dialog) | = |
+| Import…: the file chosen → "Import to Onshape" | 380–470 | 353 | = |
+| Import: the Import button | the dialog closes ~1 s; "CAD Imports" tab at the end ~2.0 s; the imported tab after the active one ~7.5 s; the view stays; bubble "<file> has been imported. Open document" | closes 0.12–0.32 s; both tabs by 0.2 s in the same places; the view stays; the same bubble | = |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
