@@ -77,7 +77,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    mark the TICKETS rows. Suite 1119-1302-291c74b0: ui 2120/2172, models done, assemblies / exchange in vibex8's slot: suites-diff.py
    vs the last full run when done. sketch-vertical-key: not the camera (lead); psui re-runs it on live2's cf70e676 (TICKETS ~5523).
    P1 walk 21:36 on a58eee8c (sketch -> extrude -> fillet -> pattern -> edit -> undo -> suppress): all build; P2 PATTERN-CHECK-STAYS-
-   ENABLED (psui) + live request (REQUESTS qa 11-19 21:36: ✓ after emptying, tooltip on click). Next walk: rollback bar, reorder,
+   ENABLED (psui) + live request (REQUESTS qa 11-19 21:36: ✓ after emptying, tooltip on click); reopen, rollback drag, reorder OK. Next walk:
    mirror / boolean / hole / shell, measure, mass properties, section view, view cube.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
