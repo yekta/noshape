@@ -1459,7 +1459,7 @@ live (`ctrl_cmd`, `shared_keys_follow_lives_list_per_os`) =. Feature-dialog widt
 
 Each of the 81 keys in live's `sketchEdit` map, pressed once in live and once in ours from the same state, inside Sketch 2 (one line on Top) of the block document,
 which is opened by double-clicking its row. Live reloads the page for every key. Ours relaunches green 5c9229069 for every key, with a clean config dir. A
-screenshot 1.3–1.5 s after the key (live/keys-1118/live/sk-pairs/). 72 keys do the same thing in both apps. Live's studio picked up a pasted second line from
+screenshot 1.3–1.5 s after the key (live/keys-1118/live/sk-pairs/). Every key but Ctrl+M, Shift+N, Shift+X, ` and Shift+V starts the same tool, dialog, view or toggle in both apps (two of those also differ in look, rows below); Ctrl+V was not compared (the clipboards differed). Live's studio picked up a pasted second line from
 Ctrl+V on, which doesn't change the keys after it.
 
 | Key (in a sketch) | Live | Ours | Status |
@@ -1469,7 +1469,7 @@ Ctrl+V on, which doesn't change the keys after it.
 | Shift+X Section view | the Section view dialog over the sketch (the sketch dialog greyed behind it) | nothing | ≠ [skasm] |
 | ` Select other | the Select other box "(No selections found)" at the pointer | nothing | ≠ [skasm] |
 | Shift+V Named views | the sketch closes (Part Studio toolbar back) and the Named views box opens | the Named views box opens over the sketch dialog; the sketch stays open | ≠ [skasm] |
-| C, R, G, L, A, Shift+S (a draw tool from the key, pointer still) | nothing drawn at the pointer until it moves | a blue dot at the resting pointer | ≠ [skasm] |
+| C, R, G, L, A, Shift+A, Shift+S (a draw tool from the key, pointer still) | nothing drawn at the pointer until it moves | a blue dot at the resting pointer | ≠ [skasm] |
 | Shift+C Curve/surface analysis | "Edge of Sketch 2" in the field, the line drawn orange, "Length: 36.856 mm" at the bottom right | the same field; the line stays blue, no length | ≠ [psui] |
 | The rest: views 1–7, arrows, Shift / Ctrl / Ctrl+Shift arrows, Z / Shift+Z / F / W / N, constraints (I, Shift+O, E, H, V, B, Shift+L, Shift+K, T, Shift+M, Shift+Q, Shift+G, Shift+J), D, X, M, O, U, Q, Shift+A, Shift+U, Shift+F, S mini toolbar, Shift+E / Shift+W (close the sketch, open the feature), Shift+D, [, Shift+R, Shift+P / P / Shift+H / K / Y / Shift+Y / Shift+I / Shift+T, Delete / Backspace, Space, Ctrl+C | the same | = |
 
