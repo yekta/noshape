@@ -273,6 +273,22 @@ fn rows() -> Vec<Row> {
             });
             expect((dialog, aspect), (Some((Some("Insert an image"), true)), Some(2.0)), "the dialog's title and Libraries tab, the box's width / height")
         } },
+        Row { id: "search / Alt+C opens the panel", live: "search-tools-1118: a 600 px panel 10 px under the toolbar at the window's right edge, the toolbar box 'Close search', the input focused, 'Start typing to search tools', Highlight tool in toolbar on; Esc closes it", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-search-open", Tool::Select);
+            keys(cx, window, &["alt-c"]);
+            draw(cx, window);
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            let panel = vcx.debug_bounds("tool-search").ok_or("no panel")?;
+            let start = vcx.debug_bounds("tool-search-start").is_some();
+            let (width, right) = cx.update_window(window, |_, w, _| (w.viewport_size().width, panel.right())).unwrap();
+            let highlight = cx.update(|cx| !view.read(cx).ui.palette_no_highlight);
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_input("f");
+            draw(cx, window);
+            let typed = cx.update(|cx| view.read(cx).palette_query.clone());
+            keys(cx, window, &["escape"]);
+            let closed = cx.update(|cx| view.read(cx).palette.is_none());
+            expect((f32::from(panel.size.width).round(), (f32::from(right - width)).abs() < 1., start, highlight, typed.as_str(), closed), (600., true, true, true, "f", true), "the panel's width, at the right edge, 'Start typing', Highlight on, the input typed into, Esc closes")
+        } },
         Row { id: "search / the found tool lit in the sketch toolbar", live: "search-tools-1118: Alt+C in a sketch; 'f' lights Fillet's button yellow (its group's face), a member under a ⌄ lights the ⌄ (Fix: the test window's collapsed constraints), Highlight tool in toolbar off lights nothing", gap: false, check: |cx| {
             let (window, view) = sketch_with(cx, "st-search-lit", Tool::Select);
             cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_palette(w, cx))).unwrap();

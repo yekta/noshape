@@ -239,6 +239,7 @@ impl PartStudioView {
         let anchor = point(window.viewport_size().width, top.get() + px(10.));
         let popover = div()
                 .id("tool-search")
+                .debug_selector(|| "tool-search".into())
                 .w(px(600.))
                 .occlude()
                 .bg(gpui_kit::rgb(0xf5f5f5))
@@ -270,7 +271,7 @@ impl PartStudioView {
                         ),
                 )
                 .when(recents && nothing, |d| {
-                    d.child(div().h(px(42.)).flex().items_center().justify_center().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Start typing to search tools"))
+                    d.child(div().debug_selector(|| "tool-search-start".into()).h(px(42.)).flex().items_center().justify_center().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Start typing to search tools"))
                 })
                 .children(suggestions.filter(|_| !self.palette_query.trim().is_empty()))
                 .when(!self.palette_query.trim().is_empty() && nothing, |d| {
