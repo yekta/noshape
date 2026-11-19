@@ -104,13 +104,8 @@ N. Drawings not deterministic: fixed, QUEUED ba3d6cc1 (23:2x; d8ace4d34..6b1a7bc
    bounds thread_local; libs installed by the lead on every host + Mac, backups .bak-0034) and mesh_body.cpp facet
    edges by vertex creation order. Proof: Mac dvp35.sh, identical over 3 parallel runs + one thread. After the land:
    hex-bookcase's DXF counts vs live (was LINE 211/206, LWPOLYLINE 17/25; its mesh edges now run one fixed way).
-C. PARKED (lead 23:2x: no lever without days of OCCT hide-step work). fan-blade (live Front 2.0 / Top 1.7 / Right 1.6 / Iso 2.1, Update 4.4 s; ours ~5.3 s each, Update
-   6.5): option (b), Hide in 8 threads over one body's edges, tried 23:0x and DROPPED (scratch /root/dx-scratch/p36:
-   OCCT patch 0036 per-thread edge mask + hlr.cpp hide_threaded). Not identical (Mac dvp36.sh, 17 corpus drawings
-   one thread vs 8: impeller 4 lines, rings-loft 2, surface-pattern 66, clamp 4 differ: something per face depends on
-   the edges hidden before) and slower: fan-blade Front 5.3 -> 9.8 s, Update 6.5 -> 37 s (each thread loads the body;
-   so the time is not in the sorted-edge phase but in Update or a face's own edges / outlines). fill-pattern Iso
-   10.5 -> 4.7 s but Top 2.2 -> 5.3. Next if asked: profile fan-blade's phases (Update vs own-edge vs sorted).
+C. PARKED (lead 23:2x) fan-blade (~2.6x live a view): Hide in 8 threads over one body's edges was not identical (4 / 17
+   corpus drawings) and slower (Front 5.3 -> 9.8 s, Update 6.5 -> 37 s); attempt in /root/dx-scratch/p36.
 Q. (lead 11-18 20:4x, after fan-blade) asm-robot-relations studio 0c3466's Import 1: live makes six separate SURFACE
    parts REV-21-1650, ours sews them into one 171,987 mm³ solid (BOM 36/42 rows, Thicken 1 11 parts for live's 1):
    Import keeps separate sheets separate. Repro from asm (d8d597e0-675c-497b-a804-544ceab99bbd).
@@ -120,6 +115,12 @@ Q. (lead 11-18 20:4x, after fan-blade) asm-robot-relations studio 0c3466's Impor
    (110) and the three rods (6 each) runs through #5090's 14 edges. Not why yet: #5090 is exact (edges on its plane
    to 1e-5 mm), loops >= 0.05 mm apart, edge use consistent, no self-intersection (BOPAlgo), curve-on-surface <= 1e-3
    mm. Next: what Parasolid rejects there (ask live2 whether live flags Import 1 faulty?).
+H. Hidden lines vs live (live + live2 02:3x, live/dx/louver-hidden-1119/: sm-louver Front + Top with Show hidden lines,
+   DXF 2018). Live: Front Hidden 882 LINE + 33 ELLIPSE, TANGENT_HIDDEN 81; Top 466 LINE + 42 ELLIPSE + 3 ARC,
+   TANGENT_HIDDEN 107. Ours before cadc2e12: Front 393 / Top 37 LINE; after: 462 / 312 (toward live). Gaps: we never
+   draw hidden tangent edges (build.rs: (false, Smooth) => continue; live's TANGENT_HIDDEN layer), hidden curves
+   aren't fitted to ELLIPSE / ARC, Front still ~420 lines short. Dumps: /root/dx-scratch/dxfm/louver-hidden-*.dxf
+   (exsh.sh + /root/dx-scratch/dxhidden.patch: the exchange suite with DXHIDDEN=1).
 R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "Import failed: <path>: i/o error: could
    not read STEP file <path>" (live: "bad.step uploaded but failed to translate."; the app's bubble already said so).
    In progress: ops import's translation failures say failed_to_translate(file) (upload-only's unreadable file keeps
@@ -167,8 +168,10 @@ R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "I
      size x 1e-6 (HlrOut.exact says the view really was exact). DXF: louver LINE 2356 -> 2360, snap-hook 351 -> 352,
      clamp 263 -> 265, every added line live's but louver's x 7.361 / 7.591 tangents, re-cut (live: one line
      running through the visible stubs on it; ours pieces, before and after). Hidden edges grow (louver 4321 -> 5224).
-   - clamp-guillem Top y 6.5867 x 4.29-4.62: our model edge is there but HLR hides it where it meets a fillet
-     tangentially (live visible); ours 7.077-7.161 at 30° live hides: grazing HLR, open. hex ELLIPSE 0 / 2: live's
+   - clamp-guillem Top/Iso: overlapping parts. Part 1 (jaw, x 0-30, y -25-0, z +-17.24, top = Redondeo 1 r7.5 to
+     x 8.25 then a slope 17.2 -> 15.0) encloses Part 2 (plate, z 0-16) over x 0-30; the plate's top edges run inside
+     the jaw (under its top over x 3.37-20.2). Live draws them visible, split at 3.37 / 8.25 / 20.2; ours hides
+     0.6-8.25 only. Live's rule for edges inside another part asked in REQUESTS 11-19 (live/dx/overlap-1119/). hex ELLIPSE 0 / 2: live's
      degenerate ellipses on a 0.5 mm mesh hole (noise).
    - Mine after all (core 22:3x: the part = live through every Draft, 22 real circles, 36 lines): housing-draft's
      0.499 in edges bowing 0.3-0.5 mm (live LINEs) and the Right-view hole rim as a SPLINE (live CIRCLE) come from our
