@@ -1,39 +1,33 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 20:29 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 21:47 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## Next (lead 19:3x): welding 9c7704 Extrude 8's part order (core handed it; asm's asm-bom 9f52415c has the BOM evidence)
-- Live: the ring region (JpC) picked first, the inner disc (JnC) second -> the disc Part 5, the ring Part 6. Ours by
-  pick order. Corpus scan (/root/skasm-scratch/bo/scan2.py): welding and scissor-lift 4ce5c7 Extrude 2 fit "by sketch
-  body, then x within one", but fed22d Extrude 30 (one body) and 1e6fd7 Extrude 4 (one region per body) go by
-  ascending y: no rule from ids. Asked live (REQUESTS 19:37, q-extrude-part-order-1119, cases A-E) for 21:00; then fix
-  in extrude.rs (profiles order before `apply_operation_from`) and check against suite J (vibex7
-  ~/agents/skasm-keep/suite-J-1119-1831.log), no document worse.
-- interaction-feel.md: no sketch row is open; rows whose test is "missing": the sketch plane field's face label, "Final"
-  on edit, drawing on a face, Show constraints saved on OK, the bend row hover's flat side.
+## In flight 21:47: one land after suite M (vibex7, /root/skasm-scratch/suitem.out, log ~/agents/skasm-keep/suite-M-*.log)
+Compare per document with suite J (vibex7 ~/tmp/skasm/suite-J-1119-1831.log.s.c: `sed` the "name: N/M features match"
+lines to "name N/M", LC_ALL=C sort, join, awk $2!=$3). None worse -> land.sh. The stack:
+- Extrude part order (3ff5480f): a New extrude's regions of one sketch go in drawing order (the lowest entity id of each
+  region's outer loop; extrude.rs `in_drawing_order`), whatever the pick order. Live q-extrude-part-order-1119 (live2,
+  REST-built sketches): A/B/D/E parts in drawing order, both pick orders; C disc + ring touching = one part. Pinned by
+  regen `a_new_extrudes_parts_follow_the_sketchs_drawing_order`. Suite L (this alone) = J on every document. welding
+  9c7704 is asm-welding-config (an assembly): asm checks the BOM after the land.
+- Relief cut creators (fc917dc3): live q-sm-creators-1119 B1: two Bend reliefs -> the second creates the cut faces at
+  both ends; ours kept Flange 1's names (keep_names on the old relief planes; predates 643d9675). Now `Piece::relief`
+  (bend relief slots, corner reliefs); a face on a relief piece and on no non-relief vertex piece (a bend's end can
+  share the cut's plane) takes this rebuild's fresh name, never renamed after its source. Pin
+  `the_latest_bend_relief_creates_every_reliefs_cut_faces`; SM std T2 66/66, frames 24/24, ops e2e 259, SM matrix,
+  clippy clean.
+- Feel tests: drawing on a face (`a_rectangle_drawn_on_a_face_is_solved_in_the_closing_clicks_frame`), Insert image's
+  dialog + aspect (sketch tools matrix row), session 2d iso dimension placement; interaction-feel rows updated.
+- Open: live's A-rect (Corner 1 Rectangle at the vertex nearest (60, 0, 2) on sm-box): ours "Sheet metal corner not
+  found." there (our nearest vertex is (60, 0, 4)); the cut-face creators are Corner 1's in live. Not pinned yet.
+- sketch-vertical-key: psui's (lead 21:2x): the start view is live's Trimetric; the 11-06 take's zoom differs. After
+  cf70e676 lands psui reruns; a gap left is the reach measure, mine with psui. No re-baseline.
 
-## In flight 11-19 18:07: qa's feel P0 (rows /root/qa-scratch/suites/1119-1610-eb3b06a8-uipr/rows.txt)
-- QUEUED (this land): line-from-midpoint (a line started at a held line's midpoint, square to it, is Perpendicular:
-  inference.rs `square_at_mid`); a chain's square corner Vertical again (live2's sketch-line-chain variants; the one
-  11-19 Perpendicular take unexplained, live2 offered a pixel sweep); spline / bezier menu takes the plane under the
-  pointer while drawing (sketch.rs `picked`); Aligned gusset with no entity fails "Select a linear edge to align to.";
-  a point wakes when the pointer arrives on it, not the one it rests on at the tool's start (`snapped_point`;
-  mirror-undo-midway). 144 sketch scenarios: all match but the stale trim / dimension-variable takes (live2 retakes:
-  today's live = ours) and vertical-key.
-- vertical-key: ours puts (3, 30) at (+64, -45) px from the start, live (+61, -42): our default camera differs a little
-  (7.47 px off plumb vs live's 7.78, reach 7.5). Camera = psui's.
-- bend-relief x3 (lead 18:0x: go; land after SM matrix + suite, no document worse; stop and tell the lead if a
-  capture contradicts): 2b72c4eb FAILED in the queue (ops e2e a_bends_second_edit_and_its_rip_reuse_its_modify_joint:
-  a radius edit's re-made bend face went to the Flange, the Modify joint wasn't found). Fixed forward 643d96753: an
-  exposed face (fresh after `keep_names`) takes its definition source's creator (`definition_creator`; a bend's /
-  vertex's the later of its walls' by `CtxState::feature_order`) only beside a face that source kept. SM 100/100, ops
-  e2e 259, matrix 17/17. Running: suite K on vibex7 (/root/skasm-scratch/suitek.out; compare per document with J,
-  vibex7 ~/agents/skasm-keep/suite-J-1119-1831.log), SM ui-parity on vibex8 (feel5.sh). Then land.sh (carries the
-  matrix / UI test commits c037340a, 015418cc, ac537f94, 6aba85b6). Captures for the rule: REQUESTS 18:10 (A-C).
-- LANDED bb4585b8 as 9a872f69: the 5 feel rows above. Open feel rows: vertical-key (camera, psui's); stale
-  trim / dimension-variable takes (live2 / qa retaking).
-- LANDED 5bd05e2f as 575aba2a: rocker-enclosure-sm (translator + host). Suite I 94/126, 1346/1585, none worse than G.
+## Landed 11-19 evening
+- 91df536c (21b41fd9): an exposed SM face takes its source's creator only beside a face that source kept
+  (643d9675; sm-box vertex test); feel tests (sketch plane field "Face of Extrude 1", a new sketch changes nothing,
+  Final on edit, the bend row hover's flat side). Suite K = J. 9a872f69: the 5 qa feel rows (qa verified 21:12).
 
 ## Landed 11-18 (since the morning)
 - b5c4ccc4 Corner / Bend relief side face; decal image. cfb07d1c pierce at a touching circle. 52c050e1 / e9e27edc:
@@ -178,12 +172,11 @@ regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete w
 - Settled 11-18: config-parts links / pulleys / linear-rail / standoffs / sprockets match to the end; cpcurves has no
   sketch difference left (first: 3D fit spline 1, "Cannot evaluate tangency for end condition.").
 
-## Agents (lead's roster, 11-19 13:2x; only these ids; the old psui / qa / live2 / studios / dx threads are stopped)
-psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, qa 40e853dc-757f-4498-878f-00b41fd8af75, live2 d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1,
-studios 31c9b9ba-e7f8-40f7-85cb-242bab86dbe6, dx aad5e825-f86c-432d-b4ac-3aab402e7052, core d30002ca-d013-4435-b7d9-7da9cb564cec,
-blend de66e481-56e2-4005-a5d3-9fa897ca5fde, bool 754a9804-feb1-4153-b32a-acf9b2a6d94d, asm d8d597e0-675c-497b-a804-544ceab99bbd,
-bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, live e8549719-ef9a-42de-960c-e24b29f142a6 (stopped till ~21:00), skasm (me)
-18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, lead 818534eb-f6b1-4a00-bb48-ebf0f7cdbd8a.
+## Agents (lead 11-19 21:2x; only these ids)
+core 08a98761-3bbe-47ce-a91a-32b208f5c6b2, blend 459f6c19-c460-4ebf-96ca-bf92455f2e1e, bool abdebc8b-6b39-4794-8390-eb02d6fa37e6,
+live 349fe81d-db78-4931-8032-6dc3edc5d558 (live2 merged; T1-pin captures), studios 91339202-41f1-4465-91f4-65ccd26ea1b1,
+dx 6cfc89bd-1196-43ef-9225-0014546fee1e, qa ac50e7f2-4677-4cab-a57a-fd068a0c07bf, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7,
+asm d8d597e0-675c-497b-a804-544ceab99bbd, lead 818534eb-f6b1-4a00-bb48-ebf0f7cdbd8a, skasm (me) 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6.
 
 ## Waiting on others
 - psui: told 20:3x the tab row is a pick difference (live hit Flange 1's wall).
