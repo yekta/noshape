@@ -10241,16 +10241,21 @@ fn failed_pattern_instances(asm: &Value) -> HashMap<String, f64> {
     for (level, element) in levels {
         let names: HashMap<&str, &str> = level["instances"].as_array().into_iter().flatten().filter_map(|i| Some((i["id"].as_str()?, i["name"].as_str()?))).collect();
         for p in level["patterns"].as_array().into_iter().flatten() {
-            let Some(id) = p["id"].as_str() else { continue };
-            let msg = match element {
-                Some(e) => &asm["liveMateMessages"][e][id],
-                None => &asm["liveMateMessages"][id],
+            let features = match element {
+                Some(e) => &asm["subAssemblyFeatures"][e],
+                None => &asm["features"],
             };
-            let states = match element {
-                Some(e) => &asm["subAssemblyFeatures"][e]["featureStates"][id],
-                None => &asm["features"]["featureStates"][id],
+            // (The pattern's own id isn't its feature's: asm-pattern-std's Linear pattern 5 is Man5… in the
+            // instance tree, M26C… in the feature list, whose state is ERROR.)
+            let by_name = features["features"].as_array().into_iter().flatten().find(|f| f["name"] == p["name"] && p["name"].is_string()).and_then(|f| f["featureId"].as_str());
+            let status = |id: &str| {
+                let msg = match element {
+                    Some(e) => &asm["liveMateMessages"][e][id],
+                    None => &asm["liveMateMessages"][id],
+                };
+                msg["liveStatusNow"].as_str().or(msg["status"].as_str()).or(features["featureStates"][id]["featureStatus"].as_str()).map(str::to_string)
             };
-            if msg["liveStatusNow"].as_str().or(msg["status"].as_str()).or(states["featureStatus"].as_str()) != Some("ERROR") {
+            if !p["id"].as_str().into_iter().chain(by_name).any(|id| status(id).as_deref() == Some("ERROR")) {
                 continue;
             }
             for i in p["seedToPatternInstances"].as_object().into_iter().flat_map(|m| m.values()).filter_map(Value::as_array).flatten() {

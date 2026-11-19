@@ -3998,8 +3998,15 @@ fn an_assembly_is_rebuilt_as_lives() {
     with_bom["liveMateMessages"] = json!({ "PAT1": { "name": "Linear pattern 1", "status": "ERROR", "message": "Linear pattern 1 has error: Failed to compute pattern direction." } });
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-bom-pattern.noshape"), &with_bom, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
     assert_eq!((r.bom_matching, r.bom_rows, r.live_defects.len()), (1, 1, 1), "{r:?}");
-    with_bom["rootAssembly"]["patterns"] = Value::Null;
+    // Its state only in the feature list's, under the feature's own id (asm-pattern-std: Man5… in the tree, M26C… listed).
     with_bom["liveMateMessages"] = Value::Null;
+    let features = with_bom["features"].clone();
+    with_bom["features"]["features"].as_array_mut().unwrap().push(json!({ "name": "Linear pattern 1", "featureId": "FPAT1" }));
+    with_bom["features"]["featureStates"]["FPAT1"] = json!({ "featureStatus": "ERROR" });
+    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-bom-pattern-state.noshape"), &with_bom, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
+    assert_eq!((r.bom_matching, r.bom_rows, r.live_defects.len()), (1, 1, 1), "{r:?}");
+    with_bom["features"] = features;
+    with_bom["rootAssembly"]["patterns"] = Value::Null;
     // The properties the user set on the part (live's metadata): its row's part number, description and material.
     let prop = |name: &str, value: Value| json!({ "name": name, "value": value, "propertySource": 3 });
     let mut with_meta = off_studio.clone();
