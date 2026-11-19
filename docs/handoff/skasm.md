@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 03:36 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 03:48 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -49,8 +49,10 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live to recheck on gree
 - Landed 373dd5b9: sketch_dimension takes a value as typed (redundant / conflicting driving, unsolvable taken, red).
   It regressed the translator (live-driving dims ours over-defines came out driving: Part grid ERROR); fixed in local
   commit "translator: a live driving dimension ours can't take ... set driven again" (Part grid matches again).
-- Queued 0b44497a (P0 REGION-PICK-SKETCH-SHOWN), checking since 03:13.
-- Local, to land after 0b44497a + suite C: Trim/Split used lines (use_ends), translator stale-Use on refs geometry
+- Open: infento Part grid (live fully constrained, Ok): live's LENGTH 80 on yNme.right is driving and its two PATTERN
+  spacing dims (330N36ii7ITe.direction1/2) too; ours finds all of them over-defining (our linear pattern's 649 links fix
+  the seed's size?), so they are driven. A user editing that 80 in ours can't (live: 80 -> 80.8 re-solves the grid).
+- 0b44497a LANDED 03:45 (48626728). Queued 031afe64 03:48: Trim/Split used lines (use_ends), translator stale-Use on refs geometry
   (suite B: = A, unfound PROJECTED 45 -> 43), the translator driven fix. Suite C (all of them) on vibe2 since 03:36:
   ~/agents/skasm-keep/suite-C-*.log; land if 90/126, 1325/1585 as A (suite-1119-0125.log).
 Split / Trim of a Use'd line (live 11-19, behaviours "skasm (11-19): split / trim of a used line"): queued 02:57.
