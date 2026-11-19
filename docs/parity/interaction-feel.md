@@ -1566,7 +1566,7 @@ Evidence: live/feel/sketch-tools-1119/ (shots, sketch1-constraints.json); ours /
 | Tangent arc: where it can start | only on a curve's end: the end lights 8 px straight off it (not 10), 7 px diagonally (not 9), not 8 px past it along the line; a click outside starts nothing | 6 px yes, 8 no (the point square) | ≈ (1–2 px) |
 | Tangent arc: made | R label while drawn, then COINCIDENT + TANGENT and the R box; the tool stays but nothing follows the pointer: the next arc needs a new start click on an end | a new tangent arc starts at once from the arc's end and follows the pointer | ≠ [skasm] |
 | Tangent arc preview | a smooth arc | a coarse polyline (about 5 straight pieces), also the next arc | ≠ [skasm] |
-| Dimension: the placement click | the value box (palette) opens 494 ms after the click (first frame 14 ms), the value selected; Enter applies (frame 48 ms), the tool stays | the same box (time not taken) | = |
+| Dimension: the placement click | the value box (palette) opens 494 ms after the click (first frame 14 ms), the value selected; Enter applies (frame 48 ms), the tool stays | the same box, the value selected, open 120–180 ms after the click (60 fps recording); Enter closes it within a frame and applies (about 80 ms later) | = (ours faster) |
 | Dimension: press on a line and drag | nothing: no preview, no box, no dimension on release | the same | = |
 | Trim, a drag from empty space | a thin grey trail from the press; each piece goes the moment the trail crosses it (mid-drag, not on release); first trail frame 6 ms | the same | = |
 
