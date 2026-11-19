@@ -35,18 +35,15 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (updated 04:00 UTC 11-19)
+## Now (updated 04:45 UTC 11-19)
 
-1. Landed: 1dd4033be (02:27: box hold, unit precision, xdev prewarm, view key, Shift+T), 373dd5b9 (03:13: Shift+Y,
-   Shift+C in a sketch, sliders remembered, mesher test race). Live retakes on green e86fcb6ed: cube hold, view key,
-   Shift+T, box drag all =. Live retakes Shift+Y / Shift+C / sliders once green carries 373dd5b9.
-2. Queued 04:0x (3 commits): rows; plane border picked at its drawn 2 px (6 level / 7 slanted, live 6 / 7.2);
-   part and assembly edges picked at their drawn width by distance (`PickBuffer::pick_reaching`, `PickClass`,
-   viewport `pick_class` from the studios' `class_fn`): 5 px over the background, 7 over a face, no hold (live
-   reach-px-1119, full-page shots; reach-1118's 7 / 9–11 was the viewer's internal pick). Tests: render pick matrix,
-   our_3d_pick_reach, feel a_click_beside_an_edge (sides told by a face lit far off).
-3. Lead: the next interaction-feel ≠ rows by frequency (hover/select/drag first). Left with live: Hole callout glyph
-   size (REQUESTS 23:33), section preview over a shown plane (REQUESTS 22:48).
+1. Landed: 1dd4033be, 373dd5b9 (Shift+Y / Shift+C / sliders), 36c58917 (04:41: edges 5 px over the background, 7
+   over a face, no hold; plane border 6 / 7). Live retakes of the reach table (reach-px-1119) once green has 36c58917.
+2. Queued 04:4x: live2 feature-dialogs-1119's six (typing mid-drag, picked face tint #998f52 at half, missing-input
+   picks unred, sketch loops filled at rest, hidden plane eye on hover, Enter within 100 ms dropped) + chip x test.
+3. Next (asm 04:3x, renderer): asm-dialogs-1119 (8) ok.png / (6) oz.png are ONE cause: two instances' coplanar tops
+   (Part 2 flush inside Part 1) — ours lets Part 2's face win / z-fight, live keeps Part 1's face with Part 2's edges.
+   (6)'s "see-through fill" is Part 2's selected top winning the tie, not a fill through.
 4. Open with live: Hole callout glyph size and weight (REQUESTS 23:33). Dialog spots remembered per dialog
    (live: localStorage, sectionview +150/+100 like ours) = already.
 3. Speed rows closed (lead 23:14): rollback 0.24 s and Mass 313 ms are software-render frame cadence (handler < 1 ms,

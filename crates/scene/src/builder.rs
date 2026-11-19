@@ -1118,6 +1118,23 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                     Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([0.0, 0.0, 0.0, 0.0]).pick_only()
                 };
                 scene.instances.push(fill.ignore_clip().layer(9));
+                // A shown sketch's own closed loops at rest: filled light grey too (live2 feature-dialogs-1119
+                // Lo-extrude-open.png: (227,230,233) over the white background, the editing fill at a third).
+                if !editing {
+                    let own: Vec<_> = sk.regions.iter().filter(|r| !r.imprinted).collect();
+                    if !own.is_empty() {
+                        let mut m = MeshData::default();
+                        for r in own {
+                            let base = m.positions.len() as u32;
+                            m.positions.extend_from_slice(&r.positions);
+                            m.normals.extend(std::iter::repeat_n(n, r.positions.len()));
+                            m.pick_ids.extend(std::iter::repeat_n(0, r.positions.len()));
+                            m.indices.extend(r.indices.iter().map(|i| i + base));
+                        }
+                        let c = theme::lin(theme::pick(theme::viewport::SKETCH_REGION, theme::viewport_dark::SKETCH_REGION));
+                        scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([c[0], c[1], c[2], theme::pick(0.33, 0.2)]).unlit().unpickable().ignore_clip().layer(9));
+                    }
+                }
             }
         }
     }

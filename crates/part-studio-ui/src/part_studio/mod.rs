@@ -1524,7 +1524,10 @@ impl PartStudioView {
         let built = self.built.as_ref().expect("built");
         // Live (behaviours "URGENT (10-22)"): a failing feature's inputs are
         // drawn red while its dialog is open.
-        let failing = self.edit.as_ref().is_some_and(|e| matches!(e.dialog.read(cx).status, Some((noshape_model::display::FeatureStatus::Error, _))));
+        let failing = self.edit.as_ref().is_some_and(|e| {
+            let d = e.dialog.read(cx);
+            matches!(d.status, Some((noshape_model::display::FeatureStatus::Error, _))) && !d.only_missing_input()
+        });
         // A failed Feature pattern shows the instances it couldn't make, and
         // its inputs keep the usual selection colors (the user's live shot
         // 2026-10-23: the seed wall orange, the instances red).
@@ -4078,7 +4081,9 @@ impl PartStudioView {
                                 cx.stop_propagation();
                                 v_eye.update(cx, |this, cx| this.set_visibility(std::slice::from_ref(&r_eye), !hidden, cx));
                             });
-                        if hidden { eye } else { crate::ui::hover_reveal(eye, "dg-row") }
+                        // Hidden or not, only while the row is hovered (live2 feature-dialogs-1119: hidden default
+                        // planes are grey rows with no icon).
+                        crate::ui::hover_reveal(eye, "dg-row")
                     })
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         let new = if *h { Some(r2.clone()) } else { None };

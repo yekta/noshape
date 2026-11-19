@@ -563,6 +563,8 @@ pub struct UiState {
     pub tb_custom: Option<crate::toolbar_customize::Customize>,
     /// The Isolate slider being dragged (pressed on it, button still down).
     pub iso_slider_drag: Option<&'static str>,
+    /// What an arrow's drag last wrote into its field (typed over, the drag stops writing).
+    pub manip_last_text: Option<String>,
     /// The info message whose 5 s auto-dismiss is running (live: Onshape's
     /// message bubbles close after 5000 ms; errors and warnings stay).
     pub message_timed: Option<(noshape_model::display::FeatureStatus, String)>,
@@ -988,6 +990,7 @@ impl UiState {
             my_custom_rev: 0,
             tb_custom: None,
             iso_slider_drag: None,
+            manip_last_text: None,
             message_timed: None,
             preview_opacity: crate::feature_dialog::PREVIEW_REST,
             preview_before: None,
@@ -3689,8 +3692,11 @@ impl PartStudioView {
         // A Shell's removed face: filled as well, a khaki at half over what's under it (live 11-01 on the 40 × 20 × 10
         // block: the rim, the walls and the floor through the opening at (173,187,174), (167,179,164) and
         // (146,151,132), live's sRGB blend of (191,180,129) at 0.5; #bcb36e at 0.47 here, within 5 of each).
+        // Any other feature's picked face under its preview takes a warm tint (live2 feature-dialogs-1119 rcmp2.png:
+        // Extrude's top face, a new pick and a re-edit, reads (129,136,120) mid-face under the see-through preview where
+        // ours stayed (96,129,147): #998f52 at half, blended in linear light).
         let shell = self.edit.as_ref().is_some_and(|e| e.history.last.type_id == "shell");
-        let removed: Vec<&Reference> = if shell { sel.iter().chain(&acc).filter(|r| changed.contains(r) && matches!(r, Reference::Face(_))).collect() } else { Vec::new() };
+        let removed: Vec<&Reference> = if shell { sel.iter().chain(&acc).filter(|r| changed.contains(r) && matches!(r, Reference::Face(_))).collect() } else { sel.iter().filter(|r| matches!(r, Reference::Face(_))).collect() };
         let mut mesh = noshape_render::MeshData::default();
         for r in removed {
             for b in before.bodies.iter().filter(|b| !b.hidden) {
@@ -3711,8 +3717,8 @@ impl PartStudioView {
             }
         }
         if !mesh.indices.is_empty() {
-            let khaki = crate::theme::lin(0xbcb36e);
-            let mut i = Instance::new(Drawable::Mesh(self.gpu.uploader().upload_mesh(&mesh))).with_color([khaki[0], khaki[1], khaki[2], 0.47]).unlit().unpickable().ignore_clip().layer(crate::scene_builder::HIGHLIGHT_FILL_LAYER);
+            let (tint, alpha) = if shell { (crate::theme::lin(0xbcb36e), 0.47) } else { (crate::theme::lin(0x998f52), 0.5) };
+            let mut i = Instance::new(Drawable::Mesh(self.gpu.uploader().upload_mesh(&mesh))).with_color([tint[0], tint[1], tint[2], alpha]).unlit().unpickable().ignore_clip().layer(crate::scene_builder::HIGHLIGHT_FILL_LAYER);
             if post {
                 i.compare = noshape_render::scene::compare::POST;
             }

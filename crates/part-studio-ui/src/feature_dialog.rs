@@ -256,6 +256,9 @@ pub struct FeatureDialog {
     /// Enter applied typed text: a dialog undo step even when the value is unchanged (live external-thread-new-edit-
     /// reedit, move-face-tool: "5" over "5 mm" turns Undo on).
     pub applied_typed: bool,
+    /// When Enter last applied typed text: an Enter in the same instant is dropped (live2 feature-dialogs-1119: two
+    /// Enters at once apply the value and leave the dialog open; from a 150 ms gap the second commits).
+    enter_applied_at: Option<std::time::Instant>,
     /// The empty selection field the last edit brought up and activated: (it, the field active before, the control
     /// edited, whether the keyboard was outside). The editing logic filling it in undoes that (`set_value_logic`).
     auto_activated: Option<(String, Option<String>, String, bool)>,
@@ -491,6 +494,7 @@ impl FeatureDialog {
             edit_focus: None,
             focus_dialog_pending: false,
             applied_typed: false,
+            enter_applied_at: None,
             auto_activated: None,
             focus_select_pending: None,
             focus_active_pending: false,
@@ -783,6 +787,11 @@ impl FeatureDialog {
             }
         }
         self.set_value_auto(path, v, cx);
+    }
+
+    /// The text a field's input shows (a manipulator's drag tells typing from its own writes).
+    pub fn shown_text(&self, path: &str, cx: &App) -> Option<String> {
+        self.inputs.get(path).map(|st| st.read(cx).value().to_string())
     }
 
     /// Set a numeric field from outside (manipulator drag): updates the value
@@ -1615,6 +1624,17 @@ impl FeatureDialog {
         }
     }
 
+    /// The regeneration's error only asks for an input: every field it names is an empty selection (Revolve with no
+    /// axis yet). Live2 feature-dialogs-1119 rv.png: the picked region then stays orange, not the failing red.
+    pub fn only_missing_input(&self) -> bool {
+        let empty_selection = |f: &String| match self.get_value(f) {
+            Some(ParamValue::Query(q)) => q.is_empty(),
+            Some(ParamValue::Array(items)) => items.is_empty(),
+            _ => false,
+        };
+        !self.faulty.is_empty() && self.faulty.iter().all(empty_selection)
+    }
+
     /// The error a field shows: the feature's error when the regeneration
     /// names this parameter.
     pub fn field_error(&self, id: &str) -> Option<String> {
@@ -1684,10 +1704,14 @@ impl FeatureDialog {
                 // Onshape: Enter in a changed field applies the value (the
                 // text stays selected); the next Enter commits the feature.
                 // Shift+Enter with typed text only applies it too (live ui-parity shortcut-plane-shift-enter).
+                let now = cx.background_executor().now();
                 if this.apply_on_enter(&path_s, state, window, cx) {
                     // (A value that doesn't parse changes nothing: no undo step, live number-field-invalid.)
                     this.applied_typed = !this.parse_errors.contains_key(&path_s);
                     this.flush_typed(cx);
+                    this.enter_applied_at = Some(now);
+                } else if this.enter_applied_at.take().is_some_and(|t| now.saturating_duration_since(t) < std::time::Duration::from_millis(100)) {
+                    // (The same instant as the applying Enter: dropped.)
                 } else if *shift {
                     cx.emit(DialogEvent::Accept { repeat: true });
                 } else if !this.refuse_invalid_enter(&path_s, state, window, cx) {
@@ -3323,6 +3347,7 @@ impl FeatureDialog {
                             .when(!reorder_on, |d| d.child(
                                 div()
                                     .id(SharedString::from(format!("chipx-{path}-{row}")))
+                                    .debug_selector(|| format!("chipx-{path}-{row}"))
                                     .map(|d| crate::ui_script::mark(d, || format!("button:x:{}:{row}", crate::i18n::spec(s.label))))
                                     .tooltip(crate::ui::user_tooltip(x_tip))
                                     // Live (woolsthorpe.css .os-param-selection-list-entry-delete:

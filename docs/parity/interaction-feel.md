@@ -908,19 +908,19 @@ Block 40 × 30 × 10 plus a Front sketch (10 × 10 rectangle at x 60, a line at 
 | …Shell (top face, 2.5 mm) | 1.35–1.85 s | 0.43–0.65 s; settled 0.53–0.86 s | = (faster) |
 | …Revolve (the region, then the line as axis, Full revolve) | 1.59–1.74 s (draw calls: the torus at 0.83–1.28 s, settled 2.4–2.9 s) | 0.31–0.32 s; settled 0.42–0.58 s | = (faster) |
 | …Linear pattern (Part 1, Direction the front edge, 25 mm × 2) | 1.68–1.80 s | 0.21–0.41 s | = (faster) |
-| Typing during Extrude's arrow drag (button held) | Depth (28.3 mm, selected) takes the typed "40"; further drag moves no longer change it; release keeps 40, Enter "40 mm" (m1-*.png) | the typed 40 is overwritten by the next drag move (29.6 mm) and the release keeps 29.6 (om1-fields.png) | ≠ [psui] |
+| Typing during Extrude's arrow drag (button held) | Depth (28.3 mm, selected) takes the typed "40"; further drag moves no longer change it; release keeps 40, Enter "40 mm" (m1-*.png) | the typed 40 is overwritten by the next drag move (29.6 mm) and the release keeps 29.6 (om1-fields.png) | = (fixed psui 11-19: typed over, the drag stops writing; dialogs matrix "manipulators / typing during the arrow's drag wins over later moves") |
 | Arrow reach, step, no snap to geometry, click flips (Extrude); Fillet's handle | as the Dialogs matrix rows (live manip-feel-1118 / manip-1118b); the same 28.3 mm at the same 30 px drag here | the same | = |
 | Instance count "1+2" / "1" / Distance "1 in" | "1+2" kept while focused, "3" after blur; "1" accepted; "1 in" → "25.4 mm" | the same | = |
 | Instance count "2.5" | pink rgb(249,235,236), title red, ✓ disabled; tooltip "Enter a valid expression." (x1-p25.png) | accepted: no pink, title black, ✓ on, no tooltip (ox1-grid.png) | ≠ [core] |
 | Shell thickness "1 in" / "-2" / "20" (block 10 mm) | "25.4 mm"; "-2 mm" pink, title red, ✓ off; 20 mm: title red, the part red see-through with red edges, the entry red | the same (osb.png) | = |
-| Two Enters in the same instant after typing Depth (preview pending) | the first takes the value, the second is dropped: the dialog stays, "40 mm" selected; from a 150 ms gap the second commits | commits at once | ≠ [psui] (minor) |
+| Two Enters in the same instant after typing Depth (preview pending) | the first takes the value, the second is dropped: the dialog stays, "40 mm" selected; from a 150 ms gap the second commits | commits at once | = (fixed psui 11-19: an Enter within 100 ms of the applying one is dropped; `enter_applies_then_the_next_enter_accepts`) |
 | ✓ clicked right after typing (no Enter) | applies 40 mm, the dialog stays; Enter then ✓ (0–1500 ms) commits | the same | = |
 | Enter, then Esc 50 ms later | cancels the dialog (one Esc: the value was sent) | the same | = |
 | Re-edit (double-click Extrude 2) | 98–173 ms to the dialog; its first box active | 101–168 ms on screen | = |
-| The picked face under the preview (new pick and re-edit) | an orange outline and a warm tint on the face (rgb(129,136,120) at the face's middle; the body above see-through grey) | the orange outline only, the face stays blue rgb(96,129,147) (rcmp2.png) | ≠ [psui] |
-| A picked sketch region while the dialog can't preview (Revolve, no axis yet) | the region orange (selected) | the region red with a red outline (rv.png) | ≠ [psui] |
-| A closed sketch profile at rest (Sketch 2's rectangle) | filled light grey | outline only (o-view vs g1) | ≠ [psui] |
-| Hidden default planes in the feature list | grey rows, no icon | grey rows with an eye-slash icon on each | ≠ [psui] |
+| The picked face under the preview (new pick and re-edit) | an orange outline and a warm tint on the face (rgb(129,136,120) at the face's middle; the body above see-through grey) | the orange outline only, the face stays blue rgb(96,129,147) (rcmp2.png) | = (fixed psui 11-19: a warm tint at half, #998f52 fitted to (129,136,120) over our (96,129,147); `an_extrudes_picked_face_is_tinted_under_its_preview`) |
+| A picked sketch region while the dialog can't preview (Revolve, no axis yet) | the region orange (selected) | the region red with a red outline (rv.png) | = (fixed psui 11-19: an error that only asks for an input leaves the picks unred; `a_dialog_only_missing_an_input_draws_its_picks_unred`) |
+| A closed sketch profile at rest (Sketch 2's rectangle) | filled light grey | outline only (o-view vs g1) | = (fixed psui 11-19: the sketch's own loops filled, (227,230,233) over white; `a_shown_sketchs_closed_loop_is_filled_at_rest`) |
+| Hidden default planes in the feature list | grey rows, no icon | grey rows with an eye-slash icon on each | = (fixed psui 11-19: the eye only on hover, as a hidden sketch's) |
 
 ### asm-dialogs-1119 (P0, Insert / mates / Group / Measure in an assembly, live2 11-19 04:10–04:22) [asm]
 

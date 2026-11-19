@@ -116,6 +116,9 @@ pub(super) struct ManipDrag {
     /// Axis parameter at the grab point minus the current length (arcs: the
     /// dragged angle so far, unwrapped).
     pub grab_offset: f64,
+    /// Typed into the field during the drag: further moves leave the value alone (live2 feature-dialogs-1119: "40"
+    /// typed with the button held stays through the drag and the release).
+    pub typed: bool,
     /// The dragged handle: 0 the first, 1 the second end's.
     pub which: usize,
     /// Arcs: the cursor's angle at the grab minus the handle's (its stem
@@ -737,7 +740,8 @@ impl PartStudioView {
             ViewportEvent::ToolDown { position, .. } => {
                 let (o, d) = ray(self, *position, cx);
                 let t = Self::axis_param(&a, o, d).unwrap_or(a.length);
-                self.manip_drag = Some(ManipDrag { grab_offset: t - a.length, which, delta: 0.0 });
+                self.manip_drag = Some(ManipDrag { grab_offset: t - a.length, which, delta: 0.0, typed: false });
+                self.ui.manip_last_text = None;
                 self.ui.arrow_press = Some(*position);
                 true
             }
@@ -754,7 +758,13 @@ impl PartStudioView {
                 // Moved: not a click (`delta` 1).
                 let m = ManipDrag { delta: 1.0, ..m };
                 self.manip_drag = Some(m);
-                if a.param.is_empty() {
+                if a.param.is_empty() || m.typed {
+                    return true;
+                }
+                // The field no longer shows what the drag last wrote: typed into, the drag lets it be.
+                let shown = self.edit.as_ref().and_then(|e| e.dialog.read(cx).shown_text(a.param, cx));
+                if self.ui.manip_last_text.as_ref().is_some_and(|t| shown.as_ref() != Some(t)) {
+                    self.manip_drag = Some(ManipDrag { typed: true, ..m });
                     return true;
                 }
                 let (o, d) = ray(self, *position, cx);
@@ -810,6 +820,7 @@ impl PartStudioView {
                         dlg.focus_field_selected(a.param, window, cx);
                     });
                 }
+                self.ui.manip_last_text = Some(text);
                 if flip {
                     // Keep grabbing the same point after the flip.
                     self.manip_drag = Some(ManipDrag { grab_offset: -m.grab_offset, ..m });
@@ -875,7 +886,7 @@ impl PartStudioView {
                 // The cursor's angle next to the handle's: the drag unwraps from it.
                 let tau = std::f64::consts::TAU;
                 let a0 = angle_at(self, *position, cx).map_or(h.angle, |raw| h.angle + (raw - h.angle + std::f64::consts::PI).rem_euclid(tau) - std::f64::consts::PI);
-                self.manip_drag = Some(ManipDrag { grab_offset: a0, which, delta: a0 - h.angle });
+                self.manip_drag = Some(ManipDrag { grab_offset: a0, which, delta: a0 - h.angle, typed: false });
                 true
             }
             ViewportEvent::ToolDrag { position, .. } => {
@@ -919,7 +930,7 @@ impl PartStudioView {
                 }
                 if flip {
                     // The axis turned over: the same cursor angle is the negated one.
-                    self.manip_drag = Some(ManipDrag { grab_offset: -a, which, delta: -m.delta });
+                    self.manip_drag = Some(ManipDrag { grab_offset: -a, which, delta: -m.delta, typed: false });
                 }
                 true
             }
@@ -1055,7 +1066,7 @@ impl PartStudioView {
             ViewportEvent::ToolDown { position, .. } => {
                 let (o, d) = ray(self, *position, cx);
                 let t = Self::axis_param(&a, o, d).unwrap_or(a.length);
-                self.manip_drag = Some(ManipDrag { grab_offset: t - a.length, which, delta: 0.0 });
+                self.manip_drag = Some(ManipDrag { grab_offset: t - a.length, which, delta: 0.0, typed: false });
                 true
             }
             ViewportEvent::ToolDrag { position, .. } => {
@@ -1119,7 +1130,7 @@ impl PartStudioView {
         match ev {
             ViewportEvent::ToolDown { position, .. } => {
                 let a0 = angle_at(self, *position, cx).map_or(h.angle, |raw| h.angle + (raw - h.angle + pi).rem_euclid(tau) - pi);
-                self.manip_drag = Some(ManipDrag { grab_offset: a0, which, delta: a0 - h.angle });
+                self.manip_drag = Some(ManipDrag { grab_offset: a0, which, delta: a0 - h.angle, typed: false });
                 true
             }
             ViewportEvent::ToolDrag { position, .. } => {

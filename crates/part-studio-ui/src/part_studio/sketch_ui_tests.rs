@@ -703,6 +703,8 @@ fn dialog_field_enter_inserts_the_highlighted_variable(cx: &mut TestAppContext) 
     assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (true, false));
     assert_eq!(dialog.update(cx, |d, cx| d.field_selection("depth", cx)), Some(0..15), "selected");
     wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    // (A person's next Enter: not in the same instant, which is dropped.)
+    cx.executor().advance_clock(std::time::Duration::from_millis(200));
     keys(cx, window, &["enter"]);
     assert!(cx.update(|cx| view.read(cx).edit.is_none()), "the third accepts");
 }
@@ -784,9 +786,14 @@ fn enter_applies_then_the_next_enter_accepts(cx: &mut TestAppContext) {
     draw(cx, window);
     keys(cx, window, &["2", "0", "enter"]);
     assert!(cx.update(|cx| view.read(cx).edit.is_some()), "the first Enter applies");
-    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    // Live2 feature-dialogs-1119: an Enter in the same instant is dropped; from a 150 ms gap it commits.
     keys(cx, window, &["enter"]);
-    assert!(cx.update(|cx| view.read(cx).edit.is_none()), "the second Enter accepts");
+    assert!(cx.update(|cx| view.read(cx).edit.is_some()), "a second Enter at once is dropped");
+    keys(cx, window, &["2", "5", "enter"]);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    cx.executor().advance_clock(std::time::Duration::from_millis(200));
+    keys(cx, window, &["enter"]);
+    assert!(cx.update(|cx| view.read(cx).edit.is_none()), "the next Enter 200 ms on accepts");
 }
 
 /// Live (ui-parity extrude-ok-button, behaviours request 1849): a click on ✓ while Depth holds typed text only
@@ -946,6 +953,27 @@ fn a_blamed_empty_field_is_not_red_once_picked(cx: &mut TestAppContext) {
     assert!(cx.update(|cx| dialog.read(cx).field_error("entities").is_some()), "empty: red");
     cx.update(|cx| dialog.update(cx, |d, cx| { d.add_pick(top.clone(), cx); }));
     assert!(cx.update(|cx| dialog.read(cx).field_error("entities").is_none()), "picked: not red, before any regeneration");
+}
+
+/// Live2 feature-dialogs-1119 (rv.png): Revolve with its face picked and no axis yet fails asking for the axis, and the
+/// face stays drawn as picked, not in the failing red.
+#[gpui::test]
+fn a_dialog_only_missing_an_input_draws_its_picks_unred(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "missing-input-not-red");
+    view.update(cx, |v, _| v.selection.clear());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("revolve", w, cx))).unwrap();
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Revolve dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| { d.add_pick(top.clone(), cx); }));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.schedule_regen(w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && dialog.read(cx).status.is_some());
+    draw(cx, window);
+    let (missing, red) = cx.update(|cx| {
+        let v = view.read(cx);
+        let states = &v.viewport.read(cx).scene().states;
+        let red = v.built.as_ref().is_some_and(|b| b.picks.ids_for(&top).iter().any(|&id| states.get(id as usize).is_some_and(|s| s & noshape_render::scene::state::ERROR != 0)));
+        (dialog.read(cx).only_missing_input(), red)
+    });
+    assert_eq!((missing, red), (true, false), "(the error only asks for the axis, the face drawn red)");
 }
 
 /// Live (live2 11-15, boundary-surface-new-edit-reedit): Boundary surface's U profiles take two picks (bsurf.fs
@@ -1191,6 +1219,7 @@ fn shift_enter_with_typed_text_applies_it_first(cx: &mut TestAppContext) {
     assert_eq!(cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.read(cx).feature.id)), Some(id), "the dialog stays");
     assert_eq!(dialog.update(cx, |d, cx| d.field_text("depth", cx)).as_deref(), Some("20 mm"));
     wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    cx.executor().advance_clock(std::time::Duration::from_millis(200));
     keys(cx, window, &["shift-enter"]);
     assert!(cx.update(|cx| view.read(cx).edit.as_ref().is_some_and(|e| e.is_new)), "accepted, a new Extrude open");
 }
@@ -3026,6 +3055,47 @@ fn a_shelled_face_is_highlighted_as_before(cx: &mut TestAppContext) {
     // Live 11-01: the removed face filled khaki at half (the opening and the rim) under its outline.
     let drawn = cx.update(|cx| view.read(cx).ui.consumed_lines.as_ref().map(|c| c.4.iter().map(|i| (matches!(i.drawable, noshape_render::Drawable::Mesh(_)), i.color[3])).collect::<Vec<_>>()));
     assert_eq!(drawn, Some(vec![(true, 0.47), (false, 1.0)]), "the removed face's fill, then its outline");
+}
+
+/// Live2 feature-dialogs-1119 (Lo-extrude-open.png): a shown sketch's closed rectangle is filled light grey at rest, as
+/// while editing it (ours drew its outline only).
+#[gpui::test]
+fn a_shown_sketchs_closed_loop_is_filled_at_rest(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "sketch-fill-at-rest", Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_none() && !view.read(cx).ui_busy());
+    draw(cx, window);
+    let fills = cx.update(|cx| {
+        let v = view.read(cx);
+        v.viewport.read(cx).scene().instances.iter().filter(|i| matches!(i.drawable, noshape_render::Drawable::Mesh(_)) && !i.pickable && (i.color[3] - 0.33).abs() < 1e-6).count()
+    });
+    assert_eq!(fills, 1, "the rectangle's fill at rest");
+}
+
+/// Live2 feature-dialogs-1119 (rcmp2.png): Extrude's picked top face under its preview takes a warm tint, filled at
+/// half under its orange outline (ours had the outline only, the face blue).
+#[gpui::test]
+fn an_extrudes_picked_face_is_tinted_under_its_preview(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "extrude-face-tint");
+    view.update(cx, |v, _| v.selection.clear());
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_feature("extrude", w, cx);
+            let d = v.edit.as_ref().expect("the Extrude dialog").dialog.clone();
+            d.update(cx, |d, cx| d.set_value("entities", noshape_model::ParamValue::Query(vec![top.clone()]), cx));
+        })
+    })
+    .unwrap();
+    wait_until(cx, window, |cx| {
+        let v = view.read(cx);
+        v.ui.preview_before.is_some() && v.edit.as_ref().and_then(|e| v.display.feature_state(e.dialog.read(cx).feature.id)).is_some_and(|s| s.status == noshape_model::display::FeatureStatus::Ok)
+    });
+    draw(cx, window);
+    let drawn = cx.update(|cx| view.read(cx).ui.consumed_lines.as_ref().map(|c| c.4.iter().map(|i| (matches!(i.drawable, noshape_render::Drawable::Mesh(_)), i.color[3])).collect::<Vec<_>>()));
+    assert_eq!(drawn, Some(vec![(true, 0.5), (false, 1.0)]), "the picked face's tint, then its outline");
 }
 
 /// Live manip-feel-1118 m6: a Transform that moves a part leaves its old place light grey and see-through with no

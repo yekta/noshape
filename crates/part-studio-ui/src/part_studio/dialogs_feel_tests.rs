@@ -144,6 +144,39 @@ fn rows() -> Vec<Row> {
             let after = state(cx);
             expect((after.0 != before.0, after.1 == before.1, cx.update(|cx| view.read(cx).edit.is_some())), (true, true, true), "flipped, depth kept, dialog open")
         } },
+        Row { id: "manipulators / typing during the arrow's drag wins over later moves", live: "live2 feature-dialogs-1119 m1: \"40\" typed with the button held replaces Depth; further moves leave it; the release keeps 40", gap: false, check: |cx| {
+            let (window, view, dialog) = edit_extrude(cx, "dlg-arrow-type");
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            draw(cx, window);
+            let vp = cx.update(|cx| view.read(cx).viewport.clone());
+            let (at, along) = cx
+                .update(|cx| {
+                    let vp = vp.read(cx);
+                    let &(a, b, _) = vp.manipulators.first()?;
+                    let (a, b) = (vp.project(a)?, vp.project(b)?);
+                    let mid = (a + b) * 0.5;
+                    let o = vp.origin();
+                    Some((gpui_kit::point(o.x + px(mid.x as f32), o.y + px(mid.y as f32)), (b - a).normalize_or_zero()))
+                })
+                .ok_or("no arrow")?;
+            let to = |k: f64| gpui_kit::point(at.x + px((along.x * 8.0 * k) as f32), at.y + px((along.y * 8.0 * k) as f32));
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            vcx.simulate_event(gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() });
+            vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
+            for k in 1..=3 {
+                vcx.simulate_event(gpui_kit::MouseMoveEvent { position: to(k as f64), pressed_button: Some(gpui_kit::MouseButton::Left), modifiers: Modifiers::default() });
+            }
+            draw(cx, window);
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("4 0");
+            draw(cx, window);
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            for k in 4..=6 {
+                vcx.simulate_event(gpui_kit::MouseMoveEvent { position: to(k as f64), pressed_button: Some(gpui_kit::MouseButton::Left), modifiers: Modifiers::default() });
+            }
+            vcx.simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: to(6.0), modifiers: Modifiers::default(), click_count: 1 });
+            draw(cx, window);
+            expect(cx.update(|cx| dialog.read(cx).input_text("depth", cx)).map(|(t, _)| t), Some("40".to_string()), "Depth after typing 40 mid-drag, moving on and releasing")
+        } },
         Row { id: "manipulators / Esc with the button held cancels the dialog", live: "live manip-feel-1118 (5): Escape while dragging the depth arrow closes the whole dialog, the feature as it was", gap: false, check: |cx| {
             let (window, view, dialog) = edit_extrude(cx, "dlg-arrow-esc");
             wait_until(cx, window, |cx| !view.read(cx).ui_busy());
@@ -302,6 +335,22 @@ fn rows() -> Vec<Row> {
             vcx.simulate_click(at, Modifiers::default());
             draw(cx, window);
             expect(cx.update(|cx| dialog.read(cx).feature.params.query("entities").len()), 1, "entities after the click")
+        } },
+        Row { id: "fields / a chip's x: its tooltip, a click removes the chip", live: "the x hovered: tooltip \"Delete Edge of Extrude 1\"; a click removes that chip (live2 ours-1118, qa CHIP-X-TOOLTIP)", gap: false, check: |cx| {
+            let (window, _view, dialog, _) = fillet_on_an_edge(cx, "dlg-chip-x")?;
+            let path = cx.update(|cx| dialog.read(cx).active_query.clone()).ok_or("no active field")?;
+            let x = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(Box::leak(format!("chipx-{path}-0").into_boxed_str())).ok_or("no x")?;
+            crate::ui_script::clear_tooltip();
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(x.center(), None, Modifiers::default());
+            for _ in 0..50 {
+                cx.executor().advance_clock(std::time::Duration::from_millis(10));
+                draw(cx, window);
+            }
+            let tip = crate::ui_script::shown_tooltip().unwrap_or_default();
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(x.center(), Modifiers::default());
+            draw(cx, window);
+            let left = cx.update(|cx| dialog.read(cx).feature.params.query("entities").len());
+            expect((tip.starts_with("Delete Edge of "), left), (true, 0), &format!("the x's tooltip {tip:?}, entities after its click"))
         } },
         Row { id: "fields / Tab from Radius", live: "Radius's ± button, then the checkboxes in order; Tab skips the selection fields and the dropdowns", gap: false, check: |cx| {
             let (window, _view, dialog, _) = fillet_on_an_edge(cx, "dlg-tab")?;
