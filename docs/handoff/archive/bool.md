@@ -4805,3 +4805,35 @@ instances on one plate either way: yours if you'll take it.
   history differences against main's recordings (taken: the direct / local histories were the odd ones). Decision
   pending (lead): 846db3d0c cf-surface-pattern 386/259 -> 385/258. On land: private docs, tell dx / core (walls) /
   blend / asm.
+
+
+## 11-19 03:33: the old stack's gate notes (superseded by bool-stack3; moved from the handoff)
+- Earlier gates of the stack: /root/bool-hat-scratch/chain-{4cf4ce0ca,8086f188b}.out. bool-hat rebased on main 1e21f28e8: the 13 below +
+  14. Shell race fix (on main as 7b8bb249) + 15. param_of cache + 16. Shell add_pcurve analysis cache + 17. offset fit
+  cache + 18. volume_possible's cut lower bound + 19. project_along tangent-corner sliver (britatap) + 20. 4cf4ce0ca
+  Shell foot: bounded_foot within two walls before OCCT's global search (impeller Shell Gehäuse 199 -> 183 ms Mac). And
+  + 14. 05e180ea5 the Shell race fix (as 7378bd2c) + 15. 4d499486d NurbsCurve::param_of keeps its sample points per span
+  run (rings-loft 51-slot cut 331fd52c 246 -> 211 ms Mac, same result) + 16. c0a72a695 Shell's add_pcurve keeps a
+  surface's ShapeAnalysis_Surface per thread (impeller Shell Gehäuse 235 -> 199 ms, same result). Then private docs
+  (udoc-ab8.sh c0a72a695), list relabelled / seam cases per condition (c), knurls ours-only, land, tell dx (2108c2b7-2f48-43a7-87a0-3f652e3cda6d),
+  core (d30002ca-d013-4435-b7d9-7da9cb564cec since 11-18 ~11:00), blend (de66e481-56e2-4005-a5d3-9fa897ca5fde), asm. Branch bool-shared2 (bool-hat) on main f6274d94e, 13 commits, all g++-13 OK:
+  17. offset_as_bspline keeps its last 32 fits (impeller Boolean 2 55 -> 35, Boolean 3 41 -> 21 ms Mac; doc's fits
+  587 -> 330 ms; kernel T1 496/496).
+  1-10. as before: e61278b1d usd room; 8a9351e4b shared shapes (lead conditions (a) suite identical, (b) hats/dock
+     SAME, (c) replay label-only by case, (d) split_names T1); a1d7ca0b4 + 65befe285 NURBS piece boxes; 51ee7c1cb unify
+     room order; 0b17fee66 par_map_by cancel; 26ce2dffa fuse_glued mirror normal; b11d72be6 gap() (pulleys seam
+     decline); 29bcd92a8 pattern clearance once + seam_cuts hull spans; 07ce00475 moved curves keep span lengths;
+     934af8abb located mirror images not fused glued.
+  11. 26dcc8ec7 (was f88eb782e) a04711 Extrude 4: non-manifold cut retried on text-round-tripped copies (lead 11-18:
+     land; commit body names live's JT6 sliver, P3 A04711-TOOL-SLIVER in TICKETS).
+  12. 8ba7c6dcc strips (lead 11-18: match live's 1e-5): drop_strip_faces / collapse_short_edges / without_strips on
+     every op_boolean path; unify keeps merges whose pieces lie on the merged surface (pieces_within, 1e-7) within 1e-8
+     of the volume. e54410 Extrude 22 14 faces as live; 850efe Extrude 5 36 as live, doc 300 s -> 1.7 s, 12/18.
+     Not matched: q-union-merge's overlap variant (face coincidence, not a strip; ours 8/18/12 tops 90/100, live
+     8/22/16 tops 100/90). OCCT fuzzy 1e-5 gives live's faces there, but over the corpora (5873 cases) parallel
+     planes 1e-7..1e-5 apart overlapping occur in 7 only, and fuzzy there drops faces (2), leaves 7 faces unmerged
+     (3) or empties a parity56 cut (ce4e3c99): not taken. Detector: /root/bool-scratch/near-planes-detector.diff. 850efe Extrude 6 33 vs 28 (live
+     merges with 2e-6 of volume change: not ours to take). Kernel T1 496/496 on the Mac.
+  13. b5b566884 fan-blade P0: an offset face grazing another argument's circle declined first (offset_grazes_a_circle,
+     rust_boolean.cpp): 36 -> 0.4 ms on the Mac; not where one of its edges lies on the circle (impeller halves).
+  cf-surface-pattern 385 vs 386 edges: its Booleans identical branch vs main (the gate's same-base pair decides).

@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-19 02:58 UTC. Hosts (lead 11-18/19): builds + probes on the Mac (NOSHAPE_RB_HOST=mac; corpus replays / A-Bs
+Updated 11-19 03:33 UTC (moved to the Motile account: continue from here). Hosts (lead 11-18/19): builds + probes on the Mac (NOSHAPE_RB_HOST=mac; corpus replays / A-Bs
 there only inside an rb.sh slot, else vibex8; Mac paths ~/noshape-host/...), gates on vibex7
 (NOSHAPE_GATE_HOST=vibex7 via /root/bool-scratch/gate-chain-own.sh <sha> as a systemd-run unit; off 02:00-04:00);
 land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs vibex7 ~/lead-private (hat8, hat15, hat15b,
@@ -28,20 +28,35 @@ Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are interna
 ## In flight
 - Share (DECISIONS 15c2c6406, report this way): ours 3121/3477 (89.8%: general Boolean 3026, direct builds 95), OCCT
   356, differing 6 (main 548d795fb's gate replay; local = OCCT on fewer faces, counted as OCCT).
-- LANDING: the fold fix alone (spur-gear P0, qa's bisect on afe2cbe90): bool-p0 cherry-picks 9301d9bc3 + fb602bac0
-  on main ce88e6672, QUEUED bd009a26 (lead 02:45: on the vibex7 gate's evidence, reasoning in the commit body). On
-  land: send qa the main sha (re-time vs v0.4.58).
-- GATE unit bool-gate-2c6b920fc on vibex8 (02:43, slot queue) -> /root/bool-hat-scratch/chain-2c6b920fc.out: branch
-  bool-stack3 (bool-hat) = main ce88e6672 + fold fix + 34 commits: the old stack without the two reorder commits
-  (87df02e54 local after ours, bf73854d9 on_face / through_holes after ours: same geometry, slower (on_face 2.2 vs
-  ours 19.5 ms), history differs from the recorded direct builds; lead 02:20 agreed to drop them) and without
-  bb10c3fe5 (main has an offset-fit cache already); wire-clip layers (WIP prefixes removed; lies_on, narrow strip,
-  coaxial cylinders, seam arc, cylinder other points, fuse strip covered: 6f38f as live, exception in the wire-clip
-  corpus's `live` file (live/bool/wire-clip-sliver.txt), corpus added to gate-host.py); and 4 new: ±π vertex
-  directions (arrange.rs; corpus2 553beda0 in 6 corpora, corpus5 6a8804ab, 4 shfall), cone apex places within tol
-  (corpus4 e72bf433), line commons past distant B-spline edges / faces (16 bool-corpus), plane vs curved sheets'
-  common empty (11 bool-corpus). Mac A/B of the ±π fix: no new differences. Land when green (lead).
+- LANDED 03:13: the fold fix alone (spur-gear P0): 373dd5b9 (e2b5c3c0e + c8d3a4734). qa re-times cf-spur-gear on the
+  first green with c8d3a4734 after vibex7's quiet window (~04:00), 7 alternating runs vs v0.4.58, numbers to bool.
+- RUNNING: unit bool-gate-2c6b920fc (systemd, vibex8 slot queue since 02:43; builds then replay + suite) ->
+  /root/bool-hat-scratch/chain-2c6b920fc.out (verdict, "CHAIN DONE rc N"), detail
+  /root/bool-tube-scratch/gate-2c6b920fc.log. It gates bool-stack3 up to 2c6b920fc. Green -> land bool-stack3 (lead:
+  as usual) from bool-hat: `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh` (rebases; its old fold commits drop as
+  already on main). Then gate 97ed541ac (bool-stack3's tip, one commit more: a cylinder face's bound puts a straight
+  edge at its seam's angle on its loop's side; parity56 b1c8abed / bb3bb5a1; Mac A/B in a slot: only those 2 changed)
+  and land it. On land: private docs, tell dx / core / blend / asm.
+- bool-stack3 (bool-hat, 37 commits on main): the old bool-shared2 stack without the two reorder commits (87df02e54
+  local after ours, bf73854d9 on_face / through_holes after ours: same geometry, slower (on_face 2.2 vs ours 19.5 ms),
+  history differs from the recorded direct builds; lead 02:20 agreed to drop them) and without bb10c3fe5 (main has an
+  offset-fit cache already); the wire-clip layers (lies_on, narrow strip, coaxial cylinders, seam arc, cylinder other
+  points, fuse strip covered: wire-clip Boolean 2 6f38f ours, 945/2879 vs OCCT 946/2880; live has no sliver face
+  (live/bool/wire-clip-sliver.txt), exception in the wire-clip corpus's `live` file on vibex7 + vibex8
+  (~/agents/bool-corpora/wire-clip, local copy /root/bool-scratch/wire-clip), corpus added to gate-host.py REPLAY;
+  then flag live's 884/2405 vs our 945 faces to core); and 5 decline fixes, all = OCCT: ±π vertex directions
+  (arrange.rs; corpus2 553beda0 in 6 corpora, corpus5 6a8804ab, 4 shfall), cone apex places within tol (corpus4
+  e72bf433), line commons past distant B-spline edges / faces (16 bool-corpus), plane vs curved sheets' common empty
+  (11 bool-corpus), cylinder bound side (97ed541ac). bool-wireclip / bool-shared2 are superseded by it.
   The failed vibex7 gate of a6a83073f (the old stack): /root/bool-tube-scratch/gate-a6a83073f.log.
+- Uncommitted, kept out of commits by rule: bool-hat's crates/kernel/tests/all.rs probe line and untracked
+  xprobe.rs (PROBE_SURF / PROBE_BOX / PROBE_HDUMP) / sampler.rs. Scratch diffs: traces
+  /root/bool-scratch/stack3-traces5.diff (DBGNM / DBGP / DBGF / DBGTE / DBGLOST, env-gated), pair-tolerance touch
+  tests /root/bool-scratch/touch-dbg.diff (882bad, parked), tolerant-end split /root/bool-scratch/tilt-split.diff
+  (parked).
+- Mac rule (lead 11-19): corpus replays and A/Bs on the Mac only inside an rb.sh slot (`NOSHAPE_RB_HOST=mac
+  tools/tiers/rb.sh bash -c 'cd ~/noshape-host/bool-keep; ...'`; the Mac runs at most two jobs), else on vibex8. Mac
+  paths ~/noshape-host/... (no ~/agents there). vibex7: nothing new 02:00-04:00 (qa's quiet window).
 - The 356 by reason (main 548d): shared shape 74 (the stack's e9b6efecc / 8a9351e4b take 46), non-manifold 31
   (mine done: 2 fixed; 7 have B-spline faces (bool2); 4 truly touch along an edge (a cylinder tangent inside a
   face, edge-to-edge fuses), 2 an invalid tool), short section from a corner 30 (bool2), near two vertices 19
@@ -58,35 +73,6 @@ Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are interna
   declines "a piece's point on another solid's face"), wire-clip / gamma Boolean 1 (87-tool fuse, ours "cylinders
   nearly coincident", OCCT 2.0-2.9 s) and Boolean 2 (23 tools, "piece's point on another solid's face"). Cases Mac
   ~/noshape-host/bool-keep/rec-<doc>; trace /root/bool-scratch/dbg-near-on.diff (DBG_ON / DBG_NEAR2, scratch only).
-- Earlier gates of the stack: /root/bool-hat-scratch/chain-{4cf4ce0ca,8086f188b}.out. bool-hat rebased on main 1e21f28e8: the 13 below +
-  14. Shell race fix (on main as 7b8bb249) + 15. param_of cache + 16. Shell add_pcurve analysis cache + 17. offset fit
-  cache + 18. volume_possible's cut lower bound + 19. project_along tangent-corner sliver (britatap) + 20. 4cf4ce0ca
-  Shell foot: bounded_foot within two walls before OCCT's global search (impeller Shell Gehäuse 199 -> 183 ms Mac). And
-  + 14. 05e180ea5 the Shell race fix (as 7378bd2c) + 15. 4d499486d NurbsCurve::param_of keeps its sample points per span
-  run (rings-loft 51-slot cut 331fd52c 246 -> 211 ms Mac, same result) + 16. c0a72a695 Shell's add_pcurve keeps a
-  surface's ShapeAnalysis_Surface per thread (impeller Shell Gehäuse 235 -> 199 ms, same result). Then private docs
-  (udoc-ab8.sh c0a72a695), list relabelled / seam cases per condition (c), knurls ours-only, land, tell dx (2108c2b7-2f48-43a7-87a0-3f652e3cda6d),
-  core (d30002ca-d013-4435-b7d9-7da9cb564cec since 11-18 ~11:00), blend (de66e481-56e2-4005-a5d3-9fa897ca5fde), asm. Branch bool-shared2 (bool-hat) on main f6274d94e, 13 commits, all g++-13 OK:
-  17. offset_as_bspline keeps its last 32 fits (impeller Boolean 2 55 -> 35, Boolean 3 41 -> 21 ms Mac; doc's fits
-  587 -> 330 ms; kernel T1 496/496).
-  1-10. as before: e61278b1d usd room; 8a9351e4b shared shapes (lead conditions (a) suite identical, (b) hats/dock
-     SAME, (c) replay label-only by case, (d) split_names T1); a1d7ca0b4 + 65befe285 NURBS piece boxes; 51ee7c1cb unify
-     room order; 0b17fee66 par_map_by cancel; 26ce2dffa fuse_glued mirror normal; b11d72be6 gap() (pulleys seam
-     decline); 29bcd92a8 pattern clearance once + seam_cuts hull spans; 07ce00475 moved curves keep span lengths;
-     934af8abb located mirror images not fused glued.
-  11. 26dcc8ec7 (was f88eb782e) a04711 Extrude 4: non-manifold cut retried on text-round-tripped copies (lead 11-18:
-     land; commit body names live's JT6 sliver, P3 A04711-TOOL-SLIVER in TICKETS).
-  12. 8ba7c6dcc strips (lead 11-18: match live's 1e-5): drop_strip_faces / collapse_short_edges / without_strips on
-     every op_boolean path; unify keeps merges whose pieces lie on the merged surface (pieces_within, 1e-7) within 1e-8
-     of the volume. e54410 Extrude 22 14 faces as live; 850efe Extrude 5 36 as live, doc 300 s -> 1.7 s, 12/18.
-     Not matched: q-union-merge's overlap variant (face coincidence, not a strip; ours 8/18/12 tops 90/100, live
-     8/22/16 tops 100/90). OCCT fuzzy 1e-5 gives live's faces there, but over the corpora (5873 cases) parallel
-     planes 1e-7..1e-5 apart overlapping occur in 7 only, and fuzzy there drops faces (2), leaves 7 faces unmerged
-     (3) or empties a parity56 cut (ce4e3c99): not taken. Detector: /root/bool-scratch/near-planes-detector.diff. 850efe Extrude 6 33 vs 28 (live
-     merges with 2e-6 of volume change: not ours to take). Kernel T1 496/496 on the Mac.
-  13. b5b566884 fan-blade P0: an offset face grazing another argument's circle declined first (offset_grazes_a_circle,
-     rust_boolean.cpp): 36 -> 0.4 ms on the Mac; not where one of its edges lies on the circle (impeller halves).
-  cf-surface-pattern 385 vs 386 edges: its Booleans identical branch vs main (the gate's same-base pair decides).
 - a04711 notes: Part 3 = live's faces / volume / area but 8/17/11 vs 9/22/15 (live's 10 um JT6 sliver; the rounded
   retry's other firings, Extrude 23 / 27, are rejected and stay errors). The doc's 19.9 s vs live 1.93: fillets on
   parts off from Extrude 1 (asm's). Repro vibex8 ~/agents/asm-keep/ma04; dumps ~/tmp/bool/a04-box.log.
