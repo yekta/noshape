@@ -2190,6 +2190,15 @@ selection, measure, section view; then P2 assembly and drawing passes; verify th
    Measure angles: pass (live2's first-wedge capture: 56.31 for slope + x=40). Face+edge menu (591643fc) not re-run yet.
 
 ## 11-19 day states (moved from the handoff 11-19 21:15)
+0x. **Speed sweep (lead 07:45, done 08:53)**: bin/speed-sweep.sh <sha> (SKIP_BUILD=1 reuses vibe2 ~/agents/qa-speed/target, 7.9 GB):
+   release build on vibe2, corpus A/B there + user docs / dock tab on vibex7, ab-feat2.py two passes, bin/speed-sum.py <dir> pass|ud.
+   80a64725 vs v0.4.57: no regression (TICKETS 364fac560). A/Bs ran outside the slots at nice 10 (both slots queued ~2 h).
+   v0.4.58 published check 08:28-08:4x: SHA OK, user docs SAME, quit 5/5, baseline -> 0.4.58.
+1. **17:00 cut (11-18): GO 16:40 on green 515102325 -> v0.4.59** (TICKETS 1f4521120; lead: ship, fix FORM-PREVIEW-SLOWER forward, skasm's
+   app A/B ~17:40). qa-wait-5151 (bin/wait-compat.sh) alerts when 51510232's ticket / authored / corpus sections finish (new DIFF vs the
+   known five -> lead at once). Impeller: core's 27b7836e0 lost the main body at feature 47 (bin/walk-parts.py, p47.py, bis47.sh: release
+   CLIs on vibe2 -> vibex7 ~/tmp/qa/apps/noshape-bis); reverted 125e4d410. After the publish: `systemd-run --unit qa-pub-0459 -E HOME=/root
+   -E PATH=$PATH bash /root/qa-scratch/bin/rel-pub-all.sh 0.4.58 0.4.59 /home/ngyekta/qa-speed/bin/noshape` (the compat app = 51510232;
 00. **11-19 07:40 state.** v0.4.60 cut GO (fafc4a25, 04:42); cherry-picks c6b003415 + 5e04baac1 OK'd. Spur gear verified 07:28 (vibe2,
    7 alternating: 1.03x v0.4.58; speed/sg-ab-vibe2.sh, ab-feat2.py from bin/). Pending: qa-dx-prewarm (heavy/dx-prewarm.sh): when dx's
    f1e0c74e lands (by subject), release apps of it + parent on vibex7, asm-xdev-subs first tab x3 alternating on local :154 -> P0 to psui +

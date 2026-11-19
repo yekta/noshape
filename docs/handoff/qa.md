@@ -56,10 +56,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    on the released app (vibex6, slot), then the compat baseline moved. Then bin/rel-compat.sh <prev> <v> (released CLI vs
    the previous release) -> compat/rel-<v>.txt; any user-document worse = P0 to the lead at once.
 3. The app spot-check rows (archive "Release checks: the app spot-check list"): user cases + 8 interaction-feel rows in
-   rotation (next: rows 17-24).
+   rotation (next: rows 33-40).
 4. Hover flow (lead 11-17 22:20, every release): uh/uh2.sh <release app> <out> on vibex6 Xvfb, 3 runs, xsheet.py for the sheet;
    USER-HOVER-STAYS-LIT is listed as known in the cut's entry until psui's latest-wins picking fix passes 3 clean runs.
-- **v0.4.57** published check done 11-17 21:44: clean, baseline 0.4.57. Next: the 05:00 cut (qa-cut-0415).
 
 ## Next (in this order)
 00b. **Night order (lead 11-19 03:45)**: qa-night-seq-1120 (flow/night-seq.sh latest 1120): 02:00 big document -> session replay ->
@@ -165,10 +164,6 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    driver's state-read redraw (all builds), so "settle" flips 200 / 800 ms; tabrel now reports psui's "tab drawn (2nd frame)" and the
    last frame over 10 returns (5 rounds), and lat-steps.py ends settle at the first "driver" event (logged once psui's 3de2cd04 lands;
    v0.4.53 has none, so compare the 2nd frame across builds). psui's A/B: 2nd frame fix 224 / 0.4.53 218 / green 321 ms.
-0x. **Speed sweep (lead 07:45, done 08:53)**: bin/speed-sweep.sh <sha> (SKIP_BUILD=1 reuses vibe2 ~/agents/qa-speed/target, 7.9 GB):
-   release build on vibe2, corpus A/B there + user docs / dock tab on vibex7, ab-feat2.py two passes, bin/speed-sum.py <dir> pass|ud.
-   80a64725 vs v0.4.57: no regression (TICKETS 364fac560). A/Bs ran outside the slots at nice 10 (both slots queued ~2 h).
-   v0.4.58 published check 08:28-08:4x: SHA OK, user docs SAME, quit 5/5, baseline -> 0.4.58.
 0w. **Workflow feel vs live (07:38)**: TICKETS "Workflow feel vs live's 11-18 07:09-07:22 timings": ours faster on every row, no
    tickets (qa-scratch/wf: wflat.py on this host's Xvfb :153, two-blocks reopened without the runner, PIL crops padded to live's
    139 ms, timestamps at capture). FEEL-FL-AUTOSCROLL-DROP verified 07:21 (b5c4ccc4), psui told. psui's next land has ROW-DBLCLICK.
@@ -178,12 +173,6 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 0b. **LOADED runs (lead 21:50)**: speed / timing at load > 16 (2 x 8 cores) don't count. suites-diff.py prints "LOADED: …" first,
    skips speed lines and tags timing scenarios "(LOADED)"; qa-suites.sh touches <run>/LOADED and alerts. Absolute speed only from
    the 02:00-04:00 nightly. The 21:03 run (vibex7, load ~60) and 11:19 run (load 19) are LOADED.
-1. **17:00 cut (11-18): GO 16:40 on green 515102325 -> v0.4.59** (TICKETS 1f4521120; lead: ship, fix FORM-PREVIEW-SLOWER forward, skasm's
-   app A/B ~17:40). qa-wait-5151 (bin/wait-compat.sh) alerts when 51510232's ticket / authored / corpus sections finish (new DIFF vs the
-   known five -> lead at once). Impeller: core's 27b7836e0 lost the main body at feature 47 (bin/walk-parts.py, p47.py, bis47.sh: release
-   CLIs on vibe2 -> vibex7 ~/tmp/qa/apps/noshape-bis); reverted 125e4d410. After the publish: `systemd-run --unit qa-pub-0459 -E HOME=/root
-   -E PATH=$PATH bash /root/qa-scratch/bin/rel-pub-all.sh 0.4.58 0.4.59 /home/ngyekta/qa-speed/bin/noshape` (the compat app = 51510232;
-   check it still is), then the spot-check rows 17-24 and the hover flow. cut-must.txt: clear it for the 05:00 cut.
 2. **User-flow timings (lead 18:00)**: qa-scratch/flow: mkflow.py (block: sketch on a face / Fillet / Extrude; two-blocks: tab +
    Fastened mate; block-drawing-empty: Insert view, base + projected placed; one file per round, the runner stops at 180 s), flow.sh
    (frame log + lat-steps.py, flowsum.py). Unit qa-flow-night runs it in the 02:00 window after NIGHTLY-DONE on v0.4.59 (vibex7 :673)
