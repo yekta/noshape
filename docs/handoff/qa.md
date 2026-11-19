@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 23:56)
+# QA handoff (agent qa; current state only, updated 2026-11-19 23:51)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -56,7 +56,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    on the released app (vibex6, slot), then the compat baseline moved. Then bin/rel-compat.sh <prev> <v> (released CLI vs
    the previous release) -> compat/rel-<v>.txt; any user-document worse = P0 to the lead at once.
 3. The app spot-check rows (archive "Release checks: the app spot-check list"): user cases + 8 interaction-feel rows in
-   rotation (list done; next round from rows 1-8. Documents page + tabs = on f6f8069f 23:56 (spot49 8/8 21/21); 41-48 (sketch colours, drawings) = on green f6f8069f 23:50, suites/1119-2348-green-
+   rotation (list done; next round from rows 1-8. Documents page + tabs = on f6f8069f 23:51 (spot49 8/8 21/21); 41-48 (sketch colours, drawings) = on green f6f8069f 23:50, suites/1119-2348-green-
    spot41 8/8 46/46 drw-dimension/note/projected/view-drag; free sketch line + ends blue by hand; 33-40 on 615bed1f 23:17).
 4. Hover flow (lead 11-17 22:20, every release): uh/uh2.sh <release app> <out> on vibex6 Xvfb, 3 runs, xsheet.py for the sheet;
    USER-HOVER-STAYS-LIT is listed as known in the cut's entry until psui's latest-wins picking fix passes 3 clean runs.
