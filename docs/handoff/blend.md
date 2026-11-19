@@ -7,29 +7,27 @@ fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_cha
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-19 00:35)
+## Now (11-19 02:45)
 
 - Background runs MUST be systemd units (`systemd-run -E HOME=/root -E PATH=$PATH`): `( ... &)` jobs die at turn end.
   Probe scripts (bin/): k-probe-x8.sh <crash_inputs test> [ENV], m-probe-x8.sh <features_c test> [ENV] (blend10 on
   vibex8), imp-dump-x8.sh (impeller NOSHAPE_DUMP_OPS -> vibex8 ~/tmp/blend/idump), weld-x8.sh (welding pair + dumps),
   ab-f3-mac.sh / ab-obb-mac.sh (Mac A/Bs). Logs logs/*.out. Mac: two slots (~/noshape-host/env.sh).
 - Order (lead 11-19 00:00): (1) impeller Fillet 3 speed, (2) spring (done: = live), (3) asm-suspension 995636.
-- Fillet 3 (Mac, impeller regen 2x per run): ~2.05 s vs live 0.10. d6f4e8a8d (blend9, branch blend-f3speed2): body face
-  boxes once, touches threaded, cell count instead of volumes, conic run-on skips the direct build (Mac A/B 2328 ->
-  2084 ms, same results). Gate bin/seq-f3sp.sh (unit blend-seq-f3sp, vibex7 slot): suite-x7-f3sp{base,}.log, .cmp,
-  ud-f3sp.log, g13-f3sp.log, f3sp.done; land if only speed differs. Tried, no gain (dropped): box-pruned touches
-  (A/B 2), OCCT OBB in the cut (798 -> 600 edge/face pairs, same time). Left: OCCT cut ~800 ms + trims ~700 ms; 2x
-  needs the two conic rounds and their ridge without the solid-tool Boolean (multi-day).
+- Gates on vibe2 (vibex7 off 02:00-04:00 for qa): bin/seq-v2.sh (unit blend-seq-v2): suites base blend4 (9268e0dd9),
+  blend9 (Fillet 3 speed d6f4e8a8d), blend6 (welding Fillet 5 b47029395 alone on 9268e0dd9) -> suite-v2-*.log/.cmp,
+  g13-f3sp/wf5.log, v2.done; then bin/ud-after4.sh on vibex7 after 04:05 (unit blend-ud4) -> ud-f3sp.log, ud-wf5.log.
+  Land each alone when its compare is identical but for its own change.
+- Fillet 3 (Mac): ~2.05 s vs live 0.10; d6f4e8a8d -240 ms same results. Tried, no gain: box-pruned touches, OCCT OBB.
+- Welding Fillet 5 (b47029395, T1 features_c::a_plates_outline_round_ending_under_a_tubes_rim_as_live): OCCT's fillet
+  fails at the chains' top ends; rolling balls after OCCT fails (detail.rs), a circular round's run-ons trimmed by
+  closed_run_on then built directly (blend_section.rs), blend_direct skips a tangent chain's next support (touched only
+  at the joint). 14709.68 mm3 (live 14709.73), 48 faces vs live 42: live makes one face per curvature-continuous run
+  (line + 2 B-splines + line G2): to do after live's capture (q-weld-f5) confirms.
 - Other impeller blend gaps (Mac vs live): Fillet Bohrungssitz Ansaugflasch ~1.0 s vs 0.25 (scaled retry 310 +
   fillet_split_closed 333 fail, fillet_by_groups builds it in 77; dumps vibex8 ~/tmp/blend/idump, last fillets),
   Fillet 4 0.38 vs 0.09, Fillet Flansch zum Stroemungskanal 0.35 vs 0.07 (direct tools 230), Chamfer Stevenrohr
   Halterung 0.30 vs 0.016.
-- asm-welding-config 5c8dc1 Fillet 5 (Part 2, R 2.54 on both plates' outer outlines, 16 edges, 2 tangent chains;
-  input = live's Extrude 6, vibex8 ~/agents/blend-keep/weld-f5.brep; probes features_c::zz_fillet_dump,
-  crash_inputs::zz_occt_sets): OCCT's faulty vertices are the chains' top ends (14.942, +-11.817, -6.35), where each
-  plate's corner sits on the tube's bottom rim (r 19.05, a 0.6 mm2 sliver face, concave edges on). Live 32 -> 42 faces:
-  one blend face per curvature-continuous run ([21] [30] [29 28 27 26] [25] [24]: line-B-spline-B-spline-line are G2).
-  Needs the round's end at that corner + G2 runs joined (~2 days). 9c7704 Fillets 1/4 now match.
 - asm-suspension 995636 Fillet 3: our Loft 1 is twisted (Piston side faces degree 5 vs 7, the z sides bulging to
   y 12; live symmetric 85.6 x2 / 125.1 x2): core's (told). Input vibex8 ~/agents/blend-keep/susp-fillet-44.brep.
 - PARKED (lead 23:05) Halter: Fillet 3's tip must be at x 0.097 (live) for Halter's input. Live (q-imp-chamfer-surf):
@@ -122,52 +120,8 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 
 ## Next, in order
 
-1. NOW (lead 11-18 17:xx): (a) land the full round (gating), (b) Halter = Fillet Stevenrohr zum Halter (P1, impeller's
-   first difference; blocks core's Move face 2 / Delete face 2), (c) c2-extension-spring Fillet 1 (10/24/16 vs live
-   11/27/18), then Fillet 3's direct-build end trimming (multi-day).
-   Landed 11-18: 7c60d5ea impeller Fillet 4 (cliff rounds on curved edges; T1 features_c::a_round_wider_than_a_
-   curved_flange...), 51510232 its face reach by projection (Mac 612 -> 370 ms), 270e489b by-tools direct build checked
-   once (snap-hook Fillet 6 25 -> 23 ms; the rest is 40 cone x torus IntSS 5.9 ms, axes parallel 50-230 mm apart: left).
-   (a) blend-fullround 16a7b76ae (blend10 branch; blend-base detached at it): op_full_round_coaxial (blend_direct.cpp):
-   a bore's FULL_ROUND by face replacement (half torus revolved from the profile arc, the sides' loops replaced by its
-   circles, only new faces + shells checked), torus renamed as the Boolean's tool face; motor-mount-jack Fillet 2 Mac
-   9 -> 2 ms x5 (live 3), 10/10; T1 kernel_robustness::a_full_round_of_a_bore_or_a_boss_is_a_half_torus passes.
-   Gate: unit blend-seq-fr2 (bin/seq-fr.sh): suites blend4 (main) / blend-base on vibex7 -> suite-x7-fr{base,}.log,
-   .cmp, g13-fr.log, fr.done. Land when only motor-mount... differ in speed (identical results).
-   (b) Halter: branch blend-halter (WIP 663 lines on af331f85e); first look upstream: Chamfer Halterung's bevel (f26)
-   foot at 0.21 mm tolerance, bevel faces 6.097 vs live 6.18 mm2, tip x 1.502 vs live 0.097.
-   qa 11-18 Mac re-time (main): snap-hook Fillet 6 25/8, motor-mount Fillet 2 9/3 (now 2), others within 1.5x.
-   (b) Fillet 3 on main (Mac, 3 runs): 2269-2277 ms (live 103). Profile (logs/imp3-prof.log): op_boolean x3 884 ms
-   (OCCT edge-face 594), min_distance x149 339, bounding_box x339 251, op_split x10 223, blend.direct 132 (declined:
-   open shell, 20 free edges at the rounds' ends x 0 / 78.9 and x 1.5-5), unify 73. Path: the conic's untrimmed ball
-   tools go to the direct build (fails), then closed_run_on + Booleans. Next: make the direct build take the
-   closed_run_on-trimmed tools (or close its ends) so the Booleans go. Same run: Chamfer Stevenrohr Halterung 272 (live
-   16-20), Fillet Bohrungssitz 938 (242), Flansch zum Stroemungskanal 137 (66.5), Fillet 1 74 (39), einnschub 55 (30),
-   Delete face 2 226 (12, core's?).
-   bool 11-18: the Boolean's 680 of 720 ms are 4 edge/face pairs (135-150 ms each): the housing's 141 / 144 mm B-spline
-   edges round its offset face F2 against each tool's strip face lying on F2's surface (another handle and basis);
-   bool's Rust Boolean declines for the same reason. Mac cases ~/noshape-host/bool-keep/imprec. The direct build avoids
-   it: its dump replays in 180 ms (blend10 patch parked/zz-dump-direct.patch: ZZ_DUMP_DIRECT=<dir> on a run,
-   crash_inputs::zz_direct with ZZ_DIRECT=<file>; Mac dumps ~/noshape-host/agents/blend10/f3d/direct-1.brep). Open
-   shell: the tools run x -1.5..78.97 untrimmed; sections blend x part faces 8 / 18 (the 6.10 mm2 chamfer faces live's
-   rounds end on) and the (8 x 6) / (9 x 0) pairs give 0 lines. Lead 12:4x: setback fillet -> core (sent); order: land
-   f4 + speed, then Halterung (rim_chamfer_cut 230 ms: tool 70 = 3 lofts + 3 Booleans, cut 95, unify 31, 2 checks 21;
-   needs the same end trimming for live's 16-20), Bohrungssitz (938 ms all OCCT fallbacks failing on a wrong input:
-   3 parts vs live 1 upstream: skip), then this end trimming.
-   Direct-build ends (blend10 branch blend-direct-ends 00e3410af = dump patch + probes; parked/direct-ends-wip.patch):
-   pairing every face a blend's box meets (ZZ_ALLNEAR; today only faces beside its supports) + keeping a ridge section
-   whose run-on to a vertex won't project gets to the sew, still open. But the untrimmed tools run on to the part's end
-   (x 79) while live's rounds stop at x 54.7-61 on the first faces met (closed_run_on's walls): the design is to trim
-   each tool's run-on at its first walls (the wall's surface extended, analytically, no op_split / Booleans), then
-   hand the trimmed tools (end caps on the walls) to the direct build. Chamfer Halterung: cheap trims (one Common with
-   slab ∩ stop, one validity check) measured 270 -> 268 ms and the doc +150 ms: dropped (zz-blend-chspeed-dropped).
-   (b2) Merged-body Fillet 3 (bool2's fillet-26) recheck: still to do.
-   (e) lead 11-18: Fillet Bohrungssitz Ansaugflasch (f48, last feature) text 'Unfilleted edge overlapped by fillet.'
-   (v0.4.58) -> 'Failed to fillet selections.' (main): its input moves with every upstream change; the text is whichever
-   fallback fails last (fillet_failed maps OCCT's "unfilleted edge overlapped"). Live builds it; both are wrong.
-   (f) live 11-18: cf-setback-fillet Setback Fillet 1 (custom: opSplitFace x2 + opDeleteFace + std fill() G1, 3 corners):
-   ours A 4117.54 vs live 4116.42 mm2 (V 18858.78; corner B-splines 26.07 / 26.98 / 34.46 mm2). Likely the Fill
-   (core's surfaces.rs) -> measure our 3 patches, then hand to core or take it. live/suite-truth-1118/cf-setback-fillet.json.
+1. Done 11-18/19 (history in the archive): full round, impeller Fillet 4 + speed, Fillet 3 speed d6f4e8a8d (gating),
+   welding Fillet 5 b47029395 (gating). Fillet 3 2x needs the direct build of the conic rounds' ridge (parked, lead).
 2. Halter (multi-day, lead; land in gated steps; tests: Fillet Stevenrohr zum Halter, core's Extrude impellerraum
    input). Branch blend-halter (blend10). tighten_tolerances does NOT land (one more raw face behind equal shown
    counts); keep it only if Halter needs it.
@@ -185,17 +139,12 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
    so they cross the supports transversally only where the part is thick, or trim fill 3 against the body first.
    Debug prints ZZ* / ZZ_INTO to strip before landing. Paused 11-18 05:50 for the lead's order (item 1). Branch
    blend-halter in blend10, last commit 2a74a13b1 (+ handoff commits).
-3. P2 asm: GearLab 1e81ca opFillet FILLET_FAILED (repro vibex7 NOSHAPE_FS_TRACE=1 NOSHAPE_PARITY_MODELS=
-   ~/agents/asm-keep/m1e ~/agents/asm-keep/bin/ops-c03 parity::parity_models); isaac-ball a2e4a2 f23 Chamfer 2
-   (one edge, TWO_OFFSETS 5.5/6, oppositeDirection false, tangentPropagation true; ours 51/124/68 40986.25 vs live
-   53/126/68 41594.02: 608 mm3 more removed, 2 faces fewer; Extrude 12 then leaves 403 of 40911, ~24 isaac mates lost
-   incl. Fastened 33; repro vibex8 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/ma2 ~/agents/asm-keep/bin/ops-c19
-   parity::parity_models --ignored --nocapture, trace ma2/tr19.log l.105); asm 21:5x: c3fdd4 (isaac Part 2 <7>) f11
-   Fillet 1 "Failed to fillet selections." (live OK), reachable after asm's Extrude 7 fix; repro vibex8
-   ~/agents/asm-keep/mc3. Also e54410 f51 Chamfer 1 (Part 1, one edge, TWO_OFFSETS 2/5, tangentPropagation true)
-   "Failed to chamfer selections." (live OK; before 46/116/68, live after 47/119/70, ~138 mm3 off): likely the same
-   TWO_OFFSETS cause as a2e4a2; costs Ball 13/14, Revolute 17; repro vibex8 ~/agents/asm-keep/me5 (bin/ops-c21,
-   trace me5/tr.log).
+3. asm (live captures asked 11-19, live/REQUESTS): isaac a2e4a2 f23 Chamfer 2 (TWO_OFFSETS 5.5/6 on the pocket rim at
+   x -209: ours -568 mm3, live +39.86 mm3 with counts unchanged: which edge?), e54410 f51 Chamfer 1 (TWO_OFFSETS 2/5 on
+   the R 10.5 arch arc; ours fails; ZZ_SAMEANGLE through sections -154 mm3 / 49 faces vs live -138 / 47: the ends' run-out).
+   Repros vibex8 ~/agents/asm-keep/ma2, me5 (bin/isaac-x8.sh, e54-x8.sh; probe features_c::zz_chamfer_dump). c3fdd4
+   Fillet 1 waits on its Extrude 7 (asm). GearLab 1e81ca -> bool2 (11-19): the teeth Union leaves edge 377 with 4 faces
+   (non-manifold), every OCCT fillet of it fails; dump vibex8 ~/tmp/blend/gdump/fillet-var1-15, repro blend-keep/m1e.
 3a. After Halter (lead 11-18): impeller Fillet 3 on bool2's merged body (33 faces, the two r 10 cylinder halves one face,
    as live after Chamfer 26) fails "unfilleted edge overlapped by fillet" in OCCT's path (live 34/99/66, 71096.12 mm3).
    Input vibex8 ~/agents/bool2-keep/fillet3/fillet-26.{brep,txt}: edge 81 (full circle r 6, centre (120,0,-34) mm, axis
