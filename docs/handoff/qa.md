@@ -62,6 +62,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - **v0.4.57** published check done 11-17 21:44: clean, baseline 0.4.57. Next: the 05:00 cut (qa-cut-0415).
 
 ## Next (in this order)
+00b. **Night order (lead 11-19 03:45)**: qa-night-seq-1120 (flow/night-seq.sh latest 1120): 02:00 big document -> session replay ->
+   everyday flows, then nightly/flows-done-<mmdd>; qa-w7-nightly waits for that flag (03:20 at the latest) before hat15 / dock;
+   user flows after NIGHTLY-DONE. Re-arm each night with the next date. Cut verdict: a must-carry still queued reads PENDING
+   at :15 and HOLD only if missing at :50 (timers qa-cut-0450 / 1650). qa-big-after fetches tonight's big run and fixes its fetch line.
 00. **11-19 03:50 state.** Spur gear: bool's fold fix e2b5c3c0e + c8d3a4734 (in 373dd5b9); qa-sg-fixwait (sha file speed/sg-fix.sha)
    builds the first green with it on vibe2, then from 04:20 (after the cut verdict) under qa-host.lock + slot: 7 alternating runs vs
    v0.4.58 on vibex7 -> qa-alerts; send to bool + lead. qa-wait-region (session/wait-region.sh): first green with skasm 0b44497a2 +
