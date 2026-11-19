@@ -5,16 +5,32 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-19 10:14 UTC)
+## State (2026-11-19 12:46 UTC)
 
-### Landed 11-19
-- c75f1894 config-assembly BOM (standard content's feature properties), 12/12. 7599cd64 qa session-asm-1119.
-- 24792169 live2 errors-1119 / asm-dialogs-1119 rows, Select other reach.
-- 058942cc isaac c3fdd4 "Part 2" by name (BOM 58 -> 60/62, mates 96 -> 98/129); mate dialog's hovered face outlined once.
-- cd1acebd an assembly's Part Studio gets the Feature Studios its custom features' namespaces name (bjr 5d8bc1 Sketch 29).
-- 4c5c1d10 written BLEND_EDGE resolver (bjr 5b44a0 Fillet 1) + live2 recheck-1119 rows (1) Insert sort / filters,
-  (3) QUERY face drops the selection tint, (4) new group's row red, (5)/(7) mate rows span the list + bold flyout
-  title, (6) Measure panel at top 279 / right 13. live2 rechecked on green bfe09bcd5: all six hold (0f4633705).
+### In flight: Derived mirror of an assembly (live2 audit-1119 m2–m14; behaviours "asm (11-19)")
+- Piece 1 (model + eval), branch asm-dmirror 28ddc6e06: `InstanceSource::DerivedMirror { assembly, derived,
+  placement, mirrored_studios }`, a rigid node of the source's instances mirrored in its XY (Transform: same part,
+  placed by its Placement type; Derived: the "-Mirrored" studio's part, "Block-Mirrored <1>"); BOM, drawing sources.
+  Lands after d7691003; full ops e2e running first (drawing touched).
+- Piece 2 (ops, uncommitted): `Document::{mirrored_assembly, ensure_mirrored_assembly, mirrored_tab,
+  ensure_mirrored_tab}`; Mirror strategy Derived on a subassembly makes "<A>-Mirrored" (fixed "Derived mirror" node)
+  and the copy is "<A>-Mirrored <1>"; eval's reflection_of treats it like a mirrored studio. e2e
+  `a_derived_mirror_of_a_subassembly_makes_its_mirrored_assembly`.
+- Piece 3 (UI): strategy rows for subassemblies ("Create new instance" / "1 instance needs to be created", reference
+  "<A>-Mirrored"), the node's row / menu / dialog ("Assembly to mirror", its own strategy).
+
+### Next: mass-property overrides (live2 12:42–12:45, behaviours "asm (11-19)", live/asm/mass-override-1119 c1–c5)
+- Part: Mass / Center of mass / Inertia overrides (part metadata {override, useOverride}; live stores inertia
+  transposed against its labels, Lxy at index 3). CoM override: inertia recomputed about the new centre (parallel
+  axis); Mass override: centre kept, inertia scaled by the mass ratio; the part's overrides carry into assemblies.
+- Assembly: only Mass overridable, inertia scaled by the ratio (ours only replaces the mass: fix), centre kept.
+- Our density trick (analysis::part_densities) can't carry CoM / inertia: per-part (mass, centre, inertia) instead.
+  Part Studio panel rows are psui's crate (part-studio-ui): coordinate.
+
+### Others' items from today
+- core 12:4x: 90d254008 moved c2-surf-intro-* Derived 1's body +0.1 in x: correct (live's source index 4 has the
+  Title text on the x=0 face, −25.4..2.54). Open (mine): our Derived 1 imports Instructions (JHD, 220 faces) instead
+  of live's Car (JWD, 7 faces): the part query's pick.
 
 ### In flight: HEAVY-ASM-SOFTWARE-FRAME, LOD side (branch asm-lod, 97b431e3e, not landed)
 - asm-xdev-subs' coarsest level: 462 k triangles / 273 k edge segments, 358 k / 219 k of them one 10 482-face part
