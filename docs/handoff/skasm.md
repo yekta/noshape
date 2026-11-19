@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 10:33 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 11:25 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -66,6 +66,9 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
     `an_extrude_in_the_flat_cuts_and_adds` (±200 mm³). Open for live (REQUESTS 10:31, q-flat-ops-1119): how the app
     picks domain FLAT (flat view focus? flat region?), regions across a bend, Add errors (SM_FLAT_OP_ADD_CROSSES_EDGE),
     the feature list entry; then the app side.
+  - API audit (lead 11:0x) QUEUED 4d2730e3: sketch tools / options, SM table, flat export, SM features matched;
+    added ui_preferences.sketch_options (Sketch dialog checkboxes, scene `save_sketch_options` pub) and sketch_draw
+    `rho` (conic). AGENT_API regenerated (regenerate + scp in ONE rb.sh call: a later rb.sh sync overwrites it).
   - #5 corner break beside bends (sm_flat.rs "only supported at a wall's free corner yet"): same request.
 - Open (low: geometry matches): infento Part grid's four 80 mm LENGTHs (seed side V2HoieiIDMV9, the pattern's
   direction lines len1 / len2, one more) end driven in ours (E, F and 07:2x builds alike; TRACE "set driven"): live's
