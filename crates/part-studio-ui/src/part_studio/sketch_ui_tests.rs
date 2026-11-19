@@ -1498,6 +1498,28 @@ fn line_then_dimension_tool(cx: &mut TestAppContext, name: &str) -> (AnyWindowHa
     (window, view)
 }
 
+/// Live session-1118 2d (retaken 3 of 3): in the iso view a rectangle's bottom line picked with the Dimension tool and a
+/// placement click 8 mm under it places the dimension and opens its box.
+#[gpui::test]
+fn a_dimension_placed_under_a_line_in_iso_opens_its_box(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "dim-iso-place", Tool::CornerRect);
+    let slant = cx.update(|cx| { let v = view.read(cx); v.viewport.read(cx).camera.forward().dot(v.sketch.as_ref().unwrap().frame.normal).abs() });
+    assert!(slant < 0.9, "the view is iso, not normal to Top: {slant}");
+    let at = |cx: &mut TestAppContext, x: f64, y: f64| { let p = on_screen(cx, &view, DVec2::new(x, y)); (p.x, p.y) };
+    let (a, b) = (at(cx, 0.01, 0.008), at(cx, 0.09, 0.058));
+    click(cx, window, &view, a);
+    click(cx, window, &view, b);
+    keys(cx, window, &["escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Dimension, w, cx))).unwrap();
+    draw(cx, window);
+    let (line, place) = (at(cx, 0.05, 0.008), at(cx, 0.05, 0.0));
+    click(cx, window, &view, line);
+    click(cx, window, &view, place);
+    let dims = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.constraints().filter(|c| c.kind.is_dimension()).count());
+    let text = cx.update(|cx| view.read(cx).dim_input.as_ref().map(|(_, st, _)| st.read(cx).value().to_string()));
+    assert_eq!((dims, text.as_deref()), (1, Some("80 mm")), "placed, its box open with the width");
+}
+
 /// Live2 11-17 sketch-dim-sel: with the Dimension tool a pick previews the dimension at once (the line kept selected);
 /// the placement click creates it and opens its box, the measured value with its unit pre-selected; Esc in the box
 /// keeps the dimension, the tool on; "1abc" Enter keeps the box (invalid), the first Esc restores the measured text
