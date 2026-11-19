@@ -986,6 +986,31 @@ display from the input to the first changed frame (the same recorder for both). 
 | …✓ in the Note dialog | the dialog closes and the note is committed; the Note tool stays on with a "NOTE" placeholder under the pointer; 439–872 ms | the same (dialog closes, note committed, "NOTE" placeholder under the pointer); 132–215 ms | = (faster) |
 | …Esc after ✓ | the tool ends and the new note is left selected (grips) | the tool ends and nothing is selected | ≠ [studios] |
 
+### doc-feel-1119 (P0, document-level everyday actions, live2 11-19 05:25–05:46) [studios]
+
+Live on lane 2 (a scratch copy: a 40 × 30 × 10 block, V1, Fillet 1; the account's "Owned by me" list); ours green b173e2970 / c97ae9b44
+on :125 (a 14-document folder through NOSHAPE_DOCUMENTS_DIR; a block + fillet + V1 built by CLI). Gaps only: document open and tab
+switch times, the tab drag, the Versions rows' look and the undo steps inside a tab are in rows above. Times: a 60 fps x11grab of
+each display from the input (the same recorder for both). Evidence live/feel/doc-feel-1119/ (L* live, O* ours).
+
+| Item | Live | Ours | Status |
+|---|---|---|---|
+| Documents list, the default sort | newest first, a ▼ beside "Modified" | newest first, no arrow on any header | ≠ [studios] |
+| A column header hovered | the cell greys, a grey ▲▼ pair beside its name and a ⋮ menu at its right end (L03) | the cell greys only (O03) | ≠ [studios] |
+| Sort by Name: click, click again | A→Z with ▲, then Z→A with ▼, case-insensitive ("uip Bracket" before "ui2 crumbs" in Z→A); the list redrawn 169 / 137 ms, thumbnails settled ~1.4 s | the same orders and arrows; 60 / 59 ms | = (faster) |
+| Search box: click, type, Enter | focused with a 2 px blue rgb(62,148,255) border; no suggestion list while typing, a ⊗ clear at the right; Enter shows "Search results in Owned by me" with Part number and Revision columns and the match bold in the names: 560 ms, settled 1.5 s | the same page, columns and clear button; 51 ms; a 1 px grey border when focused; the match not bold (O06–O08) | ≠ [studios] |
+| A tab's right-click menu (Part Studio) | Delete; Open in new browser tab, Rename, Properties…, Show code; Duplicate, Copy to clipboard; Select as document thumbnail; Move to document…, Export…, Create task…; shown 58 ms | the same items and separators in the same order, without the cloud's Create task…; 85 ms | = |
+| Tab › Rename | an input 157 × 21 over the name, the whole name selected, a thin dark border; typing + Enter commits (the tab redrawn 107 ms) | the whole name selected, a blue rounded focus border; Enter 71 ms (O11) | ≠ [studios] |
+| Tab › Duplicate | "Body Copy 1" right after the source; the source stays the active tab; the new tab at ~130 ms | the same name, place and active tab; 83 ms | = (faster) |
+| + menu | 207 px wide: Applications ›, Create Material Library, Feature Studio, CAM Studio, PCB Studio, Render Studio; Create Part Studio, Assembly, Variable Studio, Drawing…, folder; Import… | the same local items in the same order (no cloud apps), 252 px wide | ≠ [studios] |
+| + › Create Part Studio / Create Assembly | inserted right after the active tab and opened; the lowest free name ("Part Studio 1" again after the first was renamed, "Assembly 2"); the tab ~130 ms, the canvas settled 4.9 / 5.0 s | the same place, names and activation; settled 0.34 / 0.26 s | = (faster) |
+| Undo across tabs: delete Fillet 1 in a Part Studio, go to an assembly, Ctrl+Z; back, Ctrl+Z | each tab has its own history: Ctrl+Z in the assembly does nothing; back in the Part Studio it restores Fillet 1 (191 ms, settled 641 ms). A reload empties the history (the undo arrow greys) | the same; 102 / 185 ms | = (faster) |
+| Ctrl+Z after a tab rename or a new tab | changes nothing (tab operations aren't undo steps) | the same | = |
+| Versions and history panel opened (left strip, top icon) | the panel at 318 ms, settled 1.5 s; rows Main / V1 / Start | the same rows; 218 ms | = (faster) |
+| A version row hovered | the row lit at 307 ms; the tooltip at **2.27 s**, two lines: "Open version V1" and the version's description | the row lit at 133 ms; the tooltip at 0.62 s, "Open version V1" only (O31c) | ≠ [studios] |
+| Create version… (left strip, second icon) | "Create version from Main": Name "V2" focused and selected, Description (Maximum of 10000 characters), the merging note, Create / Create version and edit properties / Cancel; 575 ms, settled 1.0 s | the same dialog and focus; 147 / 364 ms | = (faster) |
+| …Create | the V2 row in the panel at 1.9 s | 133 ms | = (faster) |
+
 ### featurelist-feel (feature list, live2 11-17 23:25)
 
 | Finding | Ours | Test |
