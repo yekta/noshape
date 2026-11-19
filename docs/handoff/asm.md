@@ -37,6 +37,15 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
 - Left: Part Studio panel's CoM / Inertia ☑ Override rows (psui's part-studio-ui: tell psui once landed); several
   parts measured with CoM / inertia overrides (not captured).
 
+### In flight: parity_assemblies differences (lead 11-19 15:00: rank by documents, one land each)
+- Suite on vibe2: `~/agents/asm-keep/suite1.sh <bin> <tag> <dirs>` (slot, one model at a time) -> suite/<tag>.log;
+  bin ops-main1119 = main 17c26dc1 + translator steps. Light 20 running as tag l1119; heavy 4 (xdev, isaac,
+  infento, scissor) next.
+- isaac (10:16 trace): of 31 mate differences, 14 have an end off live's connector, the rest are collateral (their
+  ends exact, the solve fails around them). 8 of the 14 are on Part 1 <12> (a2e4a2, core's Chamfer 2); the others are
+  Part 1 <22> (Ball 2 / 8: 1.37 mm, 90°), Part 1 <1> (Fastened 43: 90°), Part 1 <84> (Fastened 83), Part 2 <5>
+  (Fastened 84: 1°), Part 1 <88> (Ball 9: 6 / 32.8 mm).
+
 ### Others' items from today
 - core 12:4x: 90d254008 moved c2-surf-intro-* Derived 1's body +0.1 in x: correct (live's source index 4 has the
   Title text on the x=0 face, −25.4..2.54). Our Derived 1 imports Instructions (JHD) instead of live's Car (JWD):
