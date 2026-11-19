@@ -23,10 +23,12 @@ the Mac; ui-parity on vibex7 / vibe2 via ~/bin/slot (vibex6 = watcher), one run 
   4fc2ea4f (live2 recheck-1119: cut line hover tan + arrow grips + blue anchor, grips while a selected parent is under
   the pointer; a selected view's centre mark: orange dot, no grips; Edge to edge always two edges (app + op); no
   centre dot on circle hover; note ruler in inches; rename border rgb(22,81,176); version tooltip 300 px).
-- Next: the + marks after any dimension pick (live2 08:30, rad-note/plus-*.png: every dimension of the sheet; linear:
-  text centre + the end arrow tip at the 2nd extension line; Ø / angle: text centre; snap points while placing, pink
-  lines + red ✕); a plain click on a cut line selects the line itself (centermark-sel case 2; ours the section view);
-  the Documents header ⋮ menu (live2 L40–L44 now in the row).
+- Local after 7a6121bb (queue as one stack once it lands): bcd70131 (+ marks after a dimension pick, snap points;
+  a click on a cut line selects the line, `Sel::CutLine`), cd8d217a + b3f400e8 (Documents header ⋮ menu, remembered),
+  81cc96c3 (drawprops-1119: units reset precision, fraction list to 1/256, chamfer keeps its precision, feet-inches
+  under a foot, ANSI aligned Ø / R / angle text, dot arrowhead size), 87450348 (Merge dialog: Variable Studio users
+  edited, Replace default, Merge card only when both changed; qa session-studio-1119 11).
+- Left: a pinned column doesn't stay put while the Documents table scrolls sideways.
 - Lead 11-19 missing-functionality sweep: nothing missing; top 5 are uncompared depth. Captures asked: live2 #1
   Drawing properties (drawprops-1119, building) and #2 Note panel (note-opts-1119); live #3 Title block, #4 hole
   callouts + hole table, #5 Export Drawing on "studios hole plate" (REQUESTS 08:15), after skasm's flat DXFs.
