@@ -5,8 +5,9 @@
 //! flat's Scope (the part, its model's parts, the Part Studio's); ☑ Use workspace units (Units grayed while on);
 //! Options; Export splines as polylines, Set z-height to zero and normals to positive, and a flat's six more
 //! checkboxes with live's defaults. Bend centerlines, bend tangent lines, counterbore / countersink lines and form
-//! outlines / centermarks go on their Onshape layers; flats and sketches are curves at z 0 already (splines as
-//! polylines, z-height to zero) and flats have no sketches to include.
+//! outlines / centermarks go on their Onshape layers, the visible sketches on the flat on MODELSKETCH_VISIBLE (live
+//! q-flat-dxf-1119); flats and sketches are curves at z 0 already (z-height to zero) and, as live's, have no splines
+//! for "splines as polylines" to change but a sketch's own.
 
 use super::PartStudioView;
 use super::export::{modal_checkbox, store_export, store_written};
@@ -223,12 +224,17 @@ impl PartStudioView {
         let mut flats = Vec::new();
         for b in &parts {
             match noshape_model::sheetmetal::flat_pattern_for(&ctx, b) {
-                Ok(f) => flats.push(f),
+                Ok(mut f) => {
+                    if let Some(studio) = self.studio(cx) {
+                        f.sketches = noshape_model::sheetmetal::flat::flat_sketch_curves(&ctx, studio, &self.display.sketches, b, &f);
+                    }
+                    flats.push(f)
+                }
                 Err(e) => return self.flash_info(format!("Export failed: {e}"), cx),
             }
         }
         let units = if s.workspace_units { self.workspace_insunits(cx) } else { UNITS[s.units.min(5)].1 };
-        let o = FlatExport { insunits: units, version: CAD_VERSIONS[s.version.min(CAD_VERSIONS.len() - 1)].1, bend_centerlines: s.checks[CENTERLINES], tangent_lines: s.checks[3], cbore_lines: s.checks[4], form_outlines: s.checks[5], form_centermarks: s.checks[6] };
+        let o = FlatExport { insunits: units, version: CAD_VERSIONS[s.version.min(CAD_VERSIONS.len() - 1)].1, bend_centerlines: s.checks[CENTERLINES], tangent_lines: s.checks[3], cbore_lines: s.checks[4], form_outlines: s.checks[5], form_centermarks: s.checks[6], sketches: s.checks[7] };
         let bytes = match if s.dwg { flats_dwg(&flats, &o) } else { flats_dxf(&flats, &o) } {
             Ok(b) => b,
             Err(e) => return self.flash_info(format!("Export failed: {e}"), cx),
@@ -268,14 +274,6 @@ impl PartStudioView {
 
     /// The workspace length unit's DXF $INSUNITS.
     fn workspace_insunits(&self, cx: &App) -> u8 {
-        match self.doc.read(cx).session.doc.settings.units.length {
-            noshape_units::LengthUnit::Centimeter => 5,
-            noshape_units::LengthUnit::Foot => 2,
-            noshape_units::LengthUnit::Inch => 1,
-            noshape_units::LengthUnit::Meter => 6,
-            noshape_units::LengthUnit::Yard => 10,
-            noshape_units::LengthUnit::Micrometer => 13,
-            _ => 4,
-        }
+        noshape_model::sheetmetal::flat_dxf::insunits(self.doc.read(cx).session.doc.settings.units.length)
     }
 }

@@ -23,13 +23,15 @@ pub struct FlatExport {
     /// "Include form feature outlines" / "… centermarks".
     pub form_outlines: bool,
     pub form_centermarks: bool,
+    /// "Include visible sketches" (on by default): the flats' `sketches` on MODELSKETCH_VISIBLE.
+    pub sketches: bool,
 }
 
 impl Default for FlatExport {
     fn default() -> Self {
         // Live: DXF switches the version to Release 14; only the bend
         // centerlines are on.
-        Self { insunits: 4, version: DxfVersion::AC1014, bend_centerlines: true, tangent_lines: false, cbore_lines: false, form_outlines: false, form_centermarks: false }
+        Self { insunits: 4, version: DxfVersion::AC1014, bend_centerlines: true, tangent_lines: false, cbore_lines: false, form_outlines: false, form_centermarks: false, sketches: true }
     }
 }
 
@@ -96,6 +98,7 @@ const LAYERS: [(&str, &str, bool, bool); 47] = [
 ];
 
 const CUT: &str = "SHEETMETAL_CUT_LINES";
+const SKETCH: &str = "MODELSKETCH_VISIBLE";
 const BEND_UP: &str = "SHEETMETAL_BEND_LINES_UP";
 const BEND_DOWN: &str = "SHEETMETAL_BEND_LINES_DOWN";
 const TANGENT: &str = "SHEETMETAL_BEND_TANGENT_LI";
@@ -114,7 +117,21 @@ fn units_per_meter(insunits: u8) -> f64 {
         5 => 100.0,
         6 => 1.0,
         10 => 1.0 / 0.9144,
+        13 => 1e6,
         _ => 1000.0,
+    }
+}
+
+/// The DXF $INSUNITS of a workspace length unit (the export's "Use workspace units").
+pub fn insunits(unit: noshape_units::LengthUnit) -> u8 {
+    match unit {
+        noshape_units::LengthUnit::Centimeter => 5,
+        noshape_units::LengthUnit::Foot => 2,
+        noshape_units::LengthUnit::Inch => 1,
+        noshape_units::LengthUnit::Meter => 6,
+        noshape_units::LengthUnit::Yard => 10,
+        noshape_units::LengthUnit::Micrometer => 13,
+        _ => 4,
     }
 }
 
@@ -161,19 +178,20 @@ pub fn flats_document(flats: &[FlatPattern], o: &FlatExport) -> Result<CadDocume
         doc.add_entity(e).map(|_| ()).map_err(|e| e.to_string())
     };
     for flat in flats {
-        for c in &flat.outline {
+        let curves = flat.outline.iter().map(|c| (c, CUT)).chain(flat.sketches.iter().filter(|_| o.sketches).map(|c| (c, SKETCH)));
+        for (c, layer) in curves {
             match c {
-                FlatCurve::Line { a, b } => add(&mut doc, *a, *b, CUT)?,
-                FlatCurve::Circle { center, radius } => put(&mut doc, EntityType::Circle(Circle::from_center_radius(p3(*center), radius * k)), CUT)?,
+                FlatCurve::Line { a, b } => add(&mut doc, *a, *b, layer)?,
+                FlatCurve::Circle { center, radius } => put(&mut doc, EntityType::Circle(Circle::from_center_radius(p3(*center), radius * k)), layer)?,
                 FlatCurve::Arc { center, radius, start, end } => {
                     let mut e = Arc::new();
                     (e.center, e.radius, e.start_angle, e.end_angle) = (p3(*center), radius * k, start.rem_euclid(std::f64::consts::TAU), end.rem_euclid(std::f64::consts::TAU));
-                    put(&mut doc, EntityType::Arc(e), CUT)?;
+                    put(&mut doc, EntityType::Arc(e), layer)?;
                 }
                 FlatCurve::Ellipse { center, major, ratio, start, end } => {
                     let mut e = Ellipse::from_center_axes(p3(*center), Vector3::new(major.x * k, major.y * k, 0.0), *ratio);
                     (e.start_parameter, e.end_parameter) = (*start, *end);
-                    put(&mut doc, EntityType::Ellipse(e), CUT)?;
+                    put(&mut doc, EntityType::Ellipse(e), layer)?;
                 }
                 // Live's: planar (flags 8), tolerances 1e-10 / 1e-8, knots 0...1.
                 FlatCurve::Spline { degree, knots, poles, weights } => {
@@ -185,7 +203,7 @@ pub fn flats_document(flats: &[FlatPattern], o: &FlatExport) -> Result<CadDocume
                     e.weights = weights.clone();
                     e.normal = Vector3::new(0.0, 0.0, 1.0);
                     (e.knot_tolerance, e.control_tolerance) = (1e-10, 1e-8);
-                    put(&mut doc, EntityType::Spline(e), CUT)?;
+                    put(&mut doc, EntityType::Spline(e), layer)?;
                 }
             }
         }
@@ -282,6 +300,7 @@ mod tests {
             frame: noshape_kernel::Plane::xy(),
             loops: vec![vec![p(0.0, 0.0), p(60.0, 0.0), p(60.0, 40.0), p(0.0, 40.0)]],
             outline: Vec::new(),
+            sketches: Vec::new(),
             bend_lines: vec![FlatBendLine { a: p(30.0, 0.0), b: p(30.0, 40.0), up: true, angle: std::f64::consts::FRAC_PI_2, radius: 2e-3, k_factor: 0.45, allowance: 4e-3, bend: 0 }],
             forms: Vec::new(),
             heads: Vec::new(),

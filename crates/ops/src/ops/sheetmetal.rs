@@ -84,9 +84,24 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "sheetmetal",
             verb: "export_flat",
-            summary: "Export a sheet metal part's flat pattern as DXF or SVG",
-            description: "The flat view's menu › Export DXF/DWG of Flat pattern of <part>…: the flat pattern as live writes it (outline, bend centerlines on the SHEETMETAL_BEND_LINES_UP / _DOWN layers), or an SVG of it.",
-            fields: vec![doc_field(), tab_field(), req("part", s(), "The sheet metal part (`body:…` id or name)."), req("file", s(), "Where to write it."), opt("format", json!({ "type": "string", "enum": ["DXF", "SVG"], "default": "DXF" }), "File format.")],
+            summary: "Export a sheet metal part's flat pattern as DXF, DWG or SVG",
+            description: "The flat view's menu › Export DXF/DWG of Flat pattern of <part>…, with the dialog's options and live's defaults: the outline's exact lines, arcs, circles, ellipses and splines on SHEETMETAL_CUT_LINES, bend centerlines on SHEETMETAL_BEND_LINES_UP / _DOWN, the visible sketches on the flat on MODELSKETCH_VISIBLE; or an SVG of the flat.",
+            fields: vec![
+                doc_field(),
+                tab_field(),
+                req("part", s(), "The sheet metal part (`body:…` id or name)."),
+                req("file", s(), "Where to write it."),
+                opt("format", json!({ "type": "string", "enum": ["DXF", "DWG", "SVG"], "default": "DXF" }), "File format."),
+                opt("version", json!({ "type": "string", "enum": ["Release 11-12", "Release 13", "Release 14", "2000", "2004", "2007", "2010", "2013", "2018"] }), "DXF / DWG version (default: Release 14 for DXF, 2000 for DWG)."),
+                opt("scope", json!({ "type": "string", "enum": ["part", "model", "part studio"], "default": "part" }), "Single flat pattern part only, all flat pattern parts in the current model, or all in the Part Studio."),
+                opt("units", json!({ "type": "string", "enum": ["Centimeter", "Foot", "Inch", "Meter", "Millimeter", "Yard"] }), "Units (default: the workspace units)."),
+                opt("bend_centerlines", json!({ "type": "boolean", "default": true }), "Include bend centerlines."),
+                opt("bend_tangent_lines", json!({ "type": "boolean", "default": false }), "Include bend tangent lines."),
+                opt("cbore_lines", json!({ "type": "boolean", "default": false }), "Include counterbore and countersink lines."),
+                opt("form_outlines", json!({ "type": "boolean", "default": false }), "Include form feature outlines."),
+                opt("form_centermarks", json!({ "type": "boolean", "default": false }), "Include form feature centermarks."),
+                opt("visible_sketches", json!({ "type": "boolean", "default": true }), "Include visible sketches (sketches on the flat)."),
+            ],
             mutates: false,
             destructive: false,
             run: export_flat,
@@ -326,11 +341,49 @@ fn export_flat(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let r = od.regenerate(tab, None)?;
     let part = super::query::find_part(&r, a.str("part")?)?;
     let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &part.id).map_err(|e| OpError::invalid(e).with_param("part"))?;
-    let bytes = match a.opt_str("format")?.unwrap_or("DXF") {
-        "SVG" => noshape_model::drawing::export::to_svg(&flat.to_sheet_geometry()).into_bytes(),
-        _ => noshape_model::sheetmetal::flat_dxf::flat_dxf(&flat, &Default::default()).map_err(OpError::invalid)?,
-    };
+    let format = a.opt_str("format")?.unwrap_or("DXF");
     let file = a.str("file")?;
+    if format == "SVG" {
+        let bytes = noshape_model::drawing::export::to_svg(&flat.to_sheet_geometry()).into_bytes();
+        std::fs::write(file, &bytes).map_err(|e| OpError::param("file", &e.to_string()))?;
+        return Ok(json!({ "file": file, "bytes": bytes.len(), "bend_lines": flat.bend_lines.len() }).into());
+    }
+    let flag = |name: &str, default: bool| a.value.get(name).and_then(Value::as_bool).unwrap_or(default);
+    use noshape_model::drawing::cad_export::{CAD_VERSIONS, DEFAULT_DWG, DEFAULT_DXF};
+    let dwg = format == "DWG";
+    let version = match a.opt_str("version")? {
+        Some(v) => CAD_VERSIONS.iter().find(|(n, _)| *n == v).ok_or_else(|| OpError::param("version", "one of Release 11-12, Release 13, Release 14, 2000, 2004, 2007, 2010, 2013, 2018"))?.1,
+        None => CAD_VERSIONS[if dwg { DEFAULT_DWG } else { DEFAULT_DXF }].1,
+    };
+    let insunits = match a.opt_str("units")? {
+        Some(u) => [("Centimeter", 5), ("Foot", 2), ("Inch", 1), ("Meter", 6), ("Millimeter", 4), ("Yard", 10)].iter().find(|(n, _)| *n == u).ok_or_else(|| OpError::param("units", "Centimeter, Foot, Inch, Meter, Millimeter or Yard"))?.1,
+        None => noshape_model::sheetmetal::flat_dxf::insunits(od.doc().settings.units.length),
+    };
+    let model = r.context.sheet_metal.get(&part.id).map(|d| d.model);
+    let parts: Vec<noshape_model::BodyId> = match a.opt_str("scope")?.unwrap_or("part") {
+        "part" => vec![part.id.clone()],
+        "model" => r.context.sheet_metal.iter().filter(|(_, d)| Some(d.model) == model).map(|(b, _)| b.clone()).collect(),
+        "part studio" => r.context.sheet_metal.keys().cloned().collect(),
+        _ => return Err(OpError::param("scope", "part, model or part studio")),
+    };
+    let studio = doc::studio(od.doc(), tab)?;
+    let mut flats = Vec::new();
+    for b in &parts {
+        let mut f = noshape_model::sheetmetal::flat_pattern_for(&r.context, b).map_err(|e| OpError::invalid(e).with_param("part"))?;
+        f.sketches = noshape_model::sheetmetal::flat::flat_sketch_curves(&r.context, studio, &r.display.sketches, b, &f);
+        flats.push(f);
+    }
+    let o = noshape_model::sheetmetal::flat_dxf::FlatExport {
+        insunits,
+        version,
+        bend_centerlines: flag("bend_centerlines", true),
+        tangent_lines: flag("bend_tangent_lines", false),
+        cbore_lines: flag("cbore_lines", false),
+        form_outlines: flag("form_outlines", false),
+        form_centermarks: flag("form_centermarks", false),
+        sketches: flag("visible_sketches", true),
+    };
+    let bytes = if dwg { noshape_model::sheetmetal::flat_dxf::flats_dwg(&flats, &o) } else { noshape_model::sheetmetal::flat_dxf::flats_dxf(&flats, &o) }.map_err(OpError::invalid)?;
     std::fs::write(file, &bytes).map_err(|e| OpError::param("file", &e.to_string()))?;
-    Ok(json!({ "file": file, "bytes": bytes.len(), "bend_lines": flat.bend_lines.len() }).into())
+    Ok(json!({ "file": file, "bytes": bytes.len(), "parts": flats.len(), "bend_lines": flats.iter().map(|f| f.bend_lines.len()).sum::<usize>(), "sketch_curves": flats.iter().map(|f| f.sketches.len()).sum::<usize>() }).into())
 }

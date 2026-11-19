@@ -117,6 +117,46 @@ pub fn outline_curves(faces: &[Shape], frame: &k::Plane) -> Option<Vec<FlatCurve
     Some(out)
 }
 
+/// The visible sketches on part `body`'s flat as curves in `flat`'s plane coordinates (the export's "Include visible
+/// sketches", on by default: live q-flat-dxf-1119's line and circle on MODELSKETCH_VISIBLE). Construction geometry
+/// stays out.
+pub fn flat_sketch_curves(ctx: &Context, studio: &crate::partstudio::PartStudio, shown: &[crate::display::SketchDisplay], body: &BodyId, flat: &FlatPattern) -> Vec<FlatCurve> {
+    let back = flat.place.as_ref().map_or(DMat4::IDENTITY, |p| p.view.inverse());
+    let mut out = Vec::new();
+    for sd in shown.iter().filter(|d| d.on_flat && !d.hidden) {
+        let on_this = studio.feature(sd.feature).is_some_and(|f| matches!(f.params.query("sketchPlane").first(), Some(crate::reference::Reference::Face(n)) if super::flat_face_of(n).is_some_and(|(b, _)| &b == body)));
+        let Some(r) = ctx.sketch(sd.feature).filter(|_| on_this) else { continue };
+        // Sketch coordinates -> the flat's: a rigid map of the plane (the sketch lies on the flat in its view place).
+        let m = |p: DVec2| flat.frame.to_local(back.transform_point3(r.frame.to_world(p)));
+        let (ex, ey) = (m(DVec2::X) - m(DVec2::ZERO), m(DVec2::Y) - m(DVec2::ZERO));
+        let lin = |v: DVec2| ex * v.x + ey * v.y;
+        let flips = ex.perp_dot(ey) < 0.0;
+        let ang = |a: f64| lin(DVec2::from_angle(a)).to_angle();
+        for e in r.sketch.entities().filter(|e| !e.construction && !e.external) {
+            let Some(c) = r.sketch.curve(e.id) else { continue };
+            out.push(match c {
+                noshape_sketch::Curve2::Line { a, b } => FlatCurve::Line { a: m(a), b: m(b) },
+                noshape_sketch::Curve2::Circle { center, radius } => FlatCurve::Circle { center: m(center), radius },
+                noshape_sketch::Curve2::Arc { center, radius, start_angle, end_angle } => {
+                    let (s, t) = (ang(start_angle), ang(end_angle));
+                    FlatCurve::Arc { center: m(center), radius, start: if flips { t } else { s }, end: if flips { s } else { t } }
+                }
+                noshape_sketch::Curve2::Ellipse { center, major, minor } => FlatCurve::Ellipse { center: m(center), major: lin(major), ratio: minor / major.length().max(1e-300), start: 0.0, end: std::f64::consts::TAU },
+                noshape_sketch::Curve2::EllipticalArc { center, major, minor, start_param, end_param } => {
+                    let (s, t) = if flips { (-end_param, -start_param) } else { (start_param, end_param) };
+                    FlatCurve::Ellipse { center: m(center), major: lin(major), ratio: minor / major.length().max(1e-300), start: s, end: t }
+                }
+                noshape_sketch::Curve2::Nurbs(n) => {
+                    let (k0, k1) = (n.knots.first().copied().unwrap_or(0.0), n.knots.last().copied().unwrap_or(1.0));
+                    let span = (k1 - k0).max(1e-300);
+                    FlatCurve::Spline { degree: n.degree as u32, knots: n.knots.iter().map(|k| (k - k0) / span).collect(), poles: n.ctrl.iter().map(|p| m(*p)).collect(), weights: n.weights.clone().unwrap_or_default() }
+                }
+            });
+        }
+    }
+    out
+}
+
 /// The unfolded part: outline loops and bend lines in the flat plane.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FlatPattern {
@@ -129,6 +169,9 @@ pub struct FlatPattern {
     /// The same outline exactly ([`outline_curves`]); empty when it can't be (the export writes `loops`).
     #[serde(default)]
     pub outline: Vec<FlatCurve>,
+    /// The visible sketches on it ([`flat_sketch_curves`]), filled by an export.
+    #[serde(skip)]
+    pub sketches: Vec<FlatCurve>,
     pub bend_lines: Vec<FlatBendLine>,
     /// Form outlines and center marks (drawn over the flat region).
     pub forms: Vec<FlatForm>,
@@ -604,7 +647,7 @@ pub fn flat_pattern(body: &Body, data: &SheetMetalData) -> Result<FlatPattern, S
     loops.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
     let outline = outline_curves(&faces_src, &frame).unwrap_or_default();
     let shape = shape.map(|s| split_bend_zones(&s, &frame, &lines));
-    Ok(FlatPattern { frame, loops, outline, bend_lines: lines, forms, heads, shape, thickness: t, warnings, built_for: None, place: None, collides: false })
+    Ok(FlatPattern { frame, loops, outline, sketches: Vec::new(), bend_lines: lines, forms, heads, shape, thickness: t, warnings, built_for: None, place: None, collides: false })
 }
 
 /// A flat pattern from planar pieces already laid flat in `frame` (walls and
@@ -639,7 +682,7 @@ pub fn flat_from_pieces(frame: k::Plane, pieces: &[Shape], bend_lines: Vec<FlatB
     loops.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
     let outline = outline_curves(&faces_src, &frame).unwrap_or_default();
     let shape = shape.map(|s| split_bend_zones(&s, &frame, &bend_lines));
-    Ok(FlatPattern { frame, loops, outline, bend_lines, forms: Vec::new(), heads: Vec::new(), shape, thickness, warnings, built_for: None, place: None, collides: false })
+    Ok(FlatPattern { frame, loops, outline, sketches: Vec::new(), bend_lines, forms: Vec::new(), heads: Vec::new(), shape, thickness, warnings, built_for: None, place: None, collides: false })
 }
 
 /// The flat region split along both sides of every bend zone (the strip

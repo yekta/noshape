@@ -1603,6 +1603,32 @@ fn sheet_metal_table_ops() {
     assert_eq!(table(&mut ctx), (vec!["Bend A 3 90 0.45 Up".to_string()], vec!["Joint B Edge joint".to_string()]));
 }
 
+/// A DXF file's entities: (type, layer, the 10 / 20 / 40 values in order).
+fn dxf_entities(path: &std::path::Path) -> Vec<(String, String, Vec<f64>)> {
+    let text = std::fs::read_to_string(path).unwrap();
+    let lines: Vec<&str> = text.lines().map(str::trim).collect();
+    let pairs: Vec<(&str, &str)> = lines.chunks(2).filter_map(|c| Some((c[0], *c.get(1)?))).collect();
+    let Some(start) = pairs.iter().position(|p| *p == ("2", "ENTITIES")) else { return Vec::new() };
+    let mut out = Vec::new();
+    let mut current: Option<(String, String, Vec<f64>)> = None;
+    for &(code, value) in &pairs[start + 1..] {
+        if code == "0" {
+            out.extend(current.take());
+            if value == "ENDSEC" {
+                break;
+            }
+            current = Some((value.to_string(), String::new(), Vec::new()));
+        } else if let Some(c) = current.as_mut() {
+            match code {
+                "8" => c.1 = value.to_string(),
+                "10" | "20" | "40" => c.2.push(value.parse().unwrap_or(f64::NAN)),
+                _ => {}
+            }
+        }
+    }
+    out
+}
+
 /// Live's flat DXF writes the outline's exact curves (samples/flat1680-a.dxf: SPLINEs, form-circle-knockout: ARCs), not
 /// short LINEs: a plate with a rounded corner and a round hole gives 4 LINEs, an ARC and a CIRCLE on
 /// SHEETMETAL_CUT_LINES, at the plate's size.
@@ -1622,29 +1648,7 @@ fn the_flat_dxf_writes_arcs_and_circles() {
     assert_eq!(f["feature_status"]["status"], "Ok", "{f}");
     let dxf = scratch("sheet-metal-flat-curves.dxf");
     call(&mut ctx, "sheetmetal_export_flat", json!({ "part": "Part 1", "file": dxf.to_str().unwrap() }));
-    let text = std::fs::read_to_string(&dxf).unwrap();
-    let pairs: Vec<(&str, &str)> = text.lines().map(str::trim).collect::<Vec<_>>().chunks(2).filter_map(|c| Some((c[0], *c.get(1)?))).collect();
-    let start = pairs.iter().position(|p| *p == ("2", "ENTITIES")).expect("an ENTITIES section");
-    let mut cut: Vec<(String, Vec<f64>)> = Vec::new();
-    let mut current: Option<(String, String, Vec<f64>)> = None;
-    for &(code, value) in &pairs[start + 1..] {
-        if code == "0" {
-            if let Some((t, layer, v)) = current.take().filter(|c| c.1 == "SHEETMETAL_CUT_LINES") {
-                cut.push((t, v));
-                let _ = layer;
-            }
-            if value == "ENDSEC" {
-                break;
-            }
-            current = Some((value.to_string(), String::new(), Vec::new()));
-        } else if let Some(c) = current.as_mut() {
-            match code {
-                "8" => c.1 = value.to_string(),
-                "10" | "20" | "40" => c.2.push(value.parse().unwrap_or(f64::NAN)),
-                _ => {}
-            }
-        }
-    }
+    let cut: Vec<(String, Vec<f64>)> = dxf_entities(&dxf).into_iter().filter(|e| e.1 == "SHEETMETAL_CUT_LINES").map(|e| (e.0, e.2)).collect();
     let count = |t: &str| cut.iter().filter(|(x, _)| x == t).count();
     assert_eq!((count("LINE"), count("ARC"), count("CIRCLE"), count("SPLINE")), (4, 1, 1, 0), "{cut:?}");
     let circle = &cut.iter().find(|(t, _)| t == "CIRCLE").unwrap().1;
@@ -6135,6 +6139,24 @@ fn a_sketch_on_the_sheet_metal_flat() {
     let o = &s["frame"]["origin"];
     assert!(num(&o[2]).abs() < 1e-6 && num(&s["frame"]["normal"][2]) > 0.999, "{s}");
     assert!((num(&o[0]) - 30.0).abs() < 1e-6 && (0.0..40.0).contains(&num(&o[1])), "the plate not mirrored: {s}");
+    // Its line and circle go into the flat's DXF on MODELSKETCH_VISIBLE ("Include visible sketches", on by default;
+    // live q-flat-dxf-1119), inside the plate; off, they don't.
+    let sk2 = s["sketch"].clone();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk2, "tool": "line", "points": [[-10, 0], [10, 0]] }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk2, "tool": "circle", "points": [[0, 5], [3, 5]] }));
+    let dxf = scratch("sheet-metal-flat-sketch.dxf");
+    for visible in [true, false] {
+        let x = call(&mut ctx, "sheetmetal_export_flat", json!({ "part": "Part 1", "file": dxf.to_str().unwrap(), "visible_sketches": visible }));
+        let drawn: Vec<(String, String, Vec<f64>)> = dxf_entities(&dxf).into_iter().filter(|e| e.1 == "MODELSKETCH_VISIBLE").collect();
+        if !visible {
+            assert!(drawn.is_empty(), "{drawn:?}");
+            continue;
+        }
+        let kinds: Vec<&str> = drawn.iter().map(|e| e.0.as_str()).collect();
+        assert_eq!((kinds.len(), x["sketch_curves"].as_u64()), (2, Some(2)), "{drawn:?} {x}");
+        let circle = &drawn.iter().find(|e| e.0 == "CIRCLE").expect("the circle").2;
+        assert!((circle[2] - 3.0).abs() < 1e-6 && (0.0..60.0).contains(&circle[0]) && (0.0..40.0).contains(&circle[1]), "on the plate: {circle:?}");
+    }
 }
 
 /// Live 2464: Edit in context on another document's part stores the context in that document's Part Studio (its

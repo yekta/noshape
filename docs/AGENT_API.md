@@ -6997,9 +6997,9 @@ Examples:
 
 #### sheetmetal_export_flat
 
-Export a sheet metal part's flat pattern as DXF or SVG.
+Export a sheet metal part's flat pattern as DXF, DWG or SVG.
 
-The flat view's menu › Export DXF/DWG of Flat pattern of <part>…: the flat pattern as live writes it (outline, bend centerlines on the SHEETMETAL_BEND_LINES_UP / _DOWN layers), or an SVG of it.
+The flat view's menu › Export DXF/DWG of Flat pattern of <part>…, with the dialog's options and live's defaults: the outline's exact lines, arcs, circles, ellipses and splines on SHEETMETAL_CUT_LINES, bend centerlines on SHEETMETAL_BEND_LINES_UP / _DOWN, the visible sketches on the flat on MODELSKETCH_VISIBLE; or an SVG of the flat.
 
 Examples:
 
@@ -7013,7 +7013,16 @@ Examples:
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `part` | string | required | The sheet metal part (`body:…` id or name). |
 | `file` | string | required | Where to write it. |
-| `format` | one of `DXF`, `SVG` |  | File format. |
+| `format` | one of `DXF`, `DWG`, `SVG` |  | File format. |
+| `version` | one of `Release 11-12`, `Release 13`, `Release 14`, `2000`, `2004`, `2007`, `2010`, `2013`, `2018` |  | DXF / DWG version (default: Release 14 for DXF, 2000 for DWG). |
+| `scope` | one of `part`, `model`, `part studio` |  | Single flat pattern part only, all flat pattern parts in the current model, or all in the Part Studio. |
+| `units` | one of `Centimeter`, `Foot`, `Inch`, `Meter`, `Millimeter`, `Yard` |  | Units (default: the workspace units). |
+| `bend_centerlines` | boolean |  | Include bend centerlines. |
+| `bend_tangent_lines` | boolean |  | Include bend tangent lines. |
+| `cbore_lines` | boolean |  | Include counterbore and countersink lines. |
+| `form_outlines` | boolean |  | Include form feature outlines. |
+| `form_centermarks` | boolean |  | Include form feature centermarks. |
+| `visible_sketches` | boolean |  | Include visible sketches (sketches on the flat). |
 
 ### release
 
