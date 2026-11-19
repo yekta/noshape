@@ -1066,11 +1066,20 @@ fn dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let kind = dimension_kind(a.opt_str("kind")?.unwrap_or("auto"), &ids, mode, &t.data, label)?;
     let text = a.get("value").map(value_text).transpose()?;
     let cid = sm::add_dimension(&mut t.data, kind, label, None).ok_or_else(|| OpError::invalid("the dimension doesn't apply to these entities").with_param("entities"))?;
-    let driving = t.data.sketch.constraint(cid).is_some_and(|c| c.driving);
-    if driving && let Some(text) = text {
+    // A value is typed into the new dimension's box: an over-defining one becomes driving, and a value the sketch
+    // can't take is kept with the sketch red, as in the app (live errors-1118: a redundant 40, a conflicting 50, a
+    // triangle's 30).
+    let mut solved = true;
+    if let Some(text) = text {
         let mut ed = editor(&t);
-        ed.apply_dimension(&mut t.data, cid, &text, &units, &vars).map_err(|m| OpError::invalid(m).with_param("value"))?;
+        ed.dim_edit = Some(sm::DimEdit { constraint: cid, text: text.clone(), created: true });
+        match ed.apply_dimension(&mut t.data, cid, &text, &units, &vars) {
+            Ok(()) => {}
+            Err(m) if m == sm::SKETCH_NOT_SOLVED => solved = false,
+            Err(m) => return Err(OpError::invalid(m).with_param("value")),
+        }
     }
+    let driving = t.data.sketch.constraint(cid).is_some_and(|c| c.driving);
     let (id, tab) = (t.id, t.tab);
     commit(od, t)?;
     let mut v = sketch_state(od, tab, id, Some(&[]))?;
@@ -1078,6 +1087,8 @@ fn dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     v["dimension"] = json!(constraint_id(cid, true));
     if !driving {
         v["warning"] = json!("The dimension would over-constrain the sketch, so it was added as a driven (reference) dimension, as in Onshape.");
+    } else if !solved {
+        v["warning"] = json!(sm::SKETCH_NOT_SOLVED);
     }
     Ok(v.into())
 }

@@ -9548,3 +9548,35 @@ export const clipBlock = defineFeature(function(context is Context, id is Id, de
     call(&mut ctx, "part_set_properties", json!({ "tab": "Part Studio 1", "part": "OPG006", "description": "Grommet, 6 mm" }));
     assert_eq!(row(&mut ctx), (json!("G-6"), json!("Grommet, 6 mm")), "the user's value wins");
 }
+
+/// Live errors-1118 (through the API as in the dialog): a value given to a dimension the sketch can't take is kept,
+/// driving, the sketch red: a rectangle's third 40 (redundant), a 50 against its 40 (conflicting), a triangle's 30
+/// against two 10s.
+#[test]
+fn a_dimension_value_the_sketch_cant_take_is_kept_driving() {
+    let mut ctx = Ctx::new();
+    for (case, third) in [("redundant", "40 mm"), ("conflicting", "50 mm")] {
+        let sk = new_sketch(&mut ctx, &format!("dimerr-{case}.noshape"), "plane:top");
+        let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [40, 30]] }));
+        let l: Vec<String> = created(&r, "line").iter().map(|x| id_of(x)).collect();
+        call(&mut ctx, "sketch_dimension", json!({ "sketch": sk, "entities": [l[0]], "value": "40 mm", "kind": "length" }));
+        call(&mut ctx, "sketch_dimension", json!({ "sketch": sk, "entities": [l[1]], "value": "30 mm", "kind": "length" }));
+        let d = call(&mut ctx, "sketch_dimension", json!({ "sketch": sk, "entities": [l[2]], "value": third, "kind": "length" }));
+        assert_eq!(d["warning"].as_str(), Some("Sketch could not be solved."), "{case}: {d}");
+        let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
+        let dims: Vec<(String, bool)> = g["constraints"].as_array().unwrap().iter().filter(|c| c["type"] == "Length").map(|c| (c["value"].as_str().unwrap_or("").to_string(), c["driving"] == true)).collect();
+        assert_eq!(dims.last(), Some(&(third.trim_end_matches(" mm").to_string(), true)), "{case}: {dims:?}");
+        let st = call(&mut ctx, "feature_list", json!({}))["features"].as_array().unwrap().iter().find(|f| f["id"] == sk.as_str()).cloned().unwrap();
+        assert_eq!((st["status"].as_str(), st["message"].as_str()), (Some("Error"), Some("Sketch could not be solved.")), "{case}: {st}");
+    }
+    let sk = new_sketch(&mut ctx, "dimerr-triangle.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "line", "points": [[100, 0], [110, 0], [105, 8], [100, 0]] }));
+    let l: Vec<String> = created(&r, "line").iter().map(|x| id_of(x)).collect();
+    call(&mut ctx, "sketch_dimension", json!({ "sketch": sk, "entities": [l[0]], "value": "10 mm", "kind": "length" }));
+    call(&mut ctx, "sketch_dimension", json!({ "sketch": sk, "entities": [l[1]], "value": "10 mm", "kind": "length" }));
+    let d = call(&mut ctx, "sketch_dimension", json!({ "sketch": sk, "entities": [l[2]], "value": "30 mm", "kind": "length" }));
+    assert_eq!(d["warning"].as_str(), Some("Sketch could not be solved."), "{d}");
+    let st = call(&mut ctx, "feature_list", json!({}))["features"].as_array().unwrap().iter().find(|f| f["id"] == sk.as_str()).cloned().unwrap();
+    assert_eq!(st["status"].as_str(), Some("Error"), "{st}");
+}
+

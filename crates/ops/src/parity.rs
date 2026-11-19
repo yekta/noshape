@@ -6383,8 +6383,9 @@ impl<'a> Translator<'a> {
                             Err(e) => problems.push(format!("{ty} dimension: not configured ({e})")),
                         }
                     }
-                    let over = r.get("warning").is_some();
-                    if driven != over
+                    // Added driven (no value: it over-defines the sketch), or driving (a value is taken, as typed).
+                    let added_driven = r["warning"].as_str().is_some_and(|w| w.contains("driven (reference)"));
+                    if driven != added_driven
                         && let Some(d) = r["dimension"].as_str()
                         && self.call("sketch_dimension_options", json!({ "sketch": id, "dimension": d, "driving": !driven })).is_ok()
                     {
