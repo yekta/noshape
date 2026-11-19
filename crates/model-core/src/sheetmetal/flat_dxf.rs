@@ -1,11 +1,11 @@
 //! "Export DXF/DWG of Flat pattern" (live behaviours.md "(10) Export DXF/DWG
 //! of Flat pattern", samples/qa5-sm-flat.dxf): the flat in model space, the
-//! full Onshape layer table, the outline as LINEs on SHEETMETAL_CUT_LINES and
+//! full Onshape layer table, the outline on SHEETMETAL_CUT_LINES as its exact LINEs, ARCs, CIRCLEs and SPLINEs and
 //! the bend centre lines on SHEETMETAL_BEND_LINES_UP / _DOWN (no labels).
 
-use super::flat::FlatPattern;
+use super::flat::{FlatCurve, FlatPattern};
 use acadrust::tables::linetype::LineTypeElement;
-use acadrust::{CadDocument, Circle, Color, DwgWriter, DxfVersion, DxfWriter, EntityType, Layer, Line, LineType, Vector3};
+use acadrust::{Arc, CadDocument, Circle, Color, DwgWriter, DxfVersion, DxfWriter, EntityType, Layer, Line, LineType, Spline, Vector3};
 
 /// The export dialog's settings that change the file.
 #[derive(Clone, Copy, Debug)]
@@ -155,8 +155,35 @@ pub fn flats_document(flats: &[FlatPattern], o: &FlatExport) -> Result<CadDocume
         e.common_mut().layer = layer.into();
         doc.add_entity(e).map(|_| ()).map_err(|e| e.to_string())
     };
+    let put = |doc: &mut CadDocument, mut e: EntityType, layer: &str| -> Result<(), String> {
+        e.common_mut().layer = layer.into();
+        doc.add_entity(e).map(|_| ()).map_err(|e| e.to_string())
+    };
     for flat in flats {
-        for l in &flat.loops {
+        for c in &flat.outline {
+            match c {
+                FlatCurve::Line { a, b } => add(&mut doc, *a, *b, CUT)?,
+                FlatCurve::Circle { center, radius } => put(&mut doc, EntityType::Circle(Circle::from_center_radius(p3(*center), radius * k)), CUT)?,
+                FlatCurve::Arc { center, radius, start, end } => {
+                    let mut e = Arc::new();
+                    (e.center, e.radius, e.start_angle, e.end_angle) = (p3(*center), radius * k, start.rem_euclid(std::f64::consts::TAU), end.rem_euclid(std::f64::consts::TAU));
+                    put(&mut doc, EntityType::Arc(e), CUT)?;
+                }
+                // Live's: planar (flags 8), tolerances 1e-10 / 1e-8, knots 0...1.
+                FlatCurve::Spline { degree, knots, poles, weights } => {
+                    let mut e = Spline::new();
+                    e.degree = *degree as i32;
+                    (e.flags.planar, e.flags.rational) = (true, !weights.is_empty());
+                    e.knots = knots.clone();
+                    e.control_points = poles.iter().map(|p| p3(*p)).collect();
+                    e.weights = weights.clone();
+                    e.normal = Vector3::new(0.0, 0.0, 1.0);
+                    (e.knot_tolerance, e.control_tolerance) = (1e-10, 1e-8);
+                    put(&mut doc, EntityType::Spline(e), CUT)?;
+                }
+            }
+        }
+        for l in flat.loops.iter().filter(|_| flat.outline.is_empty()) {
             for (i, a) in l.iter().enumerate() {
                 let b = l[(i + 1) % l.len()];
                 if a.distance(b) > 1e-12 {
@@ -248,6 +275,7 @@ mod tests {
         FlatPattern {
             frame: noshape_kernel::Plane::xy(),
             loops: vec![vec![p(0.0, 0.0), p(60.0, 0.0), p(60.0, 40.0), p(0.0, 40.0)]],
+            outline: Vec::new(),
             bend_lines: vec![FlatBendLine { a: p(30.0, 0.0), b: p(30.0, 40.0), up: true, angle: std::f64::consts::FRAC_PI_2, radius: 2e-3, k_factor: 0.45, allowance: 4e-3, bend: 0 }],
             forms: Vec::new(),
             heads: Vec::new(),

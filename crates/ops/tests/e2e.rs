@@ -1603,6 +1603,55 @@ fn sheet_metal_table_ops() {
     assert_eq!(table(&mut ctx), (vec!["Bend A 3 90 0.45 Up".to_string()], vec!["Joint B Edge joint".to_string()]));
 }
 
+/// Live's flat DXF writes the outline's exact curves (samples/flat1680-a.dxf: SPLINEs, form-circle-knockout: ARCs), not
+/// short LINEs: a plate with a rounded corner and a round hole gives 4 LINEs, an ARC and a CIRCLE on
+/// SHEETMETAL_CUT_LINES, at the plate's size.
+#[test]
+fn the_flat_dxf_writes_arcs_and_circles() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "sheet-metal-flat-curves.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [60, 40]] }));
+    let at = |e: &Value, x: f64, y: f64| e["at"][0].as_f64().is_some_and(|v| (v - x).abs() < 1e-9) && e["at"][1].as_f64().is_some_and(|v| (v - y).abs() < 1e-9);
+    let corner = r["created"].as_array().unwrap().iter().find(|e| e["type"] == "point" && at(e, 60.0, 40.0)).unwrap_or_else(|| panic!("the (60, 40) corner: {r}"))["id"].clone();
+    call(&mut ctx, "sketch_fillet", json!({ "sketch": sk, "entities": [corner], "radius": "5 mm" }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[15, 20], [19, 20]] }));
+    let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
+    let num = |v: &Value| v.as_str().and_then(|s| s.parse::<f64>().ok()).or_else(|| v.as_f64()).unwrap_or(f64::NAN);
+    let plate = g["regions"].as_array().unwrap().iter().max_by(|a, b| num(&a["area"]).total_cmp(&num(&b["area"]))).unwrap()["id"].clone();
+    let f = call(&mut ctx, "feature_add", json!({ "type": "sheetMetalStart", "params": { "process": "THICKEN", "regions": [plate], "thickness": "2 mm", "radius": "2 mm" } }));
+    assert_eq!(f["feature_status"]["status"], "Ok", "{f}");
+    let dxf = scratch("sheet-metal-flat-curves.dxf");
+    call(&mut ctx, "sheetmetal_export_flat", json!({ "part": "Part 1", "file": dxf.to_str().unwrap() }));
+    let text = std::fs::read_to_string(&dxf).unwrap();
+    let pairs: Vec<(&str, &str)> = text.lines().map(str::trim).collect::<Vec<_>>().chunks(2).filter_map(|c| Some((c[0], *c.get(1)?))).collect();
+    let start = pairs.iter().position(|p| *p == ("2", "ENTITIES")).expect("an ENTITIES section");
+    let mut cut: Vec<(String, Vec<f64>)> = Vec::new();
+    let mut current: Option<(String, String, Vec<f64>)> = None;
+    for &(code, value) in &pairs[start + 1..] {
+        if code == "0" {
+            if let Some((t, layer, v)) = current.take().filter(|c| c.1 == "SHEETMETAL_CUT_LINES") {
+                cut.push((t, v));
+                let _ = layer;
+            }
+            if value == "ENDSEC" {
+                break;
+            }
+            current = Some((value.to_string(), String::new(), Vec::new()));
+        } else if let Some(c) = current.as_mut() {
+            match code {
+                "8" => c.1 = value.to_string(),
+                "10" | "20" | "40" => c.2.push(value.parse().unwrap_or(f64::NAN)),
+                _ => {}
+            }
+        }
+    }
+    let count = |t: &str| cut.iter().filter(|(x, _)| x == t).count();
+    assert_eq!((count("LINE"), count("ARC"), count("CIRCLE"), count("SPLINE")), (4, 1, 1, 0), "{cut:?}");
+    let circle = &cut.iter().find(|(t, _)| t == "CIRCLE").unwrap().1;
+    let arc = &cut.iter().find(|(t, _)| t == "ARC").unwrap().1;
+    assert!((circle[2] - 4.0).abs() < 1e-6 && (arc[2] - 5.0).abs() < 1e-6, "radii: hole {circle:?}, corner {arc:?}");
+}
+
 /// A bend's later edits reuse its Modify joint once that has rebuilt it (live "ui (10-24 b)": a second Radius edit
 /// changes Modify joint 1; live2 sm-1118: Convert to rip right after a Radius edit adds no Modify joint 2).
 #[test]
