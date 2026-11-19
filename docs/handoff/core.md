@@ -1,11 +1,30 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-19 23:20 UTC (fresh thread 21:10 after the 17:30 usage stall; ids: /root/lead-scratch/p-core-1119.md). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-19 23:20 UTC (fresh thread 21:10 after the 17:30 usage stall). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
-## In flight
+## In flight (11-19 night)
+- **LANDED 11-19 evening:** surface Mirror / pattern with Add joins the copy into the surfaces it touches 4a52a26bb
+  (singularities 2 -> 5/15); pipe Loft through > 2 open profiles f67a191fe + checklist 123ca4b30; closed-profile surface
+  sweep faces out of its tube 575aba2a4 (Split 3).
+- **P0 qa compat 22:50 (singularities Sketch 2 error, Mirror 2 Info) ANSWERED 23:15: mine (4a52a26bb), only on qa's
+  saved copy.** Laminar edges are named Boundary{face, ordinal among the face's laminar edges}; the join shares Extrude 1
+  surface's x=0 edge, so the saved PIERCE ordinal 1 (y=0 edge) now resolves to the y=56 edge. Mirror 2's saved
+  selection is Extrude 1's body (live: Problem loft). Fresh translation solves (5/15). decision asked: keep + qa re-saves,
+  or revert; naming laminar edges stably would be a bigger change (not started).
+- **Singularities "Loft with bad singularity" (surface loft along 2 guides to a point; ours refuses point profiles in
+  solid_a.rs ~L1240):** live q-singularity-loft-1119 decoded in core-scratch/sing/ (lib.py, model.py): Default = Coons
+  sum, smoothstep W(u)=3u^2-2u^3 across guides, linear in v (exact); start Normal to profile adds phi(v)[d(u)+m(u)X],
+  phi=v(1-v)(1-v/2), magnitude Hermite between guide derivatives 60.05/126.71 with end slopes 10.0259/7.5413 (max 0.001
+  mm; area 3532.215 vs live 3532.206). Next: variant (a) as-is (guides' conditions, 3425.038), then kernel
+  loft_guided_open point case + lift the refusal; then Loft 3 (3480.951, 12x16 deg 5).
+- **Fill G0 (intro-examples Fill 1, all four edges G0): ours 65652.67 mm2 vs live 23827.44.** fair_g1_fill takes it (null
+  supports). Dump vibex8 ~/tmp/core/fd/fill-0.brep (core-oc: features.cpp dumps the edges; crash_inputs replays "fill":
+  uncommitted); replay .fr.sh -> core-scratch/fr.out. Live: 14x18 cubic, box within the edges'.
+
+## Earlier (11-18/19)
 - **LANDED 11-18/19:** Delete face errors when a face stays 67a475987; rib parallel 303e9d916; loft path sections
   c0b6e2d4a; loft one-connection equal arcs 7a8ca3b2 (asm-suspension Loft 1, blend told); error wording (Up to next,
   revolve, coplanar loft) c3e949a8; Delete face onto its neighbour (impeller face 24, ~0.2 s) edf20895.
@@ -132,7 +151,7 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
 - **c2-sm-rocker-enclosure-body 15/28 (stable now):** Extrude 6's pocket is ~2 mm off live's and differently shaped
   (top face 89.76 vs live 66.95 mm²) because Sketch 6 isn't translated as live: its PROJECTED constraint finds no model
   geometry, its circular pattern isn't kept, and the solve (1.97 mm) is taken back. Sketch translation, not modelling
-  (skasm's; skasm back 11-17 09:25 as 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, on the surface-workshop item incl. mutualtrim).
+  (skasm's).
 - **GearLab 90f78b:** with ae8b7f751 plus asm's unlanded 93346d03d (custom features with a `def` map; std 1777/1793)
   the loft builds; Gear Lab 1 then fails at an opFillet on the 157-face toothed solid ("Failed to fillet
   selections."): blend's. 4.3 s vs live 2.4 s, mostly 2 Booleans (1.7 s, bool's) and 1.2 M edge_point_at calls
@@ -179,11 +198,7 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
 - E1 Govde (dock) 539/304 -> 538/303 accepted by the lead (bf26f8759's 0.5 mm seam line).
 
 ## How to run
-- Agent ids (11-19 afternoon): lead 818534eb-f6b1-4a00-bb48-ebf0f7cdbd8a, blend de66e481-56e2-4005-a5d3-9fa897ca5fde, bool
-  754a9804-feb1-4153-b32a-acf9b2a6d94d, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, qa 40e853dc-757f-4498-878f-00b41fd8af75,
-  psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, live2 d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6,
-  asm d8d597e0-675c-497b-a804-544ceab99bbd, studios 31c9b9ba-e7f8-40f7-85cb-242bab86dbe6, dx aad5e825-f86c-432d-b4ac-3aab402e7052;
-  live stopped till ~21:00 (REQUESTS.md / live2). Old ids stopped: never message them or a paused agent (DECISIONS 11-17).
+- Agent ids: /root/lead-scratch/roster.md only (read it before every message_agent; never copy ids into notes).
 - Builds / tests: `NOSHAPE_RB_HOST=<host> tools/tiers/rb.sh bash <script>` from the worktree (env prefixes don't
   reach the host: put them in the script). Mac: builds and crate tests only, one worktree of mine at a time.
 - Heavy runs on a vibe host (suites, gates, pairs) through `~/bin/slot <cmd>` there (one per host).
