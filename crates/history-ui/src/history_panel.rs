@@ -11,6 +11,7 @@ use gpui_kit::component::Disableable as _;
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use crate::os_menu::OsContextMenuExt as _;
+use crate::ui::TipExt as _;
 use gpui_kit::*;
 use noshape_model::document::{TabContent, TabId};
 use noshape_store::{BranchId, MicroversionId, VersionGraph};
@@ -1499,10 +1500,14 @@ impl Render for HistoryPanel {
                     })
                     .when(picked, |d| d.bg(rgb(crate::compare_mode::BASE_ROW)))
                     .when(!selected && compare_side.is_none(), |d| d.hover(|d| d.bg(crate::theme::themed(0xdef1fb, 0x666666))))
-                    .tooltip(crate::ui::tooltip(match r.kind {
-                        RowKind::Workspace(_) => format!("Open workspace {}", r.name),
-                        _ => format!("Open version {}", r.name),
-                    }))
+                    // Beside the panel's right edge, not under the pointer (qa HISTFEEL-CHANGE-TOOLTIP).
+                    .tip(
+                        match r.kind {
+                            RowKind::Workspace(_) => format!("Open workspace {}", r.name),
+                            _ => format!("Open version {}", r.name),
+                        },
+                        crate::ui::TipSide::Right,
+                    )
                     .child(graph_column(&r.key))
                     .child(
                         v_flex()

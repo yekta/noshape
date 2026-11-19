@@ -92,6 +92,9 @@ fn version_rows_open_on_a_click_of_their_name_and_the_graph_column_opens_nothing
     cx.executor().advance_clock(std::time::Duration::from_millis(500));
     draw(cx, window);
     assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Open version V1"), "the row's tooltip");
+    // Beside the panel's right edge (the row's), not under the pointer (qa HISTFEEL-CHANGE-TOOLTIP).
+    let tip = VisualTestContext::from_window(window, cx).debug_bounds("placed-tooltip").expect("the tooltip");
+    assert!(tip.left() >= v1.right() && tip.left() - v1.right() < px(6.), "right of the row: {tip:?} by {v1:?}");
     click(cx, window, point(v1.origin.x + px(40.), v1.origin.y + px(15.)), 1);
     assert_eq!(viewing(cx), None, "a click in the graph column opens nothing");
     click(cx, window, name, 1);
