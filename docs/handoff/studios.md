@@ -31,8 +31,11 @@ the Mac; ui-parity on vibex7 / vibe2 via ~/bin/slot (vibex6 = watcher), one run 
 - Live answers: custom feature ✓ with a field-naming error off, plain regenError on (ours already). VSFEEL-NAME-RED
   is live's after-Enter mark (qa [x]).
 - Local 11-19 (after c2574db3): live2 drw-tools-1119 (12 rows) + rad-note (3) + doc-feel-1119 (6): fixed but these left:
-  the + marks on other dimensions' extension-line ends while a radial pick is held; the Documents header's ⋮ menu (items not captured); Callout's edge
-  reach 5 px vs ours 4 (≈; our PICKBOX is 7, the gap is how hits are measured). qa session-drw-1119: tab order of a
+  the + marks on other dimensions' extension-line ends while a radial pick is held; the Documents header's ⋮ menu (items not captured); Callout's edge reach: +1 px (lead 11-19), live2 to retake.
+- Lead 11-19 missing-functionality sweep: no tool / menu row missing (matrix, coverage, D20, TB14, 13.40 done). Top 5
+  (uncompared depth): Drawing properties / Styles, Note panel, Title block, Hole callout + hole table, Export Drawing.
+  #1: drw1119a matrix: Drawing properties 0 ≠ (80 =, 113 present); every property read by the builder except the hole
+  callout Fit standard (fixed: `hole_fit_ansi`). Next: live2 takes of the present options' effects. qa session-drw-1119: tab order of a
   new drawing asked in REQUESTS (live); the 225.0° text side (small, not looked at yet).
 - drw1119a (vibex8, 02:47 build with the woken points): 334/341, 3371/3389 states; no regression. drw-geometric-
   tolerance ≠ is the 11-07 take (edge click places a frame) against live2's 11-18 retake (edge click attaches a

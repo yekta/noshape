@@ -883,7 +883,9 @@ impl DrawingEditor {
         };
         let fit = matches!(tol, "Fit" | "Fit with tolerance" | "Fit (Tolerance only)");
         let fo = fmt.fit.clone();
-        let ansi_default = self.drawing.dim_fit_ansi();
+        // A hole callout's default is Annotations › Hole/thread callouts › Fit standard, a dimension's Dimensions ›
+        // Fit standard.
+        let ansi_default = if hole { self.drawing.hole_fit_ansi() } else { self.drawing.dim_fit_ansi() };
         let standard = match fo.iso {
             Some(true) => "ISO",
             Some(false) => "ANSI",

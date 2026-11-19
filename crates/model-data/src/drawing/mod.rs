@@ -4640,6 +4640,11 @@ impl Drawing {
         self.props.dim_fit_ansi.unwrap_or_else(|| self.is_ansi())
     }
 
+    /// Annotations › Hole/thread callouts › Fit standard ANSI (else ISO): a hole callout's fit classes.
+    pub fn hole_fit_ansi(&self) -> bool {
+        !self.props.fit_iso
+    }
+
     /// Ordinate dimensions › Dimension style ANSI (else ISO).
     pub fn ordinate_ansi(&self) -> bool {
         self.props.ordinate_ansi.unwrap_or_else(|| self.is_ansi())

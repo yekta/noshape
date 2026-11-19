@@ -2365,3 +2365,33 @@ fn a_cutting_line_hovered_frames_its_section_blue_and_its_body_does_not_drag(cx:
     assert_eq!(points(cx), before, "the cut didn't move");
     assert_eq!(cx.update(|cx| editor.read(cx).selection.clone()), vec![Sel::View(base)], "the parent view selected");
 }
+
+/// Live2 drw-tools-1119: the Callout tool lights an edge one pixel farther out than the other tools (live 5 px against
+/// ours 4 in the same take): within 8 px, not at 10.
+#[gpui::test]
+fn the_callout_tool_lights_an_edge_a_pixel_past_the_pickbox(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-callout-reach");
+    real_sheet(cx, window, &editor);
+    let (mid, normal) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+        let len = |p: &[[f64; 2]]| (p[1][0] - p[0][0]).hypot(p[1][1] - p[0][1]);
+        let edge = g.edges.iter().filter(|x| x.visible && x.points.len() == 2).max_by(|a, b| len(&a.points).total_cmp(&len(&b.points))).expect("a straight edge");
+        let (a, b) = (pl.to_sheet(edge.points[0]), pl.to_sheet(edge.points[1]));
+        let l = (b[0] - a[0]).hypot(b[1] - a[1]);
+        ([(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0], [-(b[1] - a[1]) / l, (b[0] - a[0]) / l])
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Balloon { anchor: None }, cx)));
+    draw(cx, window);
+    let edge = lit_at(cx, window, &editor, mid);
+    assert!(matches!(edge, Some(Sel::Edge(..))), "on the edge: {edge:?}");
+    for (px, lights) in [(7.5, true), (10.0, false)] {
+        for sign in [1.0, -1.0] {
+            let mm = cx.update(|cx| editor.read(cx).tol_mm(px));
+            let lit = lit_at(cx, window, &editor, [mid[0] + normal[0] * mm * sign, mid[1] + normal[1] * mm * sign]);
+            assert_eq!(lit == edge, lights, "{} px off the edge: lit {lit:?}", sign * px);
+        }
+    }
+}
