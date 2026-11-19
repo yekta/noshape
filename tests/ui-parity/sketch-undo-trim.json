@@ -19,6 +19,15 @@
   },
   {
    "do": "key",
+   "key": "shift+z"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "key",
    "key": "l"
   },
   {
