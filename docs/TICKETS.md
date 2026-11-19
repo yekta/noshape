@@ -842,12 +842,12 @@ Sheets tickets/asm-snapmode-sheet.png, row-dblclick-sheet.png, drw-feel-1118.png
 2110/2172 scenarios (05:51 run on a67911be: 2126). 67 failing; 28 pass on the re-run (load flakes or fixed). The 39 still failing
 went to owners as P0 (skasm 14, studios 15, psui 7, asm 2, dx 1); the regressions since 05:51 are ticketed here. Scores:
 qa-scratch/suites/1119-1610-eb3b06a8-uipr/score.log.
-- [ ] **P0 FEEL-TRIM-PERPENDICULAR (skasm)**: sketch-line-from-midpoint step 9: a constraint live PERPENDICULAR / ours VERTICAL
+- [x] (skasm 9a872f696; verified qa 21:12 on green 233519a8 (vibe2 re-run 1119-2120-233519a8-rr: match)) **P0 FEEL-TRIM-PERPENDICULAR (skasm)**: sketch-line-from-midpoint step 9: a constraint live PERPENDICULAR / ours VERTICAL
   (live2 retake 11-19 17:0x confirms live). The three trim rows (sketch-trim-drag / -key / undo-trim) were stale takes: today's live
   gives VERTICAL = ours once zoomed one Shift+Z step (the default view clicks a glyph); live2's retakes landed (ae7a6d55); re-check 18:22 on green ae7a6d55: the 3 trims match, line-from-midpoint still ≠.
-- [ ] **P0 FEEL-SELECT-FILLET-FACES (psui)**: face-rclick-select-fillet-faces step 3: selection count live 0 / ours 1 (passed 05:51; live2 retake 17:0x: live 0: live has no safe triangle, a diagonal move closes the submenu and selects nothing; a triangle would deviate).
-- [ ] **P0 FEEL-VERSION-ROW-TOOLTIP (studios)**: ver-row-tooltip step 2: live "Open version V1" / ours no tooltip (passed 05:51; live2 retake 17:0x confirms).
-- [ ] **P0 FEEL-DRW-COPY-DRAG (studios)**: drw-copy-annotation-drag step 6: the copied annotation's x live 105.5 / ours 70.6 (passed 05:51).
+- [ ] **P0 FEEL-SELECT-FILLET-FACES (psui)**: still ≠ on green 233519a8 (qa 21:12): face-rclick-select-fillet-faces step 3: selection count live 0 / ours 1 (passed 05:51; live2 retake 17:0x: live 0: live has no safe triangle, a diagonal move closes the submenu and selects nothing; a triangle would deviate).
+- [x] (studios 6055ccb55; verified qa 21:12 on green 233519a8 (vibe2 re-run 1119-2120-233519a8-rr: match)) **P0 FEEL-VERSION-ROW-TOOLTIP (studios)**: ver-row-tooltip step 2: live "Open version V1" / ours no tooltip (passed 05:51; live2 retake 17:0x confirms).
+- [x] (studios 6055ccb55; verified qa 21:12 on green 233519a8 (vibe2 re-run 1119-2120-233519a8-rr: match)) **P0 FEEL-DRW-COPY-DRAG (studios)**: drw-copy-annotation-drag step 6: the copied annotation's x live 105.5 / ours 70.6 (passed 05:51).
 
 ## Interaction feel vs live2's 11-18 06:0x numbers (qa 06:55, green cafe3c2af, vibex8 Xvfb at load 8-14, real xdotool pointer; llvmpipe)
 Method: the block (block-fillet) and a sketch-only document, fast sweeps of 4 moves 8 ms apart, one screen crop d ms after the stop per
@@ -5534,6 +5534,8 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   skasm 11-06 (lead: P1): done on local branch skasm/screen-reach, held until our default view's scale matches live's
   (live request 15:39): the three scenarios' clicks sit 0.1-1.6 % inside the 10 px edge at our runner's zoom
   (0.275 mm / px at 1919 x 992); handoff/skasm.md "11-06 afternoon".
+  qa 11-19 21:12: sketch-vertical-key still ≠ on every run since 11-18 (green 233519a8: step 6 ours COINCIDENT + VERTICAL,
+  live COINCIDENT only); skasm/screen-reach never landed -> skasm.
 - [x] (psui 2026-11-11 21:21: 6 of 6 runs match 9/9 on vibe5's release build while 8 ui-parity shards loaded it; matched in qa's 15:57 and 19:57 suites too) P2 UIP-ASM-FASTENED-FLAKY (skasm) the ui-parity scenario asm-fastened-undo-picks differs 1 run in 4 (vibe5, release
   build of main 08:30, run alone four times with `tools/ui-parity/run.py`): at step 4 the Fastened dialog's second query
   field ("Mate connectors") holds one item ("Mate connector of Part 2 <1>") where live's has none, then the selection
