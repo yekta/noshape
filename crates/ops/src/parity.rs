@@ -31,6 +31,15 @@ struct Use {
     shape: Value,
     ends: Option<[[f64; 2]; 2]>,
     point: Option<[f64; 2]>,
+    /// Live's used edge's ends or vertex as it evaluated them before the sketch (refs.jsonl, world metres): the stored
+    /// entity can be stale (c2-sm-rocker-enclosure-sm's Sketch 2: stored 0.725 mm off its face's edges).
+    live: Option<LiveUse>,
+}
+
+#[derive(Clone, Copy)]
+enum LiveUse {
+    Ends([[f64; 3]; 2]),
+    Point([f64; 3]),
 }
 
 /// One referenced entity as live evaluated it (`refs.jsonl`), SI units.
@@ -157,6 +166,9 @@ pub struct Translator<'a> {
     /// Onshape sketch frames by feature id (`sketches` from `GET …/sketches`):
     /// origin, x, y in metres.
     frames: HashMap<String, [[f64; 3]; 3]>,
+    /// The sketch being translated has a Use that landed where live's model had it, off its stale stored entity: its
+    /// constraints' moves follow live's solve.
+    stale_uses: bool,
     /// Live's sketch bodies (`sketchBodies`' sketches), for an in-context sketch's frame.
     sketch_bodies: Vec<Value>,
     /// Live's in-context entities (`contextEntities`, `<element>.context.jsonl` lines).
@@ -480,7 +492,7 @@ impl<'a> Translator<'a> {
                 config_defaults.entry(k.to_string()).or_insert_with(|| v.to_string());
             }
         }
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, live_states: doc["featureStates"].clone(), sub_feature: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), derived_sketches: HashMap::new(), sketch_tabs: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, stale_uses: false, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, live_states: doc["featureStates"].clone(), sub_feature: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), derived_sketches: HashMap::new(), sketch_tabs: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -1691,17 +1703,35 @@ impl<'a> Translator<'a> {
             };
             p.and_then(|p| p[0].as_f64().zip(p[1].as_f64())).is_some_and(|(x, y)| (x * map.k - q[0]).hypot(y * map.k - q[1]) < 1e-7)
         };
-        let landed = |c: &Value| match (u.point, u.ends) {
+        // Live's used geometry in live's sketch coordinates (its frame; ours where live's wasn't fetched), for `near`.
+        let frame = Some(map.onshape.unwrap_or(map.ours));
+        let local = |w: [f64; 3]| frame.map(|[o, x, y]| {
+            let d = [w[0] - o[0], w[1] - o[1], w[2] - o[2]];
+            let dot = |v: [f64; 3]| d[0] * v[0] + d[1] * v[1] + d[2] * v[2];
+            [dot(x), dot(y)]
+        });
+        let chord = |[a, b]: [[f64; 2]; 2]| (a[0] - b[0]).hypot(a[1] - b[1]);
+        let live = match u.live {
+            // Only a stored curve as long as live's edge moved off it; a shorter one is a piece live split or trimmed
+            // (asm-welding-config 9c7704's Sketch 12).
+            Some(LiveUse::Ends([a, b])) => local(a).zip(local(b)).map(|(a, b)| [a, b]).filter(|e| u.ends.is_some_and(|s| (chord(s) - chord(*e)).abs() <= 1e-7)).map(|e| (None, Some(e))),
+            Some(LiveUse::Point(p)) => local(p).map(|p| (Some(p), None)),
+            None => None,
+        };
+        let at = |c: &Value, point: Option<[f64; 2]>, ends: Option<[[f64; 2]; 2]>| match (point, ends) {
             (Some(p), _) => near(c, "at", p),
             (None, Some([a, b])) => (near(c, "start", a) && near(c, "end", b)) || (near(c, "start", b) && near(c, "end", a)),
             (None, None) => true,
         };
+        // Where live's sketch stored it, or where live's model had it before the sketch (the stored entity stale).
+        let landed = |c: &Value| at(c, u.point, u.ends) || live.is_some_and(|(p, e)| at(c, p, e));
         let created: Vec<Value> = made.as_ref().and_then(|r| r["created"].as_array().cloned()).unwrap_or_default();
         let kind: Vec<&Value> = created.iter().filter(|c| (c["type"] == "point") == point).collect();
         // A curved face's Use makes each of its silhouettes: the one live's curve is (live keeps only that one,
         // c2-fan-blade-sweep's Sketch 4).
         let ours = kind.iter().find(|c| landed(c)).or(kind.first()).map(|c| (*c).clone());
         let lands = ours.as_ref().is_some_and(landed);
+        let stale = lands && ours.as_ref().is_some_and(|c| !at(c, u.point, u.ends));
         if lands
             && kind.len() > 1
             && self.silhouettes.contains(&(oid.to_string(), u.eid.clone()))
@@ -1710,6 +1740,7 @@ impl<'a> Translator<'a> {
             let others: Vec<&str> = kind.iter().filter_map(|c| c["id"].as_str()).filter(|x| *x != keep).collect();
             let _ = self.call("sketch_delete", json!({ "sketch": id, "entities": others }));
         }
+        self.stale_uses |= stale;
         if let (true, Some(c)) = (lands, ours) {
             // A construction Use stays construction (c2-fan-blade-sweep's Sketch 9: its Ø6.8 boss circle bounds no
             // region, the Ø7.5 circle's whole disc is cut).
@@ -5097,10 +5128,15 @@ impl<'a> Translator<'a> {
                 self.curves.insert((oid.clone(), eid.clone()), poly);
             }
             let used = shape.as_ref().and_then(|_| projected.get(&eid)).and_then(|(cid, p)| self.external_ref(k, cid, p));
+            let live = projected.get(&eid).and_then(|(_, p)| p["queries"].as_array()?.first()?["deterministicIds"].as_array()?.first()?.as_str()).and_then(|id| self.refs.get(&(k, id.to_string()))).filter(|r| !r.self_made).and_then(|r| match r.kind.as_str() {
+                "EDGE" => r.ends.map(LiveUse::Ends),
+                "VERTEX" => r.point.map(LiveUse::Point),
+                _ => None,
+            });
             match shape {
                 Some(s) if used.is_some() => {
                     let point = (s["tool"] == "point").then(|| [e["x"].as_f64().unwrap_or(0.0), e["y"].as_f64().unwrap_or(0.0)]);
-                    uses.push(Use { intersect: intersected.contains(&eid), eid, reference: used.unwrap_or_default(), shape: s, ends: end_points, point });
+                    uses.push(Use { intersect: intersected.contains(&eid), eid, reference: used.unwrap_or_default(), shape: s, ends: end_points, point, live });
                 }
                 // A Use whose model geometry isn't named: drawn after the Uses ours makes (`moved_uses`).
                 Some(s) if projected.contains_key(&eid) => {
@@ -5108,7 +5144,7 @@ impl<'a> Translator<'a> {
                         eprintln!("TRACE use {oid} {eid}: its model geometry not found: {}", projected.get(&eid).map(|(c, p)| format!("{c} {p}")).unwrap_or_default().chars().take(400).collect::<String>());
                     }
                     let point = (s["tool"] == "point").then(|| [e["x"].as_f64().unwrap_or(0.0), e["y"].as_f64().unwrap_or(0.0)]);
-                    unnamed_uses.push(Use { intersect: intersected.contains(&eid), eid, reference: String::new(), shape: s, ends: end_points, point });
+                    unnamed_uses.push(Use { intersect: intersected.contains(&eid), eid, reference: String::new(), shape: s, ends: end_points, point, live: None });
                 }
                 Some(s) => {
                     shapes.push(s);
@@ -5124,6 +5160,7 @@ impl<'a> Translator<'a> {
         let unit = per_unit(&ours["units"]);
         let v = |key: &str| -> [f64; 3] { std::array::from_fn(|i| ours["frame"][key][i].as_f64().unwrap_or(0.0)) };
         self.sketch_map = SketchMap { onshape: frame, ours: [v("origin").map(|c| c * unit), v("x"), v("y")], k: unit };
+        self.stale_uses = false;
         if uses.is_empty() {
             let mut moved = Vec::new();
             let left: Vec<Use> = std::mem::take(&mut unnamed_uses).into_iter().filter_map(|u| self.use_nearest(&oid, &id, u, problems, &mut moved)).collect();
@@ -5219,7 +5256,9 @@ impl<'a> Translator<'a> {
         // it, and the stored geometry wasn't (c2-surf-workshop-cpcurves' Sketch 4: its circle stored 18.8 mm off JPg).
         // Within 10 µm when it was 0.1 mm or more off: our vertex can be a hair off live's (manualblend's JNE, 1.2 µm).
         let anchored = matches!((self.anchors_off(k, &oid, f, &before), self.anchors_off(k, &oid, f, &after)), (Some(b), Some(a)) if (b > 1e-6 && a <= 1e-6) || (b > 1e-4 && a <= 1e-5));
-        let keep = (!live_regions.is_empty() && regions_as_live(&after) > regions_as_live(&before)) || closer || anchored;
+        // Or when a Use landed where live's model had its edge, off the stale stored entity: live's solve moves the
+        // rest onto it too (c2-sm-rocker-enclosure-sm's Sketch 2: its lines 0.725 mm onto the face's edges).
+        let keep = (!live_regions.is_empty() && regions_as_live(&after) > regions_as_live(&before)) || closer || anchored || self.stale_uses;
         if moved > 1e-7 && !keep {
             // Undone back to the edit before them (deleting them would leave
             // the points moved; some calls make no edit, so not by count).
