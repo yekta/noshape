@@ -825,15 +825,15 @@ edits say the same; "Update feature" is its API). Not judged: open / scroll timi
   hist-v3-click.png). The last hovered row also keeps its tint after the pointer leaves the panel.
   Live: the click opens that microversion, the row selected #b2ddf6, with "History changes are view only. Viewing <change>"
   [Restore to Main] [Return to Main].
-- [ ] **P1 HISTFEEL-CHANGE-BAR (studios)**: right-click › Open on a change row opens it (row selected, model changes) but shows an
+- [ ] (studios fixed c5c79882f, on main; to verify) **P1 HISTFEEL-CHANGE-BAR (studios)**: right-click › Open on a change row opens it (row selected, model changes) but shows an
   orange "VIEWING HISTORY" badge after "Main" in the navbar and no bar; live: the navbar says the version it belongs to ("V3") and
   the white bar above; the panel header keeps only the compare icon and × (ours keeps all four icons, for a version too).
 - [x] (verified qa 09:24 on green 83922ad8: an expanded version reads "⌄ 15 changes") **P2 HISTFEEL-EXPANDED (studios)**: an expanded version reads "⌄ Hide changes…" (live "⌄ 15 changes", the count); its change
   rows are 26 px, white, with a time in Modified (live 30 px, grey background, Modified empty).
-- [ ] **P2 HISTFEEL-SCROLL (studios)**: the search box and toggles stay put while the rows scroll, and the legend (Workspace, Version,
+- [ ] (studios fixed f7bf434a2, on main; to verify) **P2 HISTFEEL-SCROLL (studios)**: the search box and toggles stay put while the rows scroll, and the legend (Workspace, Version,
   Change, …) is pinned at the panel's bottom with the graph lines drawn over it; live scrolls search, toggles and rows in one
   container with only "Name | Modified" pinned, and the legend comes after Start at the end of the list.
-- [ ] **P2 HISTFEEL-CHANGE-TOOLTIP (studios)**: a change row hovered 2 s shows no tooltip (live "<change>: Change by <user> at 11:42 PM
+- [ ] (studios: the change row's tooltip f7bf434a2, on main; the version row's beside the panel 11-19 01:45; to verify) **P2 HISTFEEL-CHANGE-TOOLTIP (studios)**: a change row hovered 2 s shows no tooltip (live "<change>: Change by <user> at 11:42 PM
   Today"); a version row's tooltip sits under the pointer (live: beside the panel's right edge).
 
 ## Sheet metal, right-click menus and navigation vs live's 11-17 captures (qa 00:16, green 7187ac751, vibex6 Xvfb, real pointer and keys)
@@ -884,11 +884,11 @@ snippet, Tab closes and inserts a tab, Esc keeps "op"; Commit solid blue while e
   it grey (184,184,184) at the end (as ours draws it in a fresh document). Recapture: #b8b8b8 with the pointer away, rolled back or
   not; (200,217,226) only while hovered: my 2 s shot had the pointer still on it. 8d2e0056 restores ours.
 - [ ] **P2 FLFEEL-BAR-MENU (psui)**: a right-click on the rollback bar opens no menu; live's has "Roll to end".
-- [ ] **P1 VSFEEL-NAME-RED (studios)**: an invalid name ("10", "1x") isn't marked while typed (live: red border, pink fill at once);
+- [ ] (studios fixed d94834aa7, on main; to verify) **P1 VSFEEL-NAME-RED (studios)**: an invalid name ("10", "1x") isn't marked while typed (live: red border, pink fill at once);
   after an Enter on it, Esc keeps the text (live throws it away).
-- [ ] **P1 VSFEEL-UNITS (studios)**: "2 in" in a Length (mm document) stays "2 in" in the cell (live: "50.8 mm"); a selected value cell
+- [ ] (studios fixed d94834aa7, on main; to verify) **P1 VSFEEL-UNITS (studios)**: "2 in" in a Length (mm document) stays "2 in" in the cell (live: "50.8 mm"); a selected value cell
   shows no expression bubble over the Value header (live: "2 in" / "10 mm").
-- [ ] **P2 VSFEEL-ERROR-BUBBLE (studios)**: a selected error value has the blue border and no bubble (live: red border, grey "Error
+- [ ] (studios fixed d94834aa7, on main; to verify) **P2 VSFEEL-ERROR-BUBBLE (studios)**: a selected error value has the blue border and no bubble (live: red border, grey "Error
   regenerating." over the Value header).
 - Not judged: the regeneration spinner (the louver's roll back to the end finished in under 0.8 s here); undo of Hide; the FS gutter
   marker came 0.5-1.5 s after typing (debug build at load 24; live within 0.5 s) and the grey "out of date" step.
