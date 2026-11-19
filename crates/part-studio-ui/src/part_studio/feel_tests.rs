@@ -134,12 +134,16 @@ fn a_click_beside_an_edge_selects_what_is_lit(cx: &mut TestAppContext) {
                 .map(|(r, m, n, _)| (r, m, n))
                 .unwrap()
         });
-        // The pick square reaches a slanted edge further than a level one: 5 px × (|nx| + |ny|) to its pick band (1.5
-        // px each side at rest, 4.5 lit).
-        let square = 5.0 * (across.x.abs() + across.y.abs());
-        let (reach, hold) = (square + 1.5, square + 4.5);
-        let steps = [-1.0, 1.0f64].into_iter().flat_map(|side| {
-            [(2.0 * hold, false), (reach + 1.5, false), (reach - 1.0, true), (hold + 1.5, false)].map(|(d, lit)| (side * d, lit))
+        // Live reach-px-1119 (full-page shots): an edge lights from 5 px over the background, 7 over a face, slanted
+        // or not, with no hold (lit on the way back to the same distance). Which side is which: a face lit far off (a
+        // plane behind counts as the background).
+        let side_reach = |cx: &mut TestAppContext, side: f64| {
+            pointer.move_to(cx, &view, on + across * (side * 14.0));
+            if cx.update(|cx| matches!(view.read(cx).hover, Some(Reference::Face(_)))) { 7.0 } else { 5.0 }
+        };
+        let reaches = [(-1.0, side_reach(cx, -1.0)), (1.0, side_reach(cx, 1.0))];
+        let steps = reaches.into_iter().flat_map(|(side, reach)| {
+            [(14.0, false), (reach + 1.0, false), (reach - 0.5, true), (reach + 1.0, false)].map(|(d, lit)| (side * d, lit))
         });
         for (off, lights) in steps {
             cx.update_window(window, |_, _, cx| {

@@ -48,6 +48,15 @@ impl PickKind {
     }
 }
 
+/// A kind's class for the viewport's pick: edges reach further over faces (and over a sketch region lying on one).
+pub fn pick_class(kind: PickKind) -> noshape_render::PickClass {
+    match kind {
+        PickKind::Edge => noshape_render::PickClass::Edge,
+        PickKind::Face | PickKind::SketchRegion => noshape_render::PickClass::Face,
+        _ => noshape_render::PickClass::Other,
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct PickTarget {
     pub reference: Reference,
@@ -329,6 +338,12 @@ impl PickMap {
     /// picked or hovered (a dialog field's selection filter, Onshape).
     pub fn priority_fn_filtered(&self, allow: impl Fn(PickKind) -> bool) -> Arc<dyn Fn(u32) -> i32 + Send + Sync> {
         self.priority_fn_with(allow)
+    }
+
+    /// Each pick id's class: the viewport reaches edges further over a face (live reach-px-1119).
+    pub fn class_fn(&self) -> Arc<dyn Fn(u32) -> noshape_render::PickClass + Send + Sync> {
+        let class: Vec<noshape_render::PickClass> = self.iter().map(|t| pick_class(t.kind)).collect();
+        Arc::new(move |id| if id == 0 { noshape_render::PickClass::Other } else { class.get(id as usize - 1).copied().unwrap_or(noshape_render::PickClass::Other) })
     }
 
     fn priority_fn_with(&self, allow: impl Fn(PickKind) -> bool) -> Arc<dyn Fn(u32) -> i32 + Send + Sync> {
@@ -1270,8 +1285,9 @@ fn upload_body(m: &noshape_model::display::MeshBuffers, up: &Uploader) -> Cached
     let mut lines = LineData::default();
     lines.segments.reserve(m.edges.iter().map(|e| e.len().saturating_sub(1)).sum());
     for (ei, pl) in m.edges.iter().enumerate() {
-        // Onshape DEFAULT_LINE_WIDTH 1 (live EDGE-HIGHLIGHT-LOOK: a plain edge is 1 CSS px, antialiased).
-        lines.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, 1.0, LineSegment::CORE);
+        // Onshape DEFAULT_LINE_WIDTH 1 (live EDGE-HIGHLIGHT-LOOK: a plain edge is 1 CSS px, antialiased); picked at
+        // that width, no hold (live reach-px-1119: lit from 5 px, gone at 6, a click 4 px out takes it).
+        lines.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, 1.0, LineSegment::CORE | LineSegment::DRAWN_PICK);
     }
     let points = PointData {
         points: m.vertices.iter().enumerate().map(|(i, p)| PointSprite { position: *p, color: [255; 4], pick_id: i as u32 + 1, size: 6.0, style: 0, _pad: 0 }).collect(),

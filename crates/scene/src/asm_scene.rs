@@ -80,6 +80,12 @@ impl AsmPickMap {
         let prio: Vec<i32> = self.targets.iter().map(|t| t.kind.priority()).collect();
         Arc::new(move |id| if id == 0 { -1 } else if noshape_render::section_cap_of_pick(id).is_some() { 0 } else { prio.get(id as usize - 1).copied().unwrap_or(100) })
     }
+
+    /// Each pick id's class (an edge reached further over a face, as in a Part Studio: live reach-px-1119).
+    pub fn class_fn(&self) -> Arc<dyn Fn(u32) -> noshape_render::PickClass + Send + Sync> {
+        let class: Vec<noshape_render::PickClass> = self.targets.iter().map(|t| crate::builder::pick_class(t.kind)).collect();
+        Arc::new(move |id| if id == 0 { noshape_render::PickClass::Other } else { class.get(id as usize - 1).copied().unwrap_or(noshape_render::PickClass::Other) })
+    }
 }
 
 struct CachedBody {
@@ -345,7 +351,7 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                                 if smooth.get(ei).copied().unwrap_or(false) {
                                     phantom.push_polyline(pl, [0, 0, 0, 255], 0, 1.0, LineSegment::DASH_DOT);
                                 } else {
-                                    sharp.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, noshape_render::scene::PART_EDGE_WIDTH, LineSegment::NO_HOLD);
+                                    sharp.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, noshape_render::scene::PART_EDGE_WIDTH, LineSegment::NO_HOLD | LineSegment::DRAWN_PICK);
                                 }
                             }
                             let h = (up.upload_lines(&sharp), up.upload_lines(&phantom));
@@ -454,7 +460,7 @@ fn upload_body(m: &MeshBuffers, up: &Uploader) -> CachedBody {
     let mut lines = LineData::default();
     for (ei, pl) in m.edges.iter().enumerate() {
         // (Hovered, an assembly's edge holds nothing further off: live/feel/3d.json lights it at 6 px, lit to 6.)
-        lines.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, noshape_render::scene::PART_EDGE_WIDTH, LineSegment::NO_HOLD);
+        lines.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, noshape_render::scene::PART_EDGE_WIDTH, LineSegment::NO_HOLD | LineSegment::DRAWN_PICK);
     }
     let points = PointData {
         points: m.vertices.iter().enumerate().map(|(i, p)| PointSprite { position: *p, color: [255; 4], pick_id: i as u32 + 1, size: 6.0, style: 0, _pad: 0 }).collect(),

@@ -1634,7 +1634,11 @@ impl PartStudioView {
         self.ui.pick_filter = Some(key);
         self.ui.pick_unhovered = own_plane;
         self.ui.pick_muted = muted;
-        self.viewport.update(cx, |vp, _| vp.pick_priority = prio);
+        let class = built.picks.class_fn();
+        self.viewport.update(cx, |vp, _| {
+            vp.pick_priority = prio;
+            vp.pick_class = class;
+        });
     }
 
     pub(super) fn part_for_field(&self, r: &Reference, filter: QueryFilter) -> Option<Reference> {

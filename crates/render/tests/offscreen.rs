@@ -624,7 +624,7 @@ fn our_3d_pick_reach_for_edges_and_vertices() {
     cam.fit_sphere(glam::DVec3::ZERO, 0.05, w as f64 / h as f64);
     // The top face's front edge (y = lo, z = hi) as the builder draws a part edge, and its left end's vertex.
     let mut edge = LineData::default();
-    edge.push_polyline(&[[lo[0], lo[1], hi[2]], [hi[0], lo[1], hi[2]]], [0, 0, 0, 255], 50, 1.0, LineSegment::CORE);
+    edge.push_polyline(&[[lo[0], lo[1], hi[2]], [hi[0], lo[1], hi[2]]], [0, 0, 0, 255], 50, 1.0, LineSegment::CORE | LineSegment::DRAWN_PICK);
     let vertex = PointData { points: vec![PointSprite { position: [lo[0], lo[1], hi[2]], color: [255; 4], pick_id: 60, size: 6.0, style: 0, _pad: 0 }] };
     let scene = Scene {
         instances: vec![
@@ -648,13 +648,14 @@ fn our_3d_pick_reach_for_edges_and_vertices() {
         let size = glam::DVec2::new(dw as f64, dh as f64);
         let screen = |p: [f32; 3]| cam.project(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64), size, 0.05).unwrap();
         let radius = (5.0 * dpr) as i32;
-        let at = |q: glam::DVec2| pick.pick(q.x.round() as i32, q.y.round() as i32, radius, prio);
+        let at = |q: glam::DVec2| pick.pick_reaching(q.x.round() as i32, q.y.round() as i32, radius, (7.0 * dpr) as i32, |id| if id == 50 { noshape_render::PickClass::Edge } else { noshape_render::PickClass::Face }, prio);
         // CSS px off the edge's middle, straight across it (outward over the background, inward over the top face).
         let mid = screen([0.0, lo[1], hi[2]]);
         let inward = (screen([0.0, 0.0, hi[2]]) - mid).normalize();
         let reach = |dir: glam::DVec2, id: u32| (0..40).take_while(|k| at(mid + dir * (*k as f64 * dpr as f64)) == Some(id)).count() as i32 - 1;
         let (out, inn) = (reach(-inward, 50), reach(inward, 50));
-        assert!(out == 7 && inn == 7, "dpr {dpr}: an edge lights from {out} px off it over the background, {inn} over its face");
+        // Live reach-px-1119: from 5 px over the background, 7 over its face.
+        assert!(out == 5 && inn == 7, "dpr {dpr}: an edge lights from {out} px off it over the background, {inn} over its face");
         // The vertex straight out (left of the part) and along the diagonal away from it; it beats the edge where both
         // are in reach.
         let corner = screen([lo[0], lo[1], hi[2]]);
@@ -666,7 +667,8 @@ fn our_3d_pick_reach_for_edges_and_vertices() {
         assert_eq!(at(corner + along * (6.0 * dpr as f64)), Some(60), "dpr {dpr}: on its edge 6 px from the vertex, the vertex wins");
         eprintln!("dpr {dpr}: edge {out} px out / {inn} px in, vertex {v} px ({diag} diagonally)");
     }
-    // Hovered itself, the edge holds the hover to 9–10 px off it (live: a lit edge stays lit to 9–10).
+    // Hovered itself, the edge holds the hover no further (live reach-px-1119: lit to 5 over the background, 7 over
+    // its face, either way).
     let mut scene = scene;
     scene.add_flag(50, noshape_render::scene::state::HOVER);
     for dpr in [1.0f32, 2.0] {
@@ -676,12 +678,12 @@ fn our_3d_pick_reach_for_edges_and_vertices() {
         let size = glam::DVec2::new(dw as f64, dh as f64);
         let screen = |p: [f32; 3]| cam.project(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64), size, 0.05).unwrap();
         let radius = (5.0 * dpr) as i32;
-        let at = |q: glam::DVec2| pick.pick(q.x.round() as i32, q.y.round() as i32, radius, prio);
+        let at = |q: glam::DVec2| pick.pick_reaching(q.x.round() as i32, q.y.round() as i32, radius, (7.0 * dpr) as i32, |id| if id == 50 { noshape_render::PickClass::Edge } else { noshape_render::PickClass::Face }, prio);
         let mid = screen([0.0, lo[1], hi[2]]);
         let inward = (screen([0.0, 0.0, hi[2]]) - mid).normalize();
         let reach = |dir: glam::DVec2| (0..40).take_while(|k| at(mid + dir * (*k as f64 * dpr as f64)) == Some(50)).count() as i32 - 1;
         let (out, inn) = (reach(-inward), reach(inward));
-        assert!((9..=10).contains(&out) && (9..=10).contains(&inn), "dpr {dpr}: a hovered edge holds to {out} px over the background, {inn} over its face");
+        assert!(out == 5 && inn == 7, "dpr {dpr}: a hovered edge holds to {out} px over the background, {inn} over its face");
     }
 }
 
@@ -2901,15 +2903,16 @@ fn the_3d_pick_matrix_matches_live() {
     let (edge, vertex, line, point, border, line_on_edge, point_on_vertex) = (50u32, 60u32, 70u32, 80u32, 90u32, 71u32, 81u32);
     let mut lines = LineData::default();
     // The front top edge's left half, and a sketch line drawn over its right half (a part edge under it).
-    lines.push_polyline(&[[lo[0], lo[1], hi[2]], [0.0, lo[1], hi[2]]], [0, 0, 0, 255], edge, 1.0, LineSegment::CORE);
-    lines.push_polyline(&[[0.0, lo[1], hi[2]], [hi[0], lo[1], hi[2]]], [0, 0, 0, 255], 51, 1.0, LineSegment::CORE);
+    lines.push_polyline(&[[lo[0], lo[1], hi[2]], [0.0, lo[1], hi[2]]], [0, 0, 0, 255], edge, 1.0, LineSegment::CORE | LineSegment::DRAWN_PICK);
+    lines.push_polyline(&[[0.0, lo[1], hi[2]], [hi[0], lo[1], hi[2]]], [0, 0, 0, 255], 51, 1.0, LineSegment::CORE | LineSegment::DRAWN_PICK);
     lines.push_polyline(&[[0.0, lo[1], hi[2]], [hi[0], lo[1], hi[2]]], [0, 0, 255, 255], line_on_edge, 2.0, 0);
     // Off the part: a shown sketch's line, a plane's border.
     lines.push_polyline(&[[-0.03, 0.03, 0.0], [0.0, 0.03, 0.0]], [0, 0, 255, 255], line, 2.0, 0);
     lines.push_polyline(&[[-0.03, 0.045, 0.0], [0.03, 0.045, 0.0]], [0, 0, 0, 255], border, 2.0, LineSegment::NO_HOLD | LineSegment::DRAWN_PICK);
-    // An assembly instance's edge (1.25 px, NO_HOLD as the assembly draws it), off the part.
+    // An assembly instance's edge (1.25 px, NO_HOLD as the assembly draws it), off the part: live lights it from 5 px
+    // (reach-px-1119); its 1.25 px picked at 2x reaches half a pixel more.
     let asm_edge = 92u32;
-    lines.push_polyline(&[[0.05, -0.02, 0.0], [0.05, 0.04, 0.0]], [0, 0, 0, 255], asm_edge, 1.25, LineSegment::NO_HOLD);
+    lines.push_polyline(&[[0.05, -0.02, 0.0], [0.05, 0.04, 0.0]], [0, 0, 0, 255], asm_edge, 1.25, LineSegment::NO_HOLD | LineSegment::DRAWN_PICK);
     let sprite = |p: [f32; 3], id: u32, size: f32, style: u32| PointSprite { position: p, color: [0, 0, 0, 255], pick_id: id, size, style, _pad: 0 };
     let points = PointData {
         points: vec![
@@ -2942,8 +2945,8 @@ fn the_3d_pick_matrix_matches_live() {
     type Row = (&'static str, u32, [f32; 3], (f64, f64), bool, (i32, i32), bool);
     let d = std::f64::consts::FRAC_1_SQRT_2;
     let rows: Vec<Row> = vec![
-        ("edge / across (over the background and its face)", edge, [-0.01, lo[1], hi[2]], (0.0, 1.0), false, (7, 7), false),
-        ("edge, lit / holds", edge, [-0.01, lo[1], hi[2]], (0.0, 1.0), true, (9, 10), false),
+        ("edge / across (live reach-px-1119: 5 over the background, 7 over its face; averaged)", edge, [-0.01, lo[1], hi[2]], (0.0, 1.0), false, (6, 6), false),
+        ("edge, lit / no hold", edge, [-0.01, lo[1], hi[2]], (0.0, 1.0), true, (6, 6), false),
         ("vertex / straight out", vertex, [lo[0], lo[1], hi[2]], (1.0, 0.0), false, (7, 7), false),
         ("vertex / diagonally", vertex, [lo[0], lo[1], hi[2]], (d, d), false, (8, 10), false),
         ("vertex, lit / stays lit", vertex, [lo[0], lo[1], hi[2]], (1.0, 0.0), true, (7, 8), false),
@@ -2953,8 +2956,8 @@ fn the_3d_pick_matrix_matches_live() {
         ("sketch point, lit / stays lit", point, [0.015, 0.03, 0.0], (1.0, 0.0), true, (7, 8), false),
         ("plane border", border, [0.0, 0.045, 0.0], (0.0, 1.0), false, (6, 6), false),
         ("plane border, lit / no hold", border, [0.0, 0.045, 0.0], (0.0, 1.0), true, (6, 6), false),
-        ("assembly instance edge", asm_edge, [0.05, 0.0, 0.0], (1.0, 0.0), false, (6, 6), false),
-        ("assembly instance edge, lit / no hold", asm_edge, [0.05, 0.0, 0.0], (1.0, 0.0), true, (6, 6), false),
+        ("assembly instance edge", asm_edge, [0.05, 0.0, 0.0], (1.0, 0.0), false, (5, 6), false),
+        ("assembly instance edge, lit / no hold", asm_edge, [0.05, 0.0, 0.0], (1.0, 0.0), true, (5, 6), false),
         // Priority: on the spot, the sketch line over the part edge under it, the sketch point over the vertex.
         ("priority / sketch line over a part edge", line_on_edge, [0.01, lo[1], hi[2]], (0.0, 1.0), false, (0, 99), false),
         ("priority / sketch point over a vertex", point_on_vertex, [hi[0], lo[1], hi[2]], (1.0, 0.0), false, (0, 99), false),
@@ -2976,7 +2979,7 @@ fn the_3d_pick_matrix_matches_live() {
             let dir = glam::DVec2::new(dir.0, dir.1);
             let at = |k: f64| {
                 let q = at0 + dir * (k * dpr as f64);
-                pick.pick(q.x.round() as i32, q.y.round() as i32, (5.0 * dpr) as i32, prio)
+                pick.pick_reaching(q.x.round() as i32, q.y.round() as i32, (5.0 * dpr) as i32, (7.0 * dpr) as i32, |id| if [edge, 51, asm_edge].contains(&id) { noshape_render::PickClass::Edge } else { noshape_render::PickClass::Face }, prio)
             };
             let at_dir = |at: &dyn Fn(f64) -> Option<u32>, k: i32, s: f64| at(k as f64 * s);
             let side = |s: f64| (0..40).take_while(|k| at_dir(&at, *k, s) == Some(*id)).count() as i32 - 1;

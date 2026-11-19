@@ -159,6 +159,14 @@ fn pick_radius_px(scale: f32) -> i32 {
     (PICK_RADIUS * f64::from(scale)).round() as i32
 }
 
+/// How far an edge (picked at its drawn width) reaches while the pointer is over a face, CSS px: live reach-px-1119
+/// lights it from 7 px over its face, from 5 over the background ([`pick_radius_px`]).
+const EDGE_OVER_FACE_REACH: f64 = 7.0;
+
+fn edge_reach_px(scale: f32) -> i32 {
+    (EDGE_OVER_FACE_REACH * f64::from(scale)).round() as i32
+}
+
 /// Onshape's pre-highlight with "reduce mouse hover highlight" (on for
 /// accounts, live "nav2 pre-highlight"): `PREHIGHLIGHT_SPEED_THRESHOLD`
 /// (device px/ms), `PAUSED_MOUSE_PREHIGHLIGHT_TIMEOUT_MULTIPLIER`, `_MAX_MS`.
@@ -479,6 +487,8 @@ pub struct Viewport {
     pub manipulators: Vec<(DVec3, DVec3, f64)>,
     /// Pick ids that win ties in the pick radius (edges/points over faces).
     pub pick_priority: Arc<dyn Fn(u32) -> i32 + Send + Sync>,
+    /// Which pick ids are edges and faces: over a face an edge is taken from [`EDGE_OVER_FACE_REACH`] px.
+    pub pick_class: Arc<dyn Fn(u32) -> noshape_render::PickClass + Send + Sync>,
     /// A finished box carries the pick ids inside it (read back from the GPU first). Off: the box's event goes out at
     /// the release, with no ids (a Part Studio works out what a box takes itself; the readback held its selection
     /// 4–5 frames, live recheck 11-18).
@@ -762,6 +772,7 @@ impl Viewport {
             step_clock: None,
             manipulators: Vec::new(),
             pick_priority: Arc::new(|_| 0),
+            pick_class: Arc::new(|_| noshape_render::PickClass::Other),
             box_by_pick: true,
             fit_bounds: None,
             fit_inset_left: 0.0,
@@ -1261,8 +1272,8 @@ impl Viewport {
         if !pick.covers(x, y, r) {
             return None;
         }
-        let prio = self.pick_priority.clone();
-        Some(pick.pick(x, y, r, |id| if skip(id) { i32::MIN } else { prio(id) }))
+        let (prio, class) = (self.pick_priority.clone(), self.pick_class.clone());
+        Some(pick.pick_reaching(x, y, r, edge_reach_px(self.scale), |id| class(id), |id| if skip(id) { i32::MIN } else { prio(id) }))
     }
 
     fn pick_at(&self, local: DVec2) -> Option<Option<u32>> {
@@ -1272,8 +1283,8 @@ impl Viewport {
         if !pick.covers(x, y, r) {
             return None;
         }
-        let prio = self.pick_priority.clone();
-        Some(pick.pick(x, y, r, |id| prio(id)))
+        let (prio, class) = (self.pick_priority.clone(), self.pick_class.clone());
+        Some(pick.pick_reaching(x, y, r, edge_reach_px(self.scale), |id| class(id), |id| prio(id)))
     }
 
     /// Ask the render thread for a pick rectangle.
@@ -1330,9 +1341,10 @@ impl Viewport {
             self.pick_cache = Some(b.clone());
         }
         let r = pick_radius_px(self.scale);
-        let prio = self.pick_priority.clone();
+        let rf = edge_reach_px(self.scale);
+        let (prio, class) = (self.pick_priority.clone(), self.pick_class.clone());
         let pick_in = |b: &Option<Arc<PickBuffer>>, p: DVec2, s: f64| -> Option<u32> {
-            b.as_ref()?.pick((p.x * s) as i32, (p.y * s) as i32, r, |id| prio(id))
+            b.as_ref()?.pick_reaching((p.x * s) as i32, (p.y * s) as i32, r, rf, |id| class(id), |id| prio(id))
         };
         let s = self.scale as f64;
         match purpose {
@@ -1349,7 +1361,7 @@ impl Viewport {
                         && layout_epoch == self.pick_layout_epoch
                         && let Some(b) = buf.as_ref().filter(|b| b.covers(x, y, r))
                     {
-                        self.set_hover(b.pick(x, y, r, |id| prio(id)), cx);
+                        self.set_hover(b.pick_reaching(x, y, r, rf, |id| class(id), |id| prio(id)), cx);
                     }
                     return;
                 }
@@ -1359,7 +1371,7 @@ impl Viewport {
                     let (x, y) = self.device_px(self.last_pos);
                     if let Some(b) = buf.as_ref().filter(|b| b.covers(x, y, r)) {
                         self.box_pick_pending = false;
-                        match b.pick(x, y, r, |id| prio(id)) {
+                        match b.pick_reaching(x, y, r, rf, |id| class(id), |id| prio(id)) {
                             Some(id) => self.set_hover(Some(id), cx),
                             None => {
                                 self.drag = Drag::Box;
@@ -1380,7 +1392,7 @@ impl Viewport {
                     // asked moves nothing), else at once a pick where the pointer is.
                     let (x, y) = self.device_px(self.last_pos);
                     match buf.as_ref().filter(|b| b.covers(x, y, r)) {
-                        Some(b) => self.set_hover(b.pick(x, y, r, |id| prio(id)), cx),
+                        Some(b) => self.set_hover(b.pick_reaching(x, y, r, rf, |id| class(id), |id| prio(id)), cx),
                         None => self.hover_query_again = true,
                     }
                 } else {

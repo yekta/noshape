@@ -276,6 +276,15 @@ pub struct Frame {
     pub rendered_at: std::time::Instant,
 }
 
+/// What a pick id is to [`PickBuffer::pick_reaching`]: an edge (reached by its distance, further over a face), a face,
+/// or anything else.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PickClass {
+    Edge,
+    Face,
+    Other,
+}
+
 /// Pick ids of a rectangle of a frame (possibly the whole frame).
 #[derive(Clone, Debug)]
 pub struct PickBuffer {
@@ -351,12 +360,30 @@ impl PickBuffer {
     /// gatherPicksFromPickPass: coverage its share of the square's pixels, distance its nearest pixel's from the centre,
     /// 0 there and 1 at a corner); then the lower id.
     pub fn pick(&self, x: i32, y: i32, radius: i32, priority: impl Fn(u32) -> i32) -> Option<u32> {
+        self.pick_reaching(x, y, radius, radius, |_| PickClass::Other, priority)
+    }
+
+    /// [`Self::pick`] where edges (picked at their drawn width, [`PickClass::Edge`]) are taken by their distance from
+    /// the pointer, whatever their slant: within `radius`, `far_radius` while the pointer is over a face
+    /// (live reach-px-1119: an edge lights from 5 px over the background and 7 over a face, iso's slanted edges too;
+    /// the square's corners reached ~2 px further across them).
+    pub fn pick_reaching(&self, x: i32, y: i32, radius: i32, far_radius: i32, class: impl Fn(u32) -> PickClass, priority: impl Fn(u32) -> i32) -> Option<u32> {
+        let far = |id: u32| class(id) == PickClass::Edge;
+        let over = self.id_at(x, y).is_some_and(|c| c != 0 && class(c) == PickClass::Face);
+        let edge_reach = if over { far_radius.max(radius) } else { radius };
+        // Its drawn pixels' centres within r of the pointer (live measures from the drawn edge pixel).
+        let edge_reach2 = edge_reach * edge_reach;
+        let reach = edge_reach.max(radius);
         // (id, its priority, pixels hit, nearest squared distance); a few ids under the pointer.
         let mut hits: Vec<(u32, i32, u32, i32)> = Vec::new();
-        for dy in -radius..=radius {
-            for dx in -radius..=radius {
+        for dy in -reach..=reach {
+            for dx in -reach..=reach {
                 let Some(id) = self.id_at(x + dx, y + dy) else { continue };
                 if id == 0 {
+                    continue;
+                }
+                let kept = if far(id) { dx * dx + dy * dy <= edge_reach2 } else { dx.abs() <= radius && dy.abs() <= radius };
+                if !kept {
                     continue;
                 }
                 let d2 = dx * dx + dy * dy;

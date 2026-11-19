@@ -35,18 +35,18 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (updated 02:35 UTC 11-19)
+## Now (updated 04:00 UTC 11-19)
 
-1. Landed 02:27 as 1dd4033be (a46fd345: box hold, unit precision, xdev prewarm, view key re-light, Shift+T, rows).
-2. Queued 02:3x as 70d7c71d (3 commits): Shift+Y clears the selection; Shift+C in a sketch selects the analysed
-   curves; Isolate / Make transparent sliders remembered (`feature_settings` view:isolate / view:makeTransparent);
-   the mesher test race (mesh_pixels flipped `set_rust_mesh_everywhere` for every thread; now its BRepMesh meshes are
-   made on its own thread): it failed nothing, but showed in a46fd345's check log.
-   After it lands: queue 65df5b2ca (rows only: edge vs face reach =, triad and named view restore = with their tests,
-   view cube hold / # list to retake, sketch hover timing closed, plane reach on slanted edges asked).
-3. Lead 02:3x: the interaction-feel ≠ rows by frequency (hover/select/drag first). All psui ≠ rows are now fixed
-   or waiting on live: plane reach on a slanted edge at 6–9 px (asked live 02:3x), section preview colour over a
-   shown plane (REQUESTS 22:48), Hole callout glyph size (REQUESTS 23:33); retakes once green has 1dd4033be.
+1. Landed: 1dd4033be (02:27: box hold, unit precision, xdev prewarm, view key, Shift+T), 373dd5b9 (03:13: Shift+Y,
+   Shift+C in a sketch, sliders remembered, mesher test race). Live retakes on green e86fcb6ed: cube hold, view key,
+   Shift+T, box drag all =. Live retakes Shift+Y / Shift+C / sliders once green carries 373dd5b9.
+2. Queued 04:0x (3 commits): rows; plane border picked at its drawn 2 px (6 level / 7 slanted, live 6 / 7.2);
+   part and assembly edges picked at their drawn width by distance (`PickBuffer::pick_reaching`, `PickClass`,
+   viewport `pick_class` from the studios' `class_fn`): 5 px over the background, 7 over a face, no hold (live
+   reach-px-1119, full-page shots; reach-1118's 7 / 9–11 was the viewer's internal pick). Tests: render pick matrix,
+   our_3d_pick_reach, feel a_click_beside_an_edge (sides told by a face lit far off).
+3. Lead: the next interaction-feel ≠ rows by frequency (hover/select/drag first). Left with live: Hole callout glyph
+   size (REQUESTS 23:33), section preview over a shown plane (REQUESTS 22:48).
 4. Open with live: Hole callout glyph size and weight (REQUESTS 23:33). Dialog spots remembered per dialog
    (live: localStorage, sectionview +150/+100 like ours) = already.
 3. Speed rows closed (lead 23:14): rollback 0.24 s and Mass 313 ms are software-render frame cadence (handler < 1 ms,

@@ -1111,9 +1111,12 @@ impl AssemblyView {
         let opts = self.scene_options(cx);
         let built = assembly_scene::build(&self.result, &opts, &mut self.cache, self.gpu.uploader());
         self.built_key = Some((assembly_scene::occurrence_signature(&self.result), opts));
-        let prio = built.picks.priority_fn();
+        let (prio, class) = (built.picks.priority_fn(), built.picks.class_fn());
         self.built = Some(built);
-        self.viewport.update(cx, |vp, _| vp.pick_priority = prio);
+        self.viewport.update(cx, |vp, _| {
+            vp.pick_priority = prio;
+            vp.pick_class = class;
+        });
         // (The press capture's pick bound and model follow the scene.)
         self.update_capture(cx);
         self.refresh_scene(geometry_changed, cx);

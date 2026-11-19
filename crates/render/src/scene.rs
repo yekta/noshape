@@ -72,8 +72,9 @@ impl LineSegment {
     pub const CORE: u32 = 64;
     /// Hovered, it doesn't hold the hover further off (a plane's border, an assembly's edges: live/feel/3d.json).
     pub const NO_HOLD: u32 = 128;
-    /// With NO_HOLD, picked at its drawn width (a plane's border: live lights it from 6 px off a level edge and to
-    /// ~8 off a slanted one, the pick square's corner; live reach-px-1119), not 3 px as an assembly's edge.
+    /// Picked at its drawn width and not held when hovered (live reach-px-1119, full-page shots: a part's or an
+    /// assembly's edge lights from 5 px, a plane's 2 px border from 6 off a level edge and ~8 off a slanted one, the
+    /// pick square's corner).
     pub const DRAWN_PICK: u32 = 256;
     /// A sheet metal bend's centre line in the flat view: 10 px on, 10 off, 5 on, 10 off, the same at every zoom (live
     /// sheetmetal-gaps2).

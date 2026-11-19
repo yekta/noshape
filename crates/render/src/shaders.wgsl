@@ -975,13 +975,13 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     if (face_band) { width = 2.0 / max(g.viewport.z, 1.0); }
     if (own_edge) { width = 5.0; }
     // The pick pass (`g.viewport.w` > 0), live's footprints (live/feel/3d.json, retaken reach-1118; with the 10 px
-    // pick square): a line at least 5 px wide (an edge, a silhouette or a sketch line lights from 7 px off it), a
-    // plane's border its drawn width (DRAWN_PICK style 256: lit from 6 px, live reach-px-1119), an assembly's edge
-    // (NO_HOLD, style 128) 3 px (from 6 px); hovered itself,
+    // pick square): a line at least 5 px wide (a sketch line lights from 7 px off it); a part edge, an assembly's
+    // edge and a plane's border at their drawn width with no hold (DRAWN_PICK style 256: an edge lit from 5 px, a
+    // plane's border from 6, live reach-px-1119); a NO_HOLD line (style 128) else 3 px; hovered itself,
     // 11 px (it stays lit to 9–10, live's lit overlay; live's recheck of 9 px: lost at 9), but not a NO_HOLD line.
     let picking = g.viewport.w > 0.0;
     if (picking) {
-        let held = (st & (HOVER | OUTLINE)) == HOVER && (l.style & 128u) == 0u;
+        let held = (st & (HOVER | OUTLINE)) == HOVER && (l.style & (128u | 256u)) == 0u;
         let least = select(select(5.0, 3.0, (l.style & 128u) != 0u), 0.0, (l.style & 256u) != 0u);
         width = select(max(l.width * inst.extra.x, least), 11.0, held);
     }
