@@ -5535,7 +5535,9 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   (live request 15:39): the three scenarios' clicks sit 0.1-1.6 % inside the 10 px edge at our runner's zoom
   (0.275 mm / px at 1919 x 992); handoff/skasm.md "11-06 afternoon".
   qa 11-19 21:12: sketch-vertical-key still ≠ on every run since 11-18 (green 233519a8: step 6 ours COINCIDENT + VERTICAL,
-  live COINCIDENT only); skasm/screen-reach never landed -> skasm.
+  live COINCIDENT only). skasm 21:2x: not the reach rule (screen-space 7.5 px reach landed 11-07); our default view puts (3, 30)
+  at (+64, -45) px from the start, live at (+61, -42): 7.47 px off plumb (inside the reach) vs live's 7.78. The default view's
+  orientation differs, not only its zoom -> psui (camera), routed by the lead; the reach stays (horizontal-key / offset match).
 - [x] (psui 2026-11-11 21:21: 6 of 6 runs match 9/9 on vibe5's release build while 8 ui-parity shards loaded it; matched in qa's 15:57 and 19:57 suites too) P2 UIP-ASM-FASTENED-FLAKY (skasm) the ui-parity scenario asm-fastened-undo-picks differs 1 run in 4 (vibe5, release
   build of main 08:30, run alone four times with `tools/ui-parity/run.py`): at step 4 the Fastened dialog's second query
   field ("Mate connectors") holds one item ("Mate connector of Part 2 <1>") where live's has none, then the selection
