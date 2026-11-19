@@ -5236,8 +5236,17 @@ impl<'a> Translator<'a> {
         self.sketch_edits = 0;
         self.sketch_before = before.clone();
         self.first_move = None;
-        self.constraints(k, &oid, &id, f, problems);
+        // The sketch's own constraints and dimensions first, its Coincidents to model geometry last: live solves them
+        // all at once from the stored geometry, so a shape its own constraints hold slides onto its anchor whole
+        // (c2-loft-guide-curves-wave-washer's Sketch 4: each rectangle's far corner 63.5 mm off JHk; alone, the
+        // corner crossed its rectangle and the dimensions rebuilt it on the anchor's other side).
+        let mut missed = Default::default();
+        self.constraints(k, &oid, &id, f, false, &mut missed, problems);
         self.dimensions(k, &oid, &id, f, problems);
+        self.constraints(k, &oid, &id, f, true, &mut missed, problems);
+        if !missed.is_empty() {
+            problems.push(format!("constraints left to the solved geometry: {}", missed.iter().map(|(k, n)| format!("{n} {k}")).collect::<Vec<_>>().join(", ")));
+        }
         let after = self.call("sketch_get", json!({ "sketch": id }))?;
         let moved = sketch_moved(&before, &after);
         // Kept when it gives more of live's regions (its sketch bodies file) than the stored geometry did: that was
@@ -5251,7 +5260,11 @@ impl<'a> Translator<'a> {
         // Or when it brings the points to live's solved ones (sketches.json at the lines' configuration; the stored
         // geometry is the author's last solve, in a configured document another configuration's: c2-config-parts-nuts'
         // hexagon at M2, its lines at M4).
-        let closer = matches!((self.off_live_points(&oid, &before), self.off_live_points(&oid, &after)), (Some(b), Some(a)) if a < b && a <= 1e-6);
+        let off = (self.off_live_points(&oid, &before), self.off_live_points(&oid, &after));
+        if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+            eprintln!("TRACE sketch {} off live's solved points: stored {:?}, translated {:?}", f["name"], off.0, off.1);
+        }
+        let closer = matches!(off, (Some(b), Some(a)) if a < b && a <= 1e-6);
         // Or when it puts every point live makes coincident with a model vertex on that vertex where live's refs have
         // it, and the stored geometry wasn't (c2-surf-workshop-cpcurves' Sketch 4: its circle stored 18.8 mm off JPg).
         // Within 10 µm when it was 0.1 mm or more off: our vertex can be a hair off live's (manualblend's JNE, 1.2 µm).
@@ -5706,8 +5719,8 @@ impl<'a> Translator<'a> {
     /// satisfies them: they keep it so when variables or configurations
     /// change a dimension). Coincidences our inference merged into one point
     /// are skipped; the rest that fail or have no counterpart are counted.
-    fn constraints(&mut self, k: usize, oid: &str, id: &str, f: &Value, problems: &mut Vec<String>) {
-        let mut missed: std::collections::BTreeMap<String, usize> = Default::default();
+    /// The sketch's constraints but its Coincidents to model geometry (`anchors` false), or only those (true).
+    fn constraints(&mut self, k: usize, oid: &str, id: &str, f: &Value, anchors: bool, missed: &mut std::collections::BTreeMap<String, usize>, problems: &mut Vec<String>) {
         // The curves live's Intersection made that ours made too (by Use with `intersect`).
         let sections: Vec<&str> = f["constraints"]
             .as_array()
@@ -5723,6 +5736,11 @@ impl<'a> Translator<'a> {
         ordered.sort_by_key(|c| !matches!(c["constraintType"].as_str(), Some("CIRCULAR_PATTERN" | "LINEAR_PATTERN")));
         for c in ordered {
             let ty = c["constraintType"].as_str().unwrap_or("");
+            let anchor = ty == "COINCIDENT"
+                && c["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("external")) && p["queries"].as_array().is_some_and(|q| !q.is_empty()));
+            if anchor != anchors {
+                continue;
+            }
             // A PIERCE on an end of such a curve is the Intersection's own: the end is where the face's boundary edge
             // crosses the plane, ours there already (c2-loft-paths-guides' Sketch 5: refused on our fixed section).
             let local = c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "localEntity").and_then(|p| p["value"].as_str());
@@ -5982,9 +6000,6 @@ impl<'a> Translator<'a> {
             if !made {
                 *missed.entry(format!("{ty} rejected")).or_default() += 1;
             }
-        }
-        if !missed.is_empty() {
-            problems.push(format!("constraints left to the solved geometry: {}", missed.iter().map(|(k, n)| format!("{n} {k}")).collect::<Vec<_>>().join(", ")));
         }
     }
 

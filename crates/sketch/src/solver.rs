@@ -1512,6 +1512,10 @@ impl Sketch {
         } else {
             self.solve_inner(opts)
         };
+        // A shape its constraints hold, pulled only by Coincidents onto fixed points, slides there whole when the solve
+        // fails (live: c2-loft-guide-curves-wave-washer's Sketch 4 rectangles, a far corner 63.5 mm off a model
+        // vertex, move over; ours diverged: the Minimum distance between two sides broke once the solve sheared them).
+        let rep = if rep.is_solved() { rep } else { self.carried_onto_anchors(&snapshot, opts).unwrap_or(rep) };
         let mut rep = rep;
         if let Some((_, a)) = analysis
             && rep.dof.is_none()
@@ -1531,6 +1535,90 @@ impl Sketch {
         }
         *self = snapshot;
         self.collapse_report(rep, &collapsed)
+    }
+
+    /// [`Self::solve_with`]'s retry: the free geometry of each point a Coincident ties to a fixed (external) point
+    /// elsewhere moved rigidly onto it, kept when every constraint then holds and the solve passes. None (and self as it
+    /// was) otherwise, or when the pulls on one piece differ.
+    fn carried_onto_anchors(&mut self, before: &Sketch, opts: &SolveOptions) -> Option<SolveReport> {
+        let fixed = |e: EntityId| before.entity(e).is_some_and(|x| x.external);
+        let mut pulls = Vec::new();
+        for c in before.constraints().filter(|c| c.driving) {
+            let ConstraintKind::Coincident { a, b } = c.kind else { continue };
+            let (mine, anchor) = match (fixed(a), fixed(b)) {
+                (false, true) => (a, b),
+                (true, false) => (b, a),
+                _ => continue,
+            };
+            let (Some(p), Some(q)) = (before.point(mine), before.point(anchor)) else { continue };
+            if (q - p).length() > 1e-9 {
+                pulls.push((mine, q - p));
+            }
+        }
+        if pulls.is_empty() {
+            return None;
+        }
+        let mut carried = before.clone();
+        let mut shift_of: HashMap<EntityId, DVec2> = HashMap::new();
+        for (p, d) in pulls {
+            if let Some(s) = shift_of.get(&p) {
+                if (*s - d).length() > 1e-9 {
+                    return None;
+                }
+                continue;
+            }
+            let piece = before.free_piece(p);
+            if piece.iter().any(|e| before.entity(*e).is_some_and(|x| x.kind() != EntityKind::Point && x.point_refs().is_empty())) {
+                return None;
+            }
+            for e in piece {
+                if let Some(q) = before.point(e) {
+                    carried.set_point(e, q + d).ok()?;
+                }
+                shift_of.insert(e, d);
+            }
+        }
+        if !carried.unheld_constraints(1e-9).is_empty() {
+            return None;
+        }
+        let failed = std::mem::replace(self, carried);
+        let rep = self.solve_inner(opts);
+        if rep.is_solved() && self.collapsed_lines(before).is_empty() {
+            return Some(rep);
+        }
+        *self = failed;
+        None
+    }
+
+    /// The free (not external) entities joined to `start` by shared points and driving constraints.
+    fn free_piece(&self, start: EntityId) -> HashSet<EntityId> {
+        let free = |e: EntityId| self.entity(e).is_some_and(|x| !x.external);
+        let mut next: HashMap<EntityId, Vec<EntityId>> = HashMap::new();
+        let mut link = |a: EntityId, b: EntityId| {
+            next.entry(a).or_default().push(b);
+            next.entry(b).or_default().push(a);
+        };
+        for e in self.entities().filter(|e| !e.external) {
+            for p in e.point_refs().into_iter().filter(|p| free(*p)) {
+                link(e.id, p);
+            }
+        }
+        for c in self.constraints().filter(|c| c.driving) {
+            let es: Vec<EntityId> = c.kind.entities().into_iter().filter(|e| free(*e)).collect();
+            for w in es.windows(2) {
+                link(w[0], w[1]);
+            }
+        }
+        let mut seen = HashSet::from([start]);
+        let mut todo = vec![start];
+        while let Some(e) = todo.pop() {
+            for n in next.get(&e).into_iter().flatten() {
+                if seen.insert(*n) {
+                    todo.push(*n);
+                }
+            }
+        }
+        seen
     }
 
     /// `rep` for a solve reverted because it collapsed `collapsed`: their
@@ -2034,5 +2122,47 @@ mod state_tests {
         }
         let r = sk.solve();
         assert_eq!((r.state(line), r.state(end), r.state(guide)), (Some(ConstraintState::UnderConstrained), Some(ConstraintState::UnderConstrained), Some(ConstraintState::FullyConstrained)));
+    }
+}
+
+#[cfg(test)]
+mod carried_tests {
+    use crate::constraints::{ConstraintKind as K, DistanceMode};
+    use crate::entities::Geometry;
+    use crate::sketch::Sketch;
+    use glam::DVec2;
+
+    /// Live (c2-loft-guide-curves-wave-washer's Sketch 4): a 0.45 x 0.06 in rectangle its constraints hold, one corner
+    /// made coincident with a model vertex 63.5 mm away, slides over whole (x 13.97...25.4 mm); the plain solve
+    /// diverged (the Minimum distance between its long sides broke once they sheared), with the inferred Horizontal on
+    /// its bottom too.
+    #[test]
+    fn a_held_rectangle_slides_onto_a_far_anchor() {
+        for bottom_h in [false, true] {
+            let mut sk = Sketch::new();
+            let m = |x: f64, y: f64| DVec2::new(x * 1e-3, y * 1e-3);
+            let [a, b, c, d] = [m(88.9, 3.81), m(77.47, 3.81), m(88.9, 2.286), m(77.47, 2.286)].map(|p| sk.add_point(p));
+            let bottom = sk.add_line_between(a, b).unwrap();
+            let top = sk.add_line_between(c, d).unwrap();
+            let left = sk.add_line_between(a, c).unwrap();
+            let right = sk.add_line_between(b, d).unwrap();
+            sk.add_constraint(K::Horizontal { a: top, b: None }).unwrap();
+            if bottom_h {
+                sk.add_constraint(K::Horizontal { a: bottom, b: None }).unwrap();
+            }
+            sk.add_constraint(K::Perpendicular { a: top, b: left }).unwrap();
+            sk.add_constraint(K::Parallel { a: bottom, b: top }).unwrap();
+            sk.add_constraint(K::Parallel { a: left, b: right }).unwrap();
+            sk.add_constraint(K::Distance { a: top, b: bottom, value: 1.524e-3, mode: DistanceMode::Minimum }).unwrap();
+            sk.add_constraint(K::Length { curve: top, value: 11.43e-3 }).unwrap();
+            assert!(sk.solve().is_solved());
+            let vertex = sk.add_entity(Geometry::Point { pos: m(25.4, 3.81) }, false, true).unwrap();
+            sk.add_constraint(K::Coincident { a, b: vertex }).unwrap();
+            let r = sk.solve();
+            let got = [a, b, c, d].map(|p| sk.point(p).unwrap());
+            let want = [m(25.4, 3.81), m(13.97, 3.81), m(25.4, 2.286), m(13.97, 2.286)];
+            assert!(r.is_solved() && r.dof == Some(0), "bottom H {bottom_h}: {:?}", r.status);
+            assert!(got.iter().zip(want).all(|(g, w)| (*g - w).length() < 1e-9), "bottom H {bottom_h}: {got:?}");
+        }
     }
 }
