@@ -46,7 +46,7 @@ ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scrat
 Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six on green.
 
 ## State 07:31 (11-19)
-- Landed: 373dd5b9, 48626728 (REGION-PICK), 4104b148 (5686f670), 24792169 (29bf3dcb), dceaee62 (faa5f7b1: flat view
+- Landed: 373dd5b9, 48626728 (REGION-PICK), 4104b148 (5686f670), 24792169 (29bf3dcb), dceaee62 (qa verified with the Bends order on green af11b6d5, session-sm-1119 r6; faa5f7b1: flat view
   by the model's up side, std pcbEnd's hold plane; live confirmed both cases, REQUESTS 05:10, live/skasm/q-thicken-flat-1119).
 - QUEUED 394e7c79 (07:15, carries 08511fa7): bend face clicked in 3D with the table open outlines its Bends row and
   lights its zone in the flat view (`sm_follow_pick`, sm matrix row; sm-cfg-io-1119 row 1702). Wave-washer Sketch 4 (lead P1 for core's ring branch): solver `carried_onto_anchors` (a
