@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-19 07:41 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-19 12:25 UTC (thread restarted 11:3x, replaces 2108c2b7). Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -193,13 +193,18 @@ R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "I
 6. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
 ## Since 19:50 (this thread)
-- QUEUED c8fa7d93 (07:4x, 6 commits): ACIS face merge, inside-part revert, the macOS CI hang fix (assembly prewarm on
-  scoped std threads, fillet ball tools under rayon::in_place_scope; also queued alone as f1e0c74e, on release/v0.4.60
-  as 5e04baac1), qa's session-drw-1119 DXF rows (section letter codes, R14 note text, labels top-centre, a section's
-  hole rim one line), and tool-placed views' empty label (DrawingView.placed). Left: empty labels' y offsets vary in
-  live (1-4 mm off ours); live's dialog views gain empty labels after property edits (dx1684 vs dx1644, which edit
-  unknown).
-- Waiting: live's meshparts-1119 (c2-duct-multipart 3MF / OBJ imports).
+- Landed (c8fa7d93 batch): ACIS face merge, inside-part revert, macOS CI hang fix, session-drw-1119 DXF rows, tool-placed
+  views' empty label. Left: empty labels' y offsets vary in live (1-4 mm); live's dialog views gain empty labels after
+  property edits (which edit unknown).
+- QUEUED 8b276faa (12:2x): x_t export cuts only the closed faces / rings that can't be written whole (was: one bad one cut
+  every closed face or ring of the body), and an offset face over an elementary surface (or a revolved circle) is written
+  as that surface (spindle_torus / spindle_pcurve now shared in internal.hpp). Suite exs-all5 (Mac): snap-hook x_t
+  read-back 128/284/160 = live (was 136), nothing else changed; ours reads ours 152/154. Hose: 6 of 12 rings whole; its
+  other 6 are 10-20 nm off their walls in our model (tolerant, must stay cut; a ring refit / tangent-walls attempt rescued
+  none: /root/dx-scratch/xt-ringrefit-attempt.cpp). Asked live2 (12:2x) to import /root/dx-scratch/xt-check-1119/*.x_t:
+  live must keep all 4 hoses as solids (Parasolid dropped hoses with tolerant whole rings before). If it drops any: revert
+  the edge half of 8b276faa.
+- Waiting: meshparts-1119 (c2-duct-multipart 3MF / OBJ imports), asked of live2 11:4x (live paused till ~21:00).
 - Spindle tori (08:1x): RevolutionToElementary makes them tori with their pcurves mapped exactly (v shifted or
   mirrored); snap-hook live.igs 128/300/184 for live's 128/310/202 (live's own IGES splits edges past its model's
   284/160). Suite run exs-all4 (Mac dx-keep): only that row changed; clamp-guillem LINE 265/268 (Top hiding + Iso piece,
@@ -240,10 +245,10 @@ R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "I
   temporary backtrace build.
 - vibex7 → vibex6 scp fails: relay through /root/dx-scratch/bin-relay. Host ~/tmp is pruned after 6-12 h: keep scripts
   and binaries in ~/agents/dx-keep.
-- Agent ids (message_agent needs them full; core + blend restarted 11-18): core e8af89fe-d460-49b3-b0bb-9572da230fed,
-  asm d8d597e0-675c-497b-a804-544ceab99bbd, blend 0672fa20-964d-4fde-a19c-c5b4363729ba, bool
-  7fa8ceab-4549-499f-9b01-3a289c2c95b4, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, live
-  e8549719-ef9a-42de-960c-e24b29f142a6, live2 79ae5cdb-42a4-4025-b43a-da61a4f92ad7, studios
-  58e9bca8-346c-4847-8012-e15006ae61ef, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b,
-  psui 4973e295-9e92-463f-a13f-2ec5258bc5f9.
+- Agent ids (11-19 11:3x): core d30002ca-d013-4435-b7d9-7da9cb564cec, blend de66e481-56e2-4005-a5d3-9fa897ca5fde, bool
+  754a9804-feb1-4153-b32a-acf9b2a6d94d, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, asm d8d597e0-675c-497b-a804-544ceab99bbd,
+  skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b, psui
+  4973e295-9e92-463f-a13f-2ec5258bc5f9, live2 79ae5cdb-42a4-4025-b43a-da61a4f92ad7 (live paused till ~21:00).
+- Mac exchange runs: ~/noshape-host/dx-keep/exx.sh <dir> <log> (kernel tests, release build, suite; stops on a build
+  error); dirs exs-all (all docs), exs-x (hose + snap-hook).
 - The archive's "Parity translator changes by asm" section lists asm's translator fixes one line each (lead 11-07).
