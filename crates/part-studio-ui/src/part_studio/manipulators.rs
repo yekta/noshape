@@ -1373,7 +1373,7 @@ fn arrow_glyph(a: &Arrow, hover: bool, dragging: bool, view: &noshape_render::ca
 
 #[cfg(test)]
 mod snap_tests {
-    use super::{linear_step, snap_degrees};
+    use super::{handle_style, linear_step, snap_degrees};
 
     /// Live feel/dialogs.json "linearStep": 0.1 mm at 0.207–0.293 mm/px, 1 mm at 0.414 mm/px (the switch at 0.316),
     /// 0.01 mm below 0.0316 mm/px; inches by the inch.
@@ -1386,6 +1386,17 @@ mod snap_tests {
         }
         let inch = 0.0254;
         assert!((linear_step(0.01 * inch, inch) / inch - 0.01).abs() < 1e-9);
+    }
+
+    /// Live manip-feel-1118 / dialogs extrude-06: a dragged arrow or arc is one solid blue stroke (#2c61a3), a hovered
+    /// one a blue halo round its white core, at rest a grey halo.
+    #[test]
+    fn a_dragged_handle_is_one_solid_blue_stroke() {
+        let blue = crate::theme::rgb8(0x2c61a3);
+        assert_eq!(handle_style(true, true), (blue, blue, 2.0, 2.0));
+        assert_eq!(handle_style(false, true), (blue, blue, 2.0, 2.0));
+        assert_eq!(handle_style(true, false), (crate::theme::rgb8(0x3e6eb0), crate::theme::rgb8(0xffffff), 4.0, 1.5));
+        assert_eq!(handle_style(false, false), ([0x6a, 0x76, 0x7d, 191], crate::theme::rgb8(0xffffff), 3.0, 1.5));
     }
 
     /// Live "angularStep": 5° within 2° up to a 573 px radius, free in between; then whole 1° and 0.1° steps (the

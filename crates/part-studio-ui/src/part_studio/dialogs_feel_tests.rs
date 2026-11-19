@@ -84,6 +84,62 @@ fn rows() -> Vec<Row> {
         Row { id: "manipulators / which features", live: "Extrude: one arrow; Chamfer, Shell: none", gap: false, check: |cx| {
             expect((manipulator_for(cx, "extrude"), manipulator_for(cx, "chamfer"), manipulator_for(cx, "shell")), (true, false, false), "extrude, chamfer, shell")
         } },
+        Row { id: "manipulators / patterns: none", live: "live2 pattern-hole-1118: Linear and Circular pattern draw no manipulator (no distance, count or angle arrow) with a part picked", gap: false, check: |cx| {
+            expect((manipulator_for(cx, "linearPattern"), manipulator_for(cx, "circularPattern")), (false, false), "linear, circular")
+        } },
+        Row { id: "fields / Circular pattern's fields and defaults", live: "live2 pattern-hole-1118: Entities to pattern, Axis of pattern, Angle 360 deg, Instance count 4, Equal spacing on, Centered off, Skip instances off", gap: false, check: |cx| {
+            let (window, view) = block(cx, "dlg-circular-fields");
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("circularPattern", w, cx))).unwrap();
+            draw(cx, window);
+            let dialog = cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.clone())).ok_or("no dialog")?;
+            let want = ["Entities to pattern", "Axis of pattern", "Angle", "Instance count", "Equal spacing", "Centered", "Skip instances"];
+            let (labels, values) = cx.update(|cx| {
+                let d = dialog.read(cx);
+                let p = &d.feature.params;
+                let labels: Vec<&str> = d.ty.params.iter().filter(|s| s.is_visible(p) && want.contains(&s.label)).map(|s| s.label).collect();
+                let text = |id: &str| d.input_text(id, cx).map(|(t, _)| t).unwrap_or_default();
+                (labels, (text("angle"), text("instanceCount"), p.bool("equalSpace"), p.bool("isCentered"), p.bool("skipInstances")))
+            });
+            expect((labels, values), (want.to_vec(), ("360 deg".to_string(), "4".to_string(), true, false, false)), "(the fields in order, (Angle, Instance count, Equal spacing, Centered, Skip instances))")
+        } },
+        Row { id: "Hole / only sketch points light and take; a second click removes it", live: "live2 pattern-hole-1118: a part vertex or a face never lights and adds nothing; a sketch point lights, its click adds \"Vertex of …\" and fills Merge scope with Part 1; a click on it again removes it", gap: false, check: |cx| {
+            let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+            let (window, view) = part_studio_from(cx, "dlg-hole-picks", Some(starts["hole-sketch"].clone()));
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("hole", w, cx))).unwrap();
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            draw(cx, window);
+            let dialog = cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.clone())).ok_or("no dialog")?;
+            let pick_of = |cx: &mut TestAppContext, kind: noshape_scene::builder::PickKind| cx.update(|cx| view.read(cx).built.as_ref().and_then(|b| b.picks.ids_where(|t| t.kind == kind).next()));
+            let event = |cx: &mut TestAppContext, ev: ViewportEvent| {
+                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                    let vp = v.viewport.clone();
+                    v.on_viewport_event(&vp, &ev, w, cx);
+                }))
+                .unwrap();
+                wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+                draw(cx, window);
+            };
+            let mut lit = Vec::new();
+            for kind in [noshape_scene::builder::PickKind::Face, noshape_scene::builder::PickKind::Vertex, noshape_scene::builder::PickKind::SketchPoint] {
+                let id = pick_of(cx, kind).ok_or(format!("no {kind:?} pick"))?;
+                event(cx, ViewportEvent::Hover(Some(id)));
+                lit.push(cx.update(|cx| !view.read(cx).highlighted_hover(cx).is_empty()));
+            }
+            let mut picked = Vec::new();
+            for kind in [noshape_scene::builder::PickKind::Face, noshape_scene::builder::PickKind::Vertex, noshape_scene::builder::PickKind::SketchPoint, noshape_scene::builder::PickKind::SketchPoint] {
+                let id = pick_of(cx, kind).ok_or(format!("no {kind:?} pick"))?;
+                event(cx, ViewportEvent::Click { pick: Some(id), position: glam::DVec2::new(500., 300.), modifiers: Modifiers::default() });
+                picked.push(cx.update(|cx| {
+                    let p = &dialog.read(cx).feature.params;
+                    (p.query("locations").len(), p.query("scope").len())
+                }));
+            }
+            if let Some(last) = picked.last_mut() {
+                last.1 = 0;
+            }
+            expect((lit, picked), (vec![false, false, true], vec![(0, 0), (0, 0), (1, 1), (0, 0)]), "(lit: a face, a part vertex, a sketch point), (locations, merge scope) after clicking a face, a vertex, the point; locations after the point again")
+        } },
         Row { id: "manipulators / an arrow's grab reach", live: "within 14 px across (16 no), from 4 px behind the base to the tip; nothing past the tip", gap: false, check: |cx| {
             let (window, view) = block(cx, "dlg-reach");
             cx.update_window(window, |_, w, cx| {
@@ -275,6 +331,52 @@ fn rows() -> Vec<Row> {
             let want = (Some("in:depth".to_string()), true, None);
             expect((during, after), (vec![want.clone(); 6], want), "(focused, Depth's whole text selected, lit) at each drag move, after the release")
         } },
+        Row { id: "manipulators / an arrow drag is the pointer projected on its line; Ctrl / Alt change nothing", live: "live manip-feel-1118: Depth is the pointer projected on the arrow's line (a sideways move changes nothing), Ctrl or Alt held change nothing (Shift drags unstepped), the arrow drawn dragged (one solid blue stroke)", gap: false, check: |cx| {
+            let (window, view, dialog) = edit_extrude(cx, "dlg-arrow-projection");
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            draw(cx, window);
+            let vp = cx.update(|cx| view.read(cx).viewport.clone());
+            let (at, along, mm_per_px) = cx
+                .update(|cx| {
+                    let vp = vp.read(cx);
+                    let &(a, b, _) = vp.manipulators.first()?;
+                    let (pa, pb) = (vp.project(a)?, vp.project(b)?);
+                    let mid = (pa + pb) * 0.5;
+                    let o = vp.origin();
+                    Some((gpui_kit::point(o.x + px(mid.x as f32), o.y + px(mid.y as f32)), (pb - pa).normalize_or_zero(), (b - a).length() * 1000. / (pb - pa).length()))
+                })
+                .ok_or("no arrow")?;
+            let to = |d: f64, side: f64| gpui_kit::point(at.x + px((along.x * d - along.y * side) as f32), at.y + px((along.y * d + along.x * side) as f32));
+            let depth = |cx: &mut TestAppContext| cx.update(|cx| dialog.read(cx).input_text("depth", cx)).and_then(|(t, _)| t.split_whitespace().next()?.parse::<f64>().ok());
+            let move_to = |cx: &mut TestAppContext, p, modifiers| {
+                gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseMoveEvent { position: p, pressed_button: Some(gpui_kit::MouseButton::Left), modifiers });
+                draw(cx, window);
+            };
+            let start = depth(cx).ok_or("no Depth")?;
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            vcx.simulate_event(gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() });
+            vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
+            move_to(cx, to(20., 0.), Modifiers::default());
+            move_to(cx, to(40., 0.), Modifiers::default());
+            let plain = depth(cx).ok_or("no Depth")?;
+            let dragged_look = cx.update(|cx| view.read(cx).manip_drag.is_some());
+            move_to(cx, to(40., 25.), Modifiers::default());
+            let sideways = depth(cx).ok_or("no Depth")?;
+            move_to(cx, to(30., 0.), Modifiers::default());
+            move_to(cx, to(40., 0.), Modifiers { control: true, ..Default::default() });
+            let ctrl = depth(cx).ok_or("no Depth")?;
+            move_to(cx, to(30., 0.), Modifiers::default());
+            move_to(cx, to(40., 0.), Modifiers { alt: true, ..Default::default() });
+            let alt = depth(cx).ok_or("no Depth")?;
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: to(40., 0.), modifiers: Modifiers::default(), click_count: 1 });
+            draw(cx, window);
+            let step = linear_step(mm_per_px * 0.001, 0.001) * 1000.;
+            let projected = ((plain - start) - 40. * mm_per_px).abs() <= step * 0.5 + 1e-9;
+            if !projected {
+                return Err(format!("Depth {plain} mm after 40 px along the arrow from {start} mm: not {start} + 40 px × {mm_per_px:.4} mm/px on the {step} mm step"));
+            }
+            expect((dragged_look, sideways, ctrl, alt), (true, plain, plain, plain), "(the arrow drawn dragged, Depth after a 25 px sideways move, with Ctrl, with Alt; each against the plain drag's)")
+        } },
         Row { id: "drag / the length step follows the zoom", live: "10^(round(log10(100 px in the unit)) − 2): 0.1 mm at 0.25 mm/px, 1 mm at 0.414", gap: false, check: |_| {
             let mm = 0.001;
             expect(((linear_step(0.25 * mm, mm) / mm * 1e6).round() / 1e6, (linear_step(0.414 * mm, mm) / mm * 1e6).round() / 1e6), (0.1, 1.0), "steps (mm)")
@@ -305,7 +407,7 @@ fn rows() -> Vec<Row> {
             }
             expect(counts, vec![1, 0, 1], "the edge in the field after each click")
         } },
-        Row { id: "fields / a row hovered lights its entity", live: "the selected orange outline turns light yellow-green (#f2ff80) while the row is hovered; clears when the pointer leaves", gap: false, check: |cx| {
+        Row { id: "fields / a row hovered lights its entity", live: "the selected orange outline turns light yellow-green (#f2ff80) while the row is hovered (live 121–181 ms after the move; ours in the next frame, no time passing); clears when the pointer leaves", gap: false, check: |cx| {
             let (window, view, dialog, _) = fillet_on_an_edge(cx, "dlg-row-hover")?;
             let edge = cx.update(|cx| dialog.read(cx).feature.params.query("entities").first().cloned()).ok_or("no edge")?;
             // The preview consumes the edge: it is drawn by the overlay of consumed picks, else by its pick's flag.
@@ -776,6 +878,17 @@ fn rows() -> Vec<Row> {
             let (window, _view, dialog) = edit_extrude(cx, "dlg-open-focus-edit");
             got.push(cx.update_window(window, |_, w, cx| dialog.read(cx).focused_control(w, cx)).unwrap());
             expect(got, vec![Some("q:entities".to_string()); 3], "the focused control: new Extrude, new Fillet, Extrude 1 edited")
+        } },
+        Row { id: "look / the first box active: blue frame on pale blue; empty and required, the title red", live: "live feature-dialogs-1117: a new Fillet opens with Entities to fillet active (border rgb(22,81,176), fill rgb(222,241,251)); with nothing picked the title is red", gap: false, check: |cx| {
+            let (window, view) = block(cx, "dlg-open-look");
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            draw(cx, window);
+            let dialog = cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.clone())).ok_or("no dialog")?;
+            let active = cx.update(|cx| dialog.read(cx).active_query.clone());
+            let red = cx.update(|cx| dialog.read(cx).status.as_ref().is_some_and(crate::feature_dialog::status_reads_red));
+            let pal = crate::theme::light();
+            expect((active.as_deref(), pal.accent, pal.query_active, red), (Some("entities"), gpui_kit::rgb(0x1651b0), gpui_kit::rgb(0xdef1fb), true), "(the active box, its frame, its fill, the title red)")
         } },
         Row { id: "keys / Tab from Depth, then out of the dialog; Shift+Tab back", live: "Depth -> its ± -> Direction, Starting offset, Symmetric, Draft, Second end position -> the help link -> out of the dialog; End type, the selection field, the tabs and ✓ / ✗ skipped; Shift+Tab walks it back (live2 dialog-keys-1118 b1)", gap: false, check: |cx| {
             let (window, _view, dialog) = edit_extrude(cx, "dlg-tab-depth");
