@@ -250,11 +250,12 @@ impl BuiltSheet {
         self.tables.iter().find(|(t, _)| *t == id).map(|(_, l)| l)
     }
 
-    /// The closest line pick target to a sheet point within `tol` mm among
+    /// The closest line pick target to a sheet point less than `tol` mm away among
     /// those `accept` takes (a tool that takes only view edges sees the
-    /// edge under an annotation or a centerline; qa DWG-DIM-TWO-EDGES).
+    /// edge under an annotation or a centerline; qa DWG-DIM-TWO-EDGES). The reach itself is out (live2 recheck-1119
+    /// callout: an edge lights 6 px away, not 7, with the 7 px pickbox).
     pub fn hit_where(&self, p: [f64; 2], tol: f64, accept: &dyn Fn(&PickTarget) -> bool) -> Option<u32> {
-        self.nearest_where(p, accept).filter(|(_, d)| *d <= tol).map(|(k, _)| k)
+        self.nearest_where(p, accept).filter(|(_, d)| *d < reach_limit(tol)).map(|(k, _)| k)
     }
 
     /// The closest line pick target to a sheet point among those `accept` takes, with its distance (mm).
@@ -282,7 +283,8 @@ impl BuiltSheet {
     pub fn hit_reach(&self, p: [f64; 2], tol: f64, text_tol: f64) -> Option<u32> {
         let mut best: Option<(u32, f64)> = None;
         let mut consider = |pick: u32, d: f64| {
-            if pick == 0 || d > tol {
+            // The reach itself is out, as `hit_where`'s.
+            if pick == 0 || d >= reach_limit(tol) {
                 return;
             }
             let bias = match self.picks.get(pick as usize) {
@@ -3193,6 +3195,12 @@ pub fn foot_on_line(p: [f64; 2], a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
 fn horizontal_cut(line: &[[f64; 2]]) -> bool {
     let (Some(a), Some(b)) = (line.first(), line.last()) else { return false };
     (b[0] - a[0]).abs() > (b[1] - a[1]).abs()
+}
+
+/// Where a pick reach ends: a pointer `tol` away is out (live2 recheck-1119 callout: an edge lights 6 px away, not 7,
+/// with the 7 px pickbox; a pointer's whole pixels reach the sheet through f32 window coordinates, a hair either side).
+fn reach_limit(tol: f64) -> f64 {
+    tol * (1.0 - 1e-4)
 }
 
 #[cfg(test)]
