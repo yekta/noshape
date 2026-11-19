@@ -3168,6 +3168,29 @@ fn make_transparent_clears_the_selection(cx: &mut TestAppContext) {
     assert_eq!((selection, transparent), (Vec::new(), Some(vec![body])), "(the selection, the parts made transparent)");
 }
 
+/// Live2 ps-feel2-1118: Shift+I with Part 1 selected isolates it and clears the selection; Esc closes the dialog and
+/// ends isolate.
+#[gpui::test]
+fn shift_i_isolates_the_selected_part_and_esc_ends_it(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "shift-i");
+    let body = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part").id.clone());
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, _| v.selection = vec![Reference::Body(body.clone())]);
+        let focus = view.read(cx).focus.clone();
+        w.focus(&focus, cx);
+    })
+    .unwrap();
+    draw(cx, window);
+    keys(cx, window, &["shift-i"]);
+    let state = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        (v.ui.isolate.as_ref().map(|i| (i.mode == crate::part_studio::behaviors::IsolateMode::Isolate, i.bodies.clone())), v.selection.len())
+    });
+    assert_eq!(state(cx), (Some((true, vec![body.clone()])), 0), "(isolating Part 1, selected after)");
+    keys(cx, window, &["escape"]);
+    assert_eq!(state(cx).0, None, "Esc ends isolate");
+}
+
 /// Live keys-1118: Make transparent's slider reopens where it was left; Isolate's is its own (at the left).
 #[gpui::test]
 fn the_transparency_slider_is_remembered_per_dialog(cx: &mut TestAppContext) {
