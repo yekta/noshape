@@ -815,11 +815,11 @@ Sheets tickets/asm-snapmode-sheet.png, row-dblclick-sheet.png, drw-feel-1118.png
 2110/2172 scenarios (05:51 run on a67911be: 2126). 67 failing; 28 pass on the re-run (load flakes or fixed). The 39 still failing
 went to owners as P0 (skasm 14, studios 15, psui 7, asm 2, dx 1); the regressions since 05:51 are ticketed here. Scores:
 qa-scratch/suites/1119-1610-eb3b06a8-uipr/score.log.
-- [ ] **P0 FEEL-TRIM-PERPENDICULAR (skasm)**: sketch-trim-drag step 17, sketch-trim-key step 10, sketch-undo-trim step 9 (and
-  sketch-line-from-midpoint step 9): a constraint live PERPENDICULAR / ours VERTICAL; all three trim rows passed at 05:51. Likely
-  08a1193a5 ("both ends clear is Vertical") reaching takes where live keeps Perpendicular.
-- [ ] **P0 FEEL-SELECT-FILLET-FACES (psui)**: face-rclick-select-fillet-faces step 3: selection count live 0 / ours 1 (passed 05:51).
-- [ ] **P0 FEEL-VERSION-ROW-TOOLTIP (studios)**: ver-row-tooltip step 2: live "Open version V1" / ours no tooltip (passed 05:51).
+- [ ] **P0 FEEL-TRIM-PERPENDICULAR (skasm)**: sketch-line-from-midpoint step 9: a constraint live PERPENDICULAR / ours VERTICAL
+  (live2 retake 11-19 17:0x confirms live). The three trim rows (sketch-trim-drag / -key / undo-trim) were stale takes: today's live
+  gives VERTICAL = ours once zoomed one Shift+Z step (the default view clicks a glyph); live2 retakes them with the zoom step (qa 17:05).
+- [ ] **P0 FEEL-SELECT-FILLET-FACES (psui)**: face-rclick-select-fillet-faces step 3: selection count live 0 / ours 1 (passed 05:51; live2 retake 17:0x: live 0).
+- [ ] **P0 FEEL-VERSION-ROW-TOOLTIP (studios)**: ver-row-tooltip step 2: live "Open version V1" / ours no tooltip (passed 05:51; live2 retake 17:0x confirms).
 - [ ] **P0 FEEL-DRW-COPY-DRAG (studios)**: drw-copy-annotation-drag step 6: the copied annotation's x live 105.5 / ours 70.6 (passed 05:51).
 
 ## Interaction feel vs live2's 11-18 06:0x numbers (qa 06:55, green cafe3c2af, vibex8 Xvfb at load 8-14, real xdotool pointer; llvmpipe)
