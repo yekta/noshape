@@ -847,7 +847,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   live capture of the empty-again state requested (REQUESTS.md qa 11-19). Shot: qa-scratch/tickets/pattern-check-stays-enabled-1119.png
   (q0 open, q1 Part 1, q3 emptied again).
 
-- [ ] P1 **TOOLBAR-TOOLTIP-AFTER-CLICK (psui)**: hover a Part Studio toolbar button (Linear pattern) until its tooltip shows, click:
+- [x] fixed (psui 11-19: vendor gpui-pre TooltipPressGate + Window::tooltip_released_on, the click redrew the button as a new element; chrome row "tooltip / kept while pressed, gone at the release") P1 **TOOLBAR-TOOLTIP-AFTER-CLICK (psui)**: hover a Part Studio toolbar button (Linear pattern) until its tooltip shows, click:
   ours: the tooltip still shows 1.5 s after the click, over the open dialog. Live (behaviours "qa (11-19): dialog ✓ after emptying /
   tooltip on click", live/qa/dialog-tip-1119 B): shows ~40 ms after hover, fades in over ~250 ms, stays during the press (80 and
   600 ms holds), gone the first frame after release, no fade-out. (qa 11-19, green a58eee8c)
