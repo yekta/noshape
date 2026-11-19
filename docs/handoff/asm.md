@@ -5,104 +5,59 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-19 14:10 UTC)
+## State (2026-11-19 17:47 UTC)
 
-### In flight: Derived mirror of an assembly (live2 audit-1119 m2–m14; behaviours "asm (11-19)")
-- Piece 1 (model + eval), branch asm-dmirror 28ddc6e06: `InstanceSource::DerivedMirror { assembly, derived,
-  placement, mirrored_studios }`, a rigid node of the source's instances mirrored in its XY (Transform: same part,
-  placed by its Placement type; Derived: the "-Mirrored" studio's part, "Block-Mirrored <1>"); BOM, drawing sources.
-  Full ops e2e passed (253).
-- Piece 2 (ops, uncommitted): `Document::{mirrored_assembly, ensure_mirrored_assembly, mirrored_tab,
-  ensure_mirrored_tab}`; Mirror strategy Derived on a subassembly makes "<A>-Mirrored" (fixed "Derived mirror" node)
-  and the copy is "<A>-Mirrored <1>"; eval's reflection_of treats it like a mirrored studio. e2e
-  `a_derived_mirror_of_a_subassembly_makes_its_mirrored_assembly`.
-- Branch asm-mass (stacked on queued 673142ab; land after it): mass overrides (below), 3a ecca84b2e (strategy row of a
-  subassembly: assembly icon, "<A>-Mirrored" reference; UI test of Update on a subassembly), 3b a194eedac
-  (`assembly_derived_mirror`: the node's source and per-part strategy, Derived makes the "-Mirrored" studio; e2e).
-- 3c 53a0e2897: the node's row icon (derived-mirror), menu as live m10, Edit…'s dialog (Assembly to mirror, Mirror
-  strategy… sharing the Mirror's table through `StrategyHost`, Update, ✓ "Edit : Derived mirror"); UI test.
-- 3d: the Mirror strategy's child rows under a subassembly row (chevron, Transform / Derived, placement; ✓ writes the
-  "-Mirrored" assembly's node strategy, "Edit : Derived mirror"); UI test. Derived mirror is complete; left only
-  live's exact node icon and symmetry detection on child rows (they show Symmetric).
-- Note: rb.sh clippy can report clean on stale synced mtimes: `git diff --name-only origin/main -- crates | xargs
-  touch` before the final clippy (11-19 a complex-type warning hid that way).
+### Landed today (6686624b as 702c9878 17:18: Display states Esc, driver-mate named position, paste)
+- LOD (91478e2c), Derived mirror of an assembly complete (e87a2b3e, 17c26dc1; left: live's exact node icon, symmetry
+  detection on child rows), mass overrides (17c26dc1; left: psui's Part Studio panel CoM / Inertia ☑ Override rows,
+  several parts measured with overrides, not captured), surf-intro translator steps (8c6ec107, eb3b06a8).
+- rb.sh clippy can report clean on stale synced mtimes: `git diff --name-only origin/main -- crates | xargs touch`
+  before the final clippy.
 
-### In flight: mass-property overrides (live2 12:42–12:45, behaviours "asm (11-19)", live/asm/mass-override-1119 c1–c5)
-- Branch asm-mass a96eaf1b2: PartProperties `com_override` (m) / `inertia_override` (kg·m², column by column
-  as live: Lxy at index 3); `measure::with_overrides` (CoM: parallel axis to it; Mass: inertia × m / computed, centre
-  kept; Inertia replaces); Part Studio mass with one part measured; assemblies per part (`part_overrides`,
-  `assembly_mass_properties_with`); the assembly's Mass override now scales the inertia in assembly_mass_properties
-  (the dialog already did). part_set_properties `center_of_mass_override` / `inertia_override`; `null` now clears the
-  overrides (Args::get dropped nulls: mass_override null never cleared). e2e center_of_mass_and_inertia_overrides_….
-- Left: Part Studio panel's CoM / Inertia ☑ Override rows (psui's part-studio-ui: tell psui once landed); several
-  parts measured with CoM / inertia overrides (not captured).
+### P1 (lead 17:2x, from main CI): assembly-ui test binary SIGSEGV at exit (main CI 44554083714, eb3b06a88, first seen)
+- All 97 passed, then signal 11 at exit. Each headless `Gpu` spawns a detached "noshape-render" thread that compiles
+  its pipelines (`Renderer::prewarm`, LLVM on lavapipe) before it looks at its channel; the feel tests make two per
+  test (gpu_pointer's probe + the view's), so the last tests' threads were still compiling as exit() ran Mesa's /
+  LLVM's destructors. Fix (queued with this handoff): `RenderWorker` joins its thread on drop, skips a compile not
+  yet started, drops jobs it can't deliver. Test offscreen::a_dropped_render_worker_has_ended_its_thread (fails
+  without). render 64, app-core 112, assembly-ui 97 (72 s, as before), part-studio-ui 300 pass. crates/render is
+  psui's: told.
+- Repro attempt (unfixed binary, 15 runs): vibex8 ~/agents/asm-keep/segv.sh -> segv.out (in its slot queue).
 
-### In flight: parity_assemblies differences (lead 11-19 15:00: rank by documents, one land each)
-- Suite on vibe2: `~/agents/asm-keep/suite1.sh <bin> <tag> <dirs>` (slot, one model at a time) -> suite/<tag>.log;
-  bin ops-main1119 = main 17c26dc1 + translator steps. Light 20 running as tag l1119; heavy 4 (xdev, isaac,
-  infento, scissor) next.
-- isaac (10:16 trace): of 31 mate differences, 14 have an end off live's connector, the rest are collateral (their
-  ends exact, the solve fails around them). 8 of the 14 are on Part 1 <12> (a2e4a2, core's Chamfer 2); the others are
-  Part 1 <22> (Ball 2 / 8: 1.37 mm, 90°), Part 1 <1> (Fastened 43: 90°), Part 1 <84> (Fastened 83), Part 2 <5>
-  (Fastened 84: 1°), Part 1 <88> (Ball 9: 6 / 32.8 mm).
-
-### Others' items from today
-- core 12:4x: 90d254008 moved c2-surf-intro-* Derived 1's body +0.1 in x: correct (live's source index 4 has the
-  Title text on the x=0 face, −25.4..2.54). Our Derived 1 imports Instructions (JHD) instead of live's Car (JWD):
-  the source's car isn't built. Loft 1's profile (INTERSECT of Projected curve 2's own extrude1 / extrude2 bodies,
-  a wire), Lofts 2-4 and Fillet 1 map now (6bca92a2 queued + local Loft 3 commit): the source translates fully.
-  Parked (lead 11-19 15:00, routed to core): live's Loft 4 (surface ADD) closes Car into a 5-face SOLID, ours stays
-  "Surface 1" (4 faces), so Derived 1 still takes Instructions (JWD resolves to it with no Car). Repro: vibex8
-  NOSHAPE_PARITY_ONLY=c2-surf-intro-offset (7 s).
-
-### In flight: HEAVY-ASM-SOFTWARE-FRAME, LOD side (branch asm-lod, 97b431e3e, not landed)
-- asm-xdev-subs' coarsest level: 462 k triangles / 273 k edge segments, 358 k / 219 k of them one 10 482-face part
-  (x5). `MeshBuffers::proxy` (vertex clustering, 200 cells along the diagonal, bodies > 4000 triangles, kept when it
-  halves them; memoised, warmed after a big scene's evaluation on a software adapter) replaces the coarsest level on a
-  software rasteriser (`AsmSceneOptions::software`, `asm_scene::display_levels`): 133 k / 110 k. GPU unchanged.
-- psui's renderer side (3da0173e) on vibe2 Xvfb (hv.sh): frames 1.1-1.3 s -> 0.11-0.28 s, wheel notch 3.6 -> 0.72 s
-  (live 3.4 s). My A/B: vibe2 ~/tmp/asm/hv/hv.sh (Xvfb :393) noshape-base (= psui's 3da0173e build) vs the release
-  build of 97b431e3e; parse with /root/psui-scratch/hvparse.py.
-
-### Landed 10:12 as 8f27d450 (3 commits)
-- Sketch plane off live's frame -> our face on that frame (bjr 5d8bc1 Sketch 40 + Extrude 21; bjr now 3 differences).
-- qSketchRegion(…, true) leaves out a disc a line joins to the outline when inside that region (isaac a04711
-  Extrude 1), not a circle at the outline's corner (a04711 Extrude 4). Model suite 127/127 models as base.
-- First-picked connector at 20 % + its face selected (live2 recheck (2)); live2 asked to retake on green.
-- In flight: isaac with both (vibe2 one.sh ops-region2 -> ~/agents/asm-keep/isaac-region.out).
+### In flight: parity_assemblies differences (lead 11-19: rank by documents, one land each)
+- Suites on vibex7 now (`~/agents/asm-keep/suite1.sh <bin> <tag> <dirs>` -> suite/<tag>.log), bin ops-main1119 (main
+  17c26dc1 + translator steps): light 20: the first 10 as live on vibe2 (l1119: bjr, clamp, config-assembly, corexy, flip-midaxis ×2, gearbox-std, hand-drill-pinslot, hinge-live), the other 11 on vibex7 (l1119b); heavy 4
+  (xdev, isaac, infento, scissor) next.
+- Branch asm-bom (2 commits on main, land after the P1 fix): pattern-std BOM (a pattern's live state also under its
+  feature's id: Linear pattern 5 is Man5… in the tree, M26C… ERROR in the feature list); 5d0e2d28c welding BOM
+  (9c7704: live's Part 2 / Part 6 alike in volume both took our Part 2; a live part whose fits are all taken is the
+  free part its feature made). Check run: vibex7 suite tag l1119b (bin ops-bomfix: both commits) over the 11 light
+  models left (vibe2 stopped 17:25 at the lead's word: load 81). Left in welding: our Extrude 8 names its two bodies the other way round from
+  live (JqD small = live's Part 5) and our big one is 113 mm³ short after Fillets 3/4/2 (geometry).
+- suspension 25/28 occ: studio geometry, sent to core 16:50: 805e29 Fillet 3/4 fail (Knuckle a sliver; Joint <2> /
+  LCA <1> hang off it), 995636 Body two bodies in ours (90,419 + 4,712 mm³), live one (109,049). Trace vibex7
+  ~/agents/asm-keep/susp.out.
+- isaac connector re-pick (`instance_entity_along`): no effect (never triggered, 98/129 as before); shelved, patch in
+  /root/asm-scratch/isaac-repick.patch. isaac: of 31 mate differences 14 have an end off live's connector (8 on
+  Part 1 <12>: a2e4a2 core's Chamfer 2; Ball 2 / 8, Fastened 43 / 26 / 83 / 84, Ball 9 others).
+- Others': robot-relations BOM 36/42 (dx); scissor-lift Top <3>; psui coplanar depth tie.
 
 ### isaac-ball connector cases (traced run 07:26, 98/129 mates)
 - Live fails them too (matched): Revolute 10, Fastened 6, Revolute 15, Fastened 16, Ball 16 (7 untranslated connectors).
 - GearLab "#desc" studios 1e81ca / 90f78b (3 connectors; Spiral Bevel BOM rows): FS decision with the lead.
 - Our 7 "cannot resolve" mates are on parts whose geometry differs ("volume fits []"):
-  - a04711 (Revolute 6, 11, Ball 13): Extrude 1 region (mine, landed in 8f27d450); next Extrude 4 REMOVE non-manifold
-    (Part 2 at 2x live's volume): its six regions match live's one to one -> bool.
-  - a2e4a2 (Ball 7, Fastened 33): Chamfer 2 TWO_OFFSETS 5.5/6 on a concave 7 mm line edge (our edge = live's JpF):
-    live +40 mm³, ours -568 mm³ -> core. Its Sketch 20 plane: the 43f8fb59c case (check isaac-plane.out).
-  - e54410 (Ball 14, Revolute 17, Ball 13): Chamfer 1 TWO_OFFSETS 2/5 on a plane-cylinder arc (our edge = live's JTF)
-    fails; Extrude 22 leaves RMBD 15/37/22 vs live 14/32/18 (same volume); Extrude 26 leaves 2 slivers (0.077 /
-    0.022 mm³), so "Part 3" maps to a sliver -> core / bool.
-  - Repros: vibe2 ~/tmp/asm/e544 and ~/tmp/asm/stu/<model> (NOSHAPE_PARITY_MODELS=…, ops-plane, ~11 s), saved docs
-    ~/tmp/asm/save2 (a2e4a2), save3 (e54410), save/wf.noshape (bjr Washer Face, tab "Studio bfc58c"); delete after.
-- Fastened / Revolute "overdefines" / "not consistent" (21 mates) next: ends off live's on the same studios.
+  - a04711 (Revolute 6, 11, Ball 13): Extrude 4 REMOVE non-manifold (Part 2 at 2x live's volume) -> bool.
+  - a2e4a2 (Ball 7, Fastened 33): Chamfer 2 TWO_OFFSETS 5.5/6 on a concave 7 mm line edge -> core.
+  - e54410 (Ball 14, Revolute 17, Ball 13): Chamfer 1 TWO_OFFSETS 2/5 on a plane-cylinder arc fails; Extrude 26
+    leaves 2 slivers, so "Part 3" maps to a sliver -> core / bool.
 
-### bjr
-- 137/137 occ, 31/31 mates, 23/23 BOM. Left: 5b44a0 / b509fd custDesc (live's getRow matches the first value only;
-  ours strict `tolerantEquals(a) && tolerantEquals(b)`: FS -> lead to route, dx), bfc58c Washer Face (non-manifold): the REMOVE of the hex - circle
-  region on the nut's own face fails even with one copy of the region (ours had it 6 times) -> bool.
-
-### Open (mine)
-- live2 recheck (2) done: the first-picked connector at 20 % (disc, rim, axes) and its face selected yellow; ask live2 to
-  retake it on a green build with it. Ctrl+V see-through
-  (REQUESTS 03:29 to live2, unanswered).
-- P0 HEAVY-ASM-SOFTWARE-FRAME: split agreed with psui (psui: crates/render + viewport scheduling; asm: LOD meshes and
-  load). asm-xdev-subs Assembly 1: 208 occ, finest 2,116,100 tris, level 0 462,235, level 1 679,934. A decimated level
-  below Coarse only if psui reports level 0 still too slow.
-- Night run c on vibex8 (infento-subs / scissor-lift pair) results.
-
-### Others' items
-- psui: coplanar depth tie. suspension Body / Joint / LCA: core. robot-relations BOM 36/42 (dx); pattern-std BOM 13/17
-  (scorer rule); welding Part 5 (core); scissor-lift Top <3>.
+### Parked
+- surf-intro (lead 11-19 15:00, routed to core): live's Loft 4 (surface ADD) closes Car into a 5-face SOLID, ours
+  stays "Surface 1", so Derived 1 takes Instructions. Repro vibex8 NOSHAPE_PARITY_ONLY=c2-surf-intro-offset (7 s).
+- bjr: 5b44a0 / b509fd custDesc (FS getRow first value only: dx); bfc58c Washer Face non-manifold REMOVE -> bool.
+- HEAVY-ASM: a decimated level below Coarse only if psui reports level 0 still too slow.
+- Scratch to delete when done: vibe2 ~/tmp/asm/{save,save2,save3,stu*,e544}, bins ops-mainbase / ops-main1119;
+  vibex8 bin ops-along; vibex7 bin ops-main1119.
 
 ## Scores (last measured, stack / main 11-18)
 - bjr-config 137/137 occ (step 2), 31/31 mates, BOM 22/23 before a8dedfc1 (OPG006 Description; rerun). pinslot 42/42, 16/16.
