@@ -4570,7 +4570,7 @@ impl AssemblyView {
 
     /// The Insert dialog's "Search Part Studios" / "Search assemblies" box;
     /// the placeholder is italic (live 320, 612).
-    pub(super) fn insert_search_box(&self, cx: &mut App) -> Option<AnyElement> {
+    pub(super) fn insert_search_box(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let st = self.ui.insert_search.as_ref()?;
         // Live 841: the replacement picker's box reads "Search entities or features".
         let ph = if self.picking_replacement() {
@@ -4588,7 +4588,7 @@ impl AssemblyView {
                 .child(
                     div()
                         .relative()
-                        .child(crate::ui_script::mark(div().child(crate::ui::input_with_placeholder(st, ph, cx).h(px(30.)).cleanable(true).text_size(px(12.)).pl(px(5.))), move || format!("field:{ph}"))),
+                        .child(crate::ui_script::mark(div().child(crate::ui::input_with_placeholder(st, ph, cx).h(px(30.)).text_size(px(12.)).pl(px(5.)).when(!st.read(cx).value().is_empty(), |i| i.suffix(insert_search_clear(cx)))), move || format!("field:{ph}"))),
                 )
                 .into_any_element(),
         )
@@ -5292,4 +5292,28 @@ pub(super) fn sort_folders(dirs: &mut [std::path::PathBuf], sort: noshape_ops::p
         NameDesc => dirs.sort_by_cached_key(|p| std::cmp::Reverse(name(p))),
         LastModified => dirs.sort_by_cached_key(|p| std::cmp::Reverse(std::fs::metadata(p).and_then(|m| m.modified()).ok())),
     }
+}
+
+/// Insert's search clear: a round grey ⊗ (live2 asm-dialogs-1119 ins-s), "Clear search".
+fn insert_search_clear(cx: &mut Context<AssemblyView>) -> Stateful<Div> {
+    div()
+        .id("ins-search-clear")
+        .size(px(14.))
+        .flex_none()
+        .rounded_full()
+        .bg(gpui_kit::rgb(0xc8c8c8))
+        .flex()
+        .items_center()
+        .justify_center()
+        .cursor_pointer()
+        .child(crate::ui::glyph("ui-clear", 7., gpui_kit::rgb(0xffffff)))
+        .tooltip(crate::ui::tooltip("Clear search"))
+        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+            if let Some(st) = this.ui.insert_search.clone() {
+                st.update(cx, |s, cx| s.set_value("", window, cx));
+            }
+            this.ui.insert_query.clear();
+            this.insert_search_changed(cx);
+            cx.notify();
+        }))
 }

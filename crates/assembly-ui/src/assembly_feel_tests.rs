@@ -484,3 +484,73 @@ fn select_other_reaches_an_edge_to_8_px_and_its_face_to_11(cx: &mut TestAppConte
         });
     }
 }
+
+/// The presented frame's pixels (BGRA, device px), its width and the window's scale.
+fn frame_pixels(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>) -> (Vec<u8>, usize) {
+    let vp = cx.update(|cx| view.read(cx).viewport.clone());
+    frames(cx, window, view);
+    cx.update(|cx| vp.update(cx, |v, _| v.record_frames(true)));
+    let t = std::time::Instant::now();
+    while cx.update(|cx| vp.read(cx).recorded_frames().len()) < 2 && t.elapsed() < std::time::Duration::from_secs(15) {
+        frames(cx, window, view);
+    }
+    let img = cx.update(|cx| vp.read(cx).recorded_frames()).last().cloned().expect("a presented frame");
+    cx.update(|cx| vp.update(cx, |v, _| v.record_frames(false)));
+    let w = img.size(0).width.0 as usize;
+    (img.as_bytes(0).map(|b| b.to_vec()).unwrap_or_default(), w)
+}
+
+/// Live2 asm-dialogs-1119 hz: with the mate dialog open, a hovered face's corner dots are filled white (the disc lost
+/// to the face's depth: hollow rings); after the first pick the connector's instance is outlined.
+#[gpui::test]
+fn a_mate_dialogs_dots_are_white_and_the_first_pick_outlines_its_instance(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "mate-dots", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let (lo, hi) = v.result.bounds().unwrap();
+            v.viewport.update(cx, |vp, cx| {
+                let s = vp.size();
+                vp.camera.set_view(noshape_render::StandardView::Isometric);
+                vp.camera.fit_sphere((lo + hi) * 0.5, (hi - lo).length() * 0.6, s.x / s.y);
+                vp.request_frame(cx);
+            });
+            v.start_mate(noshape_model::assembly::MateType::Fastened, w, cx);
+        })
+    })
+    .unwrap();
+    settle(cx, window, &view);
+    let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
+    let on_top = (lo + hi) * 0.5 - DVec2::new(0.0, (hi.y - lo.y) * 0.2);
+    move_to(cx, window, &view, on_top);
+    wait_until(cx, window, &view, |v, _| v.infer.is_some());
+    settle(cx, window, &view);
+    // The top face's corner nearest the top of the screen (+Z up in the isometric view): its dot's centre.
+    let corner = cx.update(|cx| {
+        let v = view.read(cx);
+        let id = v.assembly(cx).unwrap().instances.iter().find(|i| i.name == "Part 1 <1>").unwrap().id;
+        let o = v.result.occurrences.iter().find(|o| o.top() == id).unwrap();
+        let vp = v.viewport.read(cx);
+        o.mesh.positions.iter().map(|p| o.transform.transform_point3(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64))).filter_map(|p| vp.project(p)).min_by(|a, b| a.y.total_cmp(&b.y)).unwrap()
+    });
+    let scale = cx.update_window(window, |_, w, _| f64::from(w.scale_factor())).unwrap();
+    let (px, w) = frame_pixels(cx, window, &view);
+    let at = |p: DVec2| {
+        let (x, y) = ((p.x * scale).round() as usize, (p.y * scale).round() as usize);
+        let i = (y * w + x) * 4;
+        [px[i + 2], px[i + 1], px[i]]
+    };
+    let c = at(corner);
+    assert!(c.iter().all(|v| *v >= 235), "the corner dot filled white: rgb {c:?}");
+    let click = at_window(cx, &view, on_top);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(click, Modifiers::default());
+    settle(cx, window, &view);
+    assert!(cx.update(|cx| view.read(cx).mate.as_ref().is_some_and(|m| m.dialog.read(cx).connectors().len() == 1)), "the first connector picked");
+    move_to(cx, window, &view, on_top + DVec2::new(400.0, 200.0));
+    settle(cx, window, &view);
+    assert!(cx.update(|cx| view.read(cx).viewport.read(cx).scene().hover_outline), "its instance outlined");
+}

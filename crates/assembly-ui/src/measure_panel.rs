@@ -83,13 +83,16 @@ pub fn rows(results: &[(String, Measurement)], settings: &MeasureSettings, doc_u
     let f = |q: Quantity| format(q, &units);
     let l = |x: f64| f(Quantity::new(x, Dim::LENGTH));
     let mut out = Vec::new();
-    // Live (part-studio/495): Min dist is listed before Max dist.
-    let rank = |l: &str| match l {
+    // Live (part-studio/495): Min dist is listed before Max dist; a zero distance last, with no X / Y / Z (live2
+    // asm-dialogs-1119 mpz: two touching faces read Max dist with its components, then "Min dist: 0.000 mm").
+    let zero = |m: &Measurement| matches!(m, Measurement::Distance { distance, .. } if *distance == 0.0);
+    let rank = |l: &str, m: &Measurement| match l {
+        _ if zero(m) => 2,
         "Max dist" => 1,
         _ => 0,
     };
     let mut ordered: Vec<&(String, Measurement)> = results.iter().collect();
-    ordered.sort_by_key(|(l, _)| rank(l));
+    ordered.sort_by_key(|(l, m)| rank(l, m));
     for (label, m) in ordered {
         if let Some(t) = settings.kind
             && noshape_model::regen::measure::row_type(label) != Some(t)
@@ -107,7 +110,9 @@ pub fn rows(results: &[(String, Measurement)], settings: &MeasureSettings, doc_u
             Measurement::Distance { distance, .. } => l(*distance),
         };
         out.push(Row { label: label.clone(), value, axis: None });
-        if let Measurement::Distance { dx, dy, dz, .. } = m {
+        if let Measurement::Distance { dx, dy, dz, .. } = m
+            && !zero(m)
+        {
             for (i, d) in [*dx, *dy, *dz].into_iter().enumerate() {
                 out.push(Row { label: String::new(), value: l(d), axis: Some(i) });
             }
@@ -292,5 +297,15 @@ mod tests {
         let both = vec![("Max dist".to_string(), Measurement::Distance { distance: 0.02, dx: 0.0, dy: 0.0, dz: 0.02, a: Default::default(), b: Default::default() }), results[0].clone()];
         let r = rows(&both, &MeasureSettings::default(), &doc);
         assert_eq!((r[0].label.as_str(), r[4].label.as_str()), ("Min dist", "Max dist"));
+        // Touching (live2 asm-dialogs-1119 mpz): Max dist with its X / Y / Z, then Min dist 0 alone.
+        let touching = vec![("Min dist".to_string(), Measurement::Distance { distance: 0.0, dx: 0.0, dy: 0.0, dz: 0.0, a: Default::default(), b: Default::default() }), both[0].clone()];
+        let r = rows(&touching, &MeasureSettings::default(), &doc);
+        assert_eq!(r.iter().map(|r| r.label.as_str()).collect::<Vec<_>>(), ["Max dist", "", "", "", "Min dist"]);
+    }
+
+    #[test]
+    fn an_angle_reads_in_degrees_to_three_places() {
+        let units = UnitPrefs { length: LengthUnit::Millimeter, ..UnitPrefs::default() };
+        assert_eq!(format(Quantity::new(std::f64::consts::FRAC_PI_2, Dim::ANGLE), &units), "90.000 deg");
     }
 }

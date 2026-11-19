@@ -892,6 +892,13 @@ impl AssemblyView {
                 None => asm.mates.push(m),
             }
         }
+        // The open Group dialog's group: its errors show as it opens (live2 asm-dialogs-1119 grp: "Mate cannot be added
+        // between member of same group." on Revolute 1 at once).
+        if let Some((editing, ids)) = self.ui.group.clone()
+            && (!ids.is_empty() || !self.ui.group_patterns.is_empty())
+        {
+            noshape_ops::assembly::commit_group(&mut asm, editing, ids, self.ui.group_patterns.clone());
+        }
         // Mate connector being edited: previewed as a regular assembly connector.
         if let Some(s) = self.mc.as_ref().filter(|s| !s.implicit)
             && let Some(c) = s.to_connector(cx)
@@ -1239,7 +1246,7 @@ impl AssemblyView {
         let units = self.units(cx);
         // (Picking a mate connector shows its own hover look, below.) An instance on the pointer from Insert lights
         // nothing under it (live feel/mates insert-preview-follows-pointer.png), unless Snap mode looks for a face.
-        let placing_free = self.placing.is_some() && self.snap.is_none();
+        let placing_free = (self.placing.is_some() && self.snap.is_none()) || self.ui.placed_at == Some(self.pointer);
         if let Some(t) = self.hover.as_ref().filter(|_| !placing_free)
             && matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex)
             && self.pick_mode(cx) != Some(PickMode::Inference)
@@ -1442,8 +1449,33 @@ impl AssemblyView {
         self.ui.overlay_mates = overlay_mates;
         // Dialog connectors + inference preview.
         let mut chosen: Vec<MateConnectorRef> = Vec::new();
+        // A mate dialog's first pick alone: its connector's disc, not the triad, and its whole instance outlined (live2
+        // asm-dialogs-1119 hz row 2).
+        let mut first_pick: Vec<Frame> = Vec::new();
         if let Some(s) = &self.mate {
-            chosen.extend(s.dialog.read(cx).connectors().into_iter().cloned());
+            let d = s.dialog.read(cx);
+            // A hovered chip's entity, yellow-green (live2 asm-dialogs-1119 chip).
+            if let Some(c) = d.hovered_field.and_then(|f| d.slots().get(f).cloned().flatten()) {
+                let entity = match &c.reference {
+                    Reference::Implicit { on, .. } if matches!(**on, Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_)) => Some((**on).clone()),
+                    r @ (Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_)) => Some(r.clone()),
+                    _ => None,
+                };
+                if let Some(e) = entity {
+                    let mut path = vec![c.instance];
+                    path.extend(c.path.iter().copied());
+                    h.query_entities.push((path, e));
+                }
+            }
+            match d.connectors().as_slice() {
+                [c] if !d.connectors_complete() => {
+                    first_pick.extend(self.result.connector_world(c, &units));
+                    if !c.is_origin() {
+                        h.hover_tops.push(c.instance);
+                    }
+                }
+                cs => chosen.extend(cs.iter().map(|c| (*c).clone())),
+            }
         }
         if let Some(p) = &self.pattern {
             chosen.extend(p.axis.iter().cloned());
@@ -1525,11 +1557,7 @@ impl AssemblyView {
             });
             vec![m]
         };
-        if let Some(p) = self.placing_point
-            && self.placing.is_some()
-        {
-            h.cursor_mark = Some((p, size * 0.4));
-        }
+        // (Nothing is drawn at the pointer while placing: live2 asm-dialogs-1119 insz.)
         h.manipulator = self.manipulator(cx).map(|f| (f, self.manip_size(cx), self.manip_hover.or(self.ui.manip_selected)));
         self.triad_drag_marks(&mut h, cx);
         h.section = self.section_glyph(cx);
@@ -1566,12 +1594,18 @@ impl AssemblyView {
         for (f, s, _, o) in &h.connectors {
             sig.extend([f.origin.x, f.origin.y, f.origin.z, f.rotation.x, f.rotation.y, f.rotation.z, *s, f64::from(*o)]);
         }
+        for f in &first_pick {
+            sig.extend([f.origin.x, f.origin.y, f.origin.z, f.rotation.x, f.rotation.y, f.rotation.z]);
+        }
         for (f, _, _, _) in &h.mate_glyphs {
             sig.extend([f.origin.x, f.origin.y, f.origin.z, f.rotation.x, f.rotation.y, f.rotation.z]);
         }
         let geometry_changed = geometry_changed || sig != self.overlay_sig;
         self.overlay_sig = sig;
         // Live 3d.json explicit_mate_connector: the 36 px disc of the Part Studio's connectors, its pick the disc.
+        let first_pick: Option<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = (!first_pick.is_empty()).then(|| {
+            crate::scene_builder::ConnectorGlyphs::picked(first_pick.iter().map(|f| (f.origin, f.x(), f.z(), crate::scene_builder::ConnectorLook::Rest, 0))) as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>
+        });
         let connector_glyphs: Option<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = (!h.connectors.is_empty()).then(|| {
             let items = h.connectors.iter().enumerate().map(|(i, (f, _, hl, _))| {
                 let look = if *hl { crate::scene_builder::ConnectorLook::Hovered } else { crate::scene_builder::ConnectorLook::Rest };
@@ -1614,7 +1648,7 @@ impl AssemblyView {
             } else {
                 snapping.then_some(crate::cursor::AppCursor::SnapMate)
             };
-            vp.set_camera_geometry(marks.into_iter().chain(connector_glyphs).chain(mate_glyphs).chain(screen_triads).collect(), cx);
+            vp.set_camera_geometry(marks.into_iter().chain(connector_glyphs).chain(first_pick).chain(mate_glyphs).chain(screen_triads).collect(), cx);
             vp.set_scene(Arc::new(scene), geometry_changed, cx)
         });
     }
@@ -2044,6 +2078,9 @@ impl AssemblyView {
                 }
             }
             self.selected.retain(|s| !ids.contains(s));
+            if self.insert_open {
+                self.ui.placed_at = Some(self.pointer);
+            }
         } else {
             self.selected.retain(|s| !ids.contains(s));
             self.schedule_eval(window, cx);
@@ -2141,6 +2178,8 @@ impl AssemblyView {
         }
         self.ui.group_patterns.clear();
         self.edit(noshape_ops::assembly::group_description(editing.is_some()), cx, |a| noshape_ops::assembly::commit_group(a, editing, ids, patterns));
+        // ✓ clears the selection (live2 asm-dialogs-1119 gok).
+        self.clear_selection();
         self.update_capture(cx);
         cx.notify();
     }
@@ -2261,6 +2300,7 @@ impl AssemblyView {
             MateDialogEvent::AcceptAndNew => this.accept_mate_and_new(window, cx),
             MateDialogEvent::Animate => this.toggle_mate_preview(window, cx),
             MateDialogEvent::EditConnector(field) => this.edit_dialog_connector(*field, window, cx),
+            MateDialogEvent::HoverField => this.refresh_scene(false, cx),
             MateDialogEvent::ConfigureParam(param) => this.configure_mate_param(param, cx),
             MateDialogEvent::CheckboxFocused(label) => this.ui.checkbox_focus = Some(label),
             MateDialogEvent::Solve => {
@@ -2713,7 +2753,8 @@ impl AssemblyView {
         }
         let pal = p();
         let units = self.units(cx);
-        let fmt = |x: f64, dim: noshape_units::Dim| noshape_units::format_quantity(noshape_units::Quantity::new(x, dim), &units);
+        // As the Measure panel's and the Part Studio's: "90.000 deg" (live2 asm-dialogs-1119 mz).
+        let fmt = |x: f64, dim: noshape_units::Dim| crate::measure_panel::format(noshape_units::Quantity::new(x, dim), &units);
         // "12.5 mm" -> the number (monospace, underlined) and its unit.
         let value = |text: String| {
             let (num, unit) = text.split_once(' ').map(|(n, u)| (n.to_string(), u.to_string())).unwrap_or((text, String::new()));
@@ -3138,6 +3179,10 @@ impl AssemblyView {
                 }
             }
             ViewportEvent::PointerMove { position, modifiers } => {
+                if self.ui.placed_at.is_some_and(|p| p != *position) {
+                    self.ui.placed_at = None;
+                    self.refresh_scene(false, cx);
+                }
                 // Alt: transparent instances become pickable (Onshape Alt+click).
                 if modifiers.alt != self.ui.alt_through {
                     self.ui.alt_through = modifiers.alt;
@@ -4711,10 +4756,11 @@ impl AssemblyView {
             })
             // No row tooltip while a context menu is open (it would cover the menu).
             // A mate's, in error too: its flyout under its tooltip's first line (live2 asm-feel (1), errors-1118 tips);
-            // another row's: the plain tooltip.
+            // another row's: its tip in the flyout's bar.
             .map(|d| match (tip.filter(|_| !crate::os_menu::is_open(cx)), flyout) {
                 (Some(m), Some((head, rows))) => crate::assembly_flyout::with_mate_flyout(d, head, rows, m),
-                (Some(m), None) => d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(w, cx)).tooltip_show_delay(crate::ui::ROW_TIP_DELAY),
+                // (A group's or relation's: the same grey-blue bar right of the list, live2 asm-dialogs-1119 gok.)
+                (Some(m), None) => crate::assembly_flyout::with_row_tip(d, m),
                 (None, _) => d,
             })
             // Drag a row onto another of the same kind to reorder (Onshape).
@@ -7332,6 +7378,7 @@ impl AssemblyView {
         } else if self.ui.group.is_some() {
             self.ui.group = None;
             self.ui.group_patterns.clear();
+            self.ui.eval_requested = true;
             self.update_capture(cx);
             cx.notify();
         } else if self.ui.np_driver.is_some() {

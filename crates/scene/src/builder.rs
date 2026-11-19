@@ -2044,9 +2044,9 @@ impl noshape_render::camera_geometry::CameraGeometry for InferenceMarks {
             let (z, x) = (mk.z.normalize_or_zero(), mk.x.normalize_or_zero());
             let y = z.cross(x);
             let r = px * if mk.corner { MARK_CORNER_PX } else { MARK_POINT_PX };
-            // 3 px toward the eye: over the face and its edge lines (live: the white disc covers the outline), with
-            // no shift on screen; other parts in front still hide it.
-            let o = mk.origin - view.camera.forward().normalize_or_zero() * (3.0 * px);
+            // 30 px toward the eye: over the face, its edge lines and the faces' depth bias (at 3 px the white disc
+            // lost to the face: hollow rings, live2 asm-dialogs-1119 hz), with no shift on screen.
+            let o = mk.origin - view.camera.forward().normalize_or_zero() * (30.0 * px);
             let at = |k: usize| {
                 let a = k as f64 / N as f64 * std::f64::consts::TAU;
                 o + x * (r * a.cos()) + y * (r * a.sin())

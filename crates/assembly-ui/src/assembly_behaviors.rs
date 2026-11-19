@@ -315,6 +315,9 @@ pub struct AsmUi {
     /// The occurrence a mate dialog's pick was undone on, and the pointer then: it gives no connector inference
     /// (and no pick) until the pointer leaves it (live 2023).
     pub mate_spent: Option<(usize, glam::DVec2)>,
+    /// Where the pointer was when an instance was placed with Insert's dialog open: nothing lights under it there until
+    /// the pointer moves (live2 asm-dialogs-1119 ins-flow).
+    pub placed_at: Option<glam::DVec2>,
     /// The drawn inference marks and their key (the viewport resends only a new one).
     pub inference_marks: Option<(Vec<u64>, std::sync::Arc<crate::scene_builder::InferenceMarks>)>,
     /// Make transparent (Shift+T): instances drawn transparent.
@@ -4331,6 +4334,7 @@ impl AssemblyView {
         self.ui.group_patterns = patterns;
         self.ui.group = Some((editing, ids));
         self.insert_open = false;
+        self.ui.eval_requested = true;
         self.update_capture(cx);
         self.refresh_scene(false, cx);
         cx.notify();
@@ -4353,6 +4357,7 @@ impl AssemblyView {
             }
         }
         self.refresh_scene(false, cx);
+        self.ui.eval_requested = true;
         cx.notify();
     }
 
@@ -4371,6 +4376,7 @@ impl AssemblyView {
             to.push((std::mem::replace(ids, members), std::mem::replace(&mut self.ui.group_patterns, patterns)));
         }
         self.refresh_scene(false, cx);
+        self.ui.eval_requested = true;
         cx.notify();
         true
     }
@@ -4384,6 +4390,7 @@ impl AssemblyView {
             None => self.ui.group_patterns.push(pid),
         }
         self.refresh_scene(false, cx);
+        self.ui.eval_requested = true;
         cx.notify();
     }
 
@@ -4501,6 +4508,7 @@ impl AssemblyView {
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.ui.group = None;
                                 this.ui.group_patterns.clear();
+                                this.ui.eval_requested = true;
                                 this.update_capture(cx);
                                 cx.notify();
                             })),

@@ -500,6 +500,8 @@ pub struct Highlights {
     /// The face whose boundary is outlined (live: hovering a face while
     /// picking a mate connector outlines it, no fill).
     pub hover_outline: Option<(InstancePath, Reference)>,
+    /// A dialog's hovered selection row's entities: yellow-green (`state::QUERY`).
+    pub query_entities: Vec<(InstancePath, Reference)>,
     /// The hovered part's occurrence: its silhouette in the hover colour, no tint (live2 asm-feel (3b): only that
     /// part, inside a subassembly too).
     pub hover_part: Option<InstancePath>,
@@ -527,8 +529,6 @@ pub struct Highlights {
     /// Pickable mate indicators: (connector frame, highlighted, state), drawn flat in the connector's XY plane like
     /// Onshape's, at screen size ([`MateGlyphs`]).
     pub mate_glyphs: Vec<(Frame, bool, MateGlyphState, noshape_model::assembly::MateType)>,
-    /// Placement preview cross at the cursor (insert).
-    pub cursor_mark: Option<(DVec3, f64)>,
     /// Explode lines (dashed), start to exploded position.
     pub trails: Vec<(DVec3, DVec3)>,
     /// A triad handle being dragged: the other handles faded (live manip-feel-1118 m9).
@@ -1001,6 +1001,11 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     if let Some((p, r)) = &h.hover_entity {
         mark(p, r, state::HOVER, &mut scene);
     }
+    for (p, r) in &h.query_entities {
+        for &id in built.picks.ids_for(p, r) {
+            scene.add_flag(id, state::QUERY);
+        }
+    }
     if let Some((p, r)) = &h.hover_outline {
         for id in built.picks.boundary_ids(p, r) {
             scene.add_flag(id, state::HOVER);
@@ -1102,11 +1107,6 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     }
     for (a, b) in &h.trails {
         lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: DARK, pick_id: 0, width: 1.5, style: LineSegment::DASHED | LineSegment::ON_TOP });
-    }
-    if let Some((p, size)) = h.cursor_mark {
-        for axis in [DVec3::X, DVec3::Y, DVec3::Z] {
-            lines.segments.push(LineSegment { a: (p - axis * size).as_vec3().into(), b: (p + axis * size).as_vec3().into(), color: theme::rgb8(theme::pick(theme::viewport::PLANE_TEXT, theme::viewport_dark::PLANE_TEXT)), pick_id: 0, width: 1.5, style: LineSegment::ON_TOP });
-        }
     }
     if !lines.segments.is_empty() {
         scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(20));

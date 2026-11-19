@@ -931,27 +931,27 @@ changed frame (the same recorder for both), one run each. Evidence live/feel/asm
 | Item | Live | Ours | Status |
 |---|---|---|---|
 | Insert dialog open (toolbar Insert) | first frame 218 ms, drawn 435 ms | 97 ms | = (faster) |
-| Insert's list tools | the search box with a round ⊗ clear, a sort button right of it, three filter icons | a small × clear, no sort button, two filter icons (ins-s.png) | ≠ [asm] |
+| Insert's list tools | the search box with a round ⊗ clear, a sort button right of it, three filter icons | a small × clear, no sort button, two filter icons (ins-s.png) | ≠ [asm] (the round ⊗ clear fixed 11-19; the sort button and the third filter: asked live2, REQUESTS 11-19 04:39) |
 | A Part Studio row clicked, then the pointer into the graphics | the parts follow the pointer, solid orange, 731 ms after the move | the same, 350 ms | = (faster) |
-| …at the pointer | nothing drawn at the pointer | a blue six-line star at the pointer (insz.png) | ≠ [asm] |
+| …at the pointer | nothing drawn at the pointer | a blue six-line star at the pointer (insz.png) | = (fixed 11-19: nothing drawn) |
 | The placing click | dropped 943 ms after the click; no new copy follows; "Inserted: 2" | the same, 289 ms | = (faster) |
-| After the place, the pointer still over the new instance (dialog open) | nothing lit | the instance outlined orange (hover) (ins-flow.png row 2) | ≠ [asm] |
+| After the place, the pointer still over the new instance (dialog open) | nothing lit | the instance outlined orange (hover) (ins-flow.png row 2) | = (fixed 11-19: nothing lit until the pointer moves; `a_placed_instance_doesnt_light_until_the_pointer_moves`) |
 | Esc after the place | "Assembly insertion has been cancelled. Restore" blue bubble, the session's instances removed | the same | = |
-| Hovering a face with the mate dialog open | the face outlined once (thin orange); corner and midpoint dots filled white with a grey ring, the centroid's disc and triad; 516 ms after the move (more at 1133) | dots hollow (no white fill), the face outlined twice (a light orange band); 697 ms (hz.png) | ≠ [asm] (look; the time is within 100 ms / 2×) |
-| After the first pick | the picked connector drawn faded (small disc and axes), the whole instance outlined orange | a full-size bright RGB triad, no disc, no outline (hz.png row 2) | ≠ [asm] |
+| Hovering a face with the mate dialog open | the face outlined once (thin orange); corner and midpoint dots filled white with a grey ring, the centroid's disc and triad; 516 ms after the move (more at 1133) | dots hollow (no white fill), the face outlined twice (a light orange band); 697 ms (hz.png) | ≠ [asm] (dots filled white, fixed 11-19: the disc lost to the face's depth bias, `a_mate_dialogs_dots_are_white_and_the_first_pick_outlines_its_instance`; the outline band still double: the renderer's hovered edges) |
+| After the first pick | the picked connector drawn faded (small disc and axes), the whole instance outlined orange | a full-size bright RGB triad, no disc, no outline (hz.png row 2) | ≈ (fixed 11-19: the connector's disc, not the triad, and the instance outlined; live's is faded) |
 | The second pick → the part jumps (Fastened, top face onto top face) | 2.18 s | 0.23–0.48 s | = (faster) |
 | A (flip) | 1.0 s to the flipped place | 0.35 s | = (faster) |
 | Offset ✓ then Z "5+5" + Enter | three fields X / Y / Z, then Rotate about X, Rotation angle; "(5+5) mm" kept while focused, "10 mm" after blur; moved 941 ms after Enter | the same; 350 ms (off.png, ozf.png) | = (faster) |
-| The mated part inside the fixed one | only its orange edges, through the fixed part | a light see-through orange fill as well (oz.png) | ≠ [asm] |
+| The mated part inside the fixed one | only its orange edges, through the fixed part | a light see-through orange fill as well (oz.png) | ≠ [psui] (the renderer's see-through selected faces; sent 11-19) |
 | Type list | Slider … Fastened, Parallel, the current one highlighted | the same (ty.png) | = |
 | Fastened → Revolute | re-solved 1.11–1.24 s; offset and flip kept | 0.20 s, the same values | = (faster) |
-| A connector chip hovered | its face lit yellow-green; tip "Mate connector of Part 1 <1> (Click to edit)" right of the chip, same line | the face not lit; the tip below the row (chip.png) | ≠ [asm] |
+| A connector chip hovered | its face lit yellow-green; tip "Mate connector of Part 1 <1> (Click to edit)" right of the chip, same line | the face not lit; the tip below the row (chip.png) | = (fixed 11-19: its face yellow-green, the tip right of the chip; `a_hovered_connector_chip_lights_its_face`) |
 | ✓ | dialog closed 573 ms, settled 1.0 s | 0.08–0.27 s | = (faster) |
-| Coplanar tops after the mate (Part 2's top flush with Part 1's) | Part 1's face drawn, Part 2's top edges on it | Part 2's grey face over it with a blue sliver at one corner (z-fighting) (ok.png) | ≠ [asm] |
-| Group with Part 1 (fixed) and Part 2 (Revolute 1 on them), on opening | "Group 1" with Instances Part 1 <1>, Part 2 <1>; errors shown at once: Revolute 1 and Group 1 red with "!", Mate features ⬇ and the root badge red; "… has error: Mate cannot be added between member of same group. (Hidden)" | the dialog the same; no error until ✓ (grp.png) | ≠ [asm] |
-| Group ✓ | the selection cleared; both rows faded red with "!" | both instances stay selected; Group 1's tooltip (same words) in a white box below the row, not the grey-blue bar right of the list (gok.png, ogt.png) | ≠ [asm] |
-| Two perpendicular faces selected (bottom-right summary) | "Perp planes angle: 90.000 deg" | "Perp planes angle: 90°" (the Part Studio says "90.000 deg") (mz.png, opsz.png) | ≠ [asm] |
-| Measure panel ([) with the same two faces | top at y ≈ 355, left of the right strip; Perp planes angle, Area 1600.000 mm², Max dist 60.000 mm with X / Y / Z, then Min dist 0.000 mm with no components | top at y ≈ 545 (190 px lower); Min dist first with X / Y / Z all 0.000, then Max dist (mpz.png) | ≠ [asm] |
+| Coplanar tops after the mate (Part 2's top flush with Part 1's) | Part 1's face drawn, Part 2's top edges on it | Part 2's grey face over it with a blue sliver at one corner (z-fighting) (ok.png) | ≠ [psui] (coplanar faces of two instances z-fight in the renderer; sent 11-19) |
+| Group with Part 1 (fixed) and Part 2 (Revolute 1 on them), on opening | "Group 1" with Instances Part 1 <1>, Part 2 <1>; errors shown at once: Revolute 1 and Group 1 red with "!", Mate features ⬇ and the root badge red; "… has error: Mate cannot be added between member of same group. (Hidden)" | the dialog the same; no error until ✓ (grp.png) | = (fixed 11-19: the dialog's group is in the preview; `the_group_dialog_shows_its_errors_as_it_opens_and_ok_clears_the_selection`) |
+| Group ✓ | the selection cleared; both rows faded red with "!" | both instances stay selected; Group 1's tooltip (same words) in a white box below the row, not the grey-blue bar right of the list (gok.png, ogt.png) | = (fixed 11-19: the selection cleared, Group 1's tip in the bar right of the list) |
+| Two perpendicular faces selected (bottom-right summary) | "Perp planes angle: 90.000 deg" | "Perp planes angle: 90°" (the Part Studio says "90.000 deg") (mz.png, opsz.png) | = (fixed 11-19: the Measure panel's format, "90.000 deg") |
+| Measure panel ([) with the same two faces | top at y ≈ 355, left of the right strip; Perp planes angle, Area 1600.000 mm², Max dist 60.000 mm with X / Y / Z, then Min dist 0.000 mm with no components | top at y ≈ 545 (190 px lower); Min dist first with X / Y / Z all 0.000, then Max dist (mpz.png) | ≠ [asm] (order fixed 11-19: a zero distance last without X / Y / Z; the panel's place: asked live2, REQUESTS 11-19 04:39) |
 
 ### drw-tools-1119 (P0, everyday drawing tools, live2 11-19 04:24–04:39) [studios]
 

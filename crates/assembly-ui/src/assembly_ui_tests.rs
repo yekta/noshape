@@ -2087,3 +2087,100 @@ fn the_insert_dialog_leaves_out_an_empty_part_studio(cx: &mut TestAppContext) {
         assert_eq!(vcx.debug_bounds("ins-no-match").is_some(), none, "{query}: the no-match line");
     }
 }
+
+/// Live2 asm-dialogs-1119 grp / gok: Group on a fixed part and a part Revolute-mated to it shows the mate's error as the
+/// dialog opens (not only after ✓), and ✓ clears the selection.
+#[gpui::test]
+fn the_group_dialog_shows_its_errors_as_it_opens_and_ok_clears_the_selection(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "group-preview", |ctx| {
+        call(ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>"], "fixed": true }));
+        let top = |ctx: &mut Ctx, i: &str| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].clone();
+        let (a, b) = (top(ctx, "Part 1 <1>"), top(ctx, "Part 2 <1>"));
+        call(ctx, "assembly_mate", json!({ "type": "revolute", "a": { "instance": "Part 1 <1>", "entity": a }, "b": { "instance": "Part 2 <1>", "entity": b } }));
+    });
+    let (window, view) = open_assembly(cx, &path);
+    let settle = |cx: &mut TestAppContext| {
+        draw(cx, window);
+        cx.executor().advance_clock(std::time::Duration::from_millis(100));
+        cx.run_until_parked();
+        draw(cx, window);
+    };
+    let mate_error = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).result.mates.first().and_then(|m| m.message.clone()));
+    assert_eq!(mate_error(cx), None, "Revolute 1 solves");
+    cx.update(|cx| view.update(cx, |v, cx| {
+        let ids = vec![instance(v, "Part 1 <1>", cx), instance(v, "Part 2 <1>", cx)];
+        v.selected = ids.clone();
+        v.open_group(None, ids, vec![], cx);
+    }));
+    settle(cx);
+    assert_eq!(mate_error(cx).as_deref(), Some("Mate cannot be added between member of same group."), "the error as the dialog opens");
+    cx.update(|cx| view.update(cx, |v, cx| v.accept_group(cx)));
+    settle(cx);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.selected.is_empty(), "✓ clears the selection");
+        assert_eq!(v.assembly(cx).unwrap().groups.len(), 1, "Group 1 made");
+    });
+    assert_eq!(mate_error(cx).as_deref(), Some("Mate cannot be added between member of same group."), "the error stays");
+}
+
+/// Live2 asm-dialogs-1119 ins-flow: an instance placed with Insert's dialog still open lights nothing under the pointer
+/// until the pointer moves.
+#[gpui::test]
+fn a_placed_instance_doesnt_light_until_the_pointer_moves(cx: &mut TestAppContext) {
+    use noshape_scene::{asm_scene::AsmPickTarget, builder::PickKind};
+    let (window, view) = pattern_assembly(cx, "placed-quiet");
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).viewport.read(cx).scene().hover_outline);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.toggle_insert(w, cx);
+            let studio = v.doc.read(cx).session.doc.tabs.iter().find(|t| t.name == "Part Studio 1").unwrap().id;
+            let id = v.insert_part(studio, None, cx).unwrap();
+            v.start_placing(vec![id], cx);
+            v.finish_placing(true, w, cx);
+        })
+    })
+    .unwrap();
+    cx.executor().advance_clock(std::time::Duration::from_millis(100));
+    cx.run_until_parked();
+    let hover = |cx: &mut TestAppContext| {
+        cx.update(|cx| view.update(cx, |v, cx| {
+            let id = instance(v, "Part 1 <1>", cx);
+            let top = face_connector(v, "Part 1 <1>", true, cx);
+            let Reference::Implicit { on, .. } = &top.reference else { panic!("an implicit connector") };
+            let occ = v.result.occurrences.iter().position(|o| o.top() == id).unwrap();
+            v.hover = Some(AsmPickTarget { path: vec![id], reference: (**on).clone(), kind: PickKind::Face, occ, anchor: None });
+            v.refresh_scene(false, cx);
+        }));
+    };
+    assert!(cx.update(|cx| view.read(cx).insert_open && view.read(cx).ui.placed_at.is_some()), "placed, the dialog open");
+    hover(cx);
+    assert!(!lit(cx), "nothing lit where it was placed");
+    cx.update(|cx| view.update(cx, |v, _| v.pointer += glam::DVec2::new(4.0, 0.0)));
+    hover(cx);
+    assert!(lit(cx), "the face lights once the pointer moved");
+}
+
+/// Live2 asm-dialogs-1119 chip: hovering a connector chip in the mate dialog lights its face yellow-green.
+#[gpui::test]
+fn a_hovered_connector_chip_lights_its_face(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "chip-hover");
+    let query_lit = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).viewport.read(cx).scene().states.iter().any(|s| s & noshape_render::state::QUERY != 0));
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Fastened, w, cx);
+            let (a, b) = (face_connector(v, "Part 2 <1>", false, cx), face_connector(v, "Part 1 <1>", true, cx));
+            v.deliver_connector(a, w, cx);
+            v.deliver_connector(b, w, cx);
+            v.refresh_scene(false, cx);
+        })
+    })
+    .unwrap();
+    assert!(!query_lit(cx), "nothing yellow-green at rest");
+    cx.update(|cx| view.update(cx, |v, cx| {
+        let d = v.mate.as_ref().unwrap().dialog.clone();
+        d.update(cx, |d, _| d.hovered_field = Some(0));
+        v.refresh_scene(false, cx);
+    }));
+    assert!(query_lit(cx), "the first chip's face lit");
+}

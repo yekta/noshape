@@ -29,6 +29,8 @@ pub enum MateDialogEvent {
     Animate,
     /// The mate connector icon of a field: edit that mate connector.
     EditConnector(usize),
+    /// The pointer came onto or left a connector chip ([`MateDialog::hovered_field`]).
+    HoverField,
     /// "Select parameters to configure" mode: a parameter was clicked.
     ConfigureParam(&'static str),
     /// A checkbox was clicked: it keeps the keyboard focus (live asm-slider-limits).
@@ -92,6 +94,8 @@ pub struct MateDialog {
     /// An option was changed (a checkbox, a value, a flip): ✓ is on though the title is red (live
     /// asm-cylindrical-limits, asm-tangent-propagation). Picks don't count.
     pub touched: bool,
+    /// The connector chip under the pointer: its entity lights yellow-green (live2 asm-dialogs-1119 chip).
+    pub hovered_field: Option<usize>,
     pub flip_primary: bool,
     /// The connector field the Mate connector panel is editing (its chip is
     /// bold, live 578).
@@ -307,6 +311,7 @@ impl MateDialog {
             advance_disarmed: None,
             picks_undo: Vec::new(),
             touched: false,
+            hovered_field: None,
             picks_redo: Vec::new(),
             flip_primary: mate.flip_primary,
             editing_field: None,
@@ -853,9 +858,13 @@ impl MateDialog {
             let bold = self.editing_field == Some(field);
             rows.push(
                 os::query_row(SharedString::from(format!("mc-field-{field}")), text.clone())
-                    // Live: the chip's tooltip ("Mate connector of Part 1 <2>
-                    // (Click to edit)"; Tangent's faces: the label).
-                    .tooltip(crate::ui::tooltip(if self.mate_type == MateType::Tangent { text.to_string() } else { format!("{text} (Click to edit)") }))
+                    .on_hover(cx.listener(move |this, on: &bool, _, cx| {
+                        let now = if *on { Some(field) } else { this.hovered_field.filter(|f| *f != field) };
+                        if now != this.hovered_field {
+                            this.hovered_field = now;
+                            cx.emit(MateDialogEvent::HoverField);
+                        }
+                    }))
                     .when(bold, |d| d.font_weight(FontWeight::BOLD))
                     .when(lost.is_some(), |d| d.text_color(pal.text_invalid))
                     .hover(|d| d.bg(pal.row_hover))
@@ -894,6 +903,9 @@ impl MateDialog {
                                 })),
                         )
                     })
+                    // Live: the chip's tooltip ("Mate connector of Part 1 <2> (Click to edit)"; Tangent's faces: the label),
+                    // right of the chip on its line (live2 asm-dialogs-1119 chip).
+                    .map(|d| crate::assembly_flyout::with_row_tip(d, if self.mate_type == MateType::Tangent { text.to_string() } else { format!("{text} (Click to edit)") }))
                     .into_any_element(),
             );
         }
