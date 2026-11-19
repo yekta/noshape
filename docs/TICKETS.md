@@ -856,6 +856,13 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   (crates/app/src/import_dialog.rs:230); Preferences asks "Enable access to Onshape Labs features?" (prefs_general.rs:476). The app
   is Noshape in all user-facing text (no Onshape brand marks): "Import to Noshape" etc., layout as live. Walk 22:04, green a58eee8c;
   the STEP round trip itself is fine (8 faces out, Import 1 + Part 1 back, "CAD Imports" folder, info toast).
+- [ ] P0 **STALE-SKETCH-HOVER (psui)**: outside sketch mode a sketch entity's hover look stays after the pointer leaves
+  for empty space (green f3bc85da, :110, real pointer, walk 22:12). (a) Draw a circle, the last click on its rim, close
+  the sketch with ✓: the region keeps its light-orange hover outline with nothing selected, through pointer moves over
+  empty viewport and into Revolve / Extrude (whose region field is empty); it clears only when another entity is hovered
+  (a part face). Seen twice (a rectangle before Revolve 1, a circle on Top). (b) Outside sketch mode, hover the circle's
+  centre point and move off to empty space: the orange centre dot stays (1.5 s later, and after Shift+7); the rim's
+  hover clears as it should, and so does a part face's (live clears a hover when the pointer leaves the entity).
 
 ## Interaction feel suite 11-19 (qa 16:20: run 1119-1242-223cec7e on vibex8, failures re-run on green eb3b06a8 on vibe2)
 2110/2172 scenarios (05:51 run on a67911be: 2126). 67 failing; 28 pass on the re-run (load flakes or fixed). The 39 still failing
@@ -5557,6 +5564,9 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   live COINCIDENT only). Not the camera (lead + psui 11-19): our start view is already live's Trimetric; the px gap is
   the zoom of the 11-06 take, and with that take's camera (live2's cf70e676) live still shows no VERTICAL. psui re-runs the
   scenario once cf70e676 lands; any gap left is the reach measure (skasm + psui).
+  psui 11-19 22:16 on live2's camera retake: a real gap, baseline kept. Line (0,0)→(3,30) on Top, iso: the end is ~9 px
+  off plumb on screen, past the 7.5 px reach; live adds COINCIDENT only, ours snaps it plumb (VERTICAL, 30.057 mm). scene's
+  unit test with a near-identical screen map gives no VERTICAL, so the app path differs; psui fixes it in scene.
 - [x] (psui 2026-11-11 21:21: 6 of 6 runs match 9/9 on vibe5's release build while 8 ui-parity shards loaded it; matched in qa's 15:57 and 19:57 suites too) P2 UIP-ASM-FASTENED-FLAKY (skasm) the ui-parity scenario asm-fastened-undo-picks differs 1 run in 4 (vibe5, release
   build of main 08:30, run alone four times with `tools/ui-parity/run.py`): at step 4 the Fastened dialog's second query
   field ("Mate connectors") holds one item ("Mate connector of Part 2 <1>") where live's has none, then the selection
