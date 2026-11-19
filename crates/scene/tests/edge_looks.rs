@@ -299,3 +299,62 @@ fn a_rebuild_keeps_the_pick_ids_and_follows_renamed_faces() {
     assert_eq!(swapped.picks.ids_for(&top), first.picks.ids_for(&display.bodies[0].face_refs[other]));
     assert_eq!(swapped.picks.get(swapped.picks.ids_for(&top)[0]).map(|t| &t.reference), Some(&top));
 }
+
+/// Live sel-feel (P0): a selected sketch region (outside sketch mode) is a pale fill, #CD9D3C at 34 % over what's
+/// under it, inside a #FFA90A outline; hovered, only the outline (#FFC685), no fill.
+#[test]
+fn a_selected_sketch_region_is_a_pale_fill_inside_an_orange_outline() {
+    const HOVER: [u8; 3] = [0xFF, 0xC6, 0x85];
+    const SELECT: [u8; 3] = [0xFF, 0xA9, 0x0A];
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    // A 300 × 200 rectangle on Top, not extruded.
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts = [DVec2::new(0.0, 0.0), DVec2::new(0.3, 0.0), DVec2::new(0.3, 0.2), DVec2::new(0.0, 0.2)];
+    for i in 0..4 {
+        sk.add_line(pts[i], pts[(i + 1) % 4]);
+    }
+    let mut sketch = ps.new_feature("sketch", &units).unwrap();
+    sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    let sid = sketch.id;
+    ps.features.push(sketch);
+    let display = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default()).display;
+    let region = Reference::SketchRegion { sketch: sid, key: display.sketches[0].regions[0].key.clone() };
+    let style = noshape_scene::png::viewport_style(&noshape_scene::GraphicsPrefs::default());
+    let up = r.uploader();
+    let (w, h) = (800u32, 600u32);
+    let mut cache = GpuCache::default();
+    let built = builder::build(&display, &SceneOptions { display_mode: DisplayMode::ShadedWithEdges, show_planes: false, show_origin: false, ..Default::default() }, &mut cache, &up);
+    let mut cam = noshape_render::Camera::default();
+    cam.set_view(noshape_render::StandardView::Top);
+    cam.fit_box(glam::DVec3::new(-0.05, -0.05, 0.0), glam::DVec3::new(0.35, 0.25, 0.0), w as f64 / h as f64);
+    // A pixel column at the rectangle's middle, across its bottom edge (y = 0).
+    let size = glam::DVec2::new(w as f64, h as f64);
+    let x = cam.project(glam::DVec3::new(0.15, 0.1, 0.0), size, 1.0).unwrap().x as u32;
+    let (centre, edge) = (cam.project(glam::DVec3::new(0.15, 0.1, 0.0), size, 1.0).unwrap().y as u32, cam.project(glam::DVec3::new(0.15, 0.0, 0.0), size, 1.0).unwrap().y as u32);
+    let mut column = |sel: &[Reference], hover: Option<&Reference>| {
+        let scene = builder::with_highlights(&built, &display, sel, hover, &[], Vec::new(), Default::default(), &up);
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &style, pick: false }).unwrap();
+        let px = |y: u32| {
+            let o = ((y * w + x) * 4) as usize;
+            [f.bgra[o + 2], f.bgra[o + 1], f.bgra[o]]
+        };
+        (px(centre), (edge - 4..=edge + 4).map(px).collect::<Vec<_>>())
+    };
+    let (rest, rest_edge) = column(&[], None);
+    let (sel, sel_edge) = column(std::slice::from_ref(&region), None);
+    let (hov, hov_edge) = column(&[], Some(&region));
+    let want = mix([0xCD, 0x9D, 0x3C], rest, 0.34);
+    assert!(close(sel, want, 6), "selected fill {} (#CD9D3C at 34 % over {}: {})", hex(sel), hex(rest), hex(want));
+    assert!(sel.iter().all(|&c| c >= 0xB0), "a pale fill: {}", hex(sel));
+    assert!(sel_edge.contains(&SELECT), "the orange outline: {:?}", sel_edge.iter().map(|&c| hex(c)).collect::<Vec<_>>());
+    assert!(hov == rest && hov_edge.contains(&HOVER), "hovered: no fill ({} vs {}), the light outline: {:?} (rest {:?})", hex(hov), hex(rest), hov_edge.iter().map(|&c| hex(c)).collect::<Vec<_>>(), rest_edge.iter().map(|&c| hex(c)).collect::<Vec<_>>());
+}

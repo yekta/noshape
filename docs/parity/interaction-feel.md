@@ -859,7 +859,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | A hidden sketch row hovered: drawn in place, lit; "Sketch 1 (Hidden) is not fully defined" | = | list matrix "hover / a hidden sketch: drawn in place, lit" |
 | A feature row clicked: selected rgb(178,221,246), its part related rgb(236,240,244), the part drawn selected | = | list matrix "click / toggles, others kept" (the colours: Look rows) |
 | A viewport face / edge clicked relates its feature and part rows, never selects them | = | list matrix "click / a face or edge in the graphics relates its feature and part rows" |
-| A sketch region on a face relates only its sketch; its look a pale fill with an orange outline | = | list matrix "click / a sketch region relates only its sketch" (the look: missing) |
+| A sketch region on a face relates only its sketch; its look a pale fill with an orange outline | = | list matrix "click / a sketch region relates only its sketch"; scene edge_looks::a_selected_sketch_region_is_a_pale_fill_inside_an_orange_outline |
 | A default plane clicked: its row selected, Default geometry related | = | list matrix "click / a default plane: Default geometry related" |
 | Space or an empty click clears both sides | = | list matrix "clearing / a click on empty canvas" |
 
