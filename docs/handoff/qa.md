@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 22:18)
+# QA handoff (agent qa; current state only, updated 2026-11-19 22:32)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -75,7 +75,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    their 6 feel fixes): on its green re-runs face-rclick-select-fillet-faces, dialog-checkbox-convert-back, dialog-checkbox-rclick-convert,
    dialog-query-rclick-clear-all, fillet-chip-clear-missing, fillet-chip-edit-healthy-moment, analysis-interference -> one qa-alerts line;
    mark the TICKETS rows. Suite 1119-1302-291c74b0: ui 2120/2172, models done, assemblies / exchange in vibex8's slot: suites-diff.py
-   vs the last full run when done. psui's e196bc5a landed as 019698386 (not yet in green f3bc85da at 22:07).
+   vs the last full run when done. psui's 019698386 in green 624c6db77 at 22:31: qa-wait-e196 fires next.
    sketch-vertical-key: psui 22:16 on live2's camera retake = a real gap (end ~9 px off plumb, past 7.5 px; ours VERTICAL), psui fixes scene.
    P1 walk 21:36 on a58eee8c (sketch -> extrude -> fillet -> pattern -> edit -> undo -> suppress): all build; P2 PATTERN-CHECK-STAYS-
    ENABLED (psui) + live request (REQUESTS qa 11-19 21:36: ✓ after emptying, tooltip on click); reopen, rollback drag, reorder OK. Walk 21:4x: Shell, Boolean union,
@@ -98,8 +98,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    line', free end blue, 5 px drag threshold, line hover lit at 6 px not 9, two lines: every constraint enabled). Row 73 (perp x lit
    edge) only via its unit tests. P1 walk 22:12 on green f3bc85da (walk3/r.noshape): Chamfer (Enter applies, 2nd Enter commits = live),
    first dimension scales the whole sketch about its bbox centre (= live 34917), Revolve (region field stays active: multi-pick =
-   live FD7), Circular pattern 4x round a chamfer edge: all OK. P0 STALE-SKETCH-HOVER (psui) filed. Next: P1 walks of loft / sweep /
-   sketch trim + offset, then Variable Studio + configurations. App runs: units qa-xvfb110 + qa-walk*-app
+   live FD7), Circular pattern 4x round a chamfer edge: all OK. P0 STALE-SKETCH-HOVER (psui) filed (22:2x narrowed: one-event lag;
+   after-✓ outline; a cancelled sketch's lit point stays). Walk 22:2x: Trim, Plane (offset 25), Loft (2 sketches), Sweep (auto Add
+   on Part 1), Offset (5 mm box, arrow) OK; P1 OFFSET-EDIT-SCALES-SKETCH (skasm, told). Variable Studio (tab after active, Length 0 mm,
+   #len autocomplete, VS edit rebuilds the Part Studio) and configurations (Configure Part Studio list, field right-click Configure,
+   toast, Long 4 mm chamfer) = live. Next: assembly mates (Revolute / Slider / limits), drawing dims + sheet edits. App runs: units qa-xvfb110 + qa-walk*-app
    (systemd-run, NOSHAPE_CONFIG_DIR per doc), tool search alt+c + name + Return; Esc keeps selection, Space clears.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
