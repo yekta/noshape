@@ -2138,12 +2138,7 @@ pub fn resolve_point(ctx: &Context, frame: &ViewFrame, r: &PointRef) -> Option<(
         return Some((quadrant_of(frame.project(c), radius?, *k), None));
     }
     match r {
-        PointRef::Vertex { body, name } => {
-            let b = ctx.body(body)?;
-            let i = *b.find_vertices(name).first()?;
-            let p = b.shape.sub_shape(ShapeType::Vertex, i).ok()?.vertex_point().ok()?;
-            Some((frame.project(p), None))
-        }
+        PointRef::Vertex { body, name } => Some((frame.project(vertex_point(ctx.body(body)?, name, Some(frame))?), None)),
         PointRef::Center { body, name } => {
             let b = ctx.body(body)?;
             let i = *b.find_edges(name).first()?;
@@ -2154,6 +2149,24 @@ pub fn resolve_point(ctx: &Context, frame: &ViewFrame, r: &PointRef) -> Option<(
         }
         PointRef::Midpoint { .. } | PointRef::Quadrant { .. } | PointRef::Intersection { .. } | PointRef::Thread { .. } => resolve_point3(ctx, r).map(|(p, _)| (frame.project(p), None)),
     }
+}
+
+/// A referenced vertex's position. One a chamfer or fillet cut away is followed to a corner that replaced it (live2
+/// errors-1119-asmdrw: a dimension on a chamfered edge's corners stays, on the new outer edge): in a view the one
+/// farthest out from the body's middle.
+fn vertex_point(b: &Body, name: &crate::reference::TopoName, frame: Option<&ViewFrame>) -> Option<DVec3> {
+    let at = |i: usize| b.shape.sub_shape(ShapeType::Vertex, i).ok()?.vertex_point().ok();
+    if let Some(&i) = b.find_vertices(name).first() {
+        return at(i);
+    }
+    let found: Vec<DVec3> = b.find_replaced_vertices(name).into_iter().filter_map(at).collect();
+    let (Some(frame), Ok(bb)) = (frame, b.shape.bounding_box(false)) else { return found.first().copied() };
+    let mid = frame.project((bb.min + bb.max) * 0.5);
+    let out = |p: &DVec3| {
+        let q = frame.project(*p);
+        (q[0] - mid[0]).hypot(q[1] - mid[1])
+    };
+    found.into_iter().max_by(|p, q| out(p).total_cmp(&out(q)))
 }
 
 /// Projected endpoints of a straight edge.
@@ -2181,11 +2194,7 @@ fn quadrant_of(c: [f64; 2], radius: f64, k: u8) -> [f64; 2] {
 /// Model position of a point reference (and, for circle centers, the radius).
 pub fn resolve_point3(ctx: &Context, r: &PointRef) -> Option<(DVec3, Option<f64>)> {
     match r {
-        PointRef::Vertex { body, name } => {
-            let b = ctx.body(body)?;
-            let i = *b.find_vertices(name).first()?;
-            Some((b.shape.sub_shape(ShapeType::Vertex, i).ok()?.vertex_point().ok()?, None))
-        }
+        PointRef::Vertex { body, name } => Some((vertex_point(ctx.body(body)?, name, None)?, None)),
         // Quadrants resolve to the circle (center, radius); views offset them.
         PointRef::Center { body, name } | PointRef::Quadrant { body, name, .. } => {
             let b = ctx.body(body)?;

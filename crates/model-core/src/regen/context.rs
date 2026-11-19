@@ -250,6 +250,25 @@ impl Body {
         related(&|cand, refd| refd.descends_from(cand))
     }
 
+    /// The vertices that replaced vertex `n` where a feature cut its corner (a chamfer or fillet on one of its edges:
+    /// one of its faces gave way to the new face, the others stay, whole or split). For drawings, which keep a
+    /// dimension on such a corner (live2 errors-1119-asmdrw); features don't follow a vertex that way.
+    pub fn find_replaced_vertices(&self, n: &TopoName) -> Vec<usize> {
+        let TopoName::Vertex { faces, .. } = n else { return Vec::new() };
+        if faces.len() < 3 {
+            return Vec::new();
+        }
+        self.vertices
+            .iter()
+            .enumerate()
+            .filter(|(_, v)| match &***v {
+                TopoName::Vertex { faces: fs, .. } => fs.len() == faces.len() && faces.iter().filter(|a| fs.iter().any(|b| b == *a || b.descends_from(a))).count() == faces.len() - 1,
+                _ => false,
+            })
+            .map(|(i, _)| i)
+            .collect()
+    }
+
     pub fn shape_names(&self) -> crate::naming::ShapeNames {
         crate::naming::ShapeNames { faces: self.faces.clone(), edges: self.edges.clone(), vertices: self.vertices.clone() }
     }

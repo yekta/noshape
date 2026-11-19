@@ -6123,6 +6123,34 @@ fn edit_in_context_on_another_documents_part() {
     assert_eq!(e.param.as_deref(), Some("instance"), "{e:?}");
 }
 
+/// A dimension on an edge a chamfer then cuts away stays attached, on the new outer edge, with its value (live2
+/// errors-1119-asmdrw: ours drew it lost, red-orange with end dots).
+#[test]
+fn a_dimension_on_a_chamfered_edge_follows_the_new_outer_edge() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("dim-chamfer.noshape").to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let top = g["views"].as_array().unwrap().iter().find(|v| v["orientation"] == "top").cloned().expect("Top");
+    // The Top view's front edge (the lowest horizontal line): the top face's front edge.
+    let front = top["edges"].as_array().unwrap().iter().filter(|e| e["type"] == "line" && (num(&e["a"][1]) - num(&e["b"][1])).abs() < 1e-6).min_by(|a, b| num(&a["a"][1]).total_cmp(&num(&b["a"][1]))).cloned().expect("the front edge");
+    let mid = [(num(&front["a"][0]) + num(&front["b"][0])) / 2.0, num(&front["a"][1])];
+    let lin = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "picks": [mid], "place": [mid[0], mid[1] - 15.0] }));
+    assert!(lin["text"].as_str().unwrap().contains("40"), "{lin}");
+    let edge = call(&mut ctx, "query_entities", json!({ "tab": "Part Studio 1", "kind": "edges", "at": [[20, 0, 10]] }))["edges"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "tab": "Part Studio 1", "type": "chamfer", "params": { "entities": [edge], "width": "5 mm" } }));
+    call(&mut ctx, "drawing_update", json!({ "drawing": tab }));
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let dim = g["annotations"].as_array().unwrap().iter().find(|a| a["kind"] == "LinearDimension").cloned().expect("the dimension");
+    assert!(dim.get("lost").is_none(), "attached to the new corners: {dim}");
+    assert!(dim["text"].as_str().unwrap().contains("40"), "its value kept: {dim}");
+}
+
 /// Create Drawing of an assembly with parts from another document: the suggested views are scaled to fit them and
 /// its BOM lists them (qa session-asm-1119: a pin inserted from another document and patterned was left out, the views
 /// 1:2 where live's are 1:4, the BOM without its row and its callout "----").

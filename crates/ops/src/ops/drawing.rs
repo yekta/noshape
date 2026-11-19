@@ -563,6 +563,11 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if !a.refs.is_empty() {
                 j["attached"] = json!(true);
             }
+            // Its references that no longer resolve (drawn red-orange, a dot at each lost end).
+            let lost: Vec<usize> = m.built.as_deref().map(|b| b.lost.iter().filter(|(id, _)| *id == a.id).map(|(_, s)| *s as usize).collect()).unwrap_or_default();
+            if !lost.is_empty() {
+                j["lost"] = json!(lost);
+            }
             let jogs: Vec<usize> = (0..2).filter(|k| a.jogs[*k].is_some()).collect();
             if !jogs.is_empty() {
                 j["jogs"] = json!(jogs);
