@@ -7479,10 +7479,15 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     }
     // Shells inside out are voids: of the one solid there is (else declined). (One shell alone is a solid; a shell
     // whose volume by its edges' chords is next to nothing beside its box's (a cone's piece bounded by two planes'
-    // edges: the chords span nothing, its sign rounding's) is unclear.)
+    // edges: the chords span nothing, its sign rounding's) is unclear, but for one whole sphere or torus face, out
+    // by its own normal unless reversed (a sphere cut by one inside it, corpus2 6cf25eee).)
     let shells = std::mem::take(&mut out.body.solids);
+    let whole = |s: &Solid| match &s.shells[0][..] {
+        &[f] if matches!(out.body.faces[f as usize].surface, Surface::Sphere { .. } | Surface::Torus { .. }) => Some(if out.body.faces[f as usize].reversed { -1.0 } else { 1.0 }),
+        _ => None,
+    };
     if shells.len() > 1 {
-        for s in &shells {
+        for s in shells.iter().filter(|s| whole(s).is_none()) {
             let (mut lo, mut hi) = (DVec3::INFINITY, DVec3::NEG_INFINITY);
             for &f in &s.shells[0] {
                 for u in out.body.faces[f as usize].loops.iter().flatten() {
@@ -7499,7 +7504,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         }
     }
     let one = shells.len() == 1;
-    let (solids, voids): (Vec<Solid>, Vec<Solid>) = shells.into_iter().partition(|s| one || shell_volume(&out.body, &s.shells[0]) > 0.0);
+    let (solids, voids): (Vec<Solid>, Vec<Solid>) = shells.into_iter().partition(|s| one || whole(s).unwrap_or_else(|| shell_volume(&out.body, &s.shells[0])) > 0.0);
     out.body.solids = solids;
     if !voids.is_empty() {
         let [solid] = &mut out.body.solids[..] else { return Err(Decline("a void in a result of several solids")) };
