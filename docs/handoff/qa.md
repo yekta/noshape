@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 07:40)
+# QA handoff (agent qa; current state only, updated 2026-11-19 13:35)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -91,6 +91,13 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    qa-psui-lod (heavy/psui-lod.sh: asm's LOD change 46edfa849 by subject "<agent>: HEAVY-ASM-SOFTWARE-FRAME, LOD side" -> vibex7 release
    builds of it + parent, runq.sh x5 alternating on local :154, wheel zoom / orbit first frame medians -> qa-alerts; P0 rule).
    Kept vibe2 ~/agents/qa-keep/{session-ps2-1119,studio-1119-recheck}.
+0000. **11-19 13:35 state (new thread 40e853dc; old 132756b3 stopped 13:27, Ubeyd limit).** Ids: lead 818534eb, psui
+   7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, live2 d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1 (11-19 13:28); live stopped till ~21:00 (requests to
+   live/REQUESTS.md). qa-psui-lod (asm's LOD 08ac528e6 vs parent 291c74b0) re-armed 13:30: earlyoom killed the parent's LTO build on
+   vibex7 13:13, so psui-lod.sh now builds through vibex7's ~/bin/slot (SLOT_MIN_GB=12, timeout 5400). qa-session-night's 03:35 failure =
+   window over (night-seq replaced it): cleared, not restarted. qa-uip-feel ETA ~16:15 -> feel.txt -> owners P0. qa-order-wait fires on
+   studios 2fbe5a0b7's green: check the merge dialog's rows in vibe2 ~/tmp/qa/ssess/m2 shots (live Part Studio 1 / Variable Studio 1 /
+   Assembly 1). bin/evwait.sh <units> wakes the agent when one ends / UIP-DONE / a new qa alert line.
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
    with NOSHAPE_PARITY_VALIDITY=1 (bin/suites-models.sh exports it) models.log prints per feature "CHECK <doc> feature <k>:
    <part> valid <true|false> raw f/e/v; ..." (PartState.check, query parts' "check"; not in report.json). suites-diff.py
