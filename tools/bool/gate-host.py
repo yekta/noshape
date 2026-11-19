@@ -42,7 +42,7 @@ SPEED = ["k25-15", "k25-25", "cf-spur-gear"]
 SHELLS = f"{CORPORA}/shellcorpus/cases"
 # The shells where ours already differs from OCCT's alone on main (11-19): fixed ones come off.
 SHELLS_KNOWN = set("""13186b07903d913d 17488d26389dbcfc 2756e521fec08ecc 8e6576376acba8e9 8eebe1e2578bfdff 9134b29f70521b63
-99b55ec93fe844a6 b64c8b4edacba88f b79e508bd50f0791 f815832ccf431fc5""".split())
+b64c8b4edacba88f b79e508bd50f0791 f815832ccf431fc5""".split())
 # (A case is named by its file: a recorded one by its 16-digit hash, a hand-made one (kall's k25x2) any way.)
 NAME = r"[\w.-]+"
 CASE = re.compile(rf"^({NAME})( \(|: failed)")
@@ -396,14 +396,21 @@ def shells(kbin, out, role):
         with open(log, "w") as f:
             subprocess.run([kbin, "shell::shell_corpus_probe", "--exact", "--ignored", "--nocapture"], env=env, stdout=f, stderr=subprocess.DEVNULL, timeout=3600)
         got = {}
-        # ("case <name> ok <volume> <faces> <ms> ...": all but the time; any failure alike (a slow host's "took too
-        # long" for "failed").)
+        # ("case <name> ok <volume> <faces> <ms> ...": all but the time, the volume apart; any failure alike (a slow
+        # host's "took too long" for "failed").)
         for w in (l.split() for l in read_lines(log)):
             if len(w) >= 4 and w[0] == "case":
-                got[w[1]] = " ".join(w[3:5] + w[6:]) if w[2] == "ok" else "err"
+                got[w[1]] = (float(w[3]), " ".join(w[4:5] + w[6:])) if w[2] == "ok" else "err"
         return got
+
+    def same(a, b):
+        """The same result, the volumes within 1e-7 of each other (the replay's tolerance; their last digits are
+        the kernel's)."""
+        if isinstance(a, tuple) and isinstance(b, tuple):
+            return a[1] == b[1] and abs(a[0] - b[0]) <= 1e-7 * max(abs(a[0]), abs(b[0]))
+        return a == b
     o, t = run(True), run(False)
-    return {k for k in t if o.get(k) != t[k]}, len(t)
+    return {k for k in t if not same(o.get(k), t[k])}, len(t)
 
 
 def rounded(text, digits=9):
