@@ -3025,8 +3025,22 @@ impl<'a> Translator<'a> {
                 let mine: Vec<String> = outer(r).into_iter().filter(own).collect();
                 regions.iter().any(|o| in_hole_of(r, o, &mine))
             };
+            // (A disc a line joins to another region's outline is no hole of it, yet inside it: asm-isaac-ball a04711's
+            // Extrude 1, a slot's hole with a line from its centre to the slot's end. Not one the outline runs along
+            // and out of, its box past the other's: a04711's Extrude 4, a circle at the outline's corner.)
+            let within = |r: &Value, o: &Value| (0..2).all(|i| {
+                let (rb, ob) = (&r["bounds"], &o["bounds"]);
+                rb["min"][i].as_f64().zip(ob["min"][i].as_f64()).is_some_and(|(a, b)| a > b + 1e-9) && rb["max"][i].as_f64().zip(ob["max"][i].as_f64()).is_some_and(|(a, b)| a < b - 1e-9)
+            });
+            let enclosed = |r: &Value| match curves(r).as_slice() {
+                [c] if own(c) => regions.iter().any(|o| o["id"] != r["id"] && curves(o).contains(c) && within(r, o)),
+                _ => false,
+            };
             let inner = |r: &Value| {
                 let mine = outer(r);
+                if enclosed(r) {
+                    return true;
+                }
                 if mine.iter().any(own) {
                     return inner_by_own(r);
                 }

@@ -2420,6 +2420,51 @@ fn a_composite_parts_packed_query_is_its_part() {
     assert!(r.untranslated.is_empty(), "{:?}", r.untranslated);
 }
 
+/// qSketchRegion(…, true) leaves out a hole a line joins to the outline (asm-isaac-ball a04711's Extrude 1: a line from
+/// the hole's centre to the slot's end): the disc is inside the plate's region, though no hole of its loops.
+#[test]
+fn a_hole_a_line_joins_to_the_outline_is_no_region_of_the_outer_ones() {
+    let line = |id: &str, (x0, y0): (f64, f64), (x1, y1): (f64, f64)| {
+        let l = ((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0)).sqrt();
+        json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "isConstruction": false, "startParam": 0.0, "endParam": l,
+            "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": x0, "pntY": y0, "dirX": (x1 - x0) / l, "dirY": (y1 - y0) / l } })
+    };
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=dummyQuery(id+\"Top.planeOp\",EntityType.FACE);" }] }],
+          "entities": [line("r0", (0.0, 0.0), (0.06, 0.0)), line("r1", (0.06, 0.0), (0.06, 0.04)), line("r2", (0.06, 0.04), (0.0, 0.04)), line("r3", (0.0, 0.04), (0.0, 0.0)),
+                       { "btType": "BTMSketchCurve-4", "entityId": "c1", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.004, "xCenter": 0.015, "yCenter": 0.02, "xDir": 1.0, "yDir": 0.0, "clockwise": false } },
+                       line("l1", (0.015, 0.02), (0.0, 0.02))],
+          "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualSketchRegionQuery-140", "queryString": "query = qSketchRegion(id + \"FS\", true);" }] },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "10 mm" }] }
+    ] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("hole-joined-to-outline.noshape"), &features, HashMap::new()).unwrap();
+    for k in 0..t.len() {
+        let s = t.step(k);
+        assert!(s.ours.is_some() && s.status.as_deref() == Some("Ok"), "{}: {:?} {:?} {:?}", s.name, s.status, s.message, s.problems);
+    }
+    let mass = t.call("query_mass_properties", json!({})).unwrap();
+    let volume = (60.0 * 40.0 - std::f64::consts::PI * 4.0 * 4.0) * 10.0;
+    assert!((mass["volume"].as_f64().unwrap() - volume).abs() < 1e-6 * volume, "{mass}");
+
+    // A circle the outline runs along at a corner (a04711's Extrude 4) is no hole: its disc is extruded too.
+    let mut features = features;
+    features["features"][0]["entities"] = json!([line("r0", (0.0, 0.0), (0.06, 0.0)), line("r1", (0.06, 0.0), (0.06, 0.036)), line("r2", (0.056, 0.04), (0.0, 0.04)), line("r3", (0.0, 0.04), (0.0, 0.0)),
+        { "btType": "BTMSketchCurve-4", "entityId": "c2", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.004, "xCenter": 0.06, "yCenter": 0.04, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }]);
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("circle-at-a-corner.noshape"), &features, HashMap::new()).unwrap();
+    for k in 0..t.len() {
+        let s = t.step(k);
+        assert!(s.ours.is_some() && s.status.as_deref() == Some("Ok"), "{}: {:?} {:?} {:?}", s.name, s.status, s.message, s.problems);
+    }
+    let mass = t.call("query_mass_properties", json!({})).unwrap();
+    let volume = (60.0 * 40.0 + 0.75 * std::f64::consts::PI * 4.0 * 4.0) * 10.0;
+    assert!((mass["volume"].as_f64().unwrap() - volume).abs() < 1e-6 * volume, "{mass}");
+}
+
 /// An ellipse (Onshape's BTCurveGeometryEllipse) extruded: π·a·b·h.
 #[test]
 fn an_ellipse_is_rebuilt() {
