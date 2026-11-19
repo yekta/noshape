@@ -243,6 +243,7 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
     noshape_featurescript::value::reset_shown_numbers();
     let first_colour = ev.ctx.next_color;
     let cx = FsContext::new(std::mem::take(&mut ev.ctx), ev.feature, ev.name.to_string(), *ev.units, ev.outer_vars.clone(), ev.xform);
+    cx.state.lock().feature_order = ev.features.order();
     let definition = match definition(&cx, params, &values, ev, provider) {
         Ok(d) => d,
         Err(e) => {

@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 18:07 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 18:27 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## In flight 11-19 18:07: qa's feel P0 (rows /root/qa-scratch/suites/1119-1610-eb3b06a8-uipr/rows.txt)
@@ -13,11 +13,16 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   today's live = ours) and vertical-key.
 - vertical-key: ours puts (3, 30) at (+64, -45) px from the start, live (+61, -42): our default camera differs a little
   (7.47 px off plumb vs live's 7.78, reach 7.5). Camera = psui's.
-- bend-relief x3 (P0, next): live's vertex (60,-2,4) and its 3 faces / 3 edges are all qCreatedBy Flange 1 (last
-  modified by Flange 2: copyWalls / foldedBoolean; live2 /root/live2-scratch/qa39/brv-flat.json). Ours: the 2x2 face
-  (z 4, x 58..60, y -2..0) is Face{Flange 2, Generated(Face{op marker, New 12})}: the relief-exposed wall face is
-  named by Flange 2's op, live keeps it with Flange 1's wall. Needs the SM host to name a rebuilt wall's new side faces
-  after the wall's creator. Probe: ~/tmp/skasm/br/q.py, q2.py, dec.py (decodes ids).
+- bend-relief x3 (lead 18:0x: go; land after SM matrix + suite, no document worse; stop and tell the lead if a
+  capture contradicts): LOCAL. A face a sheet metal rebuild exposes for the first time (on no face of the part
+  before: `keep_names` left it fresh) is named Face{creator, Generated(fresh)}, the creator its definition source's
+  (`definition_creator`: a wall's creator; a bend's / vertex's, the later of its walls' by the Part Studio order,
+  `CtxState::feature_order` from `Features::order`). sm-box's 2x2 face comes from Flange 1's bend edge -> Flange 1
+  (live2 brv-flat.json). T2 `a_face_a_later_flange_exposes_keeps_its_walls_creator`; SM 100/100, matrix 17/17,
+  custom 16, clippy clean. Running: suite J on vibex7 (/root/skasm-scratch/suitej.out; compare per document with
+  suite I, vibe2 ~/agents/skasm-keep/suite-I-1119-1600.log), the 19 sheet metal ui-parity scenarios on vibex8
+  (feel5.sh). Captures for the rule: REQUESTS "skasm (2026-11-19 18:10 UTC)" (cases A-C, live / live2 at 21:00).
+- QUEUED bb4585b8: the 5 feel rows above.
 - LANDED 5bd05e2f as 575aba2a: rocker-enclosure-sm (translator + host). Suite I 94/126, 1346/1585, none worse than G.
 
 ## Landed 11-18 (since the morning)

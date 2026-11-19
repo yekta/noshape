@@ -127,6 +127,33 @@ fn flanges_on_adjacent_edges_match_live() {
     assert!((volume_mm3(&r) - 8511.4987).abs() < 1e-3 && faces == 24, "{} mm³, {} faces", volume_mm3(&r), faces);
 }
 
+/// ui-parity start sm-box (live2 brv-flat.json, 11-19): Flange 1 on the plate's front top edge, then Flange 2 on its
+/// right top edge (automatic miter): the corner vertex (60, -2, 4) and every face on it were created by Flange 1 (last
+/// modified by Flange 2), so the vertex's feature is Flange 1 (live's related row, chip "Vertex of Flange 1").
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_face_a_later_flange_exposes_keeps_its_walls_creator() {
+    let mut s = Studio::new();
+    let region = s.rectangle(60.0, 40.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    let r = s.ok();
+    let front = edge_at(&r, DVec3::new(20.0, 0.0, 2.0));
+    let f1 = s.add("sheetMetalFlange", |p| p.set("edges", ParamValue::Query(vec![front])));
+    let r = s.ok();
+    let right = edge_at(&r, DVec3::new(60.0, 25.0, 2.0));
+    s.add("sheetMetalFlange", |p| p.set("edges", ParamValue::Query(vec![right])));
+    let r = s.ok();
+    let Reference::Vertex(v) = vertex_at(&r, DVec3::new(60.0, -2.0, 4.0)) else { unreachable!() };
+    let noshape_model::reference::TopoName::Vertex { faces, .. } = &v else { panic!("{v:?}") };
+    let creators: Vec<_> = faces.iter().map(|f| f.creator()).collect();
+    assert!(creators.iter().all(|c| *c == Some(f1)), "{creators:?} (Flange 1 {f1:?})");
+}
+
 /// A flange leaves the plate's other top edges their references (std rebuilds
 /// the part: its faces kept their names only by being on the old ones), so in
 /// the Flange dialog's preview the next edge can still be picked (the preview's

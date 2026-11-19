@@ -116,6 +116,9 @@ pub struct CtxState {
     pub ctx: Context,
     /// The Part Studio feature being evaluated.
     pub feature: FeatureId,
+    /// The Part Studio's features' places in its list (empty outside a Part Studio feature): which of two creators
+    /// came later (a sheet metal bend's, [`sheetmetal`]'s fresh face names).
+    pub feature_order: HashMap<FeatureId, usize>,
     pub feature_name: String,
     pub units: UnitPrefs,
     pub outer_vars: BTreeMap<String, Quantity>,
@@ -322,6 +325,7 @@ impl FsContext {
             state: Mutex::new(CtxState {
                 ctx,
                 feature,
+                feature_order: HashMap::new(),
                 feature_name,
                 units,
                 outer_vars,

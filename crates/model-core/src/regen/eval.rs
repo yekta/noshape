@@ -127,6 +127,10 @@ impl<'a> Features<'a> {
     pub fn order_of(self, id: FeatureId) -> Option<usize> {
         self.list.iter().position(|f| f.id == id)
     }
+    /// Each feature's place in the list (not a read, as [`Features::order_of`]: naming asks it).
+    pub fn order(self) -> std::collections::HashMap<FeatureId, usize> {
+        self.list.iter().enumerate().map(|(i, f)| (f.id, i)).collect()
+    }
     /// The list, for as long as the Part Studio lives (a read, as `Deref`).
     pub fn list(self) -> &'a [EffectiveFeature] {
         if let Some(r) = self.reads {

@@ -2341,6 +2341,28 @@ fn keep_names(part: &Shape, new_probes: &[Option<(DVec3, DVec3)>], names: &mut [
     }
 }
 
+/// The feature that made definition entity `src` of sheet `db`: a wall's creator; a bend's or vertex's, the later of
+/// its walls' (the flange that joined them). `None` when a creator isn't in `order` (a feature of another studio).
+fn definition_creator(db: &crate::regen::context::Body, src: &Def, order: &HashMap<FeatureId, usize>) -> Option<FeatureId> {
+    use crate::reference::TopoName;
+    let later = |faces: &[Arc<TopoName>]| -> Option<FeatureId> {
+        let cs: Vec<FeatureId> = faces.iter().map(|f| f.creator()).collect::<Option<_>>()?;
+        cs.into_iter().map(|c| Some((*order.get(&c)?, c))).collect::<Option<Vec<_>>>()?.into_iter().max().map(|x| x.1)
+    };
+    match src {
+        Def::Face(f) => db.faces.get(*f)?.creator().filter(|c| order.contains_key(c)),
+        Def::Edge(e) => match db.edges.get(*e)?.root() {
+            TopoName::Edge { faces, .. } => later(faces),
+            TopoName::Boundary { face, .. } => face.creator().filter(|c| order.contains_key(c)),
+            _ => None,
+        },
+        Def::Vertex(v) => match db.vertices.get(*v)?.root() {
+            TopoName::Vertex { faces, .. } => later(faces),
+            _ => None,
+        },
+    }
+}
+
 /// Each planar face's plane (a point, its unit normal); `None` for the others.
 fn face_planes(faces: &[Shape]) -> Vec<Option<(DVec3, DVec3)>> {
     faces.iter().map(|f| f.face_plane().ok().flatten().map(|p| (p.origin, p.normal.normalize()))).collect()
@@ -2467,6 +2489,10 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         return Ok(Value::Undefined);
     }
     let op: FsId = id.iter().cloned().chain(std::iter::once(Arc::<str>::from("smGeometry"))).collect();
+    let (order, studio_feature) = {
+        let st = cx.state.lock();
+        (st.feature_order.clone(), st.feature)
+    };
     let built = run_op(i, &cx, &op, "SHEET_METAL_REBUILD_ERROR", |ev| {
         let mut out = Vec::new();
         let mut fresh = 0u32;
@@ -2551,8 +2577,21 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     let instance = def.body.index << 8 | k as u32;
                     p.names = p.names.iter().map(|x| Arc::new(crate::reference::TopoName::face(ev.feature, crate::reference::Role::Copy { instance, of: x.clone() }))).collect();
                 }
+                let fresh_names = p.names.clone();
                 if let Some(Some(b)) = before.get(k) {
                     keep_names(&p.solid, &p.probes, &mut p.names, &b.shape, &b.faces, ev.feature);
+                }
+                // A face this rebuild exposes for the first time (on no face of the part before) is the one its
+                // definition wall or bend's creator made (live sm-box: Flange 2's relief bares a face of Flange 1's
+                // bend, qCreatedBy Flange 1, last modified by Flange 2).
+                if let Some(Some(_)) = before.get(k)
+                    && let Some(db) = ev.ctx.bodies.iter().find(|b| b.id == def.body)
+                {
+                    for (fi, n) in p.names.iter_mut().enumerate() {
+                        let Some(src) = p.sources.0.get(fi).filter(|_| *n == fresh_names[fi]) else { continue };
+                        let Some(c) = definition_creator(db, src, &order).filter(|c| *c != studio_feature) else { continue };
+                        *n = Arc::new(crate::reference::TopoName::face(c, crate::reference::Role::Generated(n.clone())));
+                    }
                 }
                 taken.extend(p.names.iter().cloned());
                 let part_faces = p.solid.faces();
