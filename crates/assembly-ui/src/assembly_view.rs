@@ -316,6 +316,15 @@ fn feature_row_color(inactive: bool, ok: bool, hidden: bool) -> Rgba {
 }
 
 /// The Insert dialog's line when a search matches nothing: bold dark 12 px at the list's top left (live2 errors-1119 q3).
+/// Insert's current-document list by name, A → Z or Z → A (live2 asm-dialogs-1119 q-ins-sort; A → Z by default).
+fn sort_by_name<T>(mut items: Vec<T>, name: impl Fn(&T) -> &String, desc: bool) -> Vec<T> {
+    items.sort_by(|a, b| {
+        let o = name(a).to_lowercase().cmp(&name(b).to_lowercase());
+        if desc { o.reverse() } else { o }
+    });
+    items
+}
+
 fn insert_no_match(text: &'static str) -> Div {
     div().debug_selector(|| "ins-no-match".into()).px(px(12.)).py(px(14.)).text_size(px(12.)).font_weight(gpui_kit::FontWeight::BOLD).text_color(gpui_kit::rgb(0x333333)).child(text)
 }
@@ -5307,7 +5316,7 @@ impl AssemblyView {
             rows.push(Rc::new(|this: &mut Self, cx: &mut Context<Self>| this.pending_pattern_row(cx).unwrap_or_else(|| div().into_any_element())));
         }
         // The mates folder and its rows (and the filter's "…"): one item.
-        rows.push(Rc::new(move |this: &mut Self, cx: &mut Context<Self>| v_flex().children(this.mates_section(hidden, cx)).into_any_element()));
+        rows.push(Rc::new(move |this: &mut Self, cx: &mut Context<Self>| v_flex().w_full().children(this.mates_section(hidden, cx)).into_any_element()));
         // The list keeps its scroll position across rebuilds.
         let state = self.ui.list_state.get_or_insert_with(|| ListState::new(0, ListAlignment::Top, px(300.))).clone();
         if state.item_count() != rows.len() {
@@ -5432,18 +5441,28 @@ impl AssemblyView {
             mate_ids.push(id);
         }
         // Live 1693: a new group's row ("Group 1", grey, selected) is in the
-        // list while its dialog is open.
-        let new_group = self.ui.group.as_ref().filter(|g| g.0.is_none()).map(|_| asm.next_feature_name("Group"));
-        if let Some(name) = new_group.clone() {
-            mate_rows.push(
+        // list while its dialog is open; red bold with its "!" while its members are mated (live2 recheck-1119 (4)).
+        let new_group = self.ui.group.as_ref().filter(|g| g.0.is_none()).map(|g| (asm.next_feature_name("Group"), g.1.clone()));
+        if let Some((name, members)) = new_group.clone() {
+            let err = asm.mates.iter().any(|m| {
+                let i = m.instances();
+                i.len() >= 2 && i.iter().all(|x| members.contains(x)) && result.mates.iter().any(|s| s.id == m.id && s.message.as_deref() == Some(SAME_GROUP))
+            });
+            let row = if err {
+                let tooltip = Some(format!("{name} has error: {SAME_GROUP}"));
+                let row = self.feature_row(FeatureRow { id: MateId(u64::MAX), icon: icon_path("group"), name, ok: false, inactive: false, suppressed: false, message: Some(SAME_GROUP.to_string()), has_limits: false, hidden: None, tooltip, flyout: None, implicit: vec![] }, cx);
+                div().debug_selector(|| "group-new error".into()).bg(pal.accent_soft).font_weight(FontWeight::BOLD).child(row).into_any_element()
+            } else {
                 crate::ui::tree_row("group-new", true)
+                    .debug_selector(|| "group-new".into())
                     .text_color(pal.text_faint)
                     .font_weight(FontWeight::BOLD)
                     .child(div().w(px(12.)))
                     .child(crate::assets::icon(&icon_path("group"), 14., cx))
                     .child(div().flex_1().truncate().child(crate::ui::user_text(name)))
-                    .into_any_element(),
-            );
+                    .into_any_element()
+            };
+            mate_rows.push(row);
             mate_ids.push(MateId(u64::MAX));
         }
         let mate_hidden = filtering && mate_ids.iter().filter(|id| id.0 != u64::MAX).count() < asm.connectors.len() + asm.mates.len() + asm.relations.len() + asm.groups.len();
@@ -5480,9 +5499,11 @@ impl AssemblyView {
             // Live assembly/751, 753: the folder's rows hang off a 1 px #d7d7d7
             // line under its caret (x 9) that ends in an 8 px tick.
             rows.push(
+                // (Each row spans the list, so its flyout starts right of it: live2 recheck-1119 (5) / (7).)
                 v_flex()
                     .relative()
-                    .children(mate_rows.into_iter().map(|r| div().pl(px(17.)).child(r)))
+                    .w_full()
+                    .children(mate_rows.into_iter().map(|r| div().w_full().pl(px(17.)).child(r)))
                     .child(div().absolute().left(px(9.)).top_0().bottom_0().w(px(1.)).bg(gpui_kit::rgb(0xd7d7d7)))
                     .child(div().absolute().left(px(5.)).bottom_0().w(px(8.)).h(px(1.)).bg(gpui_kit::rgb(0xd7d7d7)))
                     .into_any_element(),
@@ -5753,6 +5774,7 @@ impl AssemblyView {
     fn render_insert_body(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let query = self.ui.insert_query.trim().to_lowercase();
+        let desc = self.ui.insert_memory.as_ref().is_some_and(|m| m.current_desc);
         let hit = |name: &str| query.is_empty() || name.to_lowercase().contains(&query);
         let (source, tab) = (self.ui.insert_source, self.ui.insert_tab);
         // Tree rows: expander, 70x40 thumbnail cell, name (13.33 px light).
@@ -5785,15 +5807,15 @@ impl AssemblyView {
             body = body.child(self.render_insert_other(cx));
         } else if tab == 0 {
             let mut any = false;
-            for s in self.catalog.studios.clone() {
+            for s in sort_by_name(self.catalog.studios.clone(), |s| &s.name, desc) {
                 let studio_hit = hit(&s.name);
                 // Type filters: none on shows everything, else the union of the
                 // selected types (Parts, Sketches, Surfaces).
                 let (only_parts, only_surfaces) = self.ui.insert_filter;
                 let only_sketches = self.ui.insert_sketches;
                 let composites_on = self.ui.insert_composites;
-                // Flat patterns (picker only): none are listed, so it narrows to nothing.
-                let any_filter = only_parts || only_surfaces || only_sketches || composites_on || (self.ui.insert_flat && self.picking_replacement());
+                // Flat patterns: none are listed, so it narrows to nothing.
+                let any_filter = only_parts || only_surfaces || only_sketches || composites_on || self.ui.insert_flat;
                 let is_composite = |p: &CatalogPart| s.composites.contains(&p.0);
                 let kind_ok = |p: &CatalogPart| if is_composite(p) { composites_on } else { !any_filter || (only_parts && !p.3) || (only_surfaces && p.3) };
                 // Composite parts first, then the parts (live 320).
@@ -5856,7 +5878,7 @@ impl AssemblyView {
                 body = body.child(if query.is_empty() { div().p_2().text_xs().text_color(pal.text_faint).child("No Part Studios with parts.") } else { insert_no_match("No Part Studios match current search.") });
             }
         } else {
-            let list: Vec<(TabId, String)> = self.catalog.assemblies.iter().filter(|(_, n)| hit(n)).cloned().collect();
+            let list = sort_by_name(self.catalog.assemblies.iter().filter(|(_, n)| hit(n)).cloned().collect(), |a| &a.1, desc);
             if list.is_empty() {
                 body = body.child(if query.is_empty() { div().p_2().text_xs().text_color(pal.text_faint).child("No Assemblies available.") } else { insert_no_match("No assemblies match current search.") });
             }
@@ -6000,7 +6022,6 @@ impl AssemblyView {
                 // Type filters (Parts, and Surfaces when there are any) and
                 // "Insert entire Part Studio as rigid" at the right.
                 let has_surfaces = self.catalog.studios.iter().any(|s| s.parts.iter().any(|p| p.3));
-                let has_sketches = self.catalog.studios.iter().any(|s| !s.sketches.is_empty());
                 // Live (assembly/01 vs 320): the Composite parts toggle only when a Part Studio has one.
                 let has_composites = self.catalog.studios.iter().any(|s| !s.composites.is_empty());
                 let fk = self.ui.insert_sketches;
@@ -6009,6 +6030,7 @@ impl AssemblyView {
                 let toggle = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &mut Context<Self>| {
                     div()
                         .id(id)
+                        .debug_selector(move || id.into())
                         .size(px(30.))
                         .flex()
                         .items_center()
@@ -6073,12 +6095,15 @@ impl AssemblyView {
                                 cx.notify();
                             })))
                         })
-                        .when(has_sketches, |d| {
-                            d.child(toggle("ins-f-sketch", "insert-sketches", "Sketches", fk, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                this.ui.insert_sketches = !this.ui.insert_sketches;
-                                cx.notify();
-                            })))
-                        })
+                        // Sketches and Flat patterns always (live2 asm-dialogs-1119 q-ins: a document with no sheet metal).
+                        .child(toggle("ins-f-sketch", "insert-sketches", "Sketches", fk, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.ui.insert_sketches = !this.ui.insert_sketches;
+                            cx.notify();
+                        })))
+                        .child(toggle("ins-f-flat", "flat-pattern", "Flat patterns", fl, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.ui.insert_flat = !this.ui.insert_flat;
+                            cx.notify();
+                        })))
                         .when(has_surfaces, |d| {
                             d.child(toggle("ins-f-surf", "surface-body", "Surfaces", fs, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.ui.insert_filter.1 = !this.ui.insert_filter.1;

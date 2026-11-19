@@ -396,10 +396,11 @@ pub struct AsmUi {
     /// the last document and version).
     pub insert_other_doc: Option<super::panels::OtherDoc>,
     /// Its sorts and last location as remembered (loaded on first use; live insert-sort-1118 keeps them across a
-    /// reload), the sort menu open (0 Folders, 1 Documents) with its button's bounds, and the sections collapsed.
+    /// reload), the sort menu open (0 Folders, 1 Documents, 2 the current document's list) with its button's
+    /// bounds, and the sections collapsed.
     pub insert_memory: Option<noshape_ops::prefs::InsertMemory>,
     pub insert_sort_menu: Option<usize>,
-    pub insert_sort_anchor: [std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>; 2],
+    pub insert_sort_anchor: [std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>; 3],
     pub insert_sections_closed: [bool; 2],
     /// Dragging a fixed instance (live 562): the cursor position for the fix
     /// glyph and the `no-drop` cursor; nothing moves, no message.
@@ -408,7 +409,7 @@ pub struct AsmUi {
     /// has the window to re-evaluate).
     pub preview_done: bool,
     pub insert_source: u8,
-    /// Replace picker's Flat patterns filter (live 840).
+    /// Flat patterns filter (the Replace picker's, live 840, and Insert's, live2 asm-dialogs-1119).
     pub insert_flat: bool,
     /// Re-evaluate at the next render (a change with no Window at hand,
     /// e.g. the Replace instance preview).
@@ -640,6 +641,10 @@ pub struct AsmUi {
     /// An action asked for while the cached result stood in.
     pub after_eval: Option<super::open::Deferred>,
 }
+
+/// The Measure panel's top and right in the graphics area (live2 asm-dialogs-1119 q-meas).
+pub(crate) const MEASURE_TOP: f32 = 279.;
+pub(crate) const MEASURE_RIGHT: f32 = 13.;
 
 impl AssemblyView {
     // ------------------------------------------------------------ targets
@@ -1990,7 +1995,7 @@ impl AssemblyView {
                     out.push(self.folder_row(f, cx));
                     let rows = members.remove(&fid).unwrap_or_default();
                     if self.ui.expanded_mates.contains(&fid) {
-                        out.extend(rows.into_iter().map(|r| div().pl(px(14.)).child(r).into_any_element()));
+                        out.extend(rows.into_iter().map(|r| div().w_full().pl(px(14.)).child(r).into_any_element()));
                     }
                 }
                 (None, Some(r)) => out.push(r),
@@ -3279,6 +3284,8 @@ impl AssemblyView {
             // The session is one step of its own (✕ / Esc revert just it).
             self.end_insert_step(cx);
             self.insert_open = true;
+            // Its list's sort, as last picked.
+            self.insert_memory();
             self.ui.insert_inserted.clear();
             self.ui.insert_redo = None;
             // Standard content opens on the user's last picks (another tab may have changed them).
@@ -5350,7 +5357,7 @@ impl AssemblyView {
     }
 
     /// The Measure panel (`crate::measure_panel`, live part-studio/82 and
-    /// icons2 Round 14): docked at the bottom right like the Part Studio's.
+    /// icons2 Round 14), at `MEASURE_TOP` / `MEASURE_RIGHT`.
     pub(super) fn render_measure(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let picks = self.ui.measure.as_ref()?;
         let asm = self.assembly(cx)?;
@@ -5400,9 +5407,9 @@ impl AssemblyView {
             std::rc::Rc::new(move |_, cx| v2.update(cx, |this, cx| this.toggle_measure(cx))),
             cx,
         );
-        // As the Part Studio's (live part-studio/82): 2 px over the graphics area's bottom, flush right, over the
-        // evaluation tools (ME1).
-        Some(div().absolute().bottom(px(2.)).right_0().child(panel).into_any_element())
+        // Hung from a fixed top 279 px into the graphics area, 13 px from its right, over the right strip; it grows
+        // downward (live2 asm-dialogs-1119 q-meas-1 / q-meas-2: y 355 under a 76 px header, x 1686–1906 of 1919).
+        Some(div().absolute().top(px(MEASURE_TOP)).right(px(MEASURE_RIGHT)).child(panel).into_any_element())
     }
 
     /// Shift+X / Section view…: open the dialog (from the hovered face or the

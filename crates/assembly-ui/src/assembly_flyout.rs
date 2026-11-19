@@ -3,6 +3,7 @@
 //! read-only as in its dialog, a value grey on its field's line (only the type while they are all at their defaults). It fades in from about 110 ms after the pointer arrives; the next row's replaces it
 //! at once (a warm tooltip).
 
+use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -67,7 +68,10 @@ impl Render for MateFlyout {
             }))
         });
         // A name-only tip (an instance row's) is as wide as its text (live2 13:05: "Part 1 <1>" 63 wide).
+        // The theme's font, as the app's other tooltips: a tooltip view doesn't inherit it, and the fallback has no
+        // bold face (live2 recheck-1119 (7): the title read regular).
         let content = div()
+            .font_family(cx.theme().font_family.clone())
             .when(!self.rows.is_empty(), |d| d.min_w(px(WIDTH)))
             .whitespace_nowrap()
             .text_size(px(12.))

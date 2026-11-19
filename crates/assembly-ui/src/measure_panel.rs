@@ -242,6 +242,7 @@ pub fn panel(selected: Vec<String>, rows: Vec<Row>, settings: MeasureSettings, d
     let help = div().size(px(14.)).rounded_full().flex().items_center().justify_center().child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa)));
     v_flex()
         .id("measure-panel")
+        .debug_selector(|| "measure-panel".into())
         .occlude()
         .w(px(220.))
         .bg(pal.dialog_bg)

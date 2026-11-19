@@ -427,6 +427,10 @@ pub struct InsertMemory {
     pub category: Option<usize>,
     #[serde(default)]
     pub folder: Option<std::path::PathBuf>,
+    /// Current document's Part Studios / Assemblies sort: Name: Z → A, else A → Z (live asm-dialogs-1119 q-ins-sort:
+    /// the default, kept when the dialog is closed and reopened).
+    #[serde(default)]
+    pub current_desc: bool,
 }
 
 impl InsertMemory {

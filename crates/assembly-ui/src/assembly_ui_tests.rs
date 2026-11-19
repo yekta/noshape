@@ -872,6 +872,27 @@ fn an_assembly_measurement_doesnt_hold_up_the_frame(cx: &mut TestAppContext) {
     assert!(cx.update(|cx| !view.read(cx).ui.measure_result.is_empty()), "the panel's rows arrived");
 }
 
+/// Live2 asm-dialogs-1119 q-meas: the Measure panel hangs 279 px into the graphics area (under the toolbar), 13 px from
+/// its right, whatever its rows (it grows downward; ours was docked at the bottom).
+#[gpui::test]
+fn the_measure_panel_hangs_from_a_fixed_top(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "measure-place", |_| {});
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let id = instance(v, "Part 1 <1>", cx);
+            let occ = v.result.occurrences.iter().find(|o| o.top() == id).unwrap();
+            v.ui.entity_sel = vec![(vec![id], occ.face_refs[0].clone())];
+            v.toggle_measure(cx);
+        })
+    });
+    draw(cx, window);
+    let window_w = cx.update_window(window, |_, w, _| f32::from(w.viewport_size().width)).unwrap();
+    let b = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("measure-panel").expect("the Measure panel");
+    let (top, right) = (f32::from(b.top()), window_w - f32::from(b.right()));
+    assert!((top - (crate::ui::TOOLBAR_H + super::MEASURE_TOP)).abs() < 0.5 && (right - super::MEASURE_RIGHT).abs() < 0.5, "top {top}, {right} from the right");
+}
+
 /// The Mass and section properties dialog's values are worked out off the UI thread, once per selection: the frame
 /// that opens it draws with them pending.
 #[gpui::test]
@@ -2032,6 +2053,22 @@ fn two_fixed_parts_warn_on_their_fixed_icons_and_the_root(cx: &mut TestAppContex
     assert!(f32::from(grounded.right()) <= list_w, "the root's name is cut short so its icon shows ({grounded:?}, list {list_w})");
 }
 
+/// Live2 recheck-1119 (5) / (7): a mate row spans the list, so its flyout and tip bar start right of the list (live x
+/// 243), not over it (ours started at 190, right of the row's text).
+#[gpui::test]
+fn a_mate_row_spans_the_list(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "mate-row-width", |ctx| {
+        let top = |ctx: &mut Ctx, i: &str| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].clone();
+        let (a, b) = (top(ctx, "Part 1 <1>"), top(ctx, "Part 2 <1>"));
+        call(ctx, "assembly_mate", json!({ "type": "revolute", "a": { "instance": "Part 1 <1>", "entity": a }, "b": { "instance": "Part 2 <1>", "entity": b } }));
+    });
+    let (window, view) = open_assembly(cx, &path);
+    draw(cx, window);
+    let list_w = cx.update(|cx| crate::ui::left_panel_w(view.read(cx).tab));
+    let row = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("mate-row Revolute 1").expect("Revolute 1's row");
+    assert!((f32::from(row.right()) - list_w).abs() <= 1., "the mate row spans the list ({row:?}, list {list_w})");
+}
+
 /// Live2 errors-1119 a5: a Revolute's minimum above its maximum disables ✓ and Enter (the dialog stays, nothing made).
 #[gpui::test]
 fn crossed_limits_keep_the_mate_dialog_open(cx: &mut TestAppContext) {
@@ -2088,6 +2125,48 @@ fn the_insert_dialog_leaves_out_an_empty_part_studio(cx: &mut TestAppContext) {
     }
 }
 
+/// Live2 asm-dialogs-1119 q-ins / q-ins-sort: Insert's Part Studios are listed by name A → Z by default, the Sort
+/// button right of the search box turns it to Z → A, kept when the dialog is closed and reopened; the filters are
+/// Parts, Sketches and Flat patterns, also with no sketches or sheet metal in the document.
+#[gpui::test]
+fn the_insert_dialogs_studios_sort_by_name_and_keep_the_sort(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "insert-sort", |ctx| {
+        let dup = call(ctx, "tab_duplicate", json!({ "tab": "Part Studio 1" }))["tab"]["name"].as_str().unwrap().to_string();
+        call(ctx, "tab_rename", json!({ "tab": dup, "name": "Alpha studio" }));
+    });
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.ui.insert_memory = Some(noshape_ops::prefs::InsertMemory::default());
+            v.toggle_insert(w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    let first = |cx: &mut TestAppContext| {
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        let y = |vcx: &mut gpui_kit::VisualTestContext, n: &str| vcx.debug_bounds(format!("ins-row {n}").leak()).unwrap_or_else(|| panic!("{n} listed")).origin.y;
+        if y(&mut vcx, "Alpha studio") < y(&mut vcx, "Part Studio 1") { "Alpha studio" } else { "Part Studio 1" }
+    };
+    assert_eq!(first(cx), "Alpha studio", "A → Z by default");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    for id in ["ins-cur-sort", "ins-f-parts", "ins-f-sketch", "ins-f-flat"] {
+        assert!(vcx.debug_bounds(id).is_some(), "{id} shown");
+    }
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.pick_insert_sort(2, 1);
+        v.insert_search_changed(cx);
+        cx.notify();
+    }));
+    draw(cx, window);
+    assert_eq!(first(cx), "Part Studio 1", "Z → A");
+    for _ in 0..2 {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_insert(w, cx))).unwrap();
+        draw(cx, window);
+    }
+    assert_eq!(first(cx), "Part Studio 1", "Z → A kept on reopening");
+}
+
 /// Live2 asm-dialogs-1119 grp / gok: Group on a fixed part and a part Revolute-mated to it shows the mate's error as the
 /// dialog opens (not only after ✓), and ✓ clears the selection.
 #[gpui::test]
@@ -2098,7 +2177,7 @@ fn the_group_dialog_shows_its_errors_as_it_opens_and_ok_clears_the_selection(cx:
         let (a, b) = (top(ctx, "Part 1 <1>"), top(ctx, "Part 2 <1>"));
         call(ctx, "assembly_mate", json!({ "type": "revolute", "a": { "instance": "Part 1 <1>", "entity": a }, "b": { "instance": "Part 2 <1>", "entity": b } }));
     });
-    let (window, view) = open_assembly(cx, &path);
+    let (window, view) = open_assembly_with_front(cx, &path);
     let settle = |cx: &mut TestAppContext| {
         draw(cx, window);
         cx.executor().advance_clock(std::time::Duration::from_millis(100));
@@ -2114,6 +2193,9 @@ fn the_group_dialog_shows_its_errors_as_it_opens_and_ok_clears_the_selection(cx:
     }));
     settle(cx);
     assert_eq!(mate_error(cx).as_deref(), Some("Mate cannot be added between member of same group."), "the error as the dialog opens");
+    // Live2 recheck-1119 (4): the new group's own row red bold with its "!" while the dialog is open.
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    assert!(vcx.debug_bounds("group-new error").is_some(), "Group 1's row in error (grey: {})", vcx.debug_bounds("group-new").is_some());
     cx.update(|cx| view.update(cx, |v, cx| v.accept_group(cx)));
     settle(cx);
     cx.update(|cx| {

@@ -4435,18 +4435,21 @@ impl AssemblyView {
 
     /// A section's Sort menu (live insert-sort-1118): 183 px under its button, right-aligned to it, 27 px rows of
     /// 14 px `#555`, the current sort on `#b2ddf6` with a check. A pick re-sorts and is remembered.
-    fn render_insert_sort_menu(&mut self, ix: usize, memory: &noshape_ops::prefs::InsertMemory, cx: &mut Context<Self>) -> AnyElement {
+    /// The current document's (live2 asm-dialogs-1119 q-ins-sort): 138 px, Name: A → Z (the default) and Z → A.
+    fn render_insert_sort_menu(&self, ix: usize, memory: &noshape_ops::prefs::InsertMemory, cx: &mut Context<Self>) -> AnyElement {
         use noshape_ops::prefs::{DocumentSort, FolderSort};
         let pal = p();
         let b = self.ui.insert_sort_anchor[ix].get();
         let rows: Vec<(&'static str, bool)> = match ix {
             0 => FolderSort::ALL.iter().map(|s| (s.label(), *s == memory.folders)).collect(),
-            _ => DocumentSort::ALL.iter().map(|s| (s.label(), *s == memory.documents)).collect(),
+            1 => DocumentSort::ALL.iter().map(|s| (s.label(), *s == memory.documents)).collect(),
+            _ => vec![("Name: A → Z", !memory.current_desc), ("Name: Z → A", memory.current_desc)],
         };
+        let w = if ix == 2 { px(138.) } else { px(183.) };
         let mut list = v_flex()
             .id("ins-other-sort-menu")
             .occlude()
-            .w(px(183.))
+            .w(w)
             .py(px(4.))
             .bg(pal.panel)
             .border_1()
@@ -4471,11 +4474,12 @@ impl AssemblyView {
                     .child(label)
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         this.pick_insert_sort(ix, k);
+                        this.insert_search_changed(cx);
                         cx.notify();
                     })),
             );
         }
-        deferred(anchored().position(point(b.right() - px(183.), b.bottom() + px(1.))).child(list)).with_priority(1).into_any_element()
+        deferred(anchored().position(point(b.right() - w, b.bottom() + px(1.))).child(list)).with_priority(1).into_any_element()
     }
 
     /// Row `k` of section `ix`'s Sort menu (0 Folders, 1 Documents): that sort, remembered; the menu closes.
@@ -4483,7 +4487,8 @@ impl AssemblyView {
         use noshape_ops::prefs::{DocumentSort, FolderSort};
         self.remember_insert(|m| match ix {
             0 => m.folders = FolderSort::ALL.get(k).copied().unwrap_or_default(),
-            _ => m.documents = DocumentSort::ALL.get(k).copied().unwrap_or_default(),
+            1 => m.documents = DocumentSort::ALL.get(k).copied().unwrap_or_default(),
+            _ => m.current_desc = k == 1,
         });
         self.ui.insert_sort_menu = None;
     }
@@ -4580,16 +4585,46 @@ impl AssemblyView {
         } else {
             "Search assemblies"
         };
-        Some(
+        // The current document's list: its Sort button right of the box (28 px, no tooltip; live2 asm-dialogs-1119).
+        let sort = (self.ui.insert_source == 0 && !self.picking_replacement()).then(|| {
+            let open = self.ui.insert_sort_menu == Some(2);
+            let probe = self.ui.insert_sort_anchor[2].clone();
             div()
+                .id("ins-cur-sort")
+                .debug_selector(|| "ins-cur-sort".into())
+                .relative()
+                .flex_none()
+                .size(px(28.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(3.))
+                .cursor_pointer()
+                .when(open, |d| d.bg(rgb(0xdef1fb)).border_1().border_color(rgb(0x90cef1)))
+                .when(!open, |d| d.hover(|d| d.bg(rgb(0xeaeaea))))
+                .child(crate::assets::icon(&icon_path("tm-sort"), 20., cx))
+                .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.ui.insert_sort_menu = if this.ui.insert_sort_menu == Some(2) { None } else { Some(2) };
+                    cx.notify();
+                }))
+        });
+        let menu = self.ui.insert_memory.as_ref().filter(|_| sort.is_some() && self.ui.insert_sort_menu == Some(2)).map(|m| self.render_insert_sort_menu(2, m, cx));
+        Some(
+            h_flex()
                 .pt(px(6.))
                 .px(px(6.))
                 .pb(px(6.))
+                .gap(px(6.))
                 .child(
                     div()
                         .relative()
+                        .flex_1()
+                        .min_w_0()
                         .child(crate::ui_script::mark(div().child(crate::ui::input_with_placeholder(st, ph, cx).h(px(30.)).text_size(px(12.)).pl(px(5.)).when(!st.read(cx).value().is_empty(), |i| i.suffix(insert_search_clear(cx)))), move || format!("field:{ph}"))),
                 )
+                .children(sort)
+                .children(menu)
                 .into_any_element(),
         )
     }
@@ -5083,7 +5118,7 @@ impl AssemblyView {
                 docs.clear();
             }
         }
-        if let Some(ix) = menu.filter(|_| q.is_none()) {
+        if let Some(ix) = menu.filter(|ix| q.is_none() && *ix < 2) {
             col = col.child(self.render_insert_sort_menu(ix, &memory, cx));
         }
         if docs.is_empty() && !loading && !(q.is_none() && closed[1]) {

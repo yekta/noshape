@@ -3109,3 +3109,36 @@ fn coplanar_faces_of_two_parts_go_to_the_first() {
     }
     assert_eq!(lost, vec![(0, 0); 3], "of 49 spots on the shared top per view (slanted perspective, orthographic, near grazing): (the second part's colour, its pick)");
 }
+
+/// A face picked in a dialog (selected) whose selection row is hovered (QUERY) is yellow-green, not the selection's
+/// orange (live2 recheck-1119 (3): a hovered mate connector chip; ours stayed (229,163,34)).
+#[test]
+fn a_selected_face_of_a_hovered_selection_row_is_yellow_green() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let mesh = r.upload_mesh(&primitives::box_mesh([-0.01, -0.01, -0.01], [0.01, 0.01, 0.01], 1));
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Mesh(mesh)));
+    let mut cam = Camera::default();
+    cam.fit_sphere(glam::DVec3::ZERO, 0.0175, 4.0 / 3.0);
+    let style = Style::default();
+    let centre = |r: &mut Renderer, scene: &Scene| {
+        let f = r.render(RenderParams { scene, camera: &cam, width: 400, height: 300, device_pixel_ratio: 1.0, style: &style, pick: true }).unwrap();
+        let i = 150 * 400 + 200;
+        (f.pick.unwrap().ids[i], [f.bgra[i * 4 + 2], f.bgra[i * 4 + 1], f.bgra[i * 4]])
+    };
+    let (id, _) = centre(&mut r, &scene);
+    assert!(id != 0, "the box under the centre");
+    scene.set_state(id, state::SELECTED);
+    let (_, selected) = centre(&mut r, &scene);
+    scene.set_state(id, state::SELECTED | state::QUERY);
+    let (_, query) = centre(&mut r, &scene);
+    assert!(selected[0] > selected[1] && selected[2] < 80, "selected: orange {selected:?}");
+    assert!(query[1] >= query[0] && query[2] > selected[2] + 40, "selected and its row hovered: yellow-green {query:?} (selected {selected:?})");
+}
