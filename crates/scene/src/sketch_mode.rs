@@ -501,12 +501,52 @@ fn split_shared(data: &mut SketchData, p: EntityId) -> bool {
     changed
 }
 
+/// A used line's or arc's ends before a Trim or Split (`used_ends_before`), for [`keep_used_ends`].
+fn used_ends_before(data: &SketchData, id: EntityId) -> Option<[(EntityId, DVec2); 2]> {
+    data.external_refs.get(&id.0)?;
+    if !matches!(data.sketch.kind(id), Some(EntityKind::Line | EntityKind::Arc)) {
+        return None;
+    }
+    let (s, e) = data.sketch.endpoints(id)?;
+    Some([(s, data.sketch.point(s)?), (e, data.sketch.point(e)?)])
+}
+
+/// Live (skasm 11-19 split / trim of a used line): an end a Trim or Split cut off a used curve still follows the edge's
+/// end. Split: the far piece's end (its USE_END). Trim: a point kept there (live's `.orphan`), on the trimmed curve so it
+/// stays on the edge's line. An end another used curve shares follows that one already.
+fn keep_used_ends(data: &mut SketchData, id: EntityId, before: Option<[(EntityId, DVec2); 2]>, trimmed: bool) {
+    let Some(ends) = before else { return };
+    let Some(r) = data.external_refs.get(&id.0).cloned() else { return };
+    let Some((s, e)) = data.sketch.endpoints(id) else { return };
+    for (i, (p, at)) in ends.into_iter().enumerate() {
+        if p == s || p == e {
+            continue;
+        }
+        let shared = data.sketch.entities().any(|x| x.id != id && x.external && data.external_refs.contains_key(&x.id.0) && x.point_refs().contains(&p));
+        if shared {
+            continue;
+        }
+        let kept = match data.sketch.entity(p) {
+            Some(_) if !trimmed => p,
+            _ => {
+                let Ok(q) = data.sketch.add_entity(noshape_sketch::Geometry::Point { pos: at }, false, true) else { continue };
+                let _ = data.sketch.add_constraint(ConstraintKind::Coincident { a: q, b: id });
+                q
+            }
+        };
+        let _ = data.sketch.set_external(kept, true);
+        data.external_refs.insert(kept.0, r.clone());
+        data.use_ends.insert(kept.0, i == 1);
+    }
+}
+
 /// Deleting a Use glyph unlinks the geometry: it stays as regular, free
 /// sketch geometry no longer following the model (Onshape).
 fn unlink_used(data: &mut SketchData, e: EntityId) -> bool {
     if data.external_refs.remove(&e.0).is_none() {
         return false;
     }
+    data.use_ends.remove(&e.0);
     let mut ids = vec![e];
     if let Some((a, b)) = data.sketch.endpoints(e) {
         ids.extend([a, b]);
@@ -2631,7 +2671,12 @@ impl SketchEditor {
                     },
                     _ => {
                         let at = data.sketch.curve(id).map(|c| c.closest(p).1).unwrap_or(p);
-                        data.sketch.split(id, at)
+                        let used = used_ends_before(data, id);
+                        let r = data.sketch.split(id, at);
+                        if r.is_ok() {
+                            keep_used_ends(data, id, used, false);
+                        }
+                        r
                     }
                 };
                 match r {
@@ -3310,7 +3355,12 @@ impl SketchEditor {
                 return EditOutcome::none();
             }
         } else {
-            data.sketch.trim_near(id, p, self.world_per_px * TRIM_CORNER_PX).map(|_| ())
+            let used = used_ends_before(data, id);
+            let r = data.sketch.trim_near(id, p, self.world_per_px * TRIM_CORNER_PX).map(|_| ());
+            if r.is_ok() && data.sketch.entity(id).is_some() {
+                keep_used_ends(data, id, used, true);
+            }
+            r
         };
         match res {
             Ok(()) => {
@@ -5844,6 +5894,7 @@ impl SketchEditor {
         }
         if changed {
             data.external_refs.retain(|k, _| data.sketch.entity(EntityId(*k)).is_some());
+            data.use_ends.retain(|k, _| data.external_refs.contains_key(k));
             prune_exprs(data);
             data.sketch.solve();
         }
@@ -7696,6 +7747,7 @@ pub fn prune_reference_only(data: &mut SketchData) {
     }
     data.sketch.remove_entities(&drop);
     data.external_refs.retain(|k, _| data.sketch.entity(EntityId(*k)).is_some());
+    data.use_ends.retain(|k, _| data.external_refs.contains_key(k));
 }
 
 fn prune_exprs(data: &mut SketchData) {

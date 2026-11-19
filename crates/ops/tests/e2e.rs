@@ -9758,4 +9758,39 @@ export const nut = defineFeature(function(context is Context, id is Id, definiti
         })
         .unwrap();
     assert_eq!(row(&mut ctx), (json!(""), json!("")), "standard content's row: no Description or Part number from its feature");
+
+/// Live (skasm 11-19 split / trim of a used line): a used edge's line trimmed at a crossing keeps a point at the cut-off
+/// end (its `.orphan`) on the line; moved along its length, the line's start and that point follow the edge's ends
+/// and the cut end stays on the crossing line. Split, the far piece's end follows the edge's end.
+#[test]
+fn a_trimmed_or_split_use_follows_the_edges_ends() {
+    for trim in [true, false] {
+        let mut ctx = Ctx::new();
+        let sk = new_sketch(&mut ctx, &format!("use-cut-{trim}.noshape"), "plane:top");
+        let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[5, -10], [35, 0]] }));
+        let rect: Vec<String> = r["created"].as_array().unwrap().iter().filter_map(|e| e["id"].as_str().map(str::to_string)).collect();
+        let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+        let edge = call(&mut ctx, "query_entities", json!({ "kind": "edges", "near": [20, 0, 0], "limit": 1 }))["edges"][0]["id"].as_str().unwrap().to_string();
+        let s2 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top", "name": "Uses" }))["sketch"].as_str().unwrap().to_string();
+        let line = id_of(created(&call(&mut ctx, "sketch_use", json!({ "sketch": s2, "references": [edge] })), "line")[0]);
+        if trim {
+            call(&mut ctx, "sketch_draw", json!({ "sketch": s2, "tool": "line", "points": [[25, -5], [25, 5]] }));
+            call(&mut ctx, "sketch_trim", json!({ "sketch": s2, "points": [[30, 0]] }));
+        } else {
+            call(&mut ctx, "sketch_split", json!({ "sketch": s2, "points": [[15, 0]], "entities": [line] }));
+        }
+        call(&mut ctx, "sketch_transform", json!({ "sketch": sk, "entities": rect, "translate": [5, 0] }));
+        // The regenerated sketch's points on y = 0, in mm.
+        let od = ctx.doc(None).unwrap();
+        let tab = noshape_ops::doc::find_tab(od.doc(), "Part Studio 1").unwrap();
+        let fid = noshape_ops::doc::studio(od.doc(), tab).unwrap().features.iter().find(|f| f.name == "Uses").unwrap().id;
+        let r = od.regenerate(tab, None).unwrap();
+        let solved = &r.context.sketches.iter().find(|s| s.feature == fid).unwrap().sketch;
+        let mut xs: Vec<f64> = solved.entities().filter_map(|e| solved.point(e.id).filter(|p| p.y.abs() < 1e-9).map(|p| (p.x * 1e4).round() / 10.0)).collect();
+        xs.sort_by(f64::total_cmp);
+        xs.dedup();
+        let want = if trim { vec![10.0, 25.0, 40.0] } else { vec![10.0, 15.0, 40.0] };
+        assert_eq!(xs, want, "trim {trim}");
+    }
 }

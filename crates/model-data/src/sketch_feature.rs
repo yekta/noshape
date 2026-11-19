@@ -17,6 +17,10 @@ pub struct SketchData {
     /// keyed by entity id; re-projected on every regeneration.
     #[serde(default)]
     pub external_refs: BTreeMap<u32, Reference>,
+    /// Points kept at an end of their `external_refs` edge's projection (`true`: its end, `false`: its start): the ends
+    /// a Trim or Split of a used curve cut off (live's `.orphan` points with USE_END).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub use_ends: BTreeMap<u32, bool>,
     /// Sketch text boxes. The box is construction geometry in the solver
     /// sketch; the glyph outlines are regenerated from it on evaluation.
     #[serde(default)]
@@ -197,6 +201,7 @@ impl PartialEq for SketchData {
         // The solver sketch has no structural equality; compare serialized forms.
         self.dimension_exprs == other.dimension_exprs
             && self.external_refs == other.external_refs
+            && self.use_ends == other.use_ends
             && self.texts == other.texts
             && self.dimension_labels == other.dimension_labels
             && self.intersections == other.intersections

@@ -106,6 +106,17 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
             let Ok(edge) = ev.edge_shape(bi, ei) else { continue };
             edge
         };
+        // An end a Trim or Split cut off a used edge: kept at that end of its projection.
+        if let Some(&at_end) = data.use_ends.get(eid) {
+            match project_edge_with(&edge, &frame, true) {
+                Some(SectionCurve::Exact(c)) => {
+                    let (t0, t1) = c.domain();
+                    let _ = sk.set_point(id, c.point(if at_end { t1 } else { t0 }));
+                }
+                _ => missing += 1,
+            }
+            continue;
+        }
         if sk.kind(id) == Some(noshape_sketch::EntityKind::Point) {
             // Pierce point: where the edge crosses the sketch plane.
             match pierce_point(&edge, &frame) {
@@ -735,12 +746,18 @@ pub fn face_silhouettes(face: &noshape_kernel::Shape, frame: &crate::display::Pl
 
 /// Update an external entity's geometry in place from a projected curve.
 pub fn update_external(sk: &mut noshape_sketch::Sketch, id: noshape_sketch::EntityId, c: &noshape_sketch::Curve2) {
+    let external = |sk: &noshape_sketch::Sketch, p: noshape_sketch::EntityId| sk.entity(p).is_some_and(|e| e.external);
     use noshape_sketch::{Curve2, Geometry};
     let Some(e) = sk.entity(id).cloned() else { return };
     match (&e.geometry, c) {
+        // An end a Trim or Split cut stays (it's no longer the edge's: not external); live keeps it where its other
+        // constraints hold it.
         (Geometry::Line { start, end }, Curve2::Line { a, b }) => {
-            let _ = sk.set_point(*start, *a);
-            let _ = sk.set_point(*end, *b);
+            for (p, q) in [(*start, *a), (*end, *b)] {
+                if external(sk, p) {
+                    let _ = sk.set_point(p, q);
+                }
+            }
         }
         (Geometry::Circle { center, .. }, Curve2::Circle { center: c2, radius }) => {
             let _ = sk.set_point(*center, *c2);
@@ -752,8 +769,11 @@ pub fn update_external(sk: &mut noshape_sketch::Sketch, id: noshape_sketch::Enti
         }
         (Geometry::Arc { center, start, end }, Curve2::Arc { center: c2, radius, start_angle, end_angle }) => {
             let _ = sk.set_point(*center, *c2);
-            let _ = sk.set_point(*start, *c2 + glam::DVec2::from_angle(*start_angle) * *radius);
-            let _ = sk.set_point(*end, *c2 + glam::DVec2::from_angle(*end_angle) * *radius);
+            for (p, angle) in [(*start, *start_angle), (*end, *end_angle)] {
+                if external(sk, p) {
+                    let _ = sk.set_point(p, *c2 + glam::DVec2::from_angle(angle) * *radius);
+                }
+            }
         }
         (Geometry::Ellipse { center, .. }, Curve2::Ellipse { center: c2, major, minor }) => {
             let _ = sk.set_point(*center, *c2);

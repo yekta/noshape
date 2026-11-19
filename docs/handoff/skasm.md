@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 02:15 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 02:57 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -45,11 +45,21 @@ quadrant's snap wakes no alignment source (ours aligns with points only).
 ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
 Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live to recheck on green.
 
-## In flight 02:15: parity: a Use lands on live's refs geometry when its stored entity is stale (same chord length,
-`LiveUse` in `Use`, `stale_uses` keeps the sketch's solve). UNCOMMITTED in crates/ops/src/parity.rs. rocker-enclosure-sm
-Sketch 2 now Uses its 4 edges (Extrude 2's difference is Sketch 4's, unchanged). Full suite B queued on vibe2 slot:
-~/agents/skasm-keep/suite-B-*.log vs A suite-1119-0125.log (90/126, 1325/1585; A is the pre-01:40 base). Land if no
-document loses features.
+## Landing 02:35: sketch_dimension P1 (5f08d65e): a value acts as typed into a new dimension's box (redundant /
+conflicting kept driving, unsolvable taken; warning "Sketch could not be solved."); translator reads `driving`.
+Live's "not applied after an earlier failing sketch" was `failed` listing every failing feature (dims do apply).
+
+## In flight: parity Use on live's refs geometry (stale stored entity, same chord length; `LiveUse`, `stale_uses` keeps
+the solve). UNCOMMITTED in crates/ops/src/parity.rs (patch copy /root/skasm-scratch/use-only.patch). rocker-enclosure-sm
+Sketch 2 now Uses its 4 edges; its Extrude 2 difference is Sketch 4 (in-context, no live frame: REQUESTS 02:20
+sketches.json for both rocker models). Full suite B queued on vibe2 slot (after asm, ~03:26):
+~/agents/skasm-keep/suite-B-*.log vs A suite-1119-0125.log (90/126, 1325/1585). Land if no document loses features.
+
+Split / Trim of a Use'd line (live 11-19, behaviours "skasm (11-19): split / trim of a used line"): queued 02:57.
+SketchData `use_ends` (point -> end of its ref's edge); Trim keeps live's .orphan point (external, on the line), Split's
+far piece's end follows; regen moves only a used curve's still-external ends. Next: the translator's split Uses
+(welding Sketch 12: the `.orphan` USE_END / MIDPOINT pattern). sketch_get lists stored, not re-projected, positions.
+REGION-PICK-SKETCH-SHOWN P0 queued 0b44497a (field kinds gate the shown sketch's reach and the GPU pick).
 welding Sketch 12 (lead: P1) is NOT 7 mm off: ours = live's geometry. Its 2 PROJECTED left are Uses live SPLIT: line
 a6Y7 Uses edge Jq9 (105.05-118.985 mm), its end at MIDPOINT(start, `.orphan` point), the orphan keeping USE_END to the
 far vertex (zBqz the same via a trimOffspring). Ours draws the piece unlinked. Our Trim of a Use'd piece keeps the link
