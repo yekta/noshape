@@ -998,11 +998,13 @@ pub fn read_rhino_parts(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedSha
 }
 
 /// Read an ACIS .sat / .sab file (any version, and ShapeManager files) as
-/// Onshape imports it: every body with its name and colour, in `unit`.
+/// Onshape imports it: every body with its name and colour, in `unit`, its
+/// faces on one surface merged as live's STEP / IGES / ACIS imports do
+/// (c2-sm-louver's live.sat: 50 faces a louver for its Parasolid's 56).
 /// Analytic geometry exactly; spline surfaces and curves from the B-spline
 /// data the file stores with them.
 pub fn read_acis_parts(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
-    imported(ck(ffi::read_sat_parts_ffi(path_str(path)?))?, unit)
+    imported(ck(ffi::read_sat_parts_ffi(path_str(path)?))?, unit)?.into_iter().map(|p| merged_faces(p, true)).collect()
 }
 
 /// Read a JT file through its exact geometry, the XT B-rep segments (JT 8–10;

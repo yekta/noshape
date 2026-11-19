@@ -2166,6 +2166,23 @@ fn a_sat_edge_keeps_its_range_where_projection_misses() {
     assert!((a - want).abs() < 1e-5 * want, "{a} vs {want}");
 }
 
+/// An ACIS import merges a body's faces on one surface, as live's STEP / IGES / ACIS imports do (c2-sm-louver's live.sat:
+/// 50 faces a louver for its Parasolid's 56; cf-sheet-metal-model-plus' 30 for 54): two boxes fused side by side, their
+/// top, bottom and sides each two faces, read back a 6-face box.
+#[test]
+fn an_acis_import_merges_faces_on_one_surface() {
+    let a = make_box_corners(DVec3::ZERO, DVec3::new(0.02, 0.02, 0.01)).unwrap();
+    let b = make_box_corners(DVec3::new(0.02, 0.0, 0.0), DVec3::new(0.04, 0.02, 0.01)).unwrap();
+    let both = fuse(&a, &b).unwrap().shape;
+    assert_eq!(both.count(ShapeType::Face), 10, "the fuse keeps the faces split");
+    let path = std::env::temp_dir().join(format!("noshape-sat-merge-{}.sat", std::process::id()));
+    write_acis(&path, std::slice::from_ref(&both), LengthUnit::Meter).unwrap();
+    let back = read_acis_parts(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(back.len(), 1);
+    assert_eq!(back[0].shape.count(ShapeType::Face), 6);
+}
+
 /// Two Shell walls (offsets of a loft's periodic B-surface) and the cylinder between them, as Parasolid: the offsets
 /// written as OFFSET_SURF over the basis (approximated, the edges along them were refitted badly) and each fin's curve
 /// in the period of the basis's range as written (one a period off put an edge 9 mm away): c2-rings-loft's Part 1

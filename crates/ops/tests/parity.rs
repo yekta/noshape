@@ -1059,8 +1059,8 @@ fn exchange_round_trip() {
             // within 1 % of theirs; of live's import of it once given, where a part inside another is that one's
             // hollow, cf-sheet-metal-model-plus.)
             let total = |v: &[PartState]| v.iter().filter_map(|p| p.volume).sum::<f64>();
-            // (STEP, IGES: as Onshape's import, faces on one surface merged: a sheet metal model's coplanar walls one
-            // face; by volume and area.)
+            // (STEP, IGES, ACIS: as Onshape's import, faces on one surface merged: a sheet metal model's coplanar walls
+            // one face; by volume and area.)
             // (An STL as live will read it: its own mesh's parts, volume and area, against what live's import of it
             // is held to; the file live has may be older.)
             if mesh(format)
@@ -1072,7 +1072,7 @@ fn exchange_round_trip() {
             // (Within the edges' tolerance, either side's: `within_edge_tolerance`.)
             let tol = |v: &[PartState]| v.iter().filter_map(|p| p.edge_tolerance).fold(0.0f64, f64::max);
             let diff = match back {
-                Ok(b) if format == "IGES" || format == "STEP" => differences(&mesh_counts(within_edge_tolerance(&native, tol(&native).max(tol(&b)))), &mesh_counts(b)),
+                Ok(b) if matches!(format, "IGES" | "STEP" | "ACIS") => differences(&mesh_counts(within_edge_tolerance(&native, tol(&native).max(tol(&b)))), &mesh_counts(b)),
                 Ok(b) if mesh(format) => {
                     let read_by_live = (!theirs[format].is_null()).then(|| parts_from_live_import(&theirs[format], true));
                     let (a, n) = (total(&b), read_by_live.as_deref().map_or_else(|| total(&native), total));
