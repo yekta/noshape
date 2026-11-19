@@ -374,6 +374,8 @@ impl PartStudioView {
         }
         let adds = matches!(target, EditTarget::Faces(_, None));
         self.ui.appearance_edit = Some(AppearanceEdit { target, rgb, transparency, tessellation: tess, mixer: false, mix: crate::color_mixer::MixerState::from_rgb(rgb), alpha_drag: false, initial: (rgb, transparency, tess), before: None, applied: (rgb, transparency, tess), adds, hex, channels, alpha, _subs: subs });
+        // Its parts outlined at once, untinted (live tools-1119 a1-appearance).
+        self.refresh_scene(false, cx);
         cx.notify();
     }
 
@@ -438,9 +440,10 @@ impl PartStudioView {
 
     /// Apply the editor (✓).
     /// The editor closed (✓, ✕ or Esc): what its faces or features field selected goes with it (live ui-parity
-    /// face-menu-add-appearance-to-face, appearance-face-row-remove).
+    /// face-menu-add-appearance-to-face, appearance-face-row-remove); a part's too (appearance-editor-hex, live
+    /// tools-1119 a3-cancelled).
     pub(super) fn appearance_closed(&mut self, target: &EditTarget, cx: &mut Context<Self>) {
-        if matches!(target, EditTarget::Faces(..) | EditTarget::Feature(..) | EditTarget::Features(_)) {
+        if matches!(target, EditTarget::Faces(..) | EditTarget::Feature(..) | EditTarget::Features(_) | EditTarget::Parts(_)) {
             self.selection.clear();
             self.selected_features.clear();
             self.refresh_scene(false, cx);
@@ -452,11 +455,6 @@ impl PartStudioView {
         self.apply_appearance(true, cx);
         let Some(e) = self.ui.appearance_edit.take() else { return };
         self.appearance_closed(&e.target, cx);
-        // A part's popup committed (Enter) leaves nothing selected (live ui-parity appearance-editor-hex).
-        if matches!(e.target, EditTarget::Parts(_)) {
-            self.selection.clear();
-            self.refresh_scene(false, cx);
-        }
         if let EditTarget::ConfiguredCell(part, row) = &e.target {
             let value = noshape_model::configured_properties::color_text(e.rgb, 1.0 - e.transparency);
             let (part, row) = (part.clone(), *row);
@@ -542,6 +540,15 @@ impl PartStudioView {
             if preview { doc.edit_tab_preview(tab, "Edit appearance", cx, edit) } else { doc.edit_tab_deferred(tab, "Edit appearance", cx, edit) }
         });
         let Some(Some((before, added))) = applied else { return };
+        // The parts in their new colour on the next frame, not after the regeneration (live tools-1119 a2-red: 38 ms),
+        // which then draws the same.
+        if let EditTarget::Parts(bodies) = &target {
+            let display = std::sync::Arc::make_mut(&mut self.display);
+            for b in display.bodies.iter_mut().filter(|b| bodies.contains(&b.id)) {
+                b.color = color;
+            }
+            self.rebuild_scene(cx);
+        }
         let Some(e) = &mut self.ui.appearance_edit else { return };
         if before.is_some() {
             e.before = before;

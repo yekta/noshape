@@ -705,6 +705,8 @@ pub struct UiState {
     /// Feature whose list context menu is open: its row and geometry stay
     /// highlighted (live menus/rmb-ps-featurelist-fillet.png).
     pub list_menu: Option<FeatureId>,
+    /// Part whose Parts-list row menu is open: its eye hidden meanwhile (live2 nav-feel-1119).
+    pub part_menu: Option<noshape_model::BodyId>,
     /// Dialog picks the preview consumed (a fillet's edges), drawn from the
     /// model before the feature: (picks, accent picks, before-model, lines).
     pub consumed_lines: Option<ConsumedLines>,
@@ -1048,6 +1050,7 @@ impl UiState {
             row_sketches: Default::default(),
             menu_target: None,
             list_menu: None,
+            part_menu: None,
             consumed_lines: None,
             shown_dims: None,
             plane_ring_hover: None,

@@ -1600,7 +1600,7 @@ impl PartStudioView {
         // A plane being resized: its highlight follows the drag.
         let shown = self.with_plane_drag(self.display.clone());
         let extra_len = extra.len();
-        let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, scene_builder::Highlighting { error: failing && error_mesh.is_none(), dialog: self.edit.is_some() }, self.gpu.uploader());
+        let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, scene_builder::Highlighting { error: failing && error_mesh.is_none(), dialog: self.edit.is_some(), untinted_parts: self.ui.appearance_edit.as_ref().is_some_and(|e| matches!(e.target, appearance::EditTarget::Parts(_))) }, self.gpu.uploader());
         if let Some(slot) = self.ui.cap_hover.and_then(|k| scene.clip_hovered.get_mut(k)) {
             *slot = true;
         }
@@ -3144,7 +3144,7 @@ impl PartStudioView {
         self.selected_features.clear();
     }
 
-    fn set_suppressed(&mut self, ids: Vec<FeatureId>, suppressed: bool, cx: &mut Context<Self>) {
+    pub(super) fn set_suppressed(&mut self, ids: Vec<FeatureId>, suppressed: bool, cx: &mut Context<Self>) {
         let desc = self.studio(cx).map(|s| noshape_ops::studio::suppress_description(s, &ids, suppressed)).unwrap_or_default();
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, &desc, cx, |ps| noshape_ops::studio::set_suppressed(ps, &ids, suppressed));
@@ -4059,8 +4059,8 @@ impl PartStudioView {
             dg_rows.push(crate::ui_script::wrap(
                 // Live (part-studio/16): the hover band spans the list (x 40
                 // to 239); the indent is inside the row.
-                crate::ui::with_user_side_tooltip(crate::ui::tree_row(SharedString::from(format!("dg-{label}")), selected), name.clone())
-                    .mr(px(5.))
+                crate::ui::with_list_row_tooltip(crate::ui::tree_row(SharedString::from(format!("dg-{label}")), selected), name.clone())
+                    .mr(crate::ui::LIST_ROW_INSET)
                     .pl(px(23.))
                     // Live: the eye's center 19 px from the row's end.
                     .pr(px(11.))
@@ -4773,14 +4773,22 @@ impl PartStudioView {
             _ => "part",
         };
         let renaming = self.ui.part_renaming.as_ref().is_some_and(|(x, ..)| *x == b.id);
+        // Its eye hidden while its menu is open (live2 nav-feel-1119).
+        let menu_open = self.ui.part_menu.as_ref() == Some(&b.id);
         // Live (selection/09, part-studio/450): the band spans the list with
         // the content indented 18 px, 24 px tall, 5 px short of the edge.
         // While renaming the row is white with no hover fill: `tree_row` gets
         // `selected` so it sets no hover style (a second `.hover` panics, CRASH1).
-        crate::ui::tree_row(SharedString::from(format!("part-{}", b.id)), selected || renaming)
+        // The name's tooltip right of the row, centred on it, as a feature row's (live list-1119 4; it showed under
+        // the pointer); a composite adds "(open|closed) (N parts)" (live dom/partslist-composite-open.txt).
+        let tip = match &b.composite {
+            Some(c) => format!("{} ({}) ({} parts)", b.name, if c.closed { "closed" } else { "open" }, c.members.len()),
+            None => b.name.clone(),
+        };
+        crate::ui::with_list_row_tooltip(crate::ui::tree_row(SharedString::from(format!("part-{}", b.id)), selected || renaming), tip)
             .h(px(24.))
             .pl(px(23.))
-            .mr(px(5.))
+            .mr(crate::ui::LIST_ROW_INSET)
             .group("part-row")
             .when(related, |d| d.bg(pal.row_related))
             .when(renaming, |d| d.bg(gpui_kit::rgb(0xffffff)))
@@ -4814,8 +4822,6 @@ impl PartStudioView {
                     }))
                     .child(gpui_kit::component::input::Input::new(&st).appearance(false).xsmall().text_size(px(13.33)))
                     .into_any_element(),
-                // Live (dom/partslist-composite-open.txt): the name's tooltip;
-                // a composite adds "(open|closed) (N parts)".
                 None => div()
                     .id(SharedString::from(format!("part-name-{}", b.id)))
                     .relative()
@@ -4825,10 +4831,6 @@ impl PartStudioView {
                     .when(show_props, |d| d.min_w_0().flex_shrink(1.))
                     .truncate()
                     .child(crate::ui::user_text(b.name.clone()))
-                    .tooltip(crate::ui::user_tooltip(match &b.composite {
-                        Some(c) => format!("{} ({}) ({} parts)", b.name, if c.closed { "closed" } else { "open" }, c.members.len()),
-                        None => b.name.clone(),
-                    }))
                     .into_any_element(),
             })
             // Parts list properties (live "psui (2026-10-28, P1) part-studio 7.7"): after the name, the part
@@ -4844,7 +4846,7 @@ impl PartStudioView {
                     .when_some(props.revision.filter(|t| !t.is_empty()), |d, t| d.child(div().ml(px(4.)).min_w_0().flex_shrink(1.).truncate().text_color(gpui_kit::rgb(0x333333)).child(crate::ui::user_text(format!("({t})")))))
                     .child(div().flex_1())
             })
-            .child(
+            .when(!menu_open, |row| row.child(
                 div()
                     .id(SharedString::from(format!("part-eye-{}", b.id)))
                     .debug_selector({
@@ -4862,7 +4864,7 @@ impl PartStudioView {
                         cx.stop_propagation();
                         this.set_part_hidden(&id3, !hidden, cx);
                     })),
-            )
+            ))
             .on_hover(cx.listener(move |this, h: &bool, window, cx| {
                 // A key doesn't end the hover (a browser keeps :hover while typing: live parts-row-dblclick-rename-
                 // escape's Y hides the part under the pointer after B, o, d); GPUI's keyboard modality reports a leave.
@@ -4905,6 +4907,12 @@ impl PartStudioView {
             }))
             .os_context_menu(move |menu, _, cx| {
                 let b = id2.clone();
+                view.update(cx, |this, cx| {
+                    if this.ui.part_menu.as_ref() != Some(&b) {
+                        this.ui.part_menu = Some(b.clone());
+                        cx.notify();
+                    }
+                });
                 let item = |label: &str, f: ViewAction| {
                     let v = view.clone();
                     crate::os_menu::OsMenuItem::new(label.to_string()).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
@@ -4974,7 +4982,7 @@ impl PartStudioView {
                     .when(!others, |m| m.item(item("Where used…", Box::new({
                         let b = b.clone();
                         move |this, _, cx| this.open_where_used(b.clone(), cx)
-                    }))))
+                    })).icon_name("menu-where-used")))
                     // Live: Release… after Export… (the selected parts); none with managed workflows off.
                     .when(noshape_ops::release_settings::managed_workflows(), |m| m.item(item("Release…", Box::new({
                         let b = b.clone();
@@ -5225,9 +5233,9 @@ impl PartStudioView {
             .text_size(px(crate::ui::ROW_TEXT))
             .text_color(pal.text)
             .bg(if selected { pal.accent_soft } else { gpui_kit::rgb(0xf0f0f0) });
-        crate::ui::with_user_side_tooltip(row, tip)
+        crate::ui::with_list_row_tooltip(row, tip)
             .pl(px(23.))
-            .mr(px(5.))
+            .mr(crate::ui::LIST_ROW_INSET)
             .pr(px(11.))
             .group("cpl-row")
             .when(dimmed, |d| d.text_color(pal.text_faint))
@@ -5335,7 +5343,12 @@ impl PartStudioView {
             let this = view.read(cx);
             targets.iter().copied().partition(|f| this.display.sketches.iter().any(|s| s.feature == *f))
         };
-        let clicked_selected = view.read(cx).selected_features.contains(&clicked);
+        // (A folder's row counts as selected when the folder is: live list-1119 p6, a selected new folder's menu starts
+        // with the hide items; ui-parity folder-rclick-menu's folder wasn't selected and had none.)
+        let clicked_selected = match folder {
+            Some(id) => view.read(cx).ui.selected_folder == Some(id),
+            None => view.read(cx).selected_features.contains(&clicked),
+        };
         let (sketches_shown, planes, sketch_swatch) = {
             let this = view.read(cx);
             (
@@ -5373,11 +5386,10 @@ impl PartStudioView {
             if !sketches_shown {
                 m = m.item(item("Show all sketches", Box::new(|this, _, cx| this.show_all_sketches(cx))));
             }
-        } else if let Some(&keep) = sketches.first().filter(|_| sketches_shown || (clicked_selected && folder.is_none())) {
+        } else if let Some(&keep) = sketches.first().filter(|_| sketches_shown || clicked_selected) {
             // Sketches with other features: Hide other / all sketches; for hidden sketches only when the right-clicked
             // row is selected itself (live feel/featurelist.json "sketch_and_feature"; not on an unselected row:
-            // ui-parity feature-row-rclick-other-selected, feature-row-mod-click-toggle; not on a folder:
-            // folder-rclick-menu).
+            // ui-parity feature-row-rclick-other-selected, feature-row-mod-click-toggle, folder-rclick-menu).
             m = m.item(item("Hide other sketches", Box::new(move |this, _, cx| this.hide_sketches(Some(keep), cx)))).item(item("Hide all sketches", Box::new(|this, _, cx| this.hide_sketches(None, cx))));
         }
         if !sketches.is_empty() || planes {
@@ -5506,7 +5518,7 @@ impl PartStudioView {
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.select_folder(id, cx)))
             .when_some(drag, |row, d| {
                 let (slot, xs) = (self.ui.feature_drop.clone(), self.ui.feature_drop_x.clone());
-                row.on_drag(d, move |d, grab, window, cx| {
+                row.drag_threshold(ROW_DRAG_PX).on_drag(d, move |d, grab, window, cx| {
                     let x = f32::from(window.mouse_position().x);
                     slot.set(None);
                     xs.set(Some((x, x)));
@@ -5634,6 +5646,15 @@ impl PartStudioView {
 
     /// A click on a folder row selects it alone (live ui 10-25 b (4)).
     fn select_folder(&mut self, id: u32, cx: &mut Context<Self>) {
+        // A new folder still holding its features: selected with them, so its menu stays the selection's (live
+        // list-1119 p6: with Hide other / all sketches first, Clear selection; no Rename).
+        if self.ui.fresh_folder == Some(id) && !self.selected_features.is_empty() {
+            if self.ui.selected_folder != Some(id) {
+                self.ui.selected_folder = Some(id);
+                cx.notify();
+            }
+            return;
+        }
         self.ui.fresh_folder = None;
         if self.ui.selected_folder != Some(id) || !self.selected_features.is_empty() {
             self.ui.selected_folder = Some(id);
@@ -5845,6 +5866,19 @@ impl PartStudioView {
     /// `slot`: the row's child index in the list and its indent: its
     /// tooltip asks the list's scroll handle where the row is when it opens
     /// (rather than each row recording its bounds as it paints).
+    /// The selections a row's ⚠ counts: none when a feature it uses is suppressed (live list-1119 p6: Extrude 2 failing
+    /// with Extrude 1 suppressed is a red name on its own icon, no triangle).
+    pub(super) fn missing_selections(&self, f: &Feature, state: Option<&noshape_model::display::FeatureState>, cx: &App) -> usize {
+        let missing = state.map_or(0, |s| s.missing);
+        if missing == 0 {
+            return 0;
+        }
+        let Some(ps) = self.studio(cx) else { return missing };
+        let Some(at) = ps.features.iter().position(|g| g.id == f.id) else { return missing };
+        let suppressed = |d: FeatureId| ps.feature(d).is_some_and(|g| g.suppressed) || self.display.feature_state(d).is_some_and(|s| s.status == FeatureStatus::Suppressed);
+        if noshape_model::interaction::feature_dependencies(&ps.features, at).into_iter().any(suppressed) { 0 } else { missing }
+    }
+
     fn render_feature_row(&self, i: usize, f: &Feature, rolled_back: bool, editing: bool, slot: (usize, f32), cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let related = self.row_ctx.related.contains(&f.id);
@@ -6057,7 +6091,7 @@ impl PartStudioView {
                     // Missing selections / warnings: Onshape's 12 px yellow triangle
                     // badge on the icon's bottom right (live 2071, 2458 Refold),
                     // also on a failed feature that lost a selection (qa5 P1-18).
-                    .when(warning_badge(status, state.map_or(0, |s| s.missing), rolled_back), |d| d.child(div().absolute().left(px(9.)).top(px(8.)).child(crate::assets::icon("list-warning-overlay", 12., cx))))
+                    .when(warning_badge(status, self.missing_selections(f, state, cx), rolled_back), |d| d.child(div().absolute().left(px(9.)).top(px(8.)).child(crate::assets::icon("list-warning-overlay", 12., cx))))
                     .when(underdefined, |d| d.child(div().absolute().left(px(9.5)).top(px(8.)).child(crate::assets::icon("list-underdefined-overlay", 12., cx)))),
             )
             .child(match self.renaming.as_ref().filter(|(rid, _, _)| *rid == f.id) {
@@ -6256,6 +6290,7 @@ impl PartStudioView {
                 this.set_rollback(Some(r + after as usize), cx)
             }))
             // Live (F33): a blue pill with the feature's name, "2 items" for several (the selection and the pressed row).
+            .drag_threshold(ROW_DRAG_PX)
             .on_drag(
                 FeatureDrag {
                     id,
@@ -7351,6 +7386,9 @@ impl Render for PartStudioView {
             self.ui.list_menu = None;
             self.refresh_scene(false, cx);
         }
+        if self.ui.part_menu.is_some() && !crate::os_menu::is_open(cx) {
+            self.ui.part_menu = None;
+        }
         let slices = self.slices(cx);
         let list_head = self.render_feature_list_head(cx);
         if self.needs_regen {
@@ -8341,3 +8379,7 @@ mod tool_tooltip_tests {
 
 /// How far the rollback bar's press moves before it drags (live ps-feel2-1118: no drop line at 6 px, one at 9).
 const ROLLBACK_DRAG_PX: f32 = 7.5;
+
+/// How far a feature or folder row's press moves before it drags (live list-1119: the ghost and drop line from 6 px
+/// straight, not 5; from 7.1 diagonally, not 5.7; GPUI's default started past 2).
+const ROW_DRAG_PX: f32 = 5.8;

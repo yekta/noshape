@@ -55,6 +55,23 @@ impl PartStudioView {
         let target_ref = target.as_ref().map(|t| t.reference.clone());
         let target_ref_for_highlight = target_ref.clone();
         let kind = target.as_ref().map(|t| t.kind);
+        // A shown sketch's straight line right-clicked on its midpoint (within 4 px): the midpoint's shorter menu (live2
+        // nav-feel-1119 L3-line: no Copy sketch entities, Curve/surface analysis…, Zoom to selection or Align view).
+        let at_midpoint = match (&target_ref, kind) {
+            (Some(Reference::SketchEntity { sketch, entity }), Some(PickKind::SketchCurve)) => {
+                let vp = self.viewport.read(cx);
+                let at = vp.pointer_position();
+                let screen = |q: &[f32; 3]| vp.project(glam::DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64));
+                self.display
+                    .sketches
+                    .iter()
+                    .find(|s| s.feature == *sketch)
+                    .and_then(|s| s.curves.iter().find(|c| c.entity == *entity && c.points.len() == 2))
+                    .and_then(|c| Some(((screen(&c.points[0])? + screen(&c.points[1])?) * 0.5).distance(at) <= 4.0))
+                    .unwrap_or(false)
+            }
+            _ => false,
+        };
         let body = target_ref.as_ref().and_then(|r| self.owning_body(r));
         let body_name = body.as_ref().and_then(|b| self.display.body(b)).map(|b| b.name.clone()).unwrap_or_else(|| "part".into());
         let has_material = body.as_ref().is_some_and(|b| self.studio(cx).and_then(|s| s.part_properties.get(b)).is_some_and(|p| p.material.is_some()));
@@ -115,8 +132,6 @@ impl PartStudioView {
         let lone = self.selection.iter().all(|r| Some(r) == target_ref.as_ref());
         let plane_name = target_ref.as_ref().map(|r| self.labeler(cx)(r)).unwrap_or_default();
         let paste_sketch = Self::clipboard_has_sketch(cx);
-        // Shown sketches besides the clicked one's (sketch region menus).
-        let other_sketches_shown = self.display.sketches.iter().filter(|s| !s.hidden && Some(s.feature) != creator).count() > 0;
         // Faces the appearance entry applies to: the selected faces plus this one.
         let mut faces = self.selected_faces();
         if let Some(r @ Reference::Face(_)) = &target_ref
@@ -306,7 +321,7 @@ impl PartStudioView {
                     if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
                         m = m.item(item(&format!("Edit {name}…"), Box::new(move |this, w, cx| this.edit_feature(id, w, cx))));
                         // Curves: Copy sketch entities (live order).
-                        if let (PickKind::SketchCurve, Reference::SketchEntity { entity, .. }) = (k, &r) {
+                        if let (PickKind::SketchCurve, Reference::SketchEntity { entity, .. }, false) = (k, &r, at_midpoint) {
                             let entity = *entity;
                             m = m.item(item("Copy sketch entities", Box::new(move |this, _, cx| this.copy_sketch_entities(id, entity, cx))));
                         }
@@ -331,14 +346,11 @@ impl PartStudioView {
                         this.set_visibility(std::slice::from_ref(&rh), true, cx);
                         this.hover = None;
                     })));
-                    // Live: Hide other sketches, Hide all sketches, when other
-                    // sketches are shown (a lone sketch only has Hide).
-                    if other_sketches_shown {
-                        m = m
-                            .item(item("Hide other sketches", Box::new(move |this, _, cx| this.hide_sketches(creator, cx))))
-                            .item(item("Hide all sketches", Box::new(|this, _, cx| this.hide_sketches(None, cx))));
-                    }
-                    if k == PickKind::SketchCurve {
+                    // Live2 nav-feel-1119: Hide other sketches, Hide all sketches, also with no other sketch shown.
+                    m = m
+                        .item(item("Hide other sketches", Box::new(move |this, _, cx| this.hide_sketches(creator, cx))))
+                        .item(item("Hide all sketches", Box::new(|this, _, cx| this.hide_sketches(None, cx))));
+                    if k == PickKind::SketchCurve && !at_midpoint {
                         let rc = r.clone();
                         m = m.item(item("Curve/surface analysis…", Box::new(move |this, w, cx| {
                             this.selection = vec![rc.clone()];
@@ -346,8 +358,10 @@ impl PartStudioView {
                             this.ui.analysis_menu_target = true;
                             this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx);
                         })));
+                    }
+                    if k == PickKind::SketchCurve {
                         // Live (behaviours "More Part Studio menus": … Curve/surface analysis… | Create Drawing of
-                        // Sketch 1… | Select ▸; SKETCH-RMB-ITEMS): no DXF export from a curve.
+                        // Sketch 1…; SKETCH-RMB-ITEMS; the midpoint's too, live2 nav-feel-1119): no DXF export from a curve.
                         if let Some(id) = creator {
                             let sk_name = creator_name.clone().unwrap_or_else(|| "Sketch".into());
                             m = m.separator().item(icon_item(&format!("Create Drawing of {sk_name}…"), "menu-create-drawing", Box::new(move |this, w, cx| crate::drawing_create::request_create_drawing_of_sketch(this.tab, id, &sk_name, w, cx))));
@@ -363,10 +377,20 @@ impl PartStudioView {
                             m = m.item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| this.open_cad_export(super::flat_export::CadSource::Sketch(id), w, cx))));
                         }
                     }
-                    m = select_menu(m.separator(), &r, k, window, cx).separator().item(zoom_fit()).item(zoom_sel(&r));
+                    // A line's menu has Select other… alone, its midpoint's Select ▸ too and Zoom to fit alone (live2
+                    // nav-feel-1119 L3-line).
+                    m = if k == PickKind::SketchCurve && !at_midpoint {
+                        m.separator().item(item("Select other…", Box::new(|this, _, cx| this.select_other_from_menu(cx))))
+                    } else {
+                        select_menu(m.separator(), &r, k, window, cx)
+                    };
+                    m = m.separator().item(zoom_fit());
+                    if !at_midpoint {
+                        m = m.item(zoom_sel(&r));
+                    }
                     if k == PickKind::SketchRegion {
                         m = m.item(normal_to(&r));
-                    } else if k == PickKind::SketchCurve && linear_edge {
+                    } else if k == PickKind::SketchCurve && linear_edge && !at_midpoint {
                         // Straight sketch lines (live curve menu).
                         let ra = r.clone();
                         m = m.item(item("Align view with vertical axis", Box::new(move |this, _, cx| this.align_view_vertical(&ra, cx))));
@@ -591,7 +615,8 @@ impl PartStudioView {
                         })));
                         // Live (ctx-menus-1117): "Where used for Part 1…" in its own group after Export….
                         let b9 = b.clone();
-                        m = m.separator().item(item(&format!("Where used for {body_name}…"), Box::new(move |this, _, cx| this.open_where_used(b9.clone(), cx))));
+                        // (Its icon, a part with a "?": live2 nav-feel-1119, in the face, edge and vertex menus.)
+                        m = m.separator().item(item(&format!("Where used for {body_name}…"), Box::new(move |this, _, cx| this.open_where_used(b9.clone(), cx))).icon_name("menu-where-used"));
                     }
                     m = m.separator();
                     if has_selection {

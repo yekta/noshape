@@ -15,3 +15,7 @@ a compile error:
   press): each press's number and the time since the one before by the X server's event times. The feature list's
   double-click (part_studio `ROW_DOUBLE_CLICK`, via app-core `viewport::platform_last_press`) uses it, because a
   busy UI thread handles a second click late (qa ROW-DBLCLICK).
+- **Anchored `SwitchAnchorOrSnap`** (elements/anchored.rs, with `flip_point`): left / right, the side that overflows
+  less; up / down, a menu that doesn't fit its side always goes to the other, then snaps to the window (live
+  nav-feel-1119: a 627 px menu under a pointer at y 520 of 1079 opens above it, its top at the window's top). Pinned
+  by the chrome feel row "context menu / too tall for below the pointer: above it, from the window's top".

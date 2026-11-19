@@ -548,6 +548,30 @@ fn rows() -> Vec<Row> {
                 "size, (left, bottom) in the graphics, hex uppercase without #, A, hex focused, its text selected",
             )
         } },
+        Row { id: "Appearance / the part outlined while open, its new colour at once", live: "Part 1 row › Edit appearance…: the part's orange silhouette band, its faces untinted; a swatch: the part red on the next frame (38 ms), still outlined (live tools-1119 a1-appearance, a2-red; ours tinted it orange at 260 ms)", gap: false, check: |cx| {
+            let (window, view) = block(cx, "dlg-appearance-outline");
+            let looks = |cx: &mut TestAppContext| cx.update(|cx| {
+                let v = view.read(cx);
+                let body = v.display.bodies.first().unwrap();
+                let states = &v.viewport.read(cx).scene().states;
+                let faces: Vec<u32> = body.face_refs.iter().flat_map(|f| v.built.as_ref().unwrap().picks.ids_for(f).to_vec()).collect();
+                let all = |flag: u32| !faces.is_empty() && faces.iter().all(|&id| states.get(id as usize).is_some_and(|s| s & flag != 0));
+                let any = |flag: u32| faces.iter().any(|&id| states.get(id as usize).is_some_and(|s| s & flag != 0));
+                (all(noshape_render::scene::state::BAND), any(noshape_render::scene::state::SELECTED), body.color.map(|c| (c * 100.).round() / 100.))
+            });
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                let b = v.display.bodies.first().map(|b| b.id.clone()).unwrap();
+                v.selection = vec![Reference::Body(b.clone())];
+                v.edit_appearance(crate::part_studio::appearance::EditTarget::Parts(vec![b]), w, cx);
+            }))
+            .unwrap();
+            draw(cx, window);
+            let (open_band, open_tint, _) = looks(cx);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.set_edit_color([255, 0, 0], w, cx))).unwrap();
+            draw(cx, window);
+            let red = looks(cx);
+            expect((open_band, open_tint, red), (true, false, (true, false, [1., 0., 0., 1.])), "(opened: the band, a tint), (a red swatch, before the regeneration: the band, a tint, the part's colour)")
+        } },
         Row { id: "Material / its panel on opening", live: "280 × 368 at the graphics area's bottom; 'Material' with ✓ / ✗, tabs Library | Custom, 'Onshape Material Library', '- None -', 'No material assigned'", gap: false, check: |cx| {
             let (window, view) = block(cx, "dlg-material-panel");
             cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {

@@ -255,7 +255,7 @@ fn a_failing_feature_leaves_the_hovered_part_unred() {
     let up = r.uploader();
     let mut cache = GpuCache::default();
     let built = builder::build(&display, &SceneOptions { display_mode: DisplayMode::ShadedWithEdges, show_planes: false, show_origin: false, show_sketches: false, ..Default::default() }, &mut cache, &up);
-    let scene = builder::with_highlights(&built, &display, std::slice::from_ref(&edge), None, std::slice::from_ref(&top), Vec::new(), builder::Highlighting { error: true, dialog: false }, &up);
+    let scene = builder::with_highlights(&built, &display, std::slice::from_ref(&edge), None, std::slice::from_ref(&top), Vec::new(), builder::Highlighting { error: true, ..Default::default() }, &up);
     let flags = |r: &Reference| built.picks.ids_for(r).iter().map(|&id| scene.states[id as usize]).collect::<Vec<u32>>();
     assert!(flags(&edge).iter().all(|f| f & state::ERROR != 0), "the failing feature's input is red: {:?}", flags(&edge));
     assert!(flags(&top).iter().all(|f| f & state::ACCENT != 0 && f & state::ERROR == 0), "the hovered part's face isn't: {:?}", flags(&top));

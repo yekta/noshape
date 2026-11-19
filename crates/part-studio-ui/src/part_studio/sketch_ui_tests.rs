@@ -790,6 +790,30 @@ fn a_hidden_later_sketch_stays_hidden_while_editing(cx: &mut TestAppContext) {
     assert!(hidden(cx), "Sketch 2 still hidden while Sketch 1 is edited");
 }
 
+/// Live list-1119 (p6-failed-menu.png): a feature failing because one it uses is suppressed reads red on its own icon,
+/// no ⚠ for the selections it lost (Fillet 1 with Extrude 1 suppressed).
+#[gpui::test]
+fn a_feature_failing_under_a_suppressed_one_has_no_warning_badge(cx: &mut TestAppContext) {
+    let doc = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } },
+        { "type": "fillet", "name": "Fillet 1", "params": { "entities": ["edge through [20, 0, 10]"], "radius": "2 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "failed-under-suppressed", Some(doc));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let id = |cx: &mut TestAppContext, name: &str| cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == name).unwrap().id);
+    let (extrude, fillet) = (id(cx, "Extrude 1"), id(cx, "Fillet 1"));
+    cx.update(|cx| view.update(cx, |v, cx| v.set_suppressed(vec![extrude], true, cx)));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.feature_state(fillet).is_some_and(|s| s.status != noshape_model::display::FeatureStatus::Ok));
+    let (status, missing, badge) = cx.update(|cx| {
+        let v = view.read(cx);
+        let f = v.studio(cx).unwrap().feature(fillet).unwrap().clone();
+        let st = v.display.feature_state(fillet);
+        (st.map(|s| s.status), st.map_or(0, |s| s.missing), v.missing_selections(&f, st, cx))
+    });
+    assert_eq!((status, missing > 0, badge), (Some(noshape_model::display::FeatureStatus::Error), true, 0), "(Fillet 1, it lost its edge, the selections its ⚠ counts)");
+}
+
 /// Live (ui-parity extrude-enter-commits): `20` Enter applies "20 mm" and keeps the dialog; the next Enter accepts it.
 #[gpui::test]
 fn enter_applies_then_the_next_enter_accepts(cx: &mut TestAppContext) {
@@ -3563,7 +3587,7 @@ fn a_plane_picked_in_a_dialog_is_lighter_than_a_selected_plane(cx: &mut TestAppC
         let built = v.built.as_ref().expect("a scene");
         let right = v.display.planes.iter().find(|p| p.name == "Right").expect("the Right plane").reference.clone();
         [false, true].map(|dialog| {
-            let scene = crate::scene_builder::with_highlights(built, &v.display, std::slice::from_ref(&right), None, &[], Vec::new(), crate::scene_builder::Highlighting { error: false, dialog }, v.gpu.uploader());
+            let scene = crate::scene_builder::with_highlights(built, &v.display, std::slice::from_ref(&right), None, &[], Vec::new(), crate::scene_builder::Highlighting { error: false, dialog, ..Default::default() }, v.gpu.uploader());
             scene.instances.iter().map(|i| i.color[3]).filter(|a| [crate::theme::viewport::PLANE_SELECTED_ALPHA, crate::theme::viewport::PLANE_PICKED_ALPHA].contains(a)).collect::<Vec<f32>>()
         })
     });
@@ -3741,6 +3765,64 @@ fn an_edge_midpoint_has_the_points_menu(cx: &mut TestAppContext) {
         assert!(!of_point.iter().any(|l| l == gone), "{gone} in {of_point:?}");
     }
     assert!(of_point.iter().any(|l| l == "Delete Extrude 1") && of_point.iter().any(|l| l == "Edit Extrude 1…"), "{of_point:?}");
+}
+
+/// Live2 nav-feel-1119: "Where used for Part 1…" carries its icon (a part with a ?) in the face, edge and vertex menus.
+#[gpui::test]
+fn where_used_has_its_icon(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "where-used-icon");
+    let (edge, vertex) = cx.update(|cx| {
+        let b = view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).cloned().expect("the part");
+        (b.edge_refs[0].clone(), b.vertex_refs[0].clone())
+    });
+    let mut icons = Vec::new();
+    for (r, kind) in [(top, noshape_scene::builder::PickKind::Face), (edge, noshape_scene::builder::PickKind::Edge), (vertex, noshape_scene::builder::PickKind::Vertex)] {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_context_menu(Some(noshape_scene::builder::PickTarget { reference: r, kind, anchor: None }), gpui_kit::point(px(600.), px(400.)), w, cx))).unwrap();
+        draw(cx, window);
+        icons.push(cx.update(|cx| view.read(cx).context_menu.as_ref().and_then(|(_, m, _)| m.read(cx).named_icon("Where used for Part 1…")).map(|n| n.to_string())));
+        view.update(cx, |v, cx| v.close_context_menu(cx));
+    }
+    assert_eq!(icons, vec![Some("menu-where-used".to_string()); 3], "face, edge, vertex");
+}
+
+/// Live2 nav-feel-1119 L3-line: a shown sketch's line right-clicked a quarter along has Copy sketch entities, Curve/surface
+/// analysis…, Select other… alone, Zoom to selection and Align view; on its midpoint (within 4 px) none of those but
+/// Select ▸ with Select other…; both have Create Drawing and the hide rows.
+#[gpui::test]
+fn a_sketch_lines_menu_and_its_midpoints(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "line-midpoint-menu", Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.finish_sketch(w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    let (sketch, entity, a, b) = cx.update(|cx| {
+        let s = view.read(cx).display.sketches.first().cloned().expect("the sketch");
+        let c = s.curves.iter().find(|c| c.points.len() == 2).cloned().expect("a line");
+        (s.feature, c.entity, c.points[0], c.points[1])
+    });
+    let menu = |cx: &mut TestAppContext, t: f64| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let at = v.viewport.read(cx).project(glam::DVec3::new(f64::from(a[0]), f64::from(a[1]), f64::from(a[2])).lerp(glam::DVec3::new(f64::from(b[0]), f64::from(b[1]), f64::from(b[2])), t)).expect("on screen");
+            v.viewport.update(cx, |vp, _| vp.place_pointer(at));
+            let target = noshape_scene::builder::PickTarget { reference: Reference::SketchEntity { sketch, entity }, kind: noshape_scene::builder::PickKind::SketchCurve, anchor: None };
+            v.open_context_menu(Some(target), gpui_kit::point(px(at.x as f32), px(at.y as f32)), w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+        let labels = cx.update(|cx| view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_default());
+        view.update(cx, |v, cx| v.close_context_menu(cx));
+        labels
+    };
+    let has = |rows: &[String], l: &str| rows.iter().any(|r| r.starts_with(l));
+    let marks = |rows: &[String]| ["Copy sketch entities", "Curve/surface analysis…", "Zoom to selection", "Align view", "Select other…", "Create Drawing", "Hide all sketches"].map(|l| has(rows, l)).to_vec();
+    let line = menu(cx, 0.25);
+    let mid = menu(cx, 0.5);
+    let select = |rows: &[String]| rows.iter().any(|r| r == "Select");
+    assert_eq!((marks(&line), select(&line)), (vec![true; 7], false), "a quarter along: {line:?}");
+    assert_eq!((marks(&mid), select(&mid)), (vec![false, false, false, false, true, true, true], true), "the midpoint: {mid:?}");
 }
 
 /// Live ctx-menus-1117 (face-selected, two-faces, face-and-edge; Add comment left out, cloud): with the face clicked
@@ -6501,6 +6583,40 @@ fn curve_analysis_in_a_sketch_selects_the_analysed_line(cx: &mut TestAppContext)
         (v.ui.analysis_tool.as_ref().map(|t| t.selection.len()), readout)
     });
     assert_eq!(field, Some(1), "the line in the field");
+    assert_eq!(readout.first().map(|r| r.0.as_str()), Some("Length"), "{readout:?}");
+}
+
+/// Live tools-1119 sc-2 / sc-3: in a rectangle's sketch with one line selected, Shift+C analyses that line only: one
+/// curve in the field, only it selected, the Length readout kept.
+#[gpui::test]
+fn curve_analysis_in_a_sketch_takes_the_selected_line_only(cx: &mut TestAppContext) {
+    use crate::part_studio::analysis_tools::ToolKind;
+    let (window, view) = sketch_with(cx, "curve-in-sketch-one", Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    keys(cx, window, &["escape", "escape"]);
+    let line = cx.update(|cx| {
+        let v = view.read(cx);
+        let sk = v.sketch.as_ref().map(|s| s.feature).expect("editing");
+        let sd = v.display.sketches.iter().find(|s| s.feature == sk).expect("its display");
+        assert_eq!(sd.curves.len(), 4, "the rectangle's lines");
+        noshape_sketch::EntityId(sd.curves[0].entity)
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        if let Some(ed) = &mut v.sketch {
+            ed.selection = vec![line];
+        }
+        v.toggle_analysis_tool(ToolKind::CurveSurface, w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    let (field, selected, readout) = cx.update(|cx| {
+        let v = view.read(cx);
+        let units = v.doc.read(cx).session.doc.settings.units;
+        let readout = v.sketch_data(cx).zip(v.sketch.as_ref()).map(|(data, ed)| ed.selection_readout(&data, &units)).unwrap_or_default();
+        (v.ui.analysis_tool.as_ref().map(|t| t.selection.len()), v.sketch.as_ref().map(|s| s.selection.clone()), readout)
+    });
+    assert_eq!((field, selected), (Some(1), Some(vec![line])), "(curves in the field, the sketch's selection)");
     assert_eq!(readout.first().map(|r| r.0.as_str()), Some("Length"), "{readout:?}");
 }
 

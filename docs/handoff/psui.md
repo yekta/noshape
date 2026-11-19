@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-18 23:58 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-19 07:50 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -35,29 +35,31 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (updated 04:45 UTC 11-19)
+## Now (updated 07:50 UTC 11-19)
 
-1. Landed: 1dd4033be, 373dd5b9 (Shift+Y / Shift+C / sliders), 36c58917 (04:41: edges 5 px over the background, 7
-   over a face, no hold; plane border 6 / 7). Live retakes of the reach table (reach-px-1119) once green has 36c58917.
-2. Queued 04:4x: live2 feature-dialogs-1119's six (typing mid-drag, picked face tint #998f52 at half, missing-input
-   picks unred, sketch loops filled at rest, hidden plane eye on hover, Enter within 100 ms dropped) + chip x test.
-3. Next (asm 04:3x, renderer): asm-dialogs-1119 (8) ok.png / (6) oz.png are ONE cause: two instances' coplanar tops
-   (Part 2 flush inside Part 1) — ours lets Part 2's face win / z-fight, live keeps Part 1's face with Part 2's edges.
-   (6)'s "see-through fill" is Part 2's selected top winning the tie, not a fill through.
-4. Open with live: Hole callout glyph size and weight (REQUESTS 23:33). Dialog spots remembered per dialog
-   (live: localStorage, sectionview +150/+100 like ours) = already.
-3. Speed rows closed (lead 23:14): rollback 0.24 s and Mass 313 ms are software-render frame cadence (handler < 1 ms,
-   frame 8 ms; frame log /root/psui-scratch/lat). Rule: act on a feel row only if our handler + layout + paint
-   exceeds ~100 ms or the event order differs from live.
-4. live's other recheck ≠ (skasm's): Symmetric on two lines, Trim past a chain's corner.
-5. Queue: plane reach decision, asm in-context pane strings when live2's capture lands (live/asm/insert-1118/),
-   Roll to here (on hold for live2), live's answer on the cap over a shown plane (REQUESTS 22:48). Not to build: 3D
-   Sketch, Fault analysis.
-- Agent ids (11-18 20:xx): core d30002ca-d013-4435-b7d9-7da9cb564cec, blend de66e481-56e2-4005-a5d3-9fa897ca5fde.
-- Landed today: 270e489b (72 a turn, drill-point fans), 933d8e41 (apex grid), 45f2d798 + 548d795f (box-drag red
-  main), 3fa69088 (Section dialog place, arrow dead zone), 9595bbf05 (tab return), e7d9df8c (Windows nav).
-- Set aside: /root/psui-scratch/revol-wip.patch (OCCT revolutions → StripAlgo, not needed).
-- Cleanup: vibex7 ~/tmp/psui/priv/dock.noshape when the tab work is over.
+1. Landed tonight: 1dd4033be, 373dd5b9, 36c58917 (edge 5/7 px), 24792169 (feature-dialogs-1119), 16297c80 (coplanar
+   depth rank), test batches. Queued: c9379de5 (+1dfda2a83, config tests), 04edd2ba (lead P0, alone: the depth rank's
+   step adds 1/32 px of the face's depth slope (`depth_step_px`, shaders.wgsl) and float-depth faces push by
+   `face_push` (override constant) instead of the bias constant; Metal reproduced CI's (14, 14) on the Mac, 0/49 after;
+   test covers perspective, ortho, near grazing). DX12 unverified locally: watch the next CI run.
+2. Queued as one land (list-1119 / nav-feel-1119 / tools-1119 rows to =):
+   - list-1119: `ROW_DRAG_PX` 5.8; no ⚠ under a suppressed dependency (`missing_selections`); a fresh folder clicked
+     keeps its features selected (`select_folder`) so its menu is the selection's with Hide other / all sketches
+     (live p6); list rows' side tooltip beside the list (`with_list_row_tooltip`, anchor reaches past the 5 px inset).
+   - nav-feel-1119: Where used icon (+ `OsMenu::named_icon`, test where_used_has_its_icon); anchored flip (vendor);
+     free line ends 4 px; Parts eye not added while its menu is open (run49 ≠, now `.when(!menu_open)`); line vs
+     midpoint menus (test a_sketch_lines_menu_and_its_midpoints).
+   - tools-1119 (live 07:5x): a part's appearance editor draws the part outlined, untinted
+     (`Highlighting::untinted_parts`, refresh on open), a swatch recolours the display at once (Arc::make_mut +
+     rebuild_scene), ✓/✕ clear a part's selection (a3-cancelled); dialogs row "Appearance / the part outlined…".
+   - live recheck 11-19: Shift+C in a sketch takes the selected curves only (else all); test
+     curve_analysis_in_a_sketch_takes_the_selected_line_only.
+   run51 green (part-studio-ui 293, scene 179, app-core 112, clippy clean); queued as one land (see --status).
+3. After: dx's prewarm on scoped threads (f1e0c74e): once landed, check the big-assembly first open isn't slower
+   (asm-xdev-subs cold open, ~4 s on vibe2 after 1dd4033be); qa times it too. Never block a rayon worker on a thread
+   that needs rayon.
+4. Open with live: Hole callout glyph size (REQUESTS 23:33), section preview over a shown plane (REQUESTS 22:48).
+5. Not to build: 3D Sketch, Fault analysis. Cleanup: vibex7 ~/tmp/psui/priv/dock.noshape when the tab work is over.
 
 ## Open decisions
 

@@ -1020,6 +1020,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 lines.push_polyline(&c.points, color, id, width, style);
             }
             let mut points = PointData::default();
+            // At rest a curve's free end (no other curve ends there) shows as a ~4 px dot in the sketch's colour; shared
+            // corners, centres and handles don't (live2 nav-feel-1119: a lone line's ends rgb 153; a rectangle's corners
+            // undrawn, live2 11-18).
+            let free_end = if editing || through { FreeEnds::default() } else { FreeEnds::of(&sk.curves) };
+            let free_end = |q: &[f32; 3]| free_end.contains(q);
             for p in &sk.points {
                 let id = picks.push(PickTarget {
                     reference: Reference::SketchEntity { sketch: sk.feature, entity: p.entity },
@@ -1035,7 +1040,17 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // 6 px once defined.
                 let vertex = if p.state == SketchEntityState::Under { 6.7 } else { 6.0 };
                 // (A spline's handle tip: Onshape's 9 px hollow handle in the point's colour, on top; lit, its disc.)
-                let size = if p.standalone { 7.0 } else if !editing && !through { 0.0 } else if p.tip { 9.0 } else if p.handle { 5.0 } else { vertex };
+                let size = if p.standalone {
+                    7.0
+                } else if !editing && !through {
+                    if !p.center && !p.handle && !p.tip && free_end(&p.position) { 4.0 } else { 0.0 }
+                } else if p.tip {
+                    9.0
+                } else if p.handle {
+                    5.0
+                } else {
+                    vertex
+                };
                 // Standalone points and spline handles are hollow (live sketch/100, Point tool).
                 let style = if p.tip { PointSprite::HANDLE_TIP | LineSegment::ON_TOP } else if p.standalone || p.handle { PointSprite::HOLLOW } else { 0 };
                 let style = style | PointSprite::SKETCH_POINT | if p.center { PointSprite::CENTER } else { 0 };
@@ -1382,11 +1397,14 @@ pub fn silhouette_edges(m: &noshape_model::display::MeshBuffers) -> SilhouetteDa
 pub struct Highlighting {
     pub error: bool,
     pub dialog: bool,
+    /// Selected parts drawn by their outline alone, in their own colour (an open part appearance editor: live
+    /// tools-1119 a1-appearance, a2-red).
+    pub untinted_parts: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &[Reference], hover: Option<&Reference>, accent: &[Reference], extra: Vec<Instance>, mode: Highlighting, up: &Uploader) -> Scene {
-    let Highlighting { error, dialog } = mode;
+    let Highlighting { error, dialog, untinted_parts } = mode;
     let _t = noshape_render::perf::scope("s.with_highlights");
     let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, clip_hovered: [false; 3], compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference, hover_outline: false, hover_outline_rgb: None, body_outline: false, no_occlusion: built.scene.no_occlusion };
     let mut overlay_pts = PointData::default();
@@ -1507,6 +1525,19 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     // A whole selected part: Onshape's lighter part amber (live #c09039 …
     // #f0b850, part-studio/09), not a selected face's.
     for r in selection {
+        if !error
+            && untinted_parts
+            && let Reference::Body(b) = r
+            && let Some(body) = display.body(b).filter(|b| !b.face_refs.is_empty())
+        {
+            for f in &body.face_refs {
+                for &id in built.picks.ids_for(f) {
+                    scene.add_flag(id, state::OUTLINE | state::BAND);
+                }
+            }
+            scene.body_outline = true;
+            continue;
+        }
         let flag = if error {
             state::ERROR
         } else if matches!(r, Reference::Body(_)) {
@@ -1606,7 +1637,7 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     for &id in &part_faces {
         scene.add_flag(id, state::OUTLINE | state::BAND);
     }
-    scene.body_outline = !part_faces.is_empty();
+    scene.body_outline |= !part_faces.is_empty();
     // Selected faces drawn again at SELECTION_OVER_PLANES over the planes in
     // front of them (live selection/04: under one plane (229,170,56), two
     // (228,176,73); the plane alone over the face gives (224,174,73)). Only
@@ -1970,6 +2001,30 @@ fn pick_disc(o: DVec3, x: DVec3, y: DVec3, z: DVec3, r: f64, pick: u32) -> MeshD
     d
 }
 
+/// The curve ends no other curve shares (a lone line's ends; not a rectangle's corners, nor a closed curve's seam).
+#[derive(Default)]
+struct FreeEnds(std::collections::HashMap<[i64; 3], u32>);
+
+impl FreeEnds {
+    fn key(q: &[f32; 3]) -> [i64; 3] {
+        q.map(|c| (f64::from(c) * 1e7).round() as i64)
+    }
+
+    fn of(curves: &[noshape_model::display::SketchCurveDisplay]) -> Self {
+        let mut ends = std::collections::HashMap::new();
+        for c in curves.iter().filter(|c| !c.handle) {
+            for e in c.points.first().into_iter().chain(c.points.last()) {
+                *ends.entry(Self::key(e)).or_default() += 1;
+            }
+        }
+        FreeEnds(ends)
+    }
+
+    fn contains(&self, q: &[f32; 3]) -> bool {
+        self.0.get(&Self::key(q)) == Some(&1)
+    }
+}
+
 /// A sketch curve's line style. A shown sketch's curves win the tie with the part edges they lie on (live2 11-17
 /// sel-feel 3: the double-clicked face's sketch drawn blue along the part's base edges).
 fn sketch_curve_style(c: &noshape_model::display::SketchCurveDisplay, editing: bool) -> u32 {
@@ -2331,3 +2386,24 @@ mod inference_mark_tests {
     }
 }
 
+#[cfg(test)]
+mod free_end_tests {
+    use super::FreeEnds;
+    use noshape_model::display::{SketchCurveDisplay, SketchEntityState};
+
+    fn curve(points: &[[f32; 3]]) -> SketchCurveDisplay {
+        SketchCurveDisplay { entity: 0, points: points.to_vec(), construction: false, external: false, state: SketchEntityState::Under, handle: false }
+    }
+
+    /// Live2 nav-feel-1119: a lone line's ends are drawn at rest; a rectangle's corners and a closed curve's seam aren't.
+    #[test]
+    fn only_unshared_curve_ends_are_free() {
+        let (a, b, c) = ([0.0, 0.0, 0.0], [0.01, 0.0, 0.0], [0.01, 0.01, 0.0]);
+        let lone = FreeEnds::of(&[curve(&[a, c])]);
+        assert!(lone.contains(&a) && lone.contains(&c), "a lone line's ends");
+        let corner = FreeEnds::of(&[curve(&[a, b]), curve(&[b, c])]);
+        assert_eq!((corner.contains(&a), corner.contains(&b), corner.contains(&c)), (true, false, true), "two lines meeting at b");
+        let closed = FreeEnds::of(&[curve(&[a, b, c, a])]);
+        assert!(!closed.contains(&a), "a closed curve's seam");
+    }
+}

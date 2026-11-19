@@ -183,13 +183,11 @@ impl Element for Anchored {
                     at = flip_at;
                 }
             }
+            // Up and down: a menu that doesn't fit its side goes to the other, then snaps (live nav-feel-1119: the
+            // face menu, 627 px under a pointer at y 520 of 1079, opens above it, its top at the window's top).
             if desired.bottom() > limits.bottom() || desired.top() < limits.top() {
                 let flip_at = self.flip_point.map_or(at, |f| point(at.x, f.y));
-                let switched = Bounds::from_anchor_and_size(anchor.other_side_along(Axis::Vertical), flip_at, children_bounds.size);
-                let over = |b: &Bounds<Pixels>| (b.bottom() - limits.bottom()).max(px(0.)) + (limits.top() - b.top()).max(px(0.));
-                if over(&switched) < over(&desired) {
-                    desired = switched;
-                }
+                desired = Bounds::from_anchor_and_size(anchor.other_side_along(Axis::Vertical), flip_at, children_bounds.size);
             }
         }
 

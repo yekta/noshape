@@ -766,6 +766,21 @@ fn rows() -> Vec<Row> {
             l.release(cx, point(from.x, from.y - px(9.)));
             expect(got, vec![false, false, true], "dragging at 3, 6, 9 px")
         } },
+        Row { id: "drag / a feature row's drag starts past about 5.5 px", live: "the ghost and drop line at 6 px straight down and 7.1 px diagonally, none at 5 or 5.7 (live list-1119; ours started past 2)", gap: false, check: |l, cx| {
+            let from = l.at(cx, "feature:Extrude 1");
+            let mut got = Vec::new();
+            for (dx, dy) in [(0., 5.), (0., 6.), (4., 4.), (5., 5.)] {
+                l.event(cx, MouseMoveEvent { position: from, pressed_button: None, modifiers: NONE });
+                l.event(cx, MouseDownEvent { button: MouseButton::Left, position: from, modifiers: NONE, click_count: 1, first_mouse: false });
+                let to = point(from.x + px(dx), from.y + px(dy));
+                l.event(cx, MouseMoveEvent { position: to, pressed_button: Some(MouseButton::Left), modifiers: NONE });
+                draw(cx, l.window);
+                got.push(l.dragging(cx));
+                l.keys(cx, "escape");
+                l.release(cx, to);
+            }
+            expect(got, vec![false, true, false, true], "dragging at 5 / 6 px down, 5.7 / 7.1 px diagonally")
+        } },
         Row { id: "rollback bar / while held nothing moves or greys", live: "the 'Rollback bar' chip follows the pointer, the insertion line shows the slot; the bar stays at its old place, nothing greys (live2 featurelist-feel 1)", gap: false, check: |l, cx| {
             let (from, to) = (l.at(cx, "rollback"), l.at_y(cx, "feature:Extrude 1", 6.));
             l.drag(cx, from, to, false);
@@ -924,6 +939,22 @@ fn rows() -> Vec<Row> {
             l.hover(cx, "feature:Extrude 1", 450);
             expect(crate::ui_script::shown_tooltip(), Some("Extrude 1 <- Sketch 1".to_string()), "tooltip")
         } },
+        Row { id: "hover / a Parts row's tooltip right of the row", live: "'Part 1' beside the list, right of the row and centred on it, as a feature row's (live list-1119 4; ours showed under the pointer)", gap: false, check: |l, cx| {
+            l.hover(cx, "part:Part 1", 450);
+            let row = l.bounds(cx, "part:Part 1").ok_or("no Part 1 row")?;
+            let tip = l.bounds(cx, "placed-tooltip").ok_or("no tooltip box")?;
+            let beside = tip.origin.x >= row.origin.x + row.size.width && (tip.center().y - row.center().y).abs() < px(2.);
+            expect((crate::ui_script::shown_tooltip(), beside), (Some("Part 1".to_string()), true), "(the tooltip, right of the row and centred on it)")
+        } },
+        Row { id: "menu / a Parts row's eye goes while its menu is open", live: "live2 nav-feel-1119: the right-clicked Parts row shows no eye while its menu is open; back after", gap: false, check: |l, cx| {
+            let id = cx.update(|cx| l.view.read(cx).display.bodies.iter().find(|b| b.name == "Part 1").map(|b| b.id.clone())).ok_or("no Part 1")?;
+            let eye = format!("part-eye-{id}");
+            l.right_click(cx, "part:Part 1");
+            let open = l.bounds(cx, &eye).is_some();
+            l.keys(cx, "escape");
+            let after = l.bounds(cx, &eye).is_some();
+            expect((open, after), (false, true), "(the eye drawn while the menu is open, after it closes)")
+        } },
         Row { id: "hover / the tooltip from 80 ms", live: "fades in from 65–100 ms, opaque at 166–209 ms (live list-1118, 3 runs; ours: shown at 80 ms, a 130 ms fade)", gap: false, check: |l, cx| {
             l.hover(cx, "feature:Extrude 1", 50);
             let early = crate::ui_script::shown_tooltip();
@@ -975,6 +1006,19 @@ fn rows() -> Vec<Row> {
             // (Its caret: live2's queued feature-list-new-folder-empty says whether an empty one opens collapsed.)
             let folders: Vec<(String, Vec<String>)> = l.folders(cx).into_iter().map(|(n, f, _)| (n, f)).collect();
             expect((folders, after), (vec![("New folder".to_string(), Vec::new())], Some("Extrude 3".to_string())), "folders, listed after")
+        } },
+        Row { id: "folders / a selected folder's menu starts with the sketch hide items", live: "a new folder over Sketch 1 + Extrude 1: right-clicked unselected, Section view… first (ui-parity folder-rclick-menu); selected, Hide other sketches, Hide all sketches, then Section view… (live list-1119 p6)", gap: false, check: |l, cx| {
+            l.click(cx, "feature:Sketch 1", NONE);
+            l.click(cx, "feature:Extrude 1", SHIFT);
+            l.new_folder(cx, true);
+            l.right_click(cx, "folder:New folder");
+            let unselected: Vec<String> = l.menu(cx).into_iter().take(1).collect();
+            l.keys(cx, "escape");
+            l.click(cx, "folder:New folder", NONE);
+            l.right_click(cx, "folder:New folder");
+            let selected: Vec<String> = l.menu(cx).into_iter().take(3).collect();
+            l.keys(cx, "escape");
+            expect((unselected, selected), (names(&["Section view…"]), names(&["Hide other sketches", "Hide all sketches", "Section view…"])), "(the unselected folder's first row, the selected folder's first three)")
         } },
         Row { id: "folders / selected features and a part", live: "the features only (Extrude 1 + Part 2: Extrude 1), collapsed", gap: false, check: |l, cx| {
             l.click(cx, "feature:Extrude 1", NONE);

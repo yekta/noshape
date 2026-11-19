@@ -50,11 +50,16 @@ impl Chrome {
 
     /// A three-row context menu opened for a right press at `at` (its rows' place `offset` from it); its bounds.
     fn menu_at(&self, cx: &mut TestAppContext, at: Point<Pixels>, offset: Point<Pixels>) -> Option<gpui_kit::Bounds<Pixels>> {
+        self.menu_of_rows_at(cx, 3, at, offset)
+    }
+
+    /// [`Self::menu_at`] with `rows` rows.
+    fn menu_of_rows_at(&self, cx: &mut TestAppContext, rows: usize, at: Point<Pixels>, offset: Point<Pixels>) -> Option<gpui_kit::Bounds<Pixels>> {
         self.move_to(cx, f32::from(at.x), f32::from(at.y));
         let menu = cx
             .update_window(self.tips, |_, w, cx| {
                 // (Labels made at run time: ops' menu coverage reads the literal ones.)
-                let menu = crate::os_menu::OsMenu::build(w, cx, |m, _, _| (1..=3).fold(m, |m, k| m.item(crate::os_menu::OsMenuItem::new(format!("Row {k}")))));
+                let menu = crate::os_menu::OsMenu::build(w, cx, |m, _, _| (1..=rows).fold(m, |m, k| m.item(crate::os_menu::OsMenuItem::new(format!("Row {k}")))));
                 crate::os_menu::open(at + offset, menu.clone(), w, cx);
                 menu
             })
@@ -275,6 +280,14 @@ fn rows() -> Vec<Row> {
             let b = c.menu_at(cx, at, crate::os_menu::MENU_AT_POINTER).ok_or("no menu")?;
             near(f32::from(b.right()), f32::from(at.x) - 1., "right")?;
             near(f32::from(b.bottom()), f32::from(at.y) + 4., "bottom")
+        } },
+        Row { id: "context menu / too tall for below the pointer: above it, from the window's top", live: "live2 nav-feel-1119: the face menu (627 px) at y 520 of 1079 opens above the pointer, its top at the window's top (y 2-629), over the pointer", gap: false, check: |c, cx| {
+            let size = cx.update_window(c.tips, |_, w, _| w.viewport_size()).unwrap();
+            let at = point(px(200.), size.height * 0.48);
+            // Rows enough for more than either side's room (~22 px a row).
+            let rows = (f32::from(size.height) * 0.6 / 22.).ceil() as usize;
+            let b = c.menu_of_rows_at(cx, rows, at, crate::os_menu::MENU_AT_POINTER).ok_or("no menu")?;
+            expect((f32::from(b.top()) <= 3., b.bottom() > at.y, b.bottom() < size.height - px(20.)), (true, true, true), &format!("(top at the window's top, over the pointer, not down to the bottom): {b:?} at {at:?}"))
         } },
         Row { id: "context menu / a feature-list row's at + (10, 12)", live: "+ (10, 12) on feature-list rows", gap: false, check: |c, cx| {
             let b = c.menu_at(cx, point(px(300.), px(200.)), crate::os_menu::MENU_AT_ROW).ok_or("no menu")?;

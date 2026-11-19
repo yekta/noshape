@@ -260,15 +260,18 @@ impl PartStudioView {
                 selection = t.parts.iter().map(|b| Reference::Body(b.clone())).collect();
             }
         }
-        // In a sketch, Shift+C takes every curve of the sketch.
+        // In a sketch, Shift+C takes the selected curves, else every curve of the sketch (live tools-1119 sc-2 / sc-3:
+        // one line selected, one "Edge of Sketch 1", the Length readout kept).
         if kind == ToolKind::CurveSurface
-            && let Some(sk) = self.sketch.as_ref().map(|s| s.feature)
+            && let Some((sk, picked)) = self.sketch.as_ref().map(|s| (s.feature, s.selection.clone()))
             && let Some(sd) = self.display.sketches.iter().find(|s| s.feature == sk)
         {
-            selection = sd.curves.iter().map(|c| Reference::SketchEntity { sketch: sk, entity: c.entity }).collect();
+            let selected: Vec<_> = sd.curves.iter().filter(|c| picked.contains(&noshape_sketch::EntityId(c.entity))).collect();
+            let curves = if selected.is_empty() { sd.curves.iter().collect() } else { selected };
+            selection = curves.iter().map(|c| Reference::SketchEntity { sketch: sk, entity: c.entity }).collect();
             // Live shortcuts-sk-1118 / sketch-readout-1119: the analysed curves are selected in the sketch (orange, the
             // Length readout).
-            let ids: Vec<noshape_sketch::EntityId> = sd.curves.iter().map(|c| noshape_sketch::EntityId(c.entity)).collect();
+            let ids: Vec<noshape_sketch::EntityId> = curves.iter().map(|c| noshape_sketch::EntityId(c.entity)).collect();
             if let Some(ed) = &mut self.sketch {
                 ed.selection = ids;
             }

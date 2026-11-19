@@ -494,6 +494,14 @@ impl OsMenu {
             .collect()
     }
 
+    /// The app icon of the row labelled `label` (UI tests).
+    pub fn named_icon(&self, label: &str) -> Option<SharedString> {
+        self.items.iter().find_map(|i| match i {
+            OsMenuItem::Item { label: l, icon: Some(MenuIcon::Named(n)), .. } | OsMenuItem::Submenu { label: l, icon: Some(MenuIcon::Named(n)), .. } if l.as_ref() == label => Some(n.clone()),
+            _ => None,
+        })
+    }
+
     pub fn submenu(self, label: impl Into<SharedString>, window: &mut Window, cx: &mut Context<Self>, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Self {
         self.submenu_with_icon(None, label, window, cx, f)
     }

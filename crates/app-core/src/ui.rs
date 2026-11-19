@@ -590,16 +590,25 @@ impl Render for PlacedTooltip {
 /// button opening its panel) and shows again only after the pointer has left
 /// it (qa4 F22).
 pub fn with_tip(el: Stateful<Div>, text: impl Into<SharedString>, side: TipSide) -> Stateful<Div> {
-    tip_with(el, text.into(), side, false)
+    tip_with(el, text.into(), side, false, Pixels::ZERO)
 }
 
 /// A list row's tooltip, beside the row (live part-studio/16, 95), showing
 /// its stored name (user text, never translated).
 pub fn with_user_side_tooltip(row: Stateful<Div>, text: impl Into<SharedString>) -> Stateful<Div> {
-    tip_with(row, text.into(), TipSide::Right, true)
+    tip_with(row, text.into(), TipSide::Right, true, Pixels::ZERO)
 }
 
-fn tip_with(el: Stateful<Div>, text: SharedString, side: TipSide, user: bool) -> Stateful<Div> {
+/// [`with_user_side_tooltip`] for a list row drawn [`LIST_ROW_INSET`] short of the list's right edge: the tooltip
+/// beside the list, as a feature row's (live list-1119: the Parts row's).
+pub fn with_list_row_tooltip(row: Stateful<Div>, text: impl Into<SharedString>) -> Stateful<Div> {
+    tip_with(row, text.into(), TipSide::Right, true, LIST_ROW_INSET)
+}
+
+/// How far the default geometry, Parts and curve rows stop short of the list's right edge.
+pub const LIST_ROW_INSET: Pixels = px(5.);
+
+fn tip_with(el: Stateful<Div>, text: SharedString, side: TipSide, user: bool, reach: Pixels) -> Stateful<Div> {
     // The parity suite clicks a button by its tooltip.
     let el = crate::ui_script::mark(el, || format!("button:{text}"));
     let anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
@@ -619,7 +628,8 @@ fn tip_with(el: Stateful<Div>, text: SharedString, side: TipSide, user: bool) ->
             .absolute()
             .top_0()
             .left_0()
-            .size_full(),
+            .bottom_0()
+            .right(-reach),
         )
         .on_any_mouse_down(move |_, _, _| p3.set(true))
         .tooltip(move |_, cx| {
