@@ -1508,6 +1508,32 @@ impl Ctx<'_> {
                 bound.push(self.c2_of(f, &s, *copy, Some(e))?);
                 *copy += 1;
             }
+            // (A straight edge at the seam's angle that isn't the seam (a slot's wall cut there): on the side its loop
+            // comes to it from, as its pieces are (parity56 b1c8abed: its other side left the face's one piece outside
+            // the bound, a face lost).)
+            if let Surf::Cyl { r, th0, .. } = self.faces[f].s {
+                let tol = self.tol;
+                let on = |x: f64| (x - r * th0).abs() <= tol || (x - r * (th0 + TAU)).abs() <= tol;
+                let es = &self.faces[f].edges;
+                let mut at = 0;
+                for &n in &self.faces[f].loop_lens {
+                    for i in at..at + n {
+                        let (e, rev) = es[i];
+                        let C2::Seg { a, b } = bound[i] else { continue };
+                        if seen[&e] > 1 || !on(a.x) || (a.x - b.x).abs() > tol || n < 2 {
+                            continue;
+                        }
+                        let p = at + (i - at + n - 1) % n;
+                        let prev = if es[p].1 { bound[p].at(0.0) } else { bound[p].at(1.0) };
+                        let start = if rev { b } else { a };
+                        let shift = DVec2::new(if a.x < r * (th0 + PI) { TAU * r } else { -TAU * r }, 0.0);
+                        if (prev - start - shift).length() < (prev - start).length() {
+                            bound[i] = C2::Seg { a: a + shift, b: b + shift };
+                        }
+                    }
+                    at += n;
+                }
+            }
             Ok(bound)
         };
         self.faces[f].bound.get_or_init(make).as_deref().map_err(|e| *e)
