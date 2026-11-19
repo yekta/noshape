@@ -179,11 +179,8 @@ regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete w
 - Settled 11-18: config-parts links / pulleys / linear-rail / standoffs / sprockets match to the end; cpcurves has no
   sketch difference left (first: 3D fit spline 1, "Cannot evaluate tangency for end condition.").
 
-## Agents (lead 11-19 21:2x; only these ids)
-core 08a98761-3bbe-47ce-a91a-32b208f5c6b2, blend 459f6c19-c460-4ebf-96ca-bf92455f2e1e, bool abdebc8b-6b39-4794-8390-eb02d6fa37e6,
-live 349fe81d-db78-4931-8032-6dc3edc5d558 (live2 merged; T1-pin captures), studios 91339202-41f1-4465-91f4-65ccd26ea1b1,
-dx 6cfc89bd-1196-43ef-9225-0014546fee1e, qa ac50e7f2-4677-4cab-a57a-fd068a0c07bf, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7,
-asm d8d597e0-675c-497b-a804-544ceab99bbd, lead 818534eb-f6b1-4a00-bb48-ebf0f7cdbd8a, skasm (me) 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6.
+## Agents
+Thread ids only in /root/lead-scratch/roster.md (lead 11-19 23:00): read it before every message_agent; never copy ids.
 
 ## Waiting on others
 - psui: told 20:3x the tab row is a pick difference (live hit Flange 1's wall).
