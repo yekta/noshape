@@ -5,35 +5,29 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-19 17:47 UTC)
+## State (2026-11-19 19:06 UTC)
 
-### Landed today (6686624b as 702c9878 17:18: Display states Esc, driver-mate named position, paste)
+### Landed today (6686624b as 702c9878: Display states Esc, driver-mate named position, paste; d671313d; 335f8e43)
 - LOD (91478e2c), Derived mirror of an assembly complete (e87a2b3e, 17c26dc1; left: live's exact node icon, symmetry
   detection on child rows), mass overrides (17c26dc1; left: psui's Part Studio panel CoM / Inertia ☑ Override rows,
   several parts measured with overrides, not captured), surf-intro translator steps (8c6ec107, eb3b06a8).
 - rb.sh clippy can report clean on stale synced mtimes: `git diff --name-only origin/main -- crates | xargs touch`
   before the final clippy.
 
-### P1 (lead 17:2x, from main CI): assembly-ui test binary SIGSEGV at exit (main CI 44554083714, eb3b06a88, first seen)
-- All 97 passed, then signal 11 at exit. Each headless `Gpu` spawns a detached "noshape-render" thread that compiles
-  its pipelines (`Renderer::prewarm`, LLVM on lavapipe) before it looks at its channel; the feel tests make two per
-  test (gpu_pointer's probe + the view's), so the last tests' threads were still compiling as exit() ran Mesa's /
-  LLVM's destructors. Fix (queued with this handoff): `RenderWorker` joins its thread on drop, skips a compile not
-  yet started, drops jobs it can't deliver. Test offscreen::a_dropped_render_worker_has_ended_its_thread (fails
-  without). render 64, app-core 112, assembly-ui 97 (72 s, as before), part-studio-ui 300 pass. crates/render is
-  psui's: told.
-- Repro attempt (unfixed binary, 15 runs): vibex8 ~/agents/asm-keep/segv.sh -> segv.out (in its slot queue).
+### P1 done: assembly-ui SIGSEGV at exit (main CI 44554083714): RenderWorker joins its thread on drop (d671313d);
+not reproduced off CI (15 runs of the unfixed binary on vibe2, all exit 0); TICKETS ASM-UI-SIGSEGV-AT-EXIT [x].
 
 ### In flight: parity_assemblies differences (lead 11-19: rank by documents, one land each)
 - Suites on vibex7 now (`~/agents/asm-keep/suite1.sh <bin> <tag> <dirs>` -> suite/<tag>.log), bin ops-main1119 (main
   17c26dc1 + translator steps): light 20: the first 10 as live on vibe2 (l1119: bjr, clamp, config-assembly, corexy, flip-midaxis ×2, gearbox-std, hand-drill-pinslot, hinge-live), the other 11 on vibex7 (l1119b); heavy 4
   (xdev, isaac, infento, scissor) next.
-- Branch asm-bom (2 commits on main, land after the P1 fix): pattern-std BOM (a pattern's live state also under its
-  feature's id: Linear pattern 5 is Man5… in the tree, M26C… ERROR in the feature list); 5d0e2d28c welding BOM
+- Landed 335f8e43: pattern-std BOM 17/17 (a pattern's live state also under its feature's id: Linear pattern 5 is
+  Man5… in the tree, M26C… ERROR in the feature list). Branch asm-bom (d4f6fdb0f, rebased on main): welding BOM
   (9c7704: live's Part 2 / Part 6 alike in volume both took our Part 2; a live part whose fits are all taken is the
   free part its feature made). Check run: vibex7 suite tag l1119b (bin ops-bomfix: both commits) over the 11 light
   models left (vibe2 stopped 17:25 at the lead's word: load 81). Left in welding: our Extrude 8 names its two bodies the other way round from
-  live (JqD small = live's Part 5) and our big one is 113 mm³ short after Fillets 3/4/2 (geometry).
+  live (JqD small = live's Part 5: live orders a multi-region extrude's bodies by the regions' creation, ours by the
+  query; sent to core 18:2x) and our big one is 113 mm³ short after Fillets 3/4/2 (geometry).
 - suspension 25/28 occ: studio geometry, sent to core 16:50: 805e29 Fillet 3/4 fail (Knuckle a sliver; Joint <2> /
   LCA <1> hang off it), 995636 Body two bodies in ours (90,419 + 4,712 mm³), live one (109,049). Trace vibex7
   ~/agents/asm-keep/susp.out.

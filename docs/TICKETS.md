@@ -5,6 +5,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## asm, 2026-11-19
+- [x] (asm d671313d) **P1 ASM-UI-SIGSEGV-AT-EXIT [asm]** (lead 17:2x, main CI 44554083714 on eb3b06a88, Linux, first seen):
+  `-p noshape-assembly-ui --lib` passed all 97, then the test process died with SIGSEGV at exit. Cause read from the code:
+  each headless `Gpu` spawns a detached "noshape-render" thread that compiles its pipelines (lavapipe / LLVM) before it
+  reads its channel, and the GPU feel tests make two per test, so the last tests' threads could still be compiling while
+  exit() ran Mesa's and LLVM's destructors. Fix: `RenderWorker` joins its thread on drop and skips a compile not yet
+  started (test offscreen::a_dropped_render_worker_has_ended_its_thread fails without it). Not reproduced off CI: 15
+  runs of the unfixed binary on vibe2 (lavapipe) all exited 0. Reopen if it comes back on CI.
+
 ## qa, 2026-11-19
 - [ ] P2 SHELL-AFTER-WELD-FILLET (bool, lead 11-19; qa 2026-11-19 12:38 UTC) qa's fuzz ticket document cli-shell-hang-pre
   (vibex7 ~/qa/tickets/cli-shell-hang-pre.noshape): since blend 92c8595b0 its Fillet 1 builds (v0.4.60: "Failed to fillet
