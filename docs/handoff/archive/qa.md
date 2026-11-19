@@ -2190,6 +2190,10 @@ selection, measure, section view; then P2 assembly and drawing passes; verify th
    Measure angles: pass (live2's first-wedge capture: 56.31 for slope + x=40). Face+edge menu (591643fc) not re-run yet.
 
 ## 11-19 day states (moved from the handoff 11-19 21:15)
+0v. **Feel: assemblies / drawings / list (07:10)**: TICKETS "Interaction feel in assemblies, drawings and the feature list": asm P1
+   SNAPMODE-REACH (70 vs 57 px), P1 SNAPMODE-RELEASE-DIALOG; psui P1 ROW-DBLCLICK-DISTANCE. Runner-built docs reopened without the
+   runner (vibex8 ~/tmp/qa/fl/docs: asm-feel, hole-plate-drawing): stable views. Drivers qa-scratch/af/snapm2.py, hv2/rowk.py, hv2/drw.py.
+   qa-wait-33c5 re-runs FEEL-FL-AUTOSCROLL-DROP on psui's 33c57541 green.
 0w. **Workflow feel vs live (07:38)**: TICKETS "Workflow feel vs live's 11-18 07:09-07:22 timings": ours faster on every row, no
    tickets (qa-scratch/wf: wflat.py on this host's Xvfb :153, two-blocks reopened without the runner, PIL crops padded to live's
    139 ms, timestamps at capture). FEEL-FL-AUTOSCROLL-DROP verified 07:21 (b5c4ccc4), psui told. psui's next land has ROW-DBLCLICK.
