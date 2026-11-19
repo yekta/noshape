@@ -948,6 +948,11 @@ impl DrawingEditor {
         if !any && !has_tabs {
             list = list.child(div().p_2().text_size(px(12.)).text_color(pal.text_muted).child(if tab == 0 { "No Part Studios in this document." } else { "No assemblies in this document." }));
         }
+        // A search that matches nothing (live2 errors-1119-asmdrw: bold 12 px #333).
+        let searched = self.chooser.search.as_ref().is_some_and(|s| !s.read(cx).value().trim().is_empty());
+        if !any && has_tabs && tab == 0 && searched {
+            list = list.child(div().id("dr-ch-no-match").debug_selector(|| "dr-ch-no-match".into()).p_2().text_size(px(12.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x333333)).child(NO_SEARCH_MATCH));
+        }
         // Only the kinds the document has (live: Part Studios and Parts always).
         let mut present = F_STUDIOS | F_PARTS;
         for k in self.chooser_sources(cx) {
@@ -1225,6 +1230,9 @@ impl DrawingEditor {
         )
     }
 }
+
+/// The Insert view picker's message for a search with no match (live2 errors-1119-asmdrw).
+pub(crate) const NO_SEARCH_MATCH: &str = "No parts or sketches match current search.";
 
 /// The document header's 30 px buttons (Create version…, Version graph).
 fn chooser_square(id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &App) -> Stateful<Div> {

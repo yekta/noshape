@@ -2140,3 +2140,25 @@ fn a_gtol_lines_up_with_a_woken_vertex_within_8_px(cx: &mut TestAppContext) {
         assert!(crossed, "{d} px: the woken vertex keeps its ✕");
     }
 }
+
+/// Live2 errors-1119-asmdrw: Insert view's picker with a search that matches nothing reads "No parts or sketches match
+/// current search." (bold 12 px #333); a search that matches shows its rows, no message.
+#[gpui::test]
+fn insert_views_search_with_no_match_says_so(cx: &mut TestAppContext) {
+    let (window, editor) = drawing(cx, "feel-insert-no-match");
+    real_sheet(cx, window, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| e.open_insert_chooser(cx)));
+    draw(cx, window);
+    draw(cx, window);
+    let search = |cx: &mut TestAppContext, text: &str| {
+        cx.update_window(window, |_, w, cx| {
+            let st = editor.read(cx).chooser.search.clone().expect("the picker's search");
+            st.update(cx, |s, cx| s.set_value(text.to_string(), w, cx));
+        })
+        .unwrap();
+        draw(cx, window);
+        VisualTestContext::from_window(window, cx).debug_bounds("dr-ch-no-match").is_some()
+    };
+    assert!(search(cx, "zzzz-none"), "no match: the message");
+    assert!(!search(cx, ""), "no search: no message");
+}
