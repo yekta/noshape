@@ -2369,6 +2369,42 @@ fn mirror_strategy_update_on_a_subassembly_makes_its_mirrored_assembly(cx: &mut 
         assert_eq!(doc.tab(m).unwrap().name, "Sub-Mirrored");
         assert!(v.pattern.as_ref().unwrap().mirror_rows.values().all(|r| r.created), "the row's reference is the new assembly");
     });
+    // Live m7: the chevron lists Sub's own parts under its row; Part 1 Derived, Update, ✓: the node's strategy.
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let chev = vcx.debug_bounds("ms-chev-0").expect("the subassembly row's chevron");
+    vcx.simulate_click(chev.center(), gpui_kit::Modifiers::default());
+    draw(cx, window);
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let sub = instance(v, "Sub <1>", cx);
+            let part = match &v.doc.read(cx).session.doc.tabs.iter().find(|t| t.name == "Sub").unwrap().content {
+                noshape_model::TabContent::Assembly(a) => a.instances[0].id,
+                _ => unreachable!(),
+            };
+            let p = v.pattern.as_mut().unwrap();
+            assert_eq!(p.mirror_expanded, [sub], "expanded");
+            p.mirror_children.entry(sub).or_default().entry(part).or_default().derived = true;
+            p.axis = Some(noshape_model::assembly::MateConnectorRef::origin());
+            cx.notify();
+        })
+    });
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let update = vcx.debug_bounds("ms-update").expect("Update");
+    vcx.simulate_click(update.center(), gpui_kit::Modifiers::default());
+    draw(cx, window);
+    cx.update(|cx| view.update(cx, |v, cx| v.accept_pattern(cx)));
+    draw(cx, window);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let doc = &v.doc.read(cx).session.doc;
+        let ps = doc.tabs.iter().find(|t| t.name == "Part Studio 1").unwrap().id;
+        let m = doc.mirrored_studio(ps).expect("Part Studio 1-Mirrored");
+        let sub = doc.tabs.iter().find(|t| t.name == "Sub").unwrap().id;
+        let noshape_model::TabContent::Assembly(a) = &doc.tab(doc.mirrored_assembly(sub).unwrap()).unwrap().content else { unreachable!() };
+        let noshape_model::assembly::InstanceSource::DerivedMirror { derived, mirrored_studios, .. } = &a.instances[0].source else { panic!("the node") };
+        assert_eq!((derived.len(), mirrored_studios.clone()), (1, vec![(ps, m)]));
+    });
 }
 
 /// Live2 audit-1119 m10–m12: a "-Mirrored" assembly's Derived mirror node: its row menu as live's, and Edit… › Mirror

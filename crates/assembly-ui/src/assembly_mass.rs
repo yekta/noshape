@@ -15,7 +15,11 @@ use noshape_model::assembly::eval::InstancePath;
 
 /// The Mass dialog's job: (selected instances, the result's address, the parts' densities and centre / inertia overrides,
 /// variance shown).
-pub type AsmMassKey = (Vec<InstanceId>, usize, std::collections::BTreeMap<(InstancePath, BodyId), Option<f64>>, Vec<((InstancePath, BodyId), PartOverrides)>, bool);
+pub type AsmMassKey = (Vec<InstanceId>, usize, Densities, Overrides, bool);
+/// The parts' centre of mass and inertia overrides, in path order.
+pub type Overrides = Vec<((InstancePath, BodyId), PartOverrides)>;
+/// Each part occurrence's density (kg/m³; None: no material).
+pub type Densities = std::collections::BTreeMap<(InstancePath, BodyId), Option<f64>>;
 /// Its face section job: (the picked faces, the result's address).
 pub type AsmSectionKey = (Vec<(InstancePath, Reference)>, usize);
 /// Its value: the mass properties and the variance.
@@ -184,7 +188,7 @@ impl AssemblyView {
     /// The selected instances' mass properties (and, shown, their variance) worked out off the UI thread, once per
     /// selection, result and densities: `None` while under way.
     fn assembly_mass_in_background(&mut self, variance: bool, cx: &mut Context<Self>) -> Option<AsmMassValue> {
-        let (densities, overrides): (std::collections::BTreeMap<(InstancePath, BodyId), Option<f64>>, Vec<((InstancePath, BodyId), PartOverrides)>) = {
+        let (densities, overrides): (Densities, Overrides) = {
             let doc = &self.doc.read(cx).session.doc;
             let densities = self.assembly(cx).map(|a| noshape_model::assembly::analysis::part_densities(doc, a, &self.result).into_iter().collect()).unwrap_or_default();
             let mut overrides: Vec<_> = noshape_model::assembly::analysis::part_overrides(doc, &self.result).into_iter().collect();
