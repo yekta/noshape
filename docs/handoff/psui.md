@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-18 23:34 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-18 23:58 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -44,10 +44,21 @@ docs/DECISIONS.md (read first; it wins over anything here).
    wrap at 400 px; a hidden sketch's eye only on hover; chip tooltip right; "#" list redraw; configuration names
    spreadsheet keys (Tab out of the add row is the input's IndentInline action, not a key event); X11 press-interval
    double-click; selected cap colour render test. Part Studio lib 273 passed, app-core, render caps, clippy clean.
-2b. Next land: a released box stays until the frame with its selection is presented (`Viewport::box_held`; live
-   recheck 5c922906 ≠: frames with neither); compound units take the larger precision (qa numfmt-1118). Queued 23:33
-   as 65539552 (carries 2a6b696b). Hole callout glyphs: filled but small / thin (Isometric foreshortens the 11 px
-   cap to ~6 px; live ~10 px, heavier): size and weight asked of live (REQUESTS 23:33).
+2b. HOLD re-queues until the lead's land-daemon fix 58d20676 lands (~00:50, lead says so), then ONE stack.
+   Re-queued 23:55 as 65f89ac4 (failed 00:00, daemon bug) (5 commits: box hold, unit precision, 2a6b696b's rows; the 23:38 failure was the land
+   queue's empty-file-list glitch). Hole callout glyphs: filled but small / thin, size and weight asked of live
+   (REQUESTS 23:33).
+2c. Lead 23:4x: xdev-subs cold first open (qa 40.7 s). Profile (qa's app.log, vibe2 A/B): click -> regen of the
+   inserted Part Studios one at a time (7.5–8 s at load 17–25), the Insert catalog's studios one at a time (3–4 s),
+   apply 0.6–1 s, then one llvmpipe frame ~5 s (not ours). In the worktree: `AssemblyEvaluator::prewarm` regenerates
+   the uncached studios side by side (rayon) before `prepare_inner`: evaluate 3.4–3.6 s, full display ~5 s sooner.
+   The catalog's prewarm doesn't take yet (DBG counts in run34); T2 `dx_perf::timed_cold_assembly_evaluation`
+   (NOSHAPE_ASM_PERF=<copy>); NOSHAPE_AB_NO_PREWARM is a scratch A/B switch: remove before landing. Doc copy
+   vibe2 ~/tmp/psui/asm/xdev.noshape (asm's rebuild, not private). Live's open: 83–94 s.
+2d. Live shortcuts-ps-1118 (5 ≠): Shift+X withdrawn (a saved panel spot); view keys don't re-light under the resting
+   pointer (feel test a_view_key_lights_what_comes_under_the_resting_pointer, running); Shift+T clears the selection
+   (done, test); Delete part: ours solid tan, live a ghost with an orange silhouette (scratch shot mk-del-shot.py);
+   Shift+Y and the slider default wait for live's lane 4.
 3. Speed rows closed (lead 23:14): rollback 0.24 s and Mass 313 ms are software-render frame cadence (handler < 1 ms,
    frame 8 ms; frame log /root/psui-scratch/lat). Rule: act on a feel row only if our handler + layout + paint
    exceeds ~100 ms or the event order differs from live.

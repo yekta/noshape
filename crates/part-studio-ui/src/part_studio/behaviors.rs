@@ -2759,10 +2759,9 @@ impl PartStudioView {
             }
             _ => self.ui.isolate = Some(Isolation { mode, bodies: targets, opacity: 0.0, select_transparent: false, expand: 0 }),
         }
-        // Live 10-27: isolating the selected parts clears the selection.
-        if mode == IsolateMode::Isolate {
-            self.selection.clear();
-        }
+        // Isolating or making transparent the selected parts clears the selection (live 10-27; Make transparent:
+        // shortcuts-ps-1118, Shift+T with Part 1 selected).
+        self.selection.clear();
         let d = self.display.clone();
         self.apply_display(d, window, cx);
     }

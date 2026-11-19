@@ -885,6 +885,11 @@ impl Viewport {
         self.pointer_inside
     }
 
+    /// A camera animation (a standard view, zoom to fit) is under way.
+    pub fn animating(&self) -> bool {
+        self.anim.is_some()
+    }
+
     /// A hover query is in flight (what is under the pointer isn't known yet).
     pub fn hover_pending(&self) -> bool {
         self.hover_query
@@ -2377,8 +2382,15 @@ impl Viewport {
         }
     }
 
-    fn on_hover_change(&mut self, hovered: &bool, _window: &mut Window, cx: &mut Context<Self>) {
+    fn on_hover_change(&mut self, hovered: &bool, window: &mut Window, cx: &mut Context<Self>) {
+        let back = *hovered && !self.pointer_inside;
         self.pointer_inside = *hovered;
+        // Back over the graphics with no move (what covered them went, or the view changed under a resting pointer:
+        // live shortcuts-ps-1118, a view key): what is under the pointer lights.
+        if back && self.drag == Drag::None {
+            self.last_pos = self.local(window.mouse_position());
+            self.request_hover();
+        }
         if !*hovered {
             self.hover_query_again = false;
             self.paused_hover = None;
@@ -3251,6 +3263,9 @@ impl Render for Viewport {
             .on_mouse_down(MouseButton::Middle, cx.listener(Self::on_mouse_down))
             .on_mouse_move(cx.listener(Self::on_hover_move))
             .on_hover(cx.listener(Self::on_hover_change))
+            // What is under the pointer stays lit through a key (GPUI's default drops the hover at any key until the
+            // mouse moves; live re-lights under the resting pointer after a view key: shortcuts-ps-1118).
+            .hover_listener_mode(gpui_kit::HoverListenerMode::InputModalityIndependent)
             .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .on_mouse_up(MouseButton::Right, cx.listener(Self::on_mouse_up))
             .on_mouse_up(MouseButton::Middle, cx.listener(Self::on_mouse_up))

@@ -677,3 +677,21 @@ export const big1755Parts = defineFeature(function(context is Context, id is Id,
     });
 "#;
 
+
+/// A big assembly's cold evaluation, its Part Studios regenerated for the first time (qa's cold tab open of
+/// asm-xdev-subs): `NOSHAPE_ASM_PERF=<file.noshape>` (a copy: opening may save it).
+#[test]
+#[ignore = "T2: a saved assembly on the build hosts only"]
+fn timed_cold_assembly_evaluation() {
+    let Ok(path) = std::env::var("NOSHAPE_ASM_PERF") else {
+        eprintln!("NOSHAPE_ASM_PERF is not set");
+        return;
+    };
+    let s = noshape_ops::session::Session::open(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
+    for t in s.doc.ordered_tabs() {
+        let noshape_model::document::TabContent::Assembly(asm) = &t.content else { continue };
+        let at = Instant::now();
+        let r = noshape_model::assembly::eval::AssemblyEvaluator::new().evaluate(&s.doc, asm, &Default::default(), None);
+        eprintln!("{}: {} occurrences in {:.0} ms", t.name, r.occurrences.len(), at.elapsed().as_secs_f64() * 1000.0);
+    }
+}

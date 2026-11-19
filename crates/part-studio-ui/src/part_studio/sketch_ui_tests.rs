@@ -3056,6 +3056,26 @@ fn a_transforms_old_place_is_a_light_grey_ghost(cx: &mut TestAppContext) {
     assert!(near(moved.color, lin(crate::theme::viewport::TOOL_PREVIEW), 0.6), "the moved part dark grey at 0.6: {:?}", moved.color);
 }
 
+/// Live shortcuts-ps-1118: Shift+T (Make transparent) with Part 1 selected makes it transparent and clears the
+/// selection, as Isolate does.
+#[gpui::test]
+fn make_transparent_clears_the_selection(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "transparent-clears");
+    let body = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part").id.clone());
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selection = vec![Reference::Body(body.clone())];
+            v.isolate(crate::part_studio::behaviors::IsolateMode::Transparent, w, cx);
+        })
+    })
+    .unwrap();
+    let (selection, transparent) = cx.update(|cx| {
+        let v = view.read(cx);
+        (v.selection.clone(), v.ui.isolate.as_ref().map(|i| i.bodies.clone()))
+    });
+    assert_eq!((selection, transparent), (Vec::new(), Some(vec![body])), "(the selection, the parts made transparent)");
+}
+
 /// Fillet's drag arrow as std edgeBlendCommon.fs addFilletControlManipulator: on a block's top edge (a 90° convex edge)
 /// its tip where the round crosses the faces' bisector (offset radius × (1/cos 45° − 1)), into the material; Width
 /// drives the width (offset × |n₀ − n₁| = √2 per width), a conic section its own radius; none for a variable radius.

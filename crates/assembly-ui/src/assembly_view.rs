@@ -467,6 +467,8 @@ pub struct AssemblyView {
     eval_seq: u64,
     eval_task: Option<Task<()>>,
     catalog: Catalog,
+    /// The catalog parts' exact boxes being worked out (after the assembly's evaluation).
+    catalog_boxes: Option<Task<()>>,
     selected: Vec<InstanceId>,
     selected_mate: Option<MateId>,
     list_hover_mate: Option<MateId>,
@@ -704,6 +706,7 @@ impl AssemblyView {
             eval_seq: 0,
             eval_task: None,
             catalog: Catalog::default(),
+            catalog_boxes: None,
             selected: Vec::new(),
             selected_mate: None,
             list_hover_mate: None,
@@ -908,7 +911,7 @@ impl AssemblyView {
         let seq = self.eval_seq;
         self.eval_task = Some(cx.spawn_in(window, async move |this, cx| {
             cx.background_executor().timer(Duration::from_millis(10)).await;
-            let (result, catalog) = cx
+            let (result, catalog, regens) = cx
                 .background_spawn(async move {
                     // Below the UI thread and the frames (threads.rs).
                     noshape_render::threads::lower_priority();
@@ -923,30 +926,37 @@ impl AssemblyView {
                     let result = ev.evaluate(&doc, &asm, &opts, explode);
                     noshape_render::perf::record("a.eval", t.elapsed());
                     let tc = std::time::Instant::now();
+                    let tabs = doc.ordered_tabs().into_iter().filter(|t| matches!(t.content, TabContent::PartStudio(_))).map(|t| (t.id, ConfigValues::default())).collect();
+                    ev.prewarm(&doc, tabs);
                     let mut catalog = Catalog::default();
+                    let mut studios = Vec::new();
                     for t in doc.ordered_tabs() {
                         match &t.content {
-                            TabContent::PartStudio(ps) => {
-                                let r = ev.studio(&doc, t.id, &ConfigValues::default());
-                                let composites: Vec<BodyId> = r.as_ref().map(|r| r.display.bodies.iter().filter(|b| ps.feature(b.id.feature).is_some_and(|f| f.type_id == "compositePart")).map(|b| b.id.clone()).collect()).unwrap_or_default();
-                                let parts = r
-                                    .as_ref()
-                                    .map(|r| {
-                                        // The exact box (live qa5 A18: a repeat insert lands at
-                                        // exactly bbox/8; the display box has OCCT's gap).
-                                        let exact = |b: &noshape_model::display::BodyDisplay| r.context.bodies.iter().find(|c| c.id == b.id).and_then(|c| c.shape.bounding_box(true).ok()).map(|bb| (bb.min, bb.max)).or(b.bounds);
-                                        r.display.bodies.iter().filter(|b| matches!(b.kind, BodyKind::Solid | BodyKind::Surface)).map(|b| (b.id.clone(), b.name.clone(), exact(b), b.kind == BodyKind::Surface)).collect()
-                                    })
-                                    .unwrap_or_default();
-                                let sketches = r.as_ref().map(|r| r.context.sketches.iter().filter(|s| s.sketch.entities().any(|e| !e.construction)).map(|s| (s.feature, s.name.clone())).collect()).unwrap_or_default();
-                                catalog.studios.push(CatalogStudio { tab: t.id, name: t.name.clone(), parts, sketches, composites });
-                            }
+                            TabContent::PartStudio(ps) => studios.push((t, ps, ev.studio(&doc, t.id, &ConfigValues::default()))),
                             TabContent::Assembly(_) if !contains_assembly(&doc, t.id, self_tab, 0) => catalog.assemblies.push((t.id, t.name.clone())),
                             _ => {}
                         }
                     }
+                    for (t, ps, r) in &studios {
+                        let composites: Vec<BodyId> = r.as_ref().map(|r| r.display.bodies.iter().filter(|b| ps.feature(b.id.feature).is_some_and(|f| f.type_id == "compositePart")).map(|b| b.id.clone()).collect()).unwrap_or_default();
+                        let parts = r
+                            .as_ref()
+                            .map(|r| {
+                                r.display
+                                    .bodies
+                                    .iter()
+                                    .filter(|b| matches!(b.kind, BodyKind::Solid | BodyKind::Surface))
+                                    .map(|b| (b.id.clone(), b.name.clone(), b.bounds, b.kind == BodyKind::Surface))
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+                        let sketches = r.as_ref().map(|r| r.context.sketches.iter().filter(|s| s.sketch.entities().any(|e| !e.construction)).map(|s| (s.feature, s.name.clone())).collect()).unwrap_or_default();
+                        catalog.studios.push(CatalogStudio { tab: t.id, name: t.name.clone(), parts, sketches, composites });
+                    }
                     noshape_render::perf::record("a.eval_catalog", tc.elapsed());
-                    (result, catalog)
+                    log::info!(target: "perf", "assembly: evaluated in {:.0} ms, catalog {:.0} ms", tc.duration_since(t).as_secs_f64() * 1e3, tc.elapsed().as_secs_f64() * 1e3);
+                    let regens: Vec<(TabId, Arc<noshape_model::regen::RegenResult>)> = studios.iter().filter_map(|(t, _, r)| Some((t.id, r.clone()?))).collect();
+                    (result, catalog, regens)
                 })
                 .await;
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
@@ -954,12 +964,27 @@ impl AssemblyView {
                     return;
                 }
                 this.catalog = catalog;
+                // The parts' exact boxes (live qa5 A18: a repeat insert lands at exactly bbox/8; the display box has
+                // OCCT's gap) after the assembly is up: before it they were 3 s of asm-xdev-subs' cold open.
+                this.catalog_boxes = Some(cx.spawn(async move |this, cx| {
+                    let boxes = cx.background_spawn(async move { exact_boxes(&regens) }).await;
+                    let _ = this.update(cx, |this: &mut Self, _| {
+                        for s in &mut this.catalog.studios {
+                            for p in &mut s.parts {
+                                if let Some(b) = boxes.get(&(s.tab, p.0.clone())) {
+                                    p.2 = Some(*b);
+                                }
+                            }
+                        }
+                    });
+                }));
                 let t = std::time::Instant::now();
                 // First seen big (an open with no cached result): once more with the coarser levels (only meshing:
                 // the studios' features stay cached).
                 let again = !big && big_scene(&result);
                 this.apply_result(Arc::new(result), window, cx);
                 noshape_render::perf::record("a.eval_apply", t.elapsed());
+                log::info!(target: "perf", "assembly: applied in {:.0} ms, again {again}", t.elapsed().as_secs_f64() * 1e3);
                 this.note_open_result(cx);
                 this.note_real_result(window, cx);
                 if again {
@@ -7638,4 +7663,27 @@ mod instance_count_tests {
         assert_eq!(top_level_rows(ids.iter().copied(), &generated, 1), 3);
         assert_eq!(top_level_rows(ids.iter().copied(), &Default::default(), 0), 5);
     }
+}
+
+/// The exact boxes of the Part Studios' parts (and surfaces), by studio and body, worked out on every core.
+fn exact_boxes(regens: &[(TabId, Arc<noshape_model::regen::RegenResult>)]) -> std::collections::HashMap<(TabId, BodyId), (DVec3, DVec3)> {
+    noshape_render::threads::lower_priority();
+    let bodies: Vec<(TabId, &noshape_model::regen::context::Body)> = regens
+        .iter()
+        .flat_map(|(tab, r)| r.display.bodies.iter().filter(|b| matches!(b.kind, BodyKind::Solid | BodyKind::Surface)).filter_map(move |b| r.context.bodies.iter().find(|c| c.id == b.id).map(|c| (*tab, &**c))))
+        .collect();
+    let threads = std::thread::available_parallelism().map_or(4, |n| n.get());
+    let chunk = bodies.len().div_ceil(threads).max(1);
+    std::thread::scope(|s| {
+        let handles: Vec<_> = bodies
+            .chunks(chunk)
+            .map(|c| {
+                s.spawn(move || {
+                    noshape_render::threads::lower_priority();
+                    c.iter().filter_map(|(tab, b)| Some(((*tab, b.id.clone()), b.shape.bounding_box(true).ok().map(|bb| (bb.min, bb.max))?))).collect::<Vec<_>>()
+                })
+            })
+            .collect();
+        handles.into_iter().flat_map(|h| h.join().unwrap_or_default()).collect()
+    })
 }

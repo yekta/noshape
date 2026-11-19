@@ -1636,6 +1636,24 @@ fn fill_solver_mate(m: &super::Mate, sm: &mut SolverMate, units: &UnitPrefs) {
 }
 
 /// Merge instance configuration over the studio defaults.
+/// The Part Studios and their configurations `asm`'s instances insert, its sub-assemblies' too.
+fn studio_uses(doc: &Document, asm: &Assembly, out: &mut Vec<(TabId, ConfigValues)>, visited: &mut Vec<TabId>) {
+    for inst in &asm.instances {
+        match &inst.source {
+            InstanceSource::Part { studio, config, .. } | InstanceSource::PartStudio { studio, config } | InstanceSource::MirroredPart { studio, config, .. } | InstanceSource::Sketch { studio, config, .. } => {
+                out.push((*studio, config.clone()));
+            }
+            InstanceSource::Assembly { assembly, .. } if !visited.contains(assembly) => {
+                visited.push(*assembly);
+                if let Some(TabContent::Assembly(sub)) = doc.tab(*assembly).map(|t| &t.content) {
+                    studio_uses(doc, sub, out, visited);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 fn effective_config(doc: &Document, studio: TabId, cfg: &ConfigValues) -> ConfigValues {
     let mut base = match doc.tab(studio).map(|t| &t.content) {
         Some(TabContent::PartStudio(ps)) => ps.configuration.defaults(),
@@ -2114,6 +2132,22 @@ impl AssemblyEvaluator {
         {
             return Some(e.result.clone());
         }
+        let (hash, opts, _) = self.studio_inputs(doc, tab, ps);
+        if self.evaluating {
+            self.studios_checked.insert(key.clone());
+        }
+        let entry = self.studios.entry(key).or_insert_with(|| StudioCacheEntry { hash: hash ^ 1, regen: Regenerator::new(), result: Arc::new(RegenResult::default()) });
+        if entry.hash != hash {
+            let r = entry.regen.regenerate(ps, &cfg, &doc.settings.units, &opts);
+            entry.result = Arc::new(r);
+            entry.hash = hash;
+        }
+        Some(entry.result.clone())
+    }
+
+    /// A Part Studio's regeneration options and the hash its cached result is kept under; whether it needs other
+    /// studios (derived parts, custom features: their sources).
+    fn studio_inputs(&mut self, doc: &Document, tab: TabId, ps: &crate::partstudio::PartStudio) -> (u64, RegenOptions, bool) {
         let mut hash = hash_of(&(ps, &doc.settings.units));
         // Derived parts and custom features need their sources (qa5 DER8:
         // a Part Studio of derived parts listed nothing in Insert); the
@@ -2148,16 +2182,54 @@ impl AssemblyEvaluator {
                 }
             }
         }
-        if self.evaluating {
-            self.studios_checked.insert(key.clone());
+        (hash, opts, needs_sources)
+    }
+
+    /// Regenerates side by side the Part Studios `asm` and its sub-assemblies insert that aren't cached, before
+    /// [`Self::prepare_inner`] takes them one at a time (asm-xdev-subs' cold open: its 58 studios one after another took
+    /// 7.5–8 s on vibe2, side by side 3.4–3.6 s). Those that need other studios (derived parts, custom features) are left
+    /// to it.
+    fn prewarm_studios(&mut self, doc: &Document, asm: &Assembly) {
+        let mut uses: Vec<(TabId, ConfigValues)> = Vec::new();
+        studio_uses(doc, asm, &mut uses, &mut Vec::new());
+        self.prewarm(doc, uses);
+    }
+
+    /// Regenerates side by side the Part Studios in `uses` (in those configurations) that aren't cached, for
+    /// [`Self::studio`] to take one at a time after (an assembly's Insert catalog lists every Part Studio of the
+    /// document). Those that need other studios are left to it.
+    pub fn prewarm(&mut self, doc: &Document, uses: Vec<(TabId, ConfigValues)>) {
+        use rayon::prelude::*;
+        let mut jobs = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for (tab, config) in uses {
+            let Some(TabContent::PartStudio(ps)) = doc.tab(tab).map(|t| &t.content) else { continue };
+            let cfg = effective_config(doc, tab, &config);
+            let key = (tab, serde_json::to_string(&cfg).unwrap_or_default());
+            if !seen.insert(key.clone()) {
+                continue;
+            }
+            let (hash, opts, needs_sources) = self.studio_inputs(doc, tab, ps);
+            if needs_sources || self.studios.get(&key).is_some_and(|e| e.hash == hash) {
+                continue;
+            }
+            let entry = self.studios.remove(&key).unwrap_or_else(|| StudioCacheEntry { hash: hash ^ 1, regen: Regenerator::new(), result: Arc::new(RegenResult::default()) });
+            jobs.push((key, ps, cfg, opts, hash, entry));
         }
-        let entry = self.studios.entry(key).or_insert_with(|| StudioCacheEntry { hash: hash ^ 1, regen: Regenerator::new(), result: Arc::new(RegenResult::default()) });
-        if entry.hash != hash {
-            let r = entry.regen.regenerate(ps, &cfg, &doc.settings.units, &opts);
-            entry.result = Arc::new(r);
-            entry.hash = hash;
+        if jobs.len() < 2 {
+            for (key, _, _, _, _, entry) in jobs {
+                self.studios.insert(key, entry);
+            }
+            return;
         }
-        Some(entry.result.clone())
+        let units = &doc.settings.units;
+        jobs.par_iter_mut().for_each(|(_, ps, cfg, opts, hash, entry)| {
+            entry.result = Arc::new(entry.regen.regenerate(ps, cfg, units, opts));
+            entry.hash = *hash;
+        });
+        for (key, _, _, _, _, entry) in jobs {
+            self.studios.insert(key, entry);
+        }
     }
 
     /// Regenerate a standard content part (cached per spec).
@@ -2298,6 +2370,7 @@ impl AssemblyEvaluator {
         self.subs_done.clear();
         self.subs_dof.clear();
         self.connectors.prune(&doc.settings.units);
+        self.prewarm_studios(doc, assembly);
         let (leaves, nodes, prepared) = self.prepare_inner(doc, assembly, &mut visited);
         self.evaluating = false;
         self.studios_checked.clear();

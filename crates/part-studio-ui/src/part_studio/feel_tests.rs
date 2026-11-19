@@ -779,3 +779,38 @@ fn a_mate_connector_wins_over_its_face_across_its_disc(cx: &mut TestAppContext) 
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
+
+/// Live shortcuts-ps-1118: after a view key (Shift+1 Front) whatever comes under the resting pointer lights once the
+/// view has moved; the pointer doesn't need to move.
+#[gpui::test]
+fn a_view_key_lights_what_comes_under_the_resting_pointer(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view, _, _) = block_part(cx, "view-key-hover");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let pointer = Pointer::new(cx, window, &view);
+    // The part's middle on screen, in the iso view and (fit again) in Front.
+    let mid = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let (lo, hi) = b.bounds.unwrap();
+        v.viewport.read(cx).project((lo + hi) * 0.5).unwrap()
+    });
+    pointer.move_to(cx, &view, mid);
+    assert!(cx.update(|cx| view.read(cx).hover.is_some()), "the part lights under the pointer before the key");
+    // A key (GPUI drops the hover at any key by default), then the view change it asks for.
+    keys(cx, window, &["shift"]);
+    cx.update(|cx| view.update(cx, |v, cx| v.view(noshape_render::StandardView::Front, cx)));
+    // The view moves (its animation), then what is under the pointer is picked again.
+    let t = std::time::Instant::now();
+    let mut lit_after = None;
+    while t.elapsed() < std::time::Duration::from_secs(15) {
+        pointer.frames(cx, &view);
+        let (moving, settled, lit) = cx.update(|cx| (pointer.vp.read(cx).animating(), pointer.vp.read(cx).hover_settled(), view.read(cx).hover.clone()));
+        if !moving && settled && lit.is_some() {
+            lit_after = lit;
+            break;
+        }
+    }
+    assert!(lit_after.is_some(), "nothing lit under the resting pointer after the view key");
+}
