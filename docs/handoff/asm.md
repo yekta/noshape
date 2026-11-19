@@ -5,9 +5,9 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-19 20:38 UTC)
+## State (2026-11-19 21:01 UTC)
 
-### Landed today (6686624b as 702c9878: Display states Esc, driver-mate named position, paste; d671313d; 335f8e43; 9f52415c)
+### Landed today (6686624b as 702c9878: Display states Esc, driver-mate named position, paste; d671313d; 335f8e43; 9f52415c; free drag c9a6822d queued)
 - LOD (91478e2c), Derived mirror of an assembly complete (e87a2b3e, 17c26dc1; left: live's exact node icon, symmetry
   detection on child rows), mass overrides (17c26dc1; left: psui's Part Studio panel CoM / Inertia ☑ Override rows,
   several parts measured with overrides, not captured), surf-intro translator steps (8c6ec107, eb3b06a8).
@@ -17,21 +17,29 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
 ### P1 done: assembly-ui SIGSEGV at exit (main CI 44554083714): RenderWorker joins its thread on drop (d671313d);
 not reproduced off CI (15 runs of the unfixed binary on vibe2, all exit 0); TICKETS ASM-UI-SIGSEGV-AT-EXIT [x].
 
-### In flight: parity_assemblies differences (lead 11-19: rank by documents, one land each)
-- Landed: pattern-std BOM 17/17 (335f8e43), welding BOM 29/29 (9f52415c; left there: row order only, core's
-  multi-region extrude body order, sent 18:2x).
-- Suite: vibex7 `~/agents/asm-keep/suite1.sh ops-bomfix l1119b <dirs>` (slot; suite/l1119b.log) over the 11 light
-  models vibe2 didn't run (the first 10 all as live, l1119 on vibe2); then the heavy 4 (xdev, isaac, infento,
-  scissor). vibex hosts: hold runs in a backgrounded ssh (the l1119b run survived its local wait's time limit).
-- suspension 25/28 occ: studio geometry, sent to core 16:50 (805e29 Fillet 3/4 fail: Knuckle a sliver; 995636 Body
-  two bodies in ours). Trace vibex7 ~/agents/asm-keep/susp.out.
-- isaac (98/129 mates; lead 19:2x: fix the off connectors that aren't core's Chamfer 2). Off ends in the 31
-  differences: 7 on Part 1 <12> (a2e4a2 Chamfer 2: sent to core 19:5x for 21:00) and Fastened 43's b on Part 1 <1>
-  (studio 00f1d4). Fastened 26 / 32 and Revolute 7 / 17 OFF lines are intermediate picks; they end as live.
-- Fastened 43: a Boolean bug, not translation (TICKETS HOLE-THROUGH-ROUND-POLE [bool], routed via the lead 20:38).
-  00f1d4's Extrude 38 Ø6 hole runs coaxially through an R4 corner round and the corner ball's pole; ours (and OCCT)
-  can't cut it, live does. Our geometry before it is live's (a column probe finds material on the axis, z 15.6–27.6).
-  Minimal repro vibex8 ~/agents/asm-keep/t-mini-false.sh (current CLI ~/agents/asm/target/debug/noshape-cli).
+### In flight: interaction feel (lead 20:4x: feel is P0; drags, mate hover and select first)
+- Queued c9a6822d: a free (6-DOF) instance dragged by its face moves in the plane of the screen without turning
+  (`run_drag_solve`: targets from the drag-start placement; the point drag had turned it 1–2° on 20 px); test
+  `a_free_instances_drag_keeps_the_default_cursor_and_follows_the_pointer`; feel rows: the free drag tested, Ctrl+V
+  `=` (fixed 702c9878).
+- Open assembly rows in docs/parity/interaction-feel.md, next in this order: line 42 Mate connector reach `≈` (live:
+  22–23 px across, 14–15 down on a face's centre; on a vertex 22 across, 16–21 down and wins over the vertex
+  throughout: a GPU feel test in assembly_feel_tests.rs); 1424 assembly section arrow drag (value box at the arrow,
+  0.1 mm steps, tan hatched caps: test missing); 1418 explode drag's 0 mm step (test missing); 1568 Y Hide `≈` (live
+  leaves the hover outline until the pointer moves); 1421–1423 / 1471 named positions and display states (tests
+  missing); 1454–1457 assembly pattern previews (tests missing).
+- Find them: `awk -F'|' 'NF>4 { st=$(NF-1); t=$(NF-2); if (st ~ /≠|≈/ || t ~ /missing/) print NR": "$2 }'
+  docs/parity/interaction-feel.md | grep -iE "asm|assembl|mate|instance|explode|named|display|section|drag"`.
+
+### parity_assemblies (lead 11-19: rank by documents, one land each)
+- Light 20 (main + the BOM fixes): 18 fully as live; robot-relations BOM 36/42 (dx), suspension 25/28 occ (core:
+  805e29 Fillet 3/4, 995636 Body two bodies; trace vibex7 ~/agents/asm-keep/susp.out). Landed today: pattern-std BOM
+  17/17 (335f8e43), welding BOM 29/29 (9f52415c; row order left: core's multi-region extrude body order).
+- Heavy 4 running on vibex7 (`suite1.sh ops-bomfix h1119 asm-xdev-subs asm-isaac-ball asm-infento-subs
+  asm-scissor-lift`, suite/h1119.log): xdev-subs 266/266 occ, 7/7 mates, 74/74 BOM (21:01).
+- isaac (98/129): closed for asm (lead 20:4x). Off ends: 7 on Part 1 <12> (a2e4a2 Chamfer 2, core, sent 19:5x) and
+  Fastened 43 (TICKETS HOLE-THROUGH-ROUND-POLE [bool]: a Ø6 hole coaxial through an R4 corner round's ball pole;
+  repro vibex8 ~/agents/asm-keep/t-mini-false.sh with the current CLI ~/agents/asm/target/debug/noshape-cli).
 - Others': robot-relations BOM 36/42 (dx); scissor-lift Top <3>; psui coplanar depth tie.
 
 ### isaac-ball connector cases (traced run 07:26, 98/129 mates)
