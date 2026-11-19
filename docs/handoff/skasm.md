@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 07:31 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 08:27 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -45,18 +45,19 @@ quadrant's snap wakes no alignment source (ours aligns with points only).
 ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
 Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six on green.
 
-## State 07:31 (11-19)
-- Landed: 373dd5b9, 48626728 (REGION-PICK), 4104b148 (5686f670), 24792169 (29bf3dcb), dceaee62 (qa verified with the Bends order on green af11b6d5, session-sm-1119 r6; faa5f7b1: flat view
-  by the model's up side, std pcbEnd's hold plane; live confirmed both cases, REQUESTS 05:10, live/skasm/q-thicken-flat-1119).
-- QUEUED 394e7c79 (07:15, carries 08511fa7): bend face clicked in 3D with the table open outlines its Bends row and
-  lights its zone in the flat view (`sm_follow_pick`, sm matrix row; sm-cfg-io-1119 row 1702). Wave-washer Sketch 4 (lead P1 for core's ring branch): solver `carried_onto_anchors` (a
-  failed solve whose Coincidents tie free points to far fixed ones moves each piece rigidly, kept when everything then
-  holds; test `a_held_rectangle_slides_onto_a_far_anchor`); translator: model Coincidents after the sketch's own
-  constraints and dimensions (`constraints(.., anchors)`), but a Coincident to geometry live lost (empty query) pins in
-  order (clamp-guillem Boceto 6). Sketch 4 = live's solved points; Loft 1 still errors (core's). Suite F (before the
-  clamp fix) 91/126, 1335/1585 vs E 90 / 1325: surf-workshop bezier 6/6, boundary 7/7, cpcurves 9, mutualtrim 7, split
-  11 (boundary / split: Sketch 1 / 2's anchors no longer taken back); clamp-guillem fixed after (25/25 alone).
-  Also: a line across a held line, both ends clear, is Vertical (live retake 06:47 of 1866's crossing; row 67 fixed).
+## State 08:27 (11-19)
+- Landed today: 4104b148, 24792169, dceaee62 (flat view by the model's up; qa verified af11b6d5), cd1acebd (394e7c79:
+  wave-washer Sketch 4 = live via solver `carried_onto_anchors` + translator anchors-last, clamp-guillem pin order,
+  crossing line -> Vertical, bend face click -> Bends row + flat zone `sm_follow_pick`). Suite F 91/126, 1335/1585.
+- CHECKING 2dbf7d61: conflict colours (live recheck: 50 typed opposite a 40 reds both, not the 30; solver
+  `conflict_dims`: driving dims the sketch solves without join the conflicting set; fuzz write_batch needs the union).
+- QUEUED 32f60584: lead's missing-functionality #1: flat DXF/DWG outline exact (`FlatCurve`, `outline_curves`, field
+  `FlatPattern::outline`, serde default; empty -> loops as before); e2e `the_flat_dxf_writes_arcs_and_circles`.
+- Lead's top 5 (missing functionality, sent to the lead 11-19): 1 flat DXF exact curves (queued); 2 flat export "Include visible
+  sketches" (live default on) + "Splines as polylines" + sheetmetal_export_flat options (live capturing files:
+  live/skasm/q-flat-dxf-1119/, sample 100x60 R5 corner, holes, slot, flange, hole across the bend); 3 pattern / mirror
+  of active sheet metal with Form / SM hole (host sheetmetal.rs "tools of sheet metal holes / forms are not supported
+  yet"); 4 extrude on the flat (opSMFlatOperation, native_args.rs); 5 corner break next to bends (sm_flat.rs:97).
 - Open (low: geometry matches): infento Part grid's four 80 mm LENGTHs (seed side V2HoieiIDMV9, the pattern's
   direction lines len1 / len2, one more) end driven in ours (E, F and 07:2x builds alike; TRACE "set driven"): live's
   grid instances are tied corner to corner by 401 PATTERN COINCIDENTs, so the spacings follow from the seed's size and
