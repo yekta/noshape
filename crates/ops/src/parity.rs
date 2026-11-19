@@ -3781,6 +3781,21 @@ impl<'a> Translator<'a> {
                 && let Some(Packed::Array(sides)) = get("derivedFrom")
                 && sides.len() == 2
             {
+                // The bodies two of one feature's own extrudes swept (a Projected curve's two sketches' extrusions,
+                // `<feature>.extrude1` / `.extrude2`): that feature's curve (c2-surf-intro-offset's source's Loft 1).
+                let swept: Vec<String> = sides
+                    .iter()
+                    .filter_map(|side| {
+                        let mut st = Vec::new();
+                        packed_strings(side, &mut st);
+                        st.iter().any(|s| s == "SWEPT_BODY").then(|| st.iter().find_map(|s| s.strip_suffix(".opExtrude")?.split_once('.').map(|(f, _)| f.to_string())))?
+                    })
+                    .collect();
+                if let [a, b] = swept.as_slice()
+                    && a == b
+                {
+                    return Some(self.swept_body(a, None, &[], false));
+                }
                 let mut faces = Vec::new();
                 for side in sides {
                     match self.named_faces(side)? {
@@ -4045,8 +4060,14 @@ impl<'a> Translator<'a> {
                 }
             }
         }
-        let r = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 1 }));
-        r.and_then(|f| f["faces"][0]["part"].as_str().map(str::to_string).ok_or_else(|| format!("SWEPT_BODY of {op}: no part of ours")))
+        // (A wire body, a Projected curve's, has edges only: c2-surf-intro-offset's source's Loft 1 profiles.)
+        for kind in ["faces", "edges"] {
+            let r = self.call("query_entities", json!({ "kind": kind, "created_by": ours, "limit": 1 }))?;
+            if let Some(part) = r[kind][0]["part"].as_str() {
+                return Ok(part.to_string());
+            }
+        }
+        Err(format!("SWEPT_BODY of {op}: no part of ours"))
     }
 
     /// The written-out form (`makeQuery(id + "F….opExtrude", "CAP_FACE",
