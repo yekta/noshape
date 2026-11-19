@@ -188,6 +188,14 @@ pub fn make_face_on(on: &Shape, wire: &Shape) -> Result<Shape> {
     Shape::from_res(ffi::make_face_on(on.raw(), wire.raw()))
 }
 
+/// An edge lying exactly on `on`'s surface through `points` (each on it, in order): interpolated in the surface's
+/// parameters, so it stays on the surface between them (a contact curve to split a face along with [`split_on`]).
+///
+/// [`split_on`]: crate::split_on
+pub fn make_edge_on(on: &Shape, points: &[DVec3]) -> Result<Shape> {
+    Shape::from_res(ffi::make_edge_on(on.raw(), &flat(points)))
+}
+
 /// `shape` without its faces' open wires (slits: a thickened seam's edge left inside a face after a unify), or as it
 /// is when it has none; each face rebuilt is checked.
 pub fn drop_open_wires(shape: &Shape) -> Result<Shape> {

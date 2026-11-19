@@ -1339,3 +1339,34 @@ fn a_cylinder_face_across_its_seam_contains_its_points() {
     let outside = DVec3::new(-0.01, 0.0, 0.005);
     assert!(!face.contains_point(outside, 1e-7).unwrap());
 }
+
+/// An edge through points on a cylinder (a rolling ball's contact curve on a tube, asm-suspension's Lower Control Arm
+/// Fillet 3) lies on it between the points too, and splits the face along it.
+#[test]
+fn an_edge_through_points_on_a_cylinder_stays_on_it_and_splits_it() {
+    let (r, h) = (0.0225, 0.04);
+    let arc = make_arc(DVec3::ZERO, DVec3::Z, DVec3::X, r, 0.0, PI).unwrap();
+    let side = extrude(&arc, DVec3::new(0.0, 0.0, h)).unwrap().shape.faces().remove(0);
+    let at = |t: f64| {
+        let a = (20.0 + 100.0 * t * t).to_radians();
+        DVec3::new(r * a.cos(), r * a.sin(), h * t)
+    };
+    let pts: Vec<DVec3> = (0..=8).map(|i| at(i as f64 / 8.0)).collect();
+    let e = make_edge_on(&side, &pts).unwrap();
+    let i = e.edge_info().unwrap();
+    assert!(i.start.distance(pts[0]) < 1e-9 && i.end.distance(pts[8]) < 1e-9, "{:?} {:?}", i.start, i.end);
+    for k in 0..=64 {
+        let p = e.point_at(i.first_param + (i.last_param - i.first_param) * k as f64 / 64.0).unwrap();
+        let off = (p.x.hypot(p.y) - r).abs();
+        assert!(off < 1e-8, "{off} m off the cylinder at {k}/64");
+    }
+    let s = split_on(&side, &[e], 1e-7).unwrap().shape;
+    let s = s.fixed(1e-7).unwrap();
+    assert!(s.is_valid());
+    assert_eq!(s.faces().len(), 2);
+    let areas: Vec<f64> = s.faces().iter().map(|f| f.area().unwrap()).collect();
+    assert!(close(areas.iter().sum::<f64>(), PI * r * h, 1e-9), "{areas:?}");
+    // (The piece toward x: the band between angle 0 and the curve, 20 + 100 t² degrees at height h t.)
+    let band = r * h * (20f64.to_radians() + 100f64.to_radians() / 3.0);
+    assert!(areas.iter().any(|a| close(*a, band, 1e-6)), "{areas:?} vs {band}");
+}

@@ -908,6 +908,7 @@ std::unique_ptr<OcShape> make_face_on_plane(const PlaneF& plane, const OcShape& 
                                             const OcShapeList& holes);
 std::unique_ptr<OcShape> make_face_from_wire(const OcShape& wire, bool only_plane);
 std::unique_ptr<OcShape> make_face_on(const OcShape& on, const OcShape& wire);
+std::unique_ptr<OcShape> make_edge_on(const OcShape& on, rust::Slice<const double> pts);
 std::unique_ptr<OcShape> extend_face(const OcShape& on, double len);
 std::unique_ptr<OcShape> extend_face_over(const OcShape& on, rust::Slice<const double> pts, double margin);
 std::unique_ptr<OcShape> reface_on(const OcShape& in, uint32_t index, const OcShape& on);

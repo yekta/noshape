@@ -1629,6 +1629,43 @@ std::unique_ptr<OcShape> make_interpolated(rust::Slice<const double> pts,
   return wrap(BRepBuilderAPI_MakeEdge(ip.Curve()).Edge());
 }
 
+// An edge lying exactly on `on`'s surface through `pts` (points on it): their (u, v), each the next from the last
+// across a periodic seam, interpolated in the parameter plane and the 3D curve built from it (a rolling ball's contact
+// curve on a tube, for a face split along it and sewn to the blend face; a 3D interpolation leaves the surface between
+// the points).
+std::unique_ptr<OcShape> make_edge_on(const OcShape& on, rust::Slice<const double> pts)
+{
+  const TopoDS_Face& face = as_face(on.shape, "face");
+  auto               p    = points_of(pts, "points on the face");
+  if (p.size() < 2)
+    fail_invalid("an edge on a face needs at least 2 points");
+  const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(face);
+  ShapeAnalysis_Surface           sas(surf);
+  const double                    tol = BRep_Tool::Tolerance(face);
+  const int                       n   = (int)p.size();
+  occ::handle<NCollection_HArray1<gp_Pnt2d>> uv = new NCollection_HArray1<gp_Pnt2d>(1, n);
+  gp_Pnt2d                                   last;
+  for (int i = 0; i < n; ++i)
+  {
+    last = i == 0 ? sas.ValueOfUV(p[i], tol) : sas.NextValueOfUV(last, p[i], tol);
+    if (sas.Gap() > 1e3 * tol)
+      fail_invalid("a point off the face's surface");
+    uv->SetValue(i + 1, last);
+  }
+  Geom2dAPI_Interpolate ip(uv, false, 1e-9);
+  ip.Perform();
+  if (!ip.IsDone())
+    fail_op("could not interpolate the points on the face");
+  BRepBuilderAPI_MakeEdge mk(ip.Curve(), surf);
+  if (!mk.IsDone())
+    fail_op("could not build an edge on the face");
+  TopoDS_Edge e = mk.Edge();
+  // (Tighter than the default: the curve stays on the surface within a nanometre, not a tenth of a micrometre.)
+  BRepLib::BuildCurves3d(e, 1e-9, GeomAbs_C2, 14, 64);
+  BRepLib::SameParameter(e, 1e-7);
+  return wrap(e);
+}
+
 std::unique_ptr<OcShape> make_bspline_3d(rust::Slice<const double> poles,
                                          rust::Slice<const double> weights,
                                          rust::Slice<const double> knots,
