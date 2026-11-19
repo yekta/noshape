@@ -6,7 +6,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## qa, 2026-11-18 (live's modelling session replay)
-- [ ] **P1 REGION-PICK-SKETCH-SHOWN [skasm, psui]** (qa 02:4x, user flow: live's session-1118 step 5): with Extrude's "Faces and sketch
+- [x] (skasm 48626728; qa verified on green fafc4a25: Tray 29505.03 mm³ / 30273.90 mm², as live) **P1 REGION-PICK-SKETCH-SHOWN [skasm, psui]** (qa 02:4x, user flow: live's session-1118 step 5): with Extrude's "Faces and sketch
   regions" field active, a click inside a small sketch circle on the part's top face picks nothing, so Extrude 2 fails "Select face or
   sketch region to extrude." and Linear pattern 1 after it (green ce88e667 Tray 29750.67 / 30545.26 vs live 29505.03 / 30273.90). The
   Ø10 circle is ~36 x 18 px in the iso view (0.277 mm/px); since skasm a535927ab / 0efdc81f3 a shown sketch's centre point picks from
@@ -677,7 +677,7 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
   1114, 1163); snap-diag 1303 stays qa's (Snap reach, on hold for asm).
 
 ## Interaction feel: live2's regression sweep on green bcbe6b0f0 (16:00-16:1x, one run per row, 3 for 1092; evidence live2-scratch/ours/sw)
-- [ ] **P0 FORM-PREVIEW-SLOWER (skasm)**: sheet-metal Form, the second point's emboss preview at 2.34 / 2.52 s (two runs); 1.3 s on
+- [x] (skasm 11-18 17:4x: no regression; live2's app A/B overlaps, A 2.3–4.0 s, B 2.9–3.4 s by host load; model regen no slower) **P0 FORM-PREVIEW-SLOWER (skasm)**: sheet-metal Form, the second point's emboss preview at 2.34 / 2.52 s (two runs); 1.3 s on
   this morning's green, live ~1.5 s (row 1288). A regression since ~13:00's green (bool2's 13:52 batch and core's impeller lands are
   in the range); skasm told by live2.
 - Unchanged (=): pattern-hole 1268-1280, view 992, field keys 1309-1312, ui-speed 1090 / 1092 (context menu 118 / 75 / 83 ms: the
