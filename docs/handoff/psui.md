@@ -50,7 +50,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
    toggles it in selectedIndices, the triad at the selected points' centre moves each one's dx/dy/dz
    (dialogs_feel_tests::a_routing_curves_multiple_triad_moves_the_selected_points). Test note: point items set
    directly are reset by the editing logic; type offsets via set_expr_text. Not done: the triad's rotation rings,
-   an Edit reference's triad (only if live has a capture). NEXT (lead, P0): qa's interaction-feel rows from its suite.
+   an Edit reference's triad: asked of live (REQUESTS psui 11-19 13:0x, routing-multi).
+   NOW (lead): no ≠ rows of mine left but the two waiting on live (section cap, Hole callout); taking P0 rows that are =
+   with no test (interaction-feel.md "missing" in the test column: hover-p0, hover-pick, sel-feel, dialogs first).
+   Done: edge double-click (dialogs_feel_tests). Next: 862 sketch region look, 810 refusal texts, 884/885.
+   qa's suite rows (P0) arrive ~16:00 UTC: they go first.
 5. Open with live: Hole callout glyph size (REQUESTS 23:33), section preview over a shown plane (REQUESTS 22:48).
    live is stopped until ~21:00 UTC: recheck asks go to live2.
 6. Not to build: 3D Sketch, Fault analysis. Cleanup: vibex7 ~/tmp/psui/priv/dock.noshape when the tab work is over;
