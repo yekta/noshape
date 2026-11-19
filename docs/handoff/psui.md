@@ -35,27 +35,19 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (updated 02:27 UTC 11-19)
+## Now (updated 02:35 UTC 11-19)
 
-0. a46fd345's land check showed planar_face_mesh::the_checks_catch_a_triangle_turned_over_or_across_a_hole failing:
-   mesh_pixels flipped `set_rust_mesh_everywhere` (all threads) while it ran. Fixed in ff75f1a27 (BRepMesh meshes
-   made on the test's own thread; the T2 triangle-count test too). If a46fd345 FAILS: rebase on origin/main and queue
-   the whole stack (a46 + ada54f008 + ff75f1a27) as ONE land. If it LANDS: queue ada54f008 + ff75f1a27.
-
-1. Queued 00:4x as a46fd345 (6 commits, one land): view cube hold ≥ 490 ms no click; Transform ghost; Hole callout
-   leader 14 px, glyphs `on_top`; tooltips wrap 400 px; hidden sketch eye on hover; configuration names spreadsheet
-   keys (Tab out of the add row = the input's IndentInline action); X11 double-click; box held until the selection's
-   frame; compound unit precision; xdev-subs cold open (`AssemblyEvaluator::prewarm`: uncached Part Studios
-   regenerate side by side; the Insert catalog uses display bounds, exact boxes in `catalog_boxes` after it is up:
-   click to full display 12-13 s -> ~4 s on vibe2; live2: 21.7–29 s); a view key re-lights under the resting pointer
-   (viewport `InputModalityIndependent`); Make transparent clears the selection. Then live retakes (arrow areas,
-   row tooltip, cube hold).
-2. Next land (in the worktree, tested on vibe2, clippy clean): Shift+Y clears the selection (editing matrix row);
-   Shift+C in a sketch selects the analysed curves (orange + readout; test
-   curve_analysis_in_a_sketch_selects_the_analysed_line); Isolate / Make transparent sliders remembered per dialog
-   (`feature_settings` keys view:isolate / view:makeTransparent; test the_transparency_slider_is_remembered_per_dialog);
-   interaction-feel: shortcuts-ps rows updated, the stale duplicate copies after the sketch table removed.
-3. Open with live: Hole callout glyph size and weight (REQUESTS 23:33). Dialog spots remembered per dialog
+1. Landed 02:27 as 1dd4033be (a46fd345: box hold, unit precision, xdev prewarm, view key re-light, Shift+T, rows).
+2. Queued 02:3x as 70d7c71d (3 commits): Shift+Y clears the selection; Shift+C in a sketch selects the analysed
+   curves; Isolate / Make transparent sliders remembered (`feature_settings` view:isolate / view:makeTransparent);
+   the mesher test race (mesh_pixels flipped `set_rust_mesh_everywhere` for every thread; now its BRepMesh meshes are
+   made on its own thread): it failed nothing, but showed in a46fd345's check log.
+   After it lands: queue 65df5b2ca (rows only: edge vs face reach =, triad and named view restore = with their tests,
+   view cube hold / # list to retake, sketch hover timing closed, plane reach on slanted edges asked).
+3. Lead 02:3x: the interaction-feel ≠ rows by frequency (hover/select/drag first). All psui ≠ rows are now fixed
+   or waiting on live: plane reach on a slanted edge at 6–9 px (asked live 02:3x), section preview colour over a
+   shown plane (REQUESTS 22:48), Hole callout glyph size (REQUESTS 23:33); retakes once green has 1dd4033be.
+4. Open with live: Hole callout glyph size and weight (REQUESTS 23:33). Dialog spots remembered per dialog
    (live: localStorage, sectionview +150/+100 like ours) = already.
 3. Speed rows closed (lead 23:14): rollback 0.24 s and Mass 313 ms are software-render frame cadence (handler < 1 ms,
    frame 8 ms; frame log /root/psui-scratch/lat). Rule: act on a feel row only if our handler + layout + paint
