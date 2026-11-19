@@ -310,7 +310,7 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                 }
             };
             if !sketch || !mesh.indices.is_empty() {
-                let mut inst = Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(color).with_transform(t).pick_base(face_base).zebra(opts.zebra.filter(|_| !dimmed && !sketch)).reflection(opts.reflection.clone().filter(|_| !dimmed && !sketch));
+                let mut inst = Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(color).with_transform(t).pick_base(face_base).zebra(opts.zebra.filter(|_| !dimmed && !sketch)).reflection(opts.reflection.clone().filter(|_| !dimmed && !sketch)).depth_rank(oi);
                 // Sketch regions are pickable faces (live 601).
                 if dimmed && !opts.pick_dimmed {
                     inst = inst.unpickable();

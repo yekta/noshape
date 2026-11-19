@@ -270,6 +270,10 @@ pub struct Instance {
     pub color_mode: ColorMode,
     /// Participates in the pick buffer.
     pub pickable: bool,
+    /// Ties between coplanar faces of different parts go to the lower rank (0–15): its faces sit a hair nearer, 2e-6 of
+    /// their depth a step (live2 asm-dialogs-1119 ok.png: Part 2's top flush in Part 1's shows Part 1's face with Part
+    /// 2's edges on it; ours z-fought).
+    pub depth_rank: u8,
     /// Excluded from section-view clipping (e.g. sketch overlays, planes).
     pub ignore_clip: bool,
     /// Left out of [`Scene::bounds`] (the depth range and zoom to fit): an
@@ -428,6 +432,7 @@ impl Instance {
             color: if image { [1.0; 4] } else { [0.7, 0.72, 0.76, 1.0] },
             color_mode: ColorMode::Instance,
             pickable: !image,
+            depth_rank: 0,
             ignore_clip: false,
             no_bounds: false,
             unlit: false,
@@ -557,6 +562,11 @@ impl Instance {
     }
     pub fn unpickable(mut self) -> Self {
         self.pickable = false;
+        self
+    }
+    /// See [`Instance::depth_rank`]: `index` (a part's or an instance's place in the scene) wraps every 16.
+    pub fn depth_rank(mut self, index: usize) -> Self {
+        self.depth_rank = (index % 16) as u8;
         self
     }
     pub fn ignore_clip(mut self) -> Self {

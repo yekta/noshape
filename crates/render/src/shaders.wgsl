@@ -202,6 +202,9 @@ fn mesh_vertex(v: MeshIn, slot: u32) -> MeshOut {
     let w = inst.model * vec4(mesh_pos(v), 1.0);
     o.world = w.xyz;
     o.pos = g.view_proj * w;
+    // params.z bits 8–11: the depth rank, a hair farther a step (reverse-Z: smaller z), so coplanar faces of two parts
+    // go to the first one rather than z-fighting.
+    o.pos.z *= 1.0 - f32((inst.params.z >> 8u) & 15u) * 2e-6;
     o.normal = (inst.normal_m * vec4(oct_decode(v.normal), 0.0)).xyz;
     o.pick = global_pick(v.pick);
     o.color = v.color;
@@ -714,7 +717,7 @@ fn fs_mesh_pick(i: MeshOut) -> @location(0) u32 {
     load_inst(i.slot);
     let st = state_of(i.pick);
     if ((st & (HIDDEN | NO_PICK)) != 0u || clipped(i.world)) { discard; }
-    if (inst.params.z == 0u) { return 0u; }
+    if ((inst.params.z & 1u) == 0u) { return 0u; }
     return i.pick;
 }
 
@@ -731,7 +734,7 @@ fn fs_mesh_pick_plane(i: MeshOut) -> PlanePickOut {
     let st = state_of(i.pick);
     if ((st & (HIDDEN | NO_PICK)) != 0u || clipped(i.world)) { discard; }
     var o: PlanePickOut;
-    o.id = select(i.pick, 0u, inst.params.z == 0u);
+    o.id = select(i.pick, 0u, (inst.params.z & 1u) == 0u);
     o.depth = i.pos.z * 0.001;
     return o;
 }
@@ -1128,7 +1131,7 @@ fn fs_line_plain(i: LineOut) -> @location(0) vec4<f32> {
 fn fs_line_pick(i: LineOut) -> @location(0) u32 {
     load_inst(i.slot);
     if (clipped(i.world) || (state_of(i.pick) & NO_PICK) != 0u) { discard; }
-    if (inst.params.z == 0u) { discard; }
+    if ((inst.params.z & 1u) == 0u) { discard; }
     return i.pick;
 }
 
@@ -1284,7 +1287,7 @@ fn fs_point(i: PointOut) -> @location(0) vec4<f32> {
 fn fs_point_pick(i: PointOut) -> @location(0) u32 {
     load_inst(i.slot);
     if (point_dist(i.uv, i.rpx) > i.rpx || clipped(i.world) || (state_of(i.pick) & NO_PICK) != 0u) { discard; }
-    if (inst.params.z == 0u) { discard; }
+    if ((inst.params.z & 1u) == 0u) { discard; }
     return i.pick;
 }
 
