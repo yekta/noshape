@@ -658,6 +658,7 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     // (A trimmed surface's own: the same parameters.)
     while (const occ::handle<Geom_RectangularTrimmedSurface> tr = occ::down_cast<Geom_RectangularTrimmedSurface>(surf))
       surf = tr->BasisSurface();
+    const bool flattened = occ::down_cast<Geom_Plane>(surf).IsNull();
     surf = as_plane(surf, f);
     // (An offset surface (Shell's slabs): the plane, cylinder, cone, ... OCCT keeps as its equivalent; else a
     // B-spline within 1e-7 of it over the face's parameters (the same parameters, so its curves on it stay).)
@@ -811,8 +812,9 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
           b.face_inner_edges.push_back(static_cast<uint32_t>(k - 1));
           continue;
         }
-        // A seam (twice in a cylinder's or cone's face) once each way.
-        if (seen[k] == i && ((cyl.IsNull() && con.IsNull() && !free) || BRep_Tool::IsClosed(TopoDS::Edge(e), f) == false))
+        // A seam (twice in a cylinder's or cone's face, or a flat closed B-spline's taken as its plane: a slit there)
+        // once each way.
+        if (seen[k] == i && ((cyl.IsNull() && con.IsNull() && !free && !(flattened && !pl.IsNull())) || BRep_Tool::IsClosed(TopoDS::Edge(e), f) == false))
           return "an edge twice in a face";
         seen[k] = i;
         b.uses.push_back(static_cast<uint32_t>(2 * (k - 1) + (e.Orientation() == TopAbs_REVERSED ? 1 : 0)));

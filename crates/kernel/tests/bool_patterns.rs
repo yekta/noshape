@@ -3127,6 +3127,38 @@ fn a_rounding_cut_tangent_to_a_blocks_walls_keeps_both_end_faces_as_occt() {
     recorded_as_occt("553beda0e7f5810f", 1e-9);
 }
 
+/// A Face Blend's ring round an elliptic boss fused on its plate (recorded): the ring's flat bottom a closed B-spline
+/// with a seam, its inner wall the boss's copy, a closed B-spline across its seam. As OCCT's.
+#[test]
+fn a_blend_ring_round_an_elliptic_boss_fuses_as_occt() {
+    recorded_as_occt("2284dd9ca29d00df", 1e-7);
+}
+
+/// The same with the asymmetric section (recorded): OCCT splits the ring's top edge on the boss at three points
+/// nothing else is at; live keeps it whole (one closed edge, live/bool2/q-fb-ell-asym-1119; Parasolid has no seams).
+/// Ours: OCCT's volume and faces, that edge in two only at the boss's and the ring's seams (as OCCT's on the other
+/// sections), three edges and vertices fewer.
+#[test]
+fn an_asymmetric_blend_ring_keeps_its_edge_on_the_boss_whole_as_live() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "2a5740b0d124e53d").expect("the recorded Boolean");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert!(r.shape.is_valid());
+    let counts = |k: k::ShapeType| r.shape.count(k);
+    assert_eq!((counts(k::ShapeType::Face), counts(k::ShapeType::Edge), counts(k::ShapeType::Vertex)), (c.summary.faces, c.summary.edges - 3, c.summary.vertices - 3));
+    let v = r.shape.volume().unwrap();
+    assert!((v - c.summary.volume).abs() <= 1e-7 * c.summary.volume, "volume {v} vs OCCT's {}", c.summary.volume);
+    // (The edges on the boss at z 8: two, between the seams, 51.054 mm in all.)
+    let on_boss: Vec<_> = r.shape.edges().into_iter().filter_map(|e| e.edge_info().ok()).filter(|i| (i.start.z - 8e-3).abs() < 1e-9 && (i.end.z - 8e-3).abs() < 1e-9).collect();
+    assert_eq!(on_boss.len(), 2, "{on_boss:?}");
+    assert!((on_boss.iter().map(|i| i.length).sum::<f64>() - 51.054e-3).abs() < 1e-5);
+}
+
 /// Two plates sharing one edge, fused (recorded): they only touch along it, so OCCT keeps both solids as they were,
 /// that edge shared by four faces, and every input Kept; ours did too only where nothing was shared ("a non-manifold
 /// result": the shared edge was taken for one OCCT remakes).
