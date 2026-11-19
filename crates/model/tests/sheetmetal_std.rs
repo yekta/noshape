@@ -2283,7 +2283,58 @@ fn a_pattern_or_mirror_of_sheet_metal_carries_its_form_and_hole() {
         assert!(solids.len() == 2 && solids.iter().all(|v| (v - 9638.003952).abs() < 1e-3), "mirror {mirror}: each part as live's 9638.003952 mm³: {solids:?}");
         // Each part's flat as the other's: the outline and the hole, the same forms.
         let flats: Vec<(usize, usize)> = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| noshape_model::sheetmetal::flat_pattern_for(&r.context, &b.id).map(|f| (f.loops.len(), f.forms.len())).expect("its flat")).collect();
-        assert!(flats.len() == 2 && flats[0] == flats[1] && flats[0].0 == 2, "mirror {mirror}: (loops, forms) per flat {flats:?}");
+        assert!(flats.len() == 2 && flats[0] == flats[1] && flats[0] == (2, 1), "mirror {mirror}: (loops, forms) per flat {flats:?}");
+    }
+}
+
+/// A plate with a hole and an emboss (live q-sm-pattern-1119's plate): its flat has the hole's loop and the
+/// emboss's outline, whichever comes first (the hole took the form's outline off the flat).
+#[test]
+#[ignore = "T2: sheet metal std (form studio)"]
+fn a_flat_keeps_its_form_beside_a_hole() {
+    for hole_first in [true, false] {
+        let mut s = Studio::new();
+        let region = s.rectangle(80.0, 60.0);
+        s.add("sheetMetalStart", move |p| {
+            p.set("process", en("THICKEN"));
+            p.set("regions", ParamValue::Query(vec![region]));
+            p.set("thickness", expr("2 mm"));
+        });
+        let r = s.ok();
+        let body = r.context.bodies[part(&r)].id.clone();
+        let top = face_at(&r, DVec3::new(40.0, 10.0, 2.0));
+        let mut sk = noshape_sketch::Sketch::new();
+        let (hole_at, form_at) = (sk.add_point(glam::DVec2::new(mm(25.0), mm(30.0))), sk.add_point(glam::DVec2::new(mm(55.0), mm(30.0))));
+        let sketch = s.add("sketch", |pv| {
+            pv.set("sketchPlane", ParamValue::Query(vec![top.clone()]));
+            pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+        });
+        s.ok();
+        let hole = |s: &mut Studio| {
+            s.add("hole", |h| {
+                h.set("scope", ParamValue::Query(vec![Reference::Body(body.clone())]));
+                h.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: hole_at.0 }]));
+                h.set("unitsSystem", en("METRIC"));
+                h.set("styleV2", en("SIMPLE"));
+                h.set("endStyleV2", en("THROUGH"));
+                h.set("holeDiameterV3", expr("6 mm"));
+            });
+        };
+        if hole_first {
+            hole(&mut s);
+        }
+        s.add("sheetMetalFormed", |p| {
+            p.set("formPartStudio", ParamValue::Text("library:circle-emboss".into()));
+            p.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: form_at.0 }]));
+            p.set("targetFaces", ParamValue::Query(vec![top.clone()]));
+        });
+        if !hole_first {
+            hole(&mut s);
+        }
+        let r = s.ok();
+        assert!((volume_mm3(&r) - 9638.003952).abs() < 1e-3, "hole first {hole_first}: the formed plate {} mm³", volume_mm3(&r));
+        let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("its flat");
+        assert!(flat.loops.len() == 2 && !flat.forms.is_empty(), "hole first {hole_first}: loops {} forms {}", flat.loops.len(), flat.forms.len());
     }
 }
 

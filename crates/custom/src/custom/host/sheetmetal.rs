@@ -1923,14 +1923,14 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             }
             let faces: Vec<Shape> = holes.into_iter().map(|h| h.0).collect();
             if let Ok(r) = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&flat), &faces, &k::BooleanOptions::default()) {
-                flat = r.shape;
+                flat = lone_face(r.shape);
             }
             slab = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&slab), &tools, &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal wall hole failed: {e}")))?.shape;
         }
         if !reliefs.is_empty() {
             let tools: Vec<Shape> = reliefs.iter().map(|r| r.0.clone()).collect();
             if let Ok(r) = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&flat), &tools, &k::BooleanOptions::default()) {
-                flat = r.shape;
+                flat = lone_face(r.shape);
             }
             slab = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&slab), &tools, &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal bend relief failed: {e}")))?.shape;
             // The slot's faces come from the bend's end vertex.
@@ -2947,6 +2947,15 @@ fn sketch_curves(s: &crate::regen::context::SketchResult) -> Vec<(Vec<DVec3>, bo
             (pts.len() >= 2).then(|| (pts.into_iter().map(|p| f.origin + f.x * p.x + f.y * p.y).collect(), !e.construction))
         })
         .collect()
+}
+
+/// A Boolean's result as its face when it is one (a wall's flat with its holes cut: the compound had no plane, and the
+/// flat lost the wall's forms).
+fn lone_face(shape: Shape) -> Shape {
+    match shape.faces().as_slice() {
+        [f] => f.clone(),
+        _ => shape,
+    }
 }
 
 fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips: &[Strip], forms: &[FormShapes], cuts: &[(usize, Vec<Shape>)]) -> Option<crate::sheetmetal::FlatPattern> {
