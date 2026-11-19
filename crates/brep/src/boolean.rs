@@ -1510,8 +1510,11 @@ impl Ctx<'_> {
             }
             // (A straight edge at the seam's angle that isn't the seam (a slot's wall cut there): on the side its loop
             // comes to it from, as its pieces are (parity56 b1c8abed: its other side left the face's one piece outside
-            // the bound, a face lost).)
-            if let Surf::Cyl { r, th0, .. } = self.faces[f].s {
+            // the bound, a face lost). Not on a face going round between rulings at th0 (a thread's turn): those are
+            // placed by `right` already.)
+            if let Surf::Cyl { r, th0, .. } = self.faces[f].s
+                && self.faces[f].right.is_empty()
+            {
                 let tol = self.tol;
                 let on = |x: f64| (x - r * th0).abs() <= tol || (x - r * (th0 + TAU)).abs() <= tol;
                 let es = &self.faces[f].edges;
