@@ -369,6 +369,28 @@ fn rows() -> Vec<Row> {
             }
             expect(got, vec![1.0, 0.0, 0.1, 10.1, 11.1, 11.1], "Depth's steps from the start (Up, Down, Ctrl+Up, Shift+Up, Alt+Up, PageUp)")
         } },
+        Row { id: "fields / the wheel over a value field", live: "live2 field-keys-1118: unfocused, two notches over Depth change nothing; focused, a notch steps it 1 mm, the next the other way back", gap: false, check: |cx| {
+            let (window, _view, dialog) = edit_extrude(cx, "dlg-wheel");
+            let field = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("numf-depth").ok_or("no Depth field")?;
+            let depth = |cx: &mut TestAppContext| cx.update(|cx| dialog.read(cx).feature.params.expr("depth").map(|e| e.text.clone()));
+            let notch = |cx: &mut TestAppContext, dy: f32| {
+                gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::ScrollWheelEvent { position: field.center(), delta: gpui_kit::ScrollDelta::Lines(gpui_kit::point(0., dy)), modifiers: Modifiers::default(), ..Default::default() });
+                draw(cx, window);
+            };
+            let before = depth(cx);
+            notch(cx, 1.);
+            notch(cx, 1.);
+            let unfocused = depth(cx);
+            cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
+            draw(cx, window);
+            let shown = |cx: &mut TestAppContext| cx.update(|cx| dialog.read(cx).input_text("depth", cx)).and_then(|(t, _)| t.split_whitespace().next()?.parse::<f64>().ok());
+            let start = shown(cx).ok_or("no Depth text")?;
+            notch(cx, 1.);
+            let one = shown(cx).ok_or("no Depth text")?;
+            notch(cx, -1.);
+            let back = shown(cx).ok_or("no Depth text")?;
+            expect((unfocused == before, ((one - start).abs() * 10.).round() / 10., back == start), (true, 1.0, true), "(unfocused unchanged, a focused notch's step, the next notch back)")
+        } },
         Row { id: "fields / Tab from Radius", live: "Radius's ± button, then the checkboxes in order; Tab skips the selection fields and the dropdowns", gap: false, check: |cx| {
             let (window, _view, dialog, _) = fillet_on_an_edge(cx, "dlg-tab")?;
             cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("radius", w, cx))).unwrap();
