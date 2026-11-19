@@ -1,16 +1,20 @@
 {
  "scenario": "drw-geometric-tolerance",
- "recorded": "2026-11-07T16:19:43.416Z",
+ "recorded": "2026-11-19T16:15:55.229Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.7 cb0eee3a + live2 2026-11-07.8"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
   "document": "b53c968665192de2f2abd604",
   "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "3d47ca994178def2700ac967",
+  "element": "a1434ec556a7ee081bc21b24",
   "start": "block-drawing",
   "startElement": "7fc07371758a5353920f612d",
   "runner": "live2 .nstate-uip-2.json"
@@ -51,6 +55,10 @@
     {
      "name": "Front",
      "kind": "base",
+     "position": [
+      81,
+      81
+     ],
      "parent": null,
      "scale": "1:1",
      "brokenOut": 0
@@ -58,6 +66,10 @@
     {
      "name": "Isometric",
      "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -65,6 +77,10 @@
     {
      "name": "Right",
      "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -72,6 +88,10 @@
     {
      "name": "Top",
      "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -143,6 +163,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -150,6 +174,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -157,6 +185,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -164,6 +196,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -173,7 +209,7 @@
      "selection": []
     }
    },
-   "t": 213552
+   "t": 233972
   },
   {
    "step": 2,
@@ -192,8 +228,8 @@
    },
    "ok": true,
    "at": [
-    749,
-    606
+    727,
+    657
    ],
    "state": {
     "focus": {
@@ -243,6 +279,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -250,6 +290,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -257,6 +301,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -264,6 +312,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -272,13 +324,17 @@
      "annotations": [
       {
        "kind": "gdt",
-       "text": "⌖"
+       "text": "⌖",
+       "position": [
+        84.5,
+        89.7
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 229642
+   "t": 260355
   },
   {
    "step": 3,
@@ -297,8 +353,8 @@
    },
    "ok": true,
    "at": [
-    749,
-    574
+    727,
+    622
    ],
    "state": {
     "focus": {
@@ -348,6 +404,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -355,6 +415,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -362,6 +426,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -369,6 +437,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -377,17 +449,25 @@
      "annotations": [
       {
        "kind": "gdt",
-       "text": "⌖"
+       "text": "⌖",
+       "position": [
+        84.5,
+        89.7
+       ]
       },
       {
        "kind": "gdt",
-       "text": "⌖"
+       "text": "⌖",
+       "position": [
+        84.5,
+        97.7
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 243673
+   "t": 286917
   },
   {
    "step": 4,
@@ -445,6 +525,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -452,6 +536,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -459,6 +547,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -466,6 +558,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -474,17 +570,25 @@
      "annotations": [
       {
        "kind": "gdt",
-       "text": "⌖"
+       "text": "⌖",
+       "position": [
+        84.5,
+        89.7
+       ]
       },
       {
        "kind": "gdt",
-       "text": "⌖"
+       "text": "⌖",
+       "position": [
+        84.5,
+        97.7
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 257859
+   "t": 312626
   },
   {
    "step": 5,
@@ -493,6 +597,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     883,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -529,6 +641,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -536,6 +652,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -543,6 +663,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -550,6 +674,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -558,17 +686,25 @@
      "annotations": [
       {
        "kind": "gdt",
-       "text": "⌖"
+       "text": "⌖",
+       "position": [
+        84.5,
+        89.7
+       ]
       },
       {
        "kind": "gdt",
-       "text": "⌖"
+       "text": "⌖",
+       "position": [
+        84.5,
+        97.7
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 272611
+   "t": 339395
   }
  ],
  "_meta": {
@@ -577,9 +713,9 @@
     "format": "DXF",
     "via": "dialog (tab › Export…)",
     "file": "drw-geometric-tolerance.dxf",
-    "bytes": 94326,
+    "bytes": 94329,
     "error": null,
-    "formatBefore": "PDF",
+    "formatBefore": "DXF",
     "fields": [
      {
       "label": "File name View export rules",
@@ -711,7 +847,7 @@
     "format": "PDF",
     "via": "dialog (tab › Export…)",
     "file": "drw-geometric-tolerance.pdf",
-    "bytes": 79611,
+    "bytes": 79730,
     "error": null,
     "formatBefore": "DWG",
     "fields": [
