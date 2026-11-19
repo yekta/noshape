@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 09:42 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 10:33 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -49,22 +49,24 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
 - Landed today: 4104b148, 24792169, dceaee62, cd1acebd, 2dbf7d61 (conflict colours, live rechecked). live rechecked
   on green bfe09bcd: crossing row 67, conflict row 110, bend-face click row 1704 all =.
 - Lead's missing-functionality list (order set by the lead): #1 / #2 export follow-ups, then #3, then #4 / #5.
-  - QUEUED 32f60584 (#1 flat DXF exact curves `FlatCurve` / `outline_curves`) and 0dae1e11 (ELLIPSE; #2 "Include
-    visible sketches" on MODELSKETCH_VISIBLE via `flat_sketch_curves`, `FlatPattern::sketches`; sheetmetal_export_flat
-    options DWG / version / scope / units / checkboxes; insunits shared; µm scale fix). Live truth:
-    live/skasm/q-flat-dxf-1119 (ARC corner, CIRCLE hole, slot 2 LINE + 2 ARC, hole across a bend 2 ELLIPSE + 2 LINE,
-    bend centreline split around that hole: LOCAL a1a00fce4 `FlatPattern::clip_to_flat`, test; lands with #3).
-  - LOCAL 63eb8b124 #3: pattern / mirror of active sheet metal forms each copy (live q-sm-pattern-1119: 80x60 plate,
-    hole, emboss, each part 9638.003952 mm³). opPattern records `body_moves`; set_attribute (`moved_form_tools`,
-    status.rs) rewrites a copied wall attribute's form tool ids to moved ids (`moved_tools`: id -> (tool, transform));
-    transient_ref resolves them; FormTools.moved places shapes and form sketches; the post-rebuild persistent rename
-    keeps moved ids. T2 `a_pattern_or_mirror_of_sheet_metal_carries_its_form_and_hole`; SM T2 96/96, sm matrix 17/17,
-    custom + ops e2e pass. Suite G running on vibe2 (/root/skasm-scratch/suiteg.out, ~/agents/skasm-keep/suite-G-*);
-    land after it equals F (91/126, 1335/1585).
-  - FOUND (pre-existing, next after #3): a flat loses its form outline when a sheet metal hole is on the plate (no
-    pattern needed): flat_of gets the form at the form's rebuild, later rebuilds pass no forms (form tools not found
-    then?). Live shows hole + form circles. Repro: the #3 test's plate; without the hole the flat has its form.
-  - #4 extrude on the flat (opSMFlatOperation), #5 corner break next to bends: live captures queued after studios'.
+  - LANDED 32f60584 (#1 flat DXF exact curves `FlatCurve` / `outline_curves`) as 1021a0c1; 0dae1e11 (ELLIPSE; #2
+    "Include visible sketches" on MODELSKETCH_VISIBLE, export options) queued. Live truth: live/skasm/q-flat-dxf-1119.
+  - LOCAL, to land together after suite G = F (91/126, 1335/1585; G waits in vibe2's slot, built 09:4x, holds the first
+    two): a1a00fce4 bend centreline split around a hole (`FlatPattern::clip_to_flat`); 63eb8b124 #3 pattern / mirror
+    of active sheet metal forms each copy (live q-sm-pattern-1119, 9638.003952 mm³ each; `body_moves`,
+    `moved_form_tools` / `moved_tools`, FormTools.moved; T2 `a_pattern_or_mirror_of_sheet_metal_carries_its_form_and_hole`
+    now also asserts one form per flat); 6f2318e4c a flat keeps a form beside a hole (`lone_face`: the wall's flat with
+    holes cut was a compound, no plane, form skipped; T2 `a_flat_keeps_its_form_beside_a_hole`); 5bbbdc5e0 #4 step 1.
+    SM T2 81/81, sm matrix 17/17, custom 16, ops e2e 252, clippy clean (10:2x).
+  - #4 step 1 (5bbbdc5e0): Extrude with domain FLAT routes to std (`adds_to_active_sheet_metal`); `Context::flat_sketches`
+    (sketch eval records a sketch on a flat face); host SM_FLAT_FILTER / PARTS_ATTACHED_TO / queryContainsFlattenedSheetMetal
+    know flat sketch entities (`QueryCx::flat_part`); `opSMFlatOperation` (sheetmetal.rs): Remove = region ∩ each wall's
+    flat face, mapped back by FlatPlace.walls' transform, cut from the definition sheet; Add = region off the flat, onto
+    the touching wall, oriented as it, fused (unify). ops no longer calls always-hidden params ignored. e2e
+    `an_extrude_in_the_flat_cuts_and_adds` (±200 mm³). Open for live (REQUESTS 10:31, q-flat-ops-1119): how the app
+    picks domain FLAT (flat view focus? flat region?), regions across a bend, Add errors (SM_FLAT_OP_ADD_CROSSES_EDGE),
+    the feature list entry; then the app side.
+  - #5 corner break beside bends (sm_flat.rs "only supported at a wall's free corner yet"): same request.
 - Open (low: geometry matches): infento Part grid's four 80 mm LENGTHs (seed side V2HoieiIDMV9, the pattern's
   direction lines len1 / len2, one more) end driven in ours (E, F and 07:2x builds alike; TRACE "set driven"): live's
   grid instances are tied corner to corner by 401 PATTERN COINCIDENTs, so the spacings follow from the seed's size and
