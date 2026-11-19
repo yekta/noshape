@@ -105,16 +105,16 @@ against live with a feel scenario; share psui's pick code (`Viewport::pick_prior
 - Assembly already as live (checked 11-17): box select rule, glyph click selects the mate (related rows, mated faces
   amber, dashed connector line), graphics hover lights no list row, list hover outlines the parts.
 
-## Agents (lead's roster 11-19 11:5x; only these ids)
+## Agents (lead's roster 11-19, qa / psui / live2 moved to Motile; only these ids)
 core d30002ca-d013-4435-b7d9-7da9cb564cec, blend de66e481-56e2-4005-a5d3-9fa897ca5fde,
-bool 754a9804-feb1-4153-b32a-acf9b2a6d94d, qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b,
-psui 4973e295-9e92-463f-a13f-2ec5258bc5f9, live2 79ae5cdb-42a4-4025-b43a-da61a4f92ad7,
+bool 754a9804-feb1-4153-b32a-acf9b2a6d94d, qa 40e853dc-757f-4498-878f-00b41fd8af75,
+psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, live2 d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1,
 asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6,
 bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0. live is paused until ~21:00 11-19: captures to live2 or live/REQUESTS.md.
-Paused agents are not messaged (DECISIONS 11-17).
+Paused agents are not messaged (DECISIONS 11-17); stopped: qa 132756b3, psui 4973e295, live2 79ae5cdb.
 
 ## Waiting on others
-- live2 (79ae5cdb): the weld retake (metric positions); drawprops-1119, note-opts-1119; retakes of 4fc2ea4f's rows and
+- live2 (d7f4a0c2): the weld retake (metric positions); drawprops-1119, note-opts-1119; retakes of 4fc2ea4f's rows and
   Callout once green. live (e8549719): the 8 drw-revision-* and drw-styles-dimension retakes; titleblock / holecallout
   / holetable / export-1119; the Feature Studio retake of f4e766b8 once green.
 
