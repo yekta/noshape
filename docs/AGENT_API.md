@@ -1512,6 +1512,7 @@ Examples:
 | `shapes` | array of object |  | Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes. A line's `direction` [x, y] with its two clicks at one point: a line a sketch fillet consumed, which keeps that direction. |
 | `construction` | boolean |  | Make the new geometry construction geometry. |
 | `sides` | integer |  | Polygon sides. |
+| `rho` | number |  | A conic's ρ (0 < ρ < 1; default 0.5), as typed in its box while drawing: its Rho dimension. |
 | `start_derivative` | array of number or string |  | spline: the open spline's derivative at its start, [x, y] (per unit of its 0–1 parameter, as Onshape stores `startDerivative`; its end handle placed for it). With `end_derivative`. |
 | `end_derivative` | array of number or string |  | spline: the derivative at its end (Onshape's `endDerivative`). With `start_derivative`. |
 | `degree` | integer |  | bezier: a B-spline of this degree on those control points (any number of them; Onshape's stored B-splines, a Use's or an offset's) instead of the tool's one span. With `knots`. |
@@ -5870,21 +5871,23 @@ Examples:
 
 #### ui_preferences
 
-Graphics preferences (the camera menu's Graphics preferences…) and dark mode.
+Graphics preferences (the camera menu's Graphics preferences…), the Sketch dialog's options and dark mode.
 
-The user's Graphics preferences: `graphics` without fields replies with them (ambient_occlusion 0–1, fov_deg 20–120, line widths in px 0.1–3, shininess 0.01–1, colors "#rrggbb", construction [dash, gap, dash, gap] px); with fields, those change and are saved (per user, for every document), as the dialog's ✓ does. render_image draws with them; with the app open (live mode) every window applies them at once. `dark_mode` turns dark mode on or off (Preferences › Theming, the account menu's View in dark mode beta), saved and applied at once with the app open.
+The user's Graphics preferences: `graphics` without fields replies with them (ambient_occlusion 0–1, fov_deg 20–120, line widths in px 0.1–3, shininess 0.01–1, colors "#rrggbb", construction [dash, gap, dash, gap] px); with fields, those change and are saved (per user, for every document), as the dialog's ✓ does. render_image draws with them; with the app open (live mode) every window applies them at once. `dark_mode` turns dark mode on or off (Preferences › Theming, the account menu's View in dark mode beta), saved and applied at once with the app open. `sketch_options` are the Sketch dialog's checkboxes (show_constraints, show_expressions, show_errors; live's defaults: errors only), kept per user as accepting a sketch with them changed does: every sketch opened next shows them.
 
 Examples:
 
 ```json
 {}
 {"graphics": {"fov_deg": 60, "line_width": 1.5, "sketch_constrained": "#202020"}}
+{"sketch_options": {"show_constraints": true}}
 ```
 
 | field | type | | description |
 |---|---|---|---|
 | `graphics` | object |  | Preferences to change, by name (see the reply). |
 | `dark_mode` | boolean |  | Dark mode on (true) or off (false). |
+| `sketch_options` | object |  | The Sketch dialog's Show constraints / Show expressions / Show errors to change: `show_constraints`, `show_expressions`, `show_errors` (booleans). |
 
 #### ui_toolbar
 

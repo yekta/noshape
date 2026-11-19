@@ -1966,6 +1966,13 @@ fn a_beziers_control_polygon_takes_constraints() {
     let polygon = bezier["handle_arms"].as_array().cloned().unwrap_or_default();
     assert_eq!(polygon.len(), 2, "{bezier}");
     assert!(created(&r, "conic")[0].get("handle_arms").is_none());
+    // ρ as typed in the conic's box while drawing: its Rho dimension.
+    let c = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "conic", "points": [[0, -80], [60, -80], [30, -60]], "rho": 0.7 }));
+    assert_eq!(created(&c, "conic")[0]["rho"].as_f64(), Some(0.7), "{c}");
+    let rhos: Vec<String> = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["constraints"].as_array().unwrap().iter().filter(|c| c["type"] == "Rho").map(|c| c["value"].to_string()).collect();
+    assert!(rhos.iter().any(|v| v.contains("0.7")), "{rhos:?}");
+    let e = try_call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "line", "points": [[0, 0], [1, 1]], "rho": 0.7 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("rho"), "{e:?}");
     let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
     let entity = |g: &Value, id: &Value| g["entities"].as_array().unwrap().iter().find(|e| e["id"] == *id).cloned().unwrap();
     let first = entity(&g, &polygon[0]);

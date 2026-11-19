@@ -34,11 +34,12 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "ui",
             verb: "preferences",
-            summary: "Graphics preferences (the camera menu's Graphics preferences…) and dark mode",
-            description: "The user's Graphics preferences: `graphics` without fields replies with them (ambient_occlusion 0–1, fov_deg 20–120, line widths in px 0.1–3, shininess 0.01–1, colors \"#rrggbb\", construction [dash, gap, dash, gap] px); with fields, those change and are saved (per user, for every document), as the dialog's ✓ does. render_image draws with them; with the app open (live mode) every window applies them at once. `dark_mode` turns dark mode on or off (Preferences › Theming, the account menu's View in dark mode beta), saved and applied at once with the app open.",
+            summary: "Graphics preferences (the camera menu's Graphics preferences…), the Sketch dialog's options and dark mode",
+            description: "The user's Graphics preferences: `graphics` without fields replies with them (ambient_occlusion 0–1, fov_deg 20–120, line widths in px 0.1–3, shininess 0.01–1, colors \"#rrggbb\", construction [dash, gap, dash, gap] px); with fields, those change and are saved (per user, for every document), as the dialog's ✓ does. render_image draws with them; with the app open (live mode) every window applies them at once. `dark_mode` turns dark mode on or off (Preferences › Theming, the account menu's View in dark mode beta), saved and applied at once with the app open. `sketch_options` are the Sketch dialog's checkboxes (show_constraints, show_expressions, show_errors; live's defaults: errors only), kept per user as accepting a sketch with them changed does: every sketch opened next shows them.",
             fields: vec![
                 opt("graphics", json!({ "type": "object" }), "Preferences to change, by name (see the reply)."),
                 opt("dark_mode", json!({ "type": "boolean" }), "Dark mode on (true) or off (false)."),
+                opt("sketch_options", json!({ "type": "object" }), "The Sketch dialog's Show constraints / Show expressions / Show errors to change: `show_constraints`, `show_expressions`, `show_errors` (booleans)."),
             ],
             mutates: false,
             destructive: false,
@@ -235,7 +236,23 @@ fn preferences(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         crate::prefs::set_dark_mode(a.bool_or("dark_mode", false)?);
         ctx.reload_prefs = true;
     }
-    Ok(json!({ "graphics": crate::prefs::graphics_json(&prefs), "dark_mode": crate::prefs::dark_mode(), "shown_in_app": ctx.serving }).into())
+    let mut sk = noshape_scene::sketch_mode::sketch_options();
+    if let Some(set) = a.object("sketch_options")?.filter(|m| !m.is_empty()) {
+        for (k, v) in set {
+            let field = format!("sketch_options.{k}");
+            let on = v.as_bool().ok_or_else(|| OpError::param(&field, "true or false"))?;
+            match k.as_str() {
+                "show_constraints" => sk.show_constraints = on,
+                "show_expressions" => sk.show_expressions = on,
+                "show_errors" => sk.show_errors = on,
+                _ => return Err(OpError::param(&field, "one of show_constraints, show_expressions, show_errors")),
+            }
+        }
+        noshape_scene::sketch_mode::save_sketch_options(sk);
+        ctx.reload_prefs = true;
+    }
+    let sketch_options = json!({ "show_constraints": sk.show_constraints, "show_expressions": sk.show_expressions, "show_errors": sk.show_errors });
+    Ok(json!({ "graphics": crate::prefs::graphics_json(&prefs), "dark_mode": crate::prefs::dark_mode(), "sketch_options": sketch_options, "shown_in_app": ctx.serving }).into())
 }
 
 fn toolbar(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

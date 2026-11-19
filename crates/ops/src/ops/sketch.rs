@@ -99,9 +99,10 @@ pub fn ops() -> Vec<Op> {
                 req("sketch", s(), "Sketch feature id or name."),
                 opt("tool", json!({ "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }), "Drawing tool (required without `shapes`)."),
                 opt("points", json!({ "type": "array", "items": click_point.clone() }), "The clicks, in order: [[x, y], ...] in sketch coordinates, or [[x, y, z], ...] model positions (required without `shapes`)."),
-                opt("shapes", json!({ "type": "array", "items": { "type": "object", "properties": { "tool": { "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }, "points": { "type": "array", "items": click_point.clone() }, "sides": { "type": "integer", "minimum": 3, "maximum": 1000 }, "construction": { "type": "boolean" }, "tangent_arc_switch": { "type": "array", "items": { "type": "integer" } }, "apart": { "type": "array", "items": { "type": "integer" } }, "start_derivative": click_point.clone(), "end_derivative": click_point.clone(), "degree": { "type": "integer", "minimum": 1 }, "knots": { "type": "array", "items": { "type": "number" } }, "weights": { "type": "array", "items": { "type": "number" } }, "direction": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 } }, "required": ["tool", "points"] } }), "Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes. A line's `direction` [x, y] with its two clicks at one point: a line a sketch fillet consumed, which keeps that direction."),
+                opt("shapes", json!({ "type": "array", "items": { "type": "object", "properties": { "tool": { "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }, "points": { "type": "array", "items": click_point.clone() }, "sides": { "type": "integer", "minimum": 3, "maximum": 1000 }, "rho": { "type": "number" }, "construction": { "type": "boolean" }, "tangent_arc_switch": { "type": "array", "items": { "type": "integer" } }, "apart": { "type": "array", "items": { "type": "integer" } }, "start_derivative": click_point.clone(), "end_derivative": click_point.clone(), "degree": { "type": "integer", "minimum": 1 }, "knots": { "type": "array", "items": { "type": "number" } }, "weights": { "type": "array", "items": { "type": "number" } }, "direction": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 } }, "required": ["tool", "points"] } }), "Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes. A line's `direction` [x, y] with its two clicks at one point: a line a sketch fillet consumed, which keeps that direction."),
                 opt("construction", json!({ "type": "boolean" }), "Make the new geometry construction geometry."),
                 opt("sides", json!({ "type": "integer", "minimum": 3, "maximum": 1000 }), "Polygon sides."),
+                opt("rho", json!({ "type": "number" }), "A conic's ρ (0 < ρ < 1; default 0.5), as typed in its box while drawing: its Rho dimension."),
                 opt("start_derivative", click_point.clone(), "spline: the open spline's derivative at its start, [x, y] (per unit of its 0–1 parameter, as Onshape stores `startDerivative`; its end handle placed for it). With `end_derivative`."),
                 opt("end_derivative", click_point.clone(), "spline: the derivative at its end (Onshape's `endDerivative`). With `start_derivative`."),
                 opt("degree", json!({ "type": "integer", "minimum": 1 }), "bezier: a B-spline of this degree on those control points (any number of them; Onshape's stored B-splines, a Use's or an offset's) instead of the tool's one span. With `knots`."),
@@ -726,6 +727,7 @@ fn draw(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 let tool = obj.get("tool").and_then(Value::as_str).ok_or_else(|| OpError::param(&format!("{p}tool"), "required"))?;
                 let points = obj.get("points").and_then(Value::as_array).ok_or_else(|| OpError::param(&format!("{p}points"), "required: [[x, y], ...]"))?;
                 let sides = obj.get("sides").map(|v| v.as_u64().ok_or_else(|| OpError::param(&format!("{p}sides"), "an integer"))).transpose()?;
+                let rho = obj.get("rho").filter(|v| !v.is_null()).map(|v| v.as_f64().ok_or_else(|| OpError::param(&format!("{p}rho"), "a number between 0 and 1"))).transpose()?;
                 let construction = obj.get("construction").map(|v| v.as_bool().ok_or_else(|| OpError::param(&format!("{p}construction"), "true or false"))).transpose()?.unwrap_or(false);
                 let switches = switch_list(obj.get("tangent_arc_switch"), &format!("{p}tangent_arc_switch"))?;
                 let apart = switch_list(obj.get("apart"), &format!("{p}apart"))?;
@@ -739,7 +741,7 @@ fn draw(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                         _ => Err(OpError::param(&format!("{p}direction"), "two numbers [x, y]")),
                     })
                     .transpose()?;
-                draw_shape(&mut t, &units, &p, tool, points, sides, construction, (&switches, &apart), ends, knots, direction)?;
+                draw_shape(&mut t, &units, &p, tool, points, (sides, rho), construction, (&switches, &apart), ends, knots, direction)?;
             }
         }
         None => {
@@ -748,7 +750,8 @@ fn draw(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let ends = end_derivatives(a.get("start_derivative"), a.get("end_derivative"), &units, "")?;
             let knots = knot_args(a.get("degree"), a.get("knots"), a.get("weights"), "")?;
             let apart = switch_list(a.get("apart"), "apart")?;
-            draw_shape(&mut t, &units, "", tool, points, a.opt_u64("sides")?, a.bool_or("construction", false)?, (&switches, &apart), ends, knots, None)?;
+            let rho = a.get("rho").filter(|v| !v.is_null()).map(|v| v.as_f64().ok_or_else(|| OpError::param("rho", "a number between 0 and 1"))).transpose()?;
+            draw_shape(&mut t, &units, "", tool, points, (a.opt_u64("sides")?, rho), a.bool_or("construction", false)?, (&switches, &apart), ends, knots, None)?;
         }
     }
     let (id, tab) = (t.id, t.tab);
@@ -799,7 +802,7 @@ fn switch_list(v: Option<&Value>, param: &str) -> Result<Vec<usize>, OpError> {
 /// `sketch_draw` call does (`p`: the parameter prefix for errors).
 /// `switches`: the line tool's Shift+A before those clicks; `apart`: clicks that don't snap onto existing points.
 #[allow(clippy::too_many_arguments)]
-fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, points: &[Value], sides: Option<u64>, construction: bool, (switches, apart): (&[usize], &[usize]), ends: Option<(DVec2, DVec2)>, knots: Option<Knots>, direction: Option<DVec2>) -> Result<(), OpError> {
+fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, points: &[Value], (sides, rho): (Option<u64>, Option<f64>), construction: bool, (switches, apart): (&[usize], &[usize]), ends: Option<(DVec2, DVec2)>, knots: Option<Knots>, direction: Option<DVec2>) -> Result<(), OpError> {
     let tool = DRAW_TOOLS.iter().find(|x| x.0 == name).map(|x| x.1).ok_or_else(|| {
         let names: Vec<&str> = DRAW_TOOLS.iter().map(|t| t.0).collect();
         OpError::param(&format!("{p}tool"), &format!("`{name}` is not a drawing tool{}; tools: {}", crate::error::did_you_mean(name, names.iter().copied()), names.join(", ")))
@@ -850,6 +853,16 @@ fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, poin
     ed.set_tool(tool);
     if let Some(n) = sides {
         ed.polygon_sides = n.clamp(3, 1000) as usize;
+    }
+    // The conic's ρ, as typed in its box while drawing (live: 0 < ρ < 1; its Rho dimension).
+    if let Some(r) = rho {
+        if name != "conic" {
+            return Err(OpError::param(&format!("{p}rho"), "the conic tool's"));
+        }
+        if !(r > 0.0 && r < 1.0) {
+            return Err(OpError::param(&format!("{p}rho"), "a number between 0 and 1"));
+        }
+        ed.conic_rho = r;
     }
     if !switches.is_empty() && name != "line" {
         return Err(OpError::param(&format!("{p}tangent_arc_switch"), "the line tool's switch"));

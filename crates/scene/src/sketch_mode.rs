@@ -944,7 +944,8 @@ pub fn sketch_options() -> SketchOptions {
     *saved.get_or_insert_with(|| if cfg!(test) { SketchOptions::default() } else { std::fs::read(sketch_options_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default() })
 }
 
-fn save_sketch_options(o: SketchOptions) {
+/// Saves the Sketch dialog's options (per user, every sketch opens with them).
+pub fn save_sketch_options(o: SketchOptions) {
     *SKETCH_OPTIONS.lock().unwrap_or_else(|e| e.into_inner()) = Some(o);
     if !cfg!(test)
         && let Ok(b) = serde_json::to_vec_pretty(&o)

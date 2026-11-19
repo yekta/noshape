@@ -37,6 +37,16 @@ fn graphics_preferences_toolbar_and_shortcuts_read_set_and_kept() {
     assert_eq!(kept, json!({ "language": "de", "darkMode": true }));
     let e = call(&mut ctx, "ui_preferences", json!({ "dark_mode": "yes" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("dark_mode"), "{e:?}");
+    // The Sketch dialog's options (live: Show errors alone ticked until changed), kept per user as accepting a sketch
+    // with them changed does.
+    let o = call(&mut ctx, "ui_preferences", json!({})).unwrap();
+    assert_eq!(o["sketch_options"], json!({ "show_constraints": false, "show_expressions": false, "show_errors": true }), "{o}");
+    let o = call(&mut ctx, "ui_preferences", json!({ "sketch_options": { "show_constraints": true, "show_errors": false } })).unwrap();
+    assert_eq!(o["sketch_options"], json!({ "show_constraints": true, "show_expressions": false, "show_errors": false }), "{o}");
+    let kept: Value = serde_json::from_slice(&std::fs::read(dir.join("sketch-options.json")).unwrap()).unwrap();
+    assert_eq!((kept["show_constraints"].clone(), kept["show_errors"].clone()), (json!(true), json!(false)), "{kept}");
+    let e = call(&mut ctx, "ui_preferences", json!({ "sketch_options": { "show_dims": true } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("sketch_options.show_dims"), "{e:?}");
 
     // The toolbar: Customize toolbar… and the S shortcut toolbar.
     let t = call(&mut ctx, "ui_toolbar", json!({})).unwrap();
