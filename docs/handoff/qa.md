@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 23:16)
+# QA handoff (agent qa; current state only, updated 2026-11-19 23:18)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -56,7 +56,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    on the released app (vibex6, slot), then the compat baseline moved. Then bin/rel-compat.sh <prev> <v> (released CLI vs
    the previous release) -> compat/rel-<v>.txt; any user-document worse = P0 to the lead at once.
 3. The app spot-check rows (archive "Release checks: the app spot-check list"): user cases + 8 interaction-feel rows in
-   rotation (next: rows 33-40).
+   rotation (next: rows 41-48; 33-40 = on green 615bed1f 23:17, suites/1119-2318-green-spot33 8/8 + rows 95-97 by hand).
 4. Hover flow (lead 11-17 22:20, every release): uh/uh2.sh <release app> <out> on vibex6 Xvfb, 3 runs, xsheet.py for the sheet;
    USER-HOVER-STAYS-LIT is listed as known in the cut's entry until psui's latest-wins picking fix passes 3 clean runs.
 
@@ -116,8 +116,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    their greens: asm b146b56f (drag group, typed limits), dx BRAND-IN-UI-TEXT, skasm Simulation connection dropped.
    Sketch tools 23:09-23:15: 3-point arc, spline, circumscribed polygon (spinner; Enter commits, Esc discards = live), Slot on a
    line (Ø20), sketch Fillet R5, angle dim, Mirror (line first) = live; P1 SKETCH-SLOT-ON-ARC (skasm, told: arc deleted, Ø0 left).
-   Also verify studios f450d0dd (history row ellipsis, "Noshape Labs"). Next: spot rows 33-40 on green, then re-walk fixes as
-   their greens land. App runs: units qa-xvfb110 + qa-walk*-app
+   Also verify studios f450d0dd (history row ellipsis, "Noshape Labs"). Next: direct-edit walk (Move / Delete face, Draft,
+   Split, Thicken), then re-walk fixes as their greens land. App runs: units qa-xvfb110 + qa-walk*-app
    (systemd-run, NOSHAPE_CONFIG_DIR per doc), tool search alt+c + name + Return; Esc keeps selection, Space clears.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
