@@ -100,6 +100,26 @@ fn slot_around_line_and_arc() {
     assert!((regions[0].area() - expect).abs() < 1e-2, "{} vs {expect}", regions[0].area());
 }
 
+/// The Slot tool on a free arc (qa SKETCH-SLOT-ON-ARC: "Ø0" and no slot): the caps are the two on its ends, not
+/// its offset sides (which share its centre); the width dimension and Equal then keep the slot whole.
+#[test]
+fn a_slot_on_an_arc_dimensions_its_end_caps_only() {
+    let mut sk = Sketch::new();
+    let a = sk.add_arc(v(0.0, 0.0), v(0.0227, 0.0), v(0.0, 0.0227));
+    let (_, caps) = sk.slot_chains(&[a], 0.02).unwrap();
+    assert_eq!(caps.len(), 2);
+    let ends = sk.endpoints(a).unwrap();
+    assert!(caps.iter().all(|c| sk.entity(*c).and_then(|e| e.center()).is_some_and(|ctr| ctr == ends.0 || ctr == ends.1)));
+    sk.add_constraint(ConstraintKind::Diameter { curve: caps[0], value: 0.02 }).unwrap();
+    sk.add_constraint(ConstraintKind::Equal { a: caps[0], b: caps[1] }).unwrap();
+    assert!(sk.solve().is_solved());
+    let regions = sk.regions();
+    assert_eq!(regions.len(), 1);
+    let (ro, ri) = (0.0327f64, 0.0127f64);
+    let expect = std::f64::consts::PI / 4.0 * (ro * ro - ri * ri) + std::f64::consts::PI * 0.01 * 0.01;
+    assert!((regions[0].area() - expect).abs() < 1e-8, "{} vs {expect}", regions[0].area());
+}
+
 #[test]
 fn spline_control_points_can_be_inserted() {
     let mut sk = Sketch::new();

@@ -9452,6 +9452,29 @@ mod tests {
         assert!(!d.sketch.entity(other).unwrap().construction);
     }
 
+    /// qa SKETCH-SLOT-ON-ARC: the Slot tool on a free 3-point arc wraps it in a slot of the tool's width (live behaviours 164); Esc
+    /// commits it with the arc kept (ours drew "Ø0", no slot, and Esc left the arc's centre and a Ø0 dimension).
+    #[test]
+    fn a_slot_on_a_free_arc_wraps_it_and_esc_keeps_the_arc() {
+        let (mut ed, mut d) = editor(Tool::Slot);
+        let c = v(0.03, 0.03);
+        let arc = d.sketch.add_arc(c, c + v(0.0227, 0.0), c + v(0.0, 0.0227));
+        click(&mut ed, &mut d, c + DVec2::from_angle(std::f64::consts::FRAC_PI_4) * 0.0227);
+        let (_, _, w) = ed.slot_dimension().expect("the preview shows its Ø dimension");
+        assert!((w - ed.slot_width).abs() < 1e-12, "{w}");
+        assert!(ed.escape_commit(&mut d).is_some_and(|o| o.changed));
+        let r = |d: &SketchData, e: EntityId| d.sketch.curve(e).map(|k| (k.start_point() - c).length());
+        assert!(r(&d, arc).is_some_and(|r| (r - 0.0227).abs() < 1e-9), "the arc kept: {:?}", r(&d, arc));
+        assert_eq!(count(&d, EntityKind::Arc), 5, "the arc, two sides and two caps");
+        let dia: Vec<f64> = d.sketch.constraints().filter_map(|k| match k.kind { ConstraintKind::Diameter { value, .. } => Some(value), _ => None }).collect();
+        assert!(dia.len() == 1 && (dia[0] - ed.slot_width).abs() < 1e-12, "{dia:?}");
+        // (The solid arc splits the slot in two: a quarter annulus and the two half-disc caps.)
+        let area: f64 = d.sketch.regions().iter().map(|g| g.area()).sum();
+        let h = ed.slot_width / 2.0;
+        let expect = std::f64::consts::FRAC_PI_4 * ((0.0227 + h).powi(2) - (0.0227 - h).powi(2)) + std::f64::consts::PI * h * h;
+        assert!((area - expect).abs() < 1e-8, "{area} vs {expect}");
+    }
+
     /// Live (sketch-linear-pattern-click-commit, sketch-circular-pattern-click-commit): a click in white space accepts
     /// the pattern and ends the tool, nothing left selected.
     #[test]

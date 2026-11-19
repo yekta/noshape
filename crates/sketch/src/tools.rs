@@ -1050,7 +1050,9 @@ impl Sketch {
                     curves.extend(s.curves);
                     continue;
                 }
-                caps.extend(s.curves.iter().copied().filter(|c| self.kind(*c) == Some(EntityKind::Arc) && self.entity(*c).and_then(|e| e.center()).is_some_and(|ctr| self.entity(items[0].0).is_some_and(|x| x.point_refs().contains(&ctr)))));
+                // The caps sit on the arc's ends (its offset sides share its centre).
+                let ends = self.endpoints(items[0].0);
+                caps.extend(s.curves.iter().copied().filter(|c| self.kind(*c) == Some(EntityKind::Arc) && self.entity(*c).and_then(|e| e.center()).is_some_and(|ctr| ends.is_some_and(|(a, b)| ctr == a || ctr == b))));
                 curves.extend(s.curves);
                 continue;
             }
