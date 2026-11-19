@@ -77,11 +77,13 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    BOM / callout, studio session Tab / Checkbox dialog / merge+restore with B1 open. Core told: c2-surf-workshop cpcurves Thicken 1 Ok ->
    Warning, Split 6 / mutualtrim Fillet 1 messages (corpus, compat ALERT 814b48d8 / daa1bebd). cut-check: green re-read under the lock,
    30 min cap then the newest finished check (named in the line).
-000. **11-19 08:30 state.** session-ps2-1119 (ps2sess/: mkdoc.py builds the start via nscli, mkps2.py, ps2.sh; vibe2) = live except
-   Hole 1 also drilling the sweep tube above its point (Part 1 -231 mm3) -> core 08:29; timings all under live's. Kept vibe2
-   ~/agents/qa-keep/session-ps2-1119. Armed: qa-rel-0460 (bin/rel-0460.sh: published check + rel-compat 0.4.59 + session-1118 /
-   smsess replays on the released app, one alert); qa-dx-prewarm (fa952d158 landed, building base/fix on vibex7); qa-dxf-recheck
-   (drwsess/dxf-recheck.sh waits for aaa02dc99 on a green, then diffs DXF counts vs live's -> dx).
+000. **11-19 09:10 state.** session-ps2-1119 (ps2sess/; vibe2 app af11b6d5) = live except Hole 1 drilling the sweep tube above its
+   point (Part 1 -231 mm3) -> core. Studios 166b521c re-check (stsess/run.sh on vibe2: asess a1..a5, ssess t1 t4 t2a t2b t3; sr.sh now
+   saves shots): asm BOM / 1:4 / pin balloon, Tab, Checkbox = live; merge dialog opens on Keep Main with Merge disabled (live: Replace
+   with B1, 3 tabs) -> studios 09:05; restore untestable until then. Kept vibe2 ~/agents/qa-keep/{session-ps2-1119,studio-1119-recheck}.
+   Armed: qa-rel-0460 (publish of v0.4.60); qa-dx-prewarm (base 2fffa9a06 built, fix rebuild after a SIGTERM; skips built apps);
+   qa-dxf-rerun (drwsess/dxf-rerun.sh: dx's placed-view label is stored at placement, so drw.sh d0..d5 reruns on vibex8 with the
+   current green, then dxf-cmp.sh vs live's DXF; on the old doc only live's empty MTEXT was missing).
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
    with NOSHAPE_PARITY_VALIDITY=1 (bin/suites-models.sh exports it) models.log prints per feature "CHECK <doc> feature <k>:
    <part> valid <true|false> raw f/e/v; ..." (PartState.check, query parts' "check"; not in report.json). suites-diff.py
