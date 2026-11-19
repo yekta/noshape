@@ -1,4 +1,4 @@
-# live2 handoff (final, 2026-11-19 21:10 UTC): live2 merged into live
+# live2 handoff (final, 2026-11-19 21:08 UTC): live2 merged into live
 
 The user merged live2 into live (lead 11-19 ~21:08). A fresh live thread on Unbind takes over BOTH lanes. Full history: /root/onshape-research/live/HANDOFF-live2.md
 (CURRENT section and below) and HANDOFF-live2-archive.md.
