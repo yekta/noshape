@@ -354,7 +354,7 @@ pub(super) fn target(od: &mut OpenDoc, tab: TabId, a: &Args) -> Result<SketchTar
         return Err(OpError::param("sketch", &format!("`{}` is a {}, not a sketch", f.name, f.type_id)));
     }
     let index = ps.index_of(id).expect("found");
-    let data = match f.params.get("sketch") {
+    let mut data = match f.params.get("sketch") {
         Some(ParamValue::Sketch(d)) => (**d).clone(),
         _ => SketchData::default(),
     };
@@ -364,6 +364,10 @@ pub(super) fn target(od: &mut OpenDoc, tab: TabId, a: &Args) -> Result<SketchTar
         o.upto = Some(index + 1);
         o.editing_sketch = Some(id);
     })?;
+    // Its Uses where the model has them now, as the opened sketch in the app (`take_solved_draft`).
+    if let Some(s) = regen.context.sketch(id) {
+        data.sketch.adopt_geometry_where(&s.sketch, |e| e.external);
+    }
     let frame = regen.context.sketch(id).map(|s| s.frame).unwrap_or(PlaneFrame::TOP);
     let units = od.doc().settings.units;
     Ok(SketchTarget { tab, id, index, name, data, frame, regen, units })
@@ -560,12 +564,16 @@ pub(super) fn sketch_state(od: &mut OpenDoc, tab: TabId, id: FeatureId, before: 
     let units = od.doc().settings.units;
     let k = crate::ops::query::len_scale(&units);
     let ps = doc::studio(od.doc(), tab)?;
-    let data = match ps.feature(id).and_then(|f| f.params.get("sketch")) {
+    let mut data = match ps.feature(id).and_then(|f| f.params.get("sketch")) {
         Some(ParamValue::Sketch(d)) => (**d).clone(),
         _ => SketchData::default(),
     };
     let features: Vec<(FeatureId, String)> = ps.features.iter().map(|f| (f.id, f.name.clone())).collect();
     let r = od.regenerate(tab, None)?;
+    // Its Uses where the model has them now, as the app shows them.
+    if let Some(s) = r.context.sketch(id) {
+        data.sketch.adopt_geometry_where(&s.sketch, |e| e.external);
+    }
     // Features the edit broke downstream (or that were already failing), as feature replies report them.
     let failed: Vec<Value> = features
         .iter()

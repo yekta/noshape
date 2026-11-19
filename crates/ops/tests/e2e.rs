@@ -9832,5 +9832,36 @@ fn a_trimmed_or_split_use_follows_the_edges_ends() {
         xs.dedup();
         let want = if trim { vec![10.0, 25.0, 40.0] } else { vec![10.0, 15.0, 40.0] };
         assert_eq!(xs, want, "trim {trim}");
+        // sketch_get shows them where the regeneration put them, as the app's opened sketch does.
+        let mut got: Vec<f64> = entities(&mut ctx, &s2, "point").iter().filter(|p| num(&p["at"][1]).abs() < 1e-6).map(|p| (num(&p["at"][0]) * 10.0).round() / 10.0).collect();
+        got.sort_by(f64::total_cmp);
+        got.dedup();
+        assert_eq!(got, want, "sketch_get, trim {trim}");
     }
 }
+
+/// Live (ui 10-24 a, qa session-sm-1119): the Bends rows run in their letters' order. A cut across the first flange's
+/// bend makes it the newest joint: re-lettered last (Bend D) and listed last (ours listed it first, A, D, B).
+#[test]
+fn bend_rows_run_in_their_letters_order() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "bend-row-order.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [60, 40]] }));
+    call(&mut ctx, "feature_add", json!({ "type": "sheetMetalStart", "params": { "process": "THICKEN", "regions": [r["regions"][0]["id"]], "thickness": "2 mm", "radius": "2 mm" } }));
+    for (dir, near) in [([1, 0, 0], [30, 0, 2]), ([0, 1, 0], [60, 20, 2]), ([1, 0, 0], [30, 40, 2])] {
+        let e = call(&mut ctx, "query_entities", json!({ "kind": "edges", "direction": dir, "near": near, "limit": 1 }))["edges"][0]["id"].clone();
+        call(&mut ctx, "feature_add", json!({ "type": "sheetMetalFlange", "params": { "edges": [e], "distance": "20 mm" } }));
+    }
+    let names = |ctx: &mut Ctx| call(ctx, "sheetmetal_table", json!({}))["bends"].as_array().unwrap().iter().map(|b| b["name"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    assert_eq!(names(&mut ctx), ["Bend A", "Bend B", "Bend C"]);
+    // A Ø6 hole through the y = 0 bend.
+    let c = call(&mut ctx, "sketch_create", json!({ "plane": "plane:front", "name": "Cut" }))["sketch"].as_str().unwrap().to_string();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": c, "tool": "circle", "points": [[30, 0], [33, 0]] }));
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [d["regions"][0]["id"]], "operationType": "REMOVE", "endBound": "THROUGH_ALL", "symmetric": true } }));
+    let rows = names(&mut ctx);
+    let mut sorted = rows.clone();
+    sorted.sort_by_key(|n| n.rsplit(' ').next().unwrap().to_string());
+    assert_eq!(rows, sorted, "rows in letter order");
+    assert_eq!(rows.len(), 3, "{rows:?}");
+}
+

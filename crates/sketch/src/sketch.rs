@@ -326,9 +326,15 @@ impl Sketch {
     /// Takes `solved`'s geometry for every entity of the same id and kind here (a regeneration's solve of this
     /// sketch); whether anything moved.
     pub fn adopt_geometry(&mut self, solved: &Sketch) -> bool {
+        self.adopt_geometry_where(solved, |_| true)
+    }
+
+    /// [`Sketch::adopt_geometry`] for the entities `which` picks.
+    pub fn adopt_geometry_where(&mut self, solved: &Sketch, which: impl Fn(&Entity) -> bool) -> bool {
         let mut moved = false;
         for (id, e) in self.entities.iter_mut() {
-            if let Some(s) = solved.entities.get(id)
+            if which(e)
+                && let Some(s) = solved.entities.get(id)
                 && std::mem::discriminant(&s.geometry) == std::mem::discriminant(&e.geometry)
                 && s.geometry != e.geometry
             {

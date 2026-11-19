@@ -126,12 +126,15 @@ pub fn bend_face(b: &Bend) -> Option<Reference> {
 }
 
 /// The Bends rows' order (indices into the model's bends): the stored Move
-/// up / Move down order, then the rest in model order; a split joint once
+/// up / Move down order, then the rest in their letters' order; a split joint once
 /// (its first piece).
 pub fn bend_row_order(data: &SheetMetalData, stored: &[Reference]) -> Vec<usize> {
     let key = |i: usize| bend_faces(&data.bends[i]).iter().filter_map(|r| stored.iter().position(|s| s == r)).min().unwrap_or(usize::MAX);
+    // Unmoved rows in their letters' order (live ui 10-24 a: "Bend A, Hem D, Bend E, Bend F"; qa session-sm-1119: A, B,
+    // D, not A, D, B): a joint's earliest piece's birth.
+    let birth = |i: usize| data.bends.iter().enumerate().filter(|(j, _)| joint_of(data, *j) == i).map(|(_, b)| b.birth).min().unwrap_or(data.bends[i].birth);
     let mut idx: Vec<usize> = (0..data.bends.len()).filter(|&i| joint_of(data, i) == i).collect();
-    idx.sort_by_key(|&i| (key(i), i));
+    idx.sort_by_key(|&i| (key(i), birth(i), i));
     idx
 }
 
