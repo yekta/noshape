@@ -1,6 +1,6 @@
 {
  "scenario": "drw-revision-table-delete",
- "recorded": "2026-11-17T20:09:06.145Z",
+ "recorded": "2026-11-19T21:28:47.525Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -9,15 +9,15 @@
    1919,
    1079
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.7"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "579e910b1c663aea195a642c",
-  "workspace": "dc99596dc35101ee71e310b0",
-  "element": "db8300301ad352ddf531196c",
+  "document": "09ef5fc646d36792afa3cc16",
+  "workspace": "5effcec11079c42aa75e3292",
+  "element": "7a20769e59eb65fa1001cb61",
   "start": "block-drawing",
-  "startElement": "db8300301ad352ddf531196c",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "7a20769e59eb65fa1001cb61",
+  "runner": "live2 nstate-co.json"
  },
  "start": {
   "focus": {
@@ -286,7 +286,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 208604
+   "t": 204486
   },
   {
    "step": 2,
@@ -439,7 +439,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 234179
+   "t": 230902
   },
   {
    "step": 3,
@@ -567,7 +567,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 260454
+   "t": 257737
   },
   {
    "step": 4,
@@ -687,7 +687,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 286472
+   "t": 282341
   },
   {
    "step": 5,
@@ -814,7 +814,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 312490
+   "t": 308504
   },
   {
    "step": 6,
@@ -996,7 +996,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 338466
+   "t": 334144
   },
   {
    "step": 7,
@@ -1126,14 +1126,14 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 363753
+   "t": 360614
   },
   {
    "step": 8,
    "do": {
     "do": "wait",
     "until": "ms",
-    "ms": 1000
+    "ms": 3000
    },
    "ok": true,
    "state": {
@@ -1251,7 +1251,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 388831
+   "t": 387505
   }
  ]
 }

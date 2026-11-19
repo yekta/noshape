@@ -1,19 +1,23 @@
 {
  "scenario": "part-menu-release-workflows-off",
- "recorded": "2026-11-14T03:18:18.184Z",
+ "recorded": "2026-11-19T21:13:54.829Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.1 82b3ead3 + live2 2026-11-14.4"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "c6bfa0e2eb3731f8f9dc7618",
+  "document": "3a0ed454d09d9a8aa7f5397a",
+  "workspace": "0165ae0580403fc0b58715ee",
+  "element": "2c429c9422c103466ee907b4",
   "start": "block",
-  "startElement": "fec75b9b8f06f7e2fe8fa56f",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "8b8a146f8f31f226afceafd7",
+  "runner": "live2 nstate-co.json"
  },
  "start": {
   "focus": {
@@ -201,7 +205,7 @@
     },
     "measure": null
    },
-   "t": 31016
+   "t": 30073
   }
  ]
 }

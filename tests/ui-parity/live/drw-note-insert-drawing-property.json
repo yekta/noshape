@@ -1,23 +1,23 @@
 {
  "scenario": "drw-note-insert-drawing-property",
- "recorded": "2026-11-17T14:33:25.400Z",
+ "recorded": "2026-11-19T21:15:34.301Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
   "viewport": [
    1919,
-   992
+   1079
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.6"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "060c0461ca301a2c112f155e",
-  "workspace": "96663039d748842f7c25efc6",
-  "element": "bd059cc86091e2bab0f8dd44",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "4887f711ffde02ec35d4a7ca",
   "start": "block-drawing",
-  "startElement": "d0643b8ab31b96fd21acb45e",
-  "runner": "live2 .nstate-uip-4.json"
+  "startElement": "7fc07371758a5353920f612d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -45,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1 (1)",
+   "tab": "Part 1 Drawing 1",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -141,7 +141,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -197,7 +197,7 @@
      "selection": []
     }
    },
-   "t": 227336
+   "t": 229127
   },
   {
    "step": 2,
@@ -212,8 +212,8 @@
    },
    "ok": true,
    "at": [
-    667,
-    799
+    636,
+    870
    ],
    "state": {
     "focus": {
@@ -224,8 +224,8 @@
      "kind": "cell-format",
      "title": "Note",
      "rect": [
-      666,
-      582,
+      636,
+      653,
       394,
       160
      ],
@@ -351,7 +351,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -407,7 +407,7 @@
      "selection": []
     }
    },
-   "t": 254092
+   "t": 256123
   },
   {
    "step": 3,
@@ -419,8 +419,8 @@
    },
    "ok": true,
    "at": [
-    741,
-    692
+    711,
+    763
    ],
    "state": {
     "focus": {
@@ -431,8 +431,8 @@
      "kind": "cell-format",
      "title": "Note",
      "rect": [
-      666,
-      582,
+      636,
+      653,
       394,
       160
      ],
@@ -634,7 +634,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -691,15 +691,11 @@
       {
        "kind": "EDGE",
        "owner": "Front"
-      },
-      {
-       "kind": "EDGE",
-       "owner": "Top"
       }
      ]
     }
    },
-   "t": 279795
+   "t": 281835
   },
   {
    "step": 4,
@@ -711,8 +707,8 @@
    },
    "ok": true,
    "at": [
-    813,
-    456
+    783,
+    527
    ],
    "state": {
     "focus": {
@@ -723,8 +719,8 @@
      "kind": "cell-format",
      "title": "Note",
      "rect": [
-      666,
-      582,
+      636,
+      653,
       394,
       160
      ],
@@ -850,7 +846,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -906,7 +902,7 @@
      "selection": []
     }
    },
-   "t": 304995
+   "t": 307767
   },
   {
    "step": 5,
@@ -921,8 +917,8 @@
    },
    "ok": true,
    "at": [
-    1372,
-    211
+    1410,
+    224
    ],
    "state": {
     "focus": {
@@ -950,7 +946,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1005,17 +1001,17 @@
      "annotations": [
       {
        "kind": "note",
-       "text": "PART 1 DRAWING 1 (1)",
+       "text": "PART 1 DRAWING 1",
        "position": [
-        81.9,
-        38.3
+        79.1,
+        38.6
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 330755
+   "t": 333822
   },
   {
    "step": 6,
@@ -1058,7 +1054,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1113,17 +1109,17 @@
      "annotations": [
       {
        "kind": "note",
-       "text": "PART 1 DRAWING 1 (1)",
+       "text": "PART 1 DRAWING 1",
        "position": [
-        81.9,
-        38.3
+        79.1,
+        38.6
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 357380
+   "t": 359542
   }
  ]
 }

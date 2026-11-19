@@ -1,6 +1,6 @@
 {
  "name": "part-menu-release",
- "about": "block: right-click Part 1's row, Release…: its dialog, then Escape",
+ "about": "block: right-click Part 1's row, Release\u2026: its dialog, then Escape",
  "area": "psui",
  "source": "coverage 11-06 (lead: menus, batch 8)",
  "start": "block",
@@ -14,12 +14,22 @@
   {
    "do": "click",
    "on": {
-    "menu": "Release…"
+    "menu": "Release\u2026"
    }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 6000
   },
   {
    "do": "key",
    "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
   }
  ],
  "config_files": {

@@ -1,6 +1,6 @@
 {
  "scenario": "drw-inspection-table-iso-scrolled",
- "recorded": "2026-11-17T19:52:56.066Z",
+ "recorded": "2026-11-19T21:32:25.534Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -9,15 +9,15 @@
    1919,
    1079
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.7"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "e7c4ca1a6800fe89ed2ff299",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "058d102124380e1d6622db6d",
   "start": "block-drawing-iso",
-  "startElement": "fec75b9b8f06f7e2fe8fa56f",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "7fc07371758a5353920f612d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -196,7 +196,7 @@
      "selection": []
     }
    },
-   "t": 229116
+   "t": 226786
   },
   {
    "step": 2,
@@ -296,7 +296,7 @@
      "selection": []
     }
    },
-   "t": 254949
+   "t": 251012
   },
   {
    "step": 3,
@@ -405,7 +405,7 @@
      "selection": []
     }
    },
-   "t": 280311
+   "t": 275123
   },
   {
    "step": 4,
@@ -510,7 +510,7 @@
      "selection": []
     }
    },
-   "t": 307360
+   "t": 301042
   },
   {
    "step": 5,
@@ -650,7 +650,7 @@
      "selection": []
     }
    },
-   "t": 332394
+   "t": 325347
   },
   {
    "step": 6,
@@ -785,7 +785,7 @@
      "selection": []
     }
    },
-   "t": 359243
+   "t": 351484
   },
   {
    "step": 7,
@@ -940,7 +940,7 @@
      "selection": []
     }
    },
-   "t": 410442
+   "t": 379179
   },
   {
    "step": 8,
@@ -1075,7 +1075,7 @@
      "selection": []
     }
    },
-   "t": 436853
+   "t": 404792
   },
   {
    "step": 9,
@@ -1214,7 +1214,7 @@
      "selection": []
     }
    },
-   "t": 463717
+   "t": 431589
   }
  ]
 }

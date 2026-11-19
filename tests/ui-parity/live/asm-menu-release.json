@@ -1,19 +1,23 @@
 {
  "scenario": "asm-menu-release",
- "recorded": "2026-11-07T00:57:23.121Z",
+ "recorded": "2026-11-19T21:16:01.013Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.1"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "50b442f0aefb751f0daea69e",
+  "document": "3a0ed454d09d9a8aa7f5397a",
+  "workspace": "0165ae0580403fc0b58715ee",
+  "element": "81c4e352e637c138fec6920a",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "9e006d1bff71b65ede8c15bb",
+  "runner": "live2 nstate-co.json"
  },
  "start": {
   "focus": {
@@ -21,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -63,6 +68,15 @@
      "related": false,
      "hidden": false,
      "cls": "is-instance"
+    },
+    {
+     "name": "Items (0)",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-folder"
     },
     {
      "name": "Mate features (0)",
@@ -133,7 +147,34 @@
    ],
    "mates": []
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    36.83,
+    25.49,
+    6.34
+   ],
+   "eye_mm": [
+    63.812,
+    -21.243,
+    37.495
+   ],
+   "width_mm": 98.649,
+   "height_mm": 57.373,
+   "mmPerPixel": 0.058965,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -155,6 +196,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -178,7 +220,9 @@
       "Move to new subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Revision history…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 2…",
@@ -232,6 +276,15 @@
        "cls": "is-instance  fake-hover context-menu-active"
       },
       {
+       "name": "Items (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
        "name": "Mate features (0)",
        "state": "ok",
        "selected": false,
@@ -300,9 +353,36 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 98.649,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.058965,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 39280
+   "t": 36489
   },
   {
    "step": 2,
@@ -312,27 +392,51 @@
      "menu": "Release…"
     }
    },
-   "ok": true,
-   "at": [
-    225,
-    722
-   ],
+   "ok": false,
+   "error": "target not found: {\"menu\":\"Release…\"}",
    "state": {
     "focus": {
-     "kind": "other",
-     "tag": "div"
+     "kind": "none"
     },
-    "dialog": {
-     "kind": "modal",
-     "title": "",
-     "fields": [],
-     "buttons": [
-      "Chat now to learn more",
-      "Start Professional Trial"
-     ]
-    },
+    "dialog": null,
     "dialogs": [],
-    "list": null,
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Properties…",
+      "Instance properties…",
+      "Hide",
+      "Hide other instances",
+      "Hide all instances",
+      "Show center of mass",
+      "Isolate…",
+      "Make transparent…",
+      "Suppress",
+      "Dynamic suppression",
+      "Fix",
+      "Use best available tessellation",
+      "Edit in context",
+      "Add mate connector to instance origin…",
+      "Replace instances…",
+      "Switch to start two-blocks",
+      "Copy Part 2 <1>",
+      "Move to new subassembly",
+      "Change to version…",
+      "Export…",
+      "Where used…",
+      "Revision history…",
+      "Create task…",
+      "Add comment",
+      "Zoom to selection",
+      "Create Drawing of Part 2…",
+      "Add selection to folder…",
+      "Create empty subassembly",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -373,7 +477,16 @@
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "is-instance"
+       "cls": "is-instance  fake-hover context-menu-active"
+      },
+      {
+       "name": "Items (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
       },
       {
        "name": "Mate features (0)",
@@ -444,9 +557,36 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 98.649,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.058965,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 42611
+   "t": 38834
   },
   {
    "step": 3,
@@ -455,12 +595,28 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     90,
+     235
+    ],
+    "hover": [
+     {
+      "_serializedByteLength": 0,
+      "path": [
+       "MVhUjOQHXaI2e/Ty4"
+      ]
+     }
+    ],
+    "element": "div#context-menu-layer"
+   },
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -503,6 +659,15 @@
        "related": false,
        "hidden": false,
        "cls": "is-instance"
+      },
+      {
+       "name": "Items (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
       },
       {
        "name": "Mate features (0)",
@@ -573,9 +738,36 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 98.649,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.058965,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 46321
+   "t": 42617
   }
  ]
 }
