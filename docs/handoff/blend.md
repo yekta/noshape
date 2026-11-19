@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-19 17:25 UTC (blend thread 2fc420a3). History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-19 21:25 UTC (fresh blend thread 11-19 21:10 after the old one stalled at the usage limit). History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -13,9 +13,7 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   (parked). Hosts by load (bin/pickhost), not vibex7 while it is loaded (lead 14:00); userdocs only vibex7, one CLI run
   there at a time (bin/ud-gate.sh waits). Units via `systemd-run -E HOME=/root -E PATH=$PATH`. No std::thread joins on
   rayon workers (dx f1e0c74ef).
-- Queued: isaac chamfers 22572486 (rebased, Chamfer 2 test appended; crash957 Chamfer 3 now builds, main failed);
-  fillet / chamfer kernel failures in Onshape's words e3035de9 (qa compat alert: knifehandle Fillet 2's raw "arc through
-  3 points failed"; detail.rs in_onshape_words at fillet() / chamfer(); test detail::tests::a_kernel_failure...).
+- LANDED: isaac chamfers (bb667320d, f8865fb7e), kernel failures in Onshape's words (74ebd649c).
 - Knifehandle Fillet 3 LANDED 5a26a0d6 (with the inside-out decline).
 - Knifehandle Fillet 2 PARKED (time box 15:00; blend12 c87fec635, probes blend-scratch/khf2-with-probes.patch). On its
   old base (8bb9824b9) it built live's 11/27/18: (1) x 15.4 end: the last ball section's feet lay a few um off the
@@ -32,16 +30,18 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 - 805e29 exact edges (blend2, uncommitted on 61320d427): analytic_blend_edges now also runs when no face was converted
   (the edges between OCCT's own cylinders); all 16 convert (8 lines, 8 circles, lengths equal) but the reshaped solid is
   invalid: one cylinder face's area negative (ZZ_ANA trace, bin/805t1.sh). Next: that face's pcurves / orientation.
-- Suspension splice (blend13): step 2 face_with_edge_replaced (kernel: a face with one edge replaced by a run between
-  its ends, other wires kept, cusps fixed; test core::a_face_with_an_edge_replaced...) gating (bin/fwer-gate.sh). With
-  it the probe (crash_inputs::zz_lca_splice, ZZ_OWN/ZZ_ONE) splices one corner face by face: 70 faces as live, valid,
-  round 3890.942 mm2 (= live), tube one face 32914.412, canal 158.807 (live 158.817), -130.38 mm3 (live -131.3).
-  Then step 3: model code (find OCCT's corner patch by its 4 neighbours, all 8 corners) + T1 (70/156/86).
+- Suspension splice (blend13, uncommitted on 8d9420223 = step 1 make_edge_on): step 2 face_with_edge_replaced passed
+  (kernel core:: 56 ok, g13 OK; clippy warnings only in the zz_lca_splice probe in crash_inputs.rs: drop the probe from
+  the land, keep it in parked/). Step 3 = blend_section.rs canal_corners (each B-spline patch with round / tube / plane
+  / torus neighbours rebuilt as a canal, face by face, sewn, unified) hooked in detail.rs fillet() after naming; T1
+  features_c::rounds_running_into_a_tube_close_on_canals_as_live (70/156/86, 8 canals 158.817, 1763356.88 mm3 +-12;
+  data suspension-lca-fillet3-input.brep untracked: add it). Compile fixed 21:20; bin/lca-t1.sh <host> -> logs/lca-t1.out.
+  Then: strict suite + userdocs + g13, land steps 1-3 together.
 - Mutualtrim Fillet 1 (blend4, parked): split_on turns closed touch loops into zero-area faces.
-- Agent ids changed 11-19: studios 31c9b9ba-e7f8-40f7-85cb-242bab86dbe6, dx aad5e825-f86c-432d-b4ac-3aab402e7052, qa
-  40e853dc-757f-4498-878f-00b41fd8af75, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, live2
-  d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1 (old qa/psui/live2/studios/dx threads stopped). live off until ~21:00: captures
-  to live2 or live/REQUESTS.md.
+- Agent ids (restart 11-19 21:10): studios 91339202-41f1-4465-91f4-65ccd26ea1b1, dx 6cfc89bd-1196-43ef-9225-0014546fee1e,
+  qa ac50e7f2-4677-4cab-a57a-fd068a0c07bf, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, asm d8d597e0-675c-497b-a804-544ceab99bbd,
+  skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, live 349fe81d-db78-4931-8032-6dc3edc5d558 (bool2/live2 merged into
+  bool/live; core, bool: new ids from the lead). Every other id in this file is dead.
 
 ## In flight (older)
 
@@ -70,11 +70,6 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   x 1.502 vs live 0.097 (live JfR curves to -x). GeomLib C2 extension changes nothing. Dumps Mac
   ~/noshape-host/agents/blend10/zzdump/sections-{31,34,35}.brep (+.txt edges); probes kernel blend.rs zz_halter /
   zz_extdev; ZZ_TOL / ZZ_DUMP / ZZ_FRAME prints in blend_section.rs (blend10, uncommitted). Next: f26's bevel.
-- Agent ids (11-19 13:40): asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm
-  18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios
-  31c9b9ba-e7f8-40f7-85cb-242bab86dbe6, live e8549719-ef9a-42de-960c-e24b29f142a6, live2
-  d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1, bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, core e8af89fe-d460-49b3-b0bb-9572da230fed,
-  qa 40e853dc-757f-4498-878f-00b41fd8af75, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, dx aad5e825-f86c-432d-b4ac-3aab402e7052.
 - Queued from asm (after the current items): asm-gearbox-std 6a912b / a470167 Fillet 2 (EDGE fillet of 2 faces' edges,
   tangent, 0.125 in: ours 38/92/56, live 38/88/52, -12.1 mm3; repro vibex6/7 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/mgb
   NOSHAPE_PARITY_ONLY=m6a912b); asm-scissor-lift fed22d Fillet 3 (Top - Side 2 45/110/64 vs 48/116/64; Motor Mount Live (q-gearbox-f2/corner.json): each corner a torus (27.55 mm2, its edge on the vertical round the
