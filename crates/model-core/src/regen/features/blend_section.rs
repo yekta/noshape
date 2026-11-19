@@ -2246,6 +2246,11 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
             Ball::Loft(secs, closed, starts, n, turn) => k::with_kernel_legacy(legacy.clone(), || {
                 halt()?;
                 let tool = k::loft_tool(&secs, closed, &starts)?;
+                // (A loft inside out: its balls turned over somewhere; a Boolean by it took 10 s of c2-surf-workshop-
+                // knifehandle's Fillet 2 to come out in pieces.)
+                if tool.shape.volume().is_ok_and(|v| v < 0.0) {
+                    return Err(fail("a rolling balls' tool inside out"));
+                }
                 if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
                     eprintln!("ball loft: {} sections ({n} on the edge, turning {turn:.3}): valid {} volume {:?}", secs.len(), tool.shape.is_valid(), tool.shape.volume());
                 }
