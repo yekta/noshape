@@ -314,7 +314,11 @@ pub fn fit_spline(ev: &mut EvalCtx) -> FResult<()> {
         let mut tangents = Vec::new();
         if !closed {
             // The picked direction and the magnitude, negated by its flip (std).
-            let dir = |id: &'static str, mag: &'static str, flip: &str, curvature: &str| -> FResult<Option<(DVec3, f64)>> {
+            // std: an edge's magnitude is scaled by the points' summed square-root spacing over its end segment's.
+            let sqrt_sum: f64 = pts.windows(2).map(|w| w[0].distance(w[1]).sqrt()).sum();
+            let ends = [(pts[0], pts[0].distance(pts[1])), (pts[pts.len() - 1], pts[pts.len() - 1].distance(pts[pts.len() - 2]))];
+            let dir = |id: &'static str, mag: &'static str, flip: &str, curvature: &str| -> FResult<Option<(DVec3, f64, f64)>> {
+                let (at, seg) = ends[usize::from(!id.starts_with("start"))];
                 // std's getEndCondition: matching curvature needs a direction, and an edge for it (psui's
                 // fit-spline-match-curvature: live marks Start direction).
                 let matching = ev.bool(curvature);
@@ -324,12 +328,21 @@ pub fn fit_spline(ev: &mut EvalCtx) -> FResult<()> {
                 if matching && matches!(r, Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::MateConnector { .. }) {
                     return crate::regen::eval::err_at(&[id], crate::regen::custom_features::error_text("FIT_SPLINE_CURVATURE_FACE"));
                 }
-                let d = ev.resolve_direction(r).ok_or_else(|| FeatureError::at(&[id], "Cannot evaluate tangency for end condition."))?;
+                // An edge: its own tangent where it comes nearest the end point (std's getEndCondition; c2-surf-
+                // workshop-cpcurves' 3D fit spline 4 starts along a sketch spline it ends on).
+                let edge = matches!(r, Reference::Edge(_) | Reference::SketchEntity { .. } | Reference::SketchRegionEdge { .. })
+                    .then(|| curve_edges(ev, std::slice::from_ref(r)).ok())
+                    .flatten()
+                    .and_then(|v| v.into_iter().next());
+                let (d, scale) = match edge {
+                    Some(e) => (edge_tangent_nearest(&e, at).ok_or_else(|| FeatureError::at(&[id], "Cannot evaluate tangency for end condition."))?, sqrt_sum / seg.sqrt().max(1e-300)),
+                    None => (ev.resolve_direction(r).ok_or_else(|| FeatureError::at(&[id], "Cannot evaluate tangency for end condition."))?, 1.0),
+                };
                 let m = ev.real(mag)?;
                 if m.abs() < 1e-12 {
                     return crate::regen::eval::err_at(&[mag], if mag.starts_with("start") { "Start magnitude cannot be 0." } else { "End magnitude cannot be 0." });
                 }
-                Ok(Some((d.normalize_or_zero(), m * if ev.bool(flip) { -1.0 } else { 1.0 })))
+                Ok(Some((d.normalize_or_zero(), m * if ev.bool(flip) { -1.0 } else { 1.0 }, scale)))
             };
             let s = dir("startDirection", "startMagnitude", "oppositeDirectionStart", "matchStartCurvature")?;
             let e = dir("endDirection", "endMagnitude", "oppositeDirectionEnd", "matchEndCurvature")?;
@@ -338,15 +351,15 @@ pub fn fit_spline(ev: &mut EvalCtx) -> FResult<()> {
             let (lo, hi) = pts.iter().fold((pts[0], pts[0]), |(lo, hi), p| (lo.min(*p), hi.max(*p)));
             let span = (hi - lo).length();
             for (key, end, at, back, primary) in [("startManipulator", s, pts[0], false, "startMagnitude"), ("endManipulator", e, pts[pts.len() - 1], true, "endMagnitude")] {
-                let Some((d, m)) = end else { continue };
+                let Some((d, m, _)) = end else { continue };
                 let direction = if back { -d } else { d };
                 ev.manipulators.push((key.into(), crate::display::FeatureManipulator::Linear { base: at, direction, offset: m * span / 3.0, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: Some(primary.into()) }));
             }
             if s.is_some() || e.is_some() {
                 let mut t = vec![DVec3::ZERO; pts.len()];
-                t[0] = s.map_or(DVec3::ZERO, |(d, m)| d * m);
+                t[0] = s.map_or(DVec3::ZERO, |(d, m, k)| d * m * k);
                 if let Some(last) = t.last_mut() {
-                    *last = e.map_or(DVec3::ZERO, |(d, m)| d * m);
+                    *last = e.map_or(DVec3::ZERO, |(d, m, k)| d * m * k);
                 }
                 tangents = t;
             }
@@ -443,6 +456,24 @@ pub fn project_curves(ev: &mut EvalCtx) -> FResult<()> {
 struct Side {
     pos: DVec3,
     tangent: Option<DVec3>,
+}
+
+/// An edge's tangent, along its own direction, at its point nearest `p` (sampled, then narrowed).
+fn edge_tangent_nearest(e: &Shape, p: DVec3) -> Option<DVec3> {
+    let i = e.edge_info().ok()?;
+    let (f, l) = (i.first_param, i.last_param);
+    let dist = |u: f64| e.point_at(u).map_or(f64::INFINITY, |q| q.distance(p));
+    let n = 256;
+    let best = (0..=n).map(|j| f + (l - f) * j as f64 / n as f64).min_by(|a, b| dist(*a).total_cmp(&dist(*b)))?;
+    let step = (l - f) / n as f64;
+    let (mut lo, mut hi) = ((best - step).max(f.min(l)), (best + step).min(f.max(l)));
+    for _ in 0..60 {
+        let (a, b) = (lo + (hi - lo) / 3.0, hi - (hi - lo) / 3.0);
+        if dist(a) < dist(b) { hi = b } else { lo = a }
+    }
+    let t = e.tangent_at(0.5 * (lo + hi)).ok()?.normalize_or_zero();
+    let t = if e.orientation() == k::Orientation::Reversed { -t } else { t };
+    (t != DVec3::ZERO).then_some(t)
 }
 
 /// Tangent of an edge at `pos` (one of its ends or an interior point),

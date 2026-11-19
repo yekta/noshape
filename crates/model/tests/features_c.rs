@@ -2318,6 +2318,32 @@ fn a_thin_sweeps_closed_wall_side_follows_its_direction_and_the_paths() {
     }
 }
 
+/// Live q-sweep-normals-1119: a surface swept from an open profile faces along the profile's direction × the path's
+/// from it: a 10 mm line on Top swept 20 mm up (+Z) faces -Y running +X, +Y running -X.
+#[test]
+fn a_surface_swept_from_a_line_faces_along_its_direction_times_the_paths() {
+    for (a, b, want) in [(0.0, 0.01, DVec3::NEG_Y), (0.01, 0.0, DVec3::Y)] {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let e = sk.add_line(DVec2::new(a, 0.0), DVec2::new(b, 0.0)).0;
+        let profile = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let mut sk = noshape_sketch::Sketch::new();
+        let l = sk.add_line(DVec2::ZERO, DVec2::new(0.0, 0.02)).0;
+        let path = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+        s.add("sweep", |p| {
+            p.set("bodyType", en("SURFACE"));
+            p.set("surfaceProfiles", q(Reference::SketchEntity { sketch: profile, entity: e }));
+            p.set("path", q(Reference::SketchEntity { sketch: path, entity: l }));
+        });
+        let r = s.ok();
+        let faces: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Surface).flat_map(|b| b.shape.faces()).collect();
+        let [f] = faces.as_slice() else { panic!("one face: {}", faces.len()) };
+        let pr = f.project_point(DVec3::new(0.005, 0.0, 0.01)).unwrap();
+        let n = f.normal_at_uv(pr.u, pr.v).unwrap();
+        assert!(n.dot(want) > 1.0 - 1e-9, "line {a} -> {b}: {n:?}");
+    }
+}
+
 /// Live "psb (10-24 c) thin sweep": a Ø20 circle (or a 20 mm line) on Top
 /// swept Thin 50 up, Thickness 1 = 2: outward / on −y; Flip wall inward;
 /// Mid plane both sides; Scale 2 keeps the wall 2 thick normal to the cone;
@@ -3545,6 +3571,31 @@ fn fit_spline_ends_along_a_sketch_region_normal() {
     // Front's normal is -Y; the arrow runs back from the end along it, its offset the signed magnitude's.
     assert_eq!(key, "endManipulator");
     assert!(direction.y > 0.999 && *offset < 0.0, "{:?}", state.manipulators);
+}
+
+/// A fit spline starting along a curved edge leaves along the edge's tangent where it comes nearest the start (std's
+/// getEndCondition; c2-surf-workshop-cpcurves' 3D fit spline 4 starts along a sketch spline it ends on, ours failed
+/// "Cannot evaluate tangency for end condition.").
+#[test]
+fn fit_spline_starts_along_a_curved_edge() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    // A quarter arc about the origin from (20, 0) to (0, 20) mm; the spline from its end, out to (-10, 40, 0).
+    let arc = sk.add_arc(DVec2::ZERO, DVec2::new(0.02, 0.0), DVec2::new(0.0, 0.02));
+    let (end, far) = (sk.add_point(DVec2::new(0.0, 0.02)), sk.add_point(DVec2::new(-0.01, 0.04)));
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let se = |e: u32| Reference::SketchEntity { sketch: sid, entity: e };
+    s.add("fitSpline", |p| {
+        p.set("vertices", ParamValue::Query(vec![se(end.0), se(far.0)]));
+        p.set("startDirection", q(se(arc.0)));
+    });
+    let r = s.ok();
+    let edges: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Wire).flat_map(|b| b.shape.edges()).collect();
+    let [e] = edges.as_slice() else { panic!("one edge: {}", edges.len()) };
+    let i = e.edge_info().unwrap();
+    let t = e.tangent_at(i.first_param).unwrap().normalize();
+    // The arc runs counter-clockwise: at (0, 20) its tangent is -X.
+    assert!(t.dot(DVec3::NEG_X) > 1.0 - 1e-9, "{t:?}");
 }
 
 /// A fit spline through two vertices with no end directions is a line, as live's (its edge reads LINE: asm-rack-pinion's

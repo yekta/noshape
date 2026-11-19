@@ -620,7 +620,8 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
             } else if let Some(d) = lock_dir {
                 opts.mode = k::SweepMode::Binormal(d);
             }
-            let res = sweep(&p.shape, frame.as_ref(), &opts).map_err(|_| fe(SWEEP_FAILED))?;
+            let mut res = sweep(&p.shape, frame.as_ref(), &opts).map_err(|_| fe(SWEEP_FAILED))?;
+            res.shape = sheet_facing_as_live(res.shape, &p.shape, &path)?;
             let names = sweep_names(ev, &p, &res, false, false);
             tools.push(NamedShape::new(res.shape, names));
         }
@@ -640,15 +641,7 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
     let thin_fail = if path_open && ev.bool("trimEnds") { THIN_TRIM_FAILED } else { THIN_THICKEN_FAILED };
     // A wall's sweep direction (live q-thin-wall-side-1119): from a free end of the path, into it; lying on the path
     // (cpcurves' Main pipe at its chain's inner junction), against the path's own direction there.
-    let along_wall = |f: &crate::display::PlaneFrame, m: DVec3| {
-        let end = path_end_near(&path, m);
-        let on = k::make_vertex(m).ok().and_then(|v| k::distance(&v, &path).ok()).map(|d| d.point_b);
-        match (end, on) {
-            (Some((q, t)), Some(p)) if p.distance(q) > 1e-6 => path_tangent_at(&path, p).map_or(t, |d| -d),
-            (Some((_, t)), _) => t,
-            _ => f.normal,
-        }
-    };
+    let along_wall = |f: &crate::display::PlaneFrame, m: DVec3| wall_sweep_direction(&path, m).unwrap_or(f.normal);
     let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::AlongClosedToo(&along_wall), false).map_err(|_| fe(thin_fail))? } else { ev.profiles(refs)? };
     if profiles.is_empty() {
         return crate::regen::eval::err_at(&[if thin { "wallShape" } else { "profiles" }], "Select faces or sketch regions to sweep.");
@@ -737,8 +730,41 @@ fn oblique_to(path: &Shape, p: &Profile) -> bool {
     t.normalize_or_zero().dot(p.frame.normal).abs() < 1.0 - 1e-9
 }
 
-/// The path end nearest `p` and the path's direction there, pointing into
-/// the path.
+/// The direction a wall at `m` is swept in (live q-thin-wall-side-1119): from a free end of the path, into it; lying on
+/// the path, against the path's own direction there.
+fn wall_sweep_direction(path: &Shape, m: DVec3) -> Option<DVec3> {
+    let end = path_end_near(path, m);
+    let on = k::make_vertex(m).ok().and_then(|v| k::distance(&v, path).ok()).map(|d| d.point_b);
+    match (end, on) {
+        (Some((q, t)), Some(p)) if p.distance(q) > 1e-6 => Some(path_tangent_at(path, p).map_or(t, |d| -d)),
+        (Some((_, t)), _) => Some(t),
+        _ => None,
+    }
+}
+
+/// A sheet swept from an open profile turned to face along the profile's tangent x the sweep direction, as live's (live
+/// q-sweep-normals-1119; c2-surf-workshop-cpcurves' Sweep 6 faced the other way and Split 3 kept the wrong piece). A
+/// closed profile's tube keeps its own (c2-surf-workshop-manualblend's Sweep 2 faces as live's).
+fn sheet_facing_as_live(sheet: Shape, profile: &Shape, path: &Shape) -> FResult<Shape> {
+    let ends: Vec<DVec3> = profile.edges().iter().filter_map(|e| e.endpoints().ok()).flat_map(|(a, b)| [a, b]).collect();
+    let closed = ends.iter().all(|p| ends.iter().filter(|q| q.distance(*p) < 1e-7).count() % 2 == 0);
+    if closed {
+        return Ok(sheet);
+    }
+    let Some(e) = profile.edges().into_iter().next() else { return Ok(sheet) };
+    let i = e.edge_info()?;
+    let u = 0.5 * (i.first_param + i.last_param);
+    let (m, t) = (e.point_at(u)?, e.tangent_at(u)?);
+    let t = if e.orientation() == k::Orientation::Reversed { -t } else { t };
+    let Some(d) = wall_sweep_direction(path, m) else { return Ok(sheet) };
+    let want = t.cross(d);
+    let near = sheet.faces().iter().filter_map(|f| super::helpers_a::face_normal_near(f, m)).min_by(|a, b| a.0.distance(m).total_cmp(&b.0.distance(m)));
+    match near {
+        Some((_, n)) if n.dot(want) < 0.0 => Ok(sheet.reversed()?),
+        _ => Ok(sheet),
+    }
+}
+
 /// The path's direction (as the wire runs) at its point nearest `p`.
 fn path_tangent_at(path: &Shape, p: DVec3) -> Option<DVec3> {
     let mut best: Option<(f64, DVec3)> = None;
@@ -756,6 +782,7 @@ fn path_tangent_at(path: &Shape, p: DVec3) -> Option<DVec3> {
     best.map(|b| b.1)
 }
 
+/// The path end nearest `p` and the path's direction there, pointing into the path.
 fn path_end_near(path: &Shape, p: DVec3) -> Option<(DVec3, DVec3)> {
     let edges = path.edges();
     let mut best: Option<(f64, DVec3, DVec3)> = None;
