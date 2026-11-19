@@ -74,8 +74,11 @@ fn same_records(a: &[(String, [i64; 3])], b: &[(String, [i64; 3])]) -> bool {
         })
 }
 
+/// A history record as text, with its output's place (`records`).
+type Rec = (String, [i64; 3]);
+
 /// The records of each not matched in the other (places within 2 µm).
-fn apart<'a>(a: &'a [(String, [i64; 3])], b: &'a [(String, [i64; 3])]) -> (Vec<&'a (String, [i64; 3])>, Vec<&'a (String, [i64; 3])>) {
+fn apart<'a>(a: &'a [Rec], b: &'a [Rec]) -> (Vec<&'a Rec>, Vec<&'a Rec>) {
     let mut used = vec![false; b.len()];
     let mut only_a = Vec::new();
     for x in a {
