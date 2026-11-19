@@ -355,6 +355,13 @@ pub fn fit_spline(ev: &mut EvalCtx) -> FResult<()> {
                 let direction = if back { -d } else { d };
                 ev.manipulators.push((key.into(), crate::display::FeatureManipulator::Linear { base: at, direction, offset: m * span / 3.0, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, tangential: false, primary: Some(primary.into()) }));
             }
+            // One end's direction only: that end's derivative (std's magnitude times the points' box diagonal), the
+            // other end natural (live's 3D fit spline 2 of c2-surf-intro-examples, 171.648 mm; OCCT's interpolation
+            // gave the free end a zero derivative, 170.589 mm).
+            if s.is_some() != e.is_some() {
+                let at = |c: Option<(DVec3, f64, f64)>| c.map(|(d, m, k)| d * m * k * span);
+                return add_wire_bodies(ev, vec![k::make_wire(&[fit_spline_edge(&pts, at(s), at(e))?])?]);
+            }
             if s.is_some() || e.is_some() {
                 let mut t = vec![DVec3::ZERO; pts.len()];
                 t[0] = s.map_or(DVec3::ZERO, |(d, m, k)| d * m * k);
@@ -1585,7 +1592,7 @@ pub fn routing_curve(ev: &mut EvalCtx) -> FResult<()> {
             k::make_wire(&[k::make_interpolated_spline(&pts, &tangents, closed)?])?
         } else {
             let ring: Vec<DVec3> = if closed { pts.iter().chain(pts.first()).copied().collect() } else { pts.clone() };
-            k::make_wire(&[fit_spline_edge(&ring, None)?])?
+            k::make_wire(&[fit_spline_edge(&ring, None, None)?])?
         }
     };
     // The feature's name: "Routing curve (61.825 mm)" (std's name template).
@@ -1595,18 +1602,19 @@ pub fn routing_curve(ev: &mut EvalCtx) -> FResult<()> {
     add_wire_bodies(ev, vec![wire])
 }
 
-/// std's opFitSpline: a cubic B-spline through `pts` at their centripetal parameters on [0, 1] with natural ends, or
-/// with `ends`' derivatives (live 2052); periodic where the last point is the first; through two points and no
-/// derivatives a line.
-pub fn fit_spline_edge(pts: &[DVec3], ends: Option<(DVec3, DVec3)>) -> FResult<Shape> {
+/// std's opFitSpline: a cubic B-spline through `pts` at their centripetal parameters on [0, 1], each end with its
+/// derivative or natural without one (live 2052; c2-surf-intro-examples' 3D fit spline 2 has only an end one);
+/// periodic where the last point is the first; through two points and no derivatives a line.
+pub fn fit_spline_edge(pts: &[DVec3], start: Option<DVec3>, end: Option<DVec3>) -> FResult<Shape> {
     if pts.len() < 2 {
         return err("A spline needs at least two points");
     }
     // (std Jog reads its fitted bend reference with evLine.)
-    if pts.len() == 2 && ends.is_none() {
+    if pts.len() == 2 && start.is_none() && end.is_none() {
         return Ok(k::make_line(pts[0], pts[1])?);
     }
     let closed = pts.len() > 2 && (pts[0] - pts[pts.len() - 1]).length() < 1e-9;
+    let ends = start.zip(end);
     // Closed: periodic at the centripetal parameters, as a closed sketch spline (cf-3d-spline's box as live's).
     let fit = if closed && ends.is_none() { noshape_sketch::nurbs::fit_3d_closed(pts) } else { None };
     if closed && fit.is_none() {
@@ -1615,7 +1623,7 @@ pub fn fit_spline_edge(pts: &[DVec3], ends: Option<(DVec3, DVec3)>) -> FResult<S
         let tangents: Vec<DVec3> = ends.map(|(s, e)| vec![s / chord, e / chord]).unwrap_or_default();
         return Ok(k::make_interpolated_spline(&pts[..pts.len() - 1], &tangents, true)?);
     }
-    let (knots, poles) = fit.or_else(|| noshape_sketch::nurbs::fit_3d(pts, ends)).ok_or_else(|| FeatureError::new("The spline could not be fitted"))?;
+    let (knots, poles) = fit.or_else(|| noshape_sketch::nurbs::fit_3d_ends(pts, start, end)).ok_or_else(|| FeatureError::new("The spline could not be fitted"))?;
     let mut unique: Vec<f64> = Vec::new();
     let mut mults: Vec<u32> = Vec::new();
     for k in knots {

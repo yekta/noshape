@@ -1722,8 +1722,8 @@ fn op_fit_spline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let pts: Vec<DVec3> = def.get("points").as_array().map(|v| v.iter().filter_map(vec3_of).collect()).unwrap_or_default();
     // Onshape's derivatives are with respect to the spline's parameter on [0, 1] (geomOperations.fs:
     // arcLengthParameterization false).
-    let ends = vec3_of(def.get("startDerivative")).zip(vec3_of(def.get("endDerivative")));
-    run_op(i, &cx, &id, "SKETCH_SPLINE_FAILED", |ev| add_wire(ev, crate::regen::features::curves::fit_spline_edge(&pts, ends)?))?;
+    let (start, end) = (vec3_of(def.get("startDerivative")), vec3_of(def.get("endDerivative")));
+    run_op(i, &cx, &id, "SKETCH_SPLINE_FAILED", |ev| add_wire(ev, crate::regen::features::curves::fit_spline_edge(&pts, start, end)?))?;
     Ok(Value::Undefined)
 }
 

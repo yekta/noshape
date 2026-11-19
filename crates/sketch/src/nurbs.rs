@@ -886,6 +886,13 @@ pub fn fit_3d_closed(pts: &[DVec3]) -> Option<(Vec<f64>, Vec<DVec3>)> {
 /// natural ends, or the end derivatives `ends` (with respect to that parameter). The full knot vector and the
 /// control points; `None` for fewer than two points or a singular system.
 pub fn fit_3d(pts: &[DVec3], ends: Option<(DVec3, DVec3)>) -> Option<(Vec<f64>, Vec<DVec3>)> {
+    let (start, end) = ends.unzip();
+    fit_3d_ends(pts, start, end)
+}
+
+/// [`fit_3d`] with each end's derivative on its own: an end without one is natural (std's opFitSpline with only an
+/// end derivative, c2-surf-intro-examples' 3D fit spline 2: 171.648 mm as live's).
+pub fn fit_3d_ends(pts: &[DVec3], start: Option<DVec3>, end: Option<DVec3>) -> Option<(Vec<f64>, Vec<DVec3>)> {
     let n = pts.len();
     if n < 2 {
         return None;
@@ -898,8 +905,10 @@ pub fn fit_3d(pts: &[DVec3], ends: Option<(DVec3, DVec3)>) -> Option<(Vec<f64>, 
     ub[n - 1] = 1.0;
     let xy: Vec<DVec2> = pts.iter().map(|p| DVec2::new(p.x, p.y)).collect();
     let z: Vec<DVec2> = pts.iter().map(|p| DVec2::new(p.z, 0.0)).collect();
-    let a = FitSystem::new(&ub, &xy, ends.map(|(d0, d1)| (DVec2::new(d0.x, d0.y), DVec2::new(d1.x, d1.y))));
-    let b = FitSystem::new(&ub, &z, ends.map(|(d0, d1)| (DVec2::new(d0.z, 0.0), DVec2::new(d1.z, 0.0))));
+    let xy_of = |d: Option<DVec3>| d.map(|d| DVec2::new(d.x, d.y));
+    let z_of = |d: Option<DVec3>| d.map(|d| DVec2::new(d.z, 0.0));
+    let a = FitSystem::with_ends(&ub, &xy, xy_of(start), xy_of(end));
+    let b = FitSystem::with_ends(&ub, &z, z_of(start), z_of(end));
     let lu = a.factor()?;
     let (c, d) = (a.solve_with(&lu), b.solve_with(&lu));
     Some((c.knots, c.ctrl.iter().zip(&d.ctrl).map(|(p, q)| DVec3::new(p.x, p.y, q.x)).collect()))
@@ -919,6 +928,12 @@ pub(crate) struct FitSystem {
 
 impl FitSystem {
     pub(crate) fn new(ub: &[f64], pts: &[DVec2], ends: Option<(DVec2, DVec2)>) -> Self {
+        let (d0, d1) = ends.unzip();
+        Self::with_ends(ub, pts, d0, d1)
+    }
+
+    /// [`FitSystem::new`] with each end's derivative on its own (natural where none).
+    pub(crate) fn with_ends(ub: &[f64], pts: &[DVec2], start: Option<DVec2>, end: Option<DVec2>) -> Self {
         let n = pts.len();
         let degree = 3;
         let nc = n + 2;
@@ -928,10 +943,8 @@ impl FitSystem {
         }
         Self::set_knots(ub, degree, &mut knots);
         // Rows: position at 0, the start condition, interior positions, the end condition, position at 1.
-        let ((o0, d0), (o1, d1)) = match ends {
-            Some((d0, d1)) => ((1, d0), (1, d1)),
-            None => ((2, DVec2::ZERO), (2, DVec2::ZERO)),
-        };
+        let condition = |d: Option<DVec2>| d.map_or((2, DVec2::ZERO), |d| (1, d));
+        let ((o0, d0), (o1, d1)) = (condition(start), condition(end));
         let mut rows: Vec<(f64, usize, DVec2)> = vec![(0.0, 0, pts[0]), (0.0, o0, d0)];
         rows.extend((1..n - 1).map(|k| (ub[k], 0, pts[k])));
         rows.extend([(1.0, o1, d1), (1.0, 0, pts[n - 1])]);

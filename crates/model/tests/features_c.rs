@@ -3721,6 +3721,37 @@ fn fit_spline_starts_along_a_curved_edge() {
     assert!(t.dot(DVec3::NEG_X) > 1.0 - 1e-9, "{t:?}");
 }
 
+/// A fit spline with only an end direction leaves its start free (natural), as std's opFitSpline: through (0, 0) and
+/// (40, 20) mm on Top, ending along Front's normal (live c2-surf-intro-examples' 3D fit spline 2: 171.648 mm, as
+/// the natural start gives; OCCT's interpolation gave the start a zero derivative, 170.589 mm, and Fill 1 failed
+/// its boundary).
+#[test]
+fn fit_spline_with_only_an_end_direction_starts_free() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts = [DVec2::new(0.0, 0.0), DVec2::new(0.04, 0.02)].map(|p| sk.add_point(p));
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let se = |e: u32| Reference::SketchEntity { sketch: sid, entity: e };
+    s.add("fitSpline", |p| {
+        p.set("vertices", ParamValue::Query(pts.iter().map(|p| se(p.0)).collect()));
+        p.set("endDirection", q(Reference::Plane(DatumPlane::Front)));
+    });
+    let r = s.ok();
+    let edges: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Wire).flat_map(|b| b.shape.edges()).collect();
+    let [e] = edges.as_slice() else { panic!("one edge: {}", edges.len()) };
+    let b = e.edge_bspline().unwrap();
+    // The cubic from a to d ending with derivative ±(the magnitude 1 times the points' box diagonal) along Front's
+    // normal (std), its start natural (second derivative zero) rather than at rest.
+    let (a, d) = (DVec3::ZERO, DVec3::new(0.04, 0.02, 0.0));
+    let span = 0.04f64.hypot(0.02);
+    let poles = |sign: f64| {
+        let p2 = d - DVec3::Y * sign * span / 3.0;
+        [a, (a + p2) / 2.0, p2, d]
+    };
+    let near = |q: [DVec3; 4]| b.degree == 3 && b.poles.len() == 4 && b.poles.iter().zip(q).all(|(p, q)| p.distance(q) < 1e-9);
+    assert!(near(poles(1.0)) || near(poles(-1.0)), "{:?}", b.poles);
+}
+
 /// A fit spline through two vertices with no end directions is a line, as live's (its edge reads LINE: asm-rack-pinion's
 /// Transform 1 turns a gear about one; a spline of ours there read as another straight edge).
 #[test]
