@@ -1975,78 +1975,6 @@ TopoDS_Shape recut_arc_seams(const TopoDS_Shape& s, HHist& hist)
   return out;
 }
 
-// Whether every face USD's `u` made of two or more of `in`'s is on an elementary surface.
-static bool merges_elementary(const TopoDS_Shape& in, ShapeUpgrade_UnifySameDomain& u)
-{
-  const occ::handle<BRepTools_History> h = u.History();
-  if (h.IsNull())
-    return false;
-  NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> from;
-  for (TopExp_Explorer x(in, TopAbs_FACE); x.More(); x.Next())
-    for (const TopoDS_Shape& m : h->Modified(x.Current()))
-      if (int* n = from.ChangeSeek(m))
-        ++*n;
-      else
-        from.Bind(m, 1);
-  for (NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher>::Iterator it(from); it.More(); it.Next())
-  {
-    if (it.Value() < 2)
-      continue;
-    occ::handle<Geom_Surface> g = BRep_Tool::Surface(TopoDS::Face(it.Key()));
-    while (const occ::handle<Geom_RectangularTrimmedSurface> t = occ::down_cast<Geom_RectangularTrimmedSurface>(g))
-      g = t->BasisSurface();
-    if (g.IsNull() || !g->IsKind(STANDARD_TYPE(Geom_ElementarySurface)))
-      return false;
-  }
-  return true;
-}
-
-// Whether every face USD made of two or more lies, at each piece's points (its vertices and a 5 x 5 grid over its
-// parameters), within `tol` of the merged face's surface.
-static bool pieces_within(const TopoDS_Shape& in, ShapeUpgrade_UnifySameDomain& u, double tol)
-{
-  const occ::handle<BRepTools_History> h = u.History();
-  if (h.IsNull())
-    return false;
-  NCollection_DataMap<TopoDS_Shape, ShapeList, TopTools_ShapeMapHasher> from;
-  for (TopExp_Explorer x(in, TopAbs_FACE); x.More(); x.Next())
-    for (const TopoDS_Shape& m : h->Modified(x.Current()))
-    {
-      if (ShapeList* l = from.ChangeSeek(m))
-        l->Append(x.Current());
-      else
-        from.Bind(m, ShapeList{x.Current()});
-    }
-  for (NCollection_DataMap<TopoDS_Shape, ShapeList, TopTools_ShapeMapHasher>::Iterator it(from); it.More(); it.Next())
-  {
-    if (it.Value().Extent() < 2)
-      continue;
-    const occ::handle<Geom_Surface> g = BRep_Tool::Surface(TopoDS::Face(it.Key()));
-    if (g.IsNull())
-      return false;
-    for (const TopoDS_Shape& piece : it.Value())
-    {
-      const TopoDS_Face&  f = TopoDS::Face(piece);
-      std::vector<gp_Pnt> pts;
-      for (TopExp_Explorer v(f, TopAbs_VERTEX); v.More(); v.Next())
-        pts.push_back(BRep_Tool::Pnt(TopoDS::Vertex(v.Current())));
-      double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
-      BRepTools::UVBounds(f, u0, u1, v0, v1);
-      BRepAdaptor_Surface sf(f);
-      for (int i = 0; i < 5; ++i)
-        for (int j = 0; j < 5; ++j)
-          pts.push_back(sf.Value(u0 + (u1 - u0) * (i + 0.5) / 5, v0 + (v1 - v0) * (j + 0.5) / 5));
-      for (const gp_Pnt& p : pts)
-      {
-        GeomAPI_ProjectPointOnSurf pr(p, g);
-        if (!pr.IsDone() || pr.NbPoints() == 0 || pr.LowerDistance() > tol)
-          return false;
-      }
-    }
-  }
-  return true;
-}
-
 // Whether a usd_kept_volume on this thread since unify_in reset it found the faces' order doesn't change USD's
 // rejected merge (the same one three times running).
 thread_local bool t_usd_order_moot = false;
@@ -2187,12 +2115,7 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.check");
     const std::optional<double> change = usd_volume_change(sf, image, share, u.Shape(), diag, &memo);
-    // (Or every merged piece on its merged face's surface itself (within 1e-7 m), each an elementary surface, within
-    // 1e-8 of the volume: the change then only its edges', as 850efe's Extrude 5, coaxial cylinders of one radius in
-    // pieces, 3e-9 of its volume; live one face each.)
-    const double need  = change ? std::abs(*change) : 0;
-    const auto   roomy = [&] { return change && need <= 1e-8 * std::abs(volume0()) && (need == 0 || (merges_elementary(in, u) && pieces_within(in, u, Precision::Confusion()))); };
-    if (!keeps_volume(change, u.Shape()) && !roomy())
+    if (!keeps_volume(change, u.Shape()))
     {
       // (The same merge rejected three times running: the faces' order doesn't change it here, so neither will the
       // rest: cf-spur-gear's Boolean 2 tried eight, 86 ms each. A notched cylinder fused with its mirror is kept at
