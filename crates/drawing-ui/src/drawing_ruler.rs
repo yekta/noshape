@@ -177,8 +177,27 @@ impl DrawingEditor {
             .child(marker(px_of(st.first_indent), true, "▼"))
             .child(marker(px_of(st.left_indent), false, "▲"))
             .child(marker(px_of(w - st.right_indent), false, "▲"));
-        // Live 414: the ◁▷ box-width handle in the grey tail (no blue bar: live2 rad-note 30).
-        ruler = ruler.child(div().absolute().left(px_of(w) + px(4.)).top_0().bottom_0().flex().items_center().text_size(px(10.)).text_color(gpui_kit::rgb(0x2e2e2e)).child("◁▷"));
+        // Live 414: the box-width handle in the grey tail, two small filled triangles ◁ ▷ (no blue bar: live2 rad-note
+        // 30; drawn, not a font's outlined ◁▷: live2 recheck-1119).
+        let handle = canvas(
+            |_, _, _| {},
+            |b, _, window, _| {
+                let at = |x: f32, y: f32| point(b.origin.x + px(x), b.origin.y + px(y));
+                for [tip, base] in [[0., 4.], [10., 6.]] {
+                    let mut pb = PathBuilder::fill();
+                    pb.move_to(at(base, 0.));
+                    pb.line_to(at(tip, 3.5));
+                    pb.line_to(at(base, 7.));
+                    pb.close();
+                    if let Ok(path) = pb.build() {
+                        window.paint_path(path, gpui_kit::rgb(0x2e2e2e));
+                    }
+                }
+            },
+        )
+        .w(px(10.))
+        .h(px(7.));
+        ruler = ruler.child(div().absolute().left(px_of(w) + px(4.)).top_0().bottom_0().flex().items_center().child(handle));
         for (i, t) in st.tabs.iter().enumerate() {
             if dragging_off && dragged == Some(i) {
                 continue;
