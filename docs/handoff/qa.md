@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-18 23:50)
+# QA handoff (agent qa; current state only, updated 2026-11-19 03:50)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -62,14 +62,17 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - **v0.4.57** published check done 11-17 21:44: clean, baseline 0.4.57. Next: the 05:00 cut (qa-cut-0415).
 
 ## Next (in this order)
-00. **11-18 23:50 state.** Spur-gear P0 = bool's afe2cbe90 (11 runs: f634e46ad 0.989, afe2cbe90 1.186 vs v0.4.58); qa-sg-fixwait
-   re-times the first green with a bool/bool2 grid|fold|spur|afe2cbe|strip|revert commit. Live's session replayed 2a-14c
-   (qa-scratch/session: mksession.py -> out/session-s1..s5.json; session.sh <app> <out> [:disp], env SEGS, START=<doc>; vibe2
-   ~/tmp/qa/session devN; kept copies vibe2 ~/agents/qa-keep/session-1118): rows interaction-feel "session-1118". Waiters:
-   qa-wait-origin (skasm origin click), qa-wait-drw (studios 1:2 / Tray / axes-only continuation). Night (vibex7 02:00, v0.4.59
-   app in ~/qa-rel/0.4.59/noshape): qa-flow-night, qa-big-night, qa-flow2-night, then qa-session-night (s1-s5 x3) -> qa-alerts;
-   compare with SCRIPT.md first/settled (>= 100 ms and >= 2x only; box steps' settle is the caret). Heavy A/B done 23:16
-   (TICKETS HEAVY-ASM-SOFTWARE-FRAME). Probe scripts for feel rows: qa-scratch/fx (vr.sh on vibex8), hv2/hold.py, holdh.py.
+00. **11-19 03:50 state.** Spur gear: bool's fold fix e2b5c3c0e + c8d3a4734 (in 373dd5b9); qa-sg-fixwait (sha file speed/sg-fix.sha)
+   builds the first green with it on vibe2, then from 04:20 (after the cut verdict) under qa-host.lock + slot: 7 alternating runs vs
+   v0.4.58 on vibex7 -> qa-alerts; send to bool + lead. qa-wait-region (session/wait-region.sh): first green with skasm 0b44497a2 +
+   core a591e8c4d -> session-1118 s1-s5 on vibe2 :187 -> qa-alerts. cut-must.txt now also pins those two + bool's fold fix.
+   Studios "to verify" feel tickets all verified 03:35-03:50 (qa-scratch/stv: stv.sh <disp> <out> <script>, NOSHAPE_UI_SHOTS per step);
+   DRW-TOOLBAR-TOOLTIP-DELAY timing running on vibex8 (stv-tip.json, tipq.py: frames after each hover). Owed on studios 166b521c's
+   green: asm session BOM / callout on a fresh drawing, studio session Tab, Checkbox dialog, merge / restore started with B1 open
+   (asess/, ssess/ on vibex8; kept vibex8 ~/agents/qa-keep/studio-1119). Night 11-19: flows done (night-1119/sum.txt, loads < 0.8);
+   everyday + session cut at 03:35; big still running (fetch its sum by ssh cat: the scp {a,b} brace form copies nothing now, fixed
+   in flow-night / flow2-night / session-night, not big-night). Live's session replay: mksession.py s1-s5, session.sh <app> <out>
+   [:disp] env SEGS / START; P1 REGION-PICK-SKETCH-SHOWN with skasm (0b44497a2).
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
    with NOSHAPE_PARITY_VALIDITY=1 (bin/suites-models.sh exports it) models.log prints per feature "CHECK <doc> feature <k>:
    <part> valid <true|false> raw f/e/v; ..." (PartState.check, query parts' "check"; not in report.json). suites-diff.py
