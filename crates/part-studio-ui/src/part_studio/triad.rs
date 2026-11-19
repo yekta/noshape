@@ -416,6 +416,35 @@ impl PartStudioView {
         self.triad_apply_move(d, delta, window, cx);
     }
 
+    /// Multiple's ball: a free move that snaps to the hovered face's or edge's inference point, as a mate connector's
+    /// placement (white dots, the chosen one a small triad); snapped, the triad takes that point's frame. The selected
+    /// points follow it, translated, not turned; multiDx/Dy/Dz is its place from the Edit reference, else the origin
+    /// (live2 routing-multi ball-a: the +X face's centre (80, 0, 5); ball-b: off the reference vertex by (10, 10, 0)).
+    fn triad_ball_move(&mut self, d: &TriadDrag, position: DVec2, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(frame) = self.inference_choice().map(|p| p.frame) else {
+            self.set_triad_axes(&d.axes, cx);
+            self.triad_move_points(d, position, window, cx);
+            return;
+        };
+        let (x, z) = (frame.x(), frame.z());
+        self.set_triad_axes(&[x, z.cross(x), z], cx);
+        self.triad_apply_move(d, frame.origin - d.origin, window, cx);
+    }
+
+    /// Whether Multiple's ball is being dragged (its inference points shown).
+    pub(super) fn triad_ball_dragged(&self) -> bool {
+        self.ui.triad_drag.as_ref().is_some_and(|d| d.handle == BALL && !d.points.is_empty())
+    }
+
+    fn set_triad_axes(&mut self, axes: &[DVec3; 3], cx: &mut Context<Self>) {
+        let text = matrix_text(axes);
+        let Some(e) = &self.edit else { return };
+        if matches!(e.dialog.read(cx).feature.params.get("multiRotationMatrix"), Some(ParamValue::Text(t)) if *t == text) {
+            return;
+        }
+        e.dialog.update(cx, |dlg, cx| dlg.set_value("multiRotationMatrix", ParamValue::Text(text), cx));
+    }
+
     /// The selected points (and multiDx/Dy/Dz) moved `delta` from where drag `d` started.
     fn triad_apply_move(&mut self, d: &TriadDrag, delta: DVec3, window: &mut Window, cx: &mut Context<Self>) {
         let units = self.doc.read(cx).session.doc.settings.units;
@@ -554,6 +583,10 @@ impl PartStudioView {
                 let points = if t.multi { self.routing_selected(cx).into_iter().filter_map(|k| Some((k, self.routing_offset(k, cx)?))).collect() } else { Vec::new() };
                 let multi_offset = if t.multi { self.routing_multi_frame(cx).map_or(DVec3::ZERO, |f| f.0) } else { DVec3::ZERO };
                 self.ui.triad_drag = Some(TriadDrag { handle, start: t.offset, grab, item: t.item, points, origin: t.origin, axes: t.axes, multi_offset, value: 0.0 });
+                // Multiple's ball snaps to what is under the pointer (live2 routing-multi ball-a): keep picking.
+                if t.multi && handle == BALL {
+                    self.viewport.update(cx, |v, _| v.tool_hover = true);
+                }
                 // A new drag drops the last one's box.
                 self.ui.triad_box = None;
                 true
@@ -563,6 +596,10 @@ impl PartStudioView {
                 if d.handle >= RING0 && d.handle < BALL {
                     let Some(q) = self.triad_point(d.origin, &d.axes, d.handle, *position, cx) else { return true };
                     self.triad_turn(&d, q, *position, cx);
+                    return true;
+                }
+                if t.multi && d.handle == BALL {
+                    self.triad_ball_move(&d, *position, window, cx);
                     return true;
                 }
                 if t.multi {
@@ -590,6 +627,10 @@ impl PartStudioView {
             }
             ViewportEvent::ToolUp { .. } => {
                 let Some(d) = self.ui.triad_drag.take() else { return false };
+                if d.handle == BALL {
+                    self.viewport.update(cx, |v, _| v.tool_hover = false);
+                    self.ui.inference = None;
+                }
                 if t.multi || d.handle >= RING0 {
                     // An arrow or a ring that moved keeps its value box, its text selected (live2 rz-45-released).
                     if t.multi && (d.handle < 3 || (RING0..BALL).contains(&d.handle)) && d.value != 0.0 {
@@ -620,10 +661,11 @@ fn index_value(it: &noshape_model::params::ParamValues) -> Option<usize> {
 }
 
 /// multiRotationMatrix's text ("[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]", live's) as the triad's axes,
-/// one per row (std stores the transpose of the manipulator's linear part).
+/// its columns (std draws `transform(matrix(multiRotationMatrix), …)`; live2 routing-multi ball-a: snapped to the +X
+/// face, "[[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]", the face's normal its third column).
 fn parse_matrix(t: &str) -> Option<[DVec3; 3]> {
     let v: Vec<f64> = t.split(['[', ']', ',']).map(str::trim).filter(|x| !x.is_empty()).map(str::parse).collect::<Result<_, _>>().ok()?;
-    (v.len() == 9 && v.iter().all(|x| x.is_finite())).then(|| [DVec3::new(v[0], v[1], v[2]), DVec3::new(v[3], v[4], v[5]), DVec3::new(v[6], v[7], v[8])])
+    (v.len() == 9 && v.iter().all(|x| x.is_finite())).then(|| [DVec3::new(v[0], v[3], v[6]), DVec3::new(v[1], v[4], v[7]), DVec3::new(v[2], v[5], v[8])])
 }
 
 fn matrix_text(axes: &[DVec3; 3]) -> String {
@@ -632,8 +674,8 @@ fn matrix_text(axes: &[DVec3; 3]) -> String {
         let x = if x == 0.0 { 0.0 } else { x };
         if x.fract() == 0.0 { format!("{x:.1}") } else { format!("{x}") }
     };
-    let row = |a: &DVec3| format!("[{}, {}, {}]", n(a.x), n(a.y), n(a.z));
-    format!("[{}, {}, {}]", row(&axes[0]), row(&axes[1]), row(&axes[2]))
+    let row = |i: usize| format!("[{}, {}, {}]", n(axes[0][i]), n(axes[1][i]), n(axes[2][i]));
+    format!("[{}, {}, {}]", row(0), row(1), row(2))
 }
 
 /// Whether `p` is inside the convex quad `q`.

@@ -1353,3 +1353,91 @@ fn a_routing_curves_multiple_ring_turns_only_the_triad_and_its_arrows_follow_the
     let kinds = cx.update(|cx| dialog.read(cx).feature.params.array("points").iter().map(|it| it.enum_("referenceType").to_string()).collect::<Vec<_>>());
     assert_eq!(kinds, vec!["ORIGIN"; 3], "the points keep their own reference");
 }
+
+/// Live2 routing-multi ball-a (11-19): Multiple's centre ball is a free move that snaps to the hovered face's
+/// inference points; on the block's +X face centre the triad lands there and takes the face's frame
+/// (multiRotationMatrix "[[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]"), the selected points move with it,
+/// translated, and multiDx/Dy/Dz is its place from the origin; no value box.
+#[gpui::test]
+fn a_routing_curves_multiple_ball_snaps_to_a_faces_inference_point(cx: &mut TestAppContext) {
+    use noshape_model::params::{ParamValue, ParamValues};
+    let (window, view) = block(cx, "dlg-routing-ball");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("routingCurve", w, cx))).unwrap();
+    draw(cx, window);
+    let item = || {
+        let mut it = ParamValues::default();
+        it.set("referenceType", ParamValue::Enum("ORIGIN".into()));
+        it
+    };
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Routing curve dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.set_value("pointsEditType", ParamValue::Enum("MULTI".into()), cx);
+        d.set_value("points", ParamValue::Array(vec![item(), item(), item()]), cx);
+    }));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| {
+        d.set_expr_text("points.1.dx", "40 mm", w, cx);
+        d.set_expr_text("points.2.dy", "40 mm", w, cx);
+    }))
+    .unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let mm = 1e-3;
+    let at = |cx: &mut TestAppContext, w: glam::DVec3| cx.update(|cx| view.read(cx).viewport.read(cx).project(w)).expect("on screen");
+    let event = |cx: &mut TestAppContext, ev: ViewportEvent| {
+        let t = cx.update(|cx| view.read(cx).routing_triad(cx)).expect("Multiple mode's manipulator");
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.triad_event(t, &ev, w, cx))).unwrap();
+        draw(cx, window);
+    };
+    for p in [glam::DVec3::new(40.0 * mm, 0.0, 0.0), glam::DVec3::new(0.0, 40.0 * mm, 0.0)] {
+        let position = at(cx, p);
+        event(cx, ViewportEvent::ToolDown { position, modifiers: Modifiers::default(), click_count: 1 });
+        event(cx, ViewportEvent::ToolUp { position, modifiers: Modifiers::default() });
+    }
+    let start = cx.update(|cx| view.read(cx).routing_triad(cx)).expect("the triad").origin;
+    let before = cx.update(|cx| view.read(cx).routing_points(cx));
+    // The block's +X face (every corner at the largest x) and its centre.
+    let (face, centre) = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.first().expect("the block");
+        let corners = |i: usize| {
+            let (first, count) = b.mesh.face_ranges[i];
+            b.mesh.indices[first as usize..(first + count) as usize].iter().map(|&k| b.mesh.positions[k as usize]).map(|p| glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)).collect::<Vec<_>>()
+        };
+        let max_x = (0..b.face_refs.len()).flat_map(corners).map(|p| p.x).fold(f64::MIN, f64::max);
+        let i = (0..b.face_refs.len()).find(|&i| corners(i).iter().all(|p| (p.x - max_x).abs() < 1e-9)).expect("the +X face");
+        let ps = corners(i);
+        let (lo, hi) = ps.iter().fold((glam::DVec3::MAX, glam::DVec3::MIN), |(lo, hi), p| (lo.min(*p), hi.max(*p)));
+        (b.face_refs[i].clone(), (lo + hi) * 0.5)
+    });
+    let ball = at(cx, start);
+    event(cx, ViewportEvent::ToolDown { position: ball, modifiers: Modifiers::default(), click_count: 1 });
+    assert!(cx.update(|cx| view.read(cx).triad_ball_dragged() && view.read(cx).viewport.read(cx).tool_hover), "the ball grabbed, the graphics still picked");
+    let target = at(cx, centre);
+    view.update(cx, |v, cx| {
+        v.ui.pointer = Some(target);
+        v.ui.hover_pick = Some(noshape_scene::builder::PickTarget { reference: face.clone(), kind: noshape_scene::builder::PickKind::Face, anchor: None });
+        v.update_inference(false, cx);
+    });
+    wait_until(cx, window, |cx| view.read(cx).inference_choice().is_some());
+    let snapped = cx.update(|cx| view.read(cx).inference_choice().map(|p| p.frame.origin)).expect("a snap point");
+    assert!(snapped.distance(centre) < 1e-6, "the face centre chosen: {snapped} for {centre}");
+    event(cx, ViewportEvent::ToolDrag { position: target });
+    let pts = cx.update(|cx| view.read(cx).routing_points(cx));
+    let moved = centre - start;
+    assert!((pts[1].1 - before[1].1).distance(moved) < 1e-8 && (pts[2].1 - before[2].1).distance(moved) < 1e-8 && pts[0].1 == before[0].1, "the selected points translated with the triad during the drag: {pts:?}, by {moved}");
+    event(cx, ViewportEvent::ToolUp { position: target, modifiers: Modifiers::default() });
+    let t = cx.update(|cx| view.read(cx).routing_triad(cx)).expect("the triad");
+    assert!(t.origin.distance(centre) < 1e-8 && t.axes[2].distance(glam::DVec3::X) < 1e-9, "on the face centre, its Z the face normal: {t:?}");
+    let (matrix, d) = cx.update(|cx| {
+        let p = &dialog.read(cx).feature.params;
+        let num = |id: &str| p.expr(id).map(|x| x.text.clone()).unwrap_or_default();
+        (p.get("multiRotationMatrix").cloned(), [num("multiDx"), num("multiDy"), num("multiDz")])
+    });
+    assert_eq!(matrix, Some(ParamValue::Text("[[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]".into())), "live's stored frame");
+    let units = cx.update(|cx| view.read(cx).doc.read(cx).session.doc.settings.units);
+    // (The face centre is our area integral's, ~1e-9 m off live's exact one: compared as values.)
+    let values: Vec<f64> = d.iter().map(|t| noshape_units::evaluate_as(t, noshape_units::Dim::LENGTH, &units, &noshape_units::EmptyScope).map_or(f64::NAN, |q| q.value)).collect();
+    assert!((0..3).all(|i| (values[i] - centre[i]).abs() < 1e-8), "multiDx/Dy/Dz: the triad's place from the origin: {d:?}, centre {centre}");
+    assert!(cx.update(|cx| view.read(cx).ui.triad_box.is_none() && !view.read(cx).viewport.read(cx).tool_hover && view.read(cx).inference_choice().is_none()), "no value box; picking and the points end with the drag");
+}

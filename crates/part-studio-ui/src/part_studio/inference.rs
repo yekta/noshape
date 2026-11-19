@@ -26,7 +26,7 @@ pub(super) struct InferenceHover {
 impl PartStudioView {
     /// Whether the active dialog field takes inference points.
     pub(super) fn inference_applies(&self, cx: &App) -> bool {
-        self.sketch.is_none() && self.picking_dialog().is_some_and(|d| d.read(cx).takes_inference())
+        self.sketch.is_none() && (self.picking_dialog().is_some_and(|d| d.read(cx).takes_inference()) || self.triad_ball_dragged())
     }
 
     /// Follows the hovered entity and the pointer; true when what is drawn changed.
