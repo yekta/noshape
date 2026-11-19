@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-19 05:05 UTC (new bool thread on the Motile account since 03:5x). Hosts (lead 11-18/19): builds + probes on the Mac (NOSHAPE_RB_HOST=mac; corpus replays / A-Bs
+Updated 11-19 06:10 UTC (new bool thread on the Motile account since 03:5x). Hosts (lead 11-18/19): builds + probes on the Mac (NOSHAPE_RB_HOST=mac; corpus replays / A-Bs
 there only inside an rb.sh slot, else vibex8; Mac paths ~/noshape-host/...), gates on vibex7
 (NOSHAPE_GATE_HOST=vibex7 via /root/bool-scratch/gate-chain-own.sh <sha> as a systemd-run unit; off 02:00-04:00);
 land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs vibex7 ~/lead-private (hat8, hat15, hat15b,
@@ -30,26 +30,26 @@ Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are interna
   356, differing 6 (main 548d795fb's gate replay; local = OCCT on fewer faces, counted as OCCT).
 - LANDED 03:13: the fold fix alone (spur-gear P0): 373dd5b9 (e2b5c3c0e + c8d3a4734). qa re-times cf-spur-gear on the
   first green with c8d3a4734 after vibex7's quiet window (~04:00), 7 alternating runs vs v0.4.58, numbers to bool.
-- GATE 2c6b920fc done (vibex8, 133 min, CHECK rc 3): replays clean (bool-corpus 865 -> 910, corpus2-6 +35..37 each,
-  shfall 55 -> 67, 0 new differences; 46 cases "shared shapes Modified where OCCT keeps them", the 8a9351e4b labels),
-  crate tests pass; suite: britatap better (4 -> 8 features), cf-surface-pattern SP3 386/259 -> 385/258 (live
-  387/258; from 129100d95, the unify keeping USD's merge; = the old pending 846db3d0c): DECISION ASKED (lead).
-  Suite total 96.4 -> 118.8 s (not alternated; most documents 1-4 s slower, uniformly: load). Log
-  /root/bool-tube-scratch/gate-2c6b920fc.log.
-- Before the land, all at the tip 191e83607 (the stack + 97ed541ac + 7663bee14 + 191e83607):
-  - A/B main vs branch ops binaries (the gate's), alternating 5 rounds, 1 thread, rings-loft / nuts / knifehandle /
-    fan-blade / surface-pattern / parting-line, via vibex8's slot: /root/bool-hat-scratch/ab-doc-2c6b.out (script
-    /root/bool-scratch/ab-doc.sh, on vibex8 ~/tmp/bool/ab-doc.sh). P0 if a document >= 20 % and >= 100 ms slower.
-  - private docs: /root/bool-hat-scratch/udoc-ab8.sh 191e83607 -> udoc-191e83607.out (cli builds on vibex8 in
-    bool-split, compare on vibex7's slot).
-  - GATE unit bool-gate-191e83607 (vibex8, from 05:02) -> /root/bool-hat-scratch/chain-191e83607.out.
-  All clean + lead's yes on cf-surface-pattern -> land bool-stack3 from bool-hat (read diff --stat; the stash of
-  traces: bool-hat's working tree has env-gated traces (DBGNM/DBGCYL/DBGSEAM...) and xprobe changes, never commit
-  them; save `git diff > /root/bool-scratch/wip-<date>.diff`, checkout, land, re-apply). If bool2's bool2-touch
-  (8c58fd0ac) lands first, merge its rust_boolean.cpp steady/decline lines with 8a9351e4b's as bool2 wrote:
+- LEAD 11-19 05:4x: 129100d95 (the unify's tolerant-edge room; cf-surface-pattern 386 -> 385 edges, live 387) out
+  of the stack, parked with 846db3d0c (branch bool-stack3-with-usd keeps it); land the rest. Speed: land if the
+  alternating A/B shows load only; else find the commit. Shell slabs: see shfall below.
+- bool-stack4 (bool-hat, 39 commits on ce88e6672) = bool-stack3 without 129100d95 and its 549c433cb (the room's
+  ordering); 13b8c4b8d's merge of pieces on one surface kept (pieces_within, without the room); + 85957b9a9 (fix of
+  97ed541ac: a face going round between rulings (a thread's turn) keeps them where `right` put them; it broke
+  bool_patterns::a_nuts_thread_turns_cut_its_bore_between_them) + b2243d771 (grooves test: 8 faces by pieces_within).
+  Kernel 519/519 + brep tests pass (vibex7). Before land, all on b2243d771:
+  - GATE unit bool-gate-b2243d771 (vibex7; queued behind bool2's) -> /root/bool-hat-scratch/chain-b2243d771.out.
+  - private docs unit bool-udoc-b2243d771 (cli builds on vibe2, compare on vibex7) -> udoc-b2243d771.out
+    (script /root/bool-hat-scratch/udoc-abh.sh, UDOC_BUILD_HOST).
+  - A/B: /root/bool-scratch/ab-doc.sh 5 <docs> on the gate's host with its binaries, via its slot (the 2c6b run was
+    stopped: its ssh outlived 30 min; run it as a systemd unit holding the ssh).
+  Clean -> land bool-stack4 (diff --stat first; bool-hat's uncommitted traces/probes: save the diff, checkout, land,
+  re-apply). bool2's merge recipe if bool2-touch lands first:
   `const int q = shared[k] < 2 ? quiet(x, shared[k] == 0) : 0; if (kept(x) || q == 2) steady...; else if (sheets &&
   shared[k] < 2 && q != 0) return decline("a shared shape of sheets OCCT may keep or remake");`. On land: tell
   dx / core / blend / asm / bool2.
+- Gate 2c6b920fc (with 129100d95): replays clean (bool-corpus 865 -> 910 ...), suite total 96.4 -> 118.8 s on a
+  loaded vibex8 (hint), cf-surface-pattern the only change. /root/bool-tube-scratch/gate-2c6b920fc.log.
 - New on bool-stack3 (Mac all-corpora A/B each, vs the commit below it; only these cases changed, 0 differ):
   7663bee14 a cylinder face's angles from curves going out and back (bool-corpus 34b7e564 / 76c804e8 / 8658a028:
   ours); 191e83607 one whole sphere / torus face's shell by its face's normal (corpus2-6 6cf25eee / a3bfaa87 /
@@ -80,12 +80,15 @@ Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are interna
   piece's point on another solid's face 12 (shfall), face lost 11 (10 shfall), edge on a free-form face 10 (shfall),
   two edges leave a vertex 8, face's vertex off its plane 7, sheets that meet 6, coincident pieces 6, edge twice in a
   face 5 (input slits), the rest <= 5 each. Shared shape: 3 (sheets) left after the stack.
-- shfall (122 declined on the tip): 93 have input edge tolerances >= 10 um (56 >= 0.1 mm): Shell slab inputs whose
-  tolerance is the size of their features; OCCT's results BRepCheck-valid but no live analogue. Tight (< 10 um) 29:
-  /root/bool-hat-scratch/shfall-tight.txt (non-manifold 7, sheets that meet 5, void 4, face lost 3, point near its
-  face's boundary 3, ...). Of the tight non-manifold: 369288 / 7a5e0b / b1ea1e / 1a254d / 543500 are one solid and
-  its mirror image whose own faces cross (a T-junction; OCCT's results have 3-4-face edges); 762dec self-touching
-  (pairing OCCT's); only 9600b3 has a clean OCCT result. Lists: /root/bool-hat-scratch/shfall-{valid,tol}.txt.
+- shfall (122 declined on the tip; lead: keep in the share, one group): recorded 11-02 03:12 from core's CLI Shell
+  fuzz (seeds 3000-3029, vibe4, gone), before dcb40cd48 (03:38: slab tools' UpdateTolerances, which lowers faces
+  only). 93 have edges >= 10 um: slabs at OCCT's nominal 1e-4 / 1e-5 (48 slab fuses) and fused slabs fed to the
+  commons (42). Source test (scratch /root/bool-scratch/retol-slabs-hook.diff: each slab edge's tolerance set to its
+  measured deviation, CheckSameParameter, then vertices updated, kept if valid; probe_retolerance_cases re-records the
+  93 into Mac ~/noshape-host/bool-keep/shfall-retol): 12 of 92 taken (8 history only, 2 history differs, 2 volume
+  differ: 934181cc OCCT 4.1e-6 vs ours 2.7e-5 m3, a01bc6de 2e-5 relative), the rest decline for other reasons
+  (non-manifold 13, inside-out tool 9: fused-slab tools with negative volume (OCCT fuse artifacts) and one inverted
+  slab 395715b6, face lost 7, ...). Not one lever. Tight (< 10 um) 29: /root/bool-hat-scratch/shfall-tight.txt.
 - two edges leave a vertex: parity56 2ebbd509 / f3936233 are tangent contacts (a tool circle's 25 um arc leaves a
   vertex down a cylinder's ruling): OCCT's (ruling 11-15). 11cc92b2 / dbc28f46 / f516559d (tolerant end vertex 8.7
   um, 2.6 um off): the end-tolerance split reach (tilt-split.diff) moves them to non-manifold / vertex off its plane,
