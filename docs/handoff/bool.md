@@ -4,7 +4,8 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-19 00:20 UTC. Hosts (lead 11-18): builds + probes on the Mac (NOSHAPE_RB_HOST=mac), gates on vibex7
+Updated 11-19 02:58 UTC. Hosts (lead 11-18/19): builds + probes on the Mac (NOSHAPE_RB_HOST=mac; corpus replays / A-Bs
+there only inside an rb.sh slot, else vibex8; Mac paths ~/noshape-host/...), gates on vibex7
 (NOSHAPE_GATE_HOST=vibex7 via /root/bool-scratch/gate-chain-own.sh <sha> as a systemd-run unit; off 02:00-04:00);
 land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs vibex7 ~/lead-private (hat8, hat15, hat15b,
 AppleWatchDock). Never kill a process tree from a computed pid: `systemctl stop <unit>`; kill only own pids > 1.
@@ -25,32 +26,31 @@ live (e8549719) captures at feature level ("bool truth (11-18)" in behaviours.md
 Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are internal Booleans (no live analogue).
 
 ## In flight
-- GATE unit bool-gate-a6a83073f on vibex7 (23:14; slot queue, branch build 00:09) -> /root/bool-hat-scratch/chain-a6a83073f.out;
-  wait task gate-wait.sh. = the stack below + a6a83073f, the spur-gear P0 fix (qa's bisect named afe2cbe90: the free
-  grid's fold test ran on every face; now lazy, only on a long thin strip; CPU over the 8 Spur Gear Booleans 6.3 -> 5.33
-  s Mac, = before afe2cbe90; results identical). On land: tell qa (qa-sg-fixwait re-times on subject "fold") + lead.
-- NEXT GATE after it (lead: spur first): bool-hat bool-shared2 = a6a83073f + 6 wire-clip layers: c494ed1c6 coaxial
-  cylinders by OCCT's rule, edb18e819 seam arc slightly off axis, 902861ae1 lies_on, 171c911f6 narrow coincident strip,
-  efe97ef34 cylinder piece's other points first, b3dcbb078 fuse piece on faces not found coincident is covered by them.
-  Mac replay vs a6a83073f: all corpora same statuses (shfall +1 equivalent). c2-wire-clip/gamma Boolean 2 (6f38f, 23
-  tools) ours 128 vs OCCT 444 ms Mac: 945/2879 vs OCCT 946/2880 (OCCT's extra face: a 2.5 x 50 um sliver where two
-  parts' r4 corners overlap 50 um, 2.5 um apart); live 884/2405. Lead 00:15: lands as a gate exception for 6f38f only
-  if live's capture (asked 00:10, -> live/bool/wire-clip-sliver.txt) shows no such face; record it in the gate's
-  exception list with the path. Then flag live's 884 vs our 945 faces to core (merging / construction).
-  Boolean 1 (882bad, 87 tools) is SUPPRESSED in live: no document value. Its declines: tangency tests use the Boolean's
-  max input tolerance (4.9 um from one imported part) not the pair's faces' (OCCT's rule); pair version
-  /root/bool-scratch/touch-dbg.diff (DBGTOUCH) fixes 2 of 3 clusters, replay-neutral; parked.
-- Older stack (in the gate above): bool-hat (branch bool-shared2) on main 57e701c03: the commits below + d04c232c8
-  (pattern checked glue reaching in -> plain fuse at once; impeller Bohrungssitz Ansaugflansch 1000 -> 295 ms Mac) +
-  8086f188b (offset_grazes_a_circle only within 1 um of the radius: parity56) + 619037c8c (a union that lost its
-  biggest argument's body: fuzzy retry, else error, never Ok: core's walls) + 123e6b177 (Shell's tangent-extension try
-  in parallel where a kept face is an open B-spline: Gehaeuse 178 -> 135 ms; both tries leave the input unchanged,
-  checked over the suite) + ea1b5ac9f (local after ours: 37 recorded cases ours) + d7721f84a (on_face / through_holes
-  after ours: 92 distinct cases ours; same f/e/v/volume; history = OCCT's whole Boolean in 88, the direct builds left
-  out the solid's Modified and the tools' Deleted / Generated records). Expect the gate's replay to show these as
-  history differences against main's recordings (taken: the direct / local histories were the odd ones). Decision
-  pending (lead): 846db3d0c cf-surface-pattern 386/259 -> 385/258. On land: private docs, tell dx / core (walls) /
-  blend / asm.
+- Share (DECISIONS 15c2c6406, report this way): ours 3121/3477 (89.8%: general Boolean 3026, direct builds 95), OCCT
+  356, differing 6 (main 548d795fb's gate replay; local = OCCT on fewer faces, counted as OCCT).
+- LANDING: the fold fix alone (spur-gear P0, qa's bisect on afe2cbe90): bool-p0 cherry-picks 9301d9bc3 + fb602bac0
+  on main ce88e6672, QUEUED bd009a26 (lead 02:45: on the vibex7 gate's evidence, reasoning in the commit body). On
+  land: send qa the main sha (re-time vs v0.4.58).
+- GATE unit bool-gate-2c6b920fc on vibex8 (02:43, slot queue) -> /root/bool-hat-scratch/chain-2c6b920fc.out: branch
+  bool-stack3 (bool-hat) = main ce88e6672 + fold fix + 34 commits: the old stack without the two reorder commits
+  (87df02e54 local after ours, bf73854d9 on_face / through_holes after ours: same geometry, slower (on_face 2.2 vs
+  ours 19.5 ms), history differs from the recorded direct builds; lead 02:20 agreed to drop them) and without
+  bb10c3fe5 (main has an offset-fit cache already); wire-clip layers (WIP prefixes removed; lies_on, narrow strip,
+  coaxial cylinders, seam arc, cylinder other points, fuse strip covered: 6f38f as live, exception in the wire-clip
+  corpus's `live` file (live/bool/wire-clip-sliver.txt), corpus added to gate-host.py); and 4 new: ±π vertex
+  directions (arrange.rs; corpus2 553beda0 in 6 corpora, corpus5 6a8804ab, 4 shfall), cone apex places within tol
+  (corpus4 e72bf433), line commons past distant B-spline edges / faces (16 bool-corpus), plane vs curved sheets'
+  common empty (11 bool-corpus). Mac A/B of the ±π fix: no new differences. Land when green (lead).
+  The failed vibex7 gate of a6a83073f (the old stack): /root/bool-tube-scratch/gate-a6a83073f.log.
+- The 356 by reason (main 548d): shared shape 74 (the stack's e9b6efecc / 8a9351e4b take 46), non-manifold 31
+  (mine done: 2 fixed; 7 have B-spline faces (bool2); 4 truly touch along an edge (a cylinder tangent inside a
+  face, edge-to-edge fuses), 2 an invalid tool), short section from a corner 30 (bool2), near two vertices 19
+  (shfall 17), sheets that meet 17 (11 fixed; 5 shfall, parity56 89ceca45 extrusion), line + curved edge 16 (fixed),
+  inside-out tool 15 (shfall 12), face lost 14, two edges leave a vertex one way 7: 11cc92b2 / dbc28f46 / 2ebbd509 /
+  f3936233 / f516559d: a tolerant input vertex (2.6 um off its face) tilts the edge piece from it, so a coincident
+  tool edge's vertex on the true line is out of split reach; fix idea: split_params measures against the origin
+  edge's own line. Edge twice in a face 5 (slit faces, input). Traces: /root/bool-scratch/stack3-traces3.diff
+  (DBGNM / DBGP / DBGF / DBGTE).
 - shfall (129 declines): no parity-suite Shell reaches slabs now (34 Shells: quadrics 20, smooth 8, regions 6), and
   16 of its 17 "near two vertices" have input vertex tolerances 0.2 mm..1 m: low value. Its 11 "piece's point on
   another solid's face": zero-area input faces (two coincident edges), a 0.2 mm triangle tangent to a cylinder.

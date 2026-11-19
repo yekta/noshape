@@ -4791,3 +4791,17 @@ instances on one plate either way: yours if you'll take it.
   through op_boolean: `boolean.rust` 52 ms, of which `boolean.rust.sections_ahead` 49.5 ms, then OCCT's
   `boolean.build` 38 ms. If the Rust path can tell earlier that it will decline here, ~50 ms go. Repro:
   `NOSHAPE_KERNEL_PROFILE=1 NOSHAPE_PARITY_ONLY=cf-snap-hook` parity_models (vibe5), table "Fillet 5".
+
+
+## 11-19 02:58: the stack's notes before bool-stack3 (moved from the handoff)
+- Older stack (in the gate above): bool-hat (branch bool-shared2) on main 57e701c03: the commits below + d04c232c8
+  (pattern checked glue reaching in -> plain fuse at once; impeller Bohrungssitz Ansaugflansch 1000 -> 295 ms Mac) +
+  8086f188b (offset_grazes_a_circle only within 1 um of the radius: parity56) + 619037c8c (a union that lost its
+  biggest argument's body: fuzzy retry, else error, never Ok: core's walls) + 123e6b177 (Shell's tangent-extension try
+  in parallel where a kept face is an open B-spline: Gehaeuse 178 -> 135 ms; both tries leave the input unchanged,
+  checked over the suite) + ea1b5ac9f (local after ours: 37 recorded cases ours) + d7721f84a (on_face / through_holes
+  after ours: 92 distinct cases ours; same f/e/v/volume; history = OCCT's whole Boolean in 88, the direct builds left
+  out the solid's Modified and the tools' Deleted / Generated records). Expect the gate's replay to show these as
+  history differences against main's recordings (taken: the direct / local histories were the odd ones). Decision
+  pending (lead): 846db3d0c cf-surface-pattern 386/259 -> 385/258. On land: private docs, tell dx / core (walls) /
+  blend / asm.
