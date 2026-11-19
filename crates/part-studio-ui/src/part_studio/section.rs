@@ -65,6 +65,9 @@ pub struct SectionDialog {
     pub keyboard_left: bool,
     /// Plane the arrow drives.
     pub active: usize,
+    /// A section plane was picked in this session (from the selection it opened with, or a click): its cap is drawn
+    /// selected, tan; reopened (Edit section view…) or restored, the part colour (live cap-plane-1119).
+    pub picked: bool,
     /// State before the dialog opened (restored by Cancel).
     saved: (Vec<SectionPlane>, Option<(bool, Vec<BodyId>)>),
     /// The "Select default plane" popup and the plane it added.
@@ -89,9 +92,9 @@ impl PartStudioView {
     /// Push the planes and the excluded parts into the scene and rebuild.
     pub(super) fn apply_section(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.opts.section = self.ui.section.iter().map(|p| p.clip()).collect();
-        // Live part-studio/72-73: while the dialog is open its plane's cap is
-        // drawn selected (tan); after ✓ in the part color (74).
-        self.opts.section_selected = self.ui.section_dialog.as_ref().map(|d| d.active);
+        // Live part-studio/72-73, cap-plane-1119: while the dialog is open a plane just picked has its cap drawn
+        // selected (tan); after ✓ or reopened, in the part colour (74).
+        self.opts.section_selected = self.ui.section_dialog.as_ref().filter(|d| d.picked).map(|d| d.active);
         self.opts.section_skip = match &self.ui.section_parts {
             Some((false, items)) => items.clone(),
             Some((true, items)) => self.display.bodies.iter().map(|b| b.id.clone()).filter(|b| !items.contains(b)).collect(),
@@ -119,14 +122,21 @@ impl PartStudioView {
     /// Open the dialog (keeping the current planes, or starting from the
     /// selection / the Front plane).
     pub(super) fn open_section_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_section_dialog_picked(false, window, cx);
+    }
+
+    /// [`Self::open_section_dialog`]; `picked`: its planes were just picked (Section view… on a plane).
+    fn open_section_dialog_picked(&mut self, picked: bool, window: &mut Window, cx: &mut Context<Self>) {
         if self.ui.section_dialog.is_some() {
             return;
         }
         let saved = (self.ui.section.clone(), self.ui.section_parts.clone());
         // Live (part-studio/70): from the camera menu with nothing selected
         // the dialog opens empty and asks for a plane.
+        let mut picked = picked;
         if self.ui.section.is_empty() && !self.selection.is_empty() {
             let refs = self.selection.clone();
+            picked = refs.iter().any(|r| self.section_frame(r).is_some());
             self.ui.section = self.planes_for(&refs, cx);
         }
         // Live (live2 view-tools-1118): turned off, then Shift+X with nothing selected: the last plane and its offset.
@@ -138,7 +148,7 @@ impl PartStudioView {
         }
         let (include, items) = self.ui.section_parts.clone().unwrap_or((false, Vec::new()));
         let active = self.ui.section.len().saturating_sub(1);
-        self.ui.section_dialog = Some(SectionDialog { include, items, items_active: false, keyboard_left: false, active, saved, popup: None, popup_plane: None });
+        self.ui.section_dialog = Some(SectionDialog { include, items, items_active: false, keyboard_left: false, active, picked, saved, popup: None, popup_plane: None });
         self.apply_section(window, cx);
     }
 
@@ -202,7 +212,8 @@ impl PartStudioView {
         let saved = (self.ui.section.clone(), self.ui.section_parts.clone());
         self.ui.section = self.planes_for(refs, cx);
         self.ui.section_dialog = None;
-        self.open_section_dialog(window, cx);
+        let picked = refs.iter().any(|r| self.section_frame(r).is_some());
+        self.open_section_dialog_picked(picked, window, cx);
         if let Some(d) = &mut self.ui.section_dialog {
             d.saved = saved;
         }
@@ -274,6 +285,7 @@ impl PartStudioView {
             }
             if let Some(d) = &mut self.ui.section_dialog {
                 d.active = self.ui.section.len().saturating_sub(1);
+                d.picked = true;
             }
             self.reset_section_manip();
         }

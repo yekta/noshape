@@ -624,6 +624,8 @@ struct CapOut {
     @location(0) world: vec3<f32>,
 };
 
+const CAP_PIXELS: f32 = 0.25;
+
 @vertex
 fn vs_section_cap(@builtin(vertex_index) vi: u32) -> CapOut {
     var corners = array<vec2<f32>, 6>(vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(1.0, 1.0), vec2(-1.0, -1.0), vec2(1.0, 1.0), vec2(-1.0, 1.0));
@@ -631,6 +633,9 @@ fn vs_section_cap(@builtin(vertex_index) vi: u32) -> CapOut {
     var o: CapOut;
     o.world = cap.center.xyz + cap.u.xyz * k.x + cap.v.xyz * k.y;
     o.pos = g.view_proj * vec4(o.world, 1.0);
+    // A shown datum plane lying on the section plane never blends over its cap (live cap-plane-1119): the cap a quarter
+    // of a pixel's depth change nearer, so the plane's coplanar fill fails the depth test there.
+    o.pos.z = o.pos.z * (1.0 + 2e-6) + CAP_PIXELS * depth_step_px(o.world, cross(cap.u.xyz, cap.v.xyz), o.pos);
     return o;
 }
 

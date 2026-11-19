@@ -2288,6 +2288,28 @@ fn shift_x_after_turning_off_restores_the_last_section(cx: &mut TestAppContext) 
     .unwrap();
 }
 
+/// Live cap-plane-1119: the cap is tan (drawn selected) only while its plane has just been picked in the open dialog;
+/// after ✓ and when the section is reopened for edit it is the part colour; a plane picked then turns tan again.
+#[gpui::test]
+fn a_section_cap_is_tan_only_while_its_plane_is_just_picked(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "section-cap-tan");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selection.clear();
+            v.section_through(Reference::Plane(DatumPlane::Front), w, cx);
+            let picked = v.opts.section_selected;
+            v.end_section_dialog(true, w, cx);
+            let after_ok = v.opts.section_selected;
+            v.edit_section(w, cx);
+            let reopened = v.opts.section_selected;
+            assert!(v.section_pick(&Reference::Plane(DatumPlane::Right), w, cx));
+            let right = v.opts.section_selected;
+            assert_eq!((picked, after_ok, reopened, right), (Some(0), None, None, Some(1)), "(Front picked, after ✓, reopened, Right picked)");
+        })
+    })
+    .unwrap();
+}
+
 /// Live 11-02: every section plane's manipulator is shown while the dialog is open, and dragging another plane's
 /// arrow moves that plane.
 #[gpui::test]

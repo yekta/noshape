@@ -3179,3 +3179,43 @@ fn a_selected_face_of_a_hovered_selection_row_is_yellow_green() {
     assert!(selected[0] > selected[1] && selected[2] < 80, "selected: orange {selected:?}");
     assert!(query[1] >= query[0] && query[2] > selected[2] + 40, "selected and its row hovered: yellow-green {query:?} (selected {selected:?})");
 }
+
+/// Live cap-plane-1119: a shown datum plane lying on the section plane never blends over the cap; its pixels are the
+/// same with the plane shown and hidden (ours blended the plane's fill over it: #E3C9A7 for #E9C497). Away from the
+/// cap the plane still shows.
+#[test]
+fn a_datum_plane_on_the_section_plane_leaves_its_cap_as_it_is() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (w, h) = (400u32, 300u32);
+    for (from, ortho) in [(glam::DVec3::new(0.3, 1.0, -0.8), false), (glam::DVec3::new(-0.6, 0.7, -0.4), false), (glam::DVec3::new(0.3, 1.0, -0.8), true)] {
+        let mut scene = Scene::default();
+        scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.05, -0.05, -0.05], [0.05, 0.05, 0.05], 1)))).with_color([0.28, 0.51, 0.73, 1.0]));
+        scene.clip = Some(ClipPlane::new(glam::Vec3::Z, 0.0));
+        let mut cam = Camera { rotation: Camera::look_rotation(from.normalize(), glam::DVec3::Z), ..Default::default() };
+        if ortho {
+            cam.projection = noshape_render::Projection::Orthographic;
+        }
+        cam.fit_box(glam::DVec3::splat(-0.1), glam::DVec3::splat(0.1), w as f64 / h as f64);
+        let size = glam::DVec2::new(w as f64, h as f64);
+        let spots: Vec<glam::DVec2> = (-3..=3).flat_map(|i| (-3..=3).map(move |j| glam::DVec3::new(i as f64 * 0.012, j as f64 * 0.012, 0.0))).filter_map(|p| cam.project(p, size, 0.2)).collect();
+        let outside = cam.project(glam::DVec3::new(0.08, 0.08, 0.0), size, 0.2).expect("on screen");
+        let px = |f: &noshape_render::Frame, p: glam::DVec2| {
+            let o = ((p.y as u32 * w + p.x as u32) * 4) as usize;
+            [f.bgra[o + 2], f.bgra[o + 1], f.bgra[o]]
+        };
+        let bare = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+        // Front-plane-like: a 0.2 m light blue square at 30 % on z = 0, unlit and not clipped, as the builder's.
+        scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::quad_mesh([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], 0.1, 9)))).with_color([0.6, 0.75, 0.9, 0.3]).ignore_clip().unlit().layer(5));
+        let shown = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+        let changed: Vec<_> = spots.iter().filter(|&&p| px(&bare, p) != px(&shown, p)).map(|&p| (px(&bare, p), px(&shown, p))).collect();
+        assert!(changed.is_empty(), "from {from:?} (ortho {ortho}): {} of {} cap spots changed by the plane: {changed:?}", changed.len(), spots.len());
+        assert_ne!(px(&bare, outside), px(&shown, outside), "from {from:?}: the plane still shows beside the part");
+    }
+}
