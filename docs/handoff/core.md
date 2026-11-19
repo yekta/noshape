@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-19 17:19 UTC (new thread 20:05 after the account limit; ids: see How to run). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-19 21:50 UTC (fresh thread 21:10 after the 17:30 usage stall; ids: /root/lead-scratch/p-core-1119.md). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
@@ -32,26 +32,22 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   dropped. WIP core-loft branch core-helixcyl 9c5711eab turns a helical sweep's crest/root into exact cylinders (kernel
   T1 a_helical_teeths_crest_and_root_are_cylinders passes, Pappus volume) but OCCT's Boolean of a cylinder face wrapping
   22 turns is invalid (thread::helical_teeth_add_to_the_core): parked. Probes vibex8 ~/tmp/core/nutsrec (ftypes, cylfit).
-- **Wave-washer ring (core-rp branch core-ring4 7aa3458b4 = core-ring3 rebased clean on main, WIP, PROBEs + env
-  NOSHAPE_RING_MODE; dump_op "ringloft"):** path reopened at the first profile, a pipe per profile pair, binormal = ring
-  axis (mode 1), upright cuts. Loft 1 2126.10 vs live 2080.67 mm3, 1.9 s vs 67 ms; measured against live's 4 exact faces
-  (vibex7/vibex8 ~/tmp/core/ringsurf <ours.brep> ring-live-surf.txt): max 2.68 mm, mean 0.36-0.78: NOT landable (0.1 mm
-  bar). Modes: 0 corrected Frenet -> loft error; 2 Frenet 4253 mm3, 13.6 mm off; 3 discrete inside out, 1.75 mm.
-  Live's sections (core-scratch/ring/sec.py, knots.py): at the 4 profiles + at 61.6 / 118.8 / 241.4 / 298.6 deg; each
-  extra one = the 90/270 (JM) profile carried along the path by a rotation-minimising frame (zc 5.01 vs RMF 5.03, r
-  19.394 vs 19.393, rin/rout 13.71/25.08 exact; bank 5.9 vs 5.5); banks up to 6.5 deg between profiles. Our routing
-  curve = live's (162.936 mm). live2 q-wave-washer-sections-1119 (scratch doc 30252aa1, kept till core says): SECTION RULE:
-  Section count N = N sections at equal arc lengths from the FIRST profile (N+1 pieces of the closed path); one landing
-  on a profile is dropped (N 1 / 3: none added, 4 spans 2091.69 mm3; N 5: 60/120/[180]/240/300 -> 4 added; N 10: all 10;
-  reordered: same offsets from JMC; 2 profiles: 5 added). SECTION SHAPE (core-scratch/ring/shape.py, RMF over
-  spine.txt from vibex8 ~/tmp/core/spine.brep): JK carried by RMF reaches 90 deg upright (no twist), 2.286 below JM, so a
-  section = JK carried + lift f x 2.286 in the frame (fits to 0.04 mm); f(angle): 0:0 31.9:.59 67.4:.97 90:1 96.7:.945
-  130.7:.515 164.2:.09 180:0, asymmetric (not linear / smoothstep / sine in arc): UNKNOWN; then the skin (C1 cubics?).
+- **Wave-washer ring (core-rp branch core-ring5 on main, uncommitted, PROBE dumps marked `// PROBE`):** live2's
+  sections decoded (core-scratch/ring/nat.py): added section = EVERY profile carried along the path by a
+  rotation-minimising frame (double reflection), mixed with NATURAL cubic spline weights over the profiles' arc places
+  (first profile again at the end, s = total); stations at total*i/(N+1) from the first profile, one on a profile
+  dropped. Fits live's sc10 / sc5 / reordered sections to <= 0.06 mm. Code: ring_sections_built (+ place_on_path,
+  wire_reversed, wire_from_arc, natural_spline_weights, wires_mixed), opts.closed in solid_a.rs loft, ts.SetSmoothing
+  (closed), closed solids turned outward. Kernel T1 features::a_loft_round_a_closed_path_mixes_its_sections_from_every_
+  profile passes. Doc: Loft 1 2064.81 vs live 2080.82 mm3 (was 2126.10), 106 ms (was 1453); ringsurf max 2.83 / mean
+  0.45 mm: skin or sections? probe vibex8 ~/tmp/core/ringl <wires.brep> ring-live-surf.txt (src core-scratch/brepq/
+  ringl.cpp: each wire vs live, then ThruSections variants), wires from NOSHAPE_RING_WIRES (.r5.sh). Bar 0.1 mm.
 - **11-19 afternoon:** guided-loft conditions e02fe92f (queued/landed: Normal to guide aslant -> BSURF_INCONSISTENT text;
   start/end conditions checked against guides; T1 a_guided_loft_with_guide_and_end_conditions_as_live). f197 closed
   (Mirror 3 splits one B-spline edge at (1.2061,39,20): DECISIONS 11-16). surf-intro Derived 1 +0.1 in = asm's
   90d254008 (handed to asm; live's body differs, can't judge). qa re-saved cpcurves/mutualtrim: left cpcurves Split 5
   Info + extra 1227.58 mm3 part (= Split 3 keeps the wrong piece) -> after pipe.
+- **Re-queued 21:20 b9d47a3d** (failed 18:07 on the batch partner's coverage row "partStudio:Row B", not ours).
 - **Pipe Loft LANDING 11-19 (lead: within 0.1 mm of live where ours errored lands, DECISIONS 11-19):** core-loft
   core-nloft2 9a112af34 + checklist 2d162d3e8: loft_guided_open through > 2 open profiles: a natural cubic across the
   profiles (live: zero 2nd derivative at the end profiles), each profile paired by its own curve parameter (live's section
@@ -60,7 +56,15 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   turns 0.05 mm into 0.6 %); kernel T1 a_surface_loft_through_three_profiles_along_curved_guides_is_live_s_face (live2's
   curves, boundaries < 1 um, interior < 0.1 mm). Parity row stays: live skins ~13 sections of its own rule with C1 cubics
   (rest in v .55-.75, mid u). Tools: vibex7 ~/tmp/core/livesurf, projpt (BRepExtrema glitches 4.7 mm here), devlive.
-- **cpcurves Split 3 QUEUED 5bc866cec:** a closed profile's surface sweep faces out of its tube (live q-sweep-normals-1119:
+- **singularities Mirror 3 QUEUED 21:25 072505c2:** a surface mirrored / patterned with Add joins the surfaces it
+  touches (merge scope + seeds) into one sheet (live: one 2-face sheet); singularities 2 -> 5/15, 30-doc subset otherwise
+  same (vibex7 ~/tmp/core/glm.log vs glsl.log). T1 features_a::a_surface_mirrored_with_add_joins_its_mirror. Next there:
+  Loft with bad singularity (ours errors, live 3425 mm2 sheet).
+- **asm a2e4a2 Chamfer 2 (isaac):** blend landed the fix bb667320d at 03:58 (concave straight-edge chamfer fills, +40.31);
+  asm's 19:54 trace may predate it: check with a fresh binary on vibex8 ~/tmp/core/isa/m/asm-a2e4a2 (studio as a
+  parity model: NOSHAPE_PARITY_MODELS=~/tmp/core/isa/m).
+- **welding Extrude 8 body order:** moved to skasm (lead 19:35).
+- **cpcurves Split 3 LANDED 575aba2a4:** a closed profile's surface sweep faces out of its tube (live q-sweep-normals-1119:
   manualblend's tube against its sketch's normal, cpcurves' along it: both outward); cpcurves' 1227.58 mm3 part and Split
   5's Info gone, Delete face 2 = live; left: edge counts from Sweep 5's split circle (known). 30-doc subset clean
   (core-scratch gls3.log). T1 features_c::a_surface_swept_from_a_circle_faces_out_of_its_tube.
