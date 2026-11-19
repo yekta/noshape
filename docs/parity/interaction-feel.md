@@ -1470,6 +1470,21 @@ Ctrl+V on, which doesn't change the keys after it.
 | Shift+X Section view | the dialog at the list's side like other feature dialogs (top left ~ (396, 192)) | the dialog low on the left (~ (336, 620)): a moved spot saved on 11-04 in the run's panel_positions.json | withdrawn (live 11-19: = with a clean config) |
 | Shift+Y Show selected parts (Part 1 selected) | the selection cleared | Part 1 stays selected | ≠ [psui] (live's studio had Part 1 hidden first; to retake from one state) |
 
+### reach-px-1119 (hover reach read from full-page screenshots, live 11-19 02:50–03:25) [psui, asm]
+
+Lane 4. The pointer stepped 1 px at a time (450 ms per step) toward the target and back out, and each step was read from a full-page screenshot of what
+live draws. Clip screenshots on this lane miss the hover overlay, so they're not used. The distances are px from the drawn edge pixel to the pointer.
+These are what the user sees; reach-1118 (16:29) read the viewer's own pick and got more for the silhouette. Evidence: live/feel/reach-px-1119/.
+
+| Target (iso, fit) | Live, drawn: lights at / still lit to | Ours | Status |
+|---|---|---|---|
+| A block's silhouette edge over the background (vertical, "start two-blocks" Part 1) | **5 / 5** (6 out: nothing), 2 rounds; a click 4 px out selects the edge, at 5 nothing (2 rounds) | 7 / 10 (green 88545e5d7, clean config, the same pixel method) | ≠ [psui]: live's drawn reach is 2 px shorter with no hold (reach-1118's pick-based 7 / 9–11 doesn't match what live draws or clicks) |
+| The same edge in the assembly ("start two-blocks asm") | 5 lit, 6 not, 2 rounds | – | [asm] the same as the Part Studio |
+| An edge between two faces, approached over the side face | lit at 7 (the side face's boundary at 9); a midpoint ⊙ on that edge takes over from 6 inward | – | (one pass) |
+| A vertex, approached along the screen diagonal over the background | lit at 8.5, not 9.9; held to 8.5 | – | (3d.json's 8–10 holds) |
+| A plane's vertical outer edge (Front / Right in iso, over the background) | **6 / 6** (7: nothing) | – | (3d.json's "level border 7–8" read 1–2 px long) |
+| A plane's slanted outer edge (Top in iso) | 7.2 lit, 8.05 not (row "A plane hovers…") | 9.1 / 9.9 | ≠ [psui] |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
