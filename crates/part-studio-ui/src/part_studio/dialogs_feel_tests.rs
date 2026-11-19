@@ -1033,3 +1033,33 @@ fn a_routing_curves_multiple_triad_moves_the_selected_points(cx: &mut TestAppCon
     click(cx, pts[1].1);
     assert_eq!(cx.update(|cx| view.read(cx).routing_selected(cx)), vec![2], "point 1 deselected");
 }
+
+/// Live sel-feel (P0): a double-click on a part edge in the graphics selects it, then the second click deselects it;
+/// no chain or loop is added.
+#[gpui::test]
+fn a_double_click_on_an_edge_selects_then_deselects_it(cx: &mut TestAppContext) {
+    let (window, view) = block(cx, "dbl-edge");
+    draw(cx, window);
+    let (edge, pick) = cx.update(|cx| {
+        let v = view.read(cx);
+        let e = v.display.bodies.first().and_then(|b| b.edge_refs.first().cloned()).expect("an edge");
+        let p = v.built.as_ref().and_then(|b| b.picks.ids_for(&e).first().copied()).expect("its pick");
+        (e, p)
+    });
+    let clock = std::rc::Rc::new(std::cell::Cell::new(std::time::Instant::now()));
+    let c = clock.clone();
+    cx.update(|cx| view.read(cx).viewport.clone().update(cx, |vp, _| vp.set_clock(move || c.get())));
+    let click = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::Click { pick: Some(pick), position: glam::DVec2::new(500., 300.), modifiers: Modifiers::default() }, w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+        cx.update(|cx| view.read(cx).selection.clone())
+    };
+    let first = click(cx);
+    clock.set(clock.get() + std::time::Duration::from_millis(200));
+    let second = click(cx);
+    assert_eq!((first, second), (vec![edge], Vec::new()), "the first click selects the edge alone, the second (a double-click) deselects it");
+}

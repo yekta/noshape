@@ -837,7 +837,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 
 | Finding | Ours | Test |
 |---|---|---|
-| A part edge vs the face behind / below it: lights at 5–6 px, stays to 8–10; the face never beats the edge inside reach | = (fixed psui 11-19, live reach-px-1119 / 32b2e16dd, 7c6d6ce55, full-page shots: over the background 5, over its face 7, no hold either way; ours was 7 and held to 10 over both) | feel_tests::a_click_beside_an_edge_selects_what_is_lit (reach in iso: missing) |
+| A part edge vs the face behind / below it: lights at 5–6 px, stays to 8–10; the face never beats the edge inside reach | = (fixed psui 11-19, live reach-px-1119 / 32b2e16dd, 7c6d6ce55, full-page shots: over the background 5, over its face 7, no hold either way; ours was 7 and held to 10 over both) | feel_tests::a_click_beside_an_edge_selects_what_is_lit (in the iso view: 5 px over the background, 7 over its face, both sides) |
 | A sketch point takes over from its line 8 px before the end; beyond the end 6 px; a line 5–7 px, the sketch's plane beyond | = | sketch_hover_feel_tests::sketch_hover_reach_and_priority_as_live |
 | A mate connector wins across its drawn triad: 22 px horizontally, 13–14 px vertically, over the face | = (fixed: the Part Studio picked fixed 4 mm axis stubs; now the drawn disc, as the assembly) | feel_tests::a_mate_connector_wins_over_its_face_across_its_disc |
 | Through a transparent default plane geometry behind it always wins; the plane lights only where nothing is behind | = | feel_tests::a_block_behind_the_front_plane_lights_through_it, part_faces_and_vertices_light_over_the_planes_behind |
@@ -852,7 +852,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | Window box counts on two blocks (28 / 21); a block's 18 / 5 / crossing 13 | = | feel_tests::box_select_takes_what_live_takes (one block; the two-block counts missing) |
 | A press whose first move ends over a default plane lights the plane and draws no box until the next move | = (fixed 11-18: was the box on the first move, live2 ours-1118) | feel tests `a_box_whose_first_move_ends_on_a_plane_waits_a_move` |
 | A click on a default plane selects it, a second adds; a face then a plane gives both; an empty click clears all | = | sketch_box_feel_tests::midpoint_glyph_and_plane_clicks_in_a_sketch_as_live (sketch mode); list matrix "click / a default plane: Default geometry related" |
-| A double-click on an edge selects then deselects, no chain | = | list matrix "double-click / a part: two toggles" (edge in the viewport: missing) |
+| A double-click on an edge selects then deselects, no chain | = | list matrix "double-click / a part: two toggles"; dialogs_feel_tests::a_double_click_on_an_edge_selects_then_deselects_it |
 | A double-click on a face shows its feature's sketch, rows related, nothing kept selected | = | sketch_ui_tests::a_face_double_clicked_shows_its_features_sketch, sketch_hover_feel_tests::a_face_double_clicked_draws_its_sketch_through_the_pointer |
 | A feature row hovered: rgb(222,241,251), tooltip "Extrude 1 <- Sketch 1", its part outlined rgb(255,198,133) | = | list matrix "hover / the row's tooltip", "hover / the geometry lit 100 ms after, cleared 100 ms after leaving" |
 | A part row hovered: the same plus its eye icon and a "Part 2" tooltip | = | list matrix "hover / the row's tooltip" |
