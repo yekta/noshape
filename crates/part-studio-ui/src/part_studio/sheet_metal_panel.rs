@@ -354,6 +354,33 @@ impl PartStudioView {
         cx.notify();
     }
 
+    /// A click in the 3D view with the table open: a bend's face selected outlines its Bends row and lights its zone in
+    /// the flat view, as a click there does (live feel sm-cfg-io-1119); a selection without one drops them. Hovering
+    /// changes neither.
+    pub(super) fn sm_follow_pick(&mut self, cx: &mut Context<Self>) {
+        if self.right_panel != Some(super::config_panel::RightPanel::SheetMetal) {
+            return;
+        }
+        let models = self.sheet_metal_models(cx);
+        let Some(data) = self.sheet_metal_context(&models).and_then(|m| self.sm_model_data(m)) else { return };
+        let bend = self.selection.iter().rev().find_map(|r| {
+            let Reference::Face(n) = r else { return None };
+            data.bends.iter().position(|b| b.inner_faces.iter().chain(&b.outer_faces).any(|f| **f == *n))
+        });
+        let line = bend.and_then(|b| self.flat_view.as_ref().and_then(|f| f.read(cx).line_of_bend(b)));
+        if let Some(b) = bend {
+            self.ui.sm_cell = Some((0, noshape_ops::sheetmetal::joint_of(&data, b), 0));
+        } else if matches!(self.ui.sm_cell, Some((0, _, 0))) {
+            self.ui.sm_cell = None;
+        }
+        self.ui.sm_flat_bend = None;
+        if let Some(f) = self.flat_view.clone()
+            && f.read(cx).selected_bend() != line
+        {
+            f.update(cx, |f, cx| f.select_bend(line, cx));
+        }
+    }
+
     /// A click inside a bend's zone in the flat view: the bend (its first face, as Select other's "Face of …")
     /// selected in both views and its Bends row (live feel/sheetmetal.json "flatView.select").
     fn select_flat_bend_zone(&mut self, line: usize, cx: &mut Context<Self>) {

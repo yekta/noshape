@@ -2525,6 +2525,9 @@ impl PartStudioView {
                     }
                     None => {}
                 }
+                if self.edit.is_none() {
+                    self.sm_follow_pick(cx);
+                }
                 // The readout's measurement starts with the click, not at the next frame (`ui_busy` then waits for it).
                 if self.edit.is_none() && !self.selection.is_empty() {
                     let _ = self.selection_readout(cx);

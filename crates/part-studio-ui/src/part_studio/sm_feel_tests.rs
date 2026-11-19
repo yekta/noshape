@@ -226,6 +226,36 @@ fn rows() -> Vec<Row> {
             });
             expect((faces, row), (1, Some((0, 0))), "faces selected in 3D, the Bends row selected")
         } },
+        Row { id: "3D view / a click on a bend face", live: "selects the face, outlines its Bends row and lights its zone in the flat view; hovering it changes no row (sm-cfg-io-1119)", gap: false, check: |s, cx| {
+            s.escape_all(cx);
+            let (face, id, row) = cx.update(|cx| {
+                let v = s.view.read(cx);
+                let (ctx, built) = (v.context.as_ref()?, v.built.as_ref()?);
+                let data = ctx.sheet_metal.values().next()?;
+                let face = Reference::Face((*data.bends.get(1)?.outer_faces.first()?.clone()).clone());
+                let id = *built.picks.ids_for(&face).first()?;
+                Some((face, id, noshape_ops::sheetmetal::joint_of(data, 1)))
+            }).ok_or("no bend face to click")?;
+            let at = glam::DVec2::new(500., 300.);
+            cx.update_window(s.window, |_, w, cx| s.view.update(cx, |v, cx| {
+                let vp = v.viewport.clone();
+                v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: at, modifiers: NONE }, w, cx);
+            })).unwrap();
+            s.frames(cx);
+            let hovered = cx.update(|cx| s.view.read(cx).ui.sm_cell);
+            cx.update_window(s.window, |_, w, cx| s.view.update(cx, |v, cx| {
+                let vp = v.viewport.clone();
+                v.on_viewport_event(&vp, &ViewportEvent::Click { pick: Some(id), position: at, modifiers: NONE }, w, cx);
+            })).unwrap();
+            s.frames(cx);
+            let got = cx.update(|cx| {
+                let v = s.view.read(cx);
+                let line = v.flat_view.as_ref().and_then(|f| f.read(cx).selected_bend());
+                let want_line = v.flat_view.as_ref().and_then(|f| f.read(cx).line_of_bend(1));
+                (hovered, v.selection == vec![face.clone()], v.ui.sm_cell, line.is_some() && line == want_line)
+            });
+            expect(got, (None, true, Some((0, row, 0)), true), "(row before the click, the face selected, the row outlined, its zone lit)")
+        } },
         Row { id: "flat view / a bend zone hovered", live: "lights that bend in both views, not its table row; on the dashed centre line nothing (sheetmetal-gaps2)", gap: false, check: |s, cx| {
             let fv = cx.update(|cx| s.view.read(cx).flat_view.clone()).ok_or("no flat view")?;
             let vp = cx.update(|cx| fv.read(cx).viewport.clone());

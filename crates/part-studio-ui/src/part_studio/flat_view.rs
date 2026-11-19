@@ -311,6 +311,16 @@ impl FlatView {
         self.flat.as_ref()?.0.bend_lines.get(line).map(|l| l.bend)
     }
 
+    /// Bend `bend`'s (first) line.
+    pub fn line_of_bend(&self, bend: usize) -> Option<usize> {
+        self.flat.as_ref()?.0.bend_lines.iter().position(|l| l.bend == bend)
+    }
+
+    /// The selected bend line.
+    pub fn selected_bend(&self) -> Option<usize> {
+        self.selected_bend
+    }
+
     /// Select bend line `line` (or none), the face unselected.
     pub fn select_bend(&mut self, line: Option<usize>, cx: &mut Context<Self>) {
         self.selected_bend = line;
