@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-19 22:00 UTC (fresh bool thread after the 17:30-21:10 usage stall). Hosts by load (DECISIONS 11-19): read
+Updated 11-19 22:30 UTC (fresh bool thread after the 17:30-21:10 usage stall). Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2; builds + probes on the Mac (NOSHAPE_RB_HOST=mac,
 inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host; land queue vibe2
 (`NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`); private docs only vibex7 ~/lead-private. Never kill a process
@@ -60,12 +60,24 @@ reasons ranked, speed list. Daily report: share as "ours N/M (general, direct), 
   - 99b55ec9: Common df5e46e1 equivalent (1.7e-8) but the Shell's volume string differs.
   Scripts: /root/bool-scratch/shc-e2e2.sh <bin> <runs>, mac-shell-env.sh <bin> <ENV..>, mac-ab-vs.sh. Probes: xprobe
   probe_who_is_right, probe_faces_on_plane, probe_edges_on_line, probe_unified_edges.
-- live2's Shell 3 ticket (P2 SHELL-AFTER-WELD-FILLET): Part 3's Shell itself is right but slow (Linux 15-24 s, Mac 3.5
-  s): ~4 s is ours computing sections of the fillet's B-spline faces in the 45-slab union then declining, OCCT redoes
-  them; ours also declines the next Common after ~0.3 s. The feature failure is NOT the time budget (120 s changes
-  nothing). In progress at the stall: an instrumented ops test (bool-hat uncommitted crates/ops/tests/all.rs `mod
-  xshell3;`, detail.rs DBGSHELL / DBGBLEND eprintlns) printing per part the Shell's solids, shell_is_whole and the
-  kernel error. Not to commit.
+- live2's Shell 3 ticket (P2 SHELL-AFTER-WELD-FILLET): platform-only. ops xshell3 (instrumented, bool-hat
+  uncommitted: crates/ops/tests/xshell3.rs, `mod xshell3;`, detail.rs DBGSHELL / DBGBLEND; patch
+  /root/bool-scratch/hat-dbg3.diff) on the Mac, main 91df536c0 and bool-pole2 alike: Fillet 1 Ok, Shell 3 Ok (parts 2
+  and 1 at 5 mm, both whole), the document 9.6 s. Linux release CLI (bool2-ab, has blend 92c8595b0): Shell 3 "Could
+  not shell part with selections.", 46-50 s; NOT the 30 s blend budget (NOSHAPE_BLEND_BUDGET=300 same). Running: the
+  instrumented ops test on Linux (vibe2 rb.sh, ~/tmp/bool/sh3) to see which part / check fails there.
+- Shell end to end: 69d3e1059 (bool-hat branch sh3-probe on 330ea2052; cherry-pick onto bool-pole2 after its gate):
+  the gate's Shell check takes volumes within 1e-7 relative as the same (the replay's); 99b55ec9 off SHELLS_KNOWN
+  (8.5e-8 apart, same faces / edges / history) -> 8 differing. Unify family (13186b07 b64c8b4e 9134b29f 8eebe1e2, all
+  +1 face +3 edges +2 vertices, same volume): 8eebe1e2's slab union da3ee477 puts the x 60..62 coincident cylinder
+  pieces on arg 9's / 10's surfaces (ours' "later argument in a fuse of 4+" rank), OCCT on arg 7's / 8's
+  (FillSameDomainFaces: unsplit original by least DS index, else the least index's piece). Scratch toggle
+  NOSHAPE_SD_RULE (bool-hat boolean.rs, uncommitted): 1 = OCCT's literal rule in fuses -> ours9 replay 6 -> 5
+  differing (da3ee477, 3b56cb83 = OCCT), Shell recordings 2ea4 / 4776 / bd8e newly differ, e2e unchanged: the union
+  and the Common then match OCCT's piece for piece, but the Shell's own ShapeUpgrade unify (shell.cpp after the
+  common, (r, true, true, false), lin tol 1e-7) merges ours' common 80 -> 22 faces, OCCT's 80 -> 21 (our
+  unify_same_domain wrapper gives both the same). Next: which pair the raw unify won't merge on ours' (edges / pcurves
+  of the converted result; dumps Mac bool-keep/dbg8-{rust1,occt}-common.brep, scratch print in shell.cpp).
 
 ## From bool2 (owned since 11-19 20:45)
 - Landed 11-19: 41fcfd2c bool2-cbs (closed B-spline faces' period; 2a5740b0 gate exception backed by live capture
