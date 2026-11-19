@@ -5138,3 +5138,33 @@ fn a_concave_chamfer_a_hole_runs_through_fills_the_corner_as_live() {
     let slanted: Vec<f64> = shape.faces().iter().filter(|f| f.face_plane().ok().flatten().is_some_and(|p| p.normal.x.abs() > 0.5 && p.normal.z.abs() > 0.5)).map(|f| f.area().unwrap() / (mm(1.0) * mm(1.0))).collect();
     assert!(slanted.len() == 1 && (slanted[0] - 19.888).abs() < 0.01, "chamfer faces {slanted:?} mm² (live 19.888)");
 }
+
+/// c2-surf-intro's derived car (Part Studio b7635b) Fillet 1: 0.6 in on the right top edge of a closed 5-face solid of
+/// lofts, tangent propagation on (with it the left top edge, the two meeting tangent at the nose). Live: 7/14/9,
+/// 1289903.86 mm³, 81479.51 mm² (ours was "Failed to fillet selections.": OCCT's fillet came out inside out).
+#[test]
+fn a_cars_top_edges_round_along_their_tangent_chain_as_live() {
+    let brep = include_str!("data/car-fillet1-input.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let lens: Vec<f64> = b.shape.edges().iter().map(|e| e.edge_info().map(|i| i.length * 1e3).unwrap_or(0.0)).collect();
+    assert!((lens[2] - 296.776).abs() < 0.01, "{lens:?}");
+    let picked: Vec<Reference> = [2].into_iter().map(|k| Reference::Edge((*b.edges[k]).clone())).collect();
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(picked));
+        p.set("radius", expr("0.6 in"));
+        p.set("tangentPropagation", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    assert!(shape.is_valid() && shape.solids().len() == 1);
+    let shown = shape.shown_topology().unwrap();
+    assert_eq!((shape.faces().len(), shown.edge_count(), shown.vertices.iter().filter(|v| **v).count()), (7, 14, 9));
+    let area: f64 = shape.faces().iter().map(|f| f.area().unwrap() * 1e6).sum();
+    assert!((area - 81479.51).abs() < 1.0, "{area} mm² (live 81479.51)");
+    // (The loft under it is already 2.1 mm² of area off live's Loft 4: its volume within 0.03 %.)
+    let v = volume(&r, 0) * 1e9;
+    assert!((v - 1289903.86).abs() < 1289903.86 * 3e-4, "{v} mm³ (live 1289903.86)");
+}

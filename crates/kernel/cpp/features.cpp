@@ -125,6 +125,7 @@
 #include <NCollection_Array1.hxx>
 #include <ShapeFix_FixSmallFace.hxx>
 #include <ShapeFix_Solid.hxx>
+#include <ShapeFix_Shape.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepTools_Modification.hxx>
 #include <BRepTools_Modifier.hxx>
@@ -5486,6 +5487,36 @@ TopoDS_Shape without_slivers(const TopoDS_Shape& s, double width, HHist& h)
   return r;
 }
 
+// `r` (one solid, its faces as built) repaired by OCCT's shape fix, `h` carried through its replacements: OCCT's fillet
+// of a tangent chain through a vertex comes out inside out with a face's curves off its surface (c2-surf-intro's car
+// Fillet 1, live's faces). Null where the fix doesn't give one valid solid of those faces.
+static TopoDS_Shape repaired(const TopoDS_Shape& input, const TopoDS_Shape& r, HHist& h)
+{
+  ShapeIMap faces;
+  TopExp::MapShapes(r, TopAbs_FACE, faces);
+  Bnd_Box box;
+  BRepBndLib::Add(r, box);
+  if (box.IsVoid())
+    return {};
+  occ::handle<ShapeFix_Shape>     fix = new ShapeFix_Shape(r);
+  occ::handle<ShapeBuild_ReShape> ctx = new ShapeBuild_ReShape;
+  fix->SetContext(ctx);
+  fix->SetMaxTolerance(1e-4 * std::sqrt(box.SquareExtent()));
+  fix->Perform();
+  const TopoDS_Shape s = fix->Shape();
+  ShapeIMap          solids, fixed_faces;
+  TopExp::MapShapes(s, TopAbs_SOLID, solids);
+  TopExp::MapShapes(s, TopAbs_FACE, fixed_faces);
+  if (solids.Extent() != 1 || fixed_faces.Extent() != faces.Extent())
+    return {};
+  GProp_GProps p;
+  BRepGProp::VolumeProperties(s, p);
+  if (p.Mass() <= 0 || !valid_shape(s))
+    return {};
+  h = h.IsNull() ? ctx->History() : compose(input, h, ctx->History());
+  return s;
+}
+
 // Runs `build` (see BlendBuild) with the fallbacks of checked blends; returns
 // the result and its history relative to `input`.
 std::pair<TopoDS_Shape, HHist> checked_blend(const TopoDS_Shape& input, const BlendBuild& build,
@@ -5558,6 +5589,12 @@ std::pair<TopoDS_Shape, HHist> checked_blend(const TopoDS_Shape& input, const Bl
     catch (const Standard_Failure&)
     {
     }
+  }
+  if (ok)
+  {
+    HHist hr = h;
+    if (const TopoDS_Shape fixed = repaired(input, r, hr); !fixed.IsNull())
+      return {fixed, hr};
   }
   if (ok && !valid_shape(input))
     return {r, h};
