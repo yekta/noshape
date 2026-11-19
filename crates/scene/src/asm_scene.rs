@@ -1006,9 +1006,11 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             scene.add_flag(id, state::QUERY);
         }
     }
+    // A solid 2 device px line, not the band of an edge hovered itself (live2 asm-dialogs-1119 hz: outlined once).
     if let Some((p, r)) = &h.hover_outline {
         for id in built.picks.boundary_ids(p, r) {
-            scene.add_flag(id, state::HOVER);
+            let own = scene.states.get(id as usize).is_some_and(|s| s & (state::HOVER | state::SELECTED | state::ERROR) != 0);
+            scene.add_flag(id, if own { state::HOVER } else { state::HOVER | state::OUTLINE });
         }
     }
     // The silhouette in #FFC20E, the hovered face's edges in the hover colour (live2 asm-feel2 (c)).

@@ -546,6 +546,14 @@ fn a_mate_dialogs_dots_are_white_and_the_first_pick_outlines_its_instance(cx: &m
     };
     let c = at(corner);
     assert!(c.iter().all(|v| *v >= 235), "the corner dot filled white: rgb {c:?}");
+    // The face outlined once: its edges the 2 device px outline, not each a hovered edge's 5 px band.
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let (scene, built) = (v.viewport.read(cx).scene(), v.built.as_ref().unwrap());
+        let lit: Vec<u32> = (1..scene.states.len() as u32).filter(|id| scene.states[*id as usize] & noshape_render::state::HOVER != 0 && built.picks.get(*id).is_some_and(|t| t.kind == crate::scene_builder::PickKind::Edge)).collect();
+        let banded = lit.iter().filter(|id| scene.states[**id as usize] & noshape_render::state::OUTLINE == 0).count();
+        assert!(lit.len() >= 4 && banded == 0, "the face's {} edges outlined, {banded} of them banded", lit.len());
+    });
     let click = at_window(cx, &view, on_top);
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(click, Modifiers::default());
     settle(cx, window, &view);
