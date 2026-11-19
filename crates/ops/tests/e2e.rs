@@ -9613,3 +9613,55 @@ fn a_dimension_value_the_sketch_cant_take_is_kept_driving() {
     assert_eq!(st["status"].as_str(), Some("Error"), "{st}");
 }
 
+/// A copy of standard content (the parity translator's of live's Standard Library studios, `standard_content`): the
+/// Description and Part number its feature sets stay out of the BOM, empty as live's standard nut rows
+/// (asm-config-assembly's "Hex machine screw nut #10-32").
+#[test]
+fn a_standard_nuts_bom_row_keeps_an_empty_description() {
+    const NUT: &str = r#"FeatureScript 2384;
+import(path : "onshape/std/geometry.fs", version : "2384.0");
+
+annotation { "Feature Type Name" : "Nut" }
+export const nut = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        fCylinder(context, id + "n", { "topCenter" : vector(0, 0, 3) * millimeter, "bottomCenter" : vector(0, 0, 0) * millimeter, "radius" : 4 * millimeter });
+        const body = qCreatedBy(id + "n", EntityType.BODY);
+        setProperty(context, { "entities" : body, "propertyType" : PropertyType.NAME, "value" : "Hex machine screw nut #10-32" });
+        setProperty(context, { "entities" : body, "propertyType" : PropertyType.DESCRIPTION, "value" : "Hex machine screw nut #10-32" });
+        setProperty(context, { "entities" : body, "propertyType" : PropertyType.PART_NUMBER, "value" : "N-10" });
+    });
+"#;
+    let mut ctx = Ctx::new();
+    let path = scratch("std-nut-bom");
+    let _ = std::fs::remove_file(format!("{}.noshape", path.display()));
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+    let e = call(&mut ctx, "featurestudio_edit", json!({ "source": NUT }));
+    assert!(e["notices"].as_array().unwrap().iter().all(|n| n["severity"] != "error"), "{e}");
+    let c = call(&mut ctx, "featurestudio_commit", json!({}));
+    let ty = c["feature_types"].as_array().unwrap().iter().find(|t| t["name"] == "Nut").unwrap_or_else(|| panic!("{c}"))["type"].as_str().unwrap().to_string();
+    let f = call(&mut ctx, "feature_add", json!({ "tab": "Part Studio 1", "type": ty, "params": {} }));
+    assert_eq!(f["feature_status"]["status"], "Ok", "{f}");
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Hex machine screw nut #10-32" }));
+    call(&mut ctx, "assembly_bom_settings", json!({ "columns": ["Item", "Quantity", "Part number", "Description"] }));
+    let row = |ctx: &mut Ctx| {
+        let bom = call(ctx, "assembly_bom", json!({}));
+        let r = bom["rows"].as_array().unwrap().iter().find(|r| r["name"] == "Hex machine screw nut #10-32").unwrap_or_else(|| panic!("{bom}")).clone();
+        (r["cells"]["Part number"].clone(), r["cells"]["Description"].clone())
+    };
+    assert_eq!(row(&mut ctx), (json!("N-10"), json!("Hex machine screw nut #10-32")), "a custom feature's properties fill its row");
+    // The translator's mark on a Standard Library studio's copy.
+    let od = ctx.doc(None).unwrap();
+    let studio = noshape_ops::doc::find_tab(od.doc(), "Part Studio 1").unwrap();
+    od.session
+        .edit_tab(studio, "Standard content", |c| {
+            if let noshape_model::TabContent::PartStudio(ps) = c {
+                ps.standard_content = true;
+            }
+        })
+        .unwrap();
+    assert_eq!(row(&mut ctx), (json!(""), json!("")), "standard content's row: no Description or Part number from its feature");
+}
