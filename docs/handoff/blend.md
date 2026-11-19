@@ -1,44 +1,38 @@
 # Blends (agent "blend"): current state
 
-Updated 11-18 21:05 UTC (blend thread 2fc420a3 since 20:05, replacing 0672fa20). History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-19 10:35 UTC (blend thread 2fc420a3). History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-19 02:45)
+## Now (11-19 10:35)
 
-- Background runs MUST be systemd units (`systemd-run -E HOME=/root -E PATH=$PATH`): `( ... &)` jobs die at turn end.
-  Probe scripts (bin/): k-probe-x8.sh <crash_inputs test> [ENV], m-probe-x8.sh <features_c test> [ENV] (blend10 on
-  vibex8), imp-dump-x8.sh (impeller NOSHAPE_DUMP_OPS -> vibex8 ~/tmp/blend/idump), weld-x8.sh (welding pair + dumps),
-  ab-f3-mac.sh / ab-obb-mac.sh (Mac A/Bs). Logs logs/*.out. Mac: two slots (~/noshape-host/env.sh).
-- Order (lead 11-19 00:00): (1) impeller Fillet 3 speed, (2) spring (done: = live), (3) asm-suspension 995636.
-- Gates on vibe2 (vibex7 off 02:00-04:00 for qa): bin/seq-v2.sh (unit blend-seq-v2): suites base blend4 (9268e0dd9),
-  blend9 (Fillet 3 speed d6f4e8a8d), blend6 (welding Fillet 5 b47029395 alone on 9268e0dd9) -> suite-v2-*.log/.cmp,
-  g13-f3sp/wf5.log, v2.done; then bin/ud-after4.sh on vibex7 after 04:05 (unit blend-ud4) -> ud-f3sp.log, ud-wf5.log.
-  Land each alone when its compare is identical but for its own change.
-- Fillet 3 (Mac): ~2.05 s vs live 0.10; d6f4e8a8d -240 ms same results. Tried, no gain: box-pruned touches, OCCT OBB.
-- Welding Fillet 5 (b47029395, T1 features_c::a_plates_outline_round_ending_under_a_tubes_rim_as_live): OCCT's fillet
-  fails at the chains' top ends; rolling balls after OCCT fails (detail.rs), a circular round's run-ons trimmed by
-  closed_run_on then built directly (blend_section.rs), blend_direct skips a tangent chain's next support (touched only
-  at the joint). 14709.68 mm3 (live 14709.73), 48 faces vs live 42: live makes one face per curvature-continuous run
-  (line + 2 B-splines + line G2): to do after live's capture (q-weld-f5) confirms.
-- Other impeller blend gaps (Mac vs live): Fillet Bohrungssitz Ansaugflasch ~1.0 s vs 0.25 (scaled retry 310 +
-  fillet_split_closed 333 fail, fillet_by_groups builds it in 77; dumps vibex8 ~/tmp/blend/idump, last fillets),
-  Fillet 4 0.38 vs 0.09, Fillet Flansch zum Stroemungskanal 0.35 vs 0.07 (direct tools 230), Chamfer Stevenrohr
-  Halterung 0.30 vs 0.016.
-- asm-suspension 995636 Fillet 3: our Loft 1 is twisted (Piston side faces degree 5 vs 7, the z sides bulging to
-  y 12; live symmetric 85.6 x2 / 125.1 x2): core's (told). Input vibex8 ~/agents/blend-keep/susp-fillet-44.brep.
-- PARKED (lead 23:05) Halter: Fillet 3's tip must be at x 0.097 (live) for Halter's input. Live (q-imp-chamfer-surf):
-  Parasolid extends the chamfer face linearly, u (ruling) by 0.4008 and v by a straight Bezier span on the end
-  tangent (3 collinear poles), from its surface's end. parked/ext-seg-lin.patch (ZZ_EXT_SEG: segment to the face's UV
-  box, ZZ_EXT_LIN: that linear extension) moves our tip 1.502 -> 0.966 mm, Fillet 3 still = live, Halter then fails
-  at the x 5 corner ("run-on round not closed"). Rest: our chamfer surface (f26) bulges up to 21 um from live's 2 x 12
-  ruled B-spline (boundary rows within 4 um): matching the tip needs Parasolid's chamfer surface (multi-day).
-  Side-face continuation of the rim curve changes nothing (ruled out).
-- c2-extension-spring: = live to the end on main (12/12): nothing to do.
-- live's Fillet / Chamfer pick rows (feel dialogs 11-18 batch 1): green counts = live; chips / highlight are psui's.
+- Queue (lead 11-19 09:20): (1) knifehandle Fillet 2, (2) land welding Fillet 5 (LANDED 92c8595b) and knifehandle
+  Fillet 3 as gates clear, (3) suspension LCA Fillet 3 face-level splice in landable steps, (4) core's
+  c2-surf-workshop-mutualtrim Fillet 1. Hosts by load (DECISIONS 11-19): bin/pickhost; userdocs only vibex7. Units via
+  `systemd-run -E HOME=/root -E PATH=$PATH`. No std::thread joins on rayon workers (dx f1e0c74ef).
+- Gates running (units): blend-gateseq (bin/gate-seq.sh: isaac CLI / suite / userdocs, 805e29 T1, suspension pair on
+  main), blend-khgate (knifehandle Fillet 3 suite, T1/clippy/CLI, userdocs after isaac), blend-dockseq
+  (AppleWatchDock for isaac; gate-seq's old dock path is gone). Compare: bin/cmp-strict.py suite-v2-base.log.
+- Waiting to land: isaac chamfers (blend11 da24d5264 a2e4a2 Chamfer 2 + bf9b93533 e54410 Chamfer 1), knifehandle
+  Fillet 3 (blend7 8bb9824b9), 805e29 exact edges (blend2 c96c49f82; tell asm after).
+- Welding's userdocs: two qa ticket documents change with it (no live truth): cli-shell-hang-pre Fillet 1 now builds
+  (Shell 3 then fails), cli-draft-hang Fillet 3's message 'Unfilleted edge overlapped by fillet.'.
+- Suspension splice (blend13 / branch blend-susp; probe crash_inputs::zz_lca_splice, bin/splice.sh, input vibe2
+  ~/agents/blend-keep/susp-dbd-f3.brep): step 1 make_edge_on (8d9420223) queued 4a5d28a2. The corner rebuilt as live:
+  contact edges 28.659 / 28.523 mm (= live), canal face 158.807 mm2 (live 158.817), whole part -130.38 mm3 a corner vs
+  OCCT (live -131.3), valid after ShapeFix (split_on's pieces and the canal face need it). Next: the splice on OCCT's
+  result face by face (its corner patch 241.32 mm2 + the bottom's triangle under the round run on -> canal, round run on
+  to x 0, tube piece), then the model code (detect the corner from OCCT's patch's 4 neighbours) + T1. split_on loses
+  area when a curve crosses a cylinder's seam (not needed here; noted).
+- Knifehandle Fillet 2 (blend12 / blend-khf2, WIP 8c25b1eab; T1 a_conic_round_of_a_blades_long_top_edges_as_live): balls
+  now run on past a free end over free-form faces (extended), closed_run_on trims them (4 pieces), but the direct build
+  fails ("a touch curve with no curve on its face", GeomProjLib on the refaced side) and the Boolean leaves 2 invalid
+  solids. Live's run follows JRl -> JRN (tangent in live, 21 deg in ours: Sweep 2's tip, core's).
+- Mutualtrim Fillet 1 (blend4 / blend-sheetfillet): a sheet's round: cut the surface by the tools, sew in the tools'
+  faces off the sheet (sheet_blend in blend_section.rs); repro bin/mutual.sh <host>.
 
 ## In flight (older)
 
