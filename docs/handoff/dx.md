@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-19 21:07 UTC (thread e0f0057e on Motile ends here; a fresh dx thread on Bbedward continues). Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-19 21:20 UTC (fresh dx thread, 11-19 21:0x). Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -9,19 +9,14 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
-## Now (21:07)
-- Landed today: 8b276faa x_t selective cuts; a63a5bc9 + 7e0683d4 mesh parts per 3MF object / OBJ group, never
-  hollowed (live2 meshcheck-1119); 062076f4 qa P0 face-rclick-export-dxf (Units heading / check / greyed list; the
-  face selected; run.py compares that dialog's fields by label; vibe2: 3/3 scenarios, 16/16 states; qa told).
-  Nothing queued. Worktree dx-land (branch dx-land-stack) is clean at main.
-- Decision asked of the lead: C (fan-blade views, below): pursue or park.
-- Next: (1) surf-intro rerun with live2's Isocline refs: ready on the Mac, NOT started: from dx-main,
-  `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh bash -c 'bash ~/noshape-host/dx-keep/sisurf.sh'` (models in
-  ~/noshape-host/dx-keep/si-models, result si.sum; script copy /root/dx-scratch/hlr-retry/sisurf.sh). Then why our
-  derived "Car" is live's "Instructions" (220/612/408; live's Car 7/14/9): the derived part pick / naming.
-  vibex8's queued surfintro.sh is a no-op now (real one: surfintro.sh.run). (2) The rest of "Next, in order".
-- Running jobs: none of mine. The Mac's dx-main release target links a PRIVATE TKHLR (OCCT_ROOT=
-  ~/noshape-host/dx-keep/hlr/root, counters print only with DXHLR=1); rebuild with the normal OCCT_ROOT for timings.
+## Now (21:20)
+- C (fan-blade HLR sampling) PARKED by the lead (1.66x < 2x): TICKETS FAN-BLADE-VIEWS-HLR-SAMPLING (P3).
+- Running: surf-intro rerun with live2's Isocline refs on the Mac (unit dx-sisurf on this host, from dx-main at
+  406dd8eb; out /root/dx-scratch/sisurf.out; Mac ~/noshape-host/dx-keep/si.sum). Next: why our derived "Car" is live's
+  "Instructions" (220/612/408; live's Car JWD 7/14/9): parity.rs derived_source maps live's part ids by
+  t.resolve(JWD), else by name.
+- The Mac's dx-main release target links a PRIVATE TKHLR (OCCT_ROOT=~/noshape-host/dx-keep/hlr/root, counters only
+  with DXHLR=1); rebuild with the normal OCCT_ROOT for timings.
 
 ## In flight: data exchange (lead 08:0x)
 Task: 10 corpus docs x every format + a drawing vs live's exports; re-import live's STEP / x_t; times vs live's.
