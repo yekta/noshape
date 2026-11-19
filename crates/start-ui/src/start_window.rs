@@ -167,6 +167,14 @@ enum ViewMode {
 enum SortKey {
     Modified,
     Name,
+    ModifiedBy,
+}
+
+/// A documents table column pinned by its ⋮ menu's Pin column ›.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Pin {
+    Left,
+    Right,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -361,8 +369,14 @@ pub struct StartView {
     view: ViewMode,
     sort: SortKey,
     descending: bool,
-    /// The list header under the pointer (its grey ▲▼ pair).
+    /// The list header under the pointer (its grey ▲▼ pair and ⋮).
     hover_header: Option<&'static str>,
+    /// The header ⋮ menu's Clear sort: no column shows a sort (the default order).
+    sort_cleared: bool,
+    /// Column widths set by the ⋮ menu's Autosize (by header label; else the defaults).
+    col_w: Vec<(&'static str, f32)>,
+    /// Columns pinned by the ⋮ menu (left ones first, right ones last).
+    pins: Vec<(Col, Pin)>,
     search: Entity<InputState>,
     query: String,
     /// The selected row (the last clicked); with Ctrl / Shift + click, `also` holds the others, valid while `selected`
@@ -595,6 +609,9 @@ impl StartView {
             sort: prefs.sort,
             descending: prefs.descending,
             hover_header: None,
+            sort_cleared: false,
+            col_w: Vec::new(),
+            pins: Vec::new(),
             search,
             query: String::new(),
             selected: None,
@@ -767,6 +784,7 @@ impl StartView {
         match self.sort {
             SortKey::Name => v.sort_by_cached_key(|d| d.name.to_lowercase()),
             SortKey::Modified => v.sort_by_key(|d| d.modified),
+            SortKey::ModifiedBy => v.sort_by_cached_key(|d| d.modified_by.to_lowercase()),
         }
         if self.descending {
             v.reverse();
@@ -782,7 +800,10 @@ impl StartView {
     }
 
     fn set_sort(&mut self, key: SortKey, cx: &mut Context<Self>) {
-        if self.sort == key {
+        if std::mem::take(&mut self.sort_cleared) {
+            self.sort = key;
+            self.descending = key == SortKey::Modified;
+        } else if self.sort == key {
             self.descending = !self.descending;
         } else {
             self.sort = key;
@@ -3809,21 +3830,135 @@ impl StartView {
 
 
 
+    /// The documents table's shown columns in order (see [`pinned_order`]).
+    fn shown_cols(&self) -> Vec<Col> {
+        pinned_order(&self.columns, &self.pins)
+    }
+
+    /// A column's width: its Autosize one, else Name 350 px and the others 200.
+    fn col_width(&self, label: &str) -> f32 {
+        self.col_w.iter().find(|w| w.0 == label).map(|w| w.1).unwrap_or(if label == "Name" { 350. } else { 200. })
+    }
+
+    /// Autosize: the column as wide as its header (name, ▲▼ and ⋮) or its widest value.
+    fn autosize(&mut self, label: &'static str, window: &Window) {
+        let me = self.me.clone();
+        let who = move |name: &str| if name.is_empty() || me.iter().any(|m| m == name) { "me".to_string() } else { name.to_string() };
+        let values: Vec<String> = self.visible_refs().iter().map(|d| match label {
+            "Name" => d.name.clone(),
+            "Modified" => lib::format_onshape_time(d.modified),
+            "Modified by" => who(&d.modified_by),
+            "Owned by" => who(&d.owner),
+            "Type" => "Document".to_string(),
+            _ => d.description.clone(),
+        }).collect();
+        // A name's row also holds its thumbnail and type icon (16 + 64 + 8 + 16 + 8), every cell its 16 px inset.
+        let lead = if label == "Name" { 112. } else { 16. };
+        let widest = values.iter().map(|v| crate::ui::text_width(window, v, 14.)).fold(0.0f32, f32::max) + lead + 15.;
+        let head = crate::ui::text_width(window, label, 14.) + 16. + 6. + 10. + 6. + 16. + 10.;
+        let w = widest.max(head).ceil();
+        self.col_w.retain(|c| c.0 != label);
+        self.col_w.push((label, w));
+    }
+
+    /// A column header's ⋮ menu ([`header_menu_items`]).
+    fn open_header_menu(&mut self, label: &'static str, key: Option<SortKey>, col: Option<Col>, at: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
+        let view = cx.entity();
+        let sorted = key.filter(|k| *k == self.sort && !self.sort_cleared).map(|_| self.descending);
+        let shown: Vec<&'static str> = std::iter::once("Name").chain(self.shown_cols().into_iter().map(|c| c.label())).collect();
+        let items = header_menu_items(key.is_some(), col.is_some(), sorted);
+        let menu = OsMenu::build(window, cx, move |mut m, window, cx| {
+            for item in &items {
+                let (v, all) = (view.clone(), shown.clone());
+                m = match *item {
+                    "-" => m.separator(),
+                    "Pin column" => m.submenu("Pin column", window, cx, move |mut s, _, _| {
+                        for (name, pin) in [("No pin", None), ("Pin left", Some(Pin::Left)), ("Pin right", Some(Pin::Right))] {
+                            let v = v.clone();
+                            s = s.item(OsMenuItem::new(name).on_click(move |_, _, cx| v.update(cx, |t, cx| {
+                                if let Some(c) = col {
+                                    t.pins.retain(|p| p.0 != c);
+                                    t.pins.extend(pin.map(|p| (c, p)));
+                                }
+                                cx.notify();
+                            })));
+                        }
+                        s
+                    }),
+                    name => m.item(OsMenuItem::new(name).on_click(move |_, window, cx| v.update(cx, |t, cx| {
+                        match name {
+                            "Sort ascending" => t.sort_by(key, false),
+                            "Sort descending" => t.sort_by(key, true),
+                            "Clear sort" => t.clear_sort(),
+                            "Autosize this column" => t.autosize(label, window),
+                            "Autosize all columns" => all.iter().for_each(|l| t.autosize(l, window)),
+                            "Remove column" => {
+                                if let Some(x) = t.columns.iter_mut().find(|x| Some(x.0) == col) {
+                                    x.1 = false;
+                                }
+                            }
+                            "Choose columns…" => t.cols_open = true,
+                            _ => t.reset_columns(),
+                        }
+                        t.save_prefs();
+                        cx.notify();
+                    }))),
+                };
+            }
+            m
+        });
+        crate::os_menu::open(at, menu, window, cx);
+    }
+
+    fn sort_by(&mut self, key: Option<SortKey>, descending: bool) {
+        if let Some(k) = key {
+            (self.sort, self.descending, self.sort_cleared) = (k, descending, false);
+        }
+    }
+
+    /// Clear sort: the default order (newest first) with no column marked.
+    fn clear_sort(&mut self) {
+        (self.sort, self.descending, self.sort_cleared) = (SortKey::Modified, true, true);
+    }
+
+    /// Reset columns: the default columns, widths, pins and sort.
+    fn reset_columns(&mut self) {
+        self.columns = default_columns();
+        self.col_w.clear();
+        self.pins.clear();
+        (self.sort, self.descending, self.sort_cleared) = (SortKey::Modified, true, false);
+    }
+
     /// A table header cell: 14 px semibold, with the 2 px column divider at
-    /// its right edge; sortable columns show ▲/▼.
-    fn list_header_cell(&self, id: &'static str, label: &'static str, key: Option<SortKey>, cx: &mut Context<Self>) -> Stateful<Div> {
+    /// its right edge; sortable columns show ▲/▼; hovered, a ⋮ menu at its right end (live2 doc-feel-1119 L03).
+    fn list_header_cell(&self, id: &'static str, label: &'static str, key: Option<SortKey>, col: Option<Col>, cx: &mut Context<Self>) -> Stateful<Div> {
         let pal = p();
         // The sorted column shows its arrows, the default order's too (live2 doc-feel-1119 L03: ▼ beside Modified).
-        let active = key == Some(self.sort);
-        let hovered = key.is_some() && self.hover_header == Some(id);
+        let active = key == Some(self.sort) && !self.sort_cleared;
+        let menu = col.is_some() || label == "Name";
+        let hovered = (key.is_some() || menu) && self.hover_header == Some(id);
         // The ▲▼ pair (live2 doc-feel-1119 L03): the sorted direction #333 over #d7d7d7, a hovered column's both #999.
-        let pair = (active || hovered).then(|| {
+        let pair = (active || (hovered && key.is_some())).then(|| {
             let (up, down) = match (active, self.descending) {
                 (true, true) => (rgb(0xd7d7d7), rgb(0x333333)),
                 (true, false) => (rgb(0x333333), rgb(0xd7d7d7)),
                 _ => (rgb(0x999999), rgb(0x999999)),
             };
             v_flex().gap(px(-4.)).child(os::glyph(os::GLYPH_CARET_UP, 10., up)).child(os::glyph(os::GLYPH_CARET, 10., down))
+        });
+        let dots = (hovered && menu).then(|| {
+            div()
+                .id(SharedString::from(format!("{id}-menu")))
+                .map(|d| crate::ui_script::mark(d, move || format!("col_menu:{label}")))
+                .flex_none()
+                .mr(px(8.))
+                .cursor_pointer()
+                .child(crate::assets::icon("column-menu", 16., cx))
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
+                    cx.stop_propagation();
+                    this.open_header_menu(label, key, col, e.position(), window, cx);
+                }))
         });
         h_flex()
             .id(id)
@@ -3837,19 +3972,18 @@ impl StartView {
             .child(label)
             .children(pair)
             .child(div().flex_1())
+            .children(dots)
             .child(div().w(px(2.)).h(px(22.)).flex_none().bg(pal.border))
-            .when_some(key, |d, k| {
-                d.cursor_pointer()
-                    .hover(|d| d.bg(rgb(0xeeeeee)))
-                    .on_hover(cx.listener(move |this, on: &bool, _, cx| {
-                        let now = if *on { Some(id) } else { this.hover_header.filter(|h| *h != id) };
-                        if now != this.hover_header {
-                            this.hover_header = now;
-                            cx.notify();
-                        }
-                    }))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_sort(k, cx)))
+            .when(key.is_some() || menu, |d| {
+                d.hover(|d| d.bg(rgb(0xeeeeee))).on_hover(cx.listener(move |this, on: &bool, _, cx| {
+                    let now = if *on { Some(id) } else { this.hover_header.filter(|h| *h != id) };
+                    if now != this.hover_header {
+                        this.hover_header = now;
+                        cx.notify();
+                    }
+                }))
             })
+            .when_some(key, |d, k| d.cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_sort(k, cx))))
     }
 
     /// "+ Add" (live documents/81): opens the column panel under the button's
@@ -4002,6 +4136,7 @@ impl StartView {
         match self.sort {
             SortKey::Name => out.sort_by_key(|(_, h)| h.name.to_lowercase()),
             SortKey::Modified => out.sort_by_key(|(d, _)| d.modified),
+            SortKey::ModifiedBy => out.sort_by_key(|(d, _)| d.modified_by.to_lowercase()),
         }
         if self.descending {
             out.reverse();
@@ -4056,7 +4191,7 @@ impl StartView {
                     .hover(|r| r.bg(pal.row_hover))
                     .child(
                         h_flex()
-                            .w(px(350.))
+                            .w(px(self.col_width("Name")))
                             .flex_none()
                             .pl(px(16.))
                             .pr(px(15.))
@@ -4068,7 +4203,7 @@ impl StartView {
                             .children(state.map(|s| div().flex_none().px(px(4.)).rounded(px(3.)).bg(rgb(0xe2e2e2)).text_size(px(11.)).text_color(rgb(0x666666)).child(s))),
                     )
                     .children(cols.iter().map(|c| {
-                        cell(200.)
+                        cell(self.col_width(c.label()))
                             .child(match c {
                                 Col::Modified => lib::format_onshape_time(d.modified),
                                 Col::ModifiedBy => who(&d.modified_by),
@@ -4096,7 +4231,7 @@ impl StartView {
 
     fn render_list(&self, docs: &[DocEntry], cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let cols: Vec<Col> = self.columns.iter().filter(|c| c.1).map(|c| c.0).collect();
+        let cols = self.shown_cols();
         // Live documents/131-135: a search adds Part number and Revision.
         let searching = !self.query.trim().is_empty() || self.adv_query.is_some();
         let search_cols: &[&'static str] = if searching { &["Part number", "Revision"] } else { &[] };
@@ -4106,13 +4241,17 @@ impl StartView {
             .flex_none()
             .border_b_1()
             .border_color(pal.border_strong)
-            .child(self.list_header_cell("h-name", "Name", Some(SortKey::Name), cx).w(px(350.)).flex_none());
+            .child(self.list_header_cell("h-name", "Name", Some(SortKey::Name), None, cx).w(px(self.col_width("Name"))).flex_none());
         for c in &cols {
-            let key = (*c == Col::Modified).then_some(SortKey::Modified);
-            header = header.child(self.list_header_cell(c.label(), c.label(), key, cx).w(px(200.)).flex_none());
+            let key = match c {
+                Col::Modified => Some(SortKey::Modified),
+                Col::ModifiedBy => Some(SortKey::ModifiedBy),
+                _ => None,
+            };
+            header = header.child(self.list_header_cell(c.label(), c.label(), key, Some(*c), cx).w(px(self.col_width(c.label()))).flex_none());
         }
         for c in search_cols {
-            header = header.child(self.list_header_cell(c, c, None, cx).w(px(200.)).flex_none());
+            header = header.child(self.list_header_cell(c, c, None, None, cx).w(px(200.)).flex_none());
         }
         // Onshape writes the signed-in user as "me".
         let me = self.me.clone();
@@ -4164,7 +4303,7 @@ impl StartView {
                     .when(d.trashed, |r| r.tooltip(crate::ui::tooltip("This document is in the trash and cannot be opened.")))
                     .child(
                         h_flex()
-                            .w(px(350.))
+                            .w(px(self.col_width("Name")))
                             .flex_none()
                             .pl(px(16.))
                             .pr(px(15.))
@@ -4199,7 +4338,7 @@ impl StartView {
                             .when(open, |r| r.child(Self::open_badge())),
                     )
                     .children(cols.iter().map(|c| {
-                        cell(200.)
+                        cell(self.col_width(c.label()))
                             .child(match c {
                                 Col::Modified => lib::format_onshape_time(d.modified),
                                 Col::ModifiedBy => who(&d.modified_by),
@@ -5382,11 +5521,61 @@ fn bold_match(name: &str, query: &str) -> Vec<(std::ops::Range<usize>, Highlight
     lower.find(&q).map(|i| vec![(i..i + q.len(), HighlightStyle { font_weight: Some(FontWeight::BOLD), ..Default::default() })]).unwrap_or_default()
 }
 
+/// A column header's ⋮ menu items ("-" a separator; live2 doc-feel-1119 L40–L44, ag-grid's): Sort ascending /
+/// descending for a sortable column (the sorted one's own direction left out, Clear sort instead), Pin column ›,
+/// Autosize this column / all columns, Remove column, Choose columns…, Reset columns; Name (no `optional` column) has
+/// no Pin or Remove.
+fn header_menu_items(sortable: bool, optional: bool, sorted: Option<bool>) -> Vec<&'static str> {
+    let mut out = Vec::new();
+    if sortable {
+        if sorted != Some(false) {
+            out.push("Sort ascending");
+        }
+        if sorted != Some(true) {
+            out.push("Sort descending");
+        }
+        if sorted.is_some() {
+            out.push("Clear sort");
+        }
+        out.push("-");
+    }
+    if optional {
+        out.extend(["Pin column", "-"]);
+    }
+    out.extend(["Autosize this column", "Autosize all columns", "-"]);
+    if optional {
+        out.push("Remove column");
+    }
+    out.extend(["Choose columns…", "Reset columns"]);
+    out
+}
+
+/// The shown columns in order: those pinned left, the others, those pinned right.
+fn pinned_order(columns: &[(Col, bool)], pins: &[(Col, Pin)]) -> Vec<Col> {
+    let pin = |c: Col| pins.iter().find(|p| p.0 == c).map(|p| p.1);
+    let shown: Vec<Col> = columns.iter().filter(|c| c.1).map(|c| c.0).collect();
+    let side = |want: Option<Pin>| shown.iter().copied().filter(move |c| pin(*c) == want);
+    side(Some(Pin::Left)).chain(side(None)).chain(side(Some(Pin::Right))).collect()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{SelectAllRows, SelectNext, SelectPrev, ToggleRow, bold_match, click_rows, history_change_matches, import_failed, key_bindings, lib, move_rows, rows_to_move, toggles};
+    use super::{Col, Pin, SelectAllRows, SelectNext, SelectPrev, ToggleRow, bold_match, default_columns, header_menu_items, pinned_order, click_rows, history_change_matches, import_failed, key_bindings, lib, move_rows, rows_to_move, toggles};
     use gpui_kit::Modifiers;
     use std::path::PathBuf;
+
+    /// Live2 doc-feel-1119 L41: the ⋮ menus of Name (sorted descending), Modified (unsorted), Owned by (not sortable).
+    #[test]
+    fn a_column_headers_menu_lists_lives_items() {
+        assert_eq!(header_menu_items(true, false, Some(true)), ["Sort ascending", "Clear sort", "-", "Autosize this column", "Autosize all columns", "-", "Choose columns…", "Reset columns"]);
+        assert_eq!(
+            header_menu_items(true, true, None),
+            ["Sort ascending", "Sort descending", "-", "Pin column", "-", "Autosize this column", "Autosize all columns", "-", "Remove column", "Choose columns…", "Reset columns"]
+        );
+        assert_eq!(header_menu_items(false, true, None), ["Pin column", "-", "Autosize this column", "Autosize all columns", "-", "Remove column", "Choose columns…", "Reset columns"]);
+        let cols = default_columns();
+        assert_eq!(pinned_order(&cols, &[(Col::OwnedBy, Pin::Left), (Col::Modified, Pin::Right)]), [Col::OwnedBy, Col::ModifiedBy, Col::Modified]);
+    }
 
     /// Live2 doc-feel-1119 L08: a search's match is bold in the names, any case.
     #[test]
