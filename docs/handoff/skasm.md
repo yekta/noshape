@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 11:25 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 13:29 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -69,7 +69,15 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
   - API audit (lead 11:0x) QUEUED 4d2730e3: sketch tools / options, SM table, flat export, SM features matched;
     added ui_preferences.sketch_options (Sketch dialog checkboxes, scene `save_sketch_options` pub) and sketch_draw
     `rho` (conic). AGENT_API regenerated (regenerate + scp in ONE rb.sh call: a later rb.sh sync overwrites it).
-  - #5 corner break beside bends (sm_flat.rs "only supported at a wall's free corner yet"): same request.
+  - #4 / #5 to live2's q-flat-ops-1119 (behaviours 'skasm (11-19): extrude in the flat…' + Leftovers): QUEUED d998d255
+    (flat Add: across a bend/outline SM_FLAT_OP_ADD_CROSSES_EDGE, inside a wall SHEET_METAL_REBUILD_ERROR, floating an
+    INFO SM_FLAT_OP_PARTIAL_INTERSECT, part unchanged; corner break at a bend's end INVALID_INPUT in sm_flat.rs; e2e
+    `a_corner_break_beside_a_bend` with live's Fillet 5 7034.757 / Chamfer 5 7020.487). LOCAL (testing 13:xx on vibex7):
+    the flat Extrude form: schema hides all but flatOperationType + entities under domain FLAT; `extrude::domain_logic`
+    (model-core) sets domain from the regions, run in the app (start_feature preselection, auto_operation on picks) and
+    in ops feature_add when domain isn't given; UI test `extrude_on_a_flat_region_opens_the_flat_form`.
+  - Sketch fuzz 10x (lead 11:3x): 550 seeds, 0 panics / wrong solves; 800-step random webs (1300-2000 entities) solve in
+    1-4 s: lead left it (not a real sketch). fuzz.rs reports SLOW steps (SKETCH_FUZZ_SLOW_MS; needs --nocapture).
 - Open (low: geometry matches): infento Part grid's four 80 mm LENGTHs (seed side V2HoieiIDMV9, the pattern's
   direction lines len1 / len2, one more) end driven in ours (E, F and 07:2x builds alike; TRACE "set driven"): live's
   grid instances are tied corner to corner by 401 PATTERN COINCIDENTs, so the spacings follow from the seed's size and
@@ -130,12 +138,12 @@ regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete w
 - Settled 11-18: config-parts links / pulleys / linear-rail / standoffs / sprockets match to the end; cpcurves has no
   sketch difference left (first: 3D fit spline 1, "Cannot evaluate tangency for end condition.").
 
-## Agents (lead's roster 11-17 10:30; only these ids)
-psui 4973e295-9e92-463f-a13f-2ec5258bc5f9 (since 11-17 ~10:35), core d30002ca-d013-4435-b7d9-7da9cb564cec (11-18 new id),
-blend de66e481-56e2-4005-a5d3-9fa897ca5fde (11-18 new id), bool 754a9804-feb1-4153-b32a-acf9b2a6d94d (11-19), dx f93a1292-5bb7-406f-9a25-59767e01878e,
-qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b, asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm (me)
-18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios
-58e9bca8-346c-4847-8012-e15006ae61ef, live e8549719-ef9a-42de-960c-e24b29f142a6, live2 79ae5cdb-42a4-4025-b43a-da61a4f92ad7 (moved 11-17 13:3x).
+## Agents (lead's roster, 11-19 13:2x; only these ids; the old psui / qa / live2 / studios / dx threads are stopped)
+psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, qa 40e853dc-757f-4498-878f-00b41fd8af75, live2 d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1,
+studios 31c9b9ba-e7f8-40f7-85cb-242bab86dbe6, dx aad5e825-f86c-432d-b4ac-3aab402e7052, core d30002ca-d013-4435-b7d9-7da9cb564cec,
+blend de66e481-56e2-4005-a5d3-9fa897ca5fde, bool 754a9804-feb1-4153-b32a-acf9b2a6d94d, asm d8d597e0-675c-497b-a804-544ceab99bbd,
+bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, live e8549719-ef9a-42de-960c-e24b29f142a6 (stopped till ~21:00), skasm (me)
+18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, lead 818534eb-f6b1-4a00-bb48-ebf0f7cdbd8a.
 
 ## Waiting on others
 - psui: told 20:3x the tab row is a pick difference (live hit Flange 1's wall).
