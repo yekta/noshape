@@ -6327,7 +6327,9 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         }
         for &si in &segs {
             let s = sedges[si].seg;
-            for copy in 0..if seams.contains(&si) { 2 } else { 1 } {
+            // (A plane's seam (a flat closed B-spline's, which the C++ build has as a plane) is one curve, a slit both
+            // sides of which are the face.)
+            for copy in 0..if seams.contains(&si) && !matches!(cx.faces[f].s, Surf::Plane { .. }) { 2 } else { 1 } {
                 // (The origin that is this face's own edge: its curve on a free-form face is that edge's.)
                 let own = sedges[si].origins.iter().copied().find(|&e| cx.faces[f].edges.iter().any(|x| x.0 == e)).or(sedges[si].origins.first().copied());
                 let c = cx.c2_of(f, &s, copy, own)?;
