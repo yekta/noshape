@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 04:58 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 05:01 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -58,8 +58,9 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
 - OPEN flat view orientation (qa session-sm-1119 step 8): the app's flat is mirrored in y vs live's Top view; the DXF
   is right (loops). Cause: custom/src/custom/host/sheetmetal.rs `flat_place` maps the fixed wall's definition-face
   normal to +Z; for a sheet thickened up from Top that normal is -Z (seen from below). Probe (e2e, removed): plate on
-  Top THICKEN 2 + flange on y=60: frame XY, `to_flat_view((10,50,0))` = (10,-50). Decide the rule against live 2468 /
-  qa5 sm (z -2..0) before changing; qa doc copies: vibe2 ~/agents/qa-keep/session-sm-1119/r3/doc-s3, doc-s5.
+  Top THICKEN 2 + flange on y=60: frame XY, `to_flat_view((10,50,0))` = (10,-50). 2468's rule (extruded lines only)
+  gives our mirror for a thickened sheet; live's shot doesn't: asked live REQUESTS 05:10 "a THICKENED sheet's flat
+  placement" (REST flat box, up and flipped). qa doc copies: vibe2 ~/agents/qa-keep/session-sm-1119/r3/doc-s3, doc-s5.
 - Open: Part grid's two PATTERN spacing dims stay driven (live driving): pattern links + shared corners make them
   redundant in ours.
 - welding Sketch 12: ours = live's geometry; its 2 PROJECTED are live's split Use (`.orphan` USE_END + MIDPOINT);
