@@ -3081,25 +3081,31 @@ fn coplanar_faces_of_two_parts_go_to_the_first() {
     let mut scene = Scene::default();
     scene.instances.push(Instance::new(Drawable::Mesh(outer)).with_color([0.8, 0.1, 0.1, 1.0]).depth_rank(0));
     scene.instances.push(Instance::new(Drawable::Mesh(inner)).with_color([0.1, 0.8, 0.1, 1.0]).with_transform(glam::Mat4::from_translation(glam::Vec3::new(0.0, 0.0, 0.004))).depth_rank(1));
-    let mut cam = Camera { rotation: Camera::look_rotation(glam::DVec3::new(-1.0, 1.0, -1.0).normalize(), glam::DVec3::Z), projection: Projection::Perspective, ..Default::default() };
+    // Slanted in perspective and orthographic, and near grazing: the second part's top a hair farther however steep its
+    // depth runs across the pixels (Metal lost 14 of 49 spots to a fixed step).
+    let views = [(Projection::Perspective, glam::DVec3::new(-1.0, 1.0, -1.0)), (Projection::Orthographic, glam::DVec3::new(-1.0, 1.0, -1.0)), (Projection::Perspective, glam::DVec3::new(-1.0, 1.0, -0.3))];
     let (w, h) = (400u32, 300u32);
-    cam.fit_box(glam::DVec3::new(-0.02, -0.015, -0.01), glam::DVec3::new(0.02, 0.015, 0.01), w as f64 / h as f64);
-    let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: true }).unwrap();
-    // The inner top's middle third on screen.
-    let size = glam::DVec2::new(w as f64, h as f64);
-    let at = |x: f64, y: f64| cam.project(glam::DVec3::new(x, y, 0.01), size, 0.05).unwrap();
-    let pick = f.pick.unwrap();
-    let (mut green, mut picked_inner, mut n) = (0, 0, 0);
-    for i in -3..=3 {
-        for j in -3..=3 {
-            let p = at(0.008 * f64::from(i) / 4.0, 0.006 * f64::from(j) / 4.0);
-            let (x, y) = (p.x.round() as u32, p.y.round() as u32);
-            let px = &f.bgra[((y * w + x) * 4) as usize..][..4];
-            n += 1;
-            // (BGRA: the green part's pixels have more green than red.)
-            green += usize::from(px[1] > px[2]);
-            picked_inner += usize::from((11..=16).contains(&pick.ids[(y * w + x) as usize]));
+    let mut lost = Vec::new();
+    for (projection, dir) in views {
+        let mut cam = Camera { rotation: Camera::look_rotation(dir.normalize(), glam::DVec3::Z), projection, ..Default::default() };
+        cam.fit_box(glam::DVec3::new(-0.02, -0.015, -0.01), glam::DVec3::new(0.02, 0.015, 0.01), w as f64 / h as f64);
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: true }).unwrap();
+        // The inner top's middle third on screen.
+        let size = glam::DVec2::new(w as f64, h as f64);
+        let at = |x: f64, y: f64| cam.project(glam::DVec3::new(x, y, 0.01), size, 0.05).unwrap();
+        let pick = f.pick.unwrap();
+        let (mut green, mut picked_inner) = (0, 0);
+        for i in -3..=3 {
+            for j in -3..=3 {
+                let p = at(0.008 * f64::from(i) / 4.0, 0.006 * f64::from(j) / 4.0);
+                let (x, y) = (p.x.round() as u32, p.y.round() as u32);
+                let px = &f.bgra[((y * w + x) * 4) as usize..][..4];
+                // (BGRA: the green part's pixels have more green than red.)
+                green += usize::from(px[1] > px[2]);
+                picked_inner += usize::from((11..=16).contains(&pick.ids[(y * w + x) as usize]));
+            }
         }
+        lost.push((green, picked_inner));
     }
-    assert_eq!((green, picked_inner), (0, 0), "of {n} spots on the shared top: (the second part's colour, its pick)");
+    assert_eq!(lost, vec![(0, 0); 3], "of 49 spots on the shared top per view (slanted perspective, orthographic, near grazing): (the second part's colour, its pick)");
 }

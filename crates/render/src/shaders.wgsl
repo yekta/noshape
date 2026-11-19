@@ -19,7 +19,7 @@ struct Globals {
     specular: vec4<f32>,     // rgb specular color, w shininess 0..1 (Graphics preferences)
     dash: vec4<f32>,         // construction lines: dash, gap, dash, gap (px)
     room: vec4<f32>,         // zebra stripes room: center xyz, radius
-    depth_unit: vec4<f32>,   // x = our depth per unit of Onshape's depth buffer (perspective: per w), y = a lit line's width px (0: the band)
+    depth_unit: vec4<f32>,   // x = our depth per unit of Onshape's depth buffer (perspective: per w), y = a lit line's width px (0: the band), z = a pixel's size at w = 1, w = orthographic depth per distance (0 perspective)
     compare: vec4<f32>,      // compare mode: xyz Onshape's eye, w its near distance
     compare2: vec4<f32>,     // x its far distance, y on (1), z mix alpha
 };
@@ -195,6 +195,23 @@ fn vs_mesh(v: MeshIn, @builtin(instance_index) slot: u32) -> MeshOut {
     return mesh_vertex(v, slot);
 }
 
+// The faces' push away from the camera as a fraction of their depth, set per pipeline (renderer.rs `make`): on a float
+// depth buffer it stands for the face bias's constant, which counts in units of each triangle's largest depth, so two
+// parts' coplanar faces fought on Metal and D3D12.
+override face_push: f32 = 0.0;
+const RANK_PIXELS: f32 = 0.03125;
+
+// Clip z's change over one pixel along a surface through `world` with `normal` (0 seen face-on), from the angle between
+// the normal and the view ray: perspective, z = near / w changes by z × tan × a pixel's angle; orthographic, by depth
+// per distance × tan × a pixel's size.
+fn depth_step_px(world: vec3<f32>, normal: vec3<f32>, clip: vec4<f32>) -> f32 {
+    let perspective = g.camera_pos.w > 0.5;
+    let ray = select(g.camera_fwd.xyz, normalize(world - g.camera_pos.xyz), perspective);
+    let n = normal / max(length(normal), 1e-20);
+    let tan_t = min(length(cross(n, ray)) / max(abs(dot(n, ray)), 1e-3), 64.0);
+    return tan_t * g.depth_unit.z * select(g.depth_unit.w * clip.w, clip.z, perspective);
+}
+
 fn mesh_vertex(v: MeshIn, slot: u32) -> MeshOut {
     load_inst(slot);
     var o: MeshOut;
@@ -202,10 +219,13 @@ fn mesh_vertex(v: MeshIn, slot: u32) -> MeshOut {
     let w = inst.model * vec4(mesh_pos(v), 1.0);
     o.world = w.xyz;
     o.pos = g.view_proj * w;
-    // params.z bits 8–11: the depth rank, a hair farther a step (reverse-Z: smaller z), so coplanar faces of two parts
-    // go to the first one rather than z-fighting.
-    o.pos.z *= 1.0 - f32((inst.params.z >> 8u) & 15u) * 2e-6;
     o.normal = (inst.normal_m * vec4(oct_decode(v.normal), 0.0)).xyz;
+    // params.z bits 8–11: the depth rank, a hair farther a step (reverse-Z: smaller z), so coplanar faces of two parts
+    // go to the first one rather than z-fighting: 2e-6 of their depth and 1/32 of a pixel's depth step along the face
+    // (the rasteriser's snapped vertices tilt each triangle's depths by about a thousandth of that: Metal lost 14 of 49
+    // spots to a fixed 2e-6, none from 1/1000 px). `face_push` on top for faces.
+    let rank = f32((inst.params.z >> 8u) & 15u);
+    o.pos.z = o.pos.z * (1.0 - face_push - rank * 2e-6) - rank * RANK_PIXELS * depth_step_px(o.world, o.normal, o.pos);
     o.pick = global_pick(v.pick);
     o.color = v.color;
     return o;

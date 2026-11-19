@@ -60,10 +60,14 @@ const SLOTS_PREVIEW_POST: usize = 6;
 /// format (that many pixels of the primitive's own depth gradient); the
 /// constant part, in units of Onshape's 24-bit depth, is applied by the edge
 /// and point shaders (`in_front_of_faces`, `onshape_depth_unit`), since a
-/// float depth buffer's units are relative. Faces keep a few float units
-/// (~2e-6 of their depth) so coplanar overlays (sketch regions, planes)
-/// still win against them.
+/// float depth buffer's units are relative. Faces keep a few units so
+/// coplanar overlays (sketch regions, planes) still win against them; on a
+/// float buffer as `FACE_PUSH`, since there a unit is a power of two of each
+/// triangle's largest depth, and two parts' coplanar faces fought (the depth
+/// ranks' 2e-6 steps lost to it on Metal and D3D12).
 const FACE_DEPTH_BIAS: wgpu::DepthBiasState = wgpu::DepthBiasState { constant: -16, slope_scale: -27.0 / 29.0, clamp: 0.0 };
+/// 16 float units of a depth at the top of its power of two: the faces' push as a fraction of their depth.
+const FACE_PUSH: f64 = 16.0 / 8_388_608.0;
 const EDGE_DEPTH_BIAS: wgpu::DepthBiasState = wgpu::DepthBiasState { constant: 0, slope_scale: -15.0 / 29.0, clamp: 0.0 };
 const POINT_DEPTH_BIAS: wgpu::DepthBiasState = wgpu::DepthBiasState { constant: 0, slope_scale: -9.0 / 29.0, clamp: 0.0 };
 /// Pick-only meshes win ties against faces at the same depth (a sketch region
@@ -215,7 +219,7 @@ struct Globals {
     room: [f32; 4],
     /// x = this frame's depth per unit of Onshape's depth buffer
     /// ([`onshape_depth_unit`]; perspective: clip z per unit and per w);
-    /// y = `Style::lit_line_px`.
+    /// y = `Style::lit_line_px`; z = a pixel's size at w = 1; w = orthographic depth per distance (0: perspective).
     depth_unit: [f32; 4],
     /// Compare mode: Onshape's eye (xyz) and near distance (w).
     compare: [f32; 4],
@@ -1531,6 +1535,10 @@ fn make_globals(scene: &Scene, camera: &Camera, width: u32, height: u32, dpr: f3
         .unwrap_or(1.0);
     let aspect = width as f64 / height as f64;
     let vp = camera.view_proj_f32(aspect, scene_radius);
+    // A pixel's size at w = 1 and (orthographic) depth per distance, for the depth ranks' push (`depth_step_px`).
+    let projection = camera.projection_matrix(aspect, scene_radius);
+    let pixel_angle = (2.0 / (projection.y_axis.y * f64::from(height.max(1)))) as f32;
+    let ortho_depth = if camera.projection == Projection::Perspective { 0.0 } else { projection.z_axis.z.abs() as f32 };
     let eye = camera.eye().as_vec3();
     let fwd = camera.forward().as_vec3();
     let up = camera.up().as_vec3();
@@ -1580,7 +1588,7 @@ fn make_globals(scene: &Scene, camera: &Camera, width: u32, height: u32, dpr: f3
         dash: s.construction_dash,
         room: room_of(bounds),
         error: s.error_color,
-        depth_unit: [onshape_depth_unit(camera, bounds, aspect, scene_radius) as f32, s.lit_line_px, 0.0, 0.0],
+        depth_unit: [onshape_depth_unit(camera, bounds, aspect, scene_radius) as f32, s.lit_line_px, pixel_angle, ortho_depth],
         compare,
         compare2,
     }
@@ -1981,6 +1989,12 @@ impl PipelineMaker {
         }
         let t = perf::enabled().then(std::time::Instant::now);
         let sh = &self.shader;
+        let depth = if p.format == PICK_FORMAT { PICK_DEPTH_FORMAT } else { depth_format() };
+        // Faces on a float depth buffer: the bias's constant as a push in the vertex shader (`face_push`), the same
+        // fraction of depth for every triangle.
+        let float_faces = p.bias.constant == FACE_DEPTH_BIAS.constant && matches!(depth, wgpu::TextureFormat::Depth32Float | wgpu::TextureFormat::Depth32FloatStencil8);
+        let bias = if float_faces { wgpu::DepthBiasState { constant: 0, ..p.bias } } else { p.bias };
+        let constants: &[(&str, f64)] = if float_faces { &[("face_push", FACE_PUSH)] } else { &[] };
         let pipeline = self.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some(p.label),
             layout: Some(match layout {
@@ -1993,7 +2007,7 @@ impl PipelineMaker {
                 module: sh,
                 entry_point: Some(p.vs),
                 buffers: p.buffers,
-                compilation_options: Default::default(),
+                compilation_options: wgpu::PipelineCompilationOptions { constants, ..Default::default() },
             },
             fragment: Some(wgpu::FragmentState {
                 module: sh,
@@ -2015,11 +2029,11 @@ impl PipelineMaker {
                 conservative: false,
             },
             depth_stencil: p.depth.map(|(write, cmp)| wgpu::DepthStencilState {
-                format: if p.format == PICK_FORMAT { PICK_DEPTH_FORMAT } else { depth_format() },
+                format: depth,
                 depth_write_enabled: Some(write),
                 depth_compare: Some(cmp),
                 stencil: x.stencil.state(),
-                bias: p.bias,
+                bias,
             }),
             multisample: wgpu::MultisampleState { count: p.samples, mask: !0, alpha_to_coverage_enabled: false },
             multiview_mask: None,
