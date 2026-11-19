@@ -1,6 +1,6 @@
 {
  "scenario": "drw-centermark",
- "recorded": "2026-11-15T21:13:31.982Z",
+ "recorded": "2026-11-19T23:53:34.525Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -9,12 +9,12 @@
    1919,
    1079
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.4"
+  "recorder": "2026-11-14.2 100d7b07 + live2 2026-11-18.1"
  },
  "live": {
   "document": "a1e7207bcd206771836609af",
   "workspace": "6d6324b30f07aa9904363635",
-  "element": "bb6db0c10048b5dbd54b92b3",
+  "element": "76828efdc33a13370d22e94c",
   "start": "hole-plate-drawing",
   "startElement": "ac3109d7c4982f44b949727b",
   "runner": "live2 .nstate-uip-1.json"
@@ -98,7 +98,20 @@
     }
    ],
    "annotations": [],
-   "selection": []
+   "selection": [],
+   "viewport": {
+    "sheet_px": [
+     378,
+     113,
+     1580,
+     1042
+    ],
+    "sheet_mm": [
+     279.4,
+     215.9
+    ],
+    "mmPerPixel": 0.23245
+   }
   }
  },
  "steps": [
@@ -203,17 +216,24 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [
-      {
-       "kind": "centermark",
-       "text": null,
-       "position": null
-      }
-     ],
-     "selection": []
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 231120
+   "t": 230165
   },
   {
    "step": 2,
@@ -325,11 +345,30 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
-     "selection": []
+     "annotations": [
+      {
+       "kind": "centermark",
+       "text": null,
+       "position": null
+      }
+     ],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 257022
+   "t": 256127
   },
   {
    "step": 3,
@@ -424,11 +463,30 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
-     "selection": []
+     "annotations": [
+      {
+       "kind": "centermark",
+       "text": null,
+       "position": null
+      }
+     ],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 282862
+   "t": 283082
   },
   {
    "step": 4,
@@ -523,10 +581,23 @@
        "position": null
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 311649
+   "t": 311429
   }
  ],
  "_meta": {
@@ -535,7 +606,7 @@
     "format": "DXF",
     "via": "dialog (tab › Export…)",
     "file": "drw-centermark.dxf",
-    "bytes": 95277,
+    "bytes": 95275,
     "error": null,
     "formatBefore": "PDF",
     "fields": [
@@ -669,7 +740,7 @@
     "format": "PDF",
     "via": "dialog (tab › Export…)",
     "file": "drw-centermark.pdf",
-    "bytes": 77607,
+    "bytes": 77888,
     "error": null,
     "formatBefore": "DWG",
     "fields": [

@@ -1,6 +1,6 @@
 {
  "scenario": "drw-bom-table-properties",
- "recorded": "2026-11-18T07:51:05.410Z",
+ "recorded": "2026-11-19T23:41:39.216Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -9,15 +9,15 @@
    1919,
    1079
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
+  "recorder": "2026-11-14.2 100d7b07 + live2 2026-11-18.1"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "ac60d7f823817cdf943d9100",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "2c1c73f89405a69928763d81",
   "start": "pin-block-asm-drawing",
-  "startElement": "2e8be4ded96940b21ba2941d",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "7425731ef03d2b9db73c3efb",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -153,7 +153,20 @@
     }
    ],
    "annotations": [],
-   "selection": []
+   "selection": [],
+   "viewport": {
+    "sheet_px": [
+     378,
+     113,
+     1580,
+     1042
+    ],
+    "sheet_mm": [
+     279.4,
+     215.9
+    ],
+    "mmPerPixel": 0.23245
+   }
   }
  },
  "steps": [
@@ -337,10 +350,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 233029
+   "t": 233651
   },
   {
    "step": 2,
@@ -507,10 +533,23 @@
        "kind": "TABLE",
        "owner": "BOM table"
       }
-     ]
+     ],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 261481
+   "t": 260934
   },
   {
    "step": 3,
@@ -676,10 +715,23 @@
        "kind": "TABLE",
        "owner": "BOM table"
       }
-     ]
+     ],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 290441
+   "t": 288468
   },
   {
    "step": 4,
@@ -897,10 +949,23 @@
        "kind": "EDGE",
        "owner": "Isometric"
       }
-     ]
+     ],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1735,
+       1162
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.2059
+     }
     }
    },
-   "t": 316949
+   "t": 315716
   },
   {
    "step": 5,
@@ -926,7 +991,7 @@
      "text": [
       "BOM table properties",
       "Document:",
-      "noshape ui parity live2-2",
+      "noshape ui parity live2-1",
       "Workspace:",
       "Main",
       "Reference:",
@@ -1101,10 +1166,23 @@
        "kind": "EDGE",
        "owner": "Isometric"
       }
-     ]
+     ],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 344261
+   "t": 343251
   },
   {
    "step": 6,
@@ -1125,7 +1203,7 @@
      "text": [
       "BOM table properties",
       "Document:",
-      "noshape ui parity live2-2",
+      "noshape ui parity live2-1",
       "Workspace:",
       "Main",
       "Reference:",
@@ -1300,10 +1378,23 @@
        "kind": "EDGE",
        "owner": "Isometric"
       }
-     ]
+     ],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 371722
+   "t": 369488
   },
   {
    "step": 7,
@@ -1460,10 +1551,28 @@
        "position": null
       }
      ],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Isometric"
+      }
+     ],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 399350
+   "t": 397027
   }
  ]
 }
