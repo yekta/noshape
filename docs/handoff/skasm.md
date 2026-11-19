@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 13:29 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 14:27 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -69,10 +69,10 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
   - API audit (lead 11:0x) QUEUED 4d2730e3: sketch tools / options, SM table, flat export, SM features matched;
     added ui_preferences.sketch_options (Sketch dialog checkboxes, scene `save_sketch_options` pub) and sketch_draw
     `rho` (conic). AGENT_API regenerated (regenerate + scp in ONE rb.sh call: a later rb.sh sync overwrites it).
-  - #4 / #5 to live2's q-flat-ops-1119 (behaviours 'skasm (11-19): extrude in the flat…' + Leftovers): QUEUED d998d255
+  - #4 / #5 to live2's q-flat-ops-1119 (behaviours 'skasm (11-19): extrude in the flat…' + Leftovers): LANDED d998d255 as e87a2b3e
     (flat Add: across a bend/outline SM_FLAT_OP_ADD_CROSSES_EDGE, inside a wall SHEET_METAL_REBUILD_ERROR, floating an
     INFO SM_FLAT_OP_PARTIAL_INTERSECT, part unchanged; corner break at a bend's end INVALID_INPUT in sm_flat.rs; e2e
-    `a_corner_break_beside_a_bend` with live's Fillet 5 7034.757 / Chamfer 5 7020.487). LOCAL (testing 13:xx on vibex7):
+    `a_corner_break_beside_a_bend` with live's Fillet 5 7034.757 / Chamfer 5 7020.487). QUEUED f1dd7113 (82be6b025):
     the flat Extrude form: schema hides all but flatOperationType + entities under domain FLAT; `extrude::domain_logic`
     (model-core) sets domain from the regions, run in the app (start_feature preselection, auto_operation on picks) and
     in ops feature_add when domain isn't given; UI test `extrude_on_a_flat_region_opens_the_flat_form`.
