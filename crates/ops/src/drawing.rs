@@ -283,7 +283,7 @@ pub fn drawing_of(doc: &Document, tab: TabId) -> Option<&Drawing> {
 /// with `suggested` the source's suggested views (scaled to its bounds,
 /// sketch sources facing the sketch plane) and its MBD datums.
 pub fn new_drawing(doc: &Document, template: &DrawingTemplate, source: Option<&DrawingSource>, suggested: bool) -> Drawing {
-    let bounds = if suggested { source.and_then(|s| noshape_model::drawing::create::source_bounds(doc, s)) } else { None };
+    let bounds = if suggested { source.and_then(|s| noshape_model::drawing::create::source_bounds_with(doc, s, &mut crate::derived::assembly_evaluator(Default::default()))) } else { None };
     let frame = source.and_then(|s| noshape_model::drawing::create::source_frame(doc, s));
     let mut d = noshape_model::drawing::create::create_drawing(template, source, bounds, suggested, frame);
     noshape_model::drawing::create::assembly_drawing_defaults(doc, &mut d);

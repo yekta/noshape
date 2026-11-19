@@ -3245,7 +3245,7 @@ impl Workspace {
                     if let Some((key, context)) = shown {
                         noshape_model::drawing::views::studio_source(&doc, &key, context);
                     }
-                    let bounds = if suggested { src.as_ref().and_then(|s| noshape_model::drawing::create::source_bounds(&doc, s)) } else { None };
+                    let bounds = if suggested { src.as_ref().and_then(|s| noshape_model::drawing::create::source_bounds_with(&doc, s, &mut noshape_ops::derived::assembly_evaluator(Default::default()))) } else { None };
                     // Sketch sources face the sketch plane.
                     let frame = src.as_ref().and_then(|s| noshape_model::drawing::create::source_frame(&doc, s));
                     let mut d = noshape_model::drawing::create::create_drawing(&template, src.as_ref(), bounds, suggested, frame);

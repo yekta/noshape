@@ -116,8 +116,14 @@ pub fn assembly_drawing_defaults(doc: &Document, d: &mut Drawing) {
 
 /// Model bounds (meters) of a drawing source, regenerated from the document.
 pub fn source_bounds(doc: &Document, src: &DrawingSource) -> Option<(DVec3, DVec3)> {
+    source_bounds_with(doc, src, &mut AssemblyEvaluator::new())
+}
+
+/// [`source_bounds`] with the caller's assembly evaluator (the app's and the agent API's read instances from other
+/// documents: qa session-asm-1119, a pin inserted from another document left out made the views 1:2 for live's 1:4).
+pub fn source_bounds_with(doc: &Document, src: &DrawingSource, assemblies: &mut AssemblyEvaluator) -> Option<(DVec3, DVec3)> {
     let key = SourceKey { tab: src.tab, config: src.config.clone(), explode: None, version: None, position: None, display: None };
-    let model = regenerate_source(doc, &key, &mut Regenerator::new(), &mut AssemblyEvaluator::new())?;
+    let model = regenerate_source(doc, &key, &mut Regenerator::new(), assemblies)?;
     let mut acc: Option<(DVec3, DVec3)> = None;
     // A sketch source: the bounds of its curves.
     if let Some(f) = &src.sketch {

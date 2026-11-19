@@ -6123,6 +6123,35 @@ fn edit_in_context_on_another_documents_part() {
     assert_eq!(e.param.as_deref(), Some("instance"), "{e:?}");
 }
 
+/// Create Drawing of an assembly with parts from another document: the suggested views are scaled to fit them and
+/// its BOM lists them (qa session-asm-1119: a pin inserted from another document and patterned was left out, the views
+/// 1:2 where live's are 1:4, the BOM without its row and its callout "----").
+#[test]
+fn suggested_views_fit_parts_from_another_document() {
+    let mut ctx = Ctx::new();
+    two_part_assembly(&mut ctx, "fit-other-lib.noshape");
+    let lib = std::env::temp_dir().join(format!("noshape-ops-e2e-{}", std::process::id())).join("fit-other-lib.noshape");
+    let libs = lib.to_str().unwrap().to_string();
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    let top = scratch("fit-other-top.noshape");
+    call(&mut ctx, "document_create", json!({ "path": top.to_str().unwrap() }));
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1", "document": libs, "version": "V1" }));
+    let far = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1", "document": libs, "version": "V1" }))["instance"].clone();
+    call(&mut ctx, "assembly_transform", json!({ "instance": far, "translation": [300, 0, 0] }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Assembly 1", "template": "ISO A3", "suggested_views": true }));
+    let front = d["views"].as_array().unwrap().iter().find(|v| v["orientation"] == "front").cloned().expect("Front");
+    let (scale, w) = (num(&front["scale"]), num(&front["bounds"]["max"][0]) - num(&front["bounds"]["min"][0]));
+    // The two plates span 340 mm: Front shows all of it and leaves room for Right beside it on A3's 420 mm.
+    assert!((w - 340.0 * scale).abs() < 2.0, "Front spans both plates: {w} mm at {scale}");
+    assert!(w < 210.0, "scaled to fit: {w} mm at {scale}");
+    // The BOM table lists both (the source laid out at creation is the one the drawing keeps using).
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    call(&mut ctx, "drawing_view_table", json!({ "drawing": tab, "kind": "bom", "view": front["id"], "position": [410, 287] }));
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let rows = g["tables"][0]["rows"].clone();
+    assert_eq!(rows[0][1], "2", "Part 1 ×2: {rows}");
+}
+
 /// A callout on a part's silhouette is that part's, not the part of an edge
 /// a little way off (qa BALLOON-WRONG-ITEM: a click on a pin's silhouette
 /// near the plate's edge showed the plate's item).
