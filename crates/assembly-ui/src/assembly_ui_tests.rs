@@ -1278,6 +1278,63 @@ fn a_typed_limit_turns_the_new_mates_preview_into_range(cx: &mut TestAppContext)
     assert!((angle(cx) - 30.0).abs() < 1e-6, "stays at 30°");
 }
 
+/// qa P1 (ASM-LIMIT-TYPED-NO-PREVIEW), live mate limits r1-r4 (11-18): in an edited Revolute a typed limit turns the
+/// preview into its range at once (min 30 / max 35 → 30°, then min 0 / max 5 → 5°), before Solve or ✓ (ours held the
+/// edited mate's angle where it was).
+#[gpui::test]
+fn a_typed_limit_turns_the_edited_mates_preview_into_range(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "edit-limit-preview");
+    let settle = |cx: &mut TestAppContext| {
+        cx.executor().advance_clock(std::time::Duration::from_millis(100));
+        cx.run_until_parked();
+    };
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Revolute, w, cx);
+            let (a, b) = (face_connector(v, "Part 2 <1>", false, cx), face_connector(v, "Part 1 <1>", true, cx));
+            v.deliver_connector(a, w, cx);
+            v.deliver_connector(b, w, cx);
+            v.accept_mate(w, cx);
+        });
+    })
+    .unwrap();
+    settle(cx);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let id = v.assembly(cx).unwrap().mates.iter().find(|m| m.name == "Revolute 1").expect("Revolute 1").id;
+            v.edit_mate(id, w, cx);
+        })
+    })
+    .unwrap();
+    settle(cx);
+    let angle = |cx: &mut TestAppContext| {
+        settle(cx);
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let id = v.mate.as_ref().unwrap().dialog.read(cx).to_mate(cx).unwrap().id;
+            let m = v.result.mates.iter().find(|m| m.id == id).expect("the previewed mate");
+            assert!(m.ok, "{:?}", m.message);
+            m.values[0].to_degrees()
+        })
+    };
+    let start = angle(cx);
+    assert!(!(29.0..=36.0).contains(&start), "outside the first range before the limits: {start}°");
+    let limit = |max: bool, text: &'static str, cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| {
+            let dialog = view.read(cx).mate.as_ref().unwrap().dialog.clone();
+            dialog.update(cx, |d, cx| d.type_limit("rz", max, text, true, w, cx));
+        })
+        .unwrap();
+    };
+    limit(false, "30", cx);
+    limit(true, "35", cx);
+    assert!((angle(cx) - 30.0).abs() < 1e-6, "turned to 30° in the preview");
+    limit(false, "0", cx);
+    limit(true, "5", cx);
+    assert!((angle(cx) - 5.0).abs() < 1e-6, "turned back to 5° in the preview");
+    assert!(view.read_with(cx, |v, _| v.mate.is_some()), "still editing (no Solve, no ✓)");
+}
+
 /// Live mate-keys-1118: Q in an edited Revolute turns the free part a quarter turn about the mate's axis, +90° about the
 /// connectors' Z (pin-block: −90° about world Z, the connectors' Z pointing down); its free rotation doesn't absorb it.
 #[gpui::test]
@@ -2715,4 +2772,67 @@ fn choosing_a_display_state_applies_it_at_once(cx: &mut TestAppContext) {
     settle(cx);
     assert_eq!(shown(cx), (true, true), "the row and the graphics both hidden");
     assert!(cx.update(|cx| view.read(cx).viewport.read(cx).animation().is_none()), "no animation");
+}
+
+/// qa P1 walk 11-19 (ASM-DRAG-UNFIXED-GROUP), live behaviours 42244 / 42565: with nothing fixed, a drag on a part
+/// carries its whole mated group as one rigid set (Part 1 <1> Fastened to <2>, on a Revolute to Part 2; ours moved
+/// nothing: the group's 6 DOF took the free-instance path, which held the mates' partners).
+#[gpui::test]
+fn a_drag_with_nothing_fixed_carries_the_mated_group(cx: &mut TestAppContext) {
+    use crate::viewport::ViewportEvent;
+    use gpui_kit::Modifiers;
+    let path = two_parts_document(cx, "drag-unfixed-group", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        let face = |ctx: &mut Ctx, i: &str, z: i32| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "normal": [0, 0, z] }))["faces"][0]["id"].clone();
+        let (a, b) = (face(ctx, "Part 1 <1>", -1), face(ctx, "Part 1 <2>", 1));
+        call(ctx, "assembly_mate", json!({ "type": "fastened", "a": { "instance": "Part 1 <1>", "entity": a }, "b": { "instance": "Part 1 <2>", "entity": b } }));
+        let (a, b) = (face(ctx, "Part 1 <1>", 1), face(ctx, "Part 2 <1>", -1));
+        call(ctx, "assembly_mate", json!({ "type": "revolute", "a": { "instance": "Part 1 <1>", "entity": a }, "b": { "instance": "Part 2 <1>", "entity": b } }));
+        call(ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>", "Part 1 <2>", "Part 2 <1>"], "fixed": false }));
+    });
+    let (window, view) = open_assembly(cx, &path);
+    draw(cx, window);
+    let names = ["Part 1 <1>", "Part 1 <2>", "Part 2 <1>"];
+    let poses = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        names.map(|n| v.result.solved.placement(instance(v, n, cx)).unwrap())
+    });
+    let before = poses(cx);
+    let to = cx
+        .update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                let a = v.assembly(cx).unwrap();
+                assert!(a.instances.iter().all(|i| !i.fixed), "nothing fixed");
+                assert!(a.mates.len() == 2 && v.result.mates.iter().all(|m| m.ok), "both mates solved");
+                let id = instance(v, "Part 1 <1>", cx);
+                let (lo, hi) = v.result.instance_bounds(id).unwrap();
+                let at = v.viewport.read(cx).project((lo + hi) * 0.5).unwrap();
+                let vp = v.viewport.clone();
+                v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+                std::thread::sleep(std::time::Duration::from_millis(60));
+                let to = at + glam::DVec2::new(75.0, 0.0);
+                v.on_viewport_event(&vp, &ViewportEvent::ToolDrag { position: to }, w, cx);
+                to
+            })
+        })
+        .unwrap();
+    cx.executor().advance_clock(std::time::Duration::from_millis(100));
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: to, modifiers: Modifiers::default() }, w, cx);
+        })
+    })
+    .unwrap();
+    cx.executor().advance_clock(std::time::Duration::from_millis(100));
+    cx.run_until_parked();
+    let after = poses(cx);
+    let moved = |i: usize| glam::DVec3::from(after[i].translation) - glam::DVec3::from(before[i].translation);
+    assert!(moved(0).length() > 1e-3, "the grabbed part moved: {:?} m", moved(0));
+    for i in 0..3 {
+        assert!((moved(i) - moved(0)).length() < 1e-6, "{} moved with the group: {:?} vs {:?}", names[i], moved(i), moved(0));
+        let turn = glam::DQuat::from_array(after[i].rotation).angle_between(glam::DQuat::from_array(before[i].rotation));
+        assert!(turn < 1e-6, "{} not turned: {turn}", names[i]);
+    }
 }

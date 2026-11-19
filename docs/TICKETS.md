@@ -879,14 +879,14 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   Live (behaviours psb 10-24 j (c), same flow on a free Ø-r5 circle, 5 -> 3): no scaling; the copy keeps r 10 and the
   free source grows to r 7 (the solver moves the source). The first-dimension scaling (behaviours 34917) is live's for the
   Dimension tool / typed box. Offset's default 5 mm box, arrow and pointer-independent preview are = live.
-- [ ] P1 **ASM-DRAG-UNFIXED-GROUP (asm)**: an assembly with nothing fixed (walk3 Assembly 1: Part 1 <1> + <2> Fastened, Part 1
+- [x] (asm 11-19 22:5x: the free-instance drag path was taken by a mated group's 6 DOF (eedeede50); now only an instance no mate, pattern or group holds; test `a_drag_with_nothing_fixed_carries_the_mated_group`; the creation preview's split: ASM-NEW-MATE-PREVIEW-GROUP) P1 **ASM-DRAG-UNFIXED-GROUP (asm)**: an assembly with nothing fixed (walk3 Assembly 1: Part 1 <1> + <2> Fastened, Part 1
   Revolute to Part 2 <1>; green 624c6db77, :110, real pointer 3 px / 40 ms): pressing on Part 1 and dragging 75 px moves
   nothing (outline lit, no motion during or after). With Part 2 › Fix the same drag turns Part 1 about the Revolute axis (=).
   Live (behaviours 42244, 42565): with nothing fixed a drag moves the grabbed part's whole mated group as one rigid set
   (translation; a free mate direction absorbs its share), the angle unchanged. Also seen: the Revolute 1 creation preview
   moved Part 1 <1> onto the ring while its Fastened twin <2> stayed put (after ✓ the pair is together again); live's edit
   preview moves the whole connected group (behaviours 1214), so the creation preview likely should too.
-- [ ] P1 **ASM-LIMIT-TYPED-NO-PREVIEW (asm)**: Edit Revolute 1 › ☑ Limits (rows "No minimum" / "No maximum" = live), type min
+- [x] (asm 11-19 22:5x: an edited mate's held free values are brought into its typed limits; test `a_typed_limit_turns_the_edited_mates_preview_into_range`) P1 **ASM-LIMIT-TYPED-NO-PREVIEW (asm)**: Edit Revolute 1 › ☑ Limits (rows "No minimum" / "No maximum" = live), type min
   30 / max 35, then min 0 / max 5 (disjoint ranges): the part never moves in the preview; it turns only on Solve or ✓.
   Live (behaviours "asm (lead 11-18 ~01:15 …) mate limits", r1-r4): a typed limit applies to the preview at once, the part
   turning into the range within ~1 s. Drag clamping at the limit after ✓ is = live. Green 624c6db77, walk 22:4x.
@@ -918,6 +918,9 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   qa 23:06: a plain Table (2 × 2) IS saved ("Part 1 Drawing 1 :: Table"), so it's the Hole table's commit only. After that
   Table's ✓ its placement guide (pink dashed line at the ✓ button's x, red × at the sheet top) stayed drawn with the pointer
   elsewhere, until the next pointer action.
+- [ ] P1 **ASM-NEW-MATE-PREVIEW-GROUP (asm)**: a new mate's preview moves only the moving part, not the group mated to it
+  (qa walk 11-19: Revolute 1's preview took Part 1 <1> onto the ring, its Fastened twin <2> stayed; together again after ✓);
+  live's preview moves the whole connected group (behaviours 1214).
 
 ## Interaction feel suite 11-19 (qa 16:20: run 1119-1242-223cec7e on vibex8, failures re-run on green eb3b06a8 on vibe2)
 2110/2172 scenarios (05:51 run on a67911be: 2126). 67 failing; 28 pass on the re-run (load flakes or fixed). The 39 still failing

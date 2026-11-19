@@ -5,7 +5,7 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-19 22:20 UTC)
+## State (2026-11-19 23:00 UTC)
 
 ### Landed today (702c9878: Display states Esc, driver-mate named position, paste; d671313d; 335f8e43; 9f52415c; 123ca4b3 free drag)
 - LOD (91478e2c), Derived mirror of an assembly complete (e87a2b3e, 17c26dc1; left: live's exact node icon, symmetry
@@ -25,7 +25,23 @@ TICKETS ASM-UI-SIGSEGV-AT-EXIT [x].
   8bf03e7b3 named positions' menu + Apply (1421–1422), display state choice (1423, 1471; `choose_display_state`
   factored out of the select), Y Hide `=` (live's leftover outline is its redraw lag).
 - Not mine (my old list was wrong): 1452–1457 are psui's Part Studio pattern rows; 699 is psui's Dialogs matrix.
-- Named position row click (edits the cell, applies nothing): tested, queued 22:2x.
+- Named position row click (edits the cell, applies nothing): landed 9bbc3f11.
+
+### qa P1s 11-19 (queued 23:0x)
+- ASM-DRAG-UNFIXED-GROUP: my eedeede50 free-drag path took any 6-DOF instance, so a mated group with nothing fixed
+  didn't move; now `Prepared::moves_alone` (no mate, pattern or group). Test fails without the fix.
+- ASM-LIMIT-TYPED-NO-PREVIEW: an edited mate's held values go through `eval::held_in_limits`. Test fails without it.
+- Open, next: ASM-NEW-MATE-PREVIEW-GROUP (a new mate's preview moves only the moving part; live the whole group).
+
+### Lead rows 11-19 22:2x (after infento / scissor)
+1. isaac on a green with bb667320d: h1119 (built 17:25, has bb667320d) still fails the Chamfer 2 block (Fastened
+   7/8/9/57/79/88, Ball 1/7, Fastened 33): only the feature's error line went. Traced run with the current tree on
+   vibe2 (`one-save.sh ops-along asm-isaac-ball ~/agents/asm-keep/isaac-main.out`, document kept in
+   ~/tmp/asm/save) for core's volume line; core told the first answer was wrong.
+2. Speed: `big_assembly_perf::suite_assemblies_speed` (NOSHAPE_PERF_DOCS=<saved suite docs>) in tagged stash
+   asm-suite-speed-1119 (c2bc6c6e), not run yet. Live's numbers (behaviours 21425 asm200, 30512 A200): drag
+   0.4–1 update/s, insert 4.96 s, add mate 1.94 s, open 11.8 s.
+3. Then the suite's next differences (xdev-subs, infento, scissor), P0/P1 first.
 - Find open rows: `awk -F'|' 'NF>4 { st=$(NF-1); t=$(NF-2); if (st ~ /≠|≈/ || t ~ /missing/) print NR": "$2 }'
   docs/parity/interaction-feel.md | grep -iE "asm|assembl|mate|instance|explode|named|display|section|drag"`.
 

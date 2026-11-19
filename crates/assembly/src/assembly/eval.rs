@@ -565,6 +565,14 @@ impl Prepared {
         (s, landed)
     }
 
+    /// The instance moves on its own: not fixed, no mate, pattern or group holding it to another (a drag carries it alone,
+    /// exactly). A mated group with nothing fixed has 6 DOF too, but its drag carries the whole group.
+    pub fn moves_alone(&self, id: &InstanceId) -> bool {
+        let Some(&(b, _)) = self.body_of.get(id) else { return false };
+        let touches = |m: &SolverMate| m.a == b || m.b == b || m.extra.iter().any(|(x, _)| *x == b);
+        !self.fixed[b] && self.body_of.values().filter(|(x, _)| *x == b).count() == 1 && !self.mates.iter().any(|(_, _, m)| touches(m))
+    }
+
     /// A part whose only mate is a Ball to fixed geometry turns as an arcball
     /// about the ball's centre (live asm drag probes 4, request 1870: six
     /// drags within 0.12 mm). The sphere passes through the grabbed point's
@@ -1552,18 +1560,21 @@ pub fn new_mate_stays(_result: &AssemblyResult, m: &super::Mate, _units: &UnitPr
 /// limits (live feel3-1118: min 30 deg turns the part to 30°). For
 /// [`SolveOptions::hold_values`].
 pub fn new_mate_holds(m: &super::Mate, units: &UnitPrefs) -> Vec<(MateId, usize, f64)> {
+    mate_dofs(m.mate_type).iter().map(|(ix, _)| (m.id, *ix, held_in_limits(m, *ix, 0.0, units))).collect()
+}
+
+/// The mate's free value `ix` held at `v`, brought into the mate's limits (crossed limits leave it): an edited mate's
+/// typed limit turns the part into its range in the preview (live mate limits r1-r4, 11-18).
+pub fn held_in_limits(m: &super::Mate, ix: usize, v: f64, units: &UnitPrefs) -> f64 {
     let keys = limit_keys(m.mate_type);
-    let clamp = |ix: usize| {
-        let dim = if ix == 0 { Dim::ANGLE } else { Dim::LENGTH };
-        let Some((_, l)) = m.limits.iter().find(|(key, _)| limit_index(key) == Some(ix) && keys.contains(&key.as_str())) else { return 0.0 };
-        let (lo, hi) = (eval_opt(&l.min, dim, units), eval_opt(&l.max, dim, units));
-        if lo.zip(hi).is_some_and(|(a, b)| a > b) {
-            return 0.0;
-        }
-        let v = lo.map_or(0.0, |a| a.max(0.0));
-        hi.map_or(v, |b| v.min(b))
-    };
-    mate_dofs(m.mate_type).iter().map(|(ix, _)| (m.id, *ix, clamp(*ix))).collect()
+    let dim = if ix == 0 { Dim::ANGLE } else { Dim::LENGTH };
+    let Some((_, l)) = m.limits.iter().find(|(key, _)| limit_index(key) == Some(ix) && keys.contains(&key.as_str())) else { return v };
+    let (lo, hi) = (eval_opt(&l.min, dim, units), eval_opt(&l.max, dim, units));
+    if lo.zip(hi).is_some_and(|(a, b)| a > b) {
+        return v;
+    }
+    let v = lo.map_or(v, |a| v.max(a));
+    hi.map_or(v, |b| v.min(b))
 }
 
 /// Degrees of freedom of a mate type that can be driven (Animate, named

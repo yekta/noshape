@@ -894,9 +894,10 @@ impl AssemblyView {
                 opts.hold_values.extend(noshape_model::assembly::eval::new_mate_holds(&m, &self.units(cx)));
             }
             // An edited mate keeps its free values, so Flip / Reorient (A / Q) turn the free part (live mate-keys-1118:
-            // Q turns pin-block's pin −90° about the Revolute's axis).
+            // Q turns pin-block's pin −90° about the Revolute's axis); a typed limit brings them into its range.
             if let Some(v) = s.editing.filter(|_| !s.solve_all).and_then(|id| self.result.solved.mate_values.get(&id)) {
-                opts.hold_values.extend(noshape_model::assembly::eval::mate_dofs(m.mate_type).iter().map(|(ix, _)| (m.id, *ix, v[*ix])));
+                let units = self.units(cx);
+                opts.hold_values.extend(noshape_model::assembly::eval::mate_dofs(m.mate_type).iter().map(|(ix, _)| (m.id, *ix, noshape_model::assembly::eval::held_in_limits(&m, *ix, v[*ix], &units))));
             }
             match s.editing.and_then(|id| asm.mates.iter().position(|x| x.id == id)) {
                 Some(i) => asm.mates[i] = m,
@@ -4000,7 +4001,7 @@ impl AssemblyView {
         let start: HashMap<InstanceId, Placement> = self.result.solved.placements.iter().cloned().collect();
         let mut opts = match d.handle {
             Some(h @ ManipHandle::Ring(_)) => SolveOptions { targets: Self::manip_targets_for(h, d.plane_normal, d.plane_point, d.value, &d.start), start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },
-            Some(h @ (ManipHandle::Axis(_) | ManipHandle::Plane(_))) if self.result.solved.instance_dof.get(&d.top).copied() == Some(6) => {
+            Some(h @ (ManipHandle::Axis(_) | ManipHandle::Plane(_))) if self.result.prepared.moves_alone(&d.top) => {
                 // Free instance: exact translation from the drag start.
                 let m = Self::manip_motion(h, d.plane_normal, d.plane_point, d.value, d.offset);
                 SolveOptions { targets: Self::moved_placements(&m, &d.start), start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() }
@@ -4013,7 +4014,7 @@ impl AssemblyView {
             }
             // A free instance dragged by its face moves in the plane of the screen, never turning (Onshape: unmated
             // instances move freely in the plane of the screen; the point drag turned it 1–2° on a 20 px drag).
-            None if d.nested.is_none() && self.result.solved.instance_dof.get(&d.top).copied() == Some(6) && d.origin.contains_key(&d.top) => {
+            None if d.nested.is_none() && self.result.prepared.moves_alone(&d.top) && d.origin.contains_key(&d.top) => {
                 let p = d.origin[&d.top];
                 let grabbed = placement_to_frame(&p).transform_point(d.local);
                 let m = Frame::new(target - grabbed, glam::DQuat::IDENTITY);
