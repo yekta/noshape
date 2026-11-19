@@ -671,7 +671,7 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 - [x] (dropped qa 13:10: a remembered value; live2's fresh config had none yet, after one Form ours opens with Circle emboss as live; row 1288 = in 792d2e7b8) **P1 FORM-DEFAULT-STUDIO (skasm)**: the sheet-metal Form dialog opens with "Form Part Studio" empty; live's opens with Circle emboss. The rest matches.
 
 ## Interaction feel: live2's "Ours" cells, batch 7 (studios rows 1294-1297: 3 equal, 1 not; live2 13:2x, green 9021eeb7a)
-- [ ] (studios 11-18 23:31, local: the editor wasn't redrawn when the tip's 450 ms ran out, so it was read on the next unrelated frame; now it redraws then; to verify) (studios 6b91ebbd8 set 450 ms; live2 17:5x on 87edba24, which has it, 3 fresh launches: first hover 687 / 610 / 636 ms, second 629 / 622 / 589, live ~470: still open; the help popover = 3.19-3.29 s, live ~3.1) **P1 DRW-TOOLBAR-TOOLTIP-DELAY (studios)**: a drawing toolbar button's title tooltip appears 0.70 s after the hover; live's at
+- [x] (qa verified 11-19 07:34 on live2's retake 07:33, green af11b6d52 with studios 19f0da201, :125 load 8, 6 hovers at 60 fps: tooltip first frame median ~620 ms (528-686), ~450-540 ms after the app's first hover frame = live's 450 ms timer; the remaining ~150 ms is the frame cadence, under the >=100 ms and 2x rule, DECISIONS 9e5b481d4) **P1 DRW-TOOLBAR-TOOLTIP-DELAY (studios)**: a drawing toolbar button's title tooltip appears 0.70 s after the hover; live's at
   ~0.47 s. (studios told by live2.)
 - Equal to live (live2): 1294, 1296, 1297. live2 next: the non-P0 "?" rows (ui-speed 1088-1093, prefs, numfmt, 1199, 1236, 893,
   1114, 1163); snap-diag 1303 stays qa's (Snap reach, on hold for asm).
