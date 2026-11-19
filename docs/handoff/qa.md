@@ -78,7 +78,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    their 6 feel fixes): on its green re-runs face-rclick-select-fillet-faces, dialog-checkbox-convert-back, dialog-checkbox-rclick-convert,
    dialog-query-rclick-clear-all, fillet-chip-clear-missing, fillet-chip-edit-healthy-moment, analysis-interference -> one qa-alerts line;
    mark the TICKETS rows. Suite 1119-1302-291c74b0: ui 2120/2172, models done, assemblies / exchange in vibex8's slot: suites-diff.py
-   vs the last full run when done. psui's 019698386 in green 624c6db77 at 22:31: qa-wait-e196 fires next.
+   vs the last full run when done. psui's 7 rows (019698386) verified 22:33 on green 615bed1f: 7/7, 43/43 (TICKETS marked).
    sketch-vertical-key: psui 22:16 on live2's camera retake = a real gap (end ~9 px off plumb, past 7.5 px; ours VERTICAL), psui fixes scene.
    P1 walk 21:36 on a58eee8c (sketch -> extrude -> fillet -> pattern -> edit -> undo -> suppress): all build; P2 PATTERN-CHECK-STAYS-
    ENABLED (psui) + live request (REQUESTS qa 11-19 21:36: ✓ after emptying, tooltip on click); reopen, rollback drag, reorder OK. Walk 21:4x: Shell, Boolean union,
