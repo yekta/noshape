@@ -77,13 +77,16 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    BOM / callout, studio session Tab / Checkbox dialog / merge+restore with B1 open. Core told: c2-surf-workshop cpcurves Thicken 1 Ok ->
    Warning, Split 6 / mutualtrim Fillet 1 messages (corpus, compat ALERT 814b48d8 / daa1bebd). cut-check: green re-read under the lock,
    30 min cap then the newest finished check (named in the line).
-000. **11-19 09:10 state.** session-ps2-1119 (ps2sess/; vibe2 app af11b6d5) = live except Hole 1 drilling the sweep tube above its
-   point (Part 1 -231 mm3) -> core. Studios 166b521c re-check (stsess/run.sh on vibe2: asess a1..a5, ssess t1 t4 t2a t2b t3; sr.sh now
-   saves shots): asm BOM / 1:4 / pin balloon, Tab, Checkbox = live; merge dialog opens on Keep Main with Merge disabled (live: Replace
-   with B1, 3 tabs) -> studios 09:05; restore untestable until then. Kept vibe2 ~/agents/qa-keep/{session-ps2-1119,studio-1119-recheck}.
-   Done 09:58: dx prewarm A/B (fa952d158 vs 2fffa9a06, local :154): medians 5.2 / 5.5 s, no regression (run 1 cold 18.0 / 19.0,
-   runs 2-3 warm caches). Done 09:16: DXF on a rerun session (green bfe09bcd) = live's entities (only author names). Armed:
-   qa-rel-0460 (publish of v0.4.60); qa-merge-wait (stsess/merge-wait.sh: studios' merge fix in a green -> t2b retake on vibe2);
+000. **11-19 12:30 state.** Ids: studios 31c9b9ba-e7f8-40f7-85cb-242bab86dbe6, dx aad5e825-f86c-432d-b4ac-3aab402e7052 (Motile);
+   live stopped till ~21:00. v0.4.60 post-release done 10:59: clean (SHA, user docs / authored = 0.4.59, session-1118 + sm-1119 on the
+   released app = live; compat baseline 0.4.60); f197 Part 1 +1 edge +1 vertex same volume -> core (low). ps2 = live since core's
+   7bf5efe3 (verified 12:05). dx prewarm A/B: no regression. DXF on a rerun drawing session = live. In flight:
+   - qa-resave (bin/resave-corpus.sh via rb.sh NOSHAPE_RB_HOST=vibe2 from the qa-suite checkout at green 42b57cbd, models staged in
+     vibe2 ~/tmp/qa/resave/models): re-translates c2-surf-workshop-cpcurves / -mutualtrim (lead + core: saved on wrong geometry);
+     then copy saved/*.noshape* over vibex7 ~/qa/corpus (keep .bak-1118), check live's values (cpcurves fit spline 1 / Sweep 5 /
+     Thicken 1 Ok, 3 parts 7024.76 + 2 x 6812.2; mutualtrim Fillet 1 on one shared 156.02 mm edge), re-run compat-check, drop alerts.
+   - qa-merge-wait (stsess/merge-wait.sh): studios' 258b8d40e in a green -> ssess-t2b retake on vibe2 -> qa-alerts; tell studios.
+   Kept vibe2 ~/agents/qa-keep/{session-ps2-1119,studio-1119-recheck}.
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
    with NOSHAPE_PARITY_VALIDITY=1 (bin/suites-models.sh exports it) models.log prints per feature "CHECK <doc> feature <k>:
    <part> valid <true|false> raw f/e/v; ..." (PartState.check, query parts' "check"; not in report.json). suites-diff.py
