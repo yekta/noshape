@@ -9,36 +9,29 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 22:34 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-19 12:25 UTC. Restarted 11-19 ~11:35 as a fresh thread (the previous one, 58e9bca8, hit its account's
+weekly limit); compacted before that ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2
-tools/tiers/land.sh --no-precheck`; builds / drawing-ui tests `NOSHAPE_RB_HOST=vibex8 tools/tiers/rb.sh`; ops e2e on
-the Mac; ui-parity on vibex7 / vibe2 via ~/bin/slot (vibex6 = watcher), one run per host.
-- Landed 11-19: 166b521c, c2574db3 (replicate region snap), 478458bf (drw-tools / rad-note / doc-feel), 1aef7f70
-  (Callout reach 5 px, hole callout Fit standard). live2 retakes Callout once green carries 1aef7f70.
-- Queued 11-19 ~08:45, one stack: ebd542cf (new drawing tab after the ACTIVE tab; reopen on the last-viewed workspace
-  and tab, app `last_viewed`), f4e766b8 (Feature Studio error marked ~900 ms, Ace's red-square marker; live tools-1119),
-  4fc2ea4f (live2 recheck-1119: cut line hover tan + arrow grips + blue anchor, grips while a selected parent is under
-  the pointer; a selected view's centre mark: orange dot, no grips; Edge to edge always two edges (app + op); no
-  centre dot on circle hover; note ruler in inches; rename border rgb(22,81,176); version tooltip 300 px).
-- Landed 11-19 09:41: 3046bb31 (7a6121bb stack: tab position, last viewed, Feature Studio marker, recheck-1119).
-- Queued 09:45: 892ee0a0 (+ marks, cut line click, header ⋮ remembered, drawprops-1119, Merge dialog VS users /
-  Replace default, Callout reach back to 7 px with an exclusive pick reach).
-- Local after it: cacd477d (note-opts-1119: Bottom to top reversed, paragraph space 1.5 h, list tab, auto-sized note
-  ignores valign, flag pitch), audit row 10. Hole callout Fit take: already as live.
+tools/tiers/land.sh --no-precheck`; builds / tests `NOSHAPE_RB_HOST=<lowest load of vibex7 / vibex8 / vibe2>
+tools/tiers/rb.sh` (warm target on vibex7); ui-parity via ~/bin/slot, one run per host.
+- Landed 11-19: 3046bb31 (tab position, last viewed, Feature Studio marker, recheck-1119), 0e754c57 (892ee0a0: +
+  marks, cut line click, header ⋮ remembered, drawprops-1119, Merge dialog, Callout reach 7 px exclusive).
+- Local, to land as one: cacd477d (note-opts-1119), audit row 10, and the top-5 #3–#5 comparison (live 11:35 captures,
+  "studios hole plate"): a feature pattern copies its Hole features' hole records (`HoleRecord::pattern`; callouts
+  count "4X"), a tapped callout's drill line first, no space after ⌴ ⌵ ↧, the countersink angle "90.0°" / "90,0°",
+  ISO drops the pitch's trailing zeros ("M6x1"), the hole table a letter per hole spec in the order made and its
+  locations at the fixed precision ("15,00"); the Inspection list / Drawing definition list CSVs in live's form (BOM,
+  "Item,Sheet,Type,Units,…", CRLF, "--", "Sheet1 (1)", "Hole/thread callout" a row per value, notes with N/A,
+  "(overridden)", a list note's lines "1.\t7"); Note border "Square circle"; the 23 date formats on 2026-11-19 tested. e2e
+  `studios_hole_plate_callouts_and_table_as_live`.
+- Compared, already as live: title block property / date lists, DXF sheets side by side (content gap 5.019 in).
 - Left: a pinned column doesn't stay put while the Documents table scrolls sideways.
-- Lead 11-19 missing-functionality sweep: nothing missing; top 5 are uncompared depth. Captures asked: live2 #1
-  Drawing properties (drawprops-1119, building) and #2 Note panel (note-opts-1119); live #3 Title block, #4 hole
-  callouts + hole table, #5 Export Drawing on "studios hole plate" (REQUESTS 08:15), after skasm's flat DXFs.
-- fs1118b (vibex7 22:38 build): 116/116 scenarios, 602/602 states. drw1118g: 336/341 (known non-targets).
-- cf-spur-gear 0.4.58 → 0.4.59 (lead 11-18): cold-only, in our Boolean's free-form face grids (Once::call in rayon
-  workers 50 → 1028 samples); bool's batch in the range; qa bisects (told). Scratch /root/studios-scratch/prof/s.
-- Not targets: drw-revision-table-delete s8,
-  drw-inspection-table-iso-scrolled s2; drw-canvas-zoom-to-sheet / drw-ref-pin-reference have no usable recording.
-- Open: the Measure readout of a point / circle pick ("Point 1", "Circle 1" names and rows are our guess); live2's
-  Measure takes covered a line only.
+- Not targets: drw-revision-table-delete s8, drw-inspection-table-iso-scrolled s2; drw-canvas-zoom-to-sheet /
+  drw-ref-pin-reference have no usable recording.
+- Open: the Measure readout of a point / circle pick ("Point 1", "Circle 1" names and rows are our guess).
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
 - live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell
@@ -112,13 +105,12 @@ against live with a feel scenario; share psui's pick code (`Viewport::pick_prior
 - Assembly already as live (checked 11-17): box select rule, glyph click selects the mate (related rows, mated faces
   amber, dashed connector line), graphics hover lights no list row, list hover outlines the parts.
 
-## Agents (lead's roster 11-17 10:30, core / blend 11-18; only these ids)
-psui 4973e295-9e92-463f-a13f-2ec5258bc5f9, core e8af89fe-d460-49b3-b0bb-9572da230fed,
-blend 0672fa20-964d-4fde-a19c-c5b4363729ba (11-18; 6692ae35 / 0e6e9942 stopped), bool 754a9804-feb1-4153-b32a-acf9b2a6d94d (11-19; 7fa8ceab stopped),
-dx 2108c2b7-2f48-43a7-87a0-3f652e3cda6d (11-17 19:49; f93a1292 stopped), qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b,
+## Agents (lead's roster 11-19 11:5x; only these ids)
+core d30002ca-d013-4435-b7d9-7da9cb564cec, blend de66e481-56e2-4005-a5d3-9fa897ca5fde,
+bool 754a9804-feb1-4153-b32a-acf9b2a6d94d, qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b,
+psui 4973e295-9e92-463f-a13f-2ec5258bc5f9, live2 79ae5cdb-42a4-4025-b43a-da61a4f92ad7,
 asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6,
-bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios 58e9bca8-346c-4847-8012-e15006ae61ef,
-live e8549719-ef9a-42de-960c-e24b29f142a6, live2 79ae5cdb-42a4-4025-b43a-da61a4f92ad7 (fresh id 11-17).
+bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0. live is paused until ~21:00 11-19: captures to live2 or live/REQUESTS.md.
 Paused agents are not messaged (DECISIONS 11-17).
 
 ## Waiting on others
