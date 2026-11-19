@@ -718,9 +718,19 @@ fn read_studios(dir: &Path, features: &mut Value) {
 }
 
 /// `fetched`'s Feature Studios (read_studios') that `features`' own import, and those they import in turn, by the element
-/// id ending an import's path; with the files they import (icons) when it has any.
+/// id ending an import's path; with the files they import (icons) when it has any. Also the studios its custom features
+/// name in their namespace ("e<element>::m…", asm-bjr-config's setData and custDesc from other documents).
 fn add_imported_studios(features: &mut Value, fetched: &Value) {
     let Some(pool) = fetched["featureStudios"].as_object() else { return };
+    let named: Vec<String> = features["features"].as_array().into_iter().flatten().filter_map(|f| f["namespace"].as_str()?.split("::").find_map(|p| p.strip_prefix('e')).map(str::to_string)).collect();
+    for id in named {
+        if let Some(studio) = pool.get(&id).filter(|_| features["featureStudios"][id.as_str()].is_null()) {
+            if !features["featureStudios"].is_object() {
+                features["featureStudios"] = json!({});
+            }
+            features["featureStudios"][id.as_str()] = studio.clone();
+        }
+    }
     let mut todo: Vec<String> = features["featureStudios"].as_object().into_iter().flatten().filter_map(|(_, s)| s["source"].as_str().map(str::to_string)).collect();
     if todo.is_empty() {
         return;
@@ -759,6 +769,12 @@ fn assembly_studios_take_the_feature_studios_theirs_import() {
     let mut plain = json!({});
     add_imported_studios(&mut plain, &fetched);
     assert!(plain["featureStudios"].is_null());
+    // One whose custom feature names a studio of another document in its namespace takes it, and what it imports.
+    let mut custom = json!({ "features": [{ "featureType": "setData", "namespace": "d0123::v4567::eaaa::m89ab" }] });
+    add_imported_studios(&mut custom, &fetched);
+    let mut ids: Vec<&String> = custom["featureStudios"].as_object().unwrap().keys().collect();
+    ids.sort();
+    assert_eq!(ids, ["aaa", "bbb"]);
 }
 
 /// Every document's Feature Studios (live's FeatureScript corpus, studios/
