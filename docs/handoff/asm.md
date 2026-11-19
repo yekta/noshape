@@ -5,7 +5,7 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-19 21:45 UTC)
+## State (2026-11-19 22:20 UTC)
 
 ### Landed today (702c9878: Display states Esc, driver-mate named position, paste; d671313d; 335f8e43; 9f52415c; 123ca4b3 free drag)
 - LOD (91478e2c), Derived mirror of an assembly complete (e87a2b3e, 17c26dc1; left: live's exact node icon, symmetry
@@ -19,13 +19,13 @@ TICKETS ASM-UI-SIGSEGV-AT-EXIT [x].
 
 ### Interaction feel (lead 20:4x: feel is P0): my assembly rows are all tested
 - Landed 123ca4b3: free drag in the screen plane without turning.
-- Queued 21:5x: 7bc96ec56 mate connector reach row 42
+- Landed 615bed1f: 7bc96ec56 mate connector reach row 42
   (22–23 across, 15 down, over the vertex; live's 16–21 down is a Part Studio hold), e2211fcb4 section arrow drag
   (row 1424; the caps stay tan while the dialog is open, live 16303), 88b65b70f explode short drag 0 mm step (1418),
   8bf03e7b3 named positions' menu + Apply (1421–1422), display state choice (1423, 1471; `choose_display_state`
   factored out of the select), Y Hide `=` (live's leftover outline is its redraw lag).
 - Not mine (my old list was wrong): 1452–1457 are psui's Part Studio pattern rows; 699 is psui's Dialogs matrix.
-- Left: a named position row's click applies nothing (not tested; needs a GPUI click on the cell).
+- Named position row click (edits the cell, applies nothing): tested, queued 22:2x.
 - Find open rows: `awk -F'|' 'NF>4 { st=$(NF-1); t=$(NF-2); if (st ~ /≠|≈/ || t ~ /missing/) print NR": "$2 }'
   docs/parity/interaction-feel.md | grep -iE "asm|assembl|mate|instance|explode|named|display|section|drag"`.
 
@@ -35,7 +35,8 @@ TICKETS ASM-UI-SIGSEGV-AT-EXIT [x].
   17/17 (335f8e43), welding BOM 29/29 (9f52415c; row order left: core's multi-region extrude body order).
 - Heavy 4 running on vibex7 (`suite1.sh ops-bomfix h1119 asm-xdev-subs asm-isaac-ball asm-infento-subs
   asm-scissor-lift`, suite/h1119.log): xdev-subs 266/266 occ, 7/7 mates, 74/74 BOM (21:01).
-- isaac (98/129): closed for asm (lead 20:4x). Off ends: 7 on Part 1 <12> (a2e4a2 Chamfer 2, core, sent 19:5x) and
+- isaac (98/129): closed for asm (lead 20:4x). a2e4a2 Chamfer 2 is fixed by blend's bb667320d (h1119 has no difference
+  there; told core 21:5x; a2e4a2's Chamfer 4 "Failed to chamfer selections." is left). Off end:
   Fastened 43 (TICKETS HOLE-THROUGH-ROUND-POLE [bool]: a Ø6 hole coaxial through an R4 corner round's ball pole;
   repro vibex8 ~/agents/asm-keep/t-mini-false.sh with the current CLI ~/agents/asm/target/debug/noshape-cli).
 - Others': robot-relations BOM 36/42 (dx); scissor-lift Top <3>; psui coplanar depth tie.
@@ -45,7 +46,7 @@ TICKETS ASM-UI-SIGSEGV-AT-EXIT [x].
 - GearLab "#desc" studios 1e81ca / 90f78b (3 connectors; Spiral Bevel BOM rows): FS decision with the lead.
 - Our 7 "cannot resolve" mates are on parts whose geometry differs ("volume fits []"):
   - a04711 (Revolute 6, 11, Ball 13): Extrude 4 REMOVE non-manifold (Part 2 at 2x live's volume) -> bool.
-  - a2e4a2 (Ball 7, Fastened 33): Chamfer 2 TWO_OFFSETS 5.5/6 on a concave 7 mm line edge -> core.
+  - a2e4a2 (Ball 7, Fastened 33): Chamfer 2 fixed by bb667320d (blend); Chamfer 4 still fails.
   - e54410 (Ball 14, Revolute 17, Ball 13): Chamfer 1 TWO_OFFSETS 2/5 on a plane-cylinder arc fails; Extrude 26
     leaves 2 slivers, so "Part 3" maps to a sliver -> core / bool.
 
@@ -80,9 +81,10 @@ TICKETS ASM-UI-SIGSEGV-AT-EXIT [x].
 - Private documents (hat8 / hat15 / dock on vibex7 ~/lead-private): mode-700 copies in ~/tmp/asm only, deleted after.
 - Live data: REQUESTS.md (times from `date -u`); live2 d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1, live
   e8549719-ef9a-42de-960c-e24b29f142a6.
-- Agent ids: psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, core
-  d30002ca-d013-4435-b7d9-7da9cb564cec, blend de66e481-56e2-4005-a5d3-9fa897ca5fde, qa 40e853dc-757f-4498-878f-00b41fd8af75, bool 754a9804-feb1-4153-b32a-acf9b2a6d94d
-  (stopped, never message: core e8af89fe, blend 0672fa20, psui 4973e295, qa 132756b3, live2 79ae5cdb); lead 818534eb-f6b1-4a00-bb48-ebf0f7cdbd8a.
+- Agent ids (lead 21:4x, only these): lead 818534eb-f6b1-4a00-bb48-ebf0f7cdbd8a, core 08a98761-3bbe-47ce-a91a-32b208f5c6b2,
+  blend 459f6c19-c460-4ebf-96ca-bf92455f2e1e, bool abdebc8b-6b39-4794-8390-eb02d6fa37e6, live
+  349fe81d-db78-4931-8032-6dc3edc5d558, studios 91339202-41f1-4465-91f4-65ccd26ea1b1, dx 6cfc89bd-1196-43ef-9225-0014546fee1e,
+  qa ac50e7f2-4677-4cab-a57a-fd068a0c07bf, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6.
 
 ## Assembly model suite (what it does)
 - T2 `parity_assemblies` (crates/ops/tests/parity.rs) over ~/parity/models/asm-* (NOSHAPE_PARITY_ASSEMBLIES).

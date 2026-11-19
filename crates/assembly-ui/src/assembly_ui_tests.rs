@@ -2663,6 +2663,20 @@ fn a_named_positions_menu_and_apply_act_as_live(cx: &mut TestAppContext) {
             assert_eq!(v.ui.np_toast.as_deref(), Some("Named position 2 is applied."));
         });
     });
+    // A click on a row edits its cell and applies nothing.
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let place = |v: &AssemblyView, cx: &gpui_kit::App| v.result.solved.placement(instance(v, "Part 2 <1>", cx)).unwrap().rotation;
+            let before = place(v, cx);
+            v.edit_np_cell(0, 0, "Named position 1".into(), w, cx);
+            assert!(v.ui.np_cell.as_ref().is_some_and(|c| (c.row, c.col) == (0, 0)), "the click edits the cell");
+            v.commit_np_cell(cx);
+            assert_eq!(place(v, cx), before, "nothing applied");
+            assert_eq!(v.ui.np_applied, Some(1));
+            assert_eq!(v.assembly(cx).unwrap().named_positions[0].name, "Named position 1");
+        });
+    })
+    .unwrap();
 }
 
 /// Live asm-dstates-1118: Display states is a toolbar tool (its panel on the left), and choosing a state in its

@@ -376,7 +376,7 @@ impl AssemblyView {
 
     /// Start typing in a cell (blue 2 px frame): column 0 renames, the
     /// others set a driving value (row `len` = the "Name" add row).
-    fn edit_np_cell(&mut self, row: usize, col: usize, current: String, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn edit_np_cell(&mut self, row: usize, col: usize, current: String, window: &mut Window, cx: &mut Context<Self>) {
         let input = cx.new(|cx| InputState::new(window, cx).default_value(current));
         input.update(cx, |s, cx| {
             s.focus(window, cx);
@@ -394,7 +394,7 @@ impl AssemblyView {
         cx.notify();
     }
 
-    fn commit_np_cell(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn commit_np_cell(&mut self, cx: &mut Context<Self>) {
         let Some(c) = self.ui.np_cell.take() else { return };
         let text = c.input.read(cx).value().trim().to_string();
         let Some(asm) = self.assembly(cx) else { return };
