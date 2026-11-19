@@ -1251,6 +1251,10 @@ pub fn tolerance_allowed(k: &ConstraintKind) -> bool {
 /// [`SketchEditor::apply_dimension`]'s error for a value the sketch can't
 /// be solved with (Onshape's warning toast text).
 pub const SKETCH_NOT_SOLVED: &str = "Sketch could not be solved.";
+
+/// A tangent arc's preview, within this many pixels of the arc (live sketch-tools-1119: a smooth arc; at a pixel
+/// it showed ~5 straight pieces).
+const ARC_PREVIEW_TOL_PX: f64 = 0.05;
 /// [`SketchEditor::apply_dimension`]'s refusals of a value the dimension
 /// can't take (a negative radius, a zero length). Live shows no message: the
 /// box turns pink and ✓ greys out.
@@ -3842,8 +3846,15 @@ impl SketchEditor {
                     Ok(ids) => {
                         let arc = ids.curves[0];
                         let end = ids.points.last().map(|e| attach(sk, *e, Some(arc), &click));
-                        self.chain_end = end;
-                        self.clicks = vec![click];
+                        // The Tangent arc tool stays but starts nothing: the next arc needs a start click on an end (live
+                        // sketch-tools-1119). A line chain's tangent arc (Shift+A) goes on from its end.
+                        if self.tool == Tool::TangentArc {
+                            self.chain_end = None;
+                            self.clicks.clear();
+                        } else {
+                            self.chain_end = end;
+                            self.clicks = vec![click];
+                        }
                         self.finish_create(data, &ids.curves);
                         self.set_otf(data, vec![radius_field(&data.sketch, arc, self.world_per_px, tangent_arc_box(&data.sketch, arc, self.world_per_px))]);
                         EditOutcome::changed()
@@ -6218,7 +6229,7 @@ impl SketchEditor {
                     {
                         let mut tmp = data.sketch.clone();
                         match tmp.tangent_arc(from, c) {
-                            Ok(ids) => poly(&tmp.tessellate(ids.curves[0], self.world_per_px), preview_color, false),
+                            Ok(ids) => poly(&tmp.tessellate(ids.curves[0], self.world_per_px * ARC_PREVIEW_TOL_PX), preview_color, false),
                             Err(_) => poly(&[a, c], preview_color, true),
                         }
                     }
@@ -6375,7 +6386,7 @@ impl SketchEditor {
                         if let Ok(ids) = tmp.tangent_arc(from, c)
                             && let Some(&arc) = ids.curves.first()
                         {
-                            poly(&tmp.tessellate(arc, self.world_per_px), preview_color, false);
+                            poly(&tmp.tessellate(arc, self.world_per_px * ARC_PREVIEW_TOL_PX), preview_color, false);
                         } else {
                             poly(&[a, c], preview_color, true);
                         }
@@ -12565,6 +12576,28 @@ mod tests {
         let Some(Curve2::Arc { center, radius, start_angle, end_angle }) = d.sketch.curve(arc) else { panic!() };
         let want = center + DVec2::from_angle((start_angle + end_angle) * 0.5) * (radius - 30.0 * PX);
         assert!((b[0].0 - want).length() < 1e-9, "radius box {:?}, want {want:?}", b[0].0);
+    }
+
+    /// Live sketch-tools-1119: the Tangent arc tool makes one arc per start: after it nothing follows the pointer and
+    /// the next arc starts with a click on an end; its preview is a smooth arc, not a few straight pieces.
+    #[test]
+    fn a_tangent_arc_ends_its_run_and_previews_smoothly() {
+        let (mut ed, mut d) = editor(Tool::TangentArc);
+        d.sketch.add_line(v(0.0, 0.0), v(0.020, 0.0));
+        click(&mut ed, &mut d, v(0.020, 0.0));
+        ed.pointer_move(&mut d, v(0.030, 0.010), false, false);
+        let (lines, _) = ed.overlay(&d, &UnitPrefs::default());
+        assert!(lines.segments.len() >= 20, "a smooth preview: {} pieces", lines.segments.len());
+        click(&mut ed, &mut d, v(0.030, 0.010));
+        assert_eq!(d.sketch.entities().filter(|e| e.kind() == EntityKind::Arc).count(), 1);
+        assert_eq!((ed.tool, ed.chain_end), (Tool::TangentArc, None), "the tool stays, nothing goes on from the arc");
+        ed.pointer_move(&mut d, v(0.040, 0.0), false, false);
+        click(&mut ed, &mut d, v(0.040, 0.0));
+        assert_eq!(d.sketch.entities().filter(|e| e.kind() == EntityKind::Arc).count(), 1, "a click off any end starts nothing");
+        let end = d.sketch.entities().find(|e| e.kind() == EntityKind::Arc).and_then(|e| e.endpoints()).map(|(_, e)| d.sketch.point(e).unwrap()).unwrap();
+        click(&mut ed, &mut d, end);
+        click(&mut ed, &mut d, end + v(0.010, -0.010));
+        assert_eq!(d.sketch.entities().filter(|e| e.kind() == EntityKind::Arc).count(), 2, "a new start on the arc's end");
     }
 
     /// Live (behaviours "spec: skasm sketch tools"): a center point
