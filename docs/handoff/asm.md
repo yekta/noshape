@@ -16,6 +16,15 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   (3) QUERY face drops the selection tint, (4) new group's row red, (5)/(7) mate rows span the list + bold flyout
   title, (6) Measure panel at top 279 / right 13. live2 rechecked on green bfe09bcd5: all six hold (0f4633705).
 
+### In flight: HEAVY-ASM-SOFTWARE-FRAME, LOD side (branch asm-lod, 97b431e3e, not landed)
+- asm-xdev-subs' coarsest level: 462 k triangles / 273 k edge segments, 358 k / 219 k of them one 10 482-face part
+  (x5). `MeshBuffers::proxy` (vertex clustering, 200 cells along the diagonal, bodies > 4000 triangles, kept when it
+  halves them; memoised, warmed after a big scene's evaluation on a software adapter) replaces the coarsest level on a
+  software rasteriser (`AsmSceneOptions::software`, `asm_scene::display_levels`): 133 k / 110 k. GPU unchanged.
+- psui's renderer side (3da0173e) on vibe2 Xvfb (hv.sh): frames 1.1-1.3 s -> 0.11-0.28 s, wheel notch 3.6 -> 0.72 s
+  (live 3.4 s). My A/B: vibe2 ~/tmp/asm/hv/hv.sh (Xvfb :393) noshape-base (= psui's 3da0173e build) vs the release
+  build of 97b431e3e; parse with /root/psui-scratch/hvparse.py.
+
 ### Landed 10:12 as 8f27d450 (3 commits)
 - Sketch plane off live's frame -> our face on that frame (bjr 5d8bc1 Sketch 40 + Extrude 21; bjr now 3 differences).
 - qSketchRegion(…, true) leaves out a disc a line joins to the outline when inside that region (isaac a04711
@@ -28,7 +37,7 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
 - GearLab "#desc" studios 1e81ca / 90f78b (3 connectors; Spiral Bevel BOM rows): FS decision with the lead.
 - Our 7 "cannot resolve" mates are on parts whose geometry differs ("volume fits []"):
   - a04711 (Revolute 6, 11, Ball 13): Extrude 1 region (mine, landed in 8f27d450); next Extrude 4 REMOVE non-manifold
-    (Part 2 at 2x live's volume), as before the fix.
+    (Part 2 at 2x live's volume): its six regions match live's one to one -> bool.
   - a2e4a2 (Ball 7, Fastened 33): Chamfer 2 TWO_OFFSETS 5.5/6 on a concave 7 mm line edge (our edge = live's JpF):
     live +40 mm³, ours -568 mm³ -> core. Its Sketch 20 plane: the 43f8fb59c case (check isaac-plane.out).
   - e54410 (Ball 14, Revolute 17, Ball 13): Chamfer 1 TWO_OFFSETS 2/5 on a plane-cylinder arc (our edge = live's JTF)
