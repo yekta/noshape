@@ -344,6 +344,31 @@ fn up_to_next_reaches_a_surface() {
     assert!(v.len() == 1 && near(v[0], PI * 0.003f64.powi(2) * 0.03, 1e-6), "{v:?}");
 }
 
+/// A surface Sweep cuts its path only at its profile's own plane (c2-surf-workshop-mutualtrim's Sweep 1: the profile's
+/// sketch on Plane 1, the path cut where it crossed Top, 3476.71 mm2 of live's 8896.85).
+#[test]
+fn surface_sweep_keeps_the_path_past_the_top_plane() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let path = sk.add_line(DVec2::new(0.0, 0.01), DVec2::new(0.0, -0.03)).0;
+    let ps = t.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let p10 = t.top_plane("10 mm");
+    let mut sk = noshape_sketch::Sketch::new();
+    let prof = sk.add_line(DVec2::new(-0.01, 0.0), DVec2::new(0.01, 0.0)).0;
+    let ss = t.sketch(Reference::FeaturePlane(p10), sk);
+    let sweep = t.add(
+        "sweep",
+        &[
+            ("bodyType", en("SURFACE")),
+            ("surfaceProfiles", q(vec![Reference::SketchEntity { sketch: ss, entity: prof }])),
+            ("path", q(vec![Reference::SketchEntity { sketch: ps, entity: path }])),
+        ],
+    );
+    let res = t.ok();
+    let a: f64 = res.context.bodies.iter().filter(|b| b.id.feature == sweep).flat_map(|b| b.shape.faces()).map(|f| f.area().unwrap()).sum();
+    assert!(near(a, 0.02 * 0.04, 1e-9), "{a}");
+}
+
 #[test]
 fn reapply_respects_feature_list_order() {
     // Boss then a hole through the boss, selected in reverse order.

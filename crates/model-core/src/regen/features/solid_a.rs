@@ -598,14 +598,29 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
             return err("Select sketch curves to sweep.");
         }
         opts.solid = false;
+        // The profile's plane, where the path is cut: its sketch's (std's evOwnerSketchPlane), else the plane it lies in;
+        // none, no cut (wire_profile's frame is a stand-in: Top cut c2-surf-workshop-mutualtrim's path at z = 0).
+        let refs = ev.query("surfaceProfiles");
+        let frames: Vec<crate::display::PlaneFrame> = refs
+            .iter()
+            .filter_map(|r| match r {
+                Reference::SketchEntity { sketch, .. } | Reference::Sketch(sketch) => ev.ctx.sketch(*sketch).map(|s| s.frame),
+                _ => None,
+            })
+            .collect();
+        let sketch_frame = match frames.first() {
+            Some(f) if frames.len() == refs.len() && frames.iter().all(|g| g.origin == f.origin && g.normal == f.normal) => Some(*f),
+            _ => None,
+        };
         for (i, w) in wires_from(&edges)?.into_iter().enumerate() {
+            let frame = sketch_frame.or_else(|| w.find_plane(1e-7).ok().flatten().map(|pl| crate::display::PlaneFrame { origin: pl.origin, x: pl.x_dir, y: pl.normal.cross(pl.x_dir), normal: pl.normal }));
             let p = wire_profile(w, &edges, Source::Index(i as u32));
             if keep {
                 opts.mode = fixed_mode_for(&p.shape)?;
             } else if let Some(d) = lock_dir {
                 opts.mode = k::SweepMode::Binormal(d);
             }
-            let res = sweep(&p.shape, Some(&p.frame), &opts).map_err(|_| fe(SWEEP_FAILED))?;
+            let res = sweep(&p.shape, frame.as_ref(), &opts).map_err(|_| fe(SWEEP_FAILED))?;
             let names = sweep_names(ev, &p, &res, false, false);
             tools.push(NamedShape::new(res.shape, names));
         }
