@@ -3917,6 +3917,16 @@ impl<'a> Translator<'a> {
             let loft = loft.to_string();
             return Some(self.loft_cap_edge(&loft, is_start));
         }
+        // A loft's side edge (`SWEPT_EDGE` of `….opLoft`) through its profiles' vertices of an `ORDER` (0 their start,
+        // 1 their end: c2-surf-intro-offset's source's Loft 3 between Loft 1's side edge and Mirror 1's copy of it).
+        if name == "SWEPT_EDGE"
+            && let Some(loft) = strings.iter().find_map(|s| s.strip_suffix(".opLoft"))
+        {
+            let loft = loft.to_string();
+            let order = find(&Packed::Map(m.clone()), &["ORDER"]).and_then(|o| o.iter().find(|(k, _)| matches!(k, Packed::Str(k) if k == "order")).map(|(_, v)| v.clone()));
+            let end = matches!(order, Some(Packed::Num(n)) if n >= 0.5);
+            return Some(self.loft_side_edge(&loft, end));
+        }
         // The cap's own feature's (a disambiguation names other features' extrudes first: asm-config-assembly studio
         // 08590a's Hole 2 on Sheet metal model 2's wall, told apart by Sheet metal model 1's edges).
         let mut own = Vec::new();
@@ -4089,40 +4099,62 @@ impl<'a> Translator<'a> {
             .ok_or_else(|| format!("COPY: no edge of ours at the mirror image of {seed}"))
     }
 
-    /// A loft's `CAP_EDGE`: our loft's edge whose midpoint lies on its first (`is_start`) or last profile's.
-    fn loft_cap_edge(&mut self, loft: &str, is_start: bool) -> Result<String, String> {
-        let ours = self.feature_ids.get(loft).cloned().ok_or_else(|| format!("CAP_EDGE: loft {loft} was not built"))?;
-        let f = self.features.iter().find(|f| f["featureId"] == loft).cloned().ok_or("CAP_EDGE: no such loft")?;
+    /// A loft's first or last profile's edges (query_entities edges) and the loft's own (its faces' edges: its boundary
+    /// edges are named for the profiles they run along).
+    fn loft_edges(&mut self, loft: &str, first: bool) -> Result<(Vec<Value>, Vec<Value>, f64), String> {
+        let ours = self.feature_ids.get(loft).cloned().ok_or_else(|| format!("loft {loft} was not built"))?;
+        let f = self.features.iter().find(|f| f["featureId"] == loft).cloned().ok_or("no such loft")?;
         let param = |id: &str| f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == id).cloned().unwrap_or(Value::Null);
         let items: Vec<Value> = ["sheetProfilesArray", "wireProfilesArray"].iter().flat_map(|k| param(k)["items"].as_array().cloned().unwrap_or_default()).collect();
-        let item = if is_start { items.first() } else { items.last() }.ok_or("CAP_EDGE: the loft has no profiles")?;
+        let item = if first { items.first() } else { items.last() }.ok_or("the loft has no profiles")?;
         let mut profile = Vec::new();
         for p in item["parameters"].as_array().into_iter().flatten() {
             for q in p["queries"].as_array().into_iter().flatten() {
                 profile.extend(self.resolve(q)?);
             }
         }
-        // The profile's edges (a wire body's, else the entities themselves) and the loft's.
         let mut targets = Vec::new();
         for id in &profile {
             let r = if id.starts_with("body:") { self.call("query_entities", json!({ "kind": "edges", "part": id, "limit": 1000 }))? } else { self.call("query_entities", json!({ "kind": "edges", "of": [id], "limit": 1000 })).unwrap_or(Value::Null) };
-            targets.extend(r["edges"].as_array().into_iter().flatten().filter_map(|e| f3(&e["midpoint"])));
+            targets.extend(r["edges"].as_array().cloned().unwrap_or_default());
         }
-        // (Its boundary edges are named for the profiles they run along: the edges of its faces.)
         let faces = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 1000 }))?;
         let ids: Vec<String> = faces["faces"].as_array().into_iter().flatten().filter_map(|f| f["id"].as_str().map(str::to_string)).collect();
         if ids.is_empty() {
-            return Err(format!("CAP_EDGE: loft {loft} has no face of ours"));
+            return Err(format!("loft {loft} has no face of ours"));
         }
         let edges = self.call("query_entities", json!({ "kind": "edges", "of": ids, "limit": 100000 }))?;
         let unit = per_unit(&edges["units"]);
+        Ok((targets, edges["edges"].as_array().cloned().unwrap_or_default(), unit))
+    }
+
+    /// A loft's `CAP_EDGE`: our loft's edge whose midpoint lies on its first (`is_start`) or last profile's.
+    fn loft_cap_edge(&mut self, loft: &str, is_start: bool) -> Result<String, String> {
+        let (profile, edges, unit) = self.loft_edges(loft, is_start).map_err(|e| format!("CAP_EDGE: {e}"))?;
+        let targets: Vec<[f64; 3]> = profile.iter().filter_map(|e| f3(&e["midpoint"])).collect();
         let off = |e: &Value| f3(&e["midpoint"]).map_or(f64::MAX, |m| targets.iter().map(|t| (0..3).map(|i| (t[i] - m[i]).powi(2)).sum::<f64>().sqrt()).fold(f64::MAX, f64::min));
-        let near = edges["edges"].as_array().into_iter().flatten().min_by(|a, b| off(a).total_cmp(&off(b)));
-        match near {
+        match edges.iter().min_by(|a, b| off(a).total_cmp(&off(b))) {
             // (The loft's edge approximates the profile's: within 0.01 mm.)
             Some(e) if off(e) * unit < 1e-5 => e["id"].as_str().map(str::to_string).ok_or_else(|| "CAP_EDGE: an edge without id".into()),
             other => Err(format!("CAP_EDGE: no edge of ours on loft {loft}'s {} profile (nearest {:.4} mm off)", if is_start { "first" } else { "last" }, other.map_or(f64::NAN, |e| off(e) * unit * 1e3))),
         }
+    }
+
+    /// A loft's side edge (`SWEPT_EDGE`): ours from its first profile's start (`end`: end) to its last profile's.
+    fn loft_side_edge(&mut self, loft: &str, end: bool) -> Result<String, String> {
+        let (first, edges, unit) = self.loft_edges(loft, true).map_err(|e| format!("SWEPT_EDGE: {e}"))?;
+        let (last, _, _) = self.loft_edges(loft, false).map_err(|e| format!("SWEPT_EDGE: {e}"))?;
+        let point = |p: &[Value]| if end { p.last().and_then(|e| f3(&e["end"])) } else { p.first().and_then(|e| f3(&e["start"])) };
+        let (Some(a), Some(b)) = (point(&first), point(&last)) else { return Err("SWEPT_EDGE: the profiles' ends".into()) };
+        let same = |p: [f64; 3], q: [f64; 3]| (0..3).map(|i| (p[i] - q[i]).powi(2)).sum::<f64>().sqrt() * unit < 1e-5;
+        edges
+            .iter()
+            .find(|e| {
+                let (Some(s), Some(t)) = (f3(&e["start"]), f3(&e["end"])) else { return false };
+                (same(s, a) && same(t, b)) || (same(s, b) && same(t, a))
+            })
+            .and_then(|e| e["id"].as_str().map(str::to_string))
+            .ok_or_else(|| format!("SWEPT_EDGE: no edge of ours along loft {loft} from its profiles' {}", if end { "ends" } else { "starts" }))
     }
 
     /// The part a feature's operation `op` swept (live's `SWEPT_BODY`): the feature's part; of an Extrude's several, the
