@@ -46,6 +46,21 @@ impl FreeSurface {
         }
     }
 
+    /// Its period along u (`i` 0) or v: a whole turn round its axis, or a closed NURBS's range (clamped, its first and
+    /// last rows of poles and weights alike: a swept tube's B-spline across its seam).
+    pub fn period(&self, i: usize) -> Option<f64> {
+        if self.periodic()[i] {
+            return Some(TAU);
+        }
+        let FreeSurface::Nurbs(s) = self else { return None };
+        let (deg, knots, n, m) = if i == 0 { (s.udegree, &s.uknots, s.nu, s.nv) } else { (s.vdegree, &s.vknots, s.nv, s.nu) };
+        let clamped = knots[..=deg].iter().all(|&k| k == knots[0]) && knots[n..].iter().all(|&k| k == knots[n]);
+        let at = |a: usize, b: usize| if i == 0 { a * s.nv + b } else { b * s.nv + a };
+        let size = s.poles.iter().fold(0.0f64, |x, q| x.max(q.abs().max_element()));
+        let closed = (0..m).all(|j| (s.poles[at(0, j)] - s.poles[at(n - 1, j)]).length() <= 1e-12 * size.max(1.0) && (s.weights.is_empty() || (s.weights[at(0, j)] - s.weights[at(n - 1, j)]).abs() <= 1e-12));
+        (clamped && closed && n > 1).then(|| knots[n] - knots[deg])
+    }
+
     /// Knot values along u (`along_u`) or v where it is less smooth (a NURBS surface's spans, a swept curve's).
     pub fn breaks(&self, along_u: bool) -> Vec<f64> {
         let k = |c: &NurbsCurve| c.knots[c.degree..=c.poles.len()].to_vec();

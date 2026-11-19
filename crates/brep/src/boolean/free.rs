@@ -22,6 +22,18 @@ fn uv_span(g: &GFace, i: usize) -> (f64, f64) {
     (lo + pad, hi - pad)
 }
 
+/// Where face `g` goes a whole turn of `period` round along u (`i` 0) or v: its parameters' span (a closed NURBS's
+/// face, its box clamped to the surface's range, the box itself).
+fn whole_turn(g: &GFace, i: usize, period: f64) -> Option<(f64, f64)> {
+    let tol = 1e-6 * period.min(1.0);
+    let (lo, hi) = uv_span(g, i);
+    if (hi - lo - period).abs() <= tol {
+        return Some((lo, hi));
+    }
+    let (lo, hi) = (g.uvbox[2 * i], g.uvbox[2 * i + 1]);
+    (g.ns.as_deref().is_some_and(|ns| ns.range()[i].is_some()) && (hi - lo - period).abs() <= tol).then_some((lo, hi))
+}
+
 pub(super) fn uv_box(ns: Option<&FreeSurface>, pcurves: &PCurves) -> Option<[f64; 4]> {
     let Some(ns) = ns else { return Some([0.0; 4]) };
     let (mut lo, mut hi) = (DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY));
@@ -814,23 +826,16 @@ pub(super) fn whole_surface_distance_first(g: &GFace, p: DVec3) -> f64 {
 /// round: its parameters (its parameters on the face jump by a turn there), in its own order.
 pub(super) fn seam_crossings(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: f64, t1: f64) -> Vec<f64> {
     let Some(ns) = g.ns.as_ref() else { return Vec::new() };
-    let round: Vec<usize> = ns
-        .periodic()
-        .into_iter()
-        .enumerate()
-        .filter(|&(i, p)| {
-            let (lo, hi) = uv_span(g, i);
-            p && (hi - lo - TAU).abs() <= 1e-6
-        })
-        .map(|x| x.0)
-        .collect();
+    let period = [ns.period(0).unwrap_or(0.0), ns.period(1).unwrap_or(0.0)];
+    let spans: Vec<Option<(f64, f64)>> = (0..2).map(|i| (period[i] > 0.0).then(|| whole_turn(g, i, period[i])).flatten()).collect();
+    let round: Vec<usize> = (0..2).filter(|&i| spans[i].is_some()).collect();
     if round.is_empty() {
         return Vec::new();
     }
     const N: usize = 64;
     // (Its parameter followed a turn at a time from the one before; param_of's own may run on into the face's margin
     // past the seam before it turns over.)
-    let unwrap = |x: f64, near: f64| x + TAU * ((near - x) / TAU).round();
+    let unwrap = |x: f64, near: f64, i: usize| x + period[i] * ((near - x) / period[i]).round();
     let mut out = Vec::new();
     let mut prev: Option<(f64, DVec2, DVec2)> = None;
     // (The side of each seam the curve was last off it, for a sample exactly on it: the private dock's rib end, a
@@ -843,8 +848,8 @@ pub(super) fn seam_crossings(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: 
         let mut w = uv;
         if let Some((tp, up, pw)) = prev {
             for &i in &round {
-                w[i] = unwrap(uv[i], pw[i]);
-                let (lo, hi) = uv_span(g, i);
+                w[i] = unwrap(uv[i], pw[i], i);
+                let (lo, hi) = spans[i].unwrap_or_default();
                 for (j, edge) in [lo, hi].into_iter().enumerate() {
                     if pw[i] == edge && w[i] != edge && side[i][j] * (w[i] - edge) < 0.0 {
                         out.push(tp);
@@ -858,7 +863,7 @@ pub(super) fn seam_crossings(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: 
                     for _ in 0..60 {
                         let mid = 0.5 * (a + b);
                         let (um, _) = ns.param_of(at(mid).0, ua, g.uvbox);
-                        let wm = unwrap(um[i], wa);
+                        let wm = unwrap(um[i], wa, i);
                         if (wa - edge) * (wm - edge) < 0.0 {
                             b = mid;
                         } else {
@@ -870,7 +875,7 @@ pub(super) fn seam_crossings(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: 
             }
         }
         for &i in &round {
-            let (lo, hi) = uv_span(g, i);
+            let (lo, hi) = spans[i].unwrap_or_default();
             for (j, edge) in [lo, hi].into_iter().enumerate() {
                 if w[i] != edge {
                     side[i][j] = w[i] - edge;
@@ -900,10 +905,9 @@ pub(super) fn projected(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: f64, 
         if k == N
             && let Some(q) = qs.last()
         {
-            for (i, round) in ns.periodic().into_iter().enumerate() {
-                let (lo, hi) = uv_span(g, i);
-                if round && (hi - lo - TAU).abs() <= 1e-6 {
-                    uv[i] += TAU * ((q.0[i] - uv[i]) / TAU).round();
+            for i in 0..2 {
+                if let Some(t) = ns.period(i).filter(|&t| whole_turn(g, i, t).is_some()) {
+                    uv[i] += t * ((q.0[i] - uv[i]) / t).round();
                 }
             }
         }
@@ -927,11 +931,10 @@ pub(super) fn projected(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: f64, 
         // (Starting on the seam of a face going a whole turn round and heading out of it there: from the seam's other
         // side, a boss's round edge on a revolved face.)
         if k == 0 {
-            for (i, round) in ns.periodic().into_iter().enumerate() {
-                let (lo, hi) = uv_span(g, i);
-                if !round || (hi - lo - TAU).abs() > 1e-6 {
+            for i in 0..2 {
+                let Some((lo, hi)) = ns.period(i).and_then(|t| whole_turn(g, i, t)) else {
                     continue;
-                }
+                };
                 if duv[i] < 0.0 && (uv[i] - lo).abs() < 1e-6 {
                     uv[i] = hi;
                 } else if duv[i] > 0.0 && (uv[i] - hi).abs() < 1e-6 {
