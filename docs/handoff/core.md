@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-19 01:38 UTC (new thread 20:05 after the account limit; ids: see How to run). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-19 04:41 UTC (new thread 20:05 after the account limit; ids: see How to run). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: core builds on vibex7 (rb-hosts); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
@@ -9,26 +9,25 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
 - **LANDED 11-18/19:** Delete face errors when a face stays 67a475987; rib parallel 303e9d916; loft path sections
   c0b6e2d4a; loft one-connection equal arcs 7a8ca3b2 (asm-suspension Loft 1, blend told); error wording (Up to next,
   revolve, coplanar loft) c3e949a8; Delete face onto its neighbour (impeller face 24, ~0.2 s) edf20895.
-- **qa P1 PATTERN-AFTER-INSERTED-CHAMFER: QUEUED a591e8c4 (11-19)**, compat A/B all same; qa told.
-- **Surface stack (core-cache branch core-split2, 6 commits on 641b409f1, NOT landed; compat A/B vibex7
-  ~/tmp/core/imp/ab-coons.out = cli-m641 vs cli-coons (= cli-stack 01:38, whole stack), queued in the slot):**
-  1. Up to next reaches surfaces (std); T1 engine::up_to_next_reaches_a_surface.
-  2. Boundary surface 2U+2V = bilinear Coons patch (kernel op_coons), 2 profiles = ruled along their own parameters;
-     sketch_edge passes splines as their B-splines (was a chord-length interpolation of the tessellation); parity pairs
-     sheets by area before box. T1 kernel surfacing::a_coons..., features_b::boundary_of_two_profiles..., parity::sheets_pair...
-  3. Split keeps a sheet's piece by a point on it (not its centre); surface Extrude Add joins (was always New).
-     T1 features_b::split_of_a_sheet_by_a_tube..., surface_extrude_add_joins...
-  4. Surface Sweep cuts its path at the profile's own plane (wire_profile's frame is a Top stand-in). T1
-     engine::surface_sweep_keeps_the_path_past_the_top_plane.
-  5. A sketch region gives a direction (its normal). T1 features_c::fit_spline_ends_along_a_sketch_region_normal.
-  Suite: workshop-boundary, -bezier match to the end; -split 6 -> 11/12; -mutualtrim 5 -> 7/8 (Fillet 1, blend's);
-  -cpcurves 8 -> 9/24. 37 surf/loft/sweep docs otherwise unchanged (Fill areas move, still far). Land when the A/B is
-  clean: rebase, diff --stat (12+ files, all mine), land.sh.
-- **Next (mine):** split's Thicken 1 (ours 16022 / other side 14979 vs live 14589.80 mm3, same 11 faces: the walls'
-  joint at the hole rim?); cpcurves Sweep 5 (thin sweep of Part 2's rim circle, Add: ours a separate part with "no
-  geometry change", live Part 2 6 -> 8 faces +13353 mm3); then m1118's list. Parked: small sweep/loft area gaps
-  (workshop-sweep: my exact integral 26841.45 is nearer ours 26841.61 than live's 26842.15); wave-washer Loft 1 and
-  pipe Loft need N-profile guided lofts (core-pipe2, held); Fill (fitted surfaces, big).
+- **LANDED 11-19:** pattern P1 6a8e411d (qa verified session-1118 = live).
+- **Surface stack (core-cache branch core-split2, 8 commits on 641b409f1, NOT landed):** Up to next reaches surfaces;
+  Boundary surface = bilinear Coons (2U+2V) / ruled (2 profiles), sketch splines as their B-splines, parity pairs
+  sheets by area; Split sheet pieces by a point on them + surface Extrude Add joins; surface Sweep cuts at its
+  profile's own plane; sketch region as a direction; loft path sections race fix (one CompCurve adaptor was shared by
+  OSD_Parallel threads: random null sections / signal 11 on path lofts, main since c0b6e2d4a); thin Sweep closed wall
+  side (live q-thin-wall-side-1119: tangent x path direction from a free end into the path, against it on the path).
+  A/B: vibex8 (qa tickets, compat-v0443, corpus) intended only (knifehandle Chamfer 1 9286 -> 10540, live 10424);
+  private docs on vibex7 ~/tmp/core/imp/ab-priv.out (cli-stack 04:03, before the thin commit). Land when clean.
+- **core-sj branch core-intfield (uncommitted):** an integer field with a non-whole value fails "Enter a valid
+  expression." on that field (live2 feature-dialogs-1119: Linear pattern count 2.5). T1 features_c::a_count_...
+- **Live truth 11-19 (live/core/):** q-sweep-ws-1119 (workshop-sweep face exact bicubic 18x54, frame = kernel default);
+  q-wave-washer-loft-1119 (profiles at arc fractions 1/8..7/8 of the closed routing curve, 5.8-6.5 mm inside it; faces
+  4x11 poles, v periodic 8 spans; 2080.670 mm3): my ring WIP /root/core-scratch/wave-washer-ring-wip.patch builds the
+  ring but inside out at 3330 mm3 (sections carried to the wrong side of the spine): next; q-split-thicken1-1119 (the
+  hole walls are part of the thickened sheet, a PLANE ring closes them; 14590.06); q-gearlab-1e81ca-1119 (small ends
+  0-2.8 um off the hub top in live too; root = a root-cone face between teeth).
+- **Next:** wave-washer ring; split Thicken 1 (ours 16022 / 14979 vs 14590); cpcurves Sweep 5 edge split (8/8/0 vs
+  8/9/2). Suspension r40 fillets -> blend (lead 11-19).
 - **Volume measure warning:** on impeller parts OCCT's plain Gauss VolumeProperties is ~1.2 % off (input 97755.8 vs
   mesh-converged ~96555, kernel props 95977.8 after the delete ~= mesh): the old "OCCT 97123.4" targets were plain
   Gauss. Compare with kernel props (replay prints them) or vibex7 ~/tmp/core/imp/mvol (mesh).
