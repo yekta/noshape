@@ -3600,3 +3600,36 @@ Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live i
   row, CSV with BOM / quoted / CRLF, rows = Model definitions characteristics; ops export_parts format "Inspection
   list" needs `parts`; feature params take `<param>__tolerance` {type, upper, lower, precision} (null clears) when
   tolerant; e2e a_parts_inspection_list_is_its_characteristics.
+
+## 11-18 19:50 to 11-19 (thread e0f0057e)
+- Landed (c8fa7d93 batch): ACIS face merge, inside-part revert, macOS CI hang fix, session-drw-1119 DXF rows, tool-placed
+  views' empty label. Left: empty labels' y offsets vary in live (1-4 mm); live's dialog views gain empty labels after
+  property edits (which edit unknown).
+- QUEUED 8b276faa (12:2x): x_t export cuts only the closed faces / rings that can't be written whole (was: one bad one cut
+  every closed face or ring of the body), and an offset face over an elementary surface (or a revolved circle) is written
+  as that surface (spindle_torus / spindle_pcurve now shared in internal.hpp). Suite exs-all5 (Mac): snap-hook x_t
+  read-back 128/284/160 = live (was 136), nothing else changed; ours reads ours 152/154. Hose: 6 of 12 rings whole; its
+  other 6 are 10-20 nm off their walls in our model (tolerant, must stay cut; a ring refit / tangent-walls attempt rescued
+  none: /root/dx-scratch/xt-ringrefit-attempt.cpp). live2 xt-check-1119 (13:19): live imports our new files fine:
+  snap-hook 128/284/160 = live; the 4 hoses solids 12/18/12 (was 12/24/24), no warnings.
+- Mesh parts (live2 meshparts-1119, 13:18): a 3MF is a part per build item named by its object, a bare OBJ a part per
+  group "g" (its "o"s face groups), never joined (c2-duct-multipart 4 parts in file order; ours joined 3 touching
+  ones). Queued 16:2x: kernel read_3mf_parts / mesh_group_parts, import.rs .3mf by
+  build item and bare .obj by groups (a63a5bc9 kept one wholly inside another as its hollow; live2 meshcheck-1119:
+  live never hollows across objects / groups: fix-forward mesh_group_parts = mesh_compound per group alone). Suite: imports 117 -> 119/130. STL rows stay (live's own STL import of it fails:
+  9 open sheets, live-self.json stlNote; the row expects the model's 4, ours joins the touching meshes by shared edges).
+- qa P0 face-rclick-export-dxf (16:1x): Export as DXF/DWG's Units: heading, "Use workspace units" check, then the
+  greyed list (flat_export.rs); ui-parity compares that dialog's fields by label (the 11-13 recorder reads the Units
+  group first). Check: vibe2 ~/tmp/dx/uip-dxf (face-rclick-export-dxf, sketch-row-menu-export-dxf).
+- Spindle tori (08:1x): RevolutionToElementary makes them tori with their pcurves mapped exactly (v shifted or
+  mirrored); snap-hook live.igs 128/300/184 for live's 128/310/202 (live's own IGES splits edges past its model's
+  284/160). Suite run exs-all4 (Mac dx-keep): only that row changed; clamp-guillem LINE 265/268 (Top hiding + Iso piece,
+  known), sm-louver Right / Iso entity counts equal to live's.
+- DXF rows (lead 23:0x), exchange suite drawings: landed through 8a74d626 (archive 11-18 22:3x). Open: live splits
+  each mesh silhouette loop into ~4 open LWPOLYLINEs (rule unknown); live's 2 hex Iso ELLIPSEs (B-rep hole rim quarters
+  inside the mesh hole, ours hidden); live's Iso centre varies by part (rule unknown). Tools /root/dx-scratch/bin/dxf*.py.
+- config-parts at live's 18:0x retake: 4/6 to the end (143/156); nuts Sweep 1: core; pulleys Circular pattern 1:
+  core's 06ecaff5a (refs are live's); standoffs Threads=true time: bool2 (profile vibex8
+  ~/agents/dx-keep/stoff-prof.log).
+- Tools: /root/dx-scratch/bin/xtdump.py (text x_t / xmm with live's embedded schema); vibex8 ~/agents/dx-land.
+

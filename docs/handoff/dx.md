@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-19 12:25 UTC (thread restarted 11:3x, replaces 2108c2b7). Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-19 21:07 UTC (thread e0f0057e on Motile ends here; a fresh dx thread on Bbedward continues). Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -8,6 +8,20 @@ visuals, the parity translator (crates/ops/src/parity.rs) for my studios. The dr
 Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc1 are mine; isaac-ball (3c5c58,
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
+
+## Now (21:07)
+- Landed today: 8b276faa x_t selective cuts; a63a5bc9 + 7e0683d4 mesh parts per 3MF object / OBJ group, never
+  hollowed (live2 meshcheck-1119); 062076f4 qa P0 face-rclick-export-dxf (Units heading / check / greyed list; the
+  face selected; run.py compares that dialog's fields by label; vibe2: 3/3 scenarios, 16/16 states; qa told).
+  Nothing queued. Worktree dx-land (branch dx-land-stack) is clean at main.
+- Decision asked of the lead: C (fan-blade views, below): pursue or park.
+- Next: (1) surf-intro rerun with live2's Isocline refs: ready on the Mac, NOT started: from dx-main,
+  `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh bash -c 'bash ~/noshape-host/dx-keep/sisurf.sh'` (models in
+  ~/noshape-host/dx-keep/si-models, result si.sum; script copy /root/dx-scratch/hlr-retry/sisurf.sh). Then why our
+  derived "Car" is live's "Instructions" (220/612/408; live's Car 7/14/9): the derived part pick / naming.
+  vibex8's queued surfintro.sh is a no-op now (real one: surfintro.sh.run). (2) The rest of "Next, in order".
+- Running jobs: none of mine. The Mac's dx-main release target links a PRIVATE TKHLR (OCCT_ROOT=
+  ~/noshape-host/dx-keep/hlr/root, counters print only with DXHLR=1); rebuild with the normal OCCT_ROOT for timings.
 
 ## In flight: data exchange (lead 08:0x)
 Task: 10 corpus docs x every format + a drawing vs live's exports; re-import live's STEP / x_t; times vs live's.
@@ -198,38 +212,6 @@ R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "I
      86 / 42 / 1), its 13 faces under 1 mm² all SPLINE, no sphere sliver. Follows the loft: core's, parked here.
    - cf-setback-fillet: parked (lead 11-05, skasm's RABC fill patch; TICKETS SETBACK-FILL-PATCH).
 6. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
-
-## Since 19:50 (this thread)
-- Landed (c8fa7d93 batch): ACIS face merge, inside-part revert, macOS CI hang fix, session-drw-1119 DXF rows, tool-placed
-  views' empty label. Left: empty labels' y offsets vary in live (1-4 mm); live's dialog views gain empty labels after
-  property edits (which edit unknown).
-- QUEUED 8b276faa (12:2x): x_t export cuts only the closed faces / rings that can't be written whole (was: one bad one cut
-  every closed face or ring of the body), and an offset face over an elementary surface (or a revolved circle) is written
-  as that surface (spindle_torus / spindle_pcurve now shared in internal.hpp). Suite exs-all5 (Mac): snap-hook x_t
-  read-back 128/284/160 = live (was 136), nothing else changed; ours reads ours 152/154. Hose: 6 of 12 rings whole; its
-  other 6 are 10-20 nm off their walls in our model (tolerant, must stay cut; a ring refit / tangent-walls attempt rescued
-  none: /root/dx-scratch/xt-ringrefit-attempt.cpp). live2 xt-check-1119 (13:19): live imports our new files fine:
-  snap-hook 128/284/160 = live; the 4 hoses solids 12/18/12 (was 12/24/24), no warnings.
-- Mesh parts (live2 meshparts-1119, 13:18): a 3MF is a part per build item named by its object, a bare OBJ a part per
-  group "g" (its "o"s face groups), never joined (c2-duct-multipart 4 parts in file order; ours joined 3 touching
-  ones). Queued 16:2x: kernel read_3mf_parts / mesh_group_parts, import.rs .3mf by
-  build item and bare .obj by groups (a63a5bc9 kept one wholly inside another as its hollow; live2 meshcheck-1119:
-  live never hollows across objects / groups: fix-forward mesh_group_parts = mesh_compound per group alone). Suite: imports 117 -> 119/130. STL rows stay (live's own STL import of it fails:
-  9 open sheets, live-self.json stlNote; the row expects the model's 4, ours joins the touching meshes by shared edges).
-- qa P0 face-rclick-export-dxf (16:1x): Export as DXF/DWG's Units: heading, "Use workspace units" check, then the
-  greyed list (flat_export.rs); ui-parity compares that dialog's fields by label (the 11-13 recorder reads the Units
-  group first). Check: vibe2 ~/tmp/dx/uip-dxf (face-rclick-export-dxf, sketch-row-menu-export-dxf).
-- Spindle tori (08:1x): RevolutionToElementary makes them tori with their pcurves mapped exactly (v shifted or
-  mirrored); snap-hook live.igs 128/300/184 for live's 128/310/202 (live's own IGES splits edges past its model's
-  284/160). Suite run exs-all4 (Mac dx-keep): only that row changed; clamp-guillem LINE 265/268 (Top hiding + Iso piece,
-  known), sm-louver Right / Iso entity counts equal to live's.
-- DXF rows (lead 23:0x), exchange suite drawings: landed through 8a74d626 (archive 11-18 22:3x). Open: live splits
-  each mesh silhouette loop into ~4 open LWPOLYLINEs (rule unknown); live's 2 hex Iso ELLIPSEs (B-rep hole rim quarters
-  inside the mesh hole, ours hidden); live's Iso centre varies by part (rule unknown). Tools /root/dx-scratch/bin/dxf*.py.
-- config-parts at live's 18:0x retake: 4/6 to the end (143/156); nuts Sweep 1: core; pulleys Circular pattern 1:
-  core's 06ecaff5a (refs are live's); standoffs Threads=true time: bool2 (profile vibex8
-  ~/agents/dx-keep/stoff-prof.log).
-- Tools: /root/dx-scratch/bin/xtdump.py (text x_t / xmm with live's embedded schema); vibex8 ~/agents/dx-land.
 
 ## How to run
 - Builds, crate tests and exchange runs on vibex8 (lead 11-17 17:00; ~/parity/exchange + its 22 models copied there);
