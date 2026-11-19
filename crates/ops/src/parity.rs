@@ -991,7 +991,19 @@ impl<'a> Translator<'a> {
         // Extrude 3; a sketch's constraints to them find them).
         let sketch = f["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketch"));
         let in_context = |s: &&Value| s["featureType"] == "importForeign" && s["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"] == "isInContext" && p["value"] == true);
+        let mut from_refs: Option<Vec<String>> = None;
         for oid in f["subFeatures"].as_array().into_iter().flatten().filter(in_context).filter_map(|s| s["featureId"].as_str()) {
+            // No context.jsonl for it, but its edges in refs.jsonl (the sketch's Uses of them: c2-sm-rocker-enclosure-sm's
+            // Sketch 4 projects four in-context holes onto a face of the part): those, once for the sketch.
+            if sketch && !self.context_entities.iter().any(|l| l["subFeature"] == oid) {
+                if from_refs.is_none() {
+                    from_refs = Some(self.context_from_refs(k).unwrap_or_default());
+                }
+                if let Some(first) = from_refs.as_ref().and_then(|ids| ids.first()) {
+                    self.feature_ids.insert(oid.to_string(), first.clone());
+                    continue;
+                }
+            }
             // A sketch's plane: live's planar face (its edges split the sketch's regions, as live's), else a face on
             // live's sketch frame, live's other bodies besides it.
             let made = match self.context_bodies(oid) {
@@ -1075,6 +1087,23 @@ impl<'a> Translator<'a> {
         let brep = String::from_utf8(face.to_brep_bytes().map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
         let r = self.call("feature_add", json!({ "type": "importForeign", "name": "In context entity", "params": { "blobData": brep, "isInContext": true } }))?;
         r["feature"].as_str().map(str::to_string).ok_or_else(|| "feature_add gave no id".into())
+    }
+
+    /// The in-context edges sketch `k` uses as refs.jsonl gives them (the lines live's sketch made itself: lines and full
+    /// circles), imported as one in-context entity; none: an error.
+    fn context_from_refs(&mut self, k: usize) -> Result<Vec<String>, String> {
+        use noshape_kernel as kn;
+        let mut keys: Vec<&(usize, String)> = self.refs.keys().filter(|key| key.0 == k).collect();
+        keys.sort();
+        let edges = self_made_edges(keys.into_iter().map(|key| &self.refs[key]))?;
+        if edges.is_empty() {
+            return Err("no edges of it in refs.jsonl".into());
+        }
+        let brep = String::from_utf8(kn::Shape::compound(&edges).to_brep_bytes().map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        let r = self.call("feature_add", json!({ "type": "importForeign", "name": "In context entity", "params": { "blobData": brep, "isInContext": true } }))?;
+        let id = r["feature"].as_str().map(str::to_string).ok_or("feature_add gave no id")?;
+        self.context_helpers.push(id.clone());
+        Ok(vec![id])
     }
 
     /// In-context sub-feature `sub`'s bodies as live evaluated them (`context_entities`), each imported: a planar sheet
@@ -7278,6 +7307,26 @@ fn context_wire(edges: &[&Value]) -> Result<noshape_kernel::Shape, String> {
     Ok(k::Shape::compound(&made))
 }
 
+/// The edges a sketch made itself (refs.jsonl, `self_made`): lines, and full circles from their centre, a point, the
+/// tangent there and their length.
+fn self_made_edges<'a>(refs: impl Iterator<Item = &'a LiveRef>) -> Result<Vec<noshape_kernel::Shape>, String> {
+    use glam::DVec3;
+    use noshape_kernel as k;
+    let mut edges = Vec::new();
+    for r in refs.filter(|r| r.self_made && r.kind == "EDGE") {
+        let made = match (r.geometry.as_deref(), r.ends, r.center, r.point, r.direction, r.measure) {
+            (Some("line"), Some([a, b]), ..) => k::make_line(DVec3::from(a), DVec3::from(b)),
+            (Some("circle"), Some([a, b]), Some(c), Some(p), Some(d), Some(len)) if DVec3::from(a).distance(DVec3::from(b)) < 1e-9 => {
+                let (c, p, d) = (DVec3::from(c), DVec3::from(p), DVec3::from(d));
+                k::make_circle(c, (p - c).cross(d).normalize(), len / std::f64::consts::TAU)
+            }
+            _ => continue,
+        };
+        edges.push(made.map_err(|e| e.to_string())?);
+    }
+    Ok(edges)
+}
+
 /// A context.jsonl spline's `points` (a closed one's repeated end dropped).
 fn context_points(e: &Value, closed: bool) -> Result<Vec<glam::DVec3>, String> {
     let mut points: Vec<glam::DVec3> = e["points"].as_array().into_iter().flatten().filter_map(|q| f3(q).map(glam::DVec3::from)).collect();
@@ -10360,6 +10409,27 @@ mod tests {
         let area = context_face(&face, &refs).unwrap().area().unwrap();
         assert!((area - (0.02 * 0.02 + pi * 0.01 * 0.01 / 2.0 - pi * 0.004 * 0.004)).abs() < 1e-9, "{area}");
         assert_eq!(context_wire(&refs).unwrap().count(noshape_kernel::ShapeType::Edge), 5);
+    }
+
+    /// c2-sm-rocker-enclosure-sm's Sketch 4: an in-context hole live's refs.jsonl gives as an edge the sketch made itself
+    /// (r 2.35 mm, axis along the slanted face's normal) is rebuilt as that circle, in place; a line too; a model edge
+    /// isn't.
+    #[test]
+    fn a_sketchs_own_in_context_edges_come_from_refs() {
+        let text = [
+            r#"{"index":7,"id":"RXBB","kind":"EDGE","curveType":"CIRCLE","center":[0.04577,0.07868,-0.09076],"point":[0.04577,0.07633,-0.09076],"direction":[-0.17365,0.0,-0.98481],"start":[0.04577,0.08103,-0.09076],"end":[0.04577,0.08103,-0.09076],"length":0.014765485471872059,"method":"POST /featurescript?rollbackBarIndex=8 (not present at 7: the sketch creates it itself)"}"#,
+            r#"{"index":7,"id":"RXBC","kind":"EDGE","curveType":"LINE","start":[0.0,0.0,0.0],"end":[0.01,0.0,0.0],"method":"(not present at 7: the sketch creates it itself)"}"#,
+            r#"{"index":7,"id":"JHB","kind":"EDGE","curveType":"LINE","start":[0.0,0.0,0.0],"end":[0.02,0.0,0.0],"method":"POST /featurescript?rollbackBarIndex=7"}"#,
+        ]
+        .join("\n");
+        let refs = parse_refs(&text);
+        let mut ids: Vec<&(usize, String)> = refs.keys().collect();
+        ids.sort();
+        let edges = self_made_edges(ids.into_iter().map(|k| &refs[k])).unwrap();
+        assert_eq!(edges.len(), 2, "the circle and the sketch's own line, not the model edge");
+        let circle = edges.iter().find(|e| (e.length().unwrap() - 0.014765485471872059).abs() < 1e-12).expect("the circle");
+        let b = circle.bounding_box(false).unwrap();
+        assert!((b.center() - glam::DVec3::new(0.04577, 0.07868, -0.09076)).length() < 1e-6, "{:?}", b.center());
     }
 
     /// An in-context sketch's frame (live's fetch has none) from its curves' ends in live's sketch bodies: an L-shaped
