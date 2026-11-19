@@ -834,8 +834,8 @@ went to owners as P0 (skasm 14, studios 15, psui 7, asm 2, dx 1); the regression
 qa-scratch/suites/1119-1610-eb3b06a8-uipr/score.log.
 - [ ] **P0 FEEL-TRIM-PERPENDICULAR (skasm)**: sketch-line-from-midpoint step 9: a constraint live PERPENDICULAR / ours VERTICAL
   (live2 retake 11-19 17:0x confirms live). The three trim rows (sketch-trim-drag / -key / undo-trim) were stale takes: today's live
-  gives VERTICAL = ours once zoomed one Shift+Z step (the default view clicks a glyph); live2 retakes them with the zoom step (qa 17:05).
-- [ ] **P0 FEEL-SELECT-FILLET-FACES (psui)**: face-rclick-select-fillet-faces step 3: selection count live 0 / ours 1 (passed 05:51; live2 retake 17:0x: live 0).
+  gives VERTICAL = ours once zoomed one Shift+Z step (the default view clicks a glyph); live2's retakes landed (ae7a6d55); re-check 18:22 on green ae7a6d55: the 3 trims match, line-from-midpoint still ≠.
+- [ ] **P0 FEEL-SELECT-FILLET-FACES (psui)**: face-rclick-select-fillet-faces step 3: selection count live 0 / ours 1 (passed 05:51; live2 retake 17:0x: live 0: live has no safe triangle, a diagonal move closes the submenu and selects nothing; a triangle would deviate).
 - [ ] **P0 FEEL-VERSION-ROW-TOOLTIP (studios)**: ver-row-tooltip step 2: live "Open version V1" / ours no tooltip (passed 05:51; live2 retake 17:0x confirms).
 - [ ] **P0 FEEL-DRW-COPY-DRAG (studios)**: drw-copy-annotation-drag step 6: the copied annotation's x live 105.5 / ours 70.6 (passed 05:51).
 
