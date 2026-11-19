@@ -310,6 +310,11 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
             if let Some(f) = name.strip_prefix(kind).map(str::to_lowercase) {
                 let has = |k: &str| {
                     let k = k[kind.len()..].to_lowercase();
+                    // A menu name is never the start of a longer row ("Open" is not "Open in new browser tab": qa
+                    // session-studio-1119 opened a second window that way, the merge dialog then hidden in the first).
+                    if kind == "menu:" && k.starts_with(&format!("{f} ")) {
+                        return false;
+                    }
                     if kind != "button:" { k.contains(&f) } else { f.split_whitespace().all(|w| k.split_whitespace().any(|x| x == w)) }
                 };
                 let near: Vec<_> = noshape_app_core::ui_script::named(kind).into_iter().filter(|(k, _)| has(k)).collect();
