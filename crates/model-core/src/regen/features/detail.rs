@@ -547,16 +547,24 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         let (first, mut made) = if ahead {
             let (shape, chain, legacy) = (&body.shape, &edges, k::kernel_legacy());
             let stop = std::sync::atomic::AtomicBool::new(false);
-            std::thread::scope(|s| {
-                let stop = &stop;
-                let balls = s.spawn(move || k::with_kernel_legacy(legacy, || super::blend_section::rolling_ball_tools(shape, chain, radius, stop)));
+            let mut balls = None;
+            // A rayon job, not a thread of its own: the tools use rayon, and a rayon worker waiting on a thread of its
+            // own while every worker did so never got them done (macOS CI's 3 cores, assemblies' Part Studios side by
+            // side, 11-19); a waiting worker runs the job itself.
+            let first = rayon::in_place_scope(|s| {
+                let (stop, balls) = (&stop, &mut balls);
+                s.spawn(move |_| {
+                    let tools = || k::with_kernel_legacy(legacy, || super::blend_section::rolling_ball_tools(shape, chain, radius, stop));
+                    *balls = std::panic::catch_unwind(std::panic::AssertUnwindSafe(tools)).ok();
+                });
                 let first = occt();
                 // (Not needed: given up at its next ball or loft.)
                 if !first.as_ref().is_ok_and(split_blends) {
                     stop.store(true, std::sync::atomic::Ordering::Relaxed);
                 }
-                (first, balls.join().ok())
-            })
+                first
+            });
+            (first, balls)
         } else {
             (if lines_overflow { k::without_blend_retries(occt) } else { occt() }, None)
         };
