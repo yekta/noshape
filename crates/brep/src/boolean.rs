@@ -1305,7 +1305,7 @@ impl Ctx<'_> {
                 Geo::Nurbs { id, t0, t1 } if matches!(self.edges[e].g, Geo::Nurbs { id: own, .. } if own == id) => (t0, t1),
                 // (A degenerate edge (the surface closing at a point), or a closed one whole: its whole curve on the
                 // face.)
-                Geo::Apex { .. } => (*pt0, *pt1),
+                Geo::Apex { a0, a1 } => if a0.is_nan() { (*pt0, *pt1) } else { (a0, a1) },
                 // (The way the piece goes round: another argument's circle merged with it may go the other way (a
                 // round's on a boss's revolved face).)
                 _ if s.v[0] == s.v[1] => {
@@ -6094,6 +6094,45 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         let w = s.v[0];
         let Some(f) = (0..cx.faces.len()).find(|&f| cx.faces[f].edges.iter().any(|x| x.0 == e)) else { return Ok(vec![s]) };
         let g = &cx.faces[f];
+        // (A free-form face's pole (a sphere's): its curve on the face (a line along u) in pieces between the u of
+        // the curves coming to it, as OCCT's; each part its range of that curve.)
+        if let Surf::Nurbs { su, .. } = g.s {
+            let Some((pc, pt0, pt1)) = g.pcurves.get(&(e, false)) else { return Ok(vec![s]) };
+            let (pt0, pt1) = (*pt0, *pt1);
+            let (x0, x1) = (pc.at(pt0).x, pc.at(pt1).x);
+            if (x1 - x0).abs() < 1e-9 {
+                return Ok(vec![s]);
+            }
+            let lo = x0.min(x1);
+            let t_of = |u: f64| pt0 + (lo + (u - lo).rem_euclid(TAU) - x0) / (x1 - x0) * (pt1 - pt0);
+            let mut at: Vec<f64> = Vec::new();
+            for c in &cx.face_segs[f] {
+                if matches!(c.g, Geo::Apex { .. }) || !c.v.contains(&w) || c.v[0] == c.v[1] {
+                    continue;
+                }
+                let first = c.v[0] == w;
+                let u = match c.g {
+                    Geo::Nurbs { id, t0, t1 } if cx.ncurves[id as usize].sec.as_ref().is_some_and(|x| x.0.contains(&f)) => {
+                        let (faces, on, _) = cx.ncurves[id as usize].sec.as_ref().expect("a section");
+                        on[if faces[0] == f { 0 } else { 1 }].at(if first { t0 } else { t1 }).x
+                    }
+                    _ => g.to2(cx.seg_at(c, if first { 1e-3 } else { 1.0 - 1e-3 })).x / su,
+                };
+                at.push(t_of(u));
+            }
+            let (lo, hi) = (pt0.min(pt1), pt0.max(pt1));
+            at.retain(|&t| t - lo > 1e-9 && hi - t > 1e-9);
+            if at.is_empty() {
+                return Ok(vec![s]);
+            }
+            at.sort_by(f64::total_cmp);
+            at.dedup_by(|x, y| *x - *y <= 1e-9);
+            if pt1 < pt0 {
+                at.reverse();
+            }
+            let ends: Vec<f64> = std::iter::once(pt0).chain(at).chain(std::iter::once(pt1)).collect();
+            return Ok(ends.windows(2).map(|x| Seg { v: s.v, g: Geo::Apex { a0: x[0], a1: x[1] } }).collect());
+        }
         let Surf::Cyl { r, th0, full, .. } = g.s else { return Ok(vec![s]) };
         let angle = |w: u32| g.to2(cx.p(w)).x / r;
         let mut at: Vec<f64> = Vec::new();
