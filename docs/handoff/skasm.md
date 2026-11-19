@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 07:04 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 07:31 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -45,10 +45,11 @@ quadrant's snap wakes no alignment source (ours aligns with points only).
 ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
 Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six on green.
 
-## State 07:04 (11-19)
+## State 07:31 (11-19)
 - Landed: 373dd5b9, 48626728 (REGION-PICK), 4104b148 (5686f670), 24792169 (29bf3dcb), dceaee62 (faa5f7b1: flat view
   by the model's up side, std pcbEnd's hold plane; live confirmed both cases, REQUESTS 05:10, live/skasm/q-thicken-flat-1119).
-- QUEUED 08511fa7 (07:0x): wave-washer Sketch 4 (lead P1 for core's ring branch): solver `carried_onto_anchors` (a
+- QUEUED 394e7c79 (07:15, carries 08511fa7): bend face clicked in 3D with the table open outlines its Bends row and
+  lights its zone in the flat view (`sm_follow_pick`, sm matrix row; sm-cfg-io-1119 row 1702). Wave-washer Sketch 4 (lead P1 for core's ring branch): solver `carried_onto_anchors` (a
   failed solve whose Coincidents tie free points to far fixed ones moves each piece rigidly, kept when everything then
   holds; test `a_held_rectangle_slides_onto_a_far_anchor`); translator: model Coincidents after the sketch's own
   constraints and dimensions (`constraints(.., anchors)`), but a Coincident to geometry live lost (empty query) pins in
