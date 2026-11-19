@@ -1900,3 +1900,33 @@ fn a_wavy_parting_line_across_a_block_drafts_both_sides_as_live() {
     assert!((366635.71..=367901.36).contains(&v), "volume {v} mm³");
 }
 
+
+/// A loft along a closed path round four profiles closes into a ring, its sections as live's (c2-loft-guide-curves-
+/// wave-washer, live2 q-wave-washer-sections-1119): each one every profile carried along the path, mixed by a natural
+/// cubic spline through them, the first again at the end. Rectangles alternately 0 and 2.286 mm up round a circle, 5
+/// sections: the one at 60 degrees stands 176/189 of the way up (a blend of its two neighbours: 2/3).
+#[test]
+fn a_loft_round_a_closed_path_mixes_its_sections_from_every_profile() {
+    let (inner, outer, h, up) = (13.97, 25.4, 1.524, 2.286);
+    let r = 0.5 * (inner + outer);
+    let rect = |deg: f64, z0: f64| {
+        let d = DVec3::new(deg.to_radians().cos(), deg.to_radians().sin(), 0.0);
+        let p = [d * inner + DVec3::Z * z0, d * outer + DVec3::Z * z0, d * outer + DVec3::Z * (z0 + h), d * inner + DVec3::Z * (z0 + h)];
+        make_wire(&(0..4).map(|i| make_line(p[i], p[(i + 1) % 4]).unwrap()).collect::<Vec<_>>()).unwrap()
+    };
+    let profiles = [rect(0.0, 0.0), rect(90.0, up), rect(180.0, 0.0), rect(270.0, up)];
+    let path = make_wire(&[make_circle(DVec3::ZERO, DVec3::Z, r).unwrap()]).unwrap();
+    let ring = loft(&profiles, &LoftOptions { solid: true, closed: true, path: Some((path, 5)), ..Default::default() }).unwrap().shape;
+    assert!(ring.is_valid());
+    assert_eq!(ring.faces().len(), 4, "a face per rectangle side, closed round");
+    let want = (outer - inner) * h * std::f64::consts::TAU * r;
+    let v = ring.volume().unwrap();
+    assert!(close(v, want, 0.005 * want), "{v} mm3, about {want}");
+    let z = up * 176.0 / 189.0;
+    let a = 60f64.to_radians();
+    let at = |z: f64| make_vertex(DVec3::new(r * a.cos(), r * a.sin(), z)).unwrap();
+    for (z, out) in [(z - 0.05, true), (z + 0.05, false), (z + h - 0.05, false), (z + h + 0.05, true)] {
+        let d = distance(&at(z), &ring).unwrap().distance;
+        assert!(if out { close(d, 0.05, 0.01) } else { d < 1e-6 }, "z {z}: {d} mm from the ring");
+    }
+}

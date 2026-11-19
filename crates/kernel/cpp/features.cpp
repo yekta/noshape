@@ -1,6 +1,7 @@
 // Feature operations: prism, revolve, sweep, loft, thicken, shell, fillet,
 // chamfer, draft, defeaturing, offsets, sewing, filling, rib.
 #include "internal.hpp"
+#include <map>
 #include <optional>
 #include <gp_Cylinder.hxx>
 #include <gp_Lin.hxx>
@@ -132,6 +133,9 @@
 #include <GeomAPI_IntSS.hxx>
 #include <GeomAPI_ExtremaCurveCurve.hxx>
 #include <BRepAdaptor_Curve.hxx>
+#include <GCPnts_UniformAbscissa.hxx>
+#include <gp_Ax3.hxx>
+#include <TColgp_Array1OfPnt.hxx>
 #include <Geom2d_TrimmedCurve.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2dConvert.hxx>
@@ -2269,6 +2273,42 @@ static std::vector<std::vector<double>> natural_bezier(const std::vector<std::ve
   return out;
 }
 
+// The derivative at the seam of a periodic cubic spline through rows R[k] at t[k] (the last row the first again, one
+// period on): natural_bezier clamped to it at both ends closes C2 round the seam (live's ring lofts:
+// c2-loft-guide-curves-wave-washer's 4 faces periodic through their sections).
+static std::vector<double> periodic_seam_derivative(const std::vector<std::vector<double>>& R, const std::vector<double>& t)
+{
+  const size_t N = R.size() - 1, dim = R[0].size();
+  std::vector<std::vector<double>> A(N, std::vector<double>(N + dim, 0.0));
+  for (size_t k = 0; k < N; ++k)
+  {
+    const size_t p = (k + N - 1) % N, q = (k + 1) % N;
+    const double h0 = k == 0 ? t[N] - t[N - 1] : t[k] - t[k - 1], h1 = t[k + 1] - t[k];
+    A[k][p] += 1 / h0, A[k][k] += 2 * (1 / h0 + 1 / h1), A[k][q] += 1 / h1;
+    for (size_t i = 0; i < dim; ++i)
+      A[k][N + i] = 3 * ((R[k][i] - R[k == 0 ? N - 1 : k - 1][i]) / (h0 * h0) + (R[k + 1][i] - R[k][i]) / (h1 * h1));
+  }
+  for (size_t c = 0; c < N; ++c)
+  {
+    size_t piv = c;
+    for (size_t r = c + 1; r < N; ++r)
+      if (std::abs(A[r][c]) > std::abs(A[piv][c]))
+        piv = r;
+    std::swap(A[c], A[piv]);
+    for (size_t r = 0; r < N; ++r)
+      if (r != c && A[r][c] != 0)
+      {
+        const double f = A[r][c] / A[c][c];
+        for (size_t j = c; j < N + dim; ++j)
+          A[r][j] -= f * A[c][j];
+      }
+  }
+  std::vector<double> d(dim);
+  for (size_t i = 0; i < dim; ++i)
+    d[i] = A[0][N + i] / A[0][0];
+  return d;
+}
+
 // A side face of a loft: its sections as compatible rows over [u0, u1].
 struct LoftSide
 {
@@ -2738,7 +2778,8 @@ static bool apex_tangent_loft(const TopoDS_Shape& loft, const gp_Pnt& P, const g
 //
 // `drop` (>= 0): a section that is only there to make ThruSections smooth
 // (it lofts two sections ruled); the columns skip it.
-static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wires, const LoftEnds& ends = {}, int drop = -1)
+static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wires, const LoftEnds& ends = {}, int drop = -1,
+                         bool periodic = false)
 {
   // The surface's sections, and the ones the columns go through.
   const std::vector<TopoDS_Wire> all = wires;
@@ -3077,8 +3118,10 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
         d = {v.X() * w, v.Y() * w, v.Z() * w, 0.0};
         return d;
       };
-      const auto col = natural_bezier(R, t, clamp(ends.start, ends.start_mag, n0, ra0, ra1, 0, 1),
-                                      clamp(ends.end, ends.end_mag, n1, rb0, rb1, n - 1, n - 2));
+      const auto seam = periodic ? periodic_seam_derivative(R, t) : std::vector<double>();
+      const auto col  = periodic ? natural_bezier(R, t, seam, seam)
+                                 : natural_bezier(R, t, clamp(ends.start, ends.start_mag, n0, ra0, ra1, 0, 1),
+                                                  clamp(ends.end, ends.end_mag, n1, rb0, rb1, n - 1, n - 2));
       for (int i = 0; i < nv; ++i)
       {
         const double w = col[i][3];
@@ -3143,7 +3186,10 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
       TopoDS_Edge e = TopoDS::Edge(edges(i));
       double      pf, pl;
       e.Orientation(TopAbs_FORWARD);
-      PCurve p{e, u.face, BRep_Tool::CurveOnSurface(e, u.face, pf, pl), {}};
+      // (Read on the face taken forward: CurveOnSurface swaps a closed edge's two curves on a reversed face, UpdateEdge
+      // doesn't: a ring's faces lost their seam, c2-loft-guide-curves-wave-washer.)
+      const TopoDS_Face fwd = TopoDS::Face(u.face.Oriented(TopAbs_FORWARD));
+      PCurve p{e, u.face, BRep_Tool::CurveOnSurface(e, fwd, pf, pl), {}};
       // Retimed rows: a section edge (v = const) at the u where the new surface's row meets each of its points.
       occ::handle<Geom2d_Line> line = occ::down_cast<Geom2d_Line>(p.forward);
       if (retimed && !line.IsNull() && std::abs(line->Direction().Y()) < 1e-12 && !BRep_Tool::IsClosed(e, u.face))
@@ -3172,7 +3218,7 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
         }
       }
       if (BRep_Tool::IsClosed(e, u.face))
-        p.reversed = BRep_Tool::CurveOnSurface(TopoDS::Edge(e.Reversed()), u.face, pf, pl);
+        p.reversed = BRep_Tool::CurveOnSurface(TopoDS::Edge(e.Reversed()), fwd, pf, pl);
       pcurves.push_back(p);
     }
   }
@@ -3857,10 +3903,339 @@ static bool straight_path_square_to(const TopoDS_Shape& path, const std::vector<
 // through them all (live "psb (10-24 f)": a □20 along a quarter arc gives
 // 25100.80 with 5 sections, 25128.64 with 10, the exact sweep 25132.74).
 // False when the sections can't be made (the wires are left as they were).
+// A profile's place on a path: the arc length of the path point nearest its centre (sampled, then narrowed).
+static double place_on_path(const TopoDS_Wire& path, const TopoDS_Wire& w)
+{
+  BRepAdaptor_CompCurve cc(path);
+  GProp_GProps          g;
+  BRepGProp::LinearProperties(w, g);
+  const gp_Pnt c  = g.CentreOfMass();
+  const double u0 = cc.FirstParameter(), u1 = cc.LastParameter();
+  const int    N  = 2000;
+  int          bi = 0;
+  for (int i = 1; i <= N; ++i)
+    if (cc.Value(u0 + (u1 - u0) * i / N).Distance(c) < cc.Value(u0 + (u1 - u0) * bi / N).Distance(c))
+      bi = i;
+  double lo = u0 + (u1 - u0) * std::max(0, bi - 1) / N, hi = u0 + (u1 - u0) * std::min(N, bi + 1) / N;
+  for (int i = 0; i < 80; ++i)
+  {
+    const double a = lo + (hi - lo) / 3, b = hi - (hi - lo) / 3;
+    if (cc.Value(a).Distance(c) < cc.Value(b).Distance(c))
+      hi = b;
+    else
+      lo = a;
+  }
+  return GCPnts_AbscissaPoint::Length(cc, u0, 0.5 * (lo + hi));
+}
+
+// A closed path's edges run the other way round.
+static TopoDS_Wire wire_reversed(const TopoDS_Wire& w)
+{
+  std::vector<TopoDS_Edge> es;
+  for (BRepTools_WireExplorer ex(w); ex.More(); ex.Next())
+    es.push_back(ex.Current());
+  BRepBuilderAPI_MakeWire mw;
+  for (auto e = es.rbegin(); e != es.rend(); ++e)
+    mw.Add(TopoDS::Edge(e->Reversed()));
+  return mw.IsDone() ? mw.Wire() : TopoDS_Wire();
+}
+
+// A closed path opened at arc length s instead: from there round to there again.
+static TopoDS_Wire wire_from_arc(const TopoDS_Wire& w, double s)
+{
+  BRepAdaptor_CompCurve cc(w);
+  GCPnts_AbscissaPoint  ap(cc, s, cc.FirstParameter());
+  if (!ap.IsDone())
+    return TopoDS_Wire();
+  TopoDS_Edge at;
+  double      u;
+  cc.Edge(ap.Parameter(), at, u);
+  std::vector<TopoDS_Edge> es;
+  for (BRepTools_WireExplorer ex(w); ex.More(); ex.Next())
+    es.push_back(ex.Current());
+  const auto k = std::find_if(es.begin(), es.end(), [&](const TopoDS_Edge& e) { return e.IsSame(at); });
+  if (k == es.end())
+    return TopoDS_Wire();
+  double                  a, b;
+  occ::handle<Geom_Curve> c = BRep_Tool::Curve(*k, a, b);
+  if (c.IsNull())
+    return TopoDS_Wire();
+  const bool   rev  = k->Orientation() == TopAbs_REVERSED;
+  const double tiny = 1e-9 * (1 + b - a);
+  BRepBuilderAPI_MakeWire mw;
+  auto piece = [&](double lo, double hi) {
+    if (hi - lo <= tiny)
+      return;
+    const TopoDS_Edge e = BRepBuilderAPI_MakeEdge(c, lo, hi).Edge();
+    mw.Add(rev ? TopoDS::Edge(e.Reversed()) : e);
+  };
+  rev ? piece(a, u) : piece(u, b);
+  for (auto e = k + 1; e != es.end(); ++e)
+    mw.Add(*e);
+  for (auto e = es.begin(); e != k; ++e)
+    mw.Add(*e);
+  rev ? piece(u, b) : piece(a, u);
+  return mw.IsDone() ? mw.Wire() : TopoDS_Wire();
+}
+
+// The weights of a natural cubic spline through values at `ts` (one per value) at x: the spline of a 1 at k, 0 elsewhere.
+static std::vector<double> natural_spline_weights(const std::vector<double>& ts, double x)
+{
+  const size_t        m = ts.size();
+  std::vector<double> out(m, 0.0);
+  size_t              i = 0;
+  while (i + 2 < m && x > ts[i + 1])
+    ++i;
+  for (size_t k = 0; k < m; ++k)
+  {
+    // Second derivatives M (M0 = M[m-1] = 0): tridiagonal, solved by elimination.
+    std::vector<double> a(m, 0.0), b(m, 1.0), c(m, 0.0), r(m, 0.0), M(m, 0.0);
+    auto                y = [&](size_t j) { return j == k ? 1.0 : 0.0; };
+    for (size_t j = 1; j + 1 < m; ++j)
+    {
+      const double h0 = ts[j] - ts[j - 1], h1 = ts[j + 1] - ts[j];
+      a[j] = h0, b[j] = 2 * (h0 + h1), c[j] = h1;
+      r[j] = 6 * ((y(j + 1) - y(j)) / h1 - (y(j) - y(j - 1)) / h0);
+    }
+    for (size_t j = 1; j < m; ++j)
+    {
+      const double f = a[j] / b[j - 1];
+      b[j] -= f * c[j - 1];
+      r[j] -= f * r[j - 1];
+    }
+    for (size_t j = m; j-- > 0;)
+      M[j] = (r[j] - (j + 1 < m ? c[j] * M[j + 1] : 0.0)) / b[j];
+    const double h = ts[i + 1] - ts[i], p = ts[i + 1] - x, q = x - ts[i];
+    out[k] = M[i] * p * p * p / (6 * h) + M[i + 1] * q * q * q / (6 * h) + (y(i) / h - M[i] * h / 6) * p +
+             (y(i + 1) / h - M[i + 1] * h / 6) * q;
+  }
+  return out;
+}
+
+// Wires of matching edges (each started and run alike) mixed point by point with weights: lines stay lines, other
+// edges are fitted through their mixed points.
+static TopoDS_Wire wires_mixed(const std::vector<TopoDS_Wire>& ws, const std::vector<double>& w)
+{
+  std::vector<std::vector<TopoDS_Edge>> es(ws.size());
+  for (size_t k = 0; k < ws.size(); ++k)
+    for (BRepTools_WireExplorer ex(ws[k]); ex.More(); ex.Next())
+      es[k].push_back(ex.Current());
+  const size_t n = es[0].size();
+  for (const auto& e : es)
+    if (e.size() != n)
+      return TopoDS_Wire();
+  auto mix = [&](auto at) {
+    gp_XYZ p(0, 0, 0);
+    for (size_t k = 0; k < ws.size(); ++k)
+      p += w[k] * at(k).XYZ();
+    return gp_Pnt(p);
+  };
+  std::vector<TopoDS_Vertex> vs;
+  for (size_t j = 0; j < n; ++j)
+    vs.push_back(BRepBuilderAPI_MakeVertex(mix([&](size_t k) { return BRep_Tool::Pnt(TopExp::FirstVertex(es[k][j], true)); })));
+  const bool              closed = BRep_Tool::IsClosed(ws[0]);
+  BRepBuilderAPI_MakeWire mw;
+  for (size_t j = 0; j < n; ++j)
+  {
+    const TopoDS_Vertex a = vs[j];
+    const TopoDS_Vertex b = j + 1 < n ? vs[j + 1]
+                            : closed ? vs[0]
+                                     : BRepBuilderAPI_MakeVertex(mix([&](size_t k) { return BRep_Tool::Pnt(TopExp::LastVertex(es[k][j], true)); })).Vertex();
+    bool lines = true;
+    for (size_t k = 0; k < ws.size() && lines; ++k)
+      lines = BRepAdaptor_Curve(es[k][j]).GetType() == GeomAbs_Line;
+    if (lines)
+    {
+      mw.Add(BRepBuilderAPI_MakeEdge(a, b).Edge());
+      continue;
+    }
+    const int          m = 64;
+    TColgp_Array1OfPnt pts(1, m + 1);
+    for (int i = 0; i <= m; ++i)
+      pts(i + 1) = i == 0 ? BRep_Tool::Pnt(a) : i == m ? BRep_Tool::Pnt(b) : mix([&](size_t k) {
+        BRepAdaptor_Curve c(es[k][j]);
+        const double      t = (double)i / m;
+        const bool        rev = es[k][j].Orientation() == TopAbs_REVERSED;
+        return c.Value(rev ? c.LastParameter() + (c.FirstParameter() - c.LastParameter()) * t : c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * t);
+      });
+    GeomAPI_PointsToBSpline fit(pts, 3, 8, GeomAbs_C2, 1e-9);
+    if (!fit.IsDone())
+      return TopoDS_Wire();
+    mw.Add(BRepBuilderAPI_MakeEdge(fit.Curve(), a, b).Edge());
+  }
+  return mw.IsDone() ? mw.Wire() : TopoDS_Wire();
+}
+
+// A loft along a closed path round three or more profiles closes into a ring (live c2-loft-guide-curves-wave-washer's
+// Loft 1, live2 q-wave-washer-sections-1119): the path opened at the first profile, run the way the others come; `count`
+// sections at even steps round it, one landing on a profile dropped. Each is every profile carried along the path in a
+// rotation-minimising frame and mixed by a natural cubic spline through them at their places (the first profile again
+// at the end): live's sections to 0.06 mm. The wires: the profiles and sections in path order, the first not repeated.
+static bool ring_sections_built(std::vector<TopoDS_Wire>& wires, TopoDS_Wire spine, int count)
+{
+  const size_t m = wires.size();
+  std::vector<double> at;
+  for (const auto& w : wires)
+    at.push_back(place_on_path(spine, w));
+  const double total0 = GCPnts_AbscissaPoint::Length(BRepAdaptor_CompCurve(spine));
+  auto rising = [&](double dir) {
+    double last = 0;
+    for (size_t k = 1; k < m; ++k)
+    {
+      const double a = std::fmod(dir * (at[k] - at[0]) + 2 * total0, total0);
+      if (a <= last + 1e-6 * total0 || a >= total0 * (1 - 1e-6))
+        return false;
+      last = a;
+    }
+    return true;
+  };
+  if (!rising(1.0))
+  {
+    if (!rising(-1.0))
+      return false;
+    spine = wire_reversed(spine);
+  }
+  if (spine.IsNull() || (spine = wire_from_arc(spine, place_on_path(spine, wires[0]))).IsNull())
+    return false;
+  BRepAdaptor_CompCurve cc(spine);
+  const double          total = GCPnts_AbscissaPoint::Length(cc);
+  std::vector<double>   ts{0.0};
+  for (size_t k = 1; k < m; ++k)
+    ts.push_back(place_on_path(spine, wires[k]));
+  ts.push_back(total);
+  for (size_t k = 1; k < ts.size(); ++k)
+    if (ts[k] <= ts[k - 1])
+      return false;
+  const double        gap = 1e-6 * (1 + total);
+  std::vector<double> stations;
+  for (int i = 1; i <= count; ++i)
+  {
+    const double s = total * i / (count + 1);
+    if (std::none_of(ts.begin(), ts.end(), [&](double t) { return std::abs(t - s) < gap; }))
+      stations.push_back(s);
+  }
+  // The frame carried along the path by double reflection (Wang et al.), at the profiles, the stations and a fine run.
+  std::vector<double> run(ts.begin(), ts.end());
+  run.insert(run.end(), stations.begin(), stations.end());
+  const int fine = 4000;
+  for (int i = 1; i < fine; ++i)
+    run.push_back(total * i / fine);
+  std::sort(run.begin(), run.end());
+  std::vector<gp_Ax3> frames;
+  {
+    gp_Pnt p0;
+    gp_Vec t0;
+    std::optional<gp_Vec> r0;
+    std::map<double, gp_Ax3> got;
+    double                   u = cc.FirstParameter(), was = 0;
+    for (double s : run)
+    {
+      // (Step by step: from the start each time the length integrals ran over the whole path 4000 times.)
+      if (s > was)
+      {
+        GCPnts_AbscissaPoint ap(cc, s - was, u, u);
+        if (!ap.IsDone())
+          return false;
+        u = ap.Parameter(), was = s;
+      }
+      gp_Pnt p;
+      gp_Vec t;
+      cc.D1(u, p, t);
+      if (t.Magnitude() < 1e-15)
+        return false;
+      t.Normalize();
+      gp_Vec r;
+      if (!r0)
+      {
+        r = std::abs(t.Z()) < 0.9 ? t.Crossed(gp_Vec(0, 0, 1)) : t.Crossed(gp_Vec(1, 0, 0));
+        r.Normalize();
+      }
+      else
+      {
+        const gp_Vec v1(p0, p);
+        const double c1 = v1.SquareMagnitude();
+        if (c1 < 1e-30)
+          r = *r0;
+        else
+        {
+          const gp_Vec rl = *r0 - v1 * (2 * v1.Dot(*r0) / c1), tl = t0 - v1 * (2 * v1.Dot(t0) / c1);
+          const gp_Vec v2 = t - tl;
+          const double c2 = v2.SquareMagnitude();
+          r = c2 < 1e-30 ? rl : rl - v2 * (2 * v2.Dot(rl) / c2);
+        }
+        r -= t * t.Dot(r);
+        if (r.Magnitude() < 1e-12)
+          return false;
+        r.Normalize();
+      }
+      got.emplace(s, gp_Ax3(p, gp_Dir(t), gp_Dir(r)));
+      p0 = p, t0 = t, r0 = r;
+    }
+    auto frame = [&](double s) { return got.lower_bound(s - 1e-15)->second; };
+    for (double s : ts)
+      frames.push_back(frame(s));
+    for (double s : stations)
+      frames.push_back(frame(s));
+  }
+  // The profiles in their own frames, each started like the first and run the same way.
+  std::vector<TopoDS_Wire> local;
+  for (size_t k = 0; k <= m; ++k)
+  {
+    gp_Trsf to;
+    to.SetTransformation(frames[k]);
+    local.push_back(TopoDS::Wire(BRepBuilderAPI_Transform(wires[k % m], to, true).Shape()));
+  }
+  auto normal_of = [](const TopoDS_Wire& w) {
+    BRepAdaptor_CompCurve c(w);
+    gp_Vec                nrm;
+    const int             n = 64;
+    for (int k = 0; k < n; ++k)
+      nrm += gp_Vec(c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * k / n).XYZ())
+               .Crossed(gp_Vec(c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * (k + 1) / n).XYZ()));
+    return nrm;
+  };
+  // (The profiles themselves keep their edges, only turned and started alike: their history stays.)
+  const gp_Vec n0    = normal_of(local[0]);
+  const gp_Pnt start = BRep_Tool::Pnt(BRepTools_WireExplorer(local[0]).CurrentVertex());
+  std::vector<std::pair<double, TopoDS_Wire>> out{{0.0, wires[0]}};
+  for (size_t k = 1; k <= m; ++k)
+  {
+    const bool rev = normal_of(local[k]).Dot(n0) < 0;
+    if (rev)
+      local[k] = TopoDS::Wire(local[k].Reversed());
+    local[k] = rotate_wire_start(local[k], start);
+    if (k == m)
+      continue;
+    gp_Trsf to;
+    to.SetTransformation(frames[k]);
+    const gp_Pnt first = BRep_Tool::Pnt(BRepTools_WireExplorer(local[k]).CurrentVertex()).Transformed(to.Inverted());
+    out.emplace_back(ts[k], rotate_wire_start(rev ? TopoDS::Wire(wires[k].Reversed()) : wires[k], first));
+  }
+  auto back = [&](const TopoDS_Wire& w, const gp_Ax3& f) {
+    gp_Trsf to;
+    to.SetTransformation(f);
+    return TopoDS::Wire(BRepBuilderAPI_Transform(w, to.Inverted(), true).Shape());
+  };
+  for (size_t i = 0; i < stations.size(); ++i)
+  {
+    const TopoDS_Wire w = wires_mixed(local, natural_spline_weights(ts, stations[i]));
+    if (w.IsNull())
+      return false;
+    out.emplace_back(stations[i], back(w, frames[m + 1 + i]));
+  }
+  std::sort(out.begin(), out.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+  wires.clear();
+  for (const auto& o : out)
+    wires.push_back(o.second);
+  return true;
+}
+
 static bool path_sections_built(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& spine, int count)
 {
   if (wires.size() < 2 || count < 1)
     return false;
+  if (wires.size() > 2 && BRep_Tool::IsClosed(spine))
+    return ring_sections_built(wires, spine, count);
   BRepOffsetAPI_MakePipeShell ps(spine);
   for (const auto& w : wires)
     ps.Add(w, false, false);
@@ -3870,29 +4245,7 @@ static bool path_sections_built(std::vector<TopoDS_Wire>& wires, const TopoDS_Wi
   const TopoDS_Shape    carried = ps.Shape();
   BRepAdaptor_CompCurve cc(spine);
   const double          total = GCPnts_AbscissaPoint::Length(cc);
-  // Each end profile's place on the path: the arc length of the path point
-  // nearest its centre (sampled, then narrowed).
-  auto place = [&](const TopoDS_Wire& w) {
-    GProp_GProps g;
-    BRepGProp::LinearProperties(w, g);
-    const gp_Pnt c  = g.CentreOfMass();
-    const double u0 = cc.FirstParameter(), u1 = cc.LastParameter();
-    const int    N  = 2000;
-    int          bi = 0;
-    for (int i = 1; i <= N; ++i)
-      if (cc.Value(u0 + (u1 - u0) * i / N).Distance(c) < cc.Value(u0 + (u1 - u0) * bi / N).Distance(c))
-        bi = i;
-    double lo = u0 + (u1 - u0) * std::max(0, bi - 1) / N, hi = u0 + (u1 - u0) * std::min(N, bi + 1) / N;
-    for (int i = 0; i < 80; ++i)
-    {
-      const double a = lo + (hi - lo) / 3, b = hi - (hi - lo) / 3;
-      if (cc.Value(a).Distance(c) < cc.Value(b).Distance(c))
-        hi = b;
-      else
-        lo = a;
-    }
-    return GCPnts_AbscissaPoint::Length(cc, u0, 0.5 * (lo + hi));
-  };
+  auto place = [&](const TopoDS_Wire& w) { return place_on_path(spine, w); };
   const double s0 = place(wires.front()), s1 = place(wires.back());
   if (std::abs(s1 - s0) < 1e-9 * (1 + total))
     return false;
@@ -4693,6 +5046,12 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
     // (Centripetal: by section spacing the side ran back behind the first profile, c2-loft-paths-guides' Loft 3 0.96 mm
     // past its start cap, and its fuse with Mirror 1's copy dropped the loft.)
     ts.SetParType(Approx_Centripetal);
+    // Round a ring the unsmoothed surface overshoots between its sections (four rectangles round a circle: 14 % over
+    // the swept volume): smoothed, unless natural_loft rebuilds it below (its sections at even steps of v).
+    if (closed && allow_natural && !ruled)
+      ts.SetParType(Approx_IsoParametric);
+    else
+      ts.SetSmoothing(closed);
   }
   const bool matched = circles || counts || connected || along;
   ts.CheckCompatibility(!matched);
@@ -4742,6 +5101,15 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
     fail_op("loft failed (incompatible sections?)");
   if (natural && (!natural_loft(ts.Shape(), smooth, ends, drop) || !BRepCheck_Analyzer(ts.Shape()).IsValid()))
     return loft_impl(sections, solid, ruled, closed, start_points, ends, false, path, path_count);
+  // Round a ring: periodic C2 through its sections at chord-length parameters, as live's (OCCT's smoothed surface ran
+  // 2.8 mm off live's between c2-loft-guide-curves-wave-washer's sections).
+  if (closed && along && allow_natural && !ruled)
+  {
+    std::vector<TopoDS_Wire> ring = wires;
+    ring.push_back(wires.front());
+    if (!natural_loft(ts.Shape(), ring, {}, -1, true) || !BRepCheck_Analyzer(ts.Shape()).IsValid())
+      return loft_impl(sections, solid, ruled, closed, start_points, ends, false, path, path_count);
+  }
   // A profile to a point, Tangent to profile at the point and the profile's end free.
   if (allow_natural && points && n == 2 && !ruled && !closed && path.IsNull())
   {
@@ -4779,8 +5147,9 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
   // sections: a face per segment).
   TopoDS_Shape out = ts.Shape();
   // natural_loft's surfaces between sections on perpendicular planes with a start condition (live 2276's G: a circle
-  // on Top to one on x = 15) came out with every face facing in: the solid turned the right way out.
-  if (natural && solid)
+  // on Top to one on x = 15) came out with every face facing in: the solid turned the right way out. So may a closed
+  // loft (c2-loft-guide-curves-wave-washer's ring).
+  if ((natural || closed) && solid)
   {
     std::optional<bool> in = faces_face_in(out);
     if (!in)

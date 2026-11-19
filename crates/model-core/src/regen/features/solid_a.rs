@@ -1285,6 +1285,9 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         let edges = resolve_curves(ev, ev.query("spine"))?;
         let wires = wires_from(&edges)?;
         let [spine] = wires.as_slice() else { return crate::regen::eval::err_at(&["spine"], "Loft path must be a contiguous set of curves.") };
+        // A closed path round three or more profiles closes the loft back to its first (live
+        // c2-loft-guide-curves-wave-washer's Loft 1: four profiles round a wave, a ring, Make periodic off).
+        opts.closed |= sections.len() > 2 && spine.is_closed().unwrap_or(false);
         opts.path = Some((spine.clone(), ev.integer("sectionCount")?.max(1) as usize));
     }
     // Onshape's LOFT_DIRECTION_ERROR: profiles all in one plane, with no path to run along (live err18: a circle and a
