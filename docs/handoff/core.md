@@ -40,8 +40,15 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   wire_reversed, wire_from_arc, natural_spline_weights, wires_mixed), opts.closed in solid_a.rs loft, ts.SetSmoothing
   (closed), closed solids turned outward. Kernel T1 features::a_loft_round_a_closed_path_mixes_its_sections_from_every_
   profile passes. Doc: Loft 1 2064.81 vs live 2080.82 mm3 (was 2126.10), 106 ms (was 1453); ringsurf max 2.83 / mean
-  0.45 mm: skin or sections? probe vibex8 ~/tmp/core/ringl <wires.brep> ring-live-surf.txt (src core-scratch/brepq/
-  ringl.cpp: each wire vs live, then ThruSections variants), wires from NOSHAPE_RING_WIRES (.r5.sh). Bar 0.1 mm.
+  0.45 mm. SECTIONS ARE RIGHT (ringl: each of our 8 section wires within 0.01 mm of live's faces); THE SKIN is off: live's
+  = periodic C2 cubic through the sections at its knots (core-scratch/ring/per.py: 0.0000 mm on its own faces); knots
+  .1722 .2519 .3339 .5 .6702 .7504 .8319 not matched by any chord / arc rule (kn.py, kn2.py); mean corner chord gives
+  0.17 mm max (sc5), rms chord 0.11 (sc10). WIP (22:40): periodic_seam_derivative + natural_loft(..., periodic=true) for
+  closed path lofts (ThruSections iso-parametric unsmoothed first): runs, but the rebuilt solid is INVALID (BRepCheck)
+  -> falls back to OCCT's smoothed one. Next: why invalid (seam edge / side edge curves), then measure (ringsurf).
+  PROBE lines `// PROBE` in features.cpp (nl false / ok valid, ring wires, ringloft dump) to strip before landing.
+  Tools: vibex8 ~/tmp/core/ringl <wires.brep> ring-live-surf.txt (src core-scratch/brepq/ringl.cpp), .r5.sh. Bar 0.1 mm
+  (0.17 would need the lead: decision).
 - **11-19 afternoon:** guided-loft conditions e02fe92f (queued/landed: Normal to guide aslant -> BSURF_INCONSISTENT text;
   start/end conditions checked against guides; T1 a_guided_loft_with_guide_and_end_conditions_as_live). f197 closed
   (Mirror 3 splits one B-spline edge at (1.2061,39,20): DECISIONS 11-16). surf-intro Derived 1 +0.1 in = asm's
@@ -60,9 +67,8 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   touches (merge scope + seeds) into one sheet (live: one 2-face sheet); singularities 2 -> 5/15, 30-doc subset otherwise
   same (vibex7 ~/tmp/core/glm.log vs glsl.log). T1 features_a::a_surface_mirrored_with_add_joins_its_mirror. Next there:
   Loft with bad singularity (ours errors, live 3425 mm2 sheet).
-- **asm a2e4a2 Chamfer 2 (isaac):** blend landed the fix bb667320d at 03:58 (concave straight-edge chamfer fills, +40.31);
-  asm's 19:54 trace may predate it: check with a fresh binary on vibex8 ~/tmp/core/isa/m/asm-a2e4a2 (studio as a
-  parity model: NOSHAPE_PARITY_MODELS=~/tmp/core/isa/m).
+- **asm a2e4a2 Chamfer 2 (isaac): DONE** by blend's bb667320d (asm re-ran 22:30: no difference). a2e4a2 left: Chamfer 4
+  "Failed to chamfer selections." (blend's?), Extrude 15/16 (vibex7 ~/agents/asm-keep/suite/h1119-asm-isaac-ball.out).
 - **welding Extrude 8 body order:** moved to skasm (lead 19:35).
 - **cpcurves Split 3 LANDED 575aba2a4:** a closed profile's surface sweep faces out of its tube (live q-sweep-normals-1119:
   manualblend's tube against its sketch's normal, cpcurves' along it: both outward); cpcurves' 1227.58 mm3 part and Split
