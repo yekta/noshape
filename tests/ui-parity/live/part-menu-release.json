@@ -1,6 +1,6 @@
 {
  "scenario": "part-menu-release",
- "recorded": "2026-11-19T21:25:06.501Z",
+ "recorded": "2026-11-19T22:16:14.910Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -12,12 +12,12 @@
   "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "3a0ed454d09d9a8aa7f5397a",
-  "workspace": "0165ae0580403fc0b58715ee",
-  "element": "67dcad3a0f49ebadd93cf843",
+  "document": "a6c566280a69ae8540eedf71",
+  "workspace": "c947d77db5eb92c40a21745c",
+  "element": "dea61e48dc750330ef17355a",
   "start": "block",
-  "startElement": "8b8a146f8f31f226afceafd7",
-  "runner": "live2 nstate-co.json"
+  "startElement": "caa869b89df0a94a439f01de",
+  "runner": "live2 nstate-co2.json"
  },
  "start": {
   "focus": {
@@ -207,7 +207,7 @@
     },
     "measure": null
    },
-   "t": 30243
+   "t": 31391
   },
   {
    "step": 2,
@@ -308,7 +308,7 @@
     },
     "measure": null
    },
-   "t": 33395
+   "t": 34640
   },
   {
    "step": 3,
@@ -328,37 +328,37 @@
      "title": "Create Release candidate",
      "fields": [
       {
-       "label": "Search",
+       "label": null,
        "kind": "input",
        "value": ""
       },
       {
-       "label": "In progress",
+       "label": "*",
        "kind": "input",
        "value": "A"
       },
       {
-       "label": "In progress",
+       "label": "*",
        "kind": "input",
        "value": ""
       },
       {
-       "label": null,
+       "label": "Release name *",
        "kind": "input",
        "value": ""
       },
       {
-       "label": null,
+       "label": "Release notes *",
        "kind": "input",
        "value": ""
       },
       {
-       "label": "Search users or teams",
+       "label": "Approvers",
        "kind": "input",
        "value": ""
       },
       {
-       "label": "Search users or teams",
+       "label": "Observers",
        "kind": "input",
        "value": ""
       }
@@ -444,7 +444,7 @@
     },
     "measure": null
    },
-   "t": 41190
+   "t": 42431
   },
   {
    "step": 4,
@@ -471,37 +471,37 @@
      "title": "Create Release candidate",
      "fields": [
       {
-       "label": "Search",
+       "label": null,
        "kind": "input",
        "value": ""
       },
       {
-       "label": "In progress",
+       "label": "*",
        "kind": "input",
        "value": "A"
       },
       {
-       "label": "In progress",
+       "label": "*",
        "kind": "input",
        "value": ""
       },
       {
-       "label": null,
+       "label": "Release name *",
        "kind": "input",
        "value": ""
       },
       {
-       "label": null,
+       "label": "Release notes *",
        "kind": "input",
        "value": ""
       },
       {
-       "label": "Search users or teams",
+       "label": "Approvers",
        "kind": "input",
        "value": ""
       },
       {
-       "label": "Search users or teams",
+       "label": "Observers",
        "kind": "input",
        "value": ""
       }
@@ -587,7 +587,7 @@
     },
     "measure": null
    },
-   "t": 44469
+   "t": 45732
   },
   {
    "step": 5,
@@ -607,37 +607,37 @@
      "title": "Create Release candidate",
      "fields": [
       {
-       "label": "Search",
+       "label": null,
        "kind": "input",
        "value": ""
       },
       {
-       "label": "In progress",
+       "label": "*",
        "kind": "input",
        "value": "A"
       },
       {
-       "label": "In progress",
+       "label": "*",
        "kind": "input",
        "value": ""
       },
       {
-       "label": null,
+       "label": "Release name *",
        "kind": "input",
        "value": ""
       },
       {
-       "label": null,
+       "label": "Release notes *",
        "kind": "input",
        "value": ""
       },
       {
-       "label": "Search users or teams",
+       "label": "Approvers",
        "kind": "input",
        "value": ""
       },
       {
-       "label": "Search users or teams",
+       "label": "Observers",
        "kind": "input",
        "value": ""
       }
@@ -723,7 +723,7 @@
     },
     "measure": null
    },
-   "t": 47744
+   "t": 49022
   }
  ]
 }

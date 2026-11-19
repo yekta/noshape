@@ -1,23 +1,19 @@
 {
  "scenario": "drw-ref-pin-reference",
- "recorded": "2026-11-19T21:26:17.962Z",
+ "recorded": "2026-11-13T17:36:28.941Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "viewport": [
-   1919,
-   1079
-  ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-13.1"
  },
  "live": {
-  "document": "9ba9de15263516608536c182",
-  "workspace": "48b6c1c8dcc403ac80072e87",
-  "element": "3edd6498b30083cd1fd814cf",
+  "document": "69bfbd0c2de6b09510b280f3",
+  "workspace": "644bc752f30b4b9ed37740e4",
+  "element": "9437d88acfbf39293591423a",
   "start": "drawing-linked",
-  "startElement": "3edd6498b30083cd1fd814cf",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "9437d88acfbf39293591423a",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -182,7 +178,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 208216
+   "t": 204053
   },
   {
    "step": 2,
@@ -207,6 +203,7 @@
      "text": [
       "Sheet1 (1)",
       "In progress",
+      "V1",
       "Part 1",
       "Front"
      ]
@@ -282,7 +279,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 233462
+   "t": 227617
   },
   {
    "step": 3,
@@ -303,6 +300,7 @@
      "text": [
       "Sheet1 (1)",
       "In progress",
+      "V1",
       "Part 1",
       "Front"
      ]
@@ -378,7 +376,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 259237
+   "t": 251534
   },
   {
    "step": 4,
@@ -404,39 +402,15 @@
      "text": [
       "Sheet1 (1)",
       "In progress",
+      "V1",
       "Part 1",
-      "Part 1 In progress",
+      "Part 1 In progress V1",
       "Front"
      ]
     },
     "dialogs": [],
     "panels": null,
-    "list": {
-     "kind": "menu",
-     "name": null,
-     "rows": [
-      "Switch to reference",
-      "",
-      "Replace...",
-      "Pin reference",
-      "Update linked document..."
-     ],
-     "checked": [
-      false,
-      false,
-      false,
-      false,
-      false
-     ],
-     "disabled": [
-      false,
-      false,
-      false,
-      false,
-      false
-     ],
-     "highlighted": -1
-    },
+    "list": null,
     "selection": {
      "count": 0,
      "items": []
@@ -505,7 +479,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 284779
+   "t": 275374
   },
   {
    "step": 5,
@@ -517,7 +491,7 @@
    },
    "ok": true,
    "at": [
-    219,
+    175,
     248
    ],
    "state": {
@@ -531,6 +505,7 @@
      "text": [
       "Sheet1 (1)",
       "In progress",
+      "V1",
       "Part 1",
       "Front"
      ]
@@ -606,7 +581,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 311429
+   "t": 300637
   },
   {
    "step": 6,
@@ -627,6 +602,7 @@
      "text": [
       "Sheet1 (1)",
       "In progress",
+      "V1",
       "Part 1",
       "Front"
      ]
@@ -702,7 +678,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 338323
+   "t": 325282
   }
  ]
 }
