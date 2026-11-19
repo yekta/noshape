@@ -1451,9 +1451,11 @@ live (`ctrl_cmd`, `shared_keys_follow_lives_list_per_os`) =. Feature-dialog widt
 |---|---|---|---|
 | A view key with the pointer resting on the model (Shift+1/2/3/4/5/6, Shift+Z, Ctrl+Shift+Down/Right) | whatever comes under the resting pointer lights after the view moves (a plane's or the part's orange outline, an edge) | nothing lights until the pointer moves | ≠ [psui] (retaken with a clean config and a 1 px move after launch: still unlit; a 3 px move after the key lights the Front plane, r-front2*.png) |
 | Shift+T Make transparent (Part 1 selected) | the dialog; the part drawn as a pale see-through ghost, its row no longer selected | the dialog; the part stays selected, see-through orange, its row highlighted | ≠ [psui] |
-| Delete / Backspace (Part 1 selected) | the Delete part 1 dialog; the part drawn as a see-through ghost with orange edges | the same dialog; the part drawn solid, tan | ≠ [psui] |
+| Make transparent's translucency slider | remembered across reloads (dragged to the left, it reopened there after a reload; restored to mid-way after); Isolate's own slider sits apart, near the left | starts at 0 like Isolate | note: live's mid-way was a remembered value, its fresh-account default not seen |
+| A dragged dialog's spot | kept across reloads per dialog (browser localStorage `panelLayoutManager.<user>.<dialog id>`: `sectionview-dialog` at (356, 103) = 150 / 100 px from the graphics corner, `feature-dialog` at (206, 3), `select-other-dialog` at (1360, 675), …) | kept in panel_positions.json | = |
+| Delete / Backspace (Part 1 selected) | the Delete part 1 dialog; the part drawn as a see-through ghost with orange edges | the same dialog; the part drawn solid, tan | = (withdrawn 11-19 01:28: at load 4 ours shows the ghost with orange edges by 0.5 s; live by 0.5 s too (orange at 0.15 s); the 1.3 s tan shot was at load 28) |
 | Shift+X Section view | the dialog at the list's side (~ (396, 192)) | the same with a clean config dir (the low-left spot was a 11-04 panel_positions.json "section" entry on this machine) | = (withdrawn 11-18 23:58) |
-| Shift+Y Show selected parts (Part 1 selected) | the selection cleared | Part 1 stays selected | ≠ [psui] (live's studio had Part 1 hidden first; to retake from one state) |
+| Shift+Y Show selected parts (Part 1 selected) | the selection cleared | Part 1 stays selected | ≠ [psui] (retaken 11-19 from a visible, selected Part 1 in live: the selection cleared) |
 
 ### shortcuts-sk-1118 (sketch default keys, live 11-19 00:00–01:15) [skasm, psui]
 
