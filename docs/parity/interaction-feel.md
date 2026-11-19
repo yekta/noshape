@@ -1709,14 +1709,14 @@ the same 100 × 60 plate with a 20 mm flange, r 15).
 | Import…: the file chosen → "Import to Onshape" | 380–470 | 353 | = |
 | Import: the Import button | the dialog closes ~1 s; "CAD Imports" tab at the end ~2.0 s; the imported tab after the active one ~7.5 s; the view stays; bubble "<file> has been imported. Open document" | closes 0.12–0.32 s; both tabs by 0.2 s in the same places; the view stays; the same bubble | = |
 
-### tools-1119 (Feature / Variable Studio, Measure, Section view, Appearance: gaps, live 11-19 07:00–07:20) [studios, psui]
+### tools-1119 (Feature / Variable Studio, Measure, Section view, Appearance: gaps, live 11-19 07:00–08:03) [studios, psui]
 
 Only what the Variable Studio / Feature Studio rows, the measure matrix, measure-mass-1118, ps-feel2-1118 (Hide / Isolate) and ui-speed-1118
 (Mass properties) don't already cover. Live: lane 4, scratch elements in the lane document (a Feature Studio with a "Feel cube" feature, a
 Part Studio with a 40 × 30 × 10 block and a 20 mm Feel cube, a Variable Studio a / b / c), page-side DOM ms from the input event plus WebGL
 draws, and live's 11-18 fsvs-feel numbers where noted. Ours: green 0bfc1ed0 on :127, clean config, the same elements built by CLI,
 xdotool input, 60 fps screen recording (first changed frame, so ours includes input and paint time live's DOM numbers leave out).
-Evidence: live/feel/tools-1119/; ours /root/live-scratch/tl19/ours/.
+Evidence: live/feel/tools-1119/; ours /root/live-scratch/tl19/ours/. The completion and error-marker rows (08:00): a scratch Feature Studio in live, ours green 313a71d3 (/root/live-scratch/dt19/ours/).
 
 | Item | Live | Ours | Status |
 |---|---|---|---|
@@ -1730,6 +1730,9 @@ Evidence: live/feel/tools-1119/; ours /root/live-scratch/tl19/ours/.
 | Section view (Top) arrow dragged | the value box follows; the cut redrawn every 0.4–0.6 s while dragging; settled 1.0 s after the release | the value box follows; redrawn every 0.12–0.43 s; nothing left to redraw after the release | = |
 | Appearance (Part 1 row › Edit appearance…) | the dialog 203 ms after the click; the part drawn with an orange outline while it's open | 127 ms; the part drawn plain, no outline | ≠ [psui] |
 | Appearance: a palette swatch clicked | the part red on the next frame (38 ms), still with the orange outline (a2-red.png) | the part filled orange (a selection tint) at 260 ms, hiding the new colour; a second swatch changes nothing visible | ≠ [psui] |
+| Feature Studio: a key typed that starts a completion ("o" on an empty line; "opE") | the list open (.ace_autocomplete) 239–242 ms after the keydown, as you type, no Ctrl+Space; "opE": Operator declaration (snippet), operator (keyword); gone at "opEx" (live 11-19 08:00) | on screen 94 ms (356 ms the first time), the same two items | = (ours faster) |
+| Feature Studio: a syntax error typed ("x" alone on a line), then deleted | the gutter marker and the red underline 858–946 ms after the key; cleared 750–766 ms after Backspace | marker and underline at 1986–2054 ms; cleared 77–79 ms | ≠ [studios] (marking 2.1–2.3× slower; clearing is faster) |
+| Feature Studio: the error's gutter marker (on line 1, hover for the message) | a red filled square with a white × (fs-notice-error), the tooltip with the same icon (fsac-err-hover.png) | a red "{!}" glyph, in the gutter and the tooltip | ≠ [studios] |
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
