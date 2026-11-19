@@ -22,13 +22,10 @@ the next run. Run the full ops e2e before any drawing land. A few app runs don't
   coverage entry "assembly:Revision history…", fixed): Measure rounds 1-2, the Pro instance menus (Where used… /
   Revision history…, no Release…; hook `open_part_revision_history`), ANSI_A_MM fit precision 4 (units-1119),
   `data_value` (ui-parity reads a dimension as live's drawing JSON: "40.00"), the two scenario fixes, note feel test.
-- Uncommitted: BRAND-IN-UI-TEXT prefs line ("Noshape Labs" in prefs, FS co-complete, help, 8 catalogs;
-  prefs-labs-consent-cancel `ours_on`; run.py `LIVE_BRAND` maps live's wording in `normalize_live`). Tests on vibex6
-  (logs/brand-tests.log), scenarios on vibex8 (~/tmp/studios/brand1). Then HISTORY-ROW-NAME-OVERLAP (qa P2): a
-  long history row name truncates at the 115 px Name column (history_panel.rs name_el; test
-  a_long_row_name_ends_at_the_name_column; logs/history-tests.log).
-- live's 48d3fc9d (asm-/part-menu-release retakes, ref-pin back to 11-13) is on my branch: run on vibex8
-  (~/tmp/studios/retakes1, after brand1); tell live the result (they keep a scratch copy until then).
+- In f450d0dd: "Noshape Labs" (prefs, FS co-complete, help, 8 catalogs; run.py `LIVE_BRAND` maps live's wording in
+  `normalize_live`; prefs-labs-consent-cancel `ours_on`) and HISTORY-ROW-NAME-OVERLAP (history_panel.rs name_el
+  truncates at the 115 px Name column; test a_long_row_name_ends_at_the_name_column).
+- Queued f450d0dd (23:09, carries 9f21ecfb + the brand prefs line + HISTORY-ROW-NAME-OVERLAP).
 
 ## Next, in order
 1. live's retakes asked 11-19 ~22:40: drw-revision-table-delete (s9 hover + s10 wait; live's stale frame after
@@ -116,9 +113,12 @@ Ids live only in /root/lead-scratch/roster.md (lead 11-19): read it before every
 into notes.
 
 ## Waiting on others
-- live (id: roster.md): the weld retake, the Measure pairs F-I, asm-menu-release: the Pro retakes
-  (REQUESTS 21:02), the 8 drw-revision-* and drw-styles-dimension retakes; titleblock / holecallout / holetable /
-  export-1119; the Feature Studio retake of f4e766b8.
+- live: drw-revision-table-delete and drw-inspection-table-iso-scrolled retakes (REQUESTS 22:13 / 22:35); whether
+  asm-menu-release's "Items (0)" folder is company-owned only (message 23:4x). Without it the take matches 5/5:
+  company-only -> a runner rule for company-owned starts; every Pro assembly -> asm's missing folder.
+- lead: the remaining Onshape-named strings (decision asked 23:0x).
+- Checked 23:45: titleblock / holecallout / holetable / export / drawprops / note-opts / versions-1119 are all in code
+  and tests; live's 48d3fc9d: part-menu-release 5/5, drw-ref-pin-reference 7/7; Labs scenarios 6/6 (vibex8).
 
 ## Open (no owner action possible yet)
 - live's drw-hole-callout-palette retake (23:03, q-hcp-shots/record.json) has the same states as the take: kept;
