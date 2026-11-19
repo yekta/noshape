@@ -236,6 +236,8 @@ pub(crate) mod ffi {
     struct HlrOut {
         edges: Vec<HlrEdgeF>,
         points: Vec<f64>,
+        /// Hidden exactly (not on the triangulation: polygonal asked, or past the exact pass's work bound).
+        exact: bool,
     }
 
     /// A placed part instance of a .pvz product tree: the part (index into

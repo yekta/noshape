@@ -162,7 +162,11 @@ R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "I
      sm-louver Visible LINE 2175 / 2178 (Front's 144 pieces on the plate edge), clamp-guillem 263 / 268 (the shared
      pairs live keeps kept), extension-spring 114 / 117 (its 6 were overlaps on the extra end rectangle: core).
    - sm-louver TANGENT_LINES 117 / 243: Front same length (78.3 in) in fewer pieces, Top's 32 live end-on stubs
-     (noise); Top's bend tangent at y 6.09203 in (live) has no model edge in ours (nearest 0.02 mm either side): open.
+     (noise). Top's bend tangent (y 6.09203 in) FIXED 00:4x: the model edge was there, drop_covered_hidden took it
+     as lying on the wall's outline 1 mm away (cover tol = deflection, 1.8 mm); exact straight-on-straight now within
+     size x 1e-6 (HlrOut.exact says the view really was exact). DXF: louver LINE 2356 -> 2360, snap-hook 351 -> 352,
+     clamp 263 -> 265, every added line live's but louver's x 7.361 / 7.591 tangents, re-cut (live: one line
+     running through the visible stubs on it; ours pieces, before and after). Hidden edges grow (louver 4321 -> 5224).
    - clamp-guillem Top y 6.5867 x 4.29-4.62: our model edge is there but HLR hides it where it meets a fillet
      tangentially (live visible); ours 7.077-7.161 at 30° live hides: grazing HLR, open. hex ELLIPSE 0 / 2: live's
      degenerate ellipses on a 0.5 mm mesh hole (noise).

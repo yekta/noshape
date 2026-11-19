@@ -589,7 +589,7 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
   HLRAlgo_Projector proj(ax);
   const double      defl = deflection > 0 ? deflection : 0.01;
 
-  HlrOut    out;
+  HlrOut    out{};
   ShapeIMap srcEdges;
   TopExp::MapShapes(s.shape, TopAbs_EDGE, srcEdges);
   const CurveIndex        curves = curve_index(srcEdges);
@@ -604,7 +604,10 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
         bodies.push_back(it.Value());
     std::atomic<bool> spent{false};
     if (bodies.size() >= kChunkedBodies && exact_chunked(em, bodies, proj, ax, spent))
+    {
+      out.exact = true;
       return out;
+    }
     // OCCT's Update swallows a failure loading the shape (HLRBRep_InternalAlgo: the shape's data left empty), seen
     // at random in one of a sheet's views computed at once (c2-rings-loft's drawing lost a whole view): a shape with
     // edges that loads none is loaded again, then hidden on its triangulation, never drawn empty.
@@ -633,6 +636,7 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
         break;
       if (!loaded)
         continue;
+      out.exact                    = true;
       occ::handle<HLRBRep_Data> DS = algo->DataStructure();
       if (DS.IsNull())
         return out;

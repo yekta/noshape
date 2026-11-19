@@ -59,12 +59,14 @@ pub struct ProjectedEdge {
 /// edge (same visibility, class and source) are merged into polylines, with
 /// collinear runs collapsed to single segments.
 pub fn project_hlr_with(shape: &Shape, view_dir: DVec3, up: DVec3, exact: bool, deflection: f64) -> Result<Vec<ProjectedEdge>> {
-    let raw = project_hlr_raw(shape, view_dir, up, exact, deflection)?;
+    let (raw, exact) = hlr_fragments(shape, view_dir, up, exact, deflection)?;
     let defl = if deflection > 0.0 { deflection } else { 0.01 };
     let size = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
     let cover_tol = defl.max(size * 1e-6);
     let join_tol = (size * 1e-7).max(1e-12);
-    Ok(merge_fragments(drop_covered_hidden(raw, cover_tol), join_tol))
+    // Exact lines lie on each other within the model's precision (a curve's chords differ by up to the deflection).
+    let line_tol = if exact { (size * 1e-6).max(1e-12) } else { cover_tol };
+    Ok(merge_fragments(drop_covered_hidden(raw, cover_tol, line_tol), join_tol))
 }
 
 /// Runs `f` with this thread's exact HLR bounded by `steps` of work (OCCT's break-hook checks; tests), past which a
@@ -82,8 +84,14 @@ pub fn with_hlr_exact_work<T>(steps: u64, f: impl FnOnce() -> T) -> T {
 
 /// Unprocessed HLR fragments (see [`project_hlr_with`]).
 pub fn project_hlr_raw(shape: &Shape, view_dir: DVec3, up: DVec3, exact: bool, deflection: f64) -> Result<Vec<ProjectedEdge>> {
+    hlr_fragments(shape, view_dir, up, exact, deflection).map(|f| f.0)
+}
+
+/// [`project_hlr_raw`]'s fragments and whether they were hidden exactly (an exact view past its work bound is
+/// hidden on the triangulation).
+fn hlr_fragments(shape: &Shape, view_dir: DVec3, up: DVec3, exact: bool, deflection: f64) -> Result<(Vec<ProjectedEdge>, bool)> {
     let out = ck(ffi::project_hlr(shape.raw(), p3(view_dir), p3(up), exact, deflection))?;
-    Ok(out
+    let edges = out
         .edges
         .iter()
         .map(|e| {
@@ -104,7 +112,8 @@ pub fn project_hlr_raw(shape: &Shape, view_dir: DVec3, up: DVec3, exact: bool, d
                 freeform: e.source == SOURCE_FREEFORM_OUTLINE,
             }
         })
-        .collect())
+        .collect();
+    Ok((edges, out.exact))
 }
 
 /// [`project_hlr_with`] with a deflection of 1/500 of the shape size.
@@ -140,14 +149,17 @@ impl SegGrid {
 /// Remove the parts of hidden polylines, and of visible tangent edges, that
 /// lie on visible sharp/outline lines (within `tol`): such lines are drawn
 /// visible only (live 1857: a fillet's tangent edge under the outline
-/// circle isn't drawn twice).
-pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64) -> Vec<ProjectedEdge> {
-    let mut vis: Vec<(DVec2, DVec2)> = Vec::new();
+/// circle isn't drawn twice). A straight edge on a straight edge (two-point
+/// polylines) within `line_tol` only: c2-sm-louver's bend tangent 1 mm beside
+/// its wall's outline is drawn (live), not covered at the deflection.
+pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64, line_tol: f64) -> Vec<ProjectedEdge> {
+    // Visible segments, and whether each is a whole straight edge.
+    let mut vis: Vec<(DVec2, DVec2, bool)> = Vec::new();
     for e in &edges {
         if e.visibility == Visibility::Visible && matches!(e.class, EdgeClass::Sharp | EdgeClass::Outline) {
             for w in e.polyline.windows(2) {
                 if w[0].distance_squared(w[1]) > 0.0 {
-                    vis.push((w[0], w[1]));
+                    vis.push((w[0], w[1], e.polyline.len() == 2));
                 }
             }
         }
@@ -157,13 +169,13 @@ pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64) -> Vec<Pr
         return edges;
     }
     let (mut lo, mut hi) = (DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY));
-    for (a, b) in &vis {
+    for (a, b, _) in &vis {
         lo = lo.min(a.min(*b));
         hi = hi.max(a.max(*b));
     }
     let extent = (hi - lo).max_element().max(tol);
     let mut grid = SegGrid { cell: (extent / 128.0).max(tol * 4.0), origin: lo, map: Default::default() };
-    for (i, (a, b)) in vis.iter().enumerate() {
+    for (i, (a, b, _)) in vis.iter().enumerate() {
         for k in grid.cells(*a, *b, tol).collect::<Vec<_>>() {
             grid.map.entry(k).or_default().push(i as u32);
         }
@@ -176,6 +188,7 @@ pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64) -> Vec<Pr
             out.push(e);
             continue;
         }
+        let straight = e.polyline.len() == 2;
         // Uncovered runs along the polyline.
         let mut runs: Vec<Vec<DVec2>> = Vec::new();
         let mut cur: Vec<DVec2> = Vec::new();
@@ -193,7 +206,8 @@ pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64) -> Vec<Pr
             cand.dedup();
             let mut covered: Vec<(f64, f64)> = Vec::new();
             for &ci in &cand {
-                let (c, f) = vis[ci as usize];
+                let (c, f, line) = vis[ci as usize];
+                let near = if straight && line { line_tol } else { tol };
                 let g = f - c;
                 let gl = g.length();
                 if gl <= 0.0 {
@@ -217,7 +231,7 @@ pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64) -> Vec<Pr
                 // Distance from the visible segment's ends to the hidden line
                 // and overlap interval along it.
                 let off = |p: DVec2| (cross2(d, p - a) / dl).abs();
-                if off(c) > tol || off(f) > tol {
+                if off(c) > near || off(f) > near {
                     continue;
                 }
                 let (t0, t1) = ((c - a).dot(d) / l2, (f - a).dot(d) / l2);
@@ -500,16 +514,31 @@ mod tests {
     fn tangent_under_visible_is_dropped() {
         let mut tangent = pe(true, &[[-5.0, 0.0], [15.0, 0.0]], Some(2));
         tangent.class = EdgeClass::Smooth;
-        let r = drop_covered_hidden(vec![pe(true, &[[0.0, 0.0], [10.0, 0.0]], Some(1)), tangent], 1e-6);
+        let r = drop_covered_hidden(vec![pe(true, &[[0.0, 0.0], [10.0, 0.0]], Some(1)), tangent], 1e-6, 1e-6);
         let left: Vec<_> = r.iter().filter(|e| e.class == EdgeClass::Smooth).map(|e| (e.polyline[0].x, e.polyline[e.polyline.len() - 1].x)).collect();
         assert_eq!(left.len(), 2, "{left:?}");
         assert!(left.iter().all(|(a, b)| a.max(*b) <= 1e-9 || a.min(*b) >= 10.0 - 1e-9), "{left:?}");
     }
 
+    /// A straight tangent edge beside a straight outline, inside the curves' cover tolerance but not on it, is drawn
+    /// (c2-sm-louver's Top: the bend's tangent 1 mm from its wall's outline, live draws it); on it, it isn't.
+    #[test]
+    fn a_straight_tangent_beside_an_outline_stays() {
+        let tangent = |y: f64| {
+            let mut t = pe(true, &[[0.0, y], [10.0, y]], Some(2));
+            t.class = EdgeClass::Smooth;
+            t
+        };
+        let r = drop_covered_hidden(vec![pe(true, &[[0.0, 0.0], [10.0, 0.0]], Some(1)), tangent(0.1)], 0.5, 1e-6);
+        assert!(r.iter().any(|e| e.class == EdgeClass::Smooth), "{r:?}");
+        let r = drop_covered_hidden(vec![pe(true, &[[0.0, 0.0], [10.0, 0.0]], Some(1)), tangent(1e-9)], 0.5, 1e-6);
+        assert!(!r.iter().any(|e| e.class == EdgeClass::Smooth), "{r:?}");
+    }
+
     #[test]
     fn hidden_under_visible_is_dropped() {
         let e = vec![pe(true, &[[0.0, 0.0], [10.0, 0.0]], Some(1)), pe(false, &[[-5.0, 0.0], [5.0, 0.0]], Some(2)), pe(false, &[[0.0, 1.0], [5.0, 1.0]], Some(3))];
-        let r = drop_covered_hidden(e, 1e-6);
+        let r = drop_covered_hidden(e, 1e-6, 1e-6);
         let hidden: Vec<_> = r.iter().filter(|x| x.visibility == Visibility::Hidden).collect();
         assert_eq!(hidden.len(), 2);
         let partial = hidden.iter().find(|x| x.source_edge == Some(2)).unwrap();
