@@ -811,6 +811,17 @@ Sheets tickets/asm-snapmode-sheet.png, row-dblclick-sheet.png, drw-feel-1118.png
 - [ ] (psui 11-18 22:49, to verify: the list's 400 ms rule also reads the X server's press times (vendored gpui-pre-linux `last_press`), so a second click handled late on a busy UI thread still counts) - [ ] (qa 09:29 on green 83922ad8 = 850ae7f32: 80 px / 200 ms now opens (live too); 80 px / 330 ms still opens nothing (live opens within ~370-400 ms); 150 px / 200 ms opens, as live (live2 08:2x: 80-163 px along the row opened, off the row didn't; live's "120 px didn't" was a stray, behaviours line 43576; our 150 px click stayed on the row, x 710 of 527-726); same spot opens, 450 ms doesn't, as live; qa-scratch/hv2/rk2) **P1 FEEL-ROW-DBLCLICK-DISTANCE (psui)**: two clicks 80 px apart along the Extrude 1 row, 200 or 330 ms apart, open nothing.
   Live opens the dialog for two clicks on the same row within ~370-400 ms at any distance along it (30 and 80 px did; the 120 px miss was a stray: any distance along the row).
 
+## Interaction feel suite 11-19 (qa 16:20: run 1119-1242-223cec7e on vibex8, failures re-run on green eb3b06a8 on vibe2)
+2110/2172 scenarios (05:51 run on a67911be: 2126). 67 failing; 28 pass on the re-run (load flakes or fixed). The 39 still failing
+went to owners as P0 (skasm 14, studios 15, psui 7, asm 2, dx 1); the regressions since 05:51 are ticketed here. Scores:
+qa-scratch/suites/1119-1610-eb3b06a8-uipr/score.log.
+- [ ] **P0 FEEL-TRIM-PERPENDICULAR (skasm)**: sketch-trim-drag step 17, sketch-trim-key step 10, sketch-undo-trim step 9 (and
+  sketch-line-from-midpoint step 9): a constraint live PERPENDICULAR / ours VERTICAL; all three trim rows passed at 05:51. Likely
+  08a1193a5 ("both ends clear is Vertical") reaching takes where live keeps Perpendicular.
+- [ ] **P0 FEEL-SELECT-FILLET-FACES (psui)**: face-rclick-select-fillet-faces step 3: selection count live 0 / ours 1 (passed 05:51).
+- [ ] **P0 FEEL-VERSION-ROW-TOOLTIP (studios)**: ver-row-tooltip step 2: live "Open version V1" / ours no tooltip (passed 05:51).
+- [ ] **P0 FEEL-DRW-COPY-DRAG (studios)**: drw-copy-annotation-drag step 6: the copied annotation's x live 105.5 / ours 70.6 (passed 05:51).
+
 ## Interaction feel vs live2's 11-18 06:0x numbers (qa 06:55, green cafe3c2af, vibex8 Xvfb at load 8-14, real xdotool pointer; llvmpipe)
 Method: the block (block-fillet) and a sketch-only document, fast sweeps of 4 moves 8 ms apart, one screen crop d ms after the stop per
 run (import takes ~60-100 ms), lit = the light-orange outline; feature list: 45 sketches built by CLI. Data qa-scratch/hv2 (r1-r6).
