@@ -852,6 +852,12 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   tooltip on click", live/qa/dialog-tip-1119 B): shows ~40 ms after hover, fades in over ~250 ms, stays during the press (80 and
   600 ms holds), gone the first frame after release, no fade-out. (qa 11-19, green a58eee8c)
 
+- [ ] P2 **ERROR-CHIP-RED-NO-FIELD (psui)**: Thicken on a box face, Thickness 1 = 0 and Thickness 2 = 0 (behaviours L19): title red,
+  "Thicken 1 did not regenerate properly: Invalid input selections." = live, but ours also draws the "Face of Move face 1" chip in red
+  text. Live flags no field for this error: title red only, the chip stays dark (live/part-studio/2059-psbL16-ThickenL19bothzero.png).
+  The evaluator's err (solid_a.rs:1559) names no parameter, so the red comes from the dialog. Shots: qa-scratch/tickets/
+  thicken-zero-chip-red-1119.png (ours), thicken-zero-chip-live-2059.png. (qa 23:29, green cb6c12e2)
+
 - [ ] P2 **BRAND-IN-UI-TEXT (dx; prefs line: studios)**: + › Import… › a STEP file: the options modal is titled "Import to Onshape"
   (crates/app/src/import_dialog.rs:230); Preferences asks "Enable access to Onshape Labs features?" (prefs_general.rs:476). The app
   is Noshape in all user-facing text (no Onshape brand marks): "Import to Noshape" etc., layout as live. Walk 22:04, green a58eee8c;

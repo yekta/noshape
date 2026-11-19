@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 23:20)
+# QA handoff (agent qa; current state only, updated 2026-11-19 23:30)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -117,8 +117,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    Sketch tools 23:09-23:15: 3-point arc, spline, circumscribed polygon (spinner; Enter commits, Esc discards = live), Slot on a
    line (Ø20), sketch Fillet R5, angle dim, Mirror (line first) = live; P1 SKETCH-SLOT-ON-ARC (skasm, told: arc deleted, Ø0 left).
    Also verify studios f450d0dd (history row ellipsis, "Noshape Labs"). Direct edit 23:18 (Move face 10 mm, Draft on Top, Split
-   refusal toast) = live. Next: Thicken / Delete face / Boolean subtract, re-walk fixes as their greens land. App runs: units qa-xvfb110 + qa-walk*-app
-   (systemd-run, NOSHAPE_CONFIG_DIR per doc), tool search alt+c + name + Return; Esc keeps selection, Space clears.
+   refusal toast) = live. Thicken 23:29 (auto Add, Merge scope, flip on Remove, 0/0 error) = live; P2 ERROR-CHIP-RED-NO-FIELD (psui).
+   asm d67512a33 landed: qa-wait-asm-d673 alerts. Next: Delete face. App runs: qa-xvfb110 + qa-walk*-app, `xdotool windowfocus` FIRST
+   (else Tab never previews), alt+c tool search. tabrel.sh builds via vibe2 slot, 1 retry on SIGTERM (earlyoom 23:01); cb6c rerun 23:27.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
