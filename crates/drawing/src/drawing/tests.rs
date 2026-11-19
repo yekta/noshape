@@ -4183,6 +4183,7 @@ fn tangent_and_hidden_circles_get_no_centermark() {
 /// A base view and a pictorial projection at a scale other than 1:1 keep their label in the DXF when it says nothing,
 /// an orthographic projection doesn't (live's exchange-suite drawings at 1:2 to 1:50: Front and Isometric each one
 /// empty MTEXT in -View-Label on ANNOTATION_TEXT, attached top centre under the view; Right and Top none); at 1:1 none.
+/// A view placed with a tool keeps it at any scale.
 #[test]
 fn cad_export_writes_empty_labels_of_base_and_pictorial_views() {
     use super::cad_export::to_dxf_version;
@@ -4219,6 +4220,10 @@ fn cad_export_writes_empty_labels_of_base_and_pictorial_views() {
     let mut labels = labels;
     labels.sort_by(f64::total_cmp);
     assert!(labels.len() == 2 && (labels[1] / labels[0] - 2.0).abs() < 0.3, "{labels:?}");
+    // A view placed with the Projected view tool keeps it at 1:1 too (live session-drw-1119's Left, qa4-r5-s11).
+    drawing.sheets[0].scale = 1.0;
+    drawing.sheets[0].views[1].placed = true;
+    assert_eq!(label_count(&dxf(&drawing)), 1, "a placed Right view at 1:1");
 }
 
 /// Live drw2-en-ansi-a / drw2-k-dxf2018: the full text style table (36

@@ -2607,12 +2607,14 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 g.texts.push(Text2 { pos: [(lo[0] + hi[0]) / 2.0 + at[0], y + at[1]], height, text, angle: 0.0, anchor: Anchor::TopCenter, pick: label_pick });
                 y -= height + 2.0;
             }
-            // A base or pictorial view at a scale other than 1:1 keeps its label when it says nothing: live's DXF has an
-            // empty MTEXT there (the exchange suite's drawings at 1:2 to 1:50: Front and Isometric each one, the Right
-            // and Top projected beside Front none; its three at 1:1 none). Nothing to pick or drag on the sheet.
+            // A view placed with a tool, or Create drawing's base or pictorial view at a scale other than 1:1, keeps its
+            // label when it says nothing: live's DXF has an empty MTEXT there (the exchange suite's drawings at 1:2 to
+            // 1:50: Front and Isometric each one, the Right and Top projected beside Front none; its three at 1:1 none;
+            // tool-placed views at any scale). Nothing to pick or drag on the sheet.
             let pictorial = matches!(v.kind, ViewKind::Projected { .. }) && views::projected_direction(sheet, v.id).is_some_and(|d| d[0] != 0.0 && d[1] != 0.0);
             let scaled = (views::view_scale(sheet, v.id) - 1.0).abs() > 1e-12;
-            if g.texts.len() == label_mark && scaled && (matches!(v.kind, ViewKind::Base { .. }) || pictorial) {
+            let plain = matches!(v.kind, ViewKind::Base { .. } | ViewKind::Projected { .. });
+            if g.texts.len() == label_mark && plain && (v.placed || scaled && (matches!(v.kind, ViewKind::Base { .. }) || pictorial)) {
                 g.texts.push(Text2 { pos: [(pl.min[0] + pl.max[0]) / 2.0 + at[0], pl.min[1] - 6.0 + at[1]], height: lh, text: String::new(), angle: 0.0, anchor: Anchor::TopCenter, pick: 0 });
             }
             g.cad_text_style_since(label_mark, CadTextStyle::ViewLabel);

@@ -487,6 +487,10 @@ pub struct DrawingView {
     /// (section, detail, auxiliary): the label isn't drawn.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub hide_label: bool,
+    /// Placed with Insert view or Projected view, not made by Create drawing: live's DXF writes its label even
+    /// when it says nothing (qa4-r5-s11's four views at 1:1, session-drw-1119's Left; the dialog's Top and Right none).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub placed: bool,
     /// Rotation of the view on the sheet (radians, counter-clockwise).
     #[serde(default)]
     pub rotation: f64,
@@ -849,6 +853,7 @@ impl Default for DrawingView {
             label_prefix: None,
             label_suffix: None,
             hide_label: false,
+            placed: false,
             rotation: 0.0,
             crop: None,
             breaks: Vec::new(),

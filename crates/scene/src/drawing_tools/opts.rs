@@ -111,7 +111,7 @@ impl SheetPick<'_> {
         // Base views take Drawing properties › Views › Insert view
         // defaults; derived views copy their parent's.
         let mk = |kind: ViewKind, position: [f64; 2], parent: Option<&DrawingView>| {
-            let mut v = DrawingView { id, kind, position, scale: None, label: None, ..Default::default() };
+            let mut v = DrawingView { id, kind, position, scale: None, label: None, placed: true, ..Default::default() };
             match parent {
                 Some(p) => {
                     // Live: child views don't inherit shading, except details

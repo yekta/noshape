@@ -8638,6 +8638,51 @@ fn a_sections_hole_rims_are_one_line_each() {
     }
 }
 
+/// A view placed with the Projected view tool writes its empty label to the DXF, as live: session-drw-1119's
+/// suggested views at 1:2 have one under Front and the Isometric (Top and Right none), the Left view placed after
+/// them one more.
+#[test]
+fn a_placed_views_empty_label_is_in_the_dxf() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "placed-label.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let empty_labels = |ctx: &mut Ctx, name: &str| {
+        let dxf = scratch(name);
+        call(ctx, "drawing_export", json!({ "drawing": tab, "format": "DXF", "file": dxf.to_str().unwrap() }));
+        let text = String::from_utf8_lossy(&std::fs::read(&dxf).unwrap()).to_string();
+        let lines: Vec<&str> = text.lines().map(str::trim).collect();
+        // Each MTEXT's layer and text (codes 8 and 1).
+        let mut n = 0;
+        let mut i = 0;
+        while i + 1 < lines.len() {
+            if lines[i] == "0" && lines[i + 1] == "MTEXT" {
+                let mut j = i + 2;
+                let (mut layer, mut text) = ("", None);
+                while j + 1 < lines.len() && lines[j] != "0" {
+                    match lines[j] {
+                        "8" => layer = lines[j + 1],
+                        "1" => text = Some(lines[j + 1]),
+                        _ => {}
+                    }
+                    j += 2;
+                }
+                n += usize::from(layer == "ANNOTATION_TEXT" && text.unwrap_or("").is_empty());
+                i = j;
+            } else {
+                i += 1;
+            }
+        }
+        n
+    };
+    let before = empty_labels(&mut ctx, "placed-label-0.dxf");
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }));
+    let front = g["views"].as_array().unwrap().iter().find(|v| v["kind"] == "base").unwrap().clone();
+    let (x, y) = (num(&front["bounds"]["min"][0]) - 60.0, (num(&front["bounds"]["min"][1]) + num(&front["bounds"]["max"][1])) / 2.0);
+    call(&mut ctx, "drawing_projected_view", json!({ "drawing": tab, "parent": front["id"], "position": [x, y] }));
+    assert_eq!(empty_labels(&mut ctx, "placed-label-1.dxf"), before + 1, "the placed Left view's label");
+}
+
 /// An automatic centermark is sized to the widest circle seen on its axis, not to a counterbore hidden on the far side,
 /// and shrinks to 0.7 r only for a circle smaller than its cross and gap (0.09 in at the defaults): live's clamp-guillem
 /// (r 2 mm with a r 3.5 mm counterbore behind: arms to r + 0.7 r; r 2.75 mm: ±0.045 in, arms to r + 0.09 in),
