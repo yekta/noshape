@@ -344,6 +344,27 @@ fn up_to_next_reaches_a_surface() {
     assert!(v.len() == 1 && near(v[0], PI * 0.003f64.powi(2) * 0.03, 1e-6), "{v:?}");
 }
 
+/// A surface Loft between two open curves in one plane builds the patch between them (live: c2-surf-intro-boundary's
+/// source's Loft 3, the car's rear panel between two edges in y = 254 mm); closed profiles in one plane stay
+/// "Could not determine loft direction.".
+#[test]
+fn surface_loft_between_coplanar_open_curves() {
+    let mut t = T::new();
+    let mut item = |x: f64| {
+        let mut sk = noshape_sketch::Sketch::new();
+        let l = sk.add_line(DVec2::new(x, 0.0), DVec2::new(x, 0.01)).0;
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let mut v = ParamValues::default();
+        v.set("wireProfileEntities", q(vec![Reference::SketchEntity { sketch: s, entity: l }]));
+        v
+    };
+    let (a, c) = (item(0.0), item(0.02));
+    let loft = t.add("loft", &[("bodyType", en("SURFACE")), ("wireProfilesArray", ParamValue::Array(vec![a, c]))]);
+    let res = t.ok();
+    let area: f64 = res.context.bodies.iter().filter(|b| b.id.feature == loft).flat_map(|b| b.shape.faces()).map(|f| f.area().unwrap()).sum();
+    assert!(near(area, 0.02 * 0.01, 1e-6), "{area}");
+}
+
 /// A surface Sweep cuts its path only at its profile's own plane (c2-surf-workshop-mutualtrim's Sweep 1: the profile's
 /// sketch on Plane 1, the path cut where it crossed Top, 3476.71 mm2 of live's 8896.85).
 #[test]

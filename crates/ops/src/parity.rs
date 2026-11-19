@@ -218,6 +218,8 @@ pub struct Translator<'a> {
     live_states: Value,
     /// The sub-feature whose parameters are being translated: live's refs name them `subFeature:<id>.<parameter>`.
     sub_feature: Option<String>,
+    /// The array item whose parameters are being translated: live's refs name them `<array>[<i>].<parameter>`.
+    array_item: Option<String>,
     /// Onshape Feature Studio element id → our Feature Studio tab id.
     studios: HashMap<String, String>,
     /// What isn't translated of the document itself (configuration inputs…).
@@ -492,7 +494,7 @@ impl<'a> Translator<'a> {
                 config_defaults.entry(k.to_string()).or_insert_with(|| v.to_string());
             }
         }
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, stale_uses: false, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, live_states: doc["featureStates"].clone(), sub_feature: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), derived_sketches: HashMap::new(), sketch_tabs: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, stale_uses: false, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, live_states: doc["featureStates"].clone(), sub_feature: None, array_item: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), derived_sketches: HashMap::new(), sketch_tabs: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -2364,10 +2366,13 @@ impl<'a> Translator<'a> {
                 self.picked.clear();
                 let mut queries: Vec<Value> = p["queries"].as_array().cloned().unwrap_or_default();
                 // A query live's fetch names no ids for, evaluated by live for this parameter (refs.jsonl): its ids.
-                let pid = match &self.sub_feature {
-                    Some(sub) => format!("subFeature:{sub}.{}", p["parameterId"].as_str().unwrap_or("")),
-                    None => p["parameterId"].as_str().unwrap_or("").to_string(),
-                };
+                let mut pid = p["parameterId"].as_str().unwrap_or("").to_string();
+                if let Some(item) = &self.array_item {
+                    pid = format!("{item}.{pid}");
+                }
+                if let Some(sub) = &self.sub_feature {
+                    pid = format!("subFeature:{sub}.{pid}");
+                }
                 let mine: Vec<(String, Option<usize>)> = self.refs.iter().filter(|((i, _), r)| *i == k && r.parameters.contains(&pid)).map(|((_, id), r)| (id.clone(), r.query)).collect();
                 let mut evaluated: Vec<String> = mine.iter().map(|(id, _)| id.clone()).collect();
                 evaluated.sort();
@@ -2471,16 +2476,30 @@ impl<'a> Translator<'a> {
             }
             "BTMParameterArray" => {
                 let mut items = Vec::new();
-                for it in p["items"].as_array().into_iter().flatten() {
+                let outer = self.array_item.clone();
+                let array = p["parameterId"].as_str().unwrap_or("");
+                for (i, it) in p["items"].as_array().into_iter().flatten().enumerate() {
                     let mut m = Map::new();
+                    // (Live's refs name an item's queries by its place: c2-surf-intro-boundary's source's Loft 3 lofts
+                    // between `wireProfilesArray[0]` and `[1]`'s rear edges; by its text the second was another edge.)
+                    self.array_item = Some(match &outer {
+                        Some(o) => format!("{o}.{array}[{i}]"),
+                        None => format!("{array}[{i}]"),
+                    });
                     for ip in it["parameters"].as_array().into_iter().flatten() {
                         let Some(id) = ip["parameterId"].as_str() else { continue };
-                        if let Some(v) = self.param(k, ip)? {
+                        let v = self.param(k, ip);
+                        let Ok(v) = v else {
+                            self.array_item = outer;
+                            return v;
+                        };
+                        if let Some(v) = v {
                             m.insert(id.to_string(), v);
                         }
                     }
                     items.push(Value::Object(m));
                 }
+                self.array_item = outer;
                 Some(json!(items))
             }
             // A configured parameter: the default configuration's value

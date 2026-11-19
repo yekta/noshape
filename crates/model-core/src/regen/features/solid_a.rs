@@ -1290,9 +1290,11 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         opts.closed |= sections.len() > 2 && spine.is_closed().unwrap_or(false);
         opts.path = Some((spine.clone(), ev.integer("sectionCount")?.max(1) as usize));
     }
-    // Onshape's LOFT_DIRECTION_ERROR: profiles all in one plane, with no path to run along (live err18: a circle and a
-    // square both sketched on Top).
-    if opts.path.is_none() && sections.iter().all(|s| s.profile.is_some()) && Shape::compound(&shapes).find_plane(1e-7)?.is_some() {
+    // Onshape's LOFT_DIRECTION_ERROR: closed profiles all in one plane, with no path to run along (live err18: a circle
+    // and a square both sketched on Top). Open ones loft across that plane (c2-surf-intro-boundary's source's Loft 3: the
+    // car's rear panel between two edges in y = 254 mm).
+    let closed = |s: &Shape| s.shape_type() == ShapeType::Face || s.is_closed().unwrap_or(true);
+    if opts.path.is_none() && sections.iter().all(|s| s.profile.is_some()) && shapes.iter().any(closed) && Shape::compound(&shapes).find_plane(1e-7)?.is_some() {
         return err("Could not determine loft direction.");
     }
     // Onshape's LOFT_CONNECTION_MATCHING: every connection needs a point on
