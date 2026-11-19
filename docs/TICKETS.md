@@ -885,6 +885,12 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   30 / max 35, then min 0 / max 5 (disjoint ranges): the part never moves in the preview; it turns only on Solve or ✓.
   Live (behaviours "asm (lead 11-18 ~01:15 …) mate limits", r1-r4): a typed limit applies to the preview at once, the part
   turning into the range within ~1 s. Drag clamping at the limit after ✓ is = live. Green 624c6db77, walk 22:4x.
+- [ ] P2 **SMM-EXTRUDE-CLOSED-PROFILE (skasm)**: Sheet metal model › Extrude of a closed 100 × 60 rectangle (Blind 25, 1.6 /
+  2.3 mm): ours fails, chip red, no part, "Sheet metal model 1 did not regenerate properly: Failed to extrude selections."
+  Live (behaviours "qa (11-19): sheet metal extrude of a closed rectangle", live/qa/smm-closed-1119/) BUILDS it: one part,
+  a closed box of 4 walls with bends at all 4 corners (32 faces: 8 cylinder + 24 plane, 64 edges, 12843.115 mm³); the
+  feature ends in a warning, name red, tooltip "Sheet metal model 1 did not regenerate properly: Sheet metal model cannot
+  be unfolded." and no flat pattern. Green 624c6db77, walk 22:45. The open L and a Flange on it are = live.
 
 ## Interaction feel suite 11-19 (qa 16:20: run 1119-1242-223cec7e on vibex8, failures re-run on green eb3b06a8 on vibe2)
 2110/2172 scenarios (05:51 run on a67911be: 2126). 67 failing; 28 pass on the re-run (load flakes or fixed). The 39 still failing

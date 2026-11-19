@@ -109,7 +109,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    rows, drag clamp, Part 2 Fix, drawing Update (ctrl+q) redraws views keeping the dimension, Sheet properties Size B = live; filed
    P1 ASM-DRAG-UNFIXED-GROUP + P1 ASM-LIMIT-TYPED-NO-PREVIEW (asm, told). Sheet metal 22:4x (Part Studio 2): Sheet metal model
    Extrude of an open L, Flange 25 mm, table (Bend A/B 2.3 mm 90° Up K 0.45) + flat view = live; closed rectangle fails 'Failed to
-   extrude selections.': live REQUESTS qa (11-19 22:46), live told; ticket only if live builds it. Next: Slider / Planar mates,
+   extrude selections.': live builds it (warning, no flat) -> P2 SMM-EXTRUDE-CLOSED-PROFILE (skasm). asm's b146b56f (both P1s): verify by hand on its green. Next: Slider / Planar mates,
    exploded views, BOM edits, drawing tables + notes. App runs: units qa-xvfb110 + qa-walk*-app
    (systemd-run, NOSHAPE_CONFIG_DIR per doc), tool search alt+c + name + Return; Esc keeps selection, Space clears.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
