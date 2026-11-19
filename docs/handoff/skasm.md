@@ -3,7 +3,7 @@
 Updated 2026-11-19 22:45 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight 23:18: one land after suite O (vibex7, /root/skasm-scratch/suiteo.out, log ~/agents/skasm-keep/suite-O-*.log on vibex7; N stopped unrun)
+## In flight 23:18: one land after suite O (vibex6 under nice 19, lead one-off; /root/skasm-scratch/suiteo.out, log ~/agents/skasm-keep/suite-O-*.log on vibex6; J is on vibex7)
 Compare per document with suite J (vibex7 ~/tmp/skasm/suite-J-1119-1831.log.s.c: `sed` the "name: N/M features match"
 lines to "name N/M", LC_ALL=C sort, join, awk $2!=$3). None worse -> land.sh. The stack:
 - Extrude part order (3ff5480f): a New extrude's regions of one sketch go in drawing order (the lowest entity id of each
