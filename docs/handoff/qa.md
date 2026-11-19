@@ -86,7 +86,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    Walk 21:55: Hole (point inside the face) = live: Merge scope "Part 1" auto, callout preview; mass properties (bottom-right icon
    "Display mass and section properties"): volume / area, red chip, blank CoM / inertia without material = live (the one-time toast
    3.6 s after the first open not caught: shots too early; parity interaction.md 5.2 says =); face + hole rim measure readout plausible.
-   Next: P2 assemblies (insert, mates, drag, BOM), then drawings, import/export. App runs: units qa-xvfb110 + qa-walk*-app
+   P2 assemblies 22:0x (walk2 Assembly 1): Insert dialog, 2 instances, fit, free drag, Fastened between hole faces (HUD, Solve),
+   BOM panel = live (Item | Quantity | Part number | Description, "1 | 2"). Decision needed (to the lead): the mate dialog draws
+   "☐ Simulation connection" (skasm audit S24 added it to match live) vs DECISIONS 11-16 (left-out features' rows not drawn).
+   Next: drawings (create from part, views, dimension, export PDF/DXF), import / export (STEP round trip). App runs: units qa-xvfb110 + qa-walk*-app
    (systemd-run, NOSHAPE_CONFIG_DIR per doc), tool search alt+c + name + Return; Esc keeps selection, Space clears.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
