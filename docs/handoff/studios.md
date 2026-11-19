@@ -9,33 +9,41 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-19 17:24 UTC. Restarted 11-19 ~11:35 as a fresh thread (the previous one, 58e9bca8, hit its account's
-weekly limit).
+Updated 2026-11-19 21:01 UTC. Moved to another account at 21:00 (Motile's session limit); the next thread starts
+from this file.
 
 ## In flight
 
-Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2
-tools/tiers/land.sh` (`--no-precheck` only when the code was clippy-checked unchanged); builds / tests
-`NOSHAPE_RB_HOST=<lowest load of vibex7 / vibex8 / vibe2> tools/tiers/rb.sh` (warm studios target on vibex7). rb.sh
-skips a file edited during a running sync: `touch` edited files before the next run. Scenario runs: vibe2
-~/agents/studios-uip (rsync tools/ui-parity tests/ui-parity there), app at ~/tmp/studios/noshape, Xvfb :391
-(pid in ~/tmp/studios/xvfb.pid); an app built on vibex7 goes vibex7 → here → vibe2 (no host-to-host ssh).
-- Landed 11-19: 3046bb31, 0e754c57, 6017f81c (P0 Ø fraction crash), 66f57e48 (note-opts, hole plate, CSVs, Merge order).
-- Queued 11-19 ~17:25, one stack: qa's 15 feel rows (11-19 16:10): fixed drw-copy-annotation-drag (Alt press on a
-  selected note's side grip resized it), ver-row-tooltip (two-stage tip, live2 versions-1119), drw-constraint-* and
-  drw-sketch-tool-center-point-rectangle (▾ rows without keys), drw-geometric-tolerance (edge click places a frame,
-  e33eb4a42's leader reverted: live2 gtol-1119); drw-view-replicate-region-place now replicates (snap by the vertex
-  under which the whole dimension lands) but onto the Top view's other 40 mm edge (ours y 153.5, live 184): live's
-  rule between two matching edges asked of live2. Not targets: drw-note-insert-drawing-property (live's drawing is
-  named "Part 1 Drawing 1 (1)", its longer name moves the note's centre 2.6 mm), part-/asm-menu-release s3 (11-06/07
-  takes on the free plan's upsell; live Pro's Release dialog ignores Esc, docs-versions-release-1118),
-  drw-inspection-table-iso-scrolled s2 and drw-revision-table-delete s8 (known). live2 drawprops retake: tolerance
-  precision resets with units (1/256, 0.1 mm), linear fractional values stacked. Note ruler tail drawn triangles.
-  Documents table pinned columns (`Pins`).
-- live2 versions-1119: (b) was live2's artefact; (c)–(e) already as live.
-- Not targets: drw-revision-table-delete s8, drw-inspection-table-iso-scrolled s2; drw-canvas-zoom-to-sheet /
-  drw-ref-pin-reference have no usable recording.
-- Open: the Measure readout of a point / circle pick ("Point 1", "Circle 1" names and rows are our guess).
+Nothing uncommitted; nothing queued. Worktree /root/projects/noshape-wt/studios, branch studios-0811a, rebased on
+main. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh` (`--no-precheck` only when the code was
+clippy-checked unchanged); read `git diff --stat origin/main` first. Builds / tests `NOSHAPE_RB_HOST=<lowest load of
+vibex7 / vibex8 / vibe2> tools/tiers/rb.sh` (warm studios target on vibex7). rb.sh skips a file edited during a running
+sync: `touch` edited files before the next run. Scenario runs: vibe2 ~/agents/studios-uip (rsync tools/ui-parity
+tests/ui-parity there), app at ~/tmp/studios/noshape, Xvfb :391 (pid in ~/tmp/studios/xvfb.pid); an app built on
+vibex7 goes vibex7 -> here -> vibe2 (no host-to-host ssh). Run the full ops e2e before any drawing land.
+- Landed 11-19: 6055ccb5 / f96abd03 / b5440871 / e811acc1 (qa's 15 feel rows, ruler tail, pinned columns), 3046bb31,
+  0e754c57, 6017f81c (P0 Ø fraction crash), 66f57e48 (note-opts, hole plate, CSVs, Merge order).
+- qa's 15 feel rows (11-19 16:10), checked in the app against live's takes on vibe2: drw-copy-annotation-drag,
+  ver-row-tooltip, drw-constraint-coincident / -vertical / -perpendicular, drw-sketch-tool-center-point-rectangle,
+  drw-geometric-tolerance match. Not run against takes: drw-constraint-parallel (same ▾-label fix),
+  drw-constraint-tangent (live's take misfired; live2 retake pending).
+- Not targets (decision asked of the lead 11-19 ~17:30: mark as known differences or retake on Pro):
+  drw-note-insert-drawing-property (live's drawing is named "Part 1 Drawing 1 (1)", its longer name moves the note's
+  centre 2.6 mm), part-/asm-menu-release s3 (free-plan upsell takes; live Pro's Release dialog ignores Esc,
+  docs-versions-release-1118), drw-inspection-table-iso-scrolled s2 and drw-revision-table-delete s8 (known);
+  drw-canvas-zoom-to-sheet / drw-ref-pin-reference have no usable recording.
+- live2 versions-1119: (b) was live2's artefact; (c)-(e) already as live.
+
+## Next, in order
+1. drw-view-replicate-region-place (feel row, partly fixed): ours replicates and shows live's message, but onto the
+   Top view's front 40 mm edge (y 153.5); live puts it at y 184, 8.2 mm above the Top view's back edge (model y 30),
+   the same offset the Front original has above its edge. live2 (d7f4a0c2) is capturing four replicate-region takes
+   to settle the rule; then change the candidate choice in `replicate_into` (crates/scene/src/drawing_tools/
+   replicate.rs: today nearest candidate under which every ref lands) and verify with the take on vibe2.
+2. drw-constraint-tangent: run live2's retake when it arrives.
+3. The lead's answer on the not-target takes above (DECISIONS / ui-parity `live_defects`).
+4. Open: the Measure readout of a point / circle pick ("Point 1", "Circle 1" names and rows are our guess).
+5. Then the feel rows below and the lead's queue (11-17).
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
 - live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell
@@ -118,7 +126,7 @@ bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0. live is paused until ~21:00 11-19: c
 Paused agents are not messaged (DECISIONS 11-17); stopped: qa 132756b3, psui 4973e295, live2 79ae5cdb.
 
 ## Waiting on others
-- live2 (d7f4a0c2): the weld retake (metric positions); drawprops-1119, note-opts-1119; retakes of 4fc2ea4f's rows and
+- live2 (d7f4a0c2): four replicate-region takes; drw-constraint-tangent retake; the weld retake (metric positions); retakes of 4fc2ea4f's rows and
   Callout once green. live (e8549719): the 8 drw-revision-* and drw-styles-dimension retakes; titleblock / holecallout
   / holetable / export-1119; the Feature Studio retake of f4e766b8 once green.
 
@@ -128,9 +136,6 @@ Paused agents are not messaged (DECISIONS 11-17); stopped: qa 132756b3, psui 497
 - Assembly "?" rows: a list row's tooltip (live2 ~70 ms), a selected instance's outline through other parts in
   explode mode, a Revolute-constrained drag's grab point.
 - Release gap list: all done (Release all configurations…, the outdated associated drawing: 11-18).
-
-## Next, in order
-See "In flight" and "Lead's queue (11-17)".
 
 ## How to run
 
