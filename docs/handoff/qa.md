@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 22:32)
+# QA handoff (agent qa; current state only, updated 2026-11-19 22:44)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -105,7 +105,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    after-✓ outline; a cancelled sketch's lit point stays). Walk 22:2x: Trim, Plane (offset 25), Loft (2 sketches), Sweep (auto Add
    on Part 1), Offset (5 mm box, arrow) OK; P1 OFFSET-EDIT-SCALES-SKETCH (skasm, told). Variable Studio (tab after active, Length 0 mm,
    #len autocomplete, VS edit rebuilds the Part Studio) and configurations (Configure Part Studio list, field right-click Configure,
-   toast, Long 4 mm chamfer) = live. Next: assembly mates (Revolute / Slider / limits), drawing dims + sheet edits. App runs: units qa-xvfb110 + qa-walk*-app
+   toast, Long 4 mm chamfer) = live. Walk 22:3x-22:43 (green 624c6db77): Insert with Configuration ▾, Revolute (HUD, Solve), limit
+   rows, drag clamp, Part 2 Fix, drawing Update (ctrl+q) redraws views keeping the dimension, Sheet properties Size B = live; filed
+   P1 ASM-DRAG-UNFIXED-GROUP + P1 ASM-LIMIT-TYPED-NO-PREVIEW (asm, told). Next: Slider / Planar mates, exploded views, BOM edits,
+   drawing tables + notes, then sheet metal (flange / flat). App runs: units qa-xvfb110 + qa-walk*-app
    (systemd-run, NOSHAPE_CONFIG_DIR per doc), tool search alt+c + name + Return; Esc keeps selection, Space clears.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
