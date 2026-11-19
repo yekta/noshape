@@ -158,6 +158,8 @@ pub struct FeatureDialog {
     /// it keeps the focus until the user leaves it and clicks back in (live behaviours "psui (2026-10-31,
     /// PRIORITY) selection-field auto-advance", rule 6).
     pub advance_disarmed: Option<String>,
+    /// The title as an edit box (Shift+N in a sketch, live shortcuts-sk-1118): Enter or leaving it names the feature.
+    title_edit: Option<(Entity<InputState>, Subscription)>,
     /// The field the open Create selection dialog fills (white with a blue
     /// border while it is open, live part-studio/395).
     pub cs_target: Option<String>,
@@ -377,6 +379,35 @@ impl FeatureDialog {
         cx.notify();
     }
 
+    /// Shift+N in a sketch: the title becomes an edit box with the name selected (live shortcuts-sk-1118).
+    pub fn start_title_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let st = cx.new(|cx| InputState::new(window, cx).default_value(self.feature.name.clone()));
+        let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
+            if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+                let v = st.read(cx).value().trim().to_string();
+                if !v.is_empty() {
+                    this.feature.name = v;
+                }
+                // Enter leaves the keyboard with the dialog (its keys and the sketch's still work).
+                if matches!(ev, InputEvent::PressEnter { .. }) {
+                    window.focus(&this.focus, cx);
+                }
+                this.title_edit = None;
+                cx.notify();
+            }
+        });
+        st.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
+        self.title_edit = Some((st, sub));
+        cx.notify();
+    }
+
+    pub fn title_editing(&self) -> bool {
+        self.title_edit.is_some()
+    }
+
     pub fn new(feature: Feature, units: UnitPrefs, labeler: RefLabeler, cx: &mut Context<Self>) -> Self {
         let ty = feature.feature_type().expect("registered feature type");
         let mut feature = feature;
@@ -412,6 +443,7 @@ impl FeatureDialog {
             configurable_inputs: false,
             active_query: None,
             advance_disarmed: None,
+            title_edit: None,
             cs_target: None,
             cs_buttons: Default::default(),
             subs: Vec::new(),
@@ -4544,7 +4576,10 @@ impl Render for FeatureDialog {
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(title_color)
                             .truncate()
-                            .child(crate::ui::user_text(name))
+                            .map(|d| match &self.title_edit {
+                                Some((st, _)) => d.child(div().debug_selector(|| "dialog-title-edit".into()).child(Input::new(st).small())),
+                                None => d.child(crate::ui::user_text(name)),
+                            })
                             .when_some(error_tip, |d, m| d.tooltip(crate::ui::tooltip(m)))
                             // Live (behaviours 2388): the title isn't editable; features are renamed in the list.
                     )

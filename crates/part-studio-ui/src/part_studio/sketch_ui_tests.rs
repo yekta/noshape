@@ -6103,3 +6103,41 @@ fn the_configurations_box_stays_one_input_tall_with_two(cx: &mut TestAppContext)
     let two = box_h(cx);
     assert!((one - two).abs() < px(0.5), "one input {one:?}, two {two:?}");
 }
+
+/// Live's sketch keys (interaction-feel shortcuts-sk-1118): Ctrl+M does nothing; ` with nothing under the pointer
+/// opens Select other "(No selections found)"; Shift+X opens Section view over the sketch, its Esc leaving the sketch
+/// open; Shift+N makes the sketch dialog's name an edit box, Enter naming the sketch; Shift+V closes the sketch (as
+/// ✓) and opens Named views.
+#[gpui::test]
+fn sketch_keys_as_lives(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "sk-keys", Tool::Select);
+    let open = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch.is_some());
+    keys(cx, window, &["ctrl-m"]);
+    assert!(open(cx), "Ctrl+M leaves the sketch open");
+    assert_eq!(cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.read(cx).feature.type_id.clone())), Some("sketch".to_string()), "no Mate connector");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: DVec2::new(900.0, 150.0), modifiers: Modifiers::default() }, w, cx);
+        });
+    })
+    .unwrap();
+    draw(cx, window);
+    keys(cx, window, &["`"]);
+    assert_eq!(cx.update(|cx| view.read(cx).ui.select_other.as_ref().map(|s| s.hits.len())), Some(0), "the empty Select other box");
+    keys(cx, window, &["escape"]);
+    assert!(cx.update(|cx| view.read(cx).ui.select_other.is_none()) && open(cx), "Esc closes the box, the sketch stays");
+    keys(cx, window, &["shift-x"]);
+    assert!(cx.update(|cx| view.read(cx).ui.section_dialog.is_some()) && open(cx), "Section view over the sketch");
+    keys(cx, window, &["escape"]);
+    assert!(cx.update(|cx| view.read(cx).ui.section_dialog.is_none()) && open(cx), "its Esc leaves the sketch open");
+    keys(cx, window, &["shift-n"]);
+    assert!(cx.update(|cx| view.read(cx).edit.as_ref().is_some_and(|e| e.dialog.read(cx).title_editing())), "the name is an edit box");
+    keys(cx, window, &["B", "o", "x", "enter"]);
+    assert_eq!(cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.read(cx).feature.name.clone())), Some("Box".to_string()));
+    assert!(open(cx), "Enter in the name leaves the sketch open");
+    keys(cx, window, &["shift-v"]);
+    assert!(!open(cx) && cx.update(|cx| view.read(cx).named_views.is_some()), "Shift+V: the sketch closed, Named views open");
+    let names: Vec<String> = cx.update(|cx| view.read(cx).studio(cx).map(|s| s.features.iter().map(|f| f.name.clone()).collect()).unwrap_or_default());
+    assert!(names.iter().any(|n| n == "Box"), "the sketch kept as Box: {names:?}");
+}

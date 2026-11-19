@@ -589,6 +589,8 @@ pub struct SketchEditor {
     /// End point of the previous line (chaining).
     chain_end: Option<EntityId>,
     pub cursor: Option<DVec2>,
+    /// A draw tool started while the pointer rests: nothing is drawn at it until it moves (live shortcuts-sk-1118).
+    pointer_rests: bool,
     pub inference: Option<Inference>,
     /// The entity the last freshly chosen snap was on: kept while it is still under the pointer (live's getInference
     /// lastInferenceTarget; not cleared when nothing is under the pointer).
@@ -1384,6 +1386,7 @@ impl SketchEditor {
         Self {
             feature,
             frame,
+            pointer_rests: false,
             scene_arms: None,
             tool: Tool::Select,
             clicks: Vec::new(),
@@ -1527,6 +1530,7 @@ impl SketchEditor {
         }
         if self.tool != previous {
             self.pattern_label_wpp = self.world_per_px;
+            self.pointer_rests = self.tool.draws();
         }
         // Choosing a drawing tool clears the selection (live: L with a line
         // selected deselects it).
@@ -2023,6 +2027,7 @@ impl SketchEditor {
         } else {
             self.center_arc_sweep = 0.0;
         }
+        self.pointer_rests &= self.cursor == Some(p);
         self.cursor = Some(p);
         self.shift_held = shift;
         self.alt_held = alt;
@@ -2476,6 +2481,7 @@ impl SketchEditor {
             return EditOutcome::none();
         }
         self.cursor = Some(p);
+        self.pointer_rests = false;
         // A dimension being placed takes the press (live: ui-parity
         // sketch-dimension-edit, its value over the line's Horizontal glyph),
         // and so does a drawing tool (live ui-parity revolve-dialog-axis: a
@@ -6151,7 +6157,7 @@ impl SketchEditor {
             lines.push_polyline(&pts3, color, 0, 2.0, on_top | if dashed { LineSegment::DASHED } else { 0 });
         };
         let circle_pts = |c: DVec2, r: f64, n: usize| -> Vec<DVec2> { (0..=n).map(|i| c + DVec2::from_angle(i as f64 / n as f64 * TAU) * r).collect() };
-        let cursor = self.snapped().map(|s| s.0);
+        let cursor = self.snapped().map(|s| s.0).filter(|_| !self.pointer_rests);
         if let Some(c) = cursor {
             let anchors: Vec<DVec2> = self.clicks.iter().map(|k| k.pos).collect();
             match self.tool {
@@ -11032,6 +11038,24 @@ mod tests {
     /// Live errors-1118: a dimension the Dimension tool added driven (it over-defines a dimensioned rectangle) takes a
     /// typed value as a driving dimension, the redundant 40 as the conflicting 50: kept, the sketch not solved, its
     /// shape as it was. Enter on the untouched box (no value typed) leaves it driven (live qa4 r5 s5).
+    /// Live shortcuts-sk-1118: a draw tool started from its key with the pointer resting draws nothing at the pointer
+    /// until it moves (ours drew the tool's blue dot there).
+    #[test]
+    fn a_draw_tool_from_its_key_draws_nothing_until_the_pointer_moves() {
+        for tool in [Tool::Circle, Tool::CenterRect, Tool::CornerRect, Tool::Line, Tool::Arc3, Tool::Point] {
+            let (mut ed, mut d) = editor(Tool::Select);
+            let units = UnitPrefs::default();
+            let _ = ed.pointer_move(&mut d, v(0.01, 0.01), false, false);
+            ed.set_tool(tool);
+            let (_, points) = ed.overlay(&d, &units);
+            assert!(points.points.is_empty(), "{tool:?}: {} points at the resting pointer", points.points.len());
+            let _ = ed.pointer_move(&mut d, v(0.01, 0.01), false, false);
+            assert!(ed.overlay(&d, &units).1.points.is_empty(), "{tool:?}: a move to the same spot isn't a move");
+            let _ = ed.pointer_move(&mut d, v(0.011, 0.01), false, false);
+            assert!(!ed.overlay(&d, &units).1.points.is_empty(), "{tool:?}: drawn once the pointer moves");
+        }
+    }
+
     #[test]
     fn a_typed_value_makes_an_over_defining_dimension_driving() {
         for typed in ["40", "50"] {

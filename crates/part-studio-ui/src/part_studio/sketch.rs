@@ -5013,7 +5013,12 @@ impl PartStudioView {
             })
             .collect();
         cands.sort_by(|a, b| a.0.total_cmp(&b.0));
+        // Live (shortcuts-sk-1118): nothing under the pointer opens the box with "(No selections found)".
         if cands.is_empty() {
+            if let Some(at) = self.ui.pointer {
+                self.ui.select_other = Some(super::behaviors::SelectOther { hits: Vec::new(), index: None, at, point: None, in_zone: true, moved_out: false, scroll: ScrollHandle::new() });
+                cx.notify();
+            }
             return;
         }
         let Some(pos) = self.vp().read(cx).project(frame.to_world(c)) else { return };
@@ -5500,6 +5505,12 @@ impl PartStudioView {
             }))
             .capture_action(cx.listener(|this, _: &Accept, window, cx| {
                 use crate::sketch_mode::EnterTarget as E;
+                // A Section view dialog over the sketch takes Enter (as ✓).
+                if this.ui.section_dialog.is_some() {
+                    cx.stop_propagation();
+                    this.close_section_dialog(true, window, cx);
+                    return;
+                }
                 let Some(ed) = this.sketch.as_ref() else { return };
                 // Live: Enter commits the step being set up and never accepts
                 // the sketch (`SketchEditor::enter_target`).
@@ -5557,6 +5568,13 @@ impl PartStudioView {
                 // Esc closes the S toolbar or Select other first (live), also
                 // when the focus is in the Sketch dialog, whose own Cancel
                 // would end the sketch.
+                // A Section view dialog over the sketch closes first (as ✕), the sketch staying open.
+                if this.sketch.is_some() && this.ui.section_dialog.is_some() {
+                    this.close_section_dialog(false, window, cx);
+                    window.focus(&this.focus, cx);
+                    cx.stop_propagation();
+                    return;
+                }
                 if this.sketch.is_some() && (this.ui.mini_toolbar.take().is_some() || this.ui.select_other.take().is_some()) {
                     window.focus(&this.focus, cx);
                     cx.stop_propagation();
@@ -5586,6 +5604,23 @@ impl PartStudioView {
             .capture_action(cx.listener(|this, _: &SelectOther, window, cx| {
                 this.open_select_other(window, cx);
                 cx.stop_propagation();
+            }))
+            // Live (shortcuts-sk-1118): Shift+N in a sketch edits the sketch dialog's name.
+            .capture_action(cx.listener(|this, _: &RenameSelected, window, cx| {
+                cx.stop_propagation();
+                if let Some(d) = this.edit.as_ref().map(|e| e.dialog.clone()) {
+                    d.update(cx, |d, cx| d.start_title_edit(window, cx));
+                }
+            }))
+            // Live (shortcuts-sk-1118): Ctrl+M does nothing in a sketch (no Mate connector).
+            .capture_action(cx.listener(|_, _: &MateConnectorTool, _, cx| cx.stop_propagation()))
+            // Live (shortcuts-sk-1118): Shift+V closes the sketch (as ✓), then opens Named views.
+            .capture_action(cx.listener(|this, _: &NamedViews, window, cx| {
+                cx.stop_propagation();
+                if this.named_views.is_none() {
+                    this.finish_sketch(window, cx);
+                }
+                this.toggle_named_views(window, cx);
             }))
             .capture_action(cx.listener(|this, _: &Copy, _, cx| {
                 let text = this.sketch_data(cx).and_then(|d| this.sketch.as_ref()?.copy_selection(&d));

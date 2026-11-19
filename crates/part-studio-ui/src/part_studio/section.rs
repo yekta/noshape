@@ -165,8 +165,9 @@ impl PartStudioView {
     /// Shift+X: open the dialog; with a section on and no dialog, turn it off.
     pub(super) fn toggle_section(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         // Live (psb 10-21 f, qa4 F14): with a feature dialog open, Shift+X
-        // does nothing (Section view is only offered once it closes).
-        if self.edit.is_some() && self.ui.section_dialog.is_none() {
+        // does nothing (Section view is only offered once it closes); in a
+        // sketch it opens over the greyed sketch dialog (shortcuts-sk-1118).
+        if self.edit.is_some() && self.sketch.is_none() && self.ui.section_dialog.is_none() {
             return;
         }
         // Live 10-27: a second Shift+X leaves the dialog open (its ✕ closes it).

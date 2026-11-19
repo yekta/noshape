@@ -2402,7 +2402,18 @@ impl PartStudioView {
             }
             return;
         }
-        if self.sketch.is_some() && self.sketch_viewport_event(vp, ev, window, cx) {
+        // Section view over a sketch: its picks, not the sketch's.
+        if self.sketch.is_some() && self.ui.section_dialog.is_some() {
+            if let ViewportEvent::Click { pick, .. } = ev
+                && let Some(t) = pick.and_then(|id| self.built.as_ref()?.picks.get(id).cloned())
+            {
+                self.section_pick(&t.reference, window, cx);
+            }
+            if !matches!(ev, ViewportEvent::Hover(_)) {
+                return;
+            }
+        }
+        if self.sketch.is_some() && self.ui.section_dialog.is_none() && self.sketch_viewport_event(vp, ev, window, cx) {
             return;
         }
         if self.sketch.is_none() && self.toggle_points_event(ev, cx) {
@@ -6612,11 +6623,14 @@ impl PartStudioView {
         let (left, top) = { let p = behaviors::feature_dialog_pos(); (p.x, p.y) };
         // Onshape: at the viewport's left edge, 3 px under the toolbar.
         let size = self.ui.dialog_size.clone();
+        // Live (shortcuts-sk-1118): a Section view dialog over a sketch greys the sketch dialog.
+        let greyed = self.sketch.is_some() && self.ui.section_dialog.is_some();
         let d = div()
             .absolute()
             .left(left)
             .top(top)
             .child(e.dialog.clone())
+            .when(greyed, |d| d.opacity(0.4).child(div().id("dialog-greyed").absolute().inset_0().occlude()))
             .child(canvas(move |b, _, _| size.set(b.size), |_, _, _, _| {}).absolute().inset_0());
         // An in-feature mate connector's editor sits right of it, level with it (live 1851: 467 vs the Hole's 246).
         let nested = self.ui.sub_dialog.as_ref().map(|(n, _)| div().absolute().left(left + px(221.)).top(top).child(n.clone()));
