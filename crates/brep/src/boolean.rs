@@ -7631,7 +7631,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     }
     // A face made a new vertex inside it where an input edge pierces it, across (edges lying on it crossing
     // there made it, not the face; where faces alone meet, no one); of faces of several arguments on one plane
-    // there, the first's.
+    // there, each of them (OCCT's: a Shell's slab disks end to end, both made the vertex).
     let mut edges_through: HashMap<u32, Vec<usize>> = HashMap::default();
     for (e, inner) in edge_inner.iter().enumerate() {
         for &w in inner {
@@ -7664,13 +7664,6 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     for (w, fs) in makers {
         let o = vmap[w as usize];
         for &f in &fs {
-            let same_plane = |g: usize| match (&cx.faces[f].s, &cx.faces[g].s) {
-                (Surf::Plane { n: n1, d: d1, .. }, Surf::Plane { n: n2, d: d2, .. }) => n1.dot(*n2).abs() > 1.0 - 1e-12 && (d1 - d2 * n1.dot(*n2).signum()).abs() <= tol,
-                _ => false,
-            };
-            if fs.iter().any(|&g| g != f && cx.faces[g].arg < cx.faces[f].arg && same_plane(g)) {
-                continue;
-            }
             h.push(rec(Kind::Face, cx.faces[f].arg, cx.faces[f].index, Relation::Generated, Kind::Vertex, o));
         }
     }
