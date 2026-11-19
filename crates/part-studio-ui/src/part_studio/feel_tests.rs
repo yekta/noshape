@@ -667,14 +667,14 @@ fn a_plane_lights_6_px_past_its_edge(cx: &mut TestAppContext) {
             wrong.push(format!("{plane:?}: no outer edge clear of the other planes"));
             continue;
         };
-        for (d, want) in [(20.0, false), (6.0, true), (-20.0, true)] {
+        // Live reach-px-1119: lit at 6 px off a level edge (7: not), at 7.2 off iso's slanted one (8.05: not).
+        for (d, want) in [(20.0, false), (9.0, false), (6.0, true), (-20.0, true)] {
             pointer.move_to(cx, &view, on + n * d);
             let lit = cx.update(|cx| view.read(cx).hover.clone());
             if (lit.as_ref() == Some(plane)) != want {
                 wrong.push(format!("{plane:?}: {d} px out lit {lit:?}, want {}", if want { "the plane" } else { "nothing" }));
             }
         }
-        // (Live's 8 px: nothing. Ours reaches further on a slanted edge, the pick square's corner: interaction-feel.md.)
         let reach = (6..=14).rev().find(|d| {
             pointer.move_to(cx, &view, on + n * 30.0);
             pointer.move_to(cx, &view, on + n * f64::from(*d));

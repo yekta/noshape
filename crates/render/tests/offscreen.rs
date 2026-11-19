@@ -2906,7 +2906,7 @@ fn the_3d_pick_matrix_matches_live() {
     lines.push_polyline(&[[0.0, lo[1], hi[2]], [hi[0], lo[1], hi[2]]], [0, 0, 255, 255], line_on_edge, 2.0, 0);
     // Off the part: a shown sketch's line, a plane's border.
     lines.push_polyline(&[[-0.03, 0.03, 0.0], [0.0, 0.03, 0.0]], [0, 0, 255, 255], line, 2.0, 0);
-    lines.push_polyline(&[[-0.03, 0.045, 0.0], [0.03, 0.045, 0.0]], [0, 0, 0, 255], border, 2.0, LineSegment::NO_HOLD | LineSegment::WIDE_PICK);
+    lines.push_polyline(&[[-0.03, 0.045, 0.0], [0.03, 0.045, 0.0]], [0, 0, 0, 255], border, 2.0, LineSegment::NO_HOLD | LineSegment::DRAWN_PICK);
     // An assembly instance's edge (1.25 px, NO_HOLD as the assembly draws it), off the part.
     let asm_edge = 92u32;
     lines.push_polyline(&[[0.05, -0.02, 0.0], [0.05, 0.04, 0.0]], [0, 0, 0, 255], asm_edge, 1.25, LineSegment::NO_HOLD);
@@ -2951,8 +2951,8 @@ fn the_3d_pick_matrix_matches_live() {
         ("sketch line, lit / stays lit", line, [-0.015, 0.03, 0.0], (0.0, 1.0), true, (9, 11), false),
         ("sketch point (not editing)", point, [0.015, 0.03, 0.0], (1.0, 0.0), false, (7, 7), false),
         ("sketch point, lit / stays lit", point, [0.015, 0.03, 0.0], (1.0, 0.0), true, (7, 8), false),
-        ("plane border", border, [0.0, 0.045, 0.0], (0.0, 1.0), false, (7, 8), false),
-        ("plane border, lit / no hold", border, [0.0, 0.045, 0.0], (0.0, 1.0), true, (7, 8), false),
+        ("plane border", border, [0.0, 0.045, 0.0], (0.0, 1.0), false, (6, 6), false),
+        ("plane border, lit / no hold", border, [0.0, 0.045, 0.0], (0.0, 1.0), true, (6, 6), false),
         ("assembly instance edge", asm_edge, [0.05, 0.0, 0.0], (1.0, 0.0), false, (6, 6), false),
         ("assembly instance edge, lit / no hold", asm_edge, [0.05, 0.0, 0.0], (1.0, 0.0), true, (6, 6), false),
         // Priority: on the spot, the sketch line over the part edge under it, the sketch point over the vertex.
