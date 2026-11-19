@@ -888,6 +888,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   names if the file format needs them (dx's call).
   dx 23:07: also a drawing's part.category property (drawing build.rs) reads "Onshape Part" / "Onshape Assembly" in title-block text.
 - [ ] P0 **STALE-SKETCH-HOVER (psui)**: outside sketch mode a sketch entity's hover look stays after the pointer leaves
+- [x] fixed (psui 11-19: leaving a sketch (✓ / ✕) drops its hover, whose remembered place drew the disc; the viewport says its hover again after the scene's geometry changed; a view change resolves a point's reach again; real-app check on green 2bcd6dd7a: the line end after Esc clears with one xdotool move (b) — re-run with the exact steps if it still lags; GPUI tests a_closed_sketchs_lit_end_goes_with_it, a_shown_circles_centre_and_region_go_dark_with_the_move_away, a_lines_lit_end_goes_dark_with_one_move_away) P0 **STALE-SKETCH-HOVER (psui)**: outside sketch mode a sketch entity's hover look stays after the pointer leaves
   for empty space (green f3bc85da, :110, real pointer, walk 22:12). (a) Draw a circle, the last click on its rim, close
   the sketch with ✓: the region keeps its light-orange hover outline with nothing selected, through pointer moves over
   empty viewport and into Revolve / Extrude (whose region field is empty); it clears only when another entity is hovered

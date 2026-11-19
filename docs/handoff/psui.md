@@ -35,31 +35,25 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (updated 22:48 UTC 11-19; this thread replaced 4973e295 at 13:27, Ubeyd's weekly limit)
+## Now (updated 23:35 UTC 11-19; this thread replaced 4973e295 at 13:27, Ubeyd's weekly limit)
 
-1. LANDED 13:59 (e87a2b3e): routing Multiple offset, edge double-click / region look / constraint refusal tests,
-   section cap, Hole callout size.
-2. LANDED 22:04 (01969838): qa's P0 feel rows (menu press closes only the menu; one Esc after a field's menu item;
-   no readout under an analysis tool), the untested-row tests, Routing curve Multiple with its value box. qa reruns
-   its 7 rows on its green automatically.
-3. QUEUED 22:48 b5fce1fd (6 commits): Mass CoM / inertia Override; TOOLBAR-TOOLTIP-AFTER-CLICK (TooltipPressGate +
-   Window::tooltip_released_on; TICKETS marked); Routing Multiple centre ball; sketch-vertical-key fix (BAND_HOLD_PX 8);
-   row tests. On green: tell qa (TOOLTIP + vertical-key re-run). Follow-up: the ball test's expected centre comes from
-   f32 mesh positions (core 22:4x) -> take it exact (DVec3(0.04, 0.015, 0.005)) and compare the text again.
-4b. P0 qa STALE-SKETCH-HOVER (TICKETS P1 walk 11-19): outside sketch mode a sketch region's hover outline (after a rim
-   click + ✓) and a circle centre point's orange dot stay after the pointer leaves to empty space (also after Shift+7);
-   rims and part faces clear fine. Leads (unverified): hover flows viewport.set_hover (emits only on a GPU id change,
-   app-core viewport.rs ~1466) -> apply_hover_pick (mod.rs ~1971) -> shown_sketch_hover_id (sketch.rs 843: CPU reach
-   8.5 px points / 7.5 curves) ; PointerMove re-checks via ui.shown_sketch_gpu_hover (mod.rs ~2356), which is None
-   while sketching. Suspects: (1) after ✓ the viewport's hover id N is re-read against the new built picks (N now the
-   region) and nothing re-emits; (2) the scene's HOVER flag set by the viewport outlives self.hover (a None->None
-   change never refreshes). Repro first as a GPUI test with explicit Hover events.
-   qa 22:3x narrowed: (b) is a ONE-EVENT LAG, in sketch mode too (line, Esc, one xdotool move to empty: the end stays
-   lit; a second move clears it). (a) the region outline after ✓ survives several moves: separate path. Read so far:
-   sketch-mode PointerMove (sketch.rs ~1190) sets ed.hover from hovered_sketch_entity() = the OLD self.hover, then the
-   re-check at ~1222 (sketch_hover_id vs ui.sketch_gpu_hover) calls sketch_hover which does reset ed.hover — so check
-   whether that re-check is reached after Esc (Select) and whether viewport pick_at / request_hover re-emits Hover
-   when the async pick equals the stale id (viewport.rs ~2575 fast-move branch, set_hover ~1466).
+1. LANDED 22:04 (01969838): qa's P0 feel rows, untested-row tests, Routing curve Multiple with its value box.
+2. QUEUED 22:48 b5fce1fd (6 commits): Mass CoM / inertia Override; TOOLBAR-TOOLTIP-AFTER-CLICK; Routing Multiple
+   centre ball; sketch-vertical-key fix (BAND_HOLD_PX 8); row tests. On green: tell qa (TOOLTIP + vertical-key re-run).
+3. STALE-SKETCH-HOVER fix (to land after run88: part-studio lib + app-core lib + clippy on vibex7):
+   leave_sketch drops self.hover / hover_pick / hover_raw / sketch_gpu_hover (the disc is drawn at hover_pick.anchor,
+   so a cancelled sketch's end stayed drawn: (c), and after ✓ (a)); viewport `hover_id_stale` (set by set_scene on a
+   geometry change) makes set_hover re-emit an unchanged id; CameraChanged re-resolves a point's reach (mod.rs, sketch.rs);
+   outside sketch mode no reach lights while the pointer is out of the graphics (shown_sketch_hover_id).
+   Tests (GPU, sketch_hover_feel_tests): a_closed_sketchs_lit_end_goes_with_it (fails without the fix),
+   a_shown_circles_centre_and_region_go_dark_with_the_move_away (view-key part fails without the CameraChanged re-check),
+   a_lines_lit_end_goes_dark_with_one_move_away. Ball test centre now exact (µm-rounded, 1e-12).
+   Real-app repro kit: /root/psui-scratch/stale/ (stale-app.sh + scenarios; run on vibex6 with ~/green/noshape):
+   on green 2bcd6dd7a (b) in sketch mode did NOT reproduce (one xdotool move clears the end) -> qa to re-run on green.
+4. P2 qa ERROR-CHIP-RED-NO-FIELD: Thicken both-zero "Invalid input selections." reddens the face chip and face
+   (FeatureDialog::entry_failing: any error naming no field reddens entries, from live's Fillet 100 mm); live keeps both
+   dark for this validation error. Needs a signal from the evaluator (an op failure vs a validation error; model-core,
+   core's crate) -> decision / ask core.
 5. Interaction-feel rows that match live with no test (grep "missing" in the Test column; P0 sections first).
    Skipped: the two-block box counts (live's camera: iso + 10 wheel steps about an unknown pointer), the rollback
    bar's hover colour (GPUI group_hover, no test hook), the spinner's 900 ms (`Instant`, not the test clock).

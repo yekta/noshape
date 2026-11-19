@@ -1408,7 +1408,8 @@ fn a_routing_curves_multiple_ball_snaps_to_a_faces_inference_point(cx: &mut Test
         let i = (0..b.face_refs.len()).find(|&i| corners(i).iter().all(|p| (p.x - max_x).abs() < 1e-9)).expect("the +X face");
         let ps = corners(i);
         let (lo, hi) = ps.iter().fold((glam::DVec3::MAX, glam::DVec3::MIN), |(lo, hi), p| (lo.min(*p), hi.max(*p)));
-        (b.face_refs[i].clone(), (lo + hi) * 0.5)
+        // (The mesh is f32; the block's sizes are whole mm: its exact centre is the mesh's to the micrometre.)
+        (b.face_refs[i].clone(), ((lo + hi) * 0.5e6).round() * 1e-6)
     });
     let ball = at(cx, start);
     event(cx, ViewportEvent::ToolDown { position: ball, modifiers: Modifiers::default(), click_count: 1 });
@@ -1436,8 +1437,7 @@ fn a_routing_curves_multiple_ball_snaps_to_a_faces_inference_point(cx: &mut Test
     });
     assert_eq!(matrix, Some(ParamValue::Text("[[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]".into())), "live's stored frame");
     let units = cx.update(|cx| view.read(cx).doc.read(cx).session.doc.settings.units);
-    // (The face centre is our area integral's, ~1e-9 m off live's exact one: compared as values.)
     let values: Vec<f64> = d.iter().map(|t| noshape_units::evaluate_as(t, noshape_units::Dim::LENGTH, &units, &noshape_units::EmptyScope).map_or(f64::NAN, |q| q.value)).collect();
-    assert!((0..3).all(|i| (values[i] - centre[i]).abs() < 1e-8), "multiDx/Dy/Dz: the triad's place from the origin: {d:?}, centre {centre}");
+    assert!((0..3).all(|i| (values[i] - centre[i]).abs() < 1e-12), "multiDx/Dy/Dz: the triad's place from the origin: {d:?}, centre {centre}");
     assert!(cx.update(|cx| view.read(cx).ui.triad_box.is_none() && !view.read(cx).viewport.read(cx).tool_hover && view.read(cx).inference_choice().is_none()), "no value box; picking and the points end with the drag");
 }

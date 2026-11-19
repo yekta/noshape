@@ -621,3 +621,182 @@ fn a_small_circles_region_lights_in_a_region_field(cx: &mut TestAppContext) {
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
+
+/// What of `feature` is lit: the hover, the sketch editor's own hover (sketch mode) and a shown point's disc.
+fn sketch_lit(cx: &mut TestAppContext, view: &Entity<PartStudioView>, feature: noshape_model::reference::FeatureId) -> Vec<String> {
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let mut lit = Vec::new();
+        if let Some(h) = v.hover.as_ref().filter(|h| matches!(h, Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } if *sketch == feature)) {
+            lit.push(format!("hover {h:?}"));
+        }
+        if let Some(e) = v.sketch.as_ref().and_then(|ed| ed.hover) {
+            lit.push(format!("the editor's hover {e:?}"));
+        }
+        if v.sketch.is_none() && !v.midpoint_overlay(cx).is_empty() {
+            lit.push("a point's disc".into());
+        }
+        lit
+    })
+}
+
+/// qa P0 STALE-SKETCH-HOVER (b), in sketch mode: a line drawn, Esc, ONE move to empty space: its end lit under the
+/// pointer goes dark with that move (it stayed lit until a second move).
+#[gpui::test]
+fn a_lines_lit_end_goes_dark_with_one_move_away(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "stale-end-gpu", Tool::Line);
+    let pointer = Pointer::new(cx, window, &view);
+    pointer.click(cx, &view, DVec2::new(400., 300.));
+    pointer.move_to(cx, &view, DVec2::new(520., 300.));
+    pointer.click(cx, &view, DVec2::new(520., 300.));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let feature = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().feature);
+    let mut wrong = Vec::new();
+    // Resting on the end, the line's chain going on (the pointer as qa's: still there after the click), then Esc.
+    pointer.move_to(cx, &view, DVec2::new(521., 301.));
+    eprintln!("stale-end: in Line on the end: lit {:?}", sketch_lit(cx, &view, feature));
+    keys(cx, window, &["escape"]);
+    pointer.frames(cx, &view);
+    let tool = cx.update(|cx| view.read(cx).sketch.as_ref().map(|ed| ed.tool));
+    eprintln!("stale-end: after Esc the tool {tool:?}, lit {:?}", sketch_lit(cx, &view, feature));
+    pointer.move_to(cx, &view, DVec2::new(700., 480.));
+    let lit = sketch_lit(cx, &view, feature);
+    if !lit.is_empty() {
+        wrong.push(format!("Esc on the end, one move away: still lit {lit:?}"));
+    }
+    // Lit in Select 2 px off the end, one move away.
+    pointer.move_to(cx, &view, DVec2::new(522., 301.));
+    if sketch_lit(cx, &view, feature).is_empty() {
+        wrong.push("2 px off the end in Select: not lit".into());
+    }
+    pointer.move_to(cx, &view, DVec2::new(700., 480.));
+    let lit = sketch_lit(cx, &view, feature);
+    if !lit.is_empty() {
+        wrong.push(format!("lit in Select, one move away: still lit {lit:?}"));
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+/// qa P0 STALE-SKETCH-HOVER (b) and (a), outside sketch mode: a circle's centre point lit, then one move off (and a view
+/// key under the resting pointer): nothing of the sketch stays lit; the circle drawn with its rim click last, ✓, then
+/// moves away: its region's outline doesn't stay.
+#[gpui::test]
+fn a_shown_circles_centre_and_region_go_dark_with_the_move_away(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "stale-centre-gpu", Tool::Circle);
+    let pointer = Pointer::new(cx, window, &view);
+    pointer.click(cx, &view, DVec2::new(575., 350.));
+    pointer.click(cx, &view, DVec2::new(665., 350.));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let feature = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().feature);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_none() && !view.read(cx).ui_busy());
+    pointer.frames(cx, &view);
+    let mut wrong = Vec::new();
+    for (k, at) in [(700., 500.), (300., 200.), (720., 150.)].into_iter().enumerate() {
+        pointer.move_to(cx, &view, DVec2::new(at.0, at.1));
+        let lit = sketch_lit(cx, &view, feature);
+        if !lit.is_empty() {
+            wrong.push(format!("after ✓ with the pointer on the rim, move {} away: lit {lit:?}", k + 1));
+        }
+    }
+    let centre = cx.update(|cx| {
+        let v = view.read(cx);
+        let s = v.display.sketches.iter().find(|s| s.feature == feature).unwrap();
+        let vp = v.viewport.read(cx);
+        s.points.iter().filter_map(|q| vp.project(glam::DVec3::new(q.position[0] as f64, q.position[1] as f64, q.position[2] as f64))).min_by(|a, b| a.distance(DVec2::new(575., 350.)).total_cmp(&b.distance(DVec2::new(575., 350.)))).unwrap()
+    });
+    pointer.move_to(cx, &view, centre + DVec2::new(3., 2.));
+    if sketch_lit(cx, &view, feature).is_empty() {
+        wrong.push("3 px off the centre: the centre point not lit".into());
+    }
+    pointer.move_to(cx, &view, centre + DVec2::new(150., 140.));
+    let lit = sketch_lit(cx, &view, feature);
+    if !lit.is_empty() {
+        wrong.push(format!("one move off the centre: lit {lit:?}"));
+    }
+    // 7 px off: the point by its reach, the GPU's pick there the region, also once the view has moved.
+    pointer.move_to(cx, &view, centre + DVec2::new(7., 0.));
+    if !sketch_lit(cx, &view, feature).iter().any(|l| l.contains("SketchEntity")) {
+        wrong.push("7 px off the centre: the centre point not lit".into());
+    }
+    keys(cx, window, &["shift"]);
+    cx.update(|cx| view.update(cx, |v, cx| v.view(noshape_render::StandardView::Top, cx)));
+    let t = std::time::Instant::now();
+    while t.elapsed() < std::time::Duration::from_secs(15) {
+        pointer.frames(cx, &view);
+        if cx.update(|cx| !pointer.vp.read(cx).animating() && pointer.vp.read(cx).hover_settled()) {
+            break;
+        }
+    }
+    // (The view's re-pick waits for 60 ms of quiet, then the GPU answers.)
+    let t = std::time::Instant::now();
+    while t.elapsed() < std::time::Duration::from_millis(1500) {
+        pointer.frames(cx, &view);
+    }
+    let (away, at) = cx.update(|cx| {
+        let v = view.read(cx);
+        let s = v.display.sketches.iter().find(|s| s.feature == feature).unwrap();
+        let vp = v.viewport.read(cx);
+        let at = vp.pointer_position();
+        (s.points.iter().filter_map(|q| vp.project(glam::DVec3::new(q.position[0] as f64, q.position[1] as f64, q.position[2] as f64))).all(|q| q.distance(at) > 12.0), at)
+    });
+    let lit: Vec<String> = sketch_lit(cx, &view, feature).into_iter().filter(|l| !l.contains("SketchRegion")).collect();
+    if away && !lit.is_empty() {
+        wrong.push(format!("the view key moved the centre from under the resting pointer ({:.0}, {:.0}): lit {lit:?}", at.x, at.y));
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+/// qa P0 STALE-SKETCH-HOVER (c) and (a): a sketch closed (✕, or ✓ from its dialog) with an end lit under the pointer
+/// takes its lit look with it: no point's disc drawn where the cancelled sketch's end was, nothing lit after the pointer
+/// comes back from the dialog's button over empty space.
+#[gpui::test]
+fn a_closed_sketchs_lit_end_goes_with_it(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let mut wrong = Vec::new();
+    for cancel in [true, false] {
+        let (window, view) = sketch_with(cx, if cancel { "closed-lit-x" } else { "closed-lit-ok" }, Tool::Line);
+        let pointer = Pointer::new(cx, window, &view);
+        pointer.click(cx, &view, DVec2::new(400., 300.));
+        pointer.move_to(cx, &view, DVec2::new(520., 300.));
+        pointer.click(cx, &view, DVec2::new(520., 300.));
+        keys(cx, window, &["escape"]);
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        let feature = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().feature);
+        pointer.move_to(cx, &view, DVec2::new(522., 301.));
+        if sketch_lit(cx, &view, feature).is_empty() {
+            wrong.push(format!("cancel {cancel}: the end not lit 2 px off it"));
+        }
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            if cancel {
+                v.cancel_edit(w, cx);
+            } else {
+                v.finish_sketch(w, cx);
+            }
+        }))
+        .unwrap();
+        wait_until(cx, window, |cx| view.read(cx).sketch.is_none() && !view.read(cx).ui_busy());
+        pointer.frames(cx, &view);
+        let lit = sketch_lit(cx, &view, feature);
+        if cancel && !lit.is_empty() {
+            wrong.push(format!("cancelled, the pointer still where the end was: lit {lit:?}"));
+        }
+        // (Where the dialog's button is: outside the graphics.)
+        pointer.move_to(cx, &view, DVec2::new(-40., -40.));
+        let lit = sketch_lit(cx, &view, feature);
+        if !lit.is_empty() {
+            wrong.push(format!("cancel {cancel}: closed, the pointer on its button: still lit {lit:?}"));
+        }
+        pointer.move_to(cx, &view, DVec2::new(700., 480.));
+        let lit = sketch_lit(cx, &view, feature);
+        if !lit.is_empty() {
+            wrong.push(format!("cancel {cancel}: back over empty space: still lit {lit:?}"));
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}

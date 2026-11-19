@@ -393,6 +393,8 @@ pub struct Viewport {
     last_pos: DVec2,
     /// The hover was cleared by a fast move before a pick said what is under the pointer.
     hover_unconfirmed: bool,
+    /// The scene's geometry changed since `hover` was picked: its id is said again even when the pick repeats it.
+    hover_id_stale: bool,
     /// Selected entities, shown in the cursor image (Onshape's
     /// selection-count cursor: 1-5, "5+" for more). Set by the owner.
     pub selection_count: usize,
@@ -733,6 +735,7 @@ impl Viewport {
             press_path: (0.0, DVec2::ZERO),
             last_pos: DVec2::ZERO,
             hover_unconfirmed: false,
+            hover_id_stale: false,
             selection_count: 0,
             menu_open: false,
             tool_cursor: None,
@@ -828,6 +831,9 @@ impl Viewport {
         // Pick bench: the next frame submitted shows the click's selection.
         if let Some((_, need @ None)) = self.bench.as_mut().and_then(|b| b.click.as_mut()) {
             *need = Some(self.seq + 1);
+        }
+        if geometry_changed {
+            self.hover_id_stale = true;
         }
         if geometry_changed || filter_changed {
             self.pick_dirty = true;
@@ -1464,7 +1470,8 @@ impl Viewport {
     }
 
     fn set_hover(&mut self, id: Option<u32>, cx: &mut Context<Self>) {
-        if self.hover != id {
+        // (After the scene's geometry changed the same id may stand for something else: said again.)
+        if self.hover != id || std::mem::take(&mut self.hover_id_stale) {
             self.hover = id;
             self.hover_unconfirmed = false;
             cx.emit(ViewportEvent::Hover(id));

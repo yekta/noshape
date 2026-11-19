@@ -2329,6 +2329,15 @@ impl PartStudioView {
             let (doc, tab, camera) = (self.doc.clone(), self.tab, vp.read(cx).camera);
             view.update(cx, |v, cx| v.update(&doc, tab, camera, cx));
         }
+        // A view change moves a shown sketch's points under the resting pointer: what their reach lit is held to it
+        // again (qa STALE-SKETCH-HOVER: a centre point's disc stayed after Shift+7; the GPU's pick there unchanged).
+        if matches!(ev, ViewportEvent::CameraChanged)
+            && self.sketch.is_none()
+            && let Some((gpu, resolved)) = self.ui.shown_sketch_gpu_hover
+            && self.shown_sketch_hover_id(gpu, cx) != resolved
+        {
+            self.apply_hover_pick(gpu, vp, window, cx);
+        }
         // Screen-sized geometry built here follows the zoom: resize it when
         // the scale changes, without re-rendering (perf; the manipulators'
         // glyphs are built by the renderer per frame).

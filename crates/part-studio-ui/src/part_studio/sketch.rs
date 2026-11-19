@@ -414,6 +414,10 @@ impl PartStudioView {
 
     pub(super) fn leave_sketch(&mut self, cx: &mut Context<Self>) {
         if let Some(ed) = self.sketch.take() {
+            // What lit in sketch mode goes with it (qa STALE-SKETCH-HOVER: a cancelled sketch's point stayed drawn at its
+            // remembered place, a region's outline after ✓); the viewport's next pick lights what is under the pointer.
+            self.hover = None;
+            (self.ui.hover_pick, self.ui.hover_raw, self.ui.sketch_gpu_hover) = (None, None, None);
             self.sketch_fillet_radius = Some(ed.fillet_radius);
             self.dim_input = None;
             self.opts.editing_sketch = None;
@@ -844,7 +848,8 @@ impl PartStudioView {
         const POINT_REACH: f64 = 8.5;
         const CURVE_REACH: f64 = 7.5;
         const CURVE_HOLD: f64 = 10.5;
-        if self.sketch.is_some() {
+        // (Out of the graphics nothing lights by reach: the pointer's last place there is no longer under it.)
+        if self.sketch.is_some() || !self.viewport.read(cx).pointer_inside() {
             return id;
         }
         // A dialog field reaches only for what it takes itself: Extrude's "Faces and sketch regions" keeps the pick's
@@ -1102,6 +1107,12 @@ impl PartStudioView {
                 if wpp_changed {
                     self.refresh_scene(false, cx);
                     cx.notify();
+                }
+                // The view moved the sketch under the resting pointer: what lit by reach is resolved again.
+                if let Some((gpu, resolved)) = self.ui.sketch_gpu_hover
+                    && self.sketch_hover_id(gpu, cx) != resolved
+                {
+                    self.sketch_hover(gpu, vp, window, cx);
                 }
                 false
             }
