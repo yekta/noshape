@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-19 08:28 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-19 12:06 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -35,34 +35,27 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (updated 08:28 UTC 11-19)
+## Now (updated 12:06 UTC 11-19; Ubeyd at 97 % weekly: keep this current, land small)
 
-1. Queued: 04edd2ba (lead P0 coplanar on Metal/D3D12, alone), 56e21c9e (list-1119 / nav-feel-1119 / tools-1119 rows +
-   Shift+C), two docs-only duplicate-row cleanups on top. DX12 for 04edd2ba: watch the next CI run.
-2. IN THE WORKTREE: TICKETS P0 HEAVY-ASM-SOFTWARE-FRAME, renderer side (lead 08:1x; split with asm: asm owns the LOD
-   meshes / load path, psui crates/render + viewport scheduling):
-   (1) no 3D frame for a refresh that changes nothing: `CameraGeometry::key` (content hash, `key_of`) on ScreenTriads,
-       MateGlyphs, ConnectorGlyphs, InferenceMarks; `Viewport::set_camera_geometry` compares keys (was Arc pointers:
-       every assembly refresh with a mate glyph shown drew a frame); and small line / point uploads (≤ 4096) always
-       carry their content hash (`small_content_key`), which `Scene::same_as` compares (asm's overlay lines / connector
-       dots were uploaded anew each refresh: a new scene each time). Tests count `Viewport::frames_requested` (UI tests'
-       Gpu::headless never returns frames, so submits stop at 1): assembly-ui
-       a_refresh_with_the_same_mate_glyphs_submits_no_frame (5 refreshes: 0 requests; pointer compare 5; neither 10),
-       part-studio-ui ui_only_redraws_submit_no_3d_frame (+ a face selected does request). UI tests run on the noop
-       adapter (not Cpu): the software path is covered by the render tests only.
-   (2) `Style::software` (set by the viewport from `Gpu::is_software` = adapter DeviceType::Cpu; print keeps full):
-       1× MSAA (`msaa_of`) and each body at its coarsest display level (DrawLists.coarsest). asm-xdev-subs: finest
-       2.1 M triangles, Coarse 462 k (asm). Tests: render a_software_rasteriser_draws_each_body_at_its_coarsest_level,
-       lib a_software_rasteriser_draws_without_msaa. Render tests keep Style::default (software false): real-GPU
-       look unchanged.
-   Next: run52 (/root/psui-scratch/run52.sh), then measure: release app on Xvfb with asm-xdev-subs (copy of vibex8
-   ~/agents/asm-keep/qa-save/asm-xdev-subs.noshape; qa's /root/qa-scratch/heavy/hvs.sh), before/after frame time and
-   frames per view change; tell asm the llvmpipe frame time (asm adds a level below Coarse if still too heavy).
-3. After: dx's prewarm on scoped threads (f1e0c74e): once landed, check the big-assembly first open isn't slower
-   (asm-xdev-subs cold open, ~4 s on vibe2 after 1dd4033be); qa times it too. Never block a rayon worker on a thread
-   that needs rayon.
-4. Open with live: Hole callout glyph size (REQUESTS 23:33), section preview over a shown plane (REQUESTS 22:48).
-5. Not to build: 3D Sketch, Fault analysis. Cleanup: vibex7 ~/tmp/psui/priv/dock.noshape when the tab work is over.
+1. LANDED 10:11 (03a8f126): HEAVY-ASM-SOFTWARE-FRAME renderer side (no 3D frame for a refresh that changes nothing:
+   `CameraGeometry::key`, `small_content_key` in `Scene::same_as`; `Style::software` = 1x MSAA + each body's coarsest
+   level), the list-1119 / nav-feel-1119 / tools-1119 rows, Shift+C. 1aef7f70 (coplanar on Metal/D3D12) landed 08:32.
+   asm owns the LOD meshes / load path.
+2. HEAVY-ASM timing, vibe2 llvmpipe, release, asm-xdev-subs Assembly 1 tab (/root/psui-scratch/hv.sh, hvparse.py;
+   out dirs in /root/psui-scratch/out-{base,new,pre}): steady frame 1.2 s -> 0.11-0.12 s; first frame after the tab
+   5.97 -> 1.95 s; a wheel notch on screen 3.62 -> 0.72 s. Assembly evaluate 4.1 s (base) vs 9.2 s (new) in one run:
+   not touched by the change; rerunning base/new x2 (hve.sh -> vibe2 ~/tmp/psui/hv/e-{b1,n1,b2,n2}, queued in slot
+   behind asm) to confirm it is load. Report to the lead once in. Prewarm timing: dropped (qa: no regression).
+3. live tools-1119 swatch recheck (484-678 ms on loaded vibex6): measured on vibe2 llvmpipe with a 2 ms X pixel
+   watcher (/root/psui-scratch/pxwatch.c, swclick2.sh; app on MY display :394 only, :393 is asm's): the part
+   recolours 60-120 ms after the swatch's own tick = the next software 3D frame. Row updated "to retake on a GPU".
+4. Next feel rows (≠ in my area, by frequency): section view preview caps (row 1160), Hole callout (1463), then
+   core's Routing curve Point edit type Multiple (needs FeatureManipulator TOGGLE_POINTS / FULL_TRIAD kinds,
+   custom/host/status.rs; std routingCurve.fs 787-1002; aeb0cc0a7 added the params; low priority).
+5. Open with live: Hole callout glyph size (REQUESTS 23:33), section preview over a shown plane (REQUESTS 22:48).
+   live is stopped until ~21:00 UTC: recheck asks go to live2.
+6. Not to build: 3D Sketch, Fault analysis. Cleanup: vibex7 ~/tmp/psui/priv/dock.noshape when the tab work is over;
+   vibe2 ~/tmp/psui/hv binaries after the reruns. Branch psui-backup-1119 = pre-reset branch (all landed; delete).
 
 ## Open decisions
 
