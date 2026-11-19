@@ -5,7 +5,7 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-19 20:14 UTC)
+## State (2026-11-19 20:38 UTC)
 
 ### Landed today (6686624b as 702c9878: Display states Esc, driver-mate named position, paste; d671313d; 335f8e43; 9f52415c)
 - LOD (91478e2c), Derived mirror of an assembly complete (e87a2b3e, 17c26dc1; left: live's exact node icon, symmetry
@@ -28,7 +28,7 @@ not reproduced off CI (15 runs of the unfixed binary on vibe2, all exit 0); TICK
 - isaac (98/129 mates; lead 19:2x: fix the off connectors that aren't core's Chamfer 2). Off ends in the 31
   differences: 7 on Part 1 <12> (a2e4a2 Chamfer 2: sent to core 19:5x for 21:00) and Fastened 43's b on Part 1 <1>
   (studio 00f1d4). Fastened 26 / 32 and Revolute 7 / 17 OFF lines are intermediate picks; they end as live.
-- Fastened 43: a Boolean bug, not translation (TICKETS HOLE-THROUGH-ROUND-POLE [bool], routed via the lead 20:1x).
+- Fastened 43: a Boolean bug, not translation (TICKETS HOLE-THROUGH-ROUND-POLE [bool], routed via the lead 20:38).
   00f1d4's Extrude 38 Ø6 hole runs coaxially through an R4 corner round and the corner ball's pole; ours (and OCCT)
   can't cut it, live does. Our geometry before it is live's (a column probe finds material on the axis, z 15.6–27.6).
   Minimal repro vibex8 ~/agents/asm-keep/t-mini-false.sh (current CLI ~/agents/asm/target/debug/noshape-cli).

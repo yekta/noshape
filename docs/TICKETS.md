@@ -6,7 +6,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## asm, 2026-11-19
-- [ ] **P2 HOLE-THROUGH-ROUND-POLE [bool]** (asm 20:1x, isaac-ball Fastened 43): a Ø6 REMOVE extrude coaxial with an
+- [ ] **P2 HOLE-THROUGH-ROUND-POLE [bool]** (asm 20:38, isaac-ball Fastened 43): a Ø6 REMOVE extrude coaxial with an
   R4 corner round, whose axis passes through the corner ball's pole (the ball touching the bottom face at the axis,
   that face's corner vertex), isn't cut: noshape's Boolean declines ("a non-manifold result") and OCCT's returns
   non-manifold ("Boolean operation would result in non-manifold body."); live cuts it. Minimal repro (current CLI):
