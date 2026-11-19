@@ -62,11 +62,13 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
 - bool2-exact (bool2-ab, tip 73dcd9e30 = b997c4c3 re-recorded with OCCT). 5101adb8: exception (DECISIONS c8a06136b):
   it is 6bb081c8 turned 90 degrees (probe_case_twins: all 33 arguments' volumes and extents equal); ours gives both
   5.295354594e-4, OCCT 6bb081c8 5.295354633e-4 (= ours, 7e-9) and 5101adb8 5.295373907e-4 (1.93 mm3 off its twin).
-  Name the symmetry in the land commit. 6bb081c8: volume = OCCT, history differs for real: ours splits edges along
-  x 57.5 mm at extra vertices ((57.467, 39.967, 18.000 / 18.967), (57.5, 38 / 39, 20)), arg0/1/3/7/10/16/24/28 records
-  "rust only" (replay: vibex8 ~/agents/bool2-ab target, NOSHAPE_BOOL_CORPUS=~/agents/bool-corpora/shfall
-  NOSHAPE_BREP_ONLY=6bb081c8e7192051 NOSHAPE_BREP_DIFF=1 NOSHAPE_BREP_VS_OCCT=1). Next: which of ours' sections end
-  there (plane lines of 957b0f4b9 / 50a079ef6?): bisect the 5 exact commits on this case.
+  Name the symmetry in the land commit. 6bb081c8 (volume = OCCT): history diff /root/bool2-scratch/6bb-hist.txt.
+  (a) every edge / face record pairs with OCCT's within 100 um (inputs at OCCT's 1e-4 of 11-02; ours puts vertices
+  on the nominal planes, OCCT 7-30 um off); (b) vertex-only records (afcf858f3 rule); (c) real: the coincident faces'
+  representative: OCCT arg16 Face0 Modified (x2) + arg17 Face2 Generated Edge, ours Deleted. Asked the lead (23:30):
+  replay taking points within the arguments' tolerance as the same, else re-record shfall. Next: (c) with OCCT's
+  FillSameDomainFaces rule (boolean.rs rank ~7027; bool-hat NOSHAPE_SD_RULE=1 is that rule, tried in fuses: other
+  recordings 2ea4 / 4776 / bd8e then differ: check them case by case).
 
 ## From bool2 (owned since 11-19 20:45)
 - Landed 11-19: 41fcfd2c bool2-cbs (closed B-spline faces' period; 2a5740b0 gate exception backed by live capture
