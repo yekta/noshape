@@ -406,7 +406,8 @@ fn a_new_extrudes_parts_follow_the_sketchs_drawing_order() {
         }
     };
     type Draw = fn(&mut noshape_sketch::Sketch, f64, f64);
-    let cases: [(&str, Draw, Vec<(f64, f64)>); 4] = [
+    type Case = (&'static str, Draw, Vec<(f64, f64)>);
+    let cases: [Case; 4] = [
         ("A", circle, vec![(-0.02, 0.0), (0.02, 0.0)]),
         ("B", circle, vec![(0.02, 0.0), (-0.02, 0.0)]),
         ("D", circle, vec![(0.0, 0.0), (-0.02, 0.0), (0.02, 0.0)]),
