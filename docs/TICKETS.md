@@ -863,6 +863,9 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   (a part face). Seen twice (a rectangle before Revolve 1, a circle on Top). (b) Outside sketch mode, hover the circle's
   centre point and move off to empty space: the orange centre dot stays (1.5 s later, and after Shift+7); the rim's
   hover clears as it should, and so does a part face's (live clears a hover when the pointer leaves the entity).
+  22:4x: (b) is a one-event lag, also in sketch mode: draw a line, Esc, ONE pointer move to empty space → its end stays lit
+  (still at 1.8 s); a second move clears it. So the hover shown is the previous pointer event's; a pointer that stops right
+  after leaving keeps a stale hover. (a) is separate: it survives several moves after ✓ (seen a 3rd time on Sketch 6).
 - [ ] P1 **OFFSET-EDIT-SCALES-SKETCH (skasm)**: in a sketch with no dimensions yet, Offset (O) a free circle, Enter, type 3,
   Enter: ours treats the offset's distance as the sketch's first dimension and scales the whole sketch by 3/5 about its
   centre (green f3bc85da, walk 22:3x: copy r 56 -> 33 px, source r 40 -> 24 px, any other free geometry shrinks too).
