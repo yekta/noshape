@@ -81,9 +81,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    point (Part 1 -231 mm3) -> core. Studios 166b521c re-check (stsess/run.sh on vibe2: asess a1..a5, ssess t1 t4 t2a t2b t3; sr.sh now
    saves shots): asm BOM / 1:4 / pin balloon, Tab, Checkbox = live; merge dialog opens on Keep Main with Merge disabled (live: Replace
    with B1, 3 tabs) -> studios 09:05; restore untestable until then. Kept vibe2 ~/agents/qa-keep/{session-ps2-1119,studio-1119-recheck}.
-   Armed: qa-rel-0460 (publish of v0.4.60); qa-dx-prewarm (base 2fffa9a06 built, fix rebuild after a SIGTERM; skips built apps);
-   qa-dxf-rerun (drwsess/dxf-rerun.sh: dx's placed-view label is stored at placement, so drw.sh d0..d5 reruns on vibex8 with the
-   current green, then dxf-cmp.sh vs live's DXF; on the old doc only live's empty MTEXT was missing).
+   Done 09:58: dx prewarm A/B (fa952d158 vs 2fffa9a06, local :154): medians 5.2 / 5.5 s, no regression (run 1 cold 18.0 / 19.0,
+   runs 2-3 warm caches). Done 09:16: DXF on a rerun session (green bfe09bcd) = live's entities (only author names). Armed:
+   qa-rel-0460 (publish of v0.4.60); qa-merge-wait (stsess/merge-wait.sh: studios' merge fix in a green -> t2b retake on vibe2);
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
    with NOSHAPE_PARITY_VALIDITY=1 (bin/suites-models.sh exports it) models.log prints per feature "CHECK <doc> feature <k>:
    <part> valid <true|false> raw f/e/v; ..." (PartState.check, query parts' "check"; not in report.json). suites-diff.py
