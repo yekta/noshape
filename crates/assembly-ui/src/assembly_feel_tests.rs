@@ -579,3 +579,52 @@ fn a_mate_dialogs_dots_are_white_and_the_first_pick_outlines_its_instance(cx: &m
         assert_eq!(selected, 1, "the picked face selected");
     });
 }
+
+/// Live reach-1118 (feel 3D): a mate connector lights 22–23 px across and 14–15 px down from its origin on a top
+/// face's centre in the isometric view, 22 across and 16–21 down on a vertex, and wins over the vertex throughout.
+#[gpui::test]
+fn a_mate_connector_reaches_as_live_and_wins_over_its_vertex(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "mc-reach", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        let top = call(ctx, "assembly_entities", json!({ "instance": "Part 1 <1>", "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].clone();
+        let corner = call(ctx, "assembly_entities", json!({ "instance": "Part 1 <1>", "kind": "vertices", "at": [[40, 0, 10]] }))["vertices"][0]["id"].clone();
+        call(ctx, "assembly_mate_connector", json!({ "on": { "instance": "Part 1 <1>", "entity": top, "inference": "center" } }));
+        call(ctx, "assembly_mate_connector", json!({ "on": { "instance": "Part 1 <1>", "entity": corner, "inference": "vertex" } }));
+    });
+    let (window, view) = open_from_top(cx, &path, 1);
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let (lo, hi) = v.result.bounds().unwrap();
+            v.viewport.update(cx, |vp, cx| {
+                let s = vp.size();
+                vp.camera.set_view(noshape_render::StandardView::Isometric);
+                vp.camera.fit_sphere((lo + hi) * 0.5, (hi - lo).length() * 0.8, s.x / s.y);
+                vp.request_frame(cx);
+            });
+            v.refresh_scene(false, cx);
+        })
+    })
+    .unwrap();
+    settle(cx, window, &view);
+    assert_eq!(cx.update(|cx| view.read(cx).overlay_connectors.len()), 2, "both connectors shown");
+    let origins: Vec<DVec2> = cx.update(|cx| {
+        let v = view.read(cx);
+        let ids = v.overlay_connectors.clone();
+        ids.iter().map(|id| v.result.connectors.iter().find(|c| c.id == *id).and_then(|c| c.frame).map(|f| v.viewport.read(cx).project(f.origin).unwrap()).unwrap()).collect()
+    });
+    // Our reach (scanned in 1 px steps): 22 right, 23 left, 15 up and down on both; live's 16–21 down on a vertex is a
+    // Part Studio's hold (an assembly has none, live reach-1118).
+    for (i, o) in origins.iter().enumerate() {
+        let reach = [(DVec2::X, 22.0, 25.0), (-DVec2::X, 22.0, 25.0), (DVec2::Y, 14.0, 18.0), (-DVec2::Y, 14.0, 18.0)];
+        for (dir, lit, past) in reach {
+            for d in [0.0, 4.0, 8.0, lit] {
+                move_to(cx, window, &view, *o + dir * d);
+                let (ov, hover) = cx.update(|cx| (view.read(cx).hover_overlay, view.read(cx).hover.as_ref().map(|t| t.kind)));
+                assert_eq!((ov, hover), (Some(OverlayPick::Connector(i)), None), "connector {i}, {d} px along {dir:?}: the connector, not what is under it");
+            }
+            move_to(cx, window, &view, *o + dir * past);
+            assert_ne!(cx.update(|cx| view.read(cx).hover_overlay), Some(OverlayPick::Connector(i)), "connector {i}, {past} px along {dir:?}: past its reach");
+        }
+    }
+}
