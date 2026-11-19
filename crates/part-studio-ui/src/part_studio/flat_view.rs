@@ -301,6 +301,12 @@ impl FlatView {
         self.viewport.read(cx).project(mid + (edge - mid) * frac)
     }
 
+    /// The bend drawn as hovered (a table row's, or one under the pointer in the flat view).
+    #[cfg(test)]
+    pub(crate) fn hovered_bend(&self) -> Option<usize> {
+        self.shown.and_then(|k| k.2)
+    }
+
     /// The hovered joint's edges on the flat (flat view coordinates).
     #[cfg(test)]
     pub(crate) fn joint_edges(&self) -> &[(DVec3, DVec3)] {

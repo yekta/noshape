@@ -140,10 +140,8 @@ fn rows() -> Vec<Row> {
             gpui_kit::VisualTestContext::from_window(s.window, cx).simulate_event(gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: NONE });
             s.frames(cx);
             let lit = cx.update(|cx| s.view.read(cx).sm_hover_refs().len());
-            if lit == 0 {
-                return Err("nothing lit".into());
-            }
-            Ok(())
+            let flat = cx.update(|cx| s.view.read(cx).flat_view.as_ref().map(|f| f.read(cx).hovered_bend()));
+            expect((lit > 0, flat), (true, Some(Some(0))), "(the bend lit in 3D, its zone on the flat)")
         } },
         Row { id: "table / a joint row hovered lights its rip", live: "hovering Joint A (a rip) lights it in the 3D view and its edges in the flat view (live 11-17 sm-feel-1117)", gap: false, check: |s, cx| {
             s.press(cx, "sm-cell-0-0-0", MouseButton::Right)?;
