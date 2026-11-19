@@ -900,6 +900,13 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   ("Edi‹root›QA Box 1"); nothing clips it. It should end at the column (live ellipsises long names in its lists; this
   row's exact cut isn't recorded, ask live if needed). Green 624c6db77, walk 23:02. Branch from V1, edit in B1,
   merge dialog (1 tab changed, Replace with B1), toast "Merged B1 into Main. Revert to before this merge" = live.
+- [ ] P1 **DRW-HOLE-TABLE-NOT-SAVED (dx)**: a Hole table placed with ✓ is never recorded: no history entry, and it is gone
+  after the app is closed and the document reopened (walk3 Part 1 Drawing 1, green 624c6db77; twice: 22:58 and 23:04:40,
+  the second time the app stopped 10 s after ✓). The document's microversions have "Part 1 Drawing 1 :: Note" (22:56) but
+  nothing for either table; the view's A1 tag and X/Y origin arrows go too. Steps: Hole table › pick the Top view › Origin
+  = the hole centre › ✓. Also seen: the first ✓ placed the table snapped at the sheet's bottom-right corner (= live: "On ✓
+  the table was placed snapped to the fixed corner"), the second left it at the pointer (top left, over the ✓ button,
+  off the sheet), with the same fixed corner (2nd icon, default).
 
 ## Interaction feel suite 11-19 (qa 16:20: run 1119-1242-223cec7e on vibex8, failures re-run on green eb3b06a8 on vibe2)
 2110/2172 scenarios (05:51 run on a67911be: 2126). 67 failing; 28 pass on the re-run (load flakes or fixed). The 39 still failing
