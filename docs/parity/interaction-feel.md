@@ -921,6 +921,37 @@ Block 40 × 30 × 10 plus a Front sketch (10 × 10 rectangle at x 60, a line at 
 | A closed sketch profile at rest (Sketch 2's rectangle) | filled light grey | outline only (o-view vs g1) | ≠ [psui] |
 | Hidden default planes in the feature list | grey rows, no icon | grey rows with an eye-slash icon on each | ≠ [psui] |
 
+### asm-dialogs-1119 (P0, Insert / mates / Group / Measure in an assembly, live2 11-19 04:10–04:22) [asm]
+
+two-blocks asm (Part 1 fixed 40 × 40 × 20, Part 2 20 × 20 × 10), F then Z; live on lane 2 (software GL), ours green bd38f88d3
+on :125. Only gaps the Assembly matrices above don't cover. Times: a 60 fps x11grab of each display from the input to the first
+changed frame (the same recorder for both), one run each. Evidence live/feel/asm-dialogs-1119/.
+
+| Item | Live | Ours | Status |
+|---|---|---|---|
+| Insert dialog open (toolbar Insert) | first frame 218 ms, drawn 435 ms | 97 ms | = (faster) |
+| Insert's list tools | the search box with a round ⊗ clear, a sort button right of it, three filter icons | a small × clear, no sort button, two filter icons (ins-s.png) | ≠ [asm] |
+| A Part Studio row clicked, then the pointer into the graphics | the parts follow the pointer, solid orange, 731 ms after the move | the same, 350 ms | = (faster) |
+| …at the pointer | nothing drawn at the pointer | a blue six-line star at the pointer (insz.png) | ≠ [asm] |
+| The placing click | dropped 943 ms after the click; no new copy follows; "Inserted: 2" | the same, 289 ms | = (faster) |
+| After the place, the pointer still over the new instance (dialog open) | nothing lit | the instance outlined orange (hover) (ins-flow.png row 2) | ≠ [asm] |
+| Esc after the place | "Assembly insertion has been cancelled. Restore" blue bubble, the session's instances removed | the same | = |
+| Hovering a face with the mate dialog open | the face outlined once (thin orange); corner and midpoint dots filled white with a grey ring, the centroid's disc and triad; 516 ms after the move (more at 1133) | dots hollow (no white fill), the face outlined twice (a light orange band); 697 ms (hz.png) | ≠ [asm] (look; the time is within 100 ms / 2×) |
+| After the first pick | the picked connector drawn faded (small disc and axes), the whole instance outlined orange | a full-size bright RGB triad, no disc, no outline (hz.png row 2) | ≠ [asm] |
+| The second pick → the part jumps (Fastened, top face onto top face) | 2.18 s | 0.23–0.48 s | = (faster) |
+| A (flip) | 1.0 s to the flipped place | 0.35 s | = (faster) |
+| Offset ✓ then Z "5+5" + Enter | three fields X / Y / Z, then Rotate about X, Rotation angle; "(5+5) mm" kept while focused, "10 mm" after blur; moved 941 ms after Enter | the same; 350 ms (off.png, ozf.png) | = (faster) |
+| The mated part inside the fixed one | only its orange edges, through the fixed part | a light see-through orange fill as well (oz.png) | ≠ [asm] |
+| Type list | Slider … Fastened, Parallel, the current one highlighted | the same (ty.png) | = |
+| Fastened → Revolute | re-solved 1.11–1.24 s; offset and flip kept | 0.20 s, the same values | = (faster) |
+| A connector chip hovered | its face lit yellow-green; tip "Mate connector of Part 1 <1> (Click to edit)" right of the chip, same line | the face not lit; the tip below the row (chip.png) | ≠ [asm] |
+| ✓ | dialog closed 573 ms, settled 1.0 s | 0.08–0.27 s | = (faster) |
+| Coplanar tops after the mate (Part 2's top flush with Part 1's) | Part 1's face drawn, Part 2's top edges on it | Part 2's grey face over it with a blue sliver at one corner (z-fighting) (ok.png) | ≠ [asm] |
+| Group with Part 1 (fixed) and Part 2 (Revolute 1 on them), on opening | "Group 1" with Instances Part 1 <1>, Part 2 <1>; errors shown at once: Revolute 1 and Group 1 red with "!", Mate features ⬇ and the root badge red; "… has error: Mate cannot be added between member of same group. (Hidden)" | the dialog the same; no error until ✓ (grp.png) | ≠ [asm] |
+| Group ✓ | the selection cleared; both rows faded red with "!" | both instances stay selected; Group 1's tooltip (same words) in a white box below the row, not the grey-blue bar right of the list (gok.png, ogt.png) | ≠ [asm] |
+| Two perpendicular faces selected (bottom-right summary) | "Perp planes angle: 90.000 deg" | "Perp planes angle: 90°" (the Part Studio says "90.000 deg") (mz.png, opsz.png) | ≠ [asm] |
+| Measure panel ([) with the same two faces | top at y ≈ 355, left of the right strip; Perp planes angle, Area 1600.000 mm², Max dist 60.000 mm with X / Y / Z, then Min dist 0.000 mm with no components | top at y ≈ 545 (190 px lower); Min dist first with X / Y / Z all 0.000, then Max dist (mpz.png) | ≠ [asm] |
+
 ### featurelist-feel (feature list, live2 11-17 23:25)
 
 | Finding | Ours | Test |
