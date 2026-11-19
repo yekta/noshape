@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 04:46 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 04:58 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -43,31 +43,29 @@ quadrant's snap wakes no alignment source (ours aligns with points only).
 
 ## Closed 11-19: big-sketch feel (no row >= 100 ms and >= 2x live; live: open 2.6-25 s, edit 2.7-13 s, press 31-56 ms;
 ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
-Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live to recheck on green.
+Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six on green.
 
-## State 03:40
-- Landed 373dd5b9: sketch_dimension takes a value as typed (redundant / conflicting driving, unsolvable taken, red).
-  It regressed the translator (live-driving dims ours over-defines came out driving: Part grid ERROR); fixed in local
-  commit "translator: a live driving dimension ours can't take ... set driven again" (Part grid matches again).
-- Open: infento Part grid (live fully constrained, Ok): live's LENGTH 80 on yNme.right is driving and its two PATTERN
-  spacing dims (330N36ii7ITe.direction1/2) too; ours finds all of them over-defining (our linear pattern's 649 links fix
-  the seed's size?), so they are driven. A user editing that 80 in ours can't (live: 80 -> 80.8 re-solves the grid).
-- 0b44497a LANDED 03:45 (48626728). Queued 031afe64 03:48: Trim/Split used lines (use_ends), translator stale-Use on refs geometry
-  (suite B: = A, unfound PROJECTED 45 -> 43), the translator driven fix. Suite C (all of them) on vibe2 since 03:36:
-  ~/agents/skasm-keep/suite-C-*.log; land if 90/126, 1325/1585 as A (suite-1119-0125.log).
-Split / Trim of a Use'd line (live 11-19, behaviours "skasm (11-19): split / trim of a used line"): queued 02:57.
-SketchData `use_ends` (point -> end of its ref's edge); Trim keeps live's .orphan point (external, on the line), Split's
-far piece's end follows; regen moves only a used curve's still-external ends. Next: the translator's split Uses
-(welding Sketch 12: the `.orphan` USE_END / MIDPOINT pattern). sketch_get lists stored, not re-projected, positions.
-REGION-PICK-SKETCH-SHOWN P0 queued 0b44497a (field kinds gate the shown sketch's reach and the GPU pick).
-welding Sketch 12 (lead: P1) is NOT 7 mm off: ours = live's geometry. Its 2 PROJECTED left are Uses live SPLIT: line
-a6Y7 Uses edge Jq9 (105.05-118.985 mm), its end at MIDPOINT(start, `.orphan` point), the orphan keeping USE_END to the
-far vertex (zBqz the same via a trimOffspring). Ours draws the piece unlinked. Our Trim of a Use'd piece keeps the link
-(e2e probe 01:15); our Split leaves the new piece unlinked (non-external). Asked live REQUESTS 01:20 "Split / Trim of
-a Use'd line"; then make Split keep the link as live, and the translator split our Use at the stored end.
-Sketch 13 solves now (core's Extrude 8); welding's first difference: Fillet 3 (core's).
-In flight 01:25: full model suite on vibe2 (scratch bin/suite1119.sh -> ~/agents/skasm-keep/suite-1119-*.log).
-Waiting: live rechecks error rows 82-85.
+## State 05:00 (11-19)
+- Landed: 373dd5b9 sketch_dimension takes a value as typed; 48626728 P0 REGION-PICK-SKETCH-SHOWN (qa verified green).
+- CHECKING 5686f670 (04:19): Trim/Split used lines (`use_ends`), translator stale-Use on refs geometry, translator
+  driven fix (Part grid Ok again), e2e brace fix. Suite C = A (90/126, 1325/1585).
+- QUEUED 29bf3dcb (04:47): pattern instances lose inferred H/V (Part grid keeps live's driving 80; suite D = A);
+  sketch_get / sketch ops adopt solved geometry of external entities (`adopt_geometry_where`); Bends rows in letter
+  order (qa session-sm-1119, `bend_rows_run_in_their_letters_order`); P0 sketch-tools-1119 (chain square ->
+  Perpendicular, a line started on a held line -> Vertical, Tangent arc tool one arc per start, smooth preview
+  `ARC_PREVIEW_TOL_PX`). Suite E (this tree) via rb.sh + slot on vibe2 -> ~/agents/skasm-keep/suite-E-*.log
+  (/root/skasm-scratch/suitee.out); compare with A ~/agents/skasm-keep/suite-1119-0125.log, fix forward if worse.
+- OPEN flat view orientation (qa session-sm-1119 step 8): the app's flat is mirrored in y vs live's Top view; the DXF
+  is right (loops). Cause: custom/src/custom/host/sheetmetal.rs `flat_place` maps the fixed wall's definition-face
+  normal to +Z; for a sheet thickened up from Top that normal is -Z (seen from below). Probe (e2e, removed): plate on
+  Top THICKEN 2 + flange on y=60: frame XY, `to_flat_view((10,50,0))` = (10,-50). Decide the rule against live 2468 /
+  qa5 sm (z -2..0) before changing; qa doc copies: vibe2 ~/agents/qa-keep/session-sm-1119/r3/doc-s3, doc-s5.
+- Open: Part grid's two PATTERN spacing dims stay driven (live driving): pattern links + shared corners make them
+  redundant in ours.
+- welding Sketch 12: ours = live's geometry; its 2 PROJECTED are live's split Use (`.orphan` USE_END + MIDPOINT);
+  translator could Use + split + point Use of the far vertex (low value).
+- Asked live: retake 1866's crossing case (a line across a held line, both ends clear -> Perpendicular?).
+- Waiting on live: rocker-enclosure sketches.json (REQUESTS 02:20); rechecks of sketch keys, errors 82-85.
 
 ## Form speed P0 (closed 17:4x): no regression; live2's app A/B overlaps (A 2.3–4.0 s, B 2.9–3.4 s, by load); model
 regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete when done).
