@@ -1633,6 +1633,32 @@ Evidence: live/feel/sketch-tools-1119/ (shots, sketch1-constraints.json); ours /
 | Dimension: press on a line and drag | nothing: no preview, no box, no dimension on release | the same | = |
 | Trim, a drag from empty space | a thin grey trail from the press; each piece goes the moment the trail crosses it (mid-drag, not on release); first trail frame 6 ms | the same | = |
 
+### list-1119 (feature list and Parts list gaps on a 30-feature part, live 11-19 05:00–06:45) [psui, core]
+
+Only what the list matrix and the featurelist-feel / ps-feel2 / parts-list rows don't already cover. The matrix already has rename (menu,
+Enter / Esc / F2, double-click opens the dialog), Shift / Alt / Ctrl clicks, autoscroll, an invalid drop, the drop line and the hover link
+from the list to the graphics. Live: lane 4, a scratch Part Studio with 30 features (a 200 × 100 × 20 plate, 12 through holes as Sketch +
+Extrude pairs, Fillet 1–3, Chamfer 1); DOM state + WebGL draw times, 3 runs. Ours: green eedbe40e on :127, clean config, the same 30
+features built by CLI, xdotool input, 60 fps screen recording aligned to the wall clock (first changed frame / last changed frame), 2–3 runs.
+Evidence: live/feel/list-1119/ (p*.json, shots); ours /root/live-scratch/fl19/ours/.
+
+| Item | Live | Ours | Status |
+|---|---|---|---|
+| A feature row's drag start | the ghost and drop line come at 6 px straight down / right / up (none at 5) and at 7.1 px diagonally (none at 5.7): past about 5.5 px | past 2 px (gpui's default; only the rollback bar has its own 7.5 px) | ≠ [psui] |
+| Reorder on the 30-feature part (Chamfer 1 dropped above Fillet 1) | the row in its new place 0.13–1.49 s after the release, graphics settled 1.7–2.7 s; Ctrl+Z: the row back 0.23–1.12 s, graphics 1.8–2.0 s | the row 79–127 ms, graphics 0.50–0.62 s; Ctrl+Z 87–105 ms, 0.32–0.36 s | = (ours faster) |
+| Rollback bar dragged up over 14 features (from the end to above Sketch 9) | the 14 rows grey 0.25–0.98 s after the release, graphics settled 1.4–1.9 s | rows 66–114 ms, graphics 0.20–0.26 s | = (ours faster) |
+| Roll to end (the bar's menu) with 14 rolled back | the rows back 1.34–1.38 s after the click, graphics settled 2.5–3.0 s | rows 116–121 ms, graphics 0.18–0.22 s | = (ours faster) |
+| Suppress an early feature (Extrude 2 of 30) from its row menu | the row struck through 1.44–1.54 s after the click, graphics settled 3.0–3.8 s; Unsuppress 1.31–1.33 s / 2.9–3.2 s | 127–169 ms / 0.41–0.46 s; Unsuppress 95–162 ms / 0.40–0.51 s | = (ours faster) |
+| A row click and a second row click (adds) | the row selected 106–127 ms, its part drawn selected by 0.52 s; the second 106–123 ms | 123–179 ms; the second 133–159 ms | = |
+| A suppressed feature's menu | Rename / Add selection to folder… / Unsuppress, Dynamic suppression ▸ / Add comment / Roll to here / Delete | the same (Add comment left out: cloud) | = |
+| A failed feature's menu (Extrude 2 failing with Extrude 1 suppressed) | Rename / Edit…, Edit healthy moment of Extrude 2…, Edit Sketch 2…, Show dimensions / Add selection to folder… / Suppress, Dynamic suppression ▸ / Add comment / Show dependencies… / Roll to here / Delete: no Zoom to selection, no appearance | the same | = |
+| A row failing because a feature above it is suppressed | red name, its own icon, no warning triangle (p6-failed-menu.png) | red name with a warning triangle on the icon | ≠ [psui] |
+| A new folder's menu (New folder over Sketch 2 + Extrude 2, the folder selected) | Hide other sketches, Hide all sketches / Section view…, Suppress, Dynamic suppression ▸ / Clear selection / Expand ▸, Collapse ▸ / Edit sketch appearance…, Add appearance to feature… / Delete | the same without Hide other sketches and Hide all sketches (the matrix's "on folders" gap) | ≠ [psui] |
+| Parts list eye | 20 × 20 at the row's right end (x 210–230 of 40–240), shown on hover; a click greys the row in 107–114 ms, graphics settled 1.0–1.4 s; a second click shows it again in 134–213 ms | the same place; 112–159 ms / 135–222 ms, graphics 0.36–0.87 s | = |
+| Parts list row tooltip | "Part 1" beside the list, right of the row and centred on it, like a feature row's | under the pointer (a plain tooltip; feature rows have the side one) | ≠ [psui] |
+| Parts list row look | the part icon and the name; no appearance swatch (the colour is only in the graphics and Edit appearance…) | the same | = |
+| A hole edge hovered in the graphics | lit; no feature row tinted (every row's class unchanged) | – (not taken) | – |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
