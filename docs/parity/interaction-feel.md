@@ -980,6 +980,13 @@ display from the input to the first changed frame (the same recorder for both). 
 | Hatch region: hovering inside the Front view | no feedback | the view's tan hover frame (hc.png) | ≠ [studios] |
 | …the click | the region hatched tan, no outline, 1.12 s; Esc cancels | hatched tan with a pale-yellow region outline, 0.37 s; Esc cancels | ≠ [studios] (outline) |
 | Edge to edge centerline (the Front view's left then right edge) | no preview while the second edge is hovered (only the edge lit); after the click the centerline midway, ~10 px past the view top and bottom, kept selected with blue grips | the centerline previewed while hovering the second edge; the same line, not selected | ≠ [studios] |
+| Radial dimension, Shift+R (live2 05:0x–05:2x, the session-drw-1119 plate: 80 × 50 × 10, Ø12 hole, ANSI_A_MM 1:2; ours green b173e2970 on the same plate built by CLI) | the Dimension button lit 503 ms after the key | lit 108 ms | = (faster) |
+| …the hole circle hovered, then picked | hover: the circle tan. Pick: the circle stays tan, a red-orange hourglass mark (an ✕ closed top and bottom) on the circle at the pick spot, existing dimensions get small orange + marks at their extension-line ends; "R6" in bold hangs on the pointer with its leader; 153 ms | hover: the circle tan and a tan dot at its centre. Pick: the circle blue-violet with the tan centre dot, no pick mark, no + marks on other dimensions, "R6" regular; 179 ms (rad-note/Or-*.png) | ≠ [studios] |
+| …placed (text at the pointer, leader with a shoulder) | 683–800 ms; the leader from the circle to the text, the same shape as ours | 211 ms, the same leader and text | = (faster) |
+| Note text entry: paste and typing | Ctrl+V pastes the clipboard into the box: first frame 327 ms, settled 760 ms; a typed key shows at 392 ms (xdotool and CDP keys both reach the box); the box grows to the text; Ctrl+A doesn't select the box's text | paste 114 ms, a key 91 ms, BackSpace 66 ms; the box grows to the text | = (faster) |
+| …the text box and its ruler | a thin solid box; the ruler a grey bar with the L tab stop inside its left end, ticks, ◁▷ at the right end | a dotted box; the L in a separate square left of the ruler, a blue marker at the ruler's right | ≠ [studios] |
+| …✓ in the Note dialog | the dialog closes and the note is committed; the Note tool stays on with a "NOTE" placeholder under the pointer; 439–872 ms | the same (dialog closes, note committed, "NOTE" placeholder under the pointer); 132–215 ms | = (faster) |
+| …Esc after ✓ | the tool ends and the new note is left selected (grips) | the tool ends and nothing is selected | ≠ [studios] |
 
 ### featurelist-feel (feature list, live2 11-17 23:25)
 
