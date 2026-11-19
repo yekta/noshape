@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-19 06:10 UTC (new bool thread on the Motile account since 03:5x). Hosts (lead 11-18/19): builds + probes on the Mac (NOSHAPE_RB_HOST=mac; corpus replays / A-Bs
+Updated 11-19 07:10 UTC (new bool thread on the Motile account since 03:5x). Hosts (lead 11-18/19): builds + probes on the Mac (NOSHAPE_RB_HOST=mac; corpus replays / A-Bs
 there only inside an rb.sh slot, else vibex8; Mac paths ~/noshape-host/...), gates on vibex7
 (NOSHAPE_GATE_HOST=vibex7 via /root/bool-scratch/gate-chain-own.sh <sha> as a systemd-run unit; off 02:00-04:00);
 land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs vibex7 ~/lead-private (hat8, hat15, hat15b,
@@ -33,21 +33,20 @@ Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are interna
 - LEAD 11-19 05:4x: 129100d95 (the unify's tolerant-edge room; cf-surface-pattern 386 -> 385 edges, live 387) out
   of the stack, parked with 846db3d0c (branch bool-stack3-with-usd keeps it); land the rest. Speed: land if the
   alternating A/B shows load only; else find the commit. Shell slabs: see shfall below.
-- bool-stack4 (bool-hat, 39 commits on ce88e6672) = bool-stack3 without 129100d95 and its 549c433cb (the room's
-  ordering); 13b8c4b8d's merge of pieces on one surface kept (pieces_within, without the room); + 85957b9a9 (fix of
-  97ed541ac: a face going round between rulings (a thread's turn) keeps them where `right` put them; it broke
-  bool_patterns::a_nuts_thread_turns_cut_its_bore_between_them) + b2243d771 (grooves test: 8 faces by pieces_within).
-  Kernel 519/519 + brep tests pass (vibex7). Before land, all on b2243d771:
-  - GATE unit bool-gate-b2243d771 (vibex7; queued behind bool2's) -> /root/bool-hat-scratch/chain-b2243d771.out.
-  - private docs unit bool-udoc-b2243d771 (cli builds on vibe2, compare on vibex7) -> udoc-b2243d771.out
-    (script /root/bool-hat-scratch/udoc-abh.sh, UDOC_BUILD_HOST).
-  - A/B: /root/bool-scratch/ab-doc.sh 5 <docs> on the gate's host with its binaries, via its slot (the 2c6b run was
-    stopped: its ssh outlived 30 min; run it as a systemd unit holding the ssh).
-  Clean -> land bool-stack4 (diff --stat first; bool-hat's uncommitted traces/probes: save the diff, checkout, land,
-  re-apply). bool2's merge recipe if bool2-touch lands first:
-  `const int q = shared[k] < 2 ? quiet(x, shared[k] == 0) : 0; if (kept(x) || q == 2) steady...; else if (sheets &&
-  shared[k] < 2 && q != 0) return decline("a shared shape of sheets OCCT may keep or remake");`. On land: tell
-  dx / core / blend / asm / bool2.
+- bool-stack6 (bool-hat, 35 commits on main 0bfc1ed03, tip fb1269481) = bool-stack3 rebased on bool2's 0bfc1ed03
+  without: 129100d95 + 549c433cb (tolerant-edge room; lead), the unify's pieces_within merge (dock B Govde after Rib
+  Round 1 85 -> 83 faces, no live capture; NOSHAPE_BOOL_KEEP_STRIPS showed it isn't the strips), my line-commons commit
+  (bool2's 4b68bdb0b supersedes it), offset_grazes_a_circle (086d69a12 + dcd7121b6: bool2's crest fix takes fan-blade).
+  With: 85957b9a9's fix (a thread turn's seam rulings stay where `right` put them: the nut T1). Kernel 516 + brep pass
+  (Mac). Older branches kept: bool-stack3, bool-stack3-with-usd, bool-stack4, bool-stack5. Before land, on fb1269481:
+  - GATE unit bool-gate-fb1269481 (vibex8, 07:04) -> /root/bool-hat-scratch/chain-fb1269481.out.
+  - private docs unit bool-udoc-fb1269481 (clis on vibe2, compare vibex7) -> udoc-fb1269481.out (dock must be SAME).
+  - A/B: /root/bool-scratch/ab-doc.sh 5 <docs> on vibex8 with the gate's binaries, via its slot, as a systemd unit
+    holding the ssh.
+  Clean -> land bool-stack6 (diff --stat; bool-hat's traces: /root/bool-scratch/wip-1119-0640.diff, retol hook
+  /root/bool-scratch/retol-slabs-hook.diff, probes /root/bool-scratch/probes/xprobe.rs; never commit them). On land:
+  tell dx / core / blend / asm / bool2 (bool2-sheets rebases on it). Dock tools: /root/bool-scratch/udoc-bisect.sh
+  (rollback bisect over a tab's features), /root/bool-hat-scratch/udoc-br-only.sh, udoc-abh.sh.
 - Gate 2c6b920fc (with 129100d95): replays clean (bool-corpus 865 -> 910 ...), suite total 96.4 -> 118.8 s on a
   loaded vibex8 (hint), cf-surface-pattern the only change. /root/bool-tube-scratch/gate-2c6b920fc.log.
 - New on bool-stack3 (Mac all-corpora A/B each, vs the commit below it; only these cases changed, 0 differ):
