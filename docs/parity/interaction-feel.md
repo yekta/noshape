@@ -1709,6 +1709,28 @@ the same 100 × 60 plate with a 20 mm flange, r 15).
 | Import…: the file chosen → "Import to Onshape" | 380–470 | 353 | = |
 | Import: the Import button | the dialog closes ~1 s; "CAD Imports" tab at the end ~2.0 s; the imported tab after the active one ~7.5 s; the view stays; bubble "<file> has been imported. Open document" | closes 0.12–0.32 s; both tabs by 0.2 s in the same places; the view stays; the same bubble | = |
 
+### tools-1119 (Feature / Variable Studio, Measure, Section view, Appearance: gaps, live 11-19 07:00–07:20) [studios, psui]
+
+Only what the Variable Studio / Feature Studio rows, the measure matrix, measure-mass-1118, ps-feel2-1118 (Hide / Isolate) and ui-speed-1118
+(Mass properties) don't already cover. Live: lane 4, scratch elements in the lane document (a Feature Studio with a "Feel cube" feature, a
+Part Studio with a 40 × 30 × 10 block and a 20 mm Feel cube, a Variable Studio a / b / c), page-side DOM ms from the input event plus WebGL
+draws, and live's 11-18 fsvs-feel numbers where noted. Ours: green 0bfc1ed0 on :127, clean config, the same elements built by CLI,
+xdotool input, 60 fps screen recording (first changed frame, so ours includes input and paint time live's DOM numbers leave out).
+Evidence: live/feel/tools-1119/; ours /root/live-scratch/tl19/ours/.
+
+| Item | Live | Ours | Status |
+|---|---|---|---|
+| Feature Studio: a key typed in a comment line | the character in the DOM 45–58 ms after the keydown | on screen 73–111 ms after the key | = |
+| Feature Studio: Ctrl+S (Commit) | the Commit button greys in 36 ms (11-18, median) | 132–170 ms on screen | = |
+| Feature Studio committed, then the Part Studio tab | the Parts list 0.57–2.47 s after the click, graphics settled 1.9–2.9 s (a plain switch: 0.56–0.68 s / 1.6–2.0 s) | rebuilt and drawn 130 ms after the click (plain switch 89–93 ms) | = (ours faster) |
+| Variable Studio: a digit typed on a selected Value cell; Enter | editing at 84 ms (11-18); committed, the cell below selected, at 39 ms (next frame 78) | 86 ms; 75–110 ms | = |
+| Variable Studio: an invalid expression ("a *") + Enter | the cell pink (parameter-error, os-invalid-textbox) 185–267 ms after Enter, the selection moves down; hover: "Error regenerating." | pink at 151 ms | = |
+| Variable Studio: the add row's first key; "12" + Enter | 841–858 ms (8 of 10), 73–81 ms (2) (11-18); the invalid name pink at 526 ms | 92 ms; pink at 385 ms | = |
+| Measure: a face, then a second face clicked | "Parallel dist: 10.000 mm" 0.61–0.80 s after the second click | 127–178 ms | = (ours faster) |
+| Section view (Top) arrow dragged | the value box follows; the cut redrawn every 0.4–0.6 s while dragging; settled 1.0 s after the release | the value box follows; redrawn every 0.12–0.43 s; nothing left to redraw after the release | = |
+| Appearance (Part 1 row › Edit appearance…) | the dialog 203 ms after the click; the part drawn with an orange outline while it's open | 127 ms; the part drawn plain, no outline | ≠ [psui] |
+| Appearance: a palette swatch clicked | the part red on the next frame (38 ms), still with the orange outline (a2-red.png) | the part filled orange (a selection tint) at 260 ms, hiding the new colour; a second swatch changes nothing visible | ≠ [psui] |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
