@@ -8550,6 +8550,71 @@ fn a_radial_hole_gets_its_centermark() {
     assert_eq!(marks, 12, "two marks of six lines");
 }
 
+/// An edge running inside another part (live overlap-1119, overlap2-1119, clamp-guillem): hidden where it gets in and
+/// out under the other part's outline (box A's top edges inside box B, through B's sides: hidden over B), drawn where it
+/// gets in or out by piercing a face (through a wedge's sloped top, out its side: live draws it end to end; through a
+/// cylinder lying across them, as clamp-guillem's plate edge through the jaw's rounded top). The Top view's visible
+/// length of A's front top edge over the stretch inside B, from the DXF.
+#[test]
+fn an_edge_inside_another_part_is_hidden_only_under_its_outline() {
+    for (name, b_shape, (x0, x1), drawn) in [("box", 0, (24.0, 36.0), false), ("cylinder", 1, (24.0, 36.0), true), ("wedge", 2, (44.0, 56.0), true), ("rounded", 3, (6.0, 26.0), true)] {
+        let mut ctx = Ctx::new();
+        let a = new_sketch(&mut ctx, &format!("inside-{name}.noshape"), "plane:top");
+        call(&mut ctx, "sketch_draw", json!({ "sketch": a, "tool": "corner_rectangle", "points": [[0, 0], [100, 10]] }));
+        let region = call(&mut ctx, "sketch_get", json!({ "sketch": a }))["regions"][0]["id"].clone();
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+        let (plane, shape, params) = match b_shape {
+            0 => ("plane:top", json!({ "tool": "corner_rectangle", "points": [[20, -15], [40, 15]] }), json!({ "depth": "15 mm" })),
+            1 => ("plane:front", json!({ "tool": "circle", "points": [[30, 5], [38, 5]] }), json!({ "depth": "30 mm", "symmetric": true })),
+            2 => ("plane:front", json!({ "tool": "line", "points": [[20, 0], [60, 0], [60, 15], [20, 5], [20, 0]] }), json!({ "depth": "30 mm", "symmetric": true })),
+            _ => ("plane:top", json!({ "tool": "corner_rectangle", "points": [[0, -15], [30, 15]] }), json!({ "depth": "12 mm" })),
+        };
+        let b = call(&mut ctx, "sketch_create", json!({ "plane": plane }))["sketch"].as_str().unwrap().to_string();
+        call(&mut ctx, "sketch_draw", json!({ "sketch": b, "shapes": [shape] }));
+        let region = call(&mut ctx, "sketch_get", json!({ "sketch": b }))["regions"][0]["id"].clone();
+        let mut p = json!({ "entities": [region], "operationType": "NEW" });
+        p.as_object_mut().unwrap().extend(params.as_object().unwrap().clone());
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": p }));
+        if b_shape == 3 {
+            // B's top edge over A's end rounded r 7.5 (clamp-guillem's jaw): A's top edges get in through the round at x 2.4.
+            let e = call(&mut ctx, "query_entities", json!({ "kind": "edges", "at": [[0.0, -12.0, 12.0]] }))["edges"][0]["id"].clone();
+            call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": [e], "radius": "7.5 mm" } }));
+        }
+        assert_eq!(call(&mut ctx, "query_parts", json!({}))["parts"].as_array().unwrap().len(), 2, "{name}: two parts");
+        let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "suggested_views": true }));
+        let got = call(&mut ctx, "drawing_get", json!({ "drawing": d["drawing"], "edges": false }));
+        let top = got["views"].as_array().unwrap().iter().find(|v| v["orientation"] == "top").unwrap().clone();
+        let (k, lo) = (num(&top["scale"]), [num(&top["bounds"]["min"][0]), num(&top["bounds"]["min"][1])]);
+        // Model x, y (A's x 0..100, B's y -15..15 the view's extent) to sheet mm.
+        let sheet = |x: f64, y: f64| [lo[0] + x * k, lo[1] + (y + 15.0) * k];
+        let dxf = scratch(&format!("inside-{name}.dxf"));
+        call(&mut ctx, "drawing_export", json!({ "drawing": d["drawing"], "format": "DXF", "file": dxf.to_str().unwrap() }));
+        let text = String::from_utf8_lossy(&std::fs::read(&dxf).unwrap()).to_string();
+        let pairs: Vec<(&str, &str)> = text.lines().map(str::trim).collect::<Vec<_>>().chunks(2).filter(|p| p.len() == 2).map(|p| (p[0], p[1])).collect();
+        let mut lines: Vec<(String, [f64; 4])> = Vec::new();
+        let mut cur: Option<(String, [f64; 4])> = None;
+        for (c, v) in pairs {
+            match (c, &mut cur) {
+                ("0", _) => {
+                    lines.extend(cur.take());
+                    cur = (v == "LINE").then(|| (String::new(), [0.0; 4]));
+                }
+                ("8", Some(l)) => l.0 = v.to_string(),
+                ("10" | "20" | "11" | "21", Some(l)) => l.1[["10", "20", "11", "21"].iter().position(|x| *x == c).unwrap()] = v.parse::<f64>().unwrap() * 25.4,
+                _ => {}
+            }
+        }
+        let (from, to) = (sheet(x0, 0.0), sheet(x1, 0.0));
+        let drawn_mm: f64 = lines
+            .iter()
+            .filter(|(layer, l)| layer.eq_ignore_ascii_case("visible") && (l[1] - from[1]).abs() < 0.05 && (l[3] - from[1]).abs() < 0.05)
+            .map(|(_, l)| (l[0].max(l[2]).min(to[0]) - l[0].min(l[2]).max(from[0])).max(0.0))
+            .sum();
+        let want = if drawn { to[0] - from[0] } else { 0.0 };
+        assert!((drawn_mm - want).abs() < 0.05, "{name}: A's top edge drawn {drawn_mm:.3} mm of x {x0}..{x1} ({want:.3} wanted)");
+    }
+}
+
 /// An automatic centermark is sized to the widest circle seen on its axis, not to a counterbore hidden on the far side,
 /// and shrinks to 0.7 r only for a circle smaller than its cross and gap (0.09 in at the defaults): live's clamp-guillem
 /// (r 2 mm with a r 3.5 mm counterbore behind: arms to r + 0.7 r; r 2.75 mm: ±0.045 in, arms to r + 0.09 in),

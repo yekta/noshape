@@ -1900,6 +1900,152 @@ pub fn dist_to_segment(p: [f64; 2], a: [f64; 2], b: [f64; 2]) -> f64 {
     ((p[0] - q[0]).powi(2) + (p[1] - q[1]).powi(2)).sqrt()
 }
 
+/// An edge running inside another part, as live draws it (overlap-1119, overlap2-1119, clamp-guillem): the part hides
+/// it only where the edge both gets in and gets out under the part's outline in the view (through faces seen edge-on: a
+/// box's sides seen from above), or where the edge ends inside it; where it gets in or out by piercing a face (a wedge's
+/// sloped top, clamp-guillem's plate edge through the jaw's rounded top) it is drawn as if that part weren't there.
+/// Each piece of such an edge is split where it crosses other parts' faces and seen along the view from its middle.
+fn inside_other_parts(projected: Vec<noshape_kernel::ProjectedEdge>, compound: &Shape, cmap: &HashMap<usize, (usize, usize)>, bodies: &[ProjBody], frame: &ViewFrame, diag: f64) -> Vec<noshape_kernel::ProjectedEdge> {
+    use noshape_kernel::PointClass;
+    let solids: Vec<Vec<Shape>> = bodies.iter().map(|b| b.shape.solids()).collect();
+    let boxes: Vec<Option<(DVec3, DVec3)>> = bodies.iter().map(|b| b.shape.bounding_box(false).ok().map(|bb| (bb.min, bb.max))).collect();
+    let overlap = |a: (DVec3, DVec3), b: (DVec3, DVec3), t: f64| a.0.cmple(b.1 + DVec3::splat(t)).all() && b.0.cmple(a.1 + DVec3::splat(t)).all();
+    let tol = diag * 1e-7;
+    let any_overlap = (0..bodies.len()).any(|i| (0..i).any(|j| matches!((boxes[i], boxes[j]), (Some(a), Some(b)) if !solids[i].is_empty() && !solids[j].is_empty() && overlap(a, b, tol))));
+    if !any_overlap {
+        return projected;
+    }
+    let edges = compound.edges();
+    let toward = -frame.dir;
+    let inside = |k: usize, p: DVec3| solids[k].iter().any(|s| s.classify_point(p, tol).is_ok_and(|c| c == PointClass::Inside));
+    // Whether the edge crosses part `k`'s boundary at `p` through a face seen edge-on (under its outline).
+    let under_outline = |k: usize, p: DVec3| {
+        bodies[k].shape.faces().iter().filter(|f| f.contains_point(p, tol * 10.0).unwrap_or(false)).any(|f| f.normal_at_point(p).is_ok_and(|n| n.dot(frame.dir).abs() < 1e-3))
+    };
+    let seen = |p: DVec3, ignore: &[usize]| {
+        (0..bodies.len()).filter(|k| !ignore.contains(k) && !solids[*k].is_empty()).all(|k| {
+            bodies[k].shape.line_crossings(p, toward, diag * 4.0).map(|hits| !hits.iter().any(|(t, _, _)| *t > tol * 10.0)).unwrap_or(true)
+        })
+    };
+    let mut out = Vec::with_capacity(projected.len());
+    for pe in projected {
+        let Some((ci, (bi, _))) = pe.source_edge.and_then(|ci| cmap.get(&(ci as usize)).map(|m| (ci as usize, *m))) else {
+            out.push(pe);
+            continue;
+        };
+        let Some(edge) = edges.get(ci) else {
+            out.push(pe);
+            continue;
+        };
+        let ebox = edge.bounding_box(false).ok().map(|bb| (bb.min, bb.max));
+        let others: Vec<usize> = (0..bodies.len()).filter(|k| *k != bi && !solids[*k].is_empty() && matches!((ebox, boxes[*k]), (Some(a), Some(b)) if overlap(a, b, tol))).collect();
+        if others.is_empty() || pe.polyline.len() < 2 {
+            out.push(pe);
+            continue;
+        }
+        let pts = sample_edge(edge, 64);
+        let q: Vec<DVec2> = pts.iter().map(|p| DVec2::from(frame.project(*p))).collect();
+        let n = pts.len();
+        if n < 2 {
+            out.push(pe);
+            continue;
+        }
+        // A view point's place along the edge: segment index + fraction.
+        let locate = |p: DVec2| -> Option<f64> {
+            let mut best: Option<(f64, f64)> = None;
+            for i in 0..n - 1 {
+                let (a, b) = (q[i], q[i + 1]);
+                let d = b - a;
+                let t = if d.length_squared() > 0.0 { ((p - a).dot(d) / d.length_squared()).clamp(0.0, 1.0) } else { 0.0 };
+                let dist = p.distance(a + d * t);
+                if best.is_none_or(|(bd, _)| dist < bd) {
+                    best = Some((dist, i as f64 + t));
+                }
+            }
+            best.filter(|(d, _)| *d <= diag * 1e-4).map(|(_, u)| u)
+        };
+        // The point at `u` on the edge itself (not its chord: a point inside its own part would be hidden by it).
+        let params = edge.edge_info().ok().filter(|_| n > 2).map(|i| (i.first_param, i.last_param));
+        let at = |u: f64| match params {
+            Some((f, l)) => edge.point_at(f + (l - f) * u / (n - 1) as f64).unwrap_or_else(|_| pts[(u.round() as usize).min(n - 1)]),
+            None => {
+                let i = (u.floor() as usize).min(n - 2);
+                pts[i].lerp(pts[i + 1], u - i as f64)
+            }
+        };
+        let (Some(ua), Some(ub)) = (locate(pe.polyline[0]), locate(*pe.polyline.last().unwrap())) else {
+            out.push(pe);
+            continue;
+        };
+        let (u0, u1, reversed) = if ua <= ub { (ua, ub, false) } else { (ub, ua, true) };
+        if u1 - u0 < 1e-9 {
+            out.push(pe);
+            continue;
+        }
+        // Where the edge crosses the other parts' faces, over the whole edge (a part entered before this piece): whether
+        // under the part's outline, or else whether the edge just outside is behind the part already.
+        let covers = |k: usize, p: DVec3| bodies[k].shape.line_crossings(p, toward, diag * 4.0).is_ok_and(|hits| hits.iter().any(|(t, _, _)| *t > tol * 10.0));
+        let mut cuts: Vec<(f64, usize, bool, bool)> = Vec::new();
+        for &k in &others {
+            for i in 0..n - 1 {
+                let (a, b) = (pts[i], pts[i + 1]);
+                let len = a.distance(b);
+                if len <= 0.0 {
+                    continue;
+                }
+                for (t, _, _) in bodies[k].shape.line_crossings(a, (b - a) / len, len).unwrap_or_default() {
+                    let u = i as f64 + t / len;
+                    let outline = under_outline(k, at(u));
+                    let outside = [u - 1e-4, u + 1e-4].into_iter().map(|v| at(v.clamp(0.0, (n - 1) as f64))).find(|p| !inside(k, *p));
+                    cuts.push((u, k, outline, !outline && outside.is_some_and(|p| covers(k, p))));
+                }
+            }
+        }
+        cuts.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let inner: Vec<f64> = {
+            let mut v: Vec<f64> = cuts.iter().map(|c| c.0).filter(|u| *u > u0 + 1e-6 && *u < u1 - 1e-6).collect();
+            v.dedup_by(|a, b| (*a - *b).abs() < 1e-6);
+            v
+        };
+        let mid = at((u0 + u1) / 2.0);
+        if cuts.is_empty() && !others.iter().any(|k| inside(*k, mid)) {
+            out.push(pe);
+            continue;
+        }
+        // Part `k` holding the point at `u` is no cover when the edge gets in or out of it by piercing a face from where
+        // the part doesn't cover it.
+        let pierced = |k: usize, u: f64| {
+            let before = cuts.iter().rev().find(|c| c.1 == k && c.0 < u);
+            let after = cuts.iter().find(|c| c.1 == k && c.0 > u);
+            matches!((before, after), (Some(b), Some(a)) if !(b.2 && a.2) && !b.3 && !a.3)
+        };
+        let bounds: Vec<f64> = std::iter::once(u0).chain(inner).chain(std::iter::once(u1)).collect();
+        let mut pieces: Vec<noshape_kernel::ProjectedEdge> = Vec::new();
+        for w in bounds.windows(2) {
+            let um = (w[0] + w[1]) / 2.0;
+            let m = at(um);
+            let ignore: Vec<usize> = others.iter().copied().filter(|k| inside(*k, m) && pierced(*k, um)).collect();
+            let visible = seen(m, &ignore);
+            let mut poly: Vec<DVec2> = vec![DVec2::from(frame.project(at(w[0])))];
+            poly.extend(((w[0].floor() as usize + 1)..=(w[1].ceil() as usize).saturating_sub(1)).filter(|i| (*i as f64) > w[0] && (*i as f64) < w[1]).map(|i| q[i]));
+            poly.push(DVec2::from(frame.project(at(w[1]))));
+            pieces.push(noshape_kernel::ProjectedEdge { visibility: if visible { Visibility::Visible } else { Visibility::Hidden }, polyline: poly, ..pe.clone() });
+        }
+        if pieces.iter().all(|p| p.visibility == pe.visibility) {
+            out.push(pe);
+            continue;
+        }
+        if reversed {
+            pieces.reverse();
+            for p in &mut pieces {
+                p.polyline.reverse();
+            }
+        }
+        out.extend(pieces);
+    }
+    out
+}
+
 /// Sample an edge into 3D points.
 pub fn sample_edge(e: &Shape, segments: usize) -> Vec<DVec3> {
     let Ok(info) = e.edge_info() else { return vec![] };
@@ -3154,6 +3300,7 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
             return g;
         }
     };
+    let projected = if faceted.iter().all(Option::is_none) { inside_other_parts(projected, &compound, &cmap, bodies, frame, diag) } else { projected };
     let mut models = ModelEdges { bodies, frame, topo: HashMap::new(), index: HashMap::new() };
     let mut mesh_pieces: Vec<(bool, Vec<[f64; 2]>)> = Vec::new();
     // A part's edge behind a mesh glimpsed past the facets' corners, in pieces shorter than the projection's own

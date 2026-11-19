@@ -164,12 +164,12 @@ R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "I
      size x 1e-6 (HlrOut.exact says the view really was exact). DXF: louver LINE 2356 -> 2360, snap-hook 351 -> 352,
      clamp 263 -> 265, every added line live's but louver's x 7.361 / 7.591 tangents, re-cut (live: one line
      running through the visible stubs on it; ours pieces, before and after). Hidden edges grow (louver 4321 -> 5224).
-   - clamp-guillem Top: overlapping parts (live.step probed with /root/dx-scratch/cg/cgprobe.cpp on vibex8 ~/agents/
-     dx-keep/rr). The plate's y=-10 top edge (z 16) runs inside Part 3 over x 0-3 and inside the jaw over x 3.4-20.2.
-     Live hides it over 0-3 only and draws 3-100 visible; ours hides 0-8.25, visible 8.25-100. live overlap-1119: an
-     edge entering another part under its outline is hidden (boxes). So live's hide works like an Appel QI pass: an edge
-     piercing a face (not crossing a projected outline) keeps its visibility. Decision asked of the lead (11-19 03:3x):
-     copy that or hide every piece inside another part.
+   - Edges inside another part (lead 11-19: copy live; live overlap-1119 boxes, overlap2-1119 wedge, clamp-guillem):
+     views.rs inside_other_parts. Another part hides a piece inside it only where the edge gets in and out under its
+     outline (faces seen edge-on), ends inside it, or pierces in from where that part already covers it; pieces are split
+     at the crossings and seen by a ray toward the viewer. clamp-guillem DXF Visible vs live: missing 1.284 -> 0.786 in,
+     extra 1.757 -> 1.647 in (Top = live; Iso one new 0.108 in piece). Speed: views of overlapping parts ~2x (clamp
+     6 -> 14 ms), big assembly / 1000-part studio unchanged. Probe: /root/dx-scratch/cg/cgprobe.cpp (vibex8 rr/).
    - Mine after all (core 22:3x: the part = live through every Draft, 22 real circles, 36 lines): housing-draft's
      0.499 in edges bowing 0.3-0.5 mm (live LINEs) and the Right-view hole rim as a SPLINE (live CIRCLE) come from our
      projection (at most Rotieren 1's grazing cut, bool's parked BOOL-ROTIEREN-TANGENT); extension-spring's Top has a second end rectangle (x 2.230 / 2.268) and
