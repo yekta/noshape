@@ -29,7 +29,6 @@
 #include <TopoDS.hxx>
 #include <TopTools_ShapeMapHasher.hxx>
 #include <NCollection_Map.hxx>
-#include <NCollection_DataMap.hxx>
 
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Shell.hxx>
@@ -458,31 +457,19 @@ TopoDS_Shape mesh_compound(const std::vector<MeshPiece>& pieces)
 
 
 // A file's objects or groups that are meshes of their own (3MF, OBJ) as Onshape imports them: a part each, never joined
-// by shared edges, but one wholly inside another that one's hollow (live meshparts-1119: c2-duct-multipart's touching
-// and overlapping parts stay 4; cf-sheet-metal-model-plus's bare OBJ, Part 3 inside Part 2: 2 parts). A part's closed
-// pieces are one solid; a part left with nothing (all hollows) an empty compound.
+// by shared edges nor made another's hollow, even wholly inside it (live meshparts-1119: c2-duct-multipart's touching
+// and overlapping parts stay 4; meshcheck-1119: cf-sheet-metal-model-plus' Part 2 inside Part 1 stays a part, Part 1
+// keeps its full volume). A part's closed pieces are one solid (its own pieces inside it its hollows).
 std::vector<TopoDS_Shape> mesh_group_parts(const std::vector<std::vector<MeshPiece>>& groups)
 {
-  std::vector<MeshPiece>                                          all;
-  NCollection_DataMap<TopoDS_Shape, size_t, TopTools_ShapeMapHasher> group_of;
-  for (size_t g = 0; g < groups.size(); ++g)
-    for (const MeshPiece& p : groups[g])
-    {
-      all.push_back(p);
-      group_of.Bind(p.face, g);
-    }
-  std::vector<std::vector<TopoDS_Shape>> per(groups.size());
-  const TopoDS_Shape                     c = mesh_compound(all);
-  for (TopoDS_Iterator it(c); it.More(); it.Next())
-  {
-    TopExp_Explorer f(it.Value(), TopAbs_FACE);
-    if (f.More() && group_of.IsBound(f.Current()))
-      per[group_of.Find(f.Current())].push_back(it.Value());
-  }
   BRep_Builder              b;
   std::vector<TopoDS_Shape> out;
-  for (const auto& shapes : per)
+  for (const auto& pieces : groups)
   {
+    std::vector<TopoDS_Shape> shapes;
+    const TopoDS_Shape        c = mesh_compound(pieces);
+    for (TopoDS_Iterator it(c); it.More(); it.Next())
+      shapes.push_back(it.Value());
     const bool solids = !shapes.empty() && std::all_of(shapes.begin(), shapes.end(), [](const TopoDS_Shape& x) { return x.ShapeType() == TopAbs_SOLID; });
     if (shapes.size() == 1)
       out.push_back(shapes[0]);

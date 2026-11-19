@@ -206,7 +206,8 @@ fn read_xt_zip(zip: &Path, units: &UnitPrefs, iges_post: bool) -> anyhow::Result
 
 /// An .obj's groups as parts (each read as the mesh reader reads a file), named by the group and coloured by its
 /// material's `Kd` from the .mtl in `dir` (sRGB 0..1) when there is one, in metres when its header says so; the whole
-/// file as one mesh when it has no groups. (Live meshparts-1119: a bare .obj's 4 groups are 4 parts, never joined.)
+/// file as one mesh when it has no groups. (Live meshparts-1119 / meshcheck-1119: a bare .obj's groups are a part each,
+/// never joined, one inside another too.)
 fn read_obj_groups(obj: &Path, dir: &Path, unit: noshape_kernel::LengthUnit) -> anyhow::Result<(noshape_kernel::Shape, Vec<noshape_model::features::importing::ImportPartInfo>)> {
     use noshape_kernel as k;
     let text = std::fs::read_to_string(obj)?;
@@ -270,7 +271,7 @@ fn read_obj_groups(obj: &Path, dir: &Path, unit: noshape_kernel::LengthUnit) -> 
         anyhow::Ok(parts)
     })();
     let _ = std::fs::remove_dir_all(&tmp);
-    // (Never joined; one wholly inside another its hollow, as live's import of a bare .obj.)
+    // (Never joined nor made another's hollow, as live's import of a bare .obj.)
     let parts = k::mesh_group_parts(&parts?)?;
     let (mut shapes, mut info) = (Vec::new(), Vec::new());
     for ((name, material, _), part) in groups.iter().zip(parts) {

@@ -908,15 +908,18 @@ fn exchange_round_trip() {
         let xt = (!selfs["PARASOLID"].is_null()).then(|| parts_from_live_import(&selfs["PARASOLID"], false));
         // `ours`: what live's import of our file is held to (an STL of live's off its model by over 1 %: the model's).
         // (No own import of ACIS, OBJ or 3MF: its Parasolid's or its STL's, the same model and mesher.)
+        let model_mesh = || {
+            let chord = LIVE_STL_CHORD_MM * 1e-3;
+            xt.as_ref().map(|x| {
+                mesh_counts(x.clone())
+                    .into_iter()
+                    .map(|p| PartState { volume_band: p.volume.zip(p.area).map(|(v, a)| [v - a * chord, v + a * chord]), area: None, area_band: None, ..p })
+                    .collect::<Vec<_>>()
+            })
+        };
         let expected = |format: &str, ours: bool| -> Option<Vec<PartState>> {
             if mesh(format) && LIVE_MESH_SHEETS.contains(&name.as_str()) {
-                let chord = LIVE_STL_CHORD_MM * 1e-3;
-                return xt.as_ref().map(|x| {
-                    mesh_counts(x.clone())
-                        .into_iter()
-                        .map(|p| PartState { volume_band: p.volume.zip(p.area).map(|(v, a)| [v - a * chord, v + a * chord]), area: None, area_band: None, ..p })
-                        .collect()
-                });
+                return model_mesh();
             }
             let key = match format {
                 "ACIS" if selfs[format].is_null() => "PARASOLID",
@@ -924,6 +927,12 @@ fn exchange_round_trip() {
                 f => f,
             };
             let own = (!selfs[key].is_null()).then(|| parts_from_live_import(&selfs[key], mesh(format)))?;
+            // (An OBJ's groups and a 3MF's objects are a part each at its full volume, where live's STL of the same
+            // parts joins or nests them (live meshcheck-1119: cf-sheet-metal-model-plus' enclosed part stays a part): the
+            // model's parts, within the STL's chord.)
+            if matches!(format, "OBJ" | "3MF") && key == "STL" && xt.as_ref().is_some_and(|x| x.len() != own.len()) {
+                return model_mesh();
+            }
             match &xt {
                 // (Live's import of ours: held to the model; where live's own import is off it, as close as that, a
                 // quarter more (live reads its own 32-tooth gear's STEP 9.7 mm³ over its model, ours 10.7; its IGES of

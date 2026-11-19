@@ -642,8 +642,8 @@ bool read_mesh_format(const std::string& path, std::vector<gp_Pnt>& nodes, std::
   return true;
 }
 
-// A 3MF file's build items as Onshape imports them: a mesh part each, named by its object, never joined (live
-// meshparts-1119: c2-duct-multipart's 4 objects, two overlapping, are 4 parts in file order), in metres.
+// A 3MF file's build items as Onshape imports them: a mesh part each, named by its object, never joined nor made
+// another's hollow (live meshparts-1119 / meshcheck-1119), in metres.
 StepImport read_3mf_parts(rust::Str path)
 {
   Mesh m;

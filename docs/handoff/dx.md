@@ -35,9 +35,8 @@ Open, ranked:
    their cuts with the cylinders 56 ELLIPSEs), ours are offsets written as approximations (deg 15x13, 7189 poles), the
    cuts B-splines (/root/dx-scratch/bin/step_edgefaces.py, step_bsurf.py). Reported to the lead for bool/core.
    housing-draft ARC 0/3, ELLIPSE 10/15, SPLINE 15/7; sm-louver ARC 101/68, ELLIPSE 50/86, SPLINE 31/0.
-- Not bugs: sheet-metal-plus ours.3mf read back 554665 for 626770 mm³ (the suite's fallback expectation: Part 2 inside
-  Part 1 is its hollow, as live's import of ours.obj does; wait for live's 3MF import of ours). ours.obj "3 parts, live
-  2": ours reads the zip by groups (live refuses zips), live was given the bare .obj.
+- sheet-metal-plus .3mf / .obj: live2 meshcheck-1119 (16:0x): live makes 3 parts of each (580567.98, 36048.84,
+  10142.77 mm³), nothing hollowed; the suite expects the model's parts for OBJ / 3MF when they differ from the STL's.
 - c2-config-parts-screws: hang fixed (b777cbd1), still in tests/parity-models/unscored.json: Sweep 1's 14.8 GB
   Boolean is bool's P0 (lead 11-16). Score it once fixed. Remove vibe5 ~/agents/dx/target-g13 when no longer needed.
 
@@ -201,9 +200,12 @@ R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "I
 - Mesh parts (live2 meshparts-1119, 13:18): a 3MF is a part per build item named by its object, a bare OBJ a part per
   group "g" (its "o"s face groups), never joined (c2-duct-multipart 4 parts in file order; ours joined 3 touching
   ones). Queued 16:2x: kernel read_3mf_parts / mesh_group_parts, import.rs .3mf by
-  build item and bare .obj by groups; one wholly inside another stays its hollow (as before; live2 asked 13:5x with
-  /root/dx-scratch/meshcheck-1119: follow-up if live keeps it a part). Suite: imports 117 -> 119/130. STL rows stay (live's own STL import of it fails:
+  build item and bare .obj by groups (a63a5bc9 kept one wholly inside another as its hollow; live2 meshcheck-1119:
+  live never hollows across objects / groups: fix-forward mesh_group_parts = mesh_compound per group alone). Suite: imports 117 -> 119/130. STL rows stay (live's own STL import of it fails:
   9 open sheets, live-self.json stlNote; the row expects the model's 4, ours joins the touching meshes by shared edges).
+- qa P0 face-rclick-export-dxf (16:1x): Export as DXF/DWG's Units: heading, "Use workspace units" check, then the
+  greyed list (flat_export.rs); ui-parity compares that dialog's fields by label (the 11-13 recorder reads the Units
+  group first). Check: vibe2 ~/tmp/dx/uip-dxf (face-rclick-export-dxf, sketch-row-menu-export-dxf).
 - Spindle tori (08:1x): RevolutionToElementary makes them tori with their pcurves mapped exactly (v shifted or
   mirrored); snap-hook live.igs 128/300/184 for live's 128/310/202 (live's own IGES splits edges past its model's
   284/160). Suite run exs-all4 (Mac dx-keep): only that row changed; clamp-guillem LINE 265/268 (Top hiding + Iso piece,
