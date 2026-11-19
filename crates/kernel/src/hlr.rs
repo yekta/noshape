@@ -153,13 +153,14 @@ impl SegGrid {
 /// polylines) within `line_tol` only: c2-sm-louver's bend tangent 1 mm beside
 /// its wall's outline is drawn (live), not covered at the deflection.
 pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64, line_tol: f64) -> Vec<ProjectedEdge> {
-    // Visible segments, and whether each is a whole straight edge.
-    let mut vis: Vec<(DVec2, DVec2, bool)> = Vec::new();
+    // Visible segments, whether each is a whole straight edge, and whether it is a tangent edge (those cover only hidden
+    // tangent edges: c2-sm-louver's bends seen edge-on, a hidden tangent line behind a visible one, live none).
+    let mut vis: Vec<(DVec2, DVec2, bool, bool)> = Vec::new();
     for e in &edges {
-        if e.visibility == Visibility::Visible && matches!(e.class, EdgeClass::Sharp | EdgeClass::Outline) {
+        if e.visibility == Visibility::Visible && matches!(e.class, EdgeClass::Sharp | EdgeClass::Outline | EdgeClass::Smooth) {
             for w in e.polyline.windows(2) {
                 if w[0].distance_squared(w[1]) > 0.0 {
-                    vis.push((w[0], w[1], e.polyline.len() == 2));
+                    vis.push((w[0], w[1], e.polyline.len() == 2, e.class == EdgeClass::Smooth));
                 }
             }
         }
@@ -169,13 +170,13 @@ pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64, line_tol:
         return edges;
     }
     let (mut lo, mut hi) = (DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY));
-    for (a, b, _) in &vis {
+    for (a, b, _, _) in &vis {
         lo = lo.min(a.min(*b));
         hi = hi.max(a.max(*b));
     }
     let extent = (hi - lo).max_element().max(tol);
     let mut grid = SegGrid { cell: (extent / 128.0).max(tol * 4.0), origin: lo, map: Default::default() };
-    for (i, (a, b, _)) in vis.iter().enumerate() {
+    for (i, (a, b, _, _)) in vis.iter().enumerate() {
         for k in grid.cells(*a, *b, tol).collect::<Vec<_>>() {
             grid.map.entry(k).or_default().push(i as u32);
         }
@@ -189,6 +190,7 @@ pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64, line_tol:
             continue;
         }
         let straight = e.polyline.len() == 2;
+        let hidden_tangent = e.visibility == Visibility::Hidden && e.class == EdgeClass::Smooth;
         // Uncovered runs along the polyline.
         let mut runs: Vec<Vec<DVec2>> = Vec::new();
         let mut cur: Vec<DVec2> = Vec::new();
@@ -206,7 +208,10 @@ pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64, line_tol:
             cand.dedup();
             let mut covered: Vec<(f64, f64)> = Vec::new();
             for &ci in &cand {
-                let (c, f, line) = vis[ci as usize];
+                let (c, f, line, smooth) = vis[ci as usize];
+                if smooth && !hidden_tangent {
+                    continue;
+                }
                 let near = if straight && line { line_tol } else { tol };
                 let g = f - c;
                 let gl = g.length();
@@ -533,6 +538,20 @@ mod tests {
         assert!(r.iter().any(|e| e.class == EdgeClass::Smooth), "{r:?}");
         let r = drop_covered_hidden(vec![pe(true, &[[0.0, 0.0], [10.0, 0.0]], Some(1)), tangent(1e-9)], 0.5, 1e-6);
         assert!(!r.iter().any(|e| e.class == EdgeClass::Smooth), "{r:?}");
+    }
+
+    /// A hidden tangent edge on a visible tangent edge isn't drawn (c2-sm-louver's bends seen edge-on: live's
+    /// TANGENT_HIDDEN has none there); a hidden sharp edge on it, and a visible tangent edge, stay.
+    #[test]
+    fn a_hidden_tangent_under_a_visible_tangent_is_dropped() {
+        let tangent = |visible: bool, id: u32| {
+            let mut t = pe(visible, &[[0.0, 0.0], [10.0, 0.0]], Some(id));
+            t.class = EdgeClass::Smooth;
+            t
+        };
+        let r = drop_covered_hidden(vec![tangent(true, 1), tangent(false, 2), pe(false, &[[0.0, 0.0], [10.0, 0.0]], Some(3))], 1e-6, 1e-6);
+        let ids: Vec<_> = r.iter().map(|e| e.source_edge).collect();
+        assert_eq!(ids, [Some(1), Some(3)], "{r:?}");
     }
 
     #[test]

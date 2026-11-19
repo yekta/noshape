@@ -570,6 +570,33 @@ fn views_tab_pens_colours_and_labels() {
     assert!(v.hide_threads && v.hide_bend_lines && v.hide_bend_notes);
 }
 
+/// With hidden lines shown, hidden tangent edges are drawn dashed as hidden lines and go to the DXF's TANGENT_HIDDEN
+/// layer (live louver-hidden-1119: 188 lines there, linetype HIDDEN); with tangent edges off they aren't drawn.
+#[test]
+fn hidden_tangent_edges_are_dashed_on_their_own_layer() {
+    use super::cad_layers::CadLayer;
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    for v in &mut drawing.sheets[0].views {
+        v.style = RenderStyle::HiddenLinesVisible;
+    }
+    let hidden_smooth: usize = drawing.sheets[0].views.iter().map(|v| compute_view(&drawing, &drawing.sheets[0], v.id, &sources, &cache, false).edges.iter().filter(|e| !e.visible && e.class == EdgeClass::Smooth).count()).sum();
+    assert!(hidden_smooth > 0, "the demo's filleted plate has tangent edges behind");
+    let layer_lines = |d: &Drawing, layer: CadLayer| {
+        let b = render_sheet(d, 0, &sources, &cache, false).unwrap();
+        let g = &b.geometry;
+        (0..g.lines.len()).filter(|&i| g.cad_line_layer(i) == layer).map(|i| (g.lines[i].style, g.line_pen(i).1)).collect::<Vec<_>>()
+    };
+    let th = layer_lines(&drawing, CadLayer::TangentHidden);
+    assert!(!th.is_empty() && th.iter().all(|(st, d)| *st == sheet::LineStyle::Hidden && d == &[3.0, 1.5]), "{th:?}");
+    assert!(!layer_lines(&drawing, CadLayer::Hidden).is_empty(), "sharp hidden edges stay on Hidden");
+    for v in &mut drawing.sheets[0].views {
+        v.show_tangent_edges = false;
+    }
+    assert!(layer_lines(&drawing, CadLayer::TangentHidden).is_empty());
+}
+
 /// Drawing properties › Views › Section views: the cutting line's pen
 /// (live 0.13 mm) and colour, its arrowheads' size and type, its label's
 /// height and colour, and the hatches' pen and colour.

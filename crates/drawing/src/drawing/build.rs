@@ -1895,11 +1895,11 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 break 'own;
             }
             let own_mark = g.mark();
-            // Projected edges: visible ones, then tangent and hidden ones (each
-            // a run, so Drawing properties › Views colors them with one span).
+            // Projected edges: visible ones, then tangent, hidden and hidden tangent ones (each a run, so Drawing
+            // properties › Views colors them with one span; live's DXF puts the last on TANGENT_HIDDEN).
             let vt = &drawing.props.view_tab;
             let edges0 = g.lines.len();
-            for pass in 0..3 {
+            for pass in 0..4 {
                 let mark = g.mark();
                 // The pass's own pen and colour go in ahead of the per-edge
                 // ones (Adjust linestyle wins: the last span covering a line).
@@ -1920,6 +1920,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                         (true, EdgeClass::Smooth) if v.show_tangent_edges && v.tangent_phantom => LineStyle::Phantom,
                         (true, EdgeClass::Smooth) if v.show_tangent_edges => LineStyle::Tangent,
                         (true, EdgeClass::Smooth) => continue,
+                        // Hidden tangent edges dashed, with tangent edges shown (live louver-hidden-1119).
+                        (false, EdgeClass::Smooth) if v.style == RenderStyle::HiddenLinesVisible && v.show_tangent_edges => LineStyle::Hidden,
                         (false, EdgeClass::Smooth) => continue,
                         (true, _) => LineStyle::Visible,
                         (false, _) if v.style == RenderStyle::HiddenLinesVisible => LineStyle::Hidden,
@@ -1927,6 +1929,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     };
                     let p = match style {
                         LineStyle::Phantom | LineStyle::Tangent => 1,
+                        LineStyle::Hidden if e.class == EdgeClass::Smooth && !marked => 3,
                         LineStyle::Hidden => 2,
                         _ => 0,
                     };
@@ -2003,6 +2006,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                             start = end;
                         }
                     }
+                }
+                if pass == 3 && !v.editing_edges {
+                    g.cad_since(mark, CadLayer::TangentHidden);
                 }
             }
             // Sketches drawn in the view: Construction geometry › Part

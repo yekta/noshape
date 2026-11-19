@@ -112,11 +112,11 @@ Q. asm-robot-relations studio 0c3466's Import 1 (REV-21-1650.STEP): live's store
    WARNING "Imported parts contained faults." (Allow faulty parts on), or no parts at all (off). So the six sheets are
    an old stored translation live no longer makes. Decision asked of the lead (11-19 03:1x): keep ours (one solid).
 H. Hidden lines vs live (live2 02:32, live/dx/louver-hidden-1119/: sm-louver Front + Top, Show hidden lines, DXF 2018).
-   Live Hidden 1348 LINE + 3 ARC + 75 ELLIPSE (105.85 in), TANGENT_HIDDEN 188 LINE (244.4 in). Ours on main (e86fcb6e)
-   Hidden 774 LINE, 105.34 in: every piece on live's Hidden geometry, and live's Hidden all on ours but 0.010 in
-   (/root/dx-scratch/bin/hidcmp.py ours live). Counts differ by splitting only. Gaps: no TANGENT_HIDDEN layer (build.rs:
-   (false, Smooth) => continue), hidden curves written as LINEs not ELLIPSE / ARC. Dumps /root/dx-scratch/dxfm/
-   louver-hidden-*.dxf (Mac exsh.sh + /root/dx-scratch/dxhidden.patch: the exchange suite with DXHIDDEN=1).
+   Hidden: live 1348 LINE + 3 ARC + 75 ELLIPSE (105.85 in), ours 774 LINE (105.34 in), each on the other's to 0.010 in.
+   TANGENT_HIDDEN (03:4x, hidden tangent edges drawn dashed with tangent edges shown, not under a visible tangent
+   edge): live 188 LINE 244.43 in, ours 244.42 in, each on the other's. /root/dx-scratch/bin/hidcmp2.py ours live tol
+   LAYER. Next: hidden curves as ARC / ELLIPSE (live 3 / 75; ours LINEs). Runs: Mac exsh2.sh with
+   /root/dx-scratch/dxhidden.patch applied (the exchange suite with DXHIDDEN=1), dumps /root/dx-scratch/dxfm/.
 R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "Import failed: <path>: i/o error: could
    not read STEP file <path>" (live: "bad.step uploaded but failed to translate."; the app's bubble already said so).
    In progress: ops import's translation failures say failed_to_translate(file) (upload-only's unreadable file keeps
@@ -164,11 +164,12 @@ R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "I
      size x 1e-6 (HlrOut.exact says the view really was exact). DXF: louver LINE 2356 -> 2360, snap-hook 351 -> 352,
      clamp 263 -> 265, every added line live's but louver's x 7.361 / 7.591 tangents, re-cut (live: one line
      running through the visible stubs on it; ours pieces, before and after). Hidden edges grow (louver 4321 -> 5224).
-   - clamp-guillem Top/Iso: overlapping parts. Part 1 (jaw, x 0-30, y -25-0, z +-17.24, top = Redondeo 1 r7.5 to
-     x 8.25 then a slope 17.2 -> 15.0) encloses Part 2 (plate, z 0-16) over x 0-30; the plate's top edges run inside
-     the jaw (under its top over x 3.37-20.2). Live draws them visible, split at 3.37 / 8.25 / 20.2; ours hides
-     0.6-8.25 only. Live's rule for edges inside another part asked in REQUESTS 11-19 (live/dx/overlap-1119/). hex ELLIPSE 0 / 2: live's
-     degenerate ellipses on a 0.5 mm mesh hole (noise).
+   - clamp-guillem Top: overlapping parts (live.step probed with /root/dx-scratch/cg/cgprobe.cpp on vibex8 ~/agents/
+     dx-keep/rr). The plate's y=-10 top edge (z 16) runs inside Part 3 over x 0-3 and inside the jaw over x 3.4-20.2.
+     Live hides it over 0-3 only and draws 3-100 visible; ours hides 0-8.25, visible 8.25-100. live overlap-1119: an
+     edge entering another part under its outline is hidden (boxes). So live's hide works like an Appel QI pass: an edge
+     piercing a face (not crossing a projected outline) keeps its visibility. Decision asked of the lead (11-19 03:3x):
+     copy that or hide every piece inside another part.
    - Mine after all (core 22:3x: the part = live through every Draft, 22 real circles, 36 lines): housing-draft's
      0.499 in edges bowing 0.3-0.5 mm (live LINEs) and the Right-view hole rim as a SPLINE (live CIRCLE) come from our
      projection (at most Rotieren 1's grazing cut, bool's parked BOOL-ROTIEREN-TANGENT); extension-spring's Top has a second end rectangle (x 2.230 / 2.268) and
