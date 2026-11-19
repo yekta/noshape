@@ -4932,6 +4932,39 @@ static bool pinched_without_normal(const TopoDS_Face& f)
   return false;
 }
 
+// A sheet with an inner edge where its two faces meet at an angle, not smoothly.
+static bool has_sharp_inner_edge(const TopoDS_Shape& sheet)
+{
+  ShapeAncMap ef;
+  TopExp::MapShapesAndUniqueAncestors(sheet, TopAbs_EDGE, TopAbs_FACE, ef);
+  auto normal = [](const TopoDS_Edge& e, const TopoDS_Face& f, gp_Dir& n) {
+    double                    a, b;
+    occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, f, a, b);
+    if (pc.IsNull())
+      return false;
+    const gp_Pnt2d      uv = pc->Value(0.5 * (a + b));
+    BRepAdaptor_Surface su(f);
+    gp_Pnt              p;
+    gp_Vec              du, dv;
+    su.D1(uv.X(), uv.Y(), p, du, dv);
+    const gp_Vec m = du.Crossed(dv);
+    if (m.Magnitude() < 1e-12)
+      return false;
+    n = gp_Dir(f.Orientation() == TopAbs_REVERSED ? -m : m);
+    return true;
+  };
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    if (ef(i).Extent() != 2 || BRep_Tool::Degenerated(TopoDS::Edge(ef.FindKey(i))))
+      continue;
+    const TopoDS_Edge e = TopoDS::Edge(ef.FindKey(i));
+    gp_Dir            n1, n2;
+    if (normal(e, TopoDS::Face(ef(i).First()), n1) && normal(e, TopoDS::Face(ef(i).Last()), n2) && n1.Angle(n2) > 0.01)
+      return true;
+  }
+  return false;
+}
+
 OpOut op_thicken(const OcShape& s, double t1, double t2)
 {
   for (TopExp_Explorer x(s.shape, TopAbs_FACE); x.More(); x.Next())
@@ -5005,6 +5038,29 @@ OpOut op_thicken(const OcShape& s, double t1, double t2)
       if (!BRepCheck_Analyzer(r).IsValid() || !(volume_props(r).Mass() > 0))
         fail_op("thicken failed");
       return make_result(args, r, h.get());
+    }
+  }
+  // Faces meeting at an angle, thickened to one side (c2-surf-workshop-split's Thicken 1: a sheet with walls standing
+  // round its hole): live's offsets meet where they cross; the simple offset keeps each face's whole, overlapping
+  // (16022 mm3 against live's 14590). On its own copy: OCCT's offset changes its input.
+  if ((std::abs(t1) < 1e-12 || std::abs(t2) < 1e-12) && has_sharp_inner_edge(base))
+  {
+    const OwnCopy  own(s);
+    const OcShape& c = own.shape();
+    try
+    {
+      BRepOffset_MakeOffset mo;
+      mo.Initialize(c.shape, std::abs(t1) > 1e-12 ? t1 : -t2, 1e-7, BRepOffset_Skin, false, false, GeomAbs_Intersection, true);
+      mo.MakeOffsetShape();
+      if (mo.IsDone() && solid_count_of(mo.Shape()) > 0 && BRepCheck_Analyzer(mo.Shape()).IsValid())
+      {
+        const TopoDS_Shape r = orient_solids_outward(mo.Shape());
+        if (volume_props(r).Mass() > 0)
+          return make_result({c.shape}, r, history_of({c.shape}, mo).get());
+      }
+    }
+    catch (const Standard_Failure&)
+    {
     }
   }
   if (std::abs(t2) > 1e-12)

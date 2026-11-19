@@ -502,6 +502,23 @@ fn thicken_and_offset() {
     assert!(close(ob.shape.volume().unwrap().abs(), 1728.0, 1e-6));
 }
 
+/// A sheet whose faces meet at an angle, thickened to one side (c2-surf-workshop-split's Thicken 1: walls standing round
+/// a sheet's hole, 16022 mm³ against live's 14590): the faces' offsets meet where they cross, as live. An L of two
+/// 20 x 10 faces thickened 1 mm: 20 x 19 inside its corner, 20 x 21 outside (each face's own slab: 400 both ways).
+#[test]
+fn a_sheets_faces_meeting_at_an_angle_thicken_to_where_their_offsets_cross() {
+    let floor = rect_face(&Plane::new(DVec3::new(10.0, 5.0, 0.0), DVec3::Z, DVec3::X), 20.0, 10.0);
+    let wall = rect_face(&Plane::new(DVec3::new(10.0, 0.0, 5.0), DVec3::Y, DVec3::X), 20.0, 10.0);
+    let l = sew(&[floor, wall], 1e-6, false).unwrap().shape;
+    let mut v: Vec<f64> = [(1.0, 0.0), (0.0, 1.0)].iter().map(|&(t1, t2)| {
+        let r = thicken(&l, t1, t2).unwrap();
+        assert!(r.shape.is_valid());
+        r.shape.volume().unwrap().abs()
+    }).collect();
+    v.sort_by(f64::total_cmp);
+    assert!(close(v[0], 380.0, 1e-6) && close(v[1], 420.0, 1e-6), "{v:?}");
+}
+
 #[test]
 fn delete_and_offset_faces() {
     let b = box10();
