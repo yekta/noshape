@@ -344,6 +344,26 @@ fn a_preselected_sketch_plane_is_not_an_undo_step(cx: &mut TestAppContext) {
     assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (false, false));
 }
 
+/// Live (sketch-open feel, interaction-feel "Top selected then Shift+S"): a face selected before Sketch opens it on
+/// that face, its Sketch plane field "Face of Extrude 1".
+#[gpui::test]
+fn a_preselected_face_names_the_sketch_plane_field_by_its_feature(cx: &mut TestAppContext) {
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "sk-plane-face", Some(starts["block"].clone()));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selection = vec![v.display.bodies[0].face_refs[0].clone()];
+            v.start_feature("sketch", w, cx);
+        });
+    })
+    .unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some());
+    let items = cx.update_window(window, |_, w, cx| view.read(cx).edit.as_ref().map(|e| e.dialog.read(cx).ui_state(w, cx)["fields"][0]["items"].clone())).unwrap();
+    assert_eq!(items, Some(serde_json::json!(["Face of Extrude 1"])));
+}
+
 /// The Origin's hidden stand-in (made when a line's first click snaps to the
 /// origin) isn't an undo step: live's Undo stays off after that click and an
 /// Escape; a drawn line still is a step.
