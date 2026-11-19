@@ -6,7 +6,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## qa, 2026-11-19
-- [ ] P2 SHELL-AFTER-WELD-FILLET (bool, lead 11-19; qa 2026-11-19 12:45 UTC) qa's fuzz ticket document cli-shell-hang-pre
+- [ ] P2 SHELL-AFTER-WELD-FILLET (bool, lead 11-19; qa 2026-11-19 12:38 UTC) qa's fuzz ticket document cli-shell-hang-pre
   (vibex7 ~/qa/tickets/cli-shell-hang-pre.noshape): since blend 92c8595b0 its Fillet 1 builds (v0.4.60: "Failed to fillet
   selections."), and Shell 3 on the filleted part now fails with "Could not shell part with selections." (Shell 5 then
   "1 missing selection"). v0.4.60's Ok Shell 3 shelled the unfilleted part. Question: should Shell 3 succeed on the filleted
