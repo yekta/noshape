@@ -6478,6 +6478,9 @@ impl<'a> Translator<'a> {
                         && let Some(d) = r["dimension"].as_str()
                         && self.call("sketch_dimension_options", json!({ "sketch": id, "dimension": d, "driving": false })).is_ok()
                     {
+                        if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+                            eprintln!("TRACE {ty} {} set driven: the sketch can't take it ({kind})", c["entityId"].as_str().unwrap_or(""));
+                        }
                         self.sketch_edits += 1;
                         added_driven = true;
                     }

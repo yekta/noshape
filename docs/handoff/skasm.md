@@ -56,8 +56,11 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
   clamp fix) 91/126, 1335/1585 vs E 90 / 1325: surf-workshop bezier 6/6, boundary 7/7, cpcurves 9, mutualtrim 7, split
   11 (boundary / split: Sketch 1 / 2's anchors no longer taken back); clamp-guillem fixed after (25/25 alone).
   Also: a line across a held line, both ends clear, is Vertical (live retake 06:47 of 1866's crossing; row 67 fixed).
-- Open: Part grid's two PATTERN spacing dims stay driven (live driving): pattern links + shared corners make them
-  redundant in ours.
+- Open (low: geometry matches): infento Part grid's four 80 mm LENGTHs (seed side V2HoieiIDMV9, the pattern's
+  direction lines len1 / len2, one more) end driven in ours (E, F and 07:2x builds alike; TRACE "set driven"): live's
+  grid instances are tied corner to corner by 401 PATTERN COINCIDENTs, so the spacings follow from the seed's size and
+  our solver calls the LENGTHs redundant; live keeps them driving and solves 80 -> 80.8. Needs live: what moves (seed,
+  spacings, instances) when the 80 is edited. Data: vibe2 ~/tmp/skasm/inf1 (rebuilt 07:1x, Part grid only), pg.sh.
 - welding Sketch 12: ours = live's geometry; its 2 PROJECTED are live's split Use (`.orphan` USE_END + MIDPOINT);
   translator could Use + split + point Use of the far vertex (low value).
 - Waiting on live: rocker-enclosure sketches.json (REQUESTS 02:20); rechecks of sketch keys, errors 82-85.
