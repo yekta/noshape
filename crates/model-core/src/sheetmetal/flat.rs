@@ -63,6 +63,9 @@ pub enum FlatCurve {
     /// Counter-clockwise from `start` to `end` (radians).
     Arc { center: DVec2, radius: f64, start: f64, end: f64 },
     Circle { center: DVec2, radius: f64 },
+    /// An elliptical arc: `major` the major semi-axis vector, `ratio` minor / major, counter-clockwise from parameter
+    /// `start` to `end` (live: a hole across a bend, ELLIPSE ratio 0.7071 at 45°).
+    Ellipse { center: DVec2, major: DVec2, ratio: f64, start: f64, end: f64 },
     /// Clamped, the full knot vector scaled to 0...1; `weights` empty unless rational.
     Spline { degree: u32, knots: Vec<f64>, poles: Vec<DVec2>, weights: Vec<f64> },
 }
@@ -88,6 +91,16 @@ pub fn outline_curves(faces: &[Shape], frame: &k::Plane) -> Option<Vec<FlatCurve
                 // Counter-clockwise from a to b when the midpoint lies on that way round.
                 let (start, end) = if ccw(ang(a), ang(mid)) <= ccw(ang(a), ang(b)) { (ang(a), ang(b)) } else { (ang(b), ang(a)) };
                 FlatCurve::Arc { center: c, radius, start, end }
+            }
+            k::Curve::Ellipse { center, x_dir, major_radius, minor_radius, .. } => {
+                let c = frame.to_local(center);
+                let major = (frame.to_local(center + x_dir.normalize_or_zero() * major_radius) - c).normalize_or_zero();
+                let minor = major.perp();
+                let t = |p: DVec2| ((p - c).dot(minor) / minor_radius).atan2((p - c).dot(major) / major_radius);
+                let mid = frame.to_local(e.point_at(0.5 * (info.first_param + info.last_param)).ok()?);
+                let ccw = |from: f64, to: f64| (to - from).rem_euclid(std::f64::consts::TAU);
+                let (start, end) = if info.closed { (0.0, std::f64::consts::TAU) } else if ccw(t(a), t(mid)) <= ccw(t(a), t(b)) { (t(a), t(b)) } else { (t(b), t(a)) };
+                FlatCurve::Ellipse { center: c, major: major * major_radius, ratio: minor_radius / major_radius, start, end }
             }
             _ => {
                 let s = e.edge_bspline().ok()?;

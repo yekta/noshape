@@ -1,11 +1,12 @@
 //! "Export DXF/DWG of Flat pattern" (live behaviours.md "(10) Export DXF/DWG
 //! of Flat pattern", samples/qa5-sm-flat.dxf): the flat in model space, the
-//! full Onshape layer table, the outline on SHEETMETAL_CUT_LINES as its exact LINEs, ARCs, CIRCLEs and SPLINEs and
+//! full Onshape layer table, the outline on SHEETMETAL_CUT_LINES as its exact LINEs, ARCs, CIRCLEs, ELLIPSEs and
+//! SPLINEs (live q-flat-dxf-1119) and
 //! the bend centre lines on SHEETMETAL_BEND_LINES_UP / _DOWN (no labels).
 
 use super::flat::{FlatCurve, FlatPattern};
 use acadrust::tables::linetype::LineTypeElement;
-use acadrust::{Arc, CadDocument, Circle, Color, DwgWriter, DxfVersion, DxfWriter, EntityType, Layer, Line, LineType, Spline, Vector3};
+use acadrust::{Arc, CadDocument, Circle, Color, DwgWriter, DxfVersion, DxfWriter, Ellipse, EntityType, Layer, Line, LineType, Spline, Vector3};
 
 /// The export dialog's settings that change the file.
 #[derive(Clone, Copy, Debug)]
@@ -169,6 +170,11 @@ pub fn flats_document(flats: &[FlatPattern], o: &FlatExport) -> Result<CadDocume
                     (e.center, e.radius, e.start_angle, e.end_angle) = (p3(*center), radius * k, start.rem_euclid(std::f64::consts::TAU), end.rem_euclid(std::f64::consts::TAU));
                     put(&mut doc, EntityType::Arc(e), CUT)?;
                 }
+                FlatCurve::Ellipse { center, major, ratio, start, end } => {
+                    let mut e = Ellipse::from_center_axes(p3(*center), Vector3::new(major.x * k, major.y * k, 0.0), *ratio);
+                    (e.start_parameter, e.end_parameter) = (*start, *end);
+                    put(&mut doc, EntityType::Ellipse(e), CUT)?;
+                }
                 // Live's: planar (flags 8), tolerances 1e-10 / 1e-8, knots 0...1.
                 FlatCurve::Spline { degree, knots, poles, weights } => {
                     let mut e = Spline::new();
@@ -301,6 +307,23 @@ mod tests {
         let doc = flats_document(&flats, &FlatExport { bend_centerlines: false, ..FlatExport::default() }).unwrap();
         assert_eq!(doc.entities().filter(|e| e.common().layer == BEND_UP).count(), 0);
         assert!(flats_dwg(&flats, &FlatExport { version: DxfVersion::AC1015, ..FlatExport::default() }).is_ok_and(|b| !b.is_empty()));
+    }
+
+    /// The exact outline goes out as live's entities (q-flat-dxf-1119: a hole across a bend as ELLIPSE arcs (live ratio
+    /// 0.7071 at 45°); a corner as an ARC), in place of the sampled loop.
+    #[test]
+    fn the_exact_outline_is_written_as_its_curves() {
+        let mut f = flat(0.0);
+        f.outline = vec![
+            FlatCurve::Line { a: DVec2::new(0.0, 0.0), b: DVec2::new(0.06, 0.0) },
+            FlatCurve::Arc { center: DVec2::new(0.055, 0.035), radius: 5e-3, start: 0.0, end: std::f64::consts::FRAC_PI_2 },
+            FlatCurve::Ellipse { center: DVec2::new(0.03, 0.0), major: DVec2::new(4.2426e-3, 0.0), ratio: 0.75, start: 0.0, end: std::f64::consts::PI },
+        ];
+        let doc = flats_document(std::slice::from_ref(&f), &FlatExport::default()).unwrap();
+        let cut: Vec<&EntityType> = doc.entities().filter(|e| e.common().layer == CUT).collect();
+        assert_eq!(cut.len(), 3, "the outline replaces the 4 loop lines");
+        assert!(cut.iter().any(|e| matches!(e, EntityType::Arc(a) if (a.radius - 5.0).abs() < 1e-9 && (a.end_angle - std::f64::consts::FRAC_PI_2).abs() < 1e-12)));
+        assert!(cut.iter().any(|e| matches!(e, EntityType::Ellipse(x) if (x.minor_axis_ratio - 0.75).abs() < 1e-12 && (x.major_axis.x - 4.2426).abs() < 1e-9)));
     }
 
     /// The export's other checkboxes: bend tangent lines (the bend zone's
