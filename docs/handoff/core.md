@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-19 13:30 UTC (new thread 20:05 after the account limit; ids: see How to run). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-19 14:25 UTC (new thread 20:05 after the account limit; ids: see How to run). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
@@ -41,14 +41,21 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   (Mirror 3 splits one B-spline edge at (1.2061,39,20): DECISIONS 11-16). surf-intro Derived 1 +0.1 in = asm's
   90d254008 (handed to asm; live's body differs, can't judge). qa re-saved cpcurves/mutualtrim: left cpcurves Split 5
   Info + extra 1227.58 mm3 part (= Split 3 keeps the wrong piece) -> after pipe.
-- **Pipe Loft (P1, core-oc branch core-nloft = 3e106dca0 cherry-picked + WIP env NOSHAPE_TRY_NLOFT; probe in core-loft
-  core-nloft2 with a dump_op):** live2 q-pipe-loft-1119 (probe-10.json): one face 32 x 24 poles, 596.6602 mm2; guide
-  Normal-to-guide magnitude 1/2/10/None give IDENTICAL poles: the guide derivative doesn't shape it. Ours unconstrained
-  582.195 (-2.4 %): the base surface differs (live v knots: 4 even steps to profile 2 at v .2365, then even). Probe
-  vibex7 ~/tmp/core/devlive <dump.brep> pipe-live-samples.txt (distance of live's 11x11 points to our face).
+- **Pipe Loft (P1, core-oc branch core-nloft = 3e106dca0 cherry-picked + WIP env NOSHAPE_TRY_NLOFT; dump probe in core-loft
+  core-nloft2):** live2 q-pipe-loft-1119: one face 32 x 24 poles, 596.6602 mm2; Normal to guide m 1/2/10/None give
+  IDENTICAL poles (the guide derivative doesn't shape it). Ours 582.167: boundaries exact (guides u 0/1, profiles 1/3),
+  profile 2 (v .2365) within 0.05 mm; interior between profiles 2 and 3 flatter, up to 0.34 mm at u .3-.4, v .6-.7
+  (vibex7 ~/tmp/core/devlive pipedump/loftopen-0.brep pipe-live-samples.txt). Guides JHt (y=0, 61.37 used of 61.37) and
+  JHV (53.70..113.36 used); profiles bow to -y between them. Ruled out: a two-rail sweep of chord-normalised profiles
+  (python /root/core-scratch/pipe/model.py: area 820-976). Next idea: live's v knots (4 even to profile 2, 6 even after)
+  suggest a skin of sections at even steps per span; try our grid with Gordon's guide term in v as well.
 - **cpcurves Split 3 (core-oc branch core-closedface, uncommitted):** surface sweep facing for closed sketch profiles (CCW
   about the sketch normal x path direction); T1 features_c::a_surface_swept_from_a_circle_faces_by_its_sketch_and_the_path;
-  30-doc subset running (gls2.log). asm: Derived 1 +0.1 in is right (live's Title body x -25.4..2.54).
+  30-doc subset on vibex7 (gls2.log; vibex8's slot was full). Then land.
+- **asm 11-19 (low):** c2-surf-intro-* Derived 1: after asm's translator commits (post 6bca92a2) the source studio translates;
+  live's Loft 4 (SURFACE, surfaceOperationType ADD) closes the 4-face "Car" sheet into a 5-face SOLID (Fillet 1 -> 7);
+  ours stays a 4-face surface. derived/b7635b82…/live.jsonl 11-16; repro vibex8 NOSHAPE_PARITY_ONLY=c2-surf-intro-offset.
+- **Lead 11-19:** rocker-enclosure-sm Extrude 2 (split face) is skasm's now; answer skasm on my notes if asked.
 - **Ring, live's sections (q-wave-washer-loft-1119 probe.json, evaluated at its v knots):** knots 0 / .1722 / .2519 /
   .3339 / .5 … = sections at the profiles (0, 90, 180, 270 deg) and at +-61.0 / +-119.4 deg: +-29 deg either side of the
   JM profiles (90 / 270), none near JK; the routing curve's 8 points are at 0, 45, 90 … (z 0 at the profiles, 3.81 at
