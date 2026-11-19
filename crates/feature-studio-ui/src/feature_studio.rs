@@ -107,9 +107,9 @@ const SAVE_DELAY: Duration = Duration::from_millis(700);
 /// fsvs-feel-1118: 275 ms median after the Backspace).
 const CHECK_DELAY: Duration = Duration::from_millis(275);
 
-/// Pause after the last keystroke before a new error shows (live fsvs-feel-1118: the squiggle and gutter ✕ 1891 ms
-/// after one syntax-breaking key, 1883–1899 over 7 reps), never while typing.
-const ERROR_DELAY: Duration = Duration::from_millis(1891);
+/// Pause after the last keystroke before a new error shows, never while typing (live tools-1119: the gutter marker and
+/// squiggle 858–946 ms after "x" typed alone on a line; ours draws ~95 ms after the timer).
+const ERROR_DELAY: Duration = Duration::from_millis(800);
 
 /// Requests for the workspace.
 pub enum FeatureStudioEvent {
@@ -373,12 +373,11 @@ pub struct Notice {
 /// Ace's notice tooltip (live document/fs-gutter-tooltip): `#f5f5f5`, 1 px
 /// `#dadada`, a row per notice with its icon and the message in the code font.
 fn ace_tooltip(notes: &[(gpui_kit::base::input::DiagnosticSeverity, SharedString)], cx: &App) -> Div {
-    use gpui_kit::base::input::DiagnosticSeverity as S;
     let rows = notes.iter().map(|(severity, message)| {
         h_flex()
             .h(px(23.))
             .gap(px(7.))
-            .child(crate::assets::icon(crate::fs_notices::notice_icon(*severity == S::Error, matches!(severity, S::Info | S::Hint)), 14., cx))
+            .child(crate::assets::icon(gutter_icon(*severity), 14., cx))
             .child(message.clone())
     });
     v_flex()
@@ -407,14 +406,24 @@ impl Render for GutterTooltip {
     }
 }
 
+/// The icon of an editor notice: an error is Ace's red square with a white × (live tools-1119 fsac-err), the
+/// others the notices panel's.
+fn gutter_icon(severity: gpui_kit::base::input::DiagnosticSeverity) -> &'static str {
+    use gpui_kit::base::input::DiagnosticSeverity as S;
+    match severity {
+        S::Error => "fs-gutter-error",
+        S::Info | S::Hint => crate::fs_notices::notice_icon(false, true),
+        _ => crate::fs_notices::notice_icon(false, false),
+    }
+}
+
 /// Ace's gutter marker (live document/fs-gutter-*): the notice icon, 13 px,
 /// with the messages it stands for as Ace's tooltip.
 pub fn gutter_marker(index: usize, severity: gpui_kit::base::input::DiagnosticSeverity, notes: &[(gpui_kit::base::input::DiagnosticSeverity, SharedString)], cx: &App) -> AnyElement {
-    use gpui_kit::base::input::DiagnosticSeverity as S;
     let notes = notes.to_vec();
     div()
         .id(("fs-gutter-marker", index))
-        .child(crate::assets::icon(crate::fs_notices::notice_icon(severity == S::Error, matches!(severity, S::Info | S::Hint)), 13., cx))
+        .child(crate::assets::icon(gutter_icon(severity), 13., cx))
         .tooltip(move |window, cx| {
             let (at, notes) = (window.mouse_position(), notes.clone());
             cx.new(|_| GutterTooltip { at, notes }).into()

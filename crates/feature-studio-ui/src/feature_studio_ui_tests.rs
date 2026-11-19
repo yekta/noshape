@@ -100,10 +100,10 @@ fn a_typed_run_undoes_in_one_step(cx: &mut TestAppContext) {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// Live fsvs-feel-1118: a new error's squiggle shows 1891 ms after the last key, never while typing; the key fixing
-/// it clears it 275 ms after.
+/// Live tools-1119: a new error's squiggle and gutter marker show ~900 ms after the last key (858–946), never while
+/// typing; the key fixing it clears it 275 ms after (fsvs-feel-1118).
 #[gpui::test]
-fn a_new_error_shows_1891_ms_after_the_last_key_and_its_fix_clears_at_275_ms(cx: &mut TestAppContext) {
+fn a_new_error_shows_800_ms_after_the_last_key_and_its_fix_clears_at_275_ms(cx: &mut TestAppContext) {
     cx.update(gpui_kit::init);
     let dir = std::env::temp_dir().join(format!("noshape-ui-fs-check-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -147,15 +147,15 @@ fn a_new_error_shows_1891_ms_after_the_last_key_and_its_fix_clears_at_275_ms(cx:
         type_key(cx, window, "x");
     }
     assert!(!error(cx), "no error while typing, a key every 500 ms");
-    for _ in 0..180 {
+    for _ in 0..75 {
         pause(cx, window, 10);
     }
-    assert!(!error(cx), "none 1.8 s after the last key");
+    assert!(!error(cx), "none 750 ms after the last key");
     assert!(counted(cx), "but counted");
     assert!(cx.update(|cx| view.read(cx).ui_busy()), "the ui-parity driver waits for it");
-    assert_eq!(squiggles(cx), clean, "no squiggle 1.8 s after the last key");
-    pause(cx, window, 150);
-    assert!(error(cx), "the error shows by 1.95 s");
+    assert_eq!(squiggles(cx), clean, "no squiggle 750 ms after the last key");
+    pause(cx, window, 100);
+    assert!(error(cx), "the error shows by 850 ms");
     assert!(!cx.update(|cx| view.read(cx).ui_busy()), "and the driver reads it");
     assert!(squiggles(cx) > clean, "with its squiggle");
     for k in ["backspace", "backspace", "backspace"] {
