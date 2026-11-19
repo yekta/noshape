@@ -2287,6 +2287,43 @@ fn a_pattern_or_mirror_of_sheet_metal_carries_its_form_and_hole() {
     }
 }
 
+/// A cut through all across a sheet metal plate leaves two sheet metal parts (live c2-sm-rocker-enclosure-sm's Extrude 3
+/// splits its part in two; std's eachSheetStillExists: each piece of the definition sheet is still tracked, with walls).
+#[test]
+#[ignore = "T2: sheet metal std"]
+fn a_cut_across_a_sheet_metal_plate_leaves_two_parts() {
+    let mut s = Studio::new();
+    let region = s.rectangle(80.0, 60.0);
+    s.add("sheetMetalStart", move |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+    });
+    s.ok();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = [(-10.0, 25.0), (90.0, 25.0), (90.0, 35.0), (-10.0, 35.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+    for i in 0..4 {
+        sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
+    }
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let key = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch").regions[0].key.clone();
+    s.add("extrude", |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        p.set("operationType", en("REMOVE"));
+        p.set("defaultScope", ParamValue::Bool(true));
+        p.set("endBound", en("THROUGH_ALL"));
+        p.set("hasSecondDirection", ParamValue::Bool(true));
+        p.set("secondDirectionBound", en("THROUGH_ALL"));
+    });
+    let r = s.ok();
+    let solids: Vec<f64> = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| b.shape.volume().unwrap_or(0.0) * 1e9).collect();
+    assert!(solids.len() == 2 && solids.iter().all(|v| (v - 4000.0).abs() < 1e-3), "two 80 × 25 × 2 parts: {solids:?}");
+}
+
 /// A plate with a hole and an emboss (live q-sm-pattern-1119's plate): its flat has the hole's loop and the
 /// emboss's outline, whichever comes first (the hole took the form's outline off the flat).
 #[test]

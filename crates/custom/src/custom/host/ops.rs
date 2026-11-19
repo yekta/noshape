@@ -818,6 +818,7 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     }
     if let Some((targets, tools)) = before {
         let mut st = cx.state.lock();
+        split_off_pieces(&mut st, &targets, &id);
         if let Some(op) = st.ops.values().find(|o| o.id == id).cloned() {
             let new: Vec<TopoName> = st.ctx.bodies.iter().filter(|b| targets.contains(&b.id)).flat_map(|b| b.faces.iter()).filter(|n| tools.contains(&**n) || tools.contains(n.root())).map(|n| (**n).clone()).collect();
             for n in new {
@@ -826,6 +827,48 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
     }
     Ok(Value::Undefined)
+}
+
+/// A subtraction that cut a target in pieces (a definition sheet a cut runs across: live c2-sm-rocker-enclosure-sm's
+/// Extrude 3 leaves two sheet metal parts): each new piece, its faces split from the target's, is that body's as an
+/// opSplitPart piece is (Parasolid's split body keeps its attributes): its attributes, hidden as it is, tracked with it
+/// (not found by the target's own id: std's MODEL attribute check takes that as one body).
+fn split_off_pieces(st: &mut super::CtxState, targets: &[BodyId], id: &super::FsId) {
+    let parents = |b: &crate::regen::context::Body| -> HashSet<TopoName> {
+        b.faces.iter().filter_map(|n| match &**n {
+            TopoName::Split { parent, .. } => Some((**parent).clone()),
+            _ => None,
+        })
+        .collect()
+    };
+    let mut found: Vec<(BodyId, BodyId)> = Vec::new();
+    for t in targets {
+        let Some(tb) = st.ctx.bodies.iter().find(|b| &b.id == t) else { continue };
+        let tp = parents(tb);
+        if tp.is_empty() {
+            continue;
+        }
+        for b in st.ctx.bodies.iter().filter(|b| !targets.contains(&b.id) && b.kind == tb.kind && st.body_creator(&b.id).as_deref() == Some(&id[..])) {
+            if parents(b).iter().any(|p| tp.contains(p)) {
+                found.push((b.id.clone(), t.clone()));
+            }
+        }
+    }
+    if found.is_empty() {
+        return;
+    }
+    let mut all: Vec<BodyId> = targets.to_vec();
+    for (piece, from) in found {
+        let copies: Vec<Value> = st.attributes_of(&Reference::Body(from.clone())).into_iter().cloned().collect();
+        for v in copies {
+            st.push_attribute(Reference::Body(piece.clone()), v);
+        }
+        if st.hidden.contains(&from) {
+            st.hidden.insert(piece.clone());
+        }
+        all.push(piece);
+    }
+    st.splits.insert(id.clone(), (all, None));
 }
 
 /// Each edge's middle.

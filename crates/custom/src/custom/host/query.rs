@@ -1526,7 +1526,9 @@ impl QueryCx<'_> {
     /// Where an attributed edge or vertex of a sheet (a sheet metal
     /// definition) is, with its body: [`CtxState::remap_attributes`].
     pub fn attribute_snapshot(&self, r: &Reference) -> Option<(BodyId, Snapshot)> {
-        if !matches!(r, Reference::Edge(_) | Reference::Vertex(_)) {
+        // (A sheet's face too: a cut across a definition wall splits it, each piece keeping its WALL attribute as
+        // Parasolid's: live c2-sm-rocker-enclosure-sm's Extrude 3 leaves two parts.)
+        if !matches!(r, Reference::Edge(_) | Reference::Vertex(_) | Reference::Face(_)) {
             return None;
         }
         let e = self.from_ref(r).into_iter().next()?;
@@ -1546,6 +1548,13 @@ impl QueryCx<'_> {
 /// sorts them out).
 pub fn relocated_pieces(q: &QueryCx, r: &Reference, snap: &Snapshot) -> Option<Vec<Ent>> {
     let found = q.from_ref(r);
+    // A face its name now finds as split pieces (each named after it): their own names (live
+    // c2-sm-rocker-enclosure-sm's Extrude 3 splits a definition wall; Parasolid's split keeps the attribute on both).
+    // Else a face keeps its name's attributes: no search by where it was (std Jog's copy of a face would take them).
+    if snap.etype == EType::Face {
+        let pieces: Vec<Ent> = found.into_iter().filter(|e| matches!(q.to_ref(e), Reference::Face(ref n) if matches!(n, TopoName::Split { .. }) && q.to_ref(e) != *r)).collect();
+        return (!pieces.is_empty() && q.from_ref(r).len() == pieces.len()).then_some(pieces);
+    }
     if !found.is_empty() && found.iter().all(|e| snap_matches(q, snap, e)) {
         // Still there, but under another name now (its faces renamed): the
         // entity's own name, which the attribute lookups compare (qa4 S1's
