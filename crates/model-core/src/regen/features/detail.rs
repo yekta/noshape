@@ -361,7 +361,17 @@ fn partial_of(ev: &EvalCtx) -> FResult<Option<super::blend_section::Partial>> {
     Ok(Some(Partial { first, second, opposite: ev.bool("partialOppositeParameter") }))
 }
 
+/// A kernel's failure reaching the user as Onshape's `message` (qa compat 11-19: c2-surf-workshop-knifehandle's Fillet 2
+/// read "Geometry operation failed: invalid input: arc through 3 points failed (collinear points?)").
+fn in_onshape_words(r: FResult<()>, message: &str) -> FResult<()> {
+    r.map_err(|e| if e.message.starts_with(crate::regen::eval::KERNEL_FAILURE) { blend_failed(message, e.message) } else { e })
+}
+
 pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
+    in_onshape_words(fillet_in(ev), "Failed to fillet selections.")
+}
+
+fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
     if ev.is("filletType", "FULL_ROUND") {
         return full_round(ev);
     }
@@ -1100,6 +1110,10 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<bool> {
 }
 
 pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
+    in_onshape_words(chamfer_in(ev), "Failed to chamfer selections.")
+}
+
+fn chamfer_in(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("entities");
     if refs.is_empty() {
         return crate::regen::eval::err_at(&["entities"], "Select edges or faces to chamfer.");
@@ -1810,6 +1824,17 @@ mod tests {
     use crate::regen::context::Body;
     use noshape_kernel as k;
     use std::sync::Arc;
+
+    /// A kernel's failure reads as Onshape's text; the feature's own messages stay (qa compat 11-19: knifehandle's
+    /// Fillet 2 read "Geometry operation failed: invalid input: arc through 3 points failed (collinear points?)").
+    #[test]
+    fn a_kernel_failure_reads_as_onshape_text() {
+        use crate::regen::eval::{FeatureError, KERNEL_FAILURE};
+        let raw = FeatureError::new(format!("{KERNEL_FAILURE}invalid input: arc through 3 points failed (collinear points?)"));
+        assert_eq!(super::in_onshape_words(Err(raw), "Failed to fillet selections.").unwrap_err().message, "Failed to fillet selections.");
+        let own = FeatureError::new("Adjoining edge not filleted.");
+        assert_eq!(super::in_onshape_words(Err(own), "Failed to fillet selections.").unwrap_err().message, "Adjoining edge not filleted.");
+    }
 
     /// Two edges of one name (a bevel gear's tooth root): each found by its own ends, not the first one twice.
     #[test]

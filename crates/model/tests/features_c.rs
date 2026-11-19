@@ -4413,6 +4413,35 @@ fn a_plates_outline_round_ending_under_a_tubes_rim_as_live() {
     assert!(bottom.len() == 1 && (bottom[0] - 890.0).abs() < 1.0, "the tube's bottom: {bottom:?} mm² (live one face, 890)");
 }
 
+/// c2-surf-workshop-knifehandle's Fillet 2 on the Blade as Chamfer 1 leaves it: a conic round (R 0.6, rho 0.5) of the top
+/// face's two long edges. Where it fails, it says so in Onshape's words, never a kernel's (qa compat 11-19: "Geometry
+/// operation failed: invalid input…" once its rolling balls' inside-out tools were declined).
+#[test]
+fn a_failed_conic_round_of_a_blades_top_edges_reads_onshape_text() {
+    let brep = include_str!("data/knifehandle-fillet2-input.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let picks: Vec<Reference> = b
+        .shape
+        .edges()
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| e.edge_info().is_ok_and(|i| near(i.length, mm(235.892), mm(0.01))))
+        .map(|(k, _)| Reference::Edge((*b.edges[k]).clone()))
+        .collect();
+    assert_eq!(picks.len(), 2, "the top face's long edges");
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(picks));
+        p.set("crossSection", en("CONIC"));
+        p.set("nonCircularRadius", expr("0.6 mm"));
+        p.set("rho", expr("0.5"));
+    });
+    let (status, message) = s.last_status();
+    assert!(status == FeatureStatus::Ok || message == "Failed to fillet selections.", "{status:?} {message:?}");
+}
+
 /// c2-surf-workshop-knifehandle's Fillet 3 on the Blade as Split 1 leaves it: a conic round (R 1, rho 0.6) of the blade
 /// tip's 4 mm edge, the curved spine on one side. Live: one face, 6/12/8, 1.59 mm³ off between its mass properties
 /// (15805.89 -> 15804.30 mm³, their accuracy some tenths); our tangent-plane sections put the contact off the spine and
