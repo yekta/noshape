@@ -539,3 +539,19 @@ fn drawn_edge_directions(ev: &EvalCtx, t: NamedShape) -> FResult<NamedShape> {
     }
     Ok(NamedShape { shape: k::reverse_edge_curves(&t.shape, &flip)?, names: t.names })
 }
+
+/// Extrude's domain from its regions (live q-flat-ops-1119): a region of a sketch on a sheet metal flat makes it the
+/// flat's (Add | Remove), regions elsewhere the model's; none leaves it. `None`: no change.
+pub fn domain_logic(ctx: &crate::regen::context::Context, params: &crate::params::ParamValues) -> Option<&'static str> {
+    let picks = params.query("entities");
+    if picks.is_empty() {
+        return None;
+    }
+    let flat = picks.iter().any(|r| matches!(r, Reference::SketchRegion { sketch, .. } if ctx.flat_sketches.contains_key(sketch)));
+    let want = if flat { "FLAT" } else { "MODEL" };
+    let now = match params.enum_("domain") {
+        "" => "MODEL",
+        d => d,
+    };
+    (now != want).then_some(want)
+}

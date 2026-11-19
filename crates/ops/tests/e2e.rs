@@ -10116,7 +10116,8 @@ fn an_extrude_in_the_flat_cuts_and_adds() {
     let (v0, _) = volume(&mut ctx);
     // A 10 mm square in the plate (the sketch's origin is the flat face's centre).
     let cut = call(&mut ctx, "sketch_draw", json!({ "sketch": sk2, "tool": "corner_rectangle", "points": [[-5, -5], [5, 5]] }))["regions"][0]["id"].clone();
-    let x = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "domain": "FLAT", "flatOperationType": "REMOVE", "entities": [cut] } }));
+    // The flat's region makes the Extrude the flat's, as the dialog does (live q-flat-ops-1119), Remove by default.
+    let x = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [cut] } }));
     assert_eq!(x["feature_status"]["status"], "Ok", "{x}");
     assert!(x.get("ignored").is_none(), "domain is taken: {x}");
     let (v1, _) = volume(&mut ctx);

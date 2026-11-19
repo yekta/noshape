@@ -108,6 +108,11 @@ pub fn extrude() -> FeatureType {
             .visible(move |v| second_direction_on(v) && v.bool("hasSecondDirectionDraft") && draft_ok(v) && second_away(v)),
     );
     p.extend(merge_scope());
+    // Made in the sheet metal flat (live q-flat-ops-1119): only Add | Remove and the regions.
+    for s in p.iter_mut().filter(|s| !matches!(s.id, "domain" | "flatOperationType" | "entities")) {
+        let shown = s.visible.take();
+        s.visible = Some(std::sync::Arc::new(move |v: &ParamValues| !v.is("domain", "FLAT") && shown.as_ref().is_none_or(|f| f(v))));
+    }
 
     FeatureType::new("extrude", "Extrude", Category::Solid, p)
         .shortcut("shift-e")

@@ -2630,6 +2630,13 @@ impl PartStudioView {
                 // fields (3D fit spline: Edges; Sheet metal model: the part).
                 let std_init = noshape_model::custom::std_feature::has_editing_logic(type_id);
                 preselect(ty, &mut feature, &sel, self.built.as_ref(), &|r, f| self.face_fits(r, f), std_init);
+                // A flat sketch's region preselected: the flat's Extrude (live q-flat-ops-1119).
+                if type_id == "extrude"
+                    && let Some(ctx) = self.context.as_ref()
+                    && let Some(d) = noshape_model::regen::features::extrude::domain_logic(ctx, &feature.params)
+                {
+                    feature.params.set("domain", ParamValue::Enum(d.into()));
+                }
                 // Plane: the type follows the preselection (Onshape's cPlaneLogic).
                 if type_id == "cPlane"
                     && let Some(ctx) = self.context.as_ref()

@@ -623,6 +623,13 @@ fn add(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         let r = od.regenerate(tab, None)?;
         noshape_model::regen::features::cplane::cplane_logic(&r.context, &mut feature.params);
     }
+    // Extrude: a flat sketch's regions make the flat's (Add | Remove), as the dialog does when one is picked.
+    if ty.id == "extrude" && !params.contains_key("domain") && !feature.params.query("entities").is_empty() {
+        let r = od.regenerate(tab, None)?;
+        if let Some(d) = noshape_model::regen::features::extrude::domain_logic(&r.context, &feature.params) {
+            feature.params.set("domain", ParamValue::Enum(d.into()));
+        }
+    }
     if let Some(n) = a.opt_str("name")? {
         // The default name given is no custom one (a paste names the copy as a new feature).
         feature.custom_name = n.trim() != feature.name;

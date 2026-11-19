@@ -5643,6 +5643,68 @@ fn a_sketch_on_the_flat_is_drawn_in_the_flat_view(cx: &mut TestAppContext) {
     assert!(near(w(line.0), (10.0, 10.0)) && near(w(line.1), (40.0, 30.0)), "{:?} {:?}", w(line.0), w(line.1));
 }
 
+/// A flat sketch's region preselected, Extrude opens as the flat's (live q-flat-ops-1119): "Extrude 1" with only
+/// Add | Remove and the region (no depth, end type or creation type).
+#[gpui::test]
+fn extrude_on_a_flat_region_opens_the_flat_form(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::init);
+    crate::part_studio_hooks::register_for_tests();
+    let dir = std::env::temp_dir().join(format!("noshape-ui-flat-extrude-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("ui.noshape");
+    let _ = std::fs::remove_file(&path);
+    {
+        use serde_json::json;
+        let mut ctx = noshape_ops::Ctx::new();
+        let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+        let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [60, 40]] }));
+        call(&mut ctx, "feature_add", json!({ "type": "sheetMetalStart", "params": { "process": "THICKEN", "regions": [r["regions"][0]["id"]], "thickness": "2 mm", "radius": "2 mm" } }));
+        let faces = call(&mut ctx, "sheetmetal_table", json!({}))["flat_faces"].as_array().unwrap().clone();
+        let num = |v: &serde_json::Value| v.as_str().and_then(|s| s.parse::<f64>().ok()).or_else(|| v.as_f64()).unwrap_or(f64::NAN);
+        let top = faces.iter().filter(|f| num(&f["normal"][2]) > 0.999).max_by(|a, b| num(&a["area"]).total_cmp(&num(&b["area"]))).unwrap().clone();
+        let s2 = call(&mut ctx, "sketch_create", json!({ "plane": top["id"] }))["sketch"].clone();
+        call(&mut ctx, "sketch_draw", json!({ "sketch": s2, "tool": "corner_rectangle", "points": [[-5, -5], [5, 5]] }));
+    }
+    let session = crate::session::Session::open(&path).unwrap();
+    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_))).unwrap().id;
+    let gpu = Gpu::headless().unwrap();
+    let (window, view) = cx.update(|cx| {
+        let doc = cx.new(|_| DocModel::new(session));
+        let bounds = Bounds { origin: Point::default(), size: size(px(1200.), px(800.)) };
+        let mut view = None;
+        let (w, _) = crate::os_menu::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+            let v = cx.new(|cx| PartStudioView::new(doc, tab, gpu, window, cx));
+            view = Some(v.clone());
+            cx.new(|_| Workspace(v))
+        })
+        .unwrap();
+        (w, view.unwrap())
+    });
+    wait_until(cx, window, |cx| view.read(cx).context.as_ref().is_some_and(|c| !c.flat_sketches.is_empty()));
+    let region = cx.update(|cx| {
+        let v = view.read(cx);
+        let sketch = *v.context.as_ref().unwrap().flat_sketches.keys().next().unwrap();
+        let sk = v.display.sketches.iter().find(|s| s.feature == sketch).expect("the flat sketch shown");
+        Reference::SketchRegion { sketch, key: sk.regions[0].key.clone() }
+    });
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selection = vec![region.clone()];
+            v.start_feature("extrude", w, cx);
+        });
+    })
+    .unwrap();
+    wait_until(cx, window, |cx| view.read(cx).edit.is_some());
+    let (domain, shown) = cx.update(|cx| {
+        let d = view.read(cx).edit.as_ref().unwrap().dialog.read(cx);
+        let p = &d.feature.params;
+        (p.enum_("domain").to_string(), d.ty.params.iter().filter(|s| s.is_visible(p)).map(|s| s.id).collect::<Vec<_>>())
+    });
+    assert_eq!((domain.as_str(), shown), ("FLAT", vec!["flatOperationType", "entities"]));
+}
+
 /// Every kind of plane right-clicked in the graphics, unselected and selected: Top, Front and Right (the feature list
 /// row's menu, ui-parity plane-graphics-rclick-menu) and a Plane feature's. The menu is built while the view is being
 /// updated: the default planes' read the view for their selection there and crashed the app (v0.4.46, 2347771e).

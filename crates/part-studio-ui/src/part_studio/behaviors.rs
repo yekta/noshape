@@ -4553,6 +4553,13 @@ impl PartStudioView {
     /// the part. Fields the user set are left alone.
     pub(super) fn auto_operation(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(e) = &self.edit else { return };
+        // A flat sketch's region picked: the flat's Extrude, Add | Remove (live q-flat-ops-1119).
+        if e.dialog.read(cx).feature.type_id == "extrude"
+            && let Some(ctx) = self.context.as_ref()
+            && let Some(d) = noshape_model::regen::features::extrude::domain_logic(ctx, &e.dialog.read(cx).feature.params)
+        {
+            e.dialog.update(cx, |dl, cx| dl.set_value_logic("domain", ParamValue::Enum(d.into()), cx));
+        }
         // Live L49/L50: a tapped hole's Depth, Tapped depth and Tap
         // clearance stay linked, new or edited (std's holeEditLogic does it
         // where it runs).
