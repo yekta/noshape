@@ -603,9 +603,13 @@ impl PartStudioView {
                             })));
                         if k == PickKind::Face && planar && faces.len() <= 1 && lone {
                             let rf = r.clone();
-                            m = m.item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| this.open_cad_export(super::flat_export::CadSource::Face(rf.clone()), w, cx))));
+                            m = m.item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| {
+                                this.selection = vec![rf.clone()];
+                                this.open_cad_export(super::flat_export::CadSource::Face(rf.clone()), w, cx)
+                            })));
                         }
-                        // (The clicked entity becomes the selection, as live's: export-format-* select the face.)
+                        // (The clicked entity becomes the selection, as live's: export-format-* and face-rclick-export-dxf
+                        // select the face.)
                         let rx = r.clone();
                         m = m.item(item("Export…", Box::new(move |this, w, cx| {
                             if !this.selection.contains(&rx) {

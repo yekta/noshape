@@ -109,19 +109,12 @@ impl PartStudioView {
         let file_focus = file.clone();
         window.open_dialog(cx, move |dialog, _, cx| {
             let s = st.borrow().clone();
-            let select = |id: &'static str, label: &'static str, opts: Vec<String>, cur: usize, disabled: bool, set: fn(&mut Settings, usize)| {
+            let select = |id: &'static str, label: &'static str, opts: Vec<String>, cur: usize, set: fn(&mut Settings, usize)| {
                 let st = st.clone();
-                div().mt(px(4.)).child(crate::os_ui::field_label(label)).child(
-                    div()
-                        .mt(px(5.))
-                        .relative()
-                        .child(crate::os_ui::select_field(id, opts, cur, move |i, w, _| {
-                            set(&mut st.borrow_mut(), i);
-                            w.refresh();
-                        }))
-                        // Live: Units is grayed while "Use workspace units" is on.
-                        .when(disabled, |d| d.child(div().absolute().inset_0().rounded(px(4.)).bg(gpui_kit::rgba(0x00000011)).occlude())),
-                )
+                div().mt(px(4.)).child(crate::os_ui::field_label(label)).child(div().mt(px(5.)).child(crate::os_ui::select_field(id, opts, cur, move |i, w, _| {
+                    set(&mut st.borrow_mut(), i);
+                    w.refresh();
+                })))
             };
             let check = |k: usize, on: bool, set: fn(&mut Settings, bool)| {
                 let st = st.clone();
@@ -135,12 +128,12 @@ impl PartStudioView {
                 .gap(px(0.))
                 .child(h_flex().gap(px(4.)).items_end().child(crate::os_ui::field_label("File name")).child(crate::part_studio_hooks::export_rules_link("fx-rules")))
                 .child(div().mt(px(2.)).child(Input::new(&file).h(px(34.)).text_size(px(14.))))
-                .child(select("fx-format", "Format", strs(&FORMATS), s.dwg as usize, false, |s, i| {
+                .child(select("fx-format", "Format", strs(&FORMATS), s.dwg as usize, |s, i| {
                     s.dwg = i == 1;
                     s.version = if s.dwg { DEFAULT_DWG } else { DEFAULT_DXF };
                 }))
-                .child(select("fx-version", "Version", CAD_VERSIONS.iter().map(|v| v.0.to_string()).collect(), s.version, false, |s, i| s.version = i))
-                .when(flat, |b| b.child(select("fx-scope", "Scope", strs(&SCOPES), s.scope, false, |s, i| s.scope = i)));
+                .child(select("fx-version", "Version", CAD_VERSIONS.iter().map(|v| v.0.to_string()).collect(), s.version, |s, i| s.version = i))
+                .when(flat, |b| b.child(select("fx-scope", "Scope", strs(&SCOPES), s.scope, |s, i| s.scope = i)));
             let units_check = {
                 let st = st.clone();
                 let on = s.workspace_units;
@@ -149,10 +142,22 @@ impl PartStudioView {
                     w.refresh();
                 })
             };
+            // Live (uip/2157-face-dxf-modal.png): the Units heading, the checkbox under it, then the units list.
+            let units_select = {
+                let st = st.clone();
+                div()
+                    .mt(px(7.))
+                    .relative()
+                    .child(crate::os_ui::select_field("fx-units", UNITS.iter().map(|u| u.0.to_string()).collect(), s.units, move |i, w, _| {
+                        st.borrow_mut().units = i;
+                        w.refresh();
+                    }))
+                    // Live: Units is grayed while "Use workspace units" is on.
+                    .when(s.workspace_units, |d| d.child(div().absolute().inset_0().rounded(px(4.)).bg(gpui_kit::rgba(0x00000011)).occlude()))
+            };
             body = body
-                .child(div().mt(px(9.)).child(units_check))
-                .child(select("fx-units", "Units", UNITS.iter().map(|u| u.0.to_string()).collect(), s.units, s.workspace_units, |s, i| s.units = i))
-                .child(select("fx-options", "Options", strs(&OPTIONS), s.options, false, |s, i| s.options = i));
+                .child(div().mt(px(4.)).child(crate::os_ui::field_label("Units")).child(div().mt(px(7.)).child(units_check)).child(units_select))
+                .child(select("fx-options", "Options", strs(&OPTIONS), s.options, |s, i| s.options = i));
             let setters: [fn(&mut Settings, bool); 8] = [|s, v| s.checks[0] = v, |s, v| s.checks[1] = v, |s, v| s.checks[2] = v, |s, v| s.checks[3] = v, |s, v| s.checks[4] = v, |s, v| s.checks[5] = v, |s, v| s.checks[6] = v, |s, v| s.checks[7] = v];
             // A sketch or face has the first two (live sketch-row-menu-export-dxf).
             let shown = if flat { CHECKS.len() } else { 2 };
@@ -169,8 +174,8 @@ impl PartStudioView {
                 if flat {
                     fields.push(json!({ "label": "Scope", "kind": "select", "value": SCOPES[s.scope.min(2)] }));
                 }
-                fields.push(json!({ "label": "Units", "kind": "select", "value": UNITS[s.units.min(5)].0 }));
                 fields.push(json!({ "label": "Use workspace units", "kind": "checkbox", "value": s.workspace_units }));
+                fields.push(json!({ "label": "Units", "kind": "select", "value": UNITS[s.units.min(5)].0 }));
                 fields.push(json!({ "label": "Options", "kind": "select", "value": OPTIONS[s.options.min(2)] }));
                 fields.extend(CHECKS.iter().zip(s.checks).take(shown).map(|((_, label, _), on)| json!({ "label": label, "kind": "checkbox", "value": on })));
                 json!({ "kind": "modal", "title": "Export as DXF/DWG", "fields": fields, "buttons": ["Export", "Cancel"] })

@@ -301,13 +301,20 @@ def picker_as_read(state, since):
     return state
 
 
+UNIT_NAMES = {"Centimeter", "Foot", "Inch", "Meter", "Millimeter", "Yard"}
+
+
 def export_fields_by_label(state):
     """The Export modal's fields by label, once each, on both sides: live's recorder reads them in page order, which
-    puts STL's own fields before File name and lists a mesh format's Resolution twice (export-format-stl, -3mf)."""
+    puts STL's own fields before File name and lists a mesh format's Resolution twice (export-format-stl, -3mf). The
+    same for Export as DXF/DWG, whose units list the 11-10 recorder reads first and labels "Use workspace units" after
+    the checkbox above it (face-rclick-export-dxf; the 11-06 one, sketch-row-menu-export-dxf: in order, "Units")."""
     d = (state or {}).get("dialog")
-    if isinstance(d, dict) and d.get("title") == "Export" and isinstance(d.get("fields"), list) and all(isinstance(f, dict) for f in d["fields"]):
+    if isinstance(d, dict) and d.get("title") in ("Export", "Export as DXF/DWG") and isinstance(d.get("fields"), list) and all(isinstance(f, dict) for f in d["fields"]):
         seen = []
         for f in d["fields"]:
+            if d["title"] == "Export as DXF/DWG" and f.get("kind") == "select" and f.get("value") in UNIT_NAMES:
+                f = {**f, "label": "Units"}
             if f not in seen:
                 seen.append(f)
         d["fields"] = sorted(seen, key=lambda f: str(f.get("label")))
