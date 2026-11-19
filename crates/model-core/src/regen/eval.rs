@@ -832,8 +832,9 @@ impl<'a> EvalCtx<'a> {
         if let Some(q) = self.qv_first(r) {
             return self.resolve_direction(&q);
         }
+        // (A sketch region too: its sketch's normal, c2-surf-workshop-cpcurves' 3D fit spline 1 ends along one.)
         if let Some(f) = self.resolve_plane(r)
-            && matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::Face(_))
+            && matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::Face(_) | Reference::SketchRegion { .. })
         {
             return Some(f.normal);
         }

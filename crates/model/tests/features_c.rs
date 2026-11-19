@@ -3490,6 +3490,34 @@ fn fit_spline_magnitude_arrow_as_std() {
     assert!((m.abs() - 2.0).abs() < 1e-9, "startMagnitude {m}");
 }
 
+/// A fit spline's end direction may be a sketch region: its sketch's normal, the magnitude's sign turning it (live
+/// c2-surf-workshop-cpcurves' 3D fit spline 1: a region's normal, magnitude -2, the end tangent against it; ours "Cannot
+/// evaluate tangency for end condition.").
+#[test]
+fn fit_spline_ends_along_a_sketch_region_normal() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts = [DVec2::new(0.0, 0.0), DVec2::new(0.02, 0.01), DVec2::new(0.04, 0.0)].map(|p| sk.add_point(p));
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let mut sq = noshape_sketch::Sketch::new();
+    sq.corner_rectangle(DVec2::new(0.05, 0.0), DVec2::new(0.06, 0.01));
+    let sq = s.sketch(Reference::Plane(DatumPlane::Front), sq);
+    let region = s.region(sq);
+    let se = |e: u32| Reference::SketchEntity { sketch: sid, entity: e };
+    let fit = s.add("fitSpline", |p| {
+        p.set("vertices", ParamValue::Query(pts.iter().map(|p| se(p.0)).collect()));
+        p.set("endDirection", q(region));
+        p.set("endMagnitude", ParamValue::Expr(ExprValue::new("-2")));
+    });
+    let r = s.ok();
+    let state = r.display.feature_state(fit).expect("state");
+    use noshape_model::display::FeatureManipulator as M;
+    let [(key, M::Linear { direction, offset, .. })] = state.manipulators.as_slice() else { panic!("{:?}", state.manipulators) };
+    // Front's normal is -Y; the arrow runs back from the end along it, its offset the signed magnitude's.
+    assert_eq!(key, "endManipulator");
+    assert!(direction.y > 0.999 && *offset < 0.0, "{:?}", state.manipulators);
+}
+
 /// A fit spline through two vertices with no end directions is a line, as live's (its edge reads LINE: asm-rack-pinion's
 /// Transform 1 turns a gear about one; a spline of ours there read as another straight edge).
 #[test]
