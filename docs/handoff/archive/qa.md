@@ -2170,3 +2170,21 @@ selection, measure, section view; then P2 assembly and drawing passes; verify th
    Green 5076e98c (01:15) has psui 8d2e0056, skasm a6236ed3a stack, psui 591643fc: run the owed re-checks (0i, 0j) on it.
    Loft: qa-lp-verify done 01:10 on 0f7610c8 (revert in): Mirror 1 37/83/51 vs live 27/67/47 (Loft 3 20/42/26 vs 15/33/23);
    volume not measured.
+
+## Moved from the handoff 11-19 07:45
+0i. **Re-checks owed on the greens with** (landed shas): skasm a65a2d3cf (= da22ce56; sel-feel C2/C3/B1/D: qa-wait-da22, re-keyed
+   00:24 after its old grep fired on 0f7610c83 without it), skasm 085fa6af1/fe7ac8832/b8234063a snaps (sweep.py / hv.py; glyphs.py
+   SHOWC=1 = Show constraints ticked, gbatch.sh -> sk/run4; first run 00:30 on 0f7610c83), skasm a3974c745 + 59cad3c05 (Flange broad
+   face; joint-row hover: fl/joint*.sh, sm.sh; mitred corner = no joint row, as live), psui 591643fc4 (= 2234f511: rollback bar: fl2.py onto-top / back-to-end + bar right-click; face + edge menu: menu.sh; rename click in graphics).
+0j. **History feel (lead 00:28)**: TICKETS "Versions and history panel" (2 P1 + 3 P2 studios). qa-scratch/hi: his.sh start <doc>|shot|
+   stop (:670, docs in vibex6 ~/tmp/qa/hi/docs), the document built by CLI batch (b.jsonl pattern; region id from sketch get).
+   Owed: psui 8d2e0056's green: bar released over Default geometry lands at the top, bar #b8b8b8 away / (200,217,226) hovered,
+   "Roll to end" menu kept; measure angles toward the entities' middles (behaviours "Part Studio measure readouts", 33.69 / 123.69 /
+   56.31 / 146.31); the Mass button leaves its panel open; `[` over Mass opens Measure empty; the spinner (900 ms delay, 50 px box).
+   Selection re-run 00:57 on 591643fc: RELATED-STAYS / HIDDEN-SKETCH-HOVER / PLANE-DEFAULT-GEOMETRY verified; DBLCLICK-FACE-SKETCH
+   still open (sent to skasm 01:03). 05:00 must-carry also: core P0 FACES-PATTERN-SLOTS (grep fix / revert of 2c51590b0, 215c12d6b).
+0m. **Owed next (01:47)**: on their first greens: skasm 4a4f7e0e (SELFEEL-DBLCLICK-FACE-SKETCH: sf mini C2), b6f5e810 (SHIFT-ICON);
+   studios 6fa3c795 (VSFEEL 1-3) and the HISTFEEL / CFGFEEL fixes as they land; core 55fc929c: faces-pattern-slots SAME vs 0.4.57 in
+   the compat loop, then the must-carry line is satisfied (cut-must.txt pins 55fc929c). Snap sweeps now run on vibex8 (~/tmp/qa/sk,
+   batch.sh python3 sweep.py <out> [targets]; hv.py <out> - al = alignment rows; ana.py's Y test misses the thin dashed line: look).
+   Measure angles: pass (live2's first-wedge capture: 56.31 for slope + x=40). Face+edge menu (591643fc) not re-run yet.

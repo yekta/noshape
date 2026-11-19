@@ -77,21 +77,6 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    BOM / callout, studio session Tab / Checkbox dialog / merge+restore with B1 open. Core told: c2-surf-workshop cpcurves Thicken 1 Ok ->
    Warning, Split 6 / mutualtrim Fillet 1 messages (corpus, compat ALERT 814b48d8 / daa1bebd). cut-check: green re-read under the lock,
    30 min cap then the newest finished check (named in the line).
-00b. **Night order (lead 11-19 03:45)**: qa-night-seq-1120 (flow/night-seq.sh latest 1120): 02:00 big document -> session replay ->
-   everyday flows, then nightly/flows-done-<mmdd>; qa-w7-nightly waits for that flag (03:20 at the latest) before hat15 / dock;
-   user flows after NIGHTLY-DONE. Re-arm each night with the next date. Cut verdict: a must-carry still queued reads PENDING
-   at :15 and HOLD only if missing at :50 (timers qa-cut-0450 / 1650). qa-big-after fetches tonight's big run and fixes its fetch line.
-00. **11-19 03:50 state.** Spur gear: bool's fold fix e2b5c3c0e + c8d3a4734 (in 373dd5b9); qa-sg-fixwait (sha file speed/sg-fix.sha)
-   builds the first green with it on vibe2, then from 04:20 (after the cut verdict) under qa-host.lock + slot: 7 alternating runs vs
-   v0.4.58 on vibex7 -> qa-alerts; send to bool + lead. qa-wait-region (session/wait-region.sh): first green with skasm 0b44497a2 +
-   core a591e8c4d -> session-1118 s1-s5 on vibe2 :187 -> qa-alerts. cut-must.txt now also pins those two + bool's fold fix.
-   Studios "to verify" feel tickets all verified 03:35-03:50 (qa-scratch/stv: stv.sh <disp> <out> <script>, NOSHAPE_UI_SHOTS per step);
-   DRW-TOOLBAR-TOOLTIP-DELAY timing running on vibex8 (stv-tip.json, tipq.py: frames after each hover). Owed on studios 166b521c's
-   green: asm session BOM / callout on a fresh drawing, studio session Tab, Checkbox dialog, merge / restore started with B1 open
-   (asess/, ssess/ on vibex8; kept vibex8 ~/agents/qa-keep/studio-1119). Night 11-19: flows done (night-1119/sum.txt, loads < 0.8);
-   everyday + session cut at 03:35; big still running (fetch its sum by ssh cat: the scp {a,b} brace form copies nothing now, fixed
-   in flow-night / flow2-night / session-night, not big-night). Live's session replay: mksession.py s1-s5, session.sh <app> <out>
-   [:disp] env SEGS / START; P1 REGION-PICK-SKETCH-SHOWN with skasm (0b44497a2).
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
    with NOSHAPE_PARITY_VALIDITY=1 (bin/suites-models.sh exports it) models.log prints per feature "CHECK <doc> feature <k>:
    <part> valid <true|false> raw f/e/v; ..." (PartState.check, query parts' "check"; not in report.json). suites-diff.py
@@ -99,22 +84,6 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    (only when both logs have CHECK lines); qa-suites.sh copies those to qa-alerts. bool's gate 2d5bf386 does the same.
    Compat: v0.4.56's CLI query parts has no "check"; once cfd943d5 is in a release CLI, add it to sig.py's part tuple.
    (suites-models.sh was moved to bin/retired by mistake at 16:35 and restored 18:28; the hosts kept their copy meanwhile.)
-0i. **Re-checks owed on the greens with** (landed shas): skasm a65a2d3cf (= da22ce56; sel-feel C2/C3/B1/D: qa-wait-da22, re-keyed
-   00:24 after its old grep fired on 0f7610c83 without it), skasm 085fa6af1/fe7ac8832/b8234063a snaps (sweep.py / hv.py; glyphs.py
-   SHOWC=1 = Show constraints ticked, gbatch.sh -> sk/run4; first run 00:30 on 0f7610c83), skasm a3974c745 + 59cad3c05 (Flange broad
-   face; joint-row hover: fl/joint*.sh, sm.sh; mitred corner = no joint row, as live), psui 591643fc4 (= 2234f511: rollback bar: fl2.py onto-top / back-to-end + bar right-click; face + edge menu: menu.sh; rename click in graphics).
-0j. **History feel (lead 00:28)**: TICKETS "Versions and history panel" (2 P1 + 3 P2 studios). qa-scratch/hi: his.sh start <doc>|shot|
-   stop (:670, docs in vibex6 ~/tmp/qa/hi/docs), the document built by CLI batch (b.jsonl pattern; region id from sketch get).
-   Owed: psui 8d2e0056's green: bar released over Default geometry lands at the top, bar #b8b8b8 away / (200,217,226) hovered,
-   "Roll to end" menu kept; measure angles toward the entities' middles (behaviours "Part Studio measure readouts", 33.69 / 123.69 /
-   56.31 / 146.31); the Mass button leaves its panel open; `[` over Mass opens Measure empty; the spinner (900 ms delay, 50 px box).
-   Selection re-run 00:57 on 591643fc: RELATED-STAYS / HIDDEN-SKETCH-HOVER / PLANE-DEFAULT-GEOMETRY verified; DBLCLICK-FACE-SKETCH
-   still open (sent to skasm 01:03). 05:00 must-carry also: core P0 FACES-PATTERN-SLOTS (grep fix / revert of 2c51590b0, 215c12d6b).
-0m. **Owed next (01:47)**: on their first greens: skasm 4a4f7e0e (SELFEEL-DBLCLICK-FACE-SKETCH: sf mini C2), b6f5e810 (SHIFT-ICON);
-   studios 6fa3c795 (VSFEEL 1-3) and the HISTFEEL / CFGFEEL fixes as they land; core 55fc929c: faces-pattern-slots SAME vs 0.4.57 in
-   the compat loop, then the must-carry line is satisfied (cut-must.txt pins 55fc929c). Snap sweeps now run on vibex8 (~/tmp/qa/sk,
-   batch.sh python3 sweep.py <out> [targets]; hv.py <out> - al = alignment rows; ana.py's Y test misses the thin dashed line: look).
-   Measure angles: pass (live2's first-wedge capture: 56.31 for slope + x=40). Face+edge menu (591643fc) not re-run yet.
 0n. **Speed report reference**: live's UI speed of everyday actions (behaviours "psui + qa (lead 11-18): UI speed of everyday
    actions", live/psui/ui-speed-1118/table.md): open document 12231 ms settled, tab switch 2291-2733, enter sketch 1291 (dialog 226),
    exit 889, undo 903-1011, open Extrude 1320 (dialog 221), first preview 2004, commit 1115, rollback drop 918-1094, context menu 117,
