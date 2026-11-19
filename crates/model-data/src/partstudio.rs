@@ -237,6 +237,13 @@ pub struct PartProperties {
     /// Mass override, kg (Mass properties "Override").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mass_override: Option<f64>,
+    /// Center of mass override, m in the Part Studio (Mass properties "Override"; live2 mass-override-1119).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub com_override: Option<[f64; 3]>,
+    /// Mass moments of inertia override about the centre of mass, kg·m², column by column as live stores them (its
+    /// Lxy, row 1 column 2, at index 3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inertia_override: Option<[f64; 9]>,
     /// Tessellation quality (Appearance dialog).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tessellation: Option<TessQuality>,

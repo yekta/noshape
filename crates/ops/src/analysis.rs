@@ -16,8 +16,9 @@ pub struct StudioMass {
 
 /// Mass properties of `bodies` (empty: every part) with the parts'
 /// densities; a mass override replaces the computed mass when every part
-/// in the computation has one (Onshape), and with a `reference` mate
-/// connector the inertia is about its origin and axes.
+/// in the computation has one (Onshape), one part's centre of mass and
+/// inertia overrides apply to it, and with a `reference` mate connector the
+/// inertia is about its origin and axes.
 pub fn studio_mass_properties(ctx: &Context, display: &StudioDisplay, ps: &PartStudio, bodies: &[BodyId], reference: Option<&ConnectorDisplay>) -> Option<StudioMass> {
     let mp = measure::mass_properties(ctx, bodies, &|b| ps.part_properties.get(b).and_then(|p| p.density))?;
     Some(studio_mass_from(mp, display, ps, bodies, reference))
@@ -29,8 +30,15 @@ pub fn studio_mass_properties(ctx: &Context, display: &StudioDisplay, ps: &PartS
 pub fn studio_mass_from(mut mp: measure::MassProperties, display: &StudioDisplay, ps: &PartStudio, bodies: &[BodyId], reference: Option<&ConnectorDisplay>) -> StudioMass {
     let props = &ps.part_properties;
     let all: Vec<BodyId> = if bodies.is_empty() { display.bodies.iter().map(|b| b.id.clone()).collect() } else { bodies.to_vec() };
+    // One part: its mass, centre of mass and inertia overrides (live2 mass-override-1119).
+    let one = match all.as_slice() {
+        [b] => props.get(b),
+        _ => None,
+    };
     let overrides: Option<f64> = all.iter().map(|b| props.get(b).and_then(|p| p.mass_override)).sum();
-    if let Some(m) = overrides {
+    if let Some(p) = one {
+        mp = measure::with_part_overrides(mp, p);
+    } else if let Some(m) = overrides {
         if let Some(old) = mp.mass.filter(|o| *o > 0.0) {
             mp.inertia *= m / old;
         } else if mp.volume > 0.0 {

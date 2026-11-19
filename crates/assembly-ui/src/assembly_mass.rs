@@ -10,11 +10,12 @@
 
 use super::*;
 use gpui_kit::component::input::InputEvent;
-use noshape_model::assembly::analysis::{AssemblyMass, assembly_mass_properties, face_section_properties};
+use noshape_model::assembly::analysis::{AssemblyMass, PartOverrides, assembly_mass_properties, face_section_properties};
 use noshape_model::assembly::eval::InstancePath;
 
-/// The Mass dialog's job: (selected instances, the result's address, the parts' densities, variance shown).
-pub type AsmMassKey = (Vec<InstanceId>, usize, std::collections::BTreeMap<(InstancePath, BodyId), Option<f64>>, bool);
+/// The Mass dialog's job: (selected instances, the result's address, the parts' densities and centre / inertia overrides,
+/// variance shown).
+pub type AsmMassKey = (Vec<InstanceId>, usize, std::collections::BTreeMap<(InstancePath, BodyId), Option<f64>>, Vec<((InstancePath, BodyId), PartOverrides)>, bool);
 /// Its face section job: (the picked faces, the result's address).
 pub type AsmSectionKey = (Vec<(InstancePath, Reference)>, usize);
 /// Its value: the mass properties and the variance.
@@ -183,11 +184,14 @@ impl AssemblyView {
     /// The selected instances' mass properties (and, shown, their variance) worked out off the UI thread, once per
     /// selection, result and densities: `None` while under way.
     fn assembly_mass_in_background(&mut self, variance: bool, cx: &mut Context<Self>) -> Option<AsmMassValue> {
-        let densities: std::collections::BTreeMap<(InstancePath, BodyId), Option<f64>> = {
+        let (densities, overrides): (std::collections::BTreeMap<(InstancePath, BodyId), Option<f64>>, Vec<((InstancePath, BodyId), PartOverrides)>) = {
             let doc = &self.doc.read(cx).session.doc;
-            self.assembly(cx).map(|a| noshape_model::assembly::analysis::part_densities(doc, a, &self.result).into_iter().collect()).unwrap_or_default()
+            let densities = self.assembly(cx).map(|a| noshape_model::assembly::analysis::part_densities(doc, a, &self.result).into_iter().collect()).unwrap_or_default();
+            let mut overrides: Vec<_> = noshape_model::assembly::analysis::part_overrides(doc, &self.result).into_iter().collect();
+            overrides.sort_by(|a, b| a.0.cmp(&b.0));
+            (densities, overrides)
         };
-        let key = (self.selected.clone(), Arc::as_ptr(&self.result) as usize, densities.clone(), variance);
+        let key = (self.selected.clone(), Arc::as_ptr(&self.result) as usize, densities.clone(), overrides.clone(), variance);
         let (result, selected) = (self.result.clone(), self.selected.clone());
         crate::bg_job::bg_job(
             self,
@@ -195,7 +199,8 @@ impl AssemblyView {
             key,
             move || {
                 let density = |o: &noshape_model::assembly::eval::PartOccurrence| densities.get(&(o.path.clone(), o.body.clone())).copied().flatten();
-                let mass = assembly_mass_properties(&result, &selected, &density);
+                let own = |o: &noshape_model::assembly::eval::PartOccurrence| overrides.iter().find(|(k, _)| k.0 == o.path && k.1 == o.body).map(|(_, v)| *v).unwrap_or_default();
+                let mass = noshape_model::assembly::analysis::assembly_mass_properties_with(&result, &selected, &density, &own);
                 let var = if variance { noshape_model::assembly::analysis::assembly_mass_variance(&result, &selected, &density) } else { None };
                 (mass, var)
             },

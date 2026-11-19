@@ -6313,7 +6313,7 @@ Examples:
 
 Set a part's properties, or several parts' at once (the Properties dialog) (edits the document (one undoable history entry)).
 
-Name, description, part number, revision, vendor, project, product line, titles, Not revision managed, Exclude from all BOMs, Unit of measure and a mass override (kg); State is set by releases. Fields not given keep their value; an empty text clears it. Fields configured for the active configuration keep the part's own value, as in the dialog. With `parts` (the Parts list's Properties… on several parts) the given fields go to each part and the others keep each part's own value.
+Name, description, part number, revision, vendor, project, product line, titles, Not revision managed, Exclude from all BOMs, Unit of measure a mass override (kg) and the Mass properties panel's center of mass and inertia overrides; State is set by releases. Fields not given keep their value; an empty text clears it. Fields configured for the active configuration keep the part's own value, as in the dialog. With `parts` (the Parts list's Properties… on several parts) the given fields go to each part and the others keep each part's own value.
 
 Examples:
 
@@ -6332,6 +6332,8 @@ Examples:
 | `part_number` | string |  | Part number. |
 | `revision` | string |  | Revision. |
 | `mass_override` | number or null |  | Mass override in kg (null: computed). |
+| `center_of_mass_override` | array or null |  | Mass properties › Center of mass Override: [x, y, z] in the Part Studio (numbers in the document's length unit or "10 mm"; null: computed). The inertia is then about it. |
+| `inertia_override` | array or null |  | Mass properties › Mass moments of inertia Override about the centre of mass, kg·(length unit)², row by row as the panel shows them (Lxx, Lxy, Lxz, Lyx, …; null: computed). |
 | `vendor` | string |  | Vendor. |
 | `project` | string |  | Project. |
 | `product_line` | string |  | Product line. |

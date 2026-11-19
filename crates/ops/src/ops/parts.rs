@@ -33,7 +33,7 @@ pub fn ops() -> Vec<Op> {
             group: "part",
             verb: "set_properties",
             summary: "Set a part's properties, or several parts' at once (the Properties dialog)",
-            description: "Name, description, part number, revision, vendor, project, product line, titles, Not revision managed, Exclude from all BOMs, Unit of measure and a mass override (kg); State is set by releases. Fields not given keep their value; an empty text clears it. Fields configured for the active configuration keep the part's own value, as in the dialog. With `parts` (the Parts list's Properties… on several parts) the given fields go to each part and the others keep each part's own value.",
+            description: "Name, description, part number, revision, vendor, project, product line, titles, Not revision managed, Exclude from all BOMs, Unit of measure a mass override (kg) and the Mass properties panel's center of mass and inertia overrides; State is set by releases. Fields not given keep their value; an empty text clears it. Fields configured for the active configuration keep the part's own value, as in the dialog. With `parts` (the Parts list's Properties… on several parts) the given fields go to each part and the others keep each part's own value.",
             fields: vec![
                 doc_field(),
                 tab_field(),
@@ -44,6 +44,8 @@ pub fn ops() -> Vec<Op> {
                 opt("part_number", s(), "Part number."),
                 opt("revision", s(), "Revision."),
                 opt("mass_override", json!({ "type": ["number", "null"] }), "Mass override in kg (null: computed)."),
+                opt("center_of_mass_override", json!({ "type": ["array", "null"], "items": {}, "minItems": 3, "maxItems": 3 }), "Mass properties › Center of mass Override: [x, y, z] in the Part Studio (numbers in the document's length unit or \"10 mm\"; null: computed). The inertia is then about it."),
+                opt("inertia_override", json!({ "type": ["array", "null"], "items": { "type": "number" }, "minItems": 9, "maxItems": 9 }), "Mass properties › Mass moments of inertia Override about the centre of mass, kg·(length unit)², row by row as the panel shows them (Lxx, Lxy, Lxz, Lyx, …; null: computed)."),
             ]
             .into_iter()
             .chain(meta_fields())
@@ -162,6 +164,28 @@ fn set_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         (None, None) => return Err(OpError::param("part", "required string")),
     };
+    // The Mass properties panel's centre of mass and inertia overrides (live2 mass-override-1119): Some(None) clears.
+    let units = od.doc().settings.units;
+    let k = crate::ops::query::len_scale(&units);
+    let com: Option<Option<[f64; 3]>> = match a.value.get("center_of_mass_override") {
+        None => None,
+        Some(serde_json::Value::Null) => Some(None),
+        Some(serde_json::Value::Array(v)) if v.len() == 3 => {
+            let m: Vec<f64> = v.iter().map(|x| crate::ops::sketch::length_value(x, &units)).collect::<Result<_, _>>().map_err(|e| e.with_param("center_of_mass_override"))?;
+            Some(Some([m[0], m[1], m[2]]))
+        }
+        Some(_) => return Err(OpError::param("center_of_mass_override", "[x, y, z] lengths, or null")),
+    };
+    let inertia: Option<Option<[f64; 9]>> = match a.value.get("inertia_override") {
+        None => None,
+        Some(serde_json::Value::Null) => Some(None),
+        Some(serde_json::Value::Array(v)) if v.len() == 9 && v.iter().all(|x| x.as_f64().is_some_and(f64::is_finite)) => {
+            // Rows as shown -> stored column by column (live's order), kg·m².
+            let rows: Vec<f64> = v.iter().filter_map(serde_json::Value::as_f64).map(|x| x / (k * k)).collect();
+            Some(Some(glam::DMat3::from_cols_array(&rows.try_into().unwrap_or([0.0; 9])).transpose().to_cols_array()))
+        }
+        Some(_) => return Err(OpError::param("inertia_override", "nine numbers (Lxx, Lxy, … Lzz), or null")),
+    };
     let r = od.regenerate(tab, None)?;
     let config = od.current_config(tab)?;
     let ps = crate::doc::studio(od.doc(), tab)?;
@@ -194,19 +218,19 @@ fn set_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
         }
         apply_meta(a, &mut v.meta)?;
-        match a.get("mass_override") {
+        match a.value.get("mass_override") {
             None => {}
             Some(serde_json::Value::Null) => v.mass_override = None,
             Some(x) => v.mass_override = Some(x.as_f64().filter(|m| *m > 0.0).ok_or_else(|| OpError::param("mass_override", "a mass in kg greater than zero, or null"))?),
         }
-        undo_step |= studio::properties_save_is_undo_step(ps, body, &v, &shown, &configured);
+        undo_step |= studio::properties_save_is_undo_step(ps, body, &v, &shown, &configured) || com.is_some() || inertia.is_some();
         edits.push((body.clone(), v, configured));
     }
     // In a version (history_view): its own properties take the edit; Name, Part number, Revision, State, Material, Not
     // revision managed and Mass override are the version's (live2 11_studios_abc (c): greyed there).
     if od.session.viewing.is_some() {
-        let locked = [("name", "Name"), ("part_number", "Part number"), ("revision", "Revision"), ("state", "State"), ("not_revision_managed", "Not revision managed"), ("mass_override", "Mass override")];
-        if let Some((k, f)) = locked.into_iter().find(|(k, _)| a.get(k).is_some()) {
+        let locked = [("name", "Name"), ("part_number", "Part number"), ("revision", "Revision"), ("state", "State"), ("not_revision_managed", "Not revision managed"), ("mass_override", "Mass override"), ("center_of_mass_override", "Center of mass override"), ("inertia_override", "Inertia override")];
+        if let Some((k, f)) = locked.into_iter().find(|(k, _)| a.value.get(k).is_some()) {
             return Err(OpError::param(k, &format!("{f} can't be edited in a version")));
         }
         for (body, v, _) in &edits {
@@ -225,6 +249,13 @@ fn set_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let save = |ps: &mut noshape_model::partstudio::PartStudio| {
         for (body, v, configured) in &edits {
             studio::set_part_properties(ps, body, v, configured);
+            let p = ps.part_properties.entry(body.clone()).or_default();
+            if let Some(c) = com {
+                p.com_override = c;
+            }
+            if let Some(i) = inertia {
+                p.inertia_override = i;
+            }
         }
         Ok(())
     };

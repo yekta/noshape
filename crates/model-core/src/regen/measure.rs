@@ -792,6 +792,33 @@ pub fn mass_properties(ctx: &Context, bodies: &[crate::reference::BodyId], densi
     })
 }
 
+/// A part's mass properties with its Mass properties overrides (live2 mass-override-1119): a centre of mass moves the
+/// inertia to it (parallel axis), a mass scales the inertia by itself over the computed one (the centre kept), and an
+/// inertia replaces it. Without a material the inertia is per unit density, its mass the volume.
+pub fn with_overrides(mut mp: MassProperties, mass: Option<f64>, center: Option<DVec3>, inertia: Option<glam::DMat3>) -> MassProperties {
+    let weight = mp.mass.unwrap_or(mp.volume);
+    if let Some(c) = center {
+        let d = c - mp.center_of_mass;
+        mp.inertia += (glam::DMat3::from_diagonal(DVec3::splat(d.length_squared())) - glam::DMat3::from_cols(d * d.x, d * d.y, d * d.z)) * weight;
+        mp.center_of_mass = c;
+    }
+    if let Some(m) = mass {
+        if weight > 0.0 {
+            mp.inertia *= m / weight;
+        }
+        mp.mass = Some(m);
+    }
+    if let Some(i) = inertia {
+        mp.inertia = i;
+    }
+    mp
+}
+
+/// [`with_overrides`] with a part's stored ones.
+pub fn with_part_overrides(mp: MassProperties, p: &crate::partstudio::PartProperties) -> MassProperties {
+    with_overrides(mp, p.mass_override, p.com_override.map(DVec3::from), p.inertia_override.map(|a| glam::DMat3::from_cols_array(&a)))
+}
+
 /// Live's calculation variance (Parasolid's estimates, live 1731: a 60 × 40 × 20 block 48000 ± 1.321 mm³, 8800 ± 3.634e-2
 /// mm², its centre ± 1.000e-3 mm, every inertia entry ± 1.058e-4 lb mm² for 0.831 lb, 0.831 ± 2.912e-9 lb; scaled ×10:
 /// the volume's bound ×100, the area's ×10, the inertia's ×1000, the centre's the same). As floors under ours (in

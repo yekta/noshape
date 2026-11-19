@@ -736,7 +736,7 @@ fn properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         let all = noshape_model::assembly::BomBehavior::ALL;
         p.bom_behavior = *all.iter().find(|x| x.label().eq_ignore_ascii_case(b.trim())).ok_or_else(|| OpError::param("bom_behavior", &all.iter().map(|x| x.label()).collect::<Vec<_>>().join(", ")))?;
     }
-    match a.get("mass_override") {
+    match a.value.get("mass_override") {
         None => {}
         Some(Value::Null) => p.mass_override = None,
         Some(x) => p.mass_override = Some(x.as_f64().filter(|m| *m > 0.0).ok_or_else(|| OpError::param("mass_override", "a mass in kg greater than zero, or null"))?),
@@ -746,7 +746,7 @@ fn properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     // release sets, the name and the mass override stay.
     if od.session.viewing.is_some() {
         let locked = [("name", "Name"), ("part_number", "Part number"), ("revision", "Revision"), ("mass_override", "Mass override"), ("not_revision_managed", "Not revision managed")];
-        if let Some((k, f)) = locked.iter().find(|(k, _)| a.get(k).is_some()) {
+        if let Some((k, f)) = locked.iter().find(|(k, _)| a.value.get(k).is_some()) {
             return Err(OpError::param(k, &format!("{f} can't be edited in a version")));
         }
         if p != before.1 {
@@ -860,13 +860,18 @@ fn mass_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let result = solve(od, tab, &SolveOptions::default())?;
     let densities = noshape_model::assembly::analysis::part_densities(od.doc(), &asm, &result);
     let density = |o: &noshape_model::assembly::eval::PartOccurrence| densities.get(&(o.path.clone(), o.body.clone())).copied().flatten();
-    let m = noshape_model::assembly::analysis::assembly_mass_properties(&result, &tops, &density).ok_or_else(|| OpError::invalid("nothing to measure: no solid parts"))?;
+    let overrides = noshape_model::assembly::analysis::part_overrides(od.doc(), &result);
+    let own = |o: &noshape_model::assembly::eval::PartOccurrence| overrides.get(&(o.path.clone(), o.body.clone())).copied().unwrap_or_default();
+    let m = noshape_model::assembly::analysis::assembly_mass_properties_with(&result, &tops, &density, &own).ok_or_else(|| OpError::invalid("nothing to measure: no solid parts"))?;
     let mut v = json!({ "units": crate::ops::query::units_json(&units), "volume": r6(m.props.volume * k * k * k), "surface_area": r6(m.props.surface_area * k * k) });
     let whole = tops.is_empty() || asm.instances.iter().all(|i| tops.contains(&i.id));
     let overridden = asm.properties.mass_override.filter(|_| whole);
     match m.props.mass.or(overridden) {
         Some(mass) => {
-            let (c, i, f) = (m.props.center_of_mass, m.props.inertia, k * k);
+            // Live2 mass-override-1119: the assembly's Mass override scales the inertia by itself over the computed
+            // mass and keeps the centre.
+            let scale = overridden.filter(|_| m.props.mass.is_some_and(|c| c > 0.0)).map_or(1.0, |o| o / mass);
+            let (c, i, f) = (m.props.center_of_mass, m.props.inertia * scale, k * k);
             v["mass_kg"] = json!(r6(overridden.unwrap_or(mass)));
             v["mass_overridden"] = json!(overridden.is_some());
             v["center_of_mass"] = pt(c, k);

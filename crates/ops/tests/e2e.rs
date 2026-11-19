@@ -9374,6 +9374,52 @@ fn a_derived_mirror_of_a_subassembly_makes_its_mirrored_assembly() {
     assert_eq!(tabs.as_array().unwrap().iter().filter(|t| t["name"] == "Sub-Mirrored").count(), 1, "{tabs}");
 }
 
+/// Live2 mass-override-1119: a part's Center of mass override moves its inertia to the new centre (parallel axis), its
+/// Inertia override replaces it (Lxy and Lyx apart, stored column by column as live: Lxy at index 3), both carry into an
+/// assembly, and the assembly's own Mass override scales the inertia by itself over the computed mass, centre kept.
+#[test]
+fn center_of_mass_and_inertia_overrides_in_a_part_and_its_assembly() {
+    let mut ctx = Ctx::new();
+    let path = scratch("com-inertia-override.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [d["regions"][0]["id"]], "depth": "10 mm" } }));
+    call(&mut ctx, "part_set_properties", json!({ "tab": "Part Studio 1", "part": "Part 1", "mass_override": 2.0 }));
+    let near = |v: &Value, w: f64| (num(v) - w).abs() < 1e-6;
+    let mp = call(&mut ctx, "query_mass_properties", json!({ "parts": ["Part 1"] }));
+    assert!(near(&mp["inertia"][1][1], 2.0 * 1700.0 / 12.0) && near(&mp["center_of_mass"][0], 20.0), "{mp}");
+    // The centre to x 10 mm: Lyy and Lzz grow by m d² (2 kg × 10² mm²), Lxx stays.
+    call(&mut ctx, "part_set_properties", json!({ "tab": "Part Studio 1", "part": "Part 1", "center_of_mass_override": [10, 10, "5 mm"] }));
+    let mp = call(&mut ctx, "query_mass_properties", json!({ "parts": ["Part 1"] }));
+    assert!(near(&mp["center_of_mass"][0], 10.0) && near(&mp["center_of_mass"][2], 5.0) && near(&mp["mass_kg"], 2.0), "{mp}");
+    assert!(near(&mp["inertia"][0][0], 2.0 * 500.0 / 12.0) && near(&mp["inertia"][1][1], 2.0 * 1700.0 / 12.0 + 200.0) && near(&mp["inertia"][2][2], 2.0 * 2000.0 / 12.0 + 200.0), "{mp}");
+    let rows = [[100.0, 5.0, 0.0], [7.0, 200.0, 0.0], [0.0, 0.0, 300.0]];
+    call(&mut ctx, "part_set_properties", json!({ "tab": "Part Studio 1", "part": "Part 1", "inertia_override": rows.concat() }));
+    let mp = call(&mut ctx, "query_mass_properties", json!({ "parts": ["Part 1"] }));
+    for (r, row) in rows.iter().enumerate() {
+        for (c, x) in row.iter().enumerate() {
+            assert!(near(&mp["inertia"][r][c], *x), "[{r}][{c}]: {mp}");
+        }
+    }
+    let e = try_call(&mut ctx, "part_set_properties", json!({ "tab": "Part Studio 1", "part": "Part 1", "inertia_override": [1, 2] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("inertia_override"), "{e:?}");
+    // In an assembly: the part's overrides; then the assembly's Mass override 5 kg (×2.5, the centre kept).
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 1" }));
+    let a = call(&mut ctx, "assembly_mass_properties", json!({ "tab": "Assembly 1" }));
+    assert!(near(&a["center_of_mass"][0], 10.0) && near(&a["inertia"][0][1], 5.0) && near(&a["inertia"][1][0], 7.0) && near(&a["inertia"][2][2], 300.0), "{a}");
+    call(&mut ctx, "assembly_properties", json!({ "tab": "Assembly 1", "mass_override": 5.0 }));
+    let a = call(&mut ctx, "assembly_mass_properties", json!({ "tab": "Assembly 1" }));
+    assert!(near(&a["mass_kg"], 5.0) && near(&a["center_of_mass"][0], 10.0) && near(&a["inertia"][0][0], 250.0) && near(&a["inertia"][1][1], 500.0), "{a}");
+    call(&mut ctx, "assembly_properties", json!({ "tab": "Assembly 1", "mass_override": null }));
+    let a = call(&mut ctx, "assembly_mass_properties", json!({ "tab": "Assembly 1" }));
+    assert!(near(&a["mass_kg"], 2.0) && near(&a["inertia"][0][0], 100.0), "null clears it: {a}");
+    // Cleared: computed again.
+    call(&mut ctx, "part_set_properties", json!({ "tab": "Part Studio 1", "part": "Part 1", "center_of_mass_override": null, "inertia_override": null }));
+    let mp = call(&mut ctx, "query_mass_properties", json!({ "parts": ["Part 1"] }));
+    assert!(near(&mp["center_of_mass"][0], 20.0) && near(&mp["inertia"][1][1], 2.0 * 1700.0 / 12.0), "{mp}");
+}
+
 /// ASM-API-GAPS: the Reference manager through the API: Update all references moves an other-document instance
 /// to its latest version, Selective update to a named one, Change to version pins this document's own parts.
 #[test]

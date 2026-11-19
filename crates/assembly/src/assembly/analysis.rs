@@ -931,6 +931,30 @@ pub fn part_densities(doc: &crate::document::Document, asm: &Assembly, result: &
 }
 
 pub fn assembly_mass_properties(result: &AssemblyResult, tops: &[InstanceId], density: &dyn Fn(&PartOccurrence) -> Option<f64>) -> Option<AssemblyMass> {
+    assembly_mass_properties_with(result, tops, density, &|_| (None, None))
+}
+
+/// A part's centre of mass and inertia overrides (its Part Studio's coordinates; kg·m² about that centre).
+pub type PartOverrides = (Option<DVec3>, Option<glam::DMat3>);
+
+/// Each part occurrence's centre of mass and inertia overrides (live2 mass-override-1119: the part's overrides carry
+/// into the assembly); only those with one.
+pub fn part_overrides(doc: &crate::document::Document, result: &AssemblyResult) -> std::collections::HashMap<(InstancePath, BodyId), PartOverrides> {
+    use crate::document::TabContent;
+    result
+        .occurrences
+        .iter()
+        .filter_map(|o| {
+            let TabContent::PartStudio(ps) = &doc.tab(o.studio)?.content else { return None };
+            let p = ps.part_properties.get(&o.body)?;
+            let v: PartOverrides = (p.com_override.map(DVec3::from), p.inertia_override.map(|a| glam::DMat3::from_cols_array(&a)));
+            (v.0.is_some() || v.1.is_some()).then(|| ((o.path.clone(), o.body.clone()), v))
+        })
+        .collect()
+}
+
+/// [`assembly_mass_properties`] with each part's centre of mass and inertia overrides.
+pub fn assembly_mass_properties_with(result: &AssemblyResult, tops: &[InstanceId], density: &dyn Fn(&PartOccurrence) -> Option<f64>, overrides: &dyn Fn(&PartOccurrence) -> PartOverrides) -> Option<AssemblyMass> {
     struct Part {
         mass: f64,
         center: DVec3,
@@ -953,7 +977,10 @@ pub fn assembly_mass_properties(result: &AssemblyResult, tops: &[InstanceId], de
         volume += p.mass;
         area += s.mass;
         let rho = rho.unwrap_or(1.0);
-        parts.push(Part { mass: p.mass * rho, center: o.transform.transform_point3(p.center), inertia: r * (p.inertia * rho) * r.transpose() });
+        let own = crate::regen::measure::MassProperties { volume: p.mass, surface_area: s.mass, density: None, mass: Some(p.mass * rho), center_of_mass: p.center, inertia: p.inertia * rho };
+        let (com, inertia) = overrides(o);
+        let own = crate::regen::measure::with_overrides(own, None, com, inertia);
+        parts.push(Part { mass: own.mass.unwrap_or(0.0), center: o.transform.transform_point3(own.center_of_mass), inertia: r * own.inertia * r.transpose() });
     }
     if parts.is_empty() {
         return None;
