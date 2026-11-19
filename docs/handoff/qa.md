@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 23:18)
+# QA handoff (agent qa; current state only, updated 2026-11-19 23:20)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -116,8 +116,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    their greens: asm b146b56f (drag group, typed limits), dx BRAND-IN-UI-TEXT, skasm Simulation connection dropped.
    Sketch tools 23:09-23:15: 3-point arc, spline, circumscribed polygon (spinner; Enter commits, Esc discards = live), Slot on a
    line (Ø20), sketch Fillet R5, angle dim, Mirror (line first) = live; P1 SKETCH-SLOT-ON-ARC (skasm, told: arc deleted, Ø0 left).
-   Also verify studios f450d0dd (history row ellipsis, "Noshape Labs"). Next: direct-edit walk (Move / Delete face, Draft,
-   Split, Thicken), then re-walk fixes as their greens land. App runs: units qa-xvfb110 + qa-walk*-app
+   Also verify studios f450d0dd (history row ellipsis, "Noshape Labs"). Direct edit 23:18 (Move face 10 mm, Draft on Top, Split
+   refusal toast) = live. Next: Thicken / Delete face / Boolean subtract, re-walk fixes as their greens land. App runs: units qa-xvfb110 + qa-walk*-app
    (systemd-run, NOSHAPE_CONFIG_DIR per doc), tool search alt+c + name + Return; Esc keeps selection, Space clears.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
