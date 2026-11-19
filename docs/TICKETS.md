@@ -6,6 +6,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## qa, 2026-11-18 (live's modelling session replay)
+- [ ] **P1 REGION-PICK-SKETCH-SHOWN [skasm, psui]** (qa 02:4x, user flow: live's session-1118 step 5): with Extrude's "Faces and sketch
+  regions" field active, a click inside a small sketch circle on the part's top face picks nothing, so Extrude 2 fails "Select face or
+  sketch region to extrude." and Linear pattern 1 after it (green ce88e667 Tray 29750.67 / 30545.26 vs live 29505.03 / 30273.90). The
+  Ø10 circle is ~36 x 18 px in the iso view (0.277 mm/px); since skasm a535927ab / 0efdc81f3 a shown sketch's centre point picks from
+  8.5 px and its curve from 7 px (held to 10) outside sketch mode, which together cover the whole disc: the centre, 2 mm and 2.7 mm off
+  it all fail. Same pixels picked the region on 87edba24; fails on df6be9b6 and ce88e667 (inputs, camera and sketch identical; Sketch 2's
+  two regions identical). Live picks the region (its active field filters out sketch points and curves). Repro: vibe2
+  ~/agents/qa-keep/session-1118/region (doc-s1 = the plate after Extrude 1; session-s2.json via qa-scratch/session/session.sh,
+  START=<doc> SEGS=s2); step 34 is the region click.
 - [ ] **P1 PATTERN-AFTER-INSERTED-CHAMFER [core]**: live's session (live/qa/session-1118 step 11): a 100 × 50 × 10 plate, a Ø10 hole
   (Extrude 2, Remove, Through all), Fillet 1 (3 vertical edges R5), Shell 1 (top face, 2 mm), Linear pattern 1 (Feature pattern of
   Extrude 2, edge along X, 20 mm × 3), Mirror 1 (Right). Roll back to Extrude 2, add Chamfer 1 (the hole's top edge, 1 mm), roll to the
