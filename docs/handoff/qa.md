@@ -92,7 +92,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    Drawings 22:00: Create Drawing dialog = live (No views default, ANSI_A_INCH), Suggested views (Top/Front/Right/iso, hole centre
    mark), tab after the active tab, tab menu Export… -> PDF 1.5 one page = the sheet. STEP round trip 22:04 OK (export AP242 8 faces,
    + › Import… back: Import 1, Part 1); P2 BRAND-IN-UI-TEXT filed ("Import to Onshape" title). 22:05: compat ALERTs vs 0.4.61 (3 Fillet messages, blend
-   74ebd649c wording) accepted in compat/accepted.txt. Drawing dimension 22:08 OK (edge lit, bold
+   74ebd649c wording) accepted in compat/accepted.txt. Drawing dimension 22:05 OK (edge lit, bold
    preview, placed 4.337 in = the part's 110.2 mm). Next: spot rows 25-32, then a P1 walk of revolve / chamfer / circular pattern / sketch constraints. App runs: units qa-xvfb110 + qa-walk*-app
    (systemd-run, NOSHAPE_CONFIG_DIR per doc), tool search alt+c + name + Return; Esc keeps selection, Space clears.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
