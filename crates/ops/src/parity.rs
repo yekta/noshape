@@ -9221,8 +9221,20 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     pname.to_string()
                 } else if let [(.., only)] = solids.as_slice() {
                     only.clone()
-                } else if let Some(n) = fits.iter().find(|n| !taken.contains(n)).or(fits.first()) {
+                } else if let Some(n) = fits.iter().find(|n| !taken.contains(n)) {
                     n.clone()
+                } else if !fits.is_empty() {
+                    if pass {
+                        continue;
+                    }
+                    // Its fits all taken by live parts alike in volume: a free part of ours its feature made, near its
+                    // volume, before sharing one (asm-welding-config 9c7704: JTD "Part 2" 31,472 mm³ and JqH "Part 6"
+                    // 31,465 mm³ both fit our Part 2; ours for JqH, 0.4 % short after its fillets, is Extrude 8's other).
+                    let maker = studio["live"].as_array().into_iter().flatten().find(|l| l["parts"].as_array().is_some_and(|ps| ps.iter().any(|p| p["partId"] == pid))).and_then(|l| l["featureId"].as_str());
+                    let head = maker.and_then(|f| t.feature_ids.get(f)).map(|ours| format!("body:{ours}."));
+                    let mid = volume_band(p).map(|(lo, hi)| (lo + hi) * 0.5);
+                    let made = head.zip(mid).and_then(|(head, mid)| solids.iter().filter(|s| s.2.starts_with(&head) && !taken.contains(&s.2) && (s.1 - mid).abs() < mid * 0.1).min_by(|a, b| (a.1 - mid).abs().total_cmp(&(b.1 - mid).abs())));
+                    made.map_or_else(|| fits[0].clone(), |s| s.2.clone())
                 } else if pass {
                     continue;
                 } else {

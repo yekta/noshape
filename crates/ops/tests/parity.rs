@@ -4188,6 +4188,47 @@ fn parts_of_one_extrude_are_ours_by_live_lines_volume() {
     assert_eq!((r.bom_matching, r.bom_rows), (2, 2), "{r:?}");
 }
 
+/// Live parts alike in volume whose fits are all one part of ours another took (asm-welding-config 9c7704: JTD
+/// "Part 2" 31,472 mm³ and JqH "Part 6" 31,465 mm³ both fit our Part 2; ours for JqH, 0.4 % over after its fillets, the
+/// other body of its Extrude 8): ours is the free part its feature made, not the taken one twice.
+#[test]
+fn a_live_part_whose_fits_are_taken_is_the_free_part_its_feature_made() {
+    let circle = |id: &str, x: f64, r: f64| json!({ "btType": "BTMSketchCurve-4", "entityId": id, "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": r, "xCenter": x, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } });
+    let sketch = |f: &str, name: &str, c: Vec<Value>| json!({ "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": f, "name": name,
+        "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+        "entities": c, "constraints": [] });
+    let extrude = |f: &str, name: &str, of: &str, depth: &str| json!({ "btType": "BTMFeature-134", "featureType": "extrude", "featureId": f, "name": name, "parameters": [
+        { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+        { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualCreatedByQuery-137", "featureId": of, "entityType": "FACE" }] },
+        { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+        { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": depth }] });
+    // Ours: Part 1 v (Extrude 1); Extrude 2's v * 1.004 and a small one. Live's Part 3 (Extrude 2's) fits only our Part 1.
+    let v = std::f64::consts::PI * 0.004 * 0.004 * 0.02;
+    let small = std::f64::consts::PI * 0.002 * 0.002 * 0.02008;
+    let parts = json!([
+        { "partId": "JAD", "name": "Part 1", "volume": [v * 0.9999, v * 1.0001] },
+        { "partId": "JBD", "name": "Part 2", "volume": [small * 0.9999, small * 1.0001] },
+        { "partId": "JCD", "name": "Part 3", "volume": [v * 0.9998, v * 1.00005] }]);
+    let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [
+        sketch("FS1", "Sketch 1", vec![circle("c1", 0.0, 0.004)]), extrude("FE1", "Extrude 1", "FS1", "20 mm"),
+        sketch("FS2", "Sketch 2", vec![circle("c2", 0.03, 0.004), circle("c3", 0.06, 0.002)]), extrude("FE2", "Extrude 2", "FS2", "20.08 mm"),
+    ], "live": [
+        { "index": 1, "name": "Extrude 1", "featureId": "FE1", "status": "OK", "parts": [{ "partId": "JAD", "name": "Part 1" }] },
+        { "index": 3, "name": "Extrude 2", "featureId": "FE2", "status": "OK", "parts": [{ "partId": "JAD", "name": "Part 1" }, { "partId": "JBD", "name": "Part 2" }, { "partId": "JCD", "name": "Part 3" }] }] });
+    let at = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    let row = |n: &str| json!({ "itemSource": { "indentLevel": 0 }, "name": n, "quantity": 1, "partNumber": "", "description": "", "material": { "displayName": "" } });
+    let instance = |id: &str, name: &str, part: &str| json!({ "id": id, "name": name, "type": "Part", "partId": part, "elementId": "E1" });
+    let asm = json!({
+        "rootAssembly": {
+            "instances": [instance("IA", "Part 1 <1>", "JAD"), instance("IB", "Part 2 <1>", "JBD"), instance("IC", "Part 3 <1>", "JCD")],
+            "occurrences": [{ "path": ["IA"], "fixed": true, "transform": at }, { "path": ["IB"], "fixed": true, "transform": at }, { "path": ["IC"], "fixed": true, "transform": at }] },
+        "features": { "features": [], "featureStates": {} },
+        "liveBom": { "root": { "bom": { "bomTable": { "items": [row("Part 1"), row("Part 2"), row("Part 3")] } } } } });
+    let mut ctx = Ctx::new();
+    let r = rebuild_assembly(&mut ctx, &scratch("fits-taken-free-of-its-feature.noshape"), &asm, &[("E1".into(), studio, parts)]);
+    assert_eq!((r.bom_matching, r.bom_rows), (3, 3), "{r:?}");
+}
+
 /// A live part whose first feature leaves only a sliver in ours, our part of it coming from a later feature and off
 /// live's volume band (asm-tvc-mount's Inner Ring, 11789 mm³ in live, ours 4 % short; the first feature's 0.014 mm³
 /// "Part 3" took it and three mates lost their ends): ours is the part nearest live's volume, never the sliver.
