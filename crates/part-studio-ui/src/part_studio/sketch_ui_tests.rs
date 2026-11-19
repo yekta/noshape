@@ -6815,3 +6815,35 @@ fn add_configuration_input_checkbox_opens_its_dialog(cx: &mut TestAppContext) {
     assert!(matches!(added.kind, noshape_model::configuration::ConfigInputKind::Checkbox { default: true }), "{:?}", added.kind);
     assert!(cx.update(|cx| view.read(cx).ui.var_input.is_none()), "closed");
 }
+
+/// Live (ui-parity sketch-vertical-key, live2's camera retake): in the isometric view a line from the origin turns
+/// vertical only while the pointer is within 7.5 px on screen of the plumb line through its start: 9 px off (the
+/// recording's (0, 0) to (3, 30) on Top) adds Coincident alone, 6 px off makes it Vertical; the pointer coming there
+/// in 8 moves through the reach (live's recorder) doesn't hold it.
+#[gpui::test]
+fn a_lines_vertical_reach_is_measured_on_the_screen_in_the_app(cx: &mut TestAppContext) {
+    for (off, vertical, moves) in [(9.0, false, 0), (6.0, true, 0), (9.0, false, 8)] {
+        let (window, view) = sketch_with(cx, "vertical-reach", Tool::Line);
+        let (o, ex, ey) = cx.update(|cx| view.read(cx).sketch.as_ref().and_then(|ed| ed.screen_map)).expect("a screen map");
+        let to_px = |p: DVec2| glam::DMat2::from_cols(ex, ey).inverse() * (p - o);
+        let start = to_px(DVec2::ZERO);
+        let up = (to_px(DVec2::new(0.0, 0.03)) - start).normalize();
+        let end = start + up * 120.0 + up.perp() * off;
+        click(cx, window, &view, (start.x, start.y));
+        for k in 1..moves {
+            let at = start + (end - start) * (k as f64 / moves as f64);
+            cx.update_window(window, |_, w, cx| {
+                view.update(cx, |v, cx| {
+                    let vp = v.viewport.clone();
+                    v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: at, modifiers: Modifiers::default() }, w, cx);
+                });
+            })
+            .unwrap();
+            draw(cx, window);
+        }
+        click(cx, window, &view, (end.x, end.y));
+        let got = cx.update(|cx| view.read(cx).sketch_data(cx).expect("sketching").sketch.constraints().any(|c| matches!(c.kind, noshape_sketch::ConstraintKind::Vertical { .. })));
+        assert_eq!(got, vertical, "{off} px off plumb on screen, {moves} moves");
+        cx.update_window(window, |_, w, _| w.remove_window()).unwrap();
+    }
+}

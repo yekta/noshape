@@ -413,6 +413,9 @@ const INFERENCE_PX: f64 = 7.5;
 /// go at 9–10 px straight out and 11–12 diagonally, curves, edges and the horizontal / vertical bands at 8–10).
 const HOLD_PX: f64 = 9.5;
 const HOLD_DIAGONAL_PX: f64 = 11.5;
+/// A line's own horizontal / vertical from its start lets go at the low end of that (ui-parity sketch-vertical-key:
+/// (0, 0) to (3, 30) on Top, coming in 8 moves through the band, ends 9 px off plumb and isn't vertical).
+const BAND_HOLD_PX: f64 = 8.0;
 /// How long the pointer rests on a model edge before it wakes (live sketch-gaps 1c: 60 ms did, 30 didn't).
 const EDGE_WAKE_REST: std::time::Duration = std::time::Duration::from_millis(60);
 /// Stands for the woken model edge in an inference's constraints until the click uses the edge
@@ -1905,7 +1908,8 @@ impl SketchEditor {
     /// `prev` again at `p` if the pointer is still within its let-go reach ([`HOLD_PX`]): the same target, kind and
     /// constraints, found with the wider reach.
     fn held_snap(&self, sk: &Sketch, p: DVec2, ctx: &InferenceContext, prev: &Inference) -> Option<Inference> {
-        let wide = InferenceContext { snap_radius: self.world_per_px * HOLD_PX, ..ctx.clone() };
+        let own_band = matches!(prev.constraints.as_slice(), [AutoConstraint::HorizontalLine | AutoConstraint::VerticalLine]);
+        let wide = InferenceContext { snap_radius: self.world_per_px * if own_band { BAND_HOLD_PX } else { HOLD_PX }, ..ctx.clone() };
         let metric = self.screen_metric();
         let seen = |v: DVec2| metric.as_ref().map_or(v.length(), |m| m.len(v));
         // (A point's square: its larger screen coordinate.)
@@ -11804,6 +11808,21 @@ mod tests {
         assert!(at(&mut ed, &mut d, 9.0), "9 px out: held");
         assert!(!at(&mut ed, &mut d, 10.5), "10.5 px: let go");
         assert!(!at(&mut ed, &mut d, 9.0), "back to 9 px: not lit again");
+    }
+
+    /// A line's own vertical holds to 8 px off plumb, not a point's 9.5 (live sketch-snap-1117 "lets go at 8–10";
+    /// ui-parity sketch-vertical-key: 9 px off after coming through the band isn't vertical).
+    #[test]
+    fn a_lines_own_vertical_lets_go_at_8_px() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        let at = |ed: &mut SketchEditor, d: &mut SketchData, px: f64| {
+            ed.pointer_move(d, v(px * PX, 80.0 * PX), false, false);
+            ed.inference.as_ref().is_some_and(|i| i.constraints == [AutoConstraint::VerticalLine])
+        };
+        assert!(at(&mut ed, &mut d, 6.0), "6 px: lit");
+        assert!(at(&mut ed, &mut d, 7.8), "7.8 px: held");
+        assert!(!at(&mut ed, &mut d, 9.0), "9 px: let go");
     }
 
     /// qa 11-17 SKSNAP-ALIGN-WOKEN-POINT (live 11-17 sketch-snap-1117 row 2): another sketch's point rested on (an
