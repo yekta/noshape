@@ -2190,6 +2190,9 @@ selection, measure, section view; then P2 assembly and drawing passes; verify th
    Measure angles: pass (live2's first-wedge capture: 56.31 for slope + x=40). Face+edge menu (591643fc) not re-run yet.
 
 ## 11-19 day states (moved from the handoff 11-19 21:15)
+0u. **Feel vs live2 11-18 (06:55)**: TICKETS "Interaction feel vs live2's 11-18 06:0x numbers": P0 FEEL-FL-AUTOSCROLL-DROP, P1
+   FEEL-SKETCH-TOOL-PICK, P1 FEEL-FAST-OFF-CLEAR (psui). Tools qa-scratch/hv2 (hovt/hovd/hoff/hsk.py on vibex8 ~/tmp/qa/fl via fls.sh;
+   docs skr / fl45 in vibex8 ~/tmp/qa/fl/docs). cut-must.txt now also 7b8bb249 + 2549be00 (Ctrl+Enter).
 0v. **Feel: assemblies / drawings / list (07:10)**: TICKETS "Interaction feel in assemblies, drawings and the feature list": asm P1
    SNAPMODE-REACH (70 vs 57 px), P1 SNAPMODE-RELEASE-DIALOG; psui P1 ROW-DBLCLICK-DISTANCE. Runner-built docs reopened without the
    runner (vibex8 ~/tmp/qa/fl/docs: asm-feel, hole-plate-drawing): stable views. Drivers qa-scratch/af/snapm2.py, hv2/rowk.py, hv2/drw.py.

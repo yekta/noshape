@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 23:13)
+# QA handoff (agent qa; current state only, updated 2026-11-19 23:16)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -114,7 +114,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    merge (dialog, toast, graph) = live; P2 HISTORY-ROW-NAME-OVERLAP (studios, told). Hole table: ✓ only starts placing, a click
    places it (= live; my DRW-HOLE-TABLE-NOT-SAVED closed). Drawing hover (view tan frame, dimension) = rows 130. To verify on
    their greens: asm b146b56f (drag group, typed limits), dx BRAND-IN-UI-TEXT, skasm Simulation connection dropped.
-   Next: sketch tools walk (arcs, spline, slot, polygon, sketch fillet / mirror, angle + radius dims). App runs: units qa-xvfb110 + qa-walk*-app
+   Sketch tools 23:09-23:15: 3-point arc, spline, circumscribed polygon (spinner; Enter commits, Esc discards = live), Slot on a
+   line (Ø20), sketch Fillet R5, angle dim, Mirror (line first) = live; P1 SKETCH-SLOT-ON-ARC (skasm, told: arc deleted, Ø0 left).
+   Also verify studios f450d0dd (history row ellipsis, "Noshape Labs"). Next: spot rows 33-40 on green, then re-walk fixes as
+   their greens land. App runs: units qa-xvfb110 + qa-walk*-app
    (systemd-run, NOSHAPE_CONFIG_DIR per doc), tool search alt+c + name + Return; Esc keeps selection, Space clears.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
@@ -135,9 +138,6 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    Live's selection latency with qa's method (behaviours "qa (lead 11-18): live's selection / hover latency"): face 964 / plane 955 /
    row 693 / box 15321 ms screen medians (software); ours 216 / 153 / 163 / 218: ours faster on every row.
    feat3 done 06:32: features > 5x live routed (blend 12, core 11, bool 5 rows; messages 06:40).
-0u. **Feel vs live2 11-18 (06:55)**: TICKETS "Interaction feel vs live2's 11-18 06:0x numbers": P0 FEEL-FL-AUTOSCROLL-DROP, P1
-   FEEL-SKETCH-TOOL-PICK, P1 FEEL-FAST-OFF-CLEAR (psui). Tools qa-scratch/hv2 (hovt/hovd/hoff/hsk.py on vibex8 ~/tmp/qa/fl via fls.sh;
-   docs skr / fl45 in vibex8 ~/tmp/qa/fl/docs). cut-must.txt now also 7b8bb249 + 2549be00 (Ctrl+Enter).
 0z3. **live2 fills interaction-feel's "Ours ?" cells on P0 rows (lead 11-18 ~12:15)**: done (2e8057c34): hover-p0 sketch reach outside
    sketch mode, hover-pick-1120 edge vs face, sel-feel press + move over a default plane, measure-mass-1118 place, ps-feel2-1118
    Y / Shift+Y. Next (live2's): manip-feel-1118 triad, other ps-feel2 rows, chips-expr-1118, field-keys-1118, asm, studios. Don't redo

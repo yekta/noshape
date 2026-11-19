@@ -860,7 +860,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   "Onshape Feature Studio", "Onshape Variable Studio", … (crates/app-core/src/properties_dialog.rs: shown as the select's
   value and matched as kind strings at 804-821 / 1054-1058). Shown text should say Noshape; stored data may keep live's
   names if the file format needs them (dx's call).
-  dx 23:1x: also a drawing's part.category property (drawing build.rs) reads "Onshape Part" / "Onshape Assembly" in title-block text.
+  dx 23:07: also a drawing's part.category property (drawing build.rs) reads "Onshape Part" / "Onshape Assembly" in title-block text.
 - [ ] P0 **STALE-SKETCH-HOVER (psui)**: outside sketch mode a sketch entity's hover look stays after the pointer leaves
   for empty space (green f3bc85da, :110, real pointer, walk 22:12). (a) Draw a circle, the last click on its rim, close
   the sketch with ✓: the region keeps its light-orange hover outline with nothing selected, through pointer moves over
@@ -904,18 +904,18 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
 - [ ] P1 **SKETCH-SLOT-ON-ARC (skasm)**: Slot, click a 3-point arc (r ≈ 22.7 mm, free): the arc lights orange and a "Ø0"
   readout with a long leader to the arc's centre appears, but no slot shape; moving the pointer changes nothing. On a line
   the same tool is = live (Ø20 preview, vertical leader, 4 tangent points). Live (behaviours 164): "click a line/arc → a
-  slot preview of default width wraps it immediately". Green 624c6db77, walk 23:2x. Arc, spline and circumscribed polygon
+  slot preview of default width wraps it immediately". Green 624c6db77, walk 23:10. Arc, spline and circumscribed polygon
   (◀ 6 ▶ spinner, Esc discards the pending one) are = live.
-  qa 23:2x, raised to P1: leaving that pending arc slot (Esc, then other tools) DELETES the arc: the sketch keeps only
+  qa 23:13, raised to P1: leaving that pending arc slot (Esc, then other tools) DELETES the arc: the sketch keeps only
   its centre point and a committed "Ø0" dimension with its leader (full shot walk3/dm3.png on the qa host).
-- [x] (qa 23:1x: NOT A BUG, closed as = live. dx: ✓ only starts placing, the table follows the pointer until a click places it (behaviours "dx (2131)"); re-walked with a click after ✓: placed and saved ("Part 1 Drawing 1 :: Hole table"). What I read as placed was the preview; its snap is the preview's frame-corner snap) P1 **DRW-HOLE-TABLE-NOT-SAVED (dx)**: a Hole table placed with ✓ is never recorded: no history entry, and it is gone
+- [x] (qa 23:08: NOT A BUG, closed as = live. dx: ✓ only starts placing, the table follows the pointer until a click places it (behaviours "dx (2131)"); re-walked with a click after ✓: placed and saved ("Part 1 Drawing 1 :: Hole table"). What I read as placed was the preview; its snap is the preview's frame-corner snap) P1 **DRW-HOLE-TABLE-NOT-SAVED (dx)**: a Hole table placed with ✓ is never recorded: no history entry, and it is gone
   after the app is closed and the document reopened (walk3 Part 1 Drawing 1, green 624c6db77; twice: 22:58 and 23:04:40,
   the second time the app stopped 10 s after ✓). The document's microversions have "Part 1 Drawing 1 :: Note" (22:56) but
   nothing for either table; the view's A1 tag and X/Y origin arrows go too. Steps: Hole table › pick the Top view › Origin
   = the hole centre › ✓. Also seen: the first ✓ placed the table snapped at the sheet's bottom-right corner (= live: "On ✓
   the table was placed snapped to the fixed corner"), the second left it at the pointer (top left, over the ✓ button,
   off the sheet), with the same fixed corner (2nd icon, default).
-  qa 23:07: a plain Table (2 × 2) IS saved ("Part 1 Drawing 1 :: Table"), so it's the Hole table's commit only. After that
+  qa 23:06: a plain Table (2 × 2) IS saved ("Part 1 Drawing 1 :: Table"), so it's the Hole table's commit only. After that
   Table's ✓ its placement guide (pink dashed line at the ✓ button's x, red × at the sheet top) stayed drawn with the pointer
   elsewhere, until the next pointer action.
 
