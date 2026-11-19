@@ -3,7 +3,7 @@
 Updated 2026-11-19 22:45 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight 22:45: one land after suite N (vibe2, /root/skasm-scratch/suiten.out, log ~/agents/skasm-keep/suite-N-*.log on vibe2; M was stopped unrun)
+## In flight 23:18: one land after suite O (vibex7, /root/skasm-scratch/suiteo.out, log ~/agents/skasm-keep/suite-O-*.log on vibex7; N stopped unrun)
 Compare per document with suite J (vibex7 ~/tmp/skasm/suite-J-1119-1831.log.s.c: `sed` the "name: N/M features match"
 lines to "name N/M", LC_ALL=C sort, join, awk $2!=$3). None worse -> land.sh. The stack:
 - Extrude part order (3ff5480f): a New extrude's regions of one sketch go in drawing order (the lowest entity id of each
@@ -33,6 +33,8 @@ lines to "name N/M", LC_ALL=C sort, join, awk $2!=$3). None worse -> land.sh. Th
   the sketch's bodies, sheet included). custom run.rs: a Reference::Sketch in a curve-only field = its curves.
   Pin `an_extruded_closed_rectangle_is_a_box_that_cannot_unfold` (both picks). Not in suite N (no parity doc hits it).
   Left: sketch points passed through ops into sketchCurves say "Cannot compute tangent line." (the app's filter blocks them).
+- Slot on an arc (44c3ffed, qa P1 SKETCH-SLOT-ON-ARC): slot_chains took the arc's offset sides as caps (they share its
+  centre) -> Equal to the Ø cap -> "Ø0" and Esc committed the wreck. Sketch + scene tests; slot tool only (no suite doc).
 - Simulation connection removed (77fa48ed, lead; DECISIONS 11-16): mate dialog field + flyout row + model-data/ops
   fields, run.py drops the two labels, scenario asm-slider-simulation-connection deleted. ops e2e assembly 14, coverage,
   assembly-ui 97, clippy clean (vibex8).
