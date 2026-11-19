@@ -6439,7 +6439,16 @@ impl<'a> Translator<'a> {
                         }
                     }
                     // Added driven (no value: it over-defines the sketch), or driving (a value is taken, as typed).
-                    let added_driven = r["warning"].as_str().is_some_and(|w| w.contains("driven (reference)"));
+                    let mut added_driven = r["warning"].as_str().is_some_and(|w| w.contains("driven (reference)"));
+                    // A value the sketch can't take as live solved it (ours over-defines it: infento's Part grid, its
+                    // linear pattern's spacings): driven, as the Dimension tool adds it, so the sketch stays solved.
+                    if r["warning"] == "Sketch could not be solved."
+                        && let Some(d) = r["dimension"].as_str()
+                        && self.call("sketch_dimension_options", json!({ "sketch": id, "dimension": d, "driving": false })).is_ok()
+                    {
+                        self.sketch_edits += 1;
+                        added_driven = true;
+                    }
                     if driven != added_driven
                         && let Some(d) = r["dimension"].as_str()
                         && self.call("sketch_dimension_options", json!({ "sketch": id, "dimension": d, "driving": !driven })).is_ok()
