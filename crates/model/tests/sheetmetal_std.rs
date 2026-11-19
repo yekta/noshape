@@ -2515,6 +2515,44 @@ fn the_flat_lies_where_its_first_wall_puts_it() {
     assert_eq!((lo[0], lo[2], hi[0], hi[2]), (-30.0, -2.0, 40.555, 0.0), "SM Top wall-first: {lo:?} {hi:?}");
 }
 
+/// The flat's +z is the model's up: the definition face's normal with Flip direction up, else its reverse (std
+/// pcbEnd's hold plane). A plate thickened up from Top with a flange on its far edge (y 40) lies as seen from Top, under
+/// z 0 (qa session-sm-1119, live's flat view); with Flip direction up it is turned over, y < 0, above z 0 (c2-sm-louver's
+/// flat face S2E6G at z +2.032 facing +z).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_thickened_plates_flat_lies_by_its_up_side() {
+    for flip in [false, true] {
+        let mut s = Studio::new();
+        let region = s.rectangle(60.0, 40.0);
+        s.add("sheetMetalStart", move |p| {
+            p.set("process", en("THICKEN"));
+            p.set("regions", ParamValue::Query(vec![region]));
+            p.set("thickness", expr("2 mm"));
+            p.set("radius", expr("2 mm"));
+            p.set("flipDirectionUp", ParamValue::Bool(flip));
+        });
+        let r = s.ok();
+        let edge = edge_at(&r, DVec3::new(30.0, 40.0, 2.0));
+        s.add("sheetMetalFlange", |p| {
+            p.set("edges", ParamValue::Query(vec![edge]));
+            p.set("distance", expr("20 mm"));
+        });
+        let r = s.ok();
+        let part = &r.context.bodies[part(&r)];
+        let flat = noshape_model::sheetmetal::flat_body(&r.context, &noshape_model::sheetmetal::flat_body_id(&part.id), &part.name).expect("the flat body");
+        let b = flat.shape.bounding_box(false).expect("its box");
+        let (lo, hi) = (b.min * 1e3, b.max * 1e3);
+        let near = |a: f64, b: f64| (a - b).abs() < 1e-3;
+        assert!(near(lo.x, 0.0) && near(hi.x, 60.0), "flip {flip}: x {lo} {hi}");
+        if flip {
+            assert!(near(hi.y, 0.0) && lo.y < -55.0 && near(lo.z, 0.0) && near(hi.z, 2.0), "flip: turned over {lo} {hi}");
+        } else {
+            assert!(near(lo.y, 0.0) && hi.y > 55.0 && near(lo.z, -2.0) && near(hi.z, 0.0), "as seen from Top {lo} {hi}");
+        }
+    }
+}
+
 /// The lowest vertex of the part's bend faces at x (mm): a bend's end.
 fn bend_end_at(r: &RegenResult, x: f64) -> Reference {
     let b = &r.context.bodies[part(r)];

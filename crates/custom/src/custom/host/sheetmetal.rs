@@ -65,6 +65,8 @@ struct Definition {
     body: BodyId,
     front: f64,
     back: f64,
+    /// The model's "Flip direction up": its definition faces' normals are up (else the other side is).
+    flip_up: bool,
     /// Bend radius by definition edge index.
     bends: BTreeMap<usize, f64>,
     /// Rolled bends (a Hem's arc: a curved definition face with a BEND
@@ -2342,7 +2344,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     }
                 }
             }
-            defs.push(Definition { forms, body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), k_factor_rolled: model.get("kFactorRolled").get("value").as_number().unwrap_or(0.5), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous, wall_ids, model_id: model.get("attributeId").as_str().map(|s| s.to_string()), breaks: corner_breaks(&st, &q, b) });
+            defs.push(Definition { forms, body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), flip_up: model.get("flipDirectionUp").as_bool().unwrap_or(false), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), k_factor_rolled: model.get("kFactorRolled").get("value").as_number().unwrap_or(0.5), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous, wall_ids, model_id: model.get("attributeId").as_str().map(|s| s.to_string()), breaks: corner_breaks(&st, &q, b) });
             let faces: Vec<Reference> = (0..body.faces.len()).map(|f| q.to_ref(&Ent::Face(b, f))).collect();
             let edges: Vec<Reference> = (0..body.edges.len()).map(|e| q.to_ref(&Ent::Edge(b, e))).collect();
             let vertices: Vec<Reference> = (0..body.vertices.len()).map(|v| q.to_ref(&Ent::Vertex(b, v))).collect();
@@ -3139,11 +3141,15 @@ fn flat_place(def: &Definition, topo: &Topo, unfolded: &Unfolded) -> Option<crat
     let w = unfolded.walls.get(&fixed)?;
     let (p0, n) = face_normal(&topo.faces[fixed]).ok()?;
     let x = crate::display::PlaneFrame::face_x(n);
-    let y = n.cross(x);
-    let live = glam::DMat4::from_cols(glam::DVec4::new(x.x, y.x, n.x, 0.0), glam::DVec4::new(x.y, y.y, n.y, 0.0), glam::DVec4::new(x.z, y.z, n.z, 0.0), glam::DVec4::new(0.0, 0.0, -p0.dot(n), 1.0));
+    // The flat's +z is the model's up (std pcbEnd's hold plane: the face's plane, flipped unless Flip direction up;
+    // x kept): a plate thickened up from Top lies as seen from Top (qa session-sm-1119), z -t...0.
+    let up = if def.flip_up { n } else { -n };
+    let y = up.cross(x);
+    let live = glam::DMat4::from_cols(glam::DVec4::new(x.x, y.x, up.x, 0.0), glam::DVec4::new(x.y, y.y, up.y, 0.0), glam::DVec4::new(x.z, y.z, up.z, 0.0), glam::DVec4::new(0.0, 0.0, -p0.dot(up), 1.0));
     let view = live * w.inverse();
     let walls = unfolded.walls.iter().filter_map(|(f, m)| Some((topo.faces.get(*f)?.clone(), view * *m))).collect();
-    Some(crate::sheetmetal::flat::FlatPlace { view, front: def.front, back: def.back, walls })
+    let (front, back) = if def.flip_up { (def.front, def.back) } else { (def.back, def.front) };
+    Some(crate::sheetmetal::flat::FlatPlace { view, front, back, walls })
 }
 
 struct Unfolded {
@@ -3336,7 +3342,7 @@ fn ev_sheet_metal_flat_transformation(i: &mut Interp, a: Vec<Value>) -> R<Value>
             let body = &st.ctx.bodies[b];
             let (bends, rips, rolled, rip_styles, joint_ids) = joints(&st, &q, b);
             let k_factor = model.get("k-factor").get("value").as_number().unwrap_or(0.45);
-            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), k_factor_rolled: model.get("kFactorRolled").get("value").as_number().unwrap_or(0.5), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new(), forms: Vec::new(), wall_ids: BTreeMap::new(), model_id: None, breaks: BTreeMap::new() };
+            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), flip_up: model.get("flipDirectionUp").as_bool().unwrap_or(false), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), k_factor_rolled: model.get("kFactorRolled").get("value").as_number().unwrap_or(0.5), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new(), forms: Vec::new(), wall_ids: BTreeMap::new(), model_id: None, breaks: BTreeMap::new() };
             (e, body.shape.clone(), def, k_factor)
         })
     };

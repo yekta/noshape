@@ -5410,14 +5410,14 @@ fn a_sketch_on_the_flat_is_drawn_in_the_flat_view(cx: &mut TestAppContext) {
         let part = ctx.bodies.iter().find(|b| ctx.sheet_metal.contains_key(&b.id)).unwrap().id.clone();
         let solid = noshape_model::sheetmetal::flat_pattern_for(ctx, &part).unwrap().flat_view_solid().unwrap();
         let top = solid.faces().iter().enumerate().filter(|(_, f)| f.face_plane().ok().flatten().is_some_and(|p| p.unit_normal().z > 0.999)).max_by(|a, b| a.1.area().unwrap_or(0.0).total_cmp(&b.1.area().unwrap_or(0.0))).unwrap().0;
-        // It shows the plate's sketch side, the face on Top (the flat is the plate turned over: live 2468, the sketch
-        // side faces +Z): the face the main view lights for it.
+        // It shows the plate's top face, as seen from Top (Flip direction up off: the model's up is +Z; qa
+        // session-sm-1119, live's flat view): the face the main view lights for it.
         let shown = noshape_model::sheetmetal::flat_face_counterpart(ctx, &noshape_model::sheetmetal::flat_face_name(&part, top)).expect("the part's face");
         let Reference::Face(n) = &shown else { panic!("{shown:?}") };
         let body = ctx.body(&part).unwrap();
         let fi = *body.find_faces(n).first().expect("on the part");
         let pl = body.shape.faces()[fi].face_plane().unwrap().unwrap();
-        assert!(pl.unit_normal().z < -0.999 && pl.origin.z.abs() < 1e-9, "{pl:?}");
+        assert!(pl.unit_normal().z > 0.999 && (pl.origin.z - 2e-3).abs() < 1e-9, "{pl:?}");
         (part, top)
     });
     cx.update_window(window, |_, w, cx| {
@@ -5434,7 +5434,7 @@ fn a_sketch_on_the_flat_is_drawn_in_the_flat_view(cx: &mut TestAppContext) {
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
     draw(cx, window);
     // Two clicks in the flat view at the flat's (10, 10) and (40, 30) mm: a line there.
-    let at = |cx: &mut TestAppContext, x: f64, y: f64| cx.update(|cx| fvp.read(cx).project(glam::DVec3::new(x * 1e-3, y * 1e-3, 2e-3))).expect("on screen");
+    let at = |cx: &mut TestAppContext, x: f64, y: f64| cx.update(|cx| fvp.read(cx).project(glam::DVec3::new(x * 1e-3, y * 1e-3, 0.0))).expect("on screen");
     for (x, y) in [(10.0, 10.0), (40.0, 30.0)] {
         let p = at(cx, x, y);
         cx.update_window(window, |_, w, cx| {

@@ -6061,8 +6061,9 @@ fn a_linked_parts_properties_save_into_its_version() {
 }
 
 /// Live 2468: a sheet metal part's flat lies where its fixed face (the first wall) puts it, here the plate's region on
-/// Top, thickened up: z 0…2 with the plate kept at x 0…60, y 0…40 and the flange unrolled beside it. A sketch on its top
-/// face is on the flat (z 2, normal +z) and shows only in the flat view; the flat is in no whole-part query.
+/// Top, thickened up: as seen from Top (qa session-sm-1119, live's flat view), z -2…0, the plate kept at x 0…60, y 0…40
+/// and the flange unrolled beside it. A sketch on its top face is on the flat (z 0, normal +z) and shows only in the
+/// flat view; the flat is in no whole-part query.
 #[test]
 fn a_sketch_on_the_sheet_metal_flat() {
     let mut ctx = Ctx::new();
@@ -6078,11 +6079,13 @@ fn a_sketch_on_the_sheet_metal_flat() {
     let num = |v: &Value| v.as_str().and_then(|s| s.parse::<f64>().ok()).or_else(|| v.as_f64()).unwrap_or(f64::NAN);
     let top = faces.iter().filter(|f| num(&f["normal"][2]) > 0.999).max_by(|a, b| num(&a["area"]).total_cmp(&num(&b["area"]))).expect("a top face").clone();
     assert_eq!(top["part"], "Flat pattern of Part 1", "{top}");
-    assert!((num(&top["offset"]) - 2.0).abs() < 1e-6, "the top face at z 2: {top}");
+    assert!(num(&top["offset"]).abs() < 1e-6, "the top face at z 0: {top}");
     let s = call(&mut ctx, "sketch_create", json!({ "plane": top["id"] }));
     assert_eq!(s["feature_status"]["status"], "Ok", "{s}");
     assert_eq!(s["on_flat"], true, "{s}");
-    assert!((num(&s["frame"]["origin"][2]) - 2.0).abs() < 1e-6 && num(&s["frame"]["normal"][2]) > 0.999, "{s}");
+    let o = &s["frame"]["origin"];
+    assert!(num(&o[2]).abs() < 1e-6 && num(&s["frame"]["normal"][2]) > 0.999, "{s}");
+    assert!((num(&o[0]) - 30.0).abs() < 1e-6 && (0.0..40.0).contains(&num(&o[1])), "the plate not mirrored: {s}");
 }
 
 /// Live 2464: Edit in context on another document's part stores the context in that document's Part Studio (its

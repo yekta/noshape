@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 05:01 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 05:32 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -45,22 +45,17 @@ quadrant's snap wakes no alignment source (ours aligns with points only).
 ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
 Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six on green.
 
-## State 05:00 (11-19)
-- Landed: 373dd5b9 sketch_dimension takes a value as typed; 48626728 P0 REGION-PICK-SKETCH-SHOWN (qa verified green).
-- CHECKING 5686f670 (04:19): Trim/Split used lines (`use_ends`), translator stale-Use on refs geometry, translator
-  driven fix (Part grid Ok again), e2e brace fix. Suite C = A (90/126, 1325/1585).
-- QUEUED 29bf3dcb (04:47): pattern instances lose inferred H/V (Part grid keeps live's driving 80; suite D = A);
-  sketch_get / sketch ops adopt solved geometry of external entities (`adopt_geometry_where`); Bends rows in letter
-  order (qa session-sm-1119, `bend_rows_run_in_their_letters_order`); P0 sketch-tools-1119 (chain square ->
-  Perpendicular, a line started on a held line -> Vertical, Tangent arc tool one arc per start, smooth preview
-  `ARC_PREVIEW_TOL_PX`). Suite E (this tree) via rb.sh + slot on vibe2 -> ~/agents/skasm-keep/suite-E-*.log
-  (/root/skasm-scratch/suitee.out); compare with A ~/agents/skasm-keep/suite-1119-0125.log, fix forward if worse.
-- OPEN flat view orientation (qa session-sm-1119 step 8): the app's flat is mirrored in y vs live's Top view; the DXF
-  is right (loops). Cause: custom/src/custom/host/sheetmetal.rs `flat_place` maps the fixed wall's definition-face
-  normal to +Z; for a sheet thickened up from Top that normal is -Z (seen from below). Probe (e2e, removed): plate on
-  Top THICKEN 2 + flange on y=60: frame XY, `to_flat_view((10,50,0))` = (10,-50). 2468's rule (extruded lines only)
-  gives our mirror for a thickened sheet; live's shot doesn't: asked live REQUESTS 05:10 "a THICKENED sheet's flat
-  placement" (REST flat box, up and flipped). qa doc copies: vibe2 ~/agents/qa-keep/session-sm-1119/r3/doc-s3, doc-s5.
+## State 05:32 (11-19)
+- Landed: 373dd5b9 sketch_dimension as typed; 48626728 P0 REGION-PICK (qa verified); 4104b148 (5686f670: Trim / Split of
+  used lines keep live's orphan point / USE_END, translator stale-Use, driven fix); 24792169 (29bf3dcb: pattern
+  instances lose inferred H/V, sketch ops adopt external solved geometry, Bends rows in letter order, P0 sketch-tools-1119
+  four rows). Suite E (this tree) = A: 90/126, 1325/1585, no document changed.
+- IN FLIGHT flat view orientation (qa session-sm-1119 step 8, the app's flat mirrored in y): custom host
+  sheetmetal.rs `flat_place` now takes std's "up" (pcbEnd's hold plane: the fixed face's normal with Flip direction up,
+  else reversed, x kept; `Definition::flip_up` from the model attribute). Fits all live evidence: qa's thickened plate
+  (flip off) seen from Top unmirrored (live 23-flat-view.png), c2-sm-louver SM model 2 (flip on, Right plane) flat top
+  face S2E6G at z +2.032 normal +z, 2468's probes (flip on). A thickened-up plate's flat now lies z -t..0 (was 0..t):
+  e2e `a_sketch_on_the_sheet_metal_flat` updated. REQUESTS 05:10 to live (REST box of a thickened flat) would confirm.
 - Open: Part grid's two PATTERN spacing dims stay driven (live driving): pattern links + shared corners make them
   redundant in ours.
 - welding Sketch 12: ours = live's geometry; its 2 PROJECTED are live's split Use (`.orphan` USE_END + MIDPOINT);
@@ -72,7 +67,7 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
 regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete when done).
 
 ## Next
-- Midpoint / quadrant snaps as alignment sources (live feel retaken 11-18).
+- Midpoint alignment landed (303e9d91); live has no circle quadrant inference, nor do we: nothing left there.
 - Handed: surf-intro-simple Loft 1 (core), surf-intro-examples Fill 1 overshoot (lead to route), welding-config
   Extrude 8 (core, fixing), manualblend Sweep 2 area / Move boundary (core).
 - Form speed P0 binaries /root/skasm-scratch/apps: delete (done).
@@ -133,10 +128,6 @@ qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b, asm d8d597e0-675c-497b-a804-544ceab99bb
   Booleans, surface-pattern sphere cuts (bool); setback fillet (blend); hex-bookcase mesh Uses (dx).
 
 ## Open questions (none blocking)
-- Sheet metal model arrow (live2 sm-feel2-1118: Thicken plate, white arrow at the plate's middle): std puts it on the first
-  face of qCreatedBy(id, BODY); ours hides the definition so that is the solid, whose first face (OCCT fuse order) is a
-  side face. A fix orders the built solid's faces (offset faces first, as Parasolid's) or lets qCreatedBy see the
-  definition sheet: either touches std's other nth-element queries; needs a suite run.
 - hat15b Sketch 1 (inserted in the doc's last microversion 1229, 11-17 ~17:30): its used point 19 (Vertex ref) was
   stored at (33.679, 45.182) mm but resolves to the vertex at x 34.75 in 0.4.43…main; nothing of the model lies at the
   stored x in any build. Not upstream geometry (not core's). Not reproduced: today's snap there stores 34.749999642 (the

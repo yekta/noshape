@@ -85,8 +85,9 @@ pub struct FlatPattern {
 }
 
 /// Live 2468: the flat is laid out by its fixed face (the first sketch segment's): a point p of that face goes to
-/// (p·x, p·y, (p − o)·n) with the face's plane frame (o, x, n), so the flat keeps its in-plane coordinates and lies
-/// on z = 0, the sheet `front` above it and `back` below.
+/// (p·x, p·y, (p − o)·u) with the face's plane frame (o, x) and the model's up u (the face's normal with Flip
+/// direction up, else its reverse), so the flat keeps its in-plane coordinates and lies on z = 0, the sheet `front`
+/// above it and `back` below.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FlatPlace {
     /// [`FlatPattern::shape`]'s space → the flat's place.
