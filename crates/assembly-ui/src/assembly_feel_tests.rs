@@ -334,7 +334,8 @@ fn press(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<Assembl
 
 /// live2 shortcuts-1118 (keys pressed in live and ours): Shift+R's bar, W's prompt (Esc ends both mode and prompt),
 /// N normal to the selected face, Shift+P hides the origin (and keeps it hidden), Ctrl+C without a toast, Ctrl+V's copy
-/// at the pointer and unselected, Shift+S keeps the selection with no banner, Shift+I takes the selection away.
+/// at the pointer, unselected and staying there (live2 paste-1119; one undo removes it), Shift+S keeps the selection with
+/// no banner, Shift+I takes the selection away.
 #[gpui::test]
 fn the_assembly_keys_act_as_live(cx: &mut TestAppContext) {
     use crate::actions::*;
@@ -377,21 +378,30 @@ fn the_assembly_keys_act_as_live(cx: &mut TestAppContext) {
     press(cx, window, &view, HideConstruction);
     press(cx, window, &view, HideConstruction);
     assert!(cx.update(|cx| view.read(cx).ui.origin_hidden), "Shift+P hides the origin");
-    // Ctrl+C: no toast; Ctrl+V: the copy at the pointer, following it, not selected.
+    // Ctrl+C: no toast; Ctrl+V: the copy at the pointer, not selected, dropped there at once.
     let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
     move_to(cx, window, &view, (lo + hi) * 0.5);
     let part1 = cx.update(|cx| view.read(cx).assembly(cx).and_then(|a| a.instances.iter().find(|i| i.name == "Part 1 <1>")).unwrap().id);
     cx.update(|cx| view.update(cx, |v, _| v.selected = vec![part1]));
     press(cx, window, &view, Copy);
     assert!(cx.update(|cx| view.read(cx).message.is_none()), "Ctrl+C shows no toast");
+    let count = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).assembly(cx).map_or(0, |a| a.instances.len()));
+    let before = count(cx);
     press(cx, window, &view, Paste);
+    assert_eq!(count(cx), before + 1, "the copy is in");
     cx.update(|cx| {
         let v = view.read(cx);
-        let placing = v.placing.clone().expect("the copy follows the pointer");
-        assert!(v.ui.place_moved, "at the pointer at once");
-        assert!(placing.iter().all(|id| !v.selected.contains(id)), "the copy isn't selected");
+        assert!(v.placing.is_none(), "dropped at once: it doesn't follow the pointer");
+        let copy = v.assembly(cx).and_then(|a| a.instances.last()).unwrap().id;
+        assert!(!v.selected.contains(&copy), "the copy isn't selected");
     });
-    press(cx, window, &view, Cancel);
+    let (clo, chi) = screen_box(cx, &view, &cx.update(|cx| view.read(cx).assembly(cx).and_then(|a| a.instances.last()).unwrap().name.clone()));
+    let at = (lo + hi) * 0.5;
+    assert!(clo.x <= at.x && at.x <= chi.x && clo.y <= at.y && at.y <= chi.y, "under the pointer: {clo:?}..{chi:?} around {at:?}");
+    // (Undo is the workspace's: the document's.)
+    cx.update(|cx| view.read(cx).doc.clone().update(cx, |d, cx| d.undo(cx)));
+    frames(cx, window, &view);
+    assert_eq!(count(cx), before, "one undo removes it");
     // Shift+S: snap mode on, the selection kept, no message.
     cx.update(|cx| view.update(cx, |v, _| v.selected = vec![part1]));
     press(cx, window, &view, ToggleSnapMode);

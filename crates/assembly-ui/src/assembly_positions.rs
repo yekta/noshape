@@ -18,6 +18,9 @@ pub struct NpDriver {
     pub mates: Vec<MateId>,
     pub checked: Vec<(MateId, u8)>,
     pub expanded: HashSet<MateId>,
+    /// Opened from a mate's menu with no position yet: "Named position 1" made for it, an undo step once the
+    /// selector closes (live asm-mate-menu-edit-driver-mate).
+    pub first: bool,
 }
 
 /// A table cell being typed in: (row, column) — column 0 is the name.
@@ -98,9 +101,8 @@ impl AssemblyView {
             }
             format!("Named position {k}")
         });
-        let placements = self.result.solved.placements.clone();
-        let mate_values = self.result.named_position_values(asm);
-        self.edit(&format!("Insert : {name}"), cx, |a| a.named_positions.push(NamedPosition { name, placements, mate_values, sub_positions: Vec::new() }));
+        let np = NamedPosition { name: name.clone(), placements: self.result.solved.placements.clone(), mate_values: self.result.named_position_values(asm), sub_positions: Vec::new() };
+        self.edit(&format!("Insert : {name}"), cx, |a| a.named_positions.push(np));
         self.panel = Some(SidePanel::Positions);
         // Live (asm-named-position-apply): the new position is being edited, not applied (its menu keeps Apply).
         self.ui.np_editing = Some(n);
@@ -110,7 +112,7 @@ impl AssemblyView {
     /// Done in the editing banner: the position keeps the current state.
     pub(super) fn finish_np_editing(&mut self, cx: &mut Context<Self>) {
         let Some(i) = self.ui.np_editing.take() else { return };
-        self.ui.np_driver = None;
+        self.close_np_driver(cx);
         self.store_np_state(i, cx);
         cx.notify();
     }
@@ -144,12 +146,33 @@ impl AssemblyView {
             mates.push(mate);
         }
         let checked = asm.position_drivers.clone();
-        // (With no position yet, the first ticked DOF makes one: `toggle_np_driver`.)
-        if !asm.named_positions.is_empty() && self.ui.np_editing.is_none() {
+        // Live asm-mate-menu-edit-driver-mate: with no position yet, "Named position 1" comes at once, being edited,
+        // no undo step until the selector closes.
+        let first = asm.named_positions.is_empty();
+        if first {
+            let np = NamedPosition { name: "Named position 1".into(), placements: self.result.solved.placements.clone(), mate_values: self.result.named_position_values(asm), sub_positions: Vec::new() };
+            self.edit_not_undoable("Insert : Named position 1", cx, |a| a.named_positions.push(np));
+            self.ui.np_editing = Some(0);
+        } else if self.ui.np_editing.is_none() {
             self.ui.np_editing = Some(self.ui.np_applied.unwrap_or(0));
         }
         self.panel = Some(SidePanel::Positions);
-        self.ui.np_driver = Some(NpDriver { mates, checked, expanded: [mate].into_iter().collect() });
+        self.ui.np_driver = Some(NpDriver { mates, checked, expanded: [mate].into_iter().collect(), first });
+        cx.notify();
+    }
+
+    /// The Driving mate selector closes (✓, ✕, Esc): a first position it made becomes its undo step, no longer
+    /// edited (live asm-mate-menu-edit-driver-mate: Undo on, the panel's info box, no banner).
+    pub(super) fn close_np_driver(&mut self, cx: &mut Context<Self>) {
+        let Some(d) = self.ui.np_driver.take() else { return };
+        if d.first
+            && let Some(np) = self.assembly(cx).and_then(|a| a.named_positions.first().cloned())
+        {
+            let name = np.name.clone();
+            self.edit_not_undoable("Insert : Named position 1", cx, |a| _ = a.named_positions.remove(0));
+            self.edit(&format!("Insert : {name}"), cx, |a| a.named_positions.insert(0, np));
+            self.ui.np_editing = None;
+        }
         cx.notify();
     }
 
@@ -183,8 +206,7 @@ impl AssemblyView {
 
     pub(super) fn accept_np_driver(&mut self, cx: &mut Context<Self>) {
         self.commit_np_drivers(cx);
-        self.ui.np_driver = None;
-        cx.notify();
+        self.close_np_driver(cx);
     }
 
     /// The selector's ticks as the assembly's position drivers (an undo step when they change).
@@ -808,10 +830,7 @@ impl AssemblyView {
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
                                 .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 24., cx))
-                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                    this.ui.np_driver = None;
-                                    cx.notify();
-                                })),
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_np_driver(cx))),
                         ),
                 )
                 .child(

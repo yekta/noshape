@@ -1367,8 +1367,9 @@ fn a_in_an_edited_revolute_turns_the_free_part_over_about_y(cx: &mut TestAppCont
     assert!(d.dot(want).abs() > 1.0 - 1e-6, "A: 180° about the connector's Y {y:?}: {d:?}");
 }
 
-/// Live extras-1118 n0/n1: ticking a driver mate's DOF applies at once: the first makes "Named position 1" and edits
-/// it, with the blue bubble "Revolute 1 Rz added to named positions"; the ✓ only closes the selector.
+/// Live extras-1118 n0/n1: Edit named position driver mate… with no position makes "Named position 1" and edits it, no
+/// undo step yet (n0, asm-mate-menu-edit-driver-mate); ticking a DOF applies at once, with the blue bubble "Revolute 1
+/// Rz added to named positions"; closing the selector makes the position an undo step (live: Undo on, no banner).
 #[gpui::test]
 fn ticking_a_driver_mate_makes_the_first_named_position_at_once(cx: &mut TestAppContext) {
     let (window, view) = pattern_assembly(cx, "np-driver");
@@ -1387,8 +1388,11 @@ fn ticking_a_driver_mate_makes_the_first_named_position_at_once(cx: &mut TestApp
     cx.update(|cx| {
         view.update(cx, |v, cx| {
             let m = v.assembly(cx).unwrap().mates.iter().find(|m| m.name == "Revolute 1").expect("Revolute 1").id;
+            let undo_before = v.doc.read(cx).session.can_undo();
             v.open_np_driver(m, cx);
-            assert!(v.assembly(cx).unwrap().named_positions.is_empty(), "opening the selector makes no position");
+            assert_eq!(v.assembly(cx).unwrap().named_positions.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(), ["Named position 1"], "opening the selector makes the first position");
+            assert_eq!(v.ui.np_editing, Some(0), "being edited");
+            assert_eq!(v.doc.read(cx).session.can_undo(), undo_before, "no undo step yet");
             v.toggle_np_driver(m, 0, cx);
             let a = v.assembly(cx).unwrap();
             assert_eq!(a.position_drivers, vec![(m, 0)]);
@@ -1399,6 +1403,8 @@ fn ticking_a_driver_mate_makes_the_first_named_position_at_once(cx: &mut TestApp
             v.accept_np_driver(cx);
             assert!(v.ui.np_driver.is_none());
             assert_eq!(v.assembly(cx).unwrap().position_drivers, vec![(m, 0)]);
+            assert_eq!(v.assembly(cx).unwrap().named_positions.len(), 1, "still one position");
+            assert!(v.ui.np_editing.is_none() && v.doc.read(cx).session.can_undo(), "closed: no banner, Undo on");
         });
     });
 }
@@ -1620,17 +1626,29 @@ fn a_triad_arrow_drag_keeps_its_grab_point(cx: &mut TestAppContext) {
     .unwrap();
 }
 
-/// Live asm-dstates-1118: Display states opens with its "New display state name" box focused.
+/// Live asm-dstates-1118: Display states opens with its "New display state name" box focused; Esc there closes the
+/// panel, nothing focused (qa asm-display-states-open-escape).
 #[gpui::test]
 fn display_states_opens_with_its_name_box_focused(cx: &mut TestAppContext) {
     use gpui_kit::Focusable as _;
-    let (window, view) = pattern_assembly(cx, "ds-focus");
+    let path = pattern_document(cx, "ds-focus");
+    let (window, view) = open_assembly_with_front(cx, &path);
     cx.update_window(window, |_, w, cx| {
         view.update(cx, |v, cx| {
             v.toggle_display_states(w, cx);
             let st = v.ui.ds_name.clone().expect("the name box");
             assert!(st.read(cx).focus_handle(cx).is_focused(w), "focused");
         })
+    })
+    .unwrap();
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_keystrokes("escape");
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| {
+        let v = view.read(cx);
+        assert!(!v.ui.display_states, "Esc closed the panel");
+        assert!(!v.ui.ds_name.as_ref().unwrap().read(cx).focus_handle(cx).is_focused(w), "the name box lost the keyboard");
     })
     .unwrap();
 }

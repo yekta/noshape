@@ -974,8 +974,8 @@ impl AssemblyView {
         }
     }
 
-    /// Ctrl+V: paste copied instances; they follow the cursor until a
-    /// click places them (Onshape: pasted where the mouse is clicked).
+    /// Ctrl+V: paste copied instances under the pointer (live2 paste-1119: at once, opaque and unselected, where the
+    /// pointer is at the key; they stay there, no click; one undo removes them).
     pub(super) fn paste_instances(&mut self, cx: &mut Context<Self>) {
         let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) else { return };
         let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) else { return };
@@ -1014,8 +1014,8 @@ impl AssemblyView {
         }
         let ids = self.edit_insert(&noshape_ops::assembly::paste_description(&clip), cx, |a| clip.paste(a, [0.0; 3])).unwrap_or_default();
         self.start_placing(ids, cx);
-        // Live keys-1118: the copy comes in at the pointer at once, see-through, not selected, and follows it.
         self.place_at_pointer(cx);
+        self.drop_placing(cx);
     }
 
     // ------------------------------------------------------------ rename
@@ -4277,6 +4277,15 @@ impl AssemblyView {
             body = body.child(
                 h_flex()
                     .gap(px(4.))
+                    // Live asm-display-states-open-escape: Esc in the name box closes the panel, nothing focused.
+                    .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                        if e.keystroke.key == "escape" && this.ui.ds_renaming.is_none() {
+                            cx.stop_propagation();
+                            this.ui.display_states = false;
+                            window.focus(&this.focus, cx);
+                            cx.notify();
+                        }
+                    }))
                     .child(div().w(px(220.)).child(Input::new(&st).xsmall()))
                     .child(icon_button("ds-add", "add-button", "Add display state", true, cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.add_display_state(window, cx)))),
             );

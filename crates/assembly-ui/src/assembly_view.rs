@@ -1767,7 +1767,7 @@ impl AssemblyView {
     }
 
     /// [`Self::edit`] that is no undo step (live: saving or deleting a named view leaves Undo as it was).
-    fn edit_not_undoable(&mut self, desc: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut Assembly)) {
+    pub(super) fn edit_not_undoable(&mut self, desc: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut Assembly)) {
         let tab = self.tab;
         self.doc.update(cx, |doc, cx| {
             doc.edit_tab_not_undoable(tab, desc, cx, |c| {
@@ -2072,6 +2072,22 @@ impl AssemblyView {
         }
         self.apply_solved(solved, cx);
         true
+    }
+
+    /// The instances being placed stay where they are now, unselected, their drop joining their insert's undo step
+    /// (a paste: live2 paste-1119).
+    pub(super) fn drop_placing(&mut self, cx: &mut Context<Self>) {
+        let Some(ids) = self.placing.take() else { return };
+        self.placing_point = None;
+        self.ui.place_snap = None;
+        let name = self.assembly(cx).and_then(|a| a.instance(ids[0]).map(|i| i.name.clone())).unwrap_or_default();
+        self.edit_insert(&format!("Place : {name}"), cx, |_| {});
+        self.selected.retain(|s| !ids.contains(s));
+        if !self.insert_open {
+            self.end_insert_step(cx);
+        }
+        self.refresh_scene(false, cx);
+        cx.notify();
     }
 
     fn finish_placing(&mut self, commit: bool, window: &mut Window, cx: &mut Context<Self>) {
@@ -7424,8 +7440,7 @@ impl AssemblyView {
             self.update_capture(cx);
             cx.notify();
         } else if self.ui.np_driver.is_some() {
-            self.ui.np_driver = None;
-            cx.notify();
+            self.close_np_driver(cx);
         } else if self.ui.ps_in_context.is_some() || self.ui.ref_manager.is_some() {
             self.ui.ps_in_context = None;
             self.ui.ref_manager = None;
