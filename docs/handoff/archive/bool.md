@@ -3,6 +3,43 @@
 Dated notes moved out of docs/handoff/bool.md on 11-15 (lead: handoffs are current state only). Newest first;
 nobody reads this by default. bool2's section is in docs/handoff/archive/bool2.md (bool2 moved it).
 
+## 11-19 13:35 (moved from the handoff)
+- Spur-gear P0 closed (lead 11-19): the fold fix 373dd5b9, qa 1.03x v0.4.58 (+99 ms; 1.28 before); ships v0.4.60.
+- LEAD 11-19 05:4x: 129100d95 (the unify's tolerant-edge room; cf-surface-pattern 386 -> 385 edges, live 387) out
+  of the stack, parked with 846db3d0c (branch bool-stack3-with-usd keeps it); land the rest. Speed: land if the
+  alternating A/B shows load only; else find the commit. Shell slabs: see shfall below.
+- bool-stack6 (bool-hat, 35 commits on main 0bfc1ed03, tip fb1269481) = bool-stack3 rebased on bool2's 0bfc1ed03
+  without: 129100d95 + 549c433cb (tolerant-edge room; lead), the unify's pieces_within merge (dock B Govde after Rib
+  Round 1 85 -> 83 faces, no live capture; NOSHAPE_BOOL_KEEP_STRIPS showed it isn't the strips), my line-commons commit
+  (bool2's 4b68bdb0b supersedes it), offset_grazes_a_circle (086d69a12 + dcd7121b6: bool2's crest fix takes fan-blade).
+  With: 85957b9a9's fix (a thread turn's seam rulings stay where `right` put them: the nut T1). Kernel 516 + brep pass
+  (Mac). Older branches kept: bool-stack3, bool-stack3-with-usd, bool-stack4, bool-stack5. Before land, on fb1269481:
+  - GATE unit bool-gate-fb1269481b (vibex7, 08:41; vibex8's slot queue held it 1.5 h) -> chain-fb1269481.out.
+  - private docs: all SAME (hats 8 / 15 / 15b, dock A-E2) -> /root/bool-hat-scratch/udoc-fb1269481.out.
+  - A/B: /root/bool-scratch/ab-doc.sh 5 <docs> on the gate's host with its binaries, via its slot, as a systemd
+    unit holding the ssh.
+  Clean -> land bool-stack6 (diff --stat; bool-hat's traces: /root/bool-scratch/wip-1119-0640.diff, retol hook
+  /root/bool-scratch/retol-slabs-hook.diff, probes /root/bool-scratch/probes/xprobe.rs; never commit them). On land:
+  tell dx / core / blend / asm / bool2 (bool2-sheets rebases on it). Dock tools: /root/bool-scratch/udoc-bisect.sh
+  (rollback bisect over a tab's features), /root/bool-hat-scratch/udoc-br-only.sh, udoc-abh.sh.
+- New on bool-stack3 (Mac all-corpora A/B each, vs the commit below it; only these cases changed, 0 differ):
+  7663bee14 a cylinder face's angles from curves going out and back (bool-corpus 34b7e564 / 76c804e8 / 8658a028:
+  ours); 191e83607 one whole sphere / torus face's shell by its face's normal (corpus2-6 6cf25eee / a3bfaa87 /
+  adeba320: ours). Mac binaries ~/noshape-host/bool-keep/bin/{cyl,sph}, replays replay-{cyl,sph}.
+- Shared shape (lead 11-19 04:2x): bool2's; the stack's e9b6efecc / 8a9351e4b take 46 of the 74, bool2 rebases on it.
+- bool-stack3 (bool-hat, 37 commits on main): the old bool-shared2 stack without the two reorder commits (87df02e54
+  local after ours, bf73854d9 on_face / through_holes after ours: same geometry, slower (on_face 2.2 vs ours 19.5 ms),
+  history differs from the recorded direct builds; lead 02:20 agreed to drop them) and without bb10c3fe5 (main has an
+  offset-fit cache already); the wire-clip layers (lies_on, narrow strip, coaxial cylinders, seam arc, cylinder other
+  points, fuse strip covered: wire-clip Boolean 2 6f38f ours, 945/2879 vs OCCT 946/2880; live has no sliver face
+  (live/bool/wire-clip-sliver.txt), exception in the wire-clip corpus's `live` file on vibex7 + vibex8
+  (~/agents/bool-corpora/wire-clip, local copy /root/bool-scratch/wire-clip), corpus added to gate-host.py REPLAY;
+  then flag live's 884/2405 vs our 945 faces to core); and 5 decline fixes, all = OCCT: ±π vertex directions
+  (arrange.rs; corpus2 553beda0 in 6 corpora, corpus5 6a8804ab, 4 shfall), cone apex places within tol (corpus4
+  e72bf433), line commons past distant B-spline edges / faces (16 bool-corpus), plane vs curved sheets' common empty
+  (11 bool-corpus), cylinder bound side (97ed541ac). bool-wireclip / bool-shared2 are superseded by it.
+  The failed vibex7 gate of a6a83073f (the old stack): /root/bool-tube-scratch/gate-a6a83073f.log.
+
 ## bool, 11-15 18:42 UTC (the last appended state before the restructure)
 - Landed 4cf7abde: split by edges on faces, line projections, exact boxes once a Boolean.
 - Gating 41c844b78 (worktree bool-split, branch bool-torus-shell, vibe5): torus_sections (was plane_torus_sections:
