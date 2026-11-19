@@ -200,13 +200,13 @@ R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "I
   live (1-4 mm off ours); live's dialog views gain empty labels after property edits (dx1684 vs dx1644, which edit
   unknown).
 - Waiting: live's meshparts-1119 (c2-duct-multipart 3MF / OBJ imports).
+- Spindle tori (08:1x): RevolutionToElementary makes them tori with their pcurves mapped exactly (v shifted or
+  mirrored); snap-hook live.igs 128/300/184 for live's 128/310/202 (live's own IGES splits edges past its model's
+  284/160). Suite run exs-all4 (Mac dx-keep): only that row changed; clamp-guillem LINE 265/268 (Top hiding + Iso piece,
+  known), sm-louver Right / Iso entity counts equal to live's.
 - DXF rows (lead 23:0x), exchange suite drawings: landed through 8a74d626 (archive 11-18 22:3x). Open: live splits
   each mesh silhouette loop into ~4 open LWPOLYLINEs (rule unknown); live's 2 hex Iso ELLIPSEs (B-rep hole rim quarters
   inside the mesh hole, ours hidden); live's Iso centre varies by part (rule unknown). Tools /root/dx-scratch/bin/dxf*.py.
-- Inspection list (live inspection-list-1118): a part row's Export… Format "Inspection list" (last, after STL), note
-  row, CSV with BOM / quoted / CRLF, rows = Model definitions characteristics; ops export_parts format "Inspection
-  list" needs `parts`; feature params take `<param>__tolerance` {type, upper, lower, precision} (null clears) when
-  tolerant; e2e a_parts_inspection_list_is_its_characteristics.
 - config-parts at live's 18:0x retake: 4/6 to the end (143/156); nuts Sweep 1: core; pulleys Circular pattern 1:
   core's 06ecaff5a (refs are live's); standoffs Threads=true time: bool2 (profile vibex8
   ~/agents/dx-keep/stoff-prof.log).

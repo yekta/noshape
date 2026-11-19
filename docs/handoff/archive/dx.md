@@ -3596,3 +3596,7 @@ Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live i
   Open document (file kept in CAD Imports); Export dialog keys test (focus on the dialog, Esc, Enter in File name).
   Assembly export (live2 asm-export-1150): queued 15790a91: written off the UI thread (app-core export_store, the
   Part Studio's too), bubble 5 s (was 4); format list / PARASOLID default already live's.
+- Inspection list (live inspection-list-1118): a part row's Export… Format "Inspection list" (last, after STL), note
+  row, CSV with BOM / quoted / CRLF, rows = Model definitions characteristics; ops export_parts format "Inspection
+  list" needs `parts`; feature params take `<param>__tolerance` {type, upper, lower, precision} (null clears) when
+  tolerant; e2e a_parts_inspection_list_is_its_characteristics.
