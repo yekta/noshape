@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 03:50)
+# QA handoff (agent qa; current state only, updated 2026-11-19 07:40)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -62,6 +62,21 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - **v0.4.57** published check done 11-17 21:44: clean, baseline 0.4.57. Next: the 05:00 cut (qa-cut-0415).
 
 ## Next (in this order)
+00b. **Night order (lead 11-19 03:45)**: qa-night-seq-1120 (flow/night-seq.sh latest 1120): 02:00 big document -> session replay ->
+   everyday flows, then nightly/flows-done-<mmdd>; qa-w7-nightly waits for that flag (03:20 at the latest) before hat15 / dock;
+   user flows after NIGHTLY-DONE. Re-arm each night with the next date. Cut verdict: a must-carry still queued reads PENDING
+   at :15 and HOLD only if missing at :50 (timers qa-cut-0450 / 1650). qa-big-after fetches tonight's big run and fixes its fetch line.
+00. **11-19 07:40 state.** v0.4.60 cut GO (fafc4a25, 04:42); cherry-picks c6b003415 + 5e04baac1 OK'd. Spur gear verified 07:28 (vibe2,
+   7 alternating: 1.03x v0.4.58; speed/sg-ab-vibe2.sh, ab-feat2.py from bin/). Pending: qa-dx-prewarm (heavy/dx-prewarm.sh): when dx's
+   f1e0c74e lands (by subject), release apps of it + parent on vibex7, asm-xdev-subs first tab x3 alternating on local :154 -> P0 to psui +
+   dx if >= 20 % and >= 100 ms slower. Session replays (vibe2, ~/tmp/qa/uip.lock serialises runners: the saved copy is the newest
+   /tmp/noshape-uip-*): session-1118 = live 04:23; session-sm-1119 (smsess/: mksm.py, smsess.sh; CLI fills Relief / Configure features /
+   cells) = live geometry, skasm's bends + flat fixed 07:35; session-drw-1119 (drwsess/: d2.py, drw.sh, start drw-1119 in its starts.json)
+   = live, open ≠: DXF LINE/MTEXT counts (dx), new assembly drawing tab place (studios asked live). Kept: vibe2 ~/agents/qa-keep/session-*.
+   Studios "to verify" feel tickets all [x] incl. DRW-TOOLBAR-TOOLTIP-DELAY (live2 retake). Owed on studios 166b521c's green: asm session
+   BOM / callout, studio session Tab / Checkbox dialog / merge+restore with B1 open. Core told: c2-surf-workshop cpcurves Thicken 1 Ok ->
+   Warning, Split 6 / mutualtrim Fillet 1 messages (corpus, compat ALERT 814b48d8 / daa1bebd). cut-check: green re-read under the lock,
+   30 min cap then the newest finished check (named in the line).
 00b. **Night order (lead 11-19 03:45)**: qa-night-seq-1120 (flow/night-seq.sh latest 1120): 02:00 big document -> session replay ->
    everyday flows, then nightly/flows-done-<mmdd>; qa-w7-nightly waits for that flag (03:20 at the latest) before hat15 / dock;
    user flows after NIGHTLY-DONE. Re-arm each night with the next date. Cut verdict: a must-carry still queued reads PENDING
