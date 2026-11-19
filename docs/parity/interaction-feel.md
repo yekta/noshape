@@ -911,7 +911,7 @@ Block 40 × 30 × 10 plus a Front sketch (10 × 10 rectangle at x 60, a line at 
 | Typing during Extrude's arrow drag (button held) | Depth (28.3 mm, selected) takes the typed "40"; further drag moves no longer change it; release keeps 40, Enter "40 mm" (m1-*.png) | the typed 40 is overwritten by the next drag move (29.6 mm) and the release keeps 29.6 (om1-fields.png) | = (fixed psui 11-19: typed over, the drag stops writing; dialogs matrix "manipulators / typing during the arrow's drag wins over later moves") |
 | Arrow reach, step, no snap to geometry, click flips (Extrude); Fillet's handle | as the Dialogs matrix rows (live manip-feel-1118 / manip-1118b); the same 28.3 mm at the same 30 px drag here | the same | = |
 | Instance count "1+2" / "1" / Distance "1 in" | "1+2" kept while focused, "3" after blur; "1" accepted; "1 in" → "25.4 mm" | the same | = |
-| Instance count "2.5" | pink rgb(249,235,236), title red, ✓ disabled; tooltip "Enter a valid expression." (x1-p25.png) | the same: pink rgb(249,235,236), title red, ✓ disabled, tooltip "Enter a valid expression."; "1 + 2" still accepted (retaken 11-19 07:3x on green daa1bebd1, rt-p25-e.png / rt-p25-tip.png; was accepted with no error) | = (fixed core 24792169) |
+| Instance count "2.5" | pink rgb(249,235,236), title red, ✓ disabled; tooltip "Enter a valid expression." (x1-p25.png) | the same: pink rgb(249,235,236), title red, ✓ disabled, tooltip "Enter a valid expression."; "1 + 2" still accepted (retaken 11-19 07:06 on green daa1bebd1, rt-p25-e.png / rt-p25-tip.png; was accepted with no error) | = (fixed core 24792169) |
 | Shell thickness "1 in" / "-2" / "20" (block 10 mm) | "25.4 mm"; "-2 mm" pink, title red, ✓ off; 20 mm: title red, the part red see-through with red edges, the entry red | the same (osb.png) | = |
 | Two Enters in the same instant after typing Depth (preview pending) | the first takes the value, the second is dropped: the dialog stays, "40 mm" selected; from a 150 ms gap the second commits | commits at once | = (fixed psui 11-19: an Enter within 100 ms of the applying one is dropped; `enter_applies_then_the_next_enter_accepts`) |
 | ✓ clicked right after typing (no Enter) | applies 40 mm, the dialog stays; Enter then ✓ (0–1500 ms) commits | the same | = |
@@ -1011,7 +1011,7 @@ each display from the input (the same recorder for both). Evidence live/feel/doc
 | Create version… (left strip, second icon) | "Create version from Main": Name "V2" focused and selected, Description (Maximum of 10000 characters), the merging note, Create / Create version and edit properties / Cancel; 575 ms, settled 1.0 s | the same dialog and focus; 147 / 364 ms | = (faster) |
 | …Create | the V2 row in the panel at 1.9 s | 133 ms | = (faster) |
 
-### nav-feel-1119 (P0, viewport menus and looks with nothing selected, live2 11-19 07:00–07:20) [psui]
+### nav-feel-1119 (P0, viewport menus and looks with nothing selected, live2 11-19 07:00–07:06) [psui]
 
 Live on lane 2 (a 40 × 30 × 20 block with Sketch 2, one line on Top, shown; iso, planes hidden, F); ours green daa1bebd1 on :125 with
 the same model by CLI and the same view (the pictures agree to the pixel). Already in rows above, not retaken: orbit (3 turns a
