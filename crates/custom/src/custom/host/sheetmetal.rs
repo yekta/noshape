@@ -2584,11 +2584,14 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 // A face this rebuild exposes for the first time (on no face of the part before) is the one its
                 // definition wall or bend's creator made (live sm-box: Flange 2's relief bares a face of Flange 1's
                 // bend, qCreatedBy Flange 1, last modified by Flange 2).
+                // Only beside a face of the same source the part had before (a source rebuilt whole, a bend's new
+                // radius, is this feature's: its Modify joint is found by them, ops `bend_joint_edit`).
                 if let Some(Some(_)) = before.get(k)
                     && let Some(db) = ev.ctx.bodies.iter().find(|b| b.id == def.body)
                 {
+                    let kept: Vec<&Def> = p.sources.0.iter().enumerate().filter(|(fi, _)| p.names.get(*fi) != fresh_names.get(*fi)).map(|(_, d)| d).collect();
                     for (fi, n) in p.names.iter_mut().enumerate() {
-                        let Some(src) = p.sources.0.get(fi).filter(|_| *n == fresh_names[fi]) else { continue };
+                        let Some(src) = p.sources.0.get(fi).filter(|d| *n == fresh_names[fi] && kept.contains(d)) else { continue };
                         let Some(c) = definition_creator(db, src, &order).filter(|c| *c != studio_feature) else { continue };
                         *n = Arc::new(crate::reference::TopoName::face(c, crate::reference::Role::Generated(n.clone())));
                     }
