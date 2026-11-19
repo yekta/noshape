@@ -4763,6 +4763,40 @@ fn frames_for(cx: &mut TestAppContext, window: AnyWindowHandle, ms: u64) {
     }
 }
 
+/// TICKETS P0 HEAVY-ASM-SOFTWARE-FRAME (1): a window redraw that changes nothing in the 3D view asks for no GPU frame (on
+/// a software renderer a big assembly's frame took ~47 s): the studio re-rendered, the pointer resting on a list button
+/// for its tooltip, then over the feature list's empty end.
+#[gpui::test]
+fn ui_only_redraws_submit_no_3d_frame(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "ui-only-frames");
+    frames_for(cx, window, 300);
+    let submitted = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).viewport.read(cx).frames_requested());
+    let before = submitted(cx);
+    let mut after = Vec::new();
+    for _ in 0..5 {
+        view.update(cx, |_, cx| cx.notify());
+        draw(cx, window);
+    }
+    after.push(submitted(cx));
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let button = vcx.debug_bounds("button:New folder").expect("the New folder button").center();
+    let list = vcx.debug_bounds("feature-list").expect("the feature list");
+    vcx.simulate_event(gpui_kit::MouseMoveEvent { position: button, pressed_button: None, modifiers: Modifiers::default() });
+    frames_for(cx, window, 600);
+    after.push(submitted(cx));
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_event(gpui_kit::MouseMoveEvent { position: gpui_kit::point(list.center().x, list.bottom() - px(4.)), pressed_button: None, modifiers: Modifiers::default() });
+    frames_for(cx, window, 300);
+    after.push(submitted(cx));
+    // A real change still asks: the top face selected.
+    view.update(cx, |v, cx| {
+        v.selection = vec![top];
+        v.refresh_scene(false, cx);
+    });
+    after.push(submitted(cx));
+    assert_eq!((&after[..3], after[3] > before), (&vec![before; 3][..], true), "frames asked for after: 5 re-renders, the button's tooltip, the list's empty end; a face selected (before: {before})");
+}
+
 /// User P1 (11-05): a new part's dialog whose preview is slow (its regeneration not in when Esc comes, then held in a
 /// kernel step that doesn't stop), cancelled: the parts list shows the model before the dialog and the spinner is off
 /// at once and while the cancelled work still runs, and both stay so once it ends.

@@ -104,6 +104,7 @@ pub struct RenderWorker {
     tx: mpsc::Sender<Msg>,
     uploader: Uploader,
     adapter: String,
+    software: bool,
     frames_in_flight: usize,
 }
 
@@ -119,6 +120,7 @@ impl RenderWorker {
     pub fn spawn_with(mut renderer: Renderer, on_done: impl Fn(Completed) + Send + 'static) -> Self {
         let uploader = renderer.uploader();
         let adapter = renderer.adapter_name();
+        let software = renderer.is_software();
         let frames_in_flight = renderer.frames_in_flight();
         let (tx, rx) = mpsc::channel::<Msg>();
         std::thread::Builder::new()
@@ -254,7 +256,7 @@ impl RenderWorker {
                 }
             })
             .expect("spawn render thread");
-        Self { tx, uploader, adapter, frames_in_flight }
+        Self { tx, uploader, adapter, software, frames_in_flight }
     }
 
     pub fn submit(&self, job: RenderJob) {
@@ -298,6 +300,11 @@ impl RenderWorker {
 
     pub fn adapter_name(&self) -> &str {
         &self.adapter
+    }
+
+    /// [`Renderer::is_software`].
+    pub fn is_software(&self) -> bool {
+        self.software
     }
 
     /// Frames a target may have in flight (submitting more only queues them).

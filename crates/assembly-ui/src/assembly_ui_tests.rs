@@ -503,6 +503,54 @@ fn draw(cx: &mut TestAppContext, window: AnyWindowHandle) {
     cx.run_until_parked();
 }
 
+/// TICKETS P0 HEAVY-ASM-SOFTWARE-FRAME (1): a refresh that changes nothing asks for no 3D frame, though it builds the
+/// mate glyphs anew (they were compared by pointer: every refresh of an assembly with mates drew a frame, ~47 s each
+/// on a software renderer for a big one).
+#[gpui::test]
+fn a_refresh_with_the_same_mate_glyphs_submits_no_frame(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "same-glyphs");
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let (a, b) = (face_connector(v, "Part 1 <1>", true, cx), face_connector(v, "Part 2 <1>", false, cx));
+            v.edit("Insert : mates", cx, |asm| {
+                asm.mates.push(noshape_model::assembly::Mate::new(noshape_model::assembly::MateId(901), "Fastened 1".into(), MateType::Fastened, a, b));
+            });
+        })
+    })
+    .unwrap();
+    // Frames come back from the render thread in real time.
+    let frames_for = |cx: &mut TestAppContext, ms: u64| {
+        let t = std::time::Instant::now();
+        while t.elapsed() < std::time::Duration::from_millis(ms) {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            cx.executor().advance_clock(std::time::Duration::from_millis(20));
+            draw(cx, window);
+        }
+    };
+    frames_for(cx, 600);
+    // Its glyph drawn: the mate selected.
+    view.update(cx, |v, cx| {
+        v.selected_mate = Some(noshape_model::assembly::MateId(901));
+        v.refresh_scene(false, cx);
+    });
+    frames_for(cx, 400);
+    // What each refresh itself asks for (other work landing meanwhile on a loaded host doesn't count).
+    let refresh = |cx: &mut TestAppContext, mate: Option<noshape_model::assembly::MateId>| {
+        let asked = view.update(cx, |v, cx| {
+            let before = v.viewport.read(cx).frames_requested();
+            v.selected_mate = mate;
+            v.refresh_scene(false, cx);
+            v.viewport.read(cx).frames_requested() - before
+        });
+        frames_for(cx, 60);
+        asked
+    };
+    let same: Vec<u64> = (0..5).map(|_| refresh(cx, Some(noshape_model::assembly::MateId(901)))).collect();
+    // A real change still draws: the mate no longer selected.
+    let deselected = refresh(cx, None);
+    assert_eq!((same, deselected > 0), (vec![0; 5], true), "(frames each of 5 unchanged refreshes asked for, one for the deselection)");
+}
+
 /// live2 2241: Hide mates on mates already hidden is an undo step of its own: one Undo takes it back and changes
 /// nothing (the hide before it stays), and Redo is offered.
 #[gpui::test]

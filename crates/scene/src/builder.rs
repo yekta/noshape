@@ -1917,6 +1917,10 @@ const MC_RIM_REST: [u8; 4] = [40, 44, 46, 255];
 const MC_RIM_LIT: [u8; 4] = [0, 40, 71, 255];
 
 impl noshape_render::camera_geometry::CameraGeometry for ConnectorGlyphs {
+    fn key(&self) -> Option<u64> {
+        Some(noshape_render::camera_geometry::key_of("ConnectorGlyphs", &(&self.items, &self.picks)))
+    }
+
     /// Live 1701: a glyph is in the scene bounds the zoom limits use: the
     /// disc ±18 px, the triad's arms out to +33 px in x / y and +23 px in z,
     /// at the pixel size at its origin.
@@ -2085,6 +2089,10 @@ impl InferenceMarks {
 }
 
 impl noshape_render::camera_geometry::CameraGeometry for InferenceMarks {
+    fn key(&self) -> Option<u64> {
+        Some(noshape_render::camera_geometry::key_of("InferenceMarks", &(&self.marks, &self.glyph.items, &self.glyph.picks)))
+    }
+
     fn build(&self, view: &noshape_render::camera_geometry::View, up: &Uploader) -> Vec<Instance> {
         let mut out = noshape_render::camera_geometry::CameraGeometry::build(&self.glyph, view, up);
         if self.marks.is_empty() {

@@ -725,6 +725,9 @@ pub struct Style {
     pub detail: Detail,
     /// A hovered or selected line's width in CSS px (drawings: live's 2 px solid + antialiasing); 0: the 3D band.
     pub lit_line_px: f32,
+    /// A software rasteriser draws it (llvmpipe, WARP, SwiftShader): 1× MSAA and each body at its coarsest display
+    /// level (TICKETS P0 HEAVY-ASM-SOFTWARE-FRAME: a big assembly's frame took ~47 s at 4× and the finest levels).
+    pub software: bool,
 }
 
 /// Graphics Onshape drops while the camera moves too slowly (webgl
@@ -883,6 +886,7 @@ impl Default for Style {
             detail: Detail::default(),
             msaa: 4,
             lit_line_px: 0.0,
+            software: false,
         }
     }
 }
@@ -1029,8 +1033,8 @@ impl Scene {
             && self.instances.iter().zip(&other.instances).all(|(a, b)| {
                 let same_drawable = match (&a.drawable, &b.drawable) {
                     (Drawable::Mesh(x), Drawable::Mesh(y)) => Arc::ptr_eq(&x.0, &y.0),
-                    (Drawable::Lines(x), Drawable::Lines(y)) => Arc::ptr_eq(&x.0, &y.0),
-                    (Drawable::Points(x), Drawable::Points(y)) => Arc::ptr_eq(&x.0, &y.0),
+                    (Drawable::Lines(x), Drawable::Lines(y)) => Arc::ptr_eq(&x.0, &y.0) || (x.0.content != 0 && x.0.content == y.0.content && x.0.count == y.0.count && x.0.silhouette == y.0.silhouette),
+                    (Drawable::Points(x), Drawable::Points(y)) => Arc::ptr_eq(&x.0, &y.0) || (x.0.content != 0 && x.0.content == y.0.content && x.0.count == y.0.count),
                     (Drawable::Image(x), Drawable::Image(y)) => Arc::ptr_eq(&x.0, &y.0),
                     _ => false,
                 };
@@ -1091,10 +1095,23 @@ pub fn keep_content_keys(on: bool) {
 
 /// The hash of an upload's data under [`keep_content_keys`] (else 0).
 pub(crate) fn content_key(parts: &[&[u8]]) -> u64 {
-    use std::hash::{Hash, Hasher};
     if !CONTENT_KEYS.load(std::sync::atomic::Ordering::Relaxed) {
         return 0;
     }
+    hash_parts(parts)
+}
+
+/// [`content_key`], always for an overlay's few lines or points (at most [`SMALL_UPLOAD`] of them): a refresh that
+/// uploads them again unchanged is then the same scene ([`Scene::same_as`]), not a new frame.
+pub(crate) fn small_content_key(parts: &[&[u8]], items: usize) -> u64 {
+    if items <= SMALL_UPLOAD { hash_parts(parts) } else { content_key(parts) }
+}
+
+/// See [`small_content_key`].
+const SMALL_UPLOAD: usize = 4096;
+
+fn hash_parts(parts: &[&[u8]]) -> u64 {
+    use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
     for p in parts {
         p.hash(&mut h);

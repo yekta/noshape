@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-19 07:50 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-19 08:28 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -35,26 +35,29 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (updated 07:50 UTC 11-19)
+## Now (updated 08:28 UTC 11-19)
 
-1. Landed tonight: 1dd4033be, 373dd5b9, 36c58917 (edge 5/7 px), 24792169 (feature-dialogs-1119), 16297c80 (coplanar
-   depth rank), test batches. Queued: c9379de5 (+1dfda2a83, config tests), 04edd2ba (lead P0, alone: the depth rank's
-   step adds 1/32 px of the face's depth slope (`depth_step_px`, shaders.wgsl) and float-depth faces push by
-   `face_push` (override constant) instead of the bias constant; Metal reproduced CI's (14, 14) on the Mac, 0/49 after;
-   test covers perspective, ortho, near grazing). DX12 unverified locally: watch the next CI run.
-2. Queued as one land (list-1119 / nav-feel-1119 / tools-1119 rows to =):
-   - list-1119: `ROW_DRAG_PX` 5.8; no ⚠ under a suppressed dependency (`missing_selections`); a fresh folder clicked
-     keeps its features selected (`select_folder`) so its menu is the selection's with Hide other / all sketches
-     (live p6); list rows' side tooltip beside the list (`with_list_row_tooltip`, anchor reaches past the 5 px inset).
-   - nav-feel-1119: Where used icon (+ `OsMenu::named_icon`, test where_used_has_its_icon); anchored flip (vendor);
-     free line ends 4 px; Parts eye not added while its menu is open (run49 ≠, now `.when(!menu_open)`); line vs
-     midpoint menus (test a_sketch_lines_menu_and_its_midpoints).
-   - tools-1119 (live 07:5x): a part's appearance editor draws the part outlined, untinted
-     (`Highlighting::untinted_parts`, refresh on open), a swatch recolours the display at once (Arc::make_mut +
-     rebuild_scene), ✓/✕ clear a part's selection (a3-cancelled); dialogs row "Appearance / the part outlined…".
-   - live recheck 11-19: Shift+C in a sketch takes the selected curves only (else all); test
-     curve_analysis_in_a_sketch_takes_the_selected_line_only.
-   run51 green (part-studio-ui 293, scene 179, app-core 112, clippy clean); queued as one land (see --status).
+1. Queued: 04edd2ba (lead P0 coplanar on Metal/D3D12, alone), 56e21c9e (list-1119 / nav-feel-1119 / tools-1119 rows +
+   Shift+C), two docs-only duplicate-row cleanups on top. DX12 for 04edd2ba: watch the next CI run.
+2. IN THE WORKTREE: TICKETS P0 HEAVY-ASM-SOFTWARE-FRAME, renderer side (lead 08:1x; split with asm: asm owns the LOD
+   meshes / load path, psui crates/render + viewport scheduling):
+   (1) no 3D frame for a refresh that changes nothing: `CameraGeometry::key` (content hash, `key_of`) on ScreenTriads,
+       MateGlyphs, ConnectorGlyphs, InferenceMarks; `Viewport::set_camera_geometry` compares keys (was Arc pointers:
+       every assembly refresh with a mate glyph shown drew a frame); and small line / point uploads (≤ 4096) always
+       carry their content hash (`small_content_key`), which `Scene::same_as` compares (asm's overlay lines / connector
+       dots were uploaded anew each refresh: a new scene each time). Tests count `Viewport::frames_requested` (UI tests'
+       Gpu::headless never returns frames, so submits stop at 1): assembly-ui
+       a_refresh_with_the_same_mate_glyphs_submits_no_frame (5 refreshes: 0 requests; pointer compare 5; neither 10),
+       part-studio-ui ui_only_redraws_submit_no_3d_frame (+ a face selected does request). UI tests run on the noop
+       adapter (not Cpu): the software path is covered by the render tests only.
+   (2) `Style::software` (set by the viewport from `Gpu::is_software` = adapter DeviceType::Cpu; print keeps full):
+       1× MSAA (`msaa_of`) and each body at its coarsest display level (DrawLists.coarsest). asm-xdev-subs: finest
+       2.1 M triangles, Coarse 462 k (asm). Tests: render a_software_rasteriser_draws_each_body_at_its_coarsest_level,
+       lib a_software_rasteriser_draws_without_msaa. Render tests keep Style::default (software false): real-GPU
+       look unchanged.
+   Next: run52 (/root/psui-scratch/run52.sh), then measure: release app on Xvfb with asm-xdev-subs (copy of vibex8
+   ~/agents/asm-keep/qa-save/asm-xdev-subs.noshape; qa's /root/qa-scratch/heavy/hvs.sh), before/after frame time and
+   frames per view change; tell asm the llvmpipe frame time (asm adds a level below Coarse if still too heavy).
 3. After: dx's prewarm on scoped threads (f1e0c74e): once landed, check the big-assembly first open isn't slower
    (asm-xdev-subs cold open, ~4 s on vibe2 after 1dd4033be); qa times it too. Never block a rayon worker on a thread
    that needs rayon.

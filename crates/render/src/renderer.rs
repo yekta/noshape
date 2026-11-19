@@ -771,6 +771,8 @@ struct DrawLists {
     /// The frame's [`Detail::mesh_error_px`] (every pass: picks follow the
     /// levels shown).
     mesh_error_px: f32,
+    /// Every body at its coarsest level ([`Style::software`]).
+    coarsest: bool,
 }
 
 /// A body for [`lod_boxes`]: its [`Instance::lod_box`]'s transform (the
@@ -1020,6 +1022,10 @@ impl DrawLists {
                     continue;
                 }
                 let (from, to) = (b.levels.trailing_zeros() as u8, 7 - b.levels.leading_zeros() as u8);
+                if self.coarsest {
+                    self.mesh_levels.push(from);
+                    continue;
+                }
                 let mut level = mesh_lod_level(self.diagonal_px[i] * 0.5, self.mesh_error_px, from, to);
                 let shown = memory.entry((b.coarse_mesh, i as u32 + 1)).or_insert(from);
                 level = level.max(*shown).min(to);
@@ -1517,6 +1523,9 @@ fn perf_overrides() -> &'static PerfOverrides {
 }
 
 fn msaa_of(style: &Style) -> u32 {
+    if style.software && perf_overrides().msaa.is_none() {
+        return 1;
+    }
     match perf_overrides().msaa.unwrap_or(style.msaa) {
         0 | 1 => 1,
         2 => 2,
@@ -2754,6 +2763,11 @@ impl Renderer {
         &self.device
     }
 
+    /// The adapter is a software rasteriser (llvmpipe, lavapipe, WARP, SwiftShader): see [`Style::software`].
+    pub fn is_software(&self) -> bool {
+        self.adapter_info.device_type == wgpu::DeviceType::Cpu
+    }
+
     pub fn adapter_name(&self) -> String {
         format!("{} ({:?})", self.adapter_info.name, self.adapter_info.backend)
     }
@@ -3219,6 +3233,7 @@ impl Renderer {
         };
         lists.lod = Some(req.style.detail);
         lists.mesh_error_px = req.style.detail.mesh_error_px;
+        lists.coarsest = req.style.software;
         lists.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), (width, height, dpr), false, &mut self.mesh_lod_memory);
         lists.apply_detail(&req.style.detail);
         let bind_inst = self.prepare_slots(SLOTS_COLOR, &lists.slots);
@@ -3233,6 +3248,7 @@ impl Renderer {
             over.skip_post = !comparing;
             over.lod = Some(req.style.detail);
             over.mesh_error_px = req.style.detail.mesh_error_px;
+            over.coarsest = req.style.software;
             over.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), (width, height, dpr), false, &mut self.mesh_lod_memory);
             over.apply_detail(&req.style.detail);
             let bind_over = self.prepare_slots(SLOTS_COMPARE_OVER, &over.slots);
@@ -3247,6 +3263,7 @@ impl Renderer {
             post.only_post = true;
             post.lod = Some(req.style.detail);
             post.mesh_error_px = req.style.detail.mesh_error_px;
+            post.coarsest = req.style.software;
             post.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), (width, height, dpr), false, &mut self.mesh_lod_memory);
             post.apply_detail(&req.style.detail);
             let bind = self.prepare_slots(SLOTS_PREVIEW_POST, &post.slots);
@@ -3676,6 +3693,7 @@ impl Renderer {
             self.queue.write_buffer(&self.globals_pick, 0, bytemuck::bytes_of(&globals));
             let mut lists = std::mem::take(&mut self.lists);
             lists.mesh_error_px = last.style.detail.mesh_error_px;
+            lists.coarsest = last.style.software;
             // A feature preview picks the model with the feature: the frame's
             // list leaves that out (it draws the model before), and the
             // unpickable base copy would hide every pick behind it.
@@ -3805,7 +3823,7 @@ impl Renderer {
         globals.viewport[3] = PICK_PASS;
         self.queue.write_buffer(&self.globals_sample, 0, bytemuck::bytes_of(&globals));
         let view_proj = Mat4::from_cols_array_2d(&globals.view_proj);
-        let mut lists = DrawLists { mesh_error_px: last.style.detail.mesh_error_px, ..Default::default() };
+        let mut lists = DrawLists { mesh_error_px: last.style.detail.mesh_error_px, coarsest: last.style.software, ..Default::default() };
         lists.build(&last.scene, &view_proj, (sw, sh, dpr), true, &mut self.mesh_lod_memory);
         let bind_inst = self.prepare_slots(SLOTS_SAMPLE, &lists.slots);
         let tex = |label, format| {
@@ -4368,7 +4386,7 @@ impl Uploader {
             },
             usage: wgpu::BufferUsages::VERTEX,
         });
-        let content = crate::scene::content_key(&[bytemuck::cast_slice(&lines.segments)]);
+        let content = crate::scene::small_content_key(&[bytemuck::cast_slice(&lines.segments)], lines.segments.len());
         LinesHandle(Arc::new(GpuLines { buffer, count: lines.segments.len() as u32, bounds: lines.bounds(), silhouette: false, content }))
     }
 
@@ -4402,7 +4420,7 @@ impl Uploader {
             }
             (!points.points.is_empty()).then_some((lo, hi))
         };
-        let content = crate::scene::content_key(&[bytemuck::cast_slice(&points.points)]);
+        let content = crate::scene::small_content_key(&[bytemuck::cast_slice(&points.points)], points.points.len());
         PointsHandle(Arc::new(GpuPoints { buffer, count: points.points.len() as u32, bounds, content }))
     }
 }
@@ -4539,6 +4557,11 @@ mod tests {
         assert_eq!(lods.len(), LINE_LOD_TOLERANCES.len() - 1);
         assert!(lods.windows(2).all(|w| w[1].segments.len() <= w[0].segments.len()));
         assert_eq!(lods[2].segments.last().map(|s| s.pick_id), Some(2));
+    }
+
+    #[test]
+    fn a_software_rasteriser_draws_without_msaa() {
+        assert_eq!((msaa_of(&Style::default()), msaa_of(&Style { software: true, ..Style::default() })), (4, 1));
     }
 
     #[test]

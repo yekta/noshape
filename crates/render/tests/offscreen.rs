@@ -3065,6 +3065,43 @@ fn part_edges_carry_lives_ink() {
 /// Live2 asm-dialogs-1119 (ok.png): Part 2's top flush in Part 1's top shows Part 1's face (with Part 2's edges on it);
 /// ours z-fought, Part 2's face winning but for a sliver. The first part's depth rank wins the tie, in the colour pass
 /// and the pick.
+/// TICKETS P0 HEAVY-ASM-SOFTWARE-FRAME (2): a body with Coarse and Medium display levels, ~150 px across at 0.1 px of
+/// error: drawn at Medium, on a software rasteriser (`Style::software`) at Coarse; nothing else of the look changes.
+#[test]
+fn a_software_rasteriser_draws_each_body_at_its_coarsest_level() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (lo, hi) = ([-0.01f32, -0.01, -0.01], [0.01f32, 0.01, 0.01]);
+    let coarse = r.upload_mesh(&primitives::box_mesh(lo, hi, 1));
+    let medium = r.upload_mesh(&primitives::box_mesh(lo, hi, 1));
+    let unit = r.upload_mesh(&lod_box_mesh());
+    let mut scene = Scene::default();
+    for (mesh, level, color) in [(coarse, 1u8, [0.8, 0.1, 0.1, 1.0]), (medium, 2u8, [0.1, 0.8, 0.1, 1.0])] {
+        let mut i = Instance::new(Drawable::Mesh(mesh)).with_color(color).body(1);
+        i.mesh_lod = level;
+        scene.instances.push(i);
+    }
+    scene.instances.push(Instance::lod_box(unit, 1, (glam::Vec3::from(lo), glam::Vec3::from(hi)), [0.1, 0.1, 0.8, 1.0]));
+    let mut cam = Camera { rotation: Camera::look_rotation(glam::DVec3::new(-1.0, 1.0, -1.0).normalize(), glam::DVec3::Z), ..Default::default() };
+    let (w, h) = (400u32, 300u32);
+    cam.fit_box(glam::DVec3::splat(-0.02), glam::DVec3::splat(0.02), w as f64 / h as f64);
+    let mut centre = |software: bool| {
+        let mut style = Style { software, ..Style::default() };
+        style.detail.mesh_error_px = MESH_ERROR_PX_HIGH_QUALITY_STUDIO;
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &style, pick: false }).unwrap();
+        let px = &f.bgra[(((h / 2) * w + w / 2) * 4) as usize..][..4];
+        // (BGRA: green over red is Medium, red over green Coarse.)
+        if px[1] > px[2] { "Medium" } else { "Coarse" }
+    };
+    assert_eq!((centre(false), centre(true)), ("Medium", "Coarse"), "(the body's level drawn, then on a software rasteriser)");
+}
+
 #[test]
 fn coplanar_faces_of_two_parts_go_to_the_first() {
     let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());

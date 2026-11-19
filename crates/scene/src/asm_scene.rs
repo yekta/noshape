@@ -737,6 +737,10 @@ impl ScreenTriads {
 }
 
 impl noshape_render::camera_geometry::CameraGeometry for ScreenTriads {
+    fn key(&self) -> Option<u64> {
+        Some(noshape_render::camera_geometry::key_of("ScreenTriads", &self.items))
+    }
+
     fn build(&self, view: &noshape_render::camera_geometry::View, up: &Uploader) -> Vec<Instance> {
         let (lines, pts) = self.geometry(view);
         if lines.segments.is_empty() {
@@ -928,6 +932,10 @@ impl MateGlyphs {
 }
 
 impl noshape_render::camera_geometry::CameraGeometry for MateGlyphs {
+    fn key(&self) -> Option<u64> {
+        Some(noshape_render::camera_geometry::key_of("MateGlyphs", &self.items))
+    }
+
     fn build(&self, view: &noshape_render::camera_geometry::View, up: &Uploader) -> Vec<Instance> {
         let (lines, points, picks) = self.geometry(view);
         if lines.segments.is_empty() {

@@ -120,6 +120,11 @@ impl Gpu {
         }
     }
 
+    /// The renderer draws on a software rasteriser (known once it is up): frames take [`noshape_render::Style::software`].
+    pub fn is_software(&self) -> bool {
+        self.worker.get().and_then(|w| w.as_ref().ok()).is_some_and(|w| w.0.is_software())
+    }
+
     /// The GPU adapter ("name (Backend)") once the renderer is up.
     pub fn adapter_name(&self) -> Option<String> {
         self.worker.get().and_then(|w| w.as_ref().ok()).map(|w| w.0.adapter_name().to_string())

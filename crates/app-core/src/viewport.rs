@@ -358,6 +358,7 @@ pub struct Viewport {
     bounds: Bounds<Pixels>,
     scale: f32,
     seq: u64,
+    frames_requested: u64,
     last_presented: u64,
     dirty: bool,
     pick_dirty: bool,
@@ -713,6 +714,7 @@ impl Viewport {
             bounds: Bounds::default(),
             scale: 1.0,
             seq: 0,
+            frames_requested: 0,
             last_presented: 0,
             dirty: true,
             pick_dirty: true,
@@ -837,7 +839,7 @@ impl Viewport {
 
     /// What ☰ › Print… renders: the GPU, the scene shown, its camera and style (print_setup).
     pub fn print_source(&self) -> (Gpu, Arc<Scene>, Camera, Style) {
-        (self.gpu.clone(), self.scene.clone(), self.camera, self.style)
+        (self.gpu.clone(), self.scene.clone(), self.camera, noshape_render::Style { software: false, ..self.style })
     }
 
     /// Size of the viewport in logical pixels.
@@ -1007,6 +1009,7 @@ impl Viewport {
 
     pub fn request_frame(&mut self, cx: &mut Context<Self>) {
         self.dirty = true;
+        self.frames_requested += 1;
         if !self.submit_scheduled {
             self.submit_scheduled = true;
             let this = cx.entity().downgrade();
@@ -1502,6 +1505,7 @@ impl Viewport {
         let bg = noshape_scene::palette::background();
         self.style.background_top = bg;
         self.style.background_bottom = bg;
+        self.style.software = self.gpu.is_software();
         // Interactive frames draw what the detail manager leaves in
         // (benchmarks can keep full detail: `NOSHAPE_PERF_DETAIL=full`).
         let style = if interactive && !perf_full_detail() {
@@ -1754,13 +1758,18 @@ impl Viewport {
     /// facing the viewer): built by the render thread for every frame from
     /// that frame's camera, so camera moves need nothing from the UI.
     pub fn set_camera_geometry(&mut self, geometry: Vec<Arc<dyn noshape_render::camera_geometry::CameraGeometry>>, cx: &mut Context<Self>) {
-        let same = self.camera_geometry.len() == geometry.len() && self.camera_geometry.iter().zip(&geometry).all(|(a, b)| Arc::ptr_eq(a, b));
+        let same = self.camera_geometry.len() == geometry.len() && self.camera_geometry.iter().zip(&geometry).all(|(a, b)| Arc::ptr_eq(a, b) || a.key().is_some_and(|k| b.key() == Some(k)));
         if same {
             return;
         }
         self.camera_geometry = geometry.clone();
         self.gpu.set_camera_geometry(self.target_id, geometry);
         self.request_redraw(cx);
+    }
+
+    /// Frames asked for so far (tests: a redraw that changes nothing in the 3D view asks for none).
+    pub fn frames_requested(&self) -> u64 {
+        self.frames_requested
     }
 
     /// Frames presented and frames failed so far (smoke test).

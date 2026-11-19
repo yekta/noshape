@@ -48,4 +48,19 @@ pub trait CameraGeometry: Send + Sync {
     fn zoom_points(&self, _view: &View) -> Vec<DVec3> {
         Vec::new()
     }
+    /// A key of what it draws ([`key_of`]): a viewport given geometry with the keys it has skips the frame (an
+    /// assembly's refresh builds its glyphs anew; on a software renderer each frame of a big one took ~47 s). None:
+    /// only the same object counts as unchanged.
+    fn key(&self) -> Option<u64> {
+        None
+    }
+}
+
+/// [`CameraGeometry::key`] from a type's name and its content's Debug text.
+pub fn key_of(kind: &str, content: &impl std::fmt::Debug) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    kind.hash(&mut h);
+    format!("{content:?}").hash(&mut h);
+    h.finish()
 }
