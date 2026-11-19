@@ -45,7 +45,13 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   .1722 .2519 .3339 .5 .6702 .7504 .8319 not matched by any chord / arc rule (kn.py, kn2.py); mean corner chord gives
   0.17 mm max (sc5), rms chord 0.11 (sc10). WIP (22:40): periodic_seam_derivative + natural_loft(..., periodic=true) for
   closed path lofts (ThruSections iso-parametric unsmoothed first): runs, but the rebuilt solid is INVALID (BRepCheck)
-  -> falls back to OCCT's smoothed one. Next: why invalid (seam edge / side edge curves), then measure (ringsurf).
+  -> falls back to OCCT's smoothed one. FOUND (23:0x, vibex8 ~/tmp/core/pcv r5/ringbad-0.brep vs ringl-iso.brep): OCCT's
+  iso closed loft is valid; after natural_loft each face's closed section edge (the seam: first section = last) has BOTH
+  pcurves at v = 1 (should be v = 0 for one use), so the face wire opens (BRepCheck 28 NotClosed). Look at natural_loft's
+  PCurve carry-over (p.forward / p.reversed of closed edges, ~line 3172 in core-rp) and anything touching section edges
+  before it. Then ringsurf the result.
+- **asm isaac (23:00):** Chamfer 2's state line gone, but Ball 7 / Fastened 33 cannot resolve and Fastened 7/8/9/57/79/88 +
+  Ball 1 still fail: asm sends Chamfer 2's volume line from a traced current-main run (wait for it, then take it).
   PROBE lines `// PROBE` in features.cpp (nl false / ok valid, ring wires, ringloft dump) to strip before landing.
   Tools: vibex8 ~/tmp/core/ringl <wires.brep> ring-live-surf.txt (src core-scratch/brepq/ringl.cpp), .r5.sh. Bar 0.1 mm
   (0.17 would need the lead: decision).
@@ -67,7 +73,7 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   touches (merge scope + seeds) into one sheet (live: one 2-face sheet); singularities 2 -> 5/15, 30-doc subset otherwise
   same (vibex7 ~/tmp/core/glm.log vs glsl.log). T1 features_a::a_surface_mirrored_with_add_joins_its_mirror. Next there:
   Loft with bad singularity (ours errors, live 3425 mm2 sheet).
-- **asm a2e4a2 Chamfer 2 (isaac): DONE** by blend's bb667320d (asm re-ran 22:30: no difference). a2e4a2 left: Chamfer 4
+- **asm a2e4a2 Chamfer 2 (isaac):** blend's bb667320d removed its state difference (see asm isaac 23:00 above). a2e4a2 left: Chamfer 4
   "Failed to chamfer selections." (blend's?), Extrude 15/16 (vibex7 ~/agents/asm-keep/suite/h1119-asm-isaac-ball.out).
 - **welding Extrude 8 body order:** moved to skasm (lead 19:35).
 - **cpcurves Split 3 LANDED 575aba2a4:** a closed profile's surface sweep faces out of its tube (live q-sweep-normals-1119:
