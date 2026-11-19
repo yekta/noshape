@@ -5,7 +5,7 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-19 08:53 UTC)
+## State (2026-11-19 10:14 UTC)
 
 ### Landed 11-19
 - c75f1894 config-assembly BOM (standard content's feature properties), 12/12. 7599cd64 qa session-asm-1119.
@@ -16,19 +16,18 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   (3) QUERY face drops the selection tint, (4) new group's row red, (5)/(7) mate rows span the list + bold flyout
   title, (6) Measure panel at top 279 / right 13. live2 rechecked on green bfe09bcd5: all six hold (0f4633705).
 
-### In flight (branch asm-fs, /root/projects/noshape-wt/asm)
-- 43f8fb59c sketch plane off live's frame -> our face on that frame: bjr 5d8bc1 Sketch 40 + Extrude 21 fixed (bjr now
-  3 differences: 2 custDesc, Washer Face).
-- a93d0a438 qSketchRegion(…, true) leaves out a disc a line joins to the outline when inside that region (isaac
-  a04711 Extrude 1 took the slot's hole: 1838 vs 1790 mm³), not a circle at the outline's corner (a04711 Extrude 4).
-- Model suite with both (vibe2 m-one.sh ops-region2 region -> ~/agents/asm-keep/m-region-ops-region2.out) vs base
-  m-plane-ops-blend.out (08:58, 127 models): compare with ~/tmp/asm-cmp.py, land both if none worse.
+### Landed 10:12 as 8f27d450 (3 commits)
+- Sketch plane off live's frame -> our face on that frame (bjr 5d8bc1 Sketch 40 + Extrude 21; bjr now 3 differences).
+- qSketchRegion(…, true) leaves out a disc a line joins to the outline when inside that region (isaac a04711
+  Extrude 1), not a circle at the outline's corner (a04711 Extrude 4). Model suite 127/127 models as base.
+- First-picked connector at 20 % + its face selected (live2 recheck (2)); live2 asked to retake on green.
+- In flight: isaac with both (vibe2 one.sh ops-region2 -> ~/agents/asm-keep/isaac-region.out).
 
 ### isaac-ball connector cases (traced run 07:26, 98/129 mates)
 - Live fails them too (matched): Revolute 10, Fastened 6, Revolute 15, Fastened 16, Ball 16 (7 untranslated connectors).
 - GearLab "#desc" studios 1e81ca / 90f78b (3 connectors; Spiral Bevel BOM rows): FS decision with the lead.
 - Our 7 "cannot resolve" mates are on parts whose geometry differs ("volume fits []"):
-  - a04711 (Revolute 6, 11, Ball 13): Extrude 1 region (mine, a93d0a438); next Extrude 4 REMOVE non-manifold
+  - a04711 (Revolute 6, 11, Ball 13): Extrude 1 region (mine, landed in 8f27d450); next Extrude 4 REMOVE non-manifold
     (Part 2 at 2x live's volume), as before the fix.
   - a2e4a2 (Ball 7, Fastened 33): Chamfer 2 TWO_OFFSETS 5.5/6 on a concave 7 mm line edge (our edge = live's JpF):
     live +40 mm³, ours -568 mm³ -> core. Its Sketch 20 plane: the 43f8fb59c case (check isaac-plane.out).
