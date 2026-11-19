@@ -10069,4 +10069,51 @@ fn an_extrude_in_the_flat_cuts_and_adds() {
     assert_eq!(y["feature_status"]["status"], "Ok", "{y}");
     let (v2, x_min) = volume(&mut ctx);
     assert!((v2 - v1 - 200.0).abs() < 1e-3 && (x_min + 10.0).abs() < 1e-6, "added 200 mm³ at x -10...0: {v1} -> {v2}, x from {x_min}");
+    // Live q-flat-ops-1119: an Add across the flat's edge (here across the bend line into the flange) is an error, the
+    // part as it was.
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk2, "tool": "corner_rectangle", "points": [[10, -30], [20, -15]] }));
+    let across = d["regions"].as_array().unwrap().iter().find(|r| num(&r["center"][0]) > 10.0 && num(&r["center"][1]) < -14.0).expect("the square across the bend")["id"].clone();
+    let z = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "domain": "FLAT", "flatOperationType": "ADD", "entities": [across] } }));
+    assert_eq!(z["feature_status"]["message"], "Added material cannot cross edges of flattened sheet metal body.", "{z}");
+    let p = call(&mut ctx, "query_parts", json!({}));
+    assert!((num(&p["parts"][0]["volume"]) - v2).abs() < 1e-6, "unchanged: {p}");
+    // Inside a wall: "Sheet metal model cannot be built."; floating off the flat: an info, the part as it was.
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk2, "tool": "corner_rectangle", "points": [[10, 5], [15, 10]] }));
+    let inside = d["regions"].as_array().unwrap().iter().find(|r| num(&r["center"][0]) > 10.0 && num(&r["center"][1]) > 5.0).expect("the square in the plate")["id"].clone();
+    let z = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "domain": "FLAT", "flatOperationType": "ADD", "entities": [inside] } }));
+    assert_eq!(z["feature_status"]["message"], "Sheet metal model cannot be built.", "{z}");
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk2, "tool": "corner_rectangle", "points": [[60, 0], [70, 10]] }));
+    let floating = d["regions"].as_array().unwrap().iter().find(|r| num(&r["center"][0]) > 60.0).expect("the square off the flat")["id"].clone();
+    let z = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "domain": "FLAT", "flatOperationType": "ADD", "entities": [floating] } }));
+    assert_eq!((z["feature_status"]["status"].as_str(), z["feature_status"]["message"].as_str()), (Some("Info"), Some("Some faces do not meet flattened sheet metal parts.")), "{z}");
+    let p = call(&mut ctx, "query_parts", json!({}));
+    assert!((num(&p["parts"][0]["volume"]) - v2).abs() < 1e-6, "unchanged: {p}");
+}
+
+/// Corner break beside a bend (live q-flat-ops-1119, the 60 × 40 × 2 plate with a 20 mm Flange): 5 mm on the flange's
+/// outer corner, Fillet 7045.487 -> 7034.757 mm³, Chamfer 7020.487 (-25); the plate's corner at the bend's end is
+/// "Invalid input selections.".
+#[test]
+fn a_corner_break_beside_a_bend() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "sheet-metal-corner-break-bend.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [60, 40]] }));
+    call(&mut ctx, "feature_add", json!({ "type": "sheetMetalStart", "params": { "process": "THICKEN", "regions": [r["regions"][0]["id"]], "thickness": "2 mm", "radius": "2 mm" } }));
+    let e = call(&mut ctx, "query_entities", json!({ "kind": "edges", "direction": [1, 0, 0], "near": [30, 0, 2], "limit": 1 }))["edges"][0]["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "sheetMetalFlange", "params": { "edges": [e], "distance": "20 mm" } }));
+    let num = |v: &Value| v.as_str().and_then(|s| s.parse::<f64>().ok()).or_else(|| v.as_f64()).unwrap_or(f64::NAN);
+    let volume = |ctx: &mut Ctx| num(&call(ctx, "query_parts", json!({}))["parts"][0]["volume"]);
+    assert!((volume(&mut ctx) - 7045.487).abs() < 1e-3);
+    let vertex = |ctx: &mut Ctx, at: [f64; 3]| call(ctx, "query_entities", json!({ "kind": "vertices", "near": at, "limit": 1 }))["vertices"][0]["id"].clone();
+    for (blend, size, want) in [("FILLET", "radius", 7034.757), ("CHAMFER", "width", 7020.487)] {
+        let outer = vertex(&mut ctx, [0.0, -2.0, 20.0]);
+        let f = call(&mut ctx, "feature_add", json!({ "type": "sheetMetalCornerBreak", "params": { "blendType": blend, "entities": [outer], size: "5 mm" } }));
+        assert_eq!(f["feature_status"]["status"], "Ok", "{blend}: {f}");
+        let v = volume(&mut ctx);
+        assert!((v - want).abs() < 1e-3, "{blend}: {v} mm³, live {want}");
+        call(&mut ctx, "feature_delete", json!({ "features": [f["feature"]] }));
+    }
+    let corner = vertex(&mut ctx, [0.0, 4.0, 2.0]);
+    let f = call(&mut ctx, "feature_add", json!({ "type": "sheetMetalCornerBreak", "params": { "blendType": "FILLET", "entities": [corner], "radius": "5 mm" } }));
+    assert_eq!(f["feature_status"]["message"], "Invalid input selections.", "{f}");
 }

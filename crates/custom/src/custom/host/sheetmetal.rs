@@ -48,7 +48,7 @@ fn op_sm_flat_operation(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let def = def_arg(i, &a, 2)?;
     let refs = evaluate_refs(i, &cx, def.get("faces"))?;
     let subtract = def_enum(&def, "operationType").as_deref() == Some("SUBTRACTION");
-    run_op(i, &cx, &id, "SM_FLAT_OPERATION_FAILED", |ev| {
+    let floating = run_op(i, &cx, &id, "SM_FLAT_OPERATION_FAILED", |ev| {
         let mut parts: Vec<BodyId> = Vec::new();
         for r in &refs {
             if let Reference::SketchRegion { sketch, .. } = r
@@ -80,6 +80,21 @@ fn op_sm_flat_operation(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     }
                 }
             } else {
+                // Added material lies off the flat, beside it (live q-flat-ops-1119: a region on the flat is an error, the
+                // part as it was: across a bend line "Added material cannot cross edges of flattened sheet metal body.").
+                if let Some(solid) = ev.ctx.sheet_metal_flats.get(&part).and_then(|f| f.flat_view_solid()) {
+                    let z = tool.bounding_box(false).map(|b| b.center().z).unwrap_or(0.0);
+                    let tops: Vec<Shape> = solid.faces().into_iter().filter(|f| face_normal(f).is_ok_and(|(_, n)| n.z > 1.0 - 1e-9)).filter_map(|f| { let fz = f.bounding_box(false).ok()?.center().z; f.translated(DVec3::Z * (z - fz)).ok() }).collect();
+                    let area = |s: &Shape| s.area().unwrap_or(0.0);
+                    let on = if tops.is_empty() { 0.0 } else { area(&k::boolean(k::BooleanOp::Common, std::slice::from_ref(&tool), &[Shape::compound(&tops)], &k::BooleanOptions::default())?.shape) };
+                    let eps = 1e-10;
+                    if on > eps {
+                        // Within one wall: "Sheet metal model cannot be built."; across a bend or the outline: its own.
+                        let common = |w: &Shape| k::boolean(k::BooleanOp::Common, std::slice::from_ref(&tool), std::slice::from_ref(w), &k::BooleanOptions::default()).map_or(0.0, |r| area(&r.shape));
+                        let within = flat_walls.iter().any(|w| common(w) >= area(&tool) - eps);
+                        return Err(super::code_error(if within { "SHEET_METAL_REBUILD_ERROR" } else { "SM_FLAT_OP_ADD_CROSSES_EDGE" }));
+                    }
+                }
                 let off = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&tool), &flat_walls, &k::BooleanOptions::default())?.shape;
                 for f in off.faces() {
                     let near = |w: &Shape| k::distance(&f, w).map_or(f64::INFINITY, |d| d.distance);
@@ -107,11 +122,17 @@ fn op_sm_flat_operation(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let names = ev.name_result(&[&body.names], &res.history, &res.shape, &BTreeMap::new(), None);
             ev.replace_body(bi, res.shape, names);
         }
-        if !met {
+        // Added material touching no wall: live's info, the part as it was.
+        if !met && subtract {
             return Err(super::code_error("SM_FLAT_OP_NO_INTERSECT"));
         }
-        Ok(())
+        Ok(!met)
     })?;
+    if floating {
+        let top: FsId = id.iter().take(1).cloned().collect();
+        let message = super::std_enum("errorstringenum.gen.fs", "ErrorStringEnum", "SM_FLAT_OP_PARTIAL_INTERSECT").unwrap_or_else(|| Value::str("SM_FLAT_OP_PARTIAL_INTERSECT"));
+        cx.state.lock().status.insert(top, Value::map_from([("statusType", Value::str("INFO")), ("statusEnum", message)]));
+    }
     Ok(Value::Undefined)
 }
 
@@ -291,10 +312,10 @@ fn apply_corner_breaks(part: &mut Shape, pieces: &mut Vec<Piece>, def: &Definiti
 /// rolled bends (face index → radius) and butt rip styles (edge → style).
 /// Bends (edge → radius), rips, rolled bends (face → radius), rip styles,
 /// and each joint's attribute id (edges, then rolled faces).
-type Joints = (BTreeMap<usize, f64>, Vec<usize>, BTreeMap<usize, f64>, BTreeMap<usize, String>, JointIds);
-type JointIds = (BTreeMap<usize, Arc<str>>, BTreeMap<usize, Arc<str>>);
+pub(super) type Joints = (BTreeMap<usize, f64>, Vec<usize>, BTreeMap<usize, f64>, BTreeMap<usize, String>, JointIds);
+pub(super) type JointIds = (BTreeMap<usize, Arc<str>>, BTreeMap<usize, Arc<str>>);
 
-fn joints(st: &CtxState, q: &QueryCx, b: usize) -> Joints {
+pub(super) fn joints(st: &CtxState, q: &QueryCx, b: usize) -> Joints {
     let mut bends = BTreeMap::new();
     let mut rips = Vec::new();
     let mut styles = BTreeMap::new();

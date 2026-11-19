@@ -116,6 +116,16 @@ fn random_sketch_edits_never_panic_wide() {
     fuzz((1, 6), 80);
 }
 
+/// A solve, drag or step over a second (the user's hang threshold; `SKETCH_FUZZ_SLOW_MS`) is reported (`SLOW seed n step m`): a wide run's log is
+/// searched for it, release builds only (a dev build is several times slower).
+fn slow(seed: u64, step: usize, what: &str, t: std::time::Instant) {
+    let ms = t.elapsed().as_millis();
+    let over: u128 = std::env::var("SKETCH_FUZZ_SLOW_MS").ok().and_then(|s| s.parse().ok()).unwrap_or(1000);
+    if ms > over && !cfg!(debug_assertions) {
+        eprintln!("SLOW seed {seed} step {step}: {what} {ms} ms");
+    }
+}
+
 fn fuzz(default_seeds: (u64, u64), default_steps: usize) {
     let range = std::env::var("SKETCH_FUZZ_SEEDS").ok().and_then(|s| s.split_once("..").and_then(|(a, b)| Some((a.parse::<u64>().ok()?, b.parse::<u64>().ok()?)))).unwrap_or(default_seeds);
     let steps: usize = std::env::var("SKETCH_FUZZ_STEPS").ok().and_then(|s| s.parse().ok()).unwrap_or(default_steps);
@@ -124,12 +134,14 @@ fn fuzz(default_seeds: (u64, u64), default_steps: usize) {
         let mut rng = Rng(seed * 2 + 1);
         let mut sk = Sketch::new();
         for step in 0..steps {
+            let started = std::time::Instant::now();
             let p = |rng: &mut Rng| DVec2::new(rng.range(-10.0, 10.0), rng.range(-10.0, 10.0));
             let ents: Vec<EntityId> = sk.entities().map(|e| e.id).collect();
             let pick = |rng: &mut Rng, v: &[EntityId]| -> Option<EntityId> { if v.is_empty() { None } else { Some(v[((rng.next() * v.len() as f64) as usize).min(v.len() - 1)]) } };
             let curves: Vec<EntityId> = sk.entities().filter(|e| e.kind() != EntityKind::Point).map(|e| e.id).collect();
             let points: Vec<EntityId> = sk.entities().filter(|e| e.kind() == EntityKind::Point).map(|e| e.id).collect();
-            match (rng.next() * 16.0) as usize {
+            let op = (rng.next() * 16.0) as usize;
+            match op {
                 0 => {
                     let (a, b) = (p(&mut rng), p(&mut rng));
                     sk.corner_rectangle(a, b);
@@ -219,19 +231,26 @@ fn fuzz(default_seeds: (u64, u64), default_steps: usize) {
                 }
                 _ => {
                     if let Some(pt) = pick(&mut rng, &points) {
+                        let t = std::time::Instant::now();
                         let rep = sk.drag(&[(DragHandle::Point(pt), p(&mut rng))]);
+                        slow(seed, step, "drag", t);
                         assert!(!rep.is_solved() || rep.max_residual < 1e-6, "seed {seed} step {step}: drag {rep:?}");
                     }
                 }
             }
+            let t = std::time::Instant::now();
             let rep = sk.solve();
+            slow(seed, step, "solve", t);
             assert!(!rep.is_solved() || rep.max_residual < 1e-6, "seed {seed} step {step}: {rep:?}");
             for e in sk.entities() {
                 if let Some(q) = sk.point(e.id) {
                     assert!(q.is_finite(), "seed {seed} step {step}: point {:?} at {q:?}", e.id);
                 }
             }
+            let t = std::time::Instant::now();
             let _ = sk.regions();
+            slow(seed, step, "regions", t);
+            slow(seed, step, &format!("step (op {op}, {} entities, {} constraints)", sk.entities().count(), sk.constraints().count()), started);
         }
     }
 }

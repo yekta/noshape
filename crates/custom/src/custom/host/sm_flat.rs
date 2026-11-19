@@ -5,10 +5,11 @@
 //! corner's two straight sides are cut back and joined by a tangent arc
 //! (fillet, `radius`) or a line (equal-offsets chamfer, `width`).
 //! Corners of a planar definition face's loops are supported (a wall's free
-//! corner, a hole's corner); corners next to bends are not yet.
+//! corner, a hole's corner); a corner at a bend's end is live's "Invalid input
+//! selections.".
 
 use super::query::{Ent, QueryCx, evaluate_refs};
-use super::sheetmetal::{associations, sm_attribute};
+use super::sheetmetal::{associations, joints, sm_attribute};
 use super::{context_arg, convert::*, run_op};
 use crate::naming::Name;
 use crate::reference::BodyId;
@@ -49,6 +50,7 @@ fn sheet_metal_apply_in_flat(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let st = cx.state.lock();
         let q = QueryCx::new(&st);
         let mut out = Vec::new();
+        let mut beside_bend = false;
         for r in &picks {
             let mine = associations(&st, r);
             if mine.is_empty() {
@@ -58,15 +60,24 @@ fn sheet_metal_apply_in_flat(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 if sm_attribute(&st, &q.to_ref(&Ent::Body(b)), "MODEL").is_none() {
                     continue;
                 }
+                // A corner at a bend's end (live q-flat-ops-1119: the plate's corner beside the flange, "Invalid input
+                // selections.").
+                let bend_ends: Vec<DVec3> = joints(&st, &q, b).0.keys().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()?.edge_info().ok()).flat_map(|i| [i.start, i.end]).collect();
                 for v in 0..body.vertices.len() {
                     if associations(&st, &q.to_ref(&Ent::Vertex(b, v))).iter().any(|x| mine.contains(x))
                         && let Ok(p) = body.shape.sub_shape(ShapeType::Vertex, v).and_then(|s| s.vertex_point())
                         && !out.iter().any(|(id, q): &(BodyId, DVec3)| id == &body.id && q.distance(p) < TOL)
                     {
+                        beside_bend |= bend_ends.iter().any(|e| e.distance(p) < TOL);
                         out.push((body.id.clone(), p));
                     }
                 }
             }
+        }
+        if beside_bend {
+            drop(q);
+            drop(st);
+            return Err(super::raise_error(i, "INVALID_INPUT", None));
         }
         out
     };
