@@ -1102,6 +1102,17 @@ pub fn click_closed_menu(e: &ClickEvent, cx: &mut App) -> bool {
     cx.default_global::<PressClosedMenu>().0.take() == Some(m.down.position)
 }
 
+/// Whether a press at `position` just closed an open menu (beside it): the graphics then take nothing from it (live2
+/// submenu-diag-1119: a click where a closed submenu was only closes the context menu, selection 0).
+pub fn press_closed_menu(position: Point<Pixels>, cx: &mut App) -> bool {
+    let closed = cx.default_global::<PressClosedMenu>();
+    if closed.0 == Some(position) {
+        closed.0 = None;
+        return true;
+    }
+    false
+}
+
 /// Where the keyboard goes back to when `menu` (or the menu it is a submenu of) closes.
 pub fn return_focus_of(menu: &Entity<OsMenu>, cx: &App) -> Option<FocusHandle> {
     let mut m = menu.read(cx);

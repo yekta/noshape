@@ -2376,6 +2376,11 @@ impl Viewport {
         self.box_held = None;
         self.buttons.set(e.button, true);
         cx.stop_propagation();
+        // A left press beside an open menu only closes it (live: nothing selected, no box).
+        if e.button == MouseButton::Left && crate::os_menu::press_closed_menu(e.position, cx) {
+            self.drag = Drag::None;
+            return;
+        }
         // A real mouse press: no touch is in progress (the platforms don't
         // emulate presses for touches), so drop any whose end was missed.
         self.touch_ids.clear();

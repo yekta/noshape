@@ -327,6 +327,45 @@ fn rows() -> Vec<Row> {
             draw(cx, c.tips);
             expect((opened, closed), (true, true), "open within 10 ms, closed 30 ms after leaving its row")
         } },
+        Row { id: "menus / a diagonal move to a submenu row closes it on the row it crosses", live: "live2 submenu-diag-1119 (no safe triangle): from Select's centre toward Fillet faces across Select other…, the submenu is gone in the first frame on the crossed row, which takes the hover at once; resting changes nothing", gap: false, check: |c, cx| {
+            let names: Vec<String> = ["A", "B", "C", "1", "2", "3", "4"].iter().map(|n| format!("Row {n}")).collect();
+            let menu = cx
+                .update_window(c.tips, |_, w, cx| {
+                    let n = names.clone();
+                    let menu = crate::os_menu::OsMenu::build(w, cx, |m, w, cx| {
+                        let sub = n[3..].to_vec();
+                        m.submenu(n[0].clone(), w, cx, move |sm, _, _| sub.iter().fold(sm, |sm, l| sm.item(crate::os_menu::OsMenuItem::new(l.clone()))))
+                            .item(crate::os_menu::OsMenuItem::new(n[1].clone()))
+                            .item(crate::os_menu::OsMenuItem::new(n[2].clone()))
+                    });
+                    crate::os_menu::open(point(px(400.), px(300.)), menu.clone(), w, cx);
+                    menu
+                })
+                .unwrap();
+            draw(cx, c.tips);
+            let at = |cx: &mut TestAppContext, sel: &str| {
+                draw(cx, c.tips);
+                gpui_kit::VisualTestContext::from_window(c.tips, cx).debug_bounds(Box::leak(format!("menu:{sel}").into_boxed_str())).map(|b| b.center())
+            };
+            let row_a = at(cx, &names[0]).ok_or("no submenu row")?;
+            c.move_to(cx, f32::from(row_a.x), f32::from(row_a.y));
+            let _ = c.wait(cx, 10);
+            let target = at(cx, &names[6]).ok_or("no submenu")?;
+            // Three steps as the parity driver moves, the middle one over Row B.
+            let mut gone_on_b = None;
+            for k in 1..=3 {
+                let p = row_a + (target - row_a) * (k as f32 / 3.0);
+                c.move_to(cx, f32::from(p.x), f32::from(p.y));
+                if gone_on_b.is_none() && at(cx, &names[1]).is_some_and(|b| (f32::from(b.y) - f32::from(p.y)).abs() < 10.) {
+                    gone_on_b = Some(at(cx, &names[6]).is_none());
+                }
+            }
+            let _ = c.wait(cx, 600);
+            let still_gone = at(cx, &names[6]).is_none();
+            cx.update(|cx| menu.update(cx, |_, cx| cx.emit(gpui_kit::DismissEvent)));
+            draw(cx, c.tips);
+            expect((gone_on_b, still_gone), (Some(true), true), "(the submenu gone on the crossed row, still gone after 600 ms)")
+        } },
         Row { id: "select other / its size", live: "220 px wide, 24 px rows in a 90 px list (~3.75 rows); with nothing found 83 px tall", gap: false, check: |_, _| {
             near(behaviors::SELECT_OTHER_SIZE.0, 220., "width")?;
             near(behaviors::SELECT_OTHER_EMPTY_H, 83., "height with nothing found")

@@ -818,3 +818,43 @@ fn a_view_key_lights_what_comes_under_the_resting_pointer(cx: &mut TestAppContex
     }
     assert!(lit_after.is_some(), "nothing lit under the resting pointer after the view key");
 }
+
+/// Live2 submenu-diag-1119 (qa face-rclick-select-fillet-faces): a click beside an open context menu only closes it:
+/// the plane under it isn't selected (live: selection 0); the next click there selects the plane.
+#[gpui::test]
+fn a_click_beside_an_open_context_menu_only_closes_it(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view, _top, _) = block_part(cx, "menu-click-closes");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let face_at = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let vp = v.viewport.read(cx);
+        let top_z = b.mesh.positions.iter().map(|q| q[2]).fold(f32::MIN, f32::max);
+        let tops: Vec<DVec2> = b.mesh.positions.iter().filter(|q| (q[2] - top_z).abs() < 1e-7).filter_map(|q| vp.project(glam::DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64))).collect();
+        tops.iter().sum::<DVec2>() / tops.len() as f64
+    });
+    let pointer = Pointer::new(cx, window, &view);
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).hover.clone());
+    let plane_spot = [DVec2::new(face_at.x - 220.0, face_at.y + 120.0), DVec2::new(face_at.x + 220.0, face_at.y + 120.0), DVec2::new(face_at.x, face_at.y + 200.0)]
+        .into_iter()
+        .find(|s| {
+            pointer.move_to(cx, &view, *s);
+            matches!(lit(cx), Some(Reference::Plane(_)))
+        })
+        .expect("a plane beside the part");
+    pointer.move_to(cx, &view, face_at);
+    let at = pointer.window_point(cx, face_at);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_mouse_down(at, gpui_kit::MouseButton::Right, Modifiers::default());
+    vcx.simulate_mouse_up(at, gpui_kit::MouseButton::Right, Modifiers::default());
+    pointer.settle(cx, &view);
+    let opened = cx.update(|cx| view.read(cx).context_menu.is_some());
+    pointer.click(cx, &view, plane_spot);
+    let after = cx.update(|cx| (view.read(cx).context_menu.is_some(), view.read(cx).selection.clone()));
+    pointer.click(cx, &view, plane_spot);
+    let second = cx.update(|cx| view.read(cx).selection.clone());
+    assert!(opened && after == (false, Vec::new()), "the face's menu opened ({opened}); after a click beside it (open, selected): {after:?}");
+    assert!(matches!(second.as_slice(), [Reference::Plane(_)]), "the next click selects the plane: {second:?}");
+}
