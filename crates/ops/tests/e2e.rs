@@ -7073,6 +7073,17 @@ fn drawing_replicate_copy_paste_replace_and_navigation() {
     assert_eq!((again["replicated"].clone(), again["message"].clone()), (json!([]), json!("No annotations replicated")), "{again}");
     let e = try_call(&mut ctx, "drawing_replicate", json!({ "drawing": tab, "from": top, "to": second, "region": [[0, 0], [1, 1]] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("at"), "{e:?}");
+    // A region (the hole and its Ø) placed by hand 8 mm off the hole: the Ø attaches to the hole inside the placed box (live
+    // drw-view-replicate-region-place: the box clicked ~7 mm off, "Successfully replicated 1/1 annotations").
+    let third = call(&mut ctx, "drawing_insert_view", json!({ "drawing": tab, "source": "Part Studio 1", "orientation": "top", "position": [330, 210] }))["view"].as_u64().unwrap();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let third_v = g["views"].as_array().unwrap().iter().find(|v| v["id"] == third).unwrap().clone();
+    let hole3 = third_v["edges"].as_array().unwrap().iter().find(|e| e["type"] == "circle").unwrap_or_else(|| panic!("{third_v}")).clone();
+    let (hx, hy) = (num(&hole3["center"][0]), num(&hole3["center"][1]));
+    let reg = call(&mut ctx, "drawing_replicate", json!({ "drawing": tab, "from": top, "to": third, "region": [[cx - 10.0, cy - 10.0], [cx + 30.0, cy + 25.0]], "at": [hx + 18.0, hy + 7.5] }));
+    assert!(reg["message"].as_str().unwrap().starts_with("Successfully replicated"), "{reg}");
+    let ann = call(&mut ctx, "drawing_get", json!({ "drawing": tab }))["annotations"].clone();
+    assert!(ann.as_array().unwrap().iter().any(|a| a["view"] == third && a["text"].as_str().is_some_and(|t| t.contains('Ø'))), "{ann}");
 
     // Copy the top view (with its Ø) and paste it.
     let c = call(&mut ctx, "drawing_copy", json!({ "drawing": tab, "views": [top] }));

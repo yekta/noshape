@@ -131,7 +131,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "replicate",
             summary: "Replicate annotations from one view onto another (beta)",
-            description: "Select for replication ▸ View (or Region… with `region`), then Replicate annotations on view `to`: a copy of each annotation where `to` shows the same geometry (each reference the same model point, or a vertex / circle center at the mapped spot); the others are skipped. With a region, `at` is where its box's center goes on `to` (sheet mm; snapped to the nearest matching vertex or center within 3 mm). One edit \"Replicate annotations\"; the reply's message is the editor's (\"Successfully replicated 7/7 annotations\").",
+            description: "Select for replication ▸ View (or Region… with `region`), then Replicate annotations on view `to`: a copy of each annotation where `to` shows the same geometry (each reference the same model point, or a vertex / circle center at the mapped spot); the others are skipped. With a region, `at` is where its box's center goes on `to` (sheet mm; the first reference snaps to the nearest matching vertex or center inside the placed box). One edit \"Replicate annotations\"; the reply's message is the editor's (\"Successfully replicated 7/7 annotations\").",
             fields: with(
                 common(),
                 vec![

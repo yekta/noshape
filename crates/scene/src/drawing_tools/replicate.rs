@@ -81,21 +81,23 @@ impl SheetPick<'_> {
             let (a, b) = (src.to_sheet([0.0, 0.0]), dst.to_sheet([0.0, 0.0]));
             [b[0] - a[0], b[1] - a[1]]
         });
-        // A placed box is positioned by hand: snap it so the first vertex /
-        // circle center lands on the nearest one of its kind (3 mm on the
-        // sheet), and move every point by the same amount.
+        // A placed box is positioned by hand: snap it so the first vertex / circle center lands on the nearest one of
+        // its kind inside the placed box (live: placed over another hole of the same size, the Ø attaches to that
+        // hole), and move every point by the same amount.
         let kind_of = |p: &PointRef| match p {
             PointRef::Vertex { .. } => Some(SnapKind::Vertex),
             PointRef::Center { .. } => Some(SnapKind::Center),
             _ => None,
         };
         let mut corr = [0.0, 0.0];
-        if delta.is_some() {
-            let tol = 3.0 / (dst.scale * 1000.0).max(1e-9);
+        if let (Some(d), Some(b)) = (delta, r.region) {
+            let inside = |p: [f64; 2]| {
+                let s = dst.to_sheet(p);
+                (b[0][0] + d[0]..=b[1][0] + d[0]).contains(&s[0]) && (b[0][1] + d[1]..=b[1][1] + d[1]).contains(&s[1])
+            };
             let first = r.items.iter().flat_map(|(a, pts)| a.refs.iter().zip(pts)).find_map(|(rf, p)| kind_of(&rf.point).map(|k| (k, map(*p))));
             if let Some((k, q)) = first
-                && let Some(s) = geo.snaps.iter().filter(|s| s.kind == k).min_by(|a, b| dist(a.p, q).total_cmp(&dist(b.p, q)))
-                && dist(s.p, q) < tol
+                && let Some(s) = geo.snaps.iter().filter(|s| s.kind == k && inside(s.p)).min_by(|a, b| dist(a.p, q).total_cmp(&dist(b.p, q)))
             {
                 corr = [s.p[0] - q[0], s.p[1] - q[1]];
             }
