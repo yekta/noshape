@@ -210,14 +210,19 @@ pub fn split_stacked(s: &str) -> (&str, Option<(&str, &str)>, &str) {
     }
 }
 
-/// A value's inline fraction split for stacking: (before, numerator, denominator, after); "2 3/4" is ("2", "3", "4", "")
-/// and `1'-2 1/4"` ("1'-2", "1", "4", "\"").
+/// A value's inline fraction split for stacking: (before, numerator, denominator, after); "2 3/4" is ("2", "3", "4", ""),
+/// `1'-2 1/4"` ("1'-2", "1", "4", "\"") and a symbol's value "Ø121/256" ("Ø", "121", "256", "") (live2 drawprops-1119:
+/// Ø121/256, R15/64 stacked). Indices on char boundaries: the symbols are multi-byte.
 pub fn split_fraction(s: &str) -> Option<(&str, &str, &str, &str)> {
     let slash = s.rfind('/')?;
-    let num_start = s[..slash].rfind(|c: char| !c.is_ascii_digit()).map_or(0, |i| i + 1);
+    let (num_start, before) = match s[..slash].char_indices().rev().find(|(_, c)| !c.is_ascii_digit()) {
+        Some((i, c)) => (i + c.len_utf8(), Some(c)),
+        None => (0, None),
+    };
     let den_end = s[slash + 1..].find(|c: char| !c.is_ascii_digit()).map_or(s.len(), |i| slash + 1 + i);
     let (num, den) = (&s[num_start..slash], &s[slash + 1..den_end]);
-    if num.is_empty() || den.is_empty() || !(num_start == 0 || s[..num_start].ends_with(' ')) {
+    // Not a decimal's digits ("2.5/…").
+    if num.is_empty() || den.is_empty() || matches!(before, Some('.' | ',')) {
         return None;
     }
     Some((s[..num_start].trim_end(), num, den, &s[den_end..]))
@@ -797,6 +802,17 @@ mod tests {
         assert_eq!(split_fraction("1/2"), Some(("", "1", "2", "")));
         assert_eq!(split_fraction("1'-2 1/4\""), Some(("1'-2", "1", "4", "\"")));
         assert_eq!(split_fraction("2.700"), None);
+        // Symbols before the value are multi-byte (live2 11-19: Inches fractional on a Ø dimension panicked).
+        assert_eq!(split_fraction("Ø121/256"), Some(("Ø", "121", "256", "")));
+        assert_eq!(split_fraction("R15/64\""), Some(("R", "15", "64", "\"")));
+        assert_eq!(split_fraction("±1/64"), Some(("±", "1", "64", "")));
+        assert_eq!(split_fraction("⌀1 3/4"), Some(("⌀1", "3", "4", "")));
+        for (symbol, units) in [("Ø", DimUnits::InchFraction), ("⌀", DimUnits::FeetInches), ("R", DimUnits::InchFraction), ("±", DimUnits::FeetInches)] {
+            let t = dim_text(&d, &DimFormat { units: Some(units), precision: Some(8), ..Default::default() }, 0.0254 * 121.0 / 256.0, false, symbol);
+            assert!(t.main.starts_with(symbol) && t.fraction, "{symbol} {units:?}: {t:?}");
+            let (before, num, den, _) = split_fraction(&t.main).unwrap_or_else(|| panic!("{t:?}"));
+            assert_eq!((before, num, den), (symbol, "121", "256"), "{units:?}");
+        }
         assert!(dim_text(&d, &f(DimUnits::InchFraction), 0.0254 * 2.7, false, "").fraction);
         let fine = DimFormat { units: Some(DimUnits::InchFraction), precision: Some(6), ..Default::default() };
         assert_eq!(dim_text(&d, &fine, 0.0254 * 2.7, false, "").main, "2 45/64");

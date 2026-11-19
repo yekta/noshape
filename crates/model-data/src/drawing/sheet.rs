@@ -3139,7 +3139,7 @@ impl SheetGeometry {
         match t.fraction.then(|| super::format::split_fraction(&t.main)).flatten() {
             Some((before, num, den, after)) => {
                 let wb = font::text_width(before, h);
-                wb + if before.is_empty() { 0.0 } else { FRACTION_GAP * h } + font::text_width(num, h).max(font::text_width(den, h)) + font::text_width(after, h)
+                wb + if before.ends_with(|c: char| c.is_ascii_digit()) { FRACTION_GAP * h } else { 0.0 } + font::text_width(num, h).max(font::text_width(den, h)) + font::text_width(after, h)
             }
             None => font::text_width(&t.main, h),
         }
@@ -3156,7 +3156,7 @@ impl SheetGeometry {
         if !before.is_empty() {
             self.texts.push(Text2 { pos: loc(x, base), height: h, text: before.to_string(), angle, anchor: Anchor::BottomLeft, pick });
         }
-        let xs = x + font::text_width(before, h) + if before.is_empty() { 0.0 } else { FRACTION_GAP * h };
+        let xs = x + font::text_width(before, h) + if before.ends_with(|c: char| c.is_ascii_digit()) { FRACTION_GAP * h } else { 0.0 };
         let (wn, wd) = (font::text_width(num, h), font::text_width(den, h));
         let w = wn.max(wd);
         let rule = base + h * 0.5;
