@@ -364,6 +364,32 @@ fn a_preselected_face_names_the_sketch_plane_field_by_its_feature(cx: &mut TestA
     assert_eq!(items, Some(serde_json::json!(["Face of Extrude 1"])));
 }
 
+/// Live (sketch-open feel, interaction-feel "A new sketch changes nothing on screen"): a new sketch on Top beside the
+/// block hides, greys and isolates nothing, and the view stays where it was.
+#[gpui::test]
+fn a_new_sketch_changes_nothing_on_screen(cx: &mut TestAppContext) {
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "sk-open-still", Some(starts["block"].clone()));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    draw(cx, window);
+    let shown = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        (v.viewport.read(cx).camera, v.display.bodies.iter().map(|b| (b.hidden, b.color)).collect::<Vec<_>>(), v.ui.isolate.is_some())
+    });
+    let before = shown(cx);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selection = vec![Reference::Plane(DatumPlane::Top)];
+            v.start_feature("sketch", w, cx);
+        });
+    })
+    .unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some());
+    draw(cx, window);
+    assert_eq!(shown(cx), before);
+}
+
 /// The Origin's hidden stand-in (made when a line's first click snaps to the
 /// origin) isn't an undo step: live's Undo stays off after that click and an
 /// Escape; a drawn line still is a step.

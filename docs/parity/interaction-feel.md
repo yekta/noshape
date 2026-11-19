@@ -1165,7 +1165,7 @@ each display from the right-click to the menu's first frame. Evidence live/feel/
 | Finding | Ours | Test |
 |---|---|---|
 | Top selected then Shift+S: the sketch opens on Top at once; nothing selected: an empty plane field; a face selected: "Face of Extrude 1"; the row added at the rollback bar, selected [skasm] | = | sketch_ui_tests::a_preselected_sketch_plane_is_not_an_undo_step, picking_the_sketch_plane_is_an_undo_step, a_preselected_face_names_the_sketch_plane_field_by_its_feature |
-| A new sketch changes nothing on screen: nothing greys or hides, the view stays [skasm] | = | missing |
+| A new sketch changes nothing on screen: nothing greys or hides, the view stays [skasm] | = | sketch_ui_tests::a_new_sketch_changes_nothing_on_screen |
 | Another feature row clicked while sketching: nothing | = | list matrix "sketching / another row clicked does nothing" |
 | Editing a sketch rolls back: later rows grey italic, Parts (2) → (1); "Final"; ✗ brings them back | = | list matrix "sketching / later rows grey and the Parts list follows, ✗ brings them back" (Final offered too) |
 | A hidden later sketch stays hidden while editing | = | `a_hidden_later_sketch_stays_hidden_while_editing` |
