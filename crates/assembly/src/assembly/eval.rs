@@ -2199,7 +2199,6 @@ impl AssemblyEvaluator {
     /// [`Self::studio`] to take one at a time after (an assembly's Insert catalog lists every Part Studio of the
     /// document). Those that need other studios are left to it.
     pub fn prewarm(&mut self, doc: &Document, uses: Vec<(TabId, ConfigValues)>) {
-        use rayon::prelude::*;
         let mut jobs = Vec::new();
         let mut seen = std::collections::HashSet::new();
         for (tab, config) in uses {
@@ -2222,10 +2221,23 @@ impl AssemblyEvaluator {
             }
             return;
         }
+        // On threads of their own, not rayon's: a regeneration waits on work it gives rayon (a fillet's rolling-ball
+        // tools, a Feature Studio's run), which never ran with every rayon worker busy regenerating (macOS CI's 3 cores:
+        // the drawing crate's assembly tests hung 11-19).
         let units = &doc.settings.units;
-        jobs.par_iter_mut().for_each(|(_, ps, cfg, opts, hash, entry)| {
-            entry.result = Arc::new(entry.regen.regenerate(ps, cfg, units, opts));
-            entry.hash = *hash;
+        let threads = std::thread::available_parallelism().map_or(2, |n| n.get()).min(jobs.len());
+        let queue = std::sync::Mutex::new(jobs.iter_mut());
+        std::thread::scope(|s| {
+            for _ in 0..threads {
+                let queue = &queue;
+                let run = move || {
+                    while let Some((_, ps, cfg, opts, hash, entry)) = queue.lock().ok().and_then(|mut q| q.next()) {
+                        entry.result = Arc::new(entry.regen.regenerate(ps, cfg, units, opts));
+                        entry.hash = *hash;
+                    }
+                };
+                let _ = std::thread::Builder::new().name("noshape-prewarm".into()).stack_size(8 << 20).spawn_scoped(s, run);
+            }
         });
         for (key, _, _, _, _, entry) in jobs {
             self.studios.insert(key, entry);
