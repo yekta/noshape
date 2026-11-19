@@ -81,11 +81,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    live stopped till ~21:00. v0.4.60 post-release done 10:59: clean (SHA, user docs / authored = 0.4.59, session-1118 + sm-1119 on the
    released app = live; compat baseline 0.4.60); f197 Part 1 +1 edge +1 vertex same volume -> core (low). ps2 = live since core's
    7bf5efe3 (verified 12:05). dx prewarm A/B: no regression. DXF on a rerun drawing session = live. In flight:
-   - qa-resave (bin/resave-corpus.sh via rb.sh NOSHAPE_RB_HOST=vibe2 from the qa-suite checkout at green 42b57cbd, models staged in
-     vibe2 ~/tmp/qa/resave/models): re-translates c2-surf-workshop-cpcurves / -mutualtrim (lead + core: saved on wrong geometry);
-     then copy saved/*.noshape* over vibex7 ~/qa/corpus (keep .bak-1118), check live's values (cpcurves fit spline 1 / Sweep 5 /
-     Thicken 1 Ok, 3 parts 7024.76 + 2 x 6812.2; mutualtrim Fillet 1 on one shared 156.02 mm edge), re-run compat-check, drop alerts.
-   - qa-merge-wait (stsess/merge-wait.sh): studios' 258b8d40e in a green -> ssess-t2b retake on vibe2 -> qa-alerts; tell studios.
+   Done 12:40: cpcurves / mutualtrim re-saved (bin/resave-corpus.sh via rb.sh on vibe2, models in ~/tmp/qa/resave) into vibex7
+   ~/qa/corpus (old: ~/agents/qa-keep/*.bak-1118); cpcurves Split 5 Info + parts 4 vs live 3 -> core; mutualtrim Fillet 1 -> blend.
+   compat/accepted.txt: those two + cli-shell-hang-pre Shell 3/5 + cli-draft-hang Fillet 3 (blend 92c8595b0, lead 11-19).
+   TICKETS P2 SHELL-AFTER-WELD-FILLET (bool; live check owed when live has room). f197 +1 edge closed by core (DECISIONS 11-16).
+   Studios' merge fix 258b8d40e verified 12:05 (m1 retake); only ≠ the tab rows' order -> studios.
    Kept vibe2 ~/agents/qa-keep/{session-ps2-1119,studio-1119-recheck}.
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
    with NOSHAPE_PARITY_VALIDITY=1 (bin/suites-models.sh exports it) models.log prints per feature "CHECK <doc> feature <k>:
