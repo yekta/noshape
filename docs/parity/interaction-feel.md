@@ -1485,7 +1485,7 @@ These are what the user sees; reach-1118 (16:29) read the viewer's own pick and 
 | A plane's vertical outer edge (Front / Right in iso, over the background) | **6 / 6** (7: nothing) | – | (3d.json's "level border 7–8" read 1–2 px long) |
 | A plane's slanted outer edge (Top in iso) | 7.2 lit, 8.05 not (row "A plane hovers…") | 9.1 / 9.9 | ≠ [psui] |
 | Assembly hover timing ("start two-blocks asm", the pointer jumped onto Part 1's top face, 10 rounds) | the first draw 93–261 ms after the pointer stops (median 255), a second at ~515 ms more; the Part Studio the same (99–263, median 260) | – | [asm] = the Part Studio's pause rule (row "Hover timing") |
-| Drawing: a click beside a view selects it (Top view of "start two-blocks", 1:2, left edge, 2 rounds) | selected out to 13 px, not at 14; hover lit at 12, not 14 (one pass; row "View edge / inside hover reach" has 14–16) | – | [studios] |
+| Drawing: a click beside a view selects it (Top view of "start two-blocks", 1:2, left edge, 2 rounds) | selected out to 13 px, not at 14; hover lights at 13, not 14, with no hold (1 px steps, 450 ms, full-page shots, 2 rounds; row "View edge / inside hover reach" has 14–16) | – | [studios] |
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
