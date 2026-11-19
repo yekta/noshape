@@ -30,9 +30,6 @@ pub const VIEW_REACH_MM: f64 = 3.45;
 /// The tools' pick reach (screen px): Graebert's PICKBOX, 7 at DPR 1 (live drawing-sysvars.json; getIntersected uses
 /// it for every tool).
 pub const PICKBOX_PX: f64 = 7.0;
-/// The Callout tool's edge reach: one pixel past the other tools' (live2 drw-tools-1119, the same take for both: live
-/// lit the edge from 5 px, ours from 4).
-pub const CALLOUT_EDGE_REACH_PX: f64 = PICKBOX_PX + 1.0;
 /// A grip's reach (screen px): GRIPSIZE 6 (live drawing-sysvars.json, XeGrip.IsMouseOver).
 pub const GRIPSIZE_PX: f64 = 6.0;
 
@@ -116,15 +113,13 @@ impl<'a> SheetPick<'a> {
         // Live2 feel/drawing.json (tables_live2_1013 centerlines): Centermark lights a circle (an ellipse in an
         // isometric view too) from 6 px and never a straight edge; Edge to edge centerline an edge from 6 px.
         let reach6 = self.tol_mm(6.0);
-        let callout_edge = || self.built.and_then(|b| b.hit_where(self.cursor, self.tol_mm(CALLOUT_EDGE_REACH_PX), &|t: &PickTarget| matches!(t, PickTarget::Edge { .. })));
         let is_circle = |t: &PickTarget| matches!(t, PickTarget::Edge { view, edge } if matches!(self.edge_geom(*view, *edge), Some(EdgeGeom::Circle { .. })));
         let hover = match self.tool {
             Tool::Centermark => self.built.and_then(|b| b.hit_where(self.cursor, reach6, &is_circle)).or(hover.filter(|h| self.built.and_then(|b| b.picks.get(*h as usize)).is_some_and(|t| !matches!(t, PickTarget::Edge { .. })))),
             Tool::EdgeCenterline { .. } => self.built.and_then(|b| b.hit_where(self.cursor, reach6, &|t: &PickTarget| matches!(t, PickTarget::Edge { .. }))).or(hover),
             Tool::Dimension { kind: DimTool::Point2, .. } => hover,
             Tool::Dimension { kind: DimTool::Linear, .. } | Tool::Sketch { .. } | Tool::Constrain { .. } => edges_only(true).or(hover),
-            Tool::Balloon { .. } => callout_edge().or(hover),
-            Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centerline { .. } | Tool::CircleCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Ordinate { .. } | Tool::Note | Tool::Datum { anchor: None } => edges_only(false).or(hover),
+            Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centerline { .. } | Tool::CircleCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } | Tool::Note | Tool::Datum { anchor: None } => edges_only(false).or(hover),
             // A surface finish symbol stands on the edge under it (live A45);
             // both it and a geometric tolerance also take a dimension (live
             // request 1624), under whatever else is on top.

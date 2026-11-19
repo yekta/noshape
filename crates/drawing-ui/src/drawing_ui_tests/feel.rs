@@ -2446,10 +2446,10 @@ fn a_cutting_line_hovered_frames_its_section_blue_and_its_body_does_not_drag(cx:
     assert_eq!(looks(cx).1, 0, "the pointer away: no grips");
 }
 
-/// Live2 drw-tools-1119: the Callout tool lights an edge one pixel farther out than the other tools (live 5 px against
-/// ours 4 in the same take): within 8 px, not at 10.
+/// Live2 recheck-1119 callout: the Callout tool lights an edge from the other tools' reach (live 6 px from the edge, not
+/// 7; the 11-19 "5 vs 4" row measured from a 1 px shifted edge): within the 7 px pickbox, not past it.
 #[gpui::test]
-fn the_callout_tool_lights_an_edge_a_pixel_past_the_pickbox(cx: &mut TestAppContext) {
+fn the_callout_tool_lights_an_edge_within_the_pickbox(cx: &mut TestAppContext) {
     SUGGESTED.set(true);
     let (window, editor) = drawing(cx, "feel-callout-reach");
     real_sheet(cx, window, &editor);
@@ -2467,7 +2467,7 @@ fn the_callout_tool_lights_an_edge_a_pixel_past_the_pickbox(cx: &mut TestAppCont
     draw(cx, window);
     let edge = lit_at(cx, window, &editor, mid);
     assert!(matches!(edge, Some(Sel::Edge(..))), "on the edge: {edge:?}");
-    for (px, lights) in [(7.5, true), (10.0, false)] {
+    for (px, lights) in [(6.0, true), (8.0, false)] {
         for sign in [1.0, -1.0] {
             let mm = cx.update(|cx| editor.read(cx).tol_mm(px));
             let lit = lit_at(cx, window, &editor, [mid[0] + normal[0] * mm * sign, mid[1] + normal[1] * mm * sign]);
