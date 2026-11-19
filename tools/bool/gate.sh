@@ -198,7 +198,8 @@ args=(--out "$out" --jobs "$jobs" --threads "$threads" --cmp base new
   --role "base:$bkey_r:$bkey_s:$bkey_o:$bk:$bo" --role "new:$nkey_r:$nkey_s:$nkey_o:$nk:$no")
 # (A branch that leaves the kernel's crates alone times the same as main.)
 [ $spd = 1 ] && [ "$base_rk" != "$new_rk" ] && args+=(--speed "$bk" "$nk")
-(cd "$wt_new" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "cd ~ && $models \$([ -x bin/slot ] && echo bin/slot) python3 agents/bool-gate/bin/gate-host.py run $(printf '%q ' "${args[@]}")") 2>&1 | tee -a "$log" | grep -E '^(gate-host|VERDICT|replay|model suite|speed)' >&2
+args+=(--shells "$bk" "$nk")
+(cd "$wt_new" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "cd ~ && $models \$([ -x bin/slot ] && echo bin/slot) python3 agents/bool-gate/bin/gate-host.py run $(printf '%q ' "${args[@]}")") 2>&1 | tee -a "$log" | grep -E '^(gate-host|VERDICT|replay|model suite|speed|shells)' >&2
 wait $ptests; rt=$?
 grep -E '^test result|FAILED$' "$scratch/gate-tests.log" >> "$log"
 failed=$(grep -E '^test .* FAILED$' "$scratch/gate-tests.log" | sed 's/^test //; s/ \.\.\. FAILED$//' | head -3 | paste -sd, -)

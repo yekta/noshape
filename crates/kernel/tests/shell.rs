@@ -1157,7 +1157,8 @@ fn shellhang_shell5_strip_probe() {
 }
 
 /// The fuzz Shell corpus (SHELL_CORPUS=<dir> of <case>.brep + <case>.txt: "face <n>" lines, 1-based, then "shell
-/// thickness <t> outward <0|1> method <m>"): each case's volume, faces and time, one line per case, on 4 threads.
+/// thickness <t> outward <0|1> method <m>"): each case's volume, faces, time, path, edges, vertices and history digest,
+/// one line per case, on 4 threads (tools/bool/gate-host.py's Shell check: ours against NOSHAPE_BOOL_RUST=0).
 #[test]
 #[ignore = "T2: corpus probe"]
 fn shell_corpus_probe() {
@@ -1182,7 +1183,21 @@ fn shell_corpus_probe() {
                 let ms = t0.elapsed().as_secs_f64() * 1e3;
                 let name = txt.file_stem().unwrap().to_string_lossy().to_string();
                 match r {
-                    Ok(r) => println!("case {name} ok {:.9e} {} {ms:.0}", vol(&r.shape), r.shape.count(ShapeType::Face)),
+                    Ok(r) => {
+                        // (Its history as one digest, each record's output named by its box to 1 um, not its index:
+                        // two results alike but for their shapes' order give the same.)
+                        let at = |k: ShapeType, i: u32| -> String {
+                            let Some(Ok(b)) = r.shape.sub_shapes(k).get(i as usize).map(|x| x.bounding_box(true)) else { return format!("{k:?} {i}") };
+                            let q = |x: f64| (x * 1e6).round() as i64;
+                            format!("{k:?} {} {} {} {} {} {}", q(b.min.x), q(b.min.y), q(b.min.z), q(b.max.x), q(b.max.y), q(b.max.z))
+                        };
+                        let mut recs: Vec<String> = r.history.records.iter().map(|x| format!("{} {:?} {} {:?} {}", x.arg, x.input_kind, x.input_index, x.relation, at(x.output_kind, x.output_index))).collect();
+                        recs.sort();
+                        let mut h = std::collections::hash_map::DefaultHasher::new();
+                        std::hash::Hash::hash(&recs, &mut h);
+                        let n = |k| r.shape.count(k);
+                        println!("case {name} ok {:.9e} {} {ms:.0} path {} edges {} vertices {} history {:016x}", vol(&r.shape), n(ShapeType::Face), last_shell_path(), n(ShapeType::Edge), n(ShapeType::Vertex), std::hash::Hasher::finish(&h))
+                    }
                     Err(e) => println!("case {name} err {} {ms:.0}", e.to_string().chars().take(60).collect::<String>()),
                 }
             });

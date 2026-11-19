@@ -35,6 +35,14 @@ SOLO = {"kall", "k10-25", "k10-25-12", "k25-15", "k25-25", "k25-71-12"}
 HEAVY_AT_ONCE = 2
 # The cases timed, ours alone, main's binary and the branch's alternating.
 SPEED = ["k25-15", "k25-25", "cf-spur-gear"]
+# The Shell corpus end to end (lead 11-19): core's 211 fuzz shells, each with ours and with OCCT's Boolean alone
+# (NOSHAPE_BOOL_RUST=0); a shell whose result (volume, faces, edges, vertices, the history with each output named by
+# its place) differs between the two on the branch, and didn't on main, fails the gate. The replay checks each Boolean
+# with OCCT's inputs; here ours' results feed the next step (a slab union unified otherwise changes the Shell's faces).
+SHELLS = f"{CORPORA}/shellcorpus/cases"
+# The shells where ours already differs from OCCT's alone on main (11-19): fixed ones come off.
+SHELLS_KNOWN = set("""13186b07903d913d 17488d26389dbcfc 2756e521fec08ecc 8e6576376acba8e9 8eebe1e2578bfdff 9134b29f70521b63
+99b55ec93fe844a6 b64c8b4edacba88f b79e508bd50f0791 f815832ccf431fc5""".split())
 # (A case is named by its file: a recorded one by its 16-digit hash, a hand-made one (kall's k25x2) any way.)
 NAME = r"[\w.-]+"
 CASE = re.compile(rf"^({NAME})( \(|: failed)")
@@ -378,6 +386,26 @@ def speed(base_kbin, new_kbin, out, threads, rounds=5):
 TAKEN = {"same", "equivalent", "as-live", "relabelled", "seams"}
 
 
+def shells(kbin, out, role):
+    """The Shell corpus with ours and with OCCT's alone: the shells whose results differ, and how many shells."""
+    def run(ours):
+        env = dict(os.environ, SHELL_CORPUS=SHELLS)
+        if not ours:
+            env["NOSHAPE_BOOL_RUST"] = "0"
+        log = f"{out}/shells-{role}-{'ours' if ours else 'occt'}.log"
+        with open(log, "w") as f:
+            subprocess.run([kbin, "shell::shell_corpus_probe", "--exact", "--ignored", "--nocapture"], env=env, stdout=f, stderr=subprocess.DEVNULL, timeout=3600)
+        got = {}
+        # ("case <name> ok <volume> <faces> <ms> ...": all but the time; any failure alike (a slow host's "took too
+        # long" for "failed").)
+        for w in (l.split() for l in read_lines(log)):
+            if len(w) >= 4 and w[0] == "case":
+                got[w[1]] = " ".join(w[3:5] + w[6:]) if w[2] == "ok" else "err"
+        return got
+    o, t = run(True), run(False)
+    return {k for k in t if o.get(k) != t[k]}, len(t)
+
+
 def rounded(text, digits=9):
     """A difference's words with its numbers to `digits` digits (a volume's last digits move run to run)."""
     return re.sub(r"-?\d+\.\d+(?:e-?\d+)?", lambda m: f"{float(m[0]):.{digits}g}", text)
@@ -509,6 +537,7 @@ def main():
     ap.add_argument("--out")
     ap.add_argument("--role", action="append", default=[])
     ap.add_argument("--speed", nargs=2)
+    ap.add_argument("--shells", nargs=2, help="main's and the branch's kernel binaries: the Shell corpus end to end")
     ap.add_argument("--cmp", nargs=2)
     ap.add_argument("--jobs", type=int, default=8)
     ap.add_argument("--threads", type=int, default=2)
@@ -597,6 +626,17 @@ def main():
             return None
         b, n = a.cmp
         verdict, why, info = compare(get(b, "replay"), get(n, "replay"), get(b, "suite"), get(n, "suite"), spd)
+        if a.shells:
+            (base_d, _), (new_d, count) = shells(a.shells[0], a.out, "base"), shells(a.shells[1], a.out, "new")
+            worse, fixed = sorted(new_d - base_d - SHELLS_KNOWN), sorted(SHELLS_KNOWN - new_d)
+            info.append(f"shells: {count} shells, ours differs from OCCT's alone in {len(new_d)} (main {len(base_d)})"
+                        + (f"; now as OCCT's (take them off SHELLS_KNOWN): {' '.join(fixed)}" if fixed else ""))
+            if count == 0:
+                why.append(f"no Shell corpus results ({SHELLS})")
+            if worse:
+                why.append(f"{len(worse)} shells differ from OCCT's alone that didn't on main: {' '.join(worse)}")
+            if (worse or count == 0) and verdict != "FAIL":
+                verdict = "FAIL"
         for l in info:
             print(l)
         if small:
