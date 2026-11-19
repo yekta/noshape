@@ -947,6 +947,35 @@ fn a_hole_up_to_next_into_a_bore_leaves_no_web_beside_it() {
     assert_eq!((part.faces.len(), cones), (before + 1, 0));
 }
 
+/// A hole started from the part reaches no higher than its own entry: the same part's tube 8 mm above the start stays
+/// whole (qa session-ps2-1119: Hole 1 on a flange top under a swept tube drilled a slug up through the tube, 231.39 mm³
+/// more than live's).
+#[test]
+fn a_hole_from_the_part_leaves_its_part_above_the_start_whole() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.1, 0.05, "8 mm");
+    let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("8 mm"))]);
+    // A post at the far end up to a Ø8 tube along X at z 16..24 over the hole.
+    let post = t.sketch(Reference::FeaturePlane(pl), rect(0.08, 0.015, 0.09, 0.025));
+    let r = t.regions(post)[0].clone();
+    t.extrude(r, "12 mm", "ADD");
+    let tube = t.sketch(Reference::Plane(DatumPlane::Right), circle(DVec2::new(0.02, 0.02), 0.004));
+    let r = t.regions(tube)[0].clone();
+    t.extrude(r, "100 mm", "ADD");
+    let before = t.ok();
+    assert_eq!(before.context.bodies.len(), 1, "one part");
+    let v0 = total_volume(&before.context);
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = sk.add_point(DVec2::new(0.03, 0.02));
+    let s = t.sketch(Reference::FeaturePlane(pl), sk);
+    t.add("hole", &[("locations", q(vec![Reference::SketchEntity { sketch: s, entity: p.0 }])), ("unitsSystem", en("METRIC")), ("holeDiameterV3", e("6.35 mm")), ("holeDepthV3", e("12 mm"))]);
+    let r = t.ok();
+    let removed = v0 - total_volume(&r.context);
+    // Through the 8 mm slab, nothing of the tube.
+    let want = PI * 0.003175f64.powi(2) * 0.008;
+    assert!(near(removed, want, 1e-3), "{} mm3 removed, {} through the slab", removed * 1e9, want * 1e9);
+}
+
 #[test]
 fn hole_up_to_next_from_part() {
     let (removed, _) = hole_with(&[("holeDiameterV3", e("8 mm")), ("endStyleV2", en("UP_TO_NEXT")), ("tipAngleStyle", en("FLAT"))]);

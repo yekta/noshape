@@ -341,6 +341,30 @@ fn entry_contacts(ev: &EvalCtx, bodies: &[usize], p: DVec3, dir: DVec3, r: f64, 
             }
         }
     }
+    // Each ruling's first contact with what goes on past the location point (rays below): material wholly above it
+    // isn't the hole's entry (qa session-ps2-1119: the same part's tube 8 mm over a flange top lifted the "top"
+    // contact to the tube's, and the tool ran up through it).
+    let ray = |a: f64| -> f64 {
+        let q = p + (u * a.cos() + v * a.sin()) * r;
+        let origin = q - dir * back;
+        bodies
+            .iter()
+            .flat_map(|&bi| super::helpers_a::ray_intervals(&ev.ctx.bodies[bi].shape, origin, dir, back + extent * 2.0))
+            .filter(|(_, b)| *b - back > 1e-9)
+            .map(|(a, _)| a - back)
+            .fold(f64::INFINITY, f64::min)
+    };
+    for f in first.iter_mut() {
+        let Some((t, e, prm)) = f.as_ref() else { continue };
+        if *t >= -1e-9 {
+            continue;
+        }
+        let Ok(q) = e.point_at(*prm) else { continue };
+        let at = ray(angle_of(q));
+        *f = at.is_finite().then(|| (at, e.clone(), *prm));
+    }
+    top = first.iter().flatten().map(|f| f.0).fold(f64::INFINITY, f64::min);
+    let ray = |a: f64| ray(a).max(0.0);
     if first.iter().any(|f| f.is_none()) || !top.is_finite() {
         return None;
     }
@@ -354,16 +378,6 @@ fn entry_contacts(ev: &EvalCtx, bodies: &[usize], p: DVec3, dir: DVec3, r: f64, 
     // The section's curves are approximations (to about a micron): the
     // deepest first contact refined with exact rays about the best angle.
     let a0 = angle_of(e0.point_at(prm_e).ok()?);
-    let ray = |a: f64| -> f64 {
-        let q = p + (u * a.cos() + v * a.sin()) * r;
-        let origin = q - dir * back;
-        bodies
-            .iter()
-            .flat_map(|&bi| super::helpers_a::ray_intervals(&ev.ctx.bodies[bi].shape, origin, dir, back + extent * 2.0))
-            .filter(|(_, b)| *b - back > 1e-9)
-            .map(|(a, _)| (a - back).max(0.0))
-            .fold(f64::INFINITY, f64::min)
-    };
     let width = std::f64::consts::TAU / BINS as f64;
     let (mut lo, mut hi) = (a0 - width, a0 + width);
     let g = (5f64.sqrt() - 1.0) / 2.0;
