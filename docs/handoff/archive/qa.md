@@ -2163,3 +2163,10 @@ selection, measure, section view; then P2 assembly and drawing passes; verify th
    Re-checks done 01:20-01:32 on 5076e98c: Flange broad face + joint-row hover fixed (skasm); bar / Mass / `[` pass, measure angle
    x=40 pair open with live2 (psui: live's 123.69 was the second wedge); model-edge glyph after the click fixed; sweep / hv analysis
    pending (sk/sw5, hv5: python3 ana.py sw sw5 / hv hv5).
+
+## Moved from the handoff 11-19 03:45
+0k. **Configurations feel (lead 01:05)**: TICKETS "Configurations vs live2's 11-18 capture" (1 P1 + 2 P2 + 1 P3 studios); doc built by
+   CLI (config add_input --kind list / add_option / configure / set_value), session his.sh (:670) with docs/cfg.noshape.
+   Green 5076e98c (01:15) has psui 8d2e0056, skasm a6236ed3a stack, psui 591643fc: run the owed re-checks (0i, 0j) on it.
+   Loft: qa-lp-verify done 01:10 on 0f7610c8 (revert in): Mirror 1 37/83/51 vs live 27/67/47 (Loft 3 20/42/26 vs 15/33/23);
+   volume not measured.

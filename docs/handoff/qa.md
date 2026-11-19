@@ -95,11 +95,6 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    56.31 / 146.31); the Mass button leaves its panel open; `[` over Mass opens Measure empty; the spinner (900 ms delay, 50 px box).
    Selection re-run 00:57 on 591643fc: RELATED-STAYS / HIDDEN-SKETCH-HOVER / PLANE-DEFAULT-GEOMETRY verified; DBLCLICK-FACE-SKETCH
    still open (sent to skasm 01:03). 05:00 must-carry also: core P0 FACES-PATTERN-SLOTS (grep fix / revert of 2c51590b0, 215c12d6b).
-0k. **Configurations feel (lead 01:05)**: TICKETS "Configurations vs live2's 11-18 capture" (1 P1 + 2 P2 + 1 P3 studios); doc built by
-   CLI (config add_input --kind list / add_option / configure / set_value), session his.sh (:670) with docs/cfg.noshape.
-   Green 5076e98c (01:15) has psui 8d2e0056, skasm a6236ed3a stack, psui 591643fc: run the owed re-checks (0i, 0j) on it.
-   Loft: qa-lp-verify done 01:10 on 0f7610c8 (revert in): Mirror 1 37/83/51 vs live 27/67/47 (Loft 3 20/42/26 vs 15/33/23);
-   volume not measured.
 0m. **Owed next (01:47)**: on their first greens: skasm 4a4f7e0e (SELFEEL-DBLCLICK-FACE-SKETCH: sf mini C2), b6f5e810 (SHIFT-ICON);
    studios 6fa3c795 (VSFEEL 1-3) and the HISTFEEL / CFGFEEL fixes as they land; core 55fc929c: faces-pattern-slots SAME vs 0.4.57 in
    the compat loop, then the must-carry line is satisfied (cut-must.txt pins 55fc929c). Snap sweeps now run on vibex8 (~/tmp/qa/sk,
