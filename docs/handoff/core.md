@@ -36,7 +36,12 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   NOSHAPE_RING_MODE):** path reopened at the first profile, a pipe per profile pair, binormal = ring axis, upright
   cuts, smoothing on. T1 a_path_loft_round_four_profiles_on_a_closed_path_is_a_ring passes; wave-washer Loft 1 2126.10
   vs live 2080.82 mm3 (+2.2 %, live banks its mid sections ~6 deg), 1.5 s vs live 67 ms: not landable (wrong Ok).
-- **Next:** ring banked sections (live's mid sections bank ~6 deg); then the queue below.
+- **Ring, live's sections (q-wave-washer-loft-1119 probe.json, evaluated at its v knots):** knots 0 / .1722 / .2519 /
+  .3339 / .5 … = sections at the profiles (0, 90, 180, 270 deg) and at +-61.0 / +-119.4 deg: +-29 deg either side of the
+  JM profiles (90 / 270), none near JK; the routing curve's 8 points are at 0, 45, 90 … (z 0 at the profiles, 3.81 at
+  45/135 …). At 61 deg live's section rises above the path (outer edge z 4.87 vs path peak 3.81, r 19.47 at mid: banked).
+  Ours cuts 5 evenly per pair (24 sections). Next: why +-29 deg (Parasolid's own section rule?); script /tmp-free:
+  evaluate live poles as in the 11-19 12:0x session (python de Boor over createdFaces[i].def.exact).
 - **Volume measure warning:** on impeller parts OCCT's plain Gauss VolumeProperties is ~1.2 % off (input 97755.8 vs
   mesh-converged ~96555, kernel props 95977.8 after the delete ~= mesh): the old "OCCT 97123.4" targets were plain
   Gauss. Compare with kernel props (replay prints them) or vibex7 ~/tmp/core/imp/mvol (mesh).
