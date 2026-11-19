@@ -7219,6 +7219,21 @@ fn drawing_replicate_copy_paste_replace_and_navigation() {
     assert_eq!(e.param.as_deref(), Some("table"), "{e:?}");
 }
 
+/// A new drawing's tab goes right after the active tab, never after its source (live drw-tab-1119: on Part Studio 1,
+/// Assembly 1's Create Drawing lands between them).
+#[test]
+fn a_new_drawing_tab_goes_after_the_active_tab() {
+    let mut ctx = Ctx::new();
+    two_part_assembly(&mut ctx, "drawing_tab_place.noshape");
+    call(&mut ctx, "tab_activate", json!({ "tab": "Part Studio 1" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Assembly 1", "template": "ANSI A", "suggested_views": true }));
+    let name = d["drawing"].as_str().unwrap().to_string();
+    let tabs: Vec<String> = call(&mut ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().filter(|t| t["kind"] != "File").map(|t| t["name"].as_str().unwrap().to_string()).collect();
+    let at = |n: &str| tabs.iter().position(|t| t == n).unwrap_or_else(|| panic!("{n} in {tabs:?}"));
+    assert_eq!(at(&name), at("Part Studio 1") + 1, "{tabs:?}");
+    assert!(at(&name) < at("Assembly 1"), "{tabs:?}");
+}
+
 /// The window's navigation (UI-only sweep, batch 1): the tab shown, the Tab
 /// manager, instance and in-context navigation, viewing / comparing /
 /// repairing history, the drawing's sheets. Each is read back in ui_state.

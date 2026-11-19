@@ -35,8 +35,9 @@ the Mac; ui-parity on vibex7 / vibe2 via ~/bin/slot (vibex6 = watcher), one run 
 - Lead 11-19 missing-functionality sweep: no tool / menu row missing (matrix, coverage, D20, TB14, 13.40 done). Top 5
   (uncompared depth): Drawing properties / Styles, Note panel, Title block, Hole callout + hole table, Export Drawing.
   #1: drw1119a matrix: Drawing properties 0 ≠ (80 =, 113 present); every property read by the builder except the hole
-  callout Fit standard (fixed: `hole_fit_ansi`). Next: live2 takes of the present options' effects. qa session-drw-1119: tab order of a
-  new drawing asked in REQUESTS (live); the 225.0° text side (small, not looked at yet).
+  callout Fit standard (fixed: `hole_fit_ansi`). Next: live2 takes of the present options' effects. live 11-19: a new drawing's tab goes after
+  the active tab (fixed); a document reopens on the workspace and tab last viewed (fixed: app `last_viewed`, the
+  user's config last-viewed.json). qa's 225.0° withdrawn.
 - drw1119a (vibex8, 02:47 build with the woken points): 334/341, 3371/3389 states; no regression. drw-geometric-
   tolerance ≠ is the 11-07 take (edge click places a frame) against live2's 11-18 retake (edge click attaches a
   leader; ours): retake asked in REQUESTS 11-19 ~04:00. drw-note-insert-drawing-property: live's doc copy "(1)".

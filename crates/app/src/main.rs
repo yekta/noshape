@@ -47,6 +47,7 @@ mod shortcuts_page;
 mod import_dialog;
 mod material_library_view;
 mod files;
+mod last_viewed;
 mod workspace_protection;
 mod doc_panels;
 mod shortcuts;

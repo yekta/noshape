@@ -124,6 +124,10 @@ impl Workspace {
     pub fn new(doc: Entity<DocModel>, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let subs = vec![cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
             DocEvent::TabsChanged | DocEvent::Reloaded | DocEvent::UnitsChanged { .. } => {
+                // A workspace switch reloads: it is the one to reopen on.
+                if matches!(ev, DocEvent::Reloaded) {
+                    this.note_viewed(cx);
+                }
                 // Register custom feature schemas of the (new) Feature Studios (in the background).
                 crate::doc_model::compile_custom_features(&this.doc, cx);
                 this.sync_tabs(window, cx);
@@ -164,7 +168,12 @@ impl Workspace {
         // When the focused element goes away (a menu, a prompt, a closed
         // panel), shortcuts keep working: focus returns to the active tab.
         let focus_lost = cx.on_focus_lost(window, |this: &mut Self, window, cx| this.focus_active(window, cx));
-        let active = doc.read(cx).session.doc.ordered_tabs().first().map(|t| t.id);
+        // The tab last viewed (live ws-open-1119), else the first.
+        let active = {
+            let s = &doc.read(cx).session;
+            let last = crate::last_viewed::get(&s.path).tab.filter(|t| s.doc.tab(*t).is_some());
+            last.or_else(|| s.doc.ordered_tabs().first().map(|t| t.id))
+        };
         noshape_render::perf::milestone("workspace: subscribed");
         // Compiled in the background, not before the window's first frame (~50 ms of a document with custom features).
         crate::doc_model::compile_custom_features(&doc, cx);
@@ -435,6 +444,16 @@ impl Workspace {
         }
     }
 
+    /// Remember the workspace and tab shown (a document reopens there: live ws-open-1119); not while viewing a
+    /// version, nor in a second window's other workspace (only the document's own window notes it).
+    fn note_viewed(&self, cx: &App) {
+        let s = &self.doc.read(cx).session;
+        if s.viewing.is_some() || !crate::files::is_document_open(&s.path, cx) {
+            return;
+        }
+        crate::last_viewed::note(&s.path, s.branch, self.active);
+    }
+
     pub(crate) fn activate(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
         self.reveal_active_tab = true;
         if let Some(prev) = self.active.filter(|p| *p != tab) {
@@ -444,6 +463,7 @@ impl Workspace {
             crate::compare_mode::tab_opened(&self.doc, tab, cx);
         }
         self.active = Some(tab);
+        self.note_viewed(cx);
         // Its hover card's picture, if one is being made, is shown by nothing now (qa DOCK-TAB-SWITCH-TRAILING-FRAMES).
         self.tab_thumbs.update(cx, |t, _| t.activated(tab));
         // The tab bar shows the folder the tab is in.
@@ -3273,8 +3293,8 @@ impl Workspace {
                 .await;
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 let mut new_id = None;
-                // After its source's tab; from + › Create Drawing… after the active tab (live doc-plus-create-drawing-ok).
-                let after = source.as_ref().map(|s| s.tab).or(this.active);
+                // Right after the active tab, never after its source (live drw-tab-1119; + › Create Drawing… too).
+                let after = this.active.or(source.as_ref().map(|s| s.tab));
                 this.doc.update(cx, |doc, cx| {
                     // The views are made from the document as it is now: a
                     // later change to a source puts the drawing out of date,

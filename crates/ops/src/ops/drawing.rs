@@ -821,7 +821,8 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     // The views are made from the document as it is now (see `old_state`).
     drawing.sources_at = od.session.head().ok().map(|m| m.to_string());
     let mut tab = None;
-    let after = source.as_ref().map(|s| s.tab).or(od.session.active_tab);
+    // Right after the active tab, never after its source (live drw-tab-1119); with none, after the source.
+    let after = od.window.active_tab.or(od.session.active_tab).or(source.as_ref().map(|s| s.tab));
     od.session.edit_document(&format!("Insert tab : {name}"), |d| tab = Some(crate::docedit::insert_drawing_tab(d, &name, drawing, after)))?;
     let tab = tab.expect("inserted");
     Ok(reply(od, tab, 0, false)?.into())

@@ -123,11 +123,16 @@ pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Do
     let prefetched = take_prefetched(&path);
     let p = path.clone();
     let open = move || -> anyhow::Result<session::Session> {
-        match prefetched {
-            Some(h) => h.join().map_err(|_| anyhow::anyhow!("the document's reader stopped"))?,
-            None if p.exists() => session::Session::open(&p),
-            None => session::Session::create(&p, create_with.unwrap_or_else(crate::units_prefs::new_document)),
+        let mut s = match prefetched {
+            Some(h) => h.join().map_err(|_| anyhow::anyhow!("the document's reader stopped"))??,
+            None if p.exists() => session::Session::open(&p)?,
+            None => return session::Session::create(&p, create_with.unwrap_or_else(crate::units_prefs::new_document)),
+        };
+        // On the workspace last viewed (live ws-open-1119), unless it is gone.
+        if let Some(b) = crate::last_viewed::get(&p).branch.filter(|b| *b != s.branch) {
+            let _ = s.switch_branch(b);
         }
+        Ok(s)
     };
     let title = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
     let (handle, loading) = open_document_frame(&title, cx)?;
