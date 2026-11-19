@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-19 10:45 UTC (new thread 20:05 after the account limit; ids: see How to run). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-19 11:30 UTC (new thread 20:05 after the account limit; ids: see How to run). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
@@ -19,12 +19,14 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
 - **LANDED 11-19:** Hole from the part leaves material above its start whole 7bf5efe3 (qa P1 session-ps2-1119; qa asked
   to verify); surface sweep of an open profile faces profile tangent x path direction + fit spline end along an edge
   82c035b7a (cpcurves fit spline 4, Sweep 8, Split 8, Split 5 errors gone; qa asked to re-save its stale corpus file).
-- **QUEUED 11-19:** loft sections of different edge counts refused before OCCT's unchecked loft e7db6358 (P0: a path
-  loft bent tighter than its profiles crashed the kernel, signal 11; T1 features::a_loft_whose_cut_sections_dont_
-  match_is_refused_not_crashed; full suite = main). Thicken one-sided intersection join 9d391e4c (split 11/12 -> 12/12;
-  private docs ALL-SAME; corpus singularities Thicken - Successful 15486.55 -> 20084.54 = A t - L t^2 exactly).
-- **qa compat alert 814b48d8:** stale corpus file (Thicken 1's 3 names hold one face twice); real differences fixed in
-  82c035b7a except cpcurves Split 3 past Swe 5 (Part 2 5/6/4 vs live 9/14/6); mutualtrim Fillet 1 -> blend.
+- **LANDED 11-19:** loft sections of different edge counts refused 82d75f4a5 (P0); Thicken one-sided intersection join
+  7dd227351 (split 12/12; singularities corpus exact); Routing curve multiDx/Dy/Dz/RotationMatrix aeb0cc0a7 (live2 audit
+  row 4; psui told: the multi triad / toggle-points manipulators are UI + host manipulator kinds).
+- **qa compat alerts ANSWERED 11:30:** both are selections saved on geometry that was wrong and is live's now. cpcurves:
+  3D fit spline 1 failed in v0.4.60 (f4443780a, live OK); its Thicken 1 "Ok" was a 103.67 mm3 part off the failed chain
+  (live: 3 parts). mutualtrim Fillet 1: bisected d8ead241b ok / 444ae7b1a lost (Sweep 1 was cut at z=0; stored name
+  Boundary(trimmed face, 0) of an unshared 58.43 mm edge; now one 156.02 mm shared edge, Edge{faces}, as live). qa asked
+  to re-save both. Tools: vibex7 ~/tmp/core/perfeat2.py, edgeids2.py (decodes entity ids); core-scratch/bis.sh <commit>.
 - **nuts (c2-config-parts-nuts):** on main Sweep 1 volume = live (135.2676), faces 29 = live; one face type off: live's
   thread crest is an exact cylinder, ours OCCT's B-spline (also Revolve 2, Part Number 1). nuts3 59df02227 stays
   dropped. WIP core-loft branch core-helixcyl 9c5711eab turns a helical sweep's crest/root into exact cylinders (kernel
@@ -34,10 +36,7 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   NOSHAPE_RING_MODE):** path reopened at the first profile, a pipe per profile pair, binormal = ring axis, upright
   cuts, smoothing on. T1 a_path_loft_round_four_profiles_on_a_closed_path_is_a_ring passes; wave-washer Loft 1 2126.10
   vs live 2080.82 mm3 (+2.2 %, live banks its mid sections ~6 deg), 1.5 s vs live 67 ms: not landable (wrong Ok).
-- **live2 audit 3a4807fbd (docs/parity/missing-commands-1119.md row 4, low):** Routing curve multi-point edit: hidden
-  multiDx/multiDy/multiDz/multiRotationMatrix (step POINTS, pointsEditType MULTI) move the selected points together;
-  spec onshape-research/live/audit-1119/ps-featurespecs.json, std routingCurve.fs. Schema + evaluator; manipulator with psui.
-- **Next:** nuts: bool2's fan fix 0bfc1ed0 is on main: re-run nuts vs live 135.268 mm3 / 29 faces, decide nuts3 59df02227.
+- **Next:** ring banked sections (live's mid sections bank ~6 deg); then the queue below.
 - **Volume measure warning:** on impeller parts OCCT's plain Gauss VolumeProperties is ~1.2 % off (input 97755.8 vs
   mesh-converged ~96555, kernel props 95977.8 after the delete ~= mesh): the old "OCCT 97123.4" targets were plain
   Gauss. Compare with kernel props (replay prints them) or vibex7 ~/tmp/core/imp/mvol (mesh).
