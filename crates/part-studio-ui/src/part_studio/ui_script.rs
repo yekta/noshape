@@ -292,7 +292,7 @@ impl PartStudioView {
             // (No readout while a feature dialog is open: the readout isn't rebuilt then.)
             "measure": match self.ui_sketch_measure(cx) {
                 Some(m) => m,
-                None if self.ui.measure_readout.is_empty() || self.edit.is_some() => Value::Null,
+                None if self.ui.measure_readout.is_empty() || self.edit.is_some() || self.ui.analysis_tool.is_some() => Value::Null,
                 None => json!({ "readout": self.ui.measure_readout, "panel": null }),
             },
         })

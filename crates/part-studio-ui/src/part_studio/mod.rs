@@ -2842,7 +2842,10 @@ impl PartStudioView {
             // the navbar; Shift+Tab before its first one to <body> (here the
             // Part Studio itself, so shortcuts keep working).
             DialogEvent::LeaveFocus { forward } => {
-                if let Some(e) = &this.edit {
+                // Only Tab past the dialog's end leaves Esc dead (live dialogs-1118 batch 3); the keyboard back on the
+                // page after a field's menu item or Shift+Tab, Esc cancels (qa dialog-query-rclick-clear-all,
+                // fillet-chip-clear-missing: one Esc closes the dialog).
+                if *forward && let Some(e) = &this.edit {
                     e.dialog.update(cx, |d, _| d.tabbed_out = true);
                 }
                 if *forward {

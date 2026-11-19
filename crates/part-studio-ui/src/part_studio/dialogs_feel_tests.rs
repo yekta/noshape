@@ -441,6 +441,76 @@ fn rows() -> Vec<Row> {
             wait_until(cx, window, |cx| !view.read(cx).ui_busy());
             expect((typed, height(cx)), (Some(10.), Some(40.)), "the body's height (mm) 3 s after typing 40, after Tab")
         } },
+        Row { id: "preview / asked at the pick", live: "live 11-17 feature-dialogs: the preview is asked 113–330 ms after the pick (its round trip); ours in the frame of the pick", gap: false, check: |cx| {
+            let (window, view) = block(cx, "dlg-preview-asked");
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            draw(cx, window);
+            let faces = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display.bodies.first().map(|b| b.face_refs.len()));
+            let (before_faces, before_seq) = (faces(cx), cx.update(|cx| view.read(cx).regen_seq));
+            let pick = cx
+                .update(|cx| {
+                    let v = view.read(cx);
+                    let e = v.display.bodies.first().and_then(|b| b.edge_refs.first().cloned())?;
+                    v.built.as_ref().and_then(|b| b.picks.ids_for(&e).first().copied())
+                })
+                .ok_or("no edge pick")?;
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                let vp = v.viewport.clone();
+                v.on_viewport_event(&vp, &ViewportEvent::Click { pick: Some(pick), position: glam::DVec2::new(500., 300.), modifiers: Modifiers::default() }, w, cx);
+            }))
+            .unwrap();
+            let asked = cx.update(|cx| view.read(cx).regen_seq > before_seq && view.read(cx).pending.is_some());
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            draw(cx, window);
+            expect((asked, before_faces, faces(cx)), (true, Some(6), Some(7)), "(a regeneration asked before any time passed, the block's faces before, the preview's)")
+        } },
+        Row { id: "preview / Linear pattern: a typed count waits for Enter", live: "live2 pattern-hole-1118: \"3\" typed into Instance count changes nothing for 3–4 s; Enter shows the preview (0.8–1.5 s on live's lane), the dialog stays open", gap: false, check: |cx| {
+            use noshape_model::params::ParamValue;
+            let (window, view) = block(cx, "dlg-pattern-count");
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("linearPattern", w, cx))).unwrap();
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            let (part, edge) = cx
+                .update(|cx| {
+                    let b = view.read(cx).display.bodies.first()?.clone();
+                    let along_x = b.edge_refs.iter().zip(&b.mesh.edges).find(|(_, pl)| matches!((pl.first(), pl.last()), (Some(a), Some(z)) if (a[0] - z[0]).abs() > 1e-3 && (a[1] - z[1]).abs() < 1e-6 && (a[2] - z[2]).abs() < 1e-6))?.0.clone();
+                    Some((Reference::Body(b.id.clone()), along_x))
+                })
+                .ok_or("no part or x edge")?;
+            let dialog = cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.clone())).ok_or("no dialog")?;
+            dialog.update(cx, |d, cx| d.set_value("entities", ParamValue::Query(vec![part]), cx));
+            dialog.update(cx, |d, cx| d.set_value("directionOne", ParamValue::Query(vec![edge]), cx));
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            draw(cx, window);
+            let span = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display.bounds().map(|(lo, hi)| ((hi - lo).max_element() * 1000.).round()));
+            let two = span(cx);
+            cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("instanceCount", w, cx))).unwrap();
+            draw(cx, window);
+            keys(cx, window, &["3"]);
+            for _ in 0..150 {
+                cx.executor().advance_clock(std::time::Duration::from_millis(20));
+                draw(cx, window);
+            }
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            let typed = span(cx);
+            keys(cx, window, &["enter"]);
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            draw(cx, window);
+            let open = cx.update(|cx| view.read(cx).edit.is_some());
+            expect((two, typed, span(cx), open), (Some(65.), Some(65.), Some(90.), true), "the parts' span (mm): 2 instances, 3 s after typing 3, after Enter; the dialog open")
+        } },
+        Row { id: "fields / after a field's menu item, one Esc cancels", live: "qa dialog-query-rclick-clear-all, fillet-chip-clear-missing: Entities to fillet › Clear all (or Clear missing references) leaves the keyboard on the page; one Esc closes the dialog (only Tab past its end leaves Esc dead)", gap: false, check: |cx| {
+            let (window, view, dialog, _) = fillet_on_an_edge(cx, "dlg-menu-esc")?;
+            // What a field's menu item does after its action (FeatureDialog::leave_keyboard_after_menu).
+            dialog.update(cx, |d, cx| {
+                d.keyboard_left = true;
+                cx.emit(crate::feature_dialog::DialogEvent::LeaveFocus { forward: false });
+            });
+            draw(cx, window);
+            keys(cx, window, &["escape"]);
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            expect(cx.update(|cx| view.read(cx).edit.is_some()), false, "the dialog open after one Esc")
+        } },
         Row { id: "fields / Esc in a value field", live: "the first Esc discards the typed value and leaves the field, the dialog stays; a second Esc cancels", gap: false, check: |cx| {
             let (window, view, dialog) = edit_extrude(cx, "dlg-esc");
             cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();

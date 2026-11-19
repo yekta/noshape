@@ -1142,8 +1142,9 @@ impl PartStudioView {
     /// monospace; a point reads "Point: X↘ … Y↗ … Z↑ …" with colored axes).
     pub(super) fn selection_readout(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         self.ui.measure_readout.clear();
-        // None while a feature dialog is open (live ui-parity dialog-enter-commits-new, edge-rclick-fillet: measure null).
-        if self.edit.is_some() {
+        // None while a feature dialog or an analysis tool's is open (live ui-parity dialog-enter-commits-new,
+        // edge-rclick-fillet, analysis-interference: measure null; no live take has a readout under any dialog).
+        if self.edit.is_some() || self.ui.analysis_tool.is_some() {
             self.ui.measure_last_line = None;
             return None;
         }

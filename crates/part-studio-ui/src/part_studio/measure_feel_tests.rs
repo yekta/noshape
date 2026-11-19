@@ -555,3 +555,54 @@ fn the_summary_keeps_its_old_text_until_the_answer(cx: &mut TestAppContext) {
     let after = b.readout(cx, &[FRONT_EDGE], &[]).unwrap();
     assert!(measuring && pending == point && after != point && !after.is_empty(), "the summary: a vertex {point:?}; an edge clicked, measuring ({measuring}) {pending:?}; answered {after:?}");
 }
+
+/// Live measure-mass-1118: with Mass properties open a face click adds its part, a face of a measured part clicked
+/// again takes the part out; the volume is the parts' sum.
+#[gpui::test]
+fn mass_adds_a_clicked_faces_part_and_a_second_click_takes_it_out(cx: &mut TestAppContext) {
+    let b = Bench::open(cx, "mass-click", 1.0);
+    let (p1, p2) = (b.reference(cx, E::Part("Part 1")).unwrap(), b.reference(cx, E::Part("Part 2")).unwrap());
+    cx.update(|cx| b.view.update(cx, |v, cx| v.open_mass(cx)));
+    draw(cx, b.window);
+    let volume = |cx: &mut TestAppContext| {
+        wait_until(cx, b.window, |cx| b.view.read(cx).ui.mass_job.as_ref().is_none_or(|j| j.value.is_some()));
+        draw(cx, b.window);
+        let state = cx.update(|cx| b.view.read(cx).ui.mass_state.clone()).unwrap_or_default();
+        state["fields"].as_array().and_then(|f| f.iter().find(|f| f["label"] == "Volume").and_then(|f| f["text"].as_str().map(str::to_string))).unwrap_or_default()
+    };
+    let mut got = Vec::new();
+    let mut volumes = Vec::new();
+    for face in [TOP, P2_TOP, BOTTOM] {
+        let r = b.reference(cx, face).unwrap();
+        cx.update_window(b.window, |_, w, cx| b.view.update(cx, |v, cx| {
+            let pick = v.built.as_ref().and_then(|bt| bt.picks.ids_for(&r).first().copied());
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::Click { pick, position: glam::DVec2::new(500., 300.), modifiers: Modifiers::default() }, w, cx);
+        }))
+        .unwrap();
+        draw(cx, b.window);
+        got.push(cx.update(|cx| {
+            let s = &b.view.read(cx).selection;
+            (s.contains(&p1), s.contains(&p2), s.len())
+        }));
+        volumes.push(volume(cx));
+    }
+    assert_eq!(got, vec![(true, false, 1), (true, true, 2), (false, true, 1)], "(Part 1, Part 2 measured, selected) after Part 1's top, Part 2's top, Part 1's bottom");
+    let mm3 = |t: &str| t.split_whitespace().next().and_then(|n| n.replace(',', "").parse::<f64>().ok());
+    let v: Vec<Option<f64>> = volumes.iter().map(|t| mm3(t)).collect();
+    let summed = matches!(v.as_slice(), [Some(a), Some(ab), Some(b)] if ((a + b) - ab).abs() <= 1e-3 * ab.abs());
+    assert!(summed, "Volume: Part 1 {:?}, both {:?}, Part 2 {:?}: the two parts' sum", volumes[0], volumes[1], volumes[2]);
+}
+
+/// qa analysis-interference (live): a face's summary goes when an analysis tool opens (Interference detection takes
+/// the face's part); no live take has a readout under any dialog.
+#[gpui::test]
+fn no_summary_while_an_analysis_tool_is_open(cx: &mut TestAppContext) {
+    let b = Bench::open(cx, "summary-analysis", 1.0);
+    let face = b.readout(cx, &[TOP], &[]).unwrap();
+    cx.update_window(b.window, |_, w, cx| b.view.update(cx, |v, cx| v.toggle_analysis_tool(crate::part_studio::analysis_tools::ToolKind::Interference, w, cx))).unwrap();
+    wait_until(cx, b.window, |cx| !b.view.read(cx).ui_busy());
+    draw(cx, b.window);
+    let open = cx.update(|cx| (b.view.read(cx).ui.analysis_tool.is_some(), b.view.read(cx).ui.measure_readout.clone()));
+    assert!(!face.is_empty() && open.0 && open.1.is_empty(), "the top face's summary {face:?}; with Interference detection open: {:?}", open.1);
+}
