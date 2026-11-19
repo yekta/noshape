@@ -106,15 +106,11 @@ N. Drawings not deterministic: fixed, QUEUED ba3d6cc1 (23:2x; d8ace4d34..6b1a7bc
    hex-bookcase's DXF counts vs live (was LINE 211/206, LWPOLYLINE 17/25; its mesh edges now run one fixed way).
 C. PARKED (lead 23:2x) fan-blade (~2.6x live a view): Hide in 8 threads over one body's edges was not identical (4 / 17
    corpus drawings) and slower (Front 5.3 -> 9.8 s, Update 6.5 -> 37 s); attempt in /root/dx-scratch/p36.
-Q. (lead 11-18 20:4x, after fan-blade) asm-robot-relations studio 0c3466's Import 1: live makes six separate SURFACE
-   parts REV-21-1650, ours sews them into one 171,987 mm³ solid (BOM 36/42 rows, Thicken 1 11 parts for live's 1):
-   Import keeps separate sheets separate. Repro from asm (d8d597e0-675c-497b-a804-544ceab99bbd).
-   Found 22:3x (/root/dx-scratch/bin/stepcomp.py, /root/dx-scratch/rr/rrprobe.cpp on vibex8): the STEP
-   (foreign/0fc7dd7c….step) is ONE closed shell, 174 faces, one component; OCCT: valid, 171,983 mm3. Live's six
-   sheets = that shell with plane face #5090 (live JFX, 1 face) cut out: every link between JFD (45 faces), JFT
-   (110) and the three rods (6 each) runs through #5090's 14 edges. Not why yet: #5090 is exact (edges on its plane
-   to 1e-5 mm), loops >= 0.05 mm apart, edge use consistent, no self-intersection (BOPAlgo), curve-on-surface <= 1e-3
-   mm. Next: what Parasolid rejects there (ask live2 whether live flags Import 1 faulty?).
+Q. asm-robot-relations studio 0c3466's Import 1 (REV-21-1650.STEP): live's stored import = six SURFACE parts, ours one
+   valid 174-face solid (OCCT: valid, 171,983 mm3; live's six sheets = that shell less plane face #5090). live2
+   rr-import-1118 (02:3x): live's own re-import of the same file today gives ONE solid "Combine1" (154 faces), Import 1
+   WARNING "Imported parts contained faults." (Allow faulty parts on), or no parts at all (off). So the six sheets are
+   an old stored translation live no longer makes. Decision asked of the lead (11-19 03:1x): keep ours (one solid).
 H. Hidden lines vs live (live + live2 02:3x, live/dx/louver-hidden-1119/: sm-louver Front + Top with Show hidden lines,
    DXF 2018). Live: Front Hidden 882 LINE + 33 ELLIPSE, TANGENT_HIDDEN 81; Top 466 LINE + 42 ELLIPSE + 3 ARC,
    TANGENT_HIDDEN 107. Ours before cadc2e12: Front 393 / Top 37 LINE; after: 462 / 312 (toward live). Gaps: we never
