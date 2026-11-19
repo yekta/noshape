@@ -24,10 +24,13 @@ pub struct VarInputDialog {
     /// The edited input's name ("Edit Wid").
     edit_name: String,
     kind: usize,
-    name: Entity<InputState>,
+    pub(super) name: Entity<InputState>,
     default: Entity<InputState>,
     min: Entity<InputState>,
     max: Entity<InputState>,
+    /// Add configuration input › Checkbox: the "Checkbox input" dialog, its Default (live2 session-studio-1119 shot 31:
+    /// Name and a ticked Default, no type tabs or range).
+    pub checkbox: Option<bool>,
     _subs: Vec<Subscription>,
 }
 
@@ -92,6 +95,9 @@ impl VarInputDialog {
         let range = range_error(dim, values, units);
         let errs = [0, 1, 2].map(|i| if invalid[i] { Some("Enter a valid expression.") } else { range.and_then(|(e, m)| m[i].then_some(e)) });
         let named = self.editing.is_some() || !self.name.read(cx).value().trim().is_empty();
+        if self.checkbox.is_some() {
+            return ([None; 3], named);
+        }
         (errs, named && errs.iter().all(Option::is_none))
     }
 }
@@ -128,8 +134,16 @@ impl PartStudioView {
         if editing.is_none() {
             name.update(cx, |s, cx| s.focus(window, cx));
         }
-        self.ui.var_input = Some(VarInputDialog { editing, edit_name, kind, name, default, min, max, _subs: subs });
+        self.ui.var_input = Some(VarInputDialog { editing, edit_name, kind, name, default, min, max, checkbox: None, _subs: subs });
         cx.notify();
+    }
+
+    /// Add configuration input › Checkbox: the "Checkbox input" dialog, its Name focused and Default ticked.
+    pub(super) fn open_checkbox_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_variable_input(None, window, cx);
+        if let Some(d) = &mut self.ui.var_input {
+            d.checkbox = Some(true);
+        }
     }
 
     /// ✓ / Enter.
@@ -140,6 +154,15 @@ impl PartStudioView {
             return;
         }
         let Some(d) = self.ui.var_input.take() else { return };
+        if let Some(default) = d.checkbox {
+            let name = d.name.read(cx).value().trim().to_string();
+            self.edit_config(noshape_ops::config::ADD_INPUT, cx, |ps| {
+                noshape_ops::config::add_checkbox_input(ps, &name, default);
+            });
+            self.config_dirty(cx);
+            cx.notify();
+            return;
+        }
         let kind = KINDS[d.kind].1;
         let [dv, lo, hi] = d.texts(cx);
         let range = (kind != VariableKind::Text).then(|| (ExprValue::new(lo), ExprValue::new(hi)));
@@ -164,8 +187,10 @@ impl PartStudioView {
         let pal = p();
         let (errs, ok) = d.errors(&units, cx);
         let blue = gpui_kit::rgb(0x1651b0);
+        let checkbox = d.checkbox;
         let title = match &d.editing {
             Some(_) => format!("Edit {}", d.edit_name),
+            None if checkbox.is_some() => "Checkbox input".to_string(),
             None => "Variable input".to_string(),
         };
         let tab = |i: usize, label: &'static str, on: bool, cx: &mut Context<Self>| {
@@ -218,7 +243,7 @@ impl PartStudioView {
         };
         let text = KINDS[d.kind].1 == VariableKind::Text;
         let mut kinds = h_flex();
-        if d.editing.is_none() {
+        if d.editing.is_none() && checkbox.is_none() {
             for (i, (label, _)) in KINDS.iter().enumerate() {
                 kinds = kinds.child(tab(i, label, d.kind == i, cx));
             }
@@ -232,6 +257,10 @@ impl PartStudioView {
             let mut fields = Vec::new();
             if d.editing.is_none() {
                 fields.push(serde_json::json!({ "label": "Name", "kind": "string", "text": value(&d.name) }));
+            }
+            if let Some(on) = checkbox {
+                fields.push(serde_json::json!({ "label": "Default", "kind": "boolean", "checked": on }));
+                return serde_json::json!({ "title": title, "kind": "feature", "tabs": [], "fields": fields, "error": null, "ok": if ok { "enabled" } else { "disabled" }, "titleState": if ok { "ok" } else { "error" } });
             }
             fields.push(serde_json::json!({ "label": "Default", "kind": num, "text": value(&d.default) }));
             if !text {
@@ -287,8 +316,16 @@ impl PartStudioView {
                 )
                 .when(d.editing.is_none(), |c| c.child(row("vi-name", "Name", &d.name, name_missing.then_some(""))))
                 .child(kinds)
-                .child(row("vi-default", "Default", &d.default, errs[0]))
-                .when(!text, |c| c.child(row("vi-min", "Minimum", &d.min, errs[1])).child(row("vi-max", "Maximum", &d.max, errs[2])))
+                .when_some(checkbox, |c, on| {
+                    c.child(div().h(px(28.)).px(px(5.)).flex().items_center().child(gpui_kit::component::checkbox::Checkbox::new("vi-checkbox-default").label("Default").checked(on).on_click(cx.listener(|this, v: &bool, _, cx| {
+                        if let Some(d) = &mut this.ui.var_input {
+                            d.checkbox = Some(*v);
+                        }
+                        cx.notify();
+                    }))))
+                })
+                .when(checkbox.is_none(), |c| c.child(row("vi-default", "Default", &d.default, errs[0])))
+                .when(checkbox.is_none() && !text, |c| c.child(row("vi-min", "Minimum", &d.min, errs[1])).child(row("vi-max", "Maximum", &d.max, errs[2])))
                 .into_any_element(),
         )
     }

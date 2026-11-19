@@ -6303,3 +6303,35 @@ fn curve_analysis_in_a_sketch_selects_the_analysed_line(cx: &mut TestAppContext)
     assert_eq!(field, Some(1), "the line in the field");
     assert_eq!(readout.first().map(|r| r.0.as_str()), Some("Length"), "{readout:?}");
 }
+
+/// Live2 session-studio-1119 (shot 31): Add configuration input › Checkbox opens the "Checkbox input" dialog (Name,
+/// Default ticked; ✓ off until named) instead of adding "Checkbox 2" at once; "Rounded" + Enter adds "Rounded
+/// (Default: true)".
+#[gpui::test]
+fn add_configuration_input_checkbox_opens_its_dialog(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_variables(cx, "cfg-checkbox-dialog", &[("width", "30 mm")]);
+    let inputs = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).map(|s| s.configuration.inputs.clone()).unwrap_or_default());
+    let before = inputs(cx).len();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_checkbox_input(w, cx))).unwrap();
+    draw(cx, window);
+    assert_eq!(inputs(cx).len(), before, "nothing added yet");
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.ui.var_input.as_ref().expect("the dialog");
+        assert_eq!(d.checkbox, Some(true), "Default ticked");
+    });
+    cx.update_window(window, |_, w, cx| {
+        let st = view.read(cx).ui.var_input.as_ref().map(|d| d.name.clone()).expect("its Name");
+        st.update(cx, |s, cx| s.set_value("Rounded".to_string(), w, cx));
+    })
+    .unwrap();
+    draw(cx, window);
+    keys(cx, window, &["enter"]);
+    draw(cx, window);
+    let all = inputs(cx);
+    let added = all.last().expect("an input");
+    assert_eq!(all.len(), before + 1);
+    assert_eq!(added.name, "Rounded");
+    assert!(matches!(added.kind, noshape_model::configuration::ConfigInputKind::Checkbox { default: true }), "{:?}", added.kind);
+    assert!(cx.update(|cx| view.read(cx).ui.var_input.is_none()), "closed");
+}

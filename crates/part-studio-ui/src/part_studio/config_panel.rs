@@ -1170,7 +1170,11 @@ impl PartStudioView {
                     let mut m = m.dropdown().min_width(width).row_height(28.5).text_inset(48.);
                     for (label, icon, kind) in [("List", "cfg-filter-list", "List"), ("Checkbox", "cfg-filter-checkbox", "Checkbox"), ("Configuration variable", "cfg-filter-variable", "Variable")] {
                         let v = v.clone();
-                        m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, w, cx| v.update(cx, |this, cx| if kind == "Variable" { this.open_variable_input(None, w, cx) } else { this.add_config_input(kind, cx) })));
+                        m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, w, cx| v.update(cx, |this, cx| match kind {
+                            "Variable" => this.open_variable_input(None, w, cx),
+                            "Checkbox" => this.open_checkbox_input(w, cx),
+                            _ => this.add_config_input(kind, cx),
+                        })));
                     }
                     // Help config-paste-inputs: Paste inputs once something was copied.
                     if !crate::config_visibility::copied_inputs().is_empty() {
@@ -2653,7 +2657,11 @@ impl PartStudioView {
                         let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
                             for (label, icon, kind) in [("List", "cfg-filter-list", "List"), ("Checkbox", "cfg-filter-checkbox", "Checkbox"), ("Configuration variable", "cfg-filter-variable", "Variable")] {
                                 let v = v.clone();
-                                m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, w, cx| v.update(cx, |this, cx| if kind == "Variable" { this.open_variable_input(None, w, cx) } else { this.add_config_input(kind, cx) })));
+                                m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, w, cx| v.update(cx, |this, cx| match kind {
+                            "Variable" => this.open_variable_input(None, w, cx),
+                            "Checkbox" => this.open_checkbox_input(w, cx),
+                            _ => this.add_config_input(kind, cx),
+                        })));
                             }
                             // Help config-paste-inputs: Paste inputs once something was copied.
                             if !crate::config_visibility::copied_inputs().is_empty() {
@@ -3169,7 +3177,11 @@ impl PartStudioView {
                     m = m.focus_after_action(after.clone());
                     for (label, icon, kind) in [("List", "cfg-filter-list", "List"), ("Checkbox", "cfg-filter-checkbox", "Checkbox"), ("Configuration variable", "cfg-filter-variable", "Variable")] {
                         let v = v.clone();
-                        m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, w, cx| v.update(cx, |this, cx| if kind == "Variable" { this.open_variable_input(None, w, cx) } else { this.add_config_input(kind, cx) })));
+                        m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, w, cx| v.update(cx, |this, cx| match kind {
+                            "Variable" => this.open_variable_input(None, w, cx),
+                            "Checkbox" => this.open_checkbox_input(w, cx),
+                            _ => this.add_config_input(kind, cx),
+                        })));
                     }
                     // Help config-paste-inputs: Paste inputs once something was copied.
                     if !crate::config_visibility::copied_inputs().is_empty() {
