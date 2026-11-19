@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 01:58 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 02:15 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -41,22 +41,15 @@ quadrant's snap wakes no alignment source (ours aligns with points only).
 - asm-suspension still: Fillet 3 / 4, Body / Joint / Lower Control Arm offsets: our edges B-splines where live's are
   r40 circles (core's; asm routes). asm-tvc-mount ring: not cce30a1a (A/B identical); asm bisects.
 
-## Big-sketch feel (lead 23:4x): reported 01:12, nothing >= 100 ms in ours
-- Ours (vibe2 release, solver + regions + redraw = clone/overlay/glyphs/labels), worst of 5 picks / 150 steps:
-  infento "Part grid" (3057 ent / 1313 con ours): press 4-10 ms, drag 7.0 avg / 11 worst, redraw 1.2, regen 12-32 ms
-  (live's recorded regen 13984 ms); no driving dimensions. robot "Sketch 2": press 3-5, drag 3.9 / 19, edit 11-14
-  (362 PROJECTED not built: Import 1 not fetched). keyboard "Sketch 5": not buildable offline (on Import 1's face);
-  substitute bjr-config 5d8bc1 "Sketch 29" (622 / 610): press 2.5-25, drag 15 / 44 (60 of 150 steps > 16 ms), edit
-  16-20, redraw 0.8.
-- Live's numbers: REQUESTS 23:45 still open; compare when they come (only a >= 100 ms gap would be mine).
-- Runs: vibe2 ~/tmp/skasm/{inf1,bjr1,bigm} model dirs (studio cut to the sketch), inf1.sh / redraw.sh (scratch bin).
-  The full infento doc (349 features) takes > 40 min to translate (not a sketch cost: Part grid itself 15 s).
-- The probe is out of the tree (01:13); to rerun, copy /root/skasm-scratch/probes/zz_sketch_speed.rs into
-  crates/ops/tests and add `mod zz_sketch_speed;` to all.rs, and remove both before any land.
-Sketch keys (live shortcuts-sk-1118, 6 rows): fixed 01:5x and landing (Ctrl+M nothing, ` empty Select other,
-Shift+X Section view over the greyed sketch dialog, Shift+N dialog name edit box, Shift+V closes the sketch then Named
-views, no dot at a resting pointer). Defaults asked by live: Show constraints off / Show errors on (live's own code,
-behaviours 33696), as ours. Big-sketch: flag only live rows >= 100 ms and >= 2x.
+## Closed 11-19: big-sketch feel (no row >= 100 ms and >= 2x live; live: open 2.6-25 s, edit 2.7-13 s, press 31-56 ms;
+ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
+Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live to recheck on green.
+
+## In flight 02:15: parity: a Use lands on live's refs geometry when its stored entity is stale (same chord length,
+`LiveUse` in `Use`, `stale_uses` keeps the sketch's solve). UNCOMMITTED in crates/ops/src/parity.rs. rocker-enclosure-sm
+Sketch 2 now Uses its 4 edges (Extrude 2's difference is Sketch 4's, unchanged). Full suite B queued on vibe2 slot:
+~/agents/skasm-keep/suite-B-*.log vs A suite-1119-0125.log (90/126, 1325/1585; A is the pre-01:40 base). Land if no
+document loses features.
 welding Sketch 12 (lead: P1) is NOT 7 mm off: ours = live's geometry. Its 2 PROJECTED left are Uses live SPLIT: line
 a6Y7 Uses edge Jq9 (105.05-118.985 mm), its end at MIDPOINT(start, `.orphan` point), the orphan keeping USE_END to the
 far vertex (zBqz the same via a trimOffspring). Ours draws the piece unlinked. Our Trim of a Use'd piece keeps the link
