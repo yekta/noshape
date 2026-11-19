@@ -3,6 +3,56 @@
 Dated notes moved out of docs/handoff/bool.md on 11-15 (lead: handoffs are current state only). Newest first;
 nobody reads this by default. bool2's section is in docs/handoff/archive/bool2.md (bool2 moved it).
 
+## 11-19 16:45 (moved from the handoff)
+- a04711 notes: Part 3 = live's faces / volume / area but 8/17/11 vs 9/22/15 (live's 10 um JT6 sliver; the rounded
+  retry's other firings, Extrude 23 / 27, are rejected and stay errors). The doc's 19.9 s vs live 1.93: fillets on
+  parts off from Extrude 1 (asm's). Repro vibex8 ~/agents/asm-keep/ma04; dumps ~/tmp/bool/a04-box.log.
+- Re-timed on the Mac vs live's rbstep-1118 (lead 12:30: qa's list first): mine > 5x: impeller Extrude Bohrungssitz
+  Ansaugflansch (op_boolean 1050 of 1115 vs live 154.5: fuse 87647d5a, 9 ring bosses on the 48-face B-spline housing,
+  glue shift_checked; ours "a piece's point on another solid's face" (coincident faces), OCCT 930 ms of EF on the big
+  B-spline faces; OBB no help), Fillet 3's cut ed9c35dc (750 ms; ours "an edge on another argument's free-form face"),
+  Chamfer Stevenrohr (op_boolean 156 vs 16), fuse 23659e13 (340 ms; ours "a face lost"). local_boolean would take them
+  (only the faces the tools reach) but needs: < 200-face targets with free-form faces, several tools, reach tighter
+  than face boxes (no(5): the B-spline faces' boxes reach > 1/4). Knife Split 4 5x: project_along's plane sections
+  (OCCT 5-10 ms each, half ComputeTolReached3d PSO); the marcher declines the grind face (grid > 257 a way): parked
+  /root/bool-scratch/parked-own-plane-section.diff (identical results where it ran). Cases Mac ~/noshape-host/bool-keep/{imprec,kdump-p}.
+- 11-18 13:4x impeller rest: Fillet 3's cut ed9c35dc (OCCT 680 of 720 ms): 4 EF pairs of the housing's 141/144 mm
+  B-spline edges against each tool's offset face lying on the housing's offset surface (geometrically, not the same
+  handle or basis): 135-150 ms each, no common part; ours declines the same coincidence. Told blend (tool oversize past
+  F2) ; our side would be coincident free-form faces in brep (big). 23659e13 (fuse, "a face lost"): ours 57 + OCCT 220;
+  e14e43ba (cut): ours 45 + OCCT 62. Scratch probes: xprobe probe_case_reach (box vs true contacts), PROBE_HIST /
+  PROBE_GLUE_OFF in probe_case_timed; Mac A/B binaries ~/noshape-host/bool-keep/bin/{base,new}, ab.sh, one.sh.
+- qa 11-18 (5x live): impeller Shell Gehäuse (Mac 199 after 16.; left: CheckerSI 26 %, quad::foot / ProjectPointOnSurf
+  Extrema grid scans per point, meshed copies 12 %), Flansch+Gehäuse 4d5e785f (ours 202 vs OCCT 3302; critical path
+  one OCCT offset x extrusion section 135 ms of it, OCCT's walk + tolerance PSO), Boolean 1 (unify 66: usd.check 38 =
+  made_valid decision, usd.volume 27 borderline-only), knife Split 4 (project_along 41). Cases Mac
+  ~/noshape-host/bool-keep/{imprec,impdump,rlrec2}.
+- live's suite-truth-1118 first differences (behaviours "core + bool + skasm (lead 11-18)"): rocker-enclosure-body
+  Extrude 6 not the Boolean (ours = OCCT; the tool's hex pocket centred (-79.16, 36.16) vs live's (-77.85, 34.85): the
+  sketch/placement, skasm/core); britatap fixed (19.); parting-line Split 3: the Mac stops at Draft 1 ("Select parting
+  edges", same model files: platform), Linux run on vibe2 (.spx.sh); fan-blade #48 sent to bool2.
+- 850efe: cases Mac ~/noshape-host/bool-keep/m85 (Extrude 5 110173579c7126ff, Extrude 6 cc1019ddbd364035), vibex8
+  ~/tmp/bool/m85acc. Blend told of the invalid Fillet 2 earlier; with 8ba7 Fillet 2 gets live's Extrude 5.
+- e54410: cases Mac ~/noshape-host/bool-keep/me5 (Extrude 22 6dc4464f40a8b0b2, Extrude 17 10c21d285eec6c3a). Live's
+  merge distance: live/bool/q-union-merge (behaviours.md "bool (11-17 22:22)").
+- asm pattern-std 36b90f Extrude 12 (17/43/28 vs live 14/36/24): not the Boolean (same with NOSHAPE_BOOL_RUST=0):
+  the up-to-surface extrude's caps; told asm 11-17. Logs /root/bool-scratch/mps-51ee{,-off}.log.
+- Pulleys recordings: vibex8 ~/tmp/bool/pul (6 cases), Mac ~/noshape-host/bool-keep/pul; Mac scripts in bool-hat
+  .samp.sh / .t6.sh / .t7.sh (untracked).
+- GearLab herringbone (dx, asm-isaac-ball 8f5622, 14.8 s vs live 1.15): fuses 726897a5 (teeth on blank, ours "two
+  edges leave a vertex in one direction"; glue changes history: no) and 68f32ae1 (half + mirror, ours "a piece's point
+  on another solid's face"; OCCT 949 ms, glue shift 294 identical history). fuse_glued now sees the mirror (6.) but
+  the half's z=5 cap is 41 faces (core's 5e-9 rad tilted sweep caps leave teeth end faces unmerged): with core's fix
+  it should go glued. ShiftChecked's volumes_add_up (1e-7) rejects B-spline solids (integration noise ~1e-5).
+  Cases Mac ~/noshape-host/agents/bool-hat/gear, vibex6 ~/agents/dx-keep/gearlab/booleans.
+- Shell corpus (Mac ~/noshape-host/bool-keep shrec-loose: 159 Booleans of /root/core-scratch/shellcorpus' 211
+  shells; DECISIONS: differing before share): 16 differing -> 8 on bool-pole (93 taken). Left: f9b2 (bool2-rim
+  a5c64eb23, gating); history only, a vertex inside coincident edges of other arguments (OCCT's Deleted vs Modified
+  follows its rounding; ours' deleted_v heuristic): 2265 (ours Deleted), 3130 / 7724 / 85ac / ffa2 (ours Modified):
+  A/B of declining that on the slab path running (/root/bool-hat-scratch/ab-rnd1.out, NOSHAPE_DECL_RND scratch
+  toggle in bool-hat's boolean.rs); unified differently: 71ca (ours joins an x-axis cylinder's pieces, 25/60 vs
+  28/67), d252 (slab edges along a ruling, the seam on the other side, 13/38 vs 12/30).
+
 ## 11-19 13:35 (moved from the handoff)
 - Spur-gear P0 closed (lead 11-19): the fold fix 373dd5b9, qa 1.03x v0.4.58 (+99 ms; 1.28 before); ships v0.4.60.
 - LEAD 11-19 05:4x: 129100d95 (the unify's tolerant-edge room; cf-surface-pattern 386 -> 385 edges, live 387) out

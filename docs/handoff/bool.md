@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-19 13:35 UTC (new bool thread on the Motile account since 03:5x). Hosts (lead 11-18/19): builds + probes on the Mac (NOSHAPE_RB_HOST=mac; corpus replays / A-Bs
+Updated 11-19 16:45 UTC (new bool thread on the Motile account since 03:5x). Hosts (lead 11-18/19): builds + probes on the Mac (NOSHAPE_RB_HOST=mac; corpus replays / A-Bs
 there only inside an rb.sh slot, else vibex8; Mac paths ~/noshape-host/...), gates on the least-loaded host (vibex8 now;
 NOSHAPE_GATE_HOST=vibex8 via /root/bool-scratch/gate-chain-own.sh <sha> as a systemd-run unit; off 02:00-04:00);
 land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs vibex7 ~/lead-private (hat8, hat15, hat15b,
@@ -47,7 +47,8 @@ Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are interna
   GATE unit bool-gate-1c8b8f4cf-x8 (vibex8, 13:02) -> /root/bool-hat-scratch/chain-1c8b8f4cf.out; private docs
   bool-udoc-1c8b8f4cf -> udoc-1c8b8f4cf.out. Both clean -> land (lead: arm it and say so in the same turn); then tell
   dx / core / blend / asm / bool2. bool-stack6's gate replay: taken 3044 -> 3139 (+95 -0), differing 6 -> 6.
-- bool-pole (on bool-stack7, 4 commits; kernel 518 + brep pass on the Mac; own gate + udoc after stack7 lands):
+- bool-pole (on bool-stack7, 6 commits; kernel 518 + brep pass on the Mac before the last two; own gate (with the
+  Shell check) + udoc after stack7 lands):
   e4f8a8066 a sphere's pole edge split at the curves ending there (boolean.rs apex_parts for Nurbs, Geo::Apex
   a0/a1; rust_boolean.cpp pole pieces): non-manifold cdd336b4 taken = OCCT (T1 a_spheres_octant_through_its_pole).
   01775a048 new straight edges continuing one another through a vertex share one Geom_Line (rust_boolean.cpp
@@ -61,13 +62,40 @@ Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are interna
   818552c9, 83b621a3 (shfall), 8e91c517, 922c847a, 952c2efc (shfall), a1186078, a7bdd15b (shfall), b359e025,
   cb7bb22b, e1dc8c98, f1c35250 (shfall), f302ef40; Shell corpus (correct ones) 1451f7cb, 43a947f0, 96d45f42,
   9bee135f, c25f7a31.
-- Shell corpus (Mac ~/noshape-host/bool-keep shrec-loose: 159 Booleans of /root/core-scratch/shellcorpus' 211
-  shells; DECISIONS: differing before share): 16 differing -> 8 on bool-pole (93 taken). Left: f9b2 (bool2-rim
-  a5c64eb23, gating); history only, a vertex inside coincident edges of other arguments (OCCT's Deleted vs Modified
-  follows its rounding; ours' deleted_v heuristic): 2265 (ours Deleted), 3130 / 7724 / 85ac / ffa2 (ours Modified):
-  A/B of declining that on the slab path running (/root/bool-hat-scratch/ab-rnd1.out, NOSHAPE_DECL_RND scratch
-  toggle in bool-hat's boolean.rs); unified differently: 71ca (ours joins an x-axis cylinder's pieces, 25/60 vs
-  28/67), d252 (slab edges along a ruling, the seam on the other side, 13/38 vs 12/30).
+- Shell end to end (LEAD 11-19, DECISIONS-level): Shell's results with ours vs OCCT's Boolean alone over core's 211
+  fuzz shells (Mac bool-keep/shellcorpus; hosts ~/agents/bool-corpora/shellcorpus/cases), history compared by place:
+  main differs in 10, bool-pole in 9 (13186b07 b64c8b4e 9134b29f 8eebe1e2: +1 face; f815832c: +1 face, volume 5e-4;
+  8e657637: +26 edges; b79e508b: -1 edge; 17488d26: volume 5e-5; 99b55ec9: volume 2e-8). The replay hid them (each
+  Boolean gets OCCT's inputs). Lead: keep the slab path (>= 100 ms on 17 shells, up to 18x); the gate now runs this
+  check (bool-pole 0d465cb70: gate-host.py SHELLS / SHELLS_KNOWN, fails on a new one; take fixed ones off the list);
+  get the 9 below 5 by 11-20 18:00 (else tell the lead), ranked by visible difference. Per shell, the Boolean that
+  differs (record one shell with ours on: NOSHAPE_RECORD_BOOLEANS, then replay NOSHAPE_BREP_VS_OCCT=1):
+  - f815832c: Common 9e2bf7c0 (also on OCCT's inputs): ours 2.719411e-6 vs OCCT 2.720903e-6 m3, 59 vs 58 faces.
+    xprobe probe_who_is_right (grid points where the two disagree, against the arguments): ours right at 7 of 8.
+    Likely OCCT's error (no live capture for a fuzz shell): decision for the lead.
+  - 17488d26 (and Shell-recording 7724 / 86b50d59): a 36-slab union; coincident cylinder faces arg9 Face4 / arg24
+    Face2 (r 6 mm, z 0..1 mm about (14, 20)): OCCT says arg9 Face4 Deleted, ours Modified to both halves (and arg14
+    Face0 Modified to one). Shell reads face records: real. Next: OCCT's history for a non-representative same-domain
+    face (BOPAlgo_Builder_2.cxx FillSameDomainFaces: representative = lowest-index original face, else a piece of
+    the lowest-index face; ours: first argument's, last argument's in a fuse of 4+).
+  - Unify family (slab union same as OCCT's, unified otherwise): b79e508b = 4dc6b1d4 (a ruling split at z 19.8 in
+    OCCT: two face pairs' sections, ours one line), da3ee477 / 71ca (an x-axis cylinder's pieces on another
+    argument's surface), f97ca580 (an extra seam split at x 34: pieces on two arguments' cylinders), 3b56cb83,
+    75780985. Tried and dropped: lines shared per section only (2ea4 / a6c8 regress, 4dc6 unchanged); first
+    argument's piece always (fixes 71ca / d252 / ffa2, breaks 2ea4 / 47763 / bd8e); OCCT's representative rule
+    literally (56 commons' history differ); declining coincident cylinders (109 of 159).
+  - 99b55ec9: Common df5e46e1 equivalent (1.7e-8 relative volume) but the Shell's volume string differs.
+  Mac scripts: /root/bool-scratch/shc-e2e2.sh <bin> <runs> (occtC = OCCT baseline), mac-shell-env.sh <bin> <ENV..>
+  (Shell recordings + 9-shell chain + end to end per env), mac-ab-vs.sh <bin> <base-tag> [ENV]. Probes:
+  xprobe probe_who_is_right, probe_faces_on_plane, probe_edges_on_line, probe_unified_edges.
+- History-only (LEAD 11-19): a Shell's slab union (recorded path *_slab_union, quick_boolean's slab_union) whose
+  history differs only in input vertices' records counts as equivalent in the replay (Shell reads only its faces'
+  records; bool-pole afcf858f3; brep_replay.rs vertex_records_only). Everywhere else history differences count.
+  Re-recorded Shell Booleans (Mac shrec-slabu, 155): 94 taken, 9 differ (the unify family 6, 7724's face, f9b2
+  (bool2's rim fix gating), 9e2bf7c0). 2265 / 3130 / 85ac / ffa2 now equivalent; the rounding decline A/B (41 Shell
+  cases, ~25 per corpus2-6) is parked: /root/bool-scratch/parked-rnd-decline.diff.
+- Speed list (lead 11-19, after stack7 / 50 um / history-only): pulleys Circular pattern 1 152 ms vs live 23 (doc 238
+  vs 102), the time in the Boolean (core confirmed).
 - Split with bool2 (lead 11-19): mine non-manifold (worked through: cdd336b4 fixed; the rest touching, tolerant,
   invalid or OCCT's own non-manifold results) + the Shell group; bool2's two edges leave a vertex, edge twice in a
   face, tiny arc and the 1-3 case tail. Tell each other before a new reason. Parked for both: short section from a
@@ -109,34 +137,7 @@ Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are interna
   declines "a piece's point on another solid's face"), wire-clip / gamma Boolean 1 (87-tool fuse, ours "cylinders
   nearly coincident", OCCT 2.0-2.9 s) and Boolean 2 (23 tools, "piece's point on another solid's face"). Cases Mac
   ~/noshape-host/bool-keep/rec-<doc>; trace /root/bool-scratch/dbg-near-on.diff (DBG_ON / DBG_NEAR2, scratch only).
-- a04711 notes: Part 3 = live's faces / volume / area but 8/17/11 vs 9/22/15 (live's 10 um JT6 sliver; the rounded
-  retry's other firings, Extrude 23 / 27, are rejected and stay errors). The doc's 19.9 s vs live 1.93: fillets on
-  parts off from Extrude 1 (asm's). Repro vibex8 ~/agents/asm-keep/ma04; dumps ~/tmp/bool/a04-box.log.
-- Re-timed on the Mac vs live's rbstep-1118 (lead 12:30: qa's list first): mine > 5x: impeller Extrude Bohrungssitz
-  Ansaugflansch (op_boolean 1050 of 1115 vs live 154.5: fuse 87647d5a, 9 ring bosses on the 48-face B-spline housing,
-  glue shift_checked; ours "a piece's point on another solid's face" (coincident faces), OCCT 930 ms of EF on the big
-  B-spline faces; OBB no help), Fillet 3's cut ed9c35dc (750 ms; ours "an edge on another argument's free-form face"),
-  Chamfer Stevenrohr (op_boolean 156 vs 16), fuse 23659e13 (340 ms; ours "a face lost"). local_boolean would take them
-  (only the faces the tools reach) but needs: < 200-face targets with free-form faces, several tools, reach tighter
-  than face boxes (no(5): the B-spline faces' boxes reach > 1/4). Knife Split 4 5x: project_along's plane sections
-  (OCCT 5-10 ms each, half ComputeTolReached3d PSO); the marcher declines the grind face (grid > 257 a way): parked
-  /root/bool-scratch/parked-own-plane-section.diff (identical results where it ran). Cases Mac ~/noshape-host/bool-keep/{imprec,kdump-p}.
-- 11-18 13:4x impeller rest: Fillet 3's cut ed9c35dc (OCCT 680 of 720 ms): 4 EF pairs of the housing's 141/144 mm
-  B-spline edges against each tool's offset face lying on the housing's offset surface (geometrically, not the same
-  handle or basis): 135-150 ms each, no common part; ours declines the same coincidence. Told blend (tool oversize past
-  F2) ; our side would be coincident free-form faces in brep (big). 23659e13 (fuse, "a face lost"): ours 57 + OCCT 220;
-  e14e43ba (cut): ours 45 + OCCT 62. Scratch probes: xprobe probe_case_reach (box vs true contacts), PROBE_HIST /
-  PROBE_GLUE_OFF in probe_case_timed; Mac A/B binaries ~/noshape-host/bool-keep/bin/{base,new}, ab.sh, one.sh.
 - parting-line Split 3: skasm's fix efd277131 landed (Draft 1 OK again): next.
-- qa 11-18 (5x live): impeller Shell Gehäuse (Mac 199 after 16.; left: CheckerSI 26 %, quad::foot / ProjectPointOnSurf
-  Extrema grid scans per point, meshed copies 12 %), Flansch+Gehäuse 4d5e785f (ours 202 vs OCCT 3302; critical path
-  one OCCT offset x extrusion section 135 ms of it, OCCT's walk + tolerance PSO), Boolean 1 (unify 66: usd.check 38 =
-  made_valid decision, usd.volume 27 borderline-only), knife Split 4 (project_along 41). Cases Mac
-  ~/noshape-host/bool-keep/{imprec,impdump,rlrec2}.
-- live's suite-truth-1118 first differences (behaviours "core + bool + skasm (lead 11-18)"): rocker-enclosure-body
-  Extrude 6 not the Boolean (ours = OCCT; the tool's hex pocket centred (-79.16, 36.16) vs live's (-77.85, 34.85): the
-  sketch/placement, skasm/core); britatap fixed (19.); parting-line Split 3: the Mac stops at Draft 1 ("Select parting
-  edges", same model files: platform), Linux run on vibe2 (.spx.sh); fan-blade #48 sent to bool2.
 - core's nut thread cut (c2-config-parts-nuts Sweep 1, vibex8 ~/agents/core-keep/nuts/nutcut{0,}.bin, Mac
   ~/noshape-host/bool-keep/nuts): the thread's crest lies on the bore (coincident, same side): ours declines, OCCT's
   wrong ((a) default options 121.40 mm3 valid, below object - tool = 131.99, main the same; (b) 157.7 invalid). Asked
@@ -145,26 +146,12 @@ Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are interna
   does, I narrow or remove offset_grazes_a_circle (check rings-loft, sp-1113).
 - P0 c2-fan-blade-sweep Boolean 2: our attempt fixed in 13. OCCT's 186 ms (Mac) is offset-surface evaluation; B-spline
   fits of the offsets gave -8 % only (dropped); core works the offset side. Case Mac ~/noshape-host/bool-keep/fan.
-- 850efe: cases Mac ~/noshape-host/bool-keep/m85 (Extrude 5 110173579c7126ff, Extrude 6 cc1019ddbd364035), vibex8
-  ~/tmp/bool/m85acc. Blend told of the invalid Fillet 2 earlier; with 8ba7 Fillet 2 gets live's Extrude 5.
-- e54410: cases Mac ~/noshape-host/bool-keep/me5 (Extrude 22 6dc4464f40a8b0b2, Extrude 17 10c21d285eec6c3a). Live's
-  merge distance: live/bool/q-union-merge (behaviours.md "bool (11-17 22:22)").
 - Scratch in bool-hat (not to commit): crates/kernel/tests/all.rs (xprobe), xprobe.rs, .*.sh; the fan DBG_NM diff in
   /root/bool-scratch/dbg-nm-fan.diff. bool-valid: debug branch, reset to origin/main after.
 - DECISION ASKED (lead, 22:00): every Boolean's check as made_valid (made / changed faces + shells) instead of
   BRepCheck of the whole result: pulleys' 5-tool cut 13.1 -> 6.2 ms (OCCT 8.2), 4-tool 7.1 -> 3.7.
 - Validity in the gate: tools/bool/gate-host.py (landed 3b8bfba0) reads blend's NOSHAPE_PARITY_VALIDITY CHECK lines
   (cfd943d5) and fails on a part valid on main and invalid on the branch.
-- asm pattern-std 36b90f Extrude 12 (17/43/28 vs live 14/36/24): not the Boolean (same with NOSHAPE_BOOL_RUST=0):
-  the up-to-surface extrude's caps; told asm 11-17. Logs /root/bool-scratch/mps-51ee{,-off}.log.
-- Pulleys recordings: vibex8 ~/tmp/bool/pul (6 cases), Mac ~/noshape-host/bool-keep/pul; Mac scripts in bool-hat
-  .samp.sh / .t6.sh / .t7.sh (untracked).
-- GearLab herringbone (dx, asm-isaac-ball 8f5622, 14.8 s vs live 1.15): fuses 726897a5 (teeth on blank, ours "two
-  edges leave a vertex in one direction"; glue changes history: no) and 68f32ae1 (half + mirror, ours "a piece's point
-  on another solid's face"; OCCT 949 ms, glue shift 294 identical history). fuse_glued now sees the mirror (6.) but
-  the half's z=5 cap is 41 faces (core's 5e-9 rad tilted sweep caps leave teeth end faces unmerged): with core's fix
-  it should go glued. ShiftChecked's volumes_add_up (1e-7) rejects B-spline solids (integration noise ~1e-5).
-  Cases Mac ~/noshape-host/agents/bool-hat/gear, vibex6 ~/agents/dx-keep/gearlab/booleans.
 - blend: c2-impeller-loft Fillet 3's OCCT cut 9602f671f8528c1a (~650-800 ms, PerformEF 481): vibex7
   ~/agents/blend-keep/rec-f3, Mac ~/noshape-host/agents/blend10/rec-f3.
 - Knife cases: vibe5 ~/tmp/bool/knrec, Mac ~/noshape-host/agents/bool-hat/knrec (17b8 c1d9 Fillet 2, a3f9 Chamfer 1, 682a
