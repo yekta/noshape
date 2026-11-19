@@ -4497,3 +4497,23 @@ skasm meanwhile; I'll list what I change here before landing.
   (104.36, 0, -27.20): the sphere seam's end), both hidden by the seam-join rule. Live's ring RvBB (81.385 mm) has its
   arc-length midpoint exactly on the first, so live keeps one vertex, at the sphere seam's end. Rule unknown (a
   Parasolid sphere has no seam); a live capture of a dome revolved onto a swept handle would settle it.
+
+## Moved 11-19 07:07 from the handoff
+- **live 11-18 21:00, feature-dialog pick rows (Shell, Hole, Revolve; behaviours "feel (feature dialogs) 11-18, batch
+  2", live/feel/dialogs-1118/):** UI, not modelling: passed to the lead to route (psui).
+- **c2-housing-draft (dx's DXF rows):** model = live at every feature up to Rotieren 1 (lengths; live measures circles
+  polygonally, 96.093 vs 2pi r 96.133). Rotieren 1's torus exact (R 15.2, r 20.72); only difference: 8 floor lines
+  0.144 / 0.337 mm where the torus is within 0.24 um of z=0 (r 15.2-15.3): ours split the side edges there (7.941 +
+  0.144 vs live 8.084; 12.711 + 0.337 vs 13.047). Boolean tangency (bool's, minor). dx's rows are drawing projection
+  (dx). Scripts /root/core-scratch/hdcmp2.sh, brepq/tor.cpp.
+- **qa 11-18 rollback-step list (speed):** fan-blade Extrude 8 120 vs 10, Derived 1 160 vs 51; motor-mount-jack
+  Extrude 2 72-133 vs 9; bottle-split Revolve 2 / Split 1 50 / 17 vs 6.5 / 3; rings-loft patterns (live/qa/rbstep-1118).
+- **Nuts: waits for bool2's graze fix ebc58e0be** (not landed; bool2 tells me). Alone it makes Sweep 1 OK with live's
+  counts (one face a B-spline where live has a cylinder). Then re-run nuts on main vs live 135.268 mm3 / 29 faces. My
+  crest move (core-rp nuts3 59df02227) and exact cylinders (nuts2 7fec58496) are DROPPED (wrong OK without bool2's fix).
+  Cases vibex8 ~/agents/core-keep/nuts/ (cutp).
+- **Live truth at the suite's first differences (live 11-18, for the restart):** behaviours.md "core + bool + skasm (lead
+  11-18): live truth at the model suite's first differences", per-face JSON live/suite-truth-1118/<doc>.json. Mine:
+  knifehandle Sweep 2 area, singularities Mirror 3 (one sheet), pipe Loft (>2-profile guides), cpcurves fit spline
+  end tangent = -n of plane JMC, Boundary surface 1, loft-paths Loft 3, rib-wrap Wrap 1, manualblend / mutualtrim
+  Sweeps, surf-workshop-fill Fill 1 (B-spline 21x22, 5910.87 vs ours 31625). Triage with the lead first.

@@ -1,7 +1,7 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-19 04:41 UTC (new thread 20:05 after the account limit; ids: see How to run). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
-docs/DECISIONS.md (read first; it wins over anything here). Hosts: core builds on vibex7 (rb-hosts); land
+Updated 11-19 07:07 UTC (new thread 20:05 after the account limit; ids: see How to run). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
@@ -9,25 +9,34 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
 - **LANDED 11-18/19:** Delete face errors when a face stays 67a475987; rib parallel 303e9d916; loft path sections
   c0b6e2d4a; loft one-connection equal arcs 7a8ca3b2 (asm-suspension Loft 1, blend told); error wording (Up to next,
   revolve, coplanar loft) c3e949a8; Delete face onto its neighbour (impeller face 24, ~0.2 s) edf20895.
-- **LANDED 11-19:** pattern P1 6a8e411d (qa verified session-1118 = live).
-- **Surface stack (core-cache branch core-split2, 8 commits on 641b409f1, NOT landed):** Up to next reaches surfaces;
-  Boundary surface = bilinear Coons (2U+2V) / ruled (2 profiles), sketch splines as their B-splines, parity pairs
-  sheets by area; Split sheet pieces by a point on them + surface Extrude Add joins; surface Sweep cuts at its
-  profile's own plane; sketch region as a direction; loft path sections race fix (one CompCurve adaptor was shared by
-  OSD_Parallel threads: random null sections / signal 11 on path lofts, main since c0b6e2d4a); thin Sweep closed wall
-  side (live q-thin-wall-side-1119: tangent x path direction from a free end into the path, against it on the path).
-  A/B: vibex8 (qa tickets, compat-v0443, corpus) intended only (knifehandle Chamfer 1 9286 -> 10540, live 10424);
-  private docs on vibex7 ~/tmp/core/imp/ab-priv.out (cli-stack 04:03, before the thin commit). Land when clean.
-- **core-sj branch core-intfield (uncommitted):** an integer field with a non-whole value fails "Enter a valid
-  expression." on that field (live2 feature-dialogs-1119: Linear pattern count 2.5). T1 features_c::a_count_...
-- **Live truth 11-19 (live/core/):** q-sweep-ws-1119 (workshop-sweep face exact bicubic 18x54, frame = kernel default);
-  q-wave-washer-loft-1119 (profiles at arc fractions 1/8..7/8 of the closed routing curve, 5.8-6.5 mm inside it; faces
-  4x11 poles, v periodic 8 spans; 2080.670 mm3): my ring WIP /root/core-scratch/wave-washer-ring-wip.patch builds the
-  ring but inside out at 3330 mm3 (sections carried to the wrong side of the spine): next; q-split-thicken1-1119 (the
-  hole walls are part of the thickened sheet, a PLANE ring closes them; 14590.06); q-gearlab-1e81ca-1119 (small ends
-  0-2.8 um off the hub top in live too; root = a root-cone face between teeth).
-- **Next:** wave-washer ring; split Thicken 1 (ours 16022 / 14979 vs 14590); cpcurves Sweep 5 edge split (8/8/0 vs
-  8/9/2). Suspension r40 fillets -> blend (lead 11-19).
+- **LANDED 11-19:** pattern P1 6a8e411d (qa verified session-1118 = live); surface stack fc162641 -> ec1882ba (7
+  commits: Up to next to surfaces, Boundary Coons/ruled + exact sketch splines, Split sheet pieces + surface Extrude
+  Add, surface Sweep path cut at its profile's plane, sketch region direction, loft section race, thin Sweep wall side;
+  private docs ALL-SAME); integer field "Enter a valid expression." 139b5ea2 -> 24792169.
+- **Lead 11-19:** cpcurves Sweep 5's 8/9/2 (live splits the R16 circle into a CIRCLE arc + an OTHER curve) is live's
+  representation, a known difference, not a target. Build hosts: the lowest 1-min load of vibex7/vibex8/vibe2 each
+  time (DECISIONS a67911bef); private docs on vibex7 only.
+- **qa compat alert 814b48d8 (answered 07:05):** cpcurves Thicken 1 Ok -> "1 missing selection", Split 6 / mutualtrim
+  Fillet 1 message changes: stale saved corpus files (vibex7 ~/qa/corpus, saved 11-18 01:02 while Sweep 5-7 errored;
+  Thicken 1's 3 names hold one face twice, live's are 3 faces of 3 bodies). With live's references (models suite) all
+  keep their selections; qa to re-save. Real differences left: cpcurves 3D fit spline 4 tangency error (-> Sweep 8),
+  Split 3 names the wrong body "Curve 4"; mutualtrim Fillet 1 fails in the fillet (boolean) -> blend told.
+- **core-rp branch core-ring3 (on ec1882ba + skasm's 42b253d43 cherry-picked; NOT landed, has PROBE prints):**
+  (a) P0 (lead): a loft whose sections have different edge counts is refused before OCCT's unchecked ThruSections
+  (it crashed, signal 11): kernel T1 features::a_loft_whose_cut_sections_dont_match_is_refused_not_crashed on
+  tests/data/loft/wave-washer-ring.brep. (b) wave-washer ring: a closed path round 3+ profiles closes the loft: path
+  reopened at the first profile, one pipe per profile pair on its own open stretch (one pipe on a closed path ran
+  round past its sections), binormal fixed to the ring's axis (the Frenet frame twisted sections a quarter turn),
+  sections cut upright, smoothing on for closed path lofts (unsmoothed overshoots 14 %). T1 features_a::
+  a_path_loft_round_four_profiles_on_a_closed_path_is_a_ring (Pappus within 0.5 %) passes. The doc: OK but 2579 vs
+  live 2080.82 mm3: must not land as a wrong Ok (DECISIONS); land (a) alone if (b) stays off. (c) Thicken: one-sided
+  thicken of a sheet with a sharp inner edge uses OCCT's MakeOffset thickening, intersection join (simple offset kept
+  each face's offset whole): split Thicken 1 16022 -> 14511 (live 14590.06); kernel T1 features::a_sheets_faces_
+  meeting_at_an_angle_... (L sheet 380 / 420). Rest 0.5 %: walls JSe/JSm meet at a 5.3 deg kink; OCCT's edge between
+  their offsets is slanted (tol 0.29 mm) where it should be a vertical line; live's top edges lie on ours (edges.json).
+  Needs a model-suite A/B before landing (thicken is everywhere).
+- **Next:** finish ring (b) or land (a)+(c) without it; cpcurves 3D fit spline 4 + Split 3 body names; nuts: bool2's
+  fan fix 0bfc1ed0 is on main (Sweep 1 OK): re-run nuts vs live 135.268 mm3 / 29 faces, then decide nuts3 59df02227.
 - **Volume measure warning:** on impeller parts OCCT's plain Gauss VolumeProperties is ~1.2 % off (input 97755.8 vs
   mesh-converged ~96555, kernel props 95977.8 after the delete ~= mesh): the old "OCCT 97123.4" targets were plain
   Gauss. Compare with kernel props (replay prints them) or vibex7 ~/tmp/core/imp/mvol (mesh).
@@ -38,8 +47,6 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
 - **qa speed backlog (TICKETS a3ff6d481) routed to bool 21:00:** sprockets Circular pattern 1 op_boolean 422/499 ms,
   loft-paths Mirror 1 op_boolean 1120/1136 + Loft 3's 942, parting-line Rib's fuses. Nuts waits on bool2. Split 3
   op_split 1.45 s (OCCT splitter section edges 729) not started. Profiler: vibex7 ~/tmp/core/sp.sh <cli> <doc> "<feature>".
-- **live 11-18 21:00, feature-dialog pick rows (Shell, Hole, Revolve; behaviours "feel (feature dialogs) 11-18, batch
-  2", live/feel/dialogs-1118/):** UI, not modelling: passed to the lead to route (psui).
 - **Walls (core-rw branch core-walls2, d010a6d78 = 27b7836e0 re-applied, HELD with bool):** with them Move face 2
   turns Ok, Delete face 2 48 faces / 95977.8 mm3 (main 37 / 96246.4), then Extrude Bohrungssitz Ansaugflansch's Add
   (OCCT fuse 1 object 65 faces + 9 seat prisms, all valid) comes out INVALID 1992 mm3 / 55 faces, accepted (16 parts).
@@ -49,15 +56,8 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   the fuse is whole + compat-on.sh clean. Case vibex7 ~/tmp/core/imp/rec47/51a35c85013e91e7.brep, probe ./fz.
 - **Pair 7 (e9caeead0 offset_planes) REGRESSES:** c2-sm-hem-plus / cf-sheet-metal-hem Derived 1 loses a part (26/72/48
   -> 14/36/24), cf-mortise-and-tenon Mortise Tenon 2 19 -> 10 faces. Not landable as is.
-- **c2-housing-draft (dx's DXF rows):** model = live at every feature up to Rotieren 1 (lengths; live measures circles
-  polygonally, 96.093 vs 2pi r 96.133). Rotieren 1's torus exact (R 15.2, r 20.72); only difference: 8 floor lines
-  0.144 / 0.337 mm where the torus is within 0.24 um of z=0 (r 15.2-15.3): ours split the side edges there (7.941 +
-  0.144 vs live 8.084; 12.711 + 0.337 vs 13.047). Boolean tangency (bool's, minor). dx's rows are drawing projection
-  (dx). Scripts /root/core-scratch/hdcmp2.sh, brepq/tor.cpp.
 - **surf-intro-simple Loft 1 (skasm): de3b6e082 (core-loft, held):** surface loft takes sketch regions (T1 4/12/8 on
   squares). skasm saw 1 face on the real doc: check against live 4/12/8 once skasm's translator lands, then land.
-- **qa 11-18 rollback-step list (speed):** fan-blade Extrude 8 120 vs 10, Derived 1 160 vs 51; motor-mount-jack
-  Extrude 2 72-133 vs 9; bottle-split Revolve 2 / Split 1 50 / 17 vs 6.5 / 3; rings-loft patterns (live/qa/rbstep-1118).
 - **Flansch verbreitern (core-rp branch flansch, on e9caeead0, uncommitted):** offset_planes takes linear extrusions too
   (the profile projected across the direction, run on 10|d| + 10 % past its ends, offset as Geom_OffsetCurve,
   extruded); extrusions move before planes so a plane moved later still meets them. T1 features_a::
@@ -74,15 +74,6 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   Parasolid's approximation. Retry parked on core-sweepseg (core-sw, 20f02b960).
 - **cf-setback-fillet (blend 11-18):** Setback Fillet 1's 3 std fill() corner patches 87.52 mm2 in live, ours +1.14
   (~1.3 % large); live/suite-truth-1118/cf-setback-fillet.json. With Fill 1.
-- **Nuts: waits for bool2's graze fix ebc58e0be** (not landed; bool2 tells me). Alone it makes Sweep 1 OK with live's
-  counts (one face a B-spline where live has a cylinder). Then re-run nuts on main vs live 135.268 mm3 / 29 faces. My
-  crest move (core-rp nuts3 59df02227) and exact cylinders (nuts2 7fec58496) are DROPPED (wrong OK without bool2's fix).
-  Cases vibex8 ~/agents/core-keep/nuts/ (cutp).
-- **Live truth at the suite's first differences (live 11-18, for the restart):** behaviours.md "core + bool + skasm (lead
-  11-18): live truth at the model suite's first differences", per-face JSON live/suite-truth-1118/<doc>.json. Mine:
-  knifehandle Sweep 2 area, singularities Mirror 3 (one sheet), pipe Loft (>2-profile guides), cpcurves fit spline
-  end tangent = -n of plane JMC, Boundary surface 1, loft-paths Loft 3, rib-wrap Wrap 1, manualblend / mutualtrim
-  Sweeps, surf-workshop-fill Fill 1 (B-spline 21x22, 5910.87 vs ours 31625). Triage with the lead first.
 - **Fan-blade P0 (fix forward):** main after core-oc 1484 ms vs 0.4.56 730; Boolean 2 877 vs 122 (live 364). bool's
   b5b566884 drops the wasted Rust attempt; my lever: per-tool offsets' edges 52 + check 24 ms (NOSHAPE_OFFSET_DEBUG=1).
 - **Extrude 4 (impeller, 490 ms vs 41):** op_prism_until's split on one face, a -3 mm offset of a 117x10 bicubic B-spline
