@@ -71,6 +71,9 @@ fn limit_label(key: &str) -> &'static str {
 pub struct MateDialog {
     pub id: MateId,
     pub name: String,
+    /// A new mate's default name per type (the assembly's next "<Type> n"): a type switch takes the new type's
+    /// (live session-asm-1119: with Fastened 1 in place, the new "Fastened 2" switched to Revolute reads "Revolute 1").
+    pub default_names: Vec<(MateType, String)>,
     pub mate_type: MateType,
     pub a: Option<MateConnectorRef>,
     pub b: Option<MateConnectorRef>,
@@ -292,6 +295,7 @@ impl MateDialog {
         Self {
             id: mate.id,
             name: mate.name,
+            default_names: Vec::new(),
             mate_type: mate.mate_type,
             a,
             b,
@@ -792,7 +796,12 @@ impl MateDialog {
         if self.mate_type != t {
             // Keep custom names; rename default ones ("Fastened 1" -> "Revolute 1",
             // in the UI language: "Fest 1" -> "Drehen 1").
-            if let Some(rest) = self.name.strip_prefix(noshape_model::default_names::base(self.mate_type.name()).as_str()) {
+            let own = |d: &Self, t: MateType| d.default_names.iter().find(|(k, _)| *k == t).map(|(_, n)| n.clone());
+            if own(self, self.mate_type).is_some_and(|n| n == self.name)
+                && let Some(next) = own(self, t)
+            {
+                self.name = next;
+            } else if let Some(rest) = self.name.strip_prefix(noshape_model::default_names::base(self.mate_type.name()).as_str()) {
                 self.name = format!("{}{}", noshape_model::default_names::base(t.name()), rest);
             }
             self.mate_type = t;
@@ -1017,7 +1026,8 @@ impl Render for MateDialog {
                     (_, false) => "mate-limit-z-lin-min",
                     (_, true) => "mate-limit-z-lin-max",
                 };
-                h_flex()
+                let target = format!("field:{} {}", if max { "Maximum" } else { "Minimum" }, limit_label(key));
+                crate::ui_script::mark(h_flex()
                     .id(SharedString::from(format!("mate-limit-{key}-{max}")))
                     // Live: a 194 x 29 row, the field ends 26 px before the dialog's edge.
                     .w(px(194.))
@@ -1032,7 +1042,7 @@ impl Render for MateDialog {
                             // Live E11: min above max turns both pink (#f9ebec, 2 px #bd3039).
                             .when(crossed.contains(&key), |d| d.bg(gpui_kit::rgb(0xf9ebec)).border_b_2().border_color(gpui_kit::rgb(0xbd3039)))
                             .child(crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.)),
-                    ))
+                    )), move || target)
             };
             for key in lkeys {
                 let (lo, hi) = &self.limits[key];

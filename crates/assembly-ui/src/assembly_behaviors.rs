@@ -414,6 +414,9 @@ pub struct AsmUi {
     /// Instances inserted since the Insert dialog opened ("Inserted: N";
     /// undone ones drop out) and the Part Studios collapsed in its tree.
     pub insert_inserted: Vec<InstanceId>,
+    /// The assembly before the Insert dialog's ✕ / Esc took its instances back, while its "Assembly insertion has been
+    /// cancelled. Restore" bubble shows (live session-asm-1119 2b: it goes by itself after a few seconds).
+    pub insert_restore: Option<Assembly>,
     /// The Redo the Insert dialog's Esc left (its dropped instance's step): closing the dialog drops it (live
     /// asm-insert-esc-pending).
     pub insert_redo: Option<noshape_store::MicroversionId>,
@@ -3299,10 +3302,35 @@ impl AssemblyView {
         self.placing_point = None;
         self.message = None;
         if inserted && self.doc.read(cx).has_pending() {
+            let before = self.assembly(cx).cloned();
             self.doc.update(cx, |d, cx| d.discard_pending(cx));
             self.selected.clear();
+            self.show_insert_restore(before, cx);
         }
         self.close_insert(window, cx);
+    }
+
+    /// The blue "Assembly insertion has been cancelled. Restore" bubble for 5 s (live session-asm-1119 2b).
+    fn show_insert_restore(&mut self, before: Option<Assembly>, cx: &mut Context<Self>) {
+        self.ui.insert_restore = before;
+        let serial = self.ui.insert_restore.as_ref().map(|a| a.instances.len());
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(Duration::from_secs(5)).await;
+            let _ = this.update(cx, |this: &mut Self, cx| {
+                if this.ui.insert_restore.as_ref().map(|a| a.instances.len()) == serial {
+                    this.ui.insert_restore = None;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
+    /// Restore: the cancelled insertion's instances come back, one step.
+    pub(super) fn restore_insert(&mut self, cx: &mut Context<Self>) {
+        let Some(before) = self.ui.insert_restore.take() else { return };
+        self.edit("Insert", cx, |a| *a = before);
+        cx.notify();
     }
 
     /// Esc in the Insert dialog with an instance on the pointer: that one goes, the dialog and the instances already

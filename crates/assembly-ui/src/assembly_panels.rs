@@ -4904,7 +4904,7 @@ impl AssemblyView {
                         .border_1()
                         .border_color(rgb(0xcccccc))
                         .relative()
-                        .children(self.ui.insert_url.clone().map(|st| crate::ui::input_with_placeholder(&st, self.ui.insert_url_ph.clone(), cx).appearance(false).cleanable(true).text_size(px(13.33)).h(px(28.)).pl(px(7.)))),
+                        .children(self.ui.insert_url.clone().map(|st| crate::ui_script::mark(div().child(crate::ui::input_with_placeholder(&st, self.ui.insert_url_ph.clone(), cx).appearance(false).cleanable(true).text_size(px(13.33)).h(px(28.)).pl(px(7.))), || "field:Search or paste URL".to_string()))),
                 )
                 .child(
                     div()
@@ -4931,7 +4931,8 @@ impl AssemblyView {
         let Some((cat, query)) = listing else {
             // Top level: the categories (32 px rows, 20 px icons).
             for (i, (label, icon)) in OTHER_SOURCES.iter().enumerate() {
-                col = col.child(
+                // (The runner's target: `list_row:<source>`, qa session-asm-1119.)
+                col = col.child(crate::ui_script::mark(
                     h_flex()
                         .id(SharedString::from(format!("ins-other-cat-{i}")))
                         // Live 610: the list starts 9 px lower.
@@ -4951,7 +4952,8 @@ impl AssemblyView {
                             this.sync_other_placeholder(cx);
                             cx.notify();
                         })),
-                );
+                    move || format!("list_row:{label}"),
+                ));
             }
             return col.into_any_element();
         };
@@ -5103,7 +5105,8 @@ impl AssemblyView {
                 _ => div().child(crate::ui::user_text(d.name.clone())).into_any_element(),
             };
             let version = self.ui.insert_other_versions.get(&d.path).cloned();
-            col = col.child(
+            let row_name = d.name.clone();
+            col = col.child(crate::ui_script::mark(
                 h_flex()
                     .id(SharedString::from(format!("ins-other-doc-{i}")))
                     .h(px(52.))
@@ -5123,7 +5126,8 @@ impl AssemblyView {
                             .children(version.map(|v| div().opacity(0.5).text_size(px(12.)).line_height(px(16.)).text_color(pal.text).child(v))),
                     )
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_other_document(path.clone(), cx))),
-            );
+                move || format!("list_row:{row_name}"),
+            ));
         }
         col.into_any_element()
     }

@@ -1922,3 +1922,63 @@ fn other_documents_sort_by_their_menu_and_remember_it(cx: &mut TestAppContext) {
     .unwrap();
     draw(cx, window);
 }
+
+/// qa session-asm-1119 (2): with Fastened 1 in place, a new mate opens as "Fastened 2"; switching its type names it
+/// by the new type's own count, "Revolute 1", then "Slider 1", as live.
+#[gpui::test]
+fn a_new_mates_type_switch_takes_that_types_next_name(cx: &mut TestAppContext) {
+    use noshape_model::assembly::{Mate, MateId};
+    let (window, view) = pattern_assembly(cx, "mate-type-names");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let (a, b) = (face_connector(v, "Part 1 <1>", true, cx), face_connector(v, "Part 2 <1>", false, cx));
+            v.edit("Fastened", cx, |asm| {
+                let id = MateId(asm.next_id());
+                asm.mates.push(Mate::new(id, "Fastened 1".into(), MateType::Fastened, a, b));
+            });
+            v.start_mate(MateType::Fastened, w, cx);
+        })
+    })
+    .unwrap();
+    let name = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).mate.as_ref().unwrap().dialog.read(cx).name.clone());
+    assert_eq!(name(cx), "Fastened 2");
+    let switch = |cx: &mut TestAppContext, t: MateType| {
+        cx.update(|cx| {
+            let d = view.read(cx).mate.as_ref().unwrap().dialog.clone();
+            d.update(cx, |d, cx| d.set_type(t, cx));
+        })
+    };
+    switch(cx, MateType::Revolute);
+    assert_eq!(name(cx), "Revolute 1");
+    switch(cx, MateType::Slider);
+    assert_eq!(name(cx), "Slider 1");
+    switch(cx, MateType::Fastened);
+    assert_eq!(name(cx), "Fastened 2");
+}
+
+/// qa session-asm-1119 (2b): ✕ / Esc in the Insert dialog takes its instances back and shows the blue "Assembly
+/// insertion has been cancelled. Restore" bubble; Restore brings them back.
+#[gpui::test]
+fn cancelling_an_insertion_offers_restore(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "insert-restore");
+    let count = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).assembly(cx).unwrap().instances.len());
+    let before = count(cx);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.toggle_insert(w, cx);
+            let studio = v.doc.read(cx).session.doc.tabs.iter().find(|t| t.name == "Part Studio 1").unwrap().id;
+            let id = v.insert_part(studio, None, cx).unwrap();
+            v.start_placing(vec![id], cx);
+            v.finish_placing(true, w, cx);
+        })
+    })
+    .unwrap();
+    assert_eq!(count(cx), before + 1, "placed in the dialog");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.cancel_insert(w, cx))).unwrap();
+    assert_eq!(count(cx), before, "taken back");
+    assert!(cx.update(|cx| view.read(cx).ui.insert_restore.is_some()), "the cancelled bubble with Restore");
+    draw(cx, window);
+    cx.update(|cx| view.update(cx, |v, cx| v.restore_insert(cx)));
+    assert_eq!(count(cx), before + 1, "Restore brings it back");
+    assert!(cx.update(|cx| view.read(cx).ui.insert_restore.is_none()), "the bubble gone");
+}

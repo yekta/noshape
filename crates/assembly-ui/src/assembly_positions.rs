@@ -847,7 +847,7 @@ pub fn yellow_banner(text: String, done: impl Fn(&ClickEvent, &mut Window, &mut 
         .text_color(rgb(0x333333))
         .child(div().pt(px(1.)).child(text))
         .child(div().w(px(60.)))
-        .child(
+        .child(crate::ui_script::mark(
             div()
                 .id("banner-done")
                 .h(px(22.))
@@ -861,6 +861,7 @@ pub fn yellow_banner(text: String, done: impl Fn(&ClickEvent, &mut Window, &mut 
                 .cursor_pointer()
                 .child("Done")
                 .on_click(done),
-        )
+            || "button:Done".to_string(),
+        ))
         .into_any_element()
 }

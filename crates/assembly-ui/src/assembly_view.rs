@@ -2226,7 +2226,15 @@ impl AssemblyView {
         let is_new = editing.is_none();
         let units = self.doc.read(cx).session.doc.settings.units;
         let variables = self.variable_scope(cx);
-        let dialog = cx.new(|cx| MateDialog::new(mate, is_new, labeler, units, variables, window, cx));
+        let defaults: Vec<(MateType, String)> = match self.assembly(cx).filter(|_| is_new) {
+            Some(a) => MateType::ALL.iter().map(|t| (*t, a.next_feature_name(t.name()))).collect(),
+            None => Vec::new(),
+        };
+        let dialog = cx.new(|cx| {
+            let mut d = MateDialog::new(mate, is_new, labeler, units, variables, window, cx);
+            d.default_names = defaults;
+            d
+        });
         let sub = cx.subscribe_in(&dialog, window, |this: &mut Self, _, ev: &MateDialogEvent, window, cx| match ev {
             MateDialogEvent::Changed => {
                 this.schedule_eval(window, cx);
@@ -6602,6 +6610,36 @@ impl AssemblyView {
                             })
                         }, cx)
                     })
+                    .into_any_element(),
+            );
+        }
+        // The Insert dialog's ✕ / Esc (live session-asm-1119 2b): blue, top centre, with Restore.
+        if self.ui.insert_restore.is_some() {
+            let view = cx.entity();
+            let close = cx.entity();
+            out.push(
+                div()
+                    .absolute()
+                    .top(px(9.))
+                    .left_0()
+                    .right_0()
+                    .pr(px(crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::left_panel_w(self.tab) }))
+                    .flex()
+                    .justify_center()
+                    .child(crate::os_ui::message_bubble_with_link(
+                        "asm-insert-cancelled",
+                        crate::ui::AlertKind::Info,
+                        "Assembly insertion has been cancelled.",
+                        "Restore",
+                        move |_: &ClickEvent, _: &mut Window, cx: &mut App| view.update(cx, |this, cx| this.restore_insert(cx)),
+                        move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
+                            close.update(cx, |this, cx| {
+                                this.ui.insert_restore = None;
+                                cx.notify();
+                            })
+                        },
+                        cx,
+                    ))
                     .into_any_element(),
             );
         }
