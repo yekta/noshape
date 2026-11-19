@@ -1043,6 +1043,14 @@ fn run_weighted(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget], allow
         // Perpendicular, an Equal twice) doesn't.
         let analysis = (opts.analyze && !is_drag).then(|| analyze(sk, &mut sys, &out, &conflicting));
         let mut conflicting = conflicting;
+        // A conflict's driving dimensions include the ones the sketch solves without (live errors-1118 / recheck 11-19:
+        // a rectangle's 50 typed on the side opposite its 40, both red, not the 30).
+        if analysis.is_some()
+            && !conflicting.is_empty()
+            && let Some(dims) = conflict_dims(sk, &conflicting)
+        {
+            conflicting = dedup_sorted(conflicting.into_iter().chain(dims).collect());
+        }
         if let Some(a) = &analysis {
             let dims: Vec<ConstraintId> = a.redundant.iter().copied().filter(|c| sk.constraint(*c).is_some_and(|c| c.driving && c.kind.is_dimension())).collect();
             let dims = if dims.is_empty() { dims } else { redundant_nearby(sk, dims) };
@@ -1122,6 +1130,29 @@ fn redundant_nearby(sk: &Sketch, dims: Vec<ConstraintId>) -> Vec<ConstraintId> {
         .collect();
     INSIDE.with(|c| c.set(false));
     kept
+}
+
+/// More driving dimensions of a conflict that has one in `conflicting`: those in its piece of the sketch it solves
+/// without (at most 12 tried: a broken sketch solves on every edit; solves without analysis, so no recursion). None
+/// when none does (a conflict among relations): the least squares' set stands.
+fn conflict_dims(sk: &Sketch, conflicting: &[ConstraintId]) -> Option<Vec<ConstraintId>> {
+    let dim = |c: &ConstraintId| sk.constraint(*c).is_some_and(|k| k.driving && k.kind.is_dimension());
+    let first = conflicting.iter().find(|c| dim(c)).and_then(|c| sk.constraint(*c)?.kind.entities().first().copied())?;
+    let piece = sk.free_piece(first);
+    let dims: Vec<ConstraintId> = sk
+        .constraints()
+        .filter(|c| c.driving && c.kind.is_dimension() && c.kind.entities().iter().all(|e| piece.contains(e) || sk.entity(*e).is_some_and(|x| x.external)))
+        .map(|c| c.id)
+        .take(12)
+        .collect();
+    let freeing: Vec<ConstraintId> = dims
+        .into_iter()
+        .filter(|&c| {
+            let mut probe = sk.clone();
+            probe.set_driving(c, false).is_ok() && probe.solve_with(&SolveOptions { analyze: false, ..Default::default() }).is_solved()
+        })
+        .collect();
+    (!freeing.is_empty()).then_some(freeing)
 }
 
 /// The driving dimension equation `eq` comes from, if any.

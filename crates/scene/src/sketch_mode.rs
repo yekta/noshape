@@ -11100,7 +11100,7 @@ mod tests {
 
     /// Live errors-1118: a dimension the Dimension tool added driven (it over-defines a dimensioned rectangle) takes a
     /// typed value as a driving dimension, the redundant 40 as the conflicting 50: kept, the sketch not solved, its
-    /// shape as it was. Enter on the untouched box (no value typed) leaves it driven (live qa4 r5 s5).
+    /// shape as it was, both it and the opposite 40 red. Enter on the untouched box (no value typed) leaves it driven (live qa4 r5 s5).
     /// Live shortcuts-sk-1118: a draw tool started from its key with the pointer resting draws nothing at the pointer
     /// until it moves (ours drew the tool's blue dot there).
     #[test]
@@ -11125,10 +11125,8 @@ mod tests {
             let (mut ed, mut d) = editor(Tool::Dimension);
             let r = d.sketch.corner_rectangle(v(0.0, 0.0), v(0.04, 0.03));
             let [bottom, right, top, _left] = [r.curves[0], r.curves[1], r.curves[2], r.curves[3]];
-            d.sketch.add_constraint(ConstraintKind::Length { curve: bottom, value: 0.04 }).unwrap();
-            d.sketch.add_constraint(ConstraintKind::Length { curve: right, value: 0.03 }).unwrap();
-            let corner = d.sketch.endpoints(bottom).unwrap().0;
-            d.sketch.add_constraint(ConstraintKind::Fix { entity: corner }).unwrap();
+            let forty = d.sketch.add_constraint(ConstraintKind::Length { curve: bottom, value: 0.04 }).unwrap();
+            let thirty = d.sketch.add_constraint(ConstraintKind::Length { curve: right, value: 0.03 }).unwrap();
             assert!(d.sketch.solve().is_solved());
             let cid = add_dimension(&mut d, ConstraintKind::Length { curve: top, value: 0.0 }, None, None).unwrap();
             assert!(!d.sketch.constraint(cid).unwrap().driving, "placed driven");
@@ -11138,7 +11136,11 @@ mod tests {
             assert_eq!(res, Err(SKETCH_NOT_SOLVED.to_string()), "{typed}");
             let c = d.sketch.constraint(cid).unwrap();
             assert!(c.driving && (c.kind.value().unwrap() - typed.parse::<f64>().unwrap() * 1e-3).abs() < 1e-12, "{typed}: {c:?}");
-            assert!(!d.sketch.solve().is_solved());
+            let rep = d.sketch.solve();
+            assert!(!rep.is_solved());
+            // Both dimensions red, the redundant 40 as the conflicting 50 (live errors-1118 / recheck 11-19); not the 30.
+            let red = |c| rep.conflicting().contains(&c) || rep.redundant.contains(&c);
+            assert!(red(cid) && red(forty) && !red(thirty), "{typed}: {:?} / {:?}", rep.conflicting(), rep.redundant);
             for (p, was) in r.points.iter().zip(&shape) {
                 assert!((d.sketch.point(*p).unwrap() - *was).length() < 1e-9, "{typed}: the shape stays");
             }
