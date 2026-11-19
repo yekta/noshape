@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-19 03:33 UTC (moved to the Motile account: continue from here). Hosts (lead 11-18/19): builds + probes on the Mac (NOSHAPE_RB_HOST=mac; corpus replays / A-Bs
+Updated 11-19 04:25 UTC (new bool thread on the Motile account since 03:5x). Hosts (lead 11-18/19): builds + probes on the Mac (NOSHAPE_RB_HOST=mac; corpus replays / A-Bs
 there only inside an rb.sh slot, else vibex8; Mac paths ~/noshape-host/...), gates on vibex7
 (NOSHAPE_GATE_HOST=vibex7 via /root/bool-scratch/gate-chain-own.sh <sha> as a systemd-run unit; off 02:00-04:00);
 land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs vibex7 ~/lead-private (hat8, hat15, hat15b,
@@ -57,18 +57,23 @@ Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are interna
 - Mac rule (lead 11-19): corpus replays and A/Bs on the Mac only inside an rb.sh slot (`NOSHAPE_RB_HOST=mac
   tools/tiers/rb.sh bash -c 'cd ~/noshape-host/bool-keep; ...'`; the Mac runs at most two jobs), else on vibex8. Mac
   paths ~/noshape-host/... (no ~/agents there). vibex7: nothing new 02:00-04:00 (qa's quiet window).
-- The 356 by reason (main 548d): shared shape 74 (the stack's e9b6efecc / 8a9351e4b take 46), non-manifold 31
-  (mine done: 2 fixed; 7 have B-spline faces (bool2); 4 truly touch along an edge (a cylinder tangent inside a
-  face, edge-to-edge fuses), 2 an invalid tool), short section from a corner 30 (bool2), near two vertices 19
-  (shfall 17), sheets that meet 17 (11 fixed; 5 shfall, parity56 89ceca45 extrusion), line + curved edge 16 (fixed),
-  inside-out tool 15 (shfall 12), face lost 14, two edges leave a vertex one way 7: 11cc92b2 / dbc28f46 / 2ebbd509 /
-  f3936233 / f516559d: a tolerant input vertex (2.6 um off its face) tilts the edge piece from it, so a coincident
-  tool edge's vertex on the true line is out of split reach; fix idea: split_params measures against the origin
-  edge's own line. Edge twice in a face 5 (slit faces, input). Traces: /root/bool-scratch/stack3-traces3.diff
-  (DBGNM / DBGP / DBGF / DBGTE).
-- shfall (129 declines): no parity-suite Shell reaches slabs now (34 Shells: quadrics 20, smooth 8, regions 6), and
-  16 of its 17 "near two vertices" have input vertex tolerances 0.2 mm..1 m: low value. Its 11 "piece's point on
-  another solid's face": zero-area input faces (two coincident edges), a 0.2 mm triangle tangent to a cylinder.
+- The OCCT cases left on bool-stack3's tip (Mac replay-bnd, distinct, not tried excluded): short section from a corner
+  30 (parity56, bool2), non-manifold 30 (15 shfall), near two vertices 19 (17 shfall), inside-out tool 15 (12 shfall),
+  piece's point on another solid's face 12 (shfall), face lost 11 (10 shfall), edge on a free-form face 10 (shfall),
+  two edges leave a vertex 8, face's vertex off its plane 7, sheets that meet 6, coincident pieces 6, edge twice in a
+  face 5 (input slits), the rest <= 5 each. Shared shape: 3 (sheets) left after the stack.
+- shfall (122 declined on the tip): 93 have input edge tolerances >= 10 um (56 >= 0.1 mm): Shell slab inputs whose
+  tolerance is the size of their features; OCCT's results BRepCheck-valid but no live analogue. Tight (< 10 um) 29:
+  /root/bool-hat-scratch/shfall-tight.txt (non-manifold 7, sheets that meet 5, void 4, face lost 3, point near its
+  face's boundary 3, ...). Of the tight non-manifold: 369288 / 7a5e0b / b1ea1e / 1a254d / 543500 are one solid and
+  its mirror image whose own faces cross (a T-junction; OCCT's results have 3-4-face edges); 762dec self-touching
+  (pairing OCCT's); only 9600b3 has a clean OCCT result. Lists: /root/bool-hat-scratch/shfall-{valid,tol}.txt.
+- two edges leave a vertex: parity56 2ebbd509 / f3936233 are tangent contacts (a tool circle's 25 um arc leaves a
+  vertex down a cylinder's ruling; curve2_within maps it round the cylinder): OCCT's (ruling 11-15); mapping it along
+  the ruling only moves them to "non-manifold". 11cc92b2 / dbc28f46 / f516559d (tolerant end vertex 8.7 um, 2.6 um
+  off): the end-tolerance split reach (tilt-split.diff, again as "lean" in bool-hat, uncommitted) moves them to
+  non-manifold / face's vertex off its plane, none taken; Mac A/B of it vs replay-bnd running
+  (/root/bool-hat-scratch/mac-ab-lean.out). Parked unless the next declines fall too.
 - qa's speed backlog (TICKETS a3ff6d481): standoffs Revolve 2 / Boolean 1 / Boolean 2 (OCCT 450-980 ms each, ours
   declines "a piece's point on another solid's face"), wire-clip / gamma Boolean 1 (87-tool fuse, ours "cylinders
   nearly coincident", OCCT 2.0-2.9 s) and Boolean 2 (23 tools, "piece's point on another solid's face"). Cases Mac
