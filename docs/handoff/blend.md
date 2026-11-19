@@ -50,10 +50,7 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   profile opposite the canal. Debug: ZZ_CANAL (blend_section.rs eprintln, build.cpp zz_statuses): strip before land.
   bin/lca-t1.sh [host] -> logs/lca-t1.out + lca-full.log. Probe parked/zz-lca-splice-probe.patch (drop from land).
 - Mutualtrim Fillet 1 (blend4, parked): split_on turns closed touch loops into zero-area faces.
-- Agent ids (restart 11-19 21:10): studios 91339202-41f1-4465-91f4-65ccd26ea1b1, dx 6cfc89bd-1196-43ef-9225-0014546fee1e,
-  qa ac50e7f2-4677-4cab-a57a-fd068a0c07bf, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, asm d8d597e0-675c-497b-a804-544ceab99bbd,
-  skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, live 349fe81d-db78-4931-8032-6dc3edc5d558 (bool2/live2 merged into
-  bool/live; core, bool: new ids from the lead). Every other id in this file is dead.
+- Agent ids: only in /root/lead-scratch/roster.md; read it before every message_agent, never copy ids here.
 
 ## In flight (older)
 
