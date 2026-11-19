@@ -551,7 +551,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "centerline",
             summary: "Centerlines: 2 point, edge to edge, 3 point / 2 point circle",
-            description: "The centerline tools, on clicks `picks` (sheet mm): two_point (two points of one view: snap points, else the clicks themselves; centerline ends snap too), edge_to_edge (one cylinder silhouette edge gives its axis; or two edges give their middle line), circle_3_point (three snap points) and circle_2_point (center, then a point on the circle). Associative to the model points snapped. One edit with the tool's name.",
+            description: "The centerline tools, on clicks `picks` (sheet mm): two_point (two points of one view: snap points, else the clicks themselves; centerline ends snap too), edge_to_edge (two edges, a cylinder's silhouettes too: their middle line), circle_3_point (three snap points) and circle_2_point (center, then a point on the circle). Associative to the model points snapped. One edit with the tool's name.",
             fields: with(
                 common(),
                 vec![
@@ -1344,17 +1344,13 @@ fn centerline(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         "edge_to_edge" => {
             let tool = Tool::EdgeCenterline { first: None };
             let (a1, b1, _) = edge_at(&t, &tool, cs[0], 0)?;
-            let (p, q) = match cs.get(1) {
-                None => t.m.pick(&tool, &[], cs[0]).silhouette_centerline(&a1, &b1).ok_or_else(|| OpError::param("picks", "one edge must be a cylinder or cone silhouette; else pick two edges"))?,
-                Some(c2) => {
-                    let tool = Tool::EdgeCenterline { first: Some((a1.clone(), b1.clone())) };
-                    let (a2, b2, _) = edge_at(&t, &tool, *c2, 1)?;
-                    if a2.view != a1.view {
-                        return Err(OpError::param("picks[1]", "Select an edge in the same view"));
-                    }
-                    dt::edge_pair_centerline(a1.p, b1.p, a2.p, b2.p)
-                }
-            };
+            let Some(c2) = cs.get(1) else { return Err(OpError::param("picks", "Select two lines or two concentric arcs")) };
+            let tool = Tool::EdgeCenterline { first: Some((a1.clone(), b1.clone())) };
+            let (a2, b2, _) = edge_at(&t, &tool, *c2, 1)?;
+            if a2.view != a1.view {
+                return Err(OpError::param("picks[1]", "Select an edge in the same view"));
+            }
+            let (p, q) = dt::edge_pair_centerline(a1.p, b1.p, a2.p, b2.p);
             (dt::edge_centerline(id, a1.view, p, q, c), "Edge to edge centerline")
         }
         "circle_3_point" | "circle_2_point" => {

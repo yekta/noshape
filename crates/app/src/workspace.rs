@@ -1873,8 +1873,9 @@ impl Workspace {
                     .child(div().flex_none().when(compare_off, |d| d.opacity(0.5)).child(crate::assets::icon(tab_icon(kind), 20., cx)))
                     .child(match self.renaming_tab.as_ref().filter(|r| r.0 == id) {
                         // Tab › Rename / double-click: the name becomes a field.
-                        // A 1 px #333 square border, no focus ring (live2 doc-feel-1119 L11).
-                        Some((_, st, _)) => div().w(px(157.)).h(px(21.)).border_1().border_color(gpui_kit::rgb(0x333333)).bg(gpui_kit::rgb(0xffffff)).child(gpui_kit::component::input::Input::new(st).appearance(false).h(px(19.)).text_size(px(14.)).px(px(2.)).text_color(pal.text)).into_any_element(),
+                        // A 1 px rgb(22,81,176) square border, no focus ring, 4 px nearer the icon than the name (live2
+                        // doc-feel-1119 L11, recheck-1119).
+                        Some((_, st, _)) => div().ml(px(-4.)).w(px(157.)).h(px(21.)).border_1().border_color(gpui_kit::rgb(0x1651b0)).bg(gpui_kit::rgb(0xffffff)).child(gpui_kit::component::input::Input::new(st).appearance(false).h(px(19.)).text_size(px(14.)).px(px(2.)).text_color(pal.text)).into_any_element(),
                         None => div().min_w_0().truncate().when(compare_off, |d| d.opacity(0.5)).child(crate::ui::user_text(name)).into_any_element(),
                     })
                     .children(compare_dot.map(|dot| div().flex_none().ml(px(3.)).when(compare_off, |d| d.opacity(0.55)).child(dot)))

@@ -320,6 +320,9 @@ pub struct RichTooltip {
 /// Width of the expanded tooltip (live).
 const RICH_TOOLTIP_W: f32 = 400.;
 
+/// Width of a version's tooltip with its description (live2 recheck-1119).
+const VERSION_TIP_W: f32 = 300.;
+
 impl Render for RichTooltip {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // Live's recorder reads the whole tooltip, title then description (fs-co-complete-off, fs-ps-ws-feature-tooltip).
@@ -547,6 +550,8 @@ impl Render for PlacedTooltip {
             .flex_col()
             .flex_none()
             .shadow(shadow)
+            // A version's described tooltip is 300 px wide, title band and description alike (live2 recheck-1119).
+            .when(self.upright && extra.is_some(), |d| d.w(px(VERSION_TIP_W)))
             .child(title)
             .children(extra)
             .child(canvas(move |b, window, _| {

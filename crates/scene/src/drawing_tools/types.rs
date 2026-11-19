@@ -112,7 +112,7 @@ pub enum Tool {
     Centerline { first: Option<PickedPoint> },
     /// Hole / thread callout: the picked hole circle, then the placement.
     HoleCallout { circle: Option<(ViewId, [f64; 2], f64, Option<PointRef>)> },
-    /// Edge-to-edge centerline: one cylinder silhouette edge, or two edges.
+    /// Edge-to-edge centerline: two edges (live: a cylinder's silhouettes too).
     EdgeCenterline { first: Option<(PickedPoint, PickedPoint)> },
     /// Circle centerline through 3 points, or (`three` false) center + point.
     CircleCenterline { three: bool, points: Vec<PickedPoint> },

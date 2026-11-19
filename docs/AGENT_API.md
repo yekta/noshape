@@ -4857,7 +4857,7 @@ Examples:
 
 Centerlines: 2 point, edge to edge, 3 point / 2 point circle (edits the document (one undoable history entry)).
 
-The centerline tools, on clicks `picks` (sheet mm): two_point (two points of one view: snap points, else the clicks themselves; centerline ends snap too), edge_to_edge (one cylinder silhouette edge gives its axis; or two edges give their middle line), circle_3_point (three snap points) and circle_2_point (center, then a point on the circle). Associative to the model points snapped. One edit with the tool's name.
+The centerline tools, on clicks `picks` (sheet mm): two_point (two points of one view: snap points, else the clicks themselves; centerline ends snap too), edge_to_edge (two edges, a cylinder's silhouettes too: their middle line), circle_3_point (three snap points) and circle_2_point (center, then a point on the circle). Associative to the model points snapped. One edit with the tool's name.
 
 Examples:
 

@@ -1157,7 +1157,8 @@ fn edit_detail_clear_profile_picks_a_region_and_esc_closes(cx: &mut TestAppConte
 
 /// Live2 drw-centermark (behaviours "studios (11-17, P0 drawing feel)"): a hole's centre mark lights from its circle, its
 /// centre or an arm (its view not framed), its circle light blue, its grips shown; hovering the view alone shows none;
-/// with the view selected the grips show and the circle is the view's orange; a press on the circle drags the view.
+/// with the view selected no grips, an orange dot at its centre and the circle the view's orange (live2 drw-tools-1119
+/// centermark-sel); a press on the circle drags the view.
 #[gpui::test]
 fn a_holes_centre_mark_lights_from_its_circle_and_a_press_there_drags_the_view(cx: &mut TestAppContext) {
     use noshape_model::drawing::build::PickTarget;
@@ -1188,24 +1189,24 @@ fn a_holes_centre_mark_lights_from_its_circle_and_a_press_there_drags_the_view(c
     let on_arm = [c[0] + (r + reach) / 2.0, c[1]];
     for (at, what) in [(on_circle, "its circle"), (c, "its centre"), (on_arm, "an arm")] {
         assert_eq!(lit_at(cx, window, &editor, at), Some(mark), "{what} lights the centre mark");
-        let (grips, blue) = looks(cx);
-        assert!(!grips.is_empty() && blue == circle, "{what}: its grips, its circle light blue ({grips:?}, {blue:?})");
+        let l = looks(cx);
+        assert!(!l.grips.is_empty() && l.circles == circle, "{what}: its grips, its circle light blue ({l:?})");
         assert!(frames(cx).is_empty(), "{what}: the view not framed");
     }
     let blank = [c[0] + reach + 12.0 * mm_per_px, c[1] + reach + 12.0 * mm_per_px];
     assert_eq!(view_of(&lit_at(cx, window, &editor, blank)), Some(view), "the view's blank inside lights the view");
-    assert_eq!(looks(cx), (vec![], vec![]), "the view hovered: no grips");
+    assert_eq!(looks(cx), Default::default(), "the view hovered: no grips");
     assert_eq!(click_at(cx, window, &editor, on_arm, Modifiers::default()), vec![mark], "a click on an arm takes the centre mark");
     lit_at(cx, window, &editor, [5.0, 5.0]);
-    let (grips, blue) = looks(cx);
-    assert!(!grips.is_empty() && blue == circle, "selected: grips, the circle light blue");
+    let l = looks(cx);
+    assert!(!l.grips.is_empty() && l.circles == circle, "selected: grips, the circle light blue");
     cx.update(|cx| editor.update(cx, |e, _| e.selection.clear()));
     assert_eq!(click_at(cx, window, &editor, on_circle, Modifiers::default()), vec![mark], "a click on the circle takes the centre mark too");
     cx.update(|cx| editor.update(cx, |e, _| e.selection.clear()));
     assert_eq!(click_at(cx, window, &editor, blank, Modifiers::default()), vec![Sel::View(view)], "a click inside takes the view");
     lit_at(cx, window, &editor, [5.0, 5.0]);
-    let (grips, blue) = looks(cx);
-    assert!(!grips.is_empty() && blue.is_empty(), "the view selected: its centre mark's grips, the circle the view's orange");
+    let l = looks(cx);
+    assert!(l.grips.is_empty() && !l.dots.is_empty() && l.circles.is_empty(), "the view selected: no grips, the centre dot, the circle the view's orange ({l:?})");
     let lit_arms = cx.update(|cx| {
         let e = editor.read(cx);
         let scene = e.build_scene();
@@ -2305,8 +2306,9 @@ fn the_dimension_tool_marks_its_picks_as_live_and_keeps_the_placed_one_selected(
     VisualTestContext::from_window(window, cx).simulate_mouse_up(p + Point::new(px(40.), px(-16.)), MouseButton::Left, Modifiers::default());
 }
 
-/// Live2 drw-tools-1119 (sl.png): a section's cutting line hovered in Select frames the section view light blue; a
-/// press-drag on the line's body moves nothing and selects the parent view.
+/// Live2 drw-tools-1119 (sl.png), recheck-1119: a section's cutting line hovered in Select frames the section view light
+/// blue, tan with its arrows and letters and grips; a press-drag on the line's body moves nothing and selects the parent
+/// view, which keeps the line's grips.
 #[gpui::test]
 fn a_cutting_line_hovered_frames_its_section_blue_and_its_body_does_not_drag(cx: &mut TestAppContext) {
     use noshape_model::drawing::build::PickTarget;
@@ -2353,6 +2355,17 @@ fn a_cutting_line_hovered_frames_its_section_blue_and_its_body_does_not_drag(cx:
         e.view_frames()
     });
     assert_eq!(frames, vec![(section, 0x90cef1)], "its section framed light blue");
+    // Live2 recheck-1119: tan grips at both ends of each arrow, a light-blue one on the line where it follows the
+    // view, the arrows and letters tan; with the parent selected the grips alone.
+    const BLUE: [u8; 4] = [0x90, 0xce, 0xf1, 255];
+    let looks = |cx: &mut TestAppContext| cx.update(|cx| {
+        let l = editor.read(cx).cut_line_looks();
+        (l.lit.len(), l.grips.iter().filter(|g| g.1 != BLUE).count(), l.grips.iter().filter(|g| g.1 == BLUE).map(|g| g.0).collect::<Vec<_>>(), l.ink.indices.len())
+    });
+    let (lit, tan, blue, ink) = looks(cx);
+    assert!(lit > 0 && ink > 0, "the line, its arrows and letters tan");
+    assert_eq!(tan, 4, "a tan grip at both ends of each arrow");
+    assert!(blue.len() == 1 && (blue[0][0] - mid[0]).abs() < 1e-6, "one light-blue grip on the point it follows: {blue:?} (line at x {})", mid[0]);
     let points = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).current_sheet().section_points(section));
     let before = points(cx);
     let p = at_window(cx, &editor, on_line);
@@ -2364,6 +2377,13 @@ fn a_cutting_line_hovered_frames_its_section_blue_and_its_body_does_not_drag(cx:
     draw(cx, window);
     assert_eq!(points(cx), before, "the cut didn't move");
     assert_eq!(cx.update(|cx| editor.read(cx).selection.clone()), vec![Sel::View(base)], "the parent view selected");
+    // Live2 drw-tools-1119 centermark-sel: with the pointer over the selected parent its cutting line's grips alone,
+    // none once the pointer leaves it.
+    lit_at(cx, window, &editor, [(inside[0] + right) / 2.0, inside[1]]);
+    let (lit, tan, blue, ink) = looks(cx);
+    assert_eq!((lit, tan, blue.len(), ink), (0, 4, 1, 0), "the parent selected, the pointer over it: the cutting line's grips alone");
+    lit_at(cx, window, &editor, [5.0, 5.0]);
+    assert_eq!(looks(cx).1, 0, "the pointer away: no grips");
 }
 
 /// Live2 drw-tools-1119: the Callout tool lights an edge one pixel farther out than the other tools (live 5 px against

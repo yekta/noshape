@@ -150,22 +150,27 @@ impl DrawingEditor {
             Some((Handle::Tab(i), _)) => Some(i),
             _ => None,
         };
-        // Live2 drw-tools-1119 rad-note 30: a white band with grey ticks inside the ruler's grey bar.
-        let mut ruler = div().id("note-ruler").relative().w(px(ruler_w)).h(px(20.)).bg(gpui_kit::rgb(0xffffff)).border_1().border_color(gpui_kit::rgb(0x808080)).overflow_hidden();
-        // Past the box: the bar's grey.
-        ruler = ruler.child(div().absolute().top_0().bottom_0().left(px_of(w)).right_0().bg(BAR));
-        // Ticks: every mm, longer every 5 and 10.
-        let mut mm = 1;
-        while (mm as f32) * k < ruler_w {
-            let len = if mm % 10 == 0 { 9. } else if mm % 5 == 0 { 6. } else { 3. };
-            if k >= 3.0 || mm % 5 == 0 {
-                ruler = ruler.child(div().absolute().left(px_of(mm as f64)).bottom(px(0.)).w(px(1.)).h(px(len)).bg(gpui_kit::rgb(0x808080)));
+        // Live2 drw-tools-1119 rad-note 30, recheck-1119: over the box's width a white band framed #5c5c5c then
+        // #808080 inside the ruler's grey bar, the grey tail past it.
+        let band_w = px_of(w).min(px(ruler_w));
+        let mut ruler = div().id("note-ruler").relative().w(px(ruler_w)).h(px(20.)).bg(BAR).overflow_hidden();
+        ruler = ruler.child(div().absolute().top_0().left_0().h(px(20.)).w(band_w).border_1().border_color(gpui_kit::rgb(0x5c5c5c)).child(div().size_full().border_1().border_color(gpui_kit::rgb(0x808080)).bg(gpui_kit::rgb(0xffffff))));
+        // Ticks every 1/8 in, 4 px, and every 1/2 in, 10 px, centred, whatever the drawing's units (live2
+        // recheck-1119: 13 / 53 px apart on a mm drawing).
+        let step = 25.4 / 8.0;
+        let mut n = 1;
+        while px_of(n as f64 * step) < band_w - px(2.) {
+            let tall = n % 4 == 0;
+            if tall || step as f32 * k >= 4.0 {
+                let h = if tall { 10. } else { 4. };
+                ruler = ruler.child(div().absolute().left(px_of(n as f64 * step)).top(px((20. - h) / 2.)).w(px(1.)).h(px(h)).bg(gpui_kit::rgb(0x404040)));
             }
-            mm += 1;
+            n += 1;
         }
         // Indents: first line (top), left and right (bottom); the box width.
         let marker = |x: Pixels, top: bool, glyph: &'static str| {
-            let d = div().absolute().left(x - px(4.)).w(px(9.)).h(px(10.)).flex().justify_center().text_size(px(9.)).text_color(ink).child(glyph);
+            // Kept inside the ruler: at an indent of 0 the markers sit at the band's ends (live2 recheck-1119).
+            let d = div().absolute().left((x - px(4.)).max(px(0.)).min(px(ruler_w - 9.))).w(px(9.)).h(px(10.)).flex().justify_center().text_size(px(10.)).text_color(gpui_kit::rgb(0x5c5c5c)).child(glyph);
             if top { d.top(px(-1.)) } else { d.bottom(px(-1.)) }
         };
         ruler = ruler
@@ -173,7 +178,7 @@ impl DrawingEditor {
             .child(marker(px_of(st.left_indent), false, "▲"))
             .child(marker(px_of(w - st.right_indent), false, "▲"));
         // Live 414: the ◁▷ box-width handle in the grey tail (no blue bar: live2 rad-note 30).
-        ruler = ruler.child(div().absolute().left(px_of(w) + px(4.)).top_0().bottom_0().flex().items_center().text_size(px(9.)).text_color(ink).child("◁▷"));
+        ruler = ruler.child(div().absolute().left(px_of(w) + px(4.)).top_0().bottom_0().flex().items_center().text_size(px(10.)).text_color(gpui_kit::rgb(0x2e2e2e)).child("◁▷"));
         for (i, t) in st.tabs.iter().enumerate() {
             if dragging_off && dragged == Some(i) {
                 continue;

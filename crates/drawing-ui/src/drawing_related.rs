@@ -121,11 +121,11 @@ impl DrawingEditor {
     /// Add the related-entity highlights of the hovered / selected
     /// annotations to the scene.
     /// A centre mark's looks (live2 drw-centermark): hovered (Select) or selected, its hole circle light blue at 3 px
-    /// (dark orange while its view is selected: the view's geometry); then and while its view is selected, 10 px
-    /// orange grips at its arm ends and an 11 px blue dot at its centre. The picks whose grips show, the blue circles.
-    pub(crate) fn centermark_looks(&self) -> (Vec<u32>, Vec<u32>) {
+    /// and 10 px orange grips at its arm ends with an 11 px blue dot at its centre; while its view is selected, the
+    /// circle the view's orange and an orange dot at its centre, no grips (live2 drw-tools-1119 centermark-sel).
+    pub(crate) fn centermark_looks(&self) -> CentermarkLooks {
         use noshape_model::drawing::build::centermark_key;
-        let Some(b) = &self.built else { return (Vec::new(), Vec::new()) };
+        let Some(b) = &self.built else { return CentermarkLooks::default() };
         let sheet = self.current_sheet();
         let mark_of = |s: &Sel| -> Option<(ViewId, [i64; 2])> {
             match s {
@@ -140,22 +140,22 @@ impl DrawingEditor {
         let hovered = self.hover.and_then(|h| self.sel_of_pick(h)).filter(|_| matches!(self.tool, Tool::Select));
         let lit: Vec<Sel> = self.selection.iter().copied().chain(hovered).filter(|s| mark_of(s).is_some()).collect();
         let views: Vec<ViewId> = self.selection.iter().filter_map(|s| if let Sel::View(v) = s { Some(*v) } else { None }).collect();
-        let mut picks: Vec<u32> = lit.iter().flat_map(|s| self.picks_of(*s)).collect();
-        picks.extend(b.picks.iter().enumerate().filter(|(_, t)| match t {
+        let grips: Vec<u32> = lit.iter().flat_map(|s| self.picks_of(*s)).collect();
+        let dots: Vec<u32> = b.picks.iter().enumerate().filter(|(i, t)| !grips.contains(&(*i as u32)) && match t {
             PickTarget::AutoCentermark { view, .. } => views.contains(view),
             PickTarget::Annotation(id) => sheet.annotations.iter().any(|a| a.id == *id && matches!(&a.kind, AnnotationKind::Centermark { view, .. } if views.contains(view))),
             _ => false,
-        }).map(|(i, _)| i as u32));
+        }).map(|(i, _)| i as u32).collect();
         let pk = self.pk();
         let circles = lit.iter().filter_map(mark_of).filter(|(v, _)| !views.contains(v)).flat_map(|(v, k)| pk.centermark_circle_picks(v, k)).collect();
-        (picks, circles)
+        CentermarkLooks { grips, dots, circles }
     }
 
     pub fn push_centermark_looks(&self, scene: &mut Scene) {
         use noshape_model::drawing::sheet::GripKind;
         let Some(b) = &self.built else { return };
-        let (picks, circles) = self.centermark_looks();
-        if picks.is_empty() && circles.is_empty() {
+        let CentermarkLooks { grips: picks, dots, circles } = self.centermark_looks();
+        if picks.is_empty() && dots.is_empty() && circles.is_empty() {
             return;
         }
         let up = self.gpu.uploader();
@@ -169,9 +169,13 @@ impl DrawingEditor {
             scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
         }
         let mut grips = PointData::default();
-        for gr in b.geometry.grips.iter().filter(|g| picks.contains(&g.pick)) {
-            let (color, size) = if gr.kind == GripKind::Origin { (REFERENCE_BLUE, 11.0) } else { ([0xcc, 0x92, 0x5c, 255], 10.0) };
-            grips.points.push(PointSprite { position: [gr.pos[0] as f32, gr.pos[1] as f32, 0.75], color, pick_id: 0, size, style: LineSegment::ON_TOP, _pad: 0 });
+        for gr in b.geometry.grips.iter().filter(|g| picks.contains(&g.pick) || (dots.contains(&g.pick) && g.kind == GripKind::Origin)) {
+            let (color, size) = match gr.kind {
+                GripKind::Origin if dots.contains(&gr.pick) => ([0xcc, 0x92, 0x5c, 255], 11.0),
+                GripKind::Origin => (REFERENCE_BLUE, 11.0),
+                _ => ([0xcc, 0x92, 0x5c, 255], 10.0),
+            };
+            grips.points.push(PointSprite { position: [gr.pos[0] as f32, gr.pos[1] as f32, 0.74], color, pick_id: 0, size, style: LineSegment::ON_TOP, _pad: 0 });
         }
         if !grips.points.is_empty() {
             scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&grips))).per_primitive_color().unpickable().layer(23));
@@ -330,4 +334,13 @@ impl DrawingEditor {
             .collect();
         g.fonts.extend(spans);
     }
+}
+
+/// [`DrawingEditor::centermark_looks`]: the picks whose grips show (hovered or selected marks), those showing only
+/// their centre dot (their view selected), and the circles lit light blue.
+#[derive(Default, Debug, PartialEq)]
+pub(crate) struct CentermarkLooks {
+    pub grips: Vec<u32>,
+    pub dots: Vec<u32>,
+    pub circles: Vec<u32>,
 }

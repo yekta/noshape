@@ -45,20 +45,6 @@ impl SheetPick<'_> {
         off.then_some(q)
     }
 
-    /// Edge to edge centerline on one edge: when it is a cylinder / cone
-    /// silhouette, the view's axis line parallel to it, spanning the edge.
-    pub fn silhouette_centerline(&self, a: &PickedPoint, b: &PickedPoint) -> Option<([f64; 2], [f64; 2])> {
-        let dir = norm(sub(b.p, a.p));
-        let n = [-dir[1], dir[0]];
-        let off = |ax: &[[f64; 2]; 2]| dot(sub(ax[0], a.p), n).abs();
-        let axis = self.geoms.get(&a.view).and_then(|g| g.axes.iter().filter(|ax| (dot(norm(sub(ax[1], ax[0])), dir)).abs() > 1.0 - 1e-6).min_by(|x, y| off(x).total_cmp(&off(y))).copied());
-        let edge_len = len(sub(b.p, a.p));
-        let ax = axis.filter(|ax| off(ax) < edge_len.max(1e-6) * 2.0)?;
-        let o = ax[0];
-        let t0 = dot(sub(a.p, o), dir);
-        let t1 = dot(sub(b.p, o), dir);
-        Some(([o[0] + dir[0] * t0, o[1] + dir[1] * t0], [o[0] + dir[0] * t1, o[1] + dir[1] * t1]))
-    }
 }
 
 impl SheetPick<'_> {

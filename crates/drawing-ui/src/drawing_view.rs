@@ -508,9 +508,6 @@ pub struct DrawingEditor {
     pub gdt_dlg: Option<crate::drawing_gdt::GdtDlg>,
     /// Custom tables: the dialog and the evaluated tables.
     pub custom_tables: crate::drawing_custom_table::CustomState,
-    /// Dimension tool: circle centers woken by hovering their edges (view,
-    /// view point); shown until the tool changes (help drawing_dimensions).
-    pub woken_centers: Vec<(ViewId, [f64; 2])>,
     /// Dimension tool: the "+" marks at straight edges' near ends and
     /// midpoints, woken by approaching the edge and kept while the tool is
     /// active (live request 1662 (b); sheet mm).
@@ -823,7 +820,6 @@ impl DrawingEditor {
             change_config: None,
             gdt_dlg: None,
             custom_tables: Default::default(),
-            woken_centers: Vec::new(),
             woken_plus: Vec::new(),
             dim_circle_spot: None,
             woken_points: Vec::new(),
@@ -1855,33 +1851,82 @@ impl DrawingEditor {
 
     /// A hovered cutting line (Select): drawn tan, 10 px orange grips at its ends, its cut points light blue (live2
     /// drw-tools-1119 sl.png).
+    /// The cutting lines' looks in Select (see [`CutLineLooks`]).
+    pub(crate) fn cut_line_looks(&self) -> CutLineLooks {
+        use noshape_model::drawing::font;
+        const TAN: [u8; 4] = [0xcc, 0x92, 0x5c, 255];
+        let mut lit = Vec::new();
+        let mut grips = Vec::new();
+        let mut ink = noshape_render::MeshData::default();
+        let Some(b) = self.built.as_ref() else { return CutLineLooks { lit, grips, ink } };
+        let hovered = self.hovered_cut_line().filter(|_| matches!(self.tool, Tool::Select));
+        // The hovered cutting line tinted with its grips; a selected view's cutting lines show their grips alone while
+        // the pointer is over it (live2 drw-tools-1119 centermark-sel: none once it moves away).
+        let selected = |w: ViewId| self.selection.contains(&Sel::View(w)) && self.placement(w).is_some_and(|pl| (pl.min[0]..=pl.max[0]).contains(&self.cursor[0]) && (pl.min[1]..=pl.max[1]).contains(&self.cursor[1]));
+        let lines: Vec<(ViewId, bool)> = hovered.map(|v| (v, true)).into_iter().chain(b.resolved.views.iter().filter(|w| Some(w.id) != hovered && b.resolved.section_points(w.id).is_some() && b.resolved.parent_of(w.id).is_some_and(selected)).map(|w| (w.id, false))).collect();
+        let mut dot = |p: [f64; 2], color: [u8; 4]| grips.push((p, color));
+        let mut tri = |pts: &[[f64; 2]], idx: &[u32]| {
+            let base = ink.positions.len() as u32;
+            for p in pts {
+                ink.positions.push([p[0] as f32, p[1] as f32, 0.5]);
+                ink.normals.push([0.0, 0.0, 1.0]);
+                ink.pick_ids.push(0);
+            }
+            ink.indices.extend(idx.iter().map(|i| base + i));
+        };
+        let len = |pts: &[[f64; 2]]| pts.windows(2).map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])).sum::<f64>();
+        for (v, tint) in lines {
+            let mine = |pick: u32| b.picks.get(pick as usize) == Some(&PickTarget::SectionLine(v));
+            if tint {
+                lit.extend(b.picks.iter().enumerate().filter(|(_, t)| **t == PickTarget::SectionLine(v)).map(|(i, _)| i as u32));
+            }
+            let Some(line) = b.geometry.lines.iter().filter(|l| mine(l.pick)).max_by(|l, m| len(&l.points).total_cmp(&len(&m.points))) else { continue };
+            let (Some(&first), Some(&last)) = (line.points.first(), line.points.last()) else { continue };
+            // Live2 recheck-1119: the arrows and letters tan, a tan grip at both ends of each arrow (the line's end and
+            // the tip), a light-blue one on the model point it follows (its anchor).
+            for (ti, t) in b.geometry.texts.iter().enumerate().filter(|(_, t)| mine(t.pick)) {
+                if tint {
+                    let (pts, idx) = font::text_fill_font(t, b.geometry.text_font(ti));
+                    tri(&pts, &idx);
+                }
+                let end = if (t.pos[0] - first[0]).hypot(t.pos[1] - first[1]) <= (t.pos[0] - last[0]).hypot(t.pos[1] - last[1]) { first } else { last };
+                let d = [t.pos[0] - end[0], t.pos[1] - end[1]];
+                let l = d[0].hypot(d[1]).max(1e-9);
+                let sight = [d[0] / l, d[1] / l];
+                let reach = (l - 1.1 * t.height).max(0.0);
+                let tip = [end[0] + sight[0] * reach, end[1] + sight[1] * reach];
+                dot(end, TAN);
+                dot(tip, TAN);
+                let near = |p: &[f64; 2]| views::dist_to_segment(*p, end, tip) <= reach * 0.3;
+                for f in b.geometry.fills.iter().filter(|f| tint && f.points.len() >= 3 && f.points.iter().all(near)) {
+                    let idx: Vec<u32> = (1..f.points.len() as u32 - 1).flat_map(|i| [0, i, i + 1]).collect();
+                    tri(&f.points, &idx);
+                }
+            }
+            let drawn = &b.resolved;
+            if let Some(pl) = drawn.parent_of(v).and_then(|p| self.placement(p))
+                && let Some((_, at)) = drawn.view(v).and_then(|w| w.cut_anchor.as_ref())
+            {
+                dot(pl.to_sheet(*at), [0x90, 0xce, 0xf1, 255]);
+            }
+        }
+        CutLineLooks { lit, grips, ink }
+    }
+
     fn push_cut_line_hover(&self, scene: &mut Scene) {
         use noshape_render::{LineSegment, PointData, PointSprite};
-        let (Some(v), Some(b)) = (self.hovered_cut_line().filter(|_| matches!(self.tool, Tool::Select)), self.built.as_ref()) else { return };
-        let mut grips = PointData::default();
-        let mut dot = |p: [f64; 2], color: [u8; 4], size: f32| grips.points.push(PointSprite { position: [p[0] as f32, p[1] as f32, 0.75], color, pick_id: 0, size, style: LineSegment::ON_TOP, _pad: 0 });
-        for (i, t) in b.picks.iter().enumerate() {
-            if *t == PickTarget::SectionLine(v) {
-                scene.add_flag(i as u32, state::HOVER);
-            }
+        let CutLineLooks { lit, grips: marks, ink } = self.cut_line_looks();
+        for i in lit {
+            scene.add_flag(i, state::HOVER);
         }
-        let line = b.geometry.lines.iter().filter(|l| matches!(b.picks.get(l.pick as usize), Some(PickTarget::SectionLine(x)) if *x == v)).max_by(|l, m| {
-            let len = |pts: &[[f64; 2]]| pts.windows(2).map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])).sum::<f64>();
-            len(&l.points).total_cmp(&len(&m.points))
-        });
-        if let Some(l) = line
-            && let (Some(a), Some(z)) = (l.points.first(), l.points.last())
-        {
-            dot(*a, [0xcc, 0x92, 0x5c, 255], 10.0);
-            dot(*z, [0xcc, 0x92, 0x5c, 255], 10.0);
+        if marks.is_empty() {
+            return;
         }
-        let drawn = &b.resolved;
-        if let (Some(pts), Some(pl)) = (drawn.section_points(v), drawn.parent_of(v).and_then(|p| self.placement(p))) {
-            for p in pts {
-                dot(pl.to_sheet(p), [0x90, 0xce, 0xf1, 255], 10.0);
-            }
-        }
+        let grips = PointData { points: marks.iter().map(|(p, color)| PointSprite { position: [p[0] as f32, p[1] as f32, 0.75], color: *color, pick_id: 0, size: if color[2] == 0xf1 { 11.0 } else { 10.0 }, style: LineSegment::ON_TOP, _pad: 0 }).collect() };
         let up = self.gpu.uploader();
+        if !ink.indices.is_empty() {
+            scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&ink))).with_color(crate::theme::lin(DRAWING_HOVER)).unlit().unpickable().layer(19));
+        }
         scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&grips))).per_primitive_color().unpickable().layer(23));
     }
 
@@ -2489,4 +2534,12 @@ impl DrawingEditor {
             .children(self.render_tool_help())
             .into_any_element()
     }
+}
+
+/// [`DrawingEditor::cut_line_looks`]: the picks lit tan, the grips (sheet mm, colour) and the tan ink over the arrows
+/// and letters.
+pub(crate) struct CutLineLooks {
+    pub lit: Vec<u32>,
+    pub grips: Vec<([f64; 2], [u8; 4])>,
+    pub ink: noshape_render::MeshData,
 }

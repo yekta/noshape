@@ -41,7 +41,6 @@ impl DrawingEditor {
         if !matches!(tool, Tool::Select) {
             self.view_props = None;
         }
-        self.woken_centers.clear();
         self.woken_points.clear();
         self.woken_plus.clear();
         self.datum_on = None;
@@ -426,7 +425,7 @@ impl DrawingEditor {
             Tool::Detail { .. } => "Click to place the detail view",
             Tool::HoleCallout { circle: None } => "Select a circle of a hole or thread",
             Tool::HoleCallout { .. } => "Drag to place the callout and click",
-            Tool::EdgeCenterline { first: None } => "Select a cylinder silhouette edge, or the first of two edges",
+            Tool::EdgeCenterline { first: None } => "Select two lines or two concentric arcs",
             Tool::EdgeCenterline { .. } => "Select the second edge",
             Tool::CircleCenterline { three: true, points } if points.len() < 3 => "Select three points on the circle (hole centers, end, mid or quad points)",
             Tool::CircleCenterline { points, .. } if points.is_empty() => "Select the center of the circle",
@@ -686,18 +685,6 @@ impl DrawingEditor {
             | Tool::Crop { .. } => self.snap_at(c),
             _ => None,
         };
-        // Dimension tool: the hovered circular edge shows its center mark (an
-        // orange center snap with a small cross) only while hovered (live,
-        // qa DWG-DIM-HOVER-STAYS: they piled up hover by hover).
-        // (Radial / diameter: no centre dot; live2 drw-tools-1119 rad-note r-hover.)
-        self.woken_centers.clear();
-        if matches!(self.tool, Tool::Dimension { kind, .. } if !matches!(kind, DimTool::Radius | DimTool::Diameter))
-            && let Some((view, me)) = self.hovered_edge()
-            && let views::EdgeGeom::Circle { center, .. } = me.geom
-            && !self.woken_centers.contains(&(view, center))
-        {
-            self.woken_centers.push((view, center));
-        }
         // Approaching a straight edge with Shift+Q's midpoints on (live request 1662 (b)): "+" marks at its near end and
         // its midpoint, kept while the tool is active; without Shift+Q nothing (live2 drw-tools-1119).
         if matches!(self.tool, Tool::Dimension { .. })
@@ -736,13 +723,6 @@ impl DrawingEditor {
             && !self.woken_points.iter().any(|w| (w[0] - p[0]).abs() < 1e-9 && (w[1] - p[1]).abs() < 1e-9)
         {
             self.woken_points.push(p);
-        }
-        // A centre the Dimension tool passed over keeps its dot (live behaviours "dsn": sticky inference dots).
-        if matches!(self.tool, Tool::Dimension { .. }) {
-            for (view, center) in self.woken_centers.clone() {
-                let Some(pl) = self.placement(view) else { continue };
-                overlay.marks.push((pl.to_sheet(center), crate::drawing_scene::SnapMark::Disc, 0.0));
-            }
         }
         self.hover_snap = snap.as_ref().and_then(|s| self.pick_sheet(s));
         if let Some(p) = self.hover_snap {
@@ -1240,15 +1220,8 @@ impl DrawingEditor {
                     return;
                 };
                 match first {
-                    None => match self.pk().silhouette_centerline(&a, &b) {
-                        // A cylinder / cone silhouette: its axis, spanning the edge.
-                        Some((p, q)) => {
-                            let id = self.current_sheet().next_annotation_id();
-                            self.edit_sheet("Edge to edge centerline", cx, |s| s.annotations.push(dt::edge_centerline(id, a.view, p, q, c)));
-                            self.selection = vec![Sel::Annotation(id)];
-                        }
-                        None => self.tool = Tool::EdgeCenterline { first: Some((a, b)) },
-                    },
+                    // Two edges always (live: "Place a centerline by selecting two edges"; a cylinder's silhouette too).
+                    None => self.tool = Tool::EdgeCenterline { first: Some((a, b)) },
                     Some((a1, b1)) => {
                         if a.view != a1.view {
                             self.status = Some("Select an edge in the same view".into());
