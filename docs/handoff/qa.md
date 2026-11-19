@@ -65,10 +65,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    everyday flows, then nightly/flows-done-<mmdd>; qa-w7-nightly waits for that flag (03:20 at the latest) before hat15 / dock;
    user flows after NIGHTLY-DONE. Re-arm each night with the next date. Cut verdict: a must-carry still queued reads PENDING
    at :15 and HOLD only if missing at :50 (timers qa-cut-0450 / 1650). qa-big-after fetches tonight's big run and fixes its fetch line.
-0000. **11-19 21:38 state (thread on Bbedward since 21:08).** Ids (lead 22:4x; never message any other id): core 08a98761-3bbe-47ce-a91a-32b208f5c6b2,
-   blend 459f6c19-c460-4ebf-96ca-bf92455f2e1e, bool abdebc8b-6b39-4794-8390-eb02d6fa37e6, live 349fe81d-db78-4931-8032-6dc3edc5d558,
-   dx 6cfc89bd-1196-43ef-9225-0014546fee1e, studios 91339202-41f1-4465-91f4-65ccd26ea1b1, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7,
-   asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6.
+0000. **11-19 21:38 state (thread on Bbedward since 21:08).** Agent ids: only in /root/lead-scratch/roster.md (lead 22:5x); read it before every message_agent, never copy ids here.
    **v0.4.61 post-release done 21:2x: clean** (qa-alerts line): SHA OK, user docs ALL-SAME (candidate and vs 0.4.60), ticket docs = the
    cut's 3 (draft-hang, shell-hang-pre, suppress-segv), quit-abort 5/5, hover flow uh/r61 108/108 shots right, spot rows 17-22 on the
    released app 12/13 (suites/1119-2120-v0461-spot; line-from-midpoint fixed after the release). Compat baseline 0.4.61. Next spot
