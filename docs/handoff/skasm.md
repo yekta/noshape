@@ -50,9 +50,9 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
   on green bfe09bcd: crossing row 67, conflict row 110, bend-face click row 1704 all =.
 - Lead's missing-functionality list (order set by the lead): #1 / #2 export follow-ups, then #3, then #4 / #5.
   - LANDED 32f60584 (#1 flat DXF exact curves `FlatCurve` / `outline_curves`) as 1021a0c1; 0dae1e11 (ELLIPSE; #2
-    "Include visible sketches" on MODELSKETCH_VISIBLE, export options) queued. Live truth: live/skasm/q-flat-dxf-1119.
-  - LOCAL, to land together after suite G = F (91/126, 1335/1585; G waits in vibe2's slot, built 09:4x, holds the first
-    two): a1a00fce4 bend centreline split around a hole (`FlatPattern::clip_to_flat`); 63eb8b124 #3 pattern / mirror
+    "Include visible sketches" on MODELSKETCH_VISIBLE, export options) landed as debcf7d1. Live truth: live/skasm/q-flat-dxf-1119.
+  - LOCAL, to land together (suite G 10:55: 92/126, 1336/1585 vs F 91 / 1335; per document only clamp-guillem 24 -> 25; G holds the first
+    two; the last two are inert outside flats): a1a00fce4 bend centreline split around a hole (`FlatPattern::clip_to_flat`); 63eb8b124 #3 pattern / mirror
     of active sheet metal forms each copy (live q-sm-pattern-1119, 9638.003952 mm³ each; `body_moves`,
     `moved_form_tools` / `moved_tools`, FormTools.moved; T2 `a_pattern_or_mirror_of_sheet_metal_carries_its_form_and_hole`
     now also asserts one form per flat); 6f2318e4c a flat keeps a form beside a hole (`lone_face`: the wall's flat with
