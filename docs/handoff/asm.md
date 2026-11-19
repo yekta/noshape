@@ -5,9 +5,9 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-19 19:06 UTC)
+## State (2026-11-19 19:54 UTC)
 
-### Landed today (6686624b as 702c9878: Display states Esc, driver-mate named position, paste; d671313d; 335f8e43)
+### Landed today (6686624b as 702c9878: Display states Esc, driver-mate named position, paste; d671313d; 335f8e43; 9f52415c)
 - LOD (91478e2c), Derived mirror of an assembly complete (e87a2b3e, 17c26dc1; left: live's exact node icon, symmetry
   detection on child rows), mass overrides (17c26dc1; left: psui's Part Studio panel CoM / Inertia ☑ Override rows,
   several parts measured with overrides, not captured), surf-intro translator steps (8c6ec107, eb3b06a8).
@@ -18,22 +18,27 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
 not reproduced off CI (15 runs of the unfixed binary on vibe2, all exit 0); TICKETS ASM-UI-SIGSEGV-AT-EXIT [x].
 
 ### In flight: parity_assemblies differences (lead 11-19: rank by documents, one land each)
-- Suites on vibex7 now (`~/agents/asm-keep/suite1.sh <bin> <tag> <dirs>` -> suite/<tag>.log), bin ops-main1119 (main
-  17c26dc1 + translator steps): light 20: the first 10 as live on vibe2 (l1119: bjr, clamp, config-assembly, corexy, flip-midaxis ×2, gearbox-std, hand-drill-pinslot, hinge-live), the other 11 on vibex7 (l1119b); heavy 4
-  (xdev, isaac, infento, scissor) next.
-- Landed 335f8e43: pattern-std BOM 17/17 (a pattern's live state also under its feature's id: Linear pattern 5 is
-  Man5… in the tree, M26C… ERROR in the feature list). Branch asm-bom (d4f6fdb0f, rebased on main): welding BOM
-  (9c7704: live's Part 2 / Part 6 alike in volume both took our Part 2; a live part whose fits are all taken is the
-  free part its feature made). Check run: vibex7 suite tag l1119b (bin ops-bomfix: both commits) over the 11 light
-  models left (vibe2 stopped 17:25 at the lead's word: load 81). Left in welding: our Extrude 8 names its two bodies the other way round from
-  live (JqD small = live's Part 5: live orders a multi-region extrude's bodies by the regions' creation, ours by the
-  query; sent to core 18:2x) and our big one is 113 mm³ short after Fillets 3/4/2 (geometry).
-- suspension 25/28 occ: studio geometry, sent to core 16:50: 805e29 Fillet 3/4 fail (Knuckle a sliver; Joint <2> /
-  LCA <1> hang off it), 995636 Body two bodies in ours (90,419 + 4,712 mm³), live one (109,049). Trace vibex7
-  ~/agents/asm-keep/susp.out.
-- isaac connector re-pick (`instance_entity_along`): no effect (never triggered, 98/129 as before); shelved, patch in
-  /root/asm-scratch/isaac-repick.patch. isaac: of 31 mate differences 14 have an end off live's connector (8 on
-  Part 1 <12>: a2e4a2 core's Chamfer 2; Ball 2 / 8, Fastened 43 / 26 / 83 / 84, Ball 9 others).
+- Landed: pattern-std BOM 17/17 (335f8e43), welding BOM 29/29 (9f52415c; left there: row order only, core's
+  multi-region extrude body order, sent 18:2x).
+- Suite: vibex7 `~/agents/asm-keep/suite1.sh ops-bomfix l1119b <dirs>` (slot; suite/l1119b.log) over the 11 light
+  models vibe2 didn't run (the first 10 all as live, l1119 on vibe2); then the heavy 4 (xdev, isaac, infento,
+  scissor). vibex hosts: hold runs in a backgrounded ssh (the l1119b run survived its local wait's time limit).
+- suspension 25/28 occ: studio geometry, sent to core 16:50 (805e29 Fillet 3/4 fail: Knuckle a sliver; 995636 Body
+  two bodies in ours). Trace vibex7 ~/agents/asm-keep/susp.out.
+- isaac (98/129 mates; lead 19:2x: fix the off connectors that aren't core's Chamfer 2). Off ends in the 31
+  differences: 7 on Part 1 <12> (a2e4a2 Chamfer 2: sent to core 19:5x for 21:00) and Fastened 43's b on Part 1 <1>
+  (studio 00f1d4). Fastened 26 / 32 and Revolute 7 / 17 OFF lines are intermediate picks; they end as live.
+- Fastened 43 (in progress): 00f1d4's Extrude 38 (REMOVE, Ø6 circle at (-27.06, 23.6) mm, from y = 0 toward -Y
+  25 mm) cuts nothing in ours ("Selected tools and targets do not intersect"; live removes 303.7 mm³ = 10.74 mm of
+  it), so the hole whose edge Fastened 43 takes (CENTER, live Z -Y at y = -7) doesn't exist. Checked: sketch plane,
+  region (d 4e-8 m), scope and tool position match live; OCCT's Boolean (NOSHAPE_BOOL_RUST=0) gives the same; an
+  INTERSECTION of the tool with Part 1 is empty. So our part has no material on that axis for y in [-25, 0] while
+  live's does, though volumes match live up to Fillet 7 and the half kept by Extrude 23 is live's. Around the axis
+  ours has Fillet 5's R4 round (axis exactly the hole's, y -7..0), concave in ours. Next: find the feature whose
+  material sits elsewhere (compare face sets near (-27.06, y, 23.6) per feature; Extrude 36's +1902 mm³ and Fillets
+  3 / 5 first). Repro: vibex7 ~/tmp/asm/stu/i00f1d4 (model dir; NOSHAPE_PARITY_MODELS=~/tmp/asm/stu, bin
+  ops-bomfix, 20 s), saved doc vibex8 ~/tmp/asm/save00/i00f1d4.noshape, current CLI vibex8
+  ~/agents/asm/target/debug/noshape-cli (feature_rollback / feature_add / query_parts on a copy).
 - Others': robot-relations BOM 36/42 (dx); scissor-lift Top <3>; psui coplanar depth tie.
 
 ### isaac-ball connector cases (traced run 07:26, 98/129 mates)
