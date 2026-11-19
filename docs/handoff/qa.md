@@ -65,7 +65,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    everyday flows, then nightly/flows-done-<mmdd>; qa-w7-nightly waits for that flag (03:20 at the latest) before hat15 / dock;
    user flows after NIGHTLY-DONE. Re-arm each night with the next date. Cut verdict: a must-carry still queued reads PENDING
    at :15 and HOLD only if missing at :50 (timers qa-cut-0450 / 1650). qa-big-after fetches tonight's big run and fixes its fetch line.
-0000. **11-19 21:38 state (thread on Bbedward since 21:08).** Ids: as in the lead's prompt (dx / live get new ids from the lead).
+0000. **11-19 21:38 state (thread on Bbedward since 21:08).** Ids (lead 22:4x; never message any other id): core 08a98761-3bbe-47ce-a91a-32b208f5c6b2,
+   blend 459f6c19-c460-4ebf-96ca-bf92455f2e1e, bool abdebc8b-6b39-4794-8390-eb02d6fa37e6, live 349fe81d-db78-4931-8032-6dc3edc5d558,
+   dx 6cfc89bd-1196-43ef-9225-0014546fee1e, studios 91339202-41f1-4465-91f4-65ccd26ea1b1, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7,
+   asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6.
    **v0.4.61 post-release done 21:2x: clean** (qa-alerts line): SHA OK, user docs ALL-SAME (candidate and vs 0.4.60), ticket docs = the
    cut's 3 (draft-hang, shell-hang-pre, suppress-segv), quit-abort 5/5, hover flow uh/r61 108/108 shots right, spot rows 17-22 on the
    released app 12/13 (suites/1119-2120-v0461-spot; line-from-midpoint fixed after the release). Compat baseline 0.4.61. Next spot
@@ -167,12 +170,6 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    driver's state-read redraw (all builds), so "settle" flips 200 / 800 ms; tabrel now reports psui's "tab drawn (2nd frame)" and the
    last frame over 10 returns (5 rounds), and lat-steps.py ends settle at the first "driver" event (logged once psui's 3de2cd04 lands;
    v0.4.53 has none, so compare the 2nd frame across builds). psui's A/B: 2nd frame fix 224 / 0.4.53 218 / green 321 ms.
-0w. **Workflow feel vs live (07:38)**: TICKETS "Workflow feel vs live's 11-18 07:09-07:22 timings": ours faster on every row, no
-   tickets (qa-scratch/wf: wflat.py on this host's Xvfb :153, two-blocks reopened without the runner, PIL crops padded to live's
-   139 ms, timestamps at capture). FEEL-FL-AUTOSCROLL-DROP verified 07:21 (b5c4ccc4), psui told. psui's next land has ROW-DBLCLICK.
-   Compat upload fixed 07:45: compat-check.sh snapshots the green, scp to noshape.new + mv (an scp onto the busy binary failed
-   and cfc031fa's run used cafe3c2a's app: its file is renamed cfc031fa.stale-binary.txt when done). qa-wait-67eb's vibex7 load
-   check was never true (ssh quoting); fixed 07:30, still waits for load < 2.
 0b. **LOADED runs (lead 21:50)**: speed / timing at load > 16 (2 x 8 cores) don't count. suites-diff.py prints "LOADED: …" first,
    skips speed lines and tags timing scenarios "(LOADED)"; qa-suites.sh touches <run>/LOADED and alerts. Absolute speed only from
    the 02:00-04:00 nightly. The 21:03 run (vibex7, load ~60) and 11:19 run (load 19) are LOADED.

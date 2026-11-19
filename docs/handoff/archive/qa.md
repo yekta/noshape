@@ -2190,6 +2190,12 @@ selection, measure, section view; then P2 assembly and drawing passes; verify th
    Measure angles: pass (live2's first-wedge capture: 56.31 for slope + x=40). Face+edge menu (591643fc) not re-run yet.
 
 ## 11-19 day states (moved from the handoff 11-19 21:15)
+0w. **Workflow feel vs live (07:38)**: TICKETS "Workflow feel vs live's 11-18 07:09-07:22 timings": ours faster on every row, no
+   tickets (qa-scratch/wf: wflat.py on this host's Xvfb :153, two-blocks reopened without the runner, PIL crops padded to live's
+   139 ms, timestamps at capture). FEEL-FL-AUTOSCROLL-DROP verified 07:21 (b5c4ccc4), psui told. psui's next land has ROW-DBLCLICK.
+   Compat upload fixed 07:45: compat-check.sh snapshots the green, scp to noshape.new + mv (an scp onto the busy binary failed
+   and cfc031fa's run used cafe3c2a's app: its file is renamed cfc031fa.stale-binary.txt when done). qa-wait-67eb's vibex7 load
+   check was never true (ssh quoting); fixed 07:30, still waits for load < 2.
 - **v0.4.57** published check done 11-17 21:44: clean, baseline 0.4.57. Next: the 05:00 cut (qa-cut-0415).
 0x. **Speed sweep (lead 07:45, done 08:53)**: bin/speed-sweep.sh <sha> (SKIP_BUILD=1 reuses vibe2 ~/agents/qa-speed/target, 7.9 GB):
    release build on vibe2, corpus A/B there + user docs / dock tab on vibex7, ab-feat2.py two passes, bin/speed-sum.py <dir> pass|ud.
