@@ -34,6 +34,29 @@ fn whole_turn(g: &GFace, i: usize, period: f64) -> Option<(f64, f64)> {
     (g.ns.as_deref().is_some_and(|ns| ns.range()[i].is_some()) && (hi - lo - period).abs() <= tol).then_some((lo, hi))
 }
 
+/// The parameters of the point of face `g`'s surface nearest `p` from `seed`, and the distance (as
+/// `FreeSurface::param_of`); where they stop on the seam of a closed NURBS's face going a whole turn round (its box
+/// ends there, so Newton's can't step over), tried again from the seam's other side: the nearer.
+fn param_on(g: &GFace, ns: &FreeSurface, p: DVec3, seed: DVec2) -> (DVec2, f64) {
+    let (uv, d) = ns.param_of(p, seed, g.uvbox);
+    let mut best = (uv, d);
+    for i in 0..2 {
+        if ns.range()[i].is_none() {
+            continue;
+        }
+        let Some((lo, hi)) = ns.period(i).and_then(|t| whole_turn(g, i, t)) else { continue };
+        let eps = 1e-9 * (hi - lo);
+        let other = if (uv[i] - hi).abs() <= eps { lo } else if (uv[i] - lo).abs() <= eps { hi } else { continue };
+        let mut s2 = uv;
+        s2[i] = other;
+        let (uv2, d2) = ns.param_of(p, s2, g.uvbox);
+        if d2 < best.1 {
+            best = (uv2, d2);
+        }
+    }
+    best
+}
+
 pub(super) fn uv_box(ns: Option<&FreeSurface>, pcurves: &PCurves) -> Option<[f64; 4]> {
     let Some(ns) = ns else { return Some([0.0; 4]) };
     let (mut lo, mut hi) = (DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY));
@@ -844,7 +867,7 @@ pub(super) fn seam_crossings(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: 
     for k in 0..=N {
         let t = t0 + (t1 - t0) * k as f64 / N as f64;
         let p = at(t).0;
-        let (uv, _) = ns.param_of(p, prev.map_or_else(|| g.uv_of(p), |q| q.1), g.uvbox);
+        let (uv, _) = param_on(g, ns, p, prev.map_or_else(|| g.uv_of(p), |q| q.1));
         let mut w = uv;
         if let Some((tp, up, pw)) = prev {
             for &i in &round {
@@ -862,7 +885,7 @@ pub(super) fn seam_crossings(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: 
                     let (mut a, mut b, mut ua, mut wa) = (tp, t, up, pw[i]);
                     for _ in 0..60 {
                         let mid = 0.5 * (a + b);
-                        let (um, _) = ns.param_of(at(mid).0, ua, g.uvbox);
+                        let (um, _) = param_on(g, ns, at(mid).0, ua);
                         let wm = unwrap(um[i], wa, i);
                         if (wa - edge) * (wm - edge) < 0.0 {
                             b = mid;
@@ -900,7 +923,7 @@ pub(super) fn projected(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: f64, 
         let t = t0 + (t1 - t0) * k as f64 / N as f64;
         let (p, dp) = at(t);
         let seed = qs.last().map_or_else(|| g.uv_of(p), |q| q.0);
-        let (mut uv, dist) = ns.param_of(p, seed, g.uvbox);
+        let (mut uv, dist) = param_on(g, ns, p, seed);
         // (Ending on the seam of a face going a whole turn round: its last point on the side it came from.)
         if k == N
             && let Some(q) = qs.last()
