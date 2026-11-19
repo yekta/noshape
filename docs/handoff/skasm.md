@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 01:25 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 01:58 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -53,7 +53,10 @@ quadrant's snap wakes no alignment source (ours aligns with points only).
   The full infento doc (349 features) takes > 40 min to translate (not a sketch cost: Part grid itself 15 s).
 - The probe is out of the tree (01:13); to rerun, copy /root/skasm-scratch/probes/zz_sketch_speed.rs into
   crates/ops/tests and add `mod zz_sketch_speed;` to all.rs, and remove both before any land.
-Then: live's sketch-shortcut ≠ rows when they come (flag only >= 100 ms and >= 2x).
+Sketch keys (live shortcuts-sk-1118, 6 rows): fixed 01:5x and landing (Ctrl+M nothing, ` empty Select other,
+Shift+X Section view over the greyed sketch dialog, Shift+N dialog name edit box, Shift+V closes the sketch then Named
+views, no dot at a resting pointer). Defaults asked by live: Show constraints off / Show errors on (live's own code,
+behaviours 33696), as ours. Big-sketch: flag only live rows >= 100 ms and >= 2x.
 welding Sketch 12 (lead: P1) is NOT 7 mm off: ours = live's geometry. Its 2 PROJECTED left are Uses live SPLIT: line
 a6Y7 Uses edge Jq9 (105.05-118.985 mm), its end at MIDPOINT(start, `.orphan` point), the orphan keeping USE_END to the
 far vertex (zBqz the same via a trimOffspring). Ours draws the piece unlinked. Our Trim of a Use'd piece keeps the link
