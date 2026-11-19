@@ -116,15 +116,12 @@ against live with a feel scenario; share psui's pick code (`Viewport::pick_prior
 - Assembly already as live (checked 11-17): box select rule, glyph click selects the mate (related rows, mated faces
   amber, dashed connector line), graphics hover lights no list row, list hover outlines the parts.
 
-## Agents (lead 11-19 ~22:40; only these ids: an old id wakes a stopped thread)
-core 08a98761-3bbe-47ce-a91a-32b208f5c6b2, blend 459f6c19-c460-4ebf-96ca-bf92455f2e1e,
-bool abdebc8b-6b39-4794-8390-eb02d6fa37e6, live 349fe81d-db78-4931-8032-6dc3edc5d558,
-dx 6cfc89bd-1196-43ef-9225-0014546fee1e, qa ac50e7f2-4677-4cab-a57a-fd068a0c07bf,
-psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, asm d8d597e0-675c-497b-a804-544ceab99bbd,
-skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6.
+## Agents
+Ids live only in /root/lead-scratch/roster.md (lead 11-19): read it before every message_agent; never copy ids
+into notes.
 
 ## Waiting on others
-- live (349fe81d-db78-4931-8032-6dc3edc5d558; live2 stopped): the weld retake, the Measure pairs F-I, asm-menu-release: the Pro retakes
+- live (id: roster.md): the weld retake, the Measure pairs F-I, asm-menu-release: the Pro retakes
   (REQUESTS 21:02), the 8 drw-revision-* and drw-styles-dimension retakes; titleblock / holecallout / holetable /
   export-1119; the Feature Studio retake of f4e766b8.
 

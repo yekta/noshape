@@ -2542,3 +2542,51 @@ fn measure_keeps_its_picks_on_an_empty_click_and_ignores_another_view(cx: &mut T
     click_at(cx, window, &editor, corners[0].2, Modifiers::default());
     assert_eq!(picks(cx), ["Point 1", "Point 2"], "another corner of the first view");
 }
+
+/// Live studios place-1118 (ann-1118 mnote.png): N › click › type "AB" › a click on empty sheet commits "AB" and the
+/// Note tool goes on, its "NOTE" preview at that click (no second editor); Esc then ends the tool and adds nothing.
+#[gpui::test]
+fn a_click_away_from_a_typed_note_commits_it_and_the_note_tool_goes_on(cx: &mut TestAppContext) {
+    let (window, editor) = drawing(cx, "feel-note-commit");
+    real_sheet(cx, window, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Note, cx)));
+    draw(cx, window);
+    // (The second click below the note: the Note panel floats above it.)
+    let (a, b) = ([30.0, 120.0], [30.0, 50.0]);
+    click_at(cx, window, &editor, a, Modifiers::default());
+    assert!(cx.update(|cx| matches!(editor.read(cx).panel, Some(crate::drawing_view::Panel::Note { .. }))), "the note editor opens");
+    VisualTestContext::from_window(window, cx).simulate_keystrokes("a b");
+    draw(cx, window);
+    let typed = cx.update(|cx| match &editor.read(cx).panel {
+        Some(crate::drawing_view::Panel::Note { input, .. }) => Some(input.read(cx).value().to_string()),
+        _ => None,
+    });
+    assert_eq!(typed.as_deref(), Some("ab"), "typed into the note");
+    let notes = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            e.drawing_sheet().annotations.iter().filter_map(|x| match &x.kind {
+                noshape_model::drawing::AnnotationKind::Note { text, .. } => Some(text.clone()),
+                _ => None,
+            }).collect::<Vec<_>>()
+        })
+    };
+    let before = notes(cx);
+    click_at(cx, window, &editor, b, Modifiers::default());
+    let after = notes(cx);
+    assert_eq!(after.len(), before.len() + 1, "{after:?}");
+    assert_eq!(after.last().map(String::as_str), Some("ab"));
+    let (open, note_tool, at, preview) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let preview = e.current_sheet().annotations.iter().any(|x| matches!(&x.kind, noshape_model::drawing::AnnotationKind::Note { text, .. } if text == "NOTE"));
+        (e.panel.is_some(), matches!(e.tool, Tool::Note) && e.note_leader.is_none(), e.cursor, preview)
+    });
+    assert!(!open && note_tool, "no second editor; the Note tool goes on");
+    assert!(preview, "the \"NOTE\" preview drawn");
+    assert!((at[0] - b[0]).abs() < 0.5 && (at[1] - b[1]).abs() < 0.5, "its preview at the click: {at:?}");
+    // (Esc's binding needs the workspace's key context: its action, as the other tests.)
+    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+    draw(cx, window);
+    assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::Select)), "Esc ends the tool");
+    assert_eq!(notes(cx), after, "Esc adds nothing");
+}
