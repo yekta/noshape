@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 01:12 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 01:25 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -51,19 +51,22 @@ quadrant's snap wakes no alignment source (ours aligns with points only).
 - Live's numbers: REQUESTS 23:45 still open; compare when they come (only a >= 100 ms gap would be mine).
 - Runs: vibe2 ~/tmp/skasm/{inf1,bjr1,bigm} model dirs (studio cut to the sketch), inf1.sh / redraw.sh (scratch bin).
   The full infento doc (349 features) takes > 40 min to translate (not a sketch cost: Part grid itself 15 s).
-- THE PROBE IS WIRED INTO THE TREE UNCOMMITTED: crates/ops/tests/zz_sketch_speed.rs + `mod zz_sketch_speed;` in
-  crates/ops/tests/all.rs: `git checkout crates/ops/tests/all.rs && rm crates/ops/tests/zz_sketch_speed.rs` before
-  any commit / land (copy with REDRAW: /root/skasm-scratch/probes/zz_sketch_speed.rs).
-Then: live's sketch-shortcut ≠ rows when they come; welding Sketch 12 (2 PROJECTED Uses: "Is" resolves to our vertex
-at x -118.985 mm, live's at -112.02; rerun vibe2 ~/tmp/skasm/cfgs.sh -> cfgs.log, saved doc ~/tmp/skasm/cfgsave).
+- The probe is out of the tree (01:13); to rerun, copy /root/skasm-scratch/probes/zz_sketch_speed.rs into
+  crates/ops/tests and add `mod zz_sketch_speed;` to all.rs, and remove both before any land.
+Then: live's sketch-shortcut ≠ rows when they come (flag only >= 100 ms and >= 2x).
+welding Sketch 12 (lead: P1) is NOT 7 mm off: ours = live's geometry. Its 2 PROJECTED left are Uses live SPLIT: line
+a6Y7 Uses edge Jq9 (105.05-118.985 mm), its end at MIDPOINT(start, `.orphan` point), the orphan keeping USE_END to the
+far vertex (zBqz the same via a trimOffspring). Ours draws the piece unlinked. Our Trim of a Use'd piece keeps the link
+(e2e probe 01:15); our Split leaves the new piece unlinked (non-external). Asked live REQUESTS 01:20 "Split / Trim of
+a Use'd line"; then make Split keep the link as live, and the translator split our Use at the stored end.
+Sketch 13 solves now (core's Extrude 8); welding's first difference: Fillet 3 (core's).
+In flight 01:25: full model suite on vibe2 (scratch bin/suite1119.sh -> ~/agents/skasm-keep/suite-1119-*.log).
 Waiting: live rechecks error rows 82-85.
 
 ## Form speed P0 (closed 17:4x): no regression; live2's app A/B overlaps (A 2.3–4.0 s, B 2.9–3.4 s, by load); model
 regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete when done).
 
 ## Next
-- welding-config 9c7704 after core's Extrude 8 fix: Sketch 12 (2 PROJECTED not found), Sketch 13 (DIAMETER "Sketch
-  could not be solved"); repro vibe2 ~/tmp/skasm/cfgm/wc-9c7704 + cfg.sh.
 - Midpoint / quadrant snaps as alignment sources (live feel retaken 11-18).
 - Handed: surf-intro-simple Loft 1 (core), surf-intro-examples Fill 1 overshoot (lead to route), welding-config
   Extrude 8 (core, fixing), manualblend Sweep 2 area / Move boundary (core).
@@ -112,8 +115,8 @@ regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete w
   sketch difference left (first: 3D fit spline 1, "Cannot evaluate tangency for end condition.").
 
 ## Agents (lead's roster 11-17 10:30; only these ids)
-psui 4973e295-9e92-463f-a13f-2ec5258bc5f9 (since 11-17 ~10:35), core e8af89fe-d460-49b3-b0bb-9572da230fed (11-18 restart), blend
-0672fa20-964d-4fde-a19c-c5b4363729ba (11-18 restart), bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, dx f93a1292-5bb7-406f-9a25-59767e01878e,
+psui 4973e295-9e92-463f-a13f-2ec5258bc5f9 (since 11-17 ~10:35), core d30002ca-d013-4435-b7d9-7da9cb564cec (11-18 new id),
+blend de66e481-56e2-4005-a5d3-9fa897ca5fde (11-18 new id), bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, dx f93a1292-5bb7-406f-9a25-59767e01878e,
 qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b, asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm (me)
 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios
 58e9bca8-346c-4847-8012-e15006ae61ef, live e8549719-ef9a-42de-960c-e24b29f142a6, live2 79ae5cdb-42a4-4025-b43a-da61a4f92ad7 (moved 11-17 13:3x).
