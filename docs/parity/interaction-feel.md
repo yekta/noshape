@@ -1470,7 +1470,7 @@ Ctrl+V on, which doesn't change the keys after it.
 | Shift+X Section view | the dialog at the list's side like other feature dialogs (top left ~ (396, 192)) | the dialog low on the left (~ (336, 620)): a moved spot saved on 11-04 in the run's panel_positions.json | withdrawn (live 11-19: = with a clean config) |
 | Shift+Y Show selected parts (Part 1 selected) | the selection cleared | Part 1 stays selected | ≠ [psui] (live's studio had Part 1 hidden first; to retake from one state) |
 
-### reach-px-1119 (hover reach read from full-page screenshots, live 11-19 02:50–03:25) [psui, asm]
+### reach-px-1119 (hover reach read from full-page screenshots, live 11-19 02:40–02:57) [psui, asm]
 
 Lane 4. The pointer stepped 1 px at a time (450 ms per step) toward the target and back out, and each step was read from a full-page screenshot of what
 live draws. Clip screenshots on this lane miss the hover overlay, so they're not used. The distances are px from the drawn edge pixel to the pointer.
