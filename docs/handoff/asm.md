@@ -16,11 +16,17 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   ensure_mirrored_tab}`; Mirror strategy Derived on a subassembly makes "<A>-Mirrored" (fixed "Derived mirror" node)
   and the copy is "<A>-Mirrored <1>"; eval's reflection_of treats it like a mirrored studio. e2e
   `a_derived_mirror_of_a_subassembly_makes_its_mirrored_assembly`.
-- Piece 3 (UI): strategy rows for subassemblies ("Create new instance" / "1 instance needs to be created", reference
-  "<A>-Mirrored"), the node's row / menu / dialog ("Assembly to mirror", its own strategy).
+- Branch asm-mass (stacked on queued 673142ab; land after it): mass overrides (below), 3a ecca84b2e (strategy row of a
+  subassembly: assembly icon, "<A>-Mirrored" reference; UI test of Update on a subassembly), 3b a194eedac
+  (`assembly_derived_mirror`: the node's source and per-part strategy, Derived makes the "-Mirrored" studio; e2e).
+- 3c next (assembly-ui): the node's row menu as live m10 (Rename, Edit…, Hide, Hide other / all instances, Show center
+  of mass, Isolate…, Make transparent…, Suppress, Dynamic suppression, Zoom to selection, Add selection to folder…,
+  Expand, Collapse, Delete) and its dialog ("Derived mirror": Assembly to mirror, Mirror strategy… table of the
+  source's parts); the Mirror strategy's child rows under a subassembly row (live m7: its parts, Transform / Derived,
+  placement) writing the node's strategy. Shots: live/asm/derived-mirror-1119/m7-expanded.png, m10-*.
 
 ### In flight: mass-property overrides (live2 12:42–12:45, behaviours "asm (11-19)", live/asm/mass-override-1119 c1–c5)
-- Branch asm-mass (on 673142ab, queued): PartProperties `com_override` (m) / `inertia_override` (kg·m², column by column
+- Branch asm-mass a96eaf1b2: PartProperties `com_override` (m) / `inertia_override` (kg·m², column by column
   as live: Lxy at index 3); `measure::with_overrides` (CoM: parallel axis to it; Mass: inertia × m / computed, centre
   kept; Inertia replaces); Part Studio mass with one part measured; assemblies per part (`part_overrides`,
   `assembly_mass_properties_with`); the assembly's Mass override now scales the inertia in assembly_mass_properties
