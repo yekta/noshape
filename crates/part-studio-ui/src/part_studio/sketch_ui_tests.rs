@@ -6087,6 +6087,50 @@ fn a_click_on_a_configuration_row_doesnt_switch_to_it(cx: &mut TestAppContext) {
     assert_eq!(after, before);
 }
 
+/// Live2 ps-feel2-1118: a configuration row's menu: the current row has no Switch to and no Delete row, the default row
+/// no Set as default, the first no Move up, the last no Move down.
+#[gpui::test]
+fn a_configuration_rows_menu_offers_what_live_offers(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_variables(cx, "cfg-row-menu", &[("width", "30 mm")]);
+    let (rows, input) = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let mut input = String::new();
+            v.edit_config("Configure", cx, |ps| {
+                input = noshape_ops::config::add_input(ps, "List");
+                noshape_ops::config::add_option(ps, &input, "A".into());
+                noshape_ops::config::add_option(ps, &input, "B".into());
+            });
+            v.right_panel = Some(crate::part_studio::config_panel::RightPanel::Configurations);
+            let rows: Vec<String> = match v.studio(cx).and_then(|s| s.configuration.inputs.iter().find(|i| i.id == input)).map(|i| &i.kind) {
+                Some(noshape_model::configuration::ConfigInputKind::List { options, .. }) => options.iter().map(|o| o.id.clone()).collect(),
+                _ => Vec::new(),
+            };
+            (rows, input)
+        })
+    });
+    assert_eq!(rows.len(), 3, "Default, A, B");
+    draw(cx, window);
+    let mut menus = Vec::new();
+    for r in &rows {
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        let b = vcx.debug_bounds(Box::leak(format!("cfg-row {input} {r}").into_boxed_str())).expect("the row drawn");
+        vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Right, position: b.center(), modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
+        vcx.simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Right, position: b.center(), modifiers: Modifiers::default(), click_count: 1 });
+        draw(cx, window);
+        menus.push(cx.update(|cx| crate::os_menu::open_labels(cx)).into_iter().filter(|s| s != "———").collect::<Vec<_>>());
+        keys(cx, window, &["escape"]);
+    }
+    let want: Vec<Vec<String>> = [
+        vec!["Duplicate row", "Move down"],
+        vec!["Switch to \"A\"", "Set as default", "Duplicate row", "Move up", "Move down", "Delete row"],
+        vec!["Switch to \"B\"", "Set as default", "Duplicate row", "Move up", "Delete row"],
+    ]
+    .iter()
+    .map(|m| m.iter().map(|s| s.to_string()).collect())
+    .collect();
+    assert_eq!(menus, want, "the menus of Default (current, default, first), A and B (last)");
+}
+
 const PROBE_FS: &str = r#"FeatureScript 3095;
 import(path : "onshape/std/geometry.fs", version : "3095.0");
 
