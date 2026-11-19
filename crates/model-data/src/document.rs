@@ -183,13 +183,59 @@ impl Document {
         f.name = "Derived mirror".into();
         f.params.set("partStudio", crate::params::ParamValue::Text(source.to_string()));
         ps.features.push(f);
+        Some(self.add_mirrored_tab(&name, TabContent::PartStudio(ps)))
+    }
+
+    /// The "<source>-Mirrored" assembly of an assembly, if one was made.
+    pub fn mirrored_assembly(&self, source: TabId) -> Option<TabId> {
+        self.tabs
+            .iter()
+            .find(|t| matches!(&t.content, TabContent::Assembly(a) if a.instances.iter().any(|i| matches!(i.source, crate::assembly::InstanceSource::DerivedMirror { assembly, .. } if assembly == source))))
+            .map(|t| t.id)
+    }
+
+    /// Live's Mirror strategy › Update with Derived on a subassembly (live2 audit-1119 m2–m14): the existing
+    /// "<source>-Mirrored" assembly, else a new one in "Mirrored parts and assemblies" holding one fixed "Derived
+    /// mirror" node of the source's instances.
+    pub fn ensure_mirrored_assembly(&mut self, source: TabId) -> Option<TabId> {
+        if let Some(t) = self.mirrored_assembly(source) {
+            return Some(t);
+        }
+        let tab = self.tab(source)?;
+        if !matches!(tab.content, TabContent::Assembly(_)) {
+            return None;
+        }
+        let name = format!("{}-Mirrored", tab.name);
+        let source = crate::assembly::InstanceSource::DerivedMirror { assembly: source, derived: Vec::new(), placement: Vec::new(), mirrored_studios: Vec::new() };
+        let mut node = crate::assembly::Instance::new(crate::assembly::InstanceId(1), "Derived mirror".into(), source, Default::default());
+        node.fixed = true;
+        node.lock = crate::assembly::SubassemblyLock::Current;
+        let asm = Assembly { instances: vec![node], ..Default::default() };
+        Some(self.add_mirrored_tab(&name, TabContent::Assembly(Box::new(asm))))
+    }
+
+    /// A Derived mirror's "-Mirrored" Part Studio or assembly of `source`, if made.
+    pub fn mirrored_tab(&self, source: TabId) -> Option<TabId> {
+        self.mirrored_studio(source).or_else(|| self.mirrored_assembly(source))
+    }
+
+    /// The Mirror strategy's Update for a Derived seed's source: its "-Mirrored" Part Studio or assembly.
+    pub fn ensure_mirrored_tab(&mut self, source: TabId) -> Option<TabId> {
+        match self.tab(source)?.content {
+            TabContent::Assembly(_) => self.ensure_mirrored_assembly(source),
+            _ => self.ensure_mirrored_studio(source),
+        }
+    }
+
+    /// A new tab in the root folder "Mirrored parts and assemblies" (made on first use).
+    fn add_mirrored_tab(&mut self, name: &str, content: TabContent) -> TabId {
         let folder = match self.settings.folders.iter().find(|f| f.name == MIRRORED_FOLDER && self.parent_of(f.id).is_none()) {
             Some(f) => f.id,
             None => self.add_folder(MIRRORED_FOLDER, None),
         };
-        let id = self.add_tab(&name, TabContent::PartStudio(ps));
+        let id = self.add_tab(name, content);
         self.set_parent(id, Some(folder));
-        Some(id)
+        id
     }
 
     // ------------------------------------------------------------ tab folders

@@ -3451,12 +3451,12 @@ impl AssemblyEvaluator {
                     let n_world = world_of(ab, &al).z();
                     let leaves_ref = &leaves;
                     let stored_ref = &stored;
-                    // A "-Mirrored" Part Studio's parts are their source's
-                    // mirrored in its XY plane (live).
+                    // A "-Mirrored" Part Studio's parts and a "-Mirrored"
+                    // assembly are their source mirrored in its XY plane (live).
                     let mirrored_tabs: Vec<_> = mirrored_studios.iter().map(|(_, m)| *m).collect();
                     let reflection_of = move |id: InstanceId| match asm.instance(id).map(|i| &i.source) {
                         Some(InstanceSource::MirroredPart { point, normal, .. }) => Some((DVec3::from(*point), DVec3::from(*normal))),
-                        Some(InstanceSource::Part { studio, .. }) if mirrored_tabs.contains(studio) => Some((DVec3::ZERO, DVec3::Z)),
+                        Some(InstanceSource::Part { studio: tab, .. } | InstanceSource::Assembly { assembly: tab, .. }) if mirrored_tabs.contains(tab) => Some((DVec3::ZERO, DVec3::Z)),
                         _ => None,
                     };
                     Box::new(move |_, seed, copy| {

@@ -9336,6 +9336,44 @@ fn assembly_measure_and_mass_properties() {
     assert!((num(&mp["mass_kg"]) - 7.5).abs() < 1e-9 && mp["mass_overridden"] == true, "{mp}");
 }
 
+/// Live2 audit-1119 (m2–m14): Mirror strategy › Derived on a subassembly row: Update makes "Sub-Mirrored" in "Mirrored
+/// parts and assemblies", one fixed "Derived mirror" node of Sub's instances; the copy is "Sub-Mirrored <1>", Sub's
+/// block mirrored across the plane (centre of mass z 5 -> -5 mm); a second Update reuses it.
+#[test]
+fn a_derived_mirror_of_a_subassembly_makes_its_mirrored_assembly() {
+    let mut ctx = Ctx::new();
+    let path = scratch("derived-mirror-sub.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [d["regions"][0]["id"]], "depth": "10 mm" } }));
+    call(&mut ctx, "part_set_properties", json!({ "tab": "Part Studio 1", "part": "Part 1", "mass_override": 2.0 }));
+    call(&mut ctx, "tab_create", json!({ "kind": "assembly", "name": "Sub" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Sub" }));
+    let m = call(&mut ctx, "assembly_pattern", json!({ "tab": "Assembly 1", "kind": "mirror", "seeds": ["Sub <1>"], "direction": { "origin": true }, "strategy": [{ "instance": "Sub <1>", "action": "derived" }] }));
+    let tabs = call(&mut ctx, "document_info", json!({}))["tabs"].clone();
+    let tabs = tabs.as_array().unwrap();
+    assert_eq!(tabs.iter().filter(|t| t["name"] == "Sub-Mirrored").count(), 1, "{tabs:?}");
+    assert!(!tabs.iter().any(|t| t["name"] == "Part Studio 1-Mirrored"), "Transform inside the node: {tabs:?}");
+    let node = call(&mut ctx, "assembly_list", json!({ "tab": "Sub-Mirrored" }));
+    assert_eq!(node["instances"].as_array().unwrap().len(), 1, "{node}");
+    assert_eq!((node["instances"][0]["name"].as_str(), node["instances"][0]["fixed"].as_bool()), (Some("Derived mirror"), Some(true)), "{node}");
+    let copy = m["created"][0].clone();
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+    let name = list["instances"].as_array().unwrap().iter().find(|i| i["id"] == copy).unwrap()["name"].clone();
+    assert_eq!(name, "Sub-Mirrored <1>", "{list}");
+    let com = |ctx: &mut Ctx, i: &Value| call(ctx, "assembly_mass_properties", json!({ "tab": "Assembly 1", "instances": [i] }))["center_of_mass"].clone();
+    let near = |c: &Value, w: [f64; 3]| (0..3).all(|k| (num(&c[k]) - w[k]).abs() < 1e-6);
+    let c = com(&mut ctx, &json!("Sub <1>"));
+    assert!(near(&c, [20.0, 10.0, 5.0]), "the seed: {c}");
+    let c = com(&mut ctx, &copy);
+    assert!(near(&c, [20.0, 10.0, -5.0]), "the mirrored copy: {c}");
+    call(&mut ctx, "assembly_pattern", json!({ "tab": "Assembly 1", "edit": "Mirror 1", "strategy": [{ "instance": "Sub <1>", "action": "derived" }] }));
+    let tabs = call(&mut ctx, "document_info", json!({}))["tabs"].clone();
+    assert_eq!(tabs.as_array().unwrap().iter().filter(|t| t["name"] == "Sub-Mirrored").count(), 1, "{tabs}");
+}
+
 /// ASM-API-GAPS: the Reference manager through the API: Update all references moves an other-document instance
 /// to its latest version, Selective update to a named one, Change to version pins this document's own parts.
 #[test]

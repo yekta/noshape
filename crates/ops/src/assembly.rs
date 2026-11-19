@@ -1096,23 +1096,24 @@ pub fn move_into_subassembly(doc: &mut noshape_model::Document, tab: TabId, ids:
 /// The Mirror strategy's Update (live "skb (10-23 15:30)").
 pub const CREATE_MIRRORED_STUDIO: &str = "Create mirrored Part Studio";
 
-/// The Part Studios of the Derived mirror seeds that are part instances, once each.
+/// The sources of the Derived mirror seeds, once each: the Part Studios of part instances and the assemblies of
+/// subassembly instances.
 pub fn derived_seed_studios(a: &Assembly, derived: &[InstanceId]) -> Vec<TabId> {
     let mut out = Vec::new();
     for id in derived {
-        if let Some(InstanceSource::Part { studio, .. }) = a.instance(*id).map(|i| &i.source)
-            && !out.contains(studio)
+        if let Some(InstanceSource::Part { studio: tab, .. } | InstanceSource::Assembly { assembly: tab, .. }) = a.instance(*id).map(|i| &i.source)
+            && !out.contains(tab)
         {
-            out.push(*studio);
+            out.push(*tab);
         }
     }
     out
 }
 
-/// A Mirror's (source Part Studio, its "-Mirrored" Part Studio) pairs for
-/// its Derived seeds: the Derived copies use the mirrored studio's parts.
+/// A Mirror's (source, its "-Mirrored" Part Studio or assembly) pairs for its Derived seeds: the Derived copies use
+/// the mirrored studio's parts and the mirrored assemblies.
 pub fn mirrored_studios(doc: &noshape_model::Document, a: &Assembly, derived: &[InstanceId]) -> Vec<(TabId, TabId)> {
-    derived_seed_studios(a, derived).into_iter().filter_map(|s| doc.mirrored_studio(s).map(|m| (s, m))).collect()
+    derived_seed_studios(a, derived).into_iter().filter_map(|s| doc.mirrored_tab(s).map(|m| (s, m))).collect()
 }
 
 /// Snap mode's edit (the history text).

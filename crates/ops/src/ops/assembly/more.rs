@@ -435,12 +435,12 @@ fn pattern(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
             derived.retain(|d| seeds.contains(d));
             placement.retain(|(d, _)| seeds.contains(d));
-            // Update: the Derived parts' "-Mirrored" Part Studios.
-            let missing: Vec<TabId> = sa::derived_seed_studios(&asm, &derived).into_iter().filter(|s| od.doc().mirrored_studio(*s).is_none()).collect();
+            // Update: the Derived parts' "-Mirrored" Part Studios and subassemblies' "-Mirrored" assemblies.
+            let missing: Vec<TabId> = sa::derived_seed_studios(&asm, &derived).into_iter().filter(|s| od.doc().mirrored_tab(*s).is_none()).collect();
             if !missing.is_empty() {
                 od.session.edit_document(sa::CREATE_MIRRORED_STUDIO, |d| {
                     for s in &missing {
-                        d.ensure_mirrored_studio(*s);
+                        d.ensure_mirrored_tab(*s);
                     }
                 })?;
             }

@@ -1452,9 +1452,11 @@ impl Assembly {
             for g in &p.generated {
                 let Some(seed) = self.instance(g.seed).map(|i| i.source.clone()) else { continue };
                 // Derived: the part of the seed's "-Mirrored" Part Studio
-                // (same part id), else the in-assembly mirrored part.
+                // (same part id), a subassembly's "-Mirrored" assembly, else
+                // the in-assembly mirrored part.
                 let derived_part = match &seed {
                     InstanceSource::Part { studio, body, .. } => mirrored_studios.iter().find(|(s, _)| s == studio).map(|(_, m)| InstanceSource::Part { studio: *m, body: body.clone(), config: Default::default() }),
+                    InstanceSource::Assembly { assembly, .. } => mirrored_studios.iter().find(|(s, _)| s == assembly).map(|(_, m)| InstanceSource::Assembly { assembly: *m, config: Default::default() }),
                     _ => None,
                 };
                 let to_derived = derived.contains(&g.seed) && derived_part.is_some();

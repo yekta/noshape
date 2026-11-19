@@ -2432,29 +2432,24 @@ impl AssemblyView {
                                 .when(pending > 0, |d| d.cursor_pointer())
                                 .child("Update")
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                    // Live: Update makes (or reuses) each Derived
-                                    // part's "<Part Studio>-Mirrored" Part Studio.
+                                    // Live: Update makes (or reuses) each Derived part's "<Part Studio>-Mirrored" Part
+                                    // Studio and each Derived subassembly's "<assembly>-Mirrored" assembly.
                                     let sources: Vec<TabId> = match (&this.pattern, this.assembly(cx)) {
-                                        (Some(p), Some(asm)) => p
-                                            .mirror_rows
-                                            .iter()
-                                            .filter(|(_, r)| r.derived && !r.created)
-                                            .filter_map(|(id, _)| match asm.instance(*id).map(|i| &i.source) {
-                                                Some(InstanceSource::Part { studio, .. }) => Some(*studio),
-                                                _ => None,
-                                            })
-                                            .collect(),
+                                        (Some(p), Some(asm)) => {
+                                            let ids: Vec<InstanceId> = p.mirror_rows.iter().filter(|(_, r)| r.derived && !r.created).map(|(id, _)| *id).collect();
+                                            noshape_ops::assembly::derived_seed_studios(asm, &ids)
+                                        }
                                         _ => Vec::new(),
                                     };
                                     let missing: Vec<TabId> = {
                                         let doc = &this.doc.read(cx).session.doc;
-                                        sources.into_iter().filter(|s| doc.mirrored_studio(*s).is_none()).collect()
+                                        sources.into_iter().filter(|s| doc.mirrored_tab(*s).is_none()).collect()
                                     };
                                     if !missing.is_empty() {
                                         this.doc.update(cx, |d, cx| {
                                             d.edit_document(noshape_ops::assembly::CREATE_MIRRORED_STUDIO, cx, |doc| {
                                                 for s in &missing {
-                                                    doc.ensure_mirrored_studio(*s);
+                                                    doc.ensure_mirrored_tab(*s);
                                                 }
                                             })
                                         });
