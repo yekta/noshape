@@ -115,7 +115,7 @@ H. Hidden lines vs live (live2 02:32, live/dx/louver-hidden-1119/: sm-louver Fro
    Hidden: live 1348 LINE + 3 ARC + 75 ELLIPSE (105.85 in), ours 774 LINE (105.34 in), each on the other's to 0.010 in.
    TANGENT_HIDDEN (03:4x, hidden tangent edges drawn dashed with tangent edges shown, not under a visible tangent
    edge): live 188 LINE 244.43 in, ours 244.42 in, each on the other's. /root/dx-scratch/bin/hidcmp2.py ours live tol
-   LAYER. Next: hidden curves as ARC / ELLIPSE (live 3 / 75; ours LINEs). Runs: Mac exsh2.sh with
+   LAYER. Hidden curves: live's 75 ELLIPSE / 3 ARC are noise (0.0002 in long, r <= 0.003 in: edges seen end-on), skipped. Runs: Mac exsh2.sh with
    /root/dx-scratch/dxhidden.patch applied (the exchange suite with DXHIDDEN=1), dumps /root/dx-scratch/dxfm/.
 R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "Import failed: <path>: i/o error: could
    not read STEP file <path>" (live: "bad.step uploaded but failed to translate."; the app's bubble already said so).
@@ -168,7 +168,8 @@ R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "I
      views.rs inside_other_parts. Another part hides a piece inside it only where the edge gets in and out under its
      outline (faces seen edge-on), ends inside it, or pierces in from where that part already covers it; pieces are split
      at the crossings and seen by a ray toward the viewer. clamp-guillem DXF Visible vs live: missing 1.284 -> 0.786 in,
-     extra 1.757 -> 1.647 in (Top = live; Iso one new 0.108 in piece). Speed: views of overlapping parts ~2x (clamp
+     extra 1.757 -> 1.647 in (Top = live). Iso: live leaves out plate edge 36 (y -10, z 16) inside the jaw (x ~3-20), ours draws it (0.43 +
+     0.118 in): live draws that stretch in Top; no outline found that explains it. Asked live (REQUESTS 04:27, overlap3). Speed: views of overlapping parts ~2x (clamp
      6 -> 14 ms), big assembly / 1000-part studio unchanged. Probe: /root/dx-scratch/cg/cgprobe.cpp (vibex8 rr/).
    - Mine after all (core 22:3x: the part = live through every Draft, 22 real circles, 36 lines): housing-draft's
      0.499 in edges bowing 0.3-0.5 mm (live LINEs) and the Right-view hole rim as a SPLINE (live CIRCLE) come from our
