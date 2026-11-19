@@ -90,8 +90,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    "Display mass and section properties"): volume / area, red chip, blank CoM / inertia without material = live (the one-time toast
    3.6 s after the first open not caught: shots too early; parity interaction.md 5.2 says =); face + hole rim measure readout plausible.
    P2 assemblies 21:58 (walk2 Assembly 1): Insert dialog, 2 instances, fit, free drag, Fastened between hole faces (HUD, Solve),
-   BOM panel = live (Item | Quantity | Part number | Description, "1 | 2"). Decision needed (to the lead): the mate dialog draws
-   "☐ Simulation connection" (skasm audit S24 added it to match live) vs DECISIONS 11-16 (left-out features' rows not drawn).
+   BOM panel = live (Item | Quantity | Part number | Description, "1 | 2"). Lead 22:5x: drop "☐ Simulation connection" from the
+   mate dialog (left-out feature; lead tells skasm): verify it's gone on the green after skasm lands.
    Drawings 22:00: Create Drawing dialog = live (No views default, ANSI_A_INCH), Suggested views (Top/Front/Right/iso, hole centre
    mark), tab after the active tab, tab menu Export… -> PDF 1.5 one page = the sheet. STEP round trip 22:04 OK (export AP242 8 faces,
    + › Import… back: Import 1, Part 1); P2 BRAND-IN-UI-TEXT filed ("Import to Onshape" title). 22:05: compat ALERTs vs 0.4.61 (3 Fillet messages, blend
