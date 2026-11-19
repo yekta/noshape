@@ -254,6 +254,33 @@ fn rows() -> Vec<Row> {
             cx.update_window(window, |_, w, _| w.remove_window()).unwrap();
             if off.is_empty() { Ok(()) } else { Err(off.join("; ")) }
         } },
+        Row { id: "tooltip / kept while pressed, gone at the release", live: "Linear pattern's tooltip stays through an 80 or 600 ms press and is gone the first frame after the release, no fade, the pointer still on the tool (live dialog-tip-1119 B)", gap: false, check: |c, cx| {
+            let (window, _view) = part_studio_from(cx, "chrome-tool-tip-click", None);
+            let scale = cx.update_window(c.tips, |_, w, _| w.scale_factor()).unwrap();
+            cx.update_window(window, |_, w, _| w.set_scale_factor(scale)).unwrap();
+            draw(cx, window);
+            let at = |cx: &mut TestAppContext, sel: &'static str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(sel);
+            let step = |cx: &mut TestAppContext, ms: u64| {
+                for _ in 0..ms / 10 {
+                    cx.executor().advance_clock(std::time::Duration::from_millis(10));
+                    draw(cx, window);
+                }
+            };
+            let b = at(cx, "tt-linearPattern").ok_or("no Linear pattern tool")?;
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(b.center(), None, NONE);
+            step(cx, 600);
+            let hovered = at(cx, "rich-tooltip").is_some();
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: b.center(), modifiers: NONE, click_count: 1, first_mouse: false });
+            step(cx, 600);
+            let pressed = at(cx, "rich-tooltip").is_some();
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: b.center(), modifiers: NONE, click_count: 1 });
+            draw(cx, window);
+            let released = at(cx, "rich-tooltip").is_some();
+            step(cx, 1500);
+            let later = at(cx, "rich-tooltip").is_some();
+            cx.update_window(window, |_, w, _| w.remove_window()).unwrap();
+            expect((hovered, pressed, released, later), (true, true, false, false), "shown hovered, pressed; after the release, 1.5 s later")
+        } },
         Row { id: "feature dialog / default place", live: "top left of the graphics area, 3 px below its top", gap: false, check: |_, _| {
             let (x, y) = dropped(0., 3.);
             near(x, 0., "x")?;

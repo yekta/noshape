@@ -1314,6 +1314,8 @@ pub struct Window {
     mouse_hit_test: HitTest,
     /// NOSHAPE PATCH (agent psui): see `pointer_rests`.
     pointer_rests: bool,
+    /// NOSHAPE PATCH (agent psui): see `tooltip_released_on`.
+    tooltip_released_on: Option<Bounds<Pixels>>,
     modifiers: Modifiers,
     capslock: Capslock,
     scale_factor: f32,
@@ -2231,6 +2233,7 @@ impl Window {
             mouse_position,
             mouse_hit_test: HitTest::default(),
             pointer_rests: false,
+            tooltip_released_on: None,
             modifiers,
             capslock,
             scale_factor,
@@ -3535,6 +3538,17 @@ impl Window {
     /// release), so an element a frame puts under it is entered as a browser's fake move enters it.
     pub(crate) fn pointer_rests(&self) -> bool {
         self.pointer_rests
+    }
+
+    /// NOSHAPE PATCH (agent psui): the bounds of the element a press with a tooltip was released on, until the pointer
+    /// leaves them: no tooltip shows there meanwhile, even from an element drawn anew in its place (live: a toolbar
+    /// button's tooltip is gone at the release and stays gone while the pointer stays on it).
+    pub(crate) fn tooltip_released_on(&self) -> Option<Bounds<Pixels>> {
+        self.tooltip_released_on
+    }
+
+    pub(crate) fn set_tooltip_released_on(&mut self, bounds: Bounds<Pixels>) {
+        self.tooltip_released_on = Some(bounds);
     }
 
     pub(crate) fn last_input_was_touch(&self) -> bool {
@@ -5905,6 +5919,9 @@ impl Window {
                 self.mouse_position = mouse_move.position;
                 self.modifiers = mouse_move.modifiers;
                 self.pointer_rests = mouse_move.pressed_button.is_none();
+                if self.tooltip_released_on.is_some_and(|b| !b.contains(&mouse_move.position)) {
+                    self.tooltip_released_on = None;
+                }
                 PlatformInput::MouseMove(mouse_move)
             }
             PlatformInput::MouseDown(mouse_down) => {
