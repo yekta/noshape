@@ -881,6 +881,10 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   (translation; a free mate direction absorbs its share), the angle unchanged. Also seen: the Revolute 1 creation preview
   moved Part 1 <1> onto the ring while its Fastened twin <2> stayed put (after ✓ the pair is together again); live's edit
   preview moves the whole connected group (behaviours 1214), so the creation preview likely should too.
+- [ ] P1 **ASM-LIMIT-TYPED-NO-PREVIEW (asm)**: Edit Revolute 1 › ☑ Limits (rows "No minimum" / "No maximum" = live), type min
+  30 / max 35, then min 0 / max 5 (disjoint ranges): the part never moves in the preview; it turns only on Solve or ✓.
+  Live (behaviours "asm (lead 11-18 ~01:15 …) mate limits", r1-r4): a typed limit applies to the preview at once, the part
+  turning into the range within ~1 s. Drag clamping at the limit after ✓ is = live. Green 624c6db77, walk 22:4x.
 
 ## Interaction feel suite 11-19 (qa 16:20: run 1119-1242-223cec7e on vibex8, failures re-run on green eb3b06a8 on vibe2)
 2110/2172 scenarios (05:51 run on a67911be: 2126). 67 failing; 28 pass on the re-run (load flakes or fixed). The 39 still failing
