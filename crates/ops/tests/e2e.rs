@@ -10117,3 +10117,102 @@ fn a_corner_break_beside_a_bend() {
     let f = call(&mut ctx, "feature_add", json!({ "type": "sheetMetalCornerBreak", "params": { "blendType": "FILLET", "entities": [corner], "radius": "5 mm" } }));
     assert_eq!(f["feature_status"]["message"], "Invalid input selections.", "{f}");
 }
+
+/// Live's "studios hole plate" (behaviours "studios (11-19): hole/thread callouts" / "hole table"): a 100 × 60 × 10
+/// plate, a Ø6 thru hole patterned ×4 (20 mm), an ISO M6×1 tapped hole (tap 10, drill 12), a C'bore Ø6.6 / Ø11 × 6.5
+/// and a C'sink Ø6.6 / Ø12 × 90°, all thru. Returns the hole centres (model mm) in hole-table order.
+fn studios_hole_plate(ctx: &mut Ctx, file: &str) -> Vec<[f64; 2]> {
+    let sk = new_sketch(ctx, file, "plane:top");
+    call(ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [100, 60]] }));
+    let r = call(ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].clone();
+    call(ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [r], "depth": "10 mm" } }));
+    let top = call(ctx, "query_entities", json!({ "kind": "faces", "at": [[50, 30, 10]] }))["faces"][0]["id"].clone();
+    let s2 = call(ctx, "sketch_create", json!({ "plane": top }))["sketch"].clone();
+    let at = [[15.0, 15.0], [30.0, 45.0], [55.0, 45.0], [80.0, 45.0]];
+    let pts: Vec<Value> = at.iter().map(|p| call(ctx, "sketch_draw", json!({ "sketch": s2, "tool": "point", "points": [[p[0], p[1], 10.0]] }))["created"][0]["id"].clone()).collect();
+    let holes = [
+        json!({ "locations": [pts[0]], "styleV2": "SIMPLE", "holeDiameterV3": "6 mm", "endStyleV2": "THROUGH" }),
+        json!({ "locations": [pts[1]], "isoHoleTableEx": ["Tapped", "Straight tap", "M6", "1.00 mm (Coarse)"], "endStyleV2": "BLIND", "holeDepthV3": "12 mm", "tappedDepthV3": "10 mm" }),
+        json!({ "locations": [pts[2]], "styleV2": "C_BORE", "holeDiameterV3": "6.6 mm", "cBoreDiameterV3": "11 mm", "cBoreDepthV3": "6.5 mm", "endStyleV2": "THROUGH" }),
+        json!({ "locations": [pts[3]], "styleV2": "C_SINK", "holeDiameterV3": "6.6 mm", "cSinkDiameterV3": "12 mm", "cSinkAngleV3": "90 deg", "endStyleV2": "THROUGH" }),
+    ];
+    for h in holes {
+        let f = call(ctx, "feature_add", json!({ "type": "hole", "params": h }));
+        assert_eq!(f["regeneration"]["failed"], json!([]), "{f}");
+    }
+    let x = call(ctx, "query_entities", json!({ "kind": "edges", "at": [[50, 0, 10]] }))["edges"][0]["id"].clone();
+    let h1 = call(ctx, "feature_list", json!({}))["features"].as_array().unwrap().iter().find(|f| f["name"] == "Hole 1").unwrap()["id"].as_str().unwrap().to_string();
+    let p = call(ctx, "feature_add", json!({ "type": "linearPattern", "params": { "entities": [format!("feature:{h1}")], "directionOne": [x], "distance": "20 mm", "instanceCount": 4 } }));
+    assert_eq!(p["regeneration"]["failed"], json!([]), "{p}");
+    vec![[15.0, 15.0], [35.0, 15.0], [55.0, 15.0], [75.0, 15.0], at[1], at[2], at[3]]
+}
+
+/// The Top view of a drawing of [`studios_hole_plate`] and a model point's place on the sheet in it.
+fn plate_top_view(ctx: &mut Ctx, tab: &str) -> (Value, impl Fn([f64; 2]) -> [f64; 2] + use<>) {
+    let g = call(ctx, "drawing_get", json!({ "drawing": tab }));
+    let view = g["views"].as_array().unwrap().iter().max_by_key(|v| v["edges"].as_array().map_or(0, |es| es.iter().filter(|e| e["type"] == "circle").count())).cloned().unwrap();
+    let lines: Vec<&Value> = view["edges"].as_array().unwrap().iter().filter(|e| e["type"] == "line").collect();
+    let xs = lines.iter().flat_map(|e| [num(&e["a"][0]), num(&e["b"][0])]);
+    let ys = lines.iter().flat_map(|e| [num(&e["a"][1]), num(&e["b"][1])]);
+    let (x0, x1) = xs.fold((f64::MAX, f64::MIN), |(a, b), v| (a.min(v), b.max(v)));
+    let (y0, y1) = ys.fold((f64::MAX, f64::MIN), |(a, b), v| (a.min(v), b.max(v)));
+    let s = (x1 - x0) / 100.0;
+    assert!(((y1 - y0) / s - 60.0).abs() < 1e-3, "the Top view: {x0} {x1} {y0} {y1}");
+    (view, move |p: [f64; 2]| [x0 + p[0] * s, y0 + p[1] * s])
+}
+
+/// Live holecallout-1119 / holetable-1119: each hole's default callout on the ANSI inch and ISO A3 drawings (a tapped
+/// hole's drill line first, no space after ⌴ ⌵ ↧, the countersink angle to 0.1°, the ×4 pattern counted), and the ISO
+/// hole table: a letter per hole spec in the order made, locations to 0.12.
+#[test]
+fn studios_hole_plate_callouts_and_table_as_live() {
+    let mut ctx = Ctx::new();
+    let at = studios_hole_plate(&mut ctx, "studios-hole-plate.noshape");
+    let live = [
+        ("ANSI_A_INCH.dwt", ["4X ⌀.236 THRU", "⌀.197 THRU M6x1.00 THRU", "⌀.260 THRU ⌴⌀.433 ↧.256", "⌀.260 THRU ⌵⌀.472 X 90.0°"]),
+        ("ISO A3", ["4X ⌀6 THRU", "⌀5 THRU M6x1 THRU", "⌀6,6 THRU ⌴⌀11 ↧6,5", "⌀6,6 THRU ⌵⌀12 X 90,0°"]),
+    ];
+    for (template, want) in live {
+        let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": template, "suggested_views": true }));
+        let tab = d["drawing"].as_str().unwrap().to_string();
+        let (view, place) = plate_top_view(&mut ctx, &tab);
+        let circles: Vec<Value> = view["edges"].as_array().unwrap().iter().filter(|e| e["type"] == "circle").cloned().collect();
+        let mut texts = Vec::new();
+        for i in [0, 4, 5, 6] {
+            let c = place(at[i]);
+            let e = circles.iter().filter(|e| (num(&e["center"][0]) - c[0]).hypot(num(&e["center"][1]) - c[1]) < 1e-3).min_by(|a, b| num(&a["radius"]).total_cmp(&num(&b["radius"]))).unwrap_or_else(|| panic!("no circle at {c:?}"));
+            let r = num(&e["radius"]);
+            let h = call(&mut ctx, "drawing_hole_callout", json!({ "drawing": tab, "hole": [c[0] + r, c[1]], "position": [c[0] + 30.0, c[1] + 15.0] }));
+            let a = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["annotations"].as_array().unwrap().iter().find(|a| a["id"] == h["annotation"]).cloned().unwrap();
+            texts.push(a["text"].as_str().unwrap_or("").to_string());
+        }
+        assert_eq!(texts, want, "{template}");
+        if template != "ISO A3" {
+            // Live export-1119's Drawing definition list: a row per callout value, in live's CSV form.
+            let f = scratch("studios-hole-plate-definitions.csv");
+            call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "Drawing definition list", "file": f.to_str().unwrap() }));
+            let csv = std::fs::read_to_string(&f).unwrap();
+            assert!(csv.starts_with("\u{feff}Item,Sheet,Type,Units,Nominal value,Tolerance,Upper limit,Lower limit\r\n"), "{csv}");
+            let values: Vec<&str> = csv.split("\r\n").filter(|l| l.contains("Hole/thread callout")).collect();
+            let live = ["in,Ø.236", "in,THRU", "in,Ø.197", "in,THRU", "N/A,M6x1.00", "in,THRU", "in,Ø.260", "in,THRU", "in,⌴Ø.433", "in,↧.256", "in,Ø.260", "in,THRU", "in,⌵Ø.472", "deg,90.0°"];
+            assert_eq!(values, live.map(|v| format!("--,Sheet1 (1),Hole/thread callout,{v},--,--,--")), "{csv}");
+            continue;
+        }
+        let ht = call(&mut ctx, "drawing_view_table", json!({ "drawing": tab, "kind": "hole", "view": view["id"], "origin": place([0.0, 0.0]), "position": [20, 120] }));
+        let t = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["tables"].as_array().unwrap().iter().find(|t| t["id"] == ht["table"]).cloned().unwrap();
+        assert_eq!(t["header"], json!(["TAG", "X LOC", "Y LOC", "SIZE", "QTY"]), "{t}");
+        assert_eq!(
+            t["rows"],
+            json!([
+                ["A1", "15,00", "15,00", "⌀6 THRU", "4"],
+                ["A2", "35,00", "15,00", "", ""],
+                ["A3", "55,00", "15,00", "", ""],
+                ["A4", "75,00", "15,00", "", ""],
+                ["B1", "30,00", "45,00", "⌀5 THRU\nM6x1 THRU", "1"],
+                ["C1", "55,00", "45,00", "⌀6,6 THRU\n⌴⌀11 ↧6,5", "1"],
+                ["D1", "80,00", "45,00", "⌀6,6 THRU\n⌵⌀12 X 90,0°", "1"]
+            ]),
+            "{t}"
+        );
+    }
+}

@@ -1222,6 +1222,14 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
             return crate::regen::eval::err_at(&["instanceFunction"], NO_GEOMETRY_FROM_FEATURES);
         }
     }
+    // The patterned Hole features' holes at each instance, still theirs (live: the ×4 pattern's callout "4X Ø6 THRU").
+    let seeds: Vec<crate::regen::context::HoleRecord> = ev.ctx.holes.iter().filter(|h| feats.contains(&h.feature)).cloned().collect();
+    for inst in instances {
+        let m = inst.t.matrix();
+        for h in &seeds {
+            ev.ctx.holes.push(crate::regen::context::HoleRecord { start: m.transform_point3(h.start), dir: m.transform_vector3(h.dir).normalize_or_zero(), pattern: Some(ev.feature), ..h.clone() });
+        }
+    }
     Ok(())
 }
 

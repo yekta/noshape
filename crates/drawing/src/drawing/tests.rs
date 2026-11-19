@@ -771,6 +771,7 @@ fn plate_holes_as_hole_features(drawing: &Drawing, sources: &mut views::Sources,
             exits: true,
             parts: parts.clone(),
             tip_angle: None,
+            pattern: None,
         });
     }
     src.context = std::sync::Arc::new(ctx);
@@ -796,7 +797,7 @@ fn hole_table_over_two_views_lists_each_hole_once() {
     let t = texts(&built);
     assert!(t.iter().any(|x| x == "B2") && !t.iter().any(|x| x == "B3" || x == "A2"), "each hole once: {t:?}");
     // A hole the first view doesn't show: after its size, else a new letter.
-    let row = |tag: &str, d: f64, k: u32| tables::HoleRow { tag: tag.into(), center: [0.0; 2], x: 0.0, y: 0.0, diameter: d, point: Some(PointRef::Thread { body: crate::BodyId { feature: crate::reference::FeatureId(1), index: 0 }, feature: crate::reference::FeatureId(1), index: k, side: 1, end: 0 }) };
+    let row = |tag: &str, d: f64, k: u32| tables::HoleRow { tag: tag.into(), center: [0.0; 2], x: 0.0, y: 0.0, diameter: d, point: Some(PointRef::Thread { body: crate::BodyId { feature: crate::reference::FeatureId(1), index: 0 }, feature: crate::reference::FeatureId(1), index: k, side: 1, end: 0 }), spec: String::new() };
     let rows = tables::merge_hole_rows(vec![row("A1", 0.024, 1), row("B1", 0.0096, 2), row("B2", 0.0096, 3)], &[row("A1", 0.0096, 4), row("A1", 0.005, 5), row("B1", 0.0096, 2)]);
     assert_eq!(rows.iter().map(|r| r.tag.as_str()).collect::<Vec<_>>(), ["A1", "B1", "B2", "B3", "C1"]);
 }
@@ -958,6 +959,15 @@ fn property_fields_in_notes_and_title_block() {
     for want in ["Part 1 (Demo)", "SHEET 1 OF 2", "SCALE 1:1", "{nope}"] {
         assert!(t.iter().any(|x| x == want), "missing {want}: {t:?}");
     }
+    // The Drawing definition list's note text (live export-1119): properties filled in, a list's lines after their
+    // designators.
+    let note = drawing.sheets[0].annotations.iter().find(|a| a.id == 99).unwrap().clone();
+    assert_eq!(build::shown_text(&drawing, 0, &sources, &info, &note), Some(vec!["SHEET 1 OF 2".into(), "SCALE 1:1".into(), "{nope}".into()]));
+    let mut listed = note.clone();
+    if let AnnotationKind::Note { style, .. } = &mut listed.kind {
+        style.list = super::note::NoteList::Numbers;
+    }
+    assert_eq!(build::shown_text(&drawing, 0, &sources, &info, &listed).unwrap()[1], "2.\tSCALE 1:1");
 }
 
 #[test]
@@ -3064,6 +3074,7 @@ fn tapped_hole_threads_from_the_side() {
             exits: false,
             parts: ctx.bodies.iter().map(|b| b.id.clone()).take(1).collect(),
             tip_angle: None,
+            pattern: None,
         });
         src.context = std::sync::Arc::new(ctx);
     }
@@ -3243,6 +3254,7 @@ fn hole_callout_overrides_are_per_value() {
         exits: true,
         parts: Vec::new(),
         tip_angle: None,
+        pattern: None,
     };
     let drawing = Drawing::default();
     let text = |a: &Annotation| build::hole_callout_text(&drawing, &hole, 1, a).join(" / ");
@@ -3281,6 +3293,7 @@ fn a_blind_hole_out_of_its_part_reads_thru() {
         exits: true,
         parts: Vec::new(),
         tip_angle: None,
+        pattern: None,
     };
     let drawing = Drawing::default();
     let a = Annotation::default();
@@ -3621,6 +3634,12 @@ fn note_property_lists_and_date_formats() {
     assert_eq!(format::field_format("2026-10-21", "mmm. d, yy"), "Oct. 21, 26");
     assert_eq!(format::field_format("2026-10-21", "dddd, mmmm d, yyyy"), "Wednesday, October 21, 2026");
     assert_eq!(format::field_format("2026-10-21", "yyyy-MM-dd"), "2026-10-21", "older notes' formats still work");
+    // Live titleblock-1119: each Date time format on 2026-11-19, in the list's order.
+    let live = [
+        "2026-11-19", "2026-11-19", "2026/11/19", "11.19.2026", "11/19/2026", "11/19/26", "11-26", "11/19/2026", "Nov. 19, 26", "November 26", "November 19, 2026", "19-Nov-26", "19 November 26",
+        "19.11.2026", "19/11/2026", "19/11/26", "19.11.26", "19-Nov-2026", "19-11-2026", "Thursday, November 19, 2026", "19 Nov 26", "2026", "11/19/26",
+    ];
+    assert_eq!(format::DATE_FORMATS.map(|f| format::field_format("2026-11-19", f)), live);
 }
 
 #[test]

@@ -879,6 +879,9 @@ pub struct HoleRecord {
     pub parts: Vec<BodyId>,
     /// Drill tip angle (None: flat).
     pub tip_angle: Option<f64>,
+    /// The feature pattern that copied it (still its Hole feature's hole).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<FeatureId>,
 }
 
 impl HoleRecord {

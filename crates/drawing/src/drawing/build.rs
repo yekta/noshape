@@ -1315,10 +1315,25 @@ pub fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sou
 }
 
 /// Onshape-style hole / thread callout text for the hole a callout points
-/// at: "2X ⌀6.6 THRU", "⌴ ⌀11 ↧ 6.5", "⌵ ⌀12.4 X 90°", tapped "M6x1.0 ↧ 10"
-/// over "⌀5 ↧ 12".
+/// at: "2X ⌀6.6 THRU", "⌴⌀11 ↧6.5", "⌵⌀12.4 X 90.0°", tapped "⌀5 ↧12" over
+/// "M6x1.0 ↧10".
 pub fn hole_callout_lines(drawing: &Drawing, sheet: &Sheet, sources: &Sources, a: &Annotation) -> Option<Vec<String>> {
     hole_callout_marked(drawing, sheet, sources, a).map(|lines| lines.iter().map(|l| format::flatten_stacked(l)).collect())
+}
+
+/// The text an annotation shows, for the inspection lists: a hole callout's lines, a note's text with its properties
+/// filled in.
+pub fn shown_text(drawing: &Drawing, si: usize, sources: &Sources, info: &SheetInfo, a: &Annotation) -> Option<Vec<String>> {
+    match &a.kind {
+        AnnotationKind::HoleCallout { .. } => hole_callout_lines(drawing, drawing.sheets.get(si)?, sources, a),
+        AnnotationKind::Note { text, style, .. } => {
+            let placeholder = if drawing.props.hide_placeholder { "" } else { "----" };
+            let text = format::text_codes(&format::expand_fields_with(text, &|k| field_value(drawing, si, info, sources, k), placeholder));
+            // A list's lines after their designators (live export-1119: "1.\t7").
+            Some(text.lines().enumerate().map(|(i, l)| if style.list == super::note::NoteList::None { l.to_string() } else { format!("{}\t{l}", style.list.designator(i)) }).collect())
+        }
+        _ => None,
+    }
 }
 
 /// A run of a hole callout preview line: its text and, for a value, which.
@@ -1384,7 +1399,7 @@ fn hole_callout_marked_with(drawing: &Drawing, sheet: &Sheet, sources: &Sources,
     Some(hole_callout_text_with(drawing, hole, n, &Annotation { format, ..a.clone() }, marks))
 }
 
-/// A hole's callout lines ("⌀6.6 ↧ 12", "⌴ ⌀11 ↧ 4" …) for `n` holes
+/// A hole's callout lines ("⌀6.6 ↧12", "⌴⌀11 ↧4" …) for `n` holes
 /// with annotation `a`'s format (hole callouts; hole tables' SIZE).
 pub fn hole_callout_text(drawing: &Drawing, hole: &crate::regen::context::HoleRecord, n: usize, a: &Annotation) -> Vec<String> {
     hole_callout_text_with(drawing, hole, n, a, false)
@@ -1403,16 +1418,26 @@ fn hole_callout_text_with(drawing: &Drawing, hole: &crate::regen::context::HoleR
         // a 10 mm plate, "Ø.197 THRU").
         let depth = |k: V, d: Option<f64>| match (hole.through || hole.exits, d) {
             (true, _) => " THRU".to_string(),
-            (false, Some(d)) => format!(" ↧ {}", len(k, d)),
+            (false, Some(d)) => format!(" ↧{}", len(k, d)),
             _ => String::new(),
         };
         let mut out = Vec::new();
         match &hole.thread {
+            // The drill, then the thread (live holecallout-1119: "Ø5 THRU" / "M6x1 THRU"), its pitch without
+            // trailing zeros where the drawing drops them (ANSI "M6x1.00").
             Some(t) => {
                 let class = hole.thread_class.as_ref().map(|c| format!(" - {c}")).unwrap_or_default();
-                out.push(format!("{count}{t}{class}{}", depth(V::Depth, hole.tapped_depth.or(hole.depth))));
-                if let Some(td) = hole.tap_drill {
-                    out.push(format!("⌀{}{}", len(V::Diameter, td), depth(V::DrillDepth, hole.depth)));
+                let t = match t.rsplit_once('x').filter(|_| !drawing.props.trailing_zeros).and_then(|(size, p)| Some((size, p.parse::<f64>().ok()?))) {
+                    Some((size, p)) => format!("{size}x{p}"),
+                    None => t.clone(),
+                };
+                let thread = format!("{t}{class}{}", depth(V::Depth, hole.tapped_depth.or(hole.depth)));
+                match hole.tap_drill {
+                    Some(td) => {
+                        out.push(format!("{count}⌀{}{}", len(V::Diameter, td), depth(V::DrillDepth, hole.depth)));
+                        out.push(thread);
+                    }
+                    None => out.push(format!("{count}{thread}")),
                 }
             }
             None => match &hole.diameter_fit {
@@ -1452,10 +1477,10 @@ fn hole_callout_text_with(drawing: &Drawing, hole: &crate::regen::context::HoleR
             },
         }
         if let Some((d, dd)) = hole.cbore {
-            out.push(format!("⌴ ⌀{} ↧ {}", len(V::CboreDiameter, d), len(V::CboreDepth, dd)));
+            out.push(format!("⌴⌀{} ↧{}", len(V::CboreDiameter, d), len(V::CboreDepth, dd)));
         }
         if let Some((d, ang)) = hole.csink {
-            out.push(format!("⌵ ⌀{} X {}°", len(V::CsinkDiameter, d), format::format_number(ang.to_degrees(), None, 1)));
+            out.push(format!("⌵⌀{} X {}°", len(V::CsinkDiameter, d), format::angle_number(drawing, ang.to_degrees(), drawing.props.angular_precision.or(Some(1)))));
         }
         out
     };

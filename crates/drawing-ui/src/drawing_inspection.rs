@@ -244,14 +244,14 @@ impl DrawingEditor {
     /// Inspection rows with hole callout texts from the model; `all` = the
     /// Drawing definition list.
     pub fn inspection_rows(&self, all: bool) -> Vec<noshape_model::drawing::inspection::InspectionRow> {
-        let (d, sources) = (&self.drawing, &self.sources);
-        self.drawing.inspection_rows_with(&|si, a| noshape_model::drawing::build::hole_callout_lines(d, &d.sheets[si], sources, a), all)
+        let (d, sources, info) = (&self.drawing, &self.sources, &self.info);
+        self.drawing.inspection_rows_with(&|si, a| noshape_model::drawing::build::shown_text(d, si, sources, info, a), all)
     }
 
     /// Export › Inspection list / Drawing definition list (CSV).
     pub fn export_inspection_list(&mut self, all: bool, window: &mut Window, cx: &mut Context<Self>) {
         let name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Drawing".into());
-        let csv = noshape_model::drawing::inspection::rows_csv(&self.inspection_rows(all));
+        let csv = noshape_model::drawing::inspection::rows_csv(&self.drawing, &self.inspection_rows(all));
         let this = cx.entity().downgrade();
         let file = format!("{name} {}.csv", if all { "drawing definition list" } else { "inspection list" });
         crate::file_dialogs::request_save_path("Export inspection list", file, "csv", window, cx, move |path, cx| {

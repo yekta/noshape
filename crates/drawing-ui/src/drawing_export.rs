@@ -241,7 +241,7 @@ impl DrawingEditor {
         let zip = noshape_ops::drawing_export::zipped(f, sheets.len());
         let file_name = format!("{name}.{}", if zip { "zip" } else { f.ext() });
         if f.csv() {
-            let csv = noshape_model::drawing::inspection::rows_csv(&self.inspection_rows(f == DrawingFormat::DefinitionList));
+            let csv = noshape_model::drawing::inspection::rows_csv(&self.drawing, &self.inspection_rows(f == DrawingFormat::DefinitionList));
             let done = self.deliver(file_name, csv.into_bytes(), path.as_ref(), store, cx);
             self.status = Some(done.unwrap_or_else(|e| format!("Export failed: {e}")).into());
             cx.notify();

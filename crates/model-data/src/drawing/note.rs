@@ -122,7 +122,7 @@ impl FlagShape {
             FlagShape::Hexagon => "Hexagon",
             FlagShape::Octagon => "Octagon",
             FlagShape::Rectangle => "Rectangle",
-            FlagShape::SquareCircle => "Square Circle",
+            FlagShape::SquareCircle => "Square circle",
             FlagShape::Triangle => "Triangle",
             FlagShape::Underline => "Underline",
         }

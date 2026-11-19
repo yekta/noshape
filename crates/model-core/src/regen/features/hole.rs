@@ -644,6 +644,7 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
                     v.iter().map(|x| ev.ctx.bodies[x.0].id.clone()).collect()
                 },
                 tip_angle,
+                pattern: None,
             });
         }
         // Live H5: a bore tangent to a side face of the part (a Ø10

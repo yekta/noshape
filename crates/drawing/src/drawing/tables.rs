@@ -345,10 +345,32 @@ pub struct HoleRow {
     pub diameter: f64,
     /// The bore's model circle (its hole feature's record).
     pub point: Option<super::PointRef>,
+    /// Its Hole feature's spec (sizes, depth, thread; empty without one): one letter per spec.
+    pub spec: String,
 }
 
-/// Holes of a view grouped by size: tags A1, A2... for the largest size,
-/// B1... for the next; sorted top-to-bottom, left-to-right within a size.
+impl HoleRow {
+    /// One size of the table (one letter, its SIZE and QTY merged).
+    pub fn same_size(&self, o: &HoleRow) -> bool {
+        self.spec == o.spec && (self.diameter - o.diameter).abs() < 1e-12
+    }
+}
+
+/// A bore of a view: its centre, radius and model circle.
+type Bore = ([f64; 2], f64, Option<super::PointRef>);
+
+/// A hole's spec: holes alike in every size, depth and thread share a tag letter.
+fn hole_spec(h: &crate::regen::context::HoleRecord) -> String {
+    let um = |x: f64| (x * 1e6).round() as i64;
+    let o = |x: Option<f64>| x.map(um);
+    let pair = |x: Option<(f64, f64)>| x.map(|(p, q)| (um(p), um(q)));
+    format!("{:?}", (um(h.diameter), o(h.depth), h.through || h.exits, &h.thread, &h.thread_class, o(h.tap_drill), o(h.tapped_depth), pair(h.cbore), pair(h.csink)))
+}
+
+/// Holes of a view grouped by size. Of Hole features (live holetable-1119, behaviours 1983): a letter per spec (a
+/// counterbore apart from a countersink of the same Ø, plain Ø.250 holes apart from a Ø.250 counterbore), letters and
+/// numbers in the order the holes were made. Without the features: tags A1, A2... for the largest size, B1... for the
+/// next; sorted top-to-bottom, left-to-right within a size.
 /// `exclude`: centers of holes left out (Holes to exclude); `x_dir`: the
 /// table's X direction (view coordinates; Y square to it), else the view's.
 /// Only the Hole features' holes of `ctx` (live: a table of extruded cuts is
@@ -366,11 +388,34 @@ pub fn hole_rows(g: &ViewGeometry, ctx: Option<&Context>, origin: [f64; 2], excl
     // Concentric bores of different size (e.g. counterbores): keep the
     // smallest per center as the hole size.
     bores.sort_by(|a, b| a.1.total_cmp(&b.1));
-    let mut holes: Vec<([f64; 2], f64, Option<super::PointRef>)> = Vec::new();
+    let mut holes: Vec<Bore> = Vec::new();
     for (c, r, p) in bores {
         if !holes.iter().any(|(h, _, _)| (h[0] - c[0]).abs() < 1e-9 && (h[1] - c[1]).abs() < 1e-9) {
             holes.push((c, r, p));
         }
+    }
+    if let Some(ctx) = ctx {
+        let record = |p: &Option<super::PointRef>| {
+            let (c, r) = super::views::resolve_point3(ctx, p.as_ref()?)?;
+            let r = r?;
+            ctx.holes.iter().position(|h| h.matches_circle(c, r, r * 1e-3 + 1e-7))
+        };
+        let mut made: Vec<(usize, String, &Bore)> = holes.iter().filter_map(|h| record(&h.2).map(|i| (i, hole_spec(&ctx.holes[i]), h))).collect();
+        made.sort_by_key(|m| m.0);
+        let mut specs: Vec<&str> = Vec::new();
+        for (_, spec, _) in &made {
+            if !specs.contains(&spec.as_str()) {
+                specs.push(spec);
+            }
+        }
+        let mut out = Vec::new();
+        for (si, spec) in specs.iter().enumerate() {
+            for (k, (_, _, (c, r, p))) in made.iter().filter(|m| m.1 == *spec).enumerate() {
+                let d = [c[0] - origin[0], c[1] - origin[1]];
+                out.push(HoleRow { tag: format!("{}{}", tag_letters(si), k + 1), center: *c, x: d[0] * ux[0] + d[1] * ux[1], y: d[0] * uy[0] + d[1] * uy[1], diameter: r * 2.0, point: p.clone(), spec: spec.to_string() });
+            }
+        }
+        return out;
     }
     let mut sizes: Vec<f64> = Vec::new();
     for (_, r, _) in &holes {
@@ -381,12 +426,12 @@ pub fn hole_rows(g: &ViewGeometry, ctx: Option<&Context>, origin: [f64; 2], excl
     sizes.sort_by(|a, b| b.total_cmp(a));
     let mut out = Vec::new();
     for (si, size) in sizes.iter().enumerate() {
-        let mut group: Vec<&([f64; 2], f64, Option<super::PointRef>)> = holes.iter().filter(|(_, r, _)| (r - size).abs() < 1e-9).collect();
+        let mut group: Vec<&Bore> = holes.iter().filter(|(_, r, _)| (r - size).abs() < 1e-9).collect();
         group.sort_by(|a, b| b.0[1].total_cmp(&a.0[1]).then(a.0[0].total_cmp(&b.0[0])));
         let letter = tag_letters(si);
         for (k, (c, r, p)) in group.into_iter().enumerate() {
             let d = [c[0] - origin[0], c[1] - origin[1]];
-            out.push(HoleRow { tag: format!("{letter}{}", k + 1), center: *c, x: d[0] * ux[0] + d[1] * ux[1], y: d[0] * uy[0] + d[1] * uy[1], diameter: r * 2.0, point: p.clone() });
+            out.push(HoleRow { tag: format!("{letter}{}", k + 1), center: *c, x: d[0] * ux[0] + d[1] * ux[1], y: d[0] * uy[0] + d[1] * uy[1], diameter: r * 2.0, point: p.clone(), spec: String::new() });
         }
     }
     out
@@ -423,7 +468,7 @@ pub fn merge_hole_rows(mut rows: Vec<HoleRow>, extra: &[HoleRow]) -> Vec<HoleRow
         if h.point.is_some() && rows.iter().any(|r| r.point == h.point) {
             continue;
         }
-        let same = |r: &HoleRow| (r.diameter - h.diameter).abs() < 1e-12;
+        let same = |r: &HoleRow| r.same_size(h);
         match rows.iter().rposition(same) {
             Some(i) => {
                 let letter = rows[i].tag.trim_end_matches(|c: char| c.is_ascii_digit()).to_string();
@@ -431,13 +476,14 @@ pub fn merge_hole_rows(mut rows: Vec<HoleRow>, extra: &[HoleRow]) -> Vec<HoleRow
                 rows.insert(i + 1, HoleRow { tag: format!("{letter}{n}"), ..h.clone() });
             }
             None => {
-                let mut sizes: Vec<f64> = Vec::new();
+                let mut sizes: Vec<&HoleRow> = Vec::new();
                 for r in &rows {
-                    if !sizes.iter().any(|s| (s - r.diameter).abs() < 1e-12) {
-                        sizes.push(r.diameter);
+                    if !sizes.iter().any(|s| s.same_size(r)) {
+                        sizes.push(r);
                     }
                 }
-                rows.push(HoleRow { tag: format!("{}1", tag_letters(sizes.len())), ..h.clone() });
+                let tag = format!("{}1", tag_letters(sizes.len()));
+                rows.push(HoleRow { tag, ..h.clone() });
             }
         }
     }
@@ -589,13 +635,19 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
             header.extend(["SIZE".into(), "QTY".into()]);
             let f = DimFormat { precision: *precision, ..Default::default() };
             let u = length_units(drawing, &f);
-            let num = |m: f64| format_number(m / u.meters(), f.precision, default_digits(u));
+            // Locations at the table's precision, else the drawing's, every digit kept and a leading zero (live 1983
+            // "0.591", holetable-1119 "15,00" on ISO A3).
+            let digits = precision.or(drawing.props.precision);
+            let num = |m: f64| {
+                let s = format_number(m / u.meters(), digits, default_digits(u));
+                if drawing.props.decimal_comma { s.replace('.', ",") } else { s }
+            };
             let holes = merge_hole_rows(view_geo.map(|g| hole_rows(g, source.map(|s| &*s.context), origin.unwrap_or(*stored), exclude, *x_dir)).unwrap_or_default(), extra);
             // Groups of one size: consecutive rows (hole_rows keeps a size together).
             let mut groups: Vec<(usize, usize)> = Vec::new();
             for (i, h) in holes.iter().enumerate() {
                 match groups.last_mut() {
-                    Some((s, n)) if (holes[*s].diameter - h.diameter).abs() < 1e-12 => *n += 1,
+                    Some((s, n)) if holes[*s].same_size(h) => *n += 1,
                     _ => groups.push((i, 1)),
                 }
             }

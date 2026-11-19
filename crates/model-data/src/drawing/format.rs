@@ -150,7 +150,7 @@ fn finish(drawing: &Drawing, s: String, fixed: bool, tolerance: bool) -> String 
 
 /// An angle in degrees: Onshape's leading / trailing zero settings are for
 /// lengths only, so a set precision keeps its digits ("90.0°", DSM2).
-fn angle_number(drawing: &Drawing, deg: f64, precision: Option<u8>) -> String {
+pub fn angle_number(drawing: &Drawing, deg: f64, precision: Option<u8>) -> String {
     let s = format_number(deg, precision, 2);
     if drawing.props.decimal_comma { s.replace('.', ",") } else { s }
 }

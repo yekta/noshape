@@ -623,7 +623,7 @@ fn hole_name(f: &Feature, shown: &dyn Fn(&str) -> Option<String>) -> Option<Stri
 /// middle hole, without a count; a blind depth reads "↧5".
 pub fn hole_callout_3d(holes: &[crate::regen::context::HoleRecord], feature: FeatureId, units: &noshape_units::UnitPrefs) -> Option<(crate::regen::context::HoleRecord, Vec<String>)> {
     use crate::drawing::format::stacked;
-    let mine: Vec<&crate::regen::context::HoleRecord> = holes.iter().filter(|h| h.feature == feature).collect();
+    let mine: Vec<&crate::regen::context::HoleRecord> = holes.iter().filter(|h| h.feature == feature && h.pattern.is_none()).collect();
     let hole = *mine.get(mine.len() / 2)?;
     let factor = units.si_factor(noshape_units::Dim::LENGTH);
     let len = |m: f64| noshape_units::format_number(m / factor, units.length_precision);
