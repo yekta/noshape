@@ -4493,6 +4493,12 @@ fn drawing_properties_get_and_set() {
     let (front3, top3) = col(&r);
     assert!(top3 > front3 && (front3 - top).abs() < 1e-6, "third angle: the rows swap, the Top above: {r}");
     call(&mut ctx, "drawing_properties", json!({ "drawing": tab, "set": { "projection": "first_angle" } }));
+    // Other units reset the precision, the chamfer keeping its own (live2 drawprops-1119: Inches fractional 1/256,
+    // Millimeters 0.12; this mm drawing's chamfer 0.12).
+    let r = call(&mut ctx, "drawing_properties", json!({ "drawing": tab, "set": { "units": "InchFraction" } }));
+    assert_eq!((r["properties"]["precision"].clone(), r["properties"]["chamfer_length_precision"].clone()), (json!(8), json!(2)), "{r}");
+    let r = call(&mut ctx, "drawing_properties", json!({ "drawing": tab, "set": { "units": "Millimeter", "precision": 1 } }));
+    assert_eq!(r["properties"]["precision"], 1, "a precision set with the units stays: {r}");
     // Locked: nothing but the lock changes.
     call(&mut ctx, "drawing_properties", json!({ "drawing": tab, "set": { "locked": true } }));
     let r = call(&mut ctx, "drawing_properties", json!({ "drawing": tab, "set": { "inspection_text_height": 5.0 } }));

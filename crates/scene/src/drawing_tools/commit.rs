@@ -1126,6 +1126,19 @@ pub fn set_drawing_props(d: &mut Drawing, f: impl FnOnce(&mut DrawingProps)) {
         d.props = before;
         return;
     }
+    // Choosing other units resets the precision to theirs (live2 drawprops-1119: Inches fractional and Feet and inches
+    // 1/256, Millimeters 0.12), unless the same change set one.
+    let unit_of = |p: &DrawingProps| p.units.unwrap_or(if d.units_mm { DimUnits::Millimeter } else { DimUnits::Inch });
+    if let Some(u) = d.props.units
+        && u != unit_of(&before)
+        && d.props.precision == before.precision
+    {
+        d.props.precision = Some(noshape_model::drawing::format::units_switch_precision(u));
+        // The chamfer dimension keeps its own length precision (live2 drawprops-1119: 5/8 X 45.0°, 15.000 X 45.0°).
+        if d.props.chamfer_length_precision.is_none() {
+            d.props.chamfer_length_precision = Some(noshape_model::drawing::format::default_digits(unit_of(&before)) as u8);
+        }
+    }
     if let Some(u) = d.props.units {
         d.units_mm = !u.imperial();
     }

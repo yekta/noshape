@@ -108,6 +108,12 @@ fn precision_label(digits: usize) -> String {
     if digits == 0 { "0".into() } else { format!("0.{}", &"123456"[..digits]) }
 }
 
+/// A fractional precision's label (live2 drawprops-1119: 0, 1/2 … 1/256; Feet and inches with ").
+fn fraction_label(bits: usize, feet: bool) -> String {
+    let q = if feet { "\"" } else { "" };
+    if bits == 0 { format!("0{q}") } else { format!("1/{}{q}", 1u32 << bits) }
+}
+
 type Act = std::rc::Rc<dyn Fn(&mut DrawingProps)>;
 /// Sets a line style (0 Solid, 1 Dashed, 2 Center).
 type StyleSet = std::rc::Rc<dyn Fn(&mut DrawingProps, u8)>;
@@ -1030,7 +1036,15 @@ impl DrawingEditor {
                 .child(section("Primary"))
                 .child(row("Units", select("dp-units", unit_label, unit_items)))
                 .child(row("Decimal separator", select("dp-sep", if props.decimal_comma { "Comma".into() } else { "Period".into() }, sep_items)))
-                .child(row("Precision", select("dp-prec", shown(props.precision, default_digits(units)), precision_items(props.precision, 6, |p, v| p.precision = v))))
+                .child(row("Precision", if matches!(units, DimUnits::InchFraction | DimUnits::FeetInches) {
+                    // Fractions: 0, 1/2 … 1/256 (live2 drawprops-1119).
+                    let feet = units == DimUnits::FeetInches;
+                    let cur = props.precision.map(|c| c as usize).unwrap_or(default_digits(units));
+                    let items = (0..=8).map(|k| (fraction_label(k, feet), cur == k, std::rc::Rc::new(move |p: &mut DrawingProps| p.precision = Some(k as u8)) as Act)).collect();
+                    select("dp-prec", fraction_label(cur, feet), items)
+                } else {
+                    select("dp-prec", shown(props.precision, default_digits(units)), precision_items(props.precision, 6, |p, v| p.precision = v))
+                }))
                 .child(row("Tolerance precision", select("dp-tprec", shown(props.tolerance_precision.or(props.precision), default_digits(units)), precision_items(props.tolerance_precision, 6, |p, v| p.tolerance_precision = v))))
                 .child(row("Angular precision", select("dp-aprec", shown(props.angular_precision, 2), precision_items(props.angular_precision, 4, |p, v| p.angular_precision = v))))
                 .child(row("Angular tolerance precision", select("dp-atprec", shown(props.angular_tolerance_precision, 2), precision_items(props.angular_tolerance_precision, 4, |p, v| p.angular_tolerance_precision = v))))

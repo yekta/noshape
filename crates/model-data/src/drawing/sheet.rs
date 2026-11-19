@@ -769,6 +769,19 @@ pub enum GripKind {
     Jog,
 }
 
+/// An angle turned by half turns into (-90°, 90°]: text along it reads left to right.
+fn upright(a: f64) -> f64 {
+    use std::f64::consts::{FRAC_PI_2, PI};
+    let a = (a + PI).rem_euclid(2.0 * PI) - PI;
+    if a > FRAC_PI_2 + 1e-9 {
+        a - PI
+    } else if a <= -FRAC_PI_2 + 1e-9 {
+        a + PI
+    } else {
+        a
+    }
+}
+
 /// The gap (text heights) between a value's whole number and its stacked fraction (live numfmt-1118: 1–2 px at 12 px).
 const FRACTION_GAP: f64 = 0.12;
 
@@ -917,7 +930,8 @@ impl SheetGeometry {
                 self.lines.push(Polyline2 { points: vec![[tip[0] - ox, tip[1] - oy], [tip[0] + ox, tip[1] + oy]], style: LineStyle::Thin, closed: false, pick: 0 });
             }
             ArrowType::FilledDot => {
-                let r = len * 0.25;
+                // As wide as an arrow is long, centred on the tip (live2 drawprops-1119 arrowhead-dot).
+                let r = len * 0.5;
                 let pts: Vec<[f64; 2]> = (0..12).map(|i| {
                     let t = i as f64 / 12.0 * std::f64::consts::TAU;
                     [tip[0] + r * t.cos(), tip[1] + r * t.sin()]
@@ -1626,6 +1640,14 @@ impl SheetGeometry {
                         let (inward, node) = if self.flip_arrows { (1.0, -4.0) } else { (-1.0, 4.0) };
                         self.arrow(tip, [dir[0] * inward, dir[1] * inward], 3.0);
                         self.grips.push(Grip { pick, pos: [tip[0] + dir[0] * node, tip[1] + dir[1] * node], kind: GripKind::Handle });
+                        // Text alignment Align with dimension line (live2 drawprops-1119): no shoulder, the value inline
+                        // along the leader past its end, read left to right.
+                        if !self.style.text_horizontal {
+                            let w = self.dim_label_width(&t, dh);
+                            let at = [out[0] + dir[0] * (w / 2.0 + 0.3 * dh), out[1] + dir[1] * (w / 2.0 + 0.3 * dh)];
+                            self.dim_label(at, upright(*angle), 0.5, true, &t, dh, pick);
+                            continue;
+                        }
                         let side = if dir[0] < 0.0 { -1.0 } else { 1.0 };
                         let sh = [out[0] + side * self.style.dim_arrow, out[1]];
                         self.lines.push(Polyline2 { points: vec![out, sh], style: LineStyle::Thin, closed: false, pick });
@@ -1769,7 +1791,10 @@ impl SheetGeometry {
                     }
                     let t = env.text(a, a1 - a0, true, "");
                     let at = if inline { *radius } else { radius + 3.0 };
-                    self.dim_label([v[0] + at * mid.cos(), v[1] + at * mid.sin()], 0.0, 0.5, true, &t, dh, pick);
+                    // ANSI with Text alignment Align with dimension line: the value tangent to the arc (live2
+                    // drawprops-1119: 225.0° turned along its arc).
+                    let turn = if inline && !self.style.text_horizontal { upright(mid + std::f64::consts::FRAC_PI_2) } else { 0.0 };
+                    self.dim_label([v[0] + at * mid.cos(), v[1] + at * mid.sin()], turn, 0.5, true, &t, dh, pick);
                 }
                 AnnotationKind::Centermark { view, center, .. } if env.covered_centermark(*view, *center) => {}
                 AnnotationKind::Centermark { view, center, size, angle, arms } => {
@@ -3937,6 +3962,21 @@ pub fn note_leader_paths(bbox: [f64; 4], leaders: &[super::Leader], targets: &[[
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Live2 drawprops-1119: a dot arrowhead is as wide as an arrow is long, centred on the tip; text turned along a
+    /// leader or an arc reads left to right.
+    #[test]
+    fn dot_arrowheads_and_upright_text() {
+        let mut g = SheetGeometry::new(100.0, 100.0);
+        g.arrow_as([10.0, 10.0], [1.0, 0.0], 4.5, ArrowType::FilledDot);
+        let xs: Vec<f64> = g.fills.iter().flat_map(|f| f.points.iter().map(|p| p[0])).collect();
+        let span = xs.iter().copied().fold(f64::MIN, f64::max) - xs.iter().copied().fold(f64::MAX, f64::min);
+        assert!((span - 4.5).abs() < 1e-9, "{span}");
+        use std::f64::consts::{FRAC_PI_2, PI};
+        for (a, want) in [(0.3, 0.3), (PI - 0.3, -0.3), (-PI + 0.3, 0.3), (FRAC_PI_2, FRAC_PI_2), (-FRAC_PI_2, FRAC_PI_2), (225f64.to_radians(), 45f64.to_radians())] {
+            assert!((upright(a) - want).abs() < 1e-9, "{a} -> {} (want {want})", upright(a));
+        }
+    }
 
     /// A new sheet after an ANSI sheet gets the continuation block (live
     /// 1410, samples/drw2-l-sheet2.dxf): one strip with DWG NO. / SIZE /

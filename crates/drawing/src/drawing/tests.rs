@@ -4557,7 +4557,7 @@ fn ansi_radial_dimension_leader_knee_and_shoulder() {
             self.0.balloon_text(a, t)
         }
         fn sheet_style(&self) -> sheet::SheetStyle {
-            sheet::SheetStyle { iso: false, ..Default::default() }
+            sheet::SheetStyle { iso: false, text_horizontal: true, ..Default::default() }
         }
     }
     let drawing = Drawing::default();

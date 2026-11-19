@@ -57,6 +57,15 @@ pub fn default_digits(u: DimUnits) -> usize {
     }
 }
 
+/// The precision Drawing properties takes when its Units change to `u` (live2 drawprops-1119: Inches fractional and
+/// Feet and inches 1/256, Millimeters 0.12; the others their default digits).
+pub fn units_switch_precision(u: DimUnits) -> u8 {
+    match u {
+        DimUnits::InchFraction | DimUnits::FeetInches => 8,
+        _ => default_digits(u) as u8,
+    }
+}
+
 /// Inches as a whole number and a reduced fraction to 1/`2^bits` (live numfmt-1118: the precision's digits pick the
 /// denominator, the drawing's 0.123 is 1/8": 2.7 in reads "2 3/4").
 fn inch_fraction(inches: f64, bits: u8) -> String {
@@ -94,6 +103,10 @@ fn unit_number(drawing: &Drawing, meters: f64, u: DimUnits, precision: Option<u8
             let ft = (total / 12.0).trunc();
             let rest = total - ft * 12.0;
             let sign = if inches < 0.0 && total > 0.0 { "-" } else { "" };
+            // Under a foot the inches alone (live2 drawprops-1119: 1 31/32", R15/64").
+            if ft == 0.0 {
+                return format!("{sign}{}\"", inch_fraction(rest, bits));
+            }
             format!("{sign}{}'-{}\"", ft as i64, inch_fraction(rest, bits))
         }
         _ => number(drawing, meters / u.meters(), precision, drawing_precision, default_digits(u), tolerance),
@@ -789,6 +802,13 @@ mod tests {
         assert_eq!(dim_text(&d, &fine, 0.0254 * 2.7, false, "").main, "2 45/64");
         assert_eq!(dim_text(&d, &f(DimUnits::FeetInches), 0.0254 * 14.25, false, "").main, "1'-2 1/4\"");
         assert_eq!(dim_text(&d, &f(DimUnits::FeetInches), 0.0254 * 11.99, false, "").main, "1'-0\"");
+        // Live2 drawprops-1119 (1/256): under a foot the inches alone, fractions reduced.
+        let fi = DimFormat { units: Some(DimUnits::FeetInches), precision: Some(8), ..Default::default() };
+        assert_eq!(dim_text(&d, &fi, 0.050, false, "").main, "1 31/32\"");
+        assert_eq!(dim_text(&d, &fi, 0.006, false, "").main, "15/64\"");
+        let fr = DimFormat { units: Some(DimUnits::InchFraction), precision: Some(8), ..Default::default() };
+        assert_eq!(dim_text(&d, &fr, 0.080, false, "").main, "3 19/128");
+        assert_eq!(dim_text(&d, &DimFormat { units: Some(DimUnits::InchFraction), precision: Some(4), ..Default::default() }, 0.010, false, "").main, "3/8");
         assert_eq!(dim_text(&d, &f(DimUnits::Yard), 0.9144 * 2.0, false, "").main, "2");
         // Parentheses, above / below text, the inspection oval.
         let t = dim_text(&d, &DimFormat { reference: true, above: "TYP".into(), below: "2X".into(), inspection_frame: true, ..Default::default() }, 0.0125, false, "");
