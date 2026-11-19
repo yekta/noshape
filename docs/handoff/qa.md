@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 23:51)
+# QA handoff (agent qa; current state only, updated 2026-11-19 23:54)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -116,8 +116,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    places it (= live; ticket closed). Drawing hover = rows 130. To verify on their greens: dx BRAND-IN-UI-TEXT, skasm Simulation
    connection dropped, studios f450d0dd (history row ellipsis, "Noshape Labs"). Sketch tools 23:09-23:15 (3-point arc, spline,
    polygon, Slot on a line, Fillet, angle dim, Mirror) = live; P1 SKETCH-SLOT-ON-ARC (skasm). Direct edit 23:18 (Move face, Draft,
-   Split toast), Thicken 23:29, Delete face (CLI: Heal/Cap/Leave open/all), drawing Section view, asm linear pattern, Ball limits
-   = live; P2 ERROR-CHIP-RED-NO-FIELD (psui). asm d67512a33 both P1s VERIFIED 23:42 (green 2574b5b5). App runs: qa-xvfb110 +
+   Split toast), Thicken 23:29, Delete face (CLI: Heal/Cap/Leave open/all), drawing Section view, asm linear pattern, Ball limits,
+   Transform (type order, XYZ triad 60 px at any zoom) = live; P2 ERROR-CHIP-RED-NO-FIELD (psui). asm d67512a33 both P1s VERIFIED 23:42 (green 2574b5b5). App runs: qa-xvfb110 +
    qa-walk*-app, `xdotool windowfocus` FIRST (else Tab never previews); drawings have no alt+c (letters are shortcuts: n = Note).
    tabrel.sh: vibe2 slot + 1 retry on SIGTERM (earlyoom 23:01); 4fee queued. Waiters: qa-wait-{dx-brand,studios-hist,skasm-sim}.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
