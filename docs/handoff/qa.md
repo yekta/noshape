@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 21:53)
+# QA handoff (agent qa; current state only, updated 2026-11-19 21:55)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -83,9 +83,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    Mirror's self-switch to Add confirmed by live's take (mirror-part-right-plane step 4 passes, tabs compared). 21:52: live's capture
    closed PATTERN-CHECK-STAYS-ENABLED (live keeps ✓ enabled) and gave P1 TOOLBAR-TOOLTIP-AFTER-CLICK (psui told). Hole try on
    qa-scratch/walk2/h.noshape: my point landed just off the block's top face (Merge scope empty = live's 8559 off-part case; not a bug).
-   Next walk: Hole again with the point well inside the face (sketch on the top face, view normal 'n' first, point at the face centre;
-   expect Merge scope "Part 1" auto, behaviours 6225), mass properties, measure two entities, then P2 assemblies. App runs: units
-   qa-xvfb110 + qa-walk*-app (systemd-run, NOSHAPE_CONFIG_DIR per doc), tool search alt+c + name + Return.
+   Walk 21:55: Hole (point inside the face) = live: Merge scope "Part 1" auto, callout preview; mass properties (bottom-right icon
+   "Display mass and section properties"): volume / area, red chip, blank CoM / inertia without material = live (the one-time toast
+   3.6 s after the first open not caught: shots too early; parity interaction.md 5.2 says =); face + hole rim measure readout plausible.
+   Next: P2 assemblies (insert, mates, drag, BOM), then drawings, import/export. App runs: units qa-xvfb110 + qa-walk*-app
+   (systemd-run, NOSHAPE_CONFIG_DIR per doc), tool search alt+c + name + Return; Esc keeps selection, Space clears.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
