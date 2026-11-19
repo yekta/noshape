@@ -113,7 +113,7 @@ against live with a feel scenario; share psui's pick code (`Viewport::pick_prior
 
 ## Agents (lead's roster 11-17 10:30, core / blend 11-18; only these ids)
 psui 4973e295-9e92-463f-a13f-2ec5258bc5f9, core e8af89fe-d460-49b3-b0bb-9572da230fed,
-blend 0672fa20-964d-4fde-a19c-c5b4363729ba (11-18; 6692ae35 / 0e6e9942 stopped), bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4,
+blend 0672fa20-964d-4fde-a19c-c5b4363729ba (11-18; 6692ae35 / 0e6e9942 stopped), bool 754a9804-feb1-4153-b32a-acf9b2a6d94d (11-19; 7fa8ceab stopped),
 dx 2108c2b7-2f48-43a7-87a0-3f652e3cda6d (11-17 19:49; f93a1292 stopped), qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b,
 asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6,
 bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios 58e9bca8-346c-4847-8012-e15006ae61ef,
