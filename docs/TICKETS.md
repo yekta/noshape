@@ -893,7 +893,7 @@ snippet, Tab closes and inserts a tab, Esc keeps "op"; Commit solid blue while e
   it grey (184,184,184) at the end (as ours draws it in a fresh document). Recapture: #b8b8b8 with the pointer away, rolled back or
   not; (200,217,226) only while hovered: my 2 s shot had the pointer still on it. 8d2e0056 restores ours.
 - [ ] **P2 FLFEEL-BAR-MENU (psui)**: a right-click on the rollback bar opens no menu; live's has "Roll to end".
-- [ ] (studios d94834aa7; qa 11-19 03:35 on green 3d422009, vibe2 Xvfb, shots qa-scratch/stv: Enter adds nothing and Esc then empties the row =; STILL ≠: "1x" typed in the add row's Name has no red border or pink fill, typed as text or as keys; the feel test checks the text, not the drawn cell) **P1 VSFEEL-NAME-RED (studios)**: an invalid name ("10", "1x") isn't marked while typed (live: red border, pink fill at once);
+- [x] (studios d94834aa7; qa verified 11-19 03:50 on green 3d422009, vibe2 Xvfb, qa-scratch/stv/vs-enter.png: "1x" plain while typed, pink with a red border after Enter with the text kept, Esc empties it; live marks it ~0.5 s after Enter, behaviours fsvs-feel-1118) **P1 VSFEEL-NAME-RED (studios)**: an invalid name ("10", "1x") isn't marked while typed (live: red border, pink fill at once);
   after an Enter on it, Esc keeps the text (live throws it away).
 - [x] (studios d94834aa7; qa verified 11-19 03:35 on green 3d422009, vibe2 Xvfb, shots qa-scratch/stv: "2 in" -> 50.8 mm; a hovered value shows "2 in" over the Value header) **P1 VSFEEL-UNITS (studios)**: "2 in" in a Length (mm document) stays "2 in" in the cell (live: "50.8 mm"); a selected value cell
   shows no expression bubble over the Value header (live: "2 in" / "10 mm").
