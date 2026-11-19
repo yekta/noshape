@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 22:44)
+# QA handoff (agent qa; current state only, updated 2026-11-19 22:48)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -107,8 +107,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    #len autocomplete, VS edit rebuilds the Part Studio) and configurations (Configure Part Studio list, field right-click Configure,
    toast, Long 4 mm chamfer) = live. Walk 22:3x-22:43 (green 624c6db77): Insert with Configuration ▾, Revolute (HUD, Solve), limit
    rows, drag clamp, Part 2 Fix, drawing Update (ctrl+q) redraws views keeping the dimension, Sheet properties Size B = live; filed
-   P1 ASM-DRAG-UNFIXED-GROUP + P1 ASM-LIMIT-TYPED-NO-PREVIEW (asm, told). Next: Slider / Planar mates, exploded views, BOM edits,
-   drawing tables + notes, then sheet metal (flange / flat). App runs: units qa-xvfb110 + qa-walk*-app
+   P1 ASM-DRAG-UNFIXED-GROUP + P1 ASM-LIMIT-TYPED-NO-PREVIEW (asm, told). Sheet metal 22:4x (Part Studio 2): Sheet metal model
+   Extrude of an open L, Flange 25 mm, table (Bend A/B 2.3 mm 90° Up K 0.45) + flat view = live; closed rectangle fails 'Failed to
+   extrude selections.': live REQUESTS qa (11-19 22:46), live told; ticket only if live builds it. Next: Slider / Planar mates,
+   exploded views, BOM edits, drawing tables + notes. App runs: units qa-xvfb110 + qa-walk*-app
    (systemd-run, NOSHAPE_CONFIG_DIR per doc), tool search alt+c + name + Return; Esc keeps selection, Space clears.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
