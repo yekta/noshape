@@ -1455,6 +1455,24 @@ live (`ctrl_cmd`, `shared_keys_follow_lives_list_per_os`) =. Feature-dialog widt
 | Shift+X Section view | the dialog at the list's side (~ (396, 192)) | the same with a clean config dir (the low-left spot was a 11-04 panel_positions.json "section" entry on this machine) | = (withdrawn 11-18 23:58) |
 | Shift+Y Show selected parts (Part 1 selected) | the selection cleared | Part 1 stays selected | ≠ [psui] (live's studio had Part 1 hidden first; to retake from one state) |
 
+### shortcuts-sk-1118 (sketch default keys, live 11-19 00:00–01:15) [skasm, psui]
+
+Each of the 81 keys in live's `sketchEdit` map, pressed once in live and once in ours from the same state, inside Sketch 2 (one line on Top) of the block document,
+which is opened by double-clicking its row. Live reloads the page for every key. Ours relaunches green 5c9229069 for every key, with a clean config dir. A
+screenshot 1.3–1.5 s after the key (live/keys-1118/live/sk-pairs/). 72 keys do the same thing in both apps. Live's studio picked up a pasted second line from
+Ctrl+V on, which doesn't change the keys after it.
+
+| Key (in a sketch) | Live | Ours | Status |
+|---|---|---|---|
+| Ctrl+M | nothing; the sketch stays open | closes the sketch and opens Mate connector 1 | ≠ [skasm] |
+| Shift+N Rename | the sketch dialog's name becomes an edit box with "Sketch 2" selected | nothing | ≠ [skasm] |
+| Shift+X Section view | the Section view dialog over the sketch (the sketch dialog greyed behind it) | nothing | ≠ [skasm] |
+| ` Select other | the Select other box "(No selections found)" at the pointer | nothing | ≠ [skasm] |
+| Shift+V Named views | the sketch closes (Part Studio toolbar back) and the Named views box opens | the Named views box opens over the sketch dialog; the sketch stays open | ≠ [skasm] |
+| C, R, G, L, A, Shift+S (a draw tool from the key, pointer still) | nothing drawn at the pointer until it moves | a blue dot at the resting pointer | ≠ [skasm] |
+| Shift+C Curve/surface analysis | "Edge of Sketch 2" in the field, the line drawn orange, "Length: 36.856 mm" at the bottom right | the same field; the line stays blue, no length | ≠ [psui] |
+| The rest: views 1–7, arrows, Shift / Ctrl / Ctrl+Shift arrows, Z / Shift+Z / F / W / N, constraints (I, Shift+O, E, H, V, B, Shift+L, Shift+K, T, Shift+M, Shift+Q, Shift+G, Shift+J), D, X, M, O, U, Q, Shift+A, Shift+U, Shift+F, S mini toolbar, Shift+E / Shift+W (close the sketch, open the feature), Shift+D, [, Shift+R, Shift+P / P / Shift+H / K / Y / Shift+Y / Shift+I / Shift+T, Delete / Backspace, Space, Ctrl+C | the same | = |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
