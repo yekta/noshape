@@ -856,6 +856,10 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   (crates/app/src/import_dialog.rs:230); Preferences asks "Enable access to Onshape Labs features?" (prefs_general.rs:476). The app
   is Noshape in all user-facing text (no Onshape brand marks): "Import to Noshape" etc., layout as live. Walk 22:04, green a58eee8c;
   the STEP round trip itself is fine (8 faces out, Import 1 + Part 1 back, "CAD Imports" folder, info toast).
+  qa 23:0x: also the Properties dialog's Category values "Onshape Part", "Onshape Assembly", "Onshape Part Studio",
+  "Onshape Feature Studio", "Onshape Variable Studio", … (crates/app-core/src/properties_dialog.rs: shown as the select's
+  value and matched as kind strings at 804-821 / 1054-1058). Shown text should say Noshape; stored data may keep live's
+  names if the file format needs them (dx's call).
 - [ ] P0 **STALE-SKETCH-HOVER (psui)**: outside sketch mode a sketch entity's hover look stays after the pointer leaves
   for empty space (green f3bc85da, :110, real pointer, walk 22:12). (a) Draw a circle, the last click on its rim, close
   the sketch with ✓: the region keeps its light-orange hover outline with nothing selected, through pointer moves over
