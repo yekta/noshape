@@ -5,7 +5,7 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-19 05:58 UTC)
+## State (2026-11-19 06:03 UTC)
 
 ### Landed 11-19
 - c75f1894 config-assembly BOM (PartStudio::standard_content; the BOM's feature-property fallback skips it), 12/12.
