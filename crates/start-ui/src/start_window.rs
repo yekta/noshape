@@ -171,7 +171,7 @@ enum SortKey {
 }
 
 /// A documents table column pinned by its ⋮ menu's Pin column ›.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 enum Pin {
     Left,
     Right,
@@ -210,6 +210,13 @@ struct Prefs {
     /// Owned by me's Folders section is open (collapsed by default; live remembers it).
     #[serde(default)]
     folders_open: bool,
+    /// The column headers' ⋮ menu: Clear sort, pinned columns, Autosize widths (by header label); live remembers them.
+    #[serde(default)]
+    sort_cleared: bool,
+    #[serde(default)]
+    pins: Vec<(Col, Pin)>,
+    #[serde(default)]
+    col_w: Vec<(String, f32)>,
 }
 
 /// The documents table's optional columns (live documents/81).
@@ -264,7 +271,7 @@ fn default_panel() -> Option<DocPanel> {
 
 impl Default for Prefs {
     fn default() -> Self {
-        Self { view: ViewMode::Grid, sort: SortKey::Modified, descending: true, source: None, columns: default_columns(), folder_sort: FolderSort::NameAsc, panel: default_panel(), folders_open: false }
+        Self { view: ViewMode::Grid, sort: SortKey::Modified, descending: true, source: None, columns: default_columns(), folder_sort: FolderSort::NameAsc, panel: default_panel(), folders_open: false, sort_cleared: false, pins: Vec::new(), col_w: Vec::new() }
     }
 }
 
@@ -609,9 +616,10 @@ impl StartView {
             sort: prefs.sort,
             descending: prefs.descending,
             hover_header: None,
-            sort_cleared: false,
-            col_w: Vec::new(),
-            pins: Vec::new(),
+            sort_cleared: prefs.sort_cleared,
+            // (Labels the table knows: a stored width for another one is dropped.)
+            col_w: prefs.col_w.iter().filter_map(|(l, w)| ["Name", "Modified", "Modified by", "Owned by", "Type", "Description"].into_iter().find(|k| k == l).map(|k| (k, *w))).collect(),
+            pins: prefs.pins.clone(),
             search,
             query: String::new(),
             selected: None,
@@ -676,7 +684,7 @@ impl StartView {
     }
 
     fn save_prefs(&self) {
-        let prefs = Prefs { view: self.view, sort: self.sort, descending: self.descending, source: Some(self.source.clone()), columns: self.columns.clone(), folder_sort: self.folder_sort, panel: self.panel, folders_open: self.folders_open };
+        let prefs = Prefs { view: self.view, sort: self.sort, descending: self.descending, source: Some(self.source.clone()), columns: self.columns.clone(), folder_sort: self.folder_sort, panel: self.panel, folders_open: self.folders_open, sort_cleared: self.sort_cleared, pins: self.pins.clone(), col_w: self.col_w.iter().map(|(l, w)| (l.to_string(), *w)).collect() };
         let _ = std::fs::write(prefs_path(), serde_json::to_vec_pretty(&prefs).unwrap_or_default());
     }
 
@@ -3880,6 +3888,7 @@ impl StartView {
                                     t.pins.retain(|p| p.0 != c);
                                     t.pins.extend(pin.map(|p| (c, p)));
                                 }
+                                t.save_prefs();
                                 cx.notify();
                             })));
                         }
