@@ -2513,3 +2513,32 @@ fn an_alt_drag_copies_a_note_and_lands_it_where_released(cx: &mut TestAppContext
     assert!((after[0][0] - before[0][0]).abs() < 1e-6, "one stays: {before:?} -> {after:?}");
     assert!((after[1][0] - before[0][0] - 40.0).abs() < 1.0, "the other 40 mm along: {before:?} -> {after:?}");
 }
+
+/// Live measure-1119: while measuring, a click on empty sheet keeps the picks, and a pick in another view than the
+/// first one's is ignored (no row, no message); a second pick in the first view is added.
+#[gpui::test]
+fn measure_keeps_its_picks_on_an_empty_click_and_ignores_another_view(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-measure-views");
+    real_sheet(cx, window, &editor);
+    let corners = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        b.placements.iter().take(2).map(|pl| {
+            let g = e.geoms.get(&pl.id).expect("geometry");
+            (pl.to_sheet(g.min), pl.to_sheet(g.max), pl.to_sheet([g.min[0], g.max[1]]))
+        }).collect::<Vec<_>>()
+    });
+    assert_eq!(corners.len(), 2, "two views");
+    cx.update(|cx| editor.update(cx, |e, cx| e.toggle_measure(cx)));
+    draw(cx, window);
+    let picks = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).measure_pick_names());
+    click_at(cx, window, &editor, corners[0].0, Modifiers::default());
+    assert_eq!(picks(cx), ["Point 1"], "a corner of the first view");
+    click_at(cx, window, &editor, [8.0, 8.0], Modifiers::default());
+    assert_eq!(picks(cx), ["Point 1"], "an empty click keeps it");
+    click_at(cx, window, &editor, corners[1].0, Modifiers::default());
+    assert_eq!(picks(cx), ["Point 1"], "a pick in another view is ignored");
+    click_at(cx, window, &editor, corners[0].2, Modifiers::default());
+    assert_eq!(picks(cx), ["Point 1", "Point 2"], "another corner of the first view");
+}

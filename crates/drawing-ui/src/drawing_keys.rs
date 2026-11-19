@@ -308,6 +308,79 @@ pub enum MeasurePick {
     Circle { view: ViewId, center: [f64; 2], radius: f64 },
 }
 
+impl MeasurePick {
+    fn view(&self) -> ViewId {
+        match self {
+            MeasurePick::Point(p) | MeasurePick::Line(p, _) => p.view,
+            MeasurePick::Circle { view, .. } => *view,
+        }
+    }
+}
+
+fn seg_dist(p: [f64; 2], a: [f64; 2], b: [f64; 2]) -> f64 {
+    let (u, w) = ([b[0] - a[0], b[1] - a[1]], [p[0] - a[0], p[1] - a[1]]);
+    let l2 = u[0] * u[0] + u[1] * u[1];
+    let t = if l2 > 0.0 { ((u[0] * w[0] + u[1] * w[1]) / l2).clamp(0.0, 1.0) } else { 0.0 };
+    (p[0] - a[0] - t * u[0]).hypot(p[1] - a[1] - t * u[1])
+}
+
+/// The Measure panel's rows (label, length in model meters) and its relation for the picks (live measure-1119): a
+/// point alone shows nothing; a line its Length; a circle its Diameter and Length (circumference); two points Min
+/// distance, dx, dy; a point and a line Min distance and the line's Length; a point and a circle Min / Max / Center
+/// distance and the circle's Length; two lines (Parallel distance,) Min distance and both Lengths summed.
+pub(crate) fn measure_rows(picks: &[MeasurePick]) -> (Vec<(&'static str, f64)>, Option<&'static str>) {
+    let d2 = |a: [f64; 2], b: [f64; 2]| (b[0] - a[0]).hypot(b[1] - a[1]);
+    let circ = |r: f64| 2.0 * std::f64::consts::PI * r;
+    let mut sorted: Vec<&MeasurePick> = picks.iter().collect();
+    sorted.sort_by_key(|m| match m {
+        MeasurePick::Point(_) => 0,
+        MeasurePick::Line(..) => 1,
+        MeasurePick::Circle { .. } => 2,
+    });
+    match sorted.as_slice() {
+        [MeasurePick::Line(a, b)] => (vec![("Length", d2(a.p, b.p))], Some("Line")),
+        [MeasurePick::Circle { radius, .. }] => (vec![("Diameter", radius * 2.0), ("Length", circ(*radius))], Some("Circle")),
+        [MeasurePick::Point(p), MeasurePick::Point(q)] => {
+            (vec![("Min distance", d2(p.p, q.p)), ("dx", (q.p[0] - p.p[0]).abs()), ("dy", (q.p[1] - p.p[1]).abs())], Some("Point-Point"))
+        }
+        [MeasurePick::Point(p), MeasurePick::Line(a, b)] => (vec![("Min distance", seg_dist(p.p, a.p, b.p)), ("Length", d2(a.p, b.p))], Some("Point-Line")),
+        [MeasurePick::Point(p), MeasurePick::Circle { center, radius, .. }] => {
+            let c = d2(p.p, *center);
+            (vec![("Min distance", (c - radius).abs()), ("Max distance", c + radius), ("Center distance", c), ("Length", circ(*radius))], Some("Point-Circle"))
+        }
+        [MeasurePick::Line(a1, b1), MeasurePick::Line(a2, b2)] => {
+            let (u, v) = ([b1.p[0] - a1.p[0], b1.p[1] - a1.p[1]], [b2.p[0] - a2.p[0], b2.p[1] - a2.p[1]]);
+            let (lu, lv) = (u[0].hypot(u[1]), v[0].hypot(v[1]));
+            let sin = (u[0] * v[1] - u[1] * v[0]) / (lu * lv).max(1e-300);
+            let cos = (u[0] * v[0] + u[1] * v[1]) / (lu * lv).max(1e-300);
+            let crosses = {
+                let side = |a: [f64; 2], b: [f64; 2], p: [f64; 2]| (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+                side(a1.p, b1.p, a2.p) * side(a1.p, b1.p, b2.p) < 0.0 && side(a2.p, b2.p, a1.p) * side(a2.p, b2.p, b1.p) < 0.0
+            };
+            let min = if crosses { 0.0 } else { [seg_dist(a1.p, a2.p, b2.p), seg_dist(b1.p, a2.p, b2.p), seg_dist(a2.p, a1.p, b1.p), seg_dist(b2.p, a1.p, b1.p)].into_iter().fold(f64::MAX, f64::min) };
+            let mut rows = Vec::new();
+            let parallel = sin.abs() < 1e-9;
+            if parallel {
+                let w = [a2.p[0] - a1.p[0], a2.p[1] - a1.p[1]];
+                rows.push(("Parallel distance", (u[0] * w[1] - u[1] * w[0]).abs() / lu.max(1e-300)));
+            }
+            rows.push(("Min distance", min));
+            rows.push(("Length", lu + lv));
+            let relation = if parallel { Some("Parallel lines") } else if cos.abs() < 1e-9 { Some("Perpendicular lines") } else { None };
+            (rows, relation)
+        }
+        [_, _] => {
+            let at = |m: &MeasurePick| match m {
+                MeasurePick::Point(p) => p.p,
+                MeasurePick::Line(a, b) => [(a.p[0] + b.p[0]) * 0.5, (a.p[1] + b.p[1]) * 0.5],
+                MeasurePick::Circle { center, .. } => *center,
+            };
+            (vec![("Center distance", d2(at(sorted[0]), at(sorted[1])))], None)
+        }
+        _ => (Vec::new(), None),
+    }
+}
+
 impl DrawingEditor {
     /// `[`: Measure on / off. Click points, straight edges or circles; up to
     /// two picks are measured (model units, through the view scale).
@@ -336,16 +409,15 @@ impl DrawingEditor {
         } else {
             None
         };
-        if let Some(m) = &mut self.measure {
-            match pick {
-                Some(p) => {
-                    if m.len() >= 2 {
-                        m.clear();
-                    }
-                    m.push(p);
-                }
-                None => m.clear(),
+        // Live measure-1119: a click on empty sheet keeps the picks (only a row's × removes one), and a pick in
+        // another view than the first pick's is ignored.
+        if let (Some(m), Some(p)) = (&mut self.measure, pick)
+            && m.first().is_none_or(|f| f.view() == p.view())
+        {
+            if m.len() >= 2 {
+                m.clear();
             }
+            m.push(p);
         }
         cx.notify();
         true
@@ -399,52 +471,8 @@ impl DrawingEditor {
     pub fn render_measure(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let picks = self.measure.as_ref()?;
         let pal = p();
-        let mut rows: Vec<(String, String)> = Vec::new();
-        let d2 = |a: [f64; 2], b: [f64; 2]| ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2)).sqrt();
-        match picks.as_slice() {
-            [] => {}
-            [MeasurePick::Line(a, b)] => rows.push(("Length".into(), self.measure_text(d2(a.p, b.p)))),
-            [MeasurePick::Circle { radius, .. }] => {
-                rows.push(("Diameter".into(), self.measure_text(radius * 2.0)));
-                rows.push(("Radius".into(), self.measure_text(*radius)));
-            }
-            [MeasurePick::Point(_)] => {}
-            [x, y] => {
-                let point = |m: &MeasurePick| match m {
-                    MeasurePick::Point(p) => Some((p.view, p.p)),
-                    MeasurePick::Circle { view, center, .. } => Some((*view, *center)),
-                    MeasurePick::Line(..) => None,
-                };
-                match (point(x), point(y), x, y) {
-                    (Some((v1, p)), Some((v2, q)), _, _) if v1 == v2 => {
-                        rows.push(("Distance".into(), self.measure_text(d2(p, q))));
-                        rows.push(("Δx".into(), self.measure_text((q[0] - p[0]).abs())));
-                        rows.push(("Δy".into(), self.measure_text((q[1] - p[1]).abs())));
-                    }
-                    (Some((v1, p)), None, _, MeasurePick::Line(a, b)) | (None, Some((v1, p)), MeasurePick::Line(a, b), _) if a.view == v1 => {
-                        // Point to line: perpendicular distance.
-                        let (u, w) = ([b.p[0] - a.p[0], b.p[1] - a.p[1]], [p[0] - a.p[0], p[1] - a.p[1]]);
-                        let l = (u[0] * u[0] + u[1] * u[1]).sqrt().max(1e-12);
-                        rows.push(("Distance".into(), self.measure_text((u[0] * w[1] - u[1] * w[0]).abs() / l)));
-                    }
-                    (None, None, MeasurePick::Line(a1, b1), MeasurePick::Line(a2, b2)) if a1.view == a2.view => {
-                        let ang = |a: &PickedPoint, b: &PickedPoint| (b.p[1] - a.p[1]).atan2(b.p[0] - a.p[0]);
-                        let mut t = (ang(a1, b1) - ang(a2, b2)).abs().to_degrees() % 180.0;
-                        if t > 90.0 {
-                            t = 180.0 - t;
-                        }
-                        rows.push(("Angle".into(), format!("{t:.2}°")));
-                        if t < 1e-6 {
-                            let (u, w) = ([b1.p[0] - a1.p[0], b1.p[1] - a1.p[1]], [a2.p[0] - a1.p[0], a2.p[1] - a1.p[1]]);
-                            let l = (u[0] * u[0] + u[1] * u[1]).sqrt().max(1e-12);
-                            rows.push(("Distance".into(), self.measure_text((u[0] * w[1] - u[1] * w[0]).abs() / l)));
-                        }
-                    }
-                    _ => rows.push(("Measure".into(), "pick entities in the same view".into())),
-                }
-            }
-            _ => {}
-        }
+        let (lengths, relation) = measure_rows(picks);
+        let rows: Vec<(&str, String)> = lengths.into_iter().map(|(k, m)| (k, self.measure_text(m))).collect();
         // Live2 shortcuts-1118 (measure.png): a drawing panel at the top left: "Measure" with the red ✕, the blue
         // selection box "Select entities to measure", the unit "Inches (Drawing)" and Show dual unit.
         // The selection box: its caption, then a row per pick with its ✕ (live2 mu-mm-edge-mm-dual.png).
@@ -461,12 +489,13 @@ impl DrawingEditor {
                 }))))
             },
         );
-        // Under Show dual unit: "Measurements (Projected geometry)", the values indented as "Length:  40.00 mm", and a
-        // line's "Relation: Line".
-        let relation = matches!(picks.as_slice(), [MeasurePick::Line(..)]).then_some("Relation: Line");
+        // Under Show dual unit: "Measurements (Projected geometry)", the labels right-aligned in one column with the
+        // values beside them, then after a blank line "Relation: …" (live measure-1119).
         let results = (!rows.is_empty()).then(|| {
-            rows.iter().fold(v_flex().px(px(8.)).pt(px(4.)).pb(px(6.)).text_size(px(13.)).child(div().child("Measurements (Projected geometry)")), |c, (k, v)| c.child(h_flex().pl(px(10.)).gap(px(8.)).child(format!("{k}:")).child(v.clone())))
-                .when_some(relation, |c, r| c.child(div().pt(px(18.)).child(r)))
+            let labels = rows.iter().fold(v_flex().items_end().pl(px(10.)), |c, (k, _)| c.child(format!("{k}:")));
+            let values = rows.iter().fold(v_flex(), |c, (_, v)| c.child(v.clone()));
+            v_flex().px(px(8.)).pt(px(4.)).pb(px(6.)).text_size(px(13.)).child(div().child("Measurements (Projected geometry)")).child(h_flex().gap(px(8.)).child(labels).child(values))
+                .when_some(relation, |c, r| c.child(div().pt(px(18.)).child(format!("Relation: {r}"))))
         });
         // Live2 wake-1118 (mu1c.png, mu-mm-units.png): live's fixed order, the drawing's own unit suffixed "(Drawing)"
         // in its place; the box's tooltip "Units".
@@ -532,6 +561,31 @@ mod control_key_tests {
         assert_eq!(measure_unit_labels(true), ["Inches", "Millimeters (Drawing)", "Centimeters", "Feet", "Meters", "Yards"]);
     }
     use gpui_kit::Modifiers;
+
+    /// Live measure-1119 on a 100 x 60 mm plate with a Ø6 hole (view coordinates in meters): each pick set's rows,
+    /// values and relation.
+    #[test]
+    fn measure_rows_are_lives_for_each_pick_set() {
+        use super::{MeasurePick, PickedPoint, ViewId, measure_rows};
+        let pt = |x: f64, y: f64| PickedPoint { view: ViewId(1), p: [x * 1e-3, y * 1e-3], r: None };
+        let point = |x, y| MeasurePick::Point(pt(x, y));
+        let line = |a: (f64, f64), b: (f64, f64)| MeasurePick::Line(pt(a.0, a.1), pt(b.0, b.1));
+        let hole = MeasurePick::Circle { view: ViewId(1), center: [50e-3, 30e-3], radius: 3e-3 };
+        let shown = |picks: &[MeasurePick]| {
+            let (rows, rel) = measure_rows(picks);
+            (rows.into_iter().map(|(k, m)| format!("{k}: {:.2}", m * 1e3)).collect::<Vec<_>>(), rel)
+        };
+        let (top, bottom, left) = (line((0., 60.), (100., 60.)), line((0., 0.), (100., 0.)), line((0., 0.), (0., 60.)));
+        assert_eq!(shown(&[point(0., 60.)]), (vec![], None));
+        assert_eq!(shown(std::slice::from_ref(&hole)), (vec!["Diameter: 6.00".into(), "Length: 18.85".into()], Some("Circle")));
+        assert_eq!(shown(&[point(0., 60.), point(100., 60.)]), (vec!["Min distance: 100.00".into(), "dx: 100.00".into(), "dy: 0.00".into()], Some("Point-Point")));
+        assert_eq!(shown(&[point(0., 60.), bottom.clone()]), (vec!["Min distance: 60.00".into(), "Length: 100.00".into()], Some("Point-Line")));
+        assert_eq!(shown(&[bottom.clone(), point(0., 60.)]).1, Some("Point-Line"), "kinds in a fixed order, not the pick order");
+        assert_eq!(shown(&[top.clone(), bottom]), (vec!["Parallel distance: 60.00".into(), "Min distance: 60.00".into(), "Length: 200.00".into()], Some("Parallel lines")));
+        assert_eq!(shown(&[top, left]), (vec!["Min distance: 0.00".into(), "Length: 160.00".into()], Some("Perpendicular lines")));
+        let (rows, rel) = shown(&[point(80., 60.), hole]);
+        assert_eq!((rows[0].as_str(), rows[3].as_str(), rel), ("Min distance: 39.43", "Length: 18.85", Some("Point-Circle")));
+    }
 
     /// Live: Control+S / Control+M only; Cmd+S / Cmd+M (Super / Windows elsewhere) and Shift or Alt chords do nothing.
     #[test]
