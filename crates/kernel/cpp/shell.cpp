@@ -9992,7 +9992,7 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
         ShapeList first, rest = sel;
         first.Append(rest.First());
         rest.RemoveFirst();
-        if (!quick_boolean(0, first, rest, bop_parallel(), u, uh))
+        if (!quick_boolean(0, first, rest, bop_parallel(), u, uh, true))
           return false;
       }
       lap("pocket fuse");
@@ -10072,7 +10072,7 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     rest.RemoveFirst();
     TopoDS_Shape fu_out;
     HHist        fu_hist;
-    if (!quick_boolean(0, first, rest, bop_parallel(), fu_out, fu_hist))
+    if (!quick_boolean(0, first, rest, bop_parallel(), fu_out, fu_hist, true))
       return false;
     union_ = fu_out;
     hu = fu_hist;
