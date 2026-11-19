@@ -19,13 +19,15 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
 - Piece 3 (UI): strategy rows for subassemblies ("Create new instance" / "1 instance needs to be created", reference
   "<A>-Mirrored"), the node's row / menu / dialog ("Assembly to mirror", its own strategy).
 
-### Next: mass-property overrides (live2 12:42–12:45, behaviours "asm (11-19)", live/asm/mass-override-1119 c1–c5)
-- Part: Mass / Center of mass / Inertia overrides (part metadata {override, useOverride}; live stores inertia
-  transposed against its labels, Lxy at index 3). CoM override: inertia recomputed about the new centre (parallel
-  axis); Mass override: centre kept, inertia scaled by the mass ratio; the part's overrides carry into assemblies.
-- Assembly: only Mass overridable, inertia scaled by the ratio (ours only replaces the mass: fix), centre kept.
-- Our density trick (analysis::part_densities) can't carry CoM / inertia: per-part (mass, centre, inertia) instead.
-  Part Studio panel rows are psui's crate (part-studio-ui): coordinate.
+### In flight: mass-property overrides (live2 12:42–12:45, behaviours "asm (11-19)", live/asm/mass-override-1119 c1–c5)
+- Branch asm-mass (on 673142ab, queued): PartProperties `com_override` (m) / `inertia_override` (kg·m², column by column
+  as live: Lxy at index 3); `measure::with_overrides` (CoM: parallel axis to it; Mass: inertia × m / computed, centre
+  kept; Inertia replaces); Part Studio mass with one part measured; assemblies per part (`part_overrides`,
+  `assembly_mass_properties_with`); the assembly's Mass override now scales the inertia in assembly_mass_properties
+  (the dialog already did). part_set_properties `center_of_mass_override` / `inertia_override`; `null` now clears the
+  overrides (Args::get dropped nulls: mass_override null never cleared). e2e center_of_mass_and_inertia_overrides_….
+- Left: Part Studio panel's CoM / Inertia ☑ Override rows (psui's part-studio-ui: tell psui once landed); several
+  parts measured with CoM / inertia overrides (not captured).
 
 ### Others' items from today
 - core 12:4x: 90d254008 moved c2-surf-intro-* Derived 1's body +0.1 in x: correct (live's source index 4 has the
@@ -104,11 +106,11 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
 - Worktrees: asm (branch asm-fs; asm-live1119 holds the dropped keep rule), asm-feel / asm-cursor (landed), asm-docs.
 - Hosts (lead DECISIONS a67911bef): pick the lowest 1-min load of vibex7 / vibex8 / vibe2 (or the Mac slot) each time.
 - Private documents (hat8 / hat15 / dock on vibex7 ~/lead-private): mode-700 copies in ~/tmp/asm only, deleted after.
-- Live data: REQUESTS.md (times from `date -u`); live2 79ae5cdb-42a4-4025-b43a-da61a4f92ad7, live
+- Live data: REQUESTS.md (times from `date -u`); live2 d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1, live
   e8549719-ef9a-42de-960c-e24b29f142a6.
-- Agent ids: psui 4973e295-9e92-463f-a13f-2ec5258bc5f9, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, core
-  d30002ca-d013-4435-b7d9-7da9cb564cec, blend de66e481-56e2-4005-a5d3-9fa897ca5fde, qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b, bool 754a9804-feb1-4153-b32a-acf9b2a6d94d
-  (old core e8af89fe / blend 0672fa20 stopped: never message them).
+- Agent ids: psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, core
+  d30002ca-d013-4435-b7d9-7da9cb564cec, blend de66e481-56e2-4005-a5d3-9fa897ca5fde, qa 40e853dc-757f-4498-878f-00b41fd8af75, bool 754a9804-feb1-4153-b32a-acf9b2a6d94d
+  (stopped, never message: core e8af89fe, blend 0672fa20, psui 4973e295, qa 132756b3, live2 79ae5cdb); lead 818534eb-f6b1-4a00-bb48-ebf0f7cdbd8a.
 
 ## Assembly model suite (what it does)
 - T2 `parity_assemblies` (crates/ops/tests/parity.rs) over ~/parity/models/asm-* (NOSHAPE_PARITY_ASSEMBLIES).
