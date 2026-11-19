@@ -67,12 +67,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
 6. Not to build: 3D Sketch, Fault analysis. Cleanup: vibex7 ~/tmp/psui/priv/dock.noshape when the tab work is over;
    vibe2 ~/tmp/psui/hv binaries. Branch psui-backup-1119 (all landed; delete).
 
-## Agents (lead 11-19 21:xx; use only these ids)
+## Agents
 
-- lead 818534eb-f6b1-4a00-bb48-ebf0f7cdbd8a; core 08a98761-3bbe-47ce-a91a-32b208f5c6b2; blend 459f6c19-c460-4ebf-96ca-bf92455f2e1e;
-  bool abdebc8b-6b39-4794-8390-eb02d6fa37e6 (bool2 merged in); live 349fe81d-db78-4931-8032-6dc3edc5d558 (live2 merged in);
-  studios 91339202-41f1-4465-91f4-65ccd26ea1b1; dx 6cfc89bd-1196-43ef-9225-0014546fee1e; qa ac50e7f2-4677-4cab-a57a-fd068a0c07bf;
-  asm d8d597e0-675c-497b-a804-544ceab99bbd; skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6. Context cap 200k (user 11-19).
+- Agent ids: ONLY in /root/lead-scratch/roster.md (lead rule 11-19); read it before every message_agent, never copy ids
+  into notes. Context cap 200k (user 11-19).
 - P0 sketch-vertical-key (lead after compaction: "match live's default view orientation, re-baseline"): checked 21:1x:
   ours already opens in live's start view, Camera::default = Trimetric (-0.433, 0.75, -0.5) = live's recorded start
   camera direction (every live take with a camera); live's Isometric menu item is the true (-1, 1, -1)/√3, as ours

@@ -6847,3 +6847,31 @@ fn a_lines_vertical_reach_is_measured_on_the_screen_in_the_app(cx: &mut TestAppC
         cx.update_window(window, |_, w, _| w.remove_window()).unwrap();
     }
 }
+
+/// qa STALE-SKETCH-HOVER (b): a line's end lit by its reach (no GPU pick there) goes dark with the one move that takes
+/// the pointer away into empty space, not a move later.
+#[gpui::test]
+fn a_reach_lit_end_goes_dark_with_the_move_away(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "stale-end-hover", Tool::Line);
+    click(cx, window, &view, (300.0, 200.0));
+    click(cx, window, &view, (400.0, 200.0));
+    keys(cx, window, &["escape"]);
+    let origin = cx.update(|cx| view.read(cx).viewport.read(cx).origin());
+    let real_move = |cx: &mut TestAppContext, x: f32, y: f32| {
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(origin + gpui_kit::point(px(x), px(y)), None, Modifiers::default());
+        draw(cx, window);
+    };
+    real_move(cx, 403.0, 202.0);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::Hover(None), w, cx);
+        });
+    })
+    .unwrap();
+    draw(cx, window);
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch.as_ref().and_then(|ed| ed.hover));
+    assert!(lit(cx).is_some(), "the end lit within its reach");
+    real_move(cx, 600.0, 350.0);
+    assert_eq!(lit(cx), None, "dark after the one move away");
+}
