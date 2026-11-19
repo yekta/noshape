@@ -1,37 +1,42 @@
 # Blends (agent "blend"): current state
 
-Updated 11-19 13:40 UTC (blend thread 2fc420a3). History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-19 17:25 UTC (blend thread 2fc420a3). History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-19 13:40)
+## Now (11-19 17:25)
 
-- Queue (lead 11-19): knifehandle Fillet 2 time box to 15:00 (done: 11 faces), land gated work, suspension LCA
-  Fillet 3 face-level splice in landable steps, core's c2-surf-workshop-mutualtrim Fillet 1 (parked). Hosts by load
-  (bin/pickhost); userdocs only vibex7. Units via `systemd-run -E HOME=/root -E PATH=$PATH`. No std::thread joins on
+- Queue (lead 11-19): suspension LCA Fillet 3 face-level splice in landable steps; core's mutualtrim Fillet 1
+  (parked). Hosts by load (bin/pickhost), not vibex7 while it is loaded (lead 14:00); userdocs only vibex7, one CLI run
+  there at a time (bin/ud-gate.sh waits). Units via `systemd-run -E HOME=/root -E PATH=$PATH`. No std::thread joins on
   rayon workers (dx f1e0c74ef).
-- Knifehandle Fillet 3 (b62503313 + inside-out decline b56aeb170): suite/T1/clippy/userdocs clean; QUEUED b56aeb17.
-- Knifehandle Fillet 2 (blend12 c87fec635 on b56aeb170; T1 a_conic_round_of_a_blades_long_top_edges_as_live): 11/27/18
-  as live. The tip's small rounds run on over the free-form sides (extended, shorter steps where the ball leaves them:
-  0.653 mm2, live 0.595, our input's tip is Sweep 2's 2.045 vs 1.850 mm2), the direct build retried on the refaced
-  part (touch curves by points' feet where GeomProjLib fails), tools fused when the joint Boolean fails, and at x 15.4
-  the last section's contacts moved into the square end plane (end face 90.374, live 90.377; a carried-past tool broke
-  the direct build). 30.46 mm3 off vs live 31.026 (band 0.6). Gate running: blend-khf2gate (bin/khf2-gate.sh ->
-  logs/khf2-t1.out, suite-khf2.cmp, g13-khf2.log, ud-khf2.log). Probes: blend-scratch/khf2-with-probes.patch.
-- Isaac chamfers (blend11 fa9c2a100 + 6c09e08c6): userdocs found cli-draft-hang Chamfer 4 failing (planar concave
-  check's error propagated); now falls back to OCCT's. Re-gate blend-isaac2 (logs/isaac-t1.out, ud-isaac2.log; the hat
-  docs too: the first run stopped at a stale dock path). crash957 Chamfer 3 builds now where main fails (no live).
-  Suite: only main's dogbone fix differs.
-- 805e29 exact edges (blend2 61320d427): its T1 fails (16 B-spline edges, between faces OCCT already made analytic:
-  analytic_blend_edges only ran after a face conversion). Fix in progress (uncommitted, ZZ_ANA trace, bin/805t1.sh).
-- Suspension splice (blend13; probe crash_inputs::zz_lca_splice, bin/splice.sh): the round run on rebuilt as one face
-  with OCCT's round (its edge A..D replaced by the contact curve + D..B): 3890.942 mm2 = live. 71 faces vs live 70:
-  the tube piece (45.5 mm2) should join the tube face the same way (3 wires; make_face_on now takes a compound of
-  wires, uncommitted; Bnd_Box void so far). Edge tolerance 57 um on the contact edges (the pipe's approximated canal).
-  Then: model code (find OCCT's corner patch by its 4 neighbours), T1 (158.817 canal, 3890.94 round, -131.3 mm3).
+- Queued: isaac chamfers 22572486 (rebased, Chamfer 2 test appended; crash957 Chamfer 3 now builds, main failed);
+  fillet / chamfer kernel failures in Onshape's words e3035de9 (qa compat alert: knifehandle Fillet 2's raw "arc through
+  3 points failed"; detail.rs in_onshape_words at fillet() / chamfer(); test detail::tests::a_kernel_failure...).
+- Knifehandle Fillet 3 LANDED 5a26a0d6 (with the inside-out decline).
+- Knifehandle Fillet 2 PARKED (time box 15:00; blend12 c87fec635, probes blend-scratch/khf2-with-probes.patch). On its
+  old base (8bb9824b9) it built live's 11/27/18: (1) x 15.4 end: the last ball section's feet lay a few um off the
+  square end plane and left 0.065 mm2 wedge faces; a tool carried past the plane instead broke the direct build (the
+  plane got cut curves); the end section's contacts moved into the plane fixed it (end face 90.374, live 90.377).
+  (2) Tip: the tip edge was dropped as "along the boundary" (snap 0.052 mm): within = min(snap, 2 % of the chord); the
+  small rounds' run-on stopped after 2 steps ("no rolling ball fits") leaving the tool's cap inside (0.008 mm2 faces):
+  shorter steps toward where the ball leaves the faces; section-size check on the edge's own sections only. 0.653 mm2
+  small rounds vs live 0.595 (our Sweep 2 tip). After rebasing on main (welding's run-on direct build 92c8595b0 and
+  c6905d82d's faster closed_run_on) both T1s fail: Fillet 3 6/14/10 (my direct retry on the refaced part skips main's
+  merge of the refaced faces), Fillet 2 13/41/30 (that retry now builds an invalid solid, the Boolean leaves 13 faces).
+  Next: retry the direct build only where the Boolean fails, merge the refaced faces after it, check the new run-on
+  pieces (bin/khboth.sh -> logs/khboth.out).
+- 805e29 exact edges (blend2, uncommitted on 61320d427): analytic_blend_edges now also runs when no face was converted
+  (the edges between OCCT's own cylinders); all 16 convert (8 lines, 8 circles, lengths equal) but the reshaped solid is
+  invalid: one cylinder face's area negative (ZZ_ANA trace, bin/805t1.sh). Next: that face's pcurves / orientation.
+- Suspension splice (blend13): step 2 face_with_edge_replaced (kernel: a face with one edge replaced by a run between
+  its ends, other wires kept, cusps fixed; test core::a_face_with_an_edge_replaced...) gating (bin/fwer-gate.sh). With
+  it the probe (crash_inputs::zz_lca_splice, ZZ_OWN/ZZ_ONE) splices one corner face by face: 70 faces as live, valid,
+  round 3890.942 mm2 (= live), tube one face 32914.412, canal 158.807 (live 158.817), -130.38 mm3 (live -131.3).
+  Then step 3: model code (find OCCT's corner patch by its 4 neighbours, all 8 corners) + T1 (70/156/86).
 - Mutualtrim Fillet 1 (blend4, parked): split_on turns closed touch loops into zero-area faces.
 - Agent ids changed 11-19: studios 31c9b9ba-e7f8-40f7-85cb-242bab86dbe6, dx aad5e825-f86c-432d-b4ac-3aab402e7052, qa
   40e853dc-757f-4498-878f-00b41fd8af75, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, live2
