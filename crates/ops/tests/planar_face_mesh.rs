@@ -415,14 +415,14 @@ fn corpus_triangle_counts_against_brepmesh() {
                 for (setting, (lin, ang)) in [display, medium].into_iter().enumerate() {
                     // (Each on a fresh copy: BRepMesh keeps a triangulation already on the shape when it is fine enough.)
                     let run = |rust: bool| {
-                        k::set_rust_mesh_everywhere(rust);
+                        k::set_rust_mesh(rust);
                         let copy = k::transform(&b.shape, &k::Transform::Translate(DVec3::ZERO), true).ok()?.shape;
                         let t0 = std::time::Instant::now();
                         let t = k::tessellate(&copy, lin, ang, true).ok();
                         Some((t?, t0.elapsed().as_secs_f64() * 1e3))
                     };
                     let (Some((ours, ours_ms)), Some((occt, occt_ms))) = (run(true), run(false)) else { continue };
-                    k::set_rust_mesh_everywhere(true);
+                    k::set_rust_mesh(true);
                     totals[setting].0 += ours.indices.len() / 3;
                     totals[setting].1 += occt.indices.len() / 3;
                     totals[setting].2 += ours_ms;

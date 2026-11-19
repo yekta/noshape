@@ -22,14 +22,17 @@ fn live_30_features_look_the_same_meshed_by_noshape_and_by_brepmesh() {
     std::fs::copy(&path, &copy).unwrap();
     let s = noshape_ops::session::Session::open(&copy).unwrap();
     let ps = s.doc.tabs.iter().find_map(|t| if let TabContent::PartStudio(ps) = &t.content { Some(ps.clone()) } else { None }).unwrap();
-    // Each way from scratch (new shapes: no mesh cached from the other).
-    let regen = |rust: bool| {
-        noshape_kernel::set_rust_mesh_everywhere(rust);
-        let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &s.doc.settings.units, &RegenOptions::default());
-        noshape_kernel::set_rust_mesh_everywhere(true);
-        r
-    };
-    let (ours, occt) = (regen(true), regen(false));
+    let ours = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &s.doc.settings.units, &RegenOptions::default());
+    // BRepMesh's meshes of the same bodies, made on this thread alone (switching the mesher for every thread handed
+    // the other tests of this binary BRepMesh meshes while it ran), each of a fresh copy (no mesh cached from ours).
+    let mut occt = ours.display.clone();
+    noshape_kernel::set_rust_mesh(false);
+    for b in &mut occt.bodies {
+        let Some(body) = (&ours.context.bodies).into_iter().find(|c| c.id == b.id) else { continue };
+        let copy = noshape_kernel::transform(&body.shape, &noshape_kernel::Transform::Translate(DVec3::ZERO), true).unwrap().shape;
+        b.mesh = std::sync::Arc::new(noshape_model::regen::tessellate_shape(&copy, 1.0).expect("a BRepMesh mesh"));
+    }
+    noshape_kernel::set_rust_mesh(true);
     let _ = std::fs::remove_dir_all(&tmp);
     let mut ctx = Ctx::new();
     // Rendering needs a GPU adapter; CI's Linux runner has none.
@@ -51,7 +54,7 @@ fn live_30_features_look_the_same_meshed_by_noshape_and_by_brepmesh() {
         camera.fit_box(lo, hi, w as f64 / h as f64);
         let mut frames = Vec::new();
         let empty = noshape_model::display::StudioDisplay::default();
-        for (way, d) in [("ours", &ours.display), ("brepmesh", &occt.display), ("background", &empty)] {
+        for (way, d) in [("ours", &ours.display), ("brepmesh", &occt), ("background", &empty)] {
             let built = builder::build(d, &opts, &mut off.cache, &up);
             let f = off.renderer.render(RenderParams { scene: &built.scene, camera: &camera, width: w, height: h, device_pixel_ratio: 1.0, style: &style, pick: false }).unwrap();
             if let Some(dir) = &out {
