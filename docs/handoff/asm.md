@@ -41,9 +41,9 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
 - core 12:4x: 90d254008 moved c2-surf-intro-* Derived 1's body +0.1 in x: correct (live's source index 4 has the
   Title text on the x=0 face, −25.4..2.54). Our Derived 1 imports Instructions (JHD) instead of live's Car (JWD):
   the source's car isn't built. Loft 1's profile (INTERSECT of Projected curve 2's own extrude1 / extrude2 bodies,
-  a wire) now maps; Loft 2 / 4 and Fillet 1 too (local commit after df6a2c16: loft CAP_EDGE, mirror_copy). Left:
-  Loft 3 (JZV: COPY of an edge given by vertices of SWEPT_FACE INTERSECTs of Projected curve 1's extrude1 / extrude2,
-  ORDER), then whether the part map finds Car (JWD). Scores unchanged (5/8, 5/12, 5/13, 5/14). Repro: vibex8
+  a wire), Lofts 2-4 and Fillet 1 map now (6bca92a2 queued + local Loft 3 commit): the source translates fully.
+  Parked (lead 11-19 15:00, routed to core): live's Loft 4 (surface ADD) closes Car into a 5-face SOLID, ours stays
+  "Surface 1" (4 faces), so Derived 1 still takes Instructions (JWD resolves to it with no Car). Repro: vibex8
   NOSHAPE_PARITY_ONLY=c2-surf-intro-offset (7 s).
 
 ### In flight: HEAVY-ASM-SOFTWARE-FRAME, LOD side (branch asm-lod, 97b431e3e, not landed)
