@@ -44,8 +44,8 @@ fn view_of(s: &Option<Sel>) -> Option<noshape_model::drawing::ViewId> {
     }
 }
 
-/// Live2 feel/drawing.json D1: in Select a view lights from 14 px (zoom A) / 16 px (zoom B) outside its geometry, a
-/// reach constant in sheet mm (ours 3.6 mm), and a click there takes it; beyond it nothing lights and a click takes
+/// Live reach-px-1119 (D1 re-read from full-page shots): in Select a view lights and takes a click out to 13 px outside
+/// its geometry, not at 14, at the fit (a reach in sheet mm, ours 3.45); beyond it nothing lights and a click takes
 /// nothing.
 #[gpui::test]
 fn a_view_lights_and_is_taken_within_its_reach_in_sheet_mm(cx: &mut TestAppContext) {
@@ -64,7 +64,7 @@ fn a_view_lights_and_is_taken_within_its_reach_in_sheet_mm(cx: &mut TestAppConte
             e.zoom
         }));
         draw(cx, window);
-        for (px_off, lights) in [(-2.0, true), (2.0, false)] {
+        for (px_off, lights) in [(-0.5, true), (0.5, false)] {
             let s = [x, pl.max[1] + reach + px_off / zoom];
             let lit = lit_at(cx, window, &editor, s);
             assert_eq!(view_of(&lit) == Some(pl.id), lights, "zoom {zoom}: {px_off} px past the reach, lit {lit:?}");

@@ -23,8 +23,9 @@ pub const CENTER_SNAP_REACH_PX: f64 = 10.0;
 pub const CENTERLINE_SNAP_REACH_PX: f64 = 9.5;
 
 /// How far outside its geometry a view lights and takes a click in Select, in sheet mm (it scales with the zoom;
-/// live2 feel/drawing.json D1: from 14 px at 3.93 px/mm, not 16).
-pub const VIEW_REACH_MM: f64 = 3.6;
+/// live reach-px-1119 from full-page shots: lit and taken at 13 px, not 14, at the fit's ~3.93 px/mm (D1's 14–16 was
+/// read from clip shots that miss the hover)).
+pub const VIEW_REACH_MM: f64 = 3.45;
 
 /// The tools' pick reach (screen px): Graebert's PICKBOX, 7 at DPR 1 (live drawing-sysvars.json; getIntersected uses
 /// it for every tool).
