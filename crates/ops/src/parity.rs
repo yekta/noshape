@@ -5241,9 +5241,9 @@ impl<'a> Translator<'a> {
         // (c2-loft-guide-curves-wave-washer's Sketch 4: each rectangle's far corner 63.5 mm off JHk; alone, the
         // corner crossed its rectangle and the dimensions rebuilt it on the anchor's other side).
         let mut missed = Default::default();
-        self.constraints(k, &oid, &id, f, false, &mut missed, problems);
+        self.constraints(k, &oid, &id, f, false, &mut missed);
         self.dimensions(k, &oid, &id, f, problems);
-        self.constraints(k, &oid, &id, f, true, &mut missed, problems);
+        self.constraints(k, &oid, &id, f, true, &mut missed);
         if !missed.is_empty() {
             problems.push(format!("constraints left to the solved geometry: {}", missed.iter().map(|(k, n)| format!("{n} {k}")).collect::<Vec<_>>().join(", ")));
         }
@@ -5720,7 +5720,7 @@ impl<'a> Translator<'a> {
     /// change a dimension). Coincidences our inference merged into one point
     /// are skipped; the rest that fail or have no counterpart are counted.
     /// The sketch's constraints but its Coincidents to model geometry (`anchors` false), or only those (true).
-    fn constraints(&mut self, k: usize, oid: &str, id: &str, f: &Value, anchors: bool, missed: &mut std::collections::BTreeMap<String, usize>, problems: &mut Vec<String>) {
+    fn constraints(&mut self, k: usize, oid: &str, id: &str, f: &Value, anchors: bool, missed: &mut std::collections::BTreeMap<String, usize>) {
         // The curves live's Intersection made that ours made too (by Use with `intersect`).
         let sections: Vec<&str> = f["constraints"]
             .as_array()
@@ -5821,7 +5821,7 @@ impl<'a> Translator<'a> {
                 }
                 "RHO" => {
                     if let Err(e) = self.conic_rho(oid, id, c) {
-                        problems.push(format!("RHO on {}: {e}", c["entityId"].as_str().unwrap_or("?")));
+                        *missed.entry(format!("{ty} ({e})")).or_default() += 1;
                     }
                     continue;
                 }
