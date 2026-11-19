@@ -419,6 +419,16 @@ impl VariableStudioView {
         }
         let n = self.studio(cx).map_or(0, |s| s.variables.len());
         let in_add_row = self.inputs.get("new").is_some_and(|(st, _)| st.read(cx).focus_handle(cx).is_focused(window));
+        // A name typed in the add row: Tab adds it as Enter does, the keyboard going to the next empty Name (live2
+        // session-studio-1119 step 2; qa: ours kept the text and "20" made "depth20").
+        if in_add_row
+            && !back
+            && let Some((st, _)) = self.inputs.get("new").cloned()
+            && !st.read(cx).value().trim().is_empty()
+        {
+            st.update(cx, |_, cx| cx.emit(InputEvent::PressEnter { secondary: false, shift: false }));
+            return;
+        }
         let from = if in_add_row {
             Some("new".to_string())
         } else if self.cell_editing.is_some() {

@@ -167,3 +167,16 @@ fn enter_on_a_failing_value_keeps_its_cell_selected(cx: &mut TestAppContext) {
     assert_eq!(enter_value(cx, "1 +").as_deref(), Some("e0"), "the failing cell stays selected");
     assert_eq!(enter_value(cx, "12 mm").as_deref(), Some("e1"), "a good value moves down a row");
 }
+
+/// Live2 session-studio-1119 (step 2): a name typed in the add row then Tab adds the variable (Length, 0) as Enter does
+/// and the keyboard stays in the next empty Name, so the next typing starts a new name (ours kept "depth" and made
+/// "depth20").
+#[gpui::test]
+fn tab_after_a_new_name_adds_the_variable(cx: &mut TestAppContext) {
+    let (window, view) = studio(cx, "tab-adds");
+    cx.update(super::bind_keys);
+    keys(cx, window, &["d", "tab"]);
+    assert_eq!(names(cx, &view), ["w", "d"], "Tab added d");
+    keys(cx, window, &["h", "enter"]);
+    assert_eq!(names(cx, &view), ["w", "d", "h"], "the next typing was a new name");
+}
