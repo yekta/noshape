@@ -115,6 +115,7 @@ pub fn tessellate_shape(shape: &noshape_kernel::Shape, quality: f64) -> Option<M
             indices: t.indices,
             vertices: keep_shown(t.vertices, &shown_vertices(shape)),
             mesh_lines: Vec::new(),
+            proxy_memo: Default::default(),
         }
         .with_mesh_lines(shape),
     )
@@ -196,6 +197,7 @@ fn tessellate_body(shape: &noshape_kernel::Shape, name: &str, quality: f64, opts
                 indices: t.indices,
                 vertices: keep_shown(t.vertices, &shown),
                 mesh_lines: Vec::new(),
+                proxy_memo: Default::default(),
             }
             .with_mesh_lines(shape),
         ),

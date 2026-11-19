@@ -939,6 +939,8 @@ impl AssemblyView {
         let self_tab = self.tab;
         // A big assembly (the last result's, or the cached one's): its bodies get their coarser levels too.
         let big = big_scene(&self.result);
+        // On a software rasteriser a big scene's dense bodies draw their proxies: made here, off the UI thread.
+        let proxies = big && self.gpu.is_software();
         self.eval_seq += 1;
         let seq = self.eval_seq;
         self.eval_task = Some(cx.spawn_in(window, async move |this, cx| {
@@ -956,6 +958,9 @@ impl AssemblyView {
                     FIRST.call_once(|| noshape_render::perf::milestone("open: first regen started"));
                     let t = std::time::Instant::now();
                     let result = ev.evaluate(&doc, &asm, &opts, explode);
+                    if proxies {
+                        result.occurrences.iter().filter_map(|o| o.coarser.first()).for_each(|m| m.warm_proxy());
+                    }
                     noshape_render::perf::record("a.eval", t.elapsed());
                     let tc = std::time::Instant::now();
                     let tabs = doc.ordered_tabs().into_iter().filter(|t| matches!(t.content, TabContent::PartStudio(_))).map(|t| (t.id, ConfigValues::default())).collect();
@@ -1120,6 +1125,7 @@ impl AssemblyView {
         o.xray_tops = self.placing.iter().flatten().copied().collect();
         o.tangent_edges = self.ui.tangent_edges;
         o.graphics = self.ui.graphics;
+        o.software = self.gpu.is_software();
         // Interference detection: everything see-through around the red
         // overlaps, still pickable for Instances to analyze (live 736).
         if self.interference_shown() && o.isolate.is_none() {

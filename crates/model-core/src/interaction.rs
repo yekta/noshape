@@ -1407,6 +1407,7 @@ mod tests {
             edges: vec![vec![[-1.0, 0.0, 1.0], [1.0, 0.0, 1.0]]],
             vertices: vec![],
             mesh_lines: vec![],
+            proxy_memo: Default::default(),
         };
         let face = |s: u32| Reference::Face(TopoName::face(FeatureId(1), Role::New(s)));
         let edge = Reference::Edge(TopoName::edge(std::sync::Arc::new(TopoName::face(FeatureId(1), Role::New(1))), std::sync::Arc::new(TopoName::face(FeatureId(1), Role::New(2))), 0));
@@ -1449,6 +1450,7 @@ mod tests {
             edges: vec![vec![[-1.0, 1.0, 0.0], [1.0, 1.0, 0.0]]],
             vertices: vec![],
             mesh_lines: vec![],
+            proxy_memo: Default::default(),
         };
         let name = |s: u32| std::sync::Arc::new(TopoName::face(FeatureId(1), Role::New(s)));
         let face = |s: u32| Reference::Face((*name(s)).clone());

@@ -15,6 +15,13 @@ pub enum BodyKind {
     Point,
 }
 
+/// A mesh with more triangles than this gets a [`MeshBuffers::proxy`] (asm-xdev-subs: one 10 482-face part is 72 k of
+/// the scene's 462 k triangles at Coarse).
+pub const PROXY_MIN_TRIANGLES: usize = 4000;
+/// [`MeshBuffers::proxy`]'s cells along the bounding-box diagonal: a vertex moves by up to half a cell, 1.5 px on a
+/// part 600 px across.
+pub const PROXY_DIVISIONS: f32 = 200.0;
+
 /// Triangle mesh of a body; faces occupy contiguous index ranges.
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct MeshBuffers {
@@ -30,6 +37,9 @@ pub struct MeshBuffers {
     /// draws every triangle edge of a mesh part as a thin dark-grey line, at
     /// every zoom (live G35).
     pub mesh_lines: Vec<[f32; 3]>,
+    /// [`Self::proxy`], made once.
+    #[serde(skip)]
+    pub proxy_memo: std::sync::OnceLock<Option<Arc<MeshBuffers>>>,
 }
 
 impl MeshBuffers {
@@ -60,6 +70,116 @@ impl MeshBuffers {
             }
         }
         self
+    }
+
+    /// The software rasteriser's stand-in for a dense mesh (more than [`PROXY_MIN_TRIANGLES`]): [`Self::clustered`] on
+    /// [`PROXY_DIVISIONS`] cells, when that at least halves its triangles; made once (an assembly's evaluation makes
+    /// it off the UI thread, [`Self::warm_proxy`]).
+    pub fn proxy(&self) -> Option<Arc<MeshBuffers>> {
+        self.proxy_memo
+            .get_or_init(|| {
+                let n = self.indices.len() / 3;
+                if n <= PROXY_MIN_TRIANGLES {
+                    return None;
+                }
+                let c = self.clustered(PROXY_DIVISIONS);
+                (c.indices.len() / 3 * 2 <= n).then(|| Arc::new(c))
+            })
+            .clone()
+    }
+
+    /// Makes [`Self::proxy`] now (a background thread's job before the scene is built).
+    pub fn warm_proxy(&self) {
+        let _ = self.proxy();
+    }
+
+    /// The mesh with its vertices merged on a grid of `divisions` cells along the bounding-box diagonal (vertex
+    /// clustering): a body with many small faces (asm-xdev-subs' 10 482-face part, 72 k triangles at Coarse) drawn
+    /// for a software rasteriser. Each face keeps its own range (picks stay), its triangles over the merged vertices
+    /// (each a cell's mean, so faces still meet) less those that collapse, with normals averaged per face; each edge
+    /// keeps its place (picks stay), its points merged likewise; the B-rep vertices stay.
+    pub fn clustered(&self, divisions: f32) -> MeshBuffers {
+        use std::collections::HashMap;
+        let (mut lo, mut hi) = ([f32::MAX; 3], [f32::MIN; 3]);
+        for p in &self.positions {
+            for (i, v) in p.iter().enumerate() {
+                lo[i] = lo[i].min(*v);
+                hi[i] = hi[i].max(*v);
+            }
+        }
+        let diag = (0..3).map(|i| (hi[i] - lo[i]).max(0.0).powi(2)).sum::<f32>().sqrt();
+        if self.positions.is_empty() || diag <= 0.0 || divisions <= 0.0 {
+            return self.clone();
+        }
+        let cell = diag / divisions;
+        let key = |p: [f32; 3]| [0, 1, 2].map(|i| ((p[i] - lo[i]) / cell).floor() as i32);
+        // Each cell's id and the mean of its points (mesh vertices and edge points alike, so edges stay on faces).
+        let mut cells: HashMap<[i32; 3], u32> = HashMap::new();
+        let mut sums: Vec<([f64; 3], u32)> = Vec::new();
+        let cell_of = |p: [f32; 3], cells: &mut HashMap<[i32; 3], u32>, sums: &mut Vec<([f64; 3], u32)>| {
+            let id = *cells.entry(key(p)).or_insert_with(|| {
+                sums.push(([0.0; 3], 0));
+                sums.len() as u32 - 1
+            });
+            let s = &mut sums[id as usize];
+            for (sum, v) in s.0.iter_mut().zip(p) {
+                *sum += f64::from(v);
+            }
+            s.1 += 1;
+            id
+        };
+        let vertex_cells: Vec<u32> = self.positions.iter().map(|p| cell_of(*p, &mut cells, &mut sums)).collect();
+        let edge_cells: Vec<Vec<u32>> = self.edges.iter().map(|e| e.iter().map(|p| cell_of(*p, &mut cells, &mut sums)).collect()).collect();
+        let mean = |c: u32| {
+            let (s, n) = sums[c as usize];
+            [0, 1, 2].map(|i| (s[i] / f64::from(n.max(1))) as f32)
+        };
+        let mut out = MeshBuffers { vertices: self.vertices.clone(), ..Default::default() };
+        let mut normal_sums: Vec<glam::Vec3> = Vec::new();
+        for &(first, count) in &self.face_ranges {
+            let start = out.indices.len() as u32;
+            // This face's vertex for each cell, and the triangles kept.
+            let mut own: HashMap<u32, u32> = HashMap::new();
+            let mut seen = std::collections::HashSet::new();
+            let tris = self.indices.get(first as usize..(first + count) as usize).unwrap_or(&[]);
+            for t in tris.as_chunks::<3>().0 {
+                let c = t.map(|v| vertex_cells.get(v as usize).copied().unwrap_or(0));
+                if c[0] == c[1] || c[1] == c[2] || c[0] == c[2] {
+                    continue;
+                }
+                let mut sorted = c;
+                sorted.sort_unstable();
+                if !seen.insert(sorted) {
+                    continue;
+                }
+                for (k, &v) in t.iter().enumerate() {
+                    let ix = *own.entry(c[k]).or_insert_with(|| {
+                        out.positions.push(mean(c[k]));
+                        normal_sums.push(glam::Vec3::ZERO);
+                        out.positions.len() as u32 - 1
+                    });
+                    normal_sums[ix as usize] += glam::Vec3::from(self.normals.get(v as usize).copied().unwrap_or([0.0, 0.0, 1.0]));
+                    out.indices.push(ix);
+                }
+            }
+            out.face_ranges.push((start, out.indices.len() as u32 - start));
+        }
+        out.normals = normal_sums.iter().map(|n| n.try_normalize().unwrap_or(glam::Vec3::Z).to_array()).collect();
+        out.edges = edge_cells
+            .iter()
+            .map(|cs| {
+                let mut pl: Vec<[f32; 3]> = Vec::new();
+                let mut last = None;
+                for &c in cs {
+                    if last != Some(c) {
+                        pl.push(mean(c));
+                        last = Some(c);
+                    }
+                }
+                if pl.len() < 2 { Vec::new() } else { pl }
+            })
+            .collect();
+        out
     }
 
     /// Per edge: whether its two faces meet tangentially (Onshape's
@@ -554,6 +674,7 @@ impl MeshBuffers {
             edges: self.edges.iter().map(|pl| pl.iter().map(point).collect()).collect(),
             vertices: self.vertices.iter().map(point).collect(),
             mesh_lines: self.mesh_lines.iter().map(point).collect(),
+            proxy_memo: Default::default(),
         }
     }
 }
@@ -611,6 +732,74 @@ impl StudioDisplay {
 mod tests {
     use super::*;
 
+    /// A 10 × 10 plate's top as 100 × 100 squares (20 000 triangles) and its x = 0 side as one quad, the shared
+    /// edge in 100 segments: clustered on 20 cells along the diagonal, the top keeps its area and normal in far fewer
+    /// triangles, the side its two, and both faces and the edge keep their places.
+    #[test]
+    fn a_dense_face_clusters_to_few_triangles_and_keeps_its_place() {
+        let n = 100usize;
+        let mut m = MeshBuffers::default();
+        for j in 0..=n {
+            for i in 0..=n {
+                m.positions.push([i as f32 * 0.1, j as f32 * 0.1, 0.0]);
+                m.normals.push([0.0, 0.0, 1.0]);
+            }
+        }
+        let at = |i: usize, j: usize| (j * (n + 1) + i) as u32;
+        for j in 0..n {
+            for i in 0..n {
+                m.indices.extend([at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j), at(i + 1, j + 1), at(i, j + 1)]);
+            }
+        }
+        m.face_ranges.push((0, m.indices.len() as u32));
+        let base = m.positions.len() as u32;
+        m.positions.extend([[0.0, 0.0, 0.0], [0.0, 10.0, 0.0], [0.0, 10.0, -1.0], [0.0, 0.0, -1.0]]);
+        m.normals.extend([[-1.0, 0.0, 0.0]; 4]);
+        let start = m.indices.len() as u32;
+        m.indices.extend([base, base + 1, base + 2, base, base + 2, base + 3]);
+        m.face_ranges.push((start, 6));
+        m.edges.push((0..=n).map(|j| [0.0, j as f32 * 0.1, 0.0]).collect());
+        m.vertices = vec![[0.0, 0.0, 0.0], [0.0, 10.0, 0.0]];
+        let c = m.clustered(20.0);
+        let tris = |f: usize| c.face_ranges[f].1 / 3;
+        assert_eq!(c.face_ranges.len(), 2, "both faces keep their place");
+        assert!(tris(0) > 0 && tris(0) < 2_000, "the top in {} triangles", tris(0));
+        assert_eq!(tris(1), 2, "the side keeps its quad");
+        let area: f32 = c.indices[..c.face_ranges[0].1 as usize]
+            .chunks(3)
+            .map(|t| {
+                let p = |k: usize| glam::Vec3::from(c.positions[t[k] as usize]);
+                (p(1) - p(0)).cross(p(2) - p(0)).length() * 0.5
+            })
+            .sum();
+        // (Its rim moves in by up to half a cell, 0.35 here: cells' means lie inside.)
+        assert!(area > 85.0 && area <= 100.0 + 1e-3, "the top's area {area}");
+        let top: Vec<u32> = c.indices[..c.face_ranges[0].1 as usize].to_vec();
+        assert!(top.iter().all(|&v| c.normals[v as usize][2] > 0.999), "the top still faces +z");
+        assert_eq!(c.edges.len(), 1);
+        assert!(c.edges[0].len() >= 2 && c.edges[0].len() < 40, "the edge in {} points", c.edges[0].len());
+        assert_eq!(c.vertices, m.vertices);
+        // On 200 cells its 0.1 squares are larger than a cell: no proxy. A 400 × 400 grid's (0.025 squares) has one.
+        assert!(m.proxy().is_none(), "no proxy where clustering halves nothing");
+        let mut dense = MeshBuffers::default();
+        let k = 400usize;
+        for j in 0..=k {
+            for i in 0..=k {
+                dense.positions.push([i as f32 * 0.025, j as f32 * 0.025, 0.0]);
+                dense.normals.push([0.0, 0.0, 1.0]);
+            }
+        }
+        let at = |i: usize, j: usize| (j * (k + 1) + i) as u32;
+        for j in 0..k {
+            for i in 0..k {
+                dense.indices.extend([at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j), at(i + 1, j + 1), at(i, j + 1)]);
+            }
+        }
+        dense.face_ranges.push((0, dense.indices.len() as u32));
+        let p = dense.proxy().expect("a 320 000-triangle grid has a proxy");
+        assert!(p.indices.len() * 2 <= dense.indices.len() && Arc::ptr_eq(&p, &dense.proxy().unwrap()), "{} of {}", p.indices.len() / 3, dense.indices.len() / 3);
+    }
+
     /// Two quads sharing the edge x = 0: flat (tangent) or folded (sharp).
     fn two_faces(fold: bool) -> MeshBuffers {
         let n2: [f32; 3] = if fold { [1.0, 0.0, 0.0] } else { [0.0, 0.0, 1.0] };
@@ -623,6 +812,7 @@ mod tests {
             edges: vec![vec![[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]], vec![[-1.0, 0.0, 0.0], [-1.0, 1.0, 0.0]]],
             vertices: vec![],
             mesh_lines: vec![],
+            proxy_memo: Default::default(),
         }
     }
 

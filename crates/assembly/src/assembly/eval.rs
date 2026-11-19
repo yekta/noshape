@@ -1314,6 +1314,7 @@ fn mirror_mesh(m: &MeshBuffers, p: DVec3, n: DVec3) -> MeshBuffers {
         edges: m.edges.iter().map(|pl| pl.iter().map(rp).collect()).collect(),
         vertices: m.vertices.iter().map(rp).collect(),
         mesh_lines: m.mesh_lines.iter().map(rp).collect(),
+        proxy_memo: Default::default(),
     }
 }
 

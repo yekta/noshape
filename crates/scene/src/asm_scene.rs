@@ -6,7 +6,7 @@
 use crate::builder::{PickKind, MESH_LINE_COLOR};
 use crate::palette as theme;
 use glam::{DMat4, DVec3, Mat4};
-use noshape_model::assembly::eval::{AssemblyResult, InstancePath};
+use noshape_model::assembly::eval::{AssemblyResult, InstancePath, PartOccurrence};
 use noshape_model::assembly::solver::Frame;
 use noshape_model::display::{BodyKind, MeshBuffers};
 use noshape_model::reference::Reference;
@@ -194,6 +194,9 @@ pub struct AsmSceneOptions {
     pub tangent_edges: crate::builder::TangentEdges,
     /// Line width and phantom edges' color and width.
     pub graphics: crate::graphics_prefs::GraphicsPrefs,
+    /// A software rasteriser draws the scene (`Gpu::is_software`): each dense body's coarsest level is its
+    /// [`MeshBuffers::proxy`] (the renderer draws every body at its coarsest there).
+    pub software: bool,
 }
 
 impl AsmSceneOptions {
@@ -218,6 +221,7 @@ impl AsmSceneOptions {
             && self.xray_tops == other.xray_tops
             && self.tangent_edges == other.tangent_edges
             && self.graphics == other.graphics
+            && self.software == other.software
     }
 }
 
@@ -294,10 +298,10 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
         // Onshape's display levels, coarsest first (`PartOccurrence::coarser`):
         // each level's instances draw only when the renderer picks that level
         // for the occurrence (`Instance::mesh_lod`).
-        let levels: Vec<&Arc<MeshBuffers>> = o.coarser.iter().chain(std::iter::once(&o.mesh)).collect();
+        let levels = display_levels(o, opts.software);
         let edge_color = if sketch { theme::lin(0x999999) } else { theme::lin(theme::viewport::EDGE) };
         let mut finest_cached = None;
-        for (li, &mesh) in levels.iter().enumerate() {
+        for (li, mesh) in levels.iter().enumerate() {
             let is_finest = li + 1 == levels.len();
             let level_first = scene.instances.len();
             let key = Arc::as_ptr(mesh) as usize;
@@ -445,6 +449,14 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
         *slot = true;
     }
     AsmBuilt { scene, picks, static_instances, spans, occurrences: result.occurrences.len() }
+}
+
+/// An occurrence's display levels, coarsest first, its finest last; on a software rasteriser (`software`) a dense
+/// body's coarsest is its [`MeshBuffers::proxy`].
+pub fn display_levels(o: &PartOccurrence, software: bool) -> Vec<Arc<MeshBuffers>> {
+    let proxy = o.coarser.first().filter(|_| software).and_then(|m| m.proxy());
+    let coarsest = proxy.into_iter().chain(o.coarser.first().cloned()).take(1);
+    coarsest.chain(o.coarser.iter().skip(1).cloned()).chain(std::iter::once(o.mesh.clone())).collect()
 }
 
 fn upload_body(m: &MeshBuffers, up: &Uploader) -> CachedBody {
@@ -1413,5 +1425,78 @@ mod screen_triad_tests {
                 assert!((len / px - 50.0).abs() < 0.01, "{} px at distance {distance}", len / px);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod display_level_tests {
+    use super::*;
+    use noshape_model::assembly::InstanceId;
+    use noshape_model::configuration::ConfigValues;
+    use noshape_model::document::TabId;
+    use noshape_model::reference::{BodyId, FeatureId};
+
+    /// A plate's top as `n` × `n` squares: 2 n² triangles in one face.
+    fn grid(n: usize) -> MeshBuffers {
+        let mut m = MeshBuffers::default();
+        for j in 0..=n {
+            for i in 0..=n {
+                m.positions.push([i as f32, j as f32, 0.0]);
+                m.normals.push([0.0, 0.0, 1.0]);
+            }
+        }
+        let at = |i: usize, j: usize| (j * (n + 1) + i) as u32;
+        for j in 0..n {
+            for i in 0..n {
+                m.indices.extend([at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j), at(i + 1, j + 1), at(i, j + 1)]);
+            }
+        }
+        m.face_ranges.push((0, m.indices.len() as u32));
+        m
+    }
+
+    fn occurrence(coarse: MeshBuffers) -> PartOccurrence {
+        let coarse = Arc::new(coarse);
+        PartOccurrence {
+            path: vec![InstanceId(1)],
+            body: BodyId { feature: FeatureId(1), index: 0 },
+            studio: TabId(1),
+            config: ConfigValues::default(),
+            instance_name: "Part 1 <1>".into(),
+            body_name: "Part 1".into(),
+            kind: BodyKind::Solid,
+            color: [0.5; 4],
+            mesh: Arc::new(grid(20)),
+            coarser: vec![coarse],
+            levels_from: 0,
+            inner: DMat4::IDENTITY,
+            transform: DMat4::IDENTITY,
+            face_refs: Vec::new(),
+            edge_refs: Vec::new(),
+            vertex_refs: Vec::new(),
+            hidden: false,
+            local_bounds: None,
+            context: Default::default(),
+            mirrored: false,
+            external: None,
+            flex: None,
+        }
+    }
+
+    /// HEAVY-ASM-SOFTWARE-FRAME: on a software rasteriser a dense body's coarsest level is its proxy (asm-xdev-subs'
+    /// 10 482-face part: 72 k triangles at Coarse), on a GPU its own Coarse mesh; a light body keeps its own on both.
+    #[test]
+    fn a_software_scene_draws_a_dense_bodys_proxy_at_its_coarsest() {
+        // (Its 1-unit squares under a cell of its 400-unit side's diagonal / 200, 2.8: they merge.)
+        let dense = occurrence(grid(400));
+        let tris = |m: &Arc<MeshBuffers>| m.indices.len() / 3;
+        let gpu = display_levels(&dense, false);
+        assert!(gpu.len() == 2 && Arc::ptr_eq(&gpu[0], &dense.coarser[0]) && Arc::ptr_eq(&gpu[1], &dense.mesh));
+        let software = display_levels(&dense, true);
+        assert_eq!(software.len(), 2);
+        assert!(tris(&software[0]) * 2 <= tris(&dense.coarser[0]), "{} triangles of {}", tris(&software[0]), tris(&dense.coarser[0]));
+        assert!(Arc::ptr_eq(&software[1], &dense.mesh), "the finest stays");
+        let light = occurrence(grid(10));
+        assert!(Arc::ptr_eq(&display_levels(&light, true)[0], &light.coarser[0]));
     }
 }
