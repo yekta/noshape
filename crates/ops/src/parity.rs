@@ -7978,12 +7978,18 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
     for l in live {
         // Ours for live's: a body of its kind (a sweep's sheet lies along its path's wire, both of no volume:
         // c2-surf-workshop-manualblend's Sweep 2), the same volume (within 1e-6: a pattern's instances tie), then the
-        // nearest box.
+        // nearest box. Sheets (no volume) by the nearest area before the box: live's boxes aren't tight
+        // (c2-surf-workshop-bezier's two boundary surfaces, their boxes within 4 mm).
         let d = |p: &PartState| {
             let (a, b) = (p.volume.unwrap_or(0.0), l.volume.unwrap_or(0.0));
             let volume = (a - b).abs() / b.abs().max(1e-12);
+            let area = match (p.area, l.area) {
+                (Some(x), Some(y)) if b.abs() < 1e-15 => (x - y).abs() / y.abs().max(1e-12),
+                _ => 0.0,
+            };
             let apart = p.bbox.zip(l.bbox).map_or(0.0, |(x, y)| (0..2).flat_map(|c| (0..3).map(move |i| (x[c][i] - y[c][i]).powi(2))).sum::<f64>().sqrt());
-            (if p.body_type == l.body_type { 0.0 } else { 1.0 }, if volume < 1e-6 { 0.0 } else { volume }, apart)
+            let tie = |r: f64| if r < 1e-6 { 0.0 } else { r };
+            (if p.body_type == l.body_type { 0.0 } else { 1.0 }, tie(volume), tie(area), apart)
         };
         let Some(i) = (0..free.len()).min_by(|a, b| d(free[*a]).partial_cmp(&d(free[*b])).unwrap_or(std::cmp::Ordering::Equal)) else {
             continue;

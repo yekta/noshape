@@ -747,6 +747,7 @@ pub(crate) mod ffi {
             points: &[f64],
             guides: &OcShapeList,
         ) -> Result<OpOut>;
+        fn op_coons(edges: &OcShapeList, counts: &[u32]) -> Result<OpOut>;
         fn op_rib(
             base: &OcShape,
             wire: &OcShape,

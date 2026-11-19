@@ -1020,6 +1020,8 @@ OpOut op_sew_closing(const OcShapeList& shapes, double tol);
 OpOut op_fill(const OcShapeList& edges, const OcShapeList& supports,
               rust::Slice<const int32_t> orders, rust::Slice<const double> points,
               const OcShapeList& guides);
+// The bilinearly blended Coons patch of four sides (edge chains of counts[i] edges: u0, u1, v0, v1).
+OpOut op_coons(const OcShapeList& edges, rust::Slice<const uint32_t> counts);
 OpOut op_rib(const OcShape& base, const OcShape& wire, const PlaneF& plane,
              P3 d1, P3 d2, bool fuse);
 

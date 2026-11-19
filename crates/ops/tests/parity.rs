@@ -352,6 +352,17 @@ fn a_wire_pairs_with_our_wire_before_a_sheet_beside_it() {
     assert!(diff.iter().any(|d| d.starts_with("\"Curve 2\": box")), "the wire's own difference: {diff:?}");
 }
 
+/// Two sheets with near boxes pair by their areas (c2-surf-workshop-bezier: live's loose boxes put our "Bézier" sheet
+/// against its "B-Spline").
+#[test]
+fn sheets_pair_by_area_before_box() {
+    let sheet = |name: &str, area: f64, hi: f64| PartState { name: name.into(), body_type: "sheet".into(), faces: 1, area: Some(area * 1e-6), bbox: Some([[-0.051, 0.0, 0.0], [hi, 0.0539, 0.052]]), ..Default::default() };
+    let live = [sheet("B-Spline", 5497.1386, 0.0349), sheet("Bézier", 5516.5878, 0.0310)];
+    let ours = [sheet("Surface 1", 5497.1386, 0.0310), sheet("Surface 2", 5516.5878, 0.0349)];
+    let diff = differences(&live, &ours);
+    assert!(diff.iter().all(|d| !d.contains("area")), "{diff:?}");
+}
+
 #[test]
 fn a_volume_band_holds_while_lives_volume_stays() {
     let part = |v: f64, band: Option<[f64; 2]>| PartState { name: "Part 1".into(), volume: Some(v), volume_band: band, ..Default::default() };

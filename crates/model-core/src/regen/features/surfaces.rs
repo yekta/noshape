@@ -717,6 +717,14 @@ fn chain_ends(edges: &[Shape]) -> Option<(DVec3, DVec3)> {
     }
 }
 
+/// The Coons patch of two profiles and the straight lines joining their nearer ends: the surface ruled between them.
+fn ruled_coons(a: &[Shape], b: &[Shape]) -> Option<Shape> {
+    let ((a0, a1), (b0, b1)) = (chain_ends(a)?, chain_ends(b)?);
+    let (b0, b1) = if a0.distance(b0) + a1.distance(b1) <= a0.distance(b1) + a1.distance(b0) { (b0, b1) } else { (b1, b0) };
+    let sides = [a.to_vec(), b.to_vec(), vec![k::make_line(a0, b0).ok()?], vec![k::make_line(a1, b1).ok()?]];
+    k::coons_surface(&sides).ok().map(|r| r.shape)
+}
+
 pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
     let collect = |ev: &EvalCtx, array: &str, ents: &str, cond: &str| -> FResult<(Vec<Vec<Shape>>, bool)> {
         let mut out = Vec::new();
@@ -772,6 +780,10 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
         // sweeps along the V one; its other two sides are the profiles moved
         // to each other's far end.
         let mut all: Vec<Shape> = u.iter().chain(v.iter()).flatten().cloned().collect();
+        let mut sides: Option<[Vec<Shape>; 4]> = match (u.as_slice(), v.as_slice()) {
+            ([u0, u1], [v0, v1]) => Some([u0.clone(), u1.clone(), v0.clone(), v1.clone()]),
+            _ => None,
+        };
         if let ([pu], [pv]) = (u.as_slice(), v.as_slice()) {
             let (Some(eu), Some(ev_)) = (chain_ends(pu), chain_ends(pv)) else { return err(BSURF_ENDS) };
             // Live (behaviours "skasm (2026-10-31, P3 surfaces row 12)"): one U
@@ -779,11 +791,18 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
             let Some((cu, cv)) = [eu.0, eu.1].into_iter().flat_map(|a| [(a, ev_.0), (a, ev_.1)]).find(|(a, b)| a.distance(*b) < 1e-7) else { return crate::regen::eval::err_at(&["uProfilesArray"], BSURF_ENDS) };
             let far = |ends: (DVec3, DVec3), c: DVec3| if ends.0.distance(c) < 1e-7 { ends.1 } else { ends.0 };
             let moved = |edges: &[Shape], by: DVec3| -> FResult<Vec<Shape>> { edges.iter().map(|e| Ok(k::transform(e, &k::Transform::Translate(by), true)?.shape)).collect() };
-            all.extend(moved(pu, far(ev_, cv) - cv)?);
-            all.extend(moved(pv, far(eu, cu) - cu)?);
+            let (pu1, pv1) = (moved(pu, far(ev_, cv) - cv)?, moved(pv, far(eu, cu) - cu)?);
+            all.extend(pu1.iter().chain(&pv1).cloned());
+            sides = Some([pu.clone(), pu1, pv.clone(), pv1]);
         }
-        let boundary: Vec<k::FillEdge> = all.into_iter().map(|e| k::FillEdge { edge: e, support: None, continuity: k::Continuity::Position }).collect();
-        k::fill_surface(&boundary, &[]).map_err(|_| FeatureError::new(BSURF_FAILED))?.shape
+        // Live: the bilinearly blended Coons patch of the four sides (c2-surf-workshop-boundary's Boundary surface 1).
+        match sides.as_ref().filter(|_| !cu && !cv).map(k::coons_surface) {
+            Some(Ok(r)) => r.shape,
+            _ => {
+                let boundary: Vec<k::FillEdge> = all.into_iter().map(|e| k::FillEdge { edge: e, support: None, continuity: k::Continuity::Position }).collect();
+                k::fill_surface(&boundary, &[]).map_err(|_| FeatureError::new(BSURF_FAILED))?.shape
+            }
+        }
     } else {
         let profiles = if u.is_empty() { &v } else { &u };
         let sections: Vec<Shape> = profiles.iter().map(|es| k::make_wire(&order_chain(es, 1e-6)?.into_iter().map(|(e, _)| e).collect::<Vec<_>>()).map_err(|_| FeatureError::new(BSURF_FAILED))).collect::<FResult<_>>()?;
@@ -811,6 +830,14 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
                     return err(BSURF_SPLINE_FAILED);
                 }
             }
+        }
+        // Live: two profiles without conditions are ruled to each other, point for point along their curves
+        // (c2-surf-workshop-bezier: straight across, 5516.59 mm2): the Coons patch with straight sides.
+        if let ([a, b], false) = (profiles.as_slice(), cu || cv)
+            && let Some(r) = ruled_coons(a, b)
+        {
+            let names = new_face_names(ev, &r);
+            return surface_result(ev, NamedShape::new(r, names));
         }
         let mut opts = k::LoftOptions::default();
         if let ([first, last], [s0, s1]) = (items.as_slice(), sections.as_slice()) {

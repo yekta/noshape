@@ -1712,6 +1712,37 @@ fn boundary_one_u_one_v_as_live() {
     assert_eq!(msg.as_deref(), Some("Could not extract boundary profiles matching at end points."));
 }
 
+/// Live (suite truth 11-18, c2-surf-workshop-bezier's "Boundary surface - Bézier"): two U profiles without conditions
+/// are ruled to each other point for point along their curves (straight across), 5516.5878 mm2; a Bézier of degree 5
+/// on Front, a spline through 4 points on Top.
+#[test]
+fn boundary_of_two_profiles_is_ruled_between_them() {
+    let mut s = Studio::new();
+    let mm = |p: &[(f64, f64)]| p.iter().map(|q| DVec2::new(q.0, q.1) * 1e-3).collect::<Vec<_>>();
+    let mut a = noshape_sketch::Sketch::new();
+    let ea = a.add_bspline(&mm(&[(30.19292, 25.49129), (36.33276, 62.92071), (9.93773, 50.09567), (-18.01856, 46.43286), (-36.1306, 42.5698), (-46.2864, 21.68969)]), 5).unwrap();
+    let sa = s.sketch(Reference::Plane(DatumPlane::Front), a);
+    let mut b = noshape_sketch::Sketch::new();
+    let eb = b.add_fit_spline(&mm(&[(28.34795, 30.06134), (4.53833, 46.00168), (-20.68373, 53.46741), (-50.9502, 46.20346)])).unwrap();
+    let sb = s.sketch(Reference::Plane(DatumPlane::Top), b);
+    s.add("boundarySurface", move |p| {
+        let rows = [(sa, ea), (sb, eb)]
+            .iter()
+            .map(|(sk, e)| {
+                let mut v = ParamValues::default();
+                v.set("uProfileEntities", ParamValue::Query(vec![Reference::SketchEntity { sketch: *sk, entity: e.0 }]));
+                v.set("uCondition", ParamValue::Enum("DEFAULT".into()));
+                v
+            })
+            .collect();
+        p.set("uProfilesArray", ParamValue::Array(rows));
+    });
+    let r = s.ok();
+    let i = r.context.bodies.iter().position(|b| b.kind == BodyKind::Surface).unwrap();
+    let area = surface_area(&r, i) * 1e6;
+    assert!((area - 5516.5878).abs() < 0.01, "{area}");
+}
+
 /// Live L28: a U row "Normal to profile" on a part edge (no sketch plane)
 /// fails with loft.fs's planar-profile text; the same rows with None work.
 #[test]

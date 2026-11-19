@@ -46,7 +46,8 @@ pub fn sketch_edge(ev: &EvalCtx, sketch: FeatureId, entity: u32) -> FResult<Opti
     let Some(s) = ev.ctx.sketch(sketch) else { return Ok(None) };
     let id = noshape_sketch::EntityId(entity);
     let Some(curve) = s.sketch.curve(id) else { return Ok(None) };
-    let seg = match super::extrude::curve_to_segment(&curve) {
+    // The curve itself (a spline's own B-spline and parameter: live's Boundary surface rules two profiles along it).
+    let seg = match super::helpers_a::curve_segment(&curve) {
         Some(seg) => seg,
         None => {
             let bb = s.sketch.bbox();

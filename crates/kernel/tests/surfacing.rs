@@ -453,3 +453,27 @@ fn a_bsurface_with_dense_knots_integrates_to_its_area() {
     let mesh: f64 = m.indices.chunks(3).map(|t| (p(t[1]) - p(t[0])).cross(p(t[2]) - p(t[0])).length() / 2.0).sum();
     assert!((area - mesh).abs() < 2e-5 * mesh, "area {} mm², its mesh's {}", area / (mm * mm), mesh / (mm * mm));
 }
+
+/// Live (suite truth 11-18, c2-surf-workshop-boundary / -split's Boundary surface 1): two U and two V cubic Béziers
+/// give the bilinearly blended Coons patch, one bicubic B-spline of 4 x 4 poles, 3762.6094 mm2, its middle at
+/// (-1.953, -32.284, 20.404) mm.
+#[test]
+fn a_coons_patch_of_four_beziers_is_lives_boundary_surface() {
+    let bezier = |p: [[f64; 3]; 4]| {
+        let poles: Vec<DVec3> = p.iter().map(|q| DVec3::from(*q) * 1e-3).collect();
+        make_bspline(&poles, None, &[0.0, 1.0], &[4, 4], 3, false).unwrap()
+    };
+    let front = bezier([[-25.0, 0.0, 50.003853], [-12.310798, 0.0, 39.898601], [2.599354, 0.0, 41.083458], [25.0, 0.0, 48.350553]]);
+    let top = bezier([[-25.0, -54.299746, 0.0], [-8.985328, -62.557317, 0.0], [8.280489, -63.558228, 0.0], [25.0, -45.291491, 0.0]]);
+    let right = bezier([[25.0, -45.291491, 0.0], [25.0, -24.299338, 2.765952], [25.0, -24.959569, 46.527136], [25.0, 0.0, 48.350553]]);
+    let left = bezier([[-25.0, -54.299746, 0.0], [-25.0, -48.224552, 31.393944], [-25.0, -14.976384, 12.721917], [-25.0, 0.0, 50.003853]]);
+    // The sides in any order and sense: u0 / u1 and v0 / v1 opposite.
+    let r = coons_surface(&[vec![front.clone()], vec![top.clone()], vec![left.clone()], vec![right.clone()]]).unwrap();
+    assert_eq!(r.shape.faces().len(), 1);
+    assert!((area(&r.shape) * 1e6 - 3762.6094).abs() < 1e-3, "{}", area(&r.shape) * 1e6);
+    let mid = DVec3::new(-1.953, -32.284, 20.404) * 1e-3;
+    let d = distance(&r.shape, &make_vertex(mid).unwrap()).unwrap().distance;
+    assert!(d < 1e-6, "{d}");
+    // Sides that don't meet at four corners: no patch.
+    assert!(coons_surface(&[vec![front.clone()], vec![top.clone()], vec![left.clone()], vec![left]]).is_err());
+}

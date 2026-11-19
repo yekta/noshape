@@ -943,6 +943,15 @@ pub fn fill_surface_guided(boundary: &[FillEdge], points: &[DVec3], curves: &[Sh
     op(ffi::op_fill(&le, &ls, &orders, &pts, &lg))
 }
 
+/// The bilinearly blended Coons patch of four sides, each a chain of edges, given as u0, u1 (opposite), v0, v1
+/// (Onshape's Boundary surface of two U and two V profiles). Fails where a side is rational or the sides don't meet
+/// at four corners. History args: the edges in order.
+pub fn coons_surface(sides: &[Vec<Shape>; 4]) -> Result<OpResult> {
+    let edges: Vec<Shape> = sides.iter().flatten().cloned().collect();
+    let counts: Vec<u32> = sides.iter().map(|s| s.len() as u32).collect();
+    op(ffi::op_coons(&vec_to_list(&edges), &counts))
+}
+
 /// Build solids from the regions fully enclosed by intersecting faces,
 /// shells and solids (BOPAlgo_MakerVolume; Onshape "Enclose").
 pub fn enclose(shapes: &[Shape]) -> Result<OpResult> {

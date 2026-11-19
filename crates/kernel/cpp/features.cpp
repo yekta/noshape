@@ -135,6 +135,7 @@
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2dConvert.hxx>
 #include <GeomConvert.hxx>
+#include <GeomConvert_CompCurveToBSplineCurve.hxx>
 #include <Geom_TrimmedCurve.hxx>
 #include <GeomAdaptor_Curve.hxx>
 #include <TopExp_Explorer.hxx>
@@ -12441,6 +12442,134 @@ OpOut op_fill(const OcShapeList& edges, const OcShapeList& supports,
     args.push_back(e);
   HHist h = history_of(args, mk);
   return make_result(args, mk.Shape(), h.get());
+}
+
+// One non-rational B-spline along a chain of edges, its parameter 0..1; null where the chain doesn't join or is rational.
+static occ::handle<Geom_BSplineCurve> coons_side(const std::vector<TopoDS_Edge>& es)
+{
+  std::vector<occ::handle<Geom_BSplineCurve>> cs;
+  for (const TopoDS_Edge& e : es)
+  {
+    double                  a, b;
+    occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, a, b);
+    if (c.IsNull())
+      return nullptr;
+    occ::handle<Geom_BSplineCurve> bs = GeomConvert::CurveToBSplineCurve(new Geom_TrimmedCurve(c, a, b));
+    if (bs.IsNull() || bs->IsRational())
+      return nullptr;
+    if (e.Orientation() == TopAbs_REVERSED)
+      bs->Reverse();
+    cs.push_back(bs);
+  }
+  if (cs.empty())
+    return nullptr;
+  GeomConvert_CompCurveToBSplineCurve join(cs[0]);
+  std::vector<bool>                   used(cs.size(), false);
+  used[0] = true;
+  for (size_t pass = 1; pass < cs.size(); ++pass)
+    for (size_t i = 1; i < cs.size(); ++i)
+      if (!used[i] && join.Add(cs[i], 1e-6))
+        used[i] = true;
+  if (std::find(used.begin(), used.end(), false) != used.end())
+    return nullptr;
+  const occ::handle<Geom_BSplineCurve> c = join.BSplineCurve();
+  if (c->IsRational())
+    return nullptr;
+  NCollection_Array1<double> knots = c->Knots();
+  BSplCLib::Reparametrize(0.0, 1.0, knots);
+  return new Geom_BSplineCurve(c->Poles(), knots, c->Multiplicities(), c->Degree());
+}
+
+// The two opposite sides of a patch on one degree and one knot vector.
+static void coons_match(const occ::handle<Geom_BSplineCurve>& a, const occ::handle<Geom_BSplineCurve>& b)
+{
+  const int d = std::max(a->Degree(), b->Degree());
+  a->IncreaseDegree(d);
+  b->IncreaseDegree(d);
+  for (const auto& [x, y] : {std::pair{a, b}, std::pair{b, a}})
+    for (int i = 1; i <= y->NbKnots(); ++i)
+      x->InsertKnot(y->Knot(i), y->Multiplicity(i), 1e-9, false);
+}
+
+// The Greville abscissae of a curve's knots (where its control points sit along 0..1): a linear function's
+// coefficients in its basis.
+static std::vector<double> coons_greville(const occ::handle<Geom_BSplineCurve>& c)
+{
+  const NCollection_Array1<double> t = c->KnotSequence();
+  const int                        p = c->Degree();
+  std::vector<double>              g(c->NbPoles());
+  for (int i = 0; i < c->NbPoles(); ++i)
+  {
+    double s = 0.0;
+    for (int k = 1; k <= p; ++k)
+      s += t(t.Lower() + i + k);
+    g[i] = s / p;
+  }
+  return g;
+}
+
+OpOut op_coons(const OcShapeList& edges, rust::Slice<const uint32_t> counts)
+{
+  // Live's Boundary surface of two U and two V profiles is the bilinearly blended Coons patch of the four
+  // (c2-surf-workshop-boundary: four cubic Béziers, one bicubic patch 4 x 4 poles, 3762.61 mm2; its grid is the Coons
+  // formula's). Sides in the order u0, u1 (opposite), v0, v1.
+  if (counts.size() != 4)
+    fail_invalid("a Coons patch needs four sides");
+  std::vector<occ::handle<Geom_BSplineCurve>> side;
+  size_t                                      at = 0;
+  for (const uint32_t n : counts)
+  {
+    std::vector<TopoDS_Edge> es;
+    for (uint32_t i = 0; i < n; ++i, ++at)
+    {
+      if (at >= edges.items.size())
+        fail_invalid("Coons side counts exceed the edges");
+      es.push_back(as_edge(edges.items[at], "Coons side edge"));
+    }
+    side.push_back(coons_side(es));
+    if (side.back().IsNull())
+      fail_op("Coons patch: a side isn't one non-rational curve");
+  }
+  occ::handle<Geom_BSplineCurve>& u0 = side[0];
+  occ::handle<Geom_BSplineCurve>& u1 = side[1];
+  occ::handle<Geom_BSplineCurve>& v0 = side[2];
+  occ::handle<Geom_BSplineCurve>& v1 = side[3];
+  const double tol = 1e-6;
+  auto meets = [&](const gp_Pnt& a, const gp_Pnt& b) { return a.Distance(b) < tol; };
+  if (!meets(u0->StartPoint(), v0->StartPoint()) && !meets(u0->StartPoint(), v0->EndPoint()))
+    std::swap(v0, v1);
+  if (meets(u0->StartPoint(), v0->EndPoint()))
+    v0->Reverse();
+  if (meets(u0->EndPoint(), v1->EndPoint()))
+    v1->Reverse();
+  if (meets(v0->EndPoint(), u1->EndPoint()))
+    u1->Reverse();
+  if (!meets(u0->StartPoint(), v0->StartPoint()) || !meets(u0->EndPoint(), v1->StartPoint())
+      || !meets(u1->StartPoint(), v0->EndPoint()) || !meets(u1->EndPoint(), v1->EndPoint()))
+    fail_op("Coons patch: the sides don't meet at four corners");
+  coons_match(u0, u1);
+  coons_match(v0, v1);
+  const std::vector<double> gu = coons_greville(u0), gv = coons_greville(v0);
+  const int                 nu = u0->NbPoles(), nv = v0->NbPoles();
+  const gp_XYZ c00 = u0->StartPoint().XYZ(), c10 = u0->EndPoint().XYZ(), c01 = u1->StartPoint().XYZ(),
+               c11 = u1->EndPoint().XYZ();
+  NCollection_Array2<gp_Pnt> poles(1, nu, 1, nv);
+  for (int i = 1; i <= nu; ++i)
+    for (int j = 1; j <= nv; ++j)
+    {
+      const double s = gu[i - 1], t = gv[j - 1];
+      const gp_XYZ p = (1 - t) * u0->Pole(i).XYZ() + t * u1->Pole(i).XYZ() + (1 - s) * v0->Pole(j).XYZ()
+                       + s * v1->Pole(j).XYZ()
+                       - ((1 - s) * (1 - t) * c00 + s * (1 - t) * c10 + (1 - s) * t * c01 + s * t * c11);
+      poles(i, j) = gp_Pnt(p);
+    }
+  occ::handle<Geom_BSplineSurface> surf = new Geom_BSplineSurface(
+    poles, u0->Knots(), v0->Knots(), u0->Multiplicities(), v0->Multiplicities(), u0->Degree(), v0->Degree());
+  BRepBuilderAPI_MakeFace mf(surf, Precision::Confusion());
+  if (!mf.IsDone())
+    fail_op("Coons patch: no face");
+  std::vector<TopoDS_Shape> args(edges.items.begin(), edges.items.end());
+  return make_result(args, mf.Face(), nullptr);
 }
 
 OpOut op_rib(const OcShape& base, const OcShape& wire, const PlaneF& plane, P3 d1, P3 d2,
