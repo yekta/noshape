@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 21:38)
+# QA handoff (agent qa; current state only, updated 2026-11-19 21:49)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -70,15 +70,17 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    **v0.4.61 post-release done 21:2x: clean** (qa-alerts line): SHA OK, user docs ALL-SAME (candidate and vs 0.4.60), ticket docs = the
    cut's 3 (draft-hang, shell-hang-pre, suppress-segv), quit-abort 5/5, hover flow uh/r61 108/108 shots right, spot rows 17-22 on the
    released app 12/13 (suites/1119-2120-v0461-spot; line-from-midpoint fixed after the release). Compat baseline 0.4.61. Next spot
-   rows: 23-24 (sticky snap, hat15b moved sketch: no scenario, check by hand) then 25-32 of interaction-feel.md's "=" rows.
+   rows 23-24 (feel rows 71 sticky snap, 72 hat15b moved sketch) checked by hand 21:4x: both = (line held 0-4 px, point from
+   5 px; hat15b Sketch 1 lit -6..+8 px round a line at 1247.5, region boundary lit inside the loop as live). Next: rows 25-32.
    **In flight:** qa-wait-e196 (bin/wait-rows.sh on subject "psui: Routing curve's Multiple" = psui's land job e196bc5a, which carries
    their 6 feel fixes): on its green re-runs face-rclick-select-fillet-faces, dialog-checkbox-convert-back, dialog-checkbox-rclick-convert,
    dialog-query-rclick-clear-all, fillet-chip-clear-missing, fillet-chip-edit-healthy-moment, analysis-interference -> one qa-alerts line;
    mark the TICKETS rows. Suite 1119-1302-291c74b0: ui 2120/2172, models done, assemblies / exchange in vibex8's slot: suites-diff.py
    vs the last full run when done. sketch-vertical-key: not the camera (lead); psui re-runs it on live2's cf70e676 (TICKETS ~5523).
    P1 walk 21:36 on a58eee8c (sketch -> extrude -> fillet -> pattern -> edit -> undo -> suppress): all build; P2 PATTERN-CHECK-STAYS-
-   ENABLED (psui) + live request (REQUESTS qa 11-19 21:36: ✓ after emptying, tooltip on click); reopen, rollback drag, reorder OK. Next walk:
-   mirror / boolean / hole / shell, measure, mass properties, section view, view cube.
+   ENABLED (psui) + live request (REQUESTS qa 11-19 21:36: ✓ after emptying, tooltip on click); reopen, rollback drag, reorder OK. Walk 21:4x: Shell, Boolean union,
+   Mirror (auto Add + merge scope), face area readout, Esc keeps selection (live), view cube Top, face menu, Section view: all OK.
+   Next walk: Hole (sketch points), mass properties, measure two entities, then P2 assemblies.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
