@@ -5,7 +5,7 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-19 12:46 UTC)
+## State (2026-11-19 14:10 UTC)
 
 ### In flight: Derived mirror of an assembly (live2 audit-1119 m2–m14; behaviours "asm (11-19)")
 - Piece 1 (model + eval), branch asm-dmirror 28ddc6e06: `InstanceSource::DerivedMirror { assembly, derived,
@@ -21,8 +21,11 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   (`assembly_derived_mirror`: the node's source and per-part strategy, Derived makes the "-Mirrored" studio; e2e).
 - 3c 53a0e2897: the node's row icon (derived-mirror), menu as live m10, Edit…'s dialog (Assembly to mirror, Mirror
   strategy… sharing the Mirror's table through `StrategyHost`, Update, ✓ "Edit : Derived mirror"); UI test.
-- 3d next: the Mirror strategy's child rows under a subassembly row (live m7: its parts, Transform / Derived, placement,
-  a chevron) writing the "-Mirrored" assembly's node strategy on ✓. Shot: live/asm/derived-mirror-1119/m7-expanded.png.
+- 3d: the Mirror strategy's child rows under a subassembly row (chevron, Transform / Derived, placement; ✓ writes the
+  "-Mirrored" assembly's node strategy, "Edit : Derived mirror"); UI test. Derived mirror is complete; left only
+  live's exact node icon and symmetry detection on child rows (they show Symmetric).
+- Note: rb.sh clippy can report clean on stale synced mtimes: `git diff --name-only origin/main -- crates | xargs
+  touch` before the final clippy (11-19 a complex-type warning hid that way).
 
 ### In flight: mass-property overrides (live2 12:42–12:45, behaviours "asm (11-19)", live/asm/mass-override-1119 c1–c5)
 - Branch asm-mass a96eaf1b2: PartProperties `com_override` (m) / `inertia_override` (kg·m², column by column
