@@ -807,7 +807,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | Corner and line drags with no tool: the rectangle stays one, a line moves along its normal [skasm] | = | sketch_mode `a_rectangles_corner_and_side_drag_as_lives` (live2's (30, -20) -> (39.19, -14.22) and the right line to x 39.20) |
 | A press on a plane and a drag draws a box; window over the rectangle takes its 4 lines, crossing over the right half 3; press-release on a plane selects it | = | sketch_box_feel_tests::a_box_in_iso_over_the_planes_takes_lines_as_live |
 | With a drawing tool active no plane or region hovers, only snap targets [skasm] | = | sketch_ui_tests::no_plane_lights_while_a_line_is_drawn |
-| Constraint buttons on a two-line selection: applied at the click, selection cleared, the second-picked line moves; refusals in a bubble; Symmetric arms [skasm] | = | scene the_second_picked_line_moves_as_lives, horizontal_and_vertical_turn_both_lines_about_their_midpoints (refusal texts: missing) |
+| Constraint buttons on a two-line selection: applied at the click, selection cleared, the second-picked line moves; refusals in a bubble; Symmetric arms [skasm] | = | scene the_second_picked_line_moves_as_lives, horizontal_and_vertical_turn_both_lines_about_their_midpoints, a_constraint_refuses_a_selection_with_lives_words |
 | A dimension label dragged follows the pointer, no snap, no selection needed [skasm] | = | sketch_label_feel_tests::a_dimension_label_follows_the_pointer_without_a_selection |
 
 ### feel-1417 (P0, glyph linger and label drag threshold, live2 11-17 14:16)

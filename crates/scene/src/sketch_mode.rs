@@ -11656,6 +11656,36 @@ mod tests {
         }
     }
 
+    /// Live 2270 (hover-p0 constraint buttons): a selection a constraint can't take is refused with live's words in the
+    /// banner (std's errorstringenum), the selection cleared, no tool started, nothing added.
+    #[test]
+    fn a_constraint_refuses_a_selection_with_lives_words() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let cases: [(ConstraintTool, &str, &str); 5] = [
+            (ConstraintTool::Parallel, "a line and a circle", "A parallel constraint requires two lines."),
+            (ConstraintTool::Tangent, "two lines", "A tangent constraint requires two curves, one of which must not be a line."),
+            (ConstraintTool::Coincident, "a line's two ends", "A coincident constraint cannot be added to two points from the same curve."),
+            (ConstraintTool::Concentric, "two lines", "A concentric constraint can only be added to circles, arcs, ellipses and points."),
+            (ConstraintTool::Coincident, "a line and a circle", "A coincident constraint cannot be applied to two curves of different types."),
+        ];
+        for (c, what, words) in cases {
+            let (mut ed, mut d) = editor(Tool::Select);
+            let l1 = d.sketch.add_line(mm(0.0, 0.0), mm(40.0, 5.0));
+            let l2 = d.sketch.add_line(mm(0.0, 20.0), mm(40.0, 30.0));
+            let circle = d.sketch.add_circle(mm(70.0, 10.0), 8e-3);
+            let ends = d.sketch.endpoints(l1).expect("its ends");
+            ed.selection = match what {
+                "a line and a circle" => vec![l1, circle],
+                "two lines" => vec![l1, l2],
+                _ => vec![ends.0, ends.1],
+            };
+            let before = d.sketch.constraints().count();
+            let applied = ed.constraint_command(&mut d, c);
+            assert_eq!(ed.refusal.as_deref(), Some(words), "{c:?} on {what}");
+            assert!(!applied && ed.selection.is_empty() && ed.tool == Tool::Select && d.sketch.constraints().count() == before, "{c:?} on {what}: refused, the selection cleared, no tool, nothing added");
+        }
+    }
+
     /// Live2 glyph-select (11-17): one constraint glyph selected at a time: a click (Shift too) on another replaces it
     /// and Delete takes only that one; a glyph click drops a selected line and a line click drops the glyph;
     /// Shift+click on the selected glyph and a click on empty space deselect it.
