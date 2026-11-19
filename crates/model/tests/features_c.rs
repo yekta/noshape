@@ -2289,6 +2289,35 @@ fn a_profile_on_a_closed_path_sweeps_the_whole_loop() {
     }
 }
 
+/// Live q-thin-wall-side-1119: a closed wall's Thickness 1 goes along its edge's direction × the path's from the wall: an
+/// R 17 circle on Right (counter-clockwise about +X) swept 60 mm along -X from its centre is R 16-17 inside (6220.354
+/// mm3), along +X R 17-18 outside (6597.345), and at the end of a path running -X onto it outside too.
+#[test]
+fn a_thin_sweeps_closed_wall_side_follows_its_direction_and_the_paths() {
+    let run = |a: f64, b: f64| {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let c = sk.add_circle(DVec2::ZERO, 0.017).0;
+        let wall = s.sketch(Reference::Plane(DatumPlane::Right), sk);
+        let mut sk = noshape_sketch::Sketch::new();
+        let e = sk.add_line(DVec2::new(a, 0.0), DVec2::new(b, 0.0)).0;
+        let path = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        s.add("sweep", |p| {
+            p.set("bodyType", en("THIN"));
+            p.set("wallShape", q(Reference::SketchEntity { sketch: wall, entity: c }));
+            p.set("path", q(Reference::SketchEntity { sketch: path, entity: e }));
+            p.set("thickness1", expr("1 mm"));
+            p.set("thickness2", expr("0 mm"));
+        });
+        let r = s.ok();
+        r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| b.shape.volume().unwrap()).sum::<f64>() * 1e9
+    };
+    for (a, b, live) in [(0.0, -0.06, 6220.354), (0.0, 0.06, 6597.345), (0.06, 0.0, 6597.345)] {
+        let v = run(a, b);
+        assert!((v - live).abs() < 0.01, "path {a} -> {b}: {v} vs live {live}");
+    }
+}
+
 /// Live "psb (10-24 c) thin sweep": a Ø20 circle (or a 20 mm line) on Top
 /// swept Thin 50 up, Thickness 1 = 2: outward / on −y; Flip wall inward;
 /// Mid plane both sides; Scale 2 keeps the wall 2 thick normal to the cone;

@@ -75,6 +75,10 @@ pub enum WallSide<'a> {
     /// (Extrude: the sketch normal; Revolve: the turning direction about the
     /// axis as directed; Sweep: along the path), whatever Opposite says.
     Along(&'a dyn Fn(&PlaneFrame, DVec3) -> DVec3),
+    /// [`WallSide::Along`] for closed curves too (Sweep: live q-thin-wall-side-1119, a circle's wall inside or out by
+    /// its own direction × the path's at the wall, a sketch curve or a face's edge alike; c2-surf-workshop-cpcurves'
+    /// Sweep 5 goes in from Part 2's rim).
+    AlongClosedToo(&'a dyn Fn(&PlaneFrame, DVec3) -> DVec3),
 }
 
 /// [`thin_profiles`] with the open walls' side given by `side`. Closed loops
@@ -118,14 +122,25 @@ pub fn thin_profiles_sided(ev: &EvalCtx, refs: &[Reference], side: WallSide, by_
             };
             let key = chain.first().map(|e| e.source.clone()).unwrap_or(Source::Index(i as u32));
             if w.is_closed().unwrap_or(false) || closed_chain(&w) {
-                let (a, b) = if by_loop_direction && runs_ccw(&w, &chain, frame.normal) { (t2, t1) } else { (t1, t2) };
+                let inward = match &side {
+                    WallSide::AlongClosedToo(d) => {
+                        let first = chain.first().map(|s| s.shape.clone()).unwrap_or_else(|| w.edges()[0].clone());
+                        let (m, left) = left_of(&first, frame.normal)?;
+                        let i = first.edge_info()?;
+                        let t = first.tangent_at((i.first_param + i.last_param) * 0.5)?;
+                        let inside = if edge_runs_ccw(&w, &first, frame.normal) { left } else { -left };
+                        t.cross(d(&frame, m)).dot(inside) > 0.0
+                    }
+                    _ => by_loop_direction && runs_ccw(&w, &chain, frame.normal),
+                };
+                let (a, b) = if inward { (t2, t1) } else { (t1, t2) };
                 out.push(closed_wall(&frame, &w, &chain, a, b, key)?);
             } else {
                 let first = chain.first().map(|s| s.shape.clone()).unwrap_or_else(|| w.edges()[0].clone());
                 let (m, left) = left_of(&first, frame.normal)?;
                 let on_left = match &side {
                     WallSide::Left => true,
-                    WallSide::Along(d) => {
+                    WallSide::Along(d) | WallSide::AlongClosedToo(d) => {
                         let i = first.edge_info()?;
                         let t = first.tangent_at((i.first_param + i.last_param) * 0.5)?;
                         t.cross(d(&frame, m)).dot(left) >= 0.0
@@ -261,6 +276,25 @@ fn closed_wall(frame: &PlaneFrame, w: &Shape, sources: &[SourcedEdge], t_out: f6
 
 /// Whether a closed loop runs counter-clockwise around `n` in the direction
 /// of its first sketch edge (the lowest source: the first one drawn).
+/// Whether edge `e` of the closed wire `w` runs counter-clockwise about `n` along its own curve: the wire's signed area
+/// from points along each edge in wire order (a lone circle too), against `e`'s sense in the wire.
+fn edge_runs_ccw(w: &Shape, e: &Shape, n: DVec3) -> bool {
+    let mut pts = Vec::new();
+    for x in w.edges() {
+        let Ok(i) = x.edge_info() else { continue };
+        let back = x.orientation() == k::Orientation::Reversed;
+        for j in 0..16 {
+            let f = if back { 1.0 - j as f64 / 16.0 } else { j as f64 / 16.0 };
+            if let Ok(p) = x.point_at(i.first_param + (i.last_param - i.first_param) * f) {
+                pts.push(p);
+            }
+        }
+    }
+    let area: f64 = (0..pts.len()).map(|i| pts[i].cross(pts[(i + 1) % pts.len()]).dot(n)).sum();
+    let along = w.edges().into_iter().find(|x| x.is_same(e)).is_none_or(|x| x.orientation() != k::Orientation::Reversed);
+    (area > 0.0) == along
+}
+
 fn runs_ccw(w: &Shape, sources: &[SourcedEdge], n: DVec3) -> bool {
     // The wire's own sense: its signed area about `n`, edge by edge in wire order.
     let mut pts = Vec::new();

@@ -638,8 +638,18 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
     // Live "psb (10-24 c)": a wall that can't be made fails with Onshape's
     // trim text when Trim ends applies, else its thicken text.
     let thin_fail = if path_open && ev.bool("trimEnds") { THIN_TRIM_FAILED } else { THIN_THICKEN_FAILED };
-    let along = |f: &crate::display::PlaneFrame, m: DVec3| path_end_near(&path, m).map_or(f.normal, |(_, t)| t);
-    let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::Along(&along), false).map_err(|_| fe(thin_fail))? } else { ev.profiles(refs)? };
+    // A wall's sweep direction (live q-thin-wall-side-1119): from a free end of the path, into it; lying on the path
+    // (cpcurves' Main pipe at its chain's inner junction), against the path's own direction there.
+    let along_wall = |f: &crate::display::PlaneFrame, m: DVec3| {
+        let end = path_end_near(&path, m);
+        let on = k::make_vertex(m).ok().and_then(|v| k::distance(&v, &path).ok()).map(|d| d.point_b);
+        match (end, on) {
+            (Some((q, t)), Some(p)) if p.distance(q) > 1e-6 => path_tangent_at(&path, p).map_or(t, |d| -d),
+            (Some((_, t)), _) => t,
+            _ => f.normal,
+        }
+    };
+    let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::AlongClosedToo(&along_wall), false).map_err(|_| fe(thin_fail))? } else { ev.profiles(refs)? };
     if profiles.is_empty() {
         return crate::regen::eval::err_at(&[if thin { "wallShape" } else { "profiles" }], "Select faces or sketch regions to sweep.");
     }
@@ -729,6 +739,23 @@ fn oblique_to(path: &Shape, p: &Profile) -> bool {
 
 /// The path end nearest `p` and the path's direction there, pointing into
 /// the path.
+/// The path's direction (as the wire runs) at its point nearest `p`.
+fn path_tangent_at(path: &Shape, p: DVec3) -> Option<DVec3> {
+    let mut best: Option<(f64, DVec3)> = None;
+    for e in path.edges() {
+        let i = e.edge_info().ok()?;
+        let sign = if e.orientation() == k::Orientation::Reversed { -1.0 } else { 1.0 };
+        for j in 0..=256 {
+            let u = i.first_param + (i.last_param - i.first_param) * j as f64 / 256.0;
+            let Ok(q) = e.point_at(u) else { continue };
+            if best.is_none_or(|b| q.distance(p) < b.0) {
+                best = e.tangent_at(u).ok().map(|t| (q.distance(p), t.normalize_or_zero() * sign));
+            }
+        }
+    }
+    best.map(|b| b.1)
+}
+
 fn path_end_near(path: &Shape, p: DVec3) -> Option<(DVec3, DVec3)> {
     let edges = path.edges();
     let mut best: Option<(f64, DVec3, DVec3)> = None;
