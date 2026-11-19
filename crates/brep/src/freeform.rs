@@ -47,10 +47,17 @@ impl FreeSurface {
     }
 
     /// Its period along u (`i` 0) or v: a whole turn round its axis, or a closed NURBS's range (clamped, its first and
-    /// last rows of poles and weights alike: a swept tube's B-spline across its seam).
+    /// last rows of poles and weights alike: a swept tube's B-spline across its seam), or an extruded closed curve's.
     pub fn period(&self, i: usize) -> Option<f64> {
         if self.periodic()[i] {
             return Some(TAU);
+        }
+        if let FreeSurface::Extrusion { c, .. } = self {
+            let n = c.poles.len();
+            let clamped = c.knots[..=c.degree].iter().all(|&k| k == c.knots[0]) && c.knots[n..].iter().all(|&k| k == c.knots[n]);
+            let size = c.poles.iter().fold(0.0f64, |x, q| x.max(q.abs().max_element()));
+            let closed = n > 1 && (c.poles[0] - c.poles[n - 1]).length() <= 1e-12 * size.max(1.0) && (c.weights.is_empty() || (c.weights[0] - c.weights[n - 1]).abs() <= 1e-12);
+            return (i == 0 && clamped && closed).then(|| c.knots[n] - c.knots[c.degree]);
         }
         let FreeSurface::Nurbs(s) = self else { return None };
         let (deg, knots, n, m) = if i == 0 { (s.udegree, &s.uknots, s.nu, s.nv) } else { (s.vdegree, &s.vknots, s.nv, s.nu) };
