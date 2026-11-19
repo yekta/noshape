@@ -88,7 +88,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    Studios' merge fix 258b8d40e verified 12:05 (m1 retake); only ≠ the tab rows' order -> studios.
    In flight (lead 12:45): qa-uip-feel (bin/uip-only.sh: interaction suite alone, vibex8 3 apps via slot, ~3 h; out
    suites/1119-1242-223cec7e-uip/feel.txt = failing + worse than 1119-0551) -> each owner its rows as P0, one line to the lead.
-   qa-psui-lod (heavy/psui-lod.sh: psui's d7691003 by subject "psui: … level of detail|LOD" since 11-19 12:00 -> vibex7 release
+   qa-psui-lod (heavy/psui-lod.sh: asm's LOD change 46edfa849 by subject "<agent>: HEAVY-ASM-SOFTWARE-FRAME, LOD side" -> vibex7 release
    builds of it + parent, runq.sh x5 alternating on local :154, wheel zoom / orbit first frame medians -> qa-alerts; P0 rule).
    Kept vibe2 ~/agents/qa-keep/{session-ps2-1119,studio-1119-recheck}.
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
