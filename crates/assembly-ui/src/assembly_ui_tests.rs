@@ -2557,3 +2557,48 @@ fn a_derived_mirror_nodes_menu_and_dialog(cx: &mut TestAppContext) {
         assert_eq!((derived.len(), mirrored_studios), (1, vec![(ps, m)]));
     });
 }
+
+/// Live asm-views2-1118: a short drag on an explode triad's arrow still makes a step (4 / 8 / 10 px: 0 mm) and opens
+/// its dialog; a longer one is the pointer's travel along the arrow at the screen scale, rounded to 0.1 mm.
+#[gpui::test]
+fn a_short_explode_arrow_drag_makes_a_0_mm_step(cx: &mut TestAppContext) {
+    use crate::viewport::ViewportEvent;
+    use gpui_kit::Modifiers;
+    let (window, view) = pattern_assembly(cx, "explode-short");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.edit("Insert : Explode 1", cx, |a| a.exploded_views.push(noshape_model::assembly::ExplodedView { name: "Explode 1".into(), steps: vec![] }));
+            v.activate_explode_from_menu(0, cx);
+            assert!(v.explode_edit, "editing Explode 1");
+            let pin = instance(v, "Part 2 <1>", cx);
+            let steps = |v: &AssemblyView, cx: &gpui_kit::App| v.assembly(cx).unwrap().exploded_views[0].steps.clone();
+            // Across the Z arrow (4 px at right angles to it on screen), then 20 px along it.
+            for (k, along) in [(1, false), (2, true)] {
+                v.selected = vec![pin];
+                let f = v.manipulator(cx).expect("a triad");
+                let vp = v.viewport.clone();
+                let (shaft, tip) = (vp.read(cx).project(f.origin + f.z() * v.manip_size(cx) * 0.6).unwrap(), vp.read(cx).project(f.origin + f.z() * v.manip_size(cx)).unwrap());
+                let up = (tip - shaft).normalize();
+                let to = if along { shaft + up * 20.0 } else { shaft + up.perp() * 4.0 };
+                v.manip_hover = Some(ManipHandle::Axis(2));
+                v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: shaft, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+                v.drag.as_mut().expect("an arrow drag").started = true;
+                v.on_viewport_event(&vp, &ViewportEvent::ToolDrag { position: to }, w, cx);
+                v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: to, modifiers: Modifiers::default() }, w, cx);
+                let s = steps(v, cx);
+                assert_eq!(s.len(), k, "drag {k}: a step made");
+                assert!(v.step_edit.is_some(), "drag {k}: its dialog open");
+                let d = glam::DVec3::from(s[k - 1].translation).dot(f.z()) * 1e3;
+                assert!((d * 10.0 - (d * 10.0).round()).abs() < 1e-6, "drag {k}: {d} mm, in 0.1 mm steps");
+                if along {
+                    let px_per_mm = (vp.read(cx).project(f.origin + f.z() * 1e-3).unwrap() - vp.read(cx).project(f.origin).unwrap()).length();
+                    assert!((d - 20.0 / px_per_mm).abs() <= 0.05 + 1e-9, "drag 2: the travel at the screen scale, {d} mm for 20 px at {px_per_mm} px/mm");
+                } else {
+                    assert_eq!(d, 0.0, "drag 1: a 0 mm step");
+                }
+                v.on_accept(&crate::actions::Accept, w, cx);
+            }
+        })
+    })
+    .unwrap();
+}
