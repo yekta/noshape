@@ -5656,6 +5656,22 @@ impl<'a> Translator<'a> {
         self.query_cache.clear();
         crate::ops::link_sketch_pattern(self.ctx, &args).map_err(|e| e.message)?;
         self.sketch_edits += 1;
+        // An instance is a copy of its seed in live, with no constraints of its own: the horizontal / vertical ours
+        // inferred drawing it would over-define the sketch with the pattern's links (infento's Part grid: its seed's
+        // 80 mm and the spacings, driving in live, came out driven).
+        let instances: HashSet<&str> = cells.iter().filter(|(i, _)| i.iter().skip(1).any(|x| *x > 0)).map(|(_, e)| e.as_str()).collect();
+        let g = self.call("sketch_get", json!({ "sketch": id }))?;
+        let inferred: Vec<Value> = g["constraints"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|c| matches!(c["type"].as_str(), Some("Horizontal" | "Vertical")))
+            .filter(|c| c["entities"].as_array().is_some_and(|e| e.len() == 1 && e[0].as_str().is_some_and(|x| instances.contains(x))))
+            .map(|c| c["id"].clone())
+            .collect();
+        if !inferred.is_empty() && self.call("sketch_delete", json!({ "sketch": id, "constraints": inferred })).is_ok() {
+            self.sketch_edits += 1;
+        }
         Ok(())
     }
 
