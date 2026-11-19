@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 08:27 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 09:42 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -45,19 +45,26 @@ quadrant's snap wakes no alignment source (ours aligns with points only).
 ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
 Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six on green.
 
-## State 08:27 (11-19)
-- Landed today: 4104b148, 24792169, dceaee62 (flat view by the model's up; qa verified af11b6d5), cd1acebd (394e7c79:
-  wave-washer Sketch 4 = live via solver `carried_onto_anchors` + translator anchors-last, clamp-guillem pin order,
-  crossing line -> Vertical, bend face click -> Bends row + flat zone `sm_follow_pick`). Suite F 91/126, 1335/1585.
-- CHECKING 2dbf7d61: conflict colours (live recheck: 50 typed opposite a 40 reds both, not the 30; solver
-  `conflict_dims`: driving dims the sketch solves without join the conflicting set; fuzz write_batch needs the union).
-- QUEUED 32f60584: lead's missing-functionality #1: flat DXF/DWG outline exact (`FlatCurve`, `outline_curves`, field
-  `FlatPattern::outline`, serde default; empty -> loops as before); e2e `the_flat_dxf_writes_arcs_and_circles`.
-- Lead's top 5 (missing functionality, sent to the lead 11-19): 1 flat DXF exact curves (queued); 2 flat export "Include visible
-  sketches" (live default on) + "Splines as polylines" + sheetmetal_export_flat options (live capturing files:
-  live/skasm/q-flat-dxf-1119/, sample 100x60 R5 corner, holes, slot, flange, hole across the bend); 3 pattern / mirror
-  of active sheet metal with Form / SM hole (host sheetmetal.rs "tools of sheet metal holes / forms are not supported
-  yet"); 4 extrude on the flat (opSMFlatOperation, native_args.rs); 5 corner break next to bends (sm_flat.rs:97).
+## State 09:42 (11-19)
+- Landed today: 4104b148, 24792169, dceaee62, cd1acebd, 2dbf7d61 (conflict colours, live rechecked). live rechecked
+  on green bfe09bcd: crossing row 67, conflict row 110, bend-face click row 1704 all =.
+- Lead's missing-functionality list (order set by the lead): #1 / #2 export follow-ups, then #3, then #4 / #5.
+  - QUEUED 32f60584 (#1 flat DXF exact curves `FlatCurve` / `outline_curves`) and 0dae1e11 (ELLIPSE; #2 "Include
+    visible sketches" on MODELSKETCH_VISIBLE via `flat_sketch_curves`, `FlatPattern::sketches`; sheetmetal_export_flat
+    options DWG / version / scope / units / checkboxes; insunits shared; µm scale fix). Live truth:
+    live/skasm/q-flat-dxf-1119 (ARC corner, CIRCLE hole, slot 2 LINE + 2 ARC, hole across a bend 2 ELLIPSE + 2 LINE,
+    bend centreline split around that hole: NOT done yet, small follow-up).
+  - LOCAL 63eb8b124 #3: pattern / mirror of active sheet metal forms each copy (live q-sm-pattern-1119: 80x60 plate,
+    hole, emboss, each part 9638.003952 mm³). opPattern records `body_moves`; set_attribute (`moved_form_tools`,
+    status.rs) rewrites a copied wall attribute's form tool ids to moved ids (`moved_tools`: id -> (tool, transform));
+    transient_ref resolves them; FormTools.moved places shapes and form sketches; the post-rebuild persistent rename
+    keeps moved ids. T2 `a_pattern_or_mirror_of_sheet_metal_carries_its_form_and_hole`; SM T2 96/96, sm matrix 17/17,
+    custom + ops e2e pass. Suite G running on vibe2 (/root/skasm-scratch/suiteg.out, ~/agents/skasm-keep/suite-G-*);
+    land after it equals F (91/126, 1335/1585).
+  - FOUND (pre-existing, next after #3): a flat loses its form outline when a sheet metal hole is on the plate (no
+    pattern needed): flat_of gets the form at the form's rebuild, later rebuilds pass no forms (form tools not found
+    then?). Live shows hole + form circles. Repro: the #3 test's plate; without the hole the flat has its form.
+  - #4 extrude on the flat (opSMFlatOperation), #5 corner break next to bends: live captures queued after studios'.
 - Open (low: geometry matches): infento Part grid's four 80 mm LENGTHs (seed side V2HoieiIDMV9, the pattern's
   direction lines len1 / len2, one more) end driven in ours (E, F and 07:2x builds alike; TRACE "set driven"): live's
   grid instances are tied corner to corner by 401 PATTERN COINCIDENTs, so the spacings follow from the seed's size and
