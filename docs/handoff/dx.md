@@ -164,13 +164,11 @@ R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "I
      size x 1e-6 (HlrOut.exact says the view really was exact). DXF: louver LINE 2356 -> 2360, snap-hook 351 -> 352,
      clamp 263 -> 265, every added line live's but louver's x 7.361 / 7.591 tangents, re-cut (live: one line
      running through the visible stubs on it; ours pieces, before and after). Hidden edges grow (louver 4321 -> 5224).
-   - Edges inside another part (lead 11-19: copy live; live overlap-1119 boxes, overlap2-1119 wedge, clamp-guillem):
-     views.rs inside_other_parts. Another part hides a piece inside it only where the edge gets in and out under its
-     outline (faces seen edge-on), ends inside it, or pierces in from where that part already covers it; pieces are split
-     at the crossings and seen by a ray toward the viewer. clamp-guillem DXF Visible vs live: missing 1.284 -> 0.786 in,
-     extra 1.757 -> 1.647 in (Top = live). Iso: live leaves out plate edge 36 (y -10, z 16) inside the jaw (x ~3-20), ours draws it (0.43 +
-     0.118 in): live draws that stretch in Top; no outline found that explains it. Asked live (REQUESTS 04:27, overlap3). Speed: views of overlapping parts ~2x (clamp
-     6 -> 14 ms), big assembly / 1000-part studio unchanged. Probe: /root/dx-scratch/cg/cgprobe.cpp (vibex8 rr/).
+   - Edges inside another part (live overlap-1119 boxes, overlap2 wedge, overlap3 round / chamfer, clamp-guillem): no
+     single rule fits live (boxes hidden; wedge drawn in Top; a box through another's round hidden over all of it in Top,
+     even the piece outside; clamp-guillem's plate edge drawn in Top, hidden in Iso). OCCT's plain hiding matches 4 of 5;
+     the outline-rule pass (357d69ab) matched 3 and contradicted overlap3: reverted 11-19 06:32. clamp-guillem's Top stays
+     a known difference. Probe /root/dx-scratch/cg/cgprobe.cpp (vibex8 rr/).
    - Mine after all (core 22:3x: the part = live through every Draft, 22 real circles, 36 lines): housing-draft's
      0.499 in edges bowing 0.3-0.5 mm (live LINEs) and the Right-view hole rim as a SPLINE (live CIRCLE) come from our
      projection (at most Rotieren 1's grazing cut, bool's parked BOOL-ROTIEREN-TANGENT); extension-spring's Top has a second end rectangle (x 2.230 / 2.268) and
