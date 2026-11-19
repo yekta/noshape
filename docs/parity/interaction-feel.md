@@ -889,6 +889,38 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | Radius focused: the box keeps its active look, an edge click goes into it and takes the keyboard out of Radius | = | dialogs matrix "fields / Radius focused, an edge click goes into the box" |
 | Boolean Subtract: picks stay in Tools (no auto-advance); a click on Targets makes it active | = | dialogs matrix "Boolean / Subtract: picks stay in Tools" |
 
+### feature-dialogs-1119 (P0, Extrude / Fillet / Shell / Revolve / Linear pattern, live2 11-19 03:30–04:08) [psui + core]
+
+Block 40 × 30 × 10 plus a Front sketch (10 × 10 rectangle at x 60, a line at x 50), planes hidden (P), F then Z; live on lane 2
+(software GL), ours green bd38f88d3 on :125. Times: a 60 fps x11grab of each display, from the click to the first changed frame
+(the same recorder for both; live's dialog open from the DOM, white on white), 3 runs each. Evidence live/feel/dialogs-1119/
+(orec.py / oan.py, t1.json for live's draw-call frames).
+
+| Item | Live | Ours | Status |
+|---|---|---|---|
+| Keyboard on opening (Shell, Revolve, Linear pattern; Extrude / Fillet in the Dialogs matrix) | the first selection box active (Faces to remove; Faces and sketch regions to revolve; Entities to pattern); ✓ pale while it is empty; Tab orders as the Dialogs matrix | the same (focus.png) | = |
+| A pick in the first box | the box stays active: no move to Revolve axis or Direction (a click on that box first); with Part pattern's Entities active, an edge of the same part toggles Part 1 out | the same | = |
+| Dialog open (toolbar click) | 145–270 ms to the dialog in the DOM | 61–136 ms to the dialog on screen | = (faster) |
+| Pick → first frame (the pick lit) | 95–352 ms | 7–39 ms | = (faster) |
+| Pick → preview drawn: Extrude (Add 25 mm on the top face) | 1.95–2.08 s; settled ~2.3–2.6 s | 0.39–0.91 s; settled 0.79–1.48 s | = (faster) |
+| …Fillet (R from memory, the top front edge) | 1.77–2.14 s | 0.21–0.59 s | = (faster) |
+| …Shell (top face, 2.5 mm) | 1.35–1.85 s | 0.43–0.65 s; settled 0.53–0.86 s | = (faster) |
+| …Revolve (the region, then the line as axis, Full revolve) | 1.59–1.74 s (draw calls: the torus at 0.83–1.28 s, settled 2.4–2.9 s) | 0.31–0.32 s; settled 0.42–0.58 s | = (faster) |
+| …Linear pattern (Part 1, Direction the front edge, 25 mm × 2) | 1.68–1.80 s | 0.21–0.41 s | = (faster) |
+| Typing during Extrude's arrow drag (button held) | Depth (28.3 mm, selected) takes the typed "40"; further drag moves no longer change it; release keeps 40, Enter "40 mm" (m1-*.png) | the typed 40 is overwritten by the next drag move (29.6 mm) and the release keeps 29.6 (om1-fields.png) | ≠ [psui] |
+| Arrow reach, step, no snap to geometry, click flips (Extrude); Fillet's handle | as the Dialogs matrix rows (live manip-feel-1118 / manip-1118b); the same 28.3 mm at the same 30 px drag here | the same | = |
+| Instance count "1+2" / "1" / Distance "1 in" | "1+2" kept while focused, "3" after blur; "1" accepted; "1 in" → "25.4 mm" | the same | = |
+| Instance count "2.5" | pink rgb(249,235,236), title red, ✓ disabled; tooltip "Enter a valid expression." (x1-p25.png) | accepted: no pink, title black, ✓ on, no tooltip (ox1-grid.png) | ≠ [core] |
+| Shell thickness "1 in" / "-2" / "20" (block 10 mm) | "25.4 mm"; "-2 mm" pink, title red, ✓ off; 20 mm: title red, the part red see-through with red edges, the entry red | the same (osb.png) | = |
+| Two Enters in the same instant after typing Depth (preview pending) | the first takes the value, the second is dropped: the dialog stays, "40 mm" selected; from a 150 ms gap the second commits | commits at once | ≠ [psui] (minor) |
+| ✓ clicked right after typing (no Enter) | applies 40 mm, the dialog stays; Enter then ✓ (0–1500 ms) commits | the same | = |
+| Enter, then Esc 50 ms later | cancels the dialog (one Esc: the value was sent) | the same | = |
+| Re-edit (double-click Extrude 2) | 98–173 ms to the dialog; its first box active | 101–168 ms on screen | = |
+| The picked face under the preview (new pick and re-edit) | an orange outline and a warm tint on the face (rgb(129,136,120) at the face's middle; the body above see-through grey) | the orange outline only, the face stays blue rgb(96,129,147) (rcmp2.png) | ≠ [psui] |
+| A picked sketch region while the dialog can't preview (Revolve, no axis yet) | the region orange (selected) | the region red with a red outline (rv.png) | ≠ [psui] |
+| A closed sketch profile at rest (Sketch 2's rectangle) | filled light grey | outline only (o-view vs g1) | ≠ [psui] |
+| Hidden default planes in the feature list | grey rows, no icon | grey rows with an eye-slash icon on each | ≠ [psui] |
+
 ### featurelist-feel (feature list, live2 11-17 23:25)
 
 | Finding | Ours | Test |
