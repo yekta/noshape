@@ -111,6 +111,25 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "assembly",
+            verb: "derived_mirror",
+            summary: "A \"<assembly>-Mirrored\" assembly's Derived mirror: its Mirror strategy per part",
+            description: "The \"Derived mirror\" node a Mirror's Derived subassembly makes (its dialog: Assembly to mirror, Mirror strategy…): the source assembly's instances mirrored in its XY plane. Without `strategy`, replies with the node's source and rows. `strategy`: per source part instance {\"instance\", \"action\", \"placement\"}, as assembly_pattern's: `transform` places the same part by `placement`, `derived` uses its Part Studio's \"<Part Studio>-Mirrored\" part (made when missing: \"Create mirrored Part Studio\"). One edit (\"Edit : Derived mirror\").",
+            fields: vec![
+                doc_field(),
+                asm_field(),
+                opt("node", s(), "The Derived mirror instance (default: the assembly's one)."),
+                opt(
+                    "strategy",
+                    json!({ "type": "array", "items": { "type": "object", "properties": { "instance": { "type": "string" }, "action": { "type": "string", "enum": ["transform", "derived"] }, "placement": { "type": "string", "enum": PLACEMENTS.map(|p| p.0) } }, "required": ["instance"] } }),
+                    "Rows by the source assembly's part instances (ids or names); rows left out keep theirs.",
+                ),
+            ],
+            mutates: true,
+            destructive: false,
+            run: derived_mirror,
+        },
+        Op {
+            group: "assembly",
             verb: "pattern",
             summary: "Pattern instances: linear, circular, mirror, part pattern or replicate",
             description: "The Linear / Circular pattern, Mirror, Part pattern and Replicate dialogs. Linear copies the seeds along a direction (an edge, a face's normal or a mate connector's Z axis), optionally in a second direction; circular copies them about an axis; mirror copies them across a plane. Part pattern re-creates the seed's mate on every copy of its target made by a Part Studio pattern; replicate re-creates it on all matching geometry (every hole of the same size). Give `edit` to change an existing pattern: fields left out keep their values. One edit (\"Insert : Linear pattern 1\").",
@@ -131,7 +150,7 @@ pub fn ops() -> Vec<Op> {
                 opt(
                     "strategy",
                     json!({ "type": "array", "items": { "type": "object", "properties": { "instance": { "type": "string" }, "action": { "type": "string", "enum": ["transform", "derived"] }, "placement": { "type": "string", "enum": PLACEMENTS.map(|p| p.0) } }, "required": ["instance"] } }),
-                    "Mirror: the Mirror strategy table, per seed {\"instance\", \"action\", \"placement\"}. `transform` (default) places a rigid copy of the part; `derived` uses its opposite-handed version from the Part Studio's \"<Part Studio>-Mirrored\" Part Studio (made when missing: one more edit, \"Create mirrored Part Studio\", in the folder \"Mirrored parts and assemblies\"). `placement` (Derived): auto (default) or the bounding box / origin plane the copy is placed by. Seeds left out keep their row (a new pattern: transform, auto).",
+                    "Mirror: the Mirror strategy table, per seed {\"instance\", \"action\", \"placement\"}. `transform` (default) places a rigid copy of the part; `derived` uses its opposite-handed version from the Part Studio's \"<Part Studio>-Mirrored\" Part Studio, and a subassembly's \"<assembly>-Mirrored\" assembly (a \"Derived mirror\" of its instances, assembly_derived_mirror; either made when missing: one more edit, \"Create mirrored Part Studio\", in the folder \"Mirrored parts and assemblies\"). `placement` (Derived): auto (default) or the bounding box / origin plane the copy is placed by. Seeds left out keep their row (a new pattern: transform, auto).",
                 ),
                 opt("mate", s(), "Part pattern / replicate: the seed's mate to follow (default: the seed's only mate)."),
                 opt("scope", json!({ "type": "string", "enum": SCOPES.iter().map(|x| x.0).collect::<Vec<_>>() }), "Replicate: where to match (default: faces_in_parts, or edges_on_face when the seed mate is on an edge)."),
@@ -500,6 +519,72 @@ fn pattern(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     v["created"] = json!(created.iter().map(|i| format!("inst:{}", i.0)).collect::<Vec<_>>());
     v["message"] = json!(format!("{} instance(s) created.", created.len()));
     Ok(v.into())
+}
+
+fn derived_mirror(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = target(ctx, a)?;
+    let asm = assembly(od, tab)?.clone();
+    let is_node = |i: &&noshape_model::assembly::Instance| matches!(i.source, InstanceSource::DerivedMirror { .. });
+    let node = match a.opt_str("node")? {
+        Some(n) => {
+            let id = find_instance(&asm, n, "node")?;
+            asm.instance(id).filter(is_node).ok_or_else(|| OpError::param("node", "not a Derived mirror"))?
+        }
+        None => asm.instances.iter().find(is_node).ok_or_else(|| OpError::param("tab", "no Derived mirror in this assembly (a Mirror's Derived subassembly makes one)"))?,
+    };
+    let (node_id, node_name) = (node.id, node.name.clone());
+    let InstanceSource::DerivedMirror { assembly: src_tab, derived, placement, .. } = node.source.clone() else { return Err(OpError::param("node", "not a Derived mirror")) };
+    let src = match od.doc().tab(src_tab).map(|t| (&t.name, &t.content)) {
+        Some((name, TabContent::Assembly(s))) => (name.clone(), (**s).clone()),
+        _ => return Err(OpError::invalid("its assembly to mirror was deleted")),
+    };
+    let (src_name, src) = src;
+    let (mut derived, mut placement) = (derived, placement);
+    let rows = a.opt_array("strategy")?.cloned().unwrap_or_default();
+    for (i, row) in rows.iter().enumerate() {
+        let f = format!("strategy[{i}]");
+        let id = find_instance(&src, row.get("instance").and_then(Value::as_str).unwrap_or_default(), &format!("{f}.instance"))?;
+        match row.get("action").and_then(Value::as_str) {
+            Some("derived") if !matches!(src.instance(id).map(|i| &i.source), Some(InstanceSource::Part { .. })) => return Err(OpError::param(&format!("{f}.action"), "Derived takes a part instance")),
+            Some("derived") if !derived.contains(&id) => derived.push(id),
+            Some("transform") => derived.retain(|d| *d != id),
+            Some("derived") | None => {}
+            Some(_) => return Err(OpError::param(&format!("{f}.action"), "transform or derived")),
+        }
+        if let Some(p) = row.get("placement") {
+            let p = PLACEMENTS.iter().find(|x| Some(x.0) == p.as_str()).map(|x| x.1).ok_or_else(|| OpError::param(&format!("{f}.placement"), &PLACEMENTS.map(|p| p.0).join(", ")))?;
+            placement.retain(|(s, _)| *s != id);
+            if p != MirrorPlacement::Auto {
+                placement.push((id, p));
+            }
+        }
+    }
+    if !rows.is_empty() {
+        let missing: Vec<TabId> = sa::derived_seed_studios(&src, &derived).into_iter().filter(|s| od.doc().mirrored_tab(*s).is_none()).collect();
+        if !missing.is_empty() {
+            od.session.edit_document(sa::CREATE_MIRRORED_STUDIO, |d| {
+                for s in &missing {
+                    d.ensure_mirrored_tab(*s);
+                }
+            })?;
+        }
+        let mirrored_studios = sa::mirrored_studios(od.doc(), &src, &derived);
+        let result = solve(od, tab, &SolveOptions::default())?;
+        let (d, pl) = (derived.clone(), placement.clone());
+        commit(od, tab, &format!("Edit : {node_name}"), &result, |a| {
+            if let Some(n) = a.instance_mut(node_id) {
+                n.source = InstanceSource::DerivedMirror { assembly: src_tab, derived: d, placement: pl, mirrored_studios };
+            }
+        })?;
+    }
+    let label = |id: InstanceId| PLACEMENTS.iter().find(|x| x.1 == placement.iter().find(|(i, _)| *i == id).map(|(_, p)| *p).unwrap_or_default()).map_or("auto", |x| x.0);
+    let out: Vec<Value> = src
+        .instances
+        .iter()
+        .filter(|i| matches!(i.source, InstanceSource::Part { .. }))
+        .map(|i| json!({ "instance": i.name, "action": if derived.contains(&i.id) { "derived" } else { "transform" }, "placement": label(i.id) }))
+        .collect();
+    Ok(json!({ "node": node_name, "assembly_to_mirror": src_name, "strategy": out }).into())
 }
 
 fn dissolve(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

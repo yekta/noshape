@@ -241,6 +241,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("assembly_delete", &[r##"{"instances": ["Part 1 <3>"]}"##, r##"{"mates": ["Fastened 2"]}"##]),
     ("assembly_pattern", &[r##"{"kind": "circular", "seeds": ["Bolt <1>"], "direction": {"instance": "Base <1>", "entity": "edge:…"}, "count": 6}"##, r##"{"kind": "mirror", "seeds": ["Bracket <1>"], "direction": {"instance": "Base <1>", "entity": "face:…"}, "strategy": [{"instance": "Bracket <1>", "action": "derived"}]}"##]),
     ("assembly_dissolve_pattern", &[r##"{"pattern": "Circular pattern 1"}"##]),
+    ("assembly_derived_mirror", &[r##"{"tab": "Assembly 1-Mirrored"}"##, r##"{"tab": "Assembly 1-Mirrored", "strategy": [{"instance": "Plate <1>", "action": "derived"}, {"instance": "Pin <1>", "placement": "origin_xy"}]}"##]),
     ("assembly_bom", &[r##"{}"##, r##"{"type": "structured", "csv": "/tmp/bom.csv"}"##]),
     ("assembly_bom_settings", &[r##"{"type": "flattened", "columns": ["Item", "Quantity", "Part number", "Name"]}"##]),
     ("assembly_interference", &[r##"{}"##, r##"{"instances": ["Bolt <1>", "Base <1>"]}"##]),

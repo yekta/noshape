@@ -9372,6 +9372,19 @@ fn a_derived_mirror_of_a_subassembly_makes_its_mirrored_assembly() {
     call(&mut ctx, "assembly_pattern", json!({ "tab": "Assembly 1", "edit": "Mirror 1", "strategy": [{ "instance": "Sub <1>", "action": "derived" }] }));
     let tabs = call(&mut ctx, "document_info", json!({}))["tabs"].clone();
     assert_eq!(tabs.as_array().unwrap().iter().filter(|t| t["name"] == "Sub-Mirrored").count(), 1, "{tabs}");
+    // The node's own Mirror strategy (live2 m10–m12): Part 1 Derived makes "Part Studio 1-Mirrored"; the copy stays put.
+    let n = call(&mut ctx, "assembly_derived_mirror", json!({ "tab": "Sub-Mirrored" }));
+    assert_eq!(n["assembly_to_mirror"], "Sub", "{n}");
+    assert_eq!(n["strategy"], json!([{ "instance": "Part 1 <1>", "action": "transform", "placement": "auto" }]), "{n}");
+    let n = call(&mut ctx, "assembly_derived_mirror", json!({ "tab": "Sub-Mirrored", "strategy": [{ "instance": "Part 1 <1>", "action": "derived" }] }));
+    assert_eq!(n["strategy"][0]["action"], "derived", "{n}");
+    let tabs = call(&mut ctx, "document_info", json!({}))["tabs"].clone();
+    assert!(tabs.as_array().unwrap().iter().any(|t| t["name"] == "Part Studio 1-Mirrored"), "{tabs}");
+    // (The mirrored studio's part has no mass override: its bottom face instead, at z -10 mm.)
+    let f = call(&mut ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": copy, "kind": "faces", "normal": [0, 0, -1] }));
+    assert!(near(&f["faces"][0]["centroid"], [20.0, 10.0, -10.0]), "the Derived part where the Transform one was: {f}");
+    let e = try_call(&mut ctx, "assembly_derived_mirror", json!({ "tab": "Assembly 1" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("tab"), "{e:?}");
 }
 
 /// Live2 mass-override-1119: a part's Center of mass override moves its inertia to the new centre (parallel axis), its
