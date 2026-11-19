@@ -1097,25 +1097,50 @@ struct Open
   TopoDS_Wire                            wire;
   double                                 t0 = 0, t1 = 0, len = 0;
 
+  // A point profile (a loft to a vertex): no curve, every abscissa the point.
+  bool   point = false;
+  gp_Pnt apex;
+  // Abscissae proportional to the curve's parameter, not its arc length (through more than two profiles, as live).
+  bool by_param = false;
+
   explicit Open(const TopoDS_Wire& w) : c(new BRepAdaptor_CompCurve(w)), wire(w)
   {
     t0  = c->FirstParameter();
     t1  = c->LastParameter();
     len = GCPnts_AbscissaPoint::Length(*c, t0, t1);
   }
+  explicit Open(const gp_Pnt& p) : point(true), apex(p) {}
+  // `s` as a profile: a vertex is a point profile.
+  static Open of(const TopoDS_Shape& s)
+  {
+    if (s.ShapeType() == TopAbs_VERTEX)
+      return Open(BRep_Tool::Pnt(TopoDS::Vertex(s)));
+    return Open(outer_wire(s));
+  }
   gp_Pnt at(double s) const
   {
+    if (point)
+      return apex;
     s = std::clamp(s, 0.0, len);
     if (s < 1e-15)
       return c->Value(t0);
     if (s > len - 1e-15)
       return c->Value(t1);
+    if (by_param)
+      return c->Value(t0 + (t1 - t0) * s / len);
     GCPnts_AbscissaPoint ap(*c, s, t0);
     return c->Value(ap.IsDone() ? ap.Parameter() : t0 + (t1 - t0) * s / len);
   }
-  double abscissa_of(double t) const { return GCPnts_AbscissaPoint::Length(*c, t0, std::clamp(t, t0, t1)); }
+  double abscissa_of(double t) const
+  {
+    if (by_param)
+      return len * (std::clamp(t, t0, t1) - t0) / (t1 - t0);
+    return GCPnts_AbscissaPoint::Length(*c, t0, std::clamp(t, t0, t1));
+  }
   double abscissa(const gp_Pnt& p) const
   {
+    if (point)
+      return 0;
     Extrema_ExtPC ext(p, *c);
     double        best = 1e300, t = t0;
     if (ext.IsDone())
@@ -1136,6 +1161,8 @@ struct Open
   // Arc lengths of the interior corners (tangent breaks between edges).
   std::vector<double> corners() const
   {
+    if (point)
+      return {};
     std::vector<double>      out;
     std::vector<TopoDS_Edge> edges;
     for (BRepTools_WireExplorer x(wire); x.More(); x.Next())
@@ -1498,61 +1525,145 @@ TopoDS_Face face_on_edges(const std::vector<TopoDS_Shape>& bounds, double tol)
 
 } // namespace
 
-std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShape& profile_b, const OcShapeList& guides,
-                                          bool trim_guides, bool trim_profiles)
+// The weights at each of `vs` of a cubic interpolation through values at `nodes` (OCCT's interpolation of each unit
+// vector in x: the interpolant is linear in the values; y the node, as OCCT refuses coincident points).
+// Each profile's weight at each v of a natural cubic spline through the profiles at `nodes` (its second derivative zero at
+// the first and last): as Parasolid's surface across them (live2 q-pipe-loft-1119: c2-surf-workshop-pipe's Loft, sections
+// deeper in its long span than an interpolating cubic's).
+std::vector<std::vector<double>> through_weights(const std::vector<double>& nodes, const std::vector<double>& vs)
 {
-  require_non_null(profile_a.shape, "first profile");
-  require_non_null(profile_b.shape, "second profile");
-  Open         A(outer_wire(profile_a.shape)), B(outer_wire(profile_b.shape));
-  const double size = std::max(A.len, B.len);
-  const double tol  = 1e-7 * (1 + size);
-  // B runs the way A does (its ends nearest A's).
-  const bool flip_b = A.at(0).Distance(B.at(0)) + A.at(A.len).Distance(B.at(B.len)) > A.at(0).Distance(B.at(B.len)) + A.at(A.len).Distance(B.at(0));
-  auto       b_at   = [&](double s) { return B.at(flip_b ? B.len - s : s); };
-  // Each guide from A to B: its parameters there, its arc length between
-  // them and how far it runs on past each profile.
+  const int                        n = (int)nodes.size();
+  std::vector<std::vector<double>> w(vs.size(), std::vector<double>(n, 0.0));
+  for (int q = 0; q < n; ++q)
+  {
+    // The spline through 1 at node q, 0 elsewhere: its second derivatives M by the tridiagonal system.
+    std::vector<double> y(n, 0.0), M(n, 0.0);
+    y[q] = 1.0;
+    if (n > 2)
+    {
+      std::vector<double> a(n, 0.0), b(n, 0.0), c(n, 0.0), d(n, 0.0);
+      for (int i = 1; i + 1 < n; ++i)
+      {
+        const double h0 = nodes[i] - nodes[i - 1], h1 = nodes[i + 1] - nodes[i];
+        a[i] = h0 / 6, b[i] = (h0 + h1) / 3, c[i] = h1 / 6;
+        d[i] = (y[i + 1] - y[i]) / h1 - (y[i] - y[i - 1]) / h0;
+      }
+      for (int i = 2; i + 1 < n; ++i)
+      {
+        const double m = a[i] / b[i - 1];
+        b[i] -= m * c[i - 1];
+        d[i] -= m * d[i - 1];
+      }
+      for (int i = n - 2; i >= 1; --i)
+        M[i] = (d[i] - (i + 2 < n ? c[i] * M[i + 1] : 0.0)) / b[i];
+    }
+    for (size_t j = 0; j < vs.size(); ++j)
+    {
+      const double v = vs[j];
+      int          i = 0;
+      while (i + 2 < n && v > nodes[i + 1])
+        ++i;
+      const double h = nodes[i + 1] - nodes[i], A = nodes[i + 1] - v, B = v - nodes[i];
+      w[j][q] = M[i] * A * A * A / (6 * h) + M[i + 1] * B * B * B / (6 * h) + (y[i] / h - M[i] * h / 6) * A + (y[i + 1] / h - M[i + 1] * h / 6) * B;
+    }
+  }
+  return w;
+}
+
+std::unique_ptr<OcShape> loft_guided_open(const OcShapeList& profiles, const OcShapeList& guides, bool trim_guides,
+                                          bool trim_profiles)
+{
+  std::vector<TopoDS_Shape> ps(profiles.items.begin(), profiles.items.end());
+  if (ps.size() < 2)
+    fail_op("Select at least two profiles, a closed guide curve or a closed path.");
+  for (const TopoDS_Shape& s : ps)
+    if (s.IsNull())
+      fail_invalid("loft: a profile is null");
+  // (A point profile last: the loft runs from the curves to it.)
+  if (ps.front().ShapeType() == TopAbs_VERTEX)
+    std::reverse(ps.begin(), ps.end());
+  std::vector<Open> P;
+  for (const TopoDS_Shape& s : ps)
+    P.push_back(Open::of(s));
+  const size_t n = P.size();
+  for (Open& o : P)
+    o.by_param = n > 2 && !o.point;
+  if (P[0].point)
+    fail_op("Select at least two profiles, a closed guide curve or a closed path.");
+  for (size_t k = 1; k + 1 < n; ++k)
+    if (P[k].point)
+      fail_op("Point profiles can only exist as first or last profiles.");
+  const Open& A    = P[0];
+  double      size = 0;
+  for (const Open& o : P)
+    size = std::max(size, o.len);
+  const double tol = 1e-7 * (1 + size);
+  // Each profile runs the way the one before it does (its ends nearest that one's).
+  std::vector<bool> flip(n, false);
+  auto              p_at = [&](size_t k, double s) { return P[k].at(flip[k] ? P[k].len - s : s); };
+  for (size_t k = 1; k < n; ++k)
+  {
+    const Open&  Q = P[k];
+    const gp_Pnt e0 = p_at(k - 1, 0), e1 = p_at(k - 1, P[k - 1].len);
+    flip[k] = e0.Distance(Q.at(0)) + e1.Distance(Q.at(Q.len)) > e0.Distance(Q.at(Q.len)) + e1.Distance(Q.at(0));
+  }
+  // Each guide from the first profile to the last: its parameters on each, its arc length between the ends and how
+  // far it runs on past each.
   struct G
   {
     std::unique_ptr<Adaptor3d_Curve> c;
-    double                           ta, tb, len, before, after, sa, sb;
+    double                           ta, tb, len, before, after;
+    std::vector<double>              t, s, cum; // per profile: guide parameter, abscissa on the profile, arc from ta
     // Arc lengths from ta to the parameter range's ends.
     double up, down;
     TopoDS_Shape shape; // the guide as selected
+    // The common v of each profile (set once all guides are known).
+    const std::vector<double>* vs = nullptr;
     // Arc length along the curve at parameters `knot` (a dense table: GCPnts_AbscissaPoint fails across a composite
     // guide's kink, c2-hunting-knife's Loft 3, and the point went off the guide).
     std::vector<double> knot, arc;
     void tabulate()
     {
       const double lo = c->FirstParameter(), hi = c->LastParameter();
-      const int    n  = 4000;
-      knot.resize(n + 1);
-      arc.resize(n + 1);
+      const int    m  = 4000;
+      knot.resize(m + 1);
+      arc.resize(m + 1);
       gp_Pnt prev = c->Value(lo);
-      for (int i = 0; i <= n; ++i)
+      for (int i = 0; i <= m; ++i)
       {
-        knot[i]       = lo + (hi - lo) * i / n;
+        knot[i]       = lo + (hi - lo) * i / m;
         const gp_Pnt p = c->Value(knot[i]);
         arc[i]        = i ? arc[i - 1] + p.Distance(prev) : 0.0;
         prev          = p;
       }
     }
-    double arc_at(double t) const
+    double arc_at(double x) const
     {
-      const size_t i = std::min<size_t>(std::upper_bound(knot.begin(), knot.end(), t) - knot.begin(), knot.size() - 1);
+      const size_t i = std::min<size_t>(std::upper_bound(knot.begin(), knot.end(), x) - knot.begin(), knot.size() - 1);
       if (i == 0)
         return 0;
-      return arc[i - 1] + (arc[i] - arc[i - 1]) * (t - knot[i - 1]) / std::max(knot[i] - knot[i - 1], 1e-300);
+      return arc[i - 1] + (arc[i] - arc[i - 1]) * (x - knot[i - 1]) / std::max(knot[i] - knot[i - 1], 1e-300);
     }
-    double param_at_arc(double s) const
+    double param_at_arc(double a) const
     {
-      const size_t i = std::min<size_t>(std::max<size_t>(std::lower_bound(arc.begin(), arc.end(), s) - arc.begin(), 1), arc.size() - 1);
-      const double f = (s - arc[i - 1]) / std::max(arc[i] - arc[i - 1], 1e-300);
+      const size_t i = std::min<size_t>(std::max<size_t>(std::lower_bound(arc.begin(), arc.end(), a) - arc.begin(), 1), arc.size() - 1);
+      const double f = (a - arc[i - 1]) / std::max(arc[i] - arc[i - 1], 1e-300);
       return knot[i - 1] + (knot[i] - knot[i - 1]) * std::clamp(f, 0.0, 1.0);
+    }
+    // Arc length from ta at v: the profiles at their common v, evenly between them.
+    double arc_of(double v) const
+    {
+      if (!vs || vs->size() == 2 || v <= 0 || v >= 1)
+        return v * len;
+      size_t k = 0;
+      while (k + 2 < vs->size() && v > (*vs)[k + 1])
+        ++k;
+      return cum[k] + (cum[k + 1] - cum[k]) * (v - (*vs)[k]) / ((*vs)[k + 1] - (*vs)[k]);
     }
     gp_Pnt at(double v) const
     {
       // Signed arc length from ta along increasing parameter.
-      const double a     = (tb > ta ? 1.0 : -1.0) * v * len;
+      const double a     = (tb > ta ? 1.0 : -1.0) * arc_of(v);
       const double avail = a >= 0 ? up : down;
       if (std::abs(a) <= avail + 1e-15)
         return c->Value(param_at_arc(arc_at(ta) + a));
@@ -1570,32 +1681,72 @@ std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShap
     g.c     = guide_curve(gx);
     g.shape = gx;
     g.tabulate();
-    gp_Pnt pa, pb;
-    if (meet(*g.c, *A.c, A.wire, tol, g.ta, pa) > tol || meet(*g.c, *B.c, B.wire, tol, g.tb, pb) > tol || std::abs(g.ta - g.tb) < 1e-12)
+    g.t.assign(n, 0.0);
+    g.s.assign(n, 0.0);
+    g.cum.assign(n, 0.0);
+    for (size_t k = 0; k < n; ++k)
+    {
+      const Open& Q = P[k];
+      gp_Pnt      at;
+      double      d = 1e300;
+      if (!Q.point)
+        d = meet(*g.c, *Q.c, Q.wire, tol, g.t[k], at);
+      else
+      {
+        // (To a point profile: where the guide passes through it.)
+        for (const double e : {g.c->FirstParameter(), g.c->LastParameter()})
+          if (g.c->Value(e).Distance(Q.apex) < d)
+            d = g.c->Value(e).Distance(Q.apex), g.t[k] = e;
+        Extrema_ExtPC ext(Q.apex, *g.c);
+        if (ext.IsDone())
+          for (int i = 1; i <= ext.NbExt(); ++i)
+            if (std::sqrt(ext.SquareDistance(i)) < d)
+              d = std::sqrt(ext.SquareDistance(i)), g.t[k] = ext.Point(i).Parameter();
+        at = Q.apex;
+      }
+      if (d > tol)
+        fail_op("All guides should intersect each profile boundary.");
+      g.s[k] = flip[k] ? Q.len - Q.abscissa(at) : Q.abscissa(at);
+      // A guide through a profile's end runs along the face's side: its position exactly that end (a projection on
+      // a composite curve lands a hair inside).
+      if (at.Distance(p_at(k, 0)) < tol)
+        g.s[k] = 0;
+      else if (at.Distance(p_at(k, Q.len)) < tol)
+        g.s[k] = Q.len;
+    }
+    g.ta = g.t.front();
+    g.tb = g.t.back();
+    if (std::abs(g.ta - g.tb) < 1e-12)
       fail_op("All guides should intersect each profile boundary.");
+    // The profiles in order along the guide.
+    for (size_t k = 1; k < n; ++k)
+      if ((g.t[k] - g.t[k - 1]) * (g.tb - g.ta) <= 0)
+        fail_op("Could not create loft with given information. Check profile order, guide/profile intersections or end conditions.");
     const double lo = g.c->FirstParameter(), hi = g.c->LastParameter();
     g.len    = GCPnts_AbscissaPoint::Length(*g.c, std::min(g.ta, g.tb), std::max(g.ta, g.tb));
     g.before = GCPnts_AbscissaPoint::Length(*g.c, g.ta < g.tb ? lo : g.ta, g.ta < g.tb ? g.ta : hi);
     g.after  = GCPnts_AbscissaPoint::Length(*g.c, g.ta < g.tb ? g.tb : lo, g.ta < g.tb ? hi : g.tb);
     g.up     = GCPnts_AbscissaPoint::Length(*g.c, g.ta, hi);
     g.down   = GCPnts_AbscissaPoint::Length(*g.c, lo, g.ta);
-    g.sa     = A.abscissa(pa);
-    g.sb     = flip_b ? B.len - B.abscissa(pb) : B.abscissa(pb);
-    // A guide through a profile's end runs along the face's side: its position exactly that end (a projection on a
-    // composite curve lands a hair inside).
-    if (pa.Distance(A.at(0)) < tol)
-      g.sa = 0;
-    else if (pa.Distance(A.at(A.len)) < tol)
-      g.sa = A.len;
-    if (pb.Distance(b_at(0)) < tol)
-      g.sb = 0;
-    else if (pb.Distance(b_at(B.len)) < tol)
-      g.sb = B.len;
+    for (size_t k = 1; k + 1 < n; ++k)
+      g.cum[k] = GCPnts_AbscissaPoint::Length(*g.c, std::min(g.ta, g.t[k]), std::max(g.ta, g.t[k]));
+    g.cum[n - 1] = g.len;
     gs.push_back(std::move(g));
   }
   if (gs.empty())
     fail_invalid("loft: no guides");
-  std::sort(gs.begin(), gs.end(), [](const G& x, const G& y) { return x.sa < y.sa; });
+  // Each profile's v: its mean share of the guides' lengths.
+  std::vector<double> vs(n, 0.0);
+  vs[n - 1] = 1;
+  for (size_t k = 1; k + 1 < n; ++k)
+  {
+    for (const G& g : gs)
+      vs[k] += g.cum[k] / g.len;
+    vs[k] /= (double)gs.size();
+  }
+  for (G& g : gs)
+    g.vs = &vs;
+  std::sort(gs.begin(), gs.end(), [](const G& x, const G& y) { return x.s[0] < y.s[0]; });
   // The v range: the profiles, or on to the guides' ends.
   double vlo = 0, vhi = 1;
   if (!trim_guides)
@@ -1604,43 +1755,63 @@ std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShap
       vlo = std::min(vlo, -g.before / g.len);
       vhi = std::max(vhi, 1 + g.after / g.len);
     }
-  // The u range: the whole profiles, or between the outermost guides.
-  double a0 = 0, a1 = A.len, b0 = 0, b1 = B.len;
-  if (trim_profiles && gs.size() > 1)
+  // The u range: the whole profiles, or between the outermost guides. Seams: the ends and the corners, as many on
+  // each profile as on the first.
+  std::vector<std::vector<double>> seams(n);
+  for (size_t k = 0; k < n; ++k)
   {
-    a0 = gs.front().sa;
-    a1 = gs.back().sa;
-    b0 = std::min(gs.front().sb, gs.back().sb);
-    b1 = std::max(gs.front().sb, gs.back().sb);
+    double lo = 0, hi = P[k].len;
+    if (trim_profiles && gs.size() > 1)
+    {
+      lo = std::min(gs.front().s[k], gs.back().s[k]);
+      hi = std::max(gs.front().s[k], gs.back().s[k]);
+      if (k == 0)
+        lo = gs.front().s[0], hi = gs.back().s[0];
+    }
+    std::vector<double> c = P[k].corners();
+    if (flip[k])
+    {
+      for (double& x : c)
+        x = P[k].len - x;
+      std::sort(c.begin(), c.end());
+    }
+    c.erase(std::remove_if(c.begin(), c.end(), [&](double x) { return x <= lo + tol || x >= hi - tol; }), c.end());
+    if (!P[k].point && k > 0 && c.size() != seams[0].size() - 2)
+      fail_op("Loft guides need profiles with as many corners yet");
+    seams[k].push_back(lo);
+    seams[k].insert(seams[k].end(), c.begin(), c.end());
+    seams[k].push_back(hi);
   }
-  // Seams: the ends and the corners, as many on B as on A.
-  std::vector<double> sa{a0}, sb{b0};
-  std::vector<double> ca = A.corners(), cb = B.corners();
-  if (flip_b)
-  {
-    for (double& x : cb)
-      x = B.len - x;
-    std::sort(cb.begin(), cb.end());
-  }
-  ca.erase(std::remove_if(ca.begin(), ca.end(), [&](double x) { return x <= a0 + tol || x >= a1 - tol; }), ca.end());
-  cb.erase(std::remove_if(cb.begin(), cb.end(), [&](double x) { return x <= b0 + tol || x >= b1 - tol; }), cb.end());
-  if (ca.size() != cb.size())
-    fail_op("Loft guides need profiles with as many corners yet");
-  sa.insert(sa.end(), ca.begin(), ca.end());
-  sb.insert(sb.end(), cb.begin(), cb.end());
-  sa.push_back(a1);
-  sb.push_back(b1);
+  const size_t spans = seams[0].size() - 1;
+  for (size_t k = 1; k < n; ++k)
+    if (P[k].point)
+      seams[k].assign(spans + 1, 0.0);
   BRepBuilderAPI_Sewing sew(1e-6 * (1 + size));
   const int             NU = 48, NV = 24;
-  for (size_t k = 0; k + 1 < sa.size(); ++k)
+  std::vector<double>   grid_v(NV + 1);
+  for (int j = 0; j <= NV; ++j)
+    grid_v[j] = vlo + (vhi - vlo) * j / NV;
+  const std::vector<std::vector<double>> wv = n > 2 ? through_weights(vs, grid_v) : std::vector<std::vector<double>>();
+  for (size_t k = 0; k < spans; ++k)
   {
-    const double la = sa[k + 1] - sa[k], lb = sb[k + 1] - sb[k];
-    std::vector<double> ua{0.0}, ub{0.0};
-    std::vector<int>    cols{-1};
+    std::vector<double> lens(n);
+    for (size_t q = 0; q < n; ++q)
+      lens[q] = seams[q][k + 1] - seams[q][k];
+    const double la = lens[0];
+    // The guides' columns: u on the first profile, and each profile's share of its span there.
+    std::vector<double>              ua{0.0};
+    std::vector<std::vector<double>> uq{std::vector<double>(n, 0.0)};
+    std::vector<int>                 cols{-1};
+    auto                             shares = [&](const G& g) {
+      std::vector<double> w(n);
+      for (size_t q = 0; q < n; ++q)
+        w[q] = lens[q] > 0 ? (g.s[q] - seams[q][k]) / lens[q] : 0.0;
+      return w;
+    };
     for (size_t i = 0; i < gs.size(); ++i)
-      if (gs[i].sa > sa[k] - tol && gs[i].sa < sa[k + 1] + tol)
+      if (gs[i].s[0] > seams[0][k] - tol && gs[i].s[0] < seams[0][k + 1] + tol)
       {
-        const double u = (gs[i].sa - sa[k]) / la, w = (gs[i].sb - sb[k]) / lb;
+        const double u = (gs[i].s[0] - seams[0][k]) / la;
         if (u < 1e-9)
           cols[0] = (int)i;
         else if (u > 1 - 1e-9)
@@ -1648,51 +1819,72 @@ std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShap
         else
         {
           ua.push_back(u);
-          ub.push_back(w);
+          uq.push_back(shares(gs[i]));
           cols.push_back((int)i);
         }
       }
     ua.push_back(1.0);
-    ub.push_back(1.0);
+    uq.push_back(std::vector<double>(n, 1.0));
     cols.push_back(-1);
     for (size_t i = 0; i < gs.size(); ++i)
-      if (std::abs((gs[i].sa - sa[k]) / la - 1) < 1e-9)
+      if (std::abs((gs[i].s[0] - seams[0][k]) / la - 1) < 1e-9)
         cols.back() = (int)i;
-    auto bot = [&](double u) { return A.at(sa[k] + la * u); };
-    auto top = [&](double u) {
+    // Profile q at u: the first profile by its arc length, the others piecewise between the guides.
+    auto prof = [&](size_t q, double u) {
+      if (q == 0)
+        return A.at(seams[0][k] + la * u);
       size_t s = 0;
       while (s + 2 < ua.size() && u > ua[s + 1])
         ++s;
       const double t = (u - ua[s]) / (ua[s + 1] - ua[s]);
-      return b_at(sb[k] + lb * (ub[s] + (ub[s + 1] - ub[s]) * t));
+      return p_at(q, seams[q][k] + lens[q] * (uq[s][q] + (uq[s + 1][q] - uq[s][q]) * t));
+    };
+    // Through the profiles at u, at grid row j: straight between two, a cubic through more.
+    auto across = [&](const std::vector<gp_Pnt>& at, int j) {
+      if (n == 2)
+      {
+        const double v = grid_v[j];
+        return at[0].XYZ() * (1 - v) + at[1].XYZ() * v;
+      }
+      gp_XYZ s(0, 0, 0);
+      for (size_t q = 0; q < n; ++q)
+        s += at[q].XYZ() * wv[j][q];
+      return s;
+    };
+    auto profiles_at = [&](double u) {
+      std::vector<gp_Pnt> at(n);
+      for (size_t q = 0; q < n; ++q)
+        at[q] = prof(q, u);
+      return at;
     };
     // One patch between two guides along its sides (c2-hunting-knife's Loft 3, closing a hole): bounded by the
     // profiles' and guides' own edges, as Parasolid's face (it shares them with the faces around the hole).
-    if (sa.size() == 2 && cols.front() >= 0 && cols.back() >= 0 && vlo == 0 && vhi == 1 && !trim_profiles)
+    if (n == 2 && spans == 1 && cols.front() >= 0 && cols.back() >= 0 && vlo == 0 && vhi == 1 && !trim_profiles && !P[1].point)
     {
-      const TopoDS_Face exact = face_on_edges({A.wire, gs[cols.back()].shape, B.wire, gs[cols.front()].shape}, tol);
+      const TopoDS_Face exact = face_on_edges({A.wire, gs[cols.back()].shape, P[1].wire, gs[cols.front()].shape}, tol);
       if (!exact.IsNull())
       {
         sew.Add(as_analytic(exact, 1e-6 * (1 + size)));
         continue;
       }
     }
+    std::vector<std::vector<gp_Pnt>> col_at(ua.size());
+    for (size_t m = 0; m < ua.size(); ++m)
+      if (cols[m] >= 0)
+        col_at[m] = profiles_at(ua[m]);
     std::vector<std::vector<gp_Pnt>> grid(NU + 1, std::vector<gp_Pnt>(NV + 1));
     for (int i = 0; i <= NU; ++i)
     {
       const double              u = (double)i / NU;
       const std::vector<double> w = hermite_tents(ua, u);
-      const gp_Pnt              pb = bot(u), pt = top(u);
+      const std::vector<gp_Pnt> at = profiles_at(u);
       for (int j = 0; j <= NV; ++j)
       {
-        const double v = vlo + (vhi - vlo) * j / NV;
-        gp_XYZ       s = pb.XYZ() * (1 - v) + pt.XYZ() * v;
+        const double v = grid_v[j];
+        gp_XYZ       s = across(at, j);
         for (size_t m = 0; m < ua.size(); ++m)
           if (cols[m] >= 0)
-          {
-            const gp_XYZ lin = bot(ua[m]).XYZ() * (1 - v) + top(ua[m]).XYZ() * v;
-            s += (gs[cols[m]].at(v).XYZ() - lin) * w[m];
-          }
+            s += (gs[cols[m]].at(v).XYZ() - across(col_at[m], j)) * w[m];
         grid[i][j] = gp_Pnt(s);
       }
     }

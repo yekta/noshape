@@ -1246,10 +1246,18 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         guides_leave_within(&last.shape, &guides, end)?;
         // Surface lofts of open profiles (live "psb (10-26 c)"): Trim guides
         // and Trim profiles.
+        // (Not yet to a point profile: the kernel's surface there lacks the end and guide conditions, c2-surf-workshop-
+        // singularities' Problem loft 2678.7 mm², live 3425.0; it fails as before rather than build a wrong face.)
         let open = !solid && shapes.iter().all(|s| s.shape_type() != ShapeType::Face && s.is_closed().is_ok_and(|c| !c));
+        // (Through more than two profiles only without end conditions: they aren't applied there yet. A guide's
+        // derivative doesn't shape live's face there: c2-surf-workshop-pipe's Loft, the same poles with None or Normal
+        // to guide at any magnitude, live2 q-pipe-loft-1119.)
+        let ends = !ev.is("startCondition", "DEFAULT") || !ev.is("endCondition", "DEFAULT");
+        if open && shapes.len() > 2 && ends {
+            return err("Loft guides with more than two profiles are not supported yet");
+        }
         let shape = if open {
-            let [a, b] = shapes.as_slice() else { return err("Loft guides with more than two profiles are not supported yet") };
-            k::loft_guided_open(a, b, &guides, ev.bool("trimGuidesByProfiles"), ev.bool("trimProfiles")).map_err(guided_error)?
+            k::loft_guided_open(&shapes, &guides, ev.bool("trimGuidesByProfiles"), ev.bool("trimProfiles")).map_err(guided_error)?
         } else {
             loft_guided(&shapes, &guides, solid)?
         };

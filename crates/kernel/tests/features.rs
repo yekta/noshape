@@ -174,12 +174,94 @@ fn a_loft_along_guides_of_several_curves_runs_through_them() {
     let b = chain(&[p(0.0, 10.0), p(10.0, 10.0)]);
     let g1 = chain(&[p(0.0, 0.0), p(-2.0, 5.0), p(0.0, 10.0)]);
     let g2 = chain(&[p(10.0, 0.0), p(12.0, 5.0), p(10.0, 10.0)]);
-    let r = loft_guided_open(&a, &b, &[g1, g2], true, false).unwrap();
+    let r = loft_guided_open(&[a, b], &[g1, g2], true, false).unwrap();
     let faces = r.faces();
     assert_eq!(faces.len(), 1);
     assert_eq!(faces[0].edges().len(), 6, "the profiles' 2 and the guides' 4 edges");
     assert!(close(faces[0].area().unwrap(), 120.0, 1e-6), "area {}", faces[0].area().unwrap());
     assert!(faces[0].is_valid());
+}
+
+/// A surface loft from an open profile to a point between two guides (c2-surf-workshop-singularities' Problem loft):
+/// one face pinched at the point, bounded by the profile and the guides (live 1/3/3). Thickened where its normal has
+/// no one direction at the point (here a cone over a bent profile), it fails as Parasolid's does, where OCCT's offset
+/// crashed.
+#[test]
+fn a_surface_loft_to_a_point_between_guides_pinches_there() {
+    let v = |x: f64, y: f64, z: f64| DVec3::new(x, y, z);
+    let (a0, a1, apex) = (v(-10., 0., 0.), v(10., 0., 0.), v(0., 20., 0.));
+    let profile = make_bspline(&[a0, v(0., 0., 8.), a1], None, &[0.0, 1.0], &[3, 3], 2, false).unwrap();
+    let guides = [make_wire(&[make_line(a0, apex).unwrap()]).unwrap(), make_wire(&[make_line(a1, apex).unwrap()]).unwrap()];
+    let r = loft_guided_open(&[make_wire(&[profile]).unwrap(), make_vertex(apex).unwrap()], &guides, true, false).unwrap();
+    let faces = r.faces();
+    assert!(faces.len() == 1 && faces[0].is_valid());
+    assert!(faces[0].project_point(apex).unwrap().distance < 1e-6);
+    let t = r.shown_topology().unwrap();
+    let edges = (0..t.edges.len()).filter(|&i| t.edges[i] && t.joined[i] == i).count();
+    assert_eq!((edges, t.vertices.iter().filter(|x| **x).count()), (3, 3), "the profile and the two guides");
+    assert!(thicken(&r, 1.0, 0.0).is_err());
+}
+
+/// A surface loft through three open profiles along two guides (c2-surf-workshop-pipe's Loft): one face through every
+/// profile. Half circles along straight guides make half a cylinder, π·5·10 mm².
+#[test]
+fn a_surface_loft_through_three_profiles_along_guides_passes_each() {
+    let half = |y: f64| make_wire(&[make_arc(DVec3::new(0.0, y, 0.0), DVec3::Y, DVec3::X, 5.0, 0.0, PI).unwrap()]).unwrap();
+    let side = |x: f64| make_wire(&[make_line(DVec3::new(x, 0.0, 0.0), DVec3::new(x, 10.0, 0.0)).unwrap()]).unwrap();
+    let r = loft_guided_open(&[half(0.0), half(3.0), half(10.0)], &[side(5.0), side(-5.0)], true, false).unwrap();
+    let faces = r.faces();
+    assert!(faces.len() == 1 && faces[0].is_valid());
+    assert!(close(faces[0].area().unwrap(), PI * 50.0, 1e-5), "area {}", faces[0].area().unwrap());
+    // (The arcs' middles, (0, y, -5): x along X, the axis Y.)
+    for y in [0.0, 3.0, 10.0] {
+        assert!(faces[0].project_point(DVec3::new(0.0, y, -5.0)).unwrap().distance < 1e-6, "profile at y {y}");
+    }
+}
+
+/// c2-surf-workshop-pipe's Loft (live2 q-pipe-loft-1119): a surface through three open profiles (a degree-8 spline and
+/// two half ellipses) along two guides in y = 0. Across the profiles live's face follows a natural cubic spline, each
+/// profile paired by its own parameter; it is exact on its four boundaries and within 0.1 mm of live's face inside
+/// (live skins ~13 sections of its own rule with C1 cubics: the rest, up to 0.093 mm in the long span, is that rule).
+#[test]
+fn a_surface_loft_through_three_profiles_along_curved_guides_is_live_s_face() {
+    let mm = |p: [f64; 3]| DVec3::from(p) * 1e-3;
+    let bezier = |poles: &[[f64; 3]]| {
+        let poles: Vec<DVec3> = poles.iter().map(|&p| mm(p)).collect();
+        let n = poles.len() as u32;
+        make_wire(&[make_bspline(&poles, None, &[0.0, 1.0], &[n, n], n - 1, false).unwrap()]).unwrap()
+    };
+    // Live's half ellipses: the minor axis the chord between the guides, bulging by the major radius to -y.
+    let half = |center: [f64; 3], axis: [f64; 3], major: f64, minor: f64| {
+        let plane = Plane::new(mm(center), DVec3::from(axis), DVec3::NEG_Y);
+        let arc = Segment2d::EllipseArc { center: DVec2::ZERO, major_radius: major * 1e-3, minor_radius: minor * 1e-3, rotation: 0.0, start_angle: -PI / 2.0, end_angle: PI / 2.0 };
+        make_wire(&[make_edge_2d(&plane, &arc).unwrap()]).unwrap()
+    };
+    let profiles = [
+        bezier(&[[-99.30368735, 0.0, 40.895774008], [-99.30368735, -2.195254667, 40.895774008], [-99.231770398, -2.8890057, 40.453196968], [-99.567422139, -3.51757044, 42.518798348], [-99.137764681, -6.470724475, 39.874685624], [-98.777409327, -5.852063186, 37.657058166], [-99.010630197, -2.935869154, 39.092299795], [-98.949077387, -2.195254667, 38.713503698], [-98.949077387, 0.0, 38.713503698]]),
+        half([-84.76664768020365, 0.0, 39.34171527340307], [0.9803095799927043, 0.0, -0.1974667753687386], 3.384485258188741, 1.238240943523987),
+        half([-46.03655420216658, 0.0, 15.474651511895855], [0.8360187944662634, 0.0, -0.5487008067236423], 5.045092377946346, 4.712022070838416),
+    ];
+    let guides = [
+        bezier(&[[-99.30368735, 0.0, 40.895774008], [-85.02764668, 0.0, 43.410146306], [-71.548910817, 0.0, 38.110364412], [-60.29433874, 0.0, 30.932533198], [-51.082656885, 0.0, 24.422802837], [-43.451063891, 0.0, 19.413990523]]),
+        bezier(&[[0.0, 0.0, -7.491798415], [-30.204061034, 0.0, -7.491798415], [-50.490468646, 0.0, 3.163826863], [-52.251807764, 0.0, 24.575373331], [-82.26342031, 0.0, 44.371887775], [-98.949077387, 0.0, 38.713503698]]),
+    ];
+    let r = loft_guided_open(&profiles, &guides, true, false).unwrap();
+    let faces = r.faces();
+    assert!(faces.len() == 1 && faces[0].is_valid());
+    // (Live 596.6602 mm²; the tube's tight curvature turns hundredths of a millimetre into tenths of a percent.)
+    let area = faces[0].area().unwrap() * 1e6;
+    assert!(close(area, 596.6602, 0.01), "area {area} mm², live 596.6602");
+    // Live's samples on the guides and the end profiles, and inside.
+    let edge = [[-99.303687, 0.000000, 40.895774], [-43.451064, 0.000000, 19.413991], [-99.308479, -2.455337, 40.925265], [-43.944852, -2.965426, 18.661639], [-99.243254, -4.146792, 40.523869], [-45.237608, -4.798043, 16.691952], [-99.049215, -4.516168, 39.329749], [-46.835512, -4.798151, 14.257333], [-98.956635, -2.790301, 38.760013], [-48.128257, -2.965426, 12.287664], [-98.949077, 0.000000, 38.713504], [-48.622045, -0.000000, 11.535313], [-86.834830, 0.000000, 40.962655], [-87.166517, -0.000000, 38.728982], [-74.216638, 0.000000, 37.411537], [-75.920261, -0.000000, 34.101762], [-62.455009, 0.000000, 31.622312], [-65.974055, -0.000000, 27.270649], [-52.128885, 0.000000, 25.193335], [-57.102450, -0.000000, 19.493481]];
+    for p in edge {
+        let d = faces[0].project_point(mm(p)).unwrap().distance;
+        assert!(d < 1e-6, "boundary point {p:?} {} mm off", d * 1e3);
+    }
+    let inner = [[-93.035665, -1.239095, 41.410411], [-80.497889, -0.992808, 39.493762], [-68.246646, -0.977959, 34.583264], [-57.200042, -1.139732, 28.261090], [-47.713913, -1.407479, 21.995116], [-93.115099, -3.060033, 41.275012], [-80.653331, -2.660999, 38.920697], [-68.695406, -2.718481, 33.709690], [-57.972079, -3.124356, 27.205711], [-48.669513, -3.739265, 20.725243], [-93.159310, -4.011423, 40.563397], [-80.928453, -3.212264, 38.159591], [-69.473690, -3.163366, 32.717517], [-59.256024, -3.687032, 25.865100], [-50.222406, -4.554235, 18.808800], [-93.194610, -3.326847, 39.796942], [-81.206569, -2.571384, 37.416903], [-70.259634, -2.489114, 31.772486], [-60.546774, -2.920593, 24.566369], [-51.777935, -3.660321, 16.908582], [-93.260124, -1.283805, 39.575879], [-81.366685, -0.977791, 36.872609], [-70.720360, -0.939524, 30.972552], [-61.329442, -1.105588, 23.576410], [-52.737654, -1.394250, 15.664056]];
+    for p in inner {
+        let d = faces[0].project_point(mm(p)).unwrap().distance;
+        assert!(d < 1e-4, "{p:?} {} mm off live's face", d * 1e3);
+    }
 }
 
 /// Live 2291 (c2-hunting-knife's Loft 3, its face to 0.01 µm): between two profiles and two guides along its sides
@@ -197,7 +279,7 @@ fn a_loft_between_guides_fades_them_across_as_live() {
     let share = spline.length().unwrap() / (spline.length().unwrap() + 10.0);
     let g0 = make_wire(&[spline, line(joint, b0)]).unwrap();
     let g1 = make_wire(&[line(a1, b1)]).unwrap();
-    let r = loft_guided_open(&make_wire(&[line(a0, a1)]).unwrap(), &make_wire(&[line(b0, b1)]).unwrap(), &[g0, g1], true, false).unwrap();
+    let r = loft_guided_open(&[make_wire(&[line(a0, a1)]).unwrap(), make_wire(&[line(b0, b1)]).unwrap()], &[g0, g1], true, false).unwrap();
     let faces = r.faces();
     assert_eq!(faces.len(), 1);
     assert!(faces[0].is_valid());
@@ -230,7 +312,7 @@ fn a_loft_guide_of_pieces_runs_at_the_geometric_mean_of_their_speeds() {
     let mean = (spline_speed * line_speed).sqrt();
     let g0 = make_wire(&[spline, line(joint, b0)]).unwrap();
     let g1 = make_wire(&[line(a1, b1)]).unwrap();
-    let r = loft_guided_open(&make_wire(&[line(a0, a1)]).unwrap(), &make_wire(&[line(b0, b1)]).unwrap(), &[g0, g1], true, false).unwrap();
+    let r = loft_guided_open(&[make_wire(&[line(a0, a1)]).unwrap(), make_wire(&[line(b0, b1)]).unwrap()], &[g0, g1], true, false).unwrap();
     let face = r.faces()[0].clone();
     let [u0, u1, v0, v1] = face.uv_bounds().unwrap();
     // The side on the spline (u at one end), run along in v.
@@ -1253,7 +1335,7 @@ fn a_guided_surface_loft_as_live() {
         ("a spline profile", &sp, &lb, vec![g0s, g1s], 2113.2909, ""),
     ];
     for (case, a, b, g, live, kind) in cases {
-        let r = loft_guided_open(a, b, &g, true, false).unwrap();
+        let r = loft_guided_open(&[(*a).clone(), (*b).clone()], &g, true, false).unwrap();
         let faces = r.faces();
         assert_eq!(faces.len(), 1, "{case}");
         let area = faces[0].area().unwrap();
