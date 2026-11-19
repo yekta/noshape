@@ -19,11 +19,10 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
 - Branch asm-mass (stacked on queued 673142ab; land after it): mass overrides (below), 3a ecca84b2e (strategy row of a
   subassembly: assembly icon, "<A>-Mirrored" reference; UI test of Update on a subassembly), 3b a194eedac
   (`assembly_derived_mirror`: the node's source and per-part strategy, Derived makes the "-Mirrored" studio; e2e).
-- 3c next (assembly-ui): the node's row menu as live m10 (Rename, Edit…, Hide, Hide other / all instances, Show center
-  of mass, Isolate…, Make transparent…, Suppress, Dynamic suppression, Zoom to selection, Add selection to folder…,
-  Expand, Collapse, Delete) and its dialog ("Derived mirror": Assembly to mirror, Mirror strategy… table of the
-  source's parts); the Mirror strategy's child rows under a subassembly row (live m7: its parts, Transform / Derived,
-  placement) writing the node's strategy. Shots: live/asm/derived-mirror-1119/m7-expanded.png, m10-*.
+- 3c 53a0e2897: the node's row icon (derived-mirror), menu as live m10, Edit…'s dialog (Assembly to mirror, Mirror
+  strategy… sharing the Mirror's table through `StrategyHost`, Update, ✓ "Edit : Derived mirror"); UI test.
+- 3d next: the Mirror strategy's child rows under a subassembly row (live m7: its parts, Transform / Derived, placement,
+  a chevron) writing the "-Mirrored" assembly's node strategy on ✓. Shot: live/asm/derived-mirror-1119/m7-expanded.png.
 
 ### In flight: mass-property overrides (live2 12:42–12:45, behaviours "asm (11-19)", live/asm/mass-override-1119 c1–c5)
 - Branch asm-mass a96eaf1b2: PartProperties `com_override` (m) / `inertia_override` (kg·m², column by column
