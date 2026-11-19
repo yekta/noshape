@@ -860,6 +860,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   "Onshape Feature Studio", "Onshape Variable Studio", … (crates/app-core/src/properties_dialog.rs: shown as the select's
   value and matched as kind strings at 804-821 / 1054-1058). Shown text should say Noshape; stored data may keep live's
   names if the file format needs them (dx's call).
+  dx 23:1x: also a drawing's part.category property (drawing build.rs) reads "Onshape Part" / "Onshape Assembly" in title-block text.
 - [ ] P0 **STALE-SKETCH-HOVER (psui)**: outside sketch mode a sketch entity's hover look stays after the pointer leaves
   for empty space (green f3bc85da, :110, real pointer, walk 22:12). (a) Draw a circle, the last click on its rim, close
   the sketch with ✓: the region keeps its light-orange hover outline with nothing selected, through pointer moves over
@@ -900,7 +901,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   ("Edi‹root›QA Box 1"); nothing clips it. It should end at the column (live ellipsises long names in its lists; this
   row's exact cut isn't recorded, ask live if needed). Green 624c6db77, walk 23:02. Branch from V1, edit in B1,
   merge dialog (1 tab changed, Replace with B1), toast "Merged B1 into Main. Revert to before this merge" = live.
-- [ ] P1 **DRW-HOLE-TABLE-NOT-SAVED (dx)**: a Hole table placed with ✓ is never recorded: no history entry, and it is gone
+- [x] (qa 23:1x: NOT A BUG, closed as = live. dx: ✓ only starts placing, the table follows the pointer until a click places it (behaviours "dx (2131)"); re-walked with a click after ✓: placed and saved ("Part 1 Drawing 1 :: Hole table"). What I read as placed was the preview; its snap is the preview's frame-corner snap) P1 **DRW-HOLE-TABLE-NOT-SAVED (dx)**: a Hole table placed with ✓ is never recorded: no history entry, and it is gone
   after the app is closed and the document reopened (walk3 Part 1 Drawing 1, green 624c6db77; twice: 22:58 and 23:04:40,
   the second time the app stopped 10 s after ✓). The document's microversions have "Part 1 Drawing 1 :: Note" (22:56) but
   nothing for either table; the view's A1 tag and X/Y origin arrows go too. Steps: Hole table › pick the Top view › Origin
