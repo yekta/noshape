@@ -1545,6 +1545,31 @@ These are what the user sees; reach-1118 (16:29) read the viewer's own pick and 
 | Assembly hover timing ("start two-blocks asm", the pointer jumped onto Part 1's top face, 10 rounds) | the first draw 93–261 ms after the pointer stops (median 255), a second at ~515 ms more; the Part Studio the same (99–263, median 260) | the Part Studio's: the assembly's hover is the shared Viewport's (`prehighlight_delay`, app-core `prehighlight_waits_for_a_pause_as_live`; by the code) | = [asm] |
 | Drawing: a click beside a view selects it (Top view of "start two-blocks", 1:2, left edge, 2 rounds) | selected out to 13 px, not at 14; hover lights at 13, not 14, with no hold (1 px steps, 450 ms, full-page shots, 2 rounds; row "View edge / inside hover reach" has 14–16) | = (fixed 11-19: a reach of 3.45 sheet mm, 13.6 px at the fit's ~3.93 px/mm: lit and taken at 13, not 14; GPUI feel `a_view_lights_and_is_taken_within_its_reach_in_sheet_mm`) | = [studios] |
 
+### sketch-tools-1119 (P0 sketch tools: Line, Rectangle, Circle, Tangent arc, Dimension, Trim; live 11-19 03:58–04:32) [skasm, psui]
+
+Only what the rows above don't already cover (inference reach, snap priority, glyph place, value boxes, Esc / Enter / Space mid-chain, the Trim
+trail and hover). Lane 4, sketch on Top, view normal, 3.44 px/mm; constraints read back by REST after ✓. Ours: green 0576a7b17 on :127, clean
+config, the same strokes; constraints by `noshape sketch get`. Times are live's first frame after the input (software GL, upper bounds).
+Evidence: live/feel/sketch-tools-1119/ (shots, sketch1-constraints.json); ours /root/live-scratch/sk19/ours/.
+
+| Item | Live | Ours | Status |
+|---|---|---|---|
+| Line, press-drag | one segment from the press to the release (dashed preview with its length while held), then the chain ends: no rubber band after the release, the tool stays; first moved frame 6 ms | the same | = |
+| Line, double-click | ends a click-click chain at that point: the segment to it is made, no rubber band follows, the tool stays | the same | = |
+| Line, press-drag from the chain's last end | no tangent arc: the drag only moves the rubber band, the release adds no point, the chain goes on from the same end | the same | = |
+| Line chain: a second segment square to the first | COINCIDENT + PERPENDICULAR to the previous segment, no VERTICAL (H on the first) | VERTICAL, no PERPENDICULAR | ≠ [skasm] |
+| A lone vertical line drawn across a horizontal line (end landing on it) | VERTICAL + COINCIDENT (on the line), no PERPENDICULAR | PERPENDICULAR to the crossed line + COINCIDENT, no VERTICAL | ≠ [skasm] |
+| Corner rectangle (g): click-click or press-drag | both make it; light-blue preview with its width above and height left; made: 4 corner COINCIDENT, PARALLEL × 2, PERPENDICULAR (top–left), HORIZONTAL (top), the width's value box shown; first frame after the first corner 6 ms | the same (corners share points) | = |
+| Centre point rectangle (r) | the same set plus a construction centre point with two MIDPOINT (each diagonal's corners) | the same | = |
+| Esc after the first corner / the circle's centre | nothing is made and the tool ends (toolbar button off) | the same | = |
+| Circle (c): click-click or press-drag | both make it; Ø label left of it while drawn, the Ø value box after; no constraint; a radius point at a line's height takes TANGENT to the line even 150 mm past its end | the same | = |
+| Tangent arc: where it can start | only on a curve's end: the end lights 8 px straight off it (not 10), 7 px diagonally (not 9), not 8 px past it along the line; a click outside starts nothing | 6 px yes, 8 no (the point square) | ≈ (1–2 px) |
+| Tangent arc: made | R label while drawn, then COINCIDENT + TANGENT and the R box; the tool stays but nothing follows the pointer: the next arc needs a new start click on an end | a new tangent arc starts at once from the arc's end and follows the pointer | ≠ [skasm] |
+| Tangent arc preview | a smooth arc | a coarse polyline (about 5 straight pieces), also the next arc | ≠ [skasm] |
+| Dimension: the placement click | the value box (palette) opens 494 ms after the click (first frame 14 ms), the value selected; Enter applies (frame 48 ms), the tool stays | the same box (time not taken) | = |
+| Dimension: press on a line and drag | nothing: no preview, no box, no dimension on release | the same | = |
+| Trim, a drag from empty space | a thin grey trail from the press; each piece goes the moment the trail crosses it (mid-drag, not on release); first trail frame 6 ms | the same | = |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
