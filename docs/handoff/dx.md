@@ -99,6 +99,19 @@ N. Drawings not deterministic: fixed, QUEUED ba3d6cc1 (23:2x; d8ace4d34..6b1a7bc
    hex-bookcase's DXF counts vs live (was LINE 211/206, LWPOLYLINE 17/25; its mesh edges now run one fixed way).
 C. UN-PARKED (lead 11-19 16:2x: 3.4 s and 2.6-3.4x live's per view) fan-blade (~2.6x live a view): Hide in 8 threads over one body's edges was not identical (4 / 17
    corpus drawings) and slower (Front 5.3 -> 9.8 s, Update 6.5 -> 37 s); attempt in /root/dx-scratch/p36.
+   11-19 (Mac private TKHLR, /root/dx-scratch/hlr-retry, dvhlr*.sh): fan-blade's 5 timed items = 3.16M exact line /
+   surface calls (all fan-blade's), 7.7M solves; rejected solves 6.65M = 37.8 s, accepted 0.98M = 2.3 s (max 77 iters,
+   rejects mostly 5-10 iters: no iteration cap to win). One try per start point: views identical, slower (dropped).
+   Classify's line clipped at wLim - TolZ (DXHLR_CLIP): views identical, calls 3.16 -> 2.94M, no faster (dropped).
+   Cause found: 5576 line / surface calls make all 6.45M start points (~1160 each, no tangent zones), every call's ~200
+   results one root at the line's end (the edge's own face: discarded by Classify). The face: a long thin B-spline strip
+   (u 0.0001-0.0009, v 4-47); HLRBRep_Surface types every B-spline OtherSurface, sampled 10 x 10 -> deflection 3.7 mm,
+   so every triangle is a candidate. (Also: NbSamplesU/V(s, u1, u2) divide by first - last: any nbs > 10 becomes 5.)
+   The strip is 0.83 mm x 57 mm (the blade's edge face): 10 x 10 gives deflection 3.7 mm = 4.5x its width.
+   DXHLR_SAMPLES (B-spline faces n x n): 20 identical but no faster; 40: Front 5.8 -> 3.5 s, Top 5.3 -> 3.2, Right / Iso
+   / Update ~unchanged, and fan-blade's views CHANGE (9993 -> 8875 dump lines; other 16 drawings identical). No live
+   fan-blade drawing to judge which is right. Decision asked of the lead (11-19 17:2x): pursue (live2 DXF of fan-blade's
+   4 views + size-based sampling, an OCCT TKHLR patch) or park C.
 Q. asm-robot-relations studio 0c3466's Import 1 (REV-21-1650.STEP): live's stored import = six SURFACE parts, ours one
    valid 174-face solid (OCCT: valid, 171,983 mm3; live's six sheets = that shell less plane face #5090). live2
    rr-import-1118 (02:3x): live's own re-import of the same file today gives ONE solid "Combine1" (154 faces), Import 1
