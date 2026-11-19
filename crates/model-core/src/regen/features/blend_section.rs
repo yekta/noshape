@@ -3304,6 +3304,120 @@ pub fn rim_chamfer_cut(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: k::Ch
     Ok(true)
 }
 
+/// A chamfer of arcs where a plane square to a cylinder's axis meets it, where OCCT's fails (asm-isaac-ball's e54410
+/// Chamfer 1: 2 / 5 mm on an arch's R 10.5 rim, ending at z 0 beside 0.19 mm ledges): the chamfer's section revolved, run
+/// on round the axis past each end, as live's (one cone face, ending on the side planes and the ledges). The part less
+/// the revolved section kept inside the plane faces its run-ons meet. False where it doesn't apply or doesn't come out
+/// one valid solid with less volume.
+pub fn arc_chamfer_run_on(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: k::ChamferSpec, reference: &[Shape]) -> FResult<bool> {
+    use super::sheetmetal_util::{body_named, bool_named};
+    use std::f64::consts::{PI, TAU};
+    let body = ev.ctx.bodies[bi].clone();
+    let shape = &body.shape;
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    let tol = scale * 1e-7;
+    let faces = shape.faces();
+    let ef = shape.edge_faces()?;
+    let mut tools = Vec::new();
+    for &e in edges {
+        let Some(fs) = ef.get(e).filter(|f| f.len() == 2) else { return Ok(false) };
+        let pair = match (faces[fs[0] as usize].face_surface()?, faces[fs[1] as usize].face_surface()?) {
+            (k::Surface::Plane(_), k::Surface::Cylinder { .. }) => [fs[0] as usize, fs[1] as usize],
+            (k::Surface::Cylinder { .. }, k::Surface::Plane(_)) => [fs[1] as usize, fs[0] as usize],
+            _ => return Ok(false),
+        };
+        let Ok(rim) = rim_of(shape, [&faces[pair[0]], &faces[pair[1]]], e, scale) else { return Ok(false) };
+        let edge = shape.sub_shape(ShapeType::Edge, e)?;
+        let info = edge.edge_info()?;
+        if info.closed || rim.axis.dot(rim.np).abs() < 1.0 - 1e-9 {
+            return Ok(false);
+        }
+        // (Along the plane d, along the cylinder w.)
+        let on_plane = reference.iter().any(|r| r.is_same(&faces[pair[0]]));
+        let (d, w) = match spec {
+            k::ChamferSpec::Equal(d) => (d, d),
+            k::ChamferSpec::TwoDistances(a, b) if on_plane => (a, b),
+            k::ChamferSpec::TwoDistances(a, b) => (b, a),
+            k::ChamferSpec::DistanceAngle(a, t) if on_plane => (a, a * t.tan()),
+            k::ChamferSpec::DistanceAngle(a, t) => (a * t.tan(), a),
+        };
+        let mid = 0.5 * (info.first_param + info.last_param);
+        let fr = frame_at(shape, [&faces[pair[0]], &faces[pair[1]]], rim.p, edge.tangent_at(mid)?.normalize(), scale)?;
+        let section = k::make_face_from_wire(&k::make_polyline(&[rim.p, rim.p + fr.u[0] * d, rim.p + fr.u[1] * w], true)?, true)?;
+        // The arc's half sweep about the axis from its middle; the run-on round it past each end, short of half way.
+        let wrap = |a: f64| (a + PI).rem_euclid(TAU) - PI;
+        let am = rim.angle_of(rim.p);
+        let half = wrap(rim.angle_of(info.end) - am).abs().max(wrap(rim.angle_of(info.start) - am).abs());
+        if half >= PI - 1e-3 {
+            return Ok(false);
+        }
+        let ext = (0.9 * (PI - half)).min(PI / 3.0);
+        let ring = k::revolve_between(&section, rim.origin, rim.axis, -(half + ext), half + ext)?.shape;
+        // Cut at each end by the half plane from the axis through it.
+        let big = 4.0 * scale;
+        let half_plane = |q: DVec3| -> FResult<Shape> {
+            let on_axis = rim.origin + rim.axis * (q - rim.origin).dot(rim.axis);
+            let radial = (q - on_axis).normalize();
+            let (a, b) = (on_axis - rim.axis * big, on_axis + rim.axis * big);
+            Ok(k::make_face_from_wire(&k::make_polyline(&[a, b, b + radial * big, a + radial * big], true)?, true)?)
+        };
+        let cells = k::split(std::slice::from_ref(&ring), &[half_plane(info.start)?, half_plane(info.end)?], &k::BooleanOptions::default())?.shape.solids();
+        let side = |c: &Shape| -> FResult<f64> { Ok(wrap(rim.angle_of(c.centroid()?) - am)) };
+        let beyond = |q: DVec3| -> FResult<Option<Shape>> {
+            let aq = wrap(rim.angle_of(q) - am);
+            for c in &cells {
+                let a = side(c)?;
+                if a.signum() == aq.signum() && a.abs() > aq.abs() {
+                    return Ok(Some(c.clone()));
+                }
+            }
+            Ok(None)
+        };
+        let (Some(run0), Some(run1)) = (beyond(info.start)?, beyond(info.end)?) else { return Ok(false) };
+        let Some(middle) = cells.iter().find(|c| side(c).is_ok_and(|a| a.abs() < half)).cloned() else { return Ok(false) };
+        // The whole ring kept on the arc's side of the plane faces its run-ons meet, extended (e54410: the ledges at z 0
+        // and the side planes y 9.5 / 30.5: live's cone ends on them, the part going on past them).
+        let mut walls: Vec<k::Plane> = Vec::new();
+        for (i, f) in faces.iter().enumerate() {
+            if pair.contains(&i) || ![&run0, &run1].iter().any(|r| k::distance(r, f).is_ok_and(|x| x.distance <= tol)) {
+                continue;
+            }
+            if let Some(pl) = f.face_plane()? {
+                walls.push(pl);
+            }
+        }
+        let mut pieces = vec![middle, run0, run1];
+        for pl in &walls {
+            let keep = (rim.p - pl.origin).dot(pl.normal);
+            let mut next = Vec::new();
+            for c in &pieces {
+                for cell in k::split_by_plane(c, pl)?.shape.solids() {
+                    if (cell.centroid()? - pl.origin).dot(pl.normal) * keep > 0.0 {
+                        next.push(cell);
+                    }
+                }
+            }
+            pieces = next;
+        }
+        let ename = body.edges[e].clone();
+        let blend = Arc::new(TopoName::face(ev.feature, Role::Blend(ename.clone())));
+        let generated = Arc::new(TopoName::face(ev.feature, Role::Generated(ename)));
+        for piece in pieces {
+            let names = piece.faces().iter().map(|f| if matches!(f.face_surface(), Ok(k::Surface::Cone { .. })) { blend.clone() } else { generated.clone() }).collect();
+            tools.push(NamedShape::new(piece, names));
+        }
+    }
+    let (cut, names) = bool_named(ev, k::BooleanOp::Cut, &body_named(&body), &tools)?;
+    let cut = NamedShape::new(cut, names);
+    let un = k::unify_same_domain(&cut.shape)?;
+    if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 || un.shape.volume()? >= shape.volume()? {
+        return Ok(false);
+    }
+    let names = ev.name_result(&[&cut.names], &un.history, &un.shape, &BTreeMap::new(), None);
+    ev.replace_body(bi, un.shape, names);
+    Ok(true)
+}
+
 pub fn ring_blend(ev: &mut EvalCtx, bi: usize, rims: &Rims, edges: &[usize], sizes: &[f64], kind: RimBlend) -> FResult<()> {
     use super::sheetmetal_util::{body_named, bool_named};
     let body = ev.ctx.bodies[bi].clone();

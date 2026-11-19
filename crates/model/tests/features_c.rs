@@ -4441,6 +4441,37 @@ fn a_conic_round_beside_a_curved_face_lies_on_it_as_live() {
     assert!((1.2..1.8).contains(&removed), "{removed} mm³ off (live 1.59)");
 }
 
+/// asm-isaac-ball's e54410 Chamfer 1 (feature 51) on its part as Extrude 22 leaves it: TWO_OFFSETS 2 / 5 mm on the R 10.5
+/// arc (28.96 mm) where an arch's top (a cylinder, axis X) meets the side plane x -4; its ends at z 0 beside 0.19 mm
+/// ledges. OCCT's chamfer fails. Live (q-isaac-e54410-ch1): one cone, 2 mm on the plane and 5 on the cylinder, run on
+/// round the axis past each end onto the side planes y 9.5 / 30.5 (63.003 mm²) and the ledges; 47 faces, -137.998 mm³.
+#[test]
+fn an_arch_rims_chamfer_runs_on_round_its_axis_as_live() {
+    let brep = include_str!("data/isaac-e54410-chamfer1-input.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let before = volume(&r, 0) * 1e9;
+    let b = &r.context.bodies[0];
+    let e = b.shape.edges().iter().position(|e| e.edge_info().is_ok_and(|i| near(i.length, mm(28.96), mm(0.01)) && near(i.start.x, mm(-4.0), mm(1e-3)) && near(i.end.x, mm(-4.0), mm(1e-3)))).expect("the arc");
+    let edge = Reference::Edge((*b.edges[e]).clone());
+    s.add("chamfer", move |p| {
+        p.set("entities", ParamValue::Query(vec![edge]));
+        p.set("chamferType", en("TWO_OFFSETS"));
+        p.set("width1", expr("2 mm"));
+        p.set("width2", expr("5 mm"));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    let dv = volume(&r, 0) * 1e9 - before;
+    assert!((dv + 137.998).abs() < 0.05, "{dv} mm³ (live -137.998)");
+    assert_eq!(shape.faces().len(), 47);
+    let cones = shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cone { .. }))).count();
+    assert_eq!(cones, 1);
+    let sides = shape.faces().iter().filter(|f| f.face_plane().ok().flatten().is_some_and(|p| p.normal.y.abs() > 0.999) && (f.area().unwrap() / (mm(1.0) * mm(1.0)) - 63.003).abs() < 0.01).count();
+    assert_eq!(sides, 2, "the side planes the chamfer ends on (live 63.003 mm² each)");
+}
+
 /// c2-impeller-loft's Fillet 4 on its part as feature 32 leaves it (live geo-1118): r 5 on the 54.87 mm B-spline rim
 /// of a 4 mm flange, overflow off. The ball is wider than the flange's side, so the round takes that whole side and
 /// rests on its top edge: one face from z -4 to 0, live's 372.45 mm² and 270.11 mm³ off (this input's side is 2.1 mm
