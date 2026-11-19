@@ -997,6 +997,13 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
   build at load 24, re-check on a release build in the quiet window. Not run: Sketch 3's region (our two-blocks start has no
   Sketch 3), the view cube click.
 
+## Release blockers for the 2026-11-19 17:00 release (qa 16:47: GO on green eb3b06a8 vs v0.4.60)
+User documents and qa's authored documents are the same as in v0.4.60. The ticket fuzz documents differ only by changes the lead
+accepted (cli-shell-hang-pre, cli-draft-hang, cli-suppress-segv). Corpus statuses only got better (Error -> Ok; c2-config-parts-nuts'
+M4 Nyloc = live). Not blocking, sent to core: c2-surf-workshop-split's and -singularities' final parts changed and match live in
+neither build. knifehandle Fillet 2 shows a kernel message in place of Onshape's (blend). The 39 interaction-feel rows are listed in
+"Interaction feel suite 11-19". Details: qa-scratch/compat/cut-1119-1615.txt.
+
 ## Release blockers for the 2026-11-18 17:00 release (qa list 06:25, newest checked green 8b4812511; the latest release is v0.4.58)
 - **Must carry (qa-cut-1615 blocks the cut if the candidate lacks one; list in qa-scratch cut-must.txt)**: psui fff088e5, the fix of
   P0 DOCK-TAB-SWITCH-TRAILING-FRAMES (returns to an open tab settled ~700 ms from v0.4.54, 2219c4373); psui's macOS Ctrl+Enter fix
