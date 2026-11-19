@@ -1011,6 +1011,29 @@ each display from the input (the same recorder for both). Evidence live/feel/doc
 | Create version… (left strip, second icon) | "Create version from Main": Name "V2" focused and selected, Description (Maximum of 10000 characters), the merging note, Create / Create version and edit properties / Cancel; 575 ms, settled 1.0 s | the same dialog and focus; 147 / 364 ms | = (faster) |
 | …Create | the V2 row in the panel at 1.9 s | 133 ms | = (faster) |
 
+### nav-feel-1119 (P0, viewport menus and looks with nothing selected, live2 11-19 07:00–07:20) [psui]
+
+Live on lane 2 (a 40 × 30 × 20 block with Sketch 2, one line on Top, shown; iso, planes hidden, F); ours green daa1bebd1 on :125 with
+the same model by CLI and the same view (the pictures agree to the pixel). Already in rows above, not retaken: orbit (3 turns a
+diagonal, inertia 0.77), pan 1:1, a wheel notch 2^(1/12) about the pointer, the view cube's targets and press rules, 500 ms
+animations for F / Zoom to fit / named views, a face's double-click, the highlight colours and pixel bands. Times: a 60 fps x11grab of
+each display from the right-click to the menu's first frame. Evidence live/feel/nav-feel-1119/ (L* live, O* ours).
+
+| Item | Live | Ours | Status |
+|---|---|---|---|
+| Right-click → menu drawn (face, edge, vertex, empty space, sketch line, Parts row) | 447–844 ms | 69–138 ms | = (faster) |
+| Face menu, nothing selected | Edit Extrude 1…, Edit Sketch 1…, Show dimensions, Show dependencies of Extrude 1… │ New sketch…, Offset plane…, Extrude…, Revolve… │ Hide Part 1, Isolate…, Make transparent…, Section view… │ Copy Part 1 │ Create Drawing of Part 1…, Export as DXF/DWG…, Export… │ Where used for Part 1… │ Select ▸, Select other… │ Add comment │ Zoom to fit, Zoom to selection, View normal to │ Delete Part 1…, Delete Extrude 1 │ Assign material for Part 1…, Edit appearance for Part 1…, Add appearance to face… | the same items and groups (no Add comment: cloud) | = |
+| …"Where used for Part 1…" / "Where used…" (face, edge, vertex, Parts row menus) | with its icon (a part with a ?) | no icon | ≠ [psui] |
+| …a menu too tall to fit below the pointer (the face menu, 627 px, pointer at y 520 of 1079) | flipped above the pointer and stopped at the window's top: y 2–629, over the pointer | moved up only until it meets the window's bottom: y 476–1079 | ≠ [psui] |
+| Edge menu, nothing selected | Edit Extrude 1…, Edit Sketch 1…, Show dimensions, Show dependencies… │ Hide Part 1, Isolate…, Make transparent… │ Copy Part 1 │ Create Drawing of Part 1…, Export… │ Where used for Part 1… │ Select ▸, Select other… │ Zoom to fit │ Delete Extrude 1; at the pointer + (0, 2) | the same items, groups and place | = |
+| Vertex menu, nothing selected | the edge's, plus Add comment after Select other…, Delete Part 1… before Delete Extrude 1, and Assign material / Edit appearance for Part 1… at the end; flipped above the pointer at the bottom | the same (no Add comment), flipped the same way | = |
+| Empty-space menu | Show all │ Select ▸ │ Zoom to fit, Isometric | the same | = |
+| A shown sketch's line (Sketch 2, not editing), nothing selected | Edit Sketch 2…, Show dimensions, Show dependencies of Sketch 2… │ Hide, Hide other sketches, Hide all sketches │ Create Drawing of Sketch 2… │ Select ▸, Select other… │ Zoom to fit │ Delete Sketch 2 │ Edit sketch appearance… | Edit Sketch 2…, **Copy sketch entities**, Show dimensions, Show dependencies… │ Hide, **Curve/surface analysis…** (no Hide other sketches, Hide all sketches) │ Create Drawing of Sketch 2… │ Select ▸, Select other… │ Zoom to fit, **Zoom to selection, Align view with vertical axis** │ Delete Sketch 2 │ Edit sketch appearance… | ≠ [psui] |
+| A shown sketch's line ends at rest | each end a grey dot about 4 px across (rgb 153) | no end dots, the line only | ≠ [psui] |
+| Parts row menu (Part 1) | Rename, Properties…, Assign material…, Edit appearance… │ Copy here…, Copy Part 1 │ Create Drawing of Part 1…, Export…, Where used…, Create task… │ Hide, Isolate…, Make transparent… │ Add comment │ Zoom to selection │ Delete… | the same (no Create task…, Add comment) | = |
+| …the row's eye icon while its menu is open | hidden (shown on the hovered row before the right-click) | still shown | ≠ [psui] |
+| A face hovered | the fill unchanged, the face's boundary edges #FFC685 | the same (#F8C181 blended on the 1 px rim) | = |
+
 ### featurelist-feel (feature list, live2 11-17 23:25)
 
 | Finding | Ours | Test |
