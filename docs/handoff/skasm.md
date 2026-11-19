@@ -1,7 +1,17 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 19:34 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 19:38 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
+
+## Next (lead 19:3x): welding 9c7704 Extrude 8's part order (core handed it; asm's asm-bom 9f52415c has the BOM evidence)
+- Live: the ring region (JpC) picked first, the inner disc (JnC) second -> the disc Part 5, the ring Part 6. Ours by
+  pick order. Corpus scan (/root/skasm-scratch/bo/scan2.py): welding and scissor-lift 4ce5c7 Extrude 2 fit "by sketch
+  body, then x within one", but fed22d Extrude 30 (one body) and 1e6fd7 Extrude 4 (one region per body) go by
+  ascending y: no rule from ids. Asked live (REQUESTS 19:37, q-extrude-part-order-1119, cases A-E) for 21:00; then fix
+  in extrude.rs (profiles order before `apply_operation_from`) and check against suite J (vibex7
+  ~/agents/skasm-keep/suite-J-1119-1831.log), no document worse.
+- interaction-feel.md: no sketch row is open; rows whose test is "missing": the sketch plane field's face label, "Final"
+  on edit, drawing on a face, Show constraints saved on OK, the bend row hover's flat side.
 
 ## In flight 11-19 18:07: qa's feel P0 (rows /root/qa-scratch/suites/1119-1610-eb3b06a8-uipr/rows.txt)
 - QUEUED (this land): line-from-midpoint (a line started at a held line's midpoint, square to it, is Perpendicular:
