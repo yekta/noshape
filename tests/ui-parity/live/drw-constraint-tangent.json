@@ -1,19 +1,23 @@
 {
  "scenario": "drw-constraint-tangent",
- "recorded": "2026-11-15T06:45:51.771Z",
+ "recorded": "2026-11-19T18:29:13.744Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "ea5616e6f8097aa51b64cc83",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "61c6a17cda4d301f42926843",
   "start": "block-drawing",
-  "startElement": "7fc07371758a5353920f612d",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -112,7 +116,7 @@
     1639,
     220
    ],
-   "via": "drawing toolbar ▾ row",
+   "via": "drawing toolbar \u25be row",
    "state": {
     "focus": {
      "kind": "other",
@@ -195,7 +199,7 @@
      "selection": []
     }
    },
-   "t": 216583
+   "t": 221008
   },
   {
    "step": 2,
@@ -287,7 +291,7 @@
      "selection": []
     }
    },
-   "t": 242072
+   "t": 246877
   },
   {
    "step": 3,
@@ -383,7 +387,7 @@
      "selection": []
     }
    },
-   "t": 267330
+   "t": 272970
   }
  ]
 }
