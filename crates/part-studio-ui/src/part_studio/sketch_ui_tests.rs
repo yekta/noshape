@@ -768,6 +768,28 @@ fn dynamic_suppression_box_completes_true(cx: &mut TestAppContext) {
     assert_eq!(expr.as_deref(), Some("true"), "the next Enter applies it");
 }
 
+/// Live sketch-entry-1118: editing a sketch leaves a hidden later sketch hidden (nothing comes back while editing).
+#[gpui::test]
+fn a_hidden_later_sketch_stays_hidden_while_editing(cx: &mut TestAppContext) {
+    let doc = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Front", "shapes": [{ "corner_rectangle": [[0, 0], [10, 10]] }] }
+    ] });
+    let (window, view) = part_studio_from(cx, "hidden-later-sketch", Some(doc));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let id = |cx: &mut TestAppContext, name: &str| cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == name).unwrap().id);
+    let (s1, s2) = (id(cx, "Sketch 1"), id(cx, "Sketch 2"));
+    assert_eq!(cx.update(|cx| view.read(cx).display.sketches.iter().find(|s| s.feature == s2).map(|s| s.hidden)), Some(false), "Sketch 2 shown first");
+    cx.update(|cx| view.update(cx, |v, cx| v.set_visibility(&[Reference::Feature(s2)], true, cx)));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let hidden = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display.sketches.iter().find(|s| s.feature == s2).is_none_or(|s| s.hidden));
+    assert!(hidden(cx), "Sketch 2 hidden");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(s1, w, cx))).unwrap();
+    draw(cx, window);
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some() && !view.read(cx).ui_busy());
+    assert!(hidden(cx), "Sketch 2 still hidden while Sketch 1 is edited");
+}
+
 /// Live (ui-parity extrude-enter-commits): `20` Enter applies "20 mm" and keeps the dialog; the next Enter accepts it.
 #[gpui::test]
 fn enter_applies_then_the_next_enter_accepts(cx: &mut TestAppContext) {

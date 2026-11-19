@@ -1144,7 +1144,7 @@ each display from the input (the same recorder for both). Evidence live/feel/doc
 | A new sketch changes nothing on screen: nothing greys or hides, the view stays [skasm] | = | missing |
 | Another feature row clicked while sketching: nothing | = | list matrix "sketching / another row clicked does nothing" |
 | Editing a sketch rolls back: later rows grey italic, Parts (2) → (1); "Final"; ✗ brings them back | = | list matrix "sketching / later rows grey and the Parts list follows, ✗ brings them back" ("Final": missing) |
-| A hidden later sketch stays hidden while editing | = | missing |
+| A hidden later sketch stays hidden while editing | = | `a_hidden_later_sketch_stays_hidden_while_editing` |
 | Drawing on a face: the light-blue preview, then the solved lines [skasm] | ≈ faster: the solved lines in the closing click's frame (live's 0.58 s preview is its server solve) | missing |
 | Orient normal to sketch on edit: an animated turn once the edit opens; ✗ leaves the view normal | = | sketch_ui_tests::orient_on_edit_turns_to_the_sketch_and_exit_keeps_the_view |
 
