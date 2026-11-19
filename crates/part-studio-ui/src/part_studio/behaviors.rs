@@ -2664,6 +2664,8 @@ impl PartStudioView {
             }
         } else {
             self.set_visibility(&targets, false, cx);
+            // Live shortcuts-ps-1118: Shift+Y on a selected visible part clears the selection.
+            self.selection.clear();
         }
     }
 
@@ -2757,7 +2759,7 @@ impl PartStudioView {
                     }
                 }
             }
-            _ => self.ui.isolate = Some(Isolation { mode, bodies: targets, opacity: 0.0, select_transparent: false, expand: 0 }),
+            _ => self.ui.isolate = Some(Isolation { mode, bodies: targets, opacity: self.remembered_transparency(mode), select_transparent: false, expand: 0 }),
         }
         // Isolating or making transparent the selected parts clears the selection (live 10-27; Make transparent:
         // shortcuts-ps-1118, Shift+T with Part 1 selected).
@@ -2767,12 +2769,40 @@ impl PartStudioView {
     }
 
     pub(super) fn exit_isolate(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        if self.ui.isolate.take().is_none() {
-            return false;
-        }
+        let Some(iso) = self.ui.isolate.take() else { return false };
+        self.remember_transparency(iso.mode, iso.opacity);
         let d = self.display.clone();
         self.apply_display(d, window, cx);
         true
+    }
+
+    /// Live keys-1118: each dialog's Transparency slider opens where the user last left it (across reloads; Isolate's
+    /// and Make transparent's apart), as a remembered setting.
+    fn transparency_key(mode: IsolateMode) -> &'static str {
+        match mode {
+            IsolateMode::Isolate => "view:isolate",
+            IsolateMode::Transparent => "view:makeTransparent",
+        }
+    }
+
+    fn remembered_transparency(&self, mode: IsolateMode) -> f32 {
+        let key = Self::transparency_key(mode);
+        let saved = self.ui.remembered.get(key).cloned().unwrap_or_else(|| crate::feature_settings::get(key));
+        match saved.get("").and_then(|g| g.get("transparency")) {
+            Some(noshape_model::params::ParamValue::Text(t)) => t.parse::<f32>().ok().filter(|f| (0.0..=1.0).contains(f)).unwrap_or(0.0),
+            _ => 0.0,
+        }
+    }
+
+    fn remember_transparency(&mut self, mode: IsolateMode, opacity: f32) {
+        if self.remembered_transparency(mode) == opacity {
+            return;
+        }
+        let key = Self::transparency_key(mode);
+        let mut groups = crate::feature_settings::Groups::new();
+        groups.entry(String::new()).or_default().insert("transparency".to_string(), noshape_model::params::ParamValue::Text(opacity.to_string()));
+        self.ui.remembered.insert(key.to_string(), groups.clone());
+        crate::feature_settings::put(key, &groups);
     }
 
     /// Display to build the scene from: the regenerated display with

@@ -266,6 +266,12 @@ impl PartStudioView {
             && let Some(sd) = self.display.sketches.iter().find(|s| s.feature == sk)
         {
             selection = sd.curves.iter().map(|c| Reference::SketchEntity { sketch: sk, entity: c.entity }).collect();
+            // Live shortcuts-sk-1118 / sketch-readout-1119: the analysed curves are selected in the sketch (orange, the
+            // Length readout).
+            let ids: Vec<noshape_sketch::EntityId> = sd.curves.iter().map(|c| noshape_sketch::EntityId(c.entity)).collect();
+            if let Some(ed) = &mut self.sketch {
+                ed.selection = ids;
+            }
         }
         let mut options = self.ui.tool_memory.options.get(key).cloned().unwrap_or_else(|| {
             // Live 10-27: Dihedral's Scale opens mid-track.

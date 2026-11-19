@@ -3076,6 +3076,32 @@ fn make_transparent_clears_the_selection(cx: &mut TestAppContext) {
     assert_eq!((selection, transparent), (Vec::new(), Some(vec![body])), "(the selection, the parts made transparent)");
 }
 
+/// Live keys-1118: Make transparent's slider reopens where it was left; Isolate's is its own (at the left).
+#[gpui::test]
+fn the_transparency_slider_is_remembered_per_dialog(cx: &mut TestAppContext) {
+    use crate::part_studio::behaviors::IsolateMode;
+    let (window, view, _, _) = block_part(cx, "transparency-kept");
+    let body = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part").id.clone());
+    let open = |cx: &mut TestAppContext, mode: IsolateMode, set: Option<f32>| {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                v.selection = vec![Reference::Body(body.clone())];
+                v.isolate(mode, w, cx);
+                let shown = v.ui.isolate.as_ref().map(|i| i.opacity);
+                if let (Some(f), Some(iso)) = (set, v.ui.isolate.as_mut()) {
+                    iso.opacity = f;
+                }
+                v.exit_isolate(w, cx);
+                shown
+            })
+        })
+        .unwrap()
+    };
+    assert_eq!(open(cx, IsolateMode::Transparent, Some(0.3)), Some(0.0), "first open");
+    assert_eq!(open(cx, IsolateMode::Transparent, None), Some(0.3), "Make transparent again");
+    assert_eq!(open(cx, IsolateMode::Isolate, None), Some(0.0), "Isolate");
+}
+
 /// Fillet's drag arrow as std edgeBlendCommon.fs addFilletControlManipulator: on a block's top edge (a 90° convex edge)
 /// its tip where the round crosses the faces' bisector (offset radius × (1/cos 45° − 1)), into the material; Width
 /// drives the width (offset × |n₀ − n₁| = √2 per width), a conic section its own radius; none for a variable radius.
@@ -6249,4 +6275,31 @@ fn sketch_keys_as_lives(cx: &mut TestAppContext) {
     assert!(!open(cx) && cx.update(|cx| view.read(cx).named_views.is_some()), "Shift+V: the sketch closed, Named views open");
     let names: Vec<String> = cx.update(|cx| view.read(cx).studio(cx).map(|s| s.features.iter().map(|f| f.name.clone()).collect()).unwrap_or_default());
     assert!(names.iter().any(|n| n == "Box"), "the sketch kept as Box: {names:?}");
+}
+
+/// Live shortcuts-sk-1118 / sketch-readout-1119: Shift+C in a sketch with no tool on selects the analysed line in the
+/// sketch (orange) and the bottom right reads its Length.
+#[gpui::test]
+fn curve_analysis_in_a_sketch_selects_the_analysed_line(cx: &mut TestAppContext) {
+    use crate::part_studio::analysis_tools::ToolKind;
+    let (window, view) = sketch_with(cx, "curve-in-sketch", Tool::Line);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (640., 360.));
+    keys(cx, window, &["escape", "escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        if let Some(ed) = &mut v.sketch {
+            ed.selection.clear();
+        }
+        v.toggle_analysis_tool(ToolKind::CurveSurface, w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    let (field, readout) = cx.update(|cx| {
+        let v = view.read(cx);
+        let units = v.doc.read(cx).session.doc.settings.units;
+        let readout = v.sketch_data(cx).zip(v.sketch.as_ref()).map(|(data, ed)| ed.selection_readout(&data, &units)).unwrap_or_default();
+        (v.ui.analysis_tool.as_ref().map(|t| t.selection.len()), readout)
+    });
+    assert_eq!(field, Some(1), "the line in the field");
+    assert_eq!(readout.first().map(|r| r.0.as_str()), Some("Length"), "{readout:?}");
 }

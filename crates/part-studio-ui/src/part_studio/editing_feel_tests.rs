@@ -155,6 +155,14 @@ fn rows() -> Vec<Row> {
             let shown = cx.update(|cx| view.read(cx).display.bodies.iter().filter(|b| !b.hidden).count());
             expect((hidden_by_y, shown), (0, 0), "hidden by Y, shown by Shift+Y")
         } },
+        Row { id: "Shift+Y on a selected shown part", live: "the selection is cleared (shortcuts-ps-1118)", gap: false, check: |cx| {
+            let (window, view) = block(cx, "ed-shift-y-sel");
+            cx.update(|cx| view.update(cx, |v, _| v.selection = v.display.bodies.iter().map(|b| Reference::Body(b.id.clone())).take(1).collect()));
+            keys(cx, window, &["shift-y"]);
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            let selected = cx.update(|cx| view.read(cx).selection.len());
+            expect(selected, 0, "selected after Shift+Y")
+        } },
         Row { id: "eye icons / a click toggles, the selection stays", live: "a row's eye (at its right on hover) toggles that item: Part 1 hidden -> shown, a hidden sketch's closed eye -> shown; the selection as it was", gap: false, check: |cx| {
             let (window, view) = block(cx, "ed-eyes");
             select_feature(cx, &view, "Extrude 1");

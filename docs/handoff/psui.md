@@ -35,30 +35,23 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (lead order after the 22:5x compaction)
+## Now (updated 02:16 UTC 11-19)
 
-1. Landed 22:28 as fea9cbbe (9662a162 + 404f2e1f). Live retakes once /root/green passes it (green is df6be9b6 now).
-2. Queued (land 23:xx, see `land.sh --status`): view cube hold ≥ 490 ms no click; view-cube-iso scenarios via the
-   view menu; Transform ghost (test a_transforms_old_place_is_a_light_grey_ghost); Hole callout leader 14 px and its
-   glyph mesh `on_top` (in-app recheck shot: /root/psui-scratch/mk-hole-shot.py makes the scratch scenario); tooltips
-   wrap at 400 px; a hidden sketch's eye only on hover; chip tooltip right; "#" list redraw; configuration names
-   spreadsheet keys (Tab out of the add row is the input's IndentInline action, not a key event); X11 press-interval
-   double-click; selected cap colour render test. Part Studio lib 273 passed, app-core, render caps, clippy clean.
-2b. HOLD re-queues until the lead's land-daemon fix 58d20676 lands (~00:50, lead says so), then ONE stack.
-   Re-queued 23:55 as 65f89ac4 (failed 00:00, daemon bug) (5 commits: box hold, unit precision, 2a6b696b's rows; the 23:38 failure was the land
-   queue's empty-file-list glitch). Hole callout glyphs: filled but small / thin, size and weight asked of live
-   (REQUESTS 23:33).
-2c. Lead 23:4x: xdev-subs cold first open (qa 40.7 s). Profile (qa's app.log, vibe2 A/B): click -> regen of the
-   inserted Part Studios one at a time (7.5–8 s at load 17–25), the Insert catalog's studios one at a time (3–4 s),
-   apply 0.6–1 s, then one llvmpipe frame ~5 s (not ours). In the worktree: `AssemblyEvaluator::prewarm` regenerates
-   the uncached studios side by side (rayon) before `prepare_inner`: evaluate 3.4–3.6 s, full display ~5 s sooner.
-   The catalog's prewarm doesn't take yet (DBG counts in run34); T2 `dx_perf::timed_cold_assembly_evaluation`
-   (NOSHAPE_ASM_PERF=<copy>); NOSHAPE_AB_NO_PREWARM is a scratch A/B switch: remove before landing. Doc copy
-   vibe2 ~/tmp/psui/asm/xdev.noshape (asm's rebuild, not private). Live's open: 83–94 s.
-2d. Live shortcuts-ps-1118 (5 ≠): Shift+X withdrawn (a saved panel spot); view keys don't re-light under the resting
-   pointer (feel test a_view_key_lights_what_comes_under_the_resting_pointer, running); Shift+T clears the selection
-   (done, test); Delete part: ours solid tan, live a ghost with an orange silhouette (scratch shot mk-del-shot.py);
-   Shift+Y and the slider default wait for live's lane 4.
+1. Queued 00:4x as a46fd345 (6 commits, one land): view cube hold ≥ 490 ms no click; Transform ghost; Hole callout
+   leader 14 px, glyphs `on_top`; tooltips wrap 400 px; hidden sketch eye on hover; configuration names spreadsheet
+   keys (Tab out of the add row = the input's IndentInline action); X11 double-click; box held until the selection's
+   frame; compound unit precision; xdev-subs cold open (`AssemblyEvaluator::prewarm`: uncached Part Studios
+   regenerate side by side; the Insert catalog uses display bounds, exact boxes in `catalog_boxes` after it is up:
+   click to full display 12-13 s -> ~4 s on vibe2; live2: 21.7–29 s); a view key re-lights under the resting pointer
+   (viewport `InputModalityIndependent`); Make transparent clears the selection. Then live retakes (arrow areas,
+   row tooltip, cube hold).
+2. Next land (in the worktree, tested on vibe2, clippy clean): Shift+Y clears the selection (editing matrix row);
+   Shift+C in a sketch selects the analysed curves (orange + readout; test
+   curve_analysis_in_a_sketch_selects_the_analysed_line); Isolate / Make transparent sliders remembered per dialog
+   (`feature_settings` keys view:isolate / view:makeTransparent; test the_transparency_slider_is_remembered_per_dialog);
+   interaction-feel: shortcuts-ps rows updated, the stale duplicate copies after the sketch table removed.
+3. Open with live: Hole callout glyph size and weight (REQUESTS 23:33). Dialog spots remembered per dialog
+   (live: localStorage, sectionview +150/+100 like ours) = already.
 3. Speed rows closed (lead 23:14): rollback 0.24 s and Mass 313 ms are software-render frame cadence (handler < 1 ms,
    frame 8 ms; frame log /root/psui-scratch/lat). Rule: act on a feel row only if our handler + layout + paint
    exceeds ~100 ms or the event order differs from live.
