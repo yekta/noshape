@@ -94,9 +94,9 @@ Evidence live/errors-1118/ (live-errors.json, rows.json, list.png, tip-*.png, dl
 | Sweep with no path | "Select entities for sweep path." | the same | = |
 | Draft with no faces | "Select faces to draft." | the same | = |
 | A failed feature's row | name red rgb(170, 37, 45), its type icon unchanged (no badge); the Features header shows a red ⬇ circle | the same | = |
-| …its tooltip | right of the list, a box at most **400 px** wide that **wraps** ("Chamfer too big did not regenerate properly: Failed to chamfer / selections." on two lines, 400 × 44); 12 px / 18 px weight 500, text rgb(51, 51, 51) on rgb(208, 219, 229), padding 4 px | the same text and colours, on **one line** however long (≈ 400 px wider) | ≠ [psui] |
+| …its tooltip | right of the list, a box at most **400 px** wide that **wraps** ("Chamfer too big did not regenerate properly: Failed to chamfer / selections." on two lines, 400 × 44); 12 px / 18 px weight 500, text rgb(51, 51, 51) on rgb(208, 219, 229), padding 4 px | the same text and colours, on one line however long; fixed psui 11-18: tooltips wrap at 400 px (`with_user_side_tooltip`, 1dd4033be) | = (fixed) |
 | …its dialog | the title red; a selection that no longer resolves red in its box; no message text in the dialog | the same | = |
-| Hidden sketches' rows at rest | no icon at the row's right end (an eye only on hover) | a crossed-out eye on every hidden sketch's row at rest | ≠ [psui] |
+| Hidden sketches' rows at rest | no icon at the row's right end (an eye only on hover) | a crossed-out eye on every hidden sketch's row at rest; fixed psui 11-18: the eye only on hover (1dd4033be; hidden default planes too, 24792169) | = (fixed) |
 
 ## Sketch (live)
 

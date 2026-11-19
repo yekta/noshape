@@ -352,6 +352,23 @@ fn rows() -> Vec<Row> {
             let left = cx.update(|cx| dialog.read(cx).feature.params.query("entities").len());
             expect((tip.starts_with("Delete Edge of "), left), (true, 0), &format!("the x's tooltip {tip:?}, entities after its click"))
         } },
+        Row { id: "fields / a focused length field's step keys", live: "live2 field-keys-1118 (Extrude Depth 10): Up 11, Down 10, Ctrl+Up 10.1, Shift+Up 20.1, Alt+Up 21.1 (as plain), PageUp nothing; the text selected throughout", gap: false, check: |cx| {
+            let (window, _view, dialog) = edit_extrude(cx, "dlg-step-keys");
+            cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
+            draw(cx, window);
+            let value = |cx: &mut TestAppContext| cx.update(|cx| dialog.read(cx).input_text("depth", cx)).and_then(|(t, sel)| Some((t.split_whitespace().next()?.parse::<f64>().ok()?, sel == t)));
+            let (start, _) = value(cx).ok_or("no Depth")?;
+            let mut got = Vec::new();
+            for k in ["up", "down", "ctrl-up", "shift-up", "alt-up", "pageup"] {
+                keys(cx, window, &[k]);
+                let (v, selected) = value(cx).ok_or("no Depth")?;
+                got.push(((v - start) * 10.0).round() / 10.0);
+                if !selected {
+                    return Err(format!("after {k} the text isn't selected"));
+                }
+            }
+            expect(got, vec![1.0, 0.0, 0.1, 10.1, 11.1, 11.1], "Depth's steps from the start (Up, Down, Ctrl+Up, Shift+Up, Alt+Up, PageUp)")
+        } },
         Row { id: "fields / Tab from Radius", live: "Radius's ± button, then the checkboxes in order; Tab skips the selection fields and the dropdowns", gap: false, check: |cx| {
             let (window, _view, dialog, _) = fillet_on_an_edge(cx, "dlg-tab")?;
             cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("radius", w, cx))).unwrap();
