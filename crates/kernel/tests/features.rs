@@ -122,6 +122,33 @@ fn a_loft_connection_cuts_a_circle_into_equal_arcs_from_its_point() {
     }
 }
 
+/// A loft along a path bent tighter than its profiles: the profiles carried round the bend fold over, and a section cut
+/// there has more edges than the profiles. OCCT's unchecked loft takes every section to have the first one's edges and
+/// crashed on it (c2-loft-guide-curves-wave-washer's ring): refused before. Bent wider, it lofts.
+#[test]
+fn a_loft_whose_cut_sections_dont_match_is_refused_not_crashed() {
+    let run = |r: f64| {
+        let s = std::f64::consts::FRAC_1_SQRT_2;
+        let path = make_wire(&[
+            make_line(DVec3::ZERO, DVec3::new(0.0, 0.0, 10.0)).unwrap(),
+            make_arc_3pts(DVec3::new(0.0, 0.0, 10.0), DVec3::new(r - r * s, 0.0, 10.0 + r * s), DVec3::new(r, 0.0, 10.0 + r)).unwrap(),
+            make_line(DVec3::new(r, 0.0, 10.0 + r), DVec3::new(r + 20.0, 0.0, 10.0 + r)).unwrap(),
+        ])
+        .unwrap();
+        let square = |o: DVec3, n: DVec3, x: DVec3| {
+            let p = [DVec2::new(-5.0, -5.0), DVec2::new(5.0, -5.0), DVec2::new(5.0, 5.0), DVec2::new(-5.0, 5.0)];
+            make_wire_2d(&Plane::new(o, n, x), &(0..4).map(|i| Segment2d::Line { a: p[i], b: p[(i + 1) % 4] }).collect::<Vec<_>>()).unwrap()
+        };
+        let ends = [square(DVec3::ZERO, DVec3::Z, DVec3::X), square(DVec3::new(r + 20.0, 0.0, 10.0 + r), DVec3::X, DVec3::Y)];
+        loft(&ends, &LoftOptions { solid: true, path: Some((path, 5)), ..Default::default() })
+    };
+    let Err(e) = run(2.0) else { panic!("a folded loft built") };
+    let e = e.to_string();
+    assert!(e.contains("sections don't match"), "{e}");
+    let ok = run(8.0).unwrap().shape;
+    assert!(ok.is_valid() && ok.faces().len() == 6);
+}
+
 /// Live "psb (10-24) loft end derivative": □20 -> □10 20 up with Start
 /// Normal to profile m1 bulges (live 5476.391496; the ruled frustum is
 /// 4666.67). The corner rule with a natural end gives 5476.310271 exactly;
@@ -1773,3 +1800,4 @@ fn a_wavy_parting_line_across_a_block_drafts_both_sides_as_live() {
     let v = r.volume().unwrap() * 1e9;
     assert!((366635.71..=367901.36).contains(&v), "volume {v} mm³");
 }
+

@@ -4582,6 +4582,14 @@ static std::optional<bool> faces_face_in(const TopoDS_Shape& solid)
   return in > 0;
 }
 
+static int edge_count(const TopoDS_Wire& w)
+{
+  int n = 0;
+  for (BRepTools_WireExplorer ex(w); ex.More(); ex.Next())
+    ++n;
+  return n;
+}
+
 static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool closed,
                        rust::Slice<const double> start_points, const LoftEnds& ends, bool allow_natural,
                        const TopoDS_Shape& path = TopoDS_Shape(), int path_count = 0, bool bare = false)
@@ -4687,6 +4695,12 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
   }
   const bool matched = circles || counts || connected || along;
   ts.CheckCompatibility(!matched);
+  // Unchecked, OCCT takes every section to have the first one's edges: one with more crashed it (a section cut where the
+  // profiles carried along a path fold over a tight bend or cross: c2-loft-guide-curves-wave-washer's ring, 10 against 4).
+  if (matched)
+    for (const auto& w : wires)
+      if (edge_count(w) != edge_count(wires.front()))
+        fail_op("the loft's sections don't match");
   TopoDS_Wire firstWire = wires.empty() ? TopoDS_Wire() : wires.front();
   // OCCT lofts two sections ruled; an end condition needs the smooth
   // surface: a section halfway (the first moved there), dropped again by
