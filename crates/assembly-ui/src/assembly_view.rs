@@ -4011,6 +4011,14 @@ impl AssemblyView {
                 let drags = d.ids.iter().filter_map(|id| d.start.get(id).map(|p| (*id, placement_to_frame(p).inverse().transform_point(d.grab0), target))).collect();
                 SolveOptions { drags, drag_view: Some(d.plane_normal), start: Some(d.origin.clone()), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() }
             }
+            // A free instance dragged by its face moves in the plane of the screen, never turning (Onshape: unmated
+            // instances move freely in the plane of the screen; the point drag turned it 1–2° on a 20 px drag).
+            None if d.nested.is_none() && self.result.solved.instance_dof.get(&d.top).copied() == Some(6) && d.origin.contains_key(&d.top) => {
+                let p = d.origin[&d.top];
+                let grabbed = placement_to_frame(&p).transform_point(d.local);
+                let m = Frame::new(target - grabbed, glam::DQuat::IDENTITY);
+                SolveOptions { targets: Self::moved_placements(&m, &HashMap::from([(d.top, p)])), start: Some(d.origin.clone()), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() }
+            }
             // (The pointer's ray, along the view: live asm drag probes.)
             _ => match &d.nested {
                 Some(k) => SolveOptions { nested_drags: vec![(k.clone(), d.local, target)], drag_view: Some(d.plane_normal), start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },

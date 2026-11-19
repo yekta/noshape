@@ -1955,6 +1955,57 @@ fn a_fixed_instances_drag_drops_the_no_drop_cursor_at_the_release(cx: &mut TestA
     });
 }
 
+/// Live icons2 10-23 (a), asm-fixed-drag-1118: a free instance's press-drag keeps the default cursor and, Snap mode
+/// off, carries the part with the pointer in the plane of the screen (its centre the pointer's 20 px away), not
+/// turning it (the point drag turned it 1–2°) and no jump onto a snap target.
+#[gpui::test]
+fn a_free_instances_drag_keeps_the_default_cursor_and_follows_the_pointer(cx: &mut TestAppContext) {
+    use crate::viewport::ViewportEvent;
+    use gpui_kit::Modifiers;
+    let (window, view) = pattern_assembly(cx, "free-drag");
+    draw(cx, window);
+    let cursor = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).viewport.read(cx).tool_cursor);
+    let centre = |v: &AssemblyView, cx: &gpui_kit::App| {
+        let id = instance(v, "Part 1 <1>", cx);
+        let (lo, hi) = v.result.instance_bounds(id).unwrap();
+        v.viewport.read(cx).project((lo + hi) * 0.5).unwrap()
+    };
+    let to = cx
+        .update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                assert!(!v.assembly(cx).unwrap().instance(instance(v, "Part 1 <1>", cx)).unwrap().fixed, "free");
+                assert!(v.snap.is_none(), "Snap mode off");
+                let at = centre(v, cx);
+                let vp = v.viewport.clone();
+                v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+                // (A drag starts past 2 px and 50 ms.)
+                std::thread::sleep(std::time::Duration::from_millis(60));
+                let to = at + glam::DVec2::new(20.0, 0.0);
+                v.on_viewport_event(&vp, &ViewportEvent::ToolDrag { position: to }, w, cx);
+                to
+            })
+        })
+        .unwrap();
+    assert_eq!(cursor(cx), None, "the default cursor while dragging it");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: to, modifiers: Modifiers::default() }, w, cx);
+        })
+    })
+    .unwrap();
+    cx.executor().advance_clock(std::time::Duration::from_millis(100));
+    cx.run_until_parked();
+    assert_eq!(cursor(cx), None, "the default cursor at the release");
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let now = centre(v, cx);
+        assert!(now.distance(to) < 1.0, "the part's centre with the pointer: {now:?}, pointer {to:?}");
+        let p = v.result.solved.placement(instance(v, "Part 1 <1>", cx)).unwrap();
+        assert_eq!(p.rotation, [0.0, 0.0, 0.0, 1.0], "moved, not turned");
+    });
+}
+
 /// Live insert-sort-1118: Insert › Other documents lists Documents newest first by default; a Sort menu pick re-sorts
 /// them (names case-insensitive, Modified by by author) and is remembered across a restart; Esc closes the menu, not the
 /// dialog.
