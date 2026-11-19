@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 15:22 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 15:58 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -76,17 +76,14 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
     the flat Extrude form: schema hides all but flatOperationType + entities under domain FLAT; `extrude::domain_logic`
     (model-core) sets domain from the regions, run in the app (start_feature preselection, auto_operation on picks) and
     in ops feature_add when domain isn't given; UI test `extrude_on_a_flat_region_opens_the_flat_form`.
-  - rocker-enclosure-sm (lead 14:3x: mine, core told): LOCAL dc43d78a7 translator `context_from_refs` /
-    `self_made_edges`: in-context sub-features without context.jsonl rebuilt from refs.jsonl's self-made edges (Sketch
-    4's 4 holes) -> 11/14; suite H running on vibe2 (/root/skasm-scratch/suiteh.out), land when H = G (92/126,
-    1336/1585). Next diff Extrude 3 "Removal destroys sheet metal part." (live: 2 parts, 44548 mm³ each): the cut
-    splits the definition sheet but its faces lose WALL. WIP patch /root/skasm-scratch/split-face-attr2.patch (git
-    apply): (a) query.rs `attribute_snapshot` takes sheet faces and `relocated_pieces` moves a face's attributes onto
-    its `TopoName::Split` pieces by name only (geometric following broke jog_matches_live: Jog's face copy took them);
-    (b) ops.rs `split_off_pieces`: a subtraction's new pieces of a target get its body attributes, hidden state,
-    split_from / splits (as opSplitPart); (c) T2 `a_cut_across_a_sheet_metal_plate_leaves_two_parts`. SM T2 82/82 with
-    it. Rocker Extrude 3 then throws in std assignSMAttributesToNewOrSplitEntities "Existing entity not fit for
-    definition attribute" (a master entity, likely a bend edge piece, now one-sided): next to look at.
+  - rocker-enclosure-sm (lead 14:3x: mine, core told): 14/14 to the end locally. LOCAL dc43d78a7 (translator
+    `context_from_refs` / `self_made_edges`: in-context entities without context.jsonl from refs.jsonl's self-made
+    edges; Sketch 4's 4 holes) and cf7a34648 (host: a split wall face's attributes go to its `TopoName::Split` pieces by
+    name, query.rs `relocated_pieces`; ops.rs `split_off_pieces`: a subtraction's new piece of a definition sheet gets
+    its body attributes + hidden + `splits` (NOT split_from: std's MODEL check then saw 2 bodies); T2
+    `a_cut_across_a_sheet_metal_plate_leaves_two_parts`). SM 98/98, matrix 17/17, custom 16, clippy clean. Suite H
+    (dc43 only) running on vibe2 (orphaned, ~/agents/skasm-keep/suite-H-1119-1511.log), suite I (both) queued after
+    (/root/skasm-scratch/suitei.out); land both when I >= G (92/126, 1336/1585) per document.
   - Sketch fuzz 10x (lead 11:3x): 550 seeds, 0 panics / wrong solves; 800-step random webs (1300-2000 entities) solve in
     1-4 s: lead left it (not a real sketch). fuzz.rs reports SLOW steps (SKETCH_FUZZ_SLOW_MS; needs --nocapture).
 - Open (low: geometry matches): infento Part grid's four 80 mm LENGTHs (seed side V2HoieiIDMV9, the pattern's
