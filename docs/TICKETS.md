@@ -840,11 +840,17 @@ Sheets tickets/asm-snapmode-sheet.png, row-dblclick-sheet.png, drw-feel-1118.png
 
 ## P1 walk 11-19 (qa 21:36, green a58eee8c, :110 Xvfb, real pointer): sketch -> extrude -> fillet -> linear pattern
 Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: all build; Part 2 made. One finding:
-- [ ] P2 **PATTERN-CHECK-STAYS-ENABLED (psui)**: new Linear pattern (toolbar) -> ✓ disabled (as live); click Part 1 in the Parts
+- [x] (not a bug: live 11-19 "qa (11-19): dialog ✓ after emptying / tooltip on click", live/qa/dialog-tip-1119 A: live's ✓ also
+  stays enabled after Entities is emptied again; only a fresh dialog has it disabled; title red throughout = ours) P2 **PATTERN-CHECK-STAYS-ENABLED (psui)**: new Linear pattern (toolbar) -> ✓ disabled (as live); click Part 1 in the Parts
   list (Entities = Part 1, ✓ green); click the part in the graphics (Entities toggles back to empty, Direction empty) -> ✓ stays
   green while nothing is selected, title red. Live: ✓ disabled (opacity .2) until something is selected (behaviours.md 231);
   live capture of the empty-again state requested (REQUESTS.md qa 11-19). Shot: qa-scratch/tickets/pattern-check-stays-enabled-1119.png
   (q0 open, q1 Part 1, q3 emptied again).
+
+- [ ] P1 **TOOLBAR-TOOLTIP-AFTER-CLICK (psui)**: hover a Part Studio toolbar button (Linear pattern) until its tooltip shows, click:
+  ours: the tooltip still shows 1.5 s after the click, over the open dialog. Live (behaviours "qa (11-19): dialog ✓ after emptying /
+  tooltip on click", live/qa/dialog-tip-1119 B): shows ~40 ms after hover, fades in over ~250 ms, stays during the press (80 and
+  600 ms holds), gone the first frame after release, no fade-out. (qa 11-19, green a58eee8c)
 
 ## Interaction feel suite 11-19 (qa 16:20: run 1119-1242-223cec7e on vibex8, failures re-run on green eb3b06a8 on vibe2)
 2110/2172 scenarios (05:51 run on a67911be: 2126). 67 failing; 28 pass on the re-run (load flakes or fixed). The 39 still failing
