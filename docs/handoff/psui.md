@@ -35,26 +35,17 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (updated 22:17 UTC 11-19; this thread replaced 4973e295 at 13:27, Ubeyd's weekly limit)
+## Now (updated 22:48 UTC 11-19; this thread replaced 4973e295 at 13:27, Ubeyd's weekly limit)
 
 1. LANDED 13:59 (e87a2b3e): routing Multiple offset, edge double-click / region look / constraint refusal tests,
    section cap, Hole callout size.
 2. LANDED 22:04 (01969838): qa's P0 feel rows (menu press closes only the menu; one Esc after a field's menu item;
    no readout under an analysis tool), the untested-row tests, Routing curve Multiple with its value box. qa reruns
    its 7 rows on its green automatically.
-3. IN FLIGHT (uncommitted; run77 on vibex7 = all part-studio-ui / scene / app-core / units lib tests + clippy):
-   (a) Mass panel CoM / inertia Override (menus.rs edit_mass_cell, MassOverrides; test ui_tests::measure::mass_centre_…).
-   (b) qa P1 TOOLBAR-TOOLTIP-AFTER-CLICK: vendor gpui-pre TooltipPressGate (held / blocked) + Window::tooltip_released_on
-   (the click re-keys the toolbar button, so a NEW element appeared under the resting pointer and showed its tip via the
-   painted_at path; now blocked on the released bounds until the pointer leaves them). Chrome row "tooltip / kept while
-   pressed, gone at the release". (c) Routing Multiple's centre ball (snaps to inference points; matrix COLUMNS are the
-   axes; triad_apply_move rounds to 10 nm: the face centroid integral is ~1e-8 off). (d) row tests: pick reach, dragged
-   angle text, comma. Mark TICKETS TOOLBAR-TOOLTIP-AFTER-CLICK. clippy gpui-pre without --all-targets.
-4. sketch-vertical-key (in run77, same commit set): cause = our snap hold (HOLD_PX 9.5) also held a line's own
-   H/V band; live's recorder comes in 8 moves through the band and ends ~9 px off plumb: no Vertical. Fix: BAND_HOLD_PX
-   8.0 (live sketch-snap-1117 "lets go at 8-10") in held_snap; tests scene a_lines_own_vertical_lets_go_at_8_px, app
-   sketch_ui_tests a_lines_vertical_reach_is_measured_on_the_screen_in_the_app. Tell qa + skasm when landed. Drop the
-   staged tests/ui-parity/live/sketch-vertical-key.json before committing.
+3. QUEUED 22:48 b5fce1fd (6 commits): Mass CoM / inertia Override; TOOLBAR-TOOLTIP-AFTER-CLICK (TooltipPressGate +
+   Window::tooltip_released_on; TICKETS marked); Routing Multiple centre ball; sketch-vertical-key fix (BAND_HOLD_PX 8);
+   row tests. On green: tell qa (TOOLTIP + vertical-key re-run). Follow-up: the ball test's expected centre comes from
+   f32 mesh positions (core 22:4x) -> take it exact (DVec3(0.04, 0.015, 0.005)) and compare the text again.
 4b. P0 qa STALE-SKETCH-HOVER (TICKETS P1 walk 11-19): outside sketch mode a sketch region's hover outline (after a rim
    click + ✓) and a circle centre point's orange dot stay after the pointer leaves to empty space (also after Shift+7);
    rims and part faces clear fine. Leads (unverified): hover flows viewport.set_hover (emits only on a GPU id change,
