@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 15:03 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 15:32 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -80,11 +80,13 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
     `self_made_edges`: in-context sub-features without context.jsonl rebuilt from refs.jsonl's self-made edges (Sketch
     4's 4 holes) -> 11/14; suite H running on vibe2 (/root/skasm-scratch/suiteh.out), land when H = G (92/126,
     1336/1585). Next diff Extrude 3 "Removal destroys sheet metal part." (live: 2 parts, 44548 mm³ each): the cut
-    splits the definition sheet but its faces lose WALL (host `attribute_snapshot` skips faces). Parked patch
-    /root/skasm-scratch/split-face-attr.patch (faces followed + T2 `a_cut_across_a_sheet_metal_plate_leaves_two_parts`):
-    fixes the T2 but breaks jog_matches_live (Jog's face copy gets the old face's attributes: "Entities with same
-    association attribute can't have different definition attributes") and rocker's Fillet 1; needs pieces of the
-    same body / bodies a Boolean split off it only (boolean_into's split pieces: no origin record yet).
+    splits the definition sheet but its faces lose WALL. WIP patch /root/skasm-scratch/split-face-attr2.patch (git
+    apply): (a) query.rs `attribute_snapshot` takes sheet faces and `relocated_pieces` moves a face's attributes onto
+    its `TopoName::Split` pieces by name only (geometric following broke jog_matches_live: Jog's face copy took them);
+    (b) ops.rs `split_off_pieces`: a subtraction's new pieces of a target get its body attributes, hidden state,
+    split_from / splits (as opSplitPart); (c) T2 `a_cut_across_a_sheet_metal_plate_leaves_two_parts`. SM T2 82/82 with
+    it. Rocker Extrude 3 then throws in std assignSMAttributesToNewOrSplitEntities "Existing entity not fit for
+    definition attribute" (a master entity, likely a bend edge piece, now one-sided): next to look at.
   - Sketch fuzz 10x (lead 11:3x): 550 seeds, 0 panics / wrong solves; 800-step random webs (1300-2000 entities) solve in
     1-4 s: lead left it (not a real sketch). fuzz.rs reports SLOW steps (SKETCH_FUZZ_SLOW_MS; needs --nocapture).
 - Open (low: geometry matches): infento Part grid's four 80 mm LENGTHs (seed side V2HoieiIDMV9, the pattern's
