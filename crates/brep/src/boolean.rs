@@ -4764,14 +4764,15 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             }
             _ => false,
         };
-        // (A plane's face and a cylinder's or cone's: never one surface, no area in common.)
-        let plane_and_round = |f: &Face, g: &Face| {
-            matches!((f.surface, g.surface), (Surface::Plane { .. }, Surface::Cylinder { .. } | Surface::Cone { .. }) | (Surface::Cylinder { .. } | Surface::Cone { .. }, Surface::Plane { .. }))
-        };
+        // (A plane and a cylinder, cone, sphere or torus have no area in common either (bool-corpus's face-overlap
+        // tests of a hole's wall and a plane).)
+        let curved = |f: &Face| matches!(f.surface, Surface::Cylinder { .. } | Surface::Cone { .. } | Surface::Sphere { .. } | Surface::Torus { .. });
         let crossing = args[0].faces.iter().all(|f| {
             args[1].faces.iter().all(|g| match (plane(f), plane(g)) {
                 (Some((o1, n1)), Some((o2, n2))) => n1.cross(n2).length() > 1e-9 || (o2 - o1).dot(n1).abs() > GREY * tol,
-                _ => coaxial(f, g).is_some_and(|dr| dr > GREY * tol) || plane_and_round(f, g),
+                (Some(_), None) => curved(g),
+                (None, Some(_)) => curved(f),
+                _ => coaxial(f, g).is_some_and(|dr| dr > GREY * tol),
             })
         });
         let bx = |b: &Body| {
