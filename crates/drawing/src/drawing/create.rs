@@ -170,7 +170,7 @@ pub fn create_drawing(template: &DrawingTemplate, source: Option<&DrawingSource>
     // Formats › Lock: Unlocked on new drawings (live's ANSI and ISO dumps,
     // dom/drawing-properties-formats-*).
     apply_template(&mut d, 0, template);
-    super::templates::template_precisions(&mut d.props, template.dim_units().imperial());
+    super::templates::template_precisions(&mut d.props, template.dim_units().imperial(), template.style == super::TitleBlockStyle::Ansi);
     super::templates::template_sizes(&mut d.props, template.style == super::TitleBlockStyle::Ansi);
     let (Some(src), true) = (source, suggested) else { return d };
     if src.sketch.is_some() {

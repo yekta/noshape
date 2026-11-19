@@ -766,7 +766,7 @@ mod tests {
         assert_eq!(dim_text(&d, &f, 0.01, false, "").main, "10.00±0.05");
         let mut inch = Drawing::default();
         inch.props.units = Some(DimUnits::Inch);
-        crate::drawing::templates::template_precisions(&mut inch.props, true);
+        crate::drawing::templates::template_precisions(&mut inch.props, true, true);
         let f = DimFormat { tolerance: Tolerance::Symmetric { value: 0.000254 }, precision: Some(2), ..Default::default() };
         assert_eq!(dim_text(&inch, &f, 0.05, false, "").main, "1.97±.010");
         let f = DimFormat { tolerance: Tolerance::Deviation { upper: 0.0001, lower: -0.00005 }, ..Default::default() };

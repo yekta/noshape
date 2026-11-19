@@ -36,8 +36,13 @@ the next run. Run the full ops e2e before any drawing land. A few app runs don't
   menus still have Release… (no Pro capture yet).
 
 ## Next, in order
-1. live's answers above (pin-reference, part-menu-release reader, revision-table screenshot, ISO trailing zeros).
-2. Then the feel rows below and the lead's queue (11-17).
+1. live's retakes asked 11-19 22:xx: drw-revision-table-delete (s9 hover [140,120] + s10 wait added: live's stale
+   table frame after Delete is a repaint lag, not a target), drw-inspection-table-iso-scrolled (sheet points were
+   off: now (60.91, 226.2) on Front's top edge, (60.91, 237.8) placing; live's s2 reads no EDGE: asked why),
+   part-menu-release / asm-menu-release (e807ca07, recorder 2026-11-19.1).
+2. qa 291c74b0 rows in my areas: all match on this branch except the two above (vibex8 22:40, 9/10 + iso).
+   Next: the newest suite log's rows once qa runs again.
+3. Then the feel rows below and the lead's queue (11-17).
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
 - live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell
@@ -111,12 +116,12 @@ against live with a feel scenario; share psui's pick code (`Viewport::pick_prior
 - Assembly already as live (checked 11-17): box select rule, glyph click selects the mate (related rows, mated faces
   amber, dashed connector line), graphics hover lights no list row, list hover outlines the parts.
 
-## Agents (lead 11-19 21:00; only these ids)
-core d30002ca-d013-4435-b7d9-7da9cb564cec, blend de66e481-56e2-4005-a5d3-9fa897ca5fde,
-bool 754a9804-feb1-4153-b32a-acf9b2a6d94d, dx aad5e825-f86c-432d-b4ac-3aab402e7052,
-qa 40e853dc-757f-4498-878f-00b41fd8af75, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7,
-asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6. live: new id from the lead
-(~21:10); live2 (d7f4a0c2) lane 2. bool2 / live2 merged into bool / live (11-19). Older ids are dead.
+## Agents (lead 11-19 ~22:40; only these ids: an old id wakes a stopped thread)
+core 08a98761-3bbe-47ce-a91a-32b208f5c6b2, blend 459f6c19-c460-4ebf-96ca-bf92455f2e1e,
+bool abdebc8b-6b39-4794-8390-eb02d6fa37e6, live 349fe81d-db78-4931-8032-6dc3edc5d558,
+dx 6cfc89bd-1196-43ef-9225-0014546fee1e, qa ac50e7f2-4677-4cab-a57a-fd068a0c07bf,
+psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, asm d8d597e0-675c-497b-a804-544ceab99bbd,
+skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6.
 
 ## Waiting on others
 - live (349fe81d-db78-4931-8032-6dc3edc5d558; live2 stopped): the weld retake, the Measure pairs F-I, asm-menu-release: the Pro retakes

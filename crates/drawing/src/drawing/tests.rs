@@ -4023,7 +4023,7 @@ fn template_precisions_keep_the_angle_decimal() {
     // length zero settings don't trim angles.
     for imperial in [true, false] {
         let mut d = Drawing::default();
-        super::templates::template_precisions(&mut d.props, imperial);
+        super::templates::template_precisions(&mut d.props, imperial, imperial);
         let t = format::dim_text(&d, &DimFormat::default(), std::f64::consts::FRAC_PI_2, true, "").main;
         assert_eq!(t, "90.0°", "imperial {imperial}");
     }
@@ -4810,6 +4810,22 @@ fn template_sizes_follow_the_standard() {
     assert!((i.props.table_h_padding - 1.5).abs() < 1e-9 && (i.props.inspection_text_height - 2.0).abs() < 1e-9);
     assert!(i.props.table_styles.hole_indicator_iso && (i.props.table_styles.hole_indicator_arrow.unwrap() - 2.5).abs() < 1e-9);
     assert!((i.props.ann_text_height - 3.5).abs() < 1e-9);
+}
+
+/// A new drawing's Units and precision (live units-1119): ISO_A4_Portrait,
+/// ISO_A3 and ANSI_A_MM all 0.12 / 0.12 / 0.1° / 0°, leading zeros on and
+/// trailing zeros off; ISO a comma, ANSI a period; fit class 0.123 on ISO,
+/// 0.1234 on ANSI_A_MM.
+#[test]
+fn new_mm_drawings_take_lives_units_and_precision() {
+    let mut ansi_mm = templates::template_by_name("ANSI A").unwrap();
+    ansi_mm.inches = false;
+    for (t, comma, fit) in [(templates::template_by_name("ISO A4").unwrap(), true, 3), (templates::template_by_name("ISO A3").unwrap(), true, 3), (ansi_mm, false, 4)] {
+        let p = create::create_drawing(&t, None, None, false, None).props;
+        assert_eq!((p.precision, p.tolerance_precision, p.angular_precision, p.angular_tolerance_precision), (Some(2), Some(2), Some(1), Some(0)), "{}", t.name);
+        assert_eq!((p.leading_zeros, p.trailing_zeros, p.tolerance_leading_zeros, p.tolerance_trailing_zeros), (true, false, true, false), "{}", t.name);
+        assert_eq!((p.decimal_comma, p.fit_tolerance_precision), (comma, Some(fit)), "{}", t.name);
+    }
 }
 
 /// Line to line angular beside the edges (live D11): 180° minus the angle,

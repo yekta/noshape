@@ -357,8 +357,9 @@ fn two_selected_mates_have_lives_menu(cx: &mut TestAppContext) {
 }
 
 /// Live 1723: a part's row inside an expanded subassembly has its own menu
-/// (less "Add comment"); Move to new subassembly makes a new subassembly in
-/// "Sub" around it;
+/// (less "Add comment"; live Pro asm-pro-menus-1119 b: Where used…, no
+/// Release…); Move to new subassembly makes a new subassembly in "Sub"
+/// around it;
 /// its Hide and Fix are kept on Assembly 1's occurrence.
 #[gpui::test]
 fn a_nested_rows_menu_is_lives(cx: &mut TestAppContext) {
@@ -376,7 +377,7 @@ fn a_nested_rows_menu_is_lives(cx: &mut TestAppContext) {
                     "Hide", "Hide other instances", "Hide all instances", "Isolate…", "Make transparent…", "Fix", "Use best available tessellation", sep,
                     "Edit in context", "Add mate connector to instance origin…", "Switch to Part Studio 1", sep,
                     "Copy Part 1 <1>", sep,
-                    "Move to new subassembly", "Export…", sep,
+                    "Move to new subassembly", "Export…", "Where used…", sep,
                     "Zoom to selection", sep,
                     "Create Drawing of Part 1…", sep,
                     "Create empty subassembly",

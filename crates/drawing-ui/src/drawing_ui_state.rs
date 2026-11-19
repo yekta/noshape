@@ -207,7 +207,7 @@ impl DrawingEditor {
                     _ => t,
                 };
                 let t = match k {
-                    "dimension" => dimension_value(&t),
+                    "dimension" => data_value(&dimension_value(&t), a.format.precision.or(self.drawing.props.precision), self.drawing.props.trailing_zeros),
                     // Each member's value: "0.000 1.575" (live).
                     "ordinate" => t.split_whitespace().map(dimension_value).collect::<Vec<_>>().join(" "),
                     _ => t,
@@ -797,6 +797,21 @@ fn dimension_value(shown: &str) -> String {
     if v.starts_with('.') { format!("0{v}") } else { v.to_string() }
 }
 
+/// A plain dimension value as live's recorder reads it from the drawing data: a period, and every digit of the
+/// precision whatever the sheet's zero suppression (live units-1119: an ISO drawing draws "40", reads "40.00").
+fn data_value(v: &str, precision: Option<u8>, keep_zeros: bool) -> String {
+    if v.is_empty() || !v.chars().all(|c| c.is_ascii_digit() || matches!(c, '.' | ',' | '-')) {
+        return v.to_string();
+    }
+    let v = v.replace(',', ".");
+    let (Some(p), false) = (precision.map(usize::from), keep_zeros) else { return v };
+    let (int, dec) = v.split_once('.').unwrap_or((&v, ""));
+    if p == 0 || dec.len() >= p {
+        return v;
+    }
+    format!("{int}.{dec:0<p$}")
+}
+
 /// A sheet point in tenths of a millimetre (live's recorder rounds to 0.1 mm), comparable and sortable.
 fn tenths(p: [f64; 2]) -> [i64; 2] {
     [(p[0] * 10.0).round() as i64, (p[1] * 10.0).round() as i64]
@@ -830,7 +845,7 @@ fn clipped_len(a: [f64; 2], b: [f64; 2], min: [f64; 2], max: [f64; 2]) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use super::clipped_len;
+    use super::{clipped_len, data_value};
 
     #[test]
     fn a_segment_counts_its_length_inside_the_box() {
@@ -839,5 +854,14 @@ mod tests {
         assert_eq!(clipped_len([2.0, 1.0], [8.0, 1.0], min, max), 6.0, "all inside");
         assert_eq!(clipped_len([-5.0, 6.0], [15.0, 6.0], min, max), 0.0, "outside");
         assert!((clipped_len([-2.0, -2.0], [12.0, 12.0], min, max) - 4.0 * 2f64.sqrt()).abs() < 1e-12, "a diagonal through a corner");
+    }
+
+    #[test]
+    fn a_dimension_reads_as_lives_drawing_data() {
+        assert_eq!(data_value("40", Some(2), false), "40.00", "ISO: 40 drawn");
+        assert_eq!(data_value("12,5", Some(2), false), "12.50", "a comma read as a period");
+        assert_eq!(data_value("1.575", Some(3), true), "1.575", "inch: zeros kept already");
+        assert_eq!(data_value("2 3/4", Some(3), false), "2 3/4", "not a plain number");
+        assert_eq!(data_value("90.0°", Some(1), false), "90.0°");
     }
 }

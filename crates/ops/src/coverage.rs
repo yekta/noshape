@@ -312,6 +312,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("assembly:Open linked document", Op("assembly_open_linked_document")),
     ("assembly:Properties…", Op("part_set_properties")),
     ("assembly:Release…", Op("release_create")),
+    ("assembly:Revision history…", Op("release_revision_history")),
     ("assembly:Rename", Op("assembly_rename")),
     ("assembly:Reset starting position", Op("assembly_exploded_view")),
     ("assembly:Reset to default", Op("assembly_insert")),
@@ -475,7 +476,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Switch to BOM", Op("drawing_switch_to_reference")),
     ("drawing:Switch to reference", Op("drawing_switch_to_reference")),
     ("assembly:Pin reference", Op("assembly_pin_reference")),
-    // (Another document's part: its Where used in that document.)
+    // (A part's Where used; another document's part: its Where used in that document.)
     ("assembly:Where used…", Op("part_where_used")),
     ("assembly:Unpin reference", Op("assembly_pin_reference")),
     ("drawing:Pin reference", Op("drawing_pin_reference")),

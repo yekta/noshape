@@ -1713,51 +1713,6 @@ impl AssemblyView {
         cx.notify();
     }
 
-    /// Instance menu Release…: the Release candidate dialog with the
-    /// instances' parts (in their configurations), as the Part Studio's.
-    fn release_instances(&mut self, ids: Vec<InstanceId>, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(asm) = self.assembly(cx) else { return };
-        let insts: Vec<Instance> = ids.iter().filter_map(|id| asm.instance(*id).cloned()).collect();
-        self.release_of(insts, window, cx);
-    }
-
-    /// Release… of instances' parts (a nested occurrence's too).
-    fn release_of(&mut self, insts: Vec<Instance>, window: &mut Window, cx: &mut Context<Self>) {
-        let mut items = Vec::new();
-        for inst in &insts {
-            if let InstanceSource::Assembly { assembly, .. } = &inst.source {
-                for it in crate::assembly_hooks::release_tab_items(self.doc.read(cx), *assembly) {
-                    if !items.iter().any(|x: &noshape_model::release::ReleaseItem| x.same_object(&it)) {
-                        items.push(it);
-                    }
-                }
-                continue;
-            }
-            // The part's name: the instance name without its " <n>".
-            let name = inst.name.rsplit_once(" <").map_or(inst.name.as_str(), |(n, _)| n).to_string();
-            // Another document's part: linked to the version the instance uses.
-            if let InstanceSource::External { key, body: Some(body), .. } = &inst.source
-                && let Some(r) = crate::derived::ExternalRef::parse(key)
-            {
-                for it in noshape_ops::release::linked_part_items(&self.doc.read(cx).session, &r, body, &name) {
-                    if !items.iter().any(|x: &noshape_model::release::ReleaseItem| x.same_object(&it)) {
-                        items.push(it);
-                    }
-                }
-                continue;
-            }
-            let InstanceSource::Part { studio, body, config } = &inst.source else { continue };
-            for it in crate::assembly_hooks::release_part_items(self.doc.read(cx), *studio, std::slice::from_ref(body), &[name], config) {
-                if !items.iter().any(|x: &noshape_model::release::ReleaseItem| x.same_object(&it)) {
-                    items.push(it);
-                }
-            }
-        }
-        if !items.is_empty() {
-            crate::assembly_hooks::open_release_candidate(self.doc.clone(), items, window, cx);
-        }
-    }
-
     /// N: normal to the last selected planar face, else the hovered one (live keys-1118: a block face selected).
     pub(super) fn view_normal(&mut self, cx: &mut Context<Self>) {
         let Some((forward, up)) = self.selected_face_normal(cx).or_else(|| self.hovered_face_normal(cx)) else { return };
@@ -2641,7 +2596,8 @@ impl AssemblyView {
     /// Hide other instances · Hide all instances · Isolate… · Make
     /// transparent… · Fix · Use best available tessellation | Edit in
     /// context · Add mate connector to instance origin… · Switch to <source>
-    /// | Copy <name> | Move to new subassembly · Export… · Release… | Zoom to
+    /// | Copy <name> | Move to new subassembly · Export… · Where used… ·
+    /// Revision history… | Zoom to
     /// selection | Create Drawing
     /// of <part>… | Create empty subassembly. Its state is kept on this
     /// assembly's occurrence (`Assembly::occurrences`).
@@ -2707,9 +2663,14 @@ impl AssemblyView {
         m.push(item("Move to new subassembly", move |t, _, cx| t.move_occurrence_to_new_subassembly(p.clone(), cx)));
         let p = path.clone();
         m.push(item("Export…", move |t, w, cx| t.open_occurrence_export(Some(vec![p.clone()]), w, cx)));
-        if matches!(inst.source, InstanceSource::Part { .. }) && noshape_ops::release_settings::managed_workflows() {
-            let i = inst.clone();
-            m.push(item("Release…", move |t, w, cx| t.release_of(vec![i.clone()], w, cx)));
+        // Live Pro (asm-pro-menus-1119 b): a part's Where used… and Revision history… (managed workflows), no Release….
+        if let InstanceSource::Part { studio, body, .. } = &inst.source {
+            let (studio, b) = (*studio, body.clone());
+            m.push(item("Where used…", move |_, _, cx| cx.emit(AssemblyViewEvent::WhereUsed(studio, b.clone()))));
+            if noshape_ops::release_settings::managed_workflows() {
+                let b = body.clone();
+                m.push(item("Revision history…", move |t, w, cx| crate::assembly_hooks::open_part_revision_history(t.doc.clone(), studio, b.clone(), w, cx)));
+            }
         }
         m.push(MenuEntry::Sep);
         let p = path.clone();
@@ -2781,8 +2742,8 @@ impl AssemblyView {
     /// A pattern, mirror or replicate row (live 1723): Rename · Edit… · Hide
     /// · Hide other instances · Hide all instances (a Mirror: · Show center
     /// of mass) · Isolate… · Make transparent… · Suppress | Move to new
-    /// subassembly (a Replicate: Dissolve <name>; a Mirror: neither) ·
-    /// Release… | Zoom to selection | Add selection to folder… · Expand ▸ ·
+    /// subassembly (a Replicate: Dissolve <name>; a Mirror: neither) | Zoom
+    /// to selection | Add selection to folder… · Expand ▸ ·
     /// Collapse ▸ | Delete. Its instances are the generated copies.
     /// A "-Mirrored" assembly's Derived mirror node (live2 audit-1119 m10, less "Add comment", cloud).
     pub(super) fn derived_mirror_menu(&self, inst: &noshape_model::assembly::Instance) -> Vec<MenuEntry> {
@@ -2842,7 +2803,6 @@ impl AssemblyView {
         let hidden = !copies.is_empty() && copies.iter().all(|i| asm.instance(*i).is_some_and(|x| x.hidden));
         let mirror = matches!(p.kind, PatternKind::Mirror { .. });
         let replicate = matches!(p.kind, PatternKind::Replicate { .. });
-        let parts = copies.iter().any(|i| asm.instance(*i).is_some_and(|x| matches!(x.source, InstanceSource::Part { .. })));
         let suppressed = p.suppressed;
         let mut m = vec![
             item("Rename", move |t, w, cx| t.start_row_rename(RenameRow::Feature(id), w, cx)),
@@ -2887,10 +2847,6 @@ impl AssemblyView {
         } else if !mirror {
             let tg = copies.clone();
             m.push(item("Move to new subassembly", move |t, w, cx| t.move_to_new_subassembly(tg.clone(), w, cx)));
-        }
-        if parts && noshape_ops::release_settings::managed_workflows() {
-            let tg = copies.clone();
-            m.push(item("Release…", move |t, w, cx| t.release_instances(tg.clone(), w, cx)));
         }
         m.push(MenuEntry::Sep);
         let tg = copies;

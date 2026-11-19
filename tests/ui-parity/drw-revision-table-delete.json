@@ -59,6 +59,20 @@
       "do": "wait",
       "until": "ms",
       "ms": 3000
+    },
+    {
+      "do": "hover",
+      "on": {
+        "sheet_point": [
+          140,
+          120
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 500
     }
   ]
 }
