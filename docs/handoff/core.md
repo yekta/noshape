@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-19 16:27 UTC (new thread 20:05 after the account limit; ids: see How to run). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-19 17:19 UTC (new thread 20:05 after the account limit; ids: see How to run). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
@@ -32,40 +32,42 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   dropped. WIP core-loft branch core-helixcyl 9c5711eab turns a helical sweep's crest/root into exact cylinders (kernel
   T1 a_helical_teeths_crest_and_root_are_cylinders passes, Pappus volume) but OCCT's Boolean of a cylinder face wrapping
   22 turns is invalid (thread::helical_teeth_add_to_the_core): parked. Probes vibex8 ~/tmp/core/nutsrec (ftypes, cylfit).
-- **Ring (core-rp branch core-ring3, rebased on main bfe09bcd5 with skasm's Sketch 4; uncommitted, PROBEs + env
-  NOSHAPE_RING_MODE):** path reopened at the first profile, a pipe per profile pair, binormal = ring axis, upright
-  cuts, smoothing on. T1 a_path_loft_round_four_profiles_on_a_closed_path_is_a_ring passes; wave-washer Loft 1 2126.10
-  vs live 2080.82 mm3 (+2.2 %, live banks its mid sections ~6 deg), 1.5 s vs live 67 ms: not landable (wrong Ok).
+- **Wave-washer ring (core-rp branch core-ring4 7aa3458b4 = core-ring3 rebased clean on main, WIP, PROBEs + env
+  NOSHAPE_RING_MODE; dump_op "ringloft"):** path reopened at the first profile, a pipe per profile pair, binormal = ring
+  axis (mode 1), upright cuts. Loft 1 2126.10 vs live 2080.67 mm3, 1.9 s vs 67 ms; measured against live's 4 exact faces
+  (vibex7/vibex8 ~/tmp/core/ringsurf <ours.brep> ring-live-surf.txt): max 2.68 mm, mean 0.36-0.78: NOT landable (0.1 mm
+  bar). Modes: 0 corrected Frenet -> loft error; 2 Frenet 4253 mm3, 13.6 mm off; 3 discrete inside out, 1.75 mm.
+  Live's sections (core-scratch/ring/sec.py, knots.py): at the 4 profiles + at 61.6 / 118.8 / 241.4 / 298.6 deg; each
+  extra one = the 90/270 (JM) profile carried along the path by a rotation-minimising frame (zc 5.01 vs RMF 5.03, r
+  19.394 vs 19.393, rin/rout 13.71/25.08 exact; bank 5.9 vs 5.5); banks up to 6.5 deg between profiles. Our routing
+  curve = live's (162.936 mm). Open: why +-28.8 deg about JM and none about JK. live2 asked 17:07 (REQUESTS "wave-washer
+  Loft 1, where live puts its path sections": Section count 1/3/10, profiles reordered, 2-profile loft).
 - **11-19 afternoon:** guided-loft conditions e02fe92f (queued/landed: Normal to guide aslant -> BSURF_INCONSISTENT text;
   start/end conditions checked against guides; T1 a_guided_loft_with_guide_and_end_conditions_as_live). f197 closed
   (Mirror 3 splits one B-spline edge at (1.2061,39,20): DECISIONS 11-16). surf-intro Derived 1 +0.1 in = asm's
   90d254008 (handed to asm; live's body differs, can't judge). qa re-saved cpcurves/mutualtrim: left cpcurves Split 5
   Info + extra 1227.58 mm3 part (= Split 3 keeps the wrong piece) -> after pipe.
-- **Pipe Loft PARKED 11-19 16:26 (lead: errors on main, not a wrong Ok):** live2 q-pipe-loft-1119: one face 32 x 24
-  poles, 596.6602 mm2; Normal to guide m 1/2/10/None give IDENTICAL poles. Live skins ~13 generated sections (v knots: 4
-  even to profile 2 at .2365, then even .0954 steps) with C1 cubics, u knots 1/16 doubled. Found: (1) across the three
-  profiles live follows a natural cubic spline (zero 2nd derivative at the end profiles), not OCCT's interpolation (a
-  parabola through 3: 0.34 mm flat in the long span); (2) live pairs the profiles by their own curve parameter (the
-  ellipses' angle), not arc length (live's section points at u .1-.5 sit at parameter share u exactly). WIP core-loft
-  branch core-nloft2 8c0fd0adc (on core-nloft 5e5ef9c19 = 3e106dca0 + env NOSHAPE_TRY_NLOFT; dump_op "loftopen" PROBE):
-  both in loft_guided_open for n > 2 -> 0.093 mm max two-way off live's face (was 0.34), area 600.16 (the tube's
-  curvature turns 0.05 mm into 0.6 %; arc pairing gave 596.31 by cancellation). Not landable: parity wants live's area to
-  1e-6. Rest is in the middle of the long span (v .55-.75, mid u): live's section rule. Tools: vibex7 ~/tmp/core/livesurf
-  <ours.brep> pipe-live-surf.txt (live's face rebuilt from probe-10 poles; two-way), projpt (BRepExtrema's distance
-  glitches on this face: 4.7 mm where projection gives 0.08), devlive; .pd.sh in core-loft (release build + dump).
-- **cpcurves Split 3 (core-oc branch core-closedface, uncommitted):** surface sweep facing for closed sketch profiles (CCW
-  about the sketch normal x path direction); T1 features_c::a_surface_swept_from_a_circle_faces_by_its_sketch_and_the_path;
-  30-doc subset on vibex7 (gls2.log; vibex8's slot was full). Then land.
+- **Pipe Loft LANDING 11-19 (lead: within 0.1 mm of live where ours errored lands, DECISIONS 11-19):** core-loft
+  core-nloft2 9a112af34 + checklist 2d162d3e8: loft_guided_open through > 2 open profiles: a natural cubic across the
+  profiles (live: zero 2nd derivative at the end profiles), each profile paired by its own curve parameter (live's section
+  points sit at parameter share u), a guide's derivative ignored (live2: None / magnitude 2 / 10 identical poles); start /
+  end conditions there still refused. 0.093 mm max two-way off live's face, area 600.16 vs 596.66 (the tube's curvature
+  turns 0.05 mm into 0.6 %); kernel T1 a_surface_loft_through_three_profiles_along_curved_guides_is_live_s_face (live2's
+  curves, boundaries < 1 um, interior < 0.1 mm). Parity row stays: live skins ~13 sections of its own rule with C1 cubics
+  (rest in v .55-.75, mid u). Tools: vibex7 ~/tmp/core/livesurf, projpt (BRepExtrema glitches 4.7 mm here), devlive.
+- **cpcurves Split 3 QUEUED 5bc866cec:** a closed profile's surface sweep faces out of its tube (live q-sweep-normals-1119:
+  manualblend's tube against its sketch's normal, cpcurves' along it: both outward); cpcurves' 1227.58 mm3 part and Split
+  5's Info gone, Delete face 2 = live; left: edge counts from Sweep 5's split circle (known). 30-doc subset clean
+  (core-scratch gls3.log). T1 features_c::a_surface_swept_from_a_circle_faces_out_of_its_tube.
+- **qa compat 11-19 17:0x answered:** split's corpus copy had Split 2's selection saved while Extrude 1 failed (qa re-saved,
+  12/12); singularities Thicken 20 084.5 mm3 exact for our input (22 880 - 90 deg concave corner 2 795; 7dd227351).
+- **asm 11-19 FYI (asm-suspension, studio geometry, mine when reached):** 805e29 Fillet 3/4 fail -> Knuckle a 0-volume
+  sliver; 995636 Body two parts (90 419 + 4 712) vs live one 109 049 mm3, Cup / Cap off. Trace vibex7
+  ~/agents/asm-keep/susp.out.
 - **asm 11-19 (low):** c2-surf-intro-* Derived 1: after asm's translator commits (post 6bca92a2) the source studio translates;
   live's Loft 4 (SURFACE, surfaceOperationType ADD) closes the 4-face "Car" sheet into a 5-face SOLID (Fillet 1 -> 7);
   ours stays a 4-face surface. derived/b7635b82…/live.jsonl 11-16; repro vibex8 NOSHAPE_PARITY_ONLY=c2-surf-intro-offset.
 - **Lead 11-19:** rocker-enclosure-sm Extrude 2 (split face) is skasm's now; answer skasm on my notes if asked.
-- **Ring, live's sections (q-wave-washer-loft-1119 probe.json, evaluated at its v knots):** knots 0 / .1722 / .2519 /
-  .3339 / .5 … = sections at the profiles (0, 90, 180, 270 deg) and at +-61.0 / +-119.4 deg: +-29 deg either side of the
-  JM profiles (90 / 270), none near JK; the routing curve's 8 points are at 0, 45, 90 … (z 0 at the profiles, 3.81 at
-  45/135 …). At 61 deg live's section rises above the path (outer edge z 4.87 vs path peak 3.81, r 19.47 at mid: banked).
-  Ours cuts 5 evenly per pair (24 sections). Next: why +-29 deg (Parasolid's own section rule?); script /tmp-free:
-  evaluate live poles as in the 11-19 12:0x session (python de Boor over createdFaces[i].def.exact).
 - **Volume measure warning:** on impeller parts OCCT's plain Gauss VolumeProperties is ~1.2 % off (input 97755.8 vs
   mesh-converged ~96555, kernel props 95977.8 after the delete ~= mesh): the old "OCCT 97123.4" targets were plain
   Gauss. Compare with kernel props (replay prints them) or vibex7 ~/tmp/core/imp/mvol (mesh).
@@ -134,8 +136,7 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
 ## Next, in order
 0. Impeller P0 (In flight): land Extrude impellerraum's split walls after the pair, then Delete face 2 on our input and
    the local rebuild, re-timed on the Mac vs 12 ms; then the In-flight queue 1-7.
-1. Guided-loft conditions P1 (live 06:14 answered: match live's errors first), then pipe (our guide 2.69 mm off live's),
-   singularities Loft with bad singularity / Loft 3. Then: Fill G0 = intro-examples' Fill 1 (live's fitted 14x18 surface),
+1. Wave-washer ring (In flight; live2's sections capture), then singularities Loft with bad singularity / Loft 3. Then: Fill G0 = intro-examples' Fill 1 (live's fitted 14x18 surface),
    mutualtrim Sweep 1 (path cut at Surface 1), fan-blade Boolean 2 with live's x_t, manualblend Intersection curve 1
    (0.057 mm off live's start; unblocks core-pipe2), knife Revolve 1's isolated vertex (live: Parasolid keeps the
    sphere's pole where a removed tangent plane touched: a Boolean rule, ask bool).
