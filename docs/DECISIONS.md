@@ -146,5 +146,8 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   the direct builds (on_face, through_holes, fuse_slabs), reported split by path, e.g. "ours 3121/3477 (general 3026,
   direct 95), OCCT 356, differing 6". "local" runs OCCT's Boolean on the reached faces, so it counts as OCCT. A change
   that only moves cases between our own paths isn't progress.
+- 11-19 (lead) Build hosts by load, not by name: before a build or test run, read the 1-min load of vibex7, vibex8 and vibe2
+  (`ssh <h> cut -d" " -f1 /proc/loadavg`) and use the lowest that has your worktree (or the Mac's free slot). Naming one host
+  for everyone moved the pile-up (vibex7 26 / vibex8 4 at 05:00, then 7 / 34 at 05:30). Private documents stay on vibex7.
 - 11-18 (lead) Hosts: psui builds off vibex6 (the watcher's host) to vibe2; the Mac takes two build slots (12 cores);
   at most one suite, gate or timing pair at a time on an 8-core host (via ~/bin/slot).
