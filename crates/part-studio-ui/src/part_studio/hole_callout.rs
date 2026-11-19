@@ -11,12 +11,15 @@ use noshape_model::drawing::format::split_stacked;
 use noshape_model::drawing::sheet::{Anchor, Text2};
 use noshape_render::{Drawable, Instance, LineData, LineSegment, MeshData};
 
-/// Screen sizes (px) measured on the live capture.
-const CAP_PX: f64 = 11.0;
+/// Screen sizes (px), live hole-callout-1119: face-on "Ø6.35 THRU" a 12 px cap and 95–96 px long at any zoom, from
+/// 6 px past the knee, its baseline 8 px over the 108 px underline (6 px past the text); in another view the same
+/// size lying in the face's plane.
+const CAP_PX: f64 = 12.0;
 /// From the hole's rim to the knee.
 const LEADER_PX: f64 = 14.0;
 const ARROW_PX: f64 = 10.0;
-const GAP_PX: f64 = 3.0;
+const TEXT_X_PX: f64 = 6.0;
+const TEXT_Y_PX: f64 = 8.0;
 
 impl PartStudioView {
     pub(super) fn hole_callout_overlay(&self, cx: &App) -> Vec<Instance> {
@@ -93,8 +96,8 @@ impl PartStudioView {
         let mut width: f64 = 0.0;
         let line_h = cap * 1.6;
         for (i, line) in lines.iter().enumerate() {
-            let y = GAP_PX * wpp + line_h * (lines.len() - 1 - i) as f64;
-            let x = GAP_PX * wpp;
+            let y = TEXT_Y_PX * wpp + line_h * (lines.len() - 1 - i) as f64;
+            let x = TEXT_X_PX * wpp;
             let w_line = match split_stacked(line) {
                 (a, Some((up, lo)), b) => {
                     let mut x1 = x + run(&mut mesh, &mut strokes, a, x, y, cap);
@@ -108,7 +111,7 @@ impl PartStudioView {
             };
             width = width.max(w_line);
         }
-        let shelf = knee + u * (width + 2.0 * GAP_PX * wpp);
+        let shelf = knee + u * (width + 2.0 * TEXT_X_PX * wpp);
         let mut lines_data = LineData::default();
         lines_data.push_polyline(&[f32v(tip + lift), f32v(knee + lift), f32v(shelf + lift)], black, 0, 1.0, LineSegment::ON_TOP);
         // Filled arrowhead on the rim, pointing at the hole.
@@ -133,5 +136,21 @@ impl PartStudioView {
             out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([0.0, 0.0, 0.0, 1.0]).unlit().unpickable().ignore_clip().on_top().layer(30));
         }
         out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Live hole-callout-1119: face-on "Ø6.35 THRU" is 95–96 px long at its 12 px cap, its underline 108 px.
+    #[test]
+    fn the_callout_text_is_lives_length() {
+        let text = "Ø6.35 THRU";
+        assert!(font::fill_supported(text), "drawn in one filled run");
+        let long = font::text_width(text, CAP_PX);
+        assert!((92.0..=99.0).contains(&long), "{text}: {long} px (live 95–96)");
+        let underline = long + 2.0 * TEXT_X_PX;
+        assert!((104.0..=111.0).contains(&underline), "underline {underline} px (live 108)");
     }
 }
