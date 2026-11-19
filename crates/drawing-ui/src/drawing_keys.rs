@@ -292,6 +292,13 @@ impl DrawingEditor {
 /// The Measure panel's units (live2 wake-1118, in live's order): name, meters per unit, abbreviation.
 const MEASURE_UNITS: [(&str, f64, &str); 6] = [("Inches", 0.0254, "in"), ("Millimeters", 0.001, "mm"), ("Centimeters", 0.01, "cm"), ("Feet", 0.3048, "ft"), ("Meters", 1.0, "m"), ("Yards", 0.9144, "yd")];
 
+/// The Measure panel's unit list: live's fixed order, the drawing's own unit suffixed "(Drawing)" in its place (live2
+/// wake-1118 mu-mm-units.png).
+pub(crate) fn measure_unit_labels(units_mm: bool) -> Vec<String> {
+    let own = if units_mm { 1 } else { 0 };
+    MEASURE_UNITS.iter().enumerate().map(|(i, u)| if i == own { format!("{} (Drawing)", u.0) } else { u.0.to_string() }).collect()
+}
+
 /// What the Measure tool (`[`) picked.
 #[derive(Clone, Debug)]
 pub enum MeasurePick {
@@ -428,18 +435,17 @@ impl DrawingEditor {
             v_flex().mx(px(4.)).my(px(3.)).p(px(3.)).border_1().border_color(pal.accent).bg(gpui_kit::rgb(0xe8f1fb)).text_size(px(12.)).child(div().text_color(pal.text_muted).child("Select entities to measure")),
             |f, (k, v)| f.child(gpui_kit::component::h_flex().gap_3().child(div().w(px(70.)).text_color(pal.text_muted).child(k.clone())).child(div().child(v.clone()))),
         );
-        // Live2 wake-1118 (mu1c.png): the drawing's unit first, "(Drawing)", then the others in live's order; the box's
-        // tooltip "Units".
+        // Live2 wake-1118 (mu1c.png, mu-mm-units.png): live's fixed order, the drawing's own unit suffixed "(Drawing)"
+        // in its place; the box's tooltip "Units".
         let own = if self.drawing.units_mm { 1 } else { 0 };
-        let label = move |i: usize| if i == own { format!("{} (Drawing)", MEASURE_UNITS[i].0) } else { MEASURE_UNITS[i].0.to_string() };
-        let order: Vec<usize> = std::iter::once(own).chain((0..MEASURE_UNITS.len()).filter(|i| *i != own)).collect();
+        let labels = measure_unit_labels(self.drawing.units_mm);
         let current = self.measure_unit.unwrap_or(own);
-        let unit = label(current);
+        let unit = labels[current].clone();
         let ed = cx.entity();
         let units = Button::new("measure-unit").label(unit.clone()).ghost().small().w_full().dropdown_caret(true).tooltip("Units").os_dropdown_menu("measure-unit-dd", true, move |mut m, _, _| {
-            for &i in &order {
+            for (i, l) in labels.iter().enumerate() {
                 let e = ed.clone();
-                m = m.item(crate::os_menu::OsMenuItem::new(label(i)).checked(i == current).on_click(move |_, _, cx| {
+                m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(i == current).on_click(move |_, _, cx| {
                     e.update(cx, |t, cx| {
                         t.measure_unit = (i != own).then_some(i);
                         cx.notify();
@@ -484,7 +490,14 @@ impl DrawingEditor {
 
 #[cfg(test)]
 mod control_key_tests {
-    use super::{ControlKey, control_key};
+    use super::{ControlKey, control_key, measure_unit_labels};
+
+    /// Live2 wake-1118: the list keeps its order on a millimetre drawing; "(Drawing)" marks the drawing's unit.
+    #[test]
+    fn measure_units_keep_lives_order_with_the_drawings_unit_marked() {
+        assert_eq!(measure_unit_labels(false), ["Inches (Drawing)", "Millimeters", "Centimeters", "Feet", "Meters", "Yards"]);
+        assert_eq!(measure_unit_labels(true), ["Inches", "Millimeters (Drawing)", "Centimeters", "Feet", "Meters", "Yards"]);
+    }
     use gpui_kit::Modifiers;
 
     /// Live: Control+S / Control+M only; Cmd+S / Cmd+M (Super / Windows elsewhere) and Shift or Alt chords do nothing.
