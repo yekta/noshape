@@ -188,11 +188,9 @@ impl AssemblyView {
         // A new mate's row while its dialog is open: selected, red until both connectors are picked.
         let new_mate = self.mate.as_ref().filter(|m| m.editing.is_none()).map(|m| m.dialog.read(cx)).filter(|d| !asm.mates.iter().any(|m| m.id == d.id));
         // Live: related (with the folder) once a connector is picked.
-        // (Not while Faces to connect takes the picks: live asm-slider-simulation-connection.)
-        let picked = new_mate.is_some_and(|d| (d.a.is_some() || d.b.is_some()) && !d.faces_active);
+        let picked = new_mate.is_some_and(|d| d.a.is_some() || d.b.is_some());
         if let Some(d) = new_mate {
-            let faces_missing = d.simulation_connection && d.simulation_faces.is_empty() && d.mate_type().has_simulation_connection();
-            items.push((d.id, row(&d.name, if d.a.is_some() && d.b.is_some() && !d.same_instance() && !faces_missing { "ok" } else { "error" }, true, true, picked, !self.show_mates)));
+            items.push((d.id, row(&d.name, if d.a.is_some() && d.b.is_some() && !d.same_instance() { "ok" } else { "error" }, true, true, picked, !self.show_mates)));
         }
         // A new relation, mate connector or group: its row while its dialog is open (live: selected, red until it has
         // what it needs; a group hidden as the mates are).
@@ -356,12 +354,7 @@ impl AssemblyView {
         }
         // A mate dialog's picked connectors are selected (live: implicit mate connector FEATUREs).
         if let Some(d) = self.mate.as_ref().map(|s| s.dialog.read(cx)) {
-            // Faces to connect active: its faces are the selection (live asm-slider-simulation-connection: none).
-            if d.faces_active {
-                items.extend(d.simulation_faces.iter().map(|_| json!({ "kind": "FACE", "owner": null })));
-            } else {
-                items.extend([&d.a, &d.b].into_iter().flatten().map(|_| json!({ "kind": "FEATURE", "owner": null })));
-            }
+            items.extend([&d.a, &d.b].into_iter().flatten().map(|_| json!({ "kind": "FEATURE", "owner": null })));
         }
         let mut dialogs: Vec<Value> = self
             .mate
@@ -369,11 +362,8 @@ impl AssemblyView {
             .map(|s| {
                 let d = s.dialog.read(cx);
                 let complete = d.a.is_some() && d.b.is_some() && !d.same_instance();
-                // Simulation connection checked with no Faces to connect: the title red, ✓ still on (live
-                // asm-slider-simulation-connection).
-                let faces_missing = d.simulation_connection && d.simulation_faces.is_empty() && d.mate_type().has_simulation_connection();
                 json!({
-                    "title": d.name, "titleState": if complete && !faces_missing { "ok" } else { "error" }, "kind": "feature", "tabs": [],
+                    "title": d.name, "titleState": if complete { "ok" } else { "error" }, "kind": "feature", "tabs": [],
                     "fields": d.ui_fields(cx),
                     "error": null, "ok": if complete || d.touched { "enabled" } else { "disabled" }
                 })

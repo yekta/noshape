@@ -5021,8 +5021,8 @@ impl AssemblyView {
             head.push_str(" (Hidden)");
         }
         // Then the dialog's rows by their labels: the type, its checkboxes
-        // (live: "Revolute" / "Offset" / "Limits" / "Simulation connection",
-        // "Tangent propagation"; behaviours 8733, E9), a set offset or limit
+        // (live: "Revolute" / "Offset" / "Limits", "Tangent propagation";
+        // behaviours 8733, E9; Simulation is left out), a set offset or limit
         // with its values.
         let t = m.mate_type;
         let mut lines = vec![head, t.name().to_string()];
@@ -5053,15 +5053,12 @@ impl AssemblyView {
                 lines.extend([&l.min, &l.max].into_iter().flatten().map(|e| e.text.clone()));
             }
         }
-        if t.has_simulation_connection() {
-            lines.push("Simulation connection".into());
-        }
         lines.join("\n")
     }
 
     /// A mate's flyout (live2 asm-feel (1)): its tooltip's head, then its parameters read-only, only the type while they
     /// are all at their defaults (Revolute: "Revolute"; with Limits ticked: the type, Offset, Limits, each limit or "No
-    /// minimum" / "No maximum", Simulation connection).
+    /// minimum" / "No maximum"; Simulation is left out).
     fn mate_flyout(&self, m: &Mate) -> (String, Vec<crate::assembly_flyout::FlyRow>) {
         use crate::assembly_flyout::FlyRow;
         let head = self.mate_tooltip(m).lines().next().unwrap_or_default().to_string();
@@ -5070,7 +5067,7 @@ impl AssemblyView {
         let set = |e: &Option<ExprValue>| e.as_ref().is_some_and(|e| !e.text.trim().is_empty());
         let offset = set(&m.offset_x) || set(&m.offset_y) || set(&m.offset_z) || set(&m.rotation);
         // (A Fastened lists its two at their defaults too: live errors-1118 tips, 10-24 "Fastened 1 (Hidden)".)
-        if !(offset || !m.limits.is_empty() || m.simulation_connection || t == MateType::Fastened) {
+        if !(offset || !m.limits.is_empty() || t == MateType::Fastened) {
             return (head, rows);
         }
         let (ox, oy, oz, orot) = noshape_model::assembly::eval::offset_axes(t);
@@ -5083,9 +5080,6 @@ impl AssemblyView {
                 rows.push(FlyRow::Text(l.min.as_ref().map(|e| e.text.clone()).unwrap_or_else(|| "No minimum".into())));
                 rows.push(FlyRow::Text(l.max.as_ref().map(|e| e.text.clone()).unwrap_or_else(|| "No maximum".into())));
             }
-        }
-        if t.has_simulation_connection() {
-            rows.push(FlyRow::Check("Simulation connection".into(), m.simulation_connection));
         }
         (head, rows)
     }

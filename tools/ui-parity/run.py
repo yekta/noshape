@@ -427,6 +427,10 @@ def normalize_live(state):
     feats = (state or {}).get("features")
     if isinstance(feats, dict) and isinstance(feats.get("rows"), list):
         feats["rows"] = [r for r in feats["rows"] if not (isinstance(r, dict) and str(r.get("name", "")).startswith("Simulation features ("))]
+    # A mate dialog's "Simulation connection" (and its Faces to connect): simulation is left out (DECISIONS 11-16).
+    for dlg in [(state or {}).get("dialog")] + list((state or {}).get("dialogs") or []):
+        if isinstance(dlg, dict) and isinstance(dlg.get("fields"), list):
+            dlg["fields"] = [f for f in dlg["fields"] if not (isinstance(f, dict) and f.get("label") in ("Simulation connection", "Faces to connect"))]
     # Ctrl+Space's card: an empty one (its div stays in the page) is none (live 2414).
     doc = (state or {}).get("document")
     if isinstance(doc, dict) and isinstance(doc.get("switcher"), dict) and not doc["switcher"].get("items"):

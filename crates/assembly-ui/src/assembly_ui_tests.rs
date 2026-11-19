@@ -1898,14 +1898,14 @@ fn a_mate_rows_flyout_shows_the_type_alone_until_a_parameter_is_set(cx: &mut Tes
         let (a, b) = (face_connector(v, "Part 1 <1>", true, cx), face_connector(v, "Part 2 <1>", false, cx));
         // A Fastened lists its two checkboxes at their defaults (live2 errors-1118 tips).
         let f = Mate::new(MateId(901), "Fastened 1".into(), MateType::Fastened, a.clone(), b.clone());
-        assert_eq!(v.mate_flyout(&f).1, vec![FlyRow::Text("Fastened".into()), FlyRow::Check("Offset".into(), false), FlyRow::Check("Simulation connection".into(), false)]);
+        assert_eq!(v.mate_flyout(&f).1, vec![FlyRow::Text("Fastened".into()), FlyRow::Check("Offset".into(), false)]);
         let mut m = Mate::new(MateId(900), "Revolute 1".into(), MateType::Revolute, a, b);
         let (head, rows) = v.mate_flyout(&m);
         assert!(head.starts_with("Revolute 1"), "{head}");
         assert_eq!(rows, vec![FlyRow::Text("Revolute".into())], "defaults: the type alone");
         m.limits = vec![("rz".into(), Limits { min: None, max: None })];
         let (_, rows) = v.mate_flyout(&m);
-        assert_eq!(rows, vec![FlyRow::Text("Revolute".into()), FlyRow::Check("Offset".into(), false), FlyRow::Check("Limits".into(), true), FlyRow::Text("No minimum".into()), FlyRow::Text("No maximum".into()), FlyRow::Check("Simulation connection".into(), false)], "Limits ticked: every parameter");
+        assert_eq!(rows, vec![FlyRow::Text("Revolute".into()), FlyRow::Check("Offset".into(), false), FlyRow::Check("Limits".into(), true), FlyRow::Text("No minimum".into()), FlyRow::Text("No maximum".into())], "Limits ticked: every parameter");
     });
 }
 
