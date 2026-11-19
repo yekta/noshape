@@ -1663,7 +1663,7 @@ fn a_placed_bom_tables_corner_snaps_to_the_frames_corner_within_10_px(cx: &mut T
 }
 
 /// Live2 place-1118: Crop view (Spline): the profile being drawn is black and open through the points to the pointer,
-/// with a red ✕ and a pink inference line on the first point; it closes onto the first point at 5 and 3 px, not at 8,
+/// with a red ✕ and a pink inference line while the pointer is in line with the first point; it closes onto the first point at 5 and 3 px, not at 8,
 /// and a click there ends it.
 #[gpui::test]
 fn a_crop_spline_is_drawn_open_and_closes_within_6_px_of_its_first_point(cx: &mut TestAppContext) {
@@ -1704,7 +1704,16 @@ fn a_crop_spline_is_drawn_open_and_closes_within_6_px_of_its_first_point(cx: &mu
         [first[0] + mm, first[1]]
     };
     let far = at(0.4, 0.2);
-    assert_eq!(look(cx, far), (false, true), "open to the pointer, the ✕ and its line on the first point");
+    assert_eq!(look(cx, far), (false, false), "open to the pointer; out of line with the first point: no ✕, no line");
+    // In line with the first point within 8 px (live2 wake-1118: 0–8 yes, 12 no): the line from it to a ✕ where the
+    // pointer snaps onto it.
+    for (d, inline) in [(8.0, true), (12.0, false)] {
+        let mm = cx.update(|cx| editor.read(cx).tol_mm(d));
+        let p = [far[0], first[1] + mm];
+        assert_eq!(look(cx, p).1, inline, "{d} px off the first point's y");
+        let end = cx.update(|cx| editor.read(cx).overlay.tinted.iter().find(|(_, rgb, _)| *rgb == [0, 0, 0, 255]).and_then(|(pts, _, _)| pts.last().copied()));
+        assert_eq!(end.is_some_and(|q| (q[1] - first[1]).abs() < 1e-4), inline, "{d} px: the profile ends on the line: {end:?} for {first:?}");
+    }
     for (d, closed) in [(12.0, false), (8.0, false), (5.0, true), (3.0, true)] {
         let p = px(cx, d);
         assert_eq!(look(cx, p).0, closed, "{d} px from the first point");
@@ -2061,6 +2070,16 @@ fn drawing_keys_as_lives_shortcut_sweep(cx: &mut TestAppContext) {
     let panel = VisualTestContext::from_window(window, cx).debug_bounds("dr-measure-panel").expect("the Measure panel");
     let canvas = cx.update(|cx| editor.read(cx).bounds);
     assert!((panel.left() - canvas.left()).abs() < px(0.5) && (panel.top() - canvas.top()).abs() < px(0.5), "top left: {panel:?} in {canvas:?}");
+    // Its units (live2 wake-1118): Feet reads a foot as 1 ft; Show dual unit adds the other unit.
+    cx.update(|cx| {
+        editor.update(cx, |e, _| {
+            e.measure_unit = Some(3);
+            assert_eq!(e.measure_text(0.3048), "1.000 ft");
+            e.measure_dual = true;
+            assert!(e.measure_text(0.0254).starts_with("0.083 ft ["), "{}", e.measure_text(0.0254));
+            (e.measure_unit, e.measure_dual) = (None, false);
+        })
+    });
     act(cx, Box::new(crate::actions::MeasureTool));
     select(cx);
     act(cx, Box::new(crate::actions::ClearSelection));
@@ -2073,4 +2092,39 @@ fn drawing_keys_as_lives_shortcut_sweep(cx: &mut TestAppContext) {
     let after = on_screen(cx);
     assert!((after[0] - before[0]).abs() < 1e-6 && (after[1] - before[1]).abs() < 1e-6, "the sheet stays: {before:?} → {after:?}");
     assert_eq!(cx.update(|cx| editor.read(cx).bounds), canvas, "the canvas keeps its size");
+}
+
+/// Live2 wake-1118: placing a geometric tolerance, a view's vertex the pointer passed over wakes (a red ✕ stays on it);
+/// from then on the frame lines up with it, a dotted line and the point held on its x, from 8 px off and not at 12. A
+/// vertex not woken lines up nothing.
+#[gpui::test]
+fn a_gtol_lines_up_with_a_woken_vertex_within_8_px(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-gdt-wake");
+    real_sheet(cx, window, &editor);
+    let (_, b, out) = horizontal_edge(cx, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Gdt, cx)));
+    draw(cx, window);
+    let zoom = cx.update(|cx| editor.read(cx).zoom);
+    let hover = |cx: &mut TestAppContext, s: [f64; 2]| {
+        let p = at_window(cx, &editor, s);
+        VisualTestContext::from_window(window, cx).simulate_mouse_move(p, None, Modifiers::default());
+        draw(cx, window);
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            (e.infer_lines.iter().any(|(from, _)| (from[0] - b[0]).abs() < 1e-9), (e.cursor[0] - b[0]).abs() < 1e-9)
+        })
+    };
+    let off = |d: f64| [b[0] + d / zoom, b[1] + out * 25.0];
+    assert_eq!(hover(cx, off(6.0)), (false, false), "not woken: nothing lines up");
+    hover(cx, b);
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        assert!(e.woken_points.iter().any(|w| (w[0] - b[0]).hypot(w[1] - b[1]) < 1e-9), "hovered: woken {:?}", e.woken_points);
+    });
+    for (d, lines_up) in [(1.0, true), (8.0, true), (12.0, false)] {
+        assert_eq!(hover(cx, off(d)), (lines_up, lines_up), "{d} px off the woken vertex's x");
+        let crossed = cx.update(|cx| editor.read(cx).overlay.crosses.iter().any(|(c, _)| (c[0] - b[0]).hypot(c[1] - b[1]) < 1e-9));
+        assert!(crossed, "{d} px: the woken vertex keeps its ✕");
+    }
 }

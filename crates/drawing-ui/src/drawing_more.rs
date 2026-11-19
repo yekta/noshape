@@ -31,6 +31,8 @@ fn len(a: [f64; 2]) -> f64 {
 const AREAS: [&str; 3] = ["Point", "Circle", "Rectangle"];
 const SCOPES: [&str; 4] = ["Cell", "Row", "Column", "Table"];
 
+/// How far (screen px) off a crop profile's first point's x or y the pointer lines up with it.
+pub(crate) const CROP_INFER_REACH_PX: f64 = 8.5;
 /// How near (px) the pointer closes a crop profile onto its first point (live2 place-1118).
 pub(crate) const CROP_CLOSE_REACH_PX: f64 = 6.0;
 
@@ -191,12 +193,26 @@ impl DrawingEditor {
             overlay.tinted.push((self.profile_on_sheet(view, points, knots), [0, 0, 0, 255], 1.0));
             return;
         }
+        let aligned = self.crop_aligned(view, points, c);
         let mut pts: Vec<[f64; 2]> = points.iter().map(|p| pl.to_sheet(*p)).collect();
-        pts.push(c);
+        pts.push(aligned.map_or(c, |(_, q)| q));
         overlay.tinted.push((if spline { open_spline(&pts, 12) } else { pts }, [0, 0, 0, 255], 1.0));
-        let first = pl.to_sheet(points[0]);
-        overlay.crosses.push((first, self.tol_mm(5.0)));
-        overlay.infer.push(([first[0] - self.tol_mm(96.0), first[1]], first));
+        let Some((first, q)) = aligned else { return };
+        overlay.crosses.push((q, self.tol_mm(5.0)));
+        // On the first point itself (just after its click): the horizontal line through it.
+        let to = if (q[0] - first[0]).hypot(q[1] - first[1]) < 1e-9 { [first[0] + self.tol_mm(96.0), first[1]] } else { q };
+        overlay.infer.push((first, to));
+    }
+
+    /// The pointer `c` in line with a crop profile's first point, horizontally or vertically within
+    /// `CROP_INFER_REACH_PX` (live2 wake-1118: 0–8 px yes, 12 no): (the first point, the pointer snapped onto the line).
+    pub(crate) fn crop_aligned(&self, view: ViewId, points: &[[f64; 2]], c: [f64; 2]) -> Option<([f64; 2], [f64; 2])> {
+        let first = self.placement(view)?.to_sheet(*points.first()?);
+        let (dx, dy) = ((c[0] - first[0]).abs() * self.zoom, (c[1] - first[1]).abs() * self.zoom);
+        if dy <= CROP_INFER_REACH_PX {
+            return Some((first, [c[0], first[1]]));
+        }
+        (dx <= CROP_INFER_REACH_PX).then_some((first, [first[0], c[1]]))
     }
 
     pub fn more_tool_click(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
@@ -287,6 +303,12 @@ impl DrawingEditor {
                     let crop = if spline { Crop::Spline(points) } else { Crop::Polygon(points) };
                     self.crop_done(view, crop, cx);
                     return true;
+                }
+                // In line with the first point: on that line (live2 wake-1118).
+                if let Some(view) = parent
+                    && let Some((_, q)) = self.crop_aligned(view, &points, c)
+                {
+                    self.cursor = q;
                 }
                 // The first point: the view under it, snapping only to that
                 // view's points (a neighbour's corner nearby took the crop).

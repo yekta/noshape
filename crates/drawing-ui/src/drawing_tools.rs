@@ -944,6 +944,11 @@ impl DrawingEditor {
             preview = Some(d);
         }
         overlay.infer.extend(self.infer_lines.iter().cloned());
+        // The points an annotation tool woke keep their red ✕ (live2 wake-1118).
+        if !matches!(self.tool, Tool::Select | Tool::Sketch { .. } | Tool::Constrain { .. }) {
+            let h = self.tol_mm(5.0);
+            overlay.crosses.extend(self.woken_points.iter().map(|p| (*p, h)));
+        }
         // The pointer on an inference line: a red ✕ (live request 1662).
         if !self.infer_lines.is_empty() {
             overlay.crosses.push((self.cursor, self.tol_mm(5.0)));
@@ -1632,7 +1637,8 @@ impl DrawingEditor {
                     // Placing a dimension or annotation: align with the others
                     // (Shift turns inferencing off).
                     self.infer_lines.clear();
-                    if !e.modifiers.shift && (self.pending_annotation().is_some() || self.placing_note()) {
+                    if !e.modifiers.shift && (self.pending_annotation().is_some() || self.placing_note() || self.placing_gdt()) {
+                        self.wake_point_at_cursor();
                         self.infer_placement(None);
                     } else if !e.modifiers.shift && self.placing_table() {
                         self.infer_table_placement();
@@ -1743,6 +1749,20 @@ impl DrawingEditor {
         }
     }
 
+    /// A new geometric tolerance's frame on the pointer (its panel open, not editing one).
+    fn placing_gdt(&self) -> bool {
+        matches!(self.tool, Tool::Gdt) && self.gdt_dlg.as_ref().is_some_and(|d| d.edit.is_none())
+    }
+
+    /// Placing an annotation: a view's point under the pointer wakes (live2 wake-1118: a red ✕ stays on it, and the
+    /// placement lines up with it from then on); a view's empty inside wakes nothing.
+    fn wake_point_at_cursor(&mut self) {
+        let Some(p) = self.snap_at(self.cursor).and_then(|s| self.placement(s.view).map(|pl| pl.to_sheet(s.p))) else { return };
+        if !self.woken_points.iter().any(|w| (w[0] - p[0]).abs() < 1e-9 && (w[1] - p[1]).abs() < 1e-9) {
+            self.woken_points.push(p);
+        }
+    }
+
     pub fn infer_placement(&mut self, skip: Option<u64>) {
         let tol = self.tol_mm(INFER_REACH_PX);
         let c = self.cursor;
@@ -1750,12 +1770,18 @@ impl DrawingEditor {
         // placed, at the cursor, which would align with itself.
         let Some(sheet) = self.drawing.sheets.get(self.sheet) else { return };
         let mut pts: Vec<[f64; 2]> = sheet.annotations.iter().filter(|a| Some(a.id) != skip).map(|a| a.position).chain(sheet.tables.iter().map(|t| t.position)).collect();
-        for (view, g) in &self.geoms {
-            if let Some(pl) = self.placement(*view) {
-                pts.extend(g.snaps.iter().map(|s| pl.to_sheet(s.p)));
+        // A tool placing lines up with the views' points it woke (live2 wake-1118: a hovered vertex, not every one); a
+        // dragged annotation with all of them.
+        if matches!(self.tool, Tool::Select) {
+            for (view, g) in &self.geoms {
+                if let Some(pl) = self.placement(*view) {
+                    pts.extend(g.snaps.iter().map(|s| pl.to_sheet(s.p)));
+                }
             }
+        } else {
+            pts.extend(self.woken_points.iter().copied());
         }
-        let best = |axis: usize| pts.iter().filter(|p| (p[axis] - c[axis]).abs() < tol).min_by(|a, b| (a[axis] - c[axis]).abs().total_cmp(&(b[axis] - c[axis]).abs())).copied();
+        let best = |axis: usize| pts.iter().filter(|p| (p[axis] - c[axis]).abs() <= tol).min_by(|a, b| (a[axis] - c[axis]).abs().total_cmp(&(b[axis] - c[axis]).abs())).copied();
         let (bx, by) = (best(0), best(1));
         let mut snapped = c;
         if let Some(p) = bx {
@@ -1784,7 +1810,7 @@ impl DrawingEditor {
         }
         // Placement inference also applies to the click that places.
         self.infer_lines.clear();
-        if e.button == MouseButton::Left && !e.modifiers.shift && matches!(self.drag, Drag::Pending { .. }) && !matches!(self.tool, Tool::Select) && (self.pending_annotation().is_some() || self.placing_note()) {
+        if e.button == MouseButton::Left && !e.modifiers.shift && matches!(self.drag, Drag::Pending { .. }) && !matches!(self.tool, Tool::Select) && (self.pending_annotation().is_some() || self.placing_note() || self.placing_gdt()) {
             self.infer_placement(None);
             self.infer_lines.clear();
         } else if e.button == MouseButton::Left && !e.modifiers.shift && matches!(self.drag, Drag::Pending { .. }) && self.placing_table() {
@@ -3022,8 +3048,8 @@ pub fn quick_double_click(gap: std::time::Duration, dist_px: f32) -> bool {
 }
 
 /// How far (screen px) placement inference holds the pointer on another item's x or y (live2 feel/drawing.json D4: a
-/// note within 7 px of a dimension text's line snaps, 9 doesn't).
-const INFER_REACH_PX: f64 = 8.0;
+/// note within 7 px of a dimension text's line snaps, 9 doesn't; wake-1118: a woken vertex at 8 px, not 12).
+const INFER_REACH_PX: f64 = 8.5;
 /// A box select shows once the pointer is more than this far from the press (live2 drw-feel-q (a): none at 7 px
 /// along an axis or 5.7 px diagonally, a box at 8 px and at 7.07 px diagonally).
 const BOX_START_PX: f64 = 7.0;

@@ -7,7 +7,9 @@ use crate::drawing_view::*;
 use noshape_model::drawing::ViewId;
 use crate::theme::p;
 use gpui_kit::*;
-use gpui_kit::component::{h_flex, v_flex};
+use crate::os_ui::OsDropdownExt as _;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 
 /// A drawing's Control-only shortcuts (live's key list, behaviours "Keys on macOS"): the Control key on every OS,
 /// a Mac's too; Cmd (Super / Windows key elsewhere) never.
@@ -287,6 +289,9 @@ impl DrawingEditor {
 
 // ---------------------------------------------------------------- measure
 
+/// The Measure panel's units (live2 wake-1118, in live's order): name, meters per unit, abbreviation.
+const MEASURE_UNITS: [(&str, f64, &str); 6] = [("Inches", 0.0254, "in"), ("Millimeters", 0.001, "mm"), ("Centimeters", 0.01, "cm"), ("Feet", 0.3048, "ft"), ("Meters", 1.0, "m"), ("Yards", 0.9144, "yd")];
+
 /// What the Measure tool (`[`) picked.
 #[derive(Clone, Debug)]
 pub enum MeasurePick {
@@ -340,8 +345,11 @@ impl DrawingEditor {
 
     /// Model length of a view-coordinate length (view coordinates are model meters); with Show dual unit, the other
     /// unit after it in brackets.
-    fn measure_text(&self, meters: f64) -> String {
-        let main = noshape_model::drawing::build::format_length(&self.drawing, meters) + if self.drawing.units_mm { " mm" } else { " in" };
+    pub(crate) fn measure_text(&self, meters: f64) -> String {
+        let main = match self.measure_unit {
+            Some(i) => format!("{:.3} {}", meters / MEASURE_UNITS[i].1, MEASURE_UNITS[i].2),
+            None => noshape_model::drawing::build::format_length(&self.drawing, meters) + if self.drawing.units_mm { " mm" } else { " in" },
+        };
         if !self.measure_dual {
             return main;
         }
@@ -420,13 +428,32 @@ impl DrawingEditor {
             v_flex().mx(px(4.)).my(px(3.)).p(px(3.)).border_1().border_color(pal.accent).bg(gpui_kit::rgb(0xe8f1fb)).text_size(px(12.)).child(div().text_color(pal.text_muted).child("Select entities to measure")),
             |f, (k, v)| f.child(gpui_kit::component::h_flex().gap_3().child(div().w(px(70.)).text_color(pal.text_muted).child(k.clone())).child(div().child(v.clone()))),
         );
-        let unit = if self.drawing.units_mm { "Millimeters (Drawing)" } else { "Inches (Drawing)" };
+        // Live2 wake-1118 (mu1c.png): the drawing's unit first, "(Drawing)", then the others in live's order; the box's
+        // tooltip "Units".
+        let own = if self.drawing.units_mm { 1 } else { 0 };
+        let label = move |i: usize| if i == own { format!("{} (Drawing)", MEASURE_UNITS[i].0) } else { MEASURE_UNITS[i].0.to_string() };
+        let order: Vec<usize> = std::iter::once(own).chain((0..MEASURE_UNITS.len()).filter(|i| *i != own)).collect();
+        let current = self.measure_unit.unwrap_or(own);
+        let unit = label(current);
+        let ed = cx.entity();
+        let units = Button::new("measure-unit").label(unit.clone()).ghost().small().w_full().dropdown_caret(true).tooltip("Units").os_dropdown_menu("measure-unit-dd", true, move |mut m, _, _| {
+            for &i in &order {
+                let e = ed.clone();
+                m = m.item(crate::os_menu::OsMenuItem::new(label(i)).checked(i == current).on_click(move |_, _, cx| {
+                    e.update(cx, |t, cx| {
+                        t.measure_unit = (i != own).then_some(i);
+                        cx.notify();
+                    })
+                }));
+            }
+            m
+        });
         let dual = self.measure_dual;
         let dual_box = div().h(px(26.)).px(px(4.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new("measure-dual").label("Show dual unit").checked(dual).on_click(cx.listener(|this, v: &bool, _, cx| {
             this.measure_dual = *v;
             cx.notify();
         })));
-        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Measure", "text": ["Measure", "Select entities to measure", unit, "Show dual unit"] }));
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Measure", "text": ["Measure", "Select entities to measure", unit.clone(), "Show dual unit".to_string()] }));
         Some(
             v_flex()
                 .id("dr-measure-panel")
@@ -449,7 +476,7 @@ impl DrawingEditor {
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Measure"))
                         .child(div().id("measure-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_measure(cx)))),
                 )
-                .child(v_flex().p(px(3.)).child(field).child(div().h(px(26.)).px(px(4.)).flex().items_center().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(12.)).child(unit)).child(dual_box))
+                .child(v_flex().p(px(3.)).child(field).child(div().h(px(26.)).flex().items_center().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(12.)).child(units)).child(dual_box))
                 .into_any_element(),
         )
     }
