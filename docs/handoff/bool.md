@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-19 23:25 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-19 23:40 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2; builds + probes on the Mac (NOSHAPE_RB_HOST=mac,
 inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host; land queue vibe2
 (`NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`); private docs only vibex7 ~/lead-private. Never kill a process
@@ -65,10 +65,18 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   Name the symmetry in the land commit. 6bb081c8 (volume = OCCT): history diff /root/bool2-scratch/6bb-hist.txt.
   (a) every edge / face record pairs with OCCT's within 100 um (inputs at OCCT's 1e-4 of 11-02; ours puts vertices
   on the nominal planes, OCCT 7-30 um off); (b) vertex-only records (afcf858f3 rule); (c) real: the coincident faces'
-  representative: OCCT arg16 Face0 Modified (x2) + arg17 Face2 Generated Edge, ours Deleted. Asked the lead (23:30):
-  replay taking points within the arguments' tolerance as the same, else re-record shfall. Next: (c) with OCCT's
-  FillSameDomainFaces rule (boolean.rs rank ~7027; bool-hat NOSHAPE_SD_RULE=1 is that rule, tried in fuses: other
-  recordings 2ea4 / 4776 / bd8e then differ: check them case by case).
+  representative: OCCT arg16 Face0 Modified (x2) + arg17 Face2 Generated Edge, ours Deleted. Lead 23:35: don't loosen the replay;
+  RE-RECORD shfall at today's tolerances as a separate step and confirm every other shfall case is unchanged apart
+  from the tolerance. Running: vibex8 ~/agents/bool-keep/shrec/run.sh (qa's clifuzz.py copied, seeds 3000-3029 x 60,
+  CLI of main 91df536c0 frozen in shrec/bin, NOSHAPE_RECORD_BOOLEANS -> shrec/rec/<seed>, log shrec/run.out, ends
+  SHREC-DONE). Then: keep the Shell slab fuses (slab_union recordings), match old shfall cases to new ones (op, tools,
+  target faces, volume within 1e-6), replay both, list any change beyond tolerance; replace shfall in one commit-less
+  corpus swap (~/agents/bool-corpora/shfall, keep the old as shfall-1102). (c): NOSHAPE_SD_RULE=3 scratch in bool2-ab
+  boolean.rs (fuse: unsplit faces by least argument first, split pieces by the later argument in fuses of 4+);
+  A/B over shfall running (vibex8 ~/tmp/bool2/sdr-0.txt / sdr-3.txt).
+- sh3-probe verified (Mac u5): kernel shell:: 34 pass; Shell corpus ours vs OCCT: 17488d26, 99b55ec9 (same under the
+  tolerance), 2e9c3ddd (ours "took too long" vs "shell failed": load flake, both errors; watch in the gate). 37 fuzz
+  shells now fail "the walls fill the part" both ways (they returned the part unchanged, as b79e508b).
 
 ## From bool2 (owned since 11-19 20:45)
 - Landed 11-19: 41fcfd2c bool2-cbs (closed B-spline faces' period; 2a5740b0 gate exception backed by live capture
