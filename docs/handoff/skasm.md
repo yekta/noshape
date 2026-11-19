@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 15:32 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 15:22 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
