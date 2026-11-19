@@ -143,7 +143,8 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   declines a case to OCCT, ranked by how many recorded cases each reason blocks; their daily report is the share ours
   takes (count) and the number of differing cases.
 - 11-19 (lead) "Ours" in that share is every case Noshape code builds instead of OCCT's Boolean: the general Boolean and
-  the direct builds (on_face, through_holes, local), reported split by path, e.g. "ours 1015/1092 (general 920, direct
-  95), OCCT 77, differing N". A change that only moves cases between our own paths isn't progress.
+  the direct builds (on_face, through_holes, fuse_slabs), reported split by path, e.g. "ours 3121/3477 (general 3026,
+  direct 95), OCCT 356, differing 6". "local" runs OCCT's Boolean on the reached faces, so it counts as OCCT. A change
+  that only moves cases between our own paths isn't progress.
 - 11-18 (lead) Hosts: psui builds off vibex6 (the watcher's host) to vibe2; the Mac takes two build slots (12 cores);
   at most one suite, gate or timing pair at a time on an 8-core host (via ~/bin/slot).
