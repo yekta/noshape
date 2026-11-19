@@ -781,6 +781,22 @@ impl<'a> Translator<'a> {
         self.features.is_empty()
     }
 
+    /// Marks this studio a copy of standard content (`PartStudio::standard_content`): live's standard content rows
+    /// take no part property its features set (asm-config-assembly's hex nuts' Description).
+    pub fn mark_standard_content(&mut self) -> Result<(), String> {
+        let tab = self.tab.clone().ok_or("no Part Studio")?;
+        let od = self.ctx.doc(None).map_err(|e| e.to_json().to_string())?;
+        let id = crate::doc::find_tab(od.doc(), &tab).map_err(|e| e.to_json().to_string())?;
+        od.session
+            .edit_tab_not_undoable(id, "Standard content", |c| {
+                if let noshape_model::document::TabContent::PartStudio(ps) = c {
+                    ps.standard_content = true;
+                }
+            })
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     pub fn call(&mut self, tool: &str, mut args: Value) -> Result<Value, String> {
         let op = registry::by_tool_name(tool).ok_or_else(|| format!("no tool {tool}"))?;
         if let (Some(tab), Some(a)) = (&self.tab, args.as_object_mut())
@@ -8973,6 +8989,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                         && let Err(e) = t.call("part_set_material", json!({ "tab": t.tab, "parts": [id], "material": spec.material() }))
                     {
                         res.untranslated.push(format!("{element}: part {pid}'s material {}: {e}", spec.material()));
+                    }
+                    if standard && let Err(e) = t.mark_standard_content() {
+                        res.untranslated.push(format!("{element}: not marked standard content: {e}"));
                     }
                     if standard {
                         let errors = configure_standard_sizes(&mut t, asm, element, pid, id, levels.iter().flat_map(|l| l.instances.iter().copied()));

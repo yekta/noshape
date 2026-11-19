@@ -373,6 +373,11 @@ impl FaceAppearance {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartStudio {
     pub features: Vec<Feature>,
+    /// A copy of Onshape's standard content (the parity translator's of live's Standard Library studios): the part
+    /// properties its features set (the content's setProperty) don't fill the BOM, as live's standard content rows
+    /// show none (asm-config-assembly's hex nuts: Description empty).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub standard_content: bool,
     /// Saved after empty merge scopes became an error, as in Onshape (see
     /// [`ScopeRule`]); older studios are upgraded on load.
     #[serde(default = "ScopeRule::legacy")]

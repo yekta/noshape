@@ -97,9 +97,13 @@ fn part_props<'a>(doc: &'a Document, studio: TabId, body: &BodyId, config: &Conf
     }
 }
 
-/// The property `kind` a custom feature gave `line`'s part (its first instance's Part Studio result).
-fn feature_property(result: &AssemblyResult, line: &BomLine, kind: &str) -> Option<String> {
-    let BomSource::Part { body, .. } = &line.source else { return None };
+/// The property `kind` a custom feature gave `line`'s part (its first instance's Part Studio result); none for a copy
+/// of standard content (`PartStudio::standard_content`).
+fn feature_property(doc: &Document, result: &AssemblyResult, line: &BomLine, kind: &str) -> Option<String> {
+    let BomSource::Part { studio, body, .. } = &line.source else { return None };
+    if matches!(doc.tab(*studio).map(|t| &t.content), Some(TabContent::PartStudio(ps)) if ps.standard_content) {
+        return None;
+    }
     let path = line.instances.first()?;
     result.occurrences.iter().find(|o| &o.path == path && &o.body == body)?.context.feature_property(body, kind)
 }
@@ -413,7 +417,7 @@ pub fn cell(doc: &Document, result: &AssemblyResult, line: &BomLine, col: BomCol
             // A value the user set wins over one a custom feature set (live bjr wire clip: "OPG006"'s Description).
             let or_feature = |own: Option<&String>, kind: &str| match own {
                 Some(v) => BomCell::Text(v.clone()),
-                None => BomCell::Text(feature_property(result, line, kind).unwrap_or_default()),
+                None => BomCell::Text(feature_property(doc, result, line, kind).unwrap_or_default()),
             };
             match col {
                 BomColumn::PartNumber => or_feature(props.and_then(|p| p.part_number.as_ref()), "PART_NUMBER"),
