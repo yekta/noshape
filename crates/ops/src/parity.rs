@@ -8873,14 +8873,14 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     // our copy made.
                     let first_line = studio["live"].as_array().into_iter().flatten().find(|l| l["parts"].as_array().is_some_and(|ps| ps.iter().any(|p| p["partId"] == pid)));
                     let maker = first_line.and_then(|l| l["featureId"].as_str()).or_else(|| studio["firstMakers"][pid]["featureId"].as_str());
-                    let by_creator = || t.part_by_creator(t.len(), pid, &our_ids).filter(|id| solids.iter().any(|s| &s.2 == id));
+                    let by_creator_any = || t.part_by_creator(t.len(), pid, &our_ids).filter(|id| solids.iter().any(|s| &s.2 == id));
                     // (Several made by it: the one its part id's order names, else the one not taken nearest live's
                     // volume: asm-suspension's Body from an Extrude of two regions; asm-pattern-std's AR-S1 / AR-S2 of
                     // one Extrude, alike in volume, by their ids.)
                     // (Never a sliver of ours for a part of live's volume: asm-tvc-mount's Inner Ring, 11789 mm³, went to a
                     // 0.014 mm³ "Part 3" its first feature left in ours while our ring came from a later one.)
                     let floor = volume_band(p).map_or(0.0, |(lo, _)| lo * 0.01);
-                    let by_creator = || by_creator().filter(|id| solids.iter().any(|s| &s.2 == id && s.1 >= floor));
+                    let by_creator = || by_creator_any().filter(|id| solids.iter().any(|s| &s.2 == id && s.1 >= floor));
                     let by_maker = maker.and_then(|f| t.feature_ids.get(f)).and_then(|ours| {
                         let head = format!("body:{ours}.");
                         let made: Vec<_> = solids.iter().filter(|s| s.2.starts_with(&head) && s.1 >= floor).collect();
@@ -8904,7 +8904,14 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                         None => match by_creator() {
                             Some(n) if fitting.contains(&n) => solids.iter().map(|s| &s.2).find(|n| !taken.contains(n) && !fitting.contains(n)).cloned().unwrap_or(n),
                             Some(n) => n,
-                            None => pname.to_string(),
+                            // Nothing else: what its feature made, a sliver too, rather than no part (asm-suspension's
+                            // Knuckle: our 805e29 leaves it a sliver where live's fillets succeed; inserted, it is placed).
+                            None => by_creator_any()
+                                .or_else(|| {
+                                    let head = format!("body:{}.", maker.and_then(|f| t.feature_ids.get(f))?);
+                                    solids.iter().find(|s| s.2.starts_with(&head) && !taken.contains(&s.2)).map(|s| s.2.clone())
+                                })
+                                .unwrap_or_else(|| pname.to_string()),
                         },
                     }
                 };

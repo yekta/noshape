@@ -4066,6 +4066,52 @@ fn a_live_part_is_never_ours_by_a_sliver() {
     assert!(volume > 2000.0, "the ring, not the sliver: {volume} mm³ ({source})");
 }
 
+/// A live part whose feature leaves only a sliver in ours and nothing else of ours fits it (asm-suspension's Knuckle:
+/// our 805e29's fillets fail, the 378159 mm³ part a broken body): ours is that sliver, inserted and placed, rather than
+/// no instance at all.
+#[test]
+fn a_live_part_with_only_a_sliver_of_ours_is_still_inserted() {
+    let circle = |id: &str, x: f64, r: f64| json!({ "btType": "BTMSketchCurve-4", "entityId": id, "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": r, "xCenter": x, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } });
+    let sketch = |f: &str, name: &str, c: Value| json!({ "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": f, "name": name,
+        "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+        "entities": [c], "constraints": [] });
+    let extrude = |f: &str, name: &str, of: &str, depth: &str| json!({ "btType": "BTMFeature-134", "featureType": "extrude", "featureId": f, "name": name, "parameters": [
+        { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+        { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualCreatedByQuery-137", "featureId": of, "entityType": "FACE" }] },
+        { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+        { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": depth }] });
+    // Ours: Extrude 1 makes a 0.0008 mm³ sliver where live's Knuckle is 1000 mm³; Extrude 2 the pin, as live's.
+    let pin = std::f64::consts::PI * 0.006 * 0.006 * 0.02;
+    let parts = json!([
+        { "partId": "JKD", "name": "Pin", "volume": [pin * 0.9995, pin * 1.0005] },
+        { "partId": "JHD", "name": "Knuckle", "volume": [1e-6 * 0.9995, 1e-6 * 1.0005] },
+    ]);
+    let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [
+        sketch("FS1", "Sketch 1", circle("c1", 0.05, 0.0005)), extrude("FE1", "Extrude 1", "FS1", "0.001 mm"),
+        sketch("FS2", "Sketch 2", circle("c2", 0.0, 0.006)), extrude("FE2", "Extrude 2", "FS2", "20 mm"),
+    ], "live": [
+        { "index": 1, "name": "Extrude 1", "featureId": "FE1", "status": "OK", "parts": [{ "partId": "JHD", "name": "Knuckle" }] },
+        { "index": 3, "name": "Extrude 2", "featureId": "FE2", "status": "OK", "parts": [{ "partId": "JHD", "name": "Knuckle" }, { "partId": "JKD", "name": "Pin" }] },
+    ] });
+    let at = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    let asm = json!({
+        "rootAssembly": { "instances": [
+            { "id": "IA", "name": "Knuckle <1>", "type": "Part", "partId": "JHD", "elementId": "E1" },
+            { "id": "IB", "name": "Pin <1>", "type": "Part", "partId": "JKD", "elementId": "E1" },
+        ], "occurrences": [{ "path": ["IA"], "fixed": true, "transform": at }, { "path": ["IB"], "fixed": true, "transform": at }] },
+        "features": { "features": [], "featureStates": {} } });
+    let mut ctx = Ctx::new();
+    rebuild_assembly(&mut ctx, &scratch("only-a-sliver.noshape"), &asm, &[("E1".into(), studio, parts)]);
+    let run = |ctx: &mut Ctx, tool: &str, args: Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap().value;
+    let list = run(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+    let source = |name: &str| list["instances"].as_array().unwrap().iter().find(|i| i["name"] == name).unwrap_or_else(|| panic!("no {name}: {list}"))["source"].clone();
+    let (knuckle, pin) = (source("Knuckle <1>"), source("Pin <1>"));
+    let q = run(&mut ctx, "query_parts", json!({ "tab": knuckle["part_studio"] }));
+    let volume = |of: &Value| q["parts"].as_array().unwrap().iter().find(|p| p["id"] == of["part"]).and_then(|p| p["volume"].as_f64()).unwrap_or_else(|| panic!("{of} in {q}"));
+    assert!(volume(&knuckle) < 0.01, "the Knuckle is ours' sliver: {} mm³", volume(&knuckle));
+    assert!(volume(&pin) > 2000.0, "the pin is ours' pin: {} mm³", volume(&pin));
+}
+
 /// A subassembly rebuilt from live's definition: "Sub" holds the cylinder (fixed inside it); the root has a fixed
 /// cylinder and Sub's instance, turned 30° and stacked on it by a Revolute from the root cylinder's top edge to the
 /// nested cylinder's bottom edge (its connector's path through Sub). Every occurrence, the nested one too, placed as
