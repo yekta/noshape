@@ -1743,6 +1743,67 @@ fn boundary_of_two_profiles_is_ruled_between_them() {
     assert!((area - 5516.5878).abs() < 0.01, "{area}");
 }
 
+/// A surface Extrude of one sketch curve (blind, symmetric when `both`), Add or New.
+fn sheet_of(s: &mut Studio, plane: DatumPlane, a: (f64, f64), b: (f64, f64), depth: &'static str, both: bool, add: bool) {
+    let mut sk = noshape_sketch::Sketch::new();
+    let e = sk.add_line(DVec2::new(a.0, a.1), DVec2::new(b.0, b.1)).0;
+    let sk = s.sketch(Reference::Plane(plane), sk);
+    s.add("extrude", move |p| {
+        p.set("bodyType", ParamValue::Enum("SURFACE".into()));
+        p.set("surfaceOperationType", ParamValue::Enum(if add { "ADD" } else { "NEW" }.into()));
+        p.set("surfaceEntities", ParamValue::Query(vec![Reference::SketchEntity { sketch: sk, entity: e }]));
+        p.set("depth", expr(depth));
+        p.set("symmetric", ParamValue::Bool(both));
+    });
+}
+
+/// A surface Extrude with Add joins the surface it meets (c2-surf-workshop-split's Extrude 2 up to Surface 1's hole: live
+/// one sheet of 3 faces, ours a second sheet).
+#[test]
+fn surface_extrude_add_joins_the_surface_it_meets() {
+    let mut s = Studio::new();
+    sheet_of(&mut s, DatumPlane::Top, (0.0, 0.0), (0.05, 0.0), "10 mm", false, false);
+    sheet_of(&mut s, DatumPlane::Top, (0.05, 0.0), (0.05, 0.05), "10 mm", false, true);
+    let r = s.ok();
+    let sheets: Vec<usize> = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Surface).map(|b| b.shape.faces().len()).collect();
+    assert_eq!(sheets, [2]);
+}
+
+/// Split of a sheet by a tube through its middle keeps one side: the piece with the hole on one, the disc on the other
+/// (c2-surf-workshop-split's Split 2: both pieces' centres lie inside the tube, so both went with Keep front).
+#[test]
+fn split_of_a_sheet_by_a_tube_keeps_one_side() {
+    let run = |front: bool| {
+        let mut s = Studio::new();
+        sheet_of(&mut s, DatumPlane::Front, (-0.05, 0.01), (0.05, 0.01), "100 mm", true, false);
+        let mut sk = noshape_sketch::Sketch::new();
+        let c = sk.add_circle(DVec2::ZERO, 0.01).0;
+        let sk = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        s.add("extrude", move |p| {
+            p.set("bodyType", ParamValue::Enum("SURFACE".into()));
+            p.set("surfaceEntities", ParamValue::Query(vec![Reference::SketchEntity { sketch: sk, entity: c }]));
+            p.set("depth", expr("30 mm"));
+        });
+        let r = s.ok();
+        let ids: Vec<BodyId> = r.context.bodies.iter().map(|b| b.id.clone()).collect();
+        s.add("splitPart", move |p| {
+            p.set("splitType", ParamValue::Enum("PART".into()));
+            p.set("targets", ParamValue::Query(vec![Reference::Body(ids[0].clone())]));
+            p.set("tool", ParamValue::Query(vec![Reference::Body(ids[1].clone())]));
+            p.set("keepBothSides", ParamValue::Bool(false));
+            p.set("keepFront", ParamValue::Bool(front));
+        });
+        let r = s.ok();
+        r.context.bodies.iter().filter(|b| b.kind == BodyKind::Surface && b.shape.faces().len() == 1).map(|b| b.shape.faces()[0].area().unwrap()).collect::<Vec<f64>>()
+    };
+    let (a, b) = (run(true), run(false));
+    let disc = PI * 0.01f64.powi(2);
+    assert!(a.len() == 1 && b.len() == 1, "{a:?} {b:?}");
+    let mut got = [a[0], b[0]];
+    got.sort_by(f64::total_cmp);
+    assert!(near(got[0], disc, 1e-6) && near(got[1], 0.01 - disc, 1e-6), "{got:?}");
+}
+
 /// Live L28: a U row "Normal to profile" on a part edge (no sketch plane)
 /// fails with loft.fs's planar-profile text; the same rows with None work.
 #[test]

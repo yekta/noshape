@@ -415,7 +415,12 @@ fn surface(ev: &mut EvalCtx) -> FResult<()> {
         let sewn = if shapes.len() > 1 { k::sew(&shapes, 1e-6, false).map(|r| r.shape).unwrap_or_else(|_| k::Shape::compound(&shapes)) } else { shapes[0].clone() };
         let names: Vec<_> = tools.iter().flat_map(|t| t.names.faces.clone()).collect();
         let named = if sewn.count(k::ShapeType::Face) == names.len() { NamedShape::new(sewn, names) } else { tools.remove(0) };
-        ev.add_new_bodies(named, BodyKind::Surface, i as u32)?;
+        // Add sews it to the surfaces it meets (c2-surf-workshop-split's Extrude 2 up to Surface 1's hole: one sheet).
+        if ev.is("surfaceOperationType", "ADD") {
+            super::bshared::surface_result(ev, named)?;
+        } else {
+            ev.add_new_bodies(named, BodyKind::Surface, i as u32)?;
+        }
     }
     Ok(())
 }

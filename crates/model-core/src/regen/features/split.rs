@@ -103,6 +103,17 @@ fn piece_center(s: &Shape) -> DVec3 {
     props.map(|p| p.center).unwrap_or_else(|_| s.bounding_box(false).map(|b| b.center()).unwrap_or(DVec3::ZERO))
 }
 
+/// A point of a sheet piece away from the tool, to tell its side by: of the point nearest its centre, its vertices and
+/// its edges' middles the one farthest from the tool. (A sheet's centre may lie off it: c2-surf-workshop-split's Split 2
+/// cuts a disc out of Surface 1, the holed piece's centre over the hole, inside the tool's tube like the disc's.)
+fn sheet_point(piece: &Shape, centre: DVec3, tool: &Shape) -> DVec3 {
+    let on = k::make_vertex(centre).ok().and_then(|v| k::distance(&v, piece).ok()).map(|d| d.point_b);
+    let ends = piece.vertices().iter().filter_map(|v| v.vertex_point().ok()).collect::<Vec<_>>();
+    let mids = piece.edges().iter().filter_map(edge_mid).collect::<Vec<_>>();
+    let away = |p: &DVec3| k::make_vertex(*p).ok().and_then(|v| k::distance(&v, tool).ok()).map_or(0.0, |d| d.distance);
+    on.into_iter().chain(ends).chain(mids).map(|p| (away(&p), p)).max_by(|a, b| a.0.total_cmp(&b.0)).map_or(centre, |(_, p)| p)
+}
+
 /// Signed side of a point relative to the tool (positive = front).
 fn side_of(tool: &Tool, p: DVec3) -> f64 {
     if let Some(pl) = &tool.plane {
@@ -255,7 +266,8 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
             .into_iter()
             .map(|p| {
                 let c = piece_center(&p.shape);
-                (side_of(&tool, c), c, p)
+                let side = if target.kind == BodyKind::Surface { side_of(&tool, sheet_point(&p.shape, c, &tool.shape)) } else { side_of(&tool, c) };
+                (side, c, p)
             })
             .collect();
         if pieces.len() < 2 {
