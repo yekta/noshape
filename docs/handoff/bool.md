@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-19 21:20 UTC (fresh bool thread after the 17:30-21:10 usage stall). Hosts by load (DECISIONS 11-19): read
+Updated 11-19 22:00 UTC (fresh bool thread after the 17:30-21:10 usage stall). Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2; builds + probes on the Mac (NOSHAPE_RB_HOST=mac,
 inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host; land queue vibe2
 (`NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`); private docs only vibex7 ~/lead-private. Never kill a process
@@ -26,11 +26,17 @@ reasons ranked, speed list. Daily report: share as "ours N/M (general, direct), 
   sphere, torus to main's e466cfa77); the cylinder face's angles = main's 1b382d666. Re-gate: unit
   bool-gate-07c3dc068-x8 -> /root/bool-hat-scratch/chain-07c3dc068.out. Clean (and knurls clean) -> land from
   bool-tube (`git switch bool-land7` first; the gate detaches it), then tell dx / core / blend / asm.
-- HOLE-THROUGH-ROUND-POLE (asm, isaac Fastened 43): repro recorded on vibex8 ~/tmp/bool/hp (mini.sh, rec/; copies
-  /root/bool-scratch/hp/rec, Mac bool-keep/hp-rec). The cut 0ea218c03ac1f745 is OCCT's (ours declines), valid, volume
-  16987 mm3 (= 17298 - 311, right), but eval.rs non_manifold() finds an edge bounding > 2 faces, so the feature errors
-  "would result in non-manifold body". Probe: Mac bin/hp xprobe::probe_case_nonmanifold (PROBE_CORPUS=hp-rec
-  PROBE_CASE=0ea218c03ac1f745, PROBE_RUST=1 for ours) prints that edge.
+- HOLE-THROUGH-ROUND-POLE: FIXED on bool-pole e87b6b170 (T1 bool_patterns::a_hole_down_a_corner_rounds_axis_through_its_ball;
+  case 0ea218c03ac1f745 in tests/data/booleans). Cause: OCCT's section of the hole's wall and the x bottom round is
+  empty (the y round's mirror pair gets the curve), so OCCT's cut keeps pieces inside the hole (an edge of 4 faces,
+  removes the whole 311 mm3) and ours declined. Fix: occt_sections, when no curve and the boundaries meet once, adds
+  where either face's edges pierce the other's cylinder / cone (edges_piercing) as seeds; seeded_sections, when the
+  seeded walk still finds none, intersects the surfaces over each face's uv box grown by a tenth; ours trims. Ours
+  removes 302.235 mm3 (exact integral 302.234; live's isaac cut 303.7 on its own geometry). Kernel 519 + brep 64 pass
+  (Mac), g++-13 ok. In the combined gate below. After it lands: tell asm (isaac 98/129 mates re-check).
+- bool-pole2 (worktree bool-docs, origin/bool-pole2, tip 330ea2052) = bool-land7 + bool-pole's 6 + e87b6b170. Gate
+  unit bool-gate-330ea2052-x7 (vibex7, gate.sh from bool-docs) -> /root/bool-hat-scratch/chain-330ea2052.out. It
+  also needs the knurls + hats/dock (udoc) before landing.
 - bool-pole (bool-hat, 6 commits on bool-stack7, tip 0d465cb70; rebase on bool-land7 after it lands; then its own
   gate with the Shell check + udoc):
   e4f8a8066 a sphere's pole edge split at the curves ending there (non-manifold cdd336b4 taken = OCCT);
@@ -72,7 +78,8 @@ reasons ranked, speed list. Daily report: share as "ours N/M (general, direct), 
   the crossing with an input line there (and tangent case); 2a8da63d4 T1 b997c4c3 to recorded_as_occt (fails).
   gate86 (/root/bool2-ab-scratch/gate-2a8da63d4.log): +2 taken, differing 6 -> 8 (shfall 6bb081c8 / 5101adb8 fuses,
   32 tools, path direct), T1 fails; c2-parting-line-draft Rib 1 edges 234 -> 225 (live 214).
-  Measurement (vibex8 unit bool2-tdbg53b, /root/bool2-scratch/tdbg53b.out, "VOL ours" / "VOL occt" per case):
+  Measurement: rerun as unit bool-tdbg53e (the first two died: build failed on `mod sampler;` missing from bool2-ab's
+  uncommitted all.rs, now added) -> /root/bool2-scratch/tdbg53c.out, "VOL ours" / "VOL occt" per case:
   - b997c4c389ff7abe: ours 4.0555e-6 vs recorded 4.05697e-6. VOL occt ~4.0555e-6 -> stale recording (re-record);
     4.05697e-6 -> needs the rest of the tail stack (bool2-taildbg b02a9be42 + 62e8ccdad).
   - 6bb081c8 / 5101adb8: ours 5.295354594164e-4 both; recordings 5.2953546335e-4 / 5.2953739068e-4 (OCCT disagrees
