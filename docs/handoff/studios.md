@@ -9,26 +9,30 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-19 12:25 UTC. Restarted 11-19 ~11:35 as a fresh thread (the previous one, 58e9bca8, hit its account's
-weekly limit); compacted before that ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-19 17:24 UTC. Restarted 11-19 ~11:35 as a fresh thread (the previous one, 58e9bca8, hit its account's
+weekly limit).
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2
-tools/tiers/land.sh --no-precheck`; builds / tests `NOSHAPE_RB_HOST=<lowest load of vibex7 / vibex8 / vibe2>
-tools/tiers/rb.sh` (warm target on vibex7); ui-parity via ~/bin/slot, one run per host.
-- Landed 11-19: 3046bb31 (tab position, last viewed, Feature Studio marker, recheck-1119), 0e754c57 (892ee0a0: +
-  marks, cut line click, header ⋮ remembered, drawprops-1119, Merge dialog, Callout reach 7 px exclusive).
-- Local, to land as one: cacd477d (note-opts-1119), audit row 10, and the top-5 #3–#5 comparison (live 11:35 captures,
-  "studios hole plate"): a feature pattern copies its Hole features' hole records (`HoleRecord::pattern`; callouts
-  count "4X"), a tapped callout's drill line first, no space after ⌴ ⌵ ↧, the countersink angle "90.0°" / "90,0°",
-  ISO drops the pitch's trailing zeros ("M6x1"), the hole table a letter per hole spec in the order made and its
-  locations at the fixed precision ("15,00"); the Inspection list / Drawing definition list CSVs in live's form (BOM,
-  "Item,Sheet,Type,Units,…", CRLF, "--", "Sheet1 (1)", "Hole/thread callout" a row per value, notes with N/A,
-  "(overridden)", a list note's lines "1.\t7"); Note border "Square circle"; the 23 date formats on 2026-11-19 tested. e2e
-  `studios_hole_plate_callouts_and_table_as_live`.
-- Compared, already as live: title block property / date lists, DXF sheets side by side (content gap 5.019 in).
-- Left: a pinned column doesn't stay put while the Documents table scrolls sideways.
+tools/tiers/land.sh` (`--no-precheck` only when the code was clippy-checked unchanged); builds / tests
+`NOSHAPE_RB_HOST=<lowest load of vibex7 / vibex8 / vibe2> tools/tiers/rb.sh` (warm studios target on vibex7). rb.sh
+skips a file edited during a running sync: `touch` edited files before the next run. Scenario runs: vibe2
+~/agents/studios-uip (rsync tools/ui-parity tests/ui-parity there), app at ~/tmp/studios/noshape, Xvfb :391
+(pid in ~/tmp/studios/xvfb.pid); an app built on vibex7 goes vibex7 → here → vibe2 (no host-to-host ssh).
+- Landed 11-19: 3046bb31, 0e754c57, 6017f81c (P0 Ø fraction crash), 66f57e48 (note-opts, hole plate, CSVs, Merge order).
+- Queued 11-19 ~17:25, one stack: qa's 15 feel rows (11-19 16:10): fixed drw-copy-annotation-drag (Alt press on a
+  selected note's side grip resized it), ver-row-tooltip (two-stage tip, live2 versions-1119), drw-constraint-* and
+  drw-sketch-tool-center-point-rectangle (▾ rows without keys), drw-geometric-tolerance (edge click places a frame,
+  e33eb4a42's leader reverted: live2 gtol-1119); drw-view-replicate-region-place now replicates (snap by the vertex
+  under which the whole dimension lands) but onto the Top view's other 40 mm edge (ours y 153.5, live 184): live's
+  rule between two matching edges asked of live2. Not targets: drw-note-insert-drawing-property (live's drawing is
+  named "Part 1 Drawing 1 (1)", its longer name moves the note's centre 2.6 mm), part-/asm-menu-release s3 (11-06/07
+  takes on the free plan's upsell; live Pro's Release dialog ignores Esc, docs-versions-release-1118),
+  drw-inspection-table-iso-scrolled s2 and drw-revision-table-delete s8 (known). live2 drawprops retake: tolerance
+  precision resets with units (1/256, 0.1 mm), linear fractional values stacked. Note ruler tail drawn triangles.
+  Documents table pinned columns (`Pins`).
+- live2 versions-1119: (b) was live2's artefact; (c)–(e) already as live.
 - Not targets: drw-revision-table-delete s8, drw-inspection-table-iso-scrolled s2; drw-canvas-zoom-to-sheet /
   drw-ref-pin-reference have no usable recording.
 - Open: the Measure readout of a point / circle pick ("Point 1", "Circle 1" names and rows are our guess).
