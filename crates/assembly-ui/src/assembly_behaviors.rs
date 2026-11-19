@@ -1002,7 +1002,7 @@ impl AssemblyView {
         let doc = self.doc.read(cx).session.doc.clone();
         let valid = clip.instances.iter().all(|i| match &i.source {
             InstanceSource::Part { studio, .. } | InstanceSource::PartStudio { studio, .. } | InstanceSource::MirroredPart { studio, .. } | InstanceSource::Sketch { studio, .. } => doc.tab(*studio).is_some(),
-            InstanceSource::Assembly { assembly, .. } => doc.tab(*assembly).is_some() && !contains_assembly(&doc, *assembly, self.tab, 0),
+            InstanceSource::Assembly { assembly, .. } | InstanceSource::DerivedMirror { assembly, .. } => doc.tab(*assembly).is_some() && !contains_assembly(&doc, *assembly, self.tab, 0),
             InstanceSource::External { .. } | InstanceSource::Standard { .. } => true,
         });
         if !valid {

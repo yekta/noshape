@@ -403,7 +403,7 @@ fn source_inputs(od: &OpenDoc, i: &noshape_model::assembly::Instance) -> Vec<nos
                 Some(of_tab(&d, &r.tab))
             })
             .unwrap_or_default(),
-        S::Standard { .. } => Vec::new(),
+        S::Standard { .. } | S::DerivedMirror { .. } => Vec::new(),
     }
 }
 

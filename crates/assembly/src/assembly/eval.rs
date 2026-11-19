@@ -1119,6 +1119,13 @@ type MirrorKey = (TabId, String, BodyId, [u64; 6]);
 type FlexLevel = (Vec<InstanceId>, Assembly, HashMap<InstanceId, Frame>);
 type SubassemblyOut<'a> = (&'a mut InstanceNode, &'a mut Vec<LeafInstance>, &'a mut Prepared, &'a mut Vec<FlexLevel>);
 
+/// A Derived mirror's strategy ([`InstanceSource::DerivedMirror`]): its leaves are its assembly's, reflected.
+struct MirrorOf<'a> {
+    derived: &'a [InstanceId],
+    placement: &'a [(InstanceId, MirrorPlacement)],
+    mirrored_studios: &'a [(TabId, TabId)],
+}
+
 /// A regenerated external Part Studio: (its tab in the pinned document, result).
 pub type ExternalStudio = (TabId, Arc<RegenResult>);
 
@@ -2567,8 +2574,9 @@ impl AssemblyEvaluator {
     /// A subassembly instance (`sub` already in the instance's configuration):
     /// its leaves, nodes and, when flexible, its parts as bodies of this solve.
     /// `visit`: the subassembly's identity for the circular-reference check.
+    /// `mirror`: a Derived mirror of `sub` (rigid, its leaves reflected: [`Self::mirror_leaf`]).
     #[allow(clippy::too_many_arguments)]
-    fn prepare_subassembly(&mut self, doc: &Document, inst: &super::Instance, sub: &Assembly, visit: u64, suppressed: bool, visited: &mut Vec<u64>, out: SubassemblyOut) {
+    fn prepare_subassembly(&mut self, doc: &Document, inst: &super::Instance, sub: &Assembly, visit: u64, suppressed: bool, visited: &mut Vec<u64>, out: SubassemblyOut, mirror: Option<&MirrorOf>) {
         let (node, leaves, prepared, flex_subs) = out;
         if visited.contains(&visit) || visited.len() > 16 {
             node.error = Some("Circular assembly reference".into());
@@ -2643,7 +2651,7 @@ impl AssemblyEvaluator {
         // Flexible (Onshape's default): its mates and relations join this
         // assembly's solve, with those of the flexible subassemblies inside it.
         // Subassemblies with patterns or tangent mates stay rigid.
-        let flexible = inst.lock.is_flexible() && !suppressed && sub.patterns.is_empty() && !sub.mates.iter().any(|m| m.mate_type == MateType::Tangent && !m.suppressed);
+        let flexible = mirror.is_none() && inst.lock.is_flexible() && !suppressed && sub.patterns.is_empty() && !sub.mates.iter().any(|m| m.mate_type == MateType::Tangent && !m.suppressed);
         node.rigid = solved.instance_dof.values().all(|d| *d == 0) && sub.fixed_instances().len() == 1 && sub_prep.failed_mates.is_empty();
         let place: HashMap<InstanceId, DMat4> = solved.placements.iter().map(|(id, p)| (*id, frame_matrix(&placement_to_frame(p)))).collect();
         if flexible {
@@ -2678,6 +2686,9 @@ impl AssemblyEvaluator {
                 _ => None,
             };
             l.inner = top * l.inner;
+            if let Some(m) = mirror {
+                self.mirror_leaf(doc, &mut l, m);
+            }
             let mut path = vec![inst.id];
             path.extend(l.path.iter().copied());
             l.path = path;
@@ -2689,6 +2700,13 @@ impl AssemblyEvaluator {
         node.children = sub_nodes
             .into_iter()
             .map(|mut n| {
+                // A Derived copy is its "-Mirrored" part's ("Plate-Mirrored <1>", live2 audit-1119 m12).
+                if mirror.is_some_and(|m| n.path.first().is_some_and(|p| m.derived.contains(p))) && n.kind == NodeKind::Part {
+                    n.name = match n.name.rsplit_once(" <") {
+                        Some((part, k)) => format!("{part}-Mirrored <{k}"),
+                        None => format!("{}-Mirrored", n.name),
+                    };
+                }
                 prefix_paths(&mut n, inst.id);
                 n
             })
@@ -2696,6 +2714,49 @@ impl AssemblyEvaluator {
         if !sub_prep.failed_mates.is_empty() {
             node.error = Some("Subassembly contains mate error".into());
         }
+    }
+
+    /// A Derived mirror's leaf `l` (its coordinates in the mirrored assembly's): reflected in that assembly's XY plane.
+    /// Derived (its instance in `derived`, its Part Studio mirrored): the "-Mirrored" Part Studio's part, mirrored in
+    /// its own XY plane, so the reflections compose to a rigid placement. Transform: the same part, completed by its
+    /// own plane by the Placement type, as the assembly Mirror's copies (live "skb (10-23 15:30)" (3)).
+    fn mirror_leaf(&mut self, doc: &Document, l: &mut LeafInstance, m: &MirrorOf) {
+        let xy = DMat4::from_scale(DVec3::new(1.0, 1.0, -1.0));
+        if m.derived.contains(&l.path[0])
+            && let Some(&(_, mirrored)) = m.mirrored_studios.iter().find(|(s, _)| *s == l.studio)
+            && let Some(regen) = self.studio(doc, mirrored, &ConfigValues::default())
+        {
+            l.studio = mirrored;
+            l.regen = regen;
+            l.config = ConfigValues::default();
+            l.inner = xy * l.inner * xy;
+            return;
+        }
+        let body = l.body.clone().or_else(|| l.regen.display.bodies.first().map(|b| b.id.clone()));
+        let center = body.as_ref().and_then(|b| l.regen.display.bodies.iter().find(|x| &x.id == b)?.bounds).map(|(lo, hi)| (lo + hi) * 0.5).unwrap_or(DVec3::ZERO);
+        let sym = body.as_ref().map(|b| cached_symmetry(&l.regen, b)).unwrap_or([false; 3]);
+        let n = l.inner.inverse().transform_vector3(DVec3::Z).abs();
+        let (closest, k) = if n.x >= n.y && n.x >= n.z {
+            (DVec3::X, 0)
+        } else if n.y >= n.z {
+            (DVec3::Y, 1)
+        } else {
+            (DVec3::Z, 2)
+        };
+        let any_sym = sym.iter().position(|s| *s).map(|i| [DVec3::X, DVec3::Y, DVec3::Z][i]);
+        let placement = m.placement.iter().find(|(i, _)| *i == l.path[0]).map(|(_, p)| *p).unwrap_or_default();
+        let (point, axis) = match placement {
+            MirrorPlacement::Auto if sym[k] => (center, closest),
+            MirrorPlacement::Auto if any_sym.is_some() => (center, any_sym.unwrap_or(closest)),
+            MirrorPlacement::Auto | MirrorPlacement::BoxXY => (center, DVec3::Z),
+            MirrorPlacement::BoxYZ => (center, DVec3::X),
+            MirrorPlacement::BoxZX => (center, DVec3::Y),
+            MirrorPlacement::OriginXY => (DVec3::ZERO, DVec3::Z),
+            MirrorPlacement::OriginYZ => (DVec3::ZERO, DVec3::X),
+            MirrorPlacement::OriginZX => (DVec3::ZERO, DVec3::Y),
+        };
+        let own = DMat4::from_translation(point) * DMat4::from_scale(DVec3::ONE - 2.0 * axis) * DMat4::from_translation(-point);
+        l.inner = xy * l.inner * own;
     }
 
     fn prepare_inner(&mut self, doc: &Document, asm: &Assembly, visited: &mut Vec<u64>) -> (Vec<LeafInstance>, Vec<InstanceNode>, Prepared) {
@@ -2809,7 +2870,7 @@ impl AssemblyEvaluator {
                     node.kind = NodeKind::Assembly;
                     let visit = hash_of(key) | (1 << 63);
                     if let Some((_, sub)) = &ext_sub {
-                        self.prepare_subassembly(doc, inst, sub, visit, suppressed, visited, (&mut node, &mut leaves, &mut prepared, &mut flex_subs));
+                        self.prepare_subassembly(doc, inst, sub, visit, suppressed, visited, (&mut node, &mut leaves, &mut prepared, &mut flex_subs), None);
                     }
                     node.linked = ext_sub.clone();
                 }
@@ -2921,7 +2982,17 @@ impl AssemblyEvaluator {
                     };
                     match sub {
                         None => node.error = Some("Assembly was deleted".into()),
-                        Some(sub) => self.prepare_subassembly(doc, inst, sub, assembly.0, suppressed, visited, (&mut node, &mut leaves, &mut prepared, &mut flex_subs)),
+                        Some(sub) => self.prepare_subassembly(doc, inst, sub, assembly.0, suppressed, visited, (&mut node, &mut leaves, &mut prepared, &mut flex_subs), None),
+                    }
+                }
+                InstanceSource::DerivedMirror { assembly, derived, placement, mirrored_studios } => {
+                    node.kind = NodeKind::Assembly;
+                    match doc.tab(*assembly).map(|t| &t.content) {
+                        Some(TabContent::Assembly(sub)) => {
+                            let mirror = MirrorOf { derived, placement, mirrored_studios };
+                            self.prepare_subassembly(doc, inst, sub, assembly.0, suppressed, visited, (&mut node, &mut leaves, &mut prepared, &mut flex_subs), Some(&mirror));
+                        }
+                        _ => node.error = Some("Assembly was deleted".into()),
                     }
                 }
             }

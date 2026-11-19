@@ -2966,6 +2966,7 @@ impl AssemblyView {
                 self.edit_standard_instance(top, cx);
                 return;
             }
+            InstanceSource::DerivedMirror { .. } => (vec![], Default::default()),
         };
         if inputs.is_empty() {
             self.message = Some((false, format!("{} is not configured.", inst.name)));

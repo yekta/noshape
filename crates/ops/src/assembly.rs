@@ -1053,7 +1053,7 @@ pub fn contains_assembly(doc: &noshape_model::Document, tab: TabId, target: TabI
     }
     let Some(noshape_model::document::TabContent::Assembly(a)) = doc.tab(tab).map(|t| &t.content) else { return false };
     a.instances.iter().any(|i| match &i.source {
-        InstanceSource::Assembly { assembly, .. } => contains_assembly(doc, *assembly, target, depth + 1),
+        InstanceSource::Assembly { assembly, .. } | InstanceSource::DerivedMirror { assembly, .. } => contains_assembly(doc, *assembly, target, depth + 1),
         _ => false,
     })
 }

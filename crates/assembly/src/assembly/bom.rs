@@ -182,6 +182,14 @@ fn walk(doc: &Document, asm: &Assembly, prefix: &InstancePath, result: &Assembly
                     out.push(Use { source: BomSource::Part { studio: *studio, body: o.body.clone(), config: canonical_config(doc, *studio, config), mirrored: false }, name: o.body_name.clone(), path: path.clone(), excluded, children: Vec::new(), behavior: BomBehavior::default() });
                 }
             }
+            // A Derived mirror: each of its parts as drawn (a Transform copy the source's part, a Derived one the
+            // "-Mirrored" Part Studio's).
+            InstanceSource::DerivedMirror { .. } => {
+                for o in result.occurrences.iter().filter(|o| o.path.starts_with(&path)) {
+                    let excluded = suppressed || part_props(doc, o.studio, &o.body, &o.config).is_some_and(|p| p.meta.exclude_from_bom);
+                    out.push(Use { source: BomSource::Part { studio: o.studio, body: o.body.clone(), config: canonical_config(doc, o.studio, &o.config), mirrored: false }, name: o.body_name.clone(), path: o.path.clone(), excluded, children: Vec::new(), behavior: BomBehavior::default() });
+                }
+            }
             InstanceSource::External { key, body: None, config } if result.node(&path).is_some_and(|n| n.linked.is_some()) => {
                 let Some((name, sub)) = result.node(&path).and_then(|n| n.linked.clone()) else { continue };
                 let mut children = Vec::new();

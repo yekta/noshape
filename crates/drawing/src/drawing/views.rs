@@ -200,6 +200,12 @@ pub fn assembly_source_tabs(doc: &Document, assembly: TabId) -> std::collections
                         todo.push(*assembly);
                     }
                 }
+                S::DerivedMirror { assembly, mirrored_studios, .. } => {
+                    seen.extend(mirrored_studios.iter().map(|(_, m)| *m));
+                    if seen.insert(*assembly) {
+                        todo.push(*assembly);
+                    }
+                }
                 S::External { .. } | S::Standard { .. } => {}
             }
         }

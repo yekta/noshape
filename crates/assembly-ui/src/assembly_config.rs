@@ -391,7 +391,7 @@ impl AssemblyView {
                 use noshape_model::assembly::eval::ExternalStudios as _;
                 super::AppExternal.studio(key).map(|(d, t)| of_tab(&d, t)).unwrap_or_default()
             }
-            InstanceSource::Standard { .. } => Vec::new(),
+            InstanceSource::Standard { .. } | InstanceSource::DerivedMirror { .. } => Vec::new(),
         }
     }
 

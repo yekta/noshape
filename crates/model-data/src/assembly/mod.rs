@@ -53,6 +53,19 @@ pub enum InstanceSource {
     /// A sketch of a Part Studio (Insert › Sketches): its curves as a wire
     /// body that can be positioned and mated like a part.
     Sketch { studio: TabId, sketch: crate::reference::FeatureId, config: ConfigValues },
+    /// An "<assembly>-Mirrored" assembly's "Derived mirror" (live derivedAssemblyMirror, live2 audit-1119 m2–m14):
+    /// `assembly`'s instances mirrored in its XY plane, as one rigid node. Its Mirror strategy per source instance:
+    /// Transform (the same part, a rigid copy placed by its Placement type) or Derived (`derived`: the part of its
+    /// Part Studio's "-Mirrored" Part Studio, `mirrored_studios`).
+    DerivedMirror {
+        assembly: TabId,
+        #[serde(default)]
+        derived: Vec<InstanceId>,
+        #[serde(default)]
+        placement: Vec<(InstanceId, MirrorPlacement)>,
+        #[serde(default)]
+        mirrored_studios: Vec<(TabId, TabId)>,
+    },
 }
 
 impl InstanceSource {
@@ -65,7 +78,7 @@ impl InstanceSource {
             | InstanceSource::MirroredPart { config, .. }
             | InstanceSource::External { config, .. }
             | InstanceSource::Sketch { config, .. } => Some(config),
-            InstanceSource::Standard { .. } => None,
+            InstanceSource::Standard { .. } | InstanceSource::DerivedMirror { .. } => None,
         }
     }
 
@@ -82,7 +95,7 @@ impl InstanceSource {
     pub fn studio(&self) -> Option<TabId> {
         match self {
             InstanceSource::Part { studio, .. } | InstanceSource::PartStudio { studio, .. } | InstanceSource::MirroredPart { studio, .. } | InstanceSource::Sketch { studio, .. } => Some(*studio),
-            InstanceSource::Assembly { .. } | InstanceSource::External { .. } | InstanceSource::Standard { .. } => None,
+            InstanceSource::Assembly { .. } | InstanceSource::External { .. } | InstanceSource::Standard { .. } | InstanceSource::DerivedMirror { .. } => None,
         }
     }
     /// Standard content spec (instances of the fastener library).

@@ -6936,3 +6936,42 @@ fn standard_content_frames_and_connectors_as_live() {
 fn parallel_limits_its_three_distances_and_the_axial_angle() {
     assert_eq!(eval::limit_keys(MateType::Parallel), ["x", "y", "z", "rz"]);
 }
+
+/// Live2 audit-1119 (m2–m14): an "<assembly>-Mirrored" assembly's "Derived mirror" node holds its source's instances
+/// mirrored in the source's XY plane. Transform: the same part placed as its mirror image (a block, symmetric in its own
+/// planes); Derived: the "-Mirrored" Part Studio's part ("Block-Mirrored <1>").
+#[test]
+fn a_derived_mirror_holds_its_assemblys_instances_mirrored_in_xy() {
+    let mut f = doc_with(vec![block_studio()]);
+    let src = f.studios[0];
+    let mut ev = AssemblyEvaluator::new();
+    let (body, _) = body_of(&mut ev, &f.doc, src);
+    let source = Assembly { instances: vec![part_instance(1, "Block <1>", src, body, DVec3::new(0.01, 0.02, 0.03), true)], ..Default::default() };
+    let source_tab = f.doc.add_tab("Assembly 1", TabContent::Assembly(Box::new(source)));
+    let mirrored = f.doc.ensure_mirrored_studio(src).unwrap();
+    let world_box = |o: &super::eval::PartOccurrence| {
+        let (lo, hi) = o.local_bounds.unwrap();
+        let pts: Vec<DVec3> = (0..8).map(|k| o.transform.transform_point3(DVec3::new(if k & 1 == 0 { lo.x } else { hi.x }, if k & 2 == 0 { lo.y } else { hi.y }, if k & 4 == 0 { lo.z } else { hi.z }))).collect();
+        (pts.iter().copied().reduce(DVec3::min).unwrap(), pts.iter().copied().reduce(DVec3::max).unwrap())
+    };
+    for derived in [false, true] {
+        let node = Instance {
+            source: InstanceSource::DerivedMirror { assembly: source_tab, derived: if derived { vec![InstanceId(1)] } else { vec![] }, placement: vec![], mirrored_studios: vec![(src, mirrored)] },
+            lock: SubassemblyLock::Current,
+            ..part_instance(1, "Derived mirror", src, BodyId { feature: crate::reference::FeatureId(0), index: 0 }, DVec3::ZERO, true)
+        };
+        let asm = Assembly { instances: vec![node], ..Default::default() };
+        let mut ev = AssemblyEvaluator::new();
+        ev.set_studio_options(std::sync::Arc::new(|d: &Document| RegenOptions { derived: Some(std::sync::Arc::new(DocSources(d.clone()))), ..Default::default() }));
+        let r = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+        assert_eq!(r.occurrences.len(), 1, "derived {derived}");
+        let o = &r.occurrences[0];
+        assert_eq!(o.studio, if derived { mirrored } else { src });
+        let (lo, hi) = world_box(o);
+        let want = (DVec3::new(0.01, 0.02, -0.04), DVec3::new(0.05, 0.04, -0.03));
+        assert!(lo.distance(want.0) < 1e-6 && hi.distance(want.1) < 1e-6, "derived {derived}: {lo} .. {hi}");
+        assert!(o.transform.determinant() > 0.0, "a rigid placement");
+        let child = &r.nodes[0].children[0];
+        assert_eq!(child.name, if derived { "Block-Mirrored <1>" } else { "Block <1>" });
+    }
+}
