@@ -208,6 +208,48 @@ pub struct FlatPlace {
 }
 
 impl FlatPattern {
+    /// The pieces of segment `a`-`b` that lie on the flat (outside its holes): a bend line a hole crosses is split
+    /// around it (live q-flat-dxf-1119: the Ø6 across the bend leaves the centreline in two).
+    pub fn clip_to_flat(&self, a: DVec2, b: DVec2) -> Vec<(DVec2, DVec2)> {
+        let d = b - a;
+        let mut ts = vec![0.0, 1.0];
+        for l in &self.loops {
+            for (i, p) in l.iter().enumerate() {
+                let q = l[(i + 1) % l.len()];
+                let e = q - *p;
+                let den = d.perp_dot(e);
+                if den.abs() < 1e-18 {
+                    continue;
+                }
+                let t = (*p - a).perp_dot(e) / den;
+                let u = (*p - a).perp_dot(d) / den;
+                if (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u) {
+                    ts.push(t);
+                }
+            }
+        }
+        ts.sort_by(f64::total_cmp);
+        ts.dedup_by(|x, y| (*x - *y).abs() < 1e-9);
+        let inside = |p: DVec2| {
+            self.loops.iter().map(|l| l.iter().enumerate().filter(|(i, v)| {
+                let w = l[(i + 1) % l.len()];
+                (v.y > p.y) != (w.y > p.y) && p.x < v.x + (p.y - v.y) / (w.y - v.y) * (w.x - v.x)
+            }).count()).sum::<usize>() % 2 == 1
+        };
+        let mut out: Vec<(DVec2, DVec2)> = Vec::new();
+        for w in ts.windows(2) {
+            if !inside(a + d * (0.5 * (w[0] + w[1]))) {
+                continue;
+            }
+            let (p, q) = (a + d * w[0], a + d * w[1]);
+            match out.last_mut() {
+                Some(last) if last.1.distance(p) < 1e-12 => last.1 = q,
+                _ => out.push((p, q)),
+            }
+        }
+        if out.is_empty() && self.loops.is_empty() { vec![(a, b)] } else { out }
+    }
+
     /// Model space → the flat view's place: the flat plane's X / Y on the
     /// world's, its reference side at z 0 facing +Z (live REST
     /// isFlattenedBody of "qa5 sm": z −2…0; the flat view shows it from Top).

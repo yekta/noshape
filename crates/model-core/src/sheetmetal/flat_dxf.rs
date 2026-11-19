@@ -217,7 +217,9 @@ pub fn flats_document(flats: &[FlatPattern], o: &FlatExport) -> Result<CadDocume
         }
         if o.bend_centerlines {
             for b in &flat.bend_lines {
-                add(&mut doc, b.a, b.b, if b.up { BEND_UP } else { BEND_DOWN })?;
+                for (p, q) in flat.clip_to_flat(b.a, b.b) {
+                    add(&mut doc, p, q, if b.up { BEND_UP } else { BEND_DOWN })?;
+                }
             }
         }
         if o.tangent_lines {
@@ -343,6 +345,19 @@ mod tests {
         assert_eq!(cut.len(), 3, "the outline replaces the 4 loop lines");
         assert!(cut.iter().any(|e| matches!(e, EntityType::Arc(a) if (a.radius - 5.0).abs() < 1e-9 && (a.end_angle - std::f64::consts::FRAC_PI_2).abs() < 1e-12)));
         assert!(cut.iter().any(|e| matches!(e, EntityType::Ellipse(x) if (x.minor_axis_ratio - 0.75).abs() < 1e-12 && (x.major_axis.x - 4.2426).abs() < 1e-9)));
+    }
+
+    /// A hole across a bend splits its centreline in two (live q-flat-dxf-1119); the line keeps its ends at the outline.
+    #[test]
+    fn a_hole_across_a_bend_splits_its_centreline() {
+        let mut f = flat(0.0);
+        let p = |a: f64, b: f64| DVec2::new(a * 1e-3, b * 1e-3);
+        f.loops.push(vec![p(27.0, 17.0), p(33.0, 17.0), p(33.0, 23.0), p(27.0, 23.0)]);
+        let doc = flats_document(std::slice::from_ref(&f), &FlatExport::default()).unwrap();
+        let mut ys: Vec<(f64, f64)> = doc.entities().filter_map(|e| match e { EntityType::Line(l) if e.common().layer == BEND_UP => Some((l.start.y.min(l.end.y), l.start.y.max(l.end.y))), _ => None }).collect();
+        ys.sort_by(|a, b| a.0.total_cmp(&b.0));
+        assert_eq!(ys.len(), 2, "{ys:?}");
+        assert!((ys[0].0 - 0.0).abs() < 1e-9 && (ys[0].1 - 17.0).abs() < 1e-9 && (ys[1].0 - 23.0).abs() < 1e-9 && (ys[1].1 - 40.0).abs() < 1e-9, "{ys:?}");
     }
 
     /// The export's other checkboxes: bend tangent lines (the bend zone's
