@@ -58,53 +58,8 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
 - **Volume measure warning:** on impeller parts OCCT's plain Gauss VolumeProperties is ~1.2 % off (input 97755.8 vs
   mesh-converged ~96555, kernel props 95977.8 after the delete ~= mesh): the old "OCCT 97123.4" targets were plain
   Gauss. Compare with kernel props (replay prints them) or vibex7 ~/tmp/core/imp/mvol (mesh).
-- **Face 30 (x=5 groove floor, cone 37 + boss cylinder 34 + rib notch B-splines 17/18/29/31):** OCCT can't delete it
-  even unbounded (UnableToRemoveTheFeature). Needs cone and cylinder run on to meet (~x 10.4) through the rib faces.
-  Our input to Delete face 2 isn't live's (44 vs 65 faces: walls held). Decision asked of the lead (build now or after
-  the input matches).
-- **qa speed backlog (TICKETS a3ff6d481) routed to bool 21:00:** sprockets Circular pattern 1 op_boolean 422/499 ms,
-  loft-paths Mirror 1 op_boolean 1120/1136 + Loft 3's 942, parting-line Rib's fuses. Nuts waits on bool2. Split 3
-  op_split 1.45 s (OCCT splitter section edges 729) not started. Profiler: vibex7 ~/tmp/core/sp.sh <cli> <doc> "<feature>".
-- **Walls (core-rw branch core-walls2, d010a6d78 = 27b7836e0 re-applied, HELD with bool):** with them Move face 2
-  turns Ok, Delete face 2 48 faces / 95977.8 mm3 (main 37 / 96246.4), then Extrude Bohrungssitz Ansaugflansch's Add
-  (OCCT fuse 1 object 65 faces + 9 seat prisms, all valid) comes out INVALID 1992 mm3 / 55 faces, accepted (16 parts).
-  Plain OCCT (fz) loses it only with NonDestructive/OBB/history/parallel all off; every other setting gives valid
-  96485.5 mm3 / 98 faces. bool's op_boolean (619037c8c, bool-hat) loses it too and now refuses a union that lost its
-  body (retry fuzzy, else error); bool looks for the trigger (asked: NOSHAPE_BOP_PAIRS_PARALLEL=0). Re-land walls when
-  the fuse is whole + compat-on.sh clean. Case vibex7 ~/tmp/core/imp/rec47/51a35c85013e91e7.brep, probe ./fz.
-- **Pair 7 (e9caeead0 offset_planes) REGRESSES:** c2-sm-hem-plus / cf-sheet-metal-hem Derived 1 loses a part (26/72/48
-  -> 14/36/24), cf-mortise-and-tenon Mortise Tenon 2 19 -> 10 faces. Not landable as is.
-- **surf-intro-simple Loft 1 (skasm): de3b6e082 (core-loft, held):** surface loft takes sketch regions (T1 4/12/8 on
-  squares). skasm saw 1 face on the real doc: check against live 4/12/8 once skasm's translator lands, then land.
-- **Flansch verbreitern (core-rp branch flansch, on e9caeead0, uncommitted):** offset_planes takes linear extrusions too
-  (the profile projected across the direction, run on 10|d| + 10 % past its ends, offset as Geom_OffsetCurve,
-  extruded); extrusions move before planes so a plane moved later still meets them. T1 features_a::
-  move_face_offset_of_an_extruded_spline_wall_and_a_plane (wall exactly 1 mm off, 6 faces). Next: impeller time A/B
-  vs pair-mt (core-rp .imp.sh), g++-13 build, pair 8, land after pair 7's e9caeead0. First A/B (loaded): Flansch
-  (vorne) 12 -> 983 ms with this branch: find why before anything else.
-- **DRIVEN-PATTERN-SWEEP (qa P1) is REAL:** main fails Sweep 1 on the suite's own translation too (the suite says
-  "matches to the end" only because live.jsonl's Sweep 1 line is unfetched). OCCT MakePipeShell status 1 at our
-  tolerance (path ~4 mm -> 4.3e-9 m); with SetMaxSegments(1000) it builds 3 faces, valid, ~0.5 s, but keeps the 21.7°
-  tilt: V 0.07543 / side 6.169 vs live 0.07985 / 6.347 (live tilts 21.7° at both caps yet less in between). Probe
-  vibex7 ~/tmp/core/dp/swt3 profile.brep path.brep (src /root/core-scratch/brepq/swt*.cpp). Asked live (REQUESTS
-  11:18) for ROBK's sections. Lead: keep the error. Live 12:4x: tilt stays 21.5°; live's extra V/area comes from its
-  one smooth face approximating 12 sharp bends (radius to 0.05 mm, sections non-circular there): matching needs
-  Parasolid's approximation. Retry parked on core-sweepseg (core-sw, 20f02b960).
-- **cf-setback-fillet (blend 11-18):** Setback Fillet 1's 3 std fill() corner patches 87.52 mm2 in live, ours +1.14
-  (~1.3 % large); live/suite-truth-1118/cf-setback-fillet.json. With Fill 1.
 - **Fan-blade P0 (fix forward):** main after core-oc 1484 ms vs 0.4.56 730; Boolean 2 877 vs 122 (live 364). bool's
   b5b566884 drops the wasted Rust attempt; my lever: per-tool offsets' edges 52 + check 24 ms (NOSHAPE_OFFSET_DEBUG=1).
-- **Extrude 4 (impeller, 490 ms vs 41):** op_prism_until's split on one face, a -3 mm offset of a 117x10 bicubic B-spline
-  (footprint_patch declines: the face's boundary runs inside the footprint box; probe vibex8 ./pup). Parked.
-- knifehandle left: Fillet 3 7/15/10 vs 6/12/8 -> Chamfer 1 wrong as Ok (9286 vs 10424 mm3): blend's (agreed 11-18 03:0x).
-  Sweep 2 area 18225.81 vs 18227.26 mm2 (mine, small). TRANSLATE's rigid branch through the tweak; Delete face 2.
-- **(4) local Delete face rebuild** once Delete face 2 sees live's faces (blend's Halter build feeds it); src
-  /root/core-scratch/brepq/lr*.cpp (B-spline neighbour 1.55 mm2 off). Projection WIP parked:
-  /root/core-scratch/proj-tight.patch.
-- **qa 11-18 speed list (live ms):** impeller Flansch (vorne) verbreitern fixed (land1); Flansch verbreitern (pair 7 note);
-  Extrude 4 690 vs 41 = prism_until split on a -3 mm offset B-spline (mine, parked); Extrude 3 / 1 = bool's Boolean;
-  valve Extrude 1/2, knife Extrude 8 / Revolve 1: not looked at. Raw /root/qa-scratch/feat3/ab.jsonl.
-- **skasm 11-18:** surf-intro-simple Extrude 1 fixed (land1); Fill 1 parked (above); manualblend Sweep 2 naming = parity pairing (above).
 - **Queue after those:**
   1. qa: c2-fan-blade-sweep Boolean 2 (~1.2 s loaded vs live 364; 75-88 ms before my exact offsets, which fixed the
      volume): offsets 2 x ~176 ms in parallel (edges 73, volume check 62 -> ~17 with adaptive GProp: core-oc 482163a60), noshape Boolean decline ~300 ms + OCCT ~1.3 s on the exact offset faces (bool's). B-spline
@@ -129,50 +84,6 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   9594.6 vs 9607.8. Root: our Intersection curve 1 (Loft 1 x Sweep 1) starts 0.057 mm beside live's (Sketch 5's circle
   centre, stored at live's curve end, Concentric to it: the harness keeps live's position), so the tube is off-centre.
   Next: why the section starts 0.057 mm off (inputs meet at a shallow angle? needs live's surfaces / x_t).
-- **P1 after impeller P0: apply loft guide + end conditions** (pipe Loft; singularities Loft with bad singularity +
-  Loft 3). Live 06:14 answered (behaviours.md "core (06:14)…", live/core/q-guided-loft/lofts.json): lines P1 (0,0,0)-
-  (40,0,0) / P2 (0,60,0)-(40,60,0), arc guides via (-8,30,10) / (48,30,10): defaults OK, 1 bicubic face 4x18 poles,
-  3269.1654 mm2, straight across (x 20 / x 4 at y 30 both z 10); both guides Normal to guide (m 1, 2):
-  BSURF_INCONSISTENT_CONDITIONS_ERROR; guide 1 Tangent, Start Normal to profile (m 1, 2):
-  LOFT_START_OR_END_CONDITIONS_WITH_GUIDES_FAILED. First: our result on these 6 (match the errors), then the suite 3.
-- c2-hunting-knife Revolve 1 HANDLE 10/27/19 (live 11-18 second batch: the new face is a SPHERE r 60, 364.68 mm2, 1 edge; live 11-17, behaviours.md "core (01:32): the isolated vertex…", data
-  live/core/q-knife-rev1/): live's extra vertex is the sphere's pole (114.5, 0, -12.563), an ISOLATED vertex (no edges)
-  kept where the pole touched HANDLE's end plane RjBK (tangent there) that the subtract removed. Block repro: tangent
-  top -> 9 vertices, 0.2 mm off -> 8. A Boolean keeping a removed face's tangent touching point; not started.
-- mutualtrim Sweep 1 (skasm 11-17, back to core): Sketch 2 = live (Bezier P0 (-53.717,-28.813) -> P3 (-27.212,55.050)
-  sketch mm = live JHR; Plane 1 on JHE). Our Surface 2's rails 36.508 mm vs live 94.15: the profile moves (22.13,
-  28.81) not (26.50, 83.86): the path cut at world z = 0, y -31.59 (where it crosses Surface 1). trimEnds is Thin-only
-  in std and in ours, so not that. Repro vibex6 ~/tmp/skasm/save/q.noshape (query_entities edges).
-- Curve point plane sketches (live 05:01, behaviours.md "core (05:01)…", live/core/q-curvepoint/frames.json): the plane
-  = ours; a sketch on it measures from the WORLD ORIGIN projected onto it (pipe (-39.2748,0,25.7771), x (0,1,0);
-  mutualtrim (0,-21.5364,-44.4163), x (1,0,0)); pipe ellipse centre (-46.0366,0,15.4747), major 5.0451 along Y,
-  minor 4.7120. Our frames = live's (traced). pipe: every PIERCE to a guide edge is rejected by the sketch op ("can't
-  be referenced in this sketch ..."), so Loft profile 3 stays as stored, 2.69 mm off our guide: sent to skasm 11-17.
-  skasm 11-17 (unlanded stack): Pierces made now; Loft profile 3's would move the ellipse 2.69 mm onto our guide and
-  are taken back (nothing of live's confirms it), so OUR GUIDE is off live's by 2.69 mm near the ellipse's far end
-  (live (-48.6220,0,11.5353)): find which guide sketch / curve (Side profile's Tangent is taken back by 0.179 mm too).
-- Fill G0 (live 11-17, behaviours.md, live/core/q-fill-g0/fills.json: poles, knots, 3x3 points + normals): corpus
-  Fill 1 (= c2-surf-intro-examples' Surface 1, ours 61910.9 vs 23827.4353 mm2) is ONE bicubic B-spline 14x18 poles,
-  non-rational, unnormalised single knots (u -0.08537..0.07992, 10 interior; v -0.07325..0.06120, 14 interior): fitted,
-  not Coons; centre (1.6244, 68.5723, 20.9206). A fresh skew-quad G0 fill (Precise) = BILINEAR 1x1 patch of its 4
-  corners, 10293.9930 mm2, centre (50,50,7.5). Next after the impeller.
-- fan-blade Boolean 2: 56/139/84 with core-next (live 56/143/88): +2 edges +2 vertices per hole need live's x_t
-  (now at /root/parity/models/c2-fan-blade-sweep/live-base.x_t, 11-17). Probe vibe5 (down 11-17) ~/tmp/core/probefan (src /root/core-scratch/brepq).
-- Worktrees: core-bis (docs lands, Mac timing), core-oc (movepl / msx: offset_planes), core-rv (pairtype parity),
-  core-rp (free: nuts dropped), core-tw (Loft 4 + uncommitted fill dump), core-trace (core-pipe2).
-- rocker-enclosure-sm Extrude 2 (next): Sketch 4's four Use circles (PROJECTED, live's external edges at x 45-60 mm,
-  not on our part) come out as two: Extrude 2 names one region twice and cuts 2 holes of 4. Sketch translation:
-  written into docs/handoff/skasm.md (landed 11-16).
-- c2-surf-workshop-cpcurves Main pipe (thin sweep, 7/24): (1) Sketch 4's circle kept 18.8 mm off the path (translator
-  take-back: in skasm's handoff). (2) Mine: live merges the faces swept along the path's three collinear lines into
-  one per wall (6 faces; ours 10: a face per path edge). **Committed b173dc5bb (core-oc, NOT in the vibex7 pair):
-  join_collinear_lines joins a sweep path's lines along one line into one edge (first piece's source)**: Main pipe's
-  faces = live (only its box differs, the take-back). T1 features_a::a_sweep_along_collinear_lines_has_one_side_face.
-- c2-fan-blade-sweep Boolean 2 (48/53, parked; lead: core's): Subtract with Offset 0.2 mm on 6 picked tool faces
-  (11 per tool after the pattern copies: the sweep's free-form thread flanks among them). basic.rs offsets only analytic
-  faces (else the tool as is), so ours removes 54.7 mm³ less (56/139/84 vs live 56/143/88). OCCT's offset_faces on them,
-  limit lifted: fails every time after 33-62 s (4 tools). Needs a free-form face offset (Geom_OffsetSurface faces
-  trimmed against their neighbours' offsets) in the kernel: a sizeable item, not started.
 - **Lofts (mine, from dx's list):**
   c2-loft-guide-curves-wave-washer Loft 1: Sketch 4's rectangles are 63.5 mm off live's (an external COINCIDENT to
   live vertex JHk/JH4 unresolved: in skasm's handoff 11-16), which explains the "83 mm off the ring" below; redo the
