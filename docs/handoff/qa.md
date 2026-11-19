@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 23:30)
+# QA handoff (agent qa; current state only, updated 2026-11-19 23:42)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -113,12 +113,12 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    23:0x: Feature Studio custom feature (QA Box: template, commit, tool search, Size field, builds), version V1, branch B1, edit,
    merge (dialog, toast, graph) = live; P2 HISTORY-ROW-NAME-OVERLAP (studios, told). Hole table: ✓ only starts placing, a click
    places it (= live; my DRW-HOLE-TABLE-NOT-SAVED closed). Drawing hover (view tan frame, dimension) = rows 130. To verify on
-   their greens: asm b146b56f (drag group, typed limits), dx BRAND-IN-UI-TEXT, skasm Simulation connection dropped.
+   their greens: dx BRAND-IN-UI-TEXT, skasm Simulation connection dropped.
    Sketch tools 23:09-23:15: 3-point arc, spline, circumscribed polygon (spinner; Enter commits, Esc discards = live), Slot on a
    line (Ø20), sketch Fillet R5, angle dim, Mirror (line first) = live; P1 SKETCH-SLOT-ON-ARC (skasm, told: arc deleted, Ø0 left).
    Also verify studios f450d0dd (history row ellipsis, "Noshape Labs"). Direct edit 23:18 (Move face 10 mm, Draft on Top, Split
    refusal toast) = live. Thicken 23:29 (auto Add, Merge scope, flip on Remove, 0/0 error) = live; P2 ERROR-CHIP-RED-NO-FIELD (psui).
-   asm d67512a33 landed: qa-wait-asm-d673 alerts. Next: Delete face. App runs: qa-xvfb110 + qa-walk*-app, `xdotool windowfocus` FIRST
+   asm d67512a33 both P1s VERIFIED 23:42 (green 2574b5b5). Delete face (CLI: Heal/Cap/Leave open/all) + drawing Section view = live. App runs: qa-xvfb110 + qa-walk*-app, `xdotool windowfocus` FIRST
    (else Tab never previews), alt+c tool search. tabrel.sh builds via vibe2 slot, 1 retry on SIGTERM (earlyoom 23:01); cb6c rerun 23:27.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
