@@ -52,7 +52,7 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
   live shot (thickened plate, flip off: as seen from Top), c2-sm-louver SM model 2 (flip on: flat face S2E6G at +2.032
   facing +z) and 2468's probes (flip on). Thickened-up flat now z -t..0; tests: model T2
   `a_thickened_plates_flat_lies_by_its_up_side`, e2e `a_sketch_on_the_sheet_metal_flat`, UI `a_sketch_on_the_flat_...`.
-  REQUESTS 05:10 to live (REST box) would confirm; not blocking.
+  Live confirmed (REQUESTS 05:10, live/skasm/q-thicken-flat-1119): up y 0..78.56 z -2..0; thickened down mirrored, z 0..2.
 - LOCAL 42b253d43 (lead P1 for core's ring branch): wave-washer Sketch 4. Solver `carried_onto_anchors`: a failed
   solve whose Coincidents tie free points to far fixed points moves each piece rigidly onto them, kept if everything
   then holds (test `a_held_rectangle_slides_onto_a_far_anchor`). Translator: model Coincidents after the sketch's own
