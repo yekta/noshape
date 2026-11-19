@@ -1421,7 +1421,7 @@ each display from the right-click to the menu's first frame. Evidence live/feel/
 | Named position row menu: Apply / Edit / Duplicate / Update named position, Delete; a click or double-click on the row applies nothing | the same menu (Move up / down only with 2+ positions, Apply left out on the applied row: live 156–161); a click applies nothing (it edits the cell) | missing |
 | Apply named position: the parts jump in one frame (0.57 s), no animation; the row then selected | the same: one frame, the row marked applied; plus the "<name> is applied." toast (live extras-1118) | missing (model: named_position_restores_driving_mate_values) |
 | Display states: a toolbar tool, not a right-strip panel | the same: a toolbar tool (`tb-display-states`), its panel on the left | missing |
-| Assembly section arrow drag: a focused value box at the arrow during the drag (0.1 mm steps), tan hatched caps on every instance; the box stays after release, text selected | the same (asm, 11-18: the 0.1 mm steps and tan hatched caps while dragged were missing): the value box at the arrow during the drag, after release focused with its text selected | missing |
+| Assembly section arrow drag: a focused value box at the arrow during the drag (0.1 mm steps), tan hatched caps on every instance; the box stays after release, text selected | the same (asm, 11-18: the 0.1 mm steps and tan hatched caps while dragged were missing): the value box at the arrow during the drag, after release focused with its text selected | GPU `feel::a_section_arrows_drag_steps_by_a_tenth_of_a_mm_and_leaves_its_value_box_focused` (the caps stay tan while the dialog is open, live 16303) |
 
 ### live recheck 11-18 (today's landed Part Studio and sketch rows, green b5b664aaa, live 21:11–21:20 UTC)
 

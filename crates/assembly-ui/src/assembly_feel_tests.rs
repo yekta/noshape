@@ -628,3 +628,89 @@ fn a_mate_connector_reaches_as_live_and_wins_over_its_vertex(cx: &mut TestAppCon
         }
     }
 }
+
+/// Live asm-views2-1118: dragging a section view's arrow moves its plane in 0.1 mm steps, its value in a box at the
+/// arrow and its caps the tan hatched preview on every instance while dragged; after release the box stays, focused,
+/// its text selected.
+#[gpui::test]
+fn a_section_arrows_drag_steps_by_a_tenth_of_a_mm_and_leaves_its_value_box_focused(cx: &mut TestAppContext) {
+    use gpui_kit::Focusable as _;
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "section-arrow", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let (lo, hi) = v.result.bounds().unwrap();
+            v.viewport.update(cx, |vp, cx| {
+                let s = vp.size();
+                vp.camera.set_view(noshape_render::StandardView::Isometric);
+                vp.camera.fit_sphere((lo + hi) * 0.5, (hi - lo).length() * 0.8, s.x / s.y);
+                vp.request_frame(cx);
+            });
+            v.refresh_scene(false, cx);
+        })
+    })
+    .unwrap();
+    settle(cx, window, &view);
+    // Section view on Part 1's top face: the plane through its centroid, the arrow along its normal.
+    let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
+    move_to(cx, window, &view, (lo + hi) * 0.5 - DVec2::new(0.0, (hi.y - lo.y) * 0.2));
+    assert_eq!(cx.update(|cx| view.read(cx).hover.as_ref().map(|t| t.kind)), Some(crate::scene_builder::PickKind::Face), "Part 1's top face hovered");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_section(w, cx))).unwrap();
+    settle(cx, window, &view);
+    // The arrow's head (60–85 px from the base along the plane's direction) and its direction on screen.
+    let (head, along) = cx.update(|cx| {
+        let v = view.read(cx);
+        let s = v.ui.section.as_ref().unwrap();
+        let pl = &s.planes[s.dialog.as_ref().unwrap().active];
+        let vp = v.viewport.read(cx);
+        let wpp = vp.camera.world_per_pixel(vp.size().y.max(1.0));
+        let (b, h) = (vp.project(pl.base()).unwrap(), vp.project(pl.base() + pl.dir() * 72.0 * wpp).unwrap());
+        (h, (h - b).normalize())
+    });
+    move_to(cx, window, &view, head);
+    assert_eq!(cx.update(|cx| view.read(cx).hover_overlay), Some(OverlayPick::Section(crate::assembly_scene::SectionHandle::Arrow)), "the arrow hovered");
+    let down = at_window(cx, &view, head);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_down(down, MouseButton::Left, Modifiers::default());
+    for k in 1..=6 {
+        let p = at_window(cx, &view, head - along * (5.0 * f64::from(k)));
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(p, Some(MouseButton::Left), Modifiers::default());
+        frames(cx, window, &view);
+        cx.update_window(window, |_, _, cx| {
+            view.update(cx, |v, cx| {
+                let d = v.ui.section_drag.clone().expect("dragging the arrow");
+                if !d.moved {
+                    return;
+                }
+                let tenths = d.value * 1e4;
+                assert!((tenths - tenths.round()).abs() < 1e-6, "{k}: the plane moved in 0.1 mm steps: {} mm", d.value * 1e3);
+                assert!(v.render_section_value(cx).is_some(), "{k}: the value box at the arrow");
+                let active = v.ui.section.as_ref().unwrap().dialog.as_ref().unwrap().active;
+                assert!(v.viewport.read(cx).scene().clip_selected[active], "{k}: the caps the tan hatched preview");
+            })
+        })
+        .unwrap();
+    }
+    let value = cx.update(|cx| view.read(cx).ui.section_drag.as_ref().map(|d| d.value)).expect("still dragging");
+    assert!(value < -1e-3, "a 30 px drag against the arrow moved the plane back: {} mm", value * 1e3);
+    let up = at_window(cx, &view, head - along * 30.0);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(up, MouseButton::Left, Modifiers::default());
+    settle(cx, window, &view);
+    cx.update_window(window, |_, w, cx| {
+        let v = view.read(cx);
+        assert!(v.ui.section_drag.is_none(), "the drag ended");
+        let sv = v.ui.section_value.as_ref().expect("the value box stays after release");
+        let st = sv.input.read(cx).state().clone();
+        let st = st.read(cx);
+        let text = st.value().to_string();
+        assert_eq!(text, format!("{:.1} mm", value * 1e3), "the dragged value, one decimal");
+        assert!(st.focus_handle(cx).is_focused(w), "the box focused");
+        assert_eq!(st.selected_range().len(), text.len(), "its text selected");
+        let active = v.ui.section.as_ref().unwrap().dialog.as_ref().unwrap().active;
+        assert!(v.viewport.read(cx).scene().clip_selected[active], "the caps tan while the dialog is open (live: the part's colour after ✓)");
+    })
+    .unwrap();
+}
