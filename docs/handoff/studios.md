@@ -30,11 +30,15 @@ the Mac; ui-parity on vibex7 / vibe2 via ~/bin/slot (vibex6 = watcher), one run 
   workspace live reopens on.
 - Live answers: custom feature ✓ with a field-naming error off, plain regenError on (ours already). VSFEEL-NAME-RED
   is live's after-Enter mark (qa [x]).
-- Running: drw1119a (vibex8 slot, 02:47 build with the woken points): all drw-* scenarios.
+- drw1119a (vibex8, 02:47 build with the woken points): 334/341, 3371/3389 states; no regression. drw-geometric-
+  tolerance ≠ is the 11-07 take (edge click places a frame) against live2's 11-18 retake (edge click attaches a
+  leader; ours): retake asked in REQUESTS 11-19 ~04:00. drw-note-insert-drawing-property: live's doc copy "(1)".
+- Local: a replicated region placed by hand attaches anywhere inside the placed box, not 3 mm (replicate-region-place
+  replicated nothing: the box ~7 mm off); e2e fails without it.
 - fs1118b (vibex7 22:38 build): 116/116 scenarios, 602/602 states. drw1118g: 336/341 (known non-targets).
 - cf-spur-gear 0.4.58 → 0.4.59 (lead 11-18): cold-only, in our Boolean's free-form face grids (Once::call in rayon
   workers 50 → 1028 samples); bool's batch in the range; qa bisects (told). Scratch /root/studios-scratch/prof/s.
-- Not targets: replicate-region-place s21 (server toast), drw-revision-table-delete s8,
+- Not targets: drw-revision-table-delete s8,
   drw-inspection-table-iso-scrolled s2; drw-canvas-zoom-to-sheet / drw-ref-pin-reference have no usable recording.
 - Open: the Measure readout of a point / circle pick ("Point 1", "Circle 1" names and rows are our guess); live2's
   Measure takes covered a line only.
