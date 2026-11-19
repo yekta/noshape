@@ -18,26 +18,26 @@ tools/tiers/land.sh` (`--no-precheck` only when the code was clippy-checked unch
 origin/main` first. Builds / tests on the lowest 1-min load of vibex7 / vibex8 / vibe2 (`NOSHAPE_RB_HOST=… tools/tiers/rb.sh`;
 read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edited during a running sync: `touch` edited files before
 the next run. Run the full ops e2e before any drawing land. A few app runs don't take ~/bin/slot (DECISIONS 11-15).
-- Queued 9d50ae60 (21:40): Replicate region onto a view of another shape keeps each point's place in the view's box
-  (`reshaped` in replicate_into; e2e a_region_replicated_onto_another_view_keeps_its_place_in_the_view_box).
-- Committed 4e9b50b9 (not queued): drawing Measure readouts as live measure-1119 (`measure_rows`, drawing_keys.rs;
-  empty click keeps the picks, another view's pick ignored; feel test). Open: line+circle, two circles, oblique
-  lines, a third pick: asked of live (REQUESTS ~22:00); ours guesses "Center distance" for the first two, no
-  Relation for oblique lines.
-- Uncommitted: the assembly instance list menu as live Pro (asm-menu-release 11-19): Where used… (in-document parts
-  too) and Revision history… (managed workflows) after Export…, no Release…; "Where used for <part>…" only in the
-  graphics menu; hook `open_part_revision_history` (release_dialog.rs, app main.rs). asm-menu-release retargeted to
-  Revision history… (retake asked); drw-inspection-table-iso-scrolled clicks now sheet_point (live's mapping). Tests
-  on vibex7 (/root/studios-scratch/logs/asm1.log). The pattern copy / nested occurrence menus still have Release…
-  (no Pro capture of them yet).
-- Scenario run on vibex8 (~/tmp/studios/rep1119, app of 9d5e1aa1): replicate-place, constraint-tangent / -parallel,
-  live's 8 Pro retakes (copied from /root/live-scratch/wt, queued 667ef537).
-- drw-revision-table-delete: ours after Delete lights an edge of Front under the still pointer (every rebuild calls
-  update_hover, drawing_view.rs:1362); compare with live's 3 s retake.
+- Queued 9d50ae60 (21:40) and c655e5de (22:2x, 4 commits): Replicate region onto another view's shape (view-box
+  rule); drawing Measure readouts as live measure-1119 rounds 1-2 (`measure_rows` / `Measured`, drawing_keys.rs; a
+  third pick adds a row and shows the summed Length only); the assembly instance list menu as live Pro (Where used…,
+  Revision history… after Export…, no Release…; hook `open_part_revision_history`); asm-menu-release retargeted to
+  Revision history… (retake asked); drw-inspection-table-iso-scrolled at live's sheet points.
+- Scenario run on vibex8 (~/tmp/studios/rep1119; app of 9d5e1aa1, with live's 667ef537 takes): match:
+  replicate-region-place, constraint-tangent / -parallel, note-insert-drawing-property, canvas-zoom-to-sheet,
+  part-menu-release-workflows-off. Asked of live 22:2x (message): drw-ref-pin-reference's retake has no "V1" (wrong
+  start; ours matches the 11-13 take 7/7: keep that one); part-menu-release s3 is live's new recorder reading input
+  labels differently from all 20 rel-* takes (retake with the old reader, or a runner rule); drw-revision-table-delete
+  s8 (live still reads EDGE Top 3 s after Delete: screenshot asked; ours lights a Front edge under the still pointer,
+  every rebuild calls update_hover, drawing_view.rs:1362); ISO_A4_Portrait's "40.00" vs ours "40" (our mm templates
+  drop trailing zeros, templates.rs template_precisions; live's Units settings asked).
+- drw-inspection-table-iso-scrolled s2: live reads no selection after the Dimension tool's first click, ours EDGE
+  Front (live's reader count?); recheck with the sheet points once landed. The pattern copy / nested occurrence
+  menus still have Release… (no Pro capture yet).
 
 ## Next, in order
-1. Land the assembly menu change and 4e9b50b9 with the scenario results.
-2. The remaining Measure pairs (live), then the feel rows below and the lead's queue (11-17).
+1. live's answers above (pin-reference, part-menu-release reader, revision-table screenshot, ISO trailing zeros).
+2. Then the feel rows below and the lead's queue (11-17).
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
 - live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell
