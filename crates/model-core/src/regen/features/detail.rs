@@ -678,6 +678,12 @@ fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
                 None => (res.shape, face_names),
             },
         };
+        // (A round run into a tube it rounds onto: OCCT's corner patches as live's canals, asm-suspension's Lower Control
+        // Arm Fillet 3.)
+        let (shape, face_names) = match if width { Ok(None) } else { super::blend_section::canal_corners(&shape, &face_names, radius) } {
+            Ok(Some(spliced)) => spliced,
+            _ => (shape, face_names),
+        };
         let t2 = std::time::Instant::now();
         ev.replace_body(bi, shape, face_names);
         log::debug!("fillet: kernel {:?}, naming {:?}, body {:?} (history records {})", t1 - t0, t2 - t1, t2.elapsed(), res.history.records.len());

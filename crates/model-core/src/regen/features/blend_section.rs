@@ -4727,6 +4727,195 @@ pub fn chamfer_offsets(shape: &Shape, e: usize, faces: [&Shape; 2], chamfer: Cha
     Ok(Some(Some([curves[0](x[0]).0.length(), curves[1](x[1]).0.length()])))
 }
 
+/// Where a round of radius `r` runs into a tube it also rounds onto, OCCT's fillet leaves a corner patch (a B-spline
+/// between the round, the tube, the plane under them and the torus of the round's end) that Parasolid makes a canal:
+/// balls of radius `r` rolled on the round and the tube from the torus's end down to where they pinch on the plane, the
+/// round and the tube run on up to their contact curves (asm-suspension's Lower Control Arm Fillet 3: live's 158.817 mm²
+/// canal, 3890.94 mm² round, -131.3 mm³ a corner, OCCT's patch 241.32 mm² with slivers). Each such corner of `shape`
+/// (named `names`) spliced in face by face; None where there is none or a splice doesn't come out one valid solid.
+pub fn canal_corners(shape: &Shape, names: &[Name], r: f64) -> FResult<Option<(Shape, Vec<Name>)>> {
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    let (mut cur, mut cur_names) = (shape.clone(), names.to_vec());
+    let mut any = false;
+    for _ in 0..16 {
+        match canal_corner(&cur, &cur_names, r, scale)? {
+            Some((s, n)) => {
+                (cur, cur_names) = (s, n);
+                any = true;
+            }
+            None => break,
+        }
+    }
+    Ok(any.then_some((cur, cur_names)))
+}
+
+fn canal_corner(shape: &Shape, names: &[Name], r: f64, scale: f64) -> FResult<Option<(Shape, Vec<Name>)>> {
+    let tol = scale * 1e-7;
+    let faces = shape.faces();
+    let ef = shape.edge_faces()?;
+    let edges = shape.edges();
+    let near = |a: DVec3, b: DVec3| a.distance(b) < tol * 100.0;
+    let corners = |f: &Shape| -> Vec<DVec3> { f.vertices().iter().filter_map(|v| v.vertex_point().ok()).collect() };
+    let shared = |a: &Shape, b: &Shape| -> Vec<DVec3> {
+        let cb = corners(b);
+        corners(a).into_iter().filter(|p| cb.iter().any(|q| near(*p, *q))).collect()
+    };
+    let edge_between = |a: &Shape, p: DVec3, q: DVec3| a.edges().into_iter().find(|e| e.edge_info().is_ok_and(|i| (near(i.start, p) && near(i.end, q)) || (near(i.start, q) && near(i.end, p))));
+    for (pi, patch) in faces.iter().enumerate() {
+        if !matches!(patch.face_surface(), Ok(k::Surface::BSpline { .. })) {
+            continue;
+        }
+        // Its four neighbours: the round (radius r), the tube, the plane, the end torus (minor radius r).
+        let mut nb: Vec<usize> = Vec::new();
+        for (ei, e) in edges.iter().enumerate() {
+            if !patch.edges().iter().any(|x| x.is_same(e)) {
+                continue;
+            }
+            for f in ef[ei].iter().map(|&f| f as usize) {
+                if f != pi && !nb.contains(&f) {
+                    nb.push(f);
+                }
+            }
+        }
+        if nb.len() != 4 {
+            continue;
+        }
+        let (mut round, mut tube, mut plane, mut torus) = (None, None, None, None);
+        for &f in &nb {
+            match faces[f].face_surface() {
+                Ok(k::Surface::Cylinder { origin, axis, radius, .. }) if (radius - r).abs() < tol => round = Some((f, origin, axis.normalize())),
+                Ok(k::Surface::Cylinder { origin, axis, radius, .. }) if radius > r => tube = Some((f, origin, axis.normalize(), radius)),
+                Ok(k::Surface::Plane(_)) => plane = Some(f),
+                Ok(k::Surface::Torus { minor_radius, .. }) if (minor_radius - r).abs() < tol => torus = Some(f),
+                _ => {}
+            }
+        }
+        let (Some((ri, ro, d)), Some((ti, to, a, rc)), Some(li), Some(ni)) = (round, tube, plane, torus) else { continue };
+        let (rf, tf, lf, nf_) = (&faces[ri], &faces[ti], &faces[li], &faces[ni]);
+        let one = |v: Vec<DVec3>| if v.len() == 1 { Some(v[0]) } else { None };
+        let at = |x: &Shape, y: &Shape| one(shared(patch, x).into_iter().filter(|p| corners(y).iter().any(|q| near(*p, *q))).collect());
+        let (Some(pa), Some(pc), Some(pd), Some(pe)) = (at(rf, nf_), at(nf_, tf), at(rf, lf), at(lf, tf)) else { continue };
+        // The round's axis and the directions from it to A (toward its other face) and D (toward the plane).
+        let foot = |p: DVec3| ro + d * (p - ro).dot(d);
+        let or = foot(pa);
+        let (ns, nf) = ((pa - or).normalize(), (pd - foot(pd)).normalize());
+        let theta = ns.dot(nf).clamp(-1.0, 1.0).acos();
+        if theta < 0.1 || ((pa - or).length() - r).abs() > tol * 100.0 {
+            continue;
+        }
+        // A ball's centre at t (0 at A, theta at the plane): 2r from the round's axis, rc + r from the tube's; of the two,
+        // the one nearer `prev`.
+        let centre = |t: f64, prev: DVec3| -> Option<DVec3> {
+            let u = (ns * (theta - t).sin() + nf * t.sin()) / theta.sin();
+            let w = or + u.normalize() * 2.0 * r - to;
+            let (wd, wa, da) = (w.dot(d), w.dot(a), d.dot(a));
+            // |w + d s - a ((w + d s) . a)|² = (rc + r)²
+            let (qa, qb, qc) = (1.0 - da * da, 2.0 * (wd - wa * da), w.length_squared() - wa * wa - (rc + r).powi(2));
+            let disc = qb * qb - 4.0 * qa * qc;
+            if qa.abs() < 1e-12 || disc < -tol {
+                return None;
+            }
+            let sq = disc.max(0.0).sqrt();
+            [(-qb + sq) / (2.0 * qa), (-qb - sq) / (2.0 * qa)].map(|s| to + w + d * s).into_iter().min_by(|x, y| x.distance(prev).total_cmp(&y.distance(prev)))
+        };
+        let path = |from: i64, to_: i64, steps: i64| -> Option<Vec<DVec3>> {
+            let mut prev = pa + ns * r;
+            (from..=to_).map(|i| centre(theta * i as f64 / steps as f64, prev).inspect(|c| prev = *c)).collect()
+        };
+        let n: usize = 24;
+        let Some(cs) = path(0, n as i64, n as i64) else { continue };
+        if cs[0].distance(pa + ns * r) > tol * 1e3 {
+            continue;
+        }
+        let c0 = cs[0];
+        let on_round = |c: DVec3| foot(c) + (c - foot(c)) * 0.5;
+        let on_tube = |c: DVec3| {
+            let ft = to + a * (c - to).dot(a);
+            ft + (c - ft) * (rc / (rc + r))
+        };
+        let cr_pts: Vec<DVec3> = cs.iter().map(|&c| on_round(c)).collect();
+        let ct_pts: Vec<DVec3> = cs.iter().map(|&c| on_tube(c)).collect();
+        let pb = cr_pts[n];
+        // (A canal only where its balls pinch on the plane: both contacts meet there.)
+        if !near(pb, ct_pts[n]) || !near(cr_pts[0], pa) || !near(ct_pts[0], pc) {
+            continue;
+        }
+        let made = (|| -> Result<Option<(Shape, Vec<Name>)>, k::KernelError> {
+            // The plane less the triangle D B E under the round run on.
+            let db = k::make_line(pd, pb)?;
+            let split = k::split_on(shape, std::slice::from_ref(&db), tol)?.shape;
+            let split = if split.is_valid() { split } else { split.fixed(tol * 10.0)? };
+            let sf = split.faces();
+            let tri = (pd + pb + pe) / 3.0;
+            let Some(tri_i) = sf.iter().position(|f| matches!(f.face_surface(), Ok(k::Surface::Plane(_))) && f.contains_point(tri, tol).unwrap_or(false)) else { return Ok(None) };
+            let find = |x: &Shape| sf.iter().position(|f| matches!((f.face_surface(), x.face_surface()), (Ok(k::Surface::Cylinder { radius: p, .. }), Ok(k::Surface::Cylinder { radius: q, .. })) if (p - q).abs() < tol) && shared(f, x).len() >= 2);
+            let (Some(rs), Some(ts), Some(ps)) = (find(rf), find(tf), sf.iter().position(|f| f.is_same(patch) || (matches!(f.face_surface(), Ok(k::Surface::BSpline { .. })) && [pa, pc, pd, pe].iter().all(|p| corners(f).iter().any(|q| near(*p, *q)))))) else { return Ok(None) };
+            let (Some(ad), Some(ec), Some(be)) = (edge_between(&sf[rs], pa, pd), edge_between(&sf[ts], pe, pc), edge_between(&sf[tri_i], pb, pe)) else { return Ok(None) };
+            let db = edge_between(&sf[tri_i], pd, pb).unwrap_or(db);
+            let cr = k::make_edge_on(&sf[rs], &cr_pts)?;
+            let ct = k::make_edge_on(&sf[ts], &ct_pts)?;
+            let round_whole = k::face_with_edge_replaced(&sf[rs], &ad, &[db, cr.clone()])?;
+            let tube_whole = k::face_with_edge_replaced(&sf[ts], &ec, &[be, ct.clone()])?;
+            // The canal: on a pipe of radius r round the centres (from a little before A), between the contact curves
+            // and the ball's arc at A.
+            let Some(pts) = path(-4, 4 * n as i64, 4 * n as i64) else { return Ok(None) };
+            let spine = k::make_interpolated_spline(&pts, &[], false)?;
+            // (The profile's seam opposite the canal, so the canal's face doesn't cross it.)
+            let tangent = (pts[1] - pts[0]).normalize();
+            let away = -((on_round(pts[0]) - pts[0]).normalize() + (on_tube(pts[0]) - pts[0]).normalize());
+            let seam = (away - tangent * away.dot(tangent)).normalize();
+            let circle = k::make_arc(pts[0], tangent, seam, r, 0.0, std::f64::consts::TAU)?;
+            let prof = k::make_face_from_wire(&k::make_wire(&[circle])?, true)?;
+            let pipe = k::sweep_pipe(&prof, &k::make_wire(&[spine])?)?.shape;
+            let Some(side) = pipe.faces().into_iter().max_by(|x, y| x.area().unwrap_or(0.0).total_cmp(&y.area().unwrap_or(0.0))) else { return Ok(None) };
+            let arc = k::make_arc_3pts(pa, c0 + ((pa + pc) * 0.5 - c0).normalize() * r, pc)?;
+            let canal = k::make_face_on(&side, &k::make_wire(&[cr, ct, arc])?)?;
+            // Sewn: the rest as they were, the round and the tube whole, the canal.
+            let mut parts: Vec<Shape> = Vec::new();
+            for (i, f) in sf.iter().enumerate() {
+                if ![tri_i, rs, ts, ps].contains(&i) {
+                    parts.push(f.clone());
+                }
+            }
+            parts.extend([round_whole, tube_whole, canal]);
+            let sewn = k::sew(&parts, tol * 10.0, true)?.shape;
+            let sewn = if sewn.is_valid() { sewn } else { sewn.fixed(tol * 10.0)? };
+            let un = k::unify_same_domain_precise(&sewn)?.shape;
+            if !un.is_valid() || un.count(ShapeType::Solid) != 1 || un.count(ShapeType::Face) != shape.count(ShapeType::Face) {
+                return Ok(None);
+            }
+            // Each face named after the face it came from: the one a point inside it lies on, the canal the patch's.
+            let inside = |f: &Shape| -> Option<DVec3> {
+                let [u0, u1, v0, v1] = f.uv_bounds().ok()?;
+                (1..8).flat_map(|i| (1..8).map(move |j| (i, j))).filter_map(|(i, j)| f.point_at_uv(u0 + (u1 - u0) * i as f64 / 8.0, v0 + (v1 - v0) * j as f64 / 8.0).ok()).find(|p| f.contains_point(*p, tol).unwrap_or(false))
+            };
+            let old_faces = faces.iter().enumerate();
+            let mut out = Vec::new();
+            for f in un.faces() {
+                let from = inside(&f).and_then(|p| old_faces.clone().filter(|(i, _)| *i != pi).find(|(_, g)| g.contains_point(p, tol * 10.0).unwrap_or(false)).map(|(i, _)| i));
+                // (The round and the tube grown past their old faces: by their surfaces.)
+                let from = from.or_else(|| match f.face_surface() {
+                    Ok(k::Surface::Cylinder { radius, .. }) if (radius - r).abs() < tol => Some(ri),
+                    Ok(k::Surface::Cylinder { radius, .. }) if (radius - rc).abs() < tol => Some(ti),
+                    _ => None,
+                });
+                out.push(names.get(from.unwrap_or(pi)).cloned().ok_or_else(|| k::KernelError::OperationFailed("a face with no name".into()))?);
+            }
+            Ok(Some((un, out)))
+        })();
+        match made {
+            Ok(Some(x)) => return Ok(Some(x)),
+            Ok(None) => {}
+            Err(e) => {
+                if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+                    eprintln!("canal corner: {e}");
+                }
+            }
+        }
+    }
+    Ok(None)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Support, plane_cylinder_contacts, rolling_ball};

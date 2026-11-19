@@ -33,6 +33,7 @@
 #include <Geom_RectangularTrimmedSurface.hxx>
 #include <Geom_Plane.hxx>
 #include <BRepTools.hxx>
+#include <Geom2d_Curve.hxx>
 #include <OSD_Parallel.hxx>
 #include <ShapeAnalysis_Surface.hxx>
 #include <gp_Dir2d.hxx>
@@ -74,7 +75,9 @@
 #include <NCollection_HSequence.hxx>
 #include <ShapeAnalysis_FreeBounds.hxx>
 #include <ShapeFix_Wire.hxx>
+#include <BRepTools_WireExplorer.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopTools_ListOfShape.hxx>
 #include <TopoDS_Wire.hxx>
 #include <gp_Circ.hxx>
 #include <gp_Elips.hxx>
@@ -1642,6 +1645,227 @@ std::unique_ptr<OcShape> make_interpolated(rust::Slice<const double> pts,
 // across a periodic seam, interpolated in the parameter plane and the 3D curve built from it (a rolling ball's contact
 // curve on a tube, for a face split along it and sewn to the blend face; a 3D interpolation leaves the surface between
 // the points).
+// `on` with its edge `old` replaced by `edges` (a run between the old edge's ends, lying on its surface): the other
+// wires and edges kept as they are, the changed wire oriented as the old one.
+std::unique_ptr<OcShape> face_with_edge_replaced(const OcShape& on, const OcShape& old, const OcShapeList& edges)
+{
+  const TopoDS_Face&              base = as_face(on.shape, "face");
+  const TopoDS_Face               fwd  = TopoDS::Face(base.Oriented(TopAbs_FORWARD));
+  TopLoc_Location                 loc;
+  const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(fwd, loc);
+  Bnd_Box                         box;
+  BRepBndLib::Add(fwd, box);
+  const double tol = std::max(1e-7, 1e-7 * std::sqrt(box.SquareExtent()));
+  BRep_Builder B;
+  TopoDS_Face  nf;
+  B.MakeFace(nf, surf, loc, BRep_Tool::Tolerance(fwd));
+  bool found = false;
+  for (TopoDS_Iterator w(fwd); w.More(); w.Next())
+  {
+    const TopoDS_Wire wire = TopoDS::Wire(w.Value());
+    bool              has  = false;
+    for (TopoDS_Iterator e(wire); e.More() && !has; e.Next())
+      has = e.Value().IsSame(old.shape);
+    if (!has)
+    {
+      B.Add(nf, wire);
+      continue;
+    }
+    found = true;
+    // The wire in its order, the old edge's place taken by the run from its start to its end.
+    TopoDS_Wire nw;
+    B.MakeWire(nw);
+    std::vector<TopoDS_Edge> we;
+    for (BRepTools_WireExplorer x(wire, fwd); x.More(); x.Next())
+      we.push_back(x.Current());
+    size_t k = 0;
+    while (k < we.size() && !we[k].IsSame(old.shape))
+      ++k;
+    if (k == we.size())
+      fail_invalid("the edge is not on the face");
+    {
+      const TopoDS_Edge&       e    = we[k];
+      const TopoDS_Edge        prev = we[(k + we.size() - 1) % we.size()], next = we[(k + 1) % we.size()];
+      const TopoDS_Vertex      v0   = TopExp::FirstVertex(e, true), v1 = TopExp::LastVertex(e, true);
+      gp_Pnt                   at   = BRep_Tool::Pnt(v0);
+      const gp_Pnt             end  = BRep_Tool::Pnt(v1);
+      // (Each piece on its own curve between the wire's vertices: the run's ends the old edge's, shared between pieces.)
+      auto shared = [&](const TopoDS_Edge& c, const TopoDS_Vertex& vs, const TopoDS_Vertex& ve) {
+        double                  f = 0, l = 0;
+        TopLoc_Location         el;
+        occ::handle<Geom_Curve> g = BRep_Tool::Curve(c, el, f, l);
+        if (!el.IsIdentity())
+          g = occ::down_cast<Geom_Curve>(g->Transformed(el.Transformation()));
+        const bool  rev = c.Orientation() == TopAbs_REVERSED;
+        TopoDS_Edge ne;
+        B.MakeEdge(ne, g, BRep_Tool::Tolerance(c));
+        for (const auto& [v, p] : {std::pair{vs, rev ? l : f}, std::pair{ve, rev ? f : l}})
+          if (const double gap = BRep_Tool::Pnt(v).Distance(g->Value(p)); gap > BRep_Tool::Tolerance(v))
+            B.UpdateVertex(v, 1.5 * gap);
+        B.Add(ne, (rev ? ve : vs).Oriented(TopAbs_FORWARD));
+        B.Add(ne, (rev ? vs : ve).Oriented(TopAbs_REVERSED));
+        B.Range(ne, f, l);
+        return rev ? TopoDS::Edge(ne.Reversed()) : ne;
+      };
+      std::vector<TopoDS_Edge> pool;
+      for (const TopoDS_Shape& s : edges.items)
+        pool.push_back(TopoDS::Edge(s));
+      // (The direction an edge leaves its start in: of two run pieces from one point, the one along the old edge.)
+      auto leaving = [](const TopoDS_Edge& c) {
+        const BRepAdaptor_Curve ac(c);
+        gp_Pnt                  p;
+        gp_Vec                  d;
+        const bool              rev = c.Orientation() == TopAbs_REVERSED;
+        ac.D1(rev ? ac.LastParameter() : ac.FirstParameter(), p, d);
+        return rev ? -d : d;
+      };
+      gp_Vec along = leaving(e);
+      auto   retraces = [&](const TopoDS_Edge& a, const TopoDS_Edge& b) {
+        const BRepAdaptor_Curve ca(a), cb(b);
+        return BRep_Tool::Pnt(TopExp::FirstVertex(a, true)).Distance(BRep_Tool::Pnt(TopExp::LastVertex(b, true))) < tol &&
+               BRep_Tool::Pnt(TopExp::LastVertex(a, true)).Distance(BRep_Tool::Pnt(TopExp::FirstVertex(b, true))) < tol &&
+               ca.Value(0.5 * (ca.FirstParameter() + ca.LastParameter())).Distance(cb.Value(0.5 * (cb.FirstParameter() + cb.LastParameter()))) < tol;
+      };
+      TopoDS_Face bare0;
+      B.MakeFace(bare0, surf, loc, BRep_Tool::Tolerance(fwd));
+      gp_Pnt2d uv_at;
+      {
+        double                          f0 = 0, l0 = 0;
+        const occ::handle<Geom2d_Curve> oc = BRep_Tool::CurveOnSurface(e, fwd, f0, l0);
+        if (!oc.IsNull())
+          uv_at = oc->Value(e.Orientation() == TopAbs_REVERSED ? l0 : f0);
+      }
+      const occ::handle<Geom_Surface> located = BRep_Tool::Surface(bare0);
+      ShapeAnalysis_Surface           sas(located);
+      // (Walked from the run's start, each point within half a period of the last: projected whole, a piece ending on
+      // the seam had its end a turn off and its wire crossed itself, the suspension's top canal corners.)
+      auto in_period = [&](const TopoDS_Edge& piece) {
+        double                        f1 = 0, l1 = 0;
+        const occ::handle<Geom_Curve> g = BRep_Tool::Curve(piece, f1, l1);
+        if (g.IsNull())
+          return;
+        const bool                                       rev = piece.Orientation() == TopAbs_REVERSED;
+        const int                                        n   = 64;
+        const occ::handle<NCollection_HArray1<gp_Pnt2d>> uv  = new NCollection_HArray1<gp_Pnt2d>(1, n + 1);
+        const occ::handle<NCollection_HArray1<double>>   ts  = new NCollection_HArray1<double>(1, n + 1);
+        gp_Pnt2d                                         last = uv_at;
+        for (int i = 0; i <= n; ++i)
+        {
+          const int    k = rev ? n - i : i;
+          const double t = f1 + (l1 - f1) * k / n;
+          gp_Pnt2d     w = sas.NextValueOfUV(last, g->Value(t), tol);
+          if (located->IsUPeriodic())
+            w.SetX(w.X() + std::round((last.X() - w.X()) / located->UPeriod()) * located->UPeriod());
+          if (located->IsVPeriodic())
+            w.SetY(w.Y() + std::round((last.Y() - w.Y()) / located->VPeriod()) * located->VPeriod());
+          last = w;
+          uv->SetValue(k + 1, w);
+          ts->SetValue(k + 1, t);
+        }
+        Geom2dAPI_Interpolate in(uv, ts, false, 1e-12);
+        in.Perform();
+        if (!in.IsDone())
+          fail_op("a new edge has no curve on the face");
+        B.UpdateEdge(piece, in.Curve(), bare0, BRep_Tool::Tolerance(piece));
+        uv_at = last;
+      };
+      std::vector<TopoDS_Edge> run;
+      while (!pool.empty())
+      {
+        auto   best  = pool.end();
+        double score = -1e300;
+        bool   flip  = false;
+        for (auto it = pool.begin(); it != pool.end(); ++it)
+          for (const bool r : {false, true})
+          {
+            const TopoDS_Edge c = r ? TopoDS::Edge(it->Reversed()) : *it;
+            if (BRep_Tool::Pnt(TopExp::FirstVertex(c, true)).Distance(at) >= tol)
+              continue;
+            const gp_Vec d  = leaving(c);
+            const double sc = d.Magnitude() > 0 && along.Magnitude() > 0 ? d.Normalized().Dot(along.Normalized()) : 0.0;
+            if (sc > score)
+            {
+              best  = it;
+              score = sc;
+              flip  = r;
+            }
+          }
+        if (best == pool.end())
+          fail_invalid("the new edges don't run on from the old edge's start");
+        const TopoDS_Edge c = flip ? TopoDS::Edge(best->Reversed()) : *best;
+        pool.erase(best);
+        at = BRep_Tool::Pnt(TopExp::LastVertex(c, true));
+        run.push_back(c);
+        const BRepAdaptor_Curve ac(c);
+        gp_Pnt                  p;
+        gp_Vec                  d;
+        const bool              rev = c.Orientation() == TopAbs_REVERSED;
+        ac.D1(rev ? ac.FirstParameter() : ac.LastParameter(), p, d);
+        along = rev ? -d : d;
+      }
+      if (at.Distance(end) >= tol)
+        fail_invalid("the new edges don't end at the old edge's end");
+      // (A first piece back along the kept edge before the old one, or a last one back along the edge after it, would
+      // leave a slit: both dropped, the run on from that edge's far end. A canal's tube at the suspension's top
+      // corners, its seam along the slit.)
+      const bool drop_front = we.size() > 2 && retraces(run.front(), prev);
+      const bool drop_back  = we.size() > 2 && run.size() > (drop_front ? 1u : 0u) && retraces(run.back(), next);
+      if (drop_front)
+      {
+        double                          f0 = 0, l0 = 0;
+        const occ::handle<Geom2d_Curve> oc = BRep_Tool::CurveOnSurface(prev, fwd, f0, l0);
+        if (!oc.IsNull())
+          uv_at = oc->Value(prev.Orientation() == TopAbs_REVERSED ? l0 : f0);
+      }
+      TopoDS_Vertex       vat  = drop_front ? TopExp::FirstVertex(prev, true) : v0;
+      const TopoDS_Vertex vend = drop_back ? TopExp::LastVertex(next, true) : v1;
+      const size_t        j0 = drop_front ? 1 : 0, j1 = run.size() - (drop_back ? 1 : 0);
+      for (size_t i = 0; i < we.size(); ++i)
+      {
+        if (i == k)
+        {
+          for (size_t j = j0; j < j1; ++j)
+          {
+            const TopoDS_Vertex vl = TopExp::LastVertex(run[j], true);
+            TopoDS_Vertex       ve = vend;
+            if (j + 1 < j1)
+              B.MakeVertex(ve, BRep_Tool::Pnt(vl), BRep_Tool::Tolerance(vl));
+            const TopoDS_Edge piece = shared(run[j], vat, ve);
+            in_period(piece);
+            B.Add(nw, piece);
+            vat = ve;
+          }
+          continue;
+        }
+        if ((drop_front && we[i].IsSame(prev)) || (drop_back && we[i].IsSame(next)))
+          continue;
+        B.Add(nw, we[i]);
+      }
+    }
+    nw.Orientation(wire.Orientation());
+    // (The new edges' curves on the surface in the period of the rest: a half circle's lay a turn off on a cylinder.)
+    TopoDS_Face bare;
+    B.MakeFace(bare, surf, loc, BRep_Tool::Tolerance(fwd));
+    ShapeFix_Wire sfw(nw, bare, tol);
+    sfw.FixEdgeCurves();
+    sfw.FixShifted();
+    B.Add(nf, sfw.Wire());
+  }
+  if (!found)
+    fail_invalid("the edge is not on the face");
+  BRepLib::SameParameter(nf, tol);
+  // (A run meeting the kept boundary in a cusp, as a canal's contact curve its pinch point: the wire checks as
+  // crossing itself until fixed.)
+  if (!BRepCheck_Analyzer(nf).IsValid())
+  {
+    ShapeFix_Face fix(nf);
+    fix.Perform();
+    if (BRepCheck_Analyzer(fix.Face()).IsValid())
+      nf = fix.Face();
+  }
+  return wrap(nf.Oriented(base.Orientation()));
+}
+
 std::unique_ptr<OcShape> make_edge_on(const OcShape& on, rust::Slice<const double> pts)
 {
   const TopoDS_Face& face = as_face(on.shape, "face");
@@ -1659,6 +1883,12 @@ std::unique_ptr<OcShape> make_edge_on(const OcShape& on, rust::Slice<const doubl
     last = i == 0 ? sas.ValueOfUV(p[i], tol) : sas.NextValueOfUV(last, p[i], tol);
     if (sas.Gap() > 1e3 * tol)
       fail_invalid("a point off the face's surface");
+    // (Unwrapped, each within half a period of the one before: from a point on a cylinder's seam the next came back a
+    // turn off and the edge looped round, the suspension's top canal corners.)
+    if (i > 0 && surf->IsUPeriodic())
+      last.SetX(last.X() + std::round((uv->Value(i).X() - last.X()) / surf->UPeriod()) * surf->UPeriod());
+    if (i > 0 && surf->IsVPeriodic())
+      last.SetY(last.Y() + std::round((uv->Value(i).Y() - last.Y()) / surf->VPeriod()) * surf->VPeriod());
     uv->SetValue(i + 1, last);
   }
   Geom2dAPI_Interpolate ip(uv, false, 1e-9);

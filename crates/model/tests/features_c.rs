@@ -5196,3 +5196,33 @@ fn rounds_between_parallel_cylinders_have_exact_edges_as_live() {
     assert!(kinds.iter().all(|c| matches!(c, noshape_kernel::Curve::Line { .. } | noshape_kernel::Curve::Circle { .. })), "{kinds:?}");
     assert_eq!(kinds.iter().filter(|c| matches!(c, noshape_kernel::Curve::Line { .. })).count(), 8);
 }
+
+/// asm-suspension's Lower Control Arm (studio dbd26f) Fillet 3: R 7.5 on 31 edges where two plates meet a bushing tube
+/// (R 22.5), their edges already rounded R 7.5. Live (q-susp-lca-f3): 17/43/26 -> 70/156/86, 1763356.88 mm³; at each of
+/// the 8 plate / tube corners one 3-sided canal face of 158.817 mm² (OCCT's patch 241.32 mm²), the plate-edge rounds run
+/// on to the tube (3890.94 mm²), the tube one face of 33232.9 mm².
+#[test]
+fn rounds_running_into_a_tube_close_on_canals_as_live() {
+    let brep = include_str!("data/suspension-lca-fillet3-input.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let picked: Vec<Reference> = [3, 5, 7, 9].into_iter().chain(17..=43).map(|k| Reference::Edge((*b.edges[k]).clone())).collect();
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(picked));
+        p.set("radius", expr("7.5 mm"));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    assert!(shape.is_valid() && shape.solids().len() == 1);
+    let shown = shape.shown_topology().unwrap();
+    let areas: Vec<f64> = shape.faces().iter().map(|f| f.area().unwrap() / (mm(1.0) * mm(1.0))).collect();
+    let count = |a: f64, tol: f64| areas.iter().filter(|x| (**x - a).abs() < tol).count();
+    assert_eq!(count(158.817, 0.1), 8, "canals {:?}", areas.iter().filter(|a| (150.0..250.0).contains(*a)).collect::<Vec<_>>());
+    assert_eq!(count(3890.94, 0.1), 2, "plate-edge rounds run on to the tube");
+    assert_eq!(count(33232.9, 1.0), 1, "the tube");
+    assert_eq!((shape.faces().len(), shown.edge_count(), shown.vertices.iter().filter(|v| **v).count()), (70, 156, 86));
+    let v = volume(&r, 0) * 1e9;
+    assert!((v - 1763356.88).abs() < 12.0, "{v} mm³ (live 1763356.88)");
+}

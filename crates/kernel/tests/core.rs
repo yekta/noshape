@@ -1370,3 +1370,22 @@ fn an_edge_through_points_on_a_cylinder_stays_on_it_and_splits_it() {
     let band = r * h * (20f64.to_radians() + 100f64.to_radians() / 3.0);
     assert!(areas.iter().any(|a| close(*a, band, 1e-6)), "{areas:?} vs {band}");
 }
+
+/// A cylinder's side, two holes in it, with its top circle replaced by two half circles: the same face, its holes kept.
+#[test]
+fn a_face_with_an_edge_replaced_by_a_run_keeps_its_other_boundaries() {
+    let (r, h) = (0.0225, 0.08);
+    let tube = make_cylinder(&Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), r, h, 2.0 * PI).unwrap();
+    // (Across y: clear of the seam at +x, two holes in the side.)
+    let hole = make_cylinder(&Plane::new(DVec3::new(0.0, -0.05, h / 2.0), DVec3::Y, DVec3::Z), 0.005, 0.1, 2.0 * PI).unwrap();
+    let part = cut(&tube, &hole).unwrap().shape;
+    let side = part.faces().into_iter().find(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { radius, .. }) if close(radius, r, 1e-9))).unwrap();
+    assert_eq!(side.wires().len(), 3);
+    let top = side.edges().into_iter().find(|e| e.edge_info().is_ok_and(|i| i.closed && close(i.start.z, h, 1e-9))).unwrap();
+    let p = |a: f64| DVec3::new(r * a.cos(), r * a.sin(), h);
+    let halves = [make_arc_3pts(p(0.0), p(PI / 2.0), p(PI)).unwrap(), make_arc_3pts(p(PI), p(1.5 * PI), p(0.0)).unwrap()];
+    let f = face_with_edge_replaced(&side, &top, &halves).unwrap();
+    assert!(f.is_valid());
+    assert_eq!((f.wires().len(), f.edges().len()), (3, side.edges().len() + 1), "side's edges {}", side.edges().len());
+    assert!(close(f.area().unwrap(), side.area().unwrap(), 1e-9), "{} vs {}", f.area().unwrap(), side.area().unwrap());
+}

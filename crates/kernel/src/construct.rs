@@ -188,6 +188,13 @@ pub fn make_face_on(on: &Shape, wire: &Shape) -> Result<Shape> {
     Shape::from_res(ffi::make_face_on(on.raw(), wire.raw()))
 }
 
+/// `face` with its edge `edge` replaced by `edges` (a run on the face's surface between that edge's ends, in any
+/// order): its other boundaries kept as they are (the suspension's tube and round taking in the pieces up to a canal).
+pub fn face_with_edge_replaced(face: &Shape, edge: &Shape, edges: &[Shape]) -> Result<Shape> {
+    let l = vec_to_list(edges);
+    Shape::from_res(ffi::face_with_edge_replaced(face.raw(), edge.raw(), &l))
+}
+
 /// An edge lying exactly on `on`'s surface through `points` (each on it, in order): interpolated in the surface's
 /// parameters, so it stays on the surface between them (a contact curve to split a face along with [`split_on`]).
 ///
