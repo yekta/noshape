@@ -11077,11 +11077,76 @@ public:
   {
     if (!revolution(BRep_Tool::Surface(F)))
       return false;
-    return ShapeCustom_SweptToElementary::NewSurface(F, S, L, Tol, RevWires, RevFace);
+    if (ShapeCustom_SweptToElementary::NewSurface(F, S, L, Tol, RevWires, RevFace))
+      return true;
+    const auto sp = spindle(F);
+    if (!sp)
+      return false;
+    L        = sp->loc;
+    S        = sp->torus;
+    Tol      = BRep_Tool::Tolerance(F);
+    RevWires = sp->mirror;
+    RevFace  = sp->mirror;
+    return true;
+  }
+
+  struct Spindle
+  {
+    occ::handle<Geom_ToroidalSurface> torus;
+    TopLoc_Location                   loc;
+    double                            phi;
+    bool                              mirror;
+  };
+
+  // A circle turned about an axis closer to its centre than its radius: a spindle torus, which OCCT leaves a revolution
+  // (cf-snap-hook's IGES hole rounds, each in two faces no merge would join). Its curves on the face map over exactly:
+  // u as it was, v turned by the circle's start (`phi`), or run backwards (`mirror`: the torus' normal the other way).
+  static std::optional<Spindle> spindle(const TopoDS_Face& F)
+  {
+    TopLoc_Location loc;
+    const auto      sr = occ::down_cast<Geom_SurfaceOfRevolution>(BRep_Tool::Surface(F, loc));
+    if (sr.IsNull())
+      return std::nullopt;
+    occ::handle<Geom_Curve> basis = sr->BasisCurve();
+    while (const auto t = occ::down_cast<Geom_TrimmedCurve>(basis))
+      basis = t->BasisCurve();
+    const auto circle = occ::down_cast<Geom_Circle>(basis);
+    if (circle.IsNull())
+      return std::nullopt;
+    const gp_Circ c    = circle->Circ();
+    const gp_Ax1  axis = sr->Axis();
+    const gp_Lin  line(axis);
+    const double  major = line.Distance(c.Location());
+    if (!c.Position().IsCoplanar(axis, Precision::Confusion(), Precision::Angular()) || major <= Precision::Confusion() || major > c.Radius())
+      return std::nullopt;
+    for (TopExp_Explorer e(F, TopAbs_EDGE); e.More(); e.Next())
+      if (BRep_Tool::IsClosed(TopoDS::Edge(e.Current()), F))
+        return std::nullopt;
+    const gp_Pnt o = ElCLib::Value(ElCLib::Parameter(line, c.Location()), line);
+    const gp_Dir z = axis.Direction(), x(gp_Vec(o, c.Location()));
+    const gp_Dir xc = c.XAxis().Direction(), yc = c.YAxis().Direction();
+    const double phi    = std::atan2(xc.Dot(z), xc.Dot(x));
+    const bool   mirror = xc.Crossed(yc).Dot(x.Crossed(z)) < 0;
+    return Spindle{new Geom_ToroidalSurface(gp_Torus(gp_Ax3(o, z, x), major, c.Radius())), loc, phi, mirror};
   }
 
   bool NewCurve2d(const TopoDS_Edge& E, const TopoDS_Face& F, const TopoDS_Edge& NewE, const TopoDS_Face& NewF, occ::handle<Geom2d_Curve>& C, double& Tol) override
   {
+    if (const auto sp = spindle(F))
+    {
+      double f, l;
+      const auto c = BRep_Tool::CurveOnSurface(E, F, f, l);
+      if (c.IsNull())
+        return false;
+      gp_Trsf2d t;
+      if (sp->mirror)
+        t.SetMirror(gp_Ax2d(gp_Pnt2d(0, sp->phi / 2), gp_Dir2d(1, 0)));
+      else
+        t.SetTranslation(gp_Vec2d(0, sp->phi));
+      C   = occ::down_cast<Geom2d_Curve>(c->Transformed(t));
+      Tol = BRep_Tool::Tolerance(E);
+      return true;
+    }
     if (revolution(BRep_Tool::Surface(F)))
       return ShapeCustom_SweptToElementary::NewCurve2d(E, F, NewE, NewF, C, Tol);
     if (E.IsSame(NewE))

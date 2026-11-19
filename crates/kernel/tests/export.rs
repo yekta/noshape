@@ -226,6 +226,37 @@ fn an_iges_parts_faces_on_one_surface_read_merged() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A boss whose round is wider than the boss less the round (a spindle torus: OCCT keeps it a circle turned about the
+/// axis, as Onshape's IGES writes it) reads with its round in one face when written in halves, as Onshape's import
+/// (cf-snap-hook's live.igs: 128 faces, ours 136 before).
+#[test]
+fn an_iges_spindle_torus_in_halves_reads_as_one_face() {
+    let dir = std::env::temp_dir().join(format!("noshape-iges-spindle-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    // Revolved about z: a boss of r 4.5, its top rim rounded by r 2.5 about a circle 2 from the axis.
+    let p = |x: f64, z: f64| DVec3::new(x, 0.0, z);
+    let a = std::f64::consts::FRAC_1_SQRT_2 * 2.5;
+    let edges = [
+        make_line(p(0.0, 0.0), p(4.5, 0.0)).unwrap(),
+        make_line(p(4.5, 0.0), p(4.5, 7.5)).unwrap(),
+        make_arc_3pts(p(4.5, 7.5), p(2.0 + a, 7.5 + a), p(2.0, 10.0)).unwrap(),
+        make_line(p(2.0, 10.0), p(0.0, 10.0)).unwrap(),
+        make_line(p(0.0, 10.0), p(0.0, 0.0)).unwrap(),
+    ];
+    let profile = make_face(&Plane::new(DVec3::ZERO, DVec3::Y, DVec3::X), &make_wire(&edges).unwrap(), &[]).unwrap();
+    let boss = revolve(&profile, DVec3::ZERO, DVec3::Z, std::f64::consts::TAU).unwrap().shape;
+    let halves = split_by_plane(&boss, &Plane::new(DVec3::ZERO, DVec3::X, DVec3::Y)).unwrap().shape;
+    let one = fuse(&halves.solids()[0], &halves.solids()[1]).map(|r| r.shape).unwrap_or(halves.clone());
+    let path = dir.join("boss.igs");
+    write_iges(&path, std::slice::from_ref(&one), LengthUnit::Millimeter).unwrap();
+    let parts = read_iges_parts(&path, LengthUnit::Millimeter).unwrap();
+    assert_eq!(parts.iter().map(|p| p.shape.count(ShapeType::Face)).sum::<usize>(), boss.count(ShapeType::Face));
+    let want = volume_properties(&boss).unwrap().mass;
+    let v: f64 = parts.iter().map(|p| volume_properties(&p.shape).unwrap().mass).sum();
+    assert!((v - want).abs() < 1e-6 * want, "{v} vs {want}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// A sphere written as a B-spline surface (an IGES writer's rational surfaces: live's o-ring) reads as a sphere, as
 /// Onshape's import.
 #[test]
@@ -2399,3 +2430,4 @@ fn a_solid_of_disconnected_pieces_imports_as_a_part_each() {
     let v: f64 = pieces.iter().map(|p| volume_properties(&p.shape).unwrap().mass).sum();
     assert!((v - 3e-6).abs() < 1e-12, "{v}");
 }
+
