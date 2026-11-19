@@ -270,9 +270,10 @@ void rust_boolean_keep(const OcShape& out);
 std::shared_ptr<const UnifyScope> rust_unify_scope(const OcShape& target);
 // The kernel's own Booleans outside op_boolean (Shell, slabs): `op` (0 fuse, 1 cut, 2 common) of `args` by
 // `tools`, noshape's where it takes them, else OCCT's (in parallel with `parallel`); recorded with
-// NOSHAPE_RECORD_BOOLEANS. False when OCCT's fails.
+// NOSHAPE_RECORD_BOOLEANS (`slab_union`: a Shell's union of its slabs, whose history only its faces' records are read
+// of, recorded as such for the replay). False when OCCT's fails.
 bool quick_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, bool parallel, TopoDS_Shape& out,
-                   occ::handle<BRepTools_History>& hist);
+                   occ::handle<BRepTools_History>& hist, bool slab_union = false);
 // The kernel's unify of a whole shape (op_unify's; boolean.cpp).
 TopoDS_Shape unify_shape(const TopoDS_Shape& s, occ::handle<BRepTools_History>& hist);
 // A hole's cylinder between two rounded rims: the three seams at a vertex both tori's outer loops share, the pieces

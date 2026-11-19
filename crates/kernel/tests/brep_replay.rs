@@ -6,7 +6,9 @@
 //! brep_replay::brep_corpus_replay -- --ignored --nocapture` (a result that differs from OCCT's only by OCCT's
 //! arbitrary choices is reported equivalent with its deltas (`equivalent`), one whose history differs only in shapes
 //! the arguments share remade where OCCT keeps them as relabelled (`shared_relabelled`), one whose unified result
-//! differs only in a closed face's seam as seam placement only (`seam_placement_only`); NOSHAPE_BREP_EXACT=1: as differing;
+//! differs only in a closed face's seam as seam placement only (`seam_placement_only`), a Shell's slab union (recorded path
+//! `*_slab_union`) whose history differs only in vertex records Shell never reads as equivalent (`vertex_records_only`);
+//! NOSHAPE_BREP_EXACT=1: as differing;
 //! NOSHAPE_BREP_DIFF=1 prints each mismatch's history records that differ; NOSHAPE_BREP_ONLY=<name> runs one case; NOSHAPE_BREP_SHOW_OCCT=<name>,... prints
 //! OCCT's result and history records for those cases, taken or not; NOSHAPE_BREP_VS_OCCT=1 compares with OCCT run
 //! here instead of the recorded result: for a corpus recorded with this Boolean on; NOSHAPE_BREP_ALWAYS=<dir> writes
@@ -88,6 +90,13 @@ fn apart<'a>(a: &'a [Rec], b: &'a [Rec]) -> (Vec<&'a Rec>, Vec<&'a Rec>) {
         }
     }
     (only_a, b.iter().zip(used).filter(|(_, u)| !u).map(|(y, _)| y).collect())
+}
+
+/// Where the histories differ only in records of input vertices: how many (`apart`'s, both ways).
+fn vertex_records_only(ours: &[Rec], occt: &[Rec]) -> Option<usize> {
+    let (mine, theirs) = apart(ours, occt);
+    let vertex = |r: &&Rec| r.0.split(' ').nth(1).is_some_and(|w| w.starts_with("Vertex"));
+    (!(mine.is_empty() && theirs.is_empty()) && mine.iter().all(vertex) && theirs.iter().all(vertex)).then_some(mine.len() + theirs.len())
 }
 
 /// Where the histories differ only in input shapes two arguments share, or edges and faces on them, Modified (remade at
@@ -470,6 +479,18 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
             && let Some(n) = theirs.as_ref().and_then(|t| shared_relabelled(&c, ours.records(), t.records()))
         {
             relabelled.push(format!("{name} ({:?}, {} tools): {n} shared shapes Modified where OCCT keeps them", c.op, c.tools.len()));
+            d.clear();
+        } else if d == ["history differs"]
+            && std::env::var_os("NOSHAPE_BREP_EXACT").is_none()
+            && c.path.ends_with("_slab_union")
+            && let Some(n) = theirs.as_ref().and_then(|t| vertex_records_only(ours.records(), t.records()))
+        {
+            // A Shell's union of its slabs whose history differs only in its input vertices' records (OCCT's Deleted or
+            // Modified for a vertex inside coincident edges of other slabs follows its rounding): Shell reads only its
+            // faces' records (shell.cpp shell_history: the union is in the tool chain, read for the slab faces
+            // standing in for the part's), so its result's history is the same; equivalent (lead 11-19). Anywhere
+            // else a history difference counts.
+            equivalents.push(format!("{name} ({:?}, {} tools): history differs in {n} vertex records only (a Shell's slab union, those unread)", c.op, c.tools.len()));
             d.clear();
         }
         // What the model does next with a result (merging faces left on one surface) must come out the same.

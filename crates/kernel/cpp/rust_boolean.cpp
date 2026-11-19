@@ -7642,7 +7642,7 @@ void rust_boolean_keep(const OcShape& out)
 namespace noshape {
 
 bool quick_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, bool parallel, TopoDS_Shape& out,
-                   occ::handle<BRepTools_History>& hist)
+                   occ::handle<BRepTools_History>& hist, bool slab_union)
 {
   const auto                t0 = std::chrono::steady_clock::now();
   std::vector<TopoDS_Shape> all;
@@ -7722,7 +7722,7 @@ bool quick_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, bo
     OcShapeList  a, t;
     a.items.assign(all.begin(), all.begin() + args.Extent());
     t.items.assign(all.begin() + args.Extent(), all.end());
-    brep_record_direct(op, a, t, make_result(all, out, hist.get()), parallel, ms, path);
+    brep_record_direct(op, a, t, make_result(all, out, hist.get()), parallel, ms, std::string(path) + (slab_union ? "_slab_union" : ""));
   }
   return true;
 }
