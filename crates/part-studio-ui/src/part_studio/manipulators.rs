@@ -911,13 +911,7 @@ impl PartStudioView {
                     snap_degrees(value.abs().to_degrees(), radius)
                 };
                 value = deg.to_radians();
-                let units = self.doc.read(cx).session.doc.settings.units;
-                // Live's updateFromManipulator: formatValue at the workspace's precision (3: 42.4154 → "42.415 deg").
-                let text = if matches!(units.angle, noshape_units::AngleUnit::Degree) {
-                    format!("{} deg", noshape_units::format_number(deg, units.angle_precision))
-                } else {
-                    noshape_units::format_quantity(Quantity::new(value, Dim::ANGLE), &units)
-                };
+                let text = dragged_angle_text(value, &self.doc.read(cx).session.doc.settings.units);
                 if let Some(e) = &self.edit {
                     e.dialog.update(cx, |dlg, cx| {
                         if flip && let Some(f) = h.flip {
@@ -1374,9 +1368,29 @@ fn arrow_glyph(a: &Arrow, hover: bool, dragging: bool, view: &noshape_render::ca
     ]
 }
 
+/// A dragged angle's text (live's updateFromManipulator: formatValue at the workspace's precision, 3: 42.4154 →
+/// "42.415 deg"); other angle units as a quantity.
+fn dragged_angle_text(rad: f64, units: &noshape_units::UnitPrefs) -> String {
+    if !matches!(units.angle, noshape_units::AngleUnit::Degree) {
+        return noshape_units::format_quantity(Quantity::new(rad, Dim::ANGLE), units);
+    }
+    format!("{} deg", noshape_units::format_number(rad.to_degrees(), units.angle_precision))
+}
+
 #[cfg(test)]
 mod snap_tests {
-    use super::{handle_style, linear_step, snap_degrees};
+    use super::{dragged_angle_text, handle_style, linear_step, snap_degrees};
+
+    /// Live feel/dialogs.json: a dragged angle is written at the workspace's angle precision (3 by default), zeros
+    /// dropped.
+    #[test]
+    fn a_dragged_angle_is_written_at_the_workspace_precision() {
+        let mut units = noshape_units::UnitPrefs::default();
+        assert_eq!(dragged_angle_text(42.4154f64.to_radians(), &units), "42.415 deg");
+        assert_eq!(dragged_angle_text(45f64.to_radians(), &units), "45 deg");
+        units.angle_precision = 1;
+        assert_eq!(dragged_angle_text(42.4154f64.to_radians(), &units), "42.4 deg");
+    }
 
     /// Live feel/dialogs.json "linearStep": 0.1 mm at 0.207–0.293 mm/px, 1 mm at 0.414 mm/px (the switch at 0.316),
     /// 0.01 mm below 0.0316 mm/px; inches by the inch.

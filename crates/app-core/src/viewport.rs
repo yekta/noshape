@@ -3386,6 +3386,12 @@ mod prehighlight_tests {
         assert_eq!(average_pick_ms(-1.0, 10.0), 10.0);
         assert!((average_pick_ms(10.0, 20.0) - 12.0).abs() < 1e-12);
     }
+
+    /// Live's pick window: round(5·dpr) device px each way: 11 × 11 at 1×, 21 × 21 at 2×, 8 at 1.5×.
+    #[::core::prelude::v1::test]
+    fn pick_reach_scales_with_the_device_pixel_ratio_as_live() {
+        assert_eq!([1.0, 2.0, 1.5].map(super::pick_radius_px), [5, 10, 8]);
+    }
 }
 
 #[cfg(test)]

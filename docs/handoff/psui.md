@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-19 21:03 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-19 22:06 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -35,22 +35,40 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (updated 21:03 UTC 11-19; this thread replaced 4973e295 at 13:27, Ubeyd's weekly limit)
+## Now (updated 22:17 UTC 11-19; this thread replaced 4973e295 at 13:27, Ubeyd's weekly limit)
 
-1. LANDED 13:59 (e87a2b3e): routing Multiple offset, the edge double-click / region look / constraint refusal
-   tests, the section cap (tan only while just picked), the Hole callout size.
-2. f117aeaf FAILED 18:20 (menu coverage: the chrome test's literal menu labels); live2 then showed live has NO safe
-   triangle (submenu-diag-1119), so the triangle is gone. Re-landing now: qa's P0 feel rows (qa-feel-1119 in
-   interaction-feel.md): a left press that closes an open menu gives the graphics nothing (face-rclick-select-fillet-
-   faces, the 05:51 regression), one Esc after a field's menu item (LeaveFocus only forward sets tabbed_out), no
-   readout under an analysis tool; the untested-row tests; Routing curve Multiple per live2 routing-multi with its
-   value box ("10.2 mm" / "45 deg", typed + Enter sets the drag's total, another Edit reference drops it) and the
-   arrow drag's blue start line. vibe2 scenarios (~/tmp/psui/fillet-faces): clear-all and clear-missing match.
-3. Next: the routing triad's centre ball drag (free, in the view plane); rerun qa's 7 rows on the landed build.
-4. asm FYI 11-19 (df6a2c16 queued): the Part Studio Mass panel's "Center of mass ☐ Override" X / Y / Z and "Mass
-   moments of inertia ☐ Override" 9 fields (live2 mass-override-1119, behaviours "asm (11-19)"): enabled only for a
-   part with a material, Lxy / Lyx not linked; written through doc.edit_studio as menus.rs mass_override
-   (PartProperties com_override, inertia_override column by column).
+1. LANDED 13:59 (e87a2b3e): routing Multiple offset, edge double-click / region look / constraint refusal tests,
+   section cap, Hole callout size.
+2. LANDED 22:04 (01969838): qa's P0 feel rows (menu press closes only the menu; one Esc after a field's menu item;
+   no readout under an analysis tool), the untested-row tests, Routing curve Multiple with its value box. qa reruns
+   its 7 rows on its green automatically.
+3. IN FLIGHT (uncommitted; run77 on vibex7 = all part-studio-ui / scene / app-core / units lib tests + clippy):
+   (a) Mass panel CoM / inertia Override (menus.rs edit_mass_cell, MassOverrides; test ui_tests::measure::mass_centre_…).
+   (b) qa P1 TOOLBAR-TOOLTIP-AFTER-CLICK: vendor gpui-pre TooltipPressGate (held / blocked) + Window::tooltip_released_on
+   (the click re-keys the toolbar button, so a NEW element appeared under the resting pointer and showed its tip via the
+   painted_at path; now blocked on the released bounds until the pointer leaves them). Chrome row "tooltip / kept while
+   pressed, gone at the release". (c) Routing Multiple's centre ball (snaps to inference points; matrix COLUMNS are the
+   axes; triad_apply_move rounds to 10 nm: the face centroid integral is ~1e-8 off). (d) row tests: pick reach, dragged
+   angle text, comma. Mark TICKETS TOOLBAR-TOOLTIP-AFTER-CLICK. clippy gpui-pre without --all-targets.
+4. sketch-vertical-key (in run77, same commit set): cause = our snap hold (HOLD_PX 9.5) also held a line's own
+   H/V band; live's recorder comes in 8 moves through the band and ends ~9 px off plumb: no Vertical. Fix: BAND_HOLD_PX
+   8.0 (live sketch-snap-1117 "lets go at 8-10") in held_snap; tests scene a_lines_own_vertical_lets_go_at_8_px, app
+   sketch_ui_tests a_lines_vertical_reach_is_measured_on_the_screen_in_the_app. Tell qa + skasm when landed. Drop the
+   staged tests/ui-parity/live/sketch-vertical-key.json before committing.
+4b. P0 qa STALE-SKETCH-HOVER (TICKETS P1 walk 11-19): outside sketch mode a sketch region's hover outline (after a rim
+   click + ✓) and a circle centre point's orange dot stay after the pointer leaves to empty space (also after Shift+7);
+   rims and part faces clear fine. Leads (unverified): hover flows viewport.set_hover (emits only on a GPU id change,
+   app-core viewport.rs ~1466) -> apply_hover_pick (mod.rs ~1971) -> shown_sketch_hover_id (sketch.rs 843: CPU reach
+   8.5 px points / 7.5 curves) ; PointerMove re-checks via ui.shown_sketch_gpu_hover (mod.rs ~2356), which is None
+   while sketching. Suspects: (1) after ✓ the viewport's hover id N is re-read against the new built picks (N now the
+   region) and nothing re-emits; (2) the scene's HOVER flag set by the viewport outlives self.hover (a None->None
+   change never refreshes). Repro first as a GPUI test with explicit Hover events.
+   qa 22:3x narrowed: (b) is a ONE-EVENT LAG, in sketch mode too (line, Esc, one xdotool move to empty: the end stays
+   lit; a second move clears it). (a) the region outline after ✓ survives several moves: separate path. Read so far:
+   sketch-mode PointerMove (sketch.rs ~1190) sets ed.hover from hovered_sketch_entity() = the OLD self.hover, then the
+   re-check at ~1222 (sketch_hover_id vs ui.sketch_gpu_hover) calls sketch_hover which does reset ed.hover — so check
+   whether that re-check is reached after Esc (Select) and whether viewport pick_at / request_hover re-emits Hover
+   when the async pick equals the stale id (viewport.rs ~2575 fast-move branch, set_hover ~1466).
 5. Interaction-feel rows that match live with no test (grep "missing" in the Test column; P0 sections first).
    Skipped: the two-block box counts (live's camera: iso + 10 wheel steps about an unknown pointer), the rollback
    bar's hover colour (GPUI group_hover, no test hook), the spinner's 900 ms (`Instant`, not the test clock).

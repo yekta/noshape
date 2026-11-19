@@ -90,4 +90,13 @@ mod tests {
         assert_eq!(localize_always("\"v1.5\" ~ 2.5"), "\"v1.5\" ~ 2,5");
         assert_eq!(delocalize_always("max(1, 2)"), "max(1, 2)");
     }
+
+    /// Live2 ours-1118 prefs: with the comma on, Extrude's Depth typed "10,25" reads "10,25 mm" and "10.5" reads
+    /// "10,5 mm" (a typed period is still a decimal point).
+    #[test]
+    fn a_typed_depth_reads_with_the_comma_as_live() {
+        for (typed, shown) in [("10,25 mm", "10,25 mm"), ("10.5 mm", "10,5 mm")] {
+            assert_eq!(localize_always(&delocalize_always(typed)), shown);
+        }
+    }
 }
