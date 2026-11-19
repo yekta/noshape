@@ -483,6 +483,41 @@ impl From<crate::ui::AlertKind> for BubbleKind {
     }
 }
 
+/// The "View in high quality" notice (Part Studio and Assembly, Shift+R). Live (part-studio/lod4-fill-shiftR,
+/// keys-1118 asm): a 433 x 28 #90cef1 bar flush with the graphics area's top, centred, square; 13 px #333 text 12 px
+/// in; a white 65 x 21 "Disable" button (1 px #aaa, 3 px radius) 4 px from the top and 8 px from the right end.
+/// Position it yourself (top centre of the graphics area).
+pub fn high_quality_bar(on_disable: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+    h_flex()
+        .id("analysis-panel")
+        .occlude()
+        .w(px(433.))
+        .h(px(28.))
+        .pl(px(12.))
+        .pr(px(8.))
+        .pt(px(1.))
+        .bg(rgb(0x90cef1))
+        .text_size(px(13.))
+        .text_color(rgb(0x333333))
+        .child(div().flex_1().relative().top(px(-1.)).child("Viewing in high quality. Performance can decrease."))
+        .child(
+            div()
+                .id("hq-off")
+                .w(px(65.))
+                .h(px(21.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .bg(rgb(0xffffff))
+                .border_1()
+                .border_color(rgb(0xaaaaaa))
+                .rounded(px(3.))
+                .cursor_pointer()
+                .child(div().relative().top(px(-1.)).child("Disable"))
+                .on_click(on_disable),
+        )
+}
+
 /// Onshape's message bubble (`.osx-message-bubble`, live dom/toast-*.txt,
 /// assembly-bom-copy-toast.txt): 14 px text in a rounded (5.25 px) box,
 /// padding 4/25/4/10 plus the 12 px close cell, an 18 px icon 10 px before

@@ -738,6 +738,8 @@ impl AssemblyView {
             return;
         }
         self.ui.iso_expand = None;
+        // The selection goes as the dialog opens (live keys-1118: Shift+I / Shift+T with a face selected).
+        self.clear_selection();
         let set = if transparent { &mut self.ui.transparent } else { &mut self.isolate };
         match set {
             Some(s) => s.extend(ids),
@@ -950,11 +952,9 @@ impl AssemblyView {
             return;
         }
         let clip = InstanceClipboard::copy(asm, &ids);
-        let n = clip.instances.len();
+        // No toast (live keys-1118).
         if let Ok(json) = serde_json::to_string(&serde_json::json!({ "noshape_instances": clip })) {
             cx.write_to_clipboard(ClipboardItem::new_string(json));
-            self.message = Some((false, if n == 1 { format!("Copied {}", clip.instances[0].name) } else { format!("Copied {n} items") }));
-            cx.notify();
         }
     }
 
@@ -998,6 +998,8 @@ impl AssemblyView {
         }
         let ids = self.edit_insert(&noshape_ops::assembly::paste_description(&clip), cx, |a| clip.paste(a, [0.0; 3])).unwrap_or_default();
         self.start_placing(ids, cx);
+        // Live keys-1118: the copy comes in at the pointer at once, see-through, not selected, and follows it.
+        self.place_at_pointer(cx);
     }
 
     // ------------------------------------------------------------ rename
@@ -1731,9 +1733,26 @@ impl AssemblyView {
         }
     }
 
-    /// View normal to: camera direction into the hovered planar face (and an up vector).
+    /// N: normal to the last selected planar face, else the hovered one (live keys-1118: a block face selected).
+    pub(super) fn view_normal(&mut self, cx: &mut Context<Self>) {
+        let Some((forward, up)) = self.selected_face_normal(cx).or_else(|| self.hovered_face_normal(cx)) else { return };
+        self.push_camera_history(cx);
+        self.viewport.update(cx, |vp, cx| vp.animate_to_direction(forward, up, cx));
+    }
+
+    /// Shift+P: hides the assembly's origin (live keys-1118: its dot goes, the Origin row greys); as the Part
+    /// Studio's, a press hides and never shows.
+    pub(super) fn hide_construction(&mut self, cx: &mut Context<Self>) {
+        if self.ui.origin_hidden {
+            return;
+        }
+        self.ui.origin_hidden = true;
+        self.refresh_scene(false, cx);
+        cx.notify();
+    }
+
     /// The last selected face's View normal to direction.
-    fn selected_face_normal(&self, cx: &App) -> Option<(DVec3, DVec3)> {
+    pub(super) fn selected_face_normal(&self, cx: &App) -> Option<(DVec3, DVec3)> {
         let (path, r) = self.ui.entity_sel.iter().rev().find(|(_, r)| matches!(r, Reference::Face(_)))?;
         let o = self.result.occurrences.iter().find(|o| &o.path == path && o.face_refs.contains(r))?;
         let at = Reference::Implicit { on: Box::new(r.clone()), inference: Inference::Centroid };
@@ -2716,11 +2735,11 @@ impl AssemblyView {
         let Some((last, parent)) = path.split_last() else { return };
         let Some(sub) = self.node_assembly(parent, cx) else { return };
         let clip = InstanceClipboard::copy(&sub, &[*last]);
-        let Some(name) = clip.instances.first().map(|i| i.name.clone()) else { return };
+        if clip.instances.is_empty() {
+            return;
+        }
         if let Ok(json) = serde_json::to_string(&serde_json::json!({ "noshape_instances": clip })) {
             cx.write_to_clipboard(ClipboardItem::new_string(json));
-            self.message = Some((false, format!("Copied {name}")));
-            cx.notify();
         }
     }
 

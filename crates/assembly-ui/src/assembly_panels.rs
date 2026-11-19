@@ -2070,11 +2070,10 @@ impl AssemblyView {
     // ------------------------------------------------------------ snap mode
 
     pub(super) fn toggle_snap(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        // Live (asm-shift-s-snap-mode): no message; the banner says what to click.
+        // Live keys-1118: only the toolbar button shows it (no message or banner), and a selection stays.
         if self.snap.take().is_none() {
             self.close_mate(window, cx);
             self.snap = Some(None);
-            self.selected.clear();
         }
         self.infer = None;
         self.update_capture(cx);
@@ -2506,62 +2505,6 @@ impl AssemblyView {
                 cx.notify();
             }),
         ))
-    }
-
-    pub(super) fn render_mode_banner(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let pal = p();
-        let (text, done): (String, Option<u8>) = if self.explode_edit {
-            // The yellow "Editing Explode 1 [Done]" banner sits in the toolbar row.
-            return None;
-        } else if let Some(s) = &self.snap {
-            (if s.is_some() { "Snap mode: click the target face or mate connector".into() } else { "Snap mode: click a face or mate connector on the instance to move".into() }, Some(1))
-        } else {
-            // Show mates mode has no banner either (live 1667: only the
-            // toolbar button shows it).
-            return None;
-        };
-        Some(
-            h_flex()
-                .absolute()
-                .top_3()
-                .left(relative(0.5))
-                .ml(px(-260.))
-                .w(px(520.))
-                .justify_center()
-                .child(
-                    h_flex()
-                        .id("mode-banner")
-                        .occlude()
-                        .gap_2()
-                        .px_3()
-                        .py_1()
-                        .rounded_md()
-                        .bg(with_alpha(pal.warning, 0.22))
-                        .border_1()
-                        .border_color(with_alpha(pal.warning, 0.6))
-                        .text_xs()
-                        .text_color(pal.text)
-                        .child(text)
-                        .when_some(done, |d, k| {
-                            d.child(Button::new("banner-done").label("Done").small().primary().on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                                match k {
-                                    0 => {
-                                        this.explode_edit = false;
-                                        this.message = None;
-                                    }
-                                    1 => this.toggle_snap(window, cx),
-                                    _ => {
-                                        this.show_mates_mode = false;
-                                        this.update_capture(cx);
-                                        this.refresh_scene(false, cx);
-                                    }
-                                }
-                                cx.notify();
-                            })))
-                        }),
-                )
-                .into_any_element(),
-        )
     }
 
     // ------------------------------------------------------------ rename helper

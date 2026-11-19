@@ -319,3 +319,113 @@ fn a_part_inside_a_subassembly_hovers_and_is_taken_alone(cx: &mut TestAppContext
         assert!(v.picked_inside(sub) && v.related_instances(cx).contains(&sub), "the sub's row related (grey), not selected");
     });
 }
+
+/// Dispatches `action` to the focused assembly view, as its key does.
+fn press(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>, action: impl gpui_kit::Action) {
+    let action: Box<dyn gpui_kit::Action> = Box::new(action);
+    cx.update_window(window, |_, w, cx| {
+        let focus = view.read(cx).focus.clone();
+        w.focus(&focus, cx);
+        w.dispatch_action(action, cx);
+    })
+    .unwrap();
+    frames(cx, window, view);
+}
+
+/// live2 shortcuts-1118 (keys pressed in live and ours): Shift+R's bar, W's prompt (Esc ends both mode and prompt),
+/// N normal to the selected face, Shift+P hides the origin (and keeps it hidden), Ctrl+C without a toast, Ctrl+V's copy
+/// at the pointer and unselected, Shift+S keeps the selection with no banner, Shift+I takes the selection away.
+#[gpui::test]
+fn the_assembly_keys_act_as_live(cx: &mut TestAppContext) {
+    use crate::actions::*;
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (window, view) = mated_blocks(cx, "keys-1118");
+    press(cx, window, &view, ViewHighQuality);
+    assert!(cx.update(|cx| view.read(cx).ui.high_quality), "Shift+R: viewing in high quality (its bar)");
+    press(cx, window, &view, ViewHighQuality);
+    press(cx, window, &view, ZoomWindow);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.viewport.read(cx).zoom_window, "W arms the zoom window");
+        assert_eq!(v.message.as_ref().map(|(e, m)| (*e, m.as_str())), Some((false, "Drag to create zoom bounding box.")), "W's blue prompt");
+    });
+    press(cx, window, &view, Cancel);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(!v.viewport.read(cx).zoom_window && v.message.is_none(), "Esc ends the mode and its prompt");
+    });
+    // N: the view turns normal to Part 1's -Y face, selected.
+    let found = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let o = v.result.occurrences.iter().find(|o| v.assembly(cx).and_then(|a| a.instance(o.top())).is_some_and(|i| i.name == "Part 1 <1>")).unwrap();
+            let (path, faces) = (o.path.clone(), o.face_refs.clone());
+            faces.into_iter().any(|r| {
+                v.ui.entity_sel = vec![(path.clone(), r)];
+                v.selected_face_normal(cx).is_some_and(|(f, _)| f.y > 0.99)
+            })
+        })
+    });
+    assert!(found, "Part 1's -Y face");
+    press(cx, window, &view, ViewNormal);
+    for _ in 0..40 {
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        frames(cx, window, &view);
+    }
+    let fwd = cx.update(|cx| view.read(cx).viewport.read(cx).camera.forward());
+    assert!(fwd.y > 0.999, "N: normal to the face (forward {fwd:?})");
+    // Shift+P hides the origin; a second press keeps it hidden.
+    press(cx, window, &view, HideConstruction);
+    press(cx, window, &view, HideConstruction);
+    assert!(cx.update(|cx| view.read(cx).ui.origin_hidden), "Shift+P hides the origin");
+    // Ctrl+C: no toast; Ctrl+V: the copy at the pointer, following it, not selected.
+    let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
+    move_to(cx, window, &view, (lo + hi) * 0.5);
+    let part1 = cx.update(|cx| view.read(cx).assembly(cx).and_then(|a| a.instances.iter().find(|i| i.name == "Part 1 <1>")).unwrap().id);
+    cx.update(|cx| view.update(cx, |v, _| v.selected = vec![part1]));
+    press(cx, window, &view, Copy);
+    assert!(cx.update(|cx| view.read(cx).message.is_none()), "Ctrl+C shows no toast");
+    press(cx, window, &view, Paste);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let placing = v.placing.clone().expect("the copy follows the pointer");
+        assert!(v.ui.place_moved, "at the pointer at once");
+        assert!(placing.iter().all(|id| !v.selected.contains(id)), "the copy isn't selected");
+    });
+    press(cx, window, &view, Cancel);
+    // Shift+S: snap mode on, the selection kept, no message.
+    cx.update(|cx| view.update(cx, |v, _| v.selected = vec![part1]));
+    press(cx, window, &view, ToggleSnapMode);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.snap.is_some() && v.selected == vec![part1] && v.message.is_none(), "Shift+S keeps the selection, no message");
+    });
+    press(cx, window, &view, ToggleSnapMode);
+    // Shift+I: the dialog, the selection gone.
+    press(cx, window, &view, IsolateSelected);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.isolate.is_some() && v.selected.is_empty() && v.ui.entity_sel.is_empty(), "Shift+I isolates and clears the selection");
+    });
+}
+
+/// live2 shortcuts-1118 (H): Show mates mode shows the hovered instance's mates' glyphs, hidden ones too.
+#[gpui::test]
+fn show_mates_mode_shows_the_hovered_instances_mates(cx: &mut TestAppContext) {
+    use crate::actions::*;
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (window, view) = mated_blocks(cx, "keys-1118-h");
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let id = v.result.mates[0].id;
+            v.set_mates_hidden(vec![id], true, cx);
+        })
+    })
+    .unwrap();
+    wait_until(cx, window, &view, |v, _| v.ui.overlay_mates.is_empty());
+    let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
+    move_to(cx, window, &view, (lo + hi) * 0.5);
+    assert!(cx.update(|cx| view.read(cx).ui.overlay_mates.is_empty()), "hidden: no glyph");
+    press(cx, window, &view, ToggleShowMatesMode);
+    wait_until(cx, window, &view, |v, _| !v.ui.overlay_mates.is_empty());
+    assert!(cx.update(|cx| !view.read(cx).ui.overlay_mates.is_empty()), "H: the hovered part's mate glyph shows");
+}

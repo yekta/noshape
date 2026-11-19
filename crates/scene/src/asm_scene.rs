@@ -508,8 +508,10 @@ pub struct Highlights {
     pub step_arrow: Option<(DVec3, DVec3, f64, bool)>,
     /// The Section view dialog's manipulator (live assembly/2368).
     pub section: Option<SectionGlyph>,
-    /// Pickable assembly origin triad (size) and whether it is hovered/selected.
+    /// Pickable assembly origin (triad size) and whether it is hovered/selected.
     pub origin: Option<(f64, bool)>,
+    /// The origin as a triad (picking it as a mate connector's origin); else the Part Studio's ring with a dot.
+    pub origin_triad: bool,
     /// Pickable assembly mate connector triads: (frame, size, highlighted).
     /// Assembly mate connectors: frame, size, highlighted, opacity (the
     /// connector dialog's preview slider fades the edited one).
@@ -1113,8 +1115,14 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     let mut op = PointData::default();
     if let Some((size, hl)) = h.origin {
         let id = overlay_id(built, OverlayPick::Origin);
-        push_triad(&mut ol, &Frame::default(), size, 1.5, id, hl);
-        op.points.push(PointSprite { position: [0.0; 3], color: if hl { HANDLE_HL } else { DARK }, pick_id: id, size: 9.0, style: LineSegment::ON_TOP, _pad: 0 });
+        if h.origin_triad {
+            push_triad(&mut ol, &Frame::default(), size, 1.5, id, hl);
+            op.points.push(PointSprite { position: [0.0; 3], color: if hl { HANDLE_HL } else { DARK }, pick_id: id, size: 9.0, style: LineSegment::ON_TOP, _pad: 0 });
+        } else {
+            // Live keys-1118: the assembly's origin is the Part Studio's 11 px ring with a centre dot (point style 4).
+            let color = if hl { HANDLE_HL } else { theme::rgb8(theme::pick(theme::viewport::ORIGIN, theme::viewport_dark::ORIGIN)) };
+            op.points.push(PointSprite { position: [0.0; 3], color, pick_id: id, size: 11.0, style: 4 | LineSegment::ON_TOP, _pad: 0 });
+        }
         scene.set_state(id, 0);
     }
     // Assembly mate connectors: Onshape's screen-size disc (`connector_glyphs`), drawn and picked as camera geometry

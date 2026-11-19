@@ -1410,17 +1410,17 @@ before / +1.5 s and ours before / +1.5 s for each key). Mac: drawing Ctrl+S / Q 
 
 | Key (scope) | Live | Ours | Status |
 |---|---|---|---|
-| Shift+R View in high quality (asm) | a blue banner at the top "Viewing in high quality. Performance can decrease. [Disable]" | nothing visible | ≠ [asm] |
-| W Zoom to window (asm) | a blue bubble "Drag to create zoom bounding box. ×" | nothing visible | ≠ [asm] |
+| Shift+R View in high quality (asm) | a blue banner at the top "Viewing in high quality. Performance can decrease. [Disable]" | the Part Studio's bar, shared (`os_ui::high_quality_bar`); Disable turns it off (GPUI feel `the_assembly_keys_act_as_live`) | = [asm] |
+| W Zoom to window (asm) | a blue bubble "Drag to create zoom bounding box. ×" | the same blue bubble while armed; a box zoomed or Esc ends mode and bubble (`ZOOM_WINDOW_PROMPT`; `the_assembly_keys_act_as_live`) | = [asm] |
 | W Zoom to window (drawing) | no bubble | = (fixed 11-18: no bubble; the next drag zooms) | = [studios] — GPUI feel `drawing_keys_as_lives_shortcut_sweep` |
-| N View normal to (asm, a block face selected) | the view turns normal to the face (the Right view of the block) | nothing | ≠ [asm] |
-| Ctrl+C (asm, Part 1 selected) | no toast | a bubble "Copied Part 1 <1> ×" | ≠ [asm] |
-| Ctrl+V after Ctrl+C (asm) | the copy comes in beside the original, see-through, following the pointer to be placed | the copy pasted in place on the original, selected (orange) | ≠ [asm] |
-| Shift+S Snap mode (asm) | the toolbar button turns on; no bubble; a selection stays | the button turns on, a yellow bubble "Snap mode: click a face or mate connector on the instance to move" with a button, and the selection is cleared | ≠ [asm] |
-| Shift+P Hide all construction (asm) | hides the assembly's origin (its dot goes, the Origin row greys) | nothing (and ours draws the origin as a red/green/blue triad where live shows a ⊙ dot) | ≠ [asm] |
-| H Show mates mode (asm) | the toolbar button turns on and the Revolute's glyph (a pale square with the mate icon) shows at the mate | the button turns on, no glyph | ≠ [asm] |
-| Y Hide (asm, the block selected) | the block hidden, its edges still drawn in yellow while it stays selected | the block gone entirely | ≠ [asm] |
-| Shift+I / Shift+T Isolate, Make transparent (asm, a face selected) | the dialog; the face no longer highlighted | the same dialog; the face stays orange | ≠ [asm] |
+| N View normal to (asm, a block face selected) | the view turns normal to the face (the Right view of the block) | normal to the last selected planar face, else the hovered one (`view_normal`; `the_assembly_keys_act_as_live`) | = [asm] |
+| Ctrl+C (asm, Part 1 selected) | no toast | no toast (`the_assembly_keys_act_as_live`) | = [asm] |
+| Ctrl+V after Ctrl+C (asm) | the copy comes in beside the original, see-through, following the pointer to be placed | the copy at the pointer at once, unselected, following it with its hidden edges drawn through (`place_at_pointer`; `the_assembly_keys_act_as_live`) | = [asm] (the see-through look: recheck) |
+| Shift+S Snap mode (asm) | the toolbar button turns on; no bubble; a selection stays | the button turns on; no banner; the selection stays (`the_assembly_keys_act_as_live`) | = [asm] |
+| Shift+P Hide all construction (asm) | hides the assembly's origin (its dot goes, the Origin row greys) | hides the origin (its row greys), a second press keeps it hidden as the Part Studio's; the origin is the Part Studio's 11 px ring with a dot (the triad only while picking it for a mate connector) (`the_assembly_keys_act_as_live`) | = [asm] |
+| H Show mates mode (asm) | the toolbar button turns on and the Revolute's glyph (a pale square with the mate icon) shows at the mate | the hovered (else selected) instance's mates' glyphs, hidden ones too (GPUI feel `show_mates_mode_shows_the_hovered_instances_mates`); ours' capture had no hover (its before shot has no hover outline, live's has) | = [asm] (recheck with a pointer move first) |
+| Y Hide (asm, the block selected) | the block hidden, its edges still drawn in yellow while it stays selected | the block gone entirely | ≈ [asm]: live's yellow lines are the block's hover outline left until the pointer moves (Part 1's row is no longer selected in live's +1.5 s shot), not kept |
+| Shift+I / Shift+T Isolate, Make transparent (asm, a face selected) | the dialog; the face no longer highlighted | the same dialog; the selection cleared (`isolate_occurrences`; `the_assembly_keys_act_as_live`) | = [asm] |
 | Shift+arrows (drawing: Coarse rotate) | pan the sheet 187 px a press on a 1919 × 1079 window (Shift+Down moves it down, Shift+Left left; measured on the full-size shots, live2 correction 11-18: "to the right" was wrong) | nothing | ≠ [studios] |
 | Shift+N Rename (drawing, a view selected, Sheets panel closed) | nothing visible (with the panel open: the view's row becomes a Rename box with ✓ ✕) | opens the View properties panel | ≠ [studios] |
 | [ Show measure (drawing, a view selected) | the Measure panel at the top left ("Select entities to measure"), the selection cleared | a bubble "Measure: select points, straight edges or circles ×" at the top and a "Measure" box at the bottom left; the selection kept | ≠ [studios] |

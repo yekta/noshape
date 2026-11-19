@@ -178,6 +178,8 @@ pub fn bind_keys(cx: &mut App) {
 /// How near (px) the pointer brings a hovered face's connector to one of its inference dots, in x and in y (a square:
 /// live asm-feel3-1118 kept a dot at (25, 46) and (47, 40), lost it at (26, 48) and (49, 42)), and a hovered edge's to
 /// one of its ends (asm/feel-1117).
+/// W's prompt while the zoom-window mode is armed (live keys-1118, as the Part Studio's).
+const ZOOM_WINDOW_PROMPT: &str = "Drag to create zoom bounding box.";
 const INFERENCE_PICK_RADIUS_PX: f64 = 47.5;
 const EDGE_END_PICK_RADIUS_PX: f64 = 15.0;
 const RELATION_KINDS: [RelationType; 4] = [RelationType::Gear, RelationType::RackAndPinion, RelationType::Screw, RelationType::Linear];
@@ -1320,6 +1322,7 @@ impl AssemblyView {
         let hovered_overlay = self.hover_overlay;
         // Assembly origin and assembly mate connectors (pickable).
         h.origin = (!self.ui.origin_hidden || picking).then_some((size * 0.8, picking && hovered_overlay == Some(OverlayPick::Origin)));
+        h.origin_triad = picking;
         let mut overlay_connectors = Vec::new();
         if let Some(asm) = self.assembly(cx) {
             let editing_mc = self.mc.as_ref().map(|m| m.id);
@@ -1766,6 +1769,19 @@ impl AssemblyView {
         self.ui.place_src_ix = 0;
         // Live Onshape shows no hint while the instance follows the cursor.
         self.viewport.update(cx, |vp, _| vp.tool_captures_left = false);
+        cx.notify();
+    }
+
+    /// Pasted instances being placed go to the pointer at once when it is over the graphics, unselected (live
+    /// keys-1118: Ctrl+V with the pointer on the part).
+    pub(super) fn place_at_pointer(&mut self, cx: &mut Context<Self>) {
+        let Some(ids) = self.placing.clone() else { return };
+        self.selected.retain(|id| !ids.contains(id));
+        if self.viewport.read(cx).pointer_inside() {
+            self.ui.place_moved = true;
+            self.update_placing(cx);
+        }
+        self.rebuild_scene(true, cx);
         cx.notify();
     }
 
@@ -3505,6 +3521,12 @@ impl AssemblyView {
                 }
                 self.refresh_scene(false, cx);
                 cx.notify();
+            }
+            // A box zoomed ends the zoom-window mode and its prompt.
+            ViewportEvent::CameraChanged if !self.viewport.read(cx).zoom_window => {
+                if self.end_zoom_window_prompt() {
+                    cx.notify();
+                }
             }
             ViewportEvent::ContextMenu { pick, position } => {
                 if let Some(OverlayPick::Mate(i)) = self.overlay(*pick)
@@ -6486,8 +6508,10 @@ impl AssemblyView {
         if let Some(el) = self.render_manip_value(cx) {
             out.push(el);
         }
-        if let Some(el) = self.render_mode_banner(cx) {
-            out.push(el);
+        // Shift+R (live keys-1118): the Part Studio's "Viewing in high quality" bar at the graphics area's top.
+        if self.ui.high_quality {
+            let bar = crate::os_ui::high_quality_bar(cx.listener(|this, _: &ClickEvent, w, cx| this.on_camera_action(crate::camera_menu::Action::HighQuality, w, cx)));
+            out.push(div().absolute().top_0().left_0().right_0().flex().justify_center().child(bar).into_any_element());
         }
         if let Some(el) = self.render_cfg_toast(cx) {
             out.push(el);
@@ -6498,7 +6522,8 @@ impl AssemblyView {
         if let Some((err, msg)) = self.message.clone() {
             // Info notices fade after 5 s like the Part Studio's (errors stay until dismissed; qa4: a notice must not
             // linger; live asm-export-1150: the export's bubble 4.9 s).
-            if !err && self.ui.msg_fading.as_deref() != Some(msg.as_str()) {
+            // (The zoom-window prompt goes with its mode instead.)
+            if !err && msg != ZOOM_WINDOW_PROMPT && self.ui.msg_fading.as_deref() != Some(msg.as_str()) {
                 self.ui.msg_fading = Some(msg.clone());
                 let m = msg.clone();
                 cx.spawn(async move |this, cx| {
@@ -6831,10 +6856,17 @@ impl AssemblyView {
             }
             Action::ZoomWindow => {
                 self.push_camera_history(cx);
-                self.viewport.update(cx, |vp, cx| {
+                let on = self.viewport.update(cx, |vp, cx| {
                     vp.zoom_window = !vp.zoom_window;
                     cx.notify();
+                    vp.zoom_window
                 });
+                // Live keys-1118 (W): the Part Studio's blue bubble while the mode is armed.
+                if on {
+                    self.message = Some((false, ZOOM_WINDOW_PROMPT.into()));
+                } else {
+                    self.end_zoom_window_prompt();
+                }
                 cx.notify();
             }
             Action::ZoomSelection => {
@@ -7055,6 +7087,15 @@ impl AssemblyView {
         }
     }
 
+    /// Clears the zoom-window prompt (W); whether it was shown.
+    fn end_zoom_window_prompt(&mut self) -> bool {
+        let shown = self.message.as_ref().is_some_and(|(_, m)| m == ZOOM_WINDOW_PROMPT);
+        if shown {
+            self.message = None;
+        }
+        shown
+    }
+
     fn on_cancel(&mut self, _: &Cancel, window: &mut Window, cx: &mut Context<Self>) {
         // Esc during a snap-mode drag does nothing: the release still moves the part, and snap mode stays on (live
         // snapmode-1118).
@@ -7064,6 +7105,16 @@ impl AssemblyView {
         // Esc during a triad arrow / ring drag (button held): only the value box goes (live manip-feel-1118 m9).
         if let Some(d) = self.drag.as_mut().filter(|d| d.started && !d.explode && !d.no_box && matches!(d.handle, Some(ManipHandle::Axis(_) | ManipHandle::Ring(_)))) {
             d.no_box = true;
+            cx.notify();
+            return;
+        }
+        // Esc leaves the zoom-window mode (W) first.
+        if self.viewport.read(cx).zoom_window {
+            self.viewport.update(cx, |vp, cx| {
+                vp.zoom_window = false;
+                cx.notify();
+            });
+            self.end_zoom_window_prompt();
             cx.notify();
             return;
         }
@@ -7260,6 +7311,8 @@ impl AssemblyView {
             .on_action(cx.listener(|this, _: &SectionView, window, cx| this.toggle_section(window, cx)))
             .on_action(cx.listener(|this, _: &NamedViews, window, cx| this.toggle_named_views(window, cx)))
             .on_action(cx.listener(|this, _: &ZoomWindow, window, cx| this.on_camera_action(crate::camera_menu::Action::ZoomWindow, window, cx)))
+            .on_action(cx.listener(|this, _: &ViewNormal, _, cx| this.view_normal(cx)))
+            .on_action(cx.listener(|this, _: &HideConstruction, _, cx| this.hide_construction(cx)))
             .on_action(cx.listener(|this, _: &SelectOtherPrevious, _, cx| this.select_other(true, cx)))
             .on_action(cx.listener(|this, _: &FlipPrimaryAxis, window, cx| this.flip_or_reorient(true, window, cx)))
             .on_action(cx.listener(|this, _: &ReorientSecondaryAxis, window, cx| this.flip_or_reorient(false, window, cx)))
