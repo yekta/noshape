@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-19 21:50 UTC (fresh thread 21:10 after the 17:30 usage stall; ids: /root/lead-scratch/p-core-1119.md). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-19 23:20 UTC (fresh thread 21:10 after the 17:30 usage stall; ids: /root/lead-scratch/p-core-1119.md). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
@@ -32,24 +32,19 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   dropped. WIP core-loft branch core-helixcyl 9c5711eab turns a helical sweep's crest/root into exact cylinders (kernel
   T1 a_helical_teeths_crest_and_root_are_cylinders passes, Pappus volume) but OCCT's Boolean of a cylinder face wrapping
   22 turns is invalid (thread::helical_teeth_add_to_the_core): parked. Probes vibex8 ~/tmp/core/nutsrec (ftypes, cylfit).
-- **Wave-washer ring (core-rp branch core-ring5 on main, uncommitted, PROBE dumps marked `// PROBE`):** live2's
-  sections decoded (core-scratch/ring/nat.py): added section = EVERY profile carried along the path by a
-  rotation-minimising frame (double reflection), mixed with NATURAL cubic spline weights over the profiles' arc places
-  (first profile again at the end, s = total); stations at total*i/(N+1) from the first profile, one on a profile
-  dropped. Fits live's sc10 / sc5 / reordered sections to <= 0.06 mm. Code: ring_sections_built (+ place_on_path,
-  wire_reversed, wire_from_arc, natural_spline_weights, wires_mixed), opts.closed in solid_a.rs loft, ts.SetSmoothing
-  (closed), closed solids turned outward. Kernel T1 features::a_loft_round_a_closed_path_mixes_its_sections_from_every_
-  profile passes. Doc: Loft 1 2064.81 vs live 2080.82 mm3 (was 2126.10), 106 ms (was 1453); ringsurf max 2.83 / mean
-  0.45 mm. SECTIONS ARE RIGHT (ringl: each of our 8 section wires within 0.01 mm of live's faces); THE SKIN is off: live's
-  = periodic C2 cubic through the sections at its knots (core-scratch/ring/per.py: 0.0000 mm on its own faces); knots
-  .1722 .2519 .3339 .5 .6702 .7504 .8319 not matched by any chord / arc rule (kn.py, kn2.py); mean corner chord gives
-  0.17 mm max (sc5), rms chord 0.11 (sc10). WIP (22:40): periodic_seam_derivative + natural_loft(..., periodic=true) for
-  closed path lofts (ThruSections iso-parametric unsmoothed first): runs, but the rebuilt solid is INVALID (BRepCheck)
-  -> falls back to OCCT's smoothed one. FOUND (23:0x, vibex8 ~/tmp/core/pcv r5/ringbad-0.brep vs ringl-iso.brep): OCCT's
-  iso closed loft is valid; after natural_loft each face's closed section edge (the seam: first section = last) has BOTH
-  pcurves at v = 1 (should be v = 0 for one use), so the face wire opens (BRepCheck 28 NotClosed). Look at natural_loft's
-  PCurve carry-over (p.forward / p.reversed of closed edges, ~line 3172 in core-rp) and anything touching section edges
-  before it. Then ringsurf the result.
+- **Wave-washer ring: core-rp branch core-ring5 fc8b33664 (committed, NOT landed):** sections = every profile carried by
+  a rotation-minimising frame, mixed with natural-spline weights over the profiles' arc places (first profile again at
+  s = total), stations total*i/(N+1) (core-scratch/ring/nat.py: live's sections to 0.06 mm); skin = natural_loft
+  periodic (periodic_seam_derivative clamps both ends) at chord-length params; ThruSections iso unsmoothed first.
+  Fix inside: natural_loft read a REVERSED face's closed edge pcurves swapped (CurveOnSurface flips, UpdateEdge
+  doesn't): now read on the face taken forward (affects every natural loft with reversed faces: suite pair needed).
+  Doc: 7/7 match, Loft 1 2079.32 vs live 2080.67 mm3, 109 ms (was error / 1453 ms); vs live's faces max 0.163 / mean
+  0.014-0.064 mm (bar 0.1: DECISION ASKED of the lead 23:20). Residual = live's knots (.1722 .2519 .3339 .5 .6702
+  .7504 .8319, asymmetric) vs our chord (.1694 .2506 .3322): rule unknown (kn.py / kn2.py). Kernel T1 features::
+  a_loft_round_a_closed_path_mixes_its_sections_from_every_profile. SUITE PAIR running 23:20 on vibex8: branch
+  ~/tmp/core/g/run-ring5.log, base (core-cache detached at 2f9ab4c4c) run-base5.log; local log
+  /root/core-scratch/ring5-suite.out. Compare SAME-PER-DOC + validity, then g++-13 build, then land if the lead OKs.
+  Probes: vibex8 ~/tmp/core/{ringl,ringsurf,pcv,chk,spar} (src core-scratch/brepq/).
 - **asm isaac (23:00):** Chamfer 2's state line gone, but Ball 7 / Fastened 33 cannot resolve and Fastened 7/8/9/57/79/88 +
   Ball 1 still fail: asm sends Chamfer 2's volume line from a traced current-main run (wait for it, then take it).
   PROBE lines `// PROBE` in features.cpp (nl false / ok valid, ring wires, ringloft dump) to strip before landing.
