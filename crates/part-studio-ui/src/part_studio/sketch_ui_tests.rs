@@ -108,6 +108,11 @@ fn sketch_in(cx: &mut TestAppContext, window: AnyWindowHandle, view: Entity<Part
     // sketch editor comes up with the next frame.
     cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
     draw(cx, window);
+    sketch_in_tool(cx, window, view, tool)
+}
+
+/// `tool` in the open sketch, the canvas focused.
+fn sketch_in_tool(cx: &mut TestAppContext, window: AnyWindowHandle, view: Entity<PartStudioView>, tool: Tool) -> (AnyWindowHandle, Entity<PartStudioView>) {
     cx.update_window(window, |_, w, cx| {
         view.update(cx, |v, cx| v.activate_tool(tool, w, cx));
         let focus = view.read(cx).focus.clone();
@@ -362,6 +367,41 @@ fn a_preselected_face_names_the_sketch_plane_field_by_its_feature(cx: &mut TestA
     wait_until(cx, window, |cx| view.read(cx).sketch.is_some());
     let items = cx.update_window(window, |_, w, cx| view.read(cx).edit.as_ref().map(|e| e.dialog.read(cx).ui_state(w, cx)["fields"][0]["items"].clone())).unwrap();
     assert_eq!(items, Some(serde_json::json!(["Face of Extrude 1"])));
+}
+
+/// Live (sketch-entry-1118, interaction-feel "Drawing on a face"): a rectangle drawn on a face is there, solved, in the
+/// closing click's frame (live shows a light-blue preview for 0.58 s while its server solves), a corner under that
+/// click (the first may snap to the face's edge).
+#[gpui::test]
+fn a_rectangle_drawn_on_a_face_is_solved_in_the_closing_clicks_frame(cx: &mut TestAppContext) {
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "sk-face-rect", Some(starts["block"].clone()));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selection = vec![v.display.bodies[0].face_refs[0].clone()];
+            v.start_feature("sketch", w, cx);
+        });
+    })
+    .unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some());
+    let (window, view) = sketch_in_tool(cx, window, view, Tool::CornerRect);
+    let frame = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().frame);
+    assert!(frame.origin.z.abs() > 1e-6 || frame.normal.z.abs() < 0.5, "the sketch is on the face, not Top: {frame:?}");
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    let corners = cx.update(|cx| {
+        let v = view.read(cx);
+        let (vp, data) = (v.viewport.read(cx), v.sketch_data(cx).unwrap());
+        let lines = data.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).count();
+        let points: Vec<DVec2> = data.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).filter_map(|e| data.sketch.point(e.id)).map(|q| vp.project(frame.to_world(q)).unwrap()).collect();
+        (lines, points, v.pending.is_none())
+    });
+    assert_eq!(corners.0, 4, "four lines");
+    assert!(corners.2, "nothing waits on a regeneration");
+    let at = DVec2::new(650., 400.);
+    assert!(corners.1.iter().any(|p| p.distance(at) < 1.0), "a corner under the closing click: {:?}", corners.1);
 }
 
 /// Live (sketch-open feel, interaction-feel "A new sketch changes nothing on screen"): a new sketch on Top beside the
