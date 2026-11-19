@@ -861,6 +861,23 @@ fn a_sunk_boss_keeps_its_wall_as_live() {
     assert_eq!(r.solids()[0].count(ShapeType::Shell), 3);
 }
 
+/// Fuzz part f815 (metres): an R6 hole through a 45° wall, shelled 0.5 mm inward with the hole's wall removed. The
+/// sloped face's slab, swept along its normal, met the hole obliquely and left a crescent of wall out: 22 faces,
+/// 0.64 mm³ short. Live (live/bool/q-f815): 2720.0509 mm³, 16 faces, the opening through that wall one cylinder face
+/// of 25.282 mm².
+#[test]
+fn an_oblique_hole_s_wall_ends_on_its_cylinder_as_live() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_brep(&dir.join("f815-input.brep")).unwrap();
+    let rm: Vec<Shape> = s.faces().into_iter().filter(|f| (f.area().unwrap() * 1e6 - 560.8285).abs() < 1e-3).collect();
+    assert_eq!(rm.len(), 1);
+    let r = shell_solid(&s, &rm, 0.5e-3, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+    assert!((vol(&r) * 1e9 - 2720.0509).abs() < 0.01, "{} mm³", vol(&r) * 1e9);
+    assert_eq!(r.count(ShapeType::Face), 16);
+    let walls: Vec<f64> = r.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { .. }))).map(|f| f.area().unwrap() * 1e6).collect();
+    assert!(walls.iter().any(|a| (a - 25.282).abs() < 1e-3), "{walls:?}");
+}
+
 /// A user's twisted hexagon vase (11-02): a loft through five regular hexagons on parallel planes, circumradii
 /// 35 / 45 / 40 / 28 / 35 mm at z 0 / 30 / 60 / 90 / 120, each turned 15° more; six B-spline sides with sharp edges
 /// between them, the two hexagon caps.

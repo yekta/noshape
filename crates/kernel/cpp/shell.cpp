@@ -58,6 +58,7 @@
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
+#include <IntAna_QuadQuadGeo.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
 #include <BRepExtrema_TriangleSet.hxx>
@@ -9486,6 +9487,66 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   return ok2;
 }
 
+// Parasolid ends a wall at a removed hole's own cylinder: a planar face's slab, swept along its normal, meets a hole
+// that crosses its plane at an angle obliquely and leaves a crescent of the wall out (fuzz Shell f815832c: an R6 hole
+// through a 45 degree wall; live one cylinder face there, ours 6 faces more and 0.64 mm3 less). For each such removed
+// hole beside `f`: the hole's section of f's plane swept as the slab is, its common with the solid trimmed at the hole.
+std::vector<TopoDS_Shape> oblique_hole_plugs(const TopoDS_Face& f, const ShapeAncMap& ef, const ShapeIMap& rm, double d)
+{
+  std::vector<TopoDS_Shape> out;
+  BRepAdaptor_Surface       fs(f, false);
+  if (fs.GetType() != GeomAbs_Plane)
+    return out;
+  gp_Pnt p;
+  gp_Dir n;
+  if (!inner_point(f, p, n))
+    return out;
+  const gp_Pln pl = fs.Plane();
+  ShapeIMap    seen;
+  for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+  {
+    const int k = ef.FindIndex(x.Current());
+    if (k == 0)
+      continue;
+    for (ShapeList::Iterator it(ef(k)); it.More(); it.Next())
+    {
+      if (!rm.Contains(it.Value()) || seen.Contains(it.Value()))
+        continue;
+      seen.Add(it.Value());
+      const TopoDS_Face&  rf = TopoDS::Face(it.Value());
+      BRepAdaptor_Surface a(rf, false);
+      if (a.GetType() != GeomAbs_Cylinder)
+        continue;
+      const gp_Cylinder cy = a.Cylinder();
+      const double      c  = std::abs(cy.Axis().Direction().Dot(pl.Axis().Direction()));
+      if (c < 1e-3 || c > 1 - 1e-9)
+        continue;
+      // A hole: the removed face's normal toward its axis.
+      const double u = (a.FirstUParameter() + a.LastUParameter()) / 2, v = (a.FirstVParameter() + a.LastVParameter()) / 2;
+      gp_Pnt       q;
+      gp_Vec       du, dv;
+      a.D1(u, v, q, du, dv);
+      gp_Vec nr = du.Crossed(dv);
+      if (rf.Orientation() == TopAbs_REVERSED)
+        nr.Reverse();
+      const gp_Vec to_axis = gp_Vec(q, ElCLib::LineValue(ElCLib::LineParameter(cy.Axis(), q), cy.Axis()));
+      if (nr.Dot(to_axis) <= 0)
+        continue;
+      IntAna_QuadQuadGeo ix(pl, cy, Precision::Angular(), Precision::Confusion());
+      if (!ix.IsDone() || ix.TypeInter() != IntAna_Ellipse || ix.NbSolutions() != 1)
+        continue;
+      const TopoDS_Wire w = BRepBuilderAPI_MakeWire(BRepBuilderAPI_MakeEdge(ix.Ellipse(1)).Edge()).Wire();
+      BRepBuilderAPI_MakeFace mf(pl, w, true);
+      if (!mf.IsDone())
+        continue;
+      BRepPrimAPI_MakePrism mk(mf.Face(), gp_Vec(n) * d);
+      if (mk.IsDone())
+        out.push_back(mk.Shape());
+    }
+  }
+  return out;
+}
+
 // Parasolid bounds an opening's cavity by the removed face's own plane, extended past its edges: a kept face meeting a
 // removed planar face along a concave edge keeps no wall behind that plane (live shell-hang Shell 5: the pocket
 // behind its 45° opening runs on over the face beside it, up to the top's wall, and a wall's thickness past the
@@ -9670,6 +9731,17 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
         try
         {
           s = clip_behind_openings(s, f, ef, rm, t, size, sources);
+        }
+        catch (const Standard_Failure&)
+        {
+        }
+      }
+      if (!s.IsNull() && sign < 0)
+      {
+        try
+        {
+          for (const TopoDS_Shape& plug : oblique_hole_plugs(p, ef, rm, d))
+            tools.Append(plug);
         }
         catch (const Standard_Failure&)
         {
