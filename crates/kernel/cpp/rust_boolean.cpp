@@ -1778,6 +1778,80 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
   std::vector<char> flipped(ne, 0);
   std::vector<EllEdge>     ells(ne);
   Sections                 sections;
+  // (New straight edges in a row, each going on where the one before it ends (a section's pieces between the faces
+  // that cross it): one line for the row, through its ends, each the right way along it, as OCCT's pieces of its
+  // section share its curve; each made through its own ends turned up to 1e-5 rad from the next (its vertices 2e-7
+  // off the line) and the unify left the row in pieces.)
+  std::vector<occ::handle<Geom_Line>> row_line(ne);
+  {
+    auto straight = [&](size_t i) { return r.edge_origin[3 * i] > 1 && b.curves[11 * i] == 0 && b.edges[2 * i] != b.edges[2 * i + 1]; };
+    auto pnt      = [&](uint32_t v) { return point_of(b, v); };
+    std::vector<std::vector<uint32_t>> at(nv);
+    for (size_t i = 0; i < ne; ++i)
+      if (straight(i))
+        for (int k = 0; k < 2; ++k)
+          at[b.edges[2 * i + k]].push_back(static_cast<uint32_t>(i));
+    std::vector<uint32_t> up(ne);
+    for (size_t i = 0; i < ne; ++i)
+      up[i] = static_cast<uint32_t>(i);
+    auto find = [&](uint32_t i) {
+      while (up[i] != i)
+        i = up[i] = up[up[i]];
+      return i;
+    };
+    for (size_t v = 0; v < nv; ++v)
+    {
+      if (at[v].size() != 2)
+        continue;
+      const uint32_t i = at[v][0], j = at[v][1];
+      const gp_Pnt   o = pnt(static_cast<uint32_t>(v));
+      const gp_Pnt   a = pnt(b.edges[2 * i] == v ? b.edges[2 * i + 1] : b.edges[2 * i]);
+      const gp_Pnt   z = pnt(b.edges[2 * j] == v ? b.edges[2 * j + 1] : b.edges[2 * j]);
+      const gp_Vec   da(o, a), dz(o, z);
+      if (da.Magnitude() < 1e-12 || dz.Magnitude() < 1e-12 || da.Dot(dz) >= 0 || da.Crossed(dz).Magnitude() > 1e-5 * da.Magnitude() * dz.Magnitude())
+        continue;
+      up[find(i)] = find(j);
+    }
+    std::map<uint32_t, std::vector<uint32_t>> rows;
+    for (size_t i = 0; i < ne; ++i)
+      if (straight(i))
+        rows[find(static_cast<uint32_t>(i))].push_back(static_cast<uint32_t>(i));
+    for (const auto& [root, row] : rows)
+    {
+      if (row.size() < 2)
+        continue;
+      // Its ends: the two vertices farthest apart along the first piece's way.
+      const gp_Pnt a0 = pnt(b.edges[2 * row[0]]);
+      const gp_Dir d0(gp_Vec(a0, pnt(b.edges[2 * row[0] + 1])));
+      gp_Pnt lo = a0, hi = a0;
+      double tl = 0, th = 0;
+      for (const uint32_t e : row)
+        for (int k = 0; k < 2; ++k)
+        {
+          const gp_Pnt q = pnt(b.edges[2 * e + k]);
+          const double t = gp_Vec(a0, q).Dot(gp_Vec(d0));
+          if (t < tl)
+            tl = t, lo = q;
+          if (t > th)
+            th = t, hi = q;
+        }
+      if (lo.Distance(hi) < 1e-9)
+        continue;
+      const gp_Lin line(lo, gp_Dir(gp_Vec(lo, hi)));
+      bool         on = true;
+      for (const uint32_t e : row)
+        for (int k = 0; k < 2; ++k)
+        {
+          const uint32_t v = b.edges[2 * e + k];
+          on = on && line.Distance(pnt(v)) <= BRep_Tool::Tolerance(vs[v]);
+        }
+      if (!on)
+        continue;
+      const occ::handle<Geom_Line> fwd = new Geom_Line(line), back = new Geom_Line(gp_Lin(lo, line.Direction().Reversed()));
+      for (const uint32_t e : row)
+        row_line[e] = gp_Vec(pnt(b.edges[2 * e]), pnt(b.edges[2 * e + 1])).Dot(gp_Vec(line.Direction())) > 0 ? fwd : back;
+    }
+  }
   // (Each loop checks the cancel every 256: the 45 / 45 knurl's result took over a second to build after it.)
   for (size_t i = 0; i < ne; ++i)
   {
@@ -1828,7 +1902,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
         at1 = l;
     }
     else if (cv[0] == 0)
-      c = new Geom_Line(p0, gp_Dir(gp_Vec(p0, p1)));
+      c = row_line[i].IsNull() ? occ::handle<Geom_Curve>(new Geom_Line(p0, gp_Dir(gp_Vec(p0, p1)))) : occ::handle<Geom_Curve>(row_line[i]);
     else if (cv[0] == 5)
     {
       // A piece of OCCT's section of a free-form face (as an ellipse's: its curve, its curves on the faces).

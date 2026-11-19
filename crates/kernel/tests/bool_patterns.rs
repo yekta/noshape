@@ -962,6 +962,22 @@ fn a_spheres_octant_through_its_pole_as_occt() {
     as_recorded("cdd336b4ea3c7cca");
 }
 
+/// A Shell's fuse of its slabs (recorded, seed 3000-3029 fuzz): a slab's side meets a cylinder along two rulings that
+/// the other slabs' faces cut in four. Each piece was a line through its own ends (2e-7 off the ruling, turned up to
+/// 1e-5 rad from the next), so the model's unify left each ruling in four; one line for the row, as OCCT's: unified,
+/// OCCT's 11 faces and 24 edges.
+#[test]
+fn a_rulings_pieces_unify_into_one_edge_as_occt() {
+    as_recorded("2ea446eed7c25a01");
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "2ea446eed7c25a01").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    k::set_rust_boolean_only(false);
+    let u = k::unify_same_domain(&r.expect("noshape's Boolean").shape).expect("unified").shape;
+    assert_eq!([u.count(k::ShapeType::Face), u.count(k::ShapeType::Edge)], [11, 24]);
+}
+
 /// prize-wheel-tim's fuse of three tools with flats at x ±1.2 mm into the hub under its sphere knob (recorded): OCCT's
 /// result. The sphere's sections by the flats lie outside the sphere's face: the two faces' parts of a section were
 /// apart, and an edge was made backwards between their ends (a 0.2 mm arc splitting a flat; "no point inside a face
