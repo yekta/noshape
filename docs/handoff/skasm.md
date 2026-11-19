@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 06:23 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 07:04 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -45,25 +45,21 @@ quadrant's snap wakes no alignment source (ours aligns with points only).
 ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
 Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six on green.
 
-## State 06:23 (11-19)
-- Landed: 373dd5b9, 48626728 (REGION-PICK), 4104b148 (5686f670), 24792169 (29bf3dcb). Suite E = A (90/126, 1325/1585).
-- QUEUED faa5f7b1: flat view orientation (qa session-sm-1119 step 8): custom host `flat_place` takes std's "up" (pcbEnd's
-  hold plane: the fixed face's normal with Flip direction up, else reversed, x kept; `Definition::flip_up`). Fits qa's
-  live shot (thickened plate, flip off: as seen from Top), c2-sm-louver SM model 2 (flip on: flat face S2E6G at +2.032
-  facing +z) and 2468's probes (flip on). Thickened-up flat now z -t..0; tests: model T2
-  `a_thickened_plates_flat_lies_by_its_up_side`, e2e `a_sketch_on_the_sheet_metal_flat`, UI `a_sketch_on_the_flat_...`.
-  Live confirmed (REQUESTS 05:10, live/skasm/q-thicken-flat-1119): up y 0..78.56 z -2..0; thickened down mirrored, z 0..2.
-- LOCAL 42b253d43 (lead P1 for core's ring branch): wave-washer Sketch 4. Solver `carried_onto_anchors`: a failed
-  solve whose Coincidents tie free points to far fixed points moves each piece rigidly onto them, kept if everything
-  then holds (test `a_held_rectangle_slides_onto_a_far_anchor`). Translator: model Coincidents after the sketch's own
-  constraints and dimensions (`constraints(.., anchors)`). Sketch 4 = live's solved points (TRACE "off live's solved
-  points"). Sketch fuzz T2, ops, scene pass. Suite F on vibe2 (/root/skasm-scratch/suitef.out ->
-  ~/agents/skasm-keep/suite-F-*.log): compare per document with E, then land. Loft 1 still errors (core's).
+## State 07:04 (11-19)
+- Landed: 373dd5b9, 48626728 (REGION-PICK), 4104b148 (5686f670), 24792169 (29bf3dcb), dceaee62 (faa5f7b1: flat view
+  by the model's up side, std pcbEnd's hold plane; live confirmed both cases, REQUESTS 05:10, live/skasm/q-thicken-flat-1119).
+- QUEUED 08511fa7 (07:0x): wave-washer Sketch 4 (lead P1 for core's ring branch): solver `carried_onto_anchors` (a
+  failed solve whose Coincidents tie free points to far fixed ones moves each piece rigidly, kept when everything then
+  holds; test `a_held_rectangle_slides_onto_a_far_anchor`); translator: model Coincidents after the sketch's own
+  constraints and dimensions (`constraints(.., anchors)`), but a Coincident to geometry live lost (empty query) pins in
+  order (clamp-guillem Boceto 6). Sketch 4 = live's solved points; Loft 1 still errors (core's). Suite F (before the
+  clamp fix) 91/126, 1335/1585 vs E 90 / 1325: surf-workshop bezier 6/6, boundary 7/7, cpcurves 9, mutualtrim 7, split
+  11 (boundary / split: Sketch 1 / 2's anchors no longer taken back); clamp-guillem fixed after (25/25 alone).
+  Also: a line across a held line, both ends clear, is Vertical (live retake 06:47 of 1866's crossing; row 67 fixed).
 - Open: Part grid's two PATTERN spacing dims stay driven (live driving): pattern links + shared corners make them
   redundant in ours.
 - welding Sketch 12: ours = live's geometry; its 2 PROJECTED are live's split Use (`.orphan` USE_END + MIDPOINT);
   translator could Use + split + point Use of the far vertex (low value).
-- Asked live: retake 1866's crossing case (a line across a held line, both ends clear -> Perpendicular?).
 - Waiting on live: rocker-enclosure sketches.json (REQUESTS 02:20); rechecks of sketch keys, errors 82-85.
 
 ## Form speed P0 (closed 17:4x): no regression; live2's app A/B overlaps (A 2.3–4.0 s, B 2.9–3.4 s, by load); model
