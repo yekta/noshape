@@ -515,6 +515,8 @@ pub struct DrawingEditor {
     /// midpoints, woken by approaching the edge and kept while the tool is
     /// active (live request 1662 (b); sheet mm).
     pub woken_plus: Vec<[f64; 2]>,
+    /// Dimension tool: where the picked circle was clicked (sheet mm; its hourglass mark).
+    pub dim_circle_spot: Option<[f64; 2]>,
     /// Sketch tools: endpoints hovered so far (SK8: the cursor aligns with
     /// them along red dotted inference lines).
     pub woken_points: Vec<[f64; 2]>,
@@ -823,6 +825,7 @@ impl DrawingEditor {
             custom_tables: Default::default(),
             woken_centers: Vec::new(),
             woken_plus: Vec::new(),
+            dim_circle_spot: None,
             woken_points: Vec::new(),
             datum_on: None,
             datum_at: None,
@@ -1356,6 +1359,7 @@ impl DrawingEditor {
             let all = noshape_model::drawing::sheet::ColorSpan { lines: 0..g.lines.len(), texts: 0..g.texts.len(), fills: 0..g.fills.len(), rgb: [255, 255, 255] };
             g.colors.insert(0, all);
         }
+        self.bold_placed(&mut built, &d, si);
         self.built = Some(Arc::new(built));
         self.geometry_dirty = true;
         self.sync_shaded(cx);
@@ -1701,7 +1705,11 @@ impl DrawingEditor {
             // and so does a selected datum (push_datum_selection).
             let datums: Vec<u32> = self.datum_selection_picks().into_iter().chain(self.hole_callout_selection_picks()).collect();
             // A table's ink stays black: its look is a grey fill and a tan frame (push_table_looks).
-            for s in self.selection.iter().chain(self.panel_highlight.iter()).chain(self.lit_tool_edge().iter()).filter(|s| !matches!(s, Sel::ViewLabel(_) | Sel::Table(_))) {
+            // A dimension just placed with the Dimension tool on is drawn bold, not orange (bold_placed; live2 drw-tools-1119).
+            let placing = matches!(self.tool, Tool::Dimension { .. });
+            // An annotation being dragged is drawn plain black (live2 drw-tools-1119 dt).
+            let dragged = self.dragging_annotation_id();
+            for s in self.selection.iter().chain(self.panel_highlight.iter()).chain(self.lit_tool_edge().iter()).filter(|s| !matches!(s, Sel::ViewLabel(_) | Sel::Table(_)) && !(placing && matches!(s, Sel::Annotation(_))) && dragged.is_none_or(|d| **s != Sel::Annotation(d))) {
                 for p in self.picks_of(*s).into_iter().filter(|p| !datums.contains(p)) {
                     scene.add_flag(p, state::SELECTED);
                 }
@@ -1713,7 +1721,7 @@ impl DrawingEditor {
                     scene.add_flag(p as u32, state::SELECTED);
                 }
             }
-            if let Some(h) = self.hover {
+            if let Some(h) = self.hover.filter(|h| dragged.is_none_or(|d| self.sel_of_pick(*h) != Some(Sel::Annotation(d)))) {
                 let single = self.tool_picks_edges();
                 match self.sel_of_pick(h) {
                     // Onshape (drawing/14): a hovered annotation turns tan with
@@ -1724,6 +1732,8 @@ impl DrawingEditor {
                     // Hovered labels and indicators show their dots only.
                     Some(Sel::ViewLabel(_) | Sel::AuxIndicator(_)) if !single => {}
                     Some(Sel::Table(_)) if matches!(self.tool, Tool::Select) => {}
+                    // The Dimension tool on a vertex: the disc alone, its edge not lit (live2 drw-tools-1119 p2p).
+                    _ if placing && self.hover_snap.is_some() => {}
                     _ => {
                         let group = if single { vec![h] } else { self.sel_of_pick(h).map(|s| self.picks_of(s)).unwrap_or_else(|| vec![h]) };
                         for p in group {
@@ -1733,6 +1743,7 @@ impl DrawingEditor {
                 }
             }
             self.push_view_frames(&mut scene);
+            self.push_cut_line_hover(&mut scene);
             self.push_placing_frame(&mut scene);
             self.push_table_looks(&mut scene);
             // The hovered / selected annotations' referenced edges (blue) and
@@ -1746,6 +1757,14 @@ impl DrawingEditor {
             self.push_aux_states(&mut scene);
         }
         scene
+    }
+
+    /// The annotation a drag is moving.
+    pub(crate) fn dragging_annotation_id(&self) -> Option<u64> {
+        match &self.drag {
+            Drag::MoveAnnotation { orig, .. } => Some(orig.id),
+            _ => None,
+        }
     }
 
     /// The drawing's render style: the gray area round the sheet and Onshape's drawing highlight colours.
@@ -1826,14 +1845,57 @@ impl DrawingEditor {
         scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
     }
 
+    /// The section view whose cutting line is under the pointer.
+    pub(crate) fn hovered_cut_line(&self) -> Option<ViewId> {
+        match self.built.as_ref()?.picks.get(self.hover? as usize)? {
+            PickTarget::SectionLine(v) => Some(*v),
+            _ => None,
+        }
+    }
+
+    /// A hovered cutting line (Select): drawn tan, 10 px orange grips at its ends, its cut points light blue (live2
+    /// drw-tools-1119 sl.png).
+    fn push_cut_line_hover(&self, scene: &mut Scene) {
+        use noshape_render::{LineSegment, PointData, PointSprite};
+        let (Some(v), Some(b)) = (self.hovered_cut_line().filter(|_| matches!(self.tool, Tool::Select)), self.built.as_ref()) else { return };
+        let mut grips = PointData::default();
+        let mut dot = |p: [f64; 2], color: [u8; 4], size: f32| grips.points.push(PointSprite { position: [p[0] as f32, p[1] as f32, 0.75], color, pick_id: 0, size, style: LineSegment::ON_TOP, _pad: 0 });
+        for (i, t) in b.picks.iter().enumerate() {
+            if *t == PickTarget::SectionLine(v) {
+                scene.add_flag(i as u32, state::HOVER);
+            }
+        }
+        let line = b.geometry.lines.iter().filter(|l| matches!(b.picks.get(l.pick as usize), Some(PickTarget::SectionLine(x)) if *x == v)).max_by(|l, m| {
+            let len = |pts: &[[f64; 2]]| pts.windows(2).map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])).sum::<f64>();
+            len(&l.points).total_cmp(&len(&m.points))
+        });
+        if let Some(l) = line
+            && let (Some(a), Some(z)) = (l.points.first(), l.points.last())
+        {
+            dot(*a, [0xcc, 0x92, 0x5c, 255], 10.0);
+            dot(*z, [0xcc, 0x92, 0x5c, 255], 10.0);
+        }
+        let drawn = &b.resolved;
+        if let (Some(pts), Some(pl)) = (drawn.section_points(v), drawn.parent_of(v).and_then(|p| self.placement(p))) {
+            for p in pts {
+                dot(pl.to_sheet(p), [0x90, 0xce, 0xf1, 255], 10.0);
+            }
+        }
+        let up = self.gpu.uploader();
+        scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&grips))).per_primitive_color().unpickable().layer(23));
+    }
+
     /// The views framed now and the frame's colour: the hovered one tan, the other selected ones orange.
     pub(crate) fn view_frames(&self) -> Vec<(ViewId, u32)> {
-        let select = matches!(self.tool, Tool::Select);
+        // (The Hatch region dialog frames no view: live2 drw-tools-1119 hc.png.)
+        let select = matches!(self.tool, Tool::Select) && self.hatch_dlg.is_none();
         let hovered = self.hover.and_then(|h| self.sel_of_pick(h)).and_then(|s| match s {
             Sel::View(v) | Sel::Edge(v, _) if select => Some(v),
             _ => None,
         });
-        let mut frames: Vec<(ViewId, u32)> = hovered.map(|v| (v, DRAWING_HOVER)).into_iter().collect();
+        // A hovered cutting line frames its section view light blue (live2 drw-tools-1119 sl.png).
+        let colour = if select && self.hovered_cut_line().is_some() { 0x90cef1 } else { DRAWING_HOVER };
+        let mut frames: Vec<(ViewId, u32)> = hovered.map(|v| (v, colour)).into_iter().collect();
         for s in &self.selection {
             if let Sel::View(v) = s
                 && Some(*v) != hovered

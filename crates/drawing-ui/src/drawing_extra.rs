@@ -1501,16 +1501,20 @@ impl DrawingEditor {
                 Some(Drag::MoveBreak { view, index, start, orig })
             }
             PickTarget::SectionLine(v) => {
-                self.selection = vec![Sel::View(v)];
                 // A line following its model point is dragged where it is
                 // drawn (live 1625).
                 let drawn = self.built.as_ref().map(|b| &b.resolved).filter(|s| s.view(v).is_some()).unwrap_or(sheet);
-                self.cut_drag = Some((v, drawn.view(v).is_some_and(|x| x.cut_lost), drawn.section_points(v).unwrap_or_default()));
                 // Near a point of the line: move that point only.
                 if let Some(index) = self.section_point_at(v, start) {
+                    self.selection = vec![Sel::View(v)];
+                    self.cut_drag = Some((v, drawn.view(v).is_some_and(|x| x.cut_lost), drawn.section_points(v).unwrap_or_default()));
                     return Some(Drag::MoveSectionPoint { view: v, index, orig: drawn.section_points(v)? });
                 }
-                Some(Drag::MoveSectionLine { view: v, start, orig: drawn.view(v)?.kind.clone() })
+                // The line's body: the press selects the parent view and nothing moves (live2 drw-tools-1119).
+                if let Some(p) = sheet.parent_of(v) {
+                    self.selection = vec![Sel::View(p)];
+                }
+                Some(Drag::None)
             }
             PickTarget::AuxIndicator(v) => {
                 let grip = self.aux_grip_at(v, start)?;

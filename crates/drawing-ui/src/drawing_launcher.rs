@@ -32,7 +32,7 @@ impl DrawingEditor {
     /// last one selected (live request 1744: one launcher serves the
     /// selection) and whether they are callouts.
     fn launcher_dimension(&self) -> Option<(u64, bool)> {
-        if self.palette.is_some() || self.selection.is_empty() {
+        if self.palette.is_some() || self.selection.is_empty() || self.dragging_annotation_id().is_some() {
             return None;
         }
         let sheet = self.current_sheet();

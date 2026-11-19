@@ -278,25 +278,6 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    /// The dialog's profiles on the sheet (for the reference-blue outline).
-    pub fn hatch_profile_outlines(&self) -> Vec<Vec<[f64; 2]>> {
-        let Some(d) = &self.hatch_dlg else { return vec![] };
-        let mut out = Vec::new();
-        for ((outer, holes), view) in &d.profiles {
-            let pl = view.and_then(|v| self.placement(v));
-            let map = |l: &Vec<[f64; 2]>| -> Vec<[f64; 2]> {
-                let mut v: Vec<[f64; 2]> = l.iter().map(|p| pl.as_ref().map_or(*p, |pl| pl.to_sheet(*p))).collect();
-                if let Some(f) = v.first().copied() {
-                    v.push(f);
-                }
-                v
-            };
-            out.push(map(outer));
-            out.extend(holes.iter().map(map));
-        }
-        out
-    }
-
     fn accept_hatch(&mut self, cx: &mut Context<Self>) {
         // Edit hatch section...: the picked regions take the style.
         if let Some(dr) = self.section_hatched(false, cx) {

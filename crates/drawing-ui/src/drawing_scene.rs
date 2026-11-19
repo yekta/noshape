@@ -286,7 +286,7 @@ pub fn quad(x0: f64, y0: f64, x1: f64, y1: f64, z: f32) -> MeshData {
 }
 
 // The tool overlay is GUI-free (shared with the agent API).
-pub use noshape_scene::drawing_tools::{Overlay, SnapMark};
+pub use noshape_scene::drawing_tools::{Overlay, SnapMark, SNAP_DISC_PX, SNAP_DISC_RGB};
 
 #[cfg(test)]
 mod tests {

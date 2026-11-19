@@ -180,10 +180,9 @@ impl DrawingEditor {
 
     pub fn push_related_highlights(&self, scene: &mut Scene) {
         let Some(b) = &self.built else { return };
-        // The Hatch region dialog's closed profiles and the selected hatch
-        // regions: a yellow outline with a pale halo (live request 1682,
-        // "the yellow surround").
-        let mut outlines = self.hatch_profile_outlines();
+        // The selected hatch regions: a yellow outline with a pale halo (live request 1682, "the yellow surround"); the
+        // Hatch region dialog's picked profiles have none (live2 drw-tools-1119 hc.png).
+        let mut outlines: Vec<Vec<[f64; 2]>> = Vec::new();
         let sheet = self.current_sheet();
         for h in self.selection.iter().filter_map(|s| if let Sel::Hatch(id) = s { sheet.sketch.hatches.iter().find(|h| h.id == *id) } else { None }) {
             let pl = h.view.and_then(|v| self.placement(v));
@@ -220,8 +219,22 @@ impl DrawingEditor {
             let up = self.gpu.uploader();
             scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
         }
-        let mut anns: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(a) = s { Some(*a) } else { None }).collect();
-        if let Some(Sel::Annotation(a)) = self.hover.and_then(|h| self.sel_of_pick(h)) {
+        let dragged = self.dragging_annotation_id();
+        let mut anns: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(a) = s { Some(*a) } else { None }).filter(|a| Some(*a) != dragged).collect();
+        // A dimension just placed with the tool still on keeps the snap discs on its points, no blue (live2
+        // drw-tools-1119 p2p).
+        if matches!(self.tool, Tool::Dimension { .. }) {
+            let discs: Vec<[f64; 2]> = anns.drain(..).flat_map(|a| self.reference_vertex_points(a)).collect();
+            if !discs.is_empty() {
+                let mut data = PointData::default();
+                for p in discs {
+                    data.points.push(PointSprite { position: [p[0] as f32, p[1] as f32, 0.65], color: drawing_scene::SNAP_DISC_RGB, pick_id: 0, size: drawing_scene::SNAP_DISC_PX, style: LineSegment::ON_TOP, _pad: 0 });
+                }
+                let up = self.gpu.uploader();
+                scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&data))).per_primitive_color().unpickable().layer(18));
+            }
+        }
+        if let Some(Sel::Annotation(a)) = self.hover.and_then(|h| self.sel_of_pick(h)).filter(|s| dragged.is_none_or(|d| *s != Sel::Annotation(d))) {
             anns.push(a);
         }
         let (row_callouts, row_geometry) = self.table_row_highlight();
@@ -292,5 +305,29 @@ impl DrawingEditor {
                 }
             }
         }
+    }
+
+    /// Placing with the Dimension tool: the dimension being placed and the one just placed (selected) draw their text
+    /// bold (live2 drw-tools-1119: p2p, dimg).
+    pub(crate) fn bold_placed(&self, built: &mut noshape_model::drawing::build::BuiltSheet, shown: &noshape_model::drawing::Drawing, si: usize) {
+        use noshape_model::drawing::sheet::{FontSpan, TextFont, DRAWING_DEFAULT_FONT};
+        if !matches!(self.tool, Tool::Dimension { .. }) {
+            return;
+        }
+        let committed = self.drawing.sheets.get(si);
+        let new = shown.sheets.get(si).into_iter().flat_map(|s| s.annotations.iter()).filter(|a| committed.is_none_or(|c| !c.annotations.iter().any(|x| x.id == a.id))).map(|a| a.id);
+        let ids: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(a) = s { Some(*a) } else { None }).chain(new).collect();
+        if ids.is_empty() {
+            return;
+        }
+        let g = &mut built.geometry;
+        let spans: Vec<FontSpan> = (0..g.texts.len())
+            .filter(|&i| matches!(built.picks.get(g.texts[i].pick as usize), Some(PickTarget::Annotation(id)) if ids.contains(id)))
+            .map(|i| {
+                let font = g.text_font(i).cloned().unwrap_or_else(|| TextFont { family: DRAWING_DEFAULT_FONT.into(), bold: false, italic: false });
+                FontSpan { texts: i..i + 1, font: TextFont { bold: true, ..font } }
+            })
+            .collect();
+        g.fonts.extend(spans);
     }
 }

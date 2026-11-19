@@ -23,7 +23,7 @@ pub mod replicate;
 pub mod view_edit;
 
 pub use commit::*;
-pub use overlay::{Overlay, SnapMark};
+pub use overlay::{Overlay, SnapMark, SNAP_DISC_PX, SNAP_DISC_RGB};
 pub use jog::{AutoArm, CentermarkArms, seg_dist};
 pub use annotation_edit::LeaderHit;
 pub use opts::*;

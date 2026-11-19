@@ -370,7 +370,9 @@ impl DrawingEditor {
             Tool::Sketch { tool: dt::SkTool::SplinePoint | dt::SkTool::Trim, .. } => Vec::new(),
             Tool::Sketch { .. } => sheet.sketch.sketch.entities().map(|e| e.id.0).filter(|&id| id > entities).map(Sel::Sketch).collect(),
             // (And a hole callout: live2 drw-hcallout-override s7, its text read lit in Top after Esc.)
+            // (And a note committed with ✓: live2 drw-tools-1119 rad-note, its grips after Esc.)
             Tool::Dimension { kind: DimTool::MaxMin | DimTool::Angle | DimTool::Angle3 | DimTool::Radius, .. } | Tool::HoleCallout { .. } => sheet.annotations.iter().filter(|a| a.id > annotations).map(|a| Sel::Annotation(a.id)).collect(),
+            Tool::Note => sheet.annotations.iter().filter(|a| a.id > annotations && matches!(a.kind, AnnotationKind::Note { .. })).map(|a| Sel::Annotation(a.id)).collect(),
             _ => Vec::new(),
         }
     }
@@ -687,17 +689,19 @@ impl DrawingEditor {
         // Dimension tool: the hovered circular edge shows its center mark (an
         // orange center snap with a small cross) only while hovered (live,
         // qa DWG-DIM-HOVER-STAYS: they piled up hover by hover).
+        // (Radial / diameter: no centre dot; live2 drw-tools-1119 rad-note r-hover.)
         self.woken_centers.clear();
-        if matches!(self.tool, Tool::Dimension { .. })
+        if matches!(self.tool, Tool::Dimension { kind, .. } if !matches!(kind, DimTool::Radius | DimTool::Diameter))
             && let Some((view, me)) = self.hovered_edge()
             && let views::EdgeGeom::Circle { center, .. } = me.geom
             && !self.woken_centers.contains(&(view, center))
         {
             self.woken_centers.push((view, center));
         }
-        // Approaching a straight edge (live request 1662 (b)): "+" marks at
-        // its near end and its midpoint, kept while the tool is active.
+        // Approaching a straight edge with Shift+Q's midpoints on (live request 1662 (b)): "+" marks at its near end and
+        // its midpoint, kept while the tool is active; without Shift+Q nothing (live2 drw-tools-1119).
         if matches!(self.tool, Tool::Dimension { .. })
+            && self.snap_mid_quad
             && let Some((view, me)) = self.hovered_edge()
             && let views::EdgeGeom::Line { a, b } = me.geom
             && let Some(pl) = self.placement(view)
@@ -758,12 +762,21 @@ impl DrawingEditor {
                 {
                     overlay.lines.push((vec![sa, self.hover_snap.unwrap_or(c)], true));
                 }
+                // A circle's pick spot: a red-orange hourglass, 13 px (live2 drw-tools-1119 rad-note r-picked).
+                if let Some(p) = self.dim_circle_spot.filter(|_| picks.iter().any(|p| matches!(p, Pick::Circle { .. } | Pick::CircleAt { .. }))) {
+                    const HOURGLASS: [u8; 4] = [255, 89, 0, 255];
+                    let h = self.tol_mm(6.5);
+                    overlay.tinted.push((vec![[p[0] - h, p[1] + h], [p[0] + h, p[1] + h], [p[0] - h, p[1] - h], [p[0] + h, p[1] - h], [p[0] - h, p[1] + h]], HOURGLASS, 1.5));
+                }
+                // Picked points keep the snap disc, picked edges the selection orange (live2 drw-tools-1119: p2p, dimg).
+                const PICKED: [u8; 4] = [0xcc, 0x92, 0x5c, 255];
+                let lit = LIT_LINE_PX;
                 for p in picks {
                     match p {
-                        Pick::Point(a) => overlay.points.extend(self.pick_sheet(a)),
+                        Pick::Point(a) => overlay.marks.extend(self.pick_sheet(a).map(|p| (p, crate::drawing_scene::SnapMark::Disc, 0.0))),
                         Pick::Line { a, b } => {
                             if let (Some(sa), Some(sb)) = (self.pick_sheet(a), self.pick_sheet(b)) {
-                                overlay.lines.push((vec![sa, sb], false));
+                                overlay.tinted.push((vec![sa, sb], PICKED, lit));
                             }
                         }
                         // A picked arc shows as itself, not its whole circle
@@ -780,12 +793,17 @@ impl DrawingEditor {
                                     let t = t0 + sweep * i as f64 / 48.0;
                                     [c[0] + r * t.cos(), c[1] + r * t.sin()]
                                 });
-                                overlay.lines.push((pts.collect(), false));
+                                overlay.tinted.push((pts.collect(), PICKED, lit));
                             }
                         }
                         Pick::Circle { view, center, radius, .. } | Pick::CircleAt { view, center, radius, .. } => {
                             if let Some(pl) = self.placement(*view) {
-                                overlay.circle(pl.to_sheet(*center), pl.len_to_sheet(*radius), false);
+                                let (c, r) = (pl.to_sheet(*center), pl.len_to_sheet(*radius));
+                                let pts = (0..=72).map(|i| {
+                                    let t = i as f64 / 72.0 * std::f64::consts::TAU;
+                                    [c[0] + r * t.cos(), c[1] + r * t.sin()]
+                                });
+                                overlay.tinted.push((pts.collect(), PICKED, lit));
                             }
                         }
                     }
@@ -809,7 +827,13 @@ impl DrawingEditor {
                     overlay.lines.push((pts, true));
                 }
             }
-            Tool::EdgeCenterline { first: Some((a, b)) } | Tool::VirtualSharp { first: Some((a, b, _)) } => {
+            // The first edge stays lit tan, no centerline previewed (live2 drw-tools-1119 hc.png).
+            Tool::EdgeCenterline { first: Some((a, b)) } => {
+                if let (Some(sa), Some(sb)) = (self.pick_sheet(a), self.pick_sheet(b)) {
+                    overlay.tinted.push((vec![sa, sb], [0xcc, 0xb2, 0x92, 255], LIT_LINE_PX));
+                }
+            }
+            Tool::VirtualSharp { first: Some((a, b, _)) } => {
                 if let (Some(sa), Some(sb)) = (self.pick_sheet(a), self.pick_sheet(b)) {
                     overlay.lines.push((vec![sa, sb], false));
                 }
@@ -1176,12 +1200,23 @@ impl DrawingEditor {
                 if !more && let Some(a) = self.pending_annotation() {
                     // Chamfer, Dimensions style: the two legs as linear dimensions.
                     let anns = self.chamfer_as_dimensions(&a).unwrap_or_else(|| vec![a]);
+                    // The new dimension stays selected, bold, its "±0.1" launcher above it (live2 drw-tools-1119).
+                    let placed: Vec<Sel> = anns.iter().map(|a| Sel::Annotation(a.id)).collect();
                     self.edit_sheet(kind.name(), cx, |s| s.annotations.extend(anns));
+                    self.selection = placed;
                     self.tool = Tool::Dimension { kind, picks: vec![] };
                 } else {
+                    // The next dimension started: the one placed before is let go.
+                    if picks.is_empty() {
+                        self.selection.retain(|s| !matches!(s, Sel::Annotation(_)));
+                    }
+                    let had = picks.len();
                     match kind {
                         DimTool::MaxMin | DimTool::Foreshorten => self.more_dimension_pick(kind, &mut picks),
                         _ => self.pk().dimension_click(kind, c, &mut picks),
+                    }
+                    if picks.len() > had && matches!(picks.last(), Some(Pick::Circle { .. } | Pick::CircleAt { .. })) {
+                        self.dim_circle_spot = Some(c);
                     }
                     self.tool = Tool::Dimension { kind, picks };
                 }
@@ -1210,6 +1245,7 @@ impl DrawingEditor {
                         Some((p, q)) => {
                             let id = self.current_sheet().next_annotation_id();
                             self.edit_sheet("Edge to edge centerline", cx, |s| s.annotations.push(dt::edge_centerline(id, a.view, p, q, c)));
+                            self.selection = vec![Sel::Annotation(id)];
                         }
                         None => self.tool = Tool::EdgeCenterline { first: Some((a, b)) },
                     },
@@ -1222,6 +1258,8 @@ impl DrawingEditor {
                         let (p, q) = dt::edge_pair_centerline(a1.p, b1.p, a.p, b.p);
                         let id = self.current_sheet().next_annotation_id();
                         self.edit_sheet("Edge to edge centerline", cx, |s| s.annotations.push(dt::edge_centerline(id, a.view, p, q, c)));
+                        // The new centerline stays selected, its grips blue (live2 drw-tools-1119 hc.png).
+                        self.selection = vec![Sel::Annotation(id)];
                         self.tool = Tool::EdgeCenterline { first: None };
                     }
                 }
@@ -1637,8 +1675,11 @@ impl DrawingEditor {
                     // Placing a dimension or annotation: align with the others
                     // (Shift turns inferencing off).
                     self.infer_lines.clear();
-                    if !e.modifiers.shift && (self.pending_annotation().is_some() || self.placing_note() || self.placing_gdt()) {
-                        self.wake_point_at_cursor();
+                    if !e.modifiers.shift && ((self.pending_annotation().is_some() && !self.dimension_picking()) || self.placing_note() || self.placing_gdt()) {
+                        // (A dimension being placed wakes no point: live2 drw-tools-1119, no ✕.)
+                        if self.placing_note() || self.placing_gdt() {
+                            self.wake_point_at_cursor();
+                        }
                         self.infer_placement(None);
                     } else if !e.modifiers.shift && self.placing_table() {
                         self.infer_table_placement();
@@ -1749,6 +1790,14 @@ impl DrawingEditor {
         }
     }
 
+    /// The Dimension tool still taking picks at the pointer (the click adds one, not places): no placement alignment.
+    fn dimension_picking(&self) -> bool {
+        match &self.tool {
+            Tool::Dimension { kind, picks } => self.pk().dimension_takes_more(*kind, self.cursor, picks),
+            _ => false,
+        }
+    }
+
     /// A new geometric tolerance's frame on the pointer (its panel open, not editing one).
     fn placing_gdt(&self) -> bool {
         matches!(self.tool, Tool::Gdt) && self.gdt_dlg.as_ref().is_some_and(|d| d.edit.is_none())
@@ -1810,7 +1859,7 @@ impl DrawingEditor {
         }
         // Placement inference also applies to the click that places.
         self.infer_lines.clear();
-        if e.button == MouseButton::Left && !e.modifiers.shift && matches!(self.drag, Drag::Pending { .. }) && !matches!(self.tool, Tool::Select) && (self.pending_annotation().is_some() || self.placing_note() || self.placing_gdt()) {
+        if e.button == MouseButton::Left && !e.modifiers.shift && matches!(self.drag, Drag::Pending { .. }) && !matches!(self.tool, Tool::Select) && ((self.pending_annotation().is_some() && !self.dimension_picking()) || self.placing_note() || self.placing_gdt()) {
             self.infer_placement(None);
             self.infer_lines.clear();
         } else if e.button == MouseButton::Left && !e.modifiers.shift && matches!(self.drag, Drag::Pending { .. }) && self.placing_table() {

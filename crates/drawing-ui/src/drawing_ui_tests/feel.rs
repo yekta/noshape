@@ -2215,3 +2215,153 @@ fn dimensioning_a_circle_seen_edge_on_measures_it_as_a_line(cx: &mut TestAppCont
         assert!(matches!(pick_with(cx, face_on).0, Some(Pick::Circle { .. })), "face-on: its diameter");
     }
 }
+
+/// Live2 drw-tools-1119 (p2p.png, dt.png): the 2 point dimension tool on a vertex shows the disc alone (its edge not
+/// lit), wakes no "+" marks along the edges without Shift+Q and no ✕ on the picks; the picked points keep their discs and
+/// the value is bold while placing; once placed the dimension stays selected, bold; dragging it in Select draws it plain.
+#[gpui::test]
+fn the_dimension_tool_marks_its_picks_as_live_and_keeps_the_placed_one_selected(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_render::state;
+    use noshape_scene::drawing_tools::{DimTool, SnapMark};
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-dim-p2p");
+    real_sheet(cx, window, &editor);
+    // Two vertices of the first view: its lower-left and lower-right corners; the middle of its bottom edge.
+    let (a, b) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+        let pts: Vec<[f64; 2]> = g.snaps.iter().map(|s| pl.to_sheet(s.p)).collect();
+        let a = pts.iter().copied().min_by(|p, q| (p[0] + p[1]).total_cmp(&(q[0] + q[1]))).expect("a vertex");
+        let b = pts.iter().copied().filter(|p| (p[1] - a[1]).abs() < 1e-6 && p[0] > a[0] + 1.0).max_by(|p, q| p[0].total_cmp(&q[0])).expect("a vertex level with it");
+        (a, b)
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Dimension { kind: DimTool::Point2, picks: vec![] }, cx)));
+    draw(cx, window);
+    lit_at(cx, window, &editor, [(a[0] + b[0]) / 2.0, a[1]]);
+    assert!(cx.update(|cx| editor.read(cx).woken_plus.is_empty()), "no + marks without Shift+Q");
+    lit_at(cx, window, &editor, a);
+    let (snap, lit) = cx.update(|cx| {
+        let e = editor.read(cx);
+        (e.hover_snap, e.build_scene().states.iter().filter(|s| **s & state::HOVER != 0).count())
+    });
+    assert!(snap.is_some() && lit == 0, "on the vertex: the disc, its edge not lit ({snap:?}, {lit} lit)");
+    let picks = |cx: &mut TestAppContext| cx.update(|cx| match &editor.read(cx).tool {
+        Tool::Dimension { picks, .. } => picks.len(),
+        _ => 99,
+    });
+    click_at(cx, window, &editor, a, Modifiers::default());
+    assert_eq!(picks(cx), 1, "the first vertex picked");
+    click_at(cx, window, &editor, b, Modifiers::default());
+    assert_eq!(picks(cx), 2, "the second vertex picked ({a:?}, {b:?})");
+    lit_at(cx, window, &editor, [(a[0] + b[0]) / 2.0, a[1] - 12.0]);
+    let bold = |cx: &mut TestAppContext, id: Option<u64>| {
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let bt = e.built.as_ref().expect("built");
+            let id = id.or_else(|| e.preview.as_ref().and_then(|d| d.sheets.get(e.sheet)).and_then(|s| s.annotations.last()).map(|a| a.id)).expect("a dimension");
+            let texts: Vec<usize> = (0..bt.geometry.texts.len()).filter(|&i| bt.picks.get(bt.geometry.texts[i].pick as usize) == Some(&PickTarget::Annotation(id))).collect();
+            !texts.is_empty() && texts.iter().all(|&i| bt.geometry.text_font(i).is_some_and(|f| f.bold))
+        })
+    };
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        assert!(e.overlay.crosses.is_empty(), "no ✕ on the picks");
+        for p in [a, b] {
+            assert!(e.overlay.marks.iter().any(|(m, k, _)| *k == SnapMark::Disc && (m[0] - p[0]).hypot(m[1] - p[1]) < 1e-6), "a disc on {p:?}");
+        }
+    });
+    assert!(bold(cx, None), "the value bold while placing");
+    let count = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).drawing.sheets[editor.read(cx).sheet].annotations.len());
+    let before = count(cx);
+    let sel = click_at(cx, window, &editor, [(a[0] + b[0]) / 2.0, a[1] - 12.0], Modifiers::default());
+    assert_eq!(picks(cx), 0, "placed: the tool ready for the next");
+    let placed = cx.update(|cx| editor.read(cx).current_sheet().annotations.last().map(|x| x.id)).expect("placed");
+    assert_eq!(count(cx), before + 1, "one dimension placed");
+    assert_eq!(sel, vec![Sel::Annotation(placed)], "placed: selected");
+    assert!(bold(cx, Some(placed)), "placed: bold");
+    // Select: a press-drag on its text draws it plain, no orange, no tan.
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Select, cx)));
+    draw(cx, window);
+    let text_at = cx.update(|cx| {
+        let e = editor.read(cx);
+        let bt = e.built.as_ref().expect("built");
+        bt.geometry.texts.iter().find(|t| bt.picks.get(t.pick as usize) == Some(&PickTarget::Annotation(placed))).map(|t| t.pos).expect("its text")
+    });
+    click_at(cx, window, &editor, text_at, Modifiers::default());
+    let p = at_window(cx, &editor, text_at);
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(p, None, Modifiers::default());
+    v.simulate_mouse_down(p, MouseButton::Left, Modifiers::default());
+    v.simulate_mouse_move(p + Point::new(px(40.), px(-16.)), Some(MouseButton::Left), Modifiers::default());
+    draw(cx, window);
+    let lit = cx.update(|cx| {
+        let e = editor.read(cx);
+        assert_eq!(e.dragging_annotation_id(), Some(placed), "dragging the dimension");
+        e.build_scene().states.iter().filter(|s| **s & (state::HOVER | state::SELECTED) != 0).count()
+    });
+    assert_eq!(lit, 0, "dragged: drawn plain");
+    VisualTestContext::from_window(window, cx).simulate_mouse_up(p + Point::new(px(40.), px(-16.)), MouseButton::Left, Modifiers::default());
+}
+
+/// Live2 drw-tools-1119 (sl.png): a section's cutting line hovered in Select frames the section view light blue; a
+/// press-drag on the line's body moves nothing and selects the parent view.
+#[gpui::test]
+fn a_cutting_line_hovered_frames_its_section_blue_and_its_body_does_not_drag(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_model::drawing::views::EdgeGeom;
+    use noshape_model::drawing::ViewKind;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-cut-line");
+    real_sheet(cx, window, &editor);
+    let (base, inside, mid, right) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let v = e.current_sheet().views.iter().find(|v| matches!(v.kind, ViewKind::Base { .. })).map(|v| v.id).expect("a base view");
+        let pl = e.placement(v).expect("placed");
+        let g = e.geoms.get(&v).cloned().expect("geometry");
+        let m = g.model_edges.iter().find_map(|me| match me.geom {
+            EdgeGeom::Line { a, b } if (a[1] - b[1]).abs() < 1e-9 => Some(pl.to_sheet([(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0])),
+            _ => None,
+        });
+        (v, [(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0], m.expect("a horizontal edge"), pl.max[0])
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Section { parent: None, p0: None, line: None, partial: false, jogs: vec![] }, cx)));
+    draw(cx, window);
+    click_at(cx, window, &editor, inside, Modifiers::default());
+    click_at(cx, window, &editor, mid, Modifiers::default());
+    click_at(cx, window, &editor, [right + 60.0, inside[1]], Modifiers::default());
+    let section = cx.update(|cx| editor.read(cx).current_sheet().views.iter().find(|v| matches!(v.kind, ViewKind::Section { .. })).map(|v| v.id)).expect("the section placed");
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Select, cx)));
+    draw(cx, window);
+    // A point on the cutting line's longest stroke, a quarter along (clear of its cut point).
+    let on_line = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        let l = b.geometry.lines.iter().filter(|l| b.picks.get(l.pick as usize) == Some(&PickTarget::SectionLine(section))).max_by(|l, m| {
+            let len = |p: &[[f64; 2]]| p.windows(2).map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])).sum::<f64>();
+            len(&l.points).total_cmp(&len(&m.points))
+        });
+        let l = l.expect("the cutting line drawn");
+        let (p, q) = (l.points[0], l.points[l.points.len() - 1]);
+        [p[0] + (q[0] - p[0]) * 0.25, p[1] + (q[1] - p[1]) * 0.25]
+    });
+    lit_at(cx, window, &editor, on_line);
+    let frames = cx.update(|cx| {
+        let e = editor.read(cx);
+        assert_eq!(e.hovered_cut_line(), Some(section), "the cutting line under the pointer");
+        e.view_frames()
+    });
+    assert_eq!(frames, vec![(section, 0x90cef1)], "its section framed light blue");
+    let points = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).current_sheet().section_points(section));
+    let before = points(cx);
+    let p = at_window(cx, &editor, on_line);
+    let q = p + Point::new(px(-40.), px(0.));
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_down(p, MouseButton::Left, Modifiers::default());
+    v.simulate_mouse_move(q, Some(MouseButton::Left), Modifiers::default());
+    v.simulate_mouse_up(q, MouseButton::Left, Modifiers::default());
+    draw(cx, window);
+    assert_eq!(points(cx), before, "the cut didn't move");
+    assert_eq!(cx.update(|cx| editor.read(cx).selection.clone()), vec![Sel::View(base)], "the parent view selected");
+}

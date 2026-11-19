@@ -265,7 +265,12 @@ fn follow(sheet: &Sheet, id: ViewId) -> Follow {
     }
     let turn = sheet.parent_of(id).map(|p| views::view_rotation(sheet, p)).unwrap_or(0.0);
     let axis = match &v.kind {
-        ViewKind::Projected { .. } => views::projected_direction(sheet, id).filter(|d| d[0] == 0.0 || d[1] == 0.0).map(|d| views::rotate2(d, turn)),
+        // An isometric (a diagonal projection) stays where it is (live2 drw-tools-1119 vmv.png).
+        ViewKind::Projected { .. } => match views::projected_direction(sheet, id) {
+            Some(d) if d[0] == 0.0 || d[1] == 0.0 => Some(views::rotate2(d, turn)),
+            Some(_) => return Follow::Stays,
+            None => None,
+        },
         ViewKind::Section { .. } | ViewKind::AlignedSection { .. } => views::section_cut(sheet, id).map(|c| views::rotate2(c.toward_view, turn)),
         ViewKind::Auxiliary { edge_dir, .. } => {
             let n = [-edge_dir[1], edge_dir[0]];
