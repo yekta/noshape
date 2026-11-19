@@ -7,7 +7,6 @@
 //! marker at the right end.
 
 use crate::drawing_view::*;
-use crate::theme::p;
 use gpui_kit::component::h_flex;
 use gpui_kit::*;
 use noshape_model::drawing::note::{NoteStyle, TabKind, TabStop};
@@ -16,6 +15,8 @@ use std::rc::Rc;
 
 /// Ruler width (px) and how far a tab stop must be dragged off it to go.
 const RULER_W: f32 = 390.;
+/// The ruler bar's grey (live2 drw-tools-1119 rad-note 30: rgb(183,183,183)).
+const BAR: Rgba = Rgba { r: 183. / 255., g: 183. / 255., b: 183. / 255., a: 1. };
 const OFF: f32 = 18.;
 
 /// What a ruler drag moves.
@@ -140,7 +141,6 @@ impl DrawingEditor {
 
     /// The ruler row of the note editor.
     pub fn note_ruler(&mut self, st: &NoteStyle, text_w: f64, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
         let (w, k) = Self::ruler_scale(st, text_w, self.ruler.sheet_k);
         let ruler_w = if self.ruler.sheet_k.is_some() { w as f32 * k + TAIL } else { RULER_W };
         let ink = gpui_kit::rgb(0x333333);
@@ -150,15 +150,16 @@ impl DrawingEditor {
             Some((Handle::Tab(i), _)) => Some(i),
             _ => None,
         };
-        let mut ruler = div().id("note-ruler").relative().w(px(ruler_w)).h(px(22.)).bg(crate::theme::light().panel).border_1().border_color(gpui_kit::rgb(0xbbbbbb)).overflow_hidden();
-        // Outside the box: grey.
-        ruler = ruler.child(div().absolute().top_0().bottom_0().left(px_of(w)).right_0().bg(gpui_kit::rgb(0xe6e6e6)));
+        // Live2 drw-tools-1119 rad-note 30: a white band with grey ticks inside the ruler's grey bar.
+        let mut ruler = div().id("note-ruler").relative().w(px(ruler_w)).h(px(20.)).bg(gpui_kit::rgb(0xffffff)).border_1().border_color(gpui_kit::rgb(0x808080)).overflow_hidden();
+        // Past the box: the bar's grey.
+        ruler = ruler.child(div().absolute().top_0().bottom_0().left(px_of(w)).right_0().bg(BAR));
         // Ticks: every mm, longer every 5 and 10.
         let mut mm = 1;
         while (mm as f32) * k < ruler_w {
             let len = if mm % 10 == 0 { 9. } else if mm % 5 == 0 { 6. } else { 3. };
             if k >= 3.0 || mm % 5 == 0 {
-                ruler = ruler.child(div().absolute().left(px_of(mm as f64)).bottom(px(0.)).w(px(1.)).h(px(len)).bg(gpui_kit::rgb(0x888888)));
+                ruler = ruler.child(div().absolute().left(px_of(mm as f64)).bottom(px(0.)).w(px(1.)).h(px(len)).bg(gpui_kit::rgb(0x808080)));
             }
             mm += 1;
         }
@@ -170,12 +171,9 @@ impl DrawingEditor {
         ruler = ruler
             .child(marker(px_of(st.first_indent), true, "▼"))
             .child(marker(px_of(st.left_indent), false, "▲"))
-            .child(marker(px_of(w - st.right_indent), false, "▲"))
-            .child(div().absolute().left(px_of(w) - px(2.)).top_0().bottom_0().w(px(4.)).bg(pal.accent));
-        if self.ruler.sheet_k.is_some() {
-            // Live 414: the ◁▷ box-width handle in the grey tail.
-            ruler = ruler.child(div().absolute().left(px_of(w) + px(6.)).top_0().bottom_0().flex().items_center().text_size(px(9.)).text_color(ink).child("◁▷"));
-        }
+            .child(marker(px_of(w - st.right_indent), false, "▲"));
+        // Live 414: the ◁▷ box-width handle in the grey tail (no blue bar: live2 rad-note 30).
+        ruler = ruler.child(div().absolute().left(px_of(w) + px(4.)).top_0().bottom_0().flex().items_center().text_size(px(9.)).text_color(ink).child("◁▷"));
         for (i, t) in st.tabs.iter().enumerate() {
             if dragging_off && dragged == Some(i) {
                 continue;
@@ -220,17 +218,24 @@ impl DrawingEditor {
             }),
         );
         let kind = self.ruler.kind;
+        // One grey bar: the tab stop selector (white, black frame) inside its left end, then the ruler (live2
+        // drw-tools-1119 rad-note 30).
         h_flex()
+            .p(px(3.))
             .gap(px(3.))
+            .bg(BAR)
+            .border_1()
+            .border_color(gpui_kit::rgb(0x5c5c5c))
             .child(
                 div()
                     .id("note-tab-kind")
-                    .size(px(22.))
+                    .size(px(20.))
                     .flex()
                     .items_center()
                     .justify_center()
+                    .bg(gpui_kit::rgb(0xffffff))
                     .border_1()
-                    .border_color(gpui_kit::rgb(0xbbbbbb))
+                    .border_color(gpui_kit::rgb(0x000000))
                     .text_size(px(12.))
                     .font_weight(FontWeight::BOLD)
                     .cursor_pointer()

@@ -1,6 +1,6 @@
 //! Drawing editor: notes edited in place (live drawing/224–227, behaviours.md
 //! "Notes: alignment, rotation, menus"): the text is typed on the sheet at the
-//! note, in its font, size and line spacing, inside a dashed box with the
+//! note, in its font, size and line spacing, inside a thin box with the
 //! formatting ruler above it; the floating Note panel sits just above that.
 //! The note's own sheet text is hidden meanwhile (`DrawingEditor.inplace_hidden`).
 //! General table cells are edited the same way (live "General table text
@@ -138,7 +138,7 @@ impl DrawingEditor {
     }
 
     /// The note's text editor on the sheet: the ruler, then the text in a
-    /// dashed box.
+    /// thin solid box.
     pub fn render_note_inplace(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let b = self.note_inplace_box(cx)?;
         let Some(Panel::Note { input, style, .. }) = &self.panel else { return None };
@@ -207,7 +207,8 @@ impl DrawingEditor {
                 // box not stretched to the ruler's width.
                 .items_start()
                 .child(div().h(px(RULER_H as f32)).ml(px((pad + 1.0 + TEXT_PX - 25.0) as f32)).child(ruler))
-                .child(div().p(px(pad as f32)).border_1().border_dashed().border_color(gpui_kit::rgb(0x8a8a8a)).child(text))
+                // A thin solid box (live2 drw-tools-1119 rad-note 30; a table cell's stays dashed).
+                .child(div().p(px(pad as f32)).border_1().border_color(gpui_kit::rgb(0x3f3f3f)).child(text))
                 .into_any_element(),
         )
     }

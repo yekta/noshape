@@ -31,8 +31,7 @@ the Mac; ui-parity on vibex7 / vibe2 via ~/bin/slot (vibex6 = watcher), one run 
 - Live answers: custom feature ✓ with a field-naming error off, plain regenError on (ours already). VSFEEL-NAME-RED
   is live's after-Enter mark (qa [x]).
 - Local 11-19 (after c2574db3): live2 drw-tools-1119 (12 rows) + rad-note (3) + doc-feel-1119 (6): fixed but these left:
-  the + marks on other dimensions' extension-line ends while a radial pick is held; the Note box's look (thin solid
-  box, grey ruler bar with the L inside, ◁▷); the Documents header's ⋮ menu (items not captured); Callout's edge
+  the + marks on other dimensions' extension-line ends while a radial pick is held; the Documents header's ⋮ menu (items not captured); Callout's edge
   reach 5 px vs ours 4 (≈; our PICKBOX is 7, the gap is how hits are measured). qa session-drw-1119: tab order of a
   new drawing asked in REQUESTS (live); the 225.0° text side (small, not looked at yet).
 - drw1119a (vibex8, 02:47 build with the woken points): 334/341, 3371/3389 states; no regression. drw-geometric-
