@@ -349,8 +349,33 @@ def live_annotation_text(t):
     return re.sub(r"\\A\d+;|\\S[^;]*;", "", t.replace("%%c", "⌀"))
 
 
+# Live's brand in text ours names Noshape (AGENTS.md: no Onshape brand marks; TICKETS BRAND-IN-UI-TEXT, prefs line).
+LIVE_BRAND = [
+    ("Onshape Labs", "Noshape Labs"),
+    ("your Onshape documents", "your Noshape documents"),
+    ("within Onshape on your behalf", "within Noshape on your behalf"),
+    ("Onshape does not warrant", "Noshape does not warrant"),
+    ("color scheme for Onshape featuring", "color scheme for Noshape featuring"),
+]
+
+
+def noshape_names(x):
+    """`x` with live's brand phrases in ours' words (`LIVE_BRAND`), in every string."""
+    if isinstance(x, str):
+        for a, b in LIVE_BRAND:
+            x = x.replace(a, b)
+        return x
+    if isinstance(x, list):
+        return [noshape_names(v) for v in x]
+    if isinstance(x, dict):
+        return {k: noshape_names(v) for k, v in x.items()}
+    return x
+
+
 def normalize_live(state):
     """Live's state in the agreed form: cloud-only menu rows dropped, no highlighted row as null (live: -1)."""
+    if isinstance(state, dict):
+        state.update(noshape_names(state))
     # A focused checkbox: the DOM gives its value "on" and no selection; it has no text.
     focus = (state or {}).get("focus")
     # (A checkbox's value attribute: "on" by default, IGES compatibility mode's "individual".)

@@ -290,7 +290,7 @@ impl PreferencesView {
         // The page itself holding the focus is live's body: none.
         let focus = if window.focused(cx).is_some() && !self.focus.is_focused(window) { serde_json::json!({ "kind": "other" }) } else { serde_json::json!({ "kind": "none" }) };
         // The sections are separate views drawn in any order: listed as the page shows them.
-        const PAGE_ORDER: [&str; 15] = ["Language", "Theming", "Decimal format", "Units", "Mouse controls", "Environment profile settings", "Part Studio settings", "Assembly settings", "Keyboard shortcuts", "Shortcut toolbars", "Toolbars", "Drawings", "Material libraries", "User export rules", "Onshape Labs"];
+        const PAGE_ORDER: [&str; 15] = ["Language", "Theming", "Decimal format", "Units", "Mouse controls", "Environment profile settings", "Part Studio settings", "Assembly settings", "Keyboard shortcuts", "Shortcut toolbars", "Toolbars", "Drawings", "Material libraries", "User export rules", "Noshape Labs"];
         // Updates (noshape's own: no Onshape counterpart) is left out.
         let mut fields: Vec<serde_json::Value> = crate::ui_script::take_fields().into_iter().filter(|f| !f["label"].as_str().is_some_and(|l| l.starts_with("Updates › "))).collect();
         fields.sort_by_key(|f| {

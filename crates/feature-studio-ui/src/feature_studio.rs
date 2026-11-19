@@ -1698,9 +1698,9 @@ impl FeatureStudioView {
         let labs = crate::preferences_window::ListPrefs::load().labs;
         let on = labs && self.co_complete;
         let (title, body) = if labs {
-            ("Co-complete (Onshape Labs)", "Use AI to contextually suggest and complete code as you type. Toggling this setting will only affect this session.")
+            ("Co-complete (Noshape Labs)", "Use AI to contextually suggest and complete code as you type. Toggling this setting will only affect this session.")
         } else {
-            ("Co-complete (must enable Onshape Labs)", "Enable Onshape Labs in your preferences to use co-complete. Co-complete use AI to contextually suggest and complete code as you type.")
+            ("Co-complete (must enable Noshape Labs)", "Enable Noshape Labs in your preferences to use co-complete. Co-complete use AI to contextually suggest and complete code as you type.")
         };
         let switch = div()
             .w(px(28.))

@@ -165,8 +165,8 @@ Access all your Dropbox files from Onshape. Import files to create new documents
 Access all your Google Drive files from Onshape. Import files to create new documents or export directly to Google Drive	Onshape から Google Drive のすべてのファイルにアクセスできます。ファイルをインポートして新しいドキュメントを作成したり、Google Drive に直接エクスポートすることができます。
 Access all your Microsoft OneDrive files from Onshape. Import files to create new documents or export directly to Microsoft OneDrive	Onshape から Microsoft OneDrive のすべてのファイルにアクセスできます。ファイルをインポートして新しいドキュメントを作成したり、Microsoft OneDrive に直接エクスポートしたりすることができます。
 Access to shared data is limited to viewing, commenting and exporting data.	共有データへのアクセスは、データの閲覧、コメント、エクスポートに限定されます。
-Access to the Onshape Labs features is disabled.	Onshape Labs のフィーチャーへのアクセスは無効になっています。
-Access to the Onshape Labs features is enabled.	Onshape Labs のフィーチャーへのアクセスは有効になっています。
+Access to the Noshape Labs features is disabled.	Noshape Labs のフィーチャーへのアクセスは無効になっています。
+Access to the Noshape Labs features is enabled.	Noshape Labs のフィーチャーへのアクセスは有効になっています。
 Access to this document has been restricted and it will close automatically at __time__.	このドキュメントへのアクセスは制限されており、__time__ に自動的に閉じます。
 Access to this document has been restricted with the message '__message__' and it will close automatically at __time__.	このドキュメントへのアクセスはメッセージ '__message__' で制限されており、__time__ に自動的に閉じます。
 Access to this document has been restricted with the message '__message__'.	このドキュメントへのアクセスはメッセージ '__message__' で制限されています。
@@ -503,7 +503,7 @@ Ambient occlusion	アンビエントオクルージョン
 Amount cannot exceed $999,999.	金額は $999,999 を超えることはできません。
 Amount cannot exceed $999.999.	金額は $999.999 を超えることはできません。
 Amount does not include sales tax	金額には税が含まれていません
-An admin must enable access for you to use Onshape Labs features.	Onshape Labs のフィーチャーを利用するには、管理者がアクセス許可を有効にする必要があります。
+An admin must enable access for you to use Noshape Labs features.	Noshape Labs のフィーチャーを利用するには、管理者がアクセス許可を有効にする必要があります。
 An email is headed your way	まもなくメールが届きます
 An environment profile is defined by settings tied to a specific browser on a specific device. Creating or selecting a profile will tie these settings to your current environment.	環境プロファイルは、特定のデバイス上の特定のブラウザに関連付けられた設定によって定義されます。プロファイルを作成または選択すると、これらの設定が現在の環境に関連付けられます。
 An error has occurred	エラーが発生しました
@@ -623,7 +623,7 @@ Are you sure you want to downgrade to the Free plan?	無料プランにダウン
 Are you sure you want to leave this organization?	この組織を離れてもよろしいですか？
 Are you sure you want to reset all keyboard shortcuts to default values?	すべてのキーボードショートカットを既定値にリセットしてもよろしいですか？
 Are you sure you wish to revoke __grantName__'s access? After revoking access Onshape will no longer have any access to this application.	__grantName__のアクセスを取り消してもよろしいですか？ アクセスを取り消すと、Onshape はこのアプリケーションにアクセスできなくなります。
-Are you sure you wish to revoke __grantName__'s access? After revoking access the application will no longer have any access to your Onshape documents.	__grantName__のアクセスを取り消してもよろしいですか？ アクセスを取り消すと、アプリケーションは Onshape ドキュメントにアクセスできなくなります。
+Are you sure you wish to revoke __grantName__'s access? After revoking access the application will no longer have any access to your Noshape documents.	__grantName__のアクセスを取り消してもよろしいですか？ アクセスを取り消すと、アプリケーションは Noshape ドキュメントにアクセスできなくなります。
 Area	面積
 Area moment of inertia (__units__)	面積慣性モーメント (__units__)
 Arena PLM connection	Arena PLM 接続
@@ -1216,8 +1216,8 @@ Cloud storage failed to load.	クラウドストレージを読み込めませ�
 Cloud storage integration settings	クラウドストレージ統合設定
 Cloud storage integration users	クラウドストレージ統合ユーザー
 Co-complete	Co-Complete
-Co-complete (Onshape Labs)	Co-Complete (Onshape Labs)
-Co-complete (must enable Onshape Labs)	Co-Complete (Onshape Labs を有効にする必要があります)
+Co-complete (Noshape Labs)	Co-Complete (Noshape Labs)
+Co-complete (must enable Noshape Labs)	Co-Complete (Noshape Labs を有効にする必要があります)
 Co-complete is disabled. You may persist this setting.	Co-Complete は無効になっています。この設定は保存できます。
 Co-complete is enabled. You may persist this setting.	Co-Complete は有効になっています。この設定は保存できます。
 Coarse	粗い
@@ -1489,7 +1489,7 @@ Construction (q)	作図線 (q)
 Construction lines	作図線
 Consumable	消費可能
 Contact Onshape support if these problems persist.	これらの問題が続く場合は、Onshape サポートにお問い合わせください。
-Contact an admin to enable and grant access for users in the company to use Onshape Labs features.	管理者に連絡し、Company のユーザーが Onshape Labs のフィーチャーを使用できるように、アクセス許可を有効にしてください。
+Contact an admin to enable and grant access for users in the company to use Noshape Labs features.	管理者に連絡し、Company のユーザーが Noshape Labs のフィーチャーを使用できるように、アクセス許可を有効にしてください。
 Contact our support team for help with your Onshape plan	Onshape プランについて詳しくは、サポートチームにお問い合わせください
 Contact sales	営業へのお問い合わせ
 Contact support	サポートへのお問い合わせ
@@ -2045,7 +2045,7 @@ Default Windchill library - Non-geometric items	既定の Windchill ライブラ
 Default Windchill library - Standard Content	既定の Windchill ライブラリ - 標準コンテンツ
 Default assembly BOM table template failed to update.	アセンブリ用の既定の BOM テーブルテンプレートを更新できませんでした。
 Default bend K Factor	既定の曲げ K 係数
-Default color scheme for Onshape featuring dark elements on light backgrounds.	Onshape の既定の配色は、明るい背景上に暗い要素が特徴です。
+Default color scheme for Noshape featuring dark elements on light backgrounds.	Noshape の既定の配色は、明るい背景上に暗い要素が特徴です。
 Default corner type	既定のコーナータイプ
 Default drawing BOM table template failed to update.	図面用の既定の BOM テーブルテンプレートを更新できませんでした。
 Default feature selected	選択した既定のフィーチャー
@@ -2642,13 +2642,13 @@ Empty trash…	ごみ箱を空にする…
 Enable	有効にする
 Enable AWS KMS key configuration	AWS KMS キーのコンフィギュレーションを有効にする
 Enable Onshape Arena connection	Onshape Arena 接続を有効にする
-Enable Onshape Labs	Onshape Labs を有効にする
-Enable Onshape Labs in your preferences to use co-complete. Co-complete use AI to contextually suggest and complete code as you type.	Co-Complete を使用するには、環境設定で Onshape Labs を有効にしてください。Co-Complete は、AI を使用して、入力中にコンテキストに応じてコードの続きを提案します。
-Enable Onshape Labs in your preferences to use descriptive image search, which uses AI to enhance search results.	AI を活用して検索結果を向上させる説明文による画像検索機能を使用するには、設定で Onshape Labs を有効にしてください。
+Enable Noshape Labs	Noshape Labs を有効にする
+Enable Noshape Labs in your preferences to use co-complete. Co-complete use AI to contextually suggest and complete code as you type.	Co-Complete を使用するには、環境設定で Noshape Labs を有効にしてください。Co-Complete は、AI を使用して、入力中にコンテキストに応じてコードの続きを提案します。
+Enable Noshape Labs in your preferences to use descriptive image search, which uses AI to enhance search results.	AI を活用して検索結果を向上させる説明文による画像検索機能を使用するには、設定で Noshape Labs を有効にしてください。
 Enable Onshape Windchill connection	Onshape Windchill の接続を有効にする
 Enable SSO provider	SSO プロバイダーを有効にする
 Enable WebGL in your browser for more consistent performance.	ブラウザで WebGL を有効にすると、より一貫したパフォーマンスが得られます。
-Enable access to Onshape Labs features?	Onshape Labs のフィーチャーへのアクセスを有効にしますか?
+Enable access to Noshape Labs features?	Noshape Labs のフィーチャーへのアクセスを有効にしますか?
 Enable access to experimental, proof of concept features.	実験的な概念実証のためのフィーチャーへのアクセスを有効にします。
 Enable basic authentication	基本認証を有効にする
 Enable enterprise features and tables	Enterprise フィーチャーとテーブルを有効にする
@@ -3047,12 +3047,12 @@ Failed to delete job.	ジョブを削除できませんでした。
 Failed to delete selected class.	選択したクラスを削除できませんでした。
 Failed to delete team.	チームを削除できませんでした。
 Failed to delete your photo.	写真を削除できませんでした。
-Failed to disable Onshape Labs features.	Onshape Labs のフィーチャーを無効にできませんでした。
+Failed to disable Noshape Labs features.	Noshape Labs のフィーチャーを無効にできませんでした。
 Failed to disable two factor authentication.	二要素認証の無効化ができませんでした。
 Failed to edit dashboard.	ダッシュボードを編集できませんでした。
 Failed to edit tab properties.	タブ プロパティを編集できませんでした。
 Failed to edit tutorial URL.	チュートリアル URL を編集できませんでした。
-Failed to enable Onshape Labs features.	Onshape Labs のフィーチャーを有効にできませんでした。
+Failed to enable Noshape Labs features.	Noshape Labs のフィーチャーを有効にできませんでした。
 Failed to expand notifications.	通知を展開できませんでした。
 Failed to export Onshape__type__ library:	Onshape__type__ ライブラリをエクスポートできませんでした:
 Failed to export __name____type__ library:	__name____type__ ライブラリをエクスポートできませんでした:
@@ -3097,7 +3097,7 @@ Failed to invite user to your enterprise.	ユーザーを Enterprise に招待�
 Failed to invite users to your company.	ユーザーを Company へ招待できませんでした。
 Failed to invite users to your enterprise.	ユーザーを Enterprise に招待することができませんでした。
 Failed to link __plmName__ change.	__plmName__ の変更にリンクできませんでした。
-Failed to load Onshape Labs permissions.	OnshapeLabs のアクセス許可を読み込めませんでした。
+Failed to load Noshape Labs permissions.	NoshapeLabs のアクセス許可を読み込めませんでした。
 Failed to load __companyType__ - 	__companyType__ を読み込めませんでした - 
 Failed to load __companyType__.	__companyType__ を読み込めませんでした。
 Failed to load class. Resource does not exist or you do not have permission to access it.	クラスを読み込めませんでした。リソースが存在しないか、アクセス許可がありません。
@@ -3197,8 +3197,8 @@ Failed to transfer publication to __companyName__.	パブリケーションを _
 Failed to transfer publication to __userEmail__.	パブリケーションを __userEmail__ に引き継げませんでした。
 Failed to unset __name____type__ library:	__name____type__ ライブラリの設定を解除できませんでした:
 Failed to unset your__type__ library:	__type__ ライブラリの設定を解除できませんでした:
-Failed to update Onshape Labs features.	Onshape Labs のフィーチャーを更新できませんでした。
-Failed to update Onshape Labs permissions.	Onshape Labs のアクセス許可を更新できませんでした。
+Failed to update Noshape Labs features.	Noshape Labs のフィーチャーを更新できませんでした。
+Failed to update Noshape Labs permissions.	Noshape Labs のアクセス許可を更新できませんでした。
 Failed to update Part Studio settings.	Part Studio 設定を更新できませんでした。
 Failed to update assembly settings.	アセンブリ設定を更新できませんでした。
 Failed to update custom feature __featureName__.	カスタム フィーチャー __featureName__ を更新できませんでした。
@@ -3266,7 +3266,7 @@ Features (__featuresCount__)	フィーチャー (__featuresCount__ 件)
 Features (__numberOfFeatures__)	フィーチャー (__numberOfFeatures__)
 Features (__shownCount__ of __featureCount__)	フィーチャー (__featureCount__ 件中__shownCount__ 件)
 Features and parts	フィーチャーおよびパーツ
-Features in Onshape Labs are experimental, may break, and are subject to change or removal at any time. Onshape Labs features are made available for testing and evaluation only and must not be used in production. Use at your own discretion.	Onshape Labs のフィーチャーは実験的なものであり、不具合が生じたり、予告なく変更・削除されたりする可能性があります。Onshape Labs のフィーチャーはテストおよび評価のみを目的として提供されており、本番環境での使用は禁止されています。ご自身の判断でご使用ください。
+Features in Noshape Labs are experimental, may break, and are subject to change or removal at any time. Noshape Labs features are made available for testing and evaluation only and must not be used in production. Use at your own discretion.	Noshape Labs のフィーチャーは実験的なものであり、不具合が生じたり、予告なく変更・削除されたりする可能性があります。Noshape Labs のフィーチャーはテストおよび評価のみを目的として提供されており、本番環境での使用は禁止されています。ご自身の判断でご使用ください。
 Features to find match in	で一致を探すフィーチャー
 Features to mirror	ミラーリングするフィーチャー
 Features to pattern	フィーチャーのためのパターン
@@ -3779,7 +3779,7 @@ Horizontal reference	水平参照
 Horizontal stripe	水平ストライプ
 Horizontal zones	水平ゾーン
 Hover over or select an instance to show its mates.	インスタンスにカーソルを合わせるか選択して、その合致を表示します。
-How Onshape Labs features use your data	Onshape Labs のフィーチャーにおけるデータの利用方法
+How Noshape Labs features use your data	Noshape Labs のフィーチャーにおけるデータの利用方法
 H™ nuts/HNL™ prevailing torque locknuts	H™ nuts/HNL™ 一般的なトルクロックナット
 I agree to the	に同意します
 I agree to use this plan for classes, personal learning projects, school clubs/organizations, and academic research. I will not use this plan for government, commercial, or other organizational use	私は、このプランを授業、個人の学習プロジェクト、学校のクラブ/グループ、および学術研究に使用することに同意します。私は、このプランを政府の利用、商業目的、その他の組織の利用のために使用しません。
@@ -5216,9 +5216,9 @@ Onshape Arena Connection Configuration	Onshape Arena の接続構成
 Onshape CAM Studio Tool Holders	Onshape CAM Studio ツールホルダー
 Onshape Free	Onshape 無料版
 Onshape Free plan	Onshape 無料プラン
-Onshape Labs access	Onshape Labs へのアクセス
-Onshape Labs features updated.	Onshape Labs のフィーチャーが更新されました。
-Onshape Labs permissions updated.	Onshape Labs のアクセス許可が更新されました。
+Noshape Labs access	Noshape Labs へのアクセス
+Noshape Labs features updated.	Noshape Labs のフィーチャーが更新されました。
+Noshape Labs permissions updated.	Noshape Labs のアクセス許可が更新されました。
 Onshape Professional Quickstart	Onshape Professional クイックスタート
 Onshape Professional Trial	Onshape Professional 試用版
 Onshape Quickstart	Onshape クイックスタート
@@ -5241,7 +5241,7 @@ Onshape date values synced to Windchill will not include a time component.	Windc
 Onshape default	Onshape の既定
 Onshape default tolerances	Onshape の既定の許容差
 Onshape default workflows	Onshape の既定のワークフロー
-Onshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose.	Onshape は、生成された出力が第三者の権利を侵害していないこと、または特定の目的に適合していることを保証しません。
+Noshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose.	Noshape は、生成された出力が第三者の権利を侵害していないこと、または特定の目的に適合していることを保証しません。
 Onshape does the heavy lifting, you just need a compatible browser and device to render your CAD data on-screen	Onshape は、CAD データを画面上に表示するために、互換性のあるブラウザとデバイスが必要です。
 Onshape frame profiles	Onshape フレーム輪郭
 Onshape images	Onshape 画像
@@ -5519,7 +5519,7 @@ Pending…	保留中…
 Per chain	チェーン単位
 Per edge	エッジ単位
 Perform a union, subtraction, or intersection on two or more parts or surfaces.	2 つ以上のパーツやサーフェスの和、差、積の演算を実行します。
-Perform actions within Onshape on your behalf during an active session.	アクティブなセッション中に、ユーザーに代わって Onshape 内でアクションを実行します。
+Perform actions within Noshape on your behalf during an active session.	アクティブなセッション中に、ユーザーに代わって Noshape 内でアクションを実行します。
 Performance	パフォーマンス
 Performance check	パフォーマンスチェック
 Performance errors detected	パフォーマンスエラーが検出されました
@@ -5893,7 +5893,7 @@ Ray gradient (%)	光線勾配 (%)
 Re-invite	再招待
 Re-releasable?	再リリース可能ですか?
 Reactivate your subscription	サブスクリプションを再有効化する
-Read or write data within your Onshape documents, only in response to your actions.	ユーザーのアクションがあった場合にのみ、Onshape ドキュメント内のデータの読み取りまたは書き込みを行います。
+Read or write data within your Noshape documents, only in response to your actions.	ユーザーのアクションがあった場合にのみ、Noshape ドキュメント内のデータの読み取りまたは書き込みを行います。
 Read-only access	読み取り専用アクセス
 Real	実数
 Realign	再配置
@@ -7117,7 +7117,7 @@ Solid	ソリッド
 Solve	解決
 Solve full assembly	フルアセンブリを解決する
 Solved	解決済み
-Some Onshape Labs features use generative or automated technologies, including third-party AI models, that produce outputs based on statistical models. These outputs may be inaccurate, incomplete, or inappropriate, and are not guaranteed to be correct.	Onshape Labs の一部のフィーチャーでは、統計モデルに基づいて出力を生成する技術や自動化技術 (サードパーティ製の AI モデルを含む) が使用されています。これらの出力は不正確、不完全、または不適切である可能性があり、その正確性は保証されません。
+Some Noshape Labs features use generative or automated technologies, including third-party AI models, that produce outputs based on statistical models. These outputs may be inaccurate, incomplete, or inappropriate, and are not guaranteed to be correct.	Noshape Labs の一部のフィーチャーでは、統計モデルに基づいて出力を生成する技術や自動化技術 (サードパーティ製の AI モデルを含む) が使用されています。これらの出力は不正確、不完全、または不適切である可能性があり、その正確性は保証されません。
 Some annotations contain invalid symbols. Invalid symbols will be removed on export.	一部の注釈に無効な記号が含まれています。無効な記号はエクスポート時に削除されます。
 Some configuration inputs are marked as not affecting configured properties.	一部のコンフィギュレーション入力は、構成済みプロパティに影響を与えないとマークされています。
 Some drawing tabs in the current workspace were overwritten. If this was done by mistake, you can restore in the versions and history.	現在のワークスペースの一部の図面タブが上書きされました。これが間違って行われた場合は、バージョンと履歴で復元できます。
@@ -8651,7 +8651,7 @@ You are not authorized to access this resource.	このリソースへのアク�
 You are not subscribed to required application for this action.	このアクションに必要なアプリケーションのサブスクリプションに登録していません。
 You are now viewing in dark mode. You may persist this setting.	現在ダークモードで表示されています。この設定を保持できます。
 You are now viewing in light mode. You may persist this setting.	現在ライトモードで表示されています。この設定を保持できます。
-You are responsible for independently reviewing, validating, and approving any outputs before relying on them for design, engineering, manufacturing, or other purposes. Onshape Labs features should not be used as a substitute for professional judgment or established controls.	設計、エンジニアリング、製造、その他の目的で出力結果を利用する前に、それらを独自に確認、検証、および承認する責任は、ユーザーにあります。Onshape Labs のフィーチャーは、専門家の判断や確立された管理方法の代わりとして使用すべきではありません。
+You are responsible for independently reviewing, validating, and approving any outputs before relying on them for design, engineering, manufacturing, or other purposes. Noshape Labs features should not be used as a substitute for professional judgment or established controls.	設計、エンジニアリング、製造、その他の目的で出力結果を利用する前に、それらを独自に確認、検証、および承認する責任は、ユーザーにあります。Noshape Labs のフィーチャーは、専門家の判断や確立された管理方法の代わりとして使用すべきではありません。
 You are running a 32-bit browser on a 64-bit operating system.  For better performance, install the 64-bit version of your browser.	64 ビットのオペレーティング システム上で 32 ビットのブラウザを実行しています。 パフォーマンスを向上させるには、64 ビット版のブラウザをインストールしてください。
 You are saving $__amountOff__ for __months__ months.	__months__ か月間は $__amountOff__ 引きでご利用いただけます。
 You are saving $__amountOff__ on your first year.	1 年目は $__amountOff__ 引きでご利用いただけます。
@@ -8667,7 +8667,7 @@ You can cancel your subscription at any time by emailing	サブスクリプシ�
 You can configure webhooks to use basic authentication. This will populate the Authorization header in all webhook requests.	基本認証を使用するには、Webhook を構成してください。これにより、すべての Webhook 要求に承認ヘッダーが表示されます。
 You can configure webhooks to use signatures to protect them against attacks. Using signatures you can ensure that a notification was really sent by Onshape and that it hasn't been tampered with in transit. Use primary and secondary keys to rotate keys in your production application.	署名を使用して Webhook を構成し、攻撃から保護してください。署名を使用すると、Onshape から正真の通知が送信され、送信中に改ざんされることはありません。プライマリキーとセカンダリキーを使用して、本番アプリケーションでキーをローテーションさせます。
 You can copy up to 10 documents per request. Select 10 or fewer documents and try again.	1 回のリクエストにつき、最大 10 件のドキュメントをコピーできます。10 件以内のドキュメントを選択して、もう一度お試しください。
-You can disable Onshape Labs and revoke access at any time from Account Settings → Labs.	Onshape Labs はいつでも、[アカウント設定] → [Labs] で無効にし、アクセス権を取り消すことができます。
+You can disable Noshape Labs and revoke access at any time from Account Settings → Labs.	Noshape Labs はいつでも、[アカウント設定] → [Labs] で無効にし、アクセス権を取り消すことができます。
 You can modify this after upgrading, or contact us.	アップグレード後にこれを変更するか、お問い合わせください。
 You can regenerate a new set of recovery codes at any time on the Security tab, thereby rendering any previously-generated codes invalid.	[セキュリティ] タブでいつでも新しい回復コードを再生成できます。それにより、以前生成されたコードは無効になります。
 You cannot copy documents within a connected enterprise.	接続している Enterprise 内のドキュメントはコピーできません。

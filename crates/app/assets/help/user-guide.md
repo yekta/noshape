@@ -107,9 +107,9 @@ On the documents page, **your name ▾ › Preferences…** sets the units of ne
 
 Preferences › Units sets the units new documents start with. A document's own units are in its ☰ › Workspace units…; changing them shows every value in the new unit.
 
-### Onshape Labs
+### Noshape Labs
 
-Preferences › Onshape Labs turns on features that are still experimental, such as FeatureScript Co-complete (completions as you type in a Feature Studio).
+Preferences › Noshape Labs turns on features that are still experimental, such as FeatureScript Co-complete (completions as you type in a Feature Studio).
 
 ## Keyboard shortcuts
 

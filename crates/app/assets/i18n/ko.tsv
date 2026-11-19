@@ -165,8 +165,8 @@ Access all your Dropbox files from Onshape. Import files to create new documents
 Access all your Google Drive files from Onshape. Import files to create new documents or export directly to Google Drive	Onshape에서 모든 Google Drive 파일에 액세스합니다. 파일을 가져와 새 통합문서를 만들거나 직접 Google Drive로 내보내십시오.
 Access all your Microsoft OneDrive files from Onshape. Import files to create new documents or export directly to Microsoft OneDrive	Onshape에서 모든 Microsoft OneDrive 파일에 액세스합니다. 파일을 가져와 새 통합문서를 만들거나 직접 Microsoft OneDrive로 내보내십시오.
 Access to shared data is limited to viewing, commenting and exporting data.	공유 데이터 액세스는 데이터 보기, 의견 추가 및 내보내기로 제한됩니다.
-Access to the Onshape Labs features is disabled.	Onshape Labs 기능에 대한 액세스가 비활성화되었습니다.
-Access to the Onshape Labs features is enabled.	Onshape Labs 기능에 대한 액세스가 활성화되었습니다.
+Access to the Noshape Labs features is disabled.	Noshape Labs 기능에 대한 액세스가 비활성화되었습니다.
+Access to the Noshape Labs features is enabled.	Noshape Labs 기능에 대한 액세스가 활성화되었습니다.
 Access to this document has been restricted and it will close automatically at __time__.	이 통합문서의 액세스가 제한되었으며 __time__에 자동으로 종료됩니다.
 Access to this document has been restricted with the message '__message__' and it will close automatically at __time__.	'__message__' 메시지와 함께 이 통합문서의 액세스가 제한되었으며 __time__에 자동으로 종료됩니다.
 Access to this document has been restricted with the message '__message__'.	'__message__' 메시지와 함께 이 통합문서의 액세스가 제한되었습니다.
@@ -502,7 +502,7 @@ Ambient occlusion	앰비언트 오클루전
 Amount cannot exceed $999,999.	금액은 $999,999를 초과할 수 없습니다.
 Amount cannot exceed $999.999.	금액은 $999.999를 초과할 수 없습니다.
 Amount does not include sales tax	금액에는 판매세가 포함되지 않습니다.
-An admin must enable access for you to use Onshape Labs features.	Onshape Labs 기능을 사용하려면 관리자가 액세스를 활성화해야 합니다.
+An admin must enable access for you to use Noshape Labs features.	Noshape Labs 기능을 사용하려면 관리자가 액세스를 활성화해야 합니다.
 An email is headed your way	이메일을 곧 받으시게 됩니다.
 An environment profile is defined by settings tied to a specific browser on a specific device. Creating or selecting a profile will tie these settings to your current environment.	특정 장치의 해당 브라우저에 연결된 설정에 따라 환경 프로파일이 정의됩니다. 프로파일을 생성하거나 선택하면 이러한 설정이 현재 환경에 연결됩니다.
 An error has occurred	오류가 발생했습니다.
@@ -622,7 +622,7 @@ Are you sure you want to downgrade to the Free plan?	무료 플랜으로 다운�
 Are you sure you want to leave this organization?	이 기관에서 탈퇴하시겠습니까?
 Are you sure you want to reset all keyboard shortcuts to default values?	모든 키보드 단축키를 기본값으로 재설정하시겠습니까?
 Are you sure you wish to revoke __grantName__'s access? After revoking access Onshape will no longer have any access to this application.	__grantName__의 액세스 권한을 해지하시겠습니까? 액세스 권한을 해지하면 Onshape가 더 이상 이 애플리케이션에 액세스할 수 없게 됩니다.
-Are you sure you wish to revoke __grantName__'s access? After revoking access the application will no longer have any access to your Onshape documents.	__grantName__의 액세스 권한을 해지하시겠습니까? 액세스 권한을 해지하면 해당 애플리케이션이 더 이상 Onshape 통합 문서에 액세스할 수 없게 됩니다.
+Are you sure you wish to revoke __grantName__'s access? After revoking access the application will no longer have any access to your Noshape documents.	__grantName__의 액세스 권한을 해지하시겠습니까? 액세스 권한을 해지하면 해당 애플리케이션이 더 이상 Noshape 통합 문서에 액세스할 수 없게 됩니다.
 Area	넓이
 Area moment of inertia (__units__)	면적 관성 모멘트(__units__)
 Arena PLM connection	Arena PLM 연결
@@ -1213,8 +1213,8 @@ Cloud Storage	클라우드 저장소
 Cloud storage failed to load.	클라우드 스토리지를 로드하지 못했습니다.
 Cloud storage integration settings	클라우드 스토리지 통합 설정
 Cloud storage integration users	클라우드 스토리지 통합 사용자
-Co-complete (Onshape Labs)	Co-complete(Onshape Labs)
-Co-complete (must enable Onshape Labs)	Co-complete(Onshape Labs를 활성화해야 함)
+Co-complete (Noshape Labs)	Co-complete(Noshape Labs)
+Co-complete (must enable Noshape Labs)	Co-complete(Noshape Labs를 활성화해야 함)
 Co-complete is disabled. You may persist this setting.	Co-complete가 비활성화되었습니다. 이 설정을 유지할 수 있습니다.
 Co-complete is enabled. You may persist this setting.	Co-complete가 활성화되었습니다. 이 설정을 유지할 수 있습니다.
 Coarse	넓게
@@ -1488,7 +1488,7 @@ Construction (q)	보조선
 Construction lines	보조선
 Consumable	소모품
 Contact Onshape support if these problems persist.	이러한 문제가 지속되면 Onshape 지원팀에 문의하십시오.
-Contact an admin to enable and grant access for users in the company to use Onshape Labs features.	Onshape Labs 기능을 사용하려면 Company 관리자가 해당 기능을 활성화하고 사용자에게 액세스 권한을 부여해야 합니다. 관리자에게 문의하십시오.
+Contact an admin to enable and grant access for users in the company to use Noshape Labs features.	Noshape Labs 기능을 사용하려면 Company 관리자가 해당 기능을 활성화하고 사용자에게 액세스 권한을 부여해야 합니다. 관리자에게 문의하십시오.
 Contact our support team for help with your Onshape plan	Onshape 플랜에 관해 도움이 필요하면 지원팀에 문의하십시오.
 Contact sales	판매 문의
 Contact support	지원 문의
@@ -2042,7 +2042,7 @@ Default Windchill library - Non-geometric items	기본 Windchill 라이브러리
 Default Windchill library - Standard Content	기본 Windchill 라이브러리 - 표준 콘텐츠
 Default assembly BOM table template failed to update.	기본 어셈블리 BOM 표 템플릿을 업데이트하지 못했습니다.
 Default bend K Factor	기본 굽힘 K 지수
-Default color scheme for Onshape featuring dark elements on light backgrounds.	Onshape의 기본 색구성표로, 밝은 배경에 짙은 요소가 나타납니다.
+Default color scheme for Noshape featuring dark elements on light backgrounds.	Noshape의 기본 색구성표로, 밝은 배경에 짙은 요소가 나타납니다.
 Default corner type	기본 코너 유형
 Default drawing BOM table template failed to update.	기본 도면 BOM 표 템플릿을 업데이트하지 못했습니다.
 Default feature selected	기본 피처 선택함
@@ -2639,13 +2639,13 @@ Empty trash…	휴지통 비우기…
 Enable	사용
 Enable AWS KMS key configuration	AWS KMS 키 구성을 활성화하십시오.
 Enable Onshape Arena connection	Onshape Arena 연결 활성화
-Enable Onshape Labs	Onshape Labs 활성화
-Enable Onshape Labs in your preferences to use co-complete. Co-complete use AI to contextually suggest and complete code as you type.	Co-complete를 사용하려면 기본 설정에서 Onshape Labs를 활성화하십시오. Co-complete는 AI를 사용하여 입력하는 코드의 맥락을 기반으로 코드를 제안하고 완성합니다.
-Enable Onshape Labs in your preferences to use descriptive image search, which uses AI to enhance search results.	AI를 사용하여 검색 결과를 향상하는 설명형 이미지 검색을 사용하려면 기본 설정에서 Onshape Labs를 활성화하십시오.
+Enable Noshape Labs	Noshape Labs 활성화
+Enable Noshape Labs in your preferences to use co-complete. Co-complete use AI to contextually suggest and complete code as you type.	Co-complete를 사용하려면 기본 설정에서 Noshape Labs를 활성화하십시오. Co-complete는 AI를 사용하여 입력하는 코드의 맥락을 기반으로 코드를 제안하고 완성합니다.
+Enable Noshape Labs in your preferences to use descriptive image search, which uses AI to enhance search results.	AI를 사용하여 검색 결과를 향상하는 설명형 이미지 검색을 사용하려면 기본 설정에서 Noshape Labs를 활성화하십시오.
 Enable Onshape Windchill connection	Onshape Windchill 연결 활성화
 Enable SSO provider	SSO 제공자 활성화
 Enable WebGL in your browser for more consistent performance.	보다 일관된 성능을 위해서 브라우저에서 WebGL을 활성화하십시오.
-Enable access to Onshape Labs features?	Onshape Labs 기능의 액세스를 활성화하시겠습니까?
+Enable access to Noshape Labs features?	Noshape Labs 기능의 액세스를 활성화하시겠습니까?
 Enable access to experimental, proof of concept features.	실험적 기능 및 개념 검증 기능에 대한 액세스를 활성화하십시오.
 Enable basic authentication	기본 인증 활성화
 Enable enterprise features and tables	엔터프라이즈 피처 및 테이블 활성화
@@ -3047,12 +3047,12 @@ Failed to delete job.	작업을 삭제하지 못했습니다.
 Failed to delete selected class.	선택한 클래스를 삭제하지 못했습니다.
 Failed to delete team.	팀을 삭제하지 못했습니다.
 Failed to delete your photo.	사진을 삭제하지 못했습니다.
-Failed to disable Onshape Labs features.	Onshape Labs 기능을 비활성화하지 못했습니다.
+Failed to disable Noshape Labs features.	Noshape Labs 기능을 비활성화하지 못했습니다.
 Failed to disable two factor authentication.	2채널 인증을 비활성화하지 못했습니다.
 Failed to edit dashboard.	대시보드를 편집하지 못했습니다.
 Failed to edit tab properties.	탭 속성을 편집하지 못했습니다.
 Failed to edit tutorial URL.	튜토리얼 URL을 편집하지 못했습니다.
-Failed to enable Onshape Labs features.	Onshape Labs 기능을 활성화하지 못했습니다.
+Failed to enable Noshape Labs features.	Noshape Labs 기능을 활성화하지 못했습니다.
 Failed to expand notifications.	알림을 확장하지 못했습니다.
 Failed to export Onshape__type__ library:	Onshape__type__ 라이브러리를 내보내지 못했습니다:
 Failed to export __name____type__ library:	__name____type__ 라이브러리를 내보내기 못했습니다:
@@ -3097,7 +3097,7 @@ Failed to invite user to your enterprise.	사용자를 엔터프라이즈에 초
 Failed to invite users to your company.	사용자를 회사에 추가하지 못했습니다.
 Failed to invite users to your enterprise.	사용자를 엔터프라이즈에 초대하지 못했습니다.
 Failed to link __plmName__ change.	__plmName__ 변경 내용을 연결하지 못했습니다.
-Failed to load Onshape Labs permissions.	Onshape Labs 권한을 로드하지 못했습니다.
+Failed to load Noshape Labs permissions.	Noshape Labs 권한을 로드하지 못했습니다.
 Failed to load __companyType__ - 	__companyType__을(를) 로드하지 못했습니다. 
 Failed to load __companyType__.	__companyType__을(를) 로드하지 못했습니다.
 Failed to load class. Resource does not exist or you do not have permission to access it.	클래스를 로드하지 못했습니다. 리소스가 존재하지 않거나, 귀하에게 해당 리소스 접근 권한이 없습니다.
@@ -3197,8 +3197,8 @@ Failed to transfer publication to __companyName__.	게시물을 __companyName__(
 Failed to transfer publication to __userEmail__.	게시물을 __userEmail__(으)로 전송하지 못했습니다.
 Failed to unset __name____type__ library:	__name____type__ 라이브러리 설정을 취소하지 못했습니다:
 Failed to unset your__type__ library:	your__type__ 라이브러리 설정을 취소하지 못했습니다:
-Failed to update Onshape Labs features.	Onshape Labs 기능을 업데이트하지 못했습니다.
-Failed to update Onshape Labs permissions.	Onshape Labs 권한을 업데이트하지 못했습니다.
+Failed to update Noshape Labs features.	Noshape Labs 기능을 업데이트하지 못했습니다.
+Failed to update Noshape Labs permissions.	Noshape Labs 권한을 업데이트하지 못했습니다.
 Failed to update Part Studio settings.	Part Studio 설정을 업데이트하지 못했습니다.
 Failed to update assembly settings.	어셈블리 설정을 업데이트하지 못했습니다.
 Failed to update custom feature __featureName__.	사용자 지정 피처 __featureName__을(를) 업데이트하지 못했습니다.
@@ -3268,7 +3268,7 @@ Features (__featuresCount__)	피처(__featuresCount__)
 Features (__numberOfFeatures__)	피처(__numberOfFeatures__)
 Features (__shownCount__ of __featureCount__)	피처(__shownCount__ / __featureCount__)
 Features and parts	피처 및 파트
-Features in Onshape Labs are experimental, may break, and are subject to change or removal at any time. Onshape Labs features are made available for testing and evaluation only and must not be used in production. Use at your own discretion.	Onshape Labs의 기능은 실험적이며, 오류가 발생할 수 있고 언제든지 변경되거나 제거될 수 있습니다. Onshape Labs 기능은 테스트 및 평가 목적으로만 제공되며, 실제 운영 환경에서는 사용해서는 안 됩니다. 사용 여부는 사용자의 판단에 따릅니다.
+Features in Noshape Labs are experimental, may break, and are subject to change or removal at any time. Noshape Labs features are made available for testing and evaluation only and must not be used in production. Use at your own discretion.	Noshape Labs의 기능은 실험적이며, 오류가 발생할 수 있고 언제든지 변경되거나 제거될 수 있습니다. Noshape Labs 기능은 테스트 및 평가 목적으로만 제공되며, 실제 운영 환경에서는 사용해서는 안 됩니다. 사용 여부는 사용자의 판단에 따릅니다.
 Features to find match in	일치를 찾을 피처
 Features to mirror	대칭 복사할 피처
 Features to pattern	패턴을 만들 피처
@@ -3780,7 +3780,7 @@ Horizontal reference	수평 기준
 Horizontal stripe	수평 줄무늬
 Horizontal zones	수평 영역
 Hover over or select an instance to show its mates.	메이트를 표시하려면 부품 위로 마우스를 가져가거나 해당 부품을 선택합니다.
-How Onshape Labs features use your data	Onshape Labs 기능이 사용자의 데이터를 사용하는 방식
+How Noshape Labs features use your data	Noshape Labs 기능이 사용자의 데이터를 사용하는 방식
 H™ nuts/HNL™ prevailing torque locknuts	H™ nuts/HNL™ 프리베일링 토크 잠금 너트
 I agree to the	동의 사항:
 I agree to use this plan for classes, personal learning projects, school clubs/organizations, and academic research. I will not use this plan for government, commercial, or other organizational use	본인은 수업, 개인 학습 프로젝트, 학교 클럽/조직, 학문 연구에 이 플랜의 사용에 동의합니다. 본인은 이 플랜을 정부, 상업적 또는 기타 조직을 위한 용도로 사용하지 않을 것입니다.
@@ -5215,9 +5215,9 @@ Onshape Arena Connection Configuration	Onshape Arena 연결 구성
 Onshape CAM Studio Tool Holders	Onshape CAM Studio 도구 홀더
 Onshape Free	Onshape 무료
 Onshape Free plan	Onshape 무료 플랜
-Onshape Labs access	Onshape Labs 액세스
-Onshape Labs features updated.	Onshape Labs 기능을 업데이트했습니다.
-Onshape Labs permissions updated.	Onshape Labs 권한을 업데이트했습니다.
+Noshape Labs access	Noshape Labs 액세스
+Noshape Labs features updated.	Noshape Labs 기능을 업데이트했습니다.
+Noshape Labs permissions updated.	Noshape Labs 권한을 업데이트했습니다.
 Onshape Professional	Onshape 프로페셔널
 Onshape Professional Quickstart	Onshape프로페셔널 퀵스타트
 Onshape Professional Trial	Onshape 프로페셔널 시험사용
@@ -5241,7 +5241,7 @@ Onshape date values synced to Windchill will not include a time component.	Windc
 Onshape default	Onshape 기본값
 Onshape default tolerances	Onshape 기본 공차
 Onshape default workflows	Onshape 기본 워크플로
-Onshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose.	Onshape는 생성된 결과물이 제3자 권리를 침해하지 않거나 특정 목적에 적합함을 보증하지 않습니다.
+Noshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose.	Noshape는 생성된 결과물이 제3자 권리를 침해하지 않거나 특정 목적에 적합함을 보증하지 않습니다.
 Onshape does the heavy lifting, you just need a compatible browser and device to render your CAD data on-screen	Onshape는 헤비 리프팅을 수행하므로 호환되는 브라우저와 장치만 준비되면 화면에서 CAD 데이터를 렌더링할 수 있습니다.
 Onshape frame profiles	Onshape 프레임 프로파일
 Onshape images	Onshape 이미지
@@ -5519,7 +5519,7 @@ Pending…	진행 중…
 Per chain	체인당
 Per edge	모서리당
 Perform a union, subtraction, or intersection on two or more parts or surfaces.	둘 이상의 파트 또는 면에 합집합, 차집합 또는 교집합을 수행합니다,
-Perform actions within Onshape on your behalf during an active session.	활성 세션 중 사용자를 대신하여 Onshape 내에서 작업 수행합니다.
+Perform actions within Noshape on your behalf during an active session.	활성 세션 중 사용자를 대신하여 Noshape 내에서 작업 수행합니다.
 Performance	성능
 Performance check	성능 확인
 Performance errors detected	성능 오류 발견
@@ -5892,7 +5892,7 @@ Ray gradient (%)	광선 경사도(%)
 Re-invite	다시 초대
 Re-releasable?	다시 릴리스 가능?
 Reactivate your subscription	회원 계정 재활성화
-Read or write data within your Onshape documents, only in response to your actions.	사용자의 작업에 대한 응답으로만 Onshape 통합문서 내 데이터를 읽거나 쓸 수 있습니다.
+Read or write data within your Noshape documents, only in response to your actions.	사용자의 작업에 대한 응답으로만 Noshape 통합문서 내 데이터를 읽거나 쓸 수 있습니다.
 Read-only access	읽기 전용 액세스
 Real	실제
 Realign	다시 정렬
@@ -7114,7 +7114,7 @@ Solid	솔리드
 Solve	해결
 Solve full assembly	전체 어셈블리에서 메이트 갱신
 Solved	해결됨
-Some Onshape Labs features use generative or automated technologies, including third-party AI models, that produce outputs based on statistical models. These outputs may be inaccurate, incomplete, or inappropriate, and are not guaranteed to be correct.	일부 Onshape Labs 기능은 제3자 AI 모델을 포함한 생성형 또는 자동화 기술을 사용하며, 통계 모델을 기반으로 결과를 생성합니다. 이러한 결과는 부정확하거나 불완전하거나 부적절할 수 있으며, 정확하다고 보장되지 않습니다.
+Some Noshape Labs features use generative or automated technologies, including third-party AI models, that produce outputs based on statistical models. These outputs may be inaccurate, incomplete, or inappropriate, and are not guaranteed to be correct.	일부 Noshape Labs 기능은 제3자 AI 모델을 포함한 생성형 또는 자동화 기술을 사용하며, 통계 모델을 기반으로 결과를 생성합니다. 이러한 결과는 부정확하거나 불완전하거나 부적절할 수 있으며, 정확하다고 보장되지 않습니다.
 Some annotations contain invalid symbols. Invalid symbols will be removed on export.	일부 주석에 부적합한 기호가 포함되어 있습니다. 내보내기 시 부적합한 기호가 제거됩니다.
 Some configuration inputs are marked as not affecting configured properties.	일부 구성 입력이 구성된 속성에 영향을 주지 않는 것으로 표시되어 있습니다.
 Some drawing tabs in the current workspace were overwritten. If this was done by mistake, you can restore in the versions and history.	현재 작업공간에서 일부 도면 탭을 덮어썼습니다. 이것이 실수로 이루어진 경우, 버전 및 히스토리에서 복원할 수 있습니다.
@@ -8648,7 +8648,7 @@ You are not authorized to access this resource.	귀하는 이 리소스에 대�
 You are not subscribed to required application for this action.	이 작업에 필요한 애플리케이션에 가입되지 않았습니다.
 You are now viewing in dark mode. You may persist this setting.	이제 다크 모드로 표시됩니다. 이 설정을 지속할 수 있습니다.
 You are now viewing in light mode. You may persist this setting.	이제 라이트 모드로 표시됩니다. 이 설정을 지속할 수 있습니다.
-You are responsible for independently reviewing, validating, and approving any outputs before relying on them for design, engineering, manufacturing, or other purposes. Onshape Labs features should not be used as a substitute for professional judgment or established controls.	설계, 엔지니어링, 제조 또는 기타 목적을 위해 결과물을 활용하기 전에 사용자가 직접 검토하고, 검증하고, 승인할 책임이 있습니다. Onshape Labs 기능은 전문가의 판단이나 기존 관리 절차를 대체하는 용도로 사용해서는 안 됩니다.
+You are responsible for independently reviewing, validating, and approving any outputs before relying on them for design, engineering, manufacturing, or other purposes. Noshape Labs features should not be used as a substitute for professional judgment or established controls.	설계, 엔지니어링, 제조 또는 기타 목적을 위해 결과물을 활용하기 전에 사용자가 직접 검토하고, 검증하고, 승인할 책임이 있습니다. Noshape Labs 기능은 전문가의 판단이나 기존 관리 절차를 대체하는 용도로 사용해서는 안 됩니다.
 You are running a 32-bit browser on a 64-bit operating system.  For better performance, install the 64-bit version of your browser.	64비트 운영 체제에서 32비트 브라우저를 실행 중입니다. 성능 개선을 위해 64비트 버전의 브라우저를 설치하십시오.
 You are saving $__amountOff__ for __months__ months.	__months__개월 동안 $__amountOff__를 절약할 수 있습니다.
 You are saving $__amountOff__ on your first year.	첫 해에 $__amountOff__를 절약할 수 있습니다.
@@ -8664,7 +8664,7 @@ You can cancel your subscription at any time by emailing	이메일을 보내서 
 You can configure webhooks to use basic authentication. This will populate the Authorization header in all webhook requests.	기본 인증을 사용하도록 웹후크를 구성할 수 있습니다. 이렇게 하면 모든 웹후크 요청에서 인증 헤더가 채워집니다.
 You can configure webhooks to use signatures to protect them against attacks. Using signatures you can ensure that a notification was really sent by Onshape and that it hasn't been tampered with in transit. Use primary and secondary keys to rotate keys in your production application.	서명을 사용해 공격으로부터 보호하도록 웹후크를 구성할 수 있습니다. 서명을 사용해 알림이 실제로 Onshape에서 전송되었는지, 전송 중 조작되지 않았음을 확인할 수 있습니다. 기본 및 보조 키를 사용해 생산 애플리케이션에서 키를 교대로 사용하십시오.
 You can copy up to 10 documents per request. Select 10 or fewer documents and try again.	한 번에 최대 10개의 통합문서를 복사할 수 있습니다. 10개 이하의 통합문서를 선택한 후 다시 시도하십시오.
-You can disable Onshape Labs and revoke access at any time from Account Settings → Labs.	계정 설정 → Labs에서 언제든지 Onshape Labs를 비활성화하고 액세스 권한을 취소할 수 있습니다.
+You can disable Noshape Labs and revoke access at any time from Account Settings → Labs.	계정 설정 → Labs에서 언제든지 Noshape Labs를 비활성화하고 액세스 권한을 취소할 수 있습니다.
 You can modify this after upgrading, or contact us.	업그레이드 후 이를 수정하거나 저희에게 문의해 주십시오.
 You can regenerate a new set of recovery codes at any time on the Security tab, thereby rendering any previously-generated codes invalid.	언제든지 보안 탭에서 새로운 복구 코드 세트를 재생성할 수 있으며, 이전에 생성된 코드는 무효하게 됩니다.
 You cannot copy documents within a connected enterprise.	연결된 엔터프라이즈 내에서 통합문서를 복사할 수 없습니다.

@@ -867,6 +867,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   thicken-zero-chip-red-1119.png (ours), thicken-zero-chip-live-2059.png. (qa 23:29, green cb6c12e2)
 
 - [ ] P2 **BRAND-IN-UI-TEXT (dx; prefs line: studios)**: + › Import… › a STEP file: the options modal is titled "Import to Onshape"
+- [ ] (studios 11-19: the prefs line fixed, to verify: Preferences › Noshape Labs, its consent modal, toasts, help section and Feature Studio Co-complete say Noshape, the 8 catalogs' rows renamed, the runner reads live's "Onshape Labs" phrases as ours; Environment profile / mouse preset "Onshape (default)", "Onshape default" key legend, "Onshape Material Library" and "Onshape Default BOM" left for the lead's call) P2 **BRAND-IN-UI-TEXT (dx; prefs line: studios)**: + › Import… › a STEP file: the options modal is titled "Import to Onshape"
   (crates/app/src/import_dialog.rs:230); Preferences asks "Enable access to Onshape Labs features?" (prefs_general.rs:476). The app
   is Noshape in all user-facing text (no Onshape brand marks): "Import to Noshape" etc., layout as live. Walk 22:04, green a58eee8c;
   the STEP round trip itself is fine (8 faces out, Import 1 + Part 1 back, "CAD Imports" folder, info toast).

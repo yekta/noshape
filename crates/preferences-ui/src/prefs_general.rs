@@ -239,7 +239,7 @@ impl Render for ThemingPrefsView {
             v_flex()
                 .pt(px(2.))
                 .gap(px(16.))
-                .child(option("pref-light", false, "Light mode", "Default color scheme for Onshape featuring dark elements on light backgrounds.", None, cx))
+                .child(option("pref-light", false, "Light mode", "Default color scheme for Noshape featuring dark elements on light backgrounds.", None, cx))
                 .child(option("pref-dark", true, "Dark mode", "Low luminance color scheme mainly featuring light elements on dark backgrounds.", Some(beta), cx))
                 .child(h_flex().child(PreferencesView::save_button("pref-theme-save", tr("Save theme"), changed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     if this.edited == this.saved {
@@ -473,33 +473,33 @@ impl LabsPrefsView {
                     .child(div().w(px(16.)).h(px(19.5)).flex_none().flex().items_center().child(div().size(px(5.)).rounded_full().bg(pal.text)))
                     .child(div().text_size(px(13.)).line_height(px(19.5)).text_color(pal.text).child(tr(t)))
             };
-            os::modal_doc_page(dialog, tr("Enable access to Onshape Labs features?"), 600.)
+            os::modal_doc_page(dialog, tr("Enable access to Noshape Labs features?"), 600.)
                 .child(
                     os::modal_body()
                         .px(px(24.))
                         .pt(px(18.))
                         .pb(px(16.))
                         .gap_0()
-                        .child(h_flex().gap(px(4.)).items_baseline().child(div().text_size(px(15.)).font_weight(FontWeight::SEMIBOLD).child(tr("Onshape Labs"))).child(div().text_size(px(13.)).italic().text_color(pal.text_muted).child(tr("Experimental features — opt-in preview"))))
-                        .child(para("Features in Onshape Labs are experimental, may break, and are subject to change or removal at any time. Onshape Labs features are made available for testing and evaluation only and must not be used in production. Use at your own discretion."))
-                        .child(heading("How Onshape Labs features use your data"))
+                        .child(h_flex().gap(px(4.)).items_baseline().child(div().text_size(px(15.)).font_weight(FontWeight::SEMIBOLD).child(tr("Noshape Labs"))).child(div().text_size(px(13.)).italic().text_color(pal.text_muted).child(tr("Experimental features — opt-in preview"))))
+                        .child(para("Features in Noshape Labs are experimental, may break, and are subject to change or removal at any time. Noshape Labs features are made available for testing and evaluation only and must not be used in production. Use at your own discretion."))
+                        .child(heading("How Noshape Labs features use your data"))
                         .child(para("When you enable a Labs feature, it may:"))
-                        .child(bullet("Read or write data within your Onshape documents, only in response to your actions.", true))
-                        .child(bullet("Perform actions within Onshape on your behalf during an active session.", false))
+                        .child(bullet("Read or write data within your Noshape documents, only in response to your actions.", true))
+                        .child(bullet("Perform actions within Noshape on your behalf during an active session.", false))
                         .child(bullet("Transmit relevant data to third-party AI providers to generate outputs, where applicable.", false))
                         .child(heading("Limitations of experimental AI features"))
-                        .child(para("Some Onshape Labs features use generative or automated technologies, including third-party AI models, that produce outputs based on statistical models. These outputs may be inaccurate, incomplete, or inappropriate, and are not guaranteed to be correct."))
-                        .child(para("You are responsible for independently reviewing, validating, and approving any outputs before relying on them for design, engineering, manufacturing, or other purposes. Onshape Labs features should not be used as a substitute for professional judgment or established controls."))
-                        .child(para("Onshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose."))
-                        .child(para("You can disable Onshape Labs and revoke access at any time from Account Settings → Labs.")),
+                        .child(para("Some Noshape Labs features use generative or automated technologies, including third-party AI models, that produce outputs based on statistical models. These outputs may be inaccurate, incomplete, or inappropriate, and are not guaranteed to be correct."))
+                        .child(para("You are responsible for independently reviewing, validating, and approving any outputs before relying on them for design, engineering, manufacturing, or other purposes. Noshape Labs features should not be used as a substitute for professional judgment or established controls."))
+                        .child(para("Noshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose."))
+                        .child(para("You can disable Noshape Labs and revoke access at any time from Account Settings → Labs.")),
                 )
-                .footer(os::modal_footer().child(os::modal_ok(os::primary_button("labs-enable", tr("Enable Onshape Labs")))).child(os::modal_cancel(os::cancel_button("labs-cancel", tr("Cancel"), cx))))
+                .footer(os::modal_footer().child(os::modal_ok(os::primary_button("labs-enable", tr("Enable Noshape Labs")))).child(os::modal_cancel(os::cancel_button("labs-cancel", tr("Cancel"), cx))))
                 .on_ok(|_, window, cx| {
                     let mut prefs = ListPrefs::load();
                     prefs.labs = true;
                     prefs.save();
                     window.refresh();
-                    toast(crate::i18n::tr("Access to the Onshape Labs features is enabled."), cx);
+                    toast(crate::i18n::tr("Access to the Noshape Labs features is enabled."), cx);
                     true
                 })
         });
@@ -508,7 +508,7 @@ impl LabsPrefsView {
 
 impl Render for LabsPrefsView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        crate::ui_script::set_section("Onshape Labs");
+        crate::ui_script::set_section("Noshape Labs");
         let pal = p();
         let prefs = ListPrefs::load();
         let (on, co) = (prefs.labs, prefs.labs_co_complete);
@@ -530,7 +530,7 @@ impl Render for LabsPrefsView {
                 })
         };
         section(
-            "Onshape Labs",
+            "Noshape Labs",
             // Live 1870, 1919: the blue flask, Labs on or off.
             Some(crate::assets::icon("onshape-labs-blue", 20., cx).into_any_element()),
             v_flex()
@@ -538,7 +538,7 @@ impl Render for LabsPrefsView {
                     check_row("pref-labs", on, tr("Enable users to access experimental, proof of concept features."))
                         .child(div().id("pref-labs-learn").ml(px(4.)).font_weight(FontWeight::BOLD).text_color(rgb(0x1651b0)).underline().child(tr("Learn more.")).on_click(|_, _, cx| {
                             cx.stop_propagation();
-                            noshape_app_core::help::open("Onshape Labs", cx);
+                            noshape_app_core::help::open("Noshape Labs", cx);
                         }))
                         .on_click(cx.listener(move |_, _: &ClickEvent, window, cx| {
                             if on {
@@ -546,7 +546,7 @@ impl Render for LabsPrefsView {
                                 let mut prefs = ListPrefs::load();
                                 prefs.labs = false;
                                 prefs.save();
-                                toast(crate::i18n::tr("Access to the Onshape Labs features is disabled."), cx);
+                                toast(crate::i18n::tr("Access to the Noshape Labs features is disabled."), cx);
                                 cx.notify();
                             } else {
                                 Self::consent_dialog(window, cx);
@@ -559,12 +559,12 @@ impl Render for LabsPrefsView {
                     d.child(
                         v_flex().pl(px(14.)).pt(px(23.)).child(
                             check_row("pref-labs-co", co, tr("FeatureScript Co-complete"))
-                                .child(external("pref-labs-co-help", "FeatureScript Co-complete", "Onshape Labs", cx))
+                                .child(external("pref-labs-co-help", "FeatureScript Co-complete", "Noshape Labs", cx))
                                 .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
                                     let mut prefs = ListPrefs::load();
                                     prefs.labs_co_complete = !co;
                                     prefs.save();
-                                    toast(crate::i18n::tr("Onshape Labs features updated."), cx);
+                                    toast(crate::i18n::tr("Noshape Labs features updated."), cx);
                                     cx.notify();
                                 })),
                         ),

@@ -9,6 +9,9 @@
    "do": "click",
    "on": {
     "checkbox": "Onshape Labs › Enable users to access experimental, proof of concept features."
+   },
+   "ours_on": {
+    "checkbox": "Noshape Labs › Enable users to access experimental, proof of concept features."
    }
   },
   {

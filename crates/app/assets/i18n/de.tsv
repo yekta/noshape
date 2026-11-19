@@ -166,8 +166,8 @@ Access all your Dropbox files from Onshape. Import files to create new documents
 Access all your Google Drive files from Onshape. Import files to create new documents or export directly to Google Drive	Greifen Sie von Onshape aus auf alle Ihre Google Drive-Dateien zu. Importieren Sie Dateien, um neue Dokumente zu erstellen, oder exportieren Sie sie direkt für Google Drive.
 Access all your Microsoft OneDrive files from Onshape. Import files to create new documents or export directly to Microsoft OneDrive	Greifen Sie von Onshape aus auf alle Ihre Microsoft OneDrive-Dateien zu. Importieren Sie Dateien, um neue Dokumente zu erstellen, oder exportieren Sie sie direkt in Microsoft OneDrive.
 Access to shared data is limited to viewing, commenting and exporting data.	Der Zugriff auf geteilte Daten ist auf das Anzeigen, Kommentieren und Exportieren von Daten beschränkt.
-Access to the Onshape Labs features is disabled.	Der Zugriff auf die Onshape-Labs-Features ist deaktiviert.
-Access to the Onshape Labs features is enabled.	Der Zugriff auf die Onshape-Labs-Features ist aktiviert.
+Access to the Noshape Labs features is disabled.	Der Zugriff auf die Noshape-Labs-Features ist deaktiviert.
+Access to the Noshape Labs features is enabled.	Der Zugriff auf die Noshape-Labs-Features ist aktiviert.
 Access to this document has been restricted and it will close automatically at __time__.	Der Zugriff auf dieses Dokument wurde eingeschränkt und es wird automatisch um __time__ geschlossen.
 Access to this document has been restricted with the message '__message__' and it will close automatically at __time__.	Der Zugriff auf dieses Dokument wurde mit der Nachricht „__message__“ eingeschränkt. Es wird automatisch um __time__ geschlossen.
 Access to this document has been restricted with the message '__message__'.	Der Zugriff auf dieses Dokument wurde mit der Nachricht „__message__“ eingeschränkt.
@@ -503,7 +503,7 @@ Ambient occlusion	Umgebungsverdeckung
 Amount cannot exceed $999,999.	Der Betrag darf 999.999 $ nicht überschreiten.
 Amount cannot exceed $999.999.	Der Betrag darf 999.999 $ nicht überschreiten.
 Amount does not include sales tax	Der Betrag ist exklusive Umsatzsteuer.
-An admin must enable access for you to use Onshape Labs features.	Ein Administrator muss den Zugriff für Sie aktivieren, damit Sie die Onshape Labs-Features nutzen können.
+An admin must enable access for you to use Noshape Labs features.	Ein Administrator muss den Zugriff für Sie aktivieren, damit Sie die Noshape Labs-Features nutzen können.
 An email is headed your way	Sie sollten bald eine E-Mail erhalten
 An environment profile is defined by settings tied to a specific browser on a specific device. Creating or selecting a profile will tie these settings to your current environment.	Ein Umgebungsprofil wird definiert, indem die Einstellungen an einen bestimmten Browser oder ein bestimmtes Gerät geknüpft werden. Durch das Erstellen oder Auswählen eines Profils werden diese Einstellungen an Ihre jetzige Umgebung geknüpft.
 An error has occurred	Ein Fehler ist aufgetreten.
@@ -624,7 +624,7 @@ Are you sure you want to downgrade to the Free plan?	Sind Sie sicher, dass Sie a
 Are you sure you want to leave this organization?	Möchten Sie diese Gruppe wirklich verlassen?
 Are you sure you want to reset all keyboard shortcuts to default values?	Sind Sie sicher, dass Sie alle Tastenkombinationen auf die Standardeinstellungen zurücksetzen möchten?
 Are you sure you wish to revoke __grantName__'s access? After revoking access Onshape will no longer have any access to this application.	Möchten Sie den Zugriff von „__grantName__“ wirklich widerrufen? Danach hat Onshape keinen Zugriff mehr auf diese Anwendung.
-Are you sure you wish to revoke __grantName__'s access? After revoking access the application will no longer have any access to your Onshape documents.	Möchten Sie den Zugriff von „__grantName__“ wirklich widerrufen? Danach hat die Anwendung keinen Zugriff mehr auf Ihre Onshape-Dokumente.
+Are you sure you wish to revoke __grantName__'s access? After revoking access the application will no longer have any access to your Noshape documents.	Möchten Sie den Zugriff von „__grantName__“ wirklich widerrufen? Danach hat die Anwendung keinen Zugriff mehr auf Ihre Noshape-Dokumente.
 Area	Fläche
 Area moment of inertia (__units__)	Flächenträgheitsmoment (__units__)
 Arena PLM connection	Verbindung zum Arena PLM
@@ -1211,8 +1211,8 @@ Cloud storage failed to load.	Der Cloud-Speicher konnte nicht geladen werden.
 Cloud storage integration settings	Einstellungen für Cloud-Speicher-Integration
 Cloud storage integration users	Benutzer von Cloud-Speicher-Integration
 Co-complete	Gemeinsam abschließen
-Co-complete (Onshape Labs)	Co-Complete (Onshape Labs)
-Co-complete (must enable Onshape Labs)	Co-Complete (Onshape Labs muss aktiviert werden)
+Co-complete (Noshape Labs)	Co-Complete (Noshape Labs)
+Co-complete (must enable Noshape Labs)	Co-Complete (Noshape Labs muss aktiviert werden)
 Co-complete is disabled. You may persist this setting.	Die Funktion „Gemeinsam abschließen“ ist deaktiviert. Sie können diese Einstellung beibehalten.
 Co-complete is enabled. You may persist this setting.	Die Funktion „Gemeinsam abschließen“ ist aktiviert. Sie können diese Einstellung beibehalten.
 Coarse	Grob
@@ -1484,7 +1484,7 @@ Construction (q)	Konstruktion (q)
 Construction lines	Konstruktionslinien
 Consumable	Verbrauchsmaterial
 Contact Onshape support if these problems persist.	Bitte wenden Sie sich an den Onshape-Support, sollten diese Probleme weiterhin bestehen.
-Contact an admin to enable and grant access for users in the company to use Onshape Labs features.	Wenden Sie sich an einen Administrator, um die Onshape Labs-Features für die Benutzer in Ihrer Company zu aktivieren und ihnen Zugriff darauf zu gewähren.
+Contact an admin to enable and grant access for users in the company to use Noshape Labs features.	Wenden Sie sich an einen Administrator, um die Noshape Labs-Features für die Benutzer in Ihrer Company zu aktivieren und ihnen Zugriff darauf zu gewähren.
 Contact our support team for help with your Onshape plan	Kontaktieren Sie unser Support-Team, wenn Sie Hilfe bei Ihrem Onshape-Abo benötigen.
 Contact sales	Kontakt Vertrieb
 Contact support	Support kontaktieren
@@ -2038,7 +2038,7 @@ Default Windchill library - Non-geometric items	Windchill-Standardbibliothek –
 Default Windchill library - Standard Content	Windchill-Standardbibliothek – Standardinhalt
 Default assembly BOM table template failed to update.	Standard-Baugruppen-Stücklistentabellenvorlage konnte nicht aktualisiert werden.
 Default bend K Factor	Standard-Biege-K-Faktor
-Default color scheme for Onshape featuring dark elements on light backgrounds.	Standard-Farbschema für Onshape, mit dunklen Elementen auf hellem Hintergrund.
+Default color scheme for Noshape featuring dark elements on light backgrounds.	Standard-Farbschema für Noshape, mit dunklen Elementen auf hellem Hintergrund.
 Default corner type	Standard-Eckentyp
 Default drawing BOM table template failed to update.	Standard-Zeichnungs-Stücklistentabellenvorlage konnte nicht aktualisiert werden.
 Default feature selected	Standard-Feature ausgewählt
@@ -2631,13 +2631,13 @@ Empty trash…	Papierkorb leeren …
 Enable	Aktivieren
 Enable AWS KMS key configuration	AWS-KMS-Schlüsselkonfiguration aktivieren
 Enable Onshape Arena connection	Onshape-Arena-Verbindung
-Enable Onshape Labs	Onshape Labs aktivieren
-Enable Onshape Labs in your preferences to use co-complete. Co-complete use AI to contextually suggest and complete code as you type.	Aktivieren Sie „Onshape Labs“ in Ihren Voreinstellungen, um Co-Complete zu nutzen. Co-Complete verwendet künstliche Intelligenz, um während der Eingabe kontextbezogene Vorschläge zu machen und Code zu vervollständigen.
-Enable Onshape Labs in your preferences to use descriptive image search, which uses AI to enhance search results.	Aktivieren Sie „Onshape Labs“ in Ihren Voreinstellungen, um die beschreibende Bildsuche zu nutzen, die mithilfe von KI die Suchergebnisse verbessert.
+Enable Noshape Labs	Noshape Labs aktivieren
+Enable Noshape Labs in your preferences to use co-complete. Co-complete use AI to contextually suggest and complete code as you type.	Aktivieren Sie „Noshape Labs“ in Ihren Voreinstellungen, um Co-Complete zu nutzen. Co-Complete verwendet künstliche Intelligenz, um während der Eingabe kontextbezogene Vorschläge zu machen und Code zu vervollständigen.
+Enable Noshape Labs in your preferences to use descriptive image search, which uses AI to enhance search results.	Aktivieren Sie „Noshape Labs“ in Ihren Voreinstellungen, um die beschreibende Bildsuche zu nutzen, die mithilfe von KI die Suchergebnisse verbessert.
 Enable Onshape Windchill connection	Onshape-Windchill-Verbindung aktivieren
 Enable SSO provider	SSO-Anbieter aktivieren
 Enable WebGL in your browser for more consistent performance.	Aktivieren Sie WebGL in Ihrem Browser für eine konsistentere Leistung.
-Enable access to Onshape Labs features?	Zugriff auf Onshape-Labs-Features aktivieren?
+Enable access to Noshape Labs features?	Zugriff auf Noshape-Labs-Features aktivieren?
 Enable access to experimental, proof of concept features.	Aktivieren Sie den Zugriff auf experimentelle Features und Proof-of-Concept-Features.
 Enable basic authentication	Basisauthentifizierung aktivieren
 Enable enterprise features and tables	Enterprise-Features und Tabellen aktivieren
@@ -3037,12 +3037,12 @@ Failed to delete job.	Auftrag konnte nicht gelöscht werden.
 Failed to delete selected class.	Ausgewählter Kurs konnte nicht gelöscht werden.
 Failed to delete team.	Löschen des Teams fehlgeschlagen.
 Failed to delete your photo.	Löschen Ihres Fotos fehlgeschlagen.
-Failed to disable Onshape Labs features.	Onshape-Labs-Features konnten nicht deaktiviert werden.
+Failed to disable Noshape Labs features.	Noshape-Labs-Features konnten nicht deaktiviert werden.
 Failed to disable two factor authentication.	Deaktivieren der Zwei-Faktor-Authentifizierung fehlgeschlagen.
 Failed to edit dashboard.	Bearbeiten des Dashboards fehlgeschlagen.
 Failed to edit tab properties.	Bearbeiten der Registerkarteneigenschaften fehlgeschlagen.
 Failed to edit tutorial URL.	Bearbeiten der Tutorial-URL fehlgeschlagen.
-Failed to enable Onshape Labs features.	Onshape-Labs-Features konnten nicht aktiviert werden.
+Failed to enable Noshape Labs features.	Noshape-Labs-Features konnten nicht aktiviert werden.
 Failed to expand notifications.	Benachrichtigungen konnten nicht erweitert werden.
 Failed to export Onshape__type__ library:	Export der Onshape-__type__-Bibliothek fehlgeschlagen:
 Failed to export __name____type__ library:	Export der  __name____type__-Bibliothek fehlgeschlagen:
@@ -3087,7 +3087,7 @@ Failed to invite user to your enterprise.	Einladen des Benutzers in Ihr Enterpri
 Failed to invite users to your company.	Benutzer konnten nicht in Ihre Company eingeladen werden.
 Failed to invite users to your enterprise.	Einladen der Benutzer in Ihr Enterprise fehlgeschlagen.
 Failed to link __plmName__ change.	__plmName__ Änderung wurde nicht verlinkt.
-Failed to load Onshape Labs permissions.	Onshape-Labs-Berechtigungen konnten nicht geladen werden.
+Failed to load Noshape Labs permissions.	Noshape-Labs-Berechtigungen konnten nicht geladen werden.
 Failed to load __companyType__ - 	Laden von __companyType__ fehlgeschlagen - 
 Failed to load __companyType__.	Laden von __companyType__ fehlgeschlagen
 Failed to load class. Resource does not exist or you do not have permission to access it.	Kurs konnte nicht geladen werden. Die Ressource gibt es nicht oder Sie haben dafür keine Zugriffsrechte.
@@ -3187,8 +3187,8 @@ Failed to transfer publication to __companyName__.	Veröffentlichung konnte nich
 Failed to transfer publication to __userEmail__.	Veröffentlichung konnte nicht in __userEmail__ übertragen werden.
 Failed to unset __name____type__ library:	Einrichtung der __name____type__-Bibliothek konnte nicht rückgängig gemacht werden:
 Failed to unset your__type__ library:	Einrichtung Ihrer __type__-Bibliothek konnte nicht rückgängig gemacht werden:
-Failed to update Onshape Labs features.	Onshape-Labs-Features konnten nicht aktualisiert werden.
-Failed to update Onshape Labs permissions.	Die Berechtigungen für Onshape Labs konnten nicht aktualisiert werden.
+Failed to update Noshape Labs features.	Noshape-Labs-Features konnten nicht aktualisiert werden.
+Failed to update Noshape Labs permissions.	Die Berechtigungen für Noshape Labs konnten nicht aktualisiert werden.
 Failed to update Part Studio settings.	Die Part Studio Einstellungen konnten nicht aktualisiert werden.
 Failed to update assembly settings.	Baugruppen-Einstellungen konnten nicht aktualisiert werden.
 Failed to update custom feature __featureName__.	Aktualiseren des benutzerdefinierten Features „__featureName__“ fehlgeschlagen.
@@ -3253,7 +3253,7 @@ FeatureScript samples	FeatureScript-Beispiele
 FeatureScript search	FeatureScript-Suche
 Features (__shownCount__ of __featureCount__)	Features (__shownCount__ von __featureCount__)
 Features and parts	Features und Bauteile
-Features in Onshape Labs are experimental, may break, and are subject to change or removal at any time. Onshape Labs features are made available for testing and evaluation only and must not be used in production. Use at your own discretion.	Die Features in Onshape Labs sind experimenteller Natur, können zu Fehlern führen und jederzeit geändert oder entfernt werden. Onshape-Labs-Features werden ausschließlich zu Test- und Evaluierungszwecken bereitgestellt und dürfen nicht in der Produktion eingesetzt werden. Die Nutzung erfolgt nach eigenem Ermessen.
+Features in Noshape Labs are experimental, may break, and are subject to change or removal at any time. Noshape Labs features are made available for testing and evaluation only and must not be used in production. Use at your own discretion.	Die Features in Noshape Labs sind experimenteller Natur, können zu Fehlern führen und jederzeit geändert oder entfernt werden. Noshape-Labs-Features werden ausschließlich zu Test- und Evaluierungszwecken bereitgestellt und dürfen nicht in der Produktion eingesetzt werden. Die Nutzung erfolgt nach eigenem Ermessen.
 Features to find match in	Features für Übereinstimmungssuche
 Features to mirror	Zu spiegelnde Features
 Features to pattern	Features für Muster
@@ -3757,7 +3757,7 @@ Horizontal reference	Horizontale Referenz
 Horizontal stripe	Horizontaler Streifen
 Horizontal zones	Horizontale Zonen
 Hover over or select an instance to show its mates.	Bewegen Sie den Mauszeiger über eine Instanz oder wählen Sie eine aus, um ihre Verknüpfungen anzuzeigen.
-How Onshape Labs features use your data	Wie Onshape-Labs-Features Ihre Daten nutzen
+How Noshape Labs features use your data	Wie Noshape-Labs-Features Ihre Daten nutzen
 H™ nuts/HNL™ prevailing torque locknuts	H™-Muttern/HNL™-Drehmoment-Gegenmuttern mit Klemmteil
 I agree to the	Ich akzeptiere die
 I agree to use this plan for classes, personal learning projects, school clubs/organizations, and academic research. I will not use this plan for government, commercial, or other organizational use	Ich erkläre mich damit einverstanden, dieses Abo für Kurse, persönliche Lernprojekte, schulische Clubs/Organisationen und akademische Forschungsarbeiten zu verwenden. Ich werde dieses Abo nicht für staatliche, kommerzielle oder andere Unternehmen nutzen.
@@ -5173,9 +5173,9 @@ Onshape CAM Studio Tool Holders	Onshape-CAM-Studio-Tool-Halter
 Onshape Company ID	Onshape-Company-ID
 Onshape Discovery Program	Onshape-Discovery-Programm
 Onshape Free plan	Onshape-Free-Abo
-Onshape Labs access	Zugriff auf Onshape Labs
-Onshape Labs features updated.	Onshape-Labs-Features aktualisiert.
-Onshape Labs permissions updated.	Onshape-Labs-Berechtigungen aktualisiert.
+Noshape Labs access	Zugriff auf Noshape Labs
+Noshape Labs features updated.	Noshape-Labs-Features aktualisiert.
+Noshape Labs permissions updated.	Noshape-Labs-Berechtigungen aktualisiert.
 Onshape Professional Quickstart	Onshape-Professional-Schnellstart
 Onshape Professional Trial	Testversion von Onshape Professional
 Onshape Quickstart	Onshape-Schnellstart
@@ -5196,7 +5196,7 @@ Onshape date values synced to Windchill will not include a time component.	Onsha
 Onshape default	Onshape-Standard
 Onshape default tolerances	Onshape-Standardtoleranzen
 Onshape default workflows	Onshape-Standard-Arbeitsabläufe
-Onshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose.	Onshape garantiert nicht, dass die erzeugten Ausgaben frei von Rechten Dritter oder für einen bestimmten Zweck geeignet sind.
+Noshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose.	Noshape garantiert nicht, dass die erzeugten Ausgaben frei von Rechten Dritter oder für einen bestimmten Zweck geeignet sind.
 Onshape does the heavy lifting, you just need a compatible browser and device to render your CAD data on-screen	Onshape übernimmt die schwere Arbeit, Sie benötigen lediglich einen kompatiblen Browser und ein kompatibles Gerät, um Ihre CAD-Daten auf dem Bildschirm darzustellen.
 Onshape frame profiles	Onshape-Rahmenprofile
 Onshape images	Onshape-Bilder
@@ -5469,7 +5469,7 @@ Pending…	Ausstehend …
 Per chain	Per Kette
 Per edge	Per Kante
 Perform a union, subtraction, or intersection on two or more parts or surfaces.	Zum Vereinigen, Subtrahieren oder Schneiden von mindestens zwei Bauteilen oder Oberflächen.
-Perform actions within Onshape on your behalf during an active session.	Führen Sie während einer aktiven Sitzung in Ihrem Namen Aktionen in Onshape aus.
+Perform actions within Noshape on your behalf during an active session.	Führen Sie während einer aktiven Sitzung in Ihrem Namen Aktionen in Noshape aus.
 Performance	Leistung
 Performance check	Leistungstest
 Performance errors detected	Leistungsfehler festgestellt
@@ -5835,7 +5835,7 @@ Ray gradient (%)	Strahlengradient (%)
 Re-invite	Erneut einladen
 Re-releasable?	Erneute Freigabe möglich?
 Reactivate your subscription	Reaktivieren Sie Ihr Abonnement
-Read or write data within your Onshape documents, only in response to your actions.	Lesen oder schreiben Sie Daten in Ihren Onshape-Dokumenten, jedoch ausschließlich als Reaktion auf Ihre Aktionen.
+Read or write data within your Noshape documents, only in response to your actions.	Lesen oder schreiben Sie Daten in Ihren Noshape-Dokumenten, jedoch ausschließlich als Reaktion auf Ihre Aktionen.
 Read-only access	Schreibgeschützter Zugriff
 Realign	Neu ausrichten
 Reapply features	Features erneut anwenden
@@ -7049,7 +7049,7 @@ Solid	Volumenkörper
 Solve	Auflösen
 Solve full assembly	Gesamte Baugruppe auflösen
 Solved	Aufgelöst
-Some Onshape Labs features use generative or automated technologies, including third-party AI models, that produce outputs based on statistical models. These outputs may be inaccurate, incomplete, or inappropriate, and are not guaranteed to be correct.	Einige Onshape-Labs-Features verwenden generative oder automatisierte Technologien, einschließlich KI-Modelle von Drittanbietern, die Ergebnisse auf der Grundlage statistischer Modelle erzeugen. Diese Ausgaben können ungenau, unvollständig oder unangemessen sein und es kann nicht garantiert werden, dass sie korrekt sind.
+Some Noshape Labs features use generative or automated technologies, including third-party AI models, that produce outputs based on statistical models. These outputs may be inaccurate, incomplete, or inappropriate, and are not guaranteed to be correct.	Einige Noshape-Labs-Features verwenden generative oder automatisierte Technologien, einschließlich KI-Modelle von Drittanbietern, die Ergebnisse auf der Grundlage statistischer Modelle erzeugen. Diese Ausgaben können ungenau, unvollständig oder unangemessen sein und es kann nicht garantiert werden, dass sie korrekt sind.
 Some annotations contain invalid symbols. Invalid symbols will be removed on export.	Einige Beschriftungen enthalten ungültige Symbole, die beim Export entfernt werden.
 Some configuration inputs are marked as not affecting configured properties.	Einige Konfigurationseingaben sind so markiert, dass sie sich nicht auf konfigurierte Eigenschaften auswirken.
 Some drawing tabs in the current workspace were overwritten. If this was done by mistake, you can restore in the versions and history.	Einige Registerkarten im aktuellen Arbeitsbereich wurden überschrieben. Geschah dies versehentlich, können Sie sie in den Versionen und im Verlauf wiederherstellen.
@@ -8557,7 +8557,7 @@ You are not authorized to access this resource.	Sie haben keine Berechtigung, au
 You are not subscribed to required application for this action.	Sie haben die erforderliche Anwendung für diese Aktion nicht abonniert.
 You are now viewing in dark mode. You may persist this setting.	Sie befinden sich im Dunkelmodus. Sie können diese Einstellung beibehalten.
 You are now viewing in light mode. You may persist this setting.	Sie befinden sich im Hellmodus. Sie können diese Einstellung beibehalten.
-You are responsible for independently reviewing, validating, and approving any outputs before relying on them for design, engineering, manufacturing, or other purposes. Onshape Labs features should not be used as a substitute for professional judgment or established controls.	Sie sind dafür verantwortlich, alle Ergebnisse eigenständig zu prüfen, zu validieren und zu genehmigen, bevor Sie diese für Konstruktions-, Entwicklungs-, Fertigungs- oder andere Zwecke heranziehen. Die Features von Onshape Labs sollten nicht als Ersatz für fachliches Urteilsvermögen oder etablierte Kontrollmechanismen verwendet werden.
+You are responsible for independently reviewing, validating, and approving any outputs before relying on them for design, engineering, manufacturing, or other purposes. Noshape Labs features should not be used as a substitute for professional judgment or established controls.	Sie sind dafür verantwortlich, alle Ergebnisse eigenständig zu prüfen, zu validieren und zu genehmigen, bevor Sie diese für Konstruktions-, Entwicklungs-, Fertigungs- oder andere Zwecke heranziehen. Die Features von Noshape Labs sollten nicht als Ersatz für fachliches Urteilsvermögen oder etablierte Kontrollmechanismen verwendet werden.
 You are running a 32-bit browser on a 64-bit operating system.  For better performance, install the 64-bit version of your browser.	Sie führen einen 32-Bit-Browser auf einem 64-Bit-Betriebssystem aus. Eine bessere Leistung erzielen Sie, wenn Sie eine 64-Bit-Version des Browsers installieren.
 You are saving $__amountOff__ for __months__ months.	Sie sparen __amountOff__ $ __months__ Monaten.
 You are saving $__amountOff__ on your first year.	Sie sparen __amountOff__ $ im ersten Jahr.
@@ -8573,7 +8573,7 @@ You can cancel your subscription at any time by emailing	Sie können Ihr Abonnem
 You can configure webhooks to use basic authentication. This will populate the Authorization header in all webhook requests.	Sie können Webhooks so konfigurieren, dass eine einfache Authentifizierung verwendet wird. Dann wird der Autorisierungs-Header bei allen Webhook-Anfragen automatisch ausgefüllt.
 You can configure webhooks to use signatures to protect them against attacks. Using signatures you can ensure that a notification was really sent by Onshape and that it hasn't been tampered with in transit. Use primary and secondary keys to rotate keys in your production application.	Sie können Webhooks so konfigurieren, dass zum Schutz vor Angriffen Signaturen verwendet werden. Mit Signaturen stellen Sie sicher, dass eine Benachrichtigung wirklich von Onshape stammt und während der Übertragung nicht manipuliert wurde. Verwenden Sie Primär- und Sekundärschlüssel in Ihrer Produktionsumgebung, sodass Sie die Schlüssel austauschen können.
 You can copy up to 10 documents per request. Select 10 or fewer documents and try again.	Sie können pro Anforderung bis zu 10 Dokumente kopieren. Wählen Sie höchstens 10 Dokumente aus und versuchen Sie es erneut.
-You can disable Onshape Labs and revoke access at any time from Account Settings → Labs.	Sie können Onshape Labs jederzeit unter „Kontoeinstellungen“ → „Labs“ deaktivieren und den Zugriff widerrufen.
+You can disable Noshape Labs and revoke access at any time from Account Settings → Labs.	Sie können Noshape Labs jederzeit unter „Kontoeinstellungen“ → „Labs“ deaktivieren und den Zugriff widerrufen.
 You can modify this after upgrading, or contact us.	Sie können dies nach dem Upgrade ändern oder kontaktieren Sie uns.
 You can regenerate a new set of recovery codes at any time on the Security tab, thereby rendering any previously-generated codes invalid.	Sie können auf der Registerkarte „Sicherheit“ jederzeit einen neuen Satz von Wiederherstellungscodes generieren, wodurch alle zuvor generierten Codes ungültig werden.
 You cannot copy documents within a connected enterprise.	Sie können keine Dokumente innerhalb eines verbundenen Enterprise kopieren.

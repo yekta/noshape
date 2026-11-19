@@ -166,8 +166,8 @@ Access all your Dropbox files from Onshape. Import files to create new documents
 Access all your Google Drive files from Onshape. Import files to create new documents or export directly to Google Drive	從 Onshape 中存取您 Google Drive 的所有檔案。匯入檔案來建立新的文件或直接匯出至 Google Drive
 Access all your Microsoft OneDrive files from Onshape. Import files to create new documents or export directly to Microsoft OneDrive	從 Onshape 中存取您 Microsoft OneDrive 的所有檔案。匯入檔案來建立新的文件或直接匯出至 Microsoft OneDrive
 Access to shared data is limited to viewing, commenting and exporting data.	對共享資料的存取僅限於檢視、評論與匯出資料。
-Access to the Onshape Labs features is disabled.	已停用存取 Onshape Labs 的功能。
-Access to the Onshape Labs features is enabled.	已啟用存取 Onshape Labs 的功能。
+Access to the Noshape Labs features is disabled.	已停用存取 Noshape Labs 的功能。
+Access to the Noshape Labs features is enabled.	已啟用存取 Noshape Labs 的功能。
 Access to this document has been restricted and it will close automatically at __time__.	對這個文件的存取有所限制，將會在 __time__ 時自動關閉。
 Access to this document has been restricted with the message '__message__' and it will close automatically at __time__.	對這個文件的存取有所限制，並有 '__message__' 的訊息，將會在 __time__ 時自動關閉。
 Access to this document has been restricted with the message '__message__'.	對這個文件的存取有所限制，並有 '__message__' 的訊息。
@@ -504,7 +504,7 @@ Ambient occlusion	環境遮蔽
 Amount cannot exceed $999,999.	金額不能超過 $999,999。
 Amount cannot exceed $999.999.	金額不能超過 $999.999。
 Amount does not include sales tax	金額並不包含營業稅
-An admin must enable access for you to use Onshape Labs features.	管理員必須啟用您的存取權限，您才能使用 Onshape Labs 的功能。
+An admin must enable access for you to use Noshape Labs features.	管理員必須啟用您的存取權限，您才能使用 Noshape Labs 的功能。
 An email is headed your way	已向您送出電子郵件
 An environment profile is defined by settings tied to a specific browser on a specific device. Creating or selecting a profile will tie these settings to your current environment.	環境設定檔是由與特定裝置的特定瀏覽器連結的設定所定義。建立或選擇設定檔會將這些設定與您目前的環境連結。
 An error has occurred	發生錯誤
@@ -622,7 +622,7 @@ Are you sure you want to downgrade to the Free plan?	您確定要降為 Free 計
 Are you sure you want to leave this organization?	您確定要離開這個組織嗎？
 Are you sure you want to reset all keyboard shortcuts to default values?	您確定要將所有的鍵盤快速鍵重設回預設值嗎?
 Are you sure you wish to revoke __grantName__'s access? After revoking access Onshape will no longer have any access to this application.	您確定要撤銷 __grantName__ 的存取權限嗎？撤銷存取權限之後，Onshape 將無法再存取這個應用程式。
-Are you sure you wish to revoke __grantName__'s access? After revoking access the application will no longer have any access to your Onshape documents.	您確定要撤銷 __grantName__ 的存取權限嗎？撤銷存取權限之後，應用程式將無法再存取您的 Onshape 文件。
+Are you sure you wish to revoke __grantName__'s access? After revoking access the application will no longer have any access to your Noshape documents.	您確定要撤銷 __grantName__ 的存取權限嗎？撤銷存取權限之後，應用程式將無法再存取您的 Noshape 文件。
 Area	面積
 Area moment of inertia (__units__)	面積性矩 (__units__)
 Arena PLM connection	Arena PLM 連線
@@ -1214,8 +1214,8 @@ Cloud storage failed to load.	載入雲端儲存失敗。
 Cloud storage integration settings	雲端儲存整合設定
 Cloud storage integration users	雲端儲存整合使用者
 Co-complete	程式碼自動完成
-Co-complete (Onshape Labs)	程式碼自動完成 (Onshape Labs)
-Co-complete (must enable Onshape Labs)	程式碼自動完成 (必須啟用 Onshape Labs)
+Co-complete (Noshape Labs)	程式碼自動完成 (Noshape Labs)
+Co-complete (must enable Noshape Labs)	程式碼自動完成 (必須啟用 Noshape Labs)
 Co-complete is disabled. You may persist this setting.	已停用程式碼自動完成。您可以保留此設定。
 Co-complete is enabled. You may persist this setting.	已啟用程式碼自動完成。您可以保留此設定。
 Coarse	粗略
@@ -1489,7 +1489,7 @@ Construction (q)	建構線 (q)
 Construction lines	建構線
 Consumable	消耗性
 Contact Onshape support if these problems persist.	如果這些問題持續發生，請與 Onshape 的支援人員聯絡。
-Contact an admin to enable and grant access for users in the company to use Onshape Labs features.	聯絡管理員啟用並授予公司使用者使用 Onshape Labs 的功能。
+Contact an admin to enable and grant access for users in the company to use Noshape Labs features.	聯絡管理員啟用並授予公司使用者使用 Noshape Labs 的功能。
 Contact our support team for help with your Onshape plan	請與我們的支援人員聯絡以協助您的 Onshape 計畫
 Contact sales	聯絡銷售部門
 Contact support	聯絡支援人員
@@ -2044,7 +2044,7 @@ Default Windchill library - Non-geometric items	預設 Windchill 資源庫 - 非
 Default Windchill library - Standard Content	預設 Windchill 資源庫 - 標準內容
 Default assembly BOM table template failed to update.	更新預設組合件 BOM 表格的範本失敗。
 Default bend K Factor	預設彎折 K 係數
-Default color scheme for Onshape featuring dark elements on light backgrounds.	Onshape 預設的色彩配置會在淡色背景中強調深色的元素。
+Default color scheme for Noshape featuring dark elements on light backgrounds.	Noshape 預設的色彩配置會在淡色背景中強調深色的元素。
 Default corner type	預設轉角類型
 Default drawing BOM table template failed to update.	更新預設工程圖 BOM 表格的範本失敗。
 Default feature selected	已選取預設特徵
@@ -2640,13 +2640,13 @@ Empty trash…	清空垃圾桶…
 Enable	啟用
 Enable AWS KMS key configuration	啟用 AWS KMS 金鑰組態
 Enable Onshape Arena connection	啟用 Onshape Arena 連線
-Enable Onshape Labs	啟用 Onshape Labs
-Enable Onshape Labs in your preferences to use co-complete. Co-complete use AI to contextually suggest and complete code as you type.	在您的喜好設定中啟用 Onshape Labs 來使用程式碼自動完成功能。程式碼自動完成使用 AI 在您輸入時根據上下文提供建議並自動補全程式碼。
-Enable Onshape Labs in your preferences to use descriptive image search, which uses AI to enhance search results.	在您的喜好設定中啟用 Onshape Labs 來使用描述性影像搜索i，搜索會使用 AI 來強化搜尋的結果。
+Enable Noshape Labs	啟用 Noshape Labs
+Enable Noshape Labs in your preferences to use co-complete. Co-complete use AI to contextually suggest and complete code as you type.	在您的喜好設定中啟用 Noshape Labs 來使用程式碼自動完成功能。程式碼自動完成使用 AI 在您輸入時根據上下文提供建議並自動補全程式碼。
+Enable Noshape Labs in your preferences to use descriptive image search, which uses AI to enhance search results.	在您的喜好設定中啟用 Noshape Labs 來使用描述性影像搜索i，搜索會使用 AI 來強化搜尋的結果。
 Enable Onshape Windchill connection	啟用 Onshape Windchill 連線
 Enable SSO provider	啟用 SSO 提供者
 Enable WebGL in your browser for more consistent performance.	啟用您瀏覽器中的 WebGL 來獲得更為穩定的效能。
-Enable access to Onshape Labs features?	啟用對 Onshape Labs 功能的存取權限嗎？
+Enable access to Noshape Labs features?	啟用對 Noshape Labs 功能的存取權限嗎？
 Enable access to experimental, proof of concept features.	啟用對實驗性、概念驗證功能的存取權限。
 Enable basic authentication	啟用基本驗證
 Enable enterprise features and tables	啟用企業特徵與表格
@@ -3041,12 +3041,12 @@ Failed to delete job.	刪除工作失敗。
 Failed to delete selected class.	刪除所選的班級失敗。
 Failed to delete team.	刪除團隊失敗。
 Failed to delete your photo.	刪除您的照片失敗。
-Failed to disable Onshape Labs features.	停用 Onshape Labs 的功能失敗。
+Failed to disable Noshape Labs features.	停用 Noshape Labs 的功能失敗。
 Failed to disable two factor authentication.	停用雙重驗證失敗。
 Failed to edit dashboard.	編輯儀表板失敗。
 Failed to edit tab properties.	編輯頁籤屬性失敗。
 Failed to edit tutorial URL.	編輯教學課程 URL 失敗。
-Failed to enable Onshape Labs features.	啟用 Onshape Labs 的功能失敗。
+Failed to enable Noshape Labs features.	啟用 Noshape Labs 的功能失敗。
 Failed to expand notifications.	展開通知失敗。
 Failed to export Onshape__type__ library:	匯出 Onshape__type__ 資源庫失敗:
 Failed to export __name____type__ library:	匯出 __name____type__ 資源庫失敗:
@@ -3091,7 +3091,7 @@ Failed to invite user to your enterprise.	邀請使用者加入企業失敗。
 Failed to invite users to your company.	邀請使用者加入公司失敗。
 Failed to invite users to your enterprise.	邀請使用者加入企業失敗。
 Failed to link __plmName__ change.	連結 __plmName__ 變更失敗。
-Failed to load Onshape Labs permissions.	載入 Onshape Labs 權限失敗。
+Failed to load Noshape Labs permissions.	載入 Noshape Labs 權限失敗。
 Failed to load __companyType__ - 	載入 __companyType__ 失敗 - 
 Failed to load __companyType__.	載入 __companyType__ 失敗。
 Failed to load class. Resource does not exist or you do not have permission to access it.	無法載入班級。資源不存在，或您沒有存取的權限。
@@ -3191,8 +3191,8 @@ Failed to transfer publication to __companyName__.	將公佈轉移給 __companyN
 Failed to transfer publication to __userEmail__.	將公佈轉移給 __userEmail__ 失敗。
 Failed to unset __name____type__ library:	取消設定 __name____type__ 資源庫失敗:
 Failed to unset your__type__ library:	取消設定您的__type__ 資源庫失敗:
-Failed to update Onshape Labs features.	更新 Onshape Labs 功能失敗。
-Failed to update Onshape Labs permissions.	更新 Onshape Labs 權限失敗。
+Failed to update Noshape Labs features.	更新 Noshape Labs 功能失敗。
+Failed to update Noshape Labs permissions.	更新 Noshape Labs 權限失敗。
 Failed to update Part Studio settings.	更新 Part Studio 設定失敗。
 Failed to update assembly settings.	更新組合件設定失敗。
 Failed to update custom feature __featureName__.	更新自訂特徵 __featureName__ 失敗。
@@ -3261,7 +3261,7 @@ Features (__featuresCount__)	特徵 (__featuresCount__)
 Features (__numberOfFeatures__)	特徵數 (__numberOfFeatures__)
 Features (__shownCount__ of __featureCount__)	特徵 (__featureCount__ 的 __shownCount__)
 Features and parts	特徵與零件
-Features in Onshape Labs are experimental, may break, and are subject to change or removal at any time. Onshape Labs features are made available for testing and evaluation only and must not be used in production. Use at your own discretion.	Onshape Labs 中的功能均為實驗性質，可能會有問題，並可能隨時變更或移除。Onshape Labs 的功能僅供測試和評估之用，不得用於生產環境中。請自行斟酌使用。
+Features in Noshape Labs are experimental, may break, and are subject to change or removal at any time. Noshape Labs features are made available for testing and evaluation only and must not be used in production. Use at your own discretion.	Noshape Labs 中的功能均為實驗性質，可能會有問題，並可能隨時變更或移除。Noshape Labs 的功能僅供測試和評估之用，不得用於生產環境中。請自行斟酌使用。
 Features to find match in	在這些特徵中尋找相符的
 Features to mirror	要鏡射的特徵
 Features to pattern	要複製排列的特徵
@@ -3769,7 +3769,7 @@ Horizontal reference	水平參考
 Horizontal stripe	橫條紋
 Horizontal zones	橫式區域
 Hover over or select an instance to show its mates.	移動游標暫留或選擇實例來顯示其結合。
-How Onshape Labs features use your data	Onshape Labs 功能如何使用您的資料
+How Noshape Labs features use your data	Noshape Labs 功能如何使用您的資料
 H™ nuts/HNL™ prevailing torque locknuts	H™ nuts/HNL™ 預置扭矩防鬆螺帽
 I agree to the	我同意
 I agree to use this plan for classes, personal learning projects, school clubs/organizations, and academic research. I will not use this plan for government, commercial, or other organizational use	本人同意將此計畫做為班級、個人學習專案、學校社團/組織，以及學術研究之用，並不會將此計畫用於政府、商業或其他組織之中
@@ -5201,9 +5201,9 @@ Onshape Access Key	Onshape 存取金鑰
 Onshape Arena Connection Configuration	Onshape Arena 連線設定
 Onshape CAM Studio Tool Holders	Onshape CAM Studio 刀具夾持器
 Onshape Free plan	Onshape Free 計畫
-Onshape Labs access	Onshape Labs 存取權限
-Onshape Labs features updated.	已更新 Onshape Labs 功能。
-Onshape Labs permissions updated.	已更新 Onshape Labs 權限。
+Noshape Labs access	Noshape Labs 存取權限
+Noshape Labs features updated.	已更新 Noshape Labs 功能。
+Noshape Labs permissions updated.	已更新 Noshape Labs 權限。
 Onshape Professional Quickstart	Onshape Professional 快速入門
 Onshape Professional Trial	Onshape Professional 試用
 Onshape Quickstart	Onshape 快速入門
@@ -5225,7 +5225,7 @@ Onshape date values synced to Windchill will not include a time component.	同�
 Onshape default	Onshape 預設
 Onshape default tolerances	Onshape 預設公差
 Onshape default workflows	Onshape 預設工作流程
-Onshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose.	Onshape 不保證產生的輸出不會侵犯第三方權利或適用於任何特定用途。
+Noshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose.	Noshape 不保證產生的輸出不會侵犯第三方權利或適用於任何特定用途。
 Onshape does the heavy lifting, you just need a compatible browser and device to render your CAD data on-screen	讓 Onshape 執行繁重的操作，您只需要一個相容的瀏覽器與裝置即可在螢幕上渲染您的 CAD 資料。
 Onshape frame profiles	Onshape 框架輪廓
 Onshape images	Onshape 影像
@@ -5501,7 +5501,7 @@ Pending…	待決中…
 Per chain	每一連續
 Per edge	每一邊線
 Perform a union, subtraction, or intersection on two or more parts or surfaces.	在兩個或多個零件或曲面上執行聯集、差集或交集。
-Perform actions within Onshape on your behalf during an active session.	在啟用的工作階段中代表您在 Onshape 中執行動作。
+Perform actions within Noshape on your behalf during an active session.	在啟用的工作階段中代表您在 Noshape 中執行動作。
 Performance	效能
 Performance check	效能檢查
 Performance errors detected	偵測到效能錯誤
@@ -5875,7 +5875,7 @@ Ray gradient (%)	射線梯度 (%)
 Re-invite	重新邀請
 Re-releasable?	可重新發行嗎？
 Reactivate your subscription	重新啟用您的訂閱
-Read or write data within your Onshape documents, only in response to your actions.	僅會根據您的動作來讀取或寫入您 Onshape 文件中的資料。
+Read or write data within your Noshape documents, only in response to your actions.	僅會根據您的動作來讀取或寫入您 Noshape 文件中的資料。
 Read-only access	唯讀存取權限
 Real	實數
 Realign	重新對齊
@@ -7094,7 +7094,7 @@ Solid	實線
 Solve	解出
 Solve full assembly	解出整個組合件
 Solved	解出
-Some Onshape Labs features use generative or automated technologies, including third-party AI models, that produce outputs based on statistical models. These outputs may be inaccurate, incomplete, or inappropriate, and are not guaranteed to be correct.	Onshape Labs 的一些功能使用生成式或自動化技術，包括第三方 AI 模型，其會根據統計模型產生輸出。這些輸出可能不準確、不完整或不恰當，也不能保證其正確性。
+Some Noshape Labs features use generative or automated technologies, including third-party AI models, that produce outputs based on statistical models. These outputs may be inaccurate, incomplete, or inappropriate, and are not guaranteed to be correct.	Noshape Labs 的一些功能使用生成式或自動化技術，包括第三方 AI 模型，其會根據統計模型產生輸出。這些輸出可能不準確、不完整或不恰當，也不能保證其正確性。
 Some annotations contain invalid symbols. Invalid symbols will be removed on export.	某些註記包含無效的符號。匯出時將移除無效的符號。
 Some configuration inputs are marked as not affecting configured properties.	某些組態輸入項被標示為不受影響的組態屬性。
 Some drawing tabs in the current workspace were overwritten. If this was done by mistake, you can restore in the versions and history.	目前工作區中某些工程圖的頁籤被覆寫。如果這是錯誤的話，您可以在版本與歷程中還原。
@@ -8622,7 +8622,7 @@ You are not authorized to access this resource.	您沒有存取此資源的權�
 You are not subscribed to required application for this action.	您並未訂閱這個動作所需的應用程式。
 You are now viewing in dark mode. You may persist this setting.	您現在正在深色模式中檢視。您可以持續使用這個設定。
 You are now viewing in light mode. You may persist this setting.	您現在正在淺色模式中檢視。您可以持續使用這個設定。
-You are responsible for independently reviewing, validating, and approving any outputs before relying on them for design, engineering, manufacturing, or other purposes. Onshape Labs features should not be used as a substitute for professional judgment or established controls.	在將輸出用於設計、工程、製造或其他用途之前，您有責任獨立檢閱、查驗和批准任何輸出。Onshape Labs 的功能不應取代專業判斷或既定的控制措施。
+You are responsible for independently reviewing, validating, and approving any outputs before relying on them for design, engineering, manufacturing, or other purposes. Noshape Labs features should not be used as a substitute for professional judgment or established controls.	在將輸出用於設計、工程、製造或其他用途之前，您有責任獨立檢閱、查驗和批准任何輸出。Noshape Labs 的功能不應取代專業判斷或既定的控制措施。
 You are running a 32-bit browser on a 64-bit operating system.  For better performance, install the 64-bit version of your browser.	您在 64 位元的作業系統上執行 32 位元的瀏覽器。為求最佳效能，請安裝瀏覽器 64 位元的版本。
 You are saving $__amountOff__ for __months__ months.	您將在 __months__ 個月期間內省下 $__amountOff__。
 You are saving $__amountOff__ on your first year.	您將在首年省下 $__amountOff__。
@@ -8638,7 +8638,7 @@ You can cancel your subscription at any time by emailing	您可以隨時透過�
 You can configure webhooks to use basic authentication. This will populate the Authorization header in all webhook requests.	您可以設定 webhooks 使用基本驗證，這樣會將 Authorization 標頭移入至所有 webhook 要求中。
 You can configure webhooks to use signatures to protect them against attacks. Using signatures you can ensure that a notification was really sent by Onshape and that it hasn't been tampered with in transit. Use primary and secondary keys to rotate keys in your production application.	您可以設定 webhooks 使用簽章以保護其免受攻擊。使用簽章可確保通知是真正由 Onshape 送出，且不會在傳輸過程中遭到竄改。使用主要金鑰與次要金鑰來在您生產應用程式中輪流使用。
 You can copy up to 10 documents per request. Select 10 or fewer documents and try again.	每次請求最多可複製 10 份文件。請選擇 10 份或更少的文件，然後重試。
-You can disable Onshape Labs and revoke access at any time from Account Settings → Labs.	您可隨時從帳戶設定 → Labs 中停用 Onshape Labs 並撤銷存取權限。
+You can disable Noshape Labs and revoke access at any time from Account Settings → Labs.	您可隨時從帳戶設定 → Labs 中停用 Noshape Labs 並撤銷存取權限。
 You can modify this after upgrading, or contact us.	您可以在升級之後修改這個項目，或是與我們聯絡。
 You can regenerate a new set of recovery codes at any time on the Security tab, thereby rendering any previously-generated codes invalid.	您可以隨時在「安全性」標籤頁中重生成新的復原代碼組，這樣會使得先前產生的代碼變為無效。
 You cannot copy documents within a connected enterprise.	您無法在連接的企業中複製文件。

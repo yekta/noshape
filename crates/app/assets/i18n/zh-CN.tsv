@@ -166,8 +166,8 @@ Access all your Dropbox files from Onshape. Import files to create new documents
 Access all your Google Drive files from Onshape. Import files to create new documents or export directly to Google Drive	从 Onshape 访问所有 Google Drive 文件。导入文件以创建新文档或直接导出到 Google Drive
 Access all your Microsoft OneDrive files from Onshape. Import files to create new documents or export directly to Microsoft OneDrive	从 Onshape 访问所有 Microsoft OneDrive 文件。导入文件以创建新文档或直接导出到 Microsoft OneDrive
 Access to shared data is limited to viewing, commenting and exporting data.	对共享数据的访问仅限于查看、评论和导出数据。
-Access to the Onshape Labs features is disabled.	已禁用 Onshape Labs 功能的访问权限。
-Access to the Onshape Labs features is enabled.	已禁用 Onshape Labs 功能的访问权限。
+Access to the Noshape Labs features is disabled.	已禁用 Noshape Labs 功能的访问权限。
+Access to the Noshape Labs features is enabled.	已禁用 Noshape Labs 功能的访问权限。
 Access to this document has been restricted and it will close automatically at __time__.	已限制对此文档的访问，它将在 __time__ 自动关闭。
 Access to this document has been restricted with the message '__message__' and it will close automatically at __time__.	已限制对此文档的访问，并会显示消息“__message__”，它将在 __time__ 自动关闭。
 Access to this document has been restricted with the message '__message__'.	已限制对此文档的访问，并会显示消息“__message__”。
@@ -504,7 +504,7 @@ Ambient occlusion	环境光遮蔽
 Amount cannot exceed $999,999.	金额不能超过 999,999 美元。
 Amount cannot exceed $999.999.	金额不能超过 999.999 美元。
 Amount does not include sales tax	金额不含销售税
-An admin must enable access for you to use Onshape Labs features.	管理员必须为您启用访问权限，您才能使用 Onshape Labs 功能。
+An admin must enable access for you to use Noshape Labs features.	管理员必须为您启用访问权限，您才能使用 Noshape Labs 功能。
 An email is headed your way	已向您发送一封电子邮件
 An environment profile is defined by settings tied to a specific browser on a specific device. Creating or selecting a profile will tie these settings to your current environment.	环境配置文件由特定设备上绑定到特定浏览器的设置定义。创建或选择配置文件会将这些设置绑定到当前环境。
 An error has occurred	发生错误
@@ -624,7 +624,7 @@ Are you sure you want to downgrade to the Free plan?	您确定要降级到 Free 
 Are you sure you want to leave this organization?	是否确实要离开此组织？
 Are you sure you want to reset all keyboard shortcuts to default values?	您确定要将所有键盘快捷键重置为默认值吗？
 Are you sure you wish to revoke __grantName__'s access? After revoking access Onshape will no longer have any access to this application.	是否确实要撤销 __grantName__ 的访问权限？撤销访问权限后，Onshape 将不再有此应用程序的任何访问权限。
-Are you sure you wish to revoke __grantName__'s access? After revoking access the application will no longer have any access to your Onshape documents.	是否确实要撤销 __grantName__ 的访问权限？撤销访问权限后，应用程序将无法访问您的任何 Onshape 文档。
+Are you sure you wish to revoke __grantName__'s access? After revoking access the application will no longer have any access to your Noshape documents.	是否确实要撤销 __grantName__ 的访问权限？撤销访问权限后，应用程序将无法访问您的任何 Noshape 文档。
 Area	面积
 Area moment of inertia (__units__)	面积惯性矩 (__units__)
 Arena PLM connection	Arena PLM 连接
@@ -1217,8 +1217,8 @@ Cloud storage failed to load.	加载云存储失败。
 Cloud storage integration settings	云存储集成设置
 Cloud storage integration users	云存储集成用户
 Co-complete	协作完成
-Co-complete (Onshape Labs)	Co-Complete (Onshape Labs)
-Co-complete (must enable Onshape Labs)	Co-Complete（必须启用 Onshape Labs）
+Co-complete (Noshape Labs)	Co-Complete (Noshape Labs)
+Co-complete (must enable Noshape Labs)	Co-Complete（必须启用 Noshape Labs）
 Co-complete is disabled. You may persist this setting.	协作已完成禁用。您可以保留此设置。
 Co-complete is enabled. You may persist this setting.	协作已完成启用。您可以保留此设置。
 Coarse	粗糙
@@ -1492,7 +1492,7 @@ Construction (q)	构造 (q)
 Construction lines	构造线
 Consumable	消耗品
 Contact Onshape support if these problems persist.	如果这些问题仍然存在，请联系 Onshape 技术支持。
-Contact an admin to enable and grant access for users in the company to use Onshape Labs features.	请联系管理员以启用并为公司用户授予使用 Onshape Labs 功能的访问权限。
+Contact an admin to enable and grant access for users in the company to use Noshape Labs features.	请联系管理员以启用并为公司用户授予使用 Noshape Labs 功能的访问权限。
 Contact our support team for help with your Onshape plan	请联系我们的支持团队以协助您的 Onshape 计划
 Contact sales	联系销售人员
 Contact support	联系技术支持
@@ -2048,7 +2048,7 @@ Default Windchill library - Non-geometric items	默认 Windchill 库——非几
 Default Windchill library - Standard Content	默认 Windchill 库——标准内容
 Default assembly BOM table template failed to update.	更新默认装配体物料清单表格模板失败。
 Default bend K Factor	默认折弯 K 系数
-Default color scheme for Onshape featuring dark elements on light backgrounds.	Onshape 的默认配色方案主要是在浅色背景上显示深色元素。
+Default color scheme for Noshape featuring dark elements on light backgrounds.	Noshape 的默认配色方案主要是在浅色背景上显示深色元素。
 Default corner type	默认拐角类型
 Default drawing BOM table template failed to update.	更新默认工程图物料清单表格模板失败。
 Default feature selected	默认特征已选定
@@ -2644,13 +2644,13 @@ Empty trash…	清空垃圾桶…
 Enable	启用
 Enable AWS KMS key configuration	启用 AWS KMS 密钥配置
 Enable Onshape Arena connection	启用 Onshape Arena 连接
-Enable Onshape Labs	启用 Onshape Labs
-Enable Onshape Labs in your preferences to use co-complete. Co-complete use AI to contextually suggest and complete code as you type.	在首选项中启用 Onshape Labs 以使用 Co-Complete。Co-Complete 使用 AI 根据上下文在您键入时提供建议并完成代码。
-Enable Onshape Labs in your preferences to use descriptive image search, which uses AI to enhance search results.	在首选项中启用 Onshape Labs 以使用描述性图像搜索，该功能使用 AI 增强搜索结果。
+Enable Noshape Labs	启用 Noshape Labs
+Enable Noshape Labs in your preferences to use co-complete. Co-complete use AI to contextually suggest and complete code as you type.	在首选项中启用 Noshape Labs 以使用 Co-Complete。Co-Complete 使用 AI 根据上下文在您键入时提供建议并完成代码。
+Enable Noshape Labs in your preferences to use descriptive image search, which uses AI to enhance search results.	在首选项中启用 Noshape Labs 以使用描述性图像搜索，该功能使用 AI 增强搜索结果。
 Enable Onshape Windchill connection	启用 Onshape Windchill 连接
 Enable SSO provider	启用 SSO 提供商
 Enable WebGL in your browser for more consistent performance.	在您的浏览器中启用 WebGL，以实现更稳定的性能。
-Enable access to Onshape Labs features?	启用 Onshape Labs 功能的访问权限？
+Enable access to Noshape Labs features?	启用 Noshape Labs 功能的访问权限？
 Enable access to experimental, proof of concept features.	启用实验性概念验证功能的访问权。
 Enable basic authentication	启用基本身份验证
 Enable enterprise features and tables	启用企业特征和表格
@@ -3051,12 +3051,12 @@ Failed to delete job.	未能删除作业。
 Failed to delete selected class.	未能删除所选班级。
 Failed to delete team.	未能删除团队。
 Failed to delete your photo.	未能删除照片。
-Failed to disable Onshape Labs features.	未能禁用 Onshape Labs 功能。
+Failed to disable Noshape Labs features.	未能禁用 Noshape Labs 功能。
 Failed to disable two factor authentication.	未能禁用双重身份验证。
 Failed to edit dashboard.	未能编辑仪表板。
 Failed to edit tab properties.	未能编辑页签属性。
 Failed to edit tutorial URL.	未能编辑教程 URL。
-Failed to enable Onshape Labs features.	未能启用 Onshape Labs 功能。
+Failed to enable Noshape Labs features.	未能启用 Noshape Labs 功能。
 Failed to expand notifications.	未能展开通知。
 Failed to export Onshape__type__ library:	未能导出 Onshape__type__ 库：
 Failed to export __name____type__ library:	未能导出 __name____type__ 库：
@@ -3101,7 +3101,7 @@ Failed to invite user to your enterprise.	未能为您的企业邀请用户。
 Failed to invite users to your company.	未能邀请用户加入您的公司。
 Failed to invite users to your enterprise.	未能为您的企业邀请用户。
 Failed to link __plmName__ change.	未能链接 __plmName__ 变更。
-Failed to load Onshape Labs permissions.	未能加载 Onshape Labs 权限。
+Failed to load Noshape Labs permissions.	未能加载 Noshape Labs 权限。
 Failed to load __companyType__ - 	未能加载 __companyType__ - 
 Failed to load __companyType__.	未能加载 __companyType__。
 Failed to load class. Resource does not exist or you do not have permission to access it.	未能加载班级。资源不存在或您无权访问该作业。
@@ -3201,8 +3201,8 @@ Failed to transfer publication to __companyName__.	未能将公布传输到 __co
 Failed to transfer publication to __userEmail__.	未能将公布传输到 __userEmail__。
 Failed to unset __name____type__ library:	未能取消设置 __name____type__ 库：
 Failed to unset your__type__ library:	未能取消设置您的 __type__ 库：
-Failed to update Onshape Labs features.	更新 Onshape Labs 功能失败。
-Failed to update Onshape Labs permissions.	更新 Onshape Labs 权限失败。
+Failed to update Noshape Labs features.	更新 Noshape Labs 功能失败。
+Failed to update Noshape Labs permissions.	更新 Noshape Labs 权限失败。
 Failed to update Part Studio settings.	未能更新 Part Studio 设置。
 Failed to update assembly settings.	未能更新装配体设置。
 Failed to update custom feature __featureName__.	未能更新自定义特征 __featureName__。
@@ -3272,7 +3272,7 @@ Features (__featuresCount__)	特征 (__featuresCount__)
 Features (__numberOfFeatures__)	特征 (__numberOfFeatures__)
 Features (__shownCount__ of __featureCount__)	特征 (__shownCount__/__featureCount__)
 Features and parts	特征和零件
-Features in Onshape Labs are experimental, may break, and are subject to change or removal at any time. Onshape Labs features are made available for testing and evaluation only and must not be used in production. Use at your own discretion.	Onshape Labs 中的功能是实验性的，可能会出问题，并且随时可能更改或移除。Onshape Labs 功能仅用于测试和评估，不得用于生产环境。请自行决定使用。
+Features in Noshape Labs are experimental, may break, and are subject to change or removal at any time. Noshape Labs features are made available for testing and evaluation only and must not be used in production. Use at your own discretion.	Noshape Labs 中的功能是实验性的，可能会出问题，并且随时可能更改或移除。Noshape Labs 功能仅用于测试和评估，不得用于生产环境。请自行决定使用。
 Features to find match in	要在其中查找匹配的特征
 Features to mirror	要镜像的特征
 Features to pattern	要阵列化的特征
@@ -3785,7 +3785,7 @@ Horizontal reference	水平参考
 Horizontal stripe	水平条纹
 Horizontal zones	水平分区
 Hover over or select an instance to show its mates.	将光标悬停在实例上或选择实例以显示其配合。
-How Onshape Labs features use your data	Onshape Labs 功能如何使用您的数据
+How Noshape Labs features use your data	Noshape Labs 功能如何使用您的数据
 H™ nuts/HNL™ prevailing torque locknuts	H™ 螺母/HNL™ 有效力矩型锁紧螺母
 I agree to the	我同意
 I agree to use this plan for classes, personal learning projects, school clubs/organizations, and academic research. I will not use this plan for government, commercial, or other organizational use	我同意将此计划用于课程、个人学习项目、学校俱乐部/组织和学术研究。我不会将此计划用于政府、商业或其他组织用途
@@ -5222,9 +5222,9 @@ Onshape Access Key	Onshape 访问密钥
 Onshape Arena Connection Configuration	Onshape Arena 连接配置
 Onshape CAM Studio Tool Holders	Onshape CAM Studio 刀具夹
 Onshape Free plan	Onshape Free 计划
-Onshape Labs access	Onshape Labs 访问权限
-Onshape Labs features updated.	Onshape Labs 功能已更新。
-Onshape Labs permissions updated.	Onshape Labs 权限已更新。
+Noshape Labs access	Noshape Labs 访问权限
+Noshape Labs features updated.	Noshape Labs 功能已更新。
+Noshape Labs permissions updated.	Noshape Labs 权限已更新。
 Onshape Professional Quickstart	Onshape Professional 快速入门
 Onshape Professional Trial	Onshape Professional 试用
 Onshape Quickstart	Onshape 快速入门
@@ -5246,7 +5246,7 @@ Onshape date values synced to Windchill will not include a time component.	同�
 Onshape default	Onshape 默认
 Onshape default tolerances	Onshape 默认公差
 Onshape default workflows	Onshape 默认工作流
-Onshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose.	Onshape 不保证生成的输出不侵犯第三方权利，或适合任何特定用途。
+Noshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose.	Noshape 不保证生成的输出不侵犯第三方权利，或适合任何特定用途。
 Onshape does the heavy lifting, you just need a compatible browser and device to render your CAD data on-screen	繁重的任务由 Onshape 来承担，您只需要兼容的浏览器和设备即可在屏幕上呈现 CAD 数据
 Onshape frame profiles	Onshape 框架轮廓
 Onshape images	Onshape 图像
@@ -5524,7 +5524,7 @@ Pending…	待决中…
 Per chain	根据链
 Per edge	根据边
 Perform a union, subtraction, or intersection on two or more parts or surfaces.	对两个或更多零件或曲面执行并集、差集或交集运算。
-Perform actions within Onshape on your behalf during an active session.	在活动会话期间代表您在 Onshape 中执行操作。
+Perform actions within Noshape on your behalf during an active session.	在活动会话期间代表您在 Noshape 中执行操作。
 Performance	性能
 Performance check	性能检查
 Performance errors detected	检测到性能错误
@@ -5896,7 +5896,7 @@ Ray gradient (%)	光线渐变 (%)
 Re-invite	重新邀请
 Re-releasable?	可以重新发布吗？
 Reactivate your subscription	重新激活您的订阅
-Read or write data within your Onshape documents, only in response to your actions.	仅在响应您的操作时，读取或写入您的 Onshape 文档中的数据。
+Read or write data within your Noshape documents, only in response to your actions.	仅在响应您的操作时，读取或写入您的 Noshape 文档中的数据。
 Read-only access	只读访问
 Real	实数
 Realign	重新对齐
@@ -7119,7 +7119,7 @@ Solid	实体
 Solve	解出
 Solve full assembly	解出完整装配体
 Solved	已求解
-Some Onshape Labs features use generative or automated technologies, including third-party AI models, that produce outputs based on statistical models. These outputs may be inaccurate, incomplete, or inappropriate, and are not guaranteed to be correct.	某些 Onshape Labs 功能使用生成式或自动化技术，包括第三方 AI 模型，这些技术基于统计模型生成输出。这些输出可能不准确、不完整或不恰当，并且不保证正确。
+Some Noshape Labs features use generative or automated technologies, including third-party AI models, that produce outputs based on statistical models. These outputs may be inaccurate, incomplete, or inappropriate, and are not guaranteed to be correct.	某些 Noshape Labs 功能使用生成式或自动化技术，包括第三方 AI 模型，这些技术基于统计模型生成输出。这些输出可能不准确、不完整或不恰当，并且不保证正确。
 Some annotations contain invalid symbols. Invalid symbols will be removed on export.	某些标注中含有无效符号。无效的符号在导出时将被移除。
 Some configuration inputs are marked as not affecting configured properties.	某些配置输入被标记为不受影响的配置属性。
 Some drawing tabs in the current workspace were overwritten. If this was done by mistake, you can restore in the versions and history.	当前工作区中的一些工程图页签已被重写。如果这系错误操作，则可以在版本和历史记录中还原。
@@ -8654,7 +8654,7 @@ You are not authorized to access this resource.	您无权访问此资源。
 You are not subscribed to required application for this action.	您未订阅此操作所需的应用程序。
 You are now viewing in dark mode. You may persist this setting.	您现在正在深色模式下查看。您可以持续使用此设置。
 You are now viewing in light mode. You may persist this setting.	您现在正在浅色模式下查看。您可以持续使用此设置。
-You are responsible for independently reviewing, validating, and approving any outputs before relying on them for design, engineering, manufacturing, or other purposes. Onshape Labs features should not be used as a substitute for professional judgment or established controls.	在依赖任何输出用于设计、工程、制造或其他目的之前，您有责任独立审查、验证和批准这些输出。Onshape Labs 功能不应替代专业判断或既定控制措施。
+You are responsible for independently reviewing, validating, and approving any outputs before relying on them for design, engineering, manufacturing, or other purposes. Noshape Labs features should not be used as a substitute for professional judgment or established controls.	在依赖任何输出用于设计、工程、制造或其他目的之前，您有责任独立审查、验证和批准这些输出。Noshape Labs 功能不应替代专业判断或既定控制措施。
 You are running a 32-bit browser on a 64-bit operating system.  For better performance, install the 64-bit version of your browser.	您正于 64 位操作系统上运行 32 位浏览器。为获得更好地性能，请安装 64 位的浏览器。
 You are saving $__amountOff__ for __months__ months.	您将在 __months__ 个月期间内省下 $__amountOff__。
 You are saving $__amountOff__ on your first year.	您将在首年省下 $__amountOff__。
@@ -8670,7 +8670,7 @@ You can cancel your subscription at any time by emailing	您可以随时通过�
 You can configure webhooks to use basic authentication. This will populate the Authorization header in all webhook requests.	您可以将 Webhook 配置为使用基本身份验证。这会填充所有 Webhook 请求中的“授权”标头。
 You can configure webhooks to use signatures to protect them against attacks. Using signatures you can ensure that a notification was really sent by Onshape and that it hasn't been tampered with in transit. Use primary and secondary keys to rotate keys in your production application.	您可以将 Webhook 配置为使用签名来保护它们免受攻击。使用签名可以确保某个通知确实由 Onshape 发出，并且在传输过程中未被篡改。使用主密钥和辅助密钥来轮换生产应用程序中的密钥。
 You can copy up to 10 documents per request. Select 10 or fewer documents and try again.	每次请求最多可复制 10 个文档。请选择 10 个或更少文档，然后重试。
-You can disable Onshape Labs and revoke access at any time from Account Settings → Labs.	您可以随时通过“帐户设置” → “实验室”禁用 Onshape Labs 并撤销访问权限。
+You can disable Noshape Labs and revoke access at any time from Account Settings → Labs.	您可以随时通过“帐户设置” → “实验室”禁用 Noshape Labs 并撤销访问权限。
 You can modify this after upgrading, or contact us.	您可以在升级后修改，或与我们联系。
 You can regenerate a new set of recovery codes at any time on the Security tab, thereby rendering any previously-generated codes invalid.	您可以随时在“安全”页签上重生成一组新的恢复代码，从而使先前生成的任何代码无效。
 You cannot copy documents within a connected enterprise.	您无法在连接的企业内复制文档。
