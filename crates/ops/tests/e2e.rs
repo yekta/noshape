@@ -10346,3 +10346,42 @@ fn a_region_placed_nearer_a_dimensions_far_end_still_replicates_it() {
     let rep = call(&mut ctx, "drawing_replicate", json!({ "drawing": tab, "from": front["id"], "to": top["id"], "region": region, "at": at }));
     assert_eq!(rep["message"], "Successfully replicated 1/1 annotations", "{rep}");
 }
+
+/// A region replicated onto a view of another shape keeps each point's place in the view's box, wherever the box is
+/// placed (live2 replicate-rule-1119: a dimension on Front's top edge lands on Top's back edge, at its offset above it,
+/// for a box placed on Top's back edge, its middle or its front edge).
+#[test]
+fn a_region_replicated_onto_another_view_keeps_its_place_in_the_view_box() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "replicate-view-box.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let view = |o: &str| g["views"].as_array().unwrap().iter().find(|v| v["orientation"] == o).unwrap_or_else(|| panic!("{o}: {g}")).clone();
+    let (front, top) = (view("front"), view("top"));
+    let flat = |v: &Value| -> Vec<([f64; 2], [f64; 2])> {
+        v["edges"].as_array().unwrap().iter().filter(|e| e["type"] == "line" && (num(&e["a"][1]) - num(&e["b"][1])).abs() < 1e-6).map(|e| {
+            let (p, q) = ([num(&e["a"][0]), num(&e["a"][1])], [num(&e["b"][0]), num(&e["b"][1])]);
+            if p[0] < q[0] { (p, q) } else { (q, p) }
+        }).collect()
+    };
+    let (a, b) = flat(&front).into_iter().max_by(|x, y| x.0[1].total_cmp(&y.0[1])).expect("the Front's top edge");
+    let dim = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "picks": [a, b], "place": [(a[0] + b[0]) / 2.0, a[1] + 10.0] }));
+    let src_pos = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["annotations"].as_array().unwrap().iter().find(|x| x["id"] == dim["annotation"]).unwrap()["position"].clone();
+    let ys: Vec<f64> = flat(&top).iter().map(|e| e.0[1]).collect();
+    let (back, front_edge) = (ys.iter().copied().fold(f64::MIN, f64::max), ys.iter().copied().fold(f64::MAX, f64::min));
+    let region = [[a[0] - 5.0, a[1] - 5.0], [b[0] + 5.0, a[1] + 15.0]];
+    let cx = (a[0] + b[0]) / 2.0;
+    for (i, y) in [front_edge, (front_edge + back) / 2.0, back].into_iter().enumerate() {
+        let rep = call(&mut ctx, "drawing_replicate", json!({ "drawing": tab, "from": front["id"], "to": top["id"], "region": region, "at": [cx, y] }));
+        if i > 0 {
+            assert_eq!(rep["message"], "No annotations replicated", "box at y {y}: the copy is already there: {rep}");
+            continue;
+        }
+        assert_eq!(rep["message"], "Successfully replicated 1/1 annotations", "{rep}");
+        let id = rep["replicated"][0].clone();
+        let pos = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["annotations"].as_array().unwrap().iter().find(|x| x["id"] == id).unwrap()["position"].clone();
+        assert!((num(&pos[0]) - num(&src_pos[0])).abs() < 0.01, "same x: {pos} vs {src_pos}");
+        assert!((num(&pos[1]) - (back + num(&src_pos[1]) - a[1])).abs() < 0.01, "above Top's back edge {back} (front {front_edge}) as above Front's top edge {}: {pos} vs {src_pos}", a[1]);
+    }
+}

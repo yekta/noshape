@@ -9,46 +9,35 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-19 21:01 UTC. Moved to another account at 21:00 (Motile's session limit); the next thread starts
-from this file.
+Updated 2026-11-19 21:20 UTC (new thread on another account, 21:00).
 
 ## In flight
 
-Nothing uncommitted; nothing queued. Worktree /root/projects/noshape-wt/studios, branch studios-0811a, rebased on
-main. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh` (`--no-precheck` only when the code was
-clippy-checked unchanged); read `git diff --stat origin/main` first. Builds / tests `NOSHAPE_RB_HOST=<lowest load of
-vibex7 / vibex8 / vibe2> tools/tiers/rb.sh` (warm studios target on vibex7). rb.sh skips a file edited during a running
-sync: `touch` edited files before the next run. Scenario runs: vibe2 ~/agents/studios-uip (rsync tools/ui-parity
-tests/ui-parity there), app at ~/tmp/studios/noshape, Xvfb :391 (pid in ~/tmp/studios/xvfb.pid); an app built on
-vibex7 goes vibex7 -> here -> vibe2 (no host-to-host ssh). Run the full ops e2e before any drawing land.
-- Landed 11-19: 6055ccb5 / f96abd03 / b5440871 / e811acc1 (qa's 15 feel rows, ruler tail, pinned columns), 3046bb31,
-  0e754c57, 6017f81c (P0 Ø fraction crash), 66f57e48 (note-opts, hole plate, CSVs, Merge order).
-- qa's 15 feel rows (11-19 16:10), checked in the app against live's takes on vibe2: drw-copy-annotation-drag,
-  ver-row-tooltip, drw-constraint-coincident / -vertical / -perpendicular, drw-sketch-tool-center-point-rectangle,
-  drw-geometric-tolerance match. Not run against takes: drw-constraint-parallel (same ▾-label fix),
-  drw-constraint-tangent (live's take misfired; live2 retake pending).
-- Not targets (decision asked of the lead 11-19 ~17:30: mark as known differences or retake on Pro):
-  drw-note-insert-drawing-property (live's drawing is named "Part 1 Drawing 1 (1)", its longer name moves the note's
-  centre 2.6 mm), part-/asm-menu-release s3 (free-plan upsell takes; live Pro's Release dialog ignores Esc,
-  docs-versions-release-1118), drw-inspection-table-iso-scrolled s2 and drw-revision-table-delete s8 (known);
-  drw-canvas-zoom-to-sheet / drw-ref-pin-reference have no usable recording.
-- live2 versions-1119: (b) was live2's artefact; (c)-(e) already as live.
+Worktree /root/projects/noshape-wt/studios, branch studios-0811a, on main. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2
+tools/tiers/land.sh` (`--no-precheck` only when the code was clippy-checked unchanged); read `git diff --stat
+origin/main` first. Builds / tests on the lowest 1-min load of vibex7 / vibex8 / vibe2 (`NOSHAPE_RB_HOST=… tools/tiers/rb.sh`;
+`awk` the load, the hosts alias `cut`). rb.sh skips a file edited during a running sync: `touch` edited files before
+the next run. Run the full ops e2e before any drawing land.
+- Uncommitted: Replicate region onto a view of another shape maps each point by its place in the view's box and
+  ignores the click (live2 replicate-rule-1119; live 651's View-mode Top→Front fits the same rule): `reshaped` in
+  `replicate_into` (crates/scene/src/drawing_tools/replicate.rs), `Replication::src_box`; e2e
+  `a_region_replicated_onto_another_view_keeps_its_place_in_the_view_box`. Testing on vibex8
+  (/root/studios-scratch/logs/rep1.log), then the app + drw-view-replicate-region-place, drw-constraint-tangent,
+  drw-constraint-parallel with /root/studios-scratch/bin/x8app-uip.sh <out> <names…> (vibex8, slot, :391).
+- drw-constraint-tangent: live2's 18:29 retake (/root/live2-scratch/qa39/out, queued 60784916) equals the old take;
+  qa's failing run was on eb3b06a8, before 6055ccb5's ▾-label fix: confirm on the new build.
+- drw-revision-table-delete step 8 wait 1000 -> 3000 ms (live drew the deleted table 1 s late), retake asked.
+- Lead's ruling 11-19 on the not-target takes: retake on Pro what live can capture. Asked of live in REQUESTS
+  (21:02): drw-note-insert-drawing-property (drawing named "Part 1 Drawing 1"), part-/asm-menu-release(-workflows-off)
+  on Pro (Esc), drw-revision-table-delete, drw-canvas-zoom-to-sheet, drw-ref-pin-reference,
+  drw-inspection-table-iso-scrolled (with sheet points). Nothing left as a known difference yet.
+- interaction-feel rows 984 (note ruler ◁▷, f96abd03) and 999 (pinned columns, b5440871) set to "= to retake".
 
 ## Next, in order
-1. drw-view-replicate-region-place (feel row, partly fixed): live2's rule takes are in (live/studios/replicate-rule-1119/;
-   behaviours "studios (11-19): Replicate region onto Top, which edge"). The Front 1.575 dimension (vertex (0,0,10) to
-   (40,0,10)) sits 8.2 mm above Front's top edge; a place click on Top's back edge, front edge or middle always puts
-   the copy at (81, 184): 8.2 mm above Top's back edge (model y 30, sheet y 175.8), never the front edge (y 0, 145.8).
-   Not nearest to the click, not the box centre, not the same model edge (ours picks y 0: 153.5). Find the rule that
-   gives y 30 (likely: the copy keeps the original's offset from the view's outer edge on the dimension's side, i.e.
-   the top silhouette edge of the target view), change the candidate choice in `replicate_into`
-   (crates/scene/src/drawing_tools/replicate.rs), add the e2e, verify with drw-view-replicate-region-place on vibe2.
-2. drw-constraint-tangent: live2 retook it; live picks Tangent fine and ours "fails as the other dropdown rows". The
-   ▾-label fix landed in 6055ccb5: check which build live2 compared (likely older), rerun the take on a build from main,
-   and fix if it still fails.
-3. The lead's answer on the not-target takes above (DECISIONS / ui-parity `live_defects`).
-4. Open: the Measure readout of a point / circle pick ("Point 1", "Circle 1" names and rows are our guess).
-5. Then the feel rows below and the lead's queue (11-17).
+1. Land the replicate change (with the scenario result).
+2. On live's Pro retakes: compare, fix (the Release dialog's Esc if live ignores it).
+3. The drawing Measure readout of points / circles / pairs: asked of live (REQUESTS 11-19 21:06); then match.
+4. Then the feel rows below and the lead's queue (11-17).
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
 - live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell
@@ -122,18 +111,17 @@ against live with a feel scenario; share psui's pick code (`Viewport::pick_prior
 - Assembly already as live (checked 11-17): box select rule, glyph click selects the mate (related rows, mated faces
   amber, dashed connector line), graphics hover lights no list row, list hover outlines the parts.
 
-## Agents (lead's roster 11-19, qa / psui / live2 moved to Motile; only these ids)
+## Agents (lead 11-19 21:00; only these ids)
 core d30002ca-d013-4435-b7d9-7da9cb564cec, blend de66e481-56e2-4005-a5d3-9fa897ca5fde,
-bool 754a9804-feb1-4153-b32a-acf9b2a6d94d, qa 40e853dc-757f-4498-878f-00b41fd8af75,
-psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, live2 d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1,
-asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6,
-bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0. live is paused until ~21:00 11-19: captures to live2 or live/REQUESTS.md.
-Paused agents are not messaged (DECISIONS 11-17); stopped: qa 132756b3, psui 4973e295, live2 79ae5cdb.
+bool 754a9804-feb1-4153-b32a-acf9b2a6d94d, dx aad5e825-f86c-432d-b4ac-3aab402e7052,
+qa 40e853dc-757f-4498-878f-00b41fd8af75, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7,
+asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6. live: new id from the lead
+(~21:10); live2 (d7f4a0c2) lane 2. bool2 / live2 merged into bool / live (11-19). Older ids are dead.
 
 ## Waiting on others
-- live2 (d7f4a0c2): the weld retake (metric positions); retakes of 4fc2ea4f's rows and
-  Callout once green. live (e8549719): the 8 drw-revision-* and drw-styles-dimension retakes; titleblock / holecallout
-  / holetable / export-1119; the Feature Studio retake of f4e766b8 once green.
+- live (349fe81d-db78-4931-8032-6dc3edc5d558; live2 stopped): the weld retake, the Measure picks (REQUESTS 21:06): the Pro retakes
+  (REQUESTS 21:02), the 8 drw-revision-* and drw-styles-dimension retakes; titleblock / holecallout / holetable /
+  export-1119; the Feature Studio retake of f4e766b8.
 
 ## Open (no owner action possible yet)
 - live's drw-hole-callout-palette retake (23:03, q-hcp-shots/record.json) has the same states as the take: kept;

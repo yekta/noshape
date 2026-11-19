@@ -13,12 +13,13 @@ use noshape_model::drawing::views::{self, SnapKind};
 use noshape_model::drawing::{Annotation, AnnotationKind, AnnotationRef, PointRef, ViewId};
 
 /// What Select for replication picked: the annotations (with their
-/// reference points, view coordinates), the source view's placement and
-/// the region (sheet mm), if any.
+/// reference points, view coordinates), the source view's placement, its
+/// box (view coordinates) and the region (sheet mm), if any.
 #[derive(Clone)]
 pub struct Replication {
     pub items: Vec<(Annotation, Vec<[f64; 2]>)>,
     pub src: ViewPlacement,
+    pub src_box: [[f64; 2]; 2],
     pub region: Option<[[f64; 2]; 2]>,
 }
 
@@ -58,7 +59,7 @@ impl SheetPick<'_> {
                 items.push((a.clone(), pts));
             }
         }
-        Some(Replication { items, src, region })
+        Some(Replication { items, src, src_box: [geo.min, geo.max], region })
     }
 
     /// Replicate annotations onto `target`: the copies (ids from the
@@ -70,7 +71,21 @@ impl SheetPick<'_> {
         let sheet = self.current_sheet();
         let ctx = views::view_source(sheet, target).and_then(|(k, _)| self.sources.get(&k)).map(|s| s.context.clone())?;
         let src = r.src;
+        // Onto a view of another shape, each point keeps its place in the view's box and the click doesn't matter
+        // (live2 replicate-rule-1119: a dimension on Front's top edge lands on Top's back edge wherever the box is
+        // placed; live 651: Top's thickness dimension maps to Front's top and bottom).
+        let [lo, hi] = r.src_box;
+        let reshaped = (0..2).any(|k| ((hi[k] - lo[k]) - (geo.max[k] - geo.min[k])).abs() > MATCH_TOL);
+        let region_copy = delta.is_some();
+        let delta = delta.filter(|_| !reshaped);
+        let in_box = |p: [f64; 2]| -> [f64; 2] {
+            std::array::from_fn(|k| {
+                let t = if hi[k] - lo[k] > MATCH_TOL { (p[k] - lo[k]) / (hi[k] - lo[k]) } else { 0.0 };
+                geo.min[k] + t * (geo.max[k] - geo.min[k])
+            })
+        };
         let map = |p: [f64; 2]| match delta {
+            None if reshaped => in_box(p),
             None => p,
             Some(d) => {
                 let s = src.to_sheet(p);
@@ -136,7 +151,7 @@ impl SheetPick<'_> {
         let mut tried = 0usize;
         for (a, pts) in &r.items {
             // Region copies need references to land on.
-            if a.refs.is_empty() && delta.is_some() {
+            if a.refs.is_empty() && region_copy {
                 continue;
             }
             tried += 1;
@@ -167,6 +182,14 @@ impl SheetPick<'_> {
             if let Some(v) = b.kind.view_mut() {
                 *v = target;
             }
+            // Reshaped, a copy keeps its offset from its first reference.
+            let shift = match pts.first().filter(|_| reshaped) {
+                Some(p) => {
+                    let (a, b) = (src.to_sheet(*p), dst.to_sheet(map(*p)));
+                    [b[0] - a[0], b[1] - a[1]]
+                }
+                None => shift,
+            };
             b.position = [b.position[0] + shift[0], b.position[1] + shift[1]];
             b.group = None;
             b.view_group = None;
