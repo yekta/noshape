@@ -17,7 +17,7 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
   Loft refused coplanar OPEN profiles ("Could not determine loft direction."; live only refuses closed ones). Both fixed
   in fb8f84f42 (+ model test engine::surface_loft_between_coplanar_open_curves): the derived Car is now the closed
   5/9/6 car of live's Loft 4. Left: the source's Fillet 1 (r 0.6 in, tangent chain from the right top edge) fails
-  in ours (live 7/14/9): sent to blend 459f6c19 22:3x with repro /root/dx-scratch/si-save/c2-surf-intro-offset.noshape (needs
+  in ours (live 7/14/9): sent to blend 22:3x with repro /root/dx-scratch/si-save/c2-surf-intro-offset.noshape (needs
   fb8f84f42). Rebuild 130 ms -> ~1.5 s (live 0.36-1.2 s): the lofts now build + the failing fillet; recheck after
   blend's fix. Mac scripts: ~/noshape-host/dx-keep/sitrace.sh (copy /tmp/sitrace.sh), sisurf.sh.
 - QUEUED to land after asm's gate: fb8f84f42. asm (22:1x): run asm-pattern-std A/B myself, land if it keeps "162/162
@@ -227,10 +227,7 @@ R. Broken STEP answers live's "<file> uploaded but failed to translate.": landed
   temporary backtrace build.
 - vibex7 → vibex6 scp fails: relay through /root/dx-scratch/bin-relay. Host ~/tmp is pruned after 6-12 h: keep scripts
   and binaries in ~/agents/dx-keep.
-- Agent ids (lead 11-19 22:3x; message no other id): core 08a98761-3bbe-47ce-a91a-32b208f5c6b2, blend
-  459f6c19-c460-4ebf-96ca-bf92455f2e1e, bool abdebc8b-6b39-4794-8390-eb02d6fa37e6, live 349fe81d-db78-4931-8032-6dc3edc5d558,
-  qa ac50e7f2-4677-4cab-a57a-fd068a0c07bf, studios 91339202-41f1-4465-91f4-65ccd26ea1b1, psui
-  7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6.
+- Agent ids: only in /root/lead-scratch/roster.md (lead 11-19 22:4x): read it before every message_agent.
 - Mac exchange runs: ~/noshape-host/dx-keep/exx.sh <dir> <log> (kernel tests, release build, suite; stops on a build
   error); dirs exs-all (all docs), exs-x (hose + snap-hook).
 - The archive's "Parity translator changes by asm" section lists asm's translator fixes one line each (lead 11-07).
