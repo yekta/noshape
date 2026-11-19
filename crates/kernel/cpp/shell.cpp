@@ -282,6 +282,29 @@ TopoDS_Shape single_solid(const TopoDS_Shape& s)
   return s;
 }
 
+// `s` without its tiny inside-out solids (under a hundredth of t³) beside the others: a slab construction's leftover
+// (live2's weld-fillet part, Shell 3 at 5 mm on Linux: -0.001 mm³ beside the wall), never a piece of a wall.
+TopoDS_Shape without_inverted_slivers(const TopoDS_Shape& s, double t)
+{
+  if (s.IsNull() || s.ShapeType() != TopAbs_COMPOUND || solid_count(s) < 2)
+    return s;
+  std::vector<TopoDS_Shape> keep;
+  for (TopoDS_Iterator it(s); it.More(); it.Next())
+  {
+    const double v = it.Value().ShapeType() == TopAbs_SOLID ? volume_of(it.Value()) : 0.0;
+    if (!(v < 0 && -v < 1e-2 * t * t * t))
+      keep.push_back(it.Value());
+  }
+  if (keep.size() == static_cast<size_t>(s.NbChildren()) || keep.empty())
+    return s;
+  TopoDS_Compound c;
+  BRep_Builder    B;
+  B.MakeCompound(c);
+  for (const TopoDS_Shape& x : keep)
+    B.Add(c, x);
+  return single_solid(c);
+}
+
 // Shells of an offset result as one outward-oriented solid.
 TopoDS_Shape solid_of(const TopoDS_Shape& s)
 {
@@ -10566,7 +10589,7 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
     if (v0 > 0 && v1 >= v0 * (1 - 1e-9))
       fail_op("shell failed (Parasolid: the walls fill the part, no cavity: live q-b79e508b)");
   }
-  return make_result({solid.shape}, b.result, b.history.get());
+  return make_result({solid.shape}, without_inverted_slivers(b.result, thickness), b.history.get());
 }
 
 } // namespace
