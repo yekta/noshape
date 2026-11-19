@@ -997,7 +997,7 @@ impl DrawingEditor {
             Sel::Hatch(h) => sheet.sketch.hatches.iter().any(|x| x.id == *h),
             Sel::Image(i) => sheet.images.iter().any(|x| x.id == *i),
             Sel::AutoCentermark(v, c) => sheet.view(*v).is_some_and(|v| !v.deleted_centermarks.contains(c)),
-            Sel::ViewLabel(v) | Sel::AuxIndicator(v) => sheet.view(*v).is_some(),
+            Sel::ViewLabel(v) | Sel::AuxIndicator(v) | Sel::CutLine(v) => sheet.view(*v).is_some(),
             Sel::FormatLine(k) => !sheet.format_edit(*k).is_some_and(|e| e.deleted),
         });
         self.ensure_sources(false, cx);
@@ -1705,7 +1705,7 @@ impl DrawingEditor {
             let placing = matches!(self.tool, Tool::Dimension { .. });
             // An annotation being dragged is drawn plain black (live2 drw-tools-1119 dt).
             let dragged = self.dragging_annotation_id();
-            for s in self.selection.iter().chain(self.panel_highlight.iter()).chain(self.lit_tool_edge().iter()).filter(|s| !matches!(s, Sel::ViewLabel(_) | Sel::Table(_)) && !(placing && matches!(s, Sel::Annotation(_))) && dragged.is_none_or(|d| **s != Sel::Annotation(d))) {
+            for s in self.selection.iter().chain(self.panel_highlight.iter()).chain(self.lit_tool_edge().iter()).filter(|s| !matches!(s, Sel::ViewLabel(_) | Sel::Table(_) | Sel::CutLine(_)) && !(placing && matches!(s, Sel::Annotation(_))) && dragged.is_none_or(|d| **s != Sel::Annotation(d))) {
                 for p in self.picks_of(*s).into_iter().filter(|p| !datums.contains(p)) {
                     scene.add_flag(p, state::SELECTED);
                 }
@@ -1849,8 +1849,6 @@ impl DrawingEditor {
         }
     }
 
-    /// A hovered cutting line (Select): drawn tan, 10 px orange grips at its ends, its cut points light blue (live2
-    /// drw-tools-1119 sl.png).
     /// The cutting lines' looks in Select (see [`CutLineLooks`]).
     pub(crate) fn cut_line_looks(&self) -> CutLineLooks {
         use noshape_model::drawing::font;
@@ -1863,7 +1861,9 @@ impl DrawingEditor {
         // The hovered cutting line tinted with its grips; a selected view's cutting lines show their grips alone while
         // the pointer is over it (live2 drw-tools-1119 centermark-sel: none once it moves away).
         let selected = |w: ViewId| self.selection.contains(&Sel::View(w)) && self.placement(w).is_some_and(|pl| (pl.min[0]..=pl.max[0]).contains(&self.cursor[0]) && (pl.min[1]..=pl.max[1]).contains(&self.cursor[1]));
-        let lines: Vec<(ViewId, bool)> = hovered.map(|v| (v, true)).into_iter().chain(b.resolved.views.iter().filter(|w| Some(w.id) != hovered && b.resolved.section_points(w.id).is_some() && b.resolved.parent_of(w.id).is_some_and(selected)).map(|w| (w.id, false))).collect();
+        // A cutting line selected on its own: tinted as hovered (live2 drw-tools-1119 centermark-sel case 2).
+        let chosen = |w: ViewId| hovered == Some(w) || self.selection.contains(&Sel::CutLine(w));
+        let lines: Vec<(ViewId, bool)> = b.resolved.views.iter().filter(|w| b.resolved.section_points(w.id).is_some()).filter_map(|w| if chosen(w.id) { Some((w.id, true)) } else { b.resolved.parent_of(w.id).is_some_and(selected).then_some((w.id, false)) }).collect();
         let mut dot = |p: [f64; 2], color: [u8; 4]| grips.push((p, color));
         let mut tri = |pts: &[[f64; 2]], idx: &[u32]| {
             let base = ink.positions.len() as u32;
@@ -1935,7 +1935,7 @@ impl DrawingEditor {
         // (The Hatch region dialog frames no view: live2 drw-tools-1119 hc.png.)
         let select = matches!(self.tool, Tool::Select) && self.hatch_dlg.is_none();
         let hovered = self.hover.and_then(|h| self.sel_of_pick(h)).and_then(|s| match s {
-            Sel::View(v) | Sel::Edge(v, _) if select => Some(v),
+            Sel::View(v) | Sel::Edge(v, _) | Sel::CutLine(v) if select => Some(v),
             _ => None,
         });
         // A hovered cutting line frames its section view light blue (live2 drw-tools-1119 sl.png).

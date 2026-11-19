@@ -286,7 +286,7 @@ impl<'a> SheetPick<'a> {
                 (Sel::Hatch(a), PickTarget::Hatch(b)) => a == *b,
                 (Sel::Image(a), PickTarget::Image(b)) => a == *b,
                 (Sel::AutoCentermark(v, c), PickTarget::AutoCentermark { view, center }) => v == *view && c == *center,
-                (Sel::ViewLabel(v), PickTarget::ViewLabel(w)) | (Sel::AuxIndicator(v), PickTarget::AuxIndicator(w)) => v == *w,
+                (Sel::ViewLabel(v), PickTarget::ViewLabel(w)) | (Sel::AuxIndicator(v), PickTarget::AuxIndicator(w)) | (Sel::CutLine(v), PickTarget::SectionLine(w)) => v == *w,
                 (Sel::FormatLine(a), PickTarget::FormatLine(b)) => a == *b,
                 (Sel::Edge(v, e), PickTarget::Edge { view, edge }) => v == *view && e == *edge,
                 _ => false,
@@ -299,7 +299,7 @@ impl<'a> SheetPick<'a> {
     pub fn sel_of_pick(&self, pick: u32) -> Option<Sel> {
         match self.built?.picks.get(pick as usize)? {
             PickTarget::Edge { view, edge } => Some(Sel::Edge(*view, *edge)),
-            PickTarget::View(v) | PickTarget::SectionLine(v) | PickTarget::DetailCircle(v) | PickTarget::BrokenOut { view: v, .. } => Some(Sel::View(*v)),
+            PickTarget::View(v) | PickTarget::DetailCircle(v) | PickTarget::BrokenOut { view: v, .. } => Some(Sel::View(*v)),
             PickTarget::Annotation(a) | PickTarget::Inspection(a) => Some(Sel::Annotation(*a)),
             PickTarget::Table(t) => Some(Sel::Table(*t)),
             PickTarget::HoleAxis(t) => Some(Sel::HoleAxis(*t)),
@@ -308,6 +308,7 @@ impl<'a> SheetPick<'a> {
             PickTarget::Hatch(id) => Some(Sel::Hatch(*id)),
             PickTarget::Image(id) => Some(Sel::Image(*id)),
             PickTarget::AuxIndicator(v) => Some(Sel::AuxIndicator(*v)),
+            PickTarget::SectionLine(v) => Some(Sel::CutLine(*v)),
             PickTarget::ViewLabel(v) => Some(Sel::ViewLabel(*v)),
             PickTarget::AutoCentermark { view, center } => Some(Sel::AutoCentermark(*view, *center)),
             PickTarget::FormatLine(k) => Some(Sel::FormatLine(*k)),

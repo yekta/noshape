@@ -711,7 +711,7 @@ impl DrawingEditor {
             // Orange, about 11 px tall, a red centre (live 1662 (b)).
             const ORANGE: [u8; 4] = [255, 130, 63, 255];
             let h = self.tol_mm(5.5);
-            for p in &self.woken_plus {
+            for p in self.woken_plus.iter().chain(self.dimension_pick_marks().iter()) {
                 overlay.tinted.push((vec![[p[0] - h * 0.7, p[1]], [p[0] + h * 0.7, p[1]]], ORANGE, 2.0));
                 overlay.tinted.push((vec![[p[0], p[1] - h], [p[0], p[1] + h]], ORANGE, 2.0));
                 overlay.tinted.push((vec![[p[0] - h * 0.1, p[1]], [p[0] + h * 0.1, p[1]]], [255, 0, 0, 255], 2.0));
@@ -1763,6 +1763,33 @@ impl DrawingEditor {
         }
     }
 
+    /// After a dimension pick (a circle or an edge, not a point) every dimension of the sheet shows small orange +
+    /// marks, snap points for the placement: a linear one at its value's centre and at its dimension line's end on the
+    /// second extension line, the others at the value's centre; none on hover (live2 rad-note plus-*.png).
+    pub(crate) fn dimension_pick_marks(&self) -> Vec<[f64; 2]> {
+        let Tool::Dimension { picks, .. } = &self.tool else { return Vec::new() };
+        if picks.first().is_none_or(|p| matches!(p, Pick::Point(_))) {
+            return Vec::new();
+        }
+        let (Some(b), Some(sheet)) = (&self.built, self.drawing.sheets.get(self.sheet)) else { return Vec::new() };
+        let mut out = Vec::new();
+        for a in sheet.annotations.iter().filter(|a| a.kind.is_dimension()) {
+            let mine = self.picks_of(Sel::Annotation(a.id));
+            if let Some(t) = b.geometry.texts.iter().find(|t| mine.contains(&t.pick)) {
+                // The box's middle, raised from the descender room to the capitals' middle.
+                let q = noshape_model::drawing::font::text_box(t);
+                let up = 0.15 * t.height;
+                out.push([(q[0][0] + q[2][0]) / 2.0 - t.angle.sin() * up, (q[0][1] + q[2][1]) / 2.0 + t.angle.cos() * up]);
+            }
+            if matches!(a.kind, AnnotationKind::LinearDimension { .. })
+                && let Some(g) = b.geometry.grips.iter().filter(|g| mine.contains(&g.pick) && g.kind == noshape_model::drawing::sheet::GripKind::End).nth(1)
+            {
+                out.push(g.pos);
+            }
+        }
+        out
+    }
+
     /// The Dimension tool still taking picks at the pointer (the click adds one, not places): no placement alignment.
     fn dimension_picking(&self) -> bool {
         match &self.tool {
@@ -1802,6 +1829,7 @@ impl DrawingEditor {
             }
         } else {
             pts.extend(self.woken_points.iter().copied());
+            pts.extend(self.dimension_pick_marks());
         }
         let best = |axis: usize| pts.iter().filter(|p| (p[axis] - c[axis]).abs() <= tol).min_by(|a, b| (a[axis] - c[axis]).abs().total_cmp(&(b[axis] - c[axis]).abs())).copied();
         let (bx, by) = (best(0), best(1));
@@ -2132,7 +2160,7 @@ impl DrawingEditor {
                     });
                 }
             }
-            Sel::Break(..) | Sel::Sketch(_) | Sel::Hatch(_) | Sel::Image(_) | Sel::AutoCentermark(..) | Sel::ViewLabel(_) | Sel::AuxIndicator(_) | Sel::HoleAxis(_) | Sel::FormatLine(_) => {}
+            Sel::Break(..) | Sel::Sketch(_) | Sel::Hatch(_) | Sel::Image(_) | Sel::AutoCentermark(..) | Sel::ViewLabel(_) | Sel::AuxIndicator(_) | Sel::CutLine(_) | Sel::HoleAxis(_) | Sel::FormatLine(_) => {}
         }
     }
 
@@ -2206,7 +2234,7 @@ impl DrawingEditor {
             },
             Sel::ViewLabel(v) => self.label_drag(v, start),
             // Dragging the indicator's line (off its dots) does nothing (live u-914).
-            Sel::Table(_) | Sel::Break(..) | Sel::Hatch(_) | Sel::AutoCentermark(..) | Sel::AuxIndicator(_) | Sel::HoleAxis(_) | Sel::FormatLine(_) => Drag::None,
+            Sel::Table(_) | Sel::Break(..) | Sel::Hatch(_) | Sel::AutoCentermark(..) | Sel::AuxIndicator(_) | Sel::CutLine(_) | Sel::HoleAxis(_) | Sel::FormatLine(_) => Drag::None,
         }
     }
 
@@ -2688,7 +2716,7 @@ impl DrawingEditor {
             return out;
         }
         match sel {
-            Some(Sel::View(id) | Sel::Edge(id, _)) => out = self.onshape_view_entries(id, cx),
+            Some(Sel::View(id) | Sel::Edge(id, _) | Sel::CutLine(id)) => out = self.onshape_view_entries(id, cx),
             Some(Sel::AuxIndicator(id)) => return Self::aux_indicator_entries(id, crate::drawing_props::paste_entry(cx)),
             // A hole table's tag axis (help drawing_hole_table): Hole table
             // properties, Flip X direction, Flip Y direction | Clear

@@ -2306,9 +2306,62 @@ fn the_dimension_tool_marks_its_picks_as_live_and_keeps_the_placed_one_selected(
     VisualTestContext::from_window(window, cx).simulate_mouse_up(p + Point::new(px(40.), px(-16.)), MouseButton::Left, Modifiers::default());
 }
 
+/// Live2 rad-note plus-*.png (11-19 08:30): after a Dimension pick on an edge (not on hover, not after a vertex pick)
+/// every dimension of the sheet shows orange + marks: a linear one at its value's centre and at its dimension line's end
+/// on the second extension line; the placement snaps to them.
+#[gpui::test]
+fn a_dimension_pick_marks_every_dimensions_value_and_far_end(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_model::drawing::sheet::GripKind;
+    use noshape_scene::drawing_tools::DimTool;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-dim-plus");
+    real_sheet(cx, window, &editor);
+    let (a, b) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+        let pts: Vec<[f64; 2]> = g.snaps.iter().map(|s| pl.to_sheet(s.p)).collect();
+        let a = pts.iter().copied().min_by(|p, q| (p[0] + p[1]).total_cmp(&(q[0] + q[1]))).expect("a vertex");
+        let b = pts.iter().copied().filter(|p| (p[1] - a[1]).abs() < 1e-6 && p[0] > a[0] + 1.0).max_by(|p, q| p[0].total_cmp(&q[0])).expect("a vertex level with it");
+        (a, b)
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Dimension { kind: DimTool::Point2, picks: vec![] }, cx)));
+    draw(cx, window);
+    click_at(cx, window, &editor, a, Modifiers::default());
+    click_at(cx, window, &editor, b, Modifiers::default());
+    click_at(cx, window, &editor, [(a[0] + b[0]) / 2.0, a[1] - 12.0], Modifiers::default());
+    let placed = cx.update(|cx| editor.read(cx).current_sheet().annotations.last().map(|x| x.id)).expect("placed");
+    let far_end = cx.update(|cx| {
+        let e = editor.read(cx);
+        let bt = e.built.as_ref().expect("built");
+        bt.geometry.grips.iter().filter(|g| bt.picks.get(g.pick as usize) == Some(&PickTarget::Annotation(placed)) && g.kind == GripKind::End).nth(1).map(|g| g.pos).expect("its far end")
+    });
+    let marks = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).dimension_pick_marks());
+    let edge = [(a[0] * 3.0 + b[0]) / 4.0, a[1]];
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)));
+    draw(cx, window);
+    lit_at(cx, window, &editor, edge);
+    assert!(marks(cx).is_empty(), "none on hover");
+    click_at(cx, window, &editor, edge, Modifiers::default());
+    let m = marks(cx);
+    assert_eq!(m.len(), 2, "the linear dimension's value and far end: {m:?}");
+    assert!(m.iter().any(|p| (p[0] - far_end[0]).hypot(p[1] - far_end[1]) < 1e-9), "one at its far end {far_end:?}: {m:?}");
+    // The placement snaps onto a mark within reach.
+    let near = [far_end[0] + cx.update(|cx| editor.read(cx).tol_mm(2.0)), far_end[1] - cx.update(|cx| editor.read(cx).tol_mm(2.0))];
+    lit_at(cx, window, &editor, near);
+    let at = cx.update(|cx| editor.read(cx).cursor);
+    assert!((at[0] - far_end[0]).hypot(at[1] - far_end[1]) < 1e-9, "the pointer held on the mark: {at:?} vs {far_end:?}");
+    // A vertex pick shows none.
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Dimension { kind: DimTool::Point2, picks: vec![] }, cx)));
+    draw(cx, window);
+    click_at(cx, window, &editor, a, Modifiers::default());
+    assert!(marks(cx).is_empty(), "none after a vertex pick");
+}
+
 /// Live2 drw-tools-1119 (sl.png), recheck-1119: a section's cutting line hovered in Select frames the section view light
-/// blue, tan with its arrows and letters and grips; a press-drag on the line's body moves nothing and selects the parent
-/// view, which keeps the line's grips.
+/// blue, tan with its arrows and letters and grips; a click on its body selects the line itself; a press-drag there
+/// moves nothing and selects the parent view, which keeps the line's grips while under the pointer.
 #[gpui::test]
 fn a_cutting_line_hovered_frames_its_section_blue_and_its_body_does_not_drag(cx: &mut TestAppContext) {
     use noshape_model::drawing::build::PickTarget;
@@ -2366,6 +2419,13 @@ fn a_cutting_line_hovered_frames_its_section_blue_and_its_body_does_not_drag(cx:
     assert!(lit > 0 && ink > 0, "the line, its arrows and letters tan");
     assert_eq!(tan, 4, "a tan grip at both ends of each arrow");
     assert!(blue.len() == 1 && (blue[0][0] - mid[0]).abs() < 1e-6, "one light-blue grip on the point it follows: {blue:?} (line at x {})", mid[0]);
+    // A plain click on its body selects the line itself, drawn as hovered, the pointer gone (centermark-sel case 2).
+    assert_eq!(click_at(cx, window, &editor, on_line, Modifiers::default()), vec![Sel::CutLine(section)], "a click selects the cutting line");
+    lit_at(cx, window, &editor, [5.0, 5.0]);
+    let (lit, tan, blue, ink) = looks(cx);
+    assert!(lit > 0 && ink > 0 && tan == 4 && blue.len() == 1, "selected: tan with its grips and anchor ({lit}, {tan}, {blue:?}, {ink})");
+    cx.update(|cx| editor.update(cx, |e, _| e.selection.clear()));
+    lit_at(cx, window, &editor, on_line);
     let points = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).current_sheet().section_points(section));
     let before = points(cx);
     let p = at_window(cx, &editor, on_line);

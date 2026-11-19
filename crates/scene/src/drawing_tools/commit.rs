@@ -1279,7 +1279,7 @@ pub fn delete_selection(s: &mut Sheet, sel: &[super::Sel]) {
     for x in sel {
         match x {
             // A label's Delete is its view's (live u-944: the view menu).
-            Sel::View(v) | Sel::ViewLabel(v) | Sel::AuxIndicator(v) => s.remove_view(*v),
+            Sel::View(v) | Sel::ViewLabel(v) | Sel::AuxIndicator(v) | Sel::CutLine(v) => s.remove_view(*v),
             // Callouts grouped with the annotation go with it.
             // A datum from the model is hidden, not removed (MBD status › Show).
             Sel::Annotation(a) if s.annotations.iter().any(|n| n.id == *a && n.model.is_some()) => {
