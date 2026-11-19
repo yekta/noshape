@@ -1986,6 +1986,42 @@ fn a_sketch_on_an_in_context_face_is_built_on_live_frame() {
     assert!(faces["faces"].as_array().unwrap().iter().any(|f| near(&f["centroid"])), "no cap at {cap:?}: {faces}");
 }
 
+/// A sketch plane named by an id whose newest earlier live line names another face (asm-bjr-config 5d8bc1's Sketch 40:
+/// RfCS was Hole 2's bore at line 95 and is Extrude 16's end cap at the sketch) lies on live's sketch frame: the face of
+/// ours there, not the stale one ("Select a sketch plane." on a bore).
+#[test]
+fn a_sketch_plane_by_a_stale_id_is_the_face_on_lives_frame() {
+    let sketch = "FdHX57YE0MI7PDU_0";
+    let side = |s: &str| format!("2i9coyYI-wWEe-o83F-jBj8-nmqTMMu2mK71.{s}");
+    let entities = json!([
+        segment(&side("bottom"), (0.0, 0.0), (0.04, 0.0)),
+        segment(&side("right"), (0.04, 0.0), (0.04, 0.02)),
+        segment(&side("top"), (0.04, 0.02), (0.0, 0.02)),
+        segment(&side("left"), (0.0, 0.02), (0.0, 0.0)),
+    ]);
+    let region = json!({ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": sketch, "queryString": format!("query = qSketchRegion(id + \"{sketch}\", false);") });
+    let block = json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 6, "edges": 12, "vertices": 8, "volume": 0.04 * 0.02 * 0.01 });
+    let (mut doc, mut live) = one_extrude(sketch, entities, region, block);
+    // Live's line 1 names RX the block's y = 0 side; Sketch 2's frame is the top cap (z 10 mm, +Z).
+    live[1]["bodies"] = json!([{ "id": "JHD", "type": "SOLID", "faces": [{ "id": "RX", "area": 0.04 * 0.01, "box": { "min": [0.0, 0.0, 0.0], "max": [0.04, 0.0, 0.01] } }] }]);
+    let fs = doc["features"].as_array_mut().unwrap();
+    fs.push(json!({ "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS2", "name": "Sketch 2",
+        "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["RX"] }] }],
+        "entities": [circle("c", 0.005, (0.02, 0.01))], "constraints": [] }));
+    doc["sketches"] = json!({ "sketches": [{ "featureId": "FS2", "transformMatrix": [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.01, 0.0, 0.0, 0.0, 1.0] }] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("stale-plane-id.noshape"), &doc, live_refs(&live, "")).unwrap();
+    let mut ours = None;
+    for k in 0..t.len() {
+        let s = t.step(k);
+        assert!(s.ours.is_some() && s.status.as_deref() == Some("Ok"), "{}: {:?} {:?} {:?}", s.name, s.status, s.message, s.problems);
+        ours = s.ours.clone();
+    }
+    let made = t.call("sketch_get", json!({ "sketch": ours.unwrap() })).unwrap();
+    let (o, n) = (made["frame"]["origin"].clone(), made["frame"]["normal"].clone());
+    assert!((o[2].as_f64().unwrap() - 10.0).abs() < 1e-6 && (n[2].as_f64().unwrap() - 1.0).abs() < 1e-9, "on the top cap: origin {o}, normal {n}");
+}
+
 /// A Variable whose value a List configures (c2-config-parts-sprockets' #dr, #r, #g by pitch): ours configured on its
 /// typed value parameter, each configuration's value set (was refused: "Variable 3 has no parameter `value`").
 #[test]

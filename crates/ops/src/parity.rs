@@ -2007,9 +2007,17 @@ impl<'a> Translator<'a> {
                 return Some(id.to_string());
             }
         }
-        let faces = self.call("query_entities", json!({ "kind": "faces", "surface": "plane", "normal": n, "near": mm(o), "limit": 20 })).ok()?;
+        self.faces_on_frame(oid, 20)?.into_iter().next()
+    }
+
+    /// Our planar faces on live's frame of sketch `oid`, nearest its origin first (at most `limit` looked at).
+    fn faces_on_frame(&mut self, oid: &str, limit: usize) -> Option<Vec<String>> {
+        let [o, x, y] = *self.frames.get(oid)?;
+        let n = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+        let faces = self.call("query_entities", json!({ "kind": "faces", "surface": "plane", "normal": n, "near": mm(o), "limit": limit })).ok()?;
         let k = per_unit(&faces["units"]);
-        faces["faces"].as_array()?.iter().find(|f| f3(&f["centroid"]).is_some_and(|c| on(c.map(|v| v * k), n))).and_then(|f| f["id"].as_str().map(str::to_string))
+        let on = |c: [f64; 3]| ((o[0] - c[0]) * n[0] + (o[1] - c[1]) * n[1] + (o[2] - c[2]) * n[2]).abs() < 1e-9;
+        Some(faces["faces"].as_array()?.iter().filter(|f| f3(&f["centroid"]).is_some_and(|c| on(c.map(|v| v * k)))).filter_map(|f| f["id"].as_str().map(str::to_string)).collect())
     }
 
     /// The regions of the last sketch before feature `k` when `queries` are
@@ -4953,6 +4961,15 @@ impl<'a> Translator<'a> {
         let plane = match self.param(k, plane_q) {
             Ok(v) => v.and_then(|v| v.as_array().and_then(|a| a.first()).cloned()).ok_or("no sketch plane")?,
             Err(e) => self.plane_at_frame(&oid).map(Value::from).ok_or(e)?,
+        };
+        // A face off live's sketch frame (an id whose newest earlier line named another entity: asm-bjr-config 5d8bc1's
+        // Sketch 40 on RfCS, Hole 2's bore at live's line 95 and Extrude 16's end cap at the sketch): ours on the frame.
+        let plane = match plane.as_str().filter(|p| p.starts_with("face:")).map(str::to_string) {
+            Some(face) => match self.faces_on_frame(&oid, 200) {
+                Some(on) if !on.is_empty() && !on.contains(&face) => Value::from(on[0].clone()),
+                _ => plane,
+            },
+            None => plane,
         };
         let mut args = json!({ "plane": plane });
         if let Some(n) = f["name"].as_str().filter(|n| !n.starts_with('#')) {
