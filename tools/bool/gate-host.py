@@ -41,7 +41,7 @@ SPEED = ["k25-15", "k25-25", "cf-spur-gear"]
 # with OCCT's inputs; here ours' results feed the next step (a slab union unified otherwise changes the Shell's faces).
 SHELLS = f"{CORPORA}/shellcorpus/cases"
 # The shells where ours already differs from OCCT's alone on main (11-19): fixed ones come off.
-SHELLS_KNOWN = set("""17488d26389dbcfc 2756e521fec08ecc 8e6576376acba8e9 b79e508bd50f0791""".split())
+SHELLS_KNOWN = set("""17488d26389dbcfc 2756e521fec08ecc 8e6576376acba8e9""".split())
 # (A case is named by its file: a recorded one by its 16-digit hash, a hand-made one (kall's k25x2) any way.)
 NAME = r"[\w.-]+"
 CASE = re.compile(rf"^({NAME})( \(|: failed)")

@@ -10558,6 +10558,14 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
                     ((method == 0 || method == 2) && timed("slabs", [&] { return by_slabs(solid.shape, removed, thickness, sign, b); }));
   if (!done)
     fail_op("shell failed");
+  // Walls that fill the whole part leave no cavity: Parasolid fails (live q-b79e508b: 19.9 mm walls in a 20 mm plate,
+  // SHELL_FAILED; ours returned the part unchanged).
+  if (!outward)
+  {
+    const double v0 = volume_of(solid.shape), v1 = volume_of(b.result);
+    if (v0 > 0 && v1 >= v0 * (1 - 1e-9))
+      fail_op("shell failed (Parasolid: the walls fill the part, no cavity: live q-b79e508b)");
+  }
   return make_result({solid.shape}, b.result, b.history.get());
 }
 
