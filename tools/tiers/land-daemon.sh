@@ -283,7 +283,9 @@ run_batch() {
     can_land "$r" && { dep=$r; start=$(cat "$LD/run/$r/stack"); break; }
   done
   # (On main: as it is now, not as fetched before the lock; a batch may have just landed.)
-  [ -n "$dep" ] || git -C "$repo" fetch -q origin "+refs/heads/$TARGET:refs/landq/$inst/target"
+  # (Fetched on a stack too: a job rebased on a newer main than the batch under it must not carry main's own newer
+  # commits, e.g. docs pushed straight to main, onto that older base. 11-19: every job failed on docs/handoff/qa.md.)
+  git -C "$repo" fetch -q origin "+refs/heads/$TARGET:refs/landq/$inst/target"
   if [ -n "$dep" ]; then cat "$LD/run/$dep/changed" "$LD/run/$dep/dep.changed" > "$d/dep.changed" 2>/dev/null; else : > "$d/dep.changed"; fi
   git checkout -q -f --detach "$start" && git clean -fdq || { exec 6>&-; log "$bid: checkout failed"; sleep 30; front resume "${keys[@]}"; return; }
   base=$(git rev-parse HEAD); : > "$d/changed"; : > "$d/counts"; local pkgs=""
@@ -292,7 +294,7 @@ run_batch() {
     local jref="refs/landq/$inst/job/$key"
     git rev-parse -q --verify "$jref" > /dev/null || continue
     # Its commits not yet on the stack (by content: a change already landed by --wait or with an earlier job drops out).
-    commits=$(git rev-list --reverse --cherry-pick --right-only HEAD..."$jref")
+    commits=$(git rev-list --reverse --cherry-pick --right-only HEAD..."$jref" "^refs/landq/$inst/target")
     # None: on main already (landed), or all in an earlier change of this batch (it lands or fails with them).
     if [ -z "$commits" ] && [ "$(git rev-parse HEAD)" = "$base" ] && [ -z "$dep" ]; then : > "$d/detail"; result "$key" LANDED "$base"; continue; fi
     before=$(git rev-parse HEAD)
