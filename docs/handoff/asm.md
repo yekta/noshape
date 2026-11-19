@@ -11,7 +11,7 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
 - Piece 1 (model + eval), branch asm-dmirror 28ddc6e06: `InstanceSource::DerivedMirror { assembly, derived,
   placement, mirrored_studios }`, a rigid node of the source's instances mirrored in its XY (Transform: same part,
   placed by its Placement type; Derived: the "-Mirrored" studio's part, "Block-Mirrored <1>"); BOM, drawing sources.
-  Lands after d7691003; full ops e2e running first (drawing touched).
+  Full ops e2e passed (253).
 - Piece 2 (ops, uncommitted): `Document::{mirrored_assembly, ensure_mirrored_assembly, mirrored_tab,
   ensure_mirrored_tab}`; Mirror strategy Derived on a subassembly makes "<A>-Mirrored" (fixed "Derived mirror" node)
   and the copy is "<A>-Mirrored <1>"; eval's reflection_of treats it like a mirrored studio. e2e
@@ -29,8 +29,10 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
 
 ### Others' items from today
 - core 12:4x: 90d254008 moved c2-surf-intro-* Derived 1's body +0.1 in x: correct (live's source index 4 has the
-  Title text on the x=0 face, −25.4..2.54). Open (mine): our Derived 1 imports Instructions (JHD, 220 faces) instead
-  of live's Car (JWD, 7 faces): the part query's pick.
+  Title text on the x=0 face, −25.4..2.54). Our Derived 1 imports Instructions (JHD) instead of live's Car (JWD):
+  the source's car isn't built. Loft 1's profile (INTERSECT of Projected curve 2's own extrude1 / extrude2 bodies,
+  a wire) now maps; left: Loft 2 / 4 (COPY of Loft 1's CAP_EDGE by Mirror 1), Loft 3 (vertices of SWEPT_FACE
+  INTERSECTs of Projected curve 1), Fillet 1. Repro: vibex8 NOSHAPE_PARITY_ONLY=c2-surf-intro-offset (7 s).
 
 ### In flight: HEAVY-ASM-SOFTWARE-FRAME, LOD side (branch asm-lod, 97b431e3e, not landed)
 - asm-xdev-subs' coarsest level: 462 k triangles / 273 k edge segments, 358 k / 219 k of them one 10 482-face part
