@@ -8592,6 +8592,52 @@ fn a_radial_hole_gets_its_centermark() {
     assert_eq!(marks, 12, "two marks of six lines");
 }
 
+/// A section through a hole draws each rim it leaves as one line, as live (live2 session-drw-1119's SECTION A - A: the
+/// cut leaves the rim circle in two arcs meeting at its old seam; ours wrote two LINEs). Each of the section's two long
+/// sides is three LINEs: outline, rim, outline. Cut both ways (the kept half holds the seam one way).
+#[test]
+fn a_sections_hole_rims_are_one_line_each() {
+    for side in [1.0, -1.0] {
+        let mut ctx = Ctx::new();
+        block_with_hole(&mut ctx, &format!("section-rims-{side}.noshape"));
+        let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+        let tab = d["drawing"].as_str().unwrap().to_string();
+        let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+        let (top, circle) = g["views"].as_array().unwrap().iter().find_map(|v| v["edges"].as_array().and_then(|es| es.iter().find(|e| e["type"] == "circle").map(|c| (v.clone(), c.clone())))).unwrap();
+        let (cx, cy) = (num(&circle["center"][0]), num(&circle["center"][1]));
+        let x = if side > 0.0 { num(&top["bounds"]["max"][0]) + 60.0 } else { num(&top["bounds"]["min"][0]) - 60.0 };
+        let s = call(&mut ctx, "drawing_section_view", json!({ "drawing": tab, "parent": top["id"], "point": [cx, cy], "position": [x, cy] }));
+        let sv = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["views"].as_array().unwrap().iter().find(|v| v["id"] == s["view"]).unwrap().clone();
+        let (lo, hi) = ([num(&sv["bounds"]["min"][0]), num(&sv["bounds"]["min"][1])], [num(&sv["bounds"]["max"][0]), num(&sv["bounds"]["max"][1])]);
+        let dxf = scratch(&format!("section-rims-{side}.dxf"));
+        call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "DXF", "file": dxf.to_str().unwrap() }));
+        let text = String::from_utf8_lossy(&std::fs::read(&dxf).unwrap()).to_string();
+        let pairs: Vec<(&str, &str)> = text.lines().map(str::trim).collect::<Vec<_>>().chunks(2).filter(|p| p.len() == 2).map(|p| (p[0], p[1])).collect();
+        // (ISO A3: the DXF in millimetres, as the sheet.)
+        let mut lines: Vec<[f64; 4]> = Vec::new();
+        let mut cur: Option<(bool, [f64; 4])> = None;
+        for (c, v) in pairs {
+            match (c, &mut cur) {
+                ("0", _) => {
+                    lines.extend(cur.take().filter(|l| l.0).map(|l| l.1));
+                    cur = (v == "LINE").then_some((false, [0.0; 4]));
+                }
+                ("8", Some(l)) => l.0 = v.eq_ignore_ascii_case("visible"),
+                ("10" | "20" | "11" | "21", Some(l)) => l.1[["10", "20", "11", "21"].iter().position(|x| *x == c).unwrap()] = v.parse::<f64>().unwrap(),
+                _ => {}
+            }
+        }
+        // The section's two long sides (its wider extent), each a row of collinear LINEs.
+        let wide = hi[0] - lo[0] > hi[1] - lo[1];
+        for at in if wide { [lo[1], hi[1]] } else { [lo[0], hi[0]] } {
+            let k = if wide { 1 } else { 0 };
+            // (The view's bounds 0.5 mm outside its outline.)
+            let row = lines.iter().filter(|l| (l[k] - at).abs() < 1.0 && (l[k + 2] - l[k]).abs() < 1e-6).count();
+            assert_eq!(row, 3, "side {side}: the row at {at:.2} (view {lo:?}..{hi:?}): outline, rim, outline");
+        }
+    }
+}
+
 /// An automatic centermark is sized to the widest circle seen on its axis, not to a counterbore hidden on the far side,
 /// and shrinks to 0.7 r only for a circle smaller than its cross and gap (0.09 in at the defaults): live's clamp-guillem
 /// (r 2 mm with a r 3.5 mm counterbore behind: arms to r + 0.7 r; r 2.75 mm: ±0.045 in, arms to r + 0.09 in),

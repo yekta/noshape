@@ -3853,7 +3853,7 @@ fn a_detail_label_hangs_under_its_whole_circle() {
         let (c, r) = (pl.to_sheet(center), pl.len_to_sheet(radius));
         let first = built.geometry.texts.iter().find(|t| built.picks.get(t.pick as usize) == Some(&PickTarget::ViewLabel(id))).expect("the label");
         assert!((first.pos[0] - c[0]).abs() < 1e-6, "clip {clip}: centred: {first:?} / {c:?}");
-        assert!((first.pos[1] + first.height - (c[1] - r - 5.3)).abs() < 1e-6, "clip {clip}: top 5.3 mm under the circle: {first:?} / {c:?} r {r}");
+        assert!((first.pos[1] - (c[1] - r - 5.3)).abs() < 1e-6, "clip {clip}: top 5.3 mm under the circle: {first:?} / {c:?} r {r}");
     }
     // A section's label: its top under the view's geometry, centred on it: 5.81 mm for a horizontal cut, 3.02 mm for
     // a vertical one (live2 sec-label-1118).
@@ -3865,7 +3865,7 @@ fn a_detail_label_hangs_under_its_whole_circle() {
     let (a, b) = (line[0], *line.last().unwrap());
     let gap = if (b[0] - a[0]).abs() > (b[1] - a[1]).abs() { 5.81 } else { 3.02 };
     let t = built.geometry.texts.iter().find(|t| built.picks.get(t.pick as usize) == Some(&PickTarget::ViewLabel(section))).expect("SECTION A - A");
-    assert!((t.pos[0] - (pl.min[0] + pl.max[0]) / 2.0).abs() < 1e-6 && (t.pos[1] + t.height - (pl.min[1] - gap)).abs() < 1e-6, "{t:?} / {pl:?}");
+    assert!((t.pos[0] - (pl.min[0] + pl.max[0]) / 2.0).abs() < 1e-6 && (t.pos[1] - (pl.min[1] - gap)).abs() < 1e-6, "{t:?} / {pl:?}");
     // Turned the other way, the other gap.
     if let ViewKind::Section { line, .. } = &mut drawing.sheets[0].view_mut(section).unwrap().kind {
         for p in line.iter_mut() {
@@ -3876,7 +3876,7 @@ fn a_detail_label_hangs_under_its_whole_circle() {
     let pl = built.placement(section).unwrap();
     let t = built.geometry.texts.iter().find(|t| built.picks.get(t.pick as usize) == Some(&PickTarget::ViewLabel(section))).expect("SECTION A - A");
     let other = if gap == 5.81 { 3.02 } else { 5.81 };
-    assert!((t.pos[1] + t.height - (pl.min[1] - other)).abs() < 1e-6, "turned: {t:?} / {pl:?}");
+    assert!((t.pos[1] - (pl.min[1] - other)).abs() < 1e-6, "turned: {t:?} / {pl:?}");
 }
 
 /// Detail profile In line on a circle (live qa4-r5-s11.dxf, detail B): the

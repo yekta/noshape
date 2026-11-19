@@ -2602,10 +2602,10 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             };
             let mut y = lo[1] - gap;
             let label_mark = g.texts.len();
+            // Hung from their tops (live's DXF: every view label's MTEXT attached top centre).
             for (text, height) in label_lines {
-                y -= height;
-                g.texts.push(Text2 { pos: [(lo[0] + hi[0]) / 2.0 + at[0], y + at[1]], height, text, angle: 0.0, anchor: Anchor::BottomCenter, pick: label_pick });
-                y -= 2.0;
+                g.texts.push(Text2 { pos: [(lo[0] + hi[0]) / 2.0 + at[0], y + at[1]], height, text, angle: 0.0, anchor: Anchor::TopCenter, pick: label_pick });
+                y -= height + 2.0;
             }
             // A base or pictorial view at a scale other than 1:1 keeps its label when it says nothing: live's DXF has an
             // empty MTEXT there (the exchange suite's drawings at 1:2 to 1:50: Front and Isometric each one, the Right

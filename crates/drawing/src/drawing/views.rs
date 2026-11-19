@@ -1900,6 +1900,56 @@ pub fn dist_to_segment(p: [f64; 2], a: [f64; 2], b: [f64; 2]) -> f64 {
     ((p[0] - q[0]).powi(2) + (p[1] - q[1]).powi(2)).sqrt()
 }
 
+/// Drawn pieces of one model edge meeting end to end, seen alike, as one line: a section's cut leaves a hole's rim in
+/// two arcs that meet at the circle's old seam (live2 session-drw-1119's SECTION A - A: each rim one LINE, ours two).
+/// Only where exactly two pieces meet.
+fn join_pieces_of_one_edge(edges: &mut Vec<ViewEdge>, tol: f64) {
+    let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).hypot(a[1] - b[1]) <= tol;
+    let mut by_model: HashMap<(u32, bool, EdgeClass), Vec<usize>> = HashMap::new();
+    for (i, e) in edges.iter().enumerate() {
+        if let (Some(m), SketchEdge::None, false, true) = (e.model, e.sketch, e.mesh, e.points.len() >= 2) {
+            by_model.entry((m, e.visible, e.class)).or_default().push(i);
+        }
+    }
+    let mut gone = vec![false; edges.len()];
+    for group in by_model.into_values().filter(|g| g.len() > 1) {
+        let mut joined = true;
+        while joined {
+            joined = false;
+            let live: Vec<usize> = group.iter().copied().filter(|&i| !gone[i]).collect();
+            'pairs: for &a in &live {
+                for &b in live.iter().filter(|&&b| b != a) {
+                    let (pa, pb) = (&edges[a].points, &edges[b].points);
+                    let ends = [(*pa.last().unwrap(), pb[0], false, false), (*pa.last().unwrap(), *pb.last().unwrap(), false, true), (pa[0], pb[0], true, false), (pa[0], *pb.last().unwrap(), true, true)];
+                    let Some(&(at, _, rev_a, rev_b)) = ends.iter().find(|(p, q, ..)| near(*p, *q)) else { continue };
+                    // Exactly two pieces at the point.
+                    if live.iter().filter(|&&c| near(edges[c].points[0], at) || near(*edges[c].points.last().unwrap(), at)).count() != 2 {
+                        continue;
+                    }
+                    let mut first = edges[a].points.clone();
+                    if rev_a {
+                        first.reverse();
+                    }
+                    let mut second = edges[b].points.clone();
+                    if rev_b {
+                        second.reverse();
+                    }
+                    first.extend(second.into_iter().skip(1));
+                    edges[a].points = first;
+                    gone[b] = true;
+                    joined = true;
+                    break 'pairs;
+                }
+            }
+        }
+    }
+    let mut i = 0;
+    edges.retain(|_| {
+        i += 1;
+        !gone[i - 1]
+    });
+}
+
 /// Sample an edge into 3D points.
 pub fn sample_edge(e: &Shape, segments: usize) -> Vec<DVec3> {
     let Ok(info) = e.edge_info() else { return vec![] };
@@ -3194,6 +3244,7 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
             freeform: pe.freeform,
         });
     }
+    join_pieces_of_one_edge(&mut g.edges, diag * 1e-7);
     if bodies.len() > 1 {
         mark_shared_edges(&mut g, &models, &compound, &cmap, diag);
     }

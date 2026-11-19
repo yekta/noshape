@@ -947,7 +947,21 @@ impl Sheet<'_> {
                     true => format!("\\K{}\\k", mtext_value(&t.text)),
                     false => mtext_value(&t.text),
                 };
-                format!("{{\\pxq{};{font}{text}}}", paragraph_align(t.anchor))
+                // R14: the text alone (live2 session-drw-1119: "DEBURR ALL EDGES", the paragraph kept aside).
+                match self.version {
+                    DxfVersion::AC1014 => format!("{font}{text}"),
+                    _ => format!("{{\\pxq{};{font}{text}}}", paragraph_align(t.anchor)),
+                }
+            }
+            // A cutting line's letter: its font, width and tracking factors, overline and underline off, in every
+            // version (live's section DXFs, R14 and 2018 alike).
+            TextIn::Space if self.g.cad_text_layer(ti) == CadLayer::SectionCuttingLine => {
+                let f = self.g.text_font(ti).cloned().unwrap_or_else(|| super::sheet::TextFont { family: super::sheet::DRAWING_DEFAULT_FONT.to_string(), bold: false, italic: false });
+                let font = match super::sheet::is_shx(&f.family) {
+                    true => mtext_font_code(&f).unwrap_or_default(),
+                    false => format!("\\f{}|b{}|i{}|c0|p0;", f.family, f.bold as u8, f.italic as u8),
+                };
+                format!("{font}\\W1.0000000000;\\T1.0000000000;\\o\\l{}", mtext_value(&t.text))
             }
             // Several texts of one MTEXT (a title block's), an empty one " ".
             TextIn::Space => match self.g.cad_mtext_of(ti) {
@@ -1965,7 +1979,8 @@ mod tests {
         g.struck_texts.push(t0..t0 + 1);
         g.strike_lines.push(l0);
         g.cad_text_style_since(t0, CadTextStyle::Note);
-        for (version, want) in [(DxfVersion::AC1032, "{\\pxql;\\KSTRUCK\\k}"), (DxfVersion::AC1027, "{\\pxql;\\KSTRUCK\\k}"), (DxfVersion::AC1024, "{\\pxql;STRUCK}")] {
+        // R14: the text alone (live2 session-drw-1119's note).
+        for (version, want) in [(DxfVersion::AC1032, "{\\pxql;\\KSTRUCK\\k}"), (DxfVersion::AC1027, "{\\pxql;\\KSTRUCK\\k}"), (DxfVersion::AC1024, "{\\pxql;STRUCK}"), (DxfVersion::AC1014, "STRUCK")] {
             let dxf = String::from_utf8(to_dxf_version(&g, 4, version).unwrap()).unwrap();
             let doc = acadrust::DxfReader::from_reader(std::io::Cursor::new(dxf.as_bytes().to_vec())).unwrap().read().unwrap();
             let value = doc.entities().find_map(|e| match e {
@@ -1975,6 +1990,21 @@ mod tests {
             assert_eq!(value.as_deref(), Some(want), "{version:?}");
             let strike = doc.entities().any(|e| matches!(e, EntityType::Line(l) if (l.start.y - l.end.y).abs() < 1e-9 && (l.start.y * 4.0 / 4.0 - 151.75).abs() < 1.0 && (l.end.x - l.start.x - 20.0).abs() < 1.0));
             assert!(!strike, "{version:?}: no strike LINE");
+        }
+    }
+
+    /// A section's cutting-line letters as live writes them in every version (live's section DXFs, R14's
+    /// session-drw-1119 and 2018's alike): font, width and tracking factors, overline and underline off.
+    #[test]
+    fn cutting_line_letters_carry_lives_codes() {
+        use crate::drawing::sheet::{Anchor, Text2};
+        let mut g = sample();
+        let m = g.mark();
+        g.texts.push(Text2 { pos: [30.0, 120.0], height: 5.0, text: "A".into(), angle: 0.0, anchor: Anchor::BottomLeft, pick: 0 });
+        g.cad_since(m, CadLayer::SectionCuttingLine);
+        for version in [DxfVersion::AC1032, DxfVersion::AC1014] {
+            let dxf = String::from_utf8_lossy(&to_dxf_version(&g, 4, version).unwrap()).to_string();
+            assert!(dxf.contains("\\fNoto Sans|b0|i0|c0|p0;\\W1.0000000000;\\T1.0000000000;\\o\\lA"), "{version:?}");
         }
     }
 
