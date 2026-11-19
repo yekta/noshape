@@ -9980,3 +9980,42 @@ fn bend_rows_run_in_their_letters_order() {
     assert_eq!(rows.len(), 3, "{rows:?}");
 }
 
+
+/// An Extrude in the flat (domain FLAT, std's SMFlatOp): Remove cuts a flat sketch's region out of the wall it lies on,
+/// Add joins one beside the flat's edge to that wall; the part stays one sheet metal part (2 mm plate: ±200 mm³ for a
+/// 10 mm square).
+#[test]
+fn an_extrude_in_the_flat_cuts_and_adds() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "sheet-metal-flat-extrude.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [60, 40]] }));
+    call(&mut ctx, "feature_add", json!({ "type": "sheetMetalStart", "params": { "process": "THICKEN", "regions": [r["regions"][0]["id"]], "thickness": "2 mm", "radius": "2 mm" } }));
+    let e = call(&mut ctx, "query_entities", json!({ "kind": "edges", "direction": [1, 0, 0], "near": [30, 0, 2], "limit": 1 }))["edges"][0]["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "sheetMetalFlange", "params": { "edges": [e], "distance": "20 mm" } }));
+    let num = |v: &Value| v.as_str().and_then(|s| s.parse::<f64>().ok()).or_else(|| v.as_f64()).unwrap_or(f64::NAN);
+    let faces = call(&mut ctx, "sheetmetal_table", json!({}))["flat_faces"].as_array().expect("flat faces").clone();
+    let top = faces.iter().filter(|f| num(&f["normal"][2]) > 0.999).max_by(|a, b| num(&a["area"]).total_cmp(&num(&b["area"]))).expect("a top face").clone();
+    let s = call(&mut ctx, "sketch_create", json!({ "plane": top["id"] }));
+    let sk2 = s["sketch"].clone();
+    let volume = |ctx: &mut Ctx| {
+        let p = call(ctx, "query_parts", json!({}));
+        let parts = p["parts"].as_array().cloned().unwrap_or_default();
+        assert_eq!(parts.len(), 1, "one part: {p}");
+        (num(&parts[0]["volume"]), num(&parts[0]["bounding_box"]["min"][0]))
+    };
+    let (v0, _) = volume(&mut ctx);
+    // A 10 mm square in the plate (the sketch's origin is the flat face's centre).
+    let cut = call(&mut ctx, "sketch_draw", json!({ "sketch": sk2, "tool": "corner_rectangle", "points": [[-5, -5], [5, 5]] }))["regions"][0]["id"].clone();
+    let x = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "domain": "FLAT", "flatOperationType": "REMOVE", "entities": [cut] } }));
+    assert_eq!(x["feature_status"]["status"], "Ok", "{x}");
+    assert!(x.get("ignored").is_none(), "domain is taken: {x}");
+    let (v1, _) = volume(&mut ctx);
+    assert!((v0 - v1 - 200.0).abs() < 1e-3, "cut 200 mm³: {v0} -> {v1}");
+    // A 10 mm square off the plate's x 0 side, touching it.
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk2, "tool": "corner_rectangle", "points": [[-40, -10], [-30, 0]] }));
+    let add = d["regions"].as_array().unwrap().iter().find(|r| num(&r["center"][0]) < -30.0).expect("the square off the plate")["id"].clone();
+    let y = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "domain": "FLAT", "flatOperationType": "ADD", "entities": [add] } }));
+    assert_eq!(y["feature_status"]["status"], "Ok", "{y}");
+    let (v2, x_min) = volume(&mut ctx);
+    assert!((v2 - v1 - 200.0).abs() < 1e-3 && (x_min + 10.0).abs() < 1e-6, "added 200 mm³ at x -10...0: {v1} -> {v2}, x from {x_min}");
+}

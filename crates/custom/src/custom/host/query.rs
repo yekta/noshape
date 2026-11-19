@@ -26,7 +26,7 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("transientIdToString", transient_id_to_string),
     ("getQueryVariable", get_query_variable),
     ("setQueryVariable", set_query_variable),
-    ("queryContainsFlattenedSheetMetal", |_, _| Ok(Value::bool(false))),
+    ("queryContainsFlattenedSheetMetal", query_contains_flattened),
 ];
 
 /// An entity of the current context.
@@ -437,6 +437,16 @@ impl<'a> QueryCx<'a> {
                 sk.sketch.entities().find(|c| sk.holds(c.id.0) && c.endpoints().is_some_and(|(a, b)| a.0 == *p || b.0 == *p)).map(|c| Ent::SketchWire(*s, c.id.0))
             }
         }
+    }
+
+    /// The sheet metal part (body index) whose flat a sketch entity lies on ([`Context::flat_sketches`]).
+    pub fn flat_part(&self, e: &Ent) -> Option<usize> {
+        let s = match e {
+            Ent::SketchSheet(s) | Ent::SketchWire(s, _) | Ent::SketchPointBody(s, _) | Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) | Ent::SketchRegionEdge(s, _) | Ent::SketchRegionVertex(s, _) | Ent::SketchCurveEnd(s, ..) => *s,
+            _ => return None,
+        };
+        let part = self.st.ctx.flat_sketches.get(&self.st.ctx.sketches.get(s)?.feature)?;
+        self.st.ctx.bodies.iter().position(|b| &b.id == part)
     }
 
     /// A sketch piece's points that are only its curves' ends (no bodies of their own), once a piece.
@@ -1962,16 +1972,30 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
             let v = sub(i, "subquery")?;
             v.into_iter().filter(|e| is_sheet_metal(q, e) == yes).collect()
         }
-        "SM_FLAT_FILTER" | "SM_FORM_FILTER" => {
-            let key = if &*kind == "SM_FLAT_FILTER" { "flatFilter" } else { "formFilter" };
-            let yes = enum_str(query.get(key)).is_some_and(|s| &*s == "YES");
+        // The flat's entities: a sketch's on a flat (live 2468).
+        "SM_FLAT_FILTER" => {
+            let yes = enum_str(query.get("flatFilter")).is_some_and(|s| &*s == "YES");
+            sub(i, "subquery")?.into_iter().filter(|e| q.flat_part(e).is_some() == yes).collect()
+        }
+        "SM_FORM_FILTER" => {
+            let yes = enum_str(query.get("formFilter")).is_some_and(|s| &*s == "YES");
             if yes { Vec::new() } else { sub(i, "subquery")? }
+        }
+        // The part a flat's sketch lies on.
+        "PARTS_ATTACHED_TO" => {
+            let mut out: Vec<Ent> = Vec::new();
+            for b in sub(i, "subquery")?.iter().filter_map(|e| q.flat_part(e)) {
+                if !out.contains(&Ent::Body(b)) {
+                    out.push(Ent::Body(b));
+                }
+            }
+            out
         }
         "MESH_GEOMETRY_FILTER" => {
             let yes = enum_str(query.get("meshGeometryFilter")).is_some_and(|s| &*s == "YES");
             if yes { Vec::new() } else { sub(i, "subquery")? }
         }
-        "SM_DEFINITION_ENTITY_FILTER" | "CORRESPONDING_IN_FLAT" | "PARTS_ATTACHED_TO" | "SM_APPLICATION_TYPE_FILTER" => Vec::new(),
+        "SM_DEFINITION_ENTITY_FILTER" | "CORRESPONDING_IN_FLAT" | "SM_APPLICATION_TYPE_FILTER" => Vec::new(),
         // Consumed: a member of a closed composite part.
         "CONSUMED" => {
             let yes = enum_str(query.get("consumed")).is_some_and(|s| &*s == "YES");
@@ -2957,6 +2981,14 @@ fn is_query_empty(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let n = with_ents(i, &cx, &query_arg(&a), |_, _, e| Ok(e.len()))?;
     Ok(Value::bool(n == 0))
+}
+
+/// `@queryContainsFlattenedSheetMetal`: the query holds a flat's entity (a sketch on a flat).
+fn query_contains_flattened(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let query = a.get(1).map(|d| d.get("entities").clone()).unwrap_or_default();
+    let yes = with_ents(i, &cx, &query, |_, q, e| Ok(e.iter().any(|e| q.flat_part(e).is_some())))?;
+    Ok(Value::bool(yes))
 }
 
 fn transient_id_to_string(_: &mut Interp, a: Vec<Value>) -> R<Value> {

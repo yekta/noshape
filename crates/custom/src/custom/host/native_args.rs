@@ -200,10 +200,9 @@ const IGNORES_MAP: &[&str] = &[
     "clampContextVersion",
     "recordQuery",
     "skSetInitialGuess",
-    // Constants: no tolerances, no flattened sheet metal, no feature pattern.
+    // Constants: no tolerances, no feature pattern.
     "getParameterToleranceInfo",
     "getTolerantParameterIds",
-    "queryContainsFlattenedSheetMetal",
     "getRemainderPatternTransform",
     // The feature's definition is not needed to start, end or abort it.
     "startFeature",
@@ -225,7 +224,6 @@ const MISSING: &[&str] = &[
     "opBooleanedPattern",
     "opImportForeign",
     "opOffsetCurveOnFace",
-    "opSMFlatOperation",
     "opSplitBySelfShadow",
 ];
 
@@ -245,7 +243,6 @@ const MISSING_OLDER: &[&str] = &[
     "opImportForeign",
     "opOffsetCurveOnFace",
     "opPrepareForBendingInternal",
-    "opSMFlatOperation",
     "opSplitBySelfShadow",
     "startSheetMetalFeature",
 ];

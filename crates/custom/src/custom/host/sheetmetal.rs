@@ -36,7 +36,84 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("evCornerType", ev_corner_type),
     ("evSheetMetalHoleToolBodies", ev_sheet_metal_hole_tool_bodies),
     ("evSheetMetalFormToolBodies", ev_sheet_metal_form_tool_bodies),
+    ("opSMFlatOperation", op_sm_flat_operation),
 ];
+
+/// `@opSMFlatOperation` (std sheetMetalInFlat.fs: an Extrude in the flat): the flat's sketch regions `faces` cut out
+/// of (SUBTRACTION) or added to (UNION) the sheet metal definition. A region's piece on a wall in the flat goes back
+/// onto that wall by the wall's flat transform; an added piece off the flat goes onto the wall it touches.
+fn op_sm_flat_operation(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let id = id_arg(i, &a, 1)?;
+    let def = def_arg(i, &a, 2)?;
+    let refs = evaluate_refs(i, &cx, def.get("faces"))?;
+    let subtract = def_enum(&def, "operationType").as_deref() == Some("SUBTRACTION");
+    run_op(i, &cx, &id, "SM_FLAT_OPERATION_FAILED", |ev| {
+        let mut parts: Vec<BodyId> = Vec::new();
+        for r in &refs {
+            if let Reference::SketchRegion { sketch, .. } = r
+                && let Some(p) = ev.ctx.flat_sketches.get(sketch)
+                && !parts.contains(p)
+            {
+                parts.push(p.clone());
+            }
+        }
+        let regions: Vec<Reference> = refs.iter().filter(|r| matches!(r, Reference::SketchRegion { .. })).cloned().collect();
+        let tool_faces: Vec<Shape> = ev.profiles(&regions)?.iter().flat_map(|p| p.shape.faces()).collect();
+        if tool_faces.is_empty() || parts.is_empty() {
+            return Err(super::code_error("SM_FLAT_OP_NO_INTERSECT"));
+        }
+        let tool = Shape::compound(&tool_faces);
+        let back = |s: &Shape, m: &glam::DMat4| k::transform(s, &k::Transform::Matrix(m.inverse()), true).map(|r| r.shape);
+        let mut met = false;
+        for part in parts {
+            let Some(place) = ev.ctx.sheet_metal_flats.get(&part).and_then(|f| f.place.clone()) else { continue };
+            let Some((first, _)) = place.walls.first() else { continue };
+            let Some(bi) = ev.ctx.bodies.iter().position(|b| b.kind == BodyKind::Surface && b.shape.faces().iter().any(|f| f.is_partner(first))) else { continue };
+            let flat_walls: Vec<Shape> = place.walls.iter().map(|(f, m)| k::transform(f, &k::Transform::Matrix(*m), true).map(|r| r.shape)).collect::<Result<_, _>>()?;
+            let mut pieces: Vec<Shape> = Vec::new();
+            if subtract {
+                for (w, (_, m)) in flat_walls.iter().zip(&place.walls) {
+                    let on = k::boolean(k::BooleanOp::Common, std::slice::from_ref(&tool), std::slice::from_ref(w), &k::BooleanOptions::default())?.shape;
+                    for f in on.faces() {
+                        pieces.push(back(&f, m)?);
+                    }
+                }
+            } else {
+                let off = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&tool), &flat_walls, &k::BooleanOptions::default())?.shape;
+                for f in off.faces() {
+                    let near = |w: &Shape| k::distance(&f, w).map_or(f64::INFINITY, |d| d.distance);
+                    let Some(k) = (0..flat_walls.len()).min_by(|a, b| near(&flat_walls[*a]).total_cmp(&near(&flat_walls[*b]))) else { continue };
+                    if near(&flat_walls[k]) > TOL {
+                        continue;
+                    }
+                    // Facing as its wall (a region's face is up the sketch's normal): one sheet when fused.
+                    let mut piece = back(&f, &place.walls[k].1)?;
+                    if let (Ok((_, a)), Ok((_, b))) = (face_normal(&piece), face_normal(&place.walls[k].0))
+                        && a.dot(b) < 0.0
+                    {
+                        piece = piece.reversed()?;
+                    }
+                    pieces.push(piece);
+                }
+            }
+            if pieces.is_empty() {
+                continue;
+            }
+            met = true;
+            let body = crate::regen::features::helpers_a::body_named(&ev.ctx.bodies[bi]);
+            let op = if subtract { k::BooleanOp::Cut } else { k::BooleanOp::Fuse };
+            let res = k::boolean(op, std::slice::from_ref(&body.shape), &pieces, &k::BooleanOptions { unify: !subtract, ..Default::default() })?;
+            let names = ev.name_result(&[&body.names], &res.history, &res.shape, &BTreeMap::new(), None);
+            ev.replace_body(bi, res.shape, names);
+        }
+        if !met {
+            return Err(super::code_error("SM_FLAT_OP_NO_INTERSECT"));
+        }
+        Ok(())
+    })?;
+    Ok(Value::Undefined)
+}
 
 const TOL: f64 = 1e-7;
 

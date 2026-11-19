@@ -794,6 +794,10 @@ pub struct Context {
     /// one of its faces is in the face's frame from before, moved with it, as Parasolid's surfaces keep theirs (live
     /// c2-sm-hem-plus's Sketch 3 on a face Transform 1 turned).
     pub placements: BTreeMap<BodyId, DMat4>,
+    /// Sketches on a sheet metal part's flat (live 2468) and the part: std's flat filters and opSMFlatOperation take
+    /// their regions as the flat's.
+    #[serde(default)]
+    pub flat_sketches: BTreeMap<FeatureId, BodyId>,
 }
 
 /// A Decal's image on a face (std decalUtils.fs `DecalData`, the "decals"
@@ -945,6 +949,7 @@ impl Context {
             sm_births,
             own_names,
             placements,
+            flat_sketches,
         } = self;
         fn same_arcs<T>(a: &[Arc<T>], b: &[Arc<T>]) -> bool {
             a.len() == b.len() && a.iter().zip(b).all(|(x, y)| Arc::ptr_eq(x, y))
@@ -989,6 +994,7 @@ impl Context {
             && *sm_births == o.sm_births
             && *own_names == o.own_names
             && *placements == o.placements
+            && *flat_sketches == o.flat_sketches
     }
 
     pub fn body(&self, id: &BodyId) -> Option<&Arc<Body>> {

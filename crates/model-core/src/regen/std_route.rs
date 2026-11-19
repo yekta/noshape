@@ -249,6 +249,10 @@ pub fn std_sheet_metal() -> bool {
 /// native cut was rebuilt away by the next Flange), and adding to one is
 /// live's error.
 fn adds_to_active_sheet_metal(ev: &EvalCtx) -> bool {
+    // Made in the flat (an Extrude's Add / Remove there): std's SMFlatOp.
+    if ev.enum_("domain") == "FLAT" {
+        return true;
+    }
     if !ev.ctx.sheet_metal.values().any(|d| d.active) || matches!(ev.enum_("operationType"), "NEW" | "") {
         return false;
     }

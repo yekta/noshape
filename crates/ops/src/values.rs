@@ -266,10 +266,12 @@ fn visibility_note(s: &ParamSpec, all: &[ParamSpec], defaults: Option<&ParamValu
 }
 
 /// The given parameters the dialog hides with `values`, which the feature
-/// ignores (qa AGENT-HIDDEN-PARAMS-SILENT): each with what would show it.
+/// ignores (qa AGENT-HIDDEN-PARAMS-SILENT): each with what would show it. One
+/// the dialog never shows is set by where it is made (an Extrude's `domain`:
+/// the flat), not ignored.
 pub fn ignored_params(specs: &[ParamSpec], values: &ParamValues, given: &serde_json::Map<String, Value>) -> Vec<Value> {
     let mut out = Vec::new();
-    for s in specs.iter().filter(|s| given.contains_key(s.id) && !s.is_visible(values)) {
+    for s in specs.iter().filter(|s| given.contains_key(s.id) && !s.hints.has(Hints::ALWAYS_HIDDEN) && !s.is_visible(values)) {
         let when = flips(s, specs, values);
         let why = if when.is_empty() { format!("{}: hidden in the dialog with these values, so it is ignored", s.id) } else { format!("{}: hidden in the dialog with these values, so it is ignored (shown when {when})", s.id) };
         out.push(json!({ "param": s.id, "message": why }));

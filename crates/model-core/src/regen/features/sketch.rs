@@ -22,6 +22,12 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     let Some(frame) = ev.resolve_sketch_plane(plane_ref) else {
         return err("Select a sketch plane.");
     };
+    if let Some((part, _)) = match plane_ref {
+        crate::reference::Reference::Face(n) => crate::sheetmetal::flat_face_of(n),
+        _ => None,
+    } {
+        ev.ctx.flat_sketches.insert(ev.feature, part);
+    }
     let data = match ev.params.get("sketch") {
         Some(ParamValue::Sketch(d)) => d.clone(),
         _ => Default::default(),
