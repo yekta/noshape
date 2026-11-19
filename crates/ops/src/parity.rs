@@ -2898,6 +2898,9 @@ impl<'a> Translator<'a> {
         if let Some(r) = self.blend_vertex_from_query(text) {
             return r.map(|e| vec![e]);
         }
+        if let Some(r) = self.blend_edge_from_query(text) {
+            return r;
+        }
         if let Some(r) = self.imprinted_vertex_from_query(text) {
             return r.map(|e| vec![e]);
         }
@@ -3615,6 +3618,38 @@ impl<'a> Translator<'a> {
             Some((off, v["id"].as_str()?.to_string()))
         }).min_by(|a, b| a.0.total_cmp(&b.0));
         Some(best.map(|(_, id)| id).ok_or_else(|| "BLEND_VERTEX: its two faces share no vertex of ours".to_string()))
+    }
+
+    /// A chamfer's or fillet's edge by Onshape's written name (`makeQuery(id+"F….opChamfer","BLEND_EDGE",EntityType.EDGE,
+    /// {"blendedFrom":[…],"blendedInto":[an Extrude's or Revolve's face]})`, asm-bjr-config 5b44a0's Fillet 1 on Chamfer
+    /// 1's edges): ours of that feature lying on that face. `None`: not such a query.
+    fn blend_edge_from_query(&mut self, text: &str) -> Option<Result<Vec<String>, String>> {
+        if !text.contains("\"BLEND_EDGE\",EntityType.EDGE") {
+            return None;
+        }
+        let query = inline_query_vars(text)?;
+        let feature = query.trim_start_matches("query=").trim_start().strip_prefix("makeQuery(id+\"")?.split('"').next()?.rsplit_once(".op")?.0.to_string();
+        let Some(ours) = self.feature_ids.get(&feature).cloned() else { return Some(Err(format!("BLEND_EDGE: feature {feature} was not built"))) };
+        let Some(into) = top_level_items(query.split("\"blendedInto\":[").nth(1)?) else { return Some(Err("BLEND_EDGE: no blendedInto".into())) };
+        let mut faces = Vec::new();
+        for f in &into {
+            match self.written_extrude_name(f) {
+                Some(Ok(id)) => faces.push(id),
+                Some(Err(e)) => return Some(Err(format!("BLEND_EDGE: {e}"))),
+                None => return Some(Err("BLEND_EDGE: the face it blends into is not an Extrude's or a Revolve's".into())),
+            }
+        }
+        let ids = |r: Result<Value, String>, key: &str| -> Result<Vec<String>, String> { Ok(r?[key].as_array().into_iter().flatten().filter_map(|e| e["id"].as_str().map(str::to_string)).collect()) };
+        let made = match ids(self.call("query_entities", json!({ "kind": "edges", "created_by": ours, "limit": 1000 })), "edges") {
+            Ok(m) => m,
+            Err(e) => return Some(Err(e)),
+        };
+        let on = match ids(self.call("query_entities", json!({ "kind": "edges", "of": faces, "limit": 1000 })), "edges") {
+            Ok(m) => m,
+            Err(e) => return Some(Err(e)),
+        };
+        let both: Vec<String> = made.into_iter().filter(|e| on.contains(e)).collect();
+        Some(if both.is_empty() { Err(format!("BLEND_EDGE: no edge of our {feature} on the face it blends into")) } else { Ok(both) })
     }
 
     /// The fillet face a packed query names `blendedFrom` an Extrude's swept edge at the corner of two sketch curves

@@ -4877,6 +4877,44 @@ fn a_written_out_cap_face_query() {
     assert_eq!((r.matching, r.compared), (3, 3), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// A fillet on a chamfer's edge named in the written-out form (makeQuery(… ".opChamfer", "BLEND_EDGE" … "blendedInto":
+/// [the face it runs on]); live: asm-bjr-config 5b44a0's Fillet 1) takes our chamfer's edge on that face, not the sketch
+/// curve nested in the query (whose swept edge the chamfer consumed: "Select edges or faces to fillet.").
+#[test]
+fn a_written_out_blend_edge_is_the_chamfers_edge_on_its_face() {
+    let sketch = "FdHX57YE0MI7PDU_0";
+    let side = |s: &str| format!("2i9coyYI-wWEe-o83F-jBj8-nmqTMMu2mK71.{s}");
+    let entities = json!([
+        segment(&side("bottom"), (0.0, 0.0), (0.04, 0.0)),
+        segment(&side("right"), (0.04, 0.0), (0.04, 0.02)),
+        segment(&side("top"), (0.04, 0.02), (0.0, 0.02)),
+        segment(&side("left"), (0.0, 0.02), (0.0, 0.0)),
+    ]);
+    let region = json!({ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": sketch, "queryString": format!("query = qSketchRegion(id + \"{sketch}\", false);") });
+    let block = json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 6, "edges": 12, "vertices": 8, "volume": 0.04 * 0.02 * 0.01 });
+    let (mut features, mut live) = one_extrude(sketch, entities, region, block);
+    let entity = |s: &str| format!("sketchEntityQuery(id+\"{sketch}.wireOp\",EntityType.EDGE,\"{}\")", side(s));
+    let sides = ["bottom", "top", "left", "right"].map(entity).join(",");
+    let end_cap = format!("makeQuery(id+\"FE1.opExtrude\",\"CAP_FACE\",EntityType.FACE,{{\"disambiguationData\":[originalSetDisambiguation([{sides}])],\"isStart\":false}})");
+    let top_edge = format!("query=makeQuery(id+\"FE1.opExtrude\",\"CAP_EDGE\",EntityType.EDGE,{{\"disambiguationData\":[originalSetDisambiguation([{}])],\"isStart\":false}});", entity("top"));
+    let swept_top = format!("makeQuery(id+\"FE1.opExtrude\",\"SWEPT_FACE\",EntityType.FACE,{{\"disambiguationData\":[originalSetDisambiguation([{}])]}})", entity("top"));
+    let blend = format!("{{var subQ0={};query=makeQuery(id+\"FC1.opChamfer\",\"BLEND_EDGE\",EntityType.EDGE,{{\"blendedFrom\":[{swept_top}],\"blendedInto\":[{end_cap}]}});}}", entity("top"));
+    let list = |id: &str, q: String| json!({ "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": [id], "queryString": q }] });
+    let fs = features["features"].as_array_mut().unwrap();
+    fs.push(json!({ "btType": "BTMFeature-134", "featureType": "chamfer", "featureId": "FC1", "name": "Chamfer 1", "parameters": [list("JNC", top_edge),
+        { "btType": "BTMParameterEnum-145", "parameterId": "chamferType", "value": "EQUAL_OFFSETS" },
+        { "btType": "BTMParameterQuantity-147", "parameterId": "width", "expression": "2 mm" }] }));
+    fs.push(json!({ "btType": "BTMFeature-134", "featureType": "fillet", "featureId": "FF1", "name": "Fillet 1", "parameters": [list("JRF", blend),
+        { "btType": "BTMParameterQuantity-147", "parameterId": "radius", "expression": "1 mm" }] }));
+    // The chamfer: 2 × 2 mm off the 40 mm edge; the fillet: r 1 mm where the cap meets the 45° face (r²(tan(π/8) − π/8) × 40 mm).
+    let chamfered = 0.04 * 0.02 * 0.01 - 0.5 * 0.002 * 0.002 * 0.04;
+    let filleted = chamfered - 0.001f64.powi(2) * ((std::f64::consts::PI / 8.).tan() - std::f64::consts::PI / 8.) * 0.04;
+    live.push(json!({ "index": 2, "status": "OK", "parts": [{ "name": "Part 1", "bodyType": "SOLID", "faces": 7, "edges": 15, "vertices": 10, "volume": chamfered }] }));
+    live.push(json!({ "index": 3, "status": "OK", "parts": [{ "name": "Part 1", "bodyType": "SOLID", "faces": 8, "edges": 18, "vertices": 12, "volume": filleted }] }));
+    let r = run_model("written-out-blend-edge", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (4, 4), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
 /// A part named by id alone (live's UI fetch lists bodies by id) is ours
 /// whose box is nearest live's, not the first whose box holds its centre:
 /// a disc in a ring's hole is the disc (exercise-jan's pattern copies

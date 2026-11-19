@@ -15,7 +15,7 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   mate dialog's hovered face outlined once (thin face outline, not the edges' band).
 
 ### Queued / in flight
-- asm-fs 40d8509c6 queued (land.sh 07:2x): parity suite gives an assembly's Part Studio the Feature Studios its custom
+- cd1acebd landed 08:06: parity suite gives an assembly's Part Studio the Feature Studios its custom
   features name in their namespace (bjr setData / custDesc from other documents): 5d8bc1 Sketch 29 fixed.
 - asm-fs working tree (tests running on vibex7, then commit + land): live2 recheck-1119 —
   (1) Insert: Sketches + Flat patterns always, Sort button (InsertMemory.current_desc, A → Z default, kept);
@@ -52,8 +52,13 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
    parity.rs ~2919 takes the first nested `sketchEntityQuery(` of any written text (Sketch 1's curves 13 / 15, whose
    swept edges the chamfer consumed -> "Select edges or faces to fillet."). Needs a written BLEND_EDGE resolver (our
    chamfer's edge between its face and the blendedInto face), and that ~2919 path only for a bare sketch-entity query.
-   Then bfc58c Washer Face (non-manifold).
-3. Night run c results; isaac Chamfer 3 / 4 to core if geometry.
+   Fixed in 637fc215b (written BLEND_EDGE resolver). Then bfc58c Washer Face (non-manifold).
+3. bjr 5d8bc1 Sketch 40 (skasm handed it over 11-19 08:0x): its plane is Extrude 16's END cap (live z 1.4 mm, facing −z)
+   by Sketch 21's entities incl. mirror copies `DLc0phWurWTU0/1.MirrorCS`; our query yields a face name no face has at
+   Sketch 40 -> "Select a sketch plane.", Extrude 21 follows. First difference earlier: feature 42 Extrude 55
+   "vanity plate front" 369 vs live 365 faces, on through Boolean 4 (510 vs 503): does a Boolean of ours split or
+   rename that cap? Repro: vibe2 ~/tmp/skasm/bjr40 (the studio alone), trace ~/tmp/skasm/bjr40.log line 1226.
+4. Night run c results; isaac Chamfer 3 / 4 to core if geometry.
 
 ## Scores (last measured, stack / main 11-18)
 - bjr-config 137/137 occ (step 2), 31/31 mates, BOM 22/23 before a8dedfc1 (OPG006 Description; rerun). pinslot 42/42, 16/16.
