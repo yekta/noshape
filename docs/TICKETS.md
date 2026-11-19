@@ -854,7 +854,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
 
 - [ ] P2 **BRAND-IN-UI-TEXT (dx; prefs line: studios)**: + › Import… › a STEP file: the options modal is titled "Import to Onshape"
   (crates/app/src/import_dialog.rs:230); Preferences asks "Enable access to Onshape Labs features?" (prefs_general.rs:476). The app
-  is Noshape in all user-facing text (no Onshape brand marks): "Import to Noshape" etc., layout as live. Walk 22:0x, green a58eee8c;
+  is Noshape in all user-facing text (no Onshape brand marks): "Import to Noshape" etc., layout as live. Walk 22:04, green a58eee8c;
   the STEP round trip itself is fine (8 faces out, Import 1 + Part 1 back, "CAD Imports" folder, info toast).
 
 ## Interaction feel suite 11-19 (qa 16:20: run 1119-1242-223cec7e on vibex8, failures re-run on green eb3b06a8 on vibe2)
