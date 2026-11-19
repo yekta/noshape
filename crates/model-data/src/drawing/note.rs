@@ -183,7 +183,7 @@ pub struct NoteStyle {
     pub align: NoteAlign,
     pub valign: NoteVAlign,
     pub list: NoteList,
-    /// Note order "Bottom to top": list items count up from the bottom.
+    /// Note order "Bottom to top": the lines drawn in reverse, the last typed on top (live2 note-opts-1119).
     pub bottom_to_top: bool,
     /// Bounding box width (mm): lines wrap at it. None: as wide as the text.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -399,23 +399,9 @@ pub fn layout(text: &str, h: f64, style: &NoteStyle, pos: [f64; 2]) -> NoteLayou
             n += 1;
         }
     }
-    if style.bottom_to_top {
-        // Count each run of items from its bottom.
-        let mut k = 0;
-        while k < items.len() {
-            let mut e = k;
-            while e < items.len() && items[e].is_some() {
-                e += 1;
-            }
-            let len = e - k;
-            for (o, it) in items[k..e].iter_mut().enumerate() {
-                *it = Some(len - 1 - o);
-            }
-            k = e.max(k + 1);
-        }
-    }
     let list = style.list != NoteList::None;
-    let indent = if list { paragraphs.iter().zip(&items).filter_map(|(_, it)| it.map(|i| width_of(&style.list.designator(i)))).fold(0.0, f64::max) + h * 0.8 } else { 0.0 };
+    // The text at a tab 1.5 heights in (live2 note-opts-1119: ≈ 0.18 in at 0.12 in), past a wider designator.
+    let indent = if list { (paragraphs.iter().zip(&items).filter_map(|(_, it)| it.map(|i| width_of(&style.list.designator(i)))).fold(0.0, f64::max) + h * 0.3).max(h * 1.5) } else { 0.0 };
     let wrap_w = style.width.map(|w| (w - indent - style.first_indent.max(style.left_indent) - style.right_indent).max(h));
     // Lines: (text, designator item, last line of its paragraph, paragraph start).
     let mut lines: Vec<(String, Option<usize>, bool, bool)> = Vec::new();
@@ -433,26 +419,40 @@ pub fn layout(text: &str, h: f64, style: &NoteStyle, pos: [f64; 2]) -> NoteLayou
     let box_w = style.width.unwrap_or(indent + text_w);
     // Live's MTEXT at line spacing 1.0: 5/3 of the height per line (dx/q-shoulder: 0.2 in for 0.12 in text).
     let pitch = h * 5.0 / 3.0 * style.line_spacing.max(0.5);
-    let para_gap = h * 0.5;
+    // Flagged lines spread to fit their flags (live2 note-opts-1119), each as tall as the sheet draws it: the
+    // designator or `flag_chars` characters wide, half a height round.
+    let flagged = list && !style.flags.is_empty() && !matches!(style.flag_shape, FlagShape::None | FlagShape::Underline);
+    let pitch = if flagged { pitch.max(width_of(&"0".repeat(style.flag_chars.max(1) as usize)) + h * 1.3) } else { pitch };
+    // Add space before / after paragraph (live2 note-opts-1119: the pitch 0.20 → 0.38 in at 0.12 in; "before" moves the
+    // first line down too, "after" doesn't).
+    let para_gap = h * 1.5;
     // Total height (first line: its cap height).
     let mut heights = Vec::new();
     let mut y = 0.0;
     for (i, l) in lines.iter().enumerate() {
-        if l.3 && i > 0 {
-            if style.space_before {
-                y += para_gap;
-            }
-            if style.space_after {
-                y += para_gap;
-            }
+        if l.3 && style.space_before {
+            y += para_gap;
+        }
+        if l.3 && i > 0 && style.space_after {
+            y += para_gap;
         }
         heights.push(y);
         if i + 1 < lines.len() {
             y += pitch;
         }
     }
+    // Note order Bottom to top: the lines drawn in reverse, the last typed on top (live2 note-opts-1119).
+    if style.bottom_to_top {
+        let first = heights.first().copied().unwrap_or(0.0);
+        let last = heights.last().copied().unwrap_or(0.0);
+        for d in heights.iter_mut() {
+            *d = first + last - *d;
+        }
+    }
     let total = y + h;
+    // A note sized by its text stays put whatever the Vertical alignment (live2 note-opts-1119 vertical-middle).
     let top = match style.valign {
+        _ if style.width.is_none() => pos[1],
         NoteVAlign::Top => pos[1],
         NoteVAlign::Middle => pos[1] + total / 2.0,
         NoteVAlign::Bottom => pos[1] + total,
@@ -532,9 +532,24 @@ mod tests {
         assert_eq!(des, ["1.", "2.", "1."], "a gap restarts numbering");
         let first = l.pieces.iter().find(|p| p.text == "FIRST").unwrap();
         assert!(first.pos[0] > 10.0, "text indented, designator not");
+        // Bottom to top: the lines drawn in reverse, each with its own designator (live2 note-opts-1119).
         let s = NoteStyle { list: NoteList::UpperLetters, bottom_to_top: true, ..Default::default() };
         let l = layout("A\nB\nC", 3.5, &s, [0.0, 0.0]);
-        assert_eq!(l.pieces.iter().filter(|p| p.designator).map(|p| p.text.as_str()).collect::<Vec<_>>(), ["C.", "B.", "A."]);
+        let mut shown: Vec<&NotePiece> = l.pieces.iter().collect();
+        shown.sort_by(|a, b| b.pos[1].total_cmp(&a.pos[1]));
+        assert_eq!(shown.iter().filter(|p| p.designator).map(|p| p.text.as_str()).collect::<Vec<_>>(), ["C.", "B.", "A."]);
+        assert_eq!(shown.iter().filter(|p| !p.designator).map(|p| p.text.as_str()).collect::<Vec<_>>(), ["C", "B", "A"]);
+        // Space before paragraph: 0.38 in apart at 0.12 in, the first line down by the gap; after: the first stays.
+        let h = 0.12 * 25.4;
+        let tops = |s: &NoteStyle| {
+            let l = layout("One\nTwo", h, s, [0.0, 0.0]);
+            l.pieces.iter().map(|p| p.pos[1]).collect::<Vec<_>>()
+        };
+        let plain = tops(&NoteStyle::default());
+        let before = tops(&NoteStyle { space_before: true, ..Default::default() });
+        let after = tops(&NoteStyle { space_after: true, ..Default::default() });
+        assert!(((plain[0] - plain[1]) / 25.4 - 0.20).abs() < 1e-9 && ((before[0] - before[1]) / 25.4 - 0.38).abs() < 1e-9, "{plain:?} {before:?}");
+        assert!((before[0] - (plain[0] - 1.5 * h)).abs() < 1e-9 && (after[0] - plain[0]).abs() < 1e-9 && ((after[0] - after[1]) / 25.4 - 0.38).abs() < 1e-9);
         // Right alignment in a fixed-width box; Middle centers on the position.
         let s = NoteStyle { align: NoteAlign::Right, valign: NoteVAlign::Middle, width: Some(60.0), ..Default::default() };
         let l = layout("AB", 3.5, &s, [0.0, 50.0]);
