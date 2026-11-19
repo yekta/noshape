@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-19 21:20 UTC (new thread on another account, 21:00).
+Updated 2026-11-19 23:53 UTC.
 
 ## In flight
 
@@ -18,23 +18,24 @@ tools/tiers/land.sh` (`--no-precheck` only when the code was clippy-checked unch
 origin/main` first. Builds / tests on the lowest 1-min load of vibex7 / vibex8 / vibe2 (`NOSHAPE_RB_HOST=… tools/tiers/rb.sh`;
 read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edited during a running sync: `touch` edited files before
 the next run. Run the full ops e2e before any drawing land. A few app runs don't take ~/bin/slot (DECISIONS 11-15).
-- Landed 9d50ae60 (Replicate region). Queued 9f21ecfb (22:59, carries 22d4ea61; c655e5de failed on a missing
-  coverage entry "assembly:Revision history…", fixed): Measure rounds 1-2, the Pro instance menus (Where used… /
-  Revision history…, no Release…; hook `open_part_revision_history`), ANSI_A_MM fit precision 4 (units-1119),
-  `data_value` (ui-parity reads a dimension as live's drawing JSON: "40.00"), the two scenario fixes, note feel test.
-- In f450d0dd: "Noshape Labs" (prefs, FS co-complete, help, 8 catalogs; run.py `LIVE_BRAND` maps live's wording in
-  `normalize_live`; prefs-labs-consent-cancel `ours_on`) and HISTORY-ROW-NAME-OVERLAP (history_panel.rs name_el
-  truncates at the 115 px Name column; test a_long_row_name_ends_at_the_name_column).
-- Queued f450d0dd (23:09, carries 9f21ecfb + the brand prefs line + HISTORY-ROW-NAME-OVERLAP).
+- Queued f450d0dd (23:09; CHECKING since 23:38; carries 9f21ecfb + 22d4ea61): Measure rounds 1-2, the Pro instance
+  menus (Where used… / Revision history…, no Release…), ANSI_A_MM fit precision 4, `data_value`, "Noshape Labs"
+  (run.py `LIVE_BRAND` / `noshape_names` in `normalize_live`), HISTORY-ROW-NAME-OVERLAP (115 px Name column ellipsis).
+- Committed, to land after f450d0dd (lead 11-19): 81d16ffcd (ticket + handoff), 7458597fb (lead's brand ruling:
+  "Noshape (default)" profile / mouse preset, "Noshape default / controlled" legend, "Noshape Material Library",
+  "Noshape Default BOM", "Noshape Default revision table", Noshape default release / obsoletion workflows; 24 catalog
+  rows; 3 scenarios `ours_on`; run.py maps live's wording; ops e2e 449 green, clippy clean).
+- Uncommitted: run.py drops live's company-only "Items (0)" assembly folder (live items-folder-1119; asm-menu-release
+  5/5 offline); ui_script menu rule takes a row with its shortcut ("Coincident (i)"); the Table / Hole table ✓
+  clear the alignment line + ✕ (test a_tables_alignment_line_goes_with_its_check_mark); drawing-matrix.md refreshed
+  (1108/1874 match, 3 ≠ = dump conditions); DRW-HOLE-TABLE-NOT-SAVED annotated (as live 2131: a click after ✓ places).
 
 ## Next, in order
-1. live's retakes asked 11-19 ~22:40: drw-revision-table-delete (s9 hover + s10 wait; live's stale frame after
-   Delete is a repaint lag), drw-inspection-table-iso-scrolled (points (60.91, 226.2) / (60.91, 237.8); why live's
-   s2 reads no EDGE).
-2. qa 291c74b0 rows in my areas: all match except the two above. Next: the newest suite log once qa runs again.
-   Brand strings left for the lead (decision asked 23:0x): "Onshape (default)" profile / mouse preset, "Onshape
-   default" key legend, "Onshape Material Library", "Onshape Default BOM".
-3. Then the feel rows below and the lead's queue (11-17).
+1. live's retakes asked 11-19 ~22:40: drw-revision-table-delete, drw-inspection-table-iso-scrolled.
+2. Lead 11-19 speed pass done: no gap >=100 ms and >=2x (drawing tab 128 ms vs live 3.2 s; back to PS 230 vs 1578 ms;
+   VS Enter 12 ms vs live rebuild 1747 ms; tab switch 23 ms vs 1.5-2.4 s; big doc 32 vs 25.5 s = 1.26x, core's regen).
+   P1 parity rows for drawings / Feature Studio: none open (audit-drawing-dataexchange D1-D18 closed).
+3. The newest qa suite log once qa runs again; then the feel rows below and the lead's queue (11-17).
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
 - live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell
@@ -113,12 +114,9 @@ Ids live only in /root/lead-scratch/roster.md (lead 11-19): read it before every
 into notes.
 
 ## Waiting on others
-- live: drw-revision-table-delete and drw-inspection-table-iso-scrolled retakes (REQUESTS 22:13 / 22:35); whether
-  asm-menu-release's "Items (0)" folder is company-owned only (message 23:4x). Without it the take matches 5/5:
-  company-only -> a runner rule for company-owned starts; every Pro assembly -> asm's missing folder.
-- lead: the remaining Onshape-named strings (decision asked 23:0x).
-- Checked 23:45: titleblock / holecallout / holetable / export / drawprops / note-opts / versions-1119 are all in code
-  and tests; live's 48d3fc9d: part-menu-release 5/5, drw-ref-pin-reference 7/7; Labs scenarios 6/6 (vibex8).
+- live: drw-revision-table-delete and drw-inspection-table-iso-scrolled retakes (REQUESTS 22:13 / 22:35).
+- Left to others under BRAND-IN-UI-TEXT: Category values "Onshape Part"… and "Import to Onshape" (dx), "Onshape
+  default tolerances" (psui), "Onshape images" / "Onshape form library" (skasm).
 
 ## Open (no owner action possible yet)
 - live's drw-hole-callout-palette retake (23:03, q-hcp-shots/record.json) has the same states as the take: kept;

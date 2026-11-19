@@ -285,6 +285,30 @@ fn placing_a_note_lines_up_with_another_within_8_px(cx: &mut TestAppContext) {
     }
 }
 
+/// qa 11-19 walk: after a Table's ✓ its placement's alignment line and ✕ went on being drawn, the pointer elsewhere.
+#[gpui::test]
+fn a_tables_alignment_line_goes_with_its_check_mark(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::TableTool;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-table-infer");
+    real_sheet(cx, window, &editor);
+    let (frame, zoom) = cx.update(|cx| editor.update(cx, |e, cx| {
+        e.set_tool(Tool::Table { kind: TableTool::General, view: None, origin: None }, cx);
+        (e.current_sheet().size.frame_rect(), e.zoom)
+    }));
+    draw(cx, window);
+    let mid = (frame[1] + frame[3]) / 2.0;
+    click_at(cx, window, &editor, [frame[0] + 40.0, mid], Modifiers::default());
+    // 3 px off the frame's left side: the table lines up with it.
+    VisualTestContext::from_window(window, cx).simulate_mouse_move(at_window(cx, &editor, [frame[0] + 3.0 / zoom, mid]), None, Modifiers::default());
+    draw(cx, window);
+    assert!(cx.update(|cx| !editor.read(cx).infer_lines.is_empty()), "the table lines up with the frame while placed");
+    window.update(cx, |_, w, cx| editor.update(cx, |e, cx| e.close_table_tool(true, w, cx))).unwrap();
+    draw(cx, window);
+    let e = cx.update(|cx| (editor.read(cx).infer_lines.len(), editor.read(cx).current_sheet().tables.len()));
+    assert_eq!(e, (0, 1), "✓: the table placed, no alignment line left");
+}
+
 /// Live2 feel/drawing.json F4: a dragged view lands exactly where it is released, with no snap to another view's
 /// centre line at 12, 9, 5 or 3 px from it (and no guide line). The isometric view is dragged level with Top's centre.
 #[gpui::test]

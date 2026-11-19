@@ -74,7 +74,7 @@ impl DrawingEditor {
         true
     }
 
-    fn close_table_tool(&mut self, accept: bool, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn close_table_tool(&mut self, accept: bool, window: &mut Window, cx: &mut Context<Self>) {
         let placed = self.table_tool.as_ref().and_then(|d| d.placed);
         if accept && let Some(at) = placed && let Some(mut t) = self.table_tool_table(at, cx) {
             let id = self.current_sheet().next_table_id();
@@ -89,7 +89,8 @@ impl DrawingEditor {
         }
         self.table_tool = None;
         self.tool = Tool::Select;
-        // The ghost outline goes with it (qa DWG-TABLE-ESC-GHOST).
+        // The ghost outline goes with it (qa DWG-TABLE-ESC-GHOST), and its alignment line and ✕ (qa 11-19 walk).
+        self.infer_lines.clear();
         self.update_preview(cx);
         cx.notify();
     }

@@ -199,6 +199,7 @@ impl DrawingEditor {
         self.edit_sheet(name, cx, |s| s.tables.push(table));
         self.hole_dlg = None;
         self.tool = Tool::Select;
+        self.infer_lines.clear();
         self.selection = vec![Sel::Table(id)];
         cx.notify();
     }

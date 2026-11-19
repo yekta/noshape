@@ -311,8 +311,9 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
                 let has = |k: &str| {
                     let k = k[kind.len()..].to_lowercase();
                     // A menu name is never the start of a longer row ("Open" is not "Open in new browser tab": qa
-                    // session-studio-1119 opened a second window that way, the merge dialog then hidden in the first).
-                    if kind == "menu:" && k.starts_with(&format!("{f} ")) {
+                    // session-studio-1119 opened a second window that way, the merge dialog then hidden in the first);
+                    // a row's shortcut after it is still that row ("Coincident (i)").
+                    if kind == "menu:" && k.strip_prefix(&format!("{f} ")).is_some_and(|rest| !rest.starts_with('(')) {
                         return false;
                     }
                     if kind != "button:" { k.contains(&f) } else { f.split_whitespace().all(|w| k.split_whitespace().any(|x| x == w)) }

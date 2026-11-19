@@ -391,6 +391,11 @@ def normalize_live(state):
         # A clicked checkbox (an <input> with no selection): no text field (README "Focus").
         if focus.get("tag") == "input":
             focus["tag"] = "checkbox"
+    # An assembly's "Items (0)" folder is shown only in a company-owned document (live items-folder-1119: managed
+    # workflows on and off alike; a personal one on the same Pro account has none): ours are personal documents.
+    feats = (state or {}).get("features")
+    if isinstance(feats, dict) and isinstance(feats.get("rows"), list):
+        feats["rows"] = [r for r in feats["rows"] if not (isinstance(r, dict) and r.get("name") == "Items (0)" and r.get("cls") == "is-folder")]
     # The Tabs panel's Sort menu hangs inside the panel's header: live's recorder reads its rows into the panel's name.
     doc, lst = (state or {}).get("document"), (state or {}).get("list")
     if isinstance(doc, dict) and isinstance(lst, dict) and isinstance(doc.get("panel"), str) and lst.get("rows"):
