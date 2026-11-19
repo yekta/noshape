@@ -847,7 +847,28 @@ impl PartStudioView {
         if self.sketch.is_some() {
             return id;
         }
+        // A dialog field reaches only for what it takes itself: Extrude's "Faces and sketch regions" keeps the pick's
+        // own reach, so a small circle's region is picked inside it (qa REGION-PICK-SKETCH-SHOWN, live session-1118).
+        let field = self.active_field_filter(cx);
+        let takes_points = field.is_none_or(|f| f.intersects(noshape_model::params::QueryFilter::SKETCH_POINT));
+        let takes_curves = field.is_none_or(|f| f.intersects(noshape_model::params::QueryFilter::SKETCH_EDGE));
         let Some(built) = self.built.as_ref() else { return id };
+        // The pick itself passes over a shown sketch's points and curves the field doesn't take (the centre point's
+        // own pick covers a small disc's middle).
+        let kind = |i: u32| {
+            let r = &built.picks.get(i)?.reference;
+            let Reference::SketchEntity { sketch, entity } = r else { return None };
+            let s = self.display.sketches.iter().find(|s| s.feature == *sketch)?;
+            Some(s.points.iter().any(|q| q.entity == *entity))
+        };
+        let refused = |i: u32| kind(i).is_some_and(|point| if point { !takes_points } else { !takes_curves });
+        let id = match id {
+            Some(i) if refused(i) => self.viewport.read(cx).pick_at_pointer_without(&refused).flatten(),
+            _ => id,
+        };
+        if !takes_points && !takes_curves {
+            return id;
+        }
         let target = id.and_then(|i| built.picks.get(i)).map(|t| t.reference.clone());
         let open = matches!(&target, None | Some(Reference::SketchEntity { .. } | Reference::SketchRegion { .. } | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }));
         if !open {
@@ -860,7 +881,7 @@ impl PartStudioView {
         let point = shown()
             .flat_map(|s| s.points.iter().map(move |q| (s.feature, q)))
             .filter_map(|(f, q)| Some((f, q.entity, screen(&q.position)?.distance(at))))
-            .filter(|(_, _, d)| *d <= POINT_REACH)
+            .filter(|(_, _, d)| takes_points && *d <= POINT_REACH)
             .min_by(|a, b| a.2.total_cmp(&b.2))
             .and_then(|(f, e, _)| built.picks.ids_for(&Reference::SketchEntity { sketch: f, entity: e }).first().copied());
         if point.is_some() {
@@ -873,6 +894,9 @@ impl PartStudioView {
             let pts: Vec<DVec2> = s.curves.iter().filter(|c| c.entity == *entity).flat_map(|c| c.points.windows(2)).flat_map(|w| [screen(&w[0]), screen(&w[1])]).collect::<Option<_>>()?;
             pts.chunks(2).map(|w| at.distance(closest_on_segment(at, w[0], w[1]))).min_by(f64::total_cmp)
         };
+        if !takes_curves {
+            return id;
+        }
         let out_of_reach = |i: u32| built.picks.get(i).and_then(|t| curve_distance(&t.reference)).is_some_and(|d| d > CURVE_REACH);
         let picked = match id {
             Some(i) if out_of_reach(i) => vp.pick_at_pointer_without(&out_of_reach).flatten(),

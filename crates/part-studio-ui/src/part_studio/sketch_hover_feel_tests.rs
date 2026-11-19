@@ -573,3 +573,51 @@ fn only_a_sketch_tool_picks_on_every_move(cx: &mut TestAppContext) {
     let got = [at_once(cx, Some(Tool::Line)), at_once(cx, Some(Tool::Dimension)), at_once(cx, Some(Tool::Select)), at_once(cx, None)];
     assert_eq!(got, [true, true, false, false], "(Line, Dimension, no tool, outside the sketch): every move picks at once");
 }
+
+/// qa REGION-PICK-SKETCH-SHOWN (live session-1118 step 5): with Extrude's "Faces and sketch regions" field active, a
+/// small shown circle's region lights on its centre and between the centre and the rim; the field takes no sketch
+/// points or curves, so their reach outside sketch mode doesn't apply.
+#[gpui::test]
+fn a_small_circles_region_lights_in_a_region_field(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "region-field-small-circle", Tool::Circle);
+    click(cx, window, &view, (575., 350.));
+    click(cx, window, &view, (593., 350.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let (feature, c) = cx.update(|cx| {
+        let v = view.read(cx);
+        let ed = v.sketch.as_ref().unwrap();
+        let data = v.sketch_data(cx).unwrap();
+        let circle = data.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Circle).unwrap().id;
+        let Some(noshape_sketch::Curve2::Circle { center, .. }) = data.sketch.curve(circle) else { panic!("a circle") };
+        (ed.feature, v.viewport.read(cx).project(ed.frame.to_world(center)).unwrap())
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.finish_sketch(w, cx);
+        v.selection.clear();
+        v.start_feature("extrude", w, cx);
+    }))
+    .unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_none() && !view.read(cx).ui_busy());
+    let pointer = Pointer::new(cx, window, &view);
+    let mut wrong = Vec::new();
+    for off in [DVec2::ZERO, DVec2::new(5.0, 0.0), DVec2::new(0.0, -7.0)] {
+        pointer.move_to(cx, &view, c + off);
+        let got = hovered(cx, &view);
+        if !matches!(&got, Some(Reference::SketchRegion { sketch, .. }) if *sketch == feature) {
+            wrong.push(format!("{off:?} off the centre: lit {got:?}, not the region"));
+        }
+    }
+    // The click puts the region in Extrude's field.
+    pointer.click(cx, &view, c + DVec2::new(5.0, 0.0));
+    let picked = cx.update(|cx| match view.read(cx).edit.as_ref().and_then(|e| e.dialog.read(cx).feature.params.get("entities").cloned()) {
+        Some(noshape_model::params::ParamValue::Query(refs)) => refs,
+        _ => Vec::new(),
+    });
+    if !matches!(picked.as_slice(), [Reference::SketchRegion { sketch, .. }] if *sketch == feature) {
+        wrong.push(format!("the click put {picked:?} in the field, not the region"));
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
