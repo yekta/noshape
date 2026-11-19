@@ -149,14 +149,9 @@ impl Nearest {
         best.map(|b| b.1)
     }
 
-    /// The points within `r` of `p` (squared distances), in no order.
-    pub(super) fn within(&self, p: DVec3, r2: f64, out: &mut Vec<usize>) {
-        self.within_using(p, r2, out, &mut Vec::new());
-    }
-
-    /// [`Self::within`] with its own list of the tree's parts still to look at (kept from call to call: a surface's
-    /// thousands of samples each asked once, [`folds`]).
-    fn within_using(&self, p: DVec3, r2: f64, out: &mut Vec<usize>, todo: &mut Vec<(usize, usize, f64)>) {
+    /// The points within `r` of `p` (squared distances), in no order; `todo` the tree's parts still to look at (kept
+    /// from call to call: a surface's thousands of samples each asked once, [`folds`]).
+    fn within(&self, p: DVec3, r2: f64, out: &mut Vec<usize>, todo: &mut Vec<(usize, usize, f64)>) {
         todo.clear();
         todo.push((0usize, self.pts.len(), 0.0f64));
         while let Some((lo, hi, least)) = todo.pop() {
@@ -296,7 +291,7 @@ fn folds(pts: &[(DVec2, DVec3)], near: &Nearest) -> bool {
                 .map(|&(a, b)| (at(a, b) - p).length_squared())
                 .fold(0.0f64, f64::max);
             out.clear();
-            near.within_using(p, h, &mut out, &mut todo);
+            near.within(p, h, &mut out, &mut todo);
             for &k in &out {
                 let (a, b) = (k / nv, k % nv);
                 let v_then_u = (along_v[i * nv + b] - along_v[i * nv + j]).abs() + (along_u[a * nv + b] - along_u[i * nv + b]).abs();
