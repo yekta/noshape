@@ -480,6 +480,15 @@ impl<'a> SheetPick<'a> {
             return Some(p);
         }
         let Some((view, me)) = self.hovered_edge() else { return self.silhouette_line_pick() };
+        // A circle seen edge-on: the segment it projects to, end to end across its diameter (live2 errors-1119-asmdrw:
+        // Dimension on a pin's edge-on circle gives a linear .394, not a diameter).
+        if let EdgeGeom::Circle { face_on: false, .. } = me.geom
+            && let Some([c, u, v]) = me.conic
+        {
+            let half = if len(u) >= len(v) { u } else { v };
+            let (a, b) = (sub(c, half), [c[0] + half[0], c[1] + half[1]]);
+            return (len(half) > 1e-9).then_some(Pick::Line { a: PickedPoint { view, p: a, r: None }, b: PickedPoint { view, p: b, r: None } });
+        }
         let EdgeGeom::Line { a, b } = me.geom else { return None };
         let pa = me.ends[0].clone().map(|(r, p)| PickedPoint { view, p, r: Some(r) }).unwrap_or(PickedPoint { view, p: a, r: None });
         let pb = me.ends[1].clone().map(|(r, p)| PickedPoint { view, p, r: Some(r) }).unwrap_or(PickedPoint { view, p: b, r: None });
@@ -572,8 +581,9 @@ impl<'a> SheetPick<'a> {
     }
 
     pub fn circle_pick(&self, s: [f64; 2]) -> Option<Pick> {
+        // (A circle seen edge-on is a line in the view: `line_pick`'s, as live's Dimension gives it a linear one.)
         if let Some((view, me)) = self.hovered_edge()
-            && let EdgeGeom::Circle { center, radius, .. } = me.geom
+            && let EdgeGeom::Circle { center, radius, face_on: true, .. } = me.geom
         {
             return Some(Pick::Circle { view, center, radius, r: me.center_ref() });
         }

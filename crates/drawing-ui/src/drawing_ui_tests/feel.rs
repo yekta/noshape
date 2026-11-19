@@ -2162,3 +2162,56 @@ fn insert_views_search_with_no_match_says_so(cx: &mut TestAppContext) {
     assert!(search(cx, "zzzz-none"), "no match: the message");
     assert!(!search(cx, ""), "no search: no message");
 }
+
+/// Live2 errors-1119-asmdrw: the Dimension tool on a circle seen edge-on (a line in the view) gives a linear dimension
+/// across it, not a diameter with a leader; a circle seen face-on keeps its diameter.
+#[gpui::test]
+fn dimensioning_a_circle_seen_edge_on_measures_it_as_a_line(cx: &mut TestAppContext) {
+    use noshape_model::drawing::{build::PickTarget, views::EdgeGeom};
+    use noshape_scene::drawing_tools::Pick;
+    SUGGESTED.set(true);
+    // A pin standing beside the block: its top circle is edge-on in Front.
+    SETUP.set(Some(|ctx, dw| {
+        let sk = call(ctx, "sketch_create", json!({ "tab": "Part Studio 1", "plane": "plane:top" }))["sketch"].clone();
+        call(ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[70, 10], [75, 10]] }));
+        let region = call(ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].clone();
+        call(ctx, "feature_add", json!({ "tab": "Part Studio 1", "type": "extrude", "params": { "entities": [region], "depth": "15 mm", "operationType": "NEW" } }));
+        call(ctx, "drawing_update", json!({ "drawing": dw }));
+    }));
+    let (window, editor) = drawing(cx, "feel-dim-edge-on-circle");
+    real_sheet(cx, window, &editor);
+    // A picked edge whose model edge is a circle, edge-on and face-on.
+    let find = |cx: &mut TestAppContext, face_on: bool| {
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let built = e.built.as_ref()?;
+            built.picks.iter().enumerate().find_map(|(i, t)| {
+                let PickTarget::Edge { view, edge } = t else { return None };
+                let g = e.geoms.get(view)?;
+                let me = g.model_edges.get(g.edges.get(*edge as usize)?.model? as usize)?;
+                match me.geom {
+                    EdgeGeom::Circle { face_on: f, radius, .. } if f == face_on && (face_on || me.conic.is_some()) => Some((i as u32, radius)),
+                    _ => None,
+                }
+            })
+        })
+    };
+    let pick_with = |cx: &mut TestAppContext, hover: u32| {
+        cx.update(|cx| {
+            editor.update(cx, |e, _| {
+                e.tool = Tool::Dimension { kind: noshape_scene::drawing_tools::DimTool::Linear, picks: vec![] };
+                e.hover = Some(hover);
+                let pk = e.pk();
+                (pk.circle_pick(e.cursor).filter(|p| matches!(p, Pick::Circle { .. }) && pk.hovered_edge().is_some_and(|(_, me)| matches!(me.geom, EdgeGeom::Circle { face_on: true, .. }))), pk.line_pick())
+            })
+        })
+    };
+    let (edge_on, radius) = find(cx, false).expect("an edge-on circle in a view");
+    let (circle, line) = pick_with(cx, edge_on);
+    assert!(circle.is_none(), "no diameter: {circle:?}");
+    let Some(Pick::Line { a, b }) = line else { panic!("a line: {line:?}") };
+    assert!(((b.p[0] - a.p[0]).hypot(b.p[1] - a.p[1]) - 2.0 * radius).abs() < 1e-9, "across its diameter");
+    if let Some((face_on, _)) = find(cx, true) {
+        assert!(matches!(pick_with(cx, face_on).0, Some(Pick::Circle { .. })), "face-on: its diameter");
+    }
+}
