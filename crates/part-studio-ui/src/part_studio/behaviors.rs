@@ -546,6 +546,12 @@ pub struct UiState {
     /// stores it on the part; the mass box while it is typed into.
     pub mass_override_edit: Option<(BodyId, Option<f64>)>,
     pub mass_override_input: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
+    /// Center of mass / inertia Override changed in the open dialog (live2 mass-override-1119): the part and the
+    /// override (m in the Part Studio; kg·m² about the centre, column by column; None = unticked).
+    pub com_override_edit: Option<(BodyId, Option<[f64; 3]>)>,
+    pub inertia_override_edit: Option<(BodyId, Option<[f64; 9]>)>,
+    /// The centre's (0–2) or an inertia cell's (3–11, row by row) box while it is typed into.
+    pub mass_cell_input: Option<(usize, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     /// Measure type filter (None = Show all).
     pub measure_type: Option<&'static str>,
     /// The Measure panel's Length / Angle unit selects (None = workspace units).
@@ -987,6 +993,9 @@ impl UiState {
             face_mass_job: None,
             mass_override_edit: None,
             mass_override_input: None,
+            com_override_edit: None,
+            inertia_override_edit: None,
+            mass_cell_input: None,
             measure_type: None,
             measure_length_unit: None,
             measure_angle_unit: None,

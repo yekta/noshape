@@ -7,6 +7,7 @@ use crate::os_ui::OsDropupExt as _;
 use crate::scene_builder::{PickKind, PickTarget};
 use crate::theme::{p, with_alpha};
 use crate::ui::{TipExt as _, TipSide};
+use glam::DVec3;
 use gpui_kit::component::Sizable as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
@@ -1528,8 +1529,33 @@ impl PartStudioView {
             let bodies = mass_parts(&self.display, self.selection.iter().filter_map(|r| self.owning_body(r)));
             // Inertia about the reference field's mate connector.
             let reference = self.ui.mass_reference.as_ref().and_then(|r| self.display.connectors.iter().find(|c| &c.reference == r)).cloned();
-            let studio = self.studio(cx).cloned().unwrap_or_default();
+            let mut studio = self.studio(cx).cloned().unwrap_or_default();
             let frame = reference.as_ref().map(|c| (c.origin, c.x, c.z.cross(c.x), c.z));
+            // Mass Override (live ui-mass/10–15) and the centre's and inertia's (live2 mass-override-1119) apply to
+            // one part: its stored overrides, or those just changed in the dialog.
+            let single = match bodies.as_slice() {
+                [b] => Some(b.clone()),
+                [] if self.display.bodies.len() == 1 => self.display.bodies.first().map(|b| b.id.clone()),
+                _ => None,
+            };
+            let stored = single.as_ref().and_then(|b| studio.part_properties.get(b)?.mass_override);
+            let edit = single.as_ref().and_then(|b| self.ui.mass_override_edit.as_ref().filter(|(eb, _)| eb == b)).map(|(_, m)| *m);
+            let com_edit = single.as_ref().and_then(|b| self.ui.com_override_edit.as_ref().filter(|(eb, _)| eb == b)).map(|(_, c)| *c);
+            let inertia_edit = single.as_ref().and_then(|b| self.ui.inertia_override_edit.as_ref().filter(|(eb, _)| eb == b)).map(|(_, i)| *i);
+            let stored_props = single.as_ref().and_then(|b| studio.part_properties.get(b)).cloned().unwrap_or_default();
+            let material = single.as_ref().is_some_and(|b| studio.part_properties.get(b).is_some_and(|p| p.density.is_some()));
+            if let Some(b) = &single {
+                let p = studio.part_properties.entry(b.clone()).or_default();
+                if let Some(m) = edit {
+                    p.mass_override = m;
+                }
+                if let Some(c) = com_edit {
+                    p.com_override = c;
+                }
+                if let Some(i) = inertia_edit {
+                    p.inertia_override = i;
+                }
+            }
             // Live: nothing in "Parts to measure" → every value blank (not
             // all parts; behaviours "qa5 (10-26 p4)", qa5 P1-17).
             self.note_unmaterialed_parts(&bodies, cx);
@@ -1558,11 +1584,11 @@ impl PartStudioView {
                     self.ui.mass_shown.clone_from(&computed);
                 }
                 match computed.or_else(|| self.ui.mass_shown.clone()) {
-                    Some((mp, var)) => (mp.map(|mp| noshape_ops::analysis::studio_mass_from(mp, &self.display, &studio, &bodies, reference.as_ref())), var),
+                    Some((mp, var)) => (mp.map(|mp| (noshape_ops::analysis::studio_mass_from(mp.clone(), &self.display, &studio, &bodies, reference.as_ref()), noshape_ops::analysis::studio_mass_from(mp, &self.display, &studio, &bodies, None).props)), var),
                     None => (None, None),
                 }
             };
-            if let Some(noshape_ops::analysis::StudioMass { props: mp, reference }) = measured {
+            if let Some((noshape_ops::analysis::StudioMass { props: mp, reference }, world)) = measured {
                 if let Some(name) = &reference {
                     rows.push(("Reference".into(), name.clone()));
                 }
@@ -1591,16 +1617,8 @@ impl PartStudioView {
                 let units = self.doc.read(cx).session.doc.settings.units;
                 let f = units.si_factor(Dim::LENGTH).powi(2);
                 let sym = units.length.symbol();
-                // Mass Override (live ui-mass/10–15): one part's stored or
-                // just-typed mass; the inertia scales with it, the centre of
-                // mass stays.
-                let single = match bodies.as_slice() {
-                    [b] => Some(b.clone()),
-                    [] if self.display.bodies.len() == 1 => self.display.bodies.first().map(|b| b.id.clone()),
-                    _ => None,
-                };
-                let stored = single.as_ref().and_then(|b| studio.part_properties.get(b)?.mass_override);
-                let edit = single.as_ref().and_then(|b| self.ui.mass_override_edit.as_ref().filter(|(eb, _)| eb == b)).map(|(_, m)| *m);
+                // The mass shown: the part's stored or just-typed override (the inertia scales with it, the centre
+                // stays), else the computed one.
                 let computed = single.as_ref().and_then(|b| studio.part_properties.get(b)?.density).map(|d| d * mp.volume);
                 let shown = edit.unwrap_or(stored).or(computed).or(mp.mass);
                 // Without a material a typed mass is spread uniformly: the inertia (per unit density) times
@@ -1631,8 +1649,10 @@ impl PartStudioView {
                 };
                 // Live's bounds don't turn with a reference frame: the centre's
                 // per axis, one for every inertia entry.
-                let var_c = var.as_ref().map(|b| b.center_of_mass);
-                let var_i = var.as_ref().map(|b| b.inertia * scale);
+                let com_on = com_edit.unwrap_or(stored_props.com_override).is_some();
+                let inertia_on = inertia_edit.unwrap_or(stored_props.inertia_override).is_some();
+                let var_c = var.as_ref().map(|b| b.center_of_mass).filter(|_| !com_on);
+                let var_i = var.as_ref().map(|b| b.inertia * scale).filter(|_| !inertia_on);
                 let len_f = units.si_factor(Dim::LENGTH);
                 let overridden = edit.unwrap_or(stored).is_some();
                 let cell = |x: f64, b: Option<f64>, k: &str| match b {
@@ -1641,8 +1661,10 @@ impl PartStudioView {
                 };
                 let ib = |r: usize, c: usize| var_i.map(|m| m.col(c)[r]);
                 mass_view = Some(MassView {
+                    // Greyed with a reference connector (live ui-mass/07, interaction.md 5.4).
+                    more_overrides: single.clone().filter(|_| material && has_mass && frame.is_none()).map(|body| MassOverrides { body, com_on, inertia_on, com: world.center_of_mass, inertia: world.inertia }),
                     override_part: single.map(|b| (b, edit.unwrap_or(stored).is_some(), shown.unwrap_or(0.0))),
-                    changed: edit.is_some_and(|e| e != stored && e.is_none_or(|v| v > 0.0)),
+                    changed: edit.is_some_and(|e| e != stored && e.is_none_or(|v| v > 0.0)) || com_edit.is_some_and(|c| c != stored_props.com_override) || inertia_edit.is_some_and(|i| i != stored_props.inertia_override),
                     volume: with_pm(fine(Quantity::new(mp.volume, len3), "volume"), var.as_ref().map(|b| b.volume / units.si_factor(len3))),
                     area: with_pm(fine(Quantity::new(mp.surface_area, len2), "area"), var.as_ref().map(|b| b.surface_area / units.si_factor(len2))),
                     mass: shown.filter(|_| has_mass).map(|m| {
@@ -1894,6 +1916,50 @@ impl PartStudioView {
                 }
                 (None, Some(m)) => {
                     let ref_active = self.ui.mass_ref_active;
+                    // Center of mass / inertia Override (live2 mass-override-1119): ticking keeps the values shown,
+                    // which become editable.
+                    let more = m.more_overrides.clone();
+                    let override_check = |id: &'static str, inertia: bool, cx: &mut Context<Self>| match more.clone() {
+                        Some(o) => {
+                            let on = if inertia { o.inertia_on } else { o.com_on };
+                            crate::ui::os_checkbox(id, "Override", on)
+                                .debug_selector(move || id.to_string())
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    this.ui.mass_cell_input = None;
+                                    if inertia {
+                                        this.ui.inertia_override_edit = Some((o.body.clone(), (!on).then(|| o.inertia.to_cols_array())));
+                                    } else {
+                                        this.ui.com_override_edit = Some((o.body.clone(), (!on).then(|| o.com.to_array())));
+                                    }
+                                    cx.notify();
+                                }))
+                                .into_any_element()
+                        }
+                        None => disabled_check(id).into_any_element(),
+                    };
+                    let cell_input = self.ui.mass_cell_input.as_ref().map(|(k, input, _)| (*k, input.clone()));
+                    let override_cell = |k: usize, key: &'static str, text: String, o: &MassOverrides, cx: &mut Context<Self>| match &cell_input {
+                        Some((at, input)) if *at == k => div().flex_1().h(px(24.)).border_b_1().border_color(pal.accent).child(gpui_kit::component::input::Input::new(input).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right)).into_any_element(),
+                        _ => {
+                            let o = o.clone();
+                            div()
+                                .id(key)
+                                .debug_selector(move || format!("mass-override-{key}"))
+                                .flex_1()
+                                .h(px(24.))
+                                .flex()
+                                .items_center()
+                                .justify_end()
+                                .border_b_1()
+                                .border_color(pal.border)
+                                .text_size(px(13.33))
+                                .text_color(pal.text)
+                                .cursor_text()
+                                .child(text.clone())
+                                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.edit_mass_cell(k, o.clone(), text.clone(), window, cx)))
+                                .into_any_element()
+                        }
+                    };
                     // (Unit tests read it too.)
                     if crate::ui_script::active() || cfg!(test) {
                         self.ui.mass_state = Some(mass_ui_state(&m, self.ui.mass_faces, ref_active, self.ui.mass_variance));
@@ -1942,16 +2008,24 @@ impl PartStudioView {
                         }))
                         .child(h_flex().h(px(26.)).mt(px(2.)).child(div().pl(px(5.)).pr(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Volume")).child(precise_value("volume", m.volume.clone(), cx).mr(px(5.))))
                         .child(h_flex().h(px(26.)).mt(px(2.)).child(div().pl(px(5.)).pr(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Surface area")).child(precise_value("area", m.area.clone(), cx).mr(px(5.))))
-                        .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Center of mass")).child(disabled_check("com-override")))
+                        .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Center of mass")).child(override_check("com-override", false, cx)))
                         .children([("X", 0xbd3039u32, "axis-arrow-x", "cx"), ("Y", 0x009400, "axis-arrow-y", "cy"), ("Z", 0x1651b0, "axis-arrow-z", "cz")].into_iter().zip(m.center.iter()).enumerate().map(|(k, ((l, c, g, key), v))| {
-                            h_flex().mt(px(if k == 0 { 3. } else { 2. })).h(px(29.)).child(axis(l, c, g)).child(precise_value(key, v.clone(), cx).mr(px(5.)))
+                            let value = match more.as_ref().filter(|o| o.com_on) {
+                                Some(o) => override_cell(k, key, v.clone(), o, cx),
+                                None => precise_value(key, v.clone(), cx).into_any_element(),
+                            };
+                            h_flex().mt(px(if k == 0 { 3. } else { 2. })).h(px(29.)).child(axis(l, c, g)).child(div().flex_1().flex().mr(px(5.)).child(value))
                         }))
-                        .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Mass moments of inertia ({})", m.inertia_unit))).child(disabled_check("moi-override")));
+                        .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Mass moments of inertia ({})", m.inertia_unit))).child(override_check("moi-override", true, cx)));
                     for (r, row_names) in MOMENT_NAMES.iter().enumerate() {
                         let mut row = h_flex().mt(px(2.)).h(px(26.)).px(px(5.)).gap(px(8.));
                         for (c, &n) in row_names.iter().enumerate() {
                             let v = m.inertia.as_ref().map(|i| i[r][c].clone()).unwrap_or_default();
-                            row = row.child(h_flex().flex_1().gap(px(4.)).child(div().w(px(24.)).text_size(px(12.)).text_color(pal.text_muted).child(n)).child(precise_value(n, v, cx)));
+                            let value = match more.as_ref().filter(|o| o.inertia_on) {
+                                Some(o) => override_cell(3 + r * 3 + c, n, v, o, cx),
+                                None => precise_value(n, v, cx).into_any_element(),
+                            };
+                            row = row.child(h_flex().flex_1().gap(px(4.)).child(div().w(px(24.)).text_size(px(12.)).text_color(pal.text_muted).child(n)).child(div().flex_1().flex().child(value)));
                         }
                         body = body.child(row);
                     }
@@ -2217,7 +2291,7 @@ struct FaceMassView {
 /// decimals (trailing zeros dropped): [[Lxx, Lxy], [Lyx, Lyy]] and Lzz = Lxx + Lyy. Lxx = ∫y² dA,
 /// Lyy = ∫x² dA, Lxy = −∫xy dA (an inertia tensor's off-diagonal).
 fn face_area_moments(props: &[noshape_kernel::MassProperties], p0: &noshape_kernel::Plane, si: f64) -> ([[String; 2]; 2], String) {
-    use glam::{DMat3, DVec3};
+    use glam::DMat3;
     let area: f64 = props.iter().map(|p| p.mass).sum();
     let c = props.iter().fold(DVec3::ZERO, |a, p| a + p.center * p.mass) / area.max(f64::MIN_POSITIVE);
     // OCCT's tensor T = tr(S)·I − S of the second moments S = ∫ r rᵀ dA.
@@ -2254,8 +2328,33 @@ struct MassView {
     /// The part Mass Override applies to (one part measured, with a
     /// mass), whether it is ticked, and the mass shown (kg).
     override_part: Option<(BodyId, bool, f64)>,
+    /// Center of mass and inertia Override: enabled for one part with a material (live2 mass-override-1119).
+    more_overrides: Option<MassOverrides>,
     /// An Override change ✓ would store.
     changed: bool,
+}
+
+/// The one part's Center of mass and inertia Override state and its centre (m) and inertia about it (kg·m²).
+#[derive(Clone)]
+struct MassOverrides {
+    body: BodyId,
+    com_on: bool,
+    inertia_on: bool,
+    com: DVec3,
+    inertia: glam::DMat3,
+}
+
+impl MassOverrides {
+    /// The overrides with the centre's (0–2) or an inertia cell's (3–11, row by row) value replaced by `v` (m, kg·m²).
+    fn with_value(&self, k: usize, v: f64) -> ([f64; 3], [f64; 9]) {
+        let (mut c, mut i) = (self.com, self.inertia);
+        if k < 3 {
+            c[k] = v;
+        } else {
+            i.col_mut((k - 3) % 3)[(k - 3) / 3] = v;
+        }
+        (c.to_array(), i.to_cols_array())
+    }
 }
 
 impl MassView {
@@ -2271,6 +2370,7 @@ impl MassView {
             parts: Vec::new(),
             reference,
             override_part: None,
+            more_overrides: None,
             changed: false,
         }
     }
@@ -2296,10 +2396,10 @@ fn mass_ui_state(m: &MassView, faces: bool, ref_active: bool, variance: bool) ->
         num(serde_json::Value::Null, m.mass.as_deref().unwrap_or_default()),
         num(json!("Volume"), &m.volume),
         num(json!("Surface area"), &m.area),
-        check("Center of mass", false, false),
+        check("Center of mass", m.more_overrides.as_ref().is_some_and(|o| o.com_on), m.more_overrides.is_some()),
     ];
     fields.extend(m.center.iter().map(|c| num(json!(""), c)));
-    fields.push(check(&format!("Mass moments of inertia ({})", m.inertia_unit), false, false));
+    fields.push(check(&format!("Mass moments of inertia ({})", m.inertia_unit), m.more_overrides.as_ref().is_some_and(|o| o.inertia_on), m.more_overrides.is_some()));
     let names = [["Lxx", "Lxy", "Lxz"], ["Lyx", "Lyy", "Lyz"], ["Lzx", "Lzy", "Lzz"]];
     for (r, row) in names.iter().enumerate() {
         for (c, n) in row.iter().enumerate() {
@@ -2467,12 +2567,76 @@ impl PartStudioView {
         cx.notify();
     }
 
+    /// A Center of mass (k 0–2) or inertia (3–11) box typed into, as the Mass box: Enter applies (a bare number in
+    /// the document's unit, "500 lb mm²" shown while focused) and keeps it with its value selected; leaving it
+    /// applies; text that isn't a value stays out (live2 mass-override-1119: Lxx 500, Lyx kept when Lxy changes).
+    fn edit_mass_cell(&mut self, k: usize, o: MassOverrides, text: String, window: &mut Window, cx: &mut Context<Self>) {
+        use gpui_kit::component::input::{InputEvent, InputState};
+        let input = cx.new(|cx| InputState::new(window, cx).default_value(text));
+        let sub = cx.subscribe_in(&input, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
+            let enter = matches!(ev, InputEvent::PressEnter { .. });
+            if !enter && !matches!(ev, InputEvent::Blur) {
+                return;
+            }
+            let typed = st.read(cx).value().to_string();
+            let units = this.doc.read(cx).session.doc.settings.units;
+            let (msym, mfac) = crate::properties_dialog::mass_unit(&units);
+            let f = units.si_factor(Dim::LENGTH).powi(2);
+            let unit = format!("{msym} {}²", units.length.symbol());
+            let parsed = if k < 3 {
+                noshape_units::evaluate_as(&typed, Dim::LENGTH, &units, &this.display.variables).ok().map(|q| q.value)
+            } else {
+                typed.trim().trim_end_matches(unit.as_str()).trim().parse::<f64>().ok().map(|v| v * f / mfac)
+            };
+            match parsed {
+                Some(v) => {
+                    let (com, inertia) = o.with_value(k, v);
+                    if k < 3 {
+                        this.ui.com_override_edit = Some((o.body.clone(), Some(com)));
+                    } else {
+                        this.ui.inertia_override_edit = Some((o.body.clone(), Some(inertia)));
+                    }
+                    if enter {
+                        let shown = if k < 3 { this.fmt(Quantity::new(v, Dim::LENGTH), cx) } else { format!("{} {unit}", noshape_units::format_value(v * mfac / f, 3)) };
+                        st.update(cx, |s, cx| {
+                            s.set_value(shown, window, cx);
+                            s.select_all(window, cx);
+                        });
+                    } else {
+                        this.ui.mass_cell_input = None;
+                    }
+                }
+                None if !enter => this.ui.mass_cell_input = None,
+                None => {}
+            }
+            cx.notify();
+        });
+        input.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
+        self.ui.mass_cell_input = Some((k, input, sub));
+        cx.notify();
+    }
+
     /// ✓: store a changed Mass Override on its part (one undo step), close.
-    fn accept_mass_dialog(&mut self, cx: &mut Context<Self>) {
-        if let Some((body, kg)) = self.ui.mass_override_edit.clone() {
+    pub(super) fn accept_mass_dialog(&mut self, cx: &mut Context<Self>) {
+        let (mass, com, inertia) = (self.ui.mass_override_edit.clone(), self.ui.com_override_edit.clone(), self.ui.inertia_override_edit.clone());
+        let body = mass.as_ref().map(|e| e.0.clone()).or_else(|| com.as_ref().map(|e| e.0.clone())).or_else(|| inertia.as_ref().map(|e| e.0.clone()));
+        if let Some(body) = body {
             let name = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_default();
             self.doc.update(cx, |doc, cx| {
-                doc.edit_studio(self.tab, &noshape_ops::studio::properties_description(&name), cx, |ps| ps.part_properties.entry(body).or_default().mass_override = kg);
+                doc.edit_studio(self.tab, &noshape_ops::studio::properties_description(&name), cx, |ps| {
+                    if let Some((b, kg)) = mass {
+                        ps.part_properties.entry(b).or_default().mass_override = kg;
+                    }
+                    if let Some((b, c)) = com {
+                        ps.part_properties.entry(b).or_default().com_override = c;
+                    }
+                    if let Some((b, i)) = inertia {
+                        ps.part_properties.entry(b).or_default().inertia_override = i;
+                    }
+                });
             });
         }
         self.set_show_mass(false, cx);
@@ -2538,6 +2702,9 @@ impl PartStudioView {
         self.ui.mass_reference = None;
         self.ui.mass_override_edit = None;
         self.ui.mass_override_input = None;
+        self.ui.com_override_edit = None;
+        self.ui.inertia_override_edit = None;
+        self.ui.mass_cell_input = None;
         cx.notify();
     }
 

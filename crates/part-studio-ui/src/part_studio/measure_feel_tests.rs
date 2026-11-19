@@ -606,3 +606,92 @@ fn no_summary_while_an_analysis_tool_is_open(cx: &mut TestAppContext) {
     let open = cx.update(|cx| (b.view.read(cx).ui.analysis_tool.is_some(), b.view.read(cx).ui.measure_readout.clone()));
     assert!(!face.is_empty() && open.0 && open.1.is_empty(), "the top face's summary {face:?}; with Interference detection open: {:?}", open.1);
 }
+
+/// live2 mass-override-1119: on one part with a material the Center of mass and inertia Override boxes enable (a part
+/// without one keeps them greyed); ticked, the values they had become editable. A centre's X typed moves the inertia
+/// to the new centre (parallel axis); Lxy typed leaves Lyx as it was; ✓ stores both on the part, no feature added.
+#[gpui::test]
+fn mass_centre_and_inertia_overrides_on_a_part_with_a_material(cx: &mut TestAppContext) {
+    let b = Bench::open(cx, "mass-com-override", 1.0);
+    let state = |cx: &mut TestAppContext| {
+        draw(cx, b.window);
+        cx.update(|cx| b.view.read(cx).ui.mass_state.clone()).unwrap_or_default()
+    };
+    let field = |s: &serde_json::Value, label: &str| s["fields"].as_array().and_then(|f| f.iter().find(|f| f["label"].as_str().is_some_and(|l| l.starts_with(label))).cloned()).unwrap_or_default();
+    let cell = |s: &serde_json::Value, label: &str| field(s, label)["text"].as_str().and_then(|t| t.split_whitespace().next()?.parse::<f64>().ok());
+    let measured = |s: &serde_json::Value| cell(s, "Lyy").is_some();
+    let open = |cx: &mut TestAppContext, part: &'static str| {
+        let r = b.reference(cx, E::Part(part)).unwrap();
+        cx.update(|cx| b.view.update(cx, |v, cx| {
+            v.set_show_mass(false, cx);
+            v.selection = vec![r.clone()];
+            v.open_mass(cx);
+        }));
+        let window = b.window;
+        wait_until(cx, window, |cx| b.view.read(cx).ui.mass_state.as_ref().is_some_and(|s| s["fields"].as_array().is_some_and(|f| f.iter().any(|f| f["label"] == "Volume" && f["text"].as_str().is_some_and(|t| !t.is_empty())))));
+        state(cx)
+    };
+    let Reference::Body(p2) = b.reference(cx, E::Part("Part 2")).unwrap() else { panic!("Part 2") };
+    // Part 1 has no material: greyed.
+    let s = open(cx, "Part 1");
+    assert_eq!(field(&s, "Center of mass")["state"], "disabled", "{s}");
+    cx.update(|cx| b.view.update(cx, |v, cx| {
+        let tab = v.tab;
+        let body = p2.clone();
+        v.doc.update(cx, |doc, cx| doc.edit_studio(tab, "Material", cx, |ps| ps.part_properties.entry(body).or_default().density = Some(8000.0)));
+    }));
+    let window = b.window;
+    wait_until(cx, window, |cx| !b.view.read(cx).ui_busy());
+    open(cx, "Part 2");
+    let window = b.window;
+    wait_until(cx, window, |cx| b.view.read(cx).ui.mass_state.as_ref().is_some_and(measured));
+    let s = state(cx);
+    assert_eq!(field(&s, "Center of mass")["state"], "ok", "{s}");
+    assert_eq!(field(&s, "Mass moments of inertia")["state"], "ok", "{s}");
+    let (lyy, lxy_before, lyx_before) = (cell(&s, "Lyy").unwrap(), cell(&s, "Lxy").unwrap(), cell(&s, "Lyx").unwrap());
+    let click = |cx: &mut TestAppContext, sel: &str| {
+        let at = gpui_kit::VisualTestContext::from_window(b.window, cx).debug_bounds(Box::leak(sel.to_string().into_boxed_str())).unwrap_or_else(|| panic!("no {sel}")).center();
+        gpui_kit::VisualTestContext::from_window(b.window, cx).simulate_click(at, Modifiers::default());
+        draw(cx, b.window);
+    };
+    let type_enter = |cx: &mut TestAppContext, text: &str| {
+        gpui_kit::VisualTestContext::from_window(b.window, cx).simulate_input(text);
+        gpui_kit::VisualTestContext::from_window(b.window, cx).simulate_keystrokes("enter");
+        draw(cx, b.window);
+    };
+    // Ticked, the centre (70, 10, 7.5) is kept; X typed 10 mm moves the inertia 60 mm: Lyy and Lzz grow by m·0.06².
+    assert_eq!(field(&s, "Center of mass")["checked"], false, "{s}");
+    click(cx, "com-override");
+    let s = state(cx);
+    assert_eq!(field(&s, "Center of mass")["checked"], true, "{s}");
+    assert_eq!(cell(&s, "Lyy"), Some(lyy), "ticking keeps the values: {s}");
+    click(cx, "mass-override-cx");
+    type_enter(cx, "10");
+    let s = state(cx);
+    let (m_kg, unit_per_kg) = cx.update(|cx| {
+        let units = b.view.read(cx).doc.read(cx).session.doc.settings.units;
+        (0.02 * 0.02 * 0.015 * 8000.0, crate::properties_dialog::mass_unit(&units).1)
+    });
+    let grow = m_kg * 0.06 * 0.06 * unit_per_kg * 1e6;
+    assert!((cell(&s, "Lyy").unwrap() - (lyy + grow)).abs() < 1e-3 * grow, "Lyy {lyy} + {grow}: {s}");
+    // Inertia ticked, Lxy typed 50: Lyx stays.
+    click(cx, "moi-override");
+    click(cx, "mass-override-Lxy");
+    type_enter(cx, "50");
+    let s = state(cx);
+    assert_eq!(cell(&s, "Lxy"), Some(50.0), "{s}");
+    assert_eq!(cell(&s, "Lyx"), Some(lyx_before), "Lxy was {lxy_before}: {s}");
+    let features = cx.update(|cx| b.view.read(cx).studio(cx).unwrap().features.len());
+    cx.update(|cx| b.view.update(cx, |v, cx| v.accept_mass_dialog(cx)));
+    draw(cx, b.window);
+    let (stored, after) = cx.update(|cx| {
+        let v = b.view.read(cx);
+        let ps = v.studio(cx).unwrap();
+        (ps.part_properties.get(&p2).cloned().unwrap_or_default(), ps.features.len())
+    });
+    let com = stored.com_override.expect("the centre stored");
+    assert!((com[0] - 0.01).abs() < 1e-9 && (com[1] - 0.01).abs() < 1e-9 && (com[2] - 0.0075).abs() < 1e-9, "{com:?}");
+    let i = stored.inertia_override.expect("the inertia stored");
+    assert!((i[3] * unit_per_kg * 1e6 - 50.0).abs() < 1e-6, "Lxy at index 3: {i:?}");
+    assert_eq!(after, features, "no feature added");
+}
