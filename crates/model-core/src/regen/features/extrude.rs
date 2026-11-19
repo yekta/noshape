@@ -45,6 +45,14 @@ fn eval_inner(ev: &mut EvalCtx) -> FResult<()> {
         return crate::regen::eval::err_at(if thin { &["wallShape"] } else { &["entities"] }, if thin { "Select edges or faces to define the path of the thin wall." } else { "Select face or sketch region to extrude." });
     }
     let t0 = std::time::Instant::now();
+    let op = ev.enum_("operationType").to_string();
+    let drawn;
+    let refs = if !thin && op == "NEW" {
+        drawn = in_drawing_order(ev, refs);
+        &drawn[..]
+    } else {
+        refs
+    };
     let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::Along(&|f, _| f.normal), false)? } else { ev.profiles(refs)? };
     if profiles.is_empty() {
         // (What was picked is gone: std's query is empty.)
@@ -69,7 +77,6 @@ fn eval_inner(ev: &mut EvalCtx) -> FResult<()> {
     }
     let tools = tools.into_iter().map(|t| drawn_edge_directions(ev, t)).collect::<FResult<Vec<_>>>()?;
     let t_tools = t0.elapsed();
-    let op = ev.enum_("operationType").to_string();
     let scope = scope(ev);
     let sketches: Vec<Option<FeatureId>> = profiles.iter().map(|p| if let Source::Region { sketch, .. } = &p.key { Some(*sketch) } else { None }).collect();
     let r = ev.apply_operation_from(tools, (!thin).then_some(&sketches[..]), &op, scope, BodyKind::Solid);
@@ -538,6 +545,22 @@ fn drawn_edge_directions(ev: &EvalCtx, t: NamedShape) -> FResult<NamedShape> {
         return Ok(t);
     }
     Ok(NamedShape { shape: k::reverse_edge_curves(&t.shape, &flip)?, names: t.names })
+}
+
+/// A New extrude's regions of one sketch in the sketch's drawing order, whatever the pick order: its parts are numbered
+/// so (live q-extrude-part-order-1119: two circles, three, two rectangles, both pick orders), a region placed by its outer
+/// loop's first drawn entity (welding 9c7704 Extrude 8: the disc inside the ring, its circle drawn first, is Part 5).
+fn in_drawing_order(ev: &EvalCtx, refs: &[Reference]) -> Vec<Reference> {
+    let mut out = refs.to_vec();
+    let Some(Reference::SketchRegion { sketch: first, .. }) = refs.first() else { return out };
+    if !refs.iter().all(|r| matches!(r, Reference::SketchRegion { sketch, .. } if sketch == first)) {
+        return out;
+    }
+    out.sort_by_cached_key(|r| {
+        let Reference::SketchRegion { sketch, key } = r else { return u32::MAX };
+        ev.resolve_region(*sketch, key).and_then(|(_, region)| region.outer.sources.iter().map(|s| s.entity.0).min()).unwrap_or(u32::MAX)
+    });
+    out
 }
 
 /// Extrude's domain from its regions (live q-flat-ops-1119): a region of a sketch on a sheet metal flat makes it the
