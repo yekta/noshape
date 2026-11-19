@@ -1544,6 +1544,12 @@ impl Workspace {
         }
     }
 
+    /// The bubble shown over a tab without its own message display.
+    #[cfg(test)]
+    pub(crate) fn toast(&self) -> Option<&(crate::ui::AlertKind, String)> {
+        self.toast.as_ref()
+    }
+
     /// The Versions and history flyout is open.
     #[cfg(test)]
     pub(crate) fn history_open(&self) -> bool {

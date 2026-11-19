@@ -220,7 +220,7 @@ fn the_versions_flyouts_open_state_carries_over_to_the_next_document(cx: &mut Te
 /// Import (live import-export-1118): the files are translated off the UI thread (the document unchanged until then);
 /// the Part Studio goes right after the active tab, the view stays, the file is kept in CAD Imports, and the bubble
 /// reads "<file> has been imported." with "Open document"; a file that doesn't translate is kept too, its bubble
-/// "<file> uploaded but failed to translate." with the same link.
+/// "<file> uploaded but failed to translate." with the same link, red (live rr-import-1118: alert-danger).
 #[gpui::test]
 fn an_import_translates_off_the_ui_thread_and_bubbles_as_live(cx: &mut TestAppContext) {
     let (w, ws, [_, _, _, c]) = workspace(cx, "import");
@@ -261,6 +261,8 @@ fn an_import_translates_off_the_ui_thread_and_bubbles_as_live(cx: &mut TestAppCo
     cx.run_until_parked();
     assert!(kept(cx, "broken.step"), "a file that didn't translate is kept too");
     assert!(doc.read_with(cx, |d, _| d.notice_link("broken.step uploaded but failed to translate.").is_some_and(|l| l.label == "Open document")));
+    let red = cx.update(|cx| ws.read(cx).toast().is_some_and(|(k, m)| *k == crate::ui::AlertKind::Error && m == "broken.step uploaded but failed to translate."));
+    assert!(red, "live's red bubble (rr-import-1118), not the info one");
     let _ = std::fs::remove_dir_all(&dir);
 }
 

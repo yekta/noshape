@@ -121,6 +121,12 @@ impl DocModel {
         cx.emit(DocEvent::Info(notice));
     }
 
+    /// An error notice (red, stays until ×) with a link after it.
+    pub fn error_with_link(&mut self, notice: String, label: &str, run: impl Fn(&mut Window, &mut App) + 'static, cx: &mut Context<Self>) {
+        self.notice_link = Some(NoticeLink { notice: notice.clone(), label: SharedString::from(label.to_string()), run: std::rc::Rc::new(run) });
+        cx.emit(DocEvent::Error(notice));
+    }
+
     /// The link of the notice `notice`, if it has one.
     pub fn notice_link(&self, notice: &str) -> Option<NoticeLink> {
         self.notice_link.clone().filter(|l| l.notice == notice)

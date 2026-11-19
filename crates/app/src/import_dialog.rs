@@ -330,7 +330,7 @@ pub fn reimport(doc: &Entity<DocModel>, path: PathBuf, cx: &mut App) {
 
 /// The files read on a background thread (the dialog closes at once; live shows no progress either, the tabs come when
 /// translated), then their tabs added after `after` and live's bubble: "<file> has been imported. Open document", or
-/// for a file that didn't translate "<file> uploaded but failed to translate. Open document" with the file kept in CAD
+/// for a file that didn't translate a red "<file> uploaded but failed to translate. Open document" with the file kept in CAD
 /// Imports (live import-export-1118); the reason goes to the Notifications bell (live IM3).
 pub(crate) fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<TabId>, keep_files: bool, cx: &mut App) {
     use noshape_ops::import as imp;
@@ -364,19 +364,23 @@ pub(crate) fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after
                     }
                 }
                 // The bubble's link shows what the import made: the new tab, or the kept file of one that failed.
-                let (notice, tab) = match (paths.as_slice(), errors.first()) {
-                    ([p], None) => (format!("{} has been imported.", file_name(p)), first),
-                    (_, Some(e)) => (failed_toast(e), import_name(e).and_then(|n| kept_file(&doc.session.doc, &n))),
+                // A file that didn't translate gets live's red bubble (rr-import-1118: alert-danger, stays until ×).
+                let (notice, tab, failed) = match (paths.as_slice(), errors.first()) {
+                    ([p], None) => (format!("{} has been imported.", file_name(p)), first, false),
+                    (_, Some(e)) => (failed_toast(e), import_name(e).and_then(|n| kept_file(&doc.session.doc, &n)), true),
                     _ => return,
                 };
-                match tab {
-                    Some(tab) => {
-                        let me = cx.entity().downgrade();
-                        doc.info_with_link(notice, "Open document", move |_, cx| {
-                            let _ = me.update(cx, |_, cx| cx.emit(DocEvent::Ui(noshape_ops::UiRequest::ActivateTab(tab))));
-                        }, cx);
-                    }
-                    None => cx.emit(DocEvent::Info(notice)),
+                let Some(tab) = tab else {
+                    cx.emit(if failed { DocEvent::Error(notice) } else { DocEvent::Info(notice) });
+                    return;
+                };
+                let me = cx.entity().downgrade();
+                let open = move |_: &mut Window, cx: &mut App| {
+                    let _ = me.update(cx, |_, cx| cx.emit(DocEvent::Ui(noshape_ops::UiRequest::ActivateTab(tab))));
+                };
+                match failed {
+                    true => doc.error_with_link(notice, "Open document", open, cx),
+                    false => doc.info_with_link(notice, "Open document", open, cx),
                 }
             });
         });
