@@ -16,26 +16,28 @@ Updated 2026-11-18 22:34 UTC. Restarted 11-17 09:20 after the lead's pause; comp
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2
 tools/tiers/land.sh --no-precheck`; builds / drawing-ui tests `NOSHAPE_RB_HOST=vibex8 tools/tiers/rb.sh`; ops e2e on
 the Mac; ui-parity on vibex7 / vibe2 via ~/bin/slot (vibex6 = watcher), one run per host.
-- Landed 11-18 (all): release dialog's associated drawings, dimension value on the pointer, projected / section
-  previews grey, section cut on inference points, tooltip fade, FS notice count (f0307a3e), tab switch test (794df283).
-- Landed 11-19 00:00 (21d8f791): the whole 11-18 stack (placement rows, GTOL leader + ⊕, part gone, lost dot, VS
-  Enter, Configurations box, release notice / Submit tooltip, session-1118 14a/b, toolbar tooltip redraw, shortcuts-1118).
-- Queued 11-19: live2 wake-1118: woken points while placing a GTOL / note (red ✕ stays, lines up 8 px not 12, only
-  woken points; INFER_REACH_PX 8.5), crop ✕ + line only in line with the first point (8 px), Measure units dropdown.
-- Queued 11-19 01:46 d9d1942f: Versions row tooltip beside the panel (HISTFEEL-CHANGE-TOOLTIP); tickets HISTFEEL /
-  VSFEEL / CFGFEEL / DRW-TOOLBAR-TOOLTIP-DELAY marked fixed, qa told to verify.
-- Asked live2 (REQUESTS 11-19): Measure units on a mm drawing; custom feature ✓ with an error.
-- fs1118b (vibex7 22:38 build): 116/116 scenarios, 602/602 states.
-- drw1118g (vibex7, 11-18 21:5x): 336/341; the rest are the known non-targets below and two with no recording
-  (drw-break-view-straight, drw-broken-out-offset). Running: fs-* rerun with the ui_busy wait (fs1118b, vibex7).
+- Landed 11-19: the 11-18 stack (21d8f791), live2 wake-1118 woken points / crop band / Measure units (9b5a7736),
+  Versions row tooltip (b03c752d), Measure units fixed order on a mm drawing (56357496).
+- Queued 11-19 03:35 166b521c: Measure readout as live (Line 1, Length: 40.00 mm, dual [1.575 in], Relation: Line);
+  Create Drawing of an assembly reads other documents (qa session-asm-1119: the bare regeneration was cached in
+  RECENT_SOURCES and reused: scale 1:2, BOM item 5 and its callout missing); VS Tab adds a typed name; view reach 13 px
+  (3.45 sheet mm); Checkbox input dialog; runner: a menu name never matches the start of a longer row; Insert view
+  no-match message; Dimension on an edge-on circle is linear.
+- Local, after 166b521c: a dimension on corners a chamfer cut away follows the replacing (outer) corners
+  (`Body::find_replaced_vertices`, drawings only); drawing_get "lost".
+- qa session-studio-1119 merge / restore: not a dialog bug. Ours reopens a document on its default workspace, so the
+  script's "Main › Open" fell back to "Open in new browser tab" (a second window). Asked live (REQUESTS 03:19) which
+  workspace live reopens on.
+- Live answers: custom feature ✓ with a field-naming error off, plain regenError on (ours already). VSFEEL-NAME-RED
+  is live's after-Enter mark (qa [x]).
+- Running: drw1119a (vibex8 slot, 02:47 build with the woken points): all drw-* scenarios.
+- fs1118b (vibex7 22:38 build): 116/116 scenarios, 602/602 states. drw1118g: 336/341 (known non-targets).
 - cf-spur-gear 0.4.58 → 0.4.59 (lead 11-18): cold-only, in our Boolean's free-form face grids (Once::call in rayon
   workers 50 → 1028 samples); bool's batch in the range; qa bisects (told). Scratch /root/studios-scratch/prof/s.
 - Not targets: replicate-region-place s21 (server toast), drw-revision-table-delete s8,
   drw-inspection-table-iso-scrolled s2; drw-canvas-zoom-to-sheet / drw-ref-pin-reference have no usable recording.
-- Open (GTOL retake): our ⌖ draws far smaller than live's ⊕ (likely the drawing text face has no ⌖ and sketch
-  `layout_drawing_text` falls back): needs a GD&T glyph in the drawing font path, exports too; the pink alignment line
-  (what it aligns to unclear). Crop ✕ condition unknown (live2), ours shows it while the profile is open.
-- Awaiting live2: Versions panel feel re-take (REQUESTS 11-18 19:53).
+- Open: the Measure readout of a point / circle pick ("Point 1", "Circle 1" names and rows are our guess); live2's
+  Measure takes covered a line only.
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
 - live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell
