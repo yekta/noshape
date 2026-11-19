@@ -6428,7 +6428,11 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                     // (A part of a cone's apex: at both its rulings' angles.)
                     if apex_part.contains(&w) || matches!(cx.faces[f].s, Surf::Nurbs { .. }) {
                         let at = places.entry(w).or_default();
-                        ends[k] = match at.iter().find(|x| (x.0 - q).length() <= 100.0 * tol) {
+                        // (A cone's apex within the tolerance: its places are its rulings' angles, exact, and closer than
+                        // 100 tol on a small cone (0.46 mm apart under an 11 um tolerance, corpus4 e72bf433's corner
+                        // blends).)
+                        let reach = if matches!(cx.faces[f].s, Surf::Nurbs { .. }) { 100.0 * tol } else { tol };
+                        ends[k] = match at.iter().find(|x| (x.0 - q).length() <= reach) {
                             Some(x) => x.1,
                             None => {
                                 pts.push(q);
