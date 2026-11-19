@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 13:35)
+# QA handoff (agent qa; current state only, updated 2026-11-19 21:08)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -91,15 +91,27 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    qa-psui-lod (heavy/psui-lod.sh: asm's LOD change 46edfa849 by subject "<agent>: HEAVY-ASM-SOFTWARE-FRAME, LOD side" -> vibex7 release
    builds of it + parent, runq.sh x5 alternating on local :154, wheel zoom / orbit first frame medians -> qa-alerts; P0 rule).
    Kept vibe2 ~/agents/qa-keep/{session-ps2-1119,studio-1119-recheck}.
-0000. **11-19 21:05 state (thread 40e853dc since 13:28).** Ids: lead 818534eb, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, live2
-   d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1. v0.4.61 = eb3b06a8 (cut GO 16:45 / 17:20), published 20:04; qa-pub-0461 running (candidate step
-   = released CLI vs itself: eb3b06a8's binary is gone; compare compat/rel-0.4.61.txt with compat/cut-1119-1615.txt by hand). Then the
-   spot-check rows 17-24 and the hover flow (Release checks 3-4).
-   Feel 11-19: 39 rows to owners (suites/1119-1610-eb3b06a8-uipr/rows.txt, live2 verdict per row): 33 confirmed, 4 stale takes retaken
-   (trims ae7a6d55 = ours on re-check 18:22; dimension-variable 1da77c2a), line-chain with skasm + live2, drw-constraint-tangent retake
-   60784916. dx export dialog verified 3/3 on 64566cd2 (17:38). Re-check tools: bin/uip-rerun.sh <names> <run> (vibe2 :691/692, qa-bisect),
-   bin/wait-rows.sh <subject regex> <since> <label> <scenarios> (waiter unit). LOD A/B done (faster). Corpus split re-saved 17:17
-   (= live 12/12); singularities / pipe wording noted in compat/accepted.txt. qa-night-seq-1120 armed for tonight; re-arm 1121 tomorrow.
+0000. **11-19 21:08 state (thread 40e853dc 13:28-21:08, moved off Motile by the lead; next qa thread on Bbedward).** Ids: lead
+   818534eb, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, live2 d7f4a0c2-c793-48d7-b749-13dbbe1dd3a1 (others as in the lead's prompt).
+   **In flight: qa-pub-0461** (bin/rel-pub-all.sh 0.4.60 0.4.61 ~/qa-rel/0.4.61/noshape-cli; v0.4.61 = eb3b06a8, published 20:04). SHA
+   OK at 21:07, now userdocs. Output: compat/published-0.4.61.txt (ends PUB-DONE; SHA, USERDOCS, QUIT-ABORT-DOCK x5 on vibe2, then the
+   compat loop's baseline moves to 0.4.61), compat/rel-0.4.61.txt (released CLI vs v0.4.60), logs compat/pub-0.4.61.out + relc-0.4.61.out,
+   and one "qa v0.4.61 published: …" line in /tmp/lead/qa-alerts. The candidate step compares the released CLI with itself (eb3b06a8's
+   binary is gone): compare rel-0.4.61.txt with compat/cut-1119-1615.txt (eb3b06a8 vs 0.4.60) by hand; any user-document change = P0 to
+   the lead. Then Release checks 3-4 (spot-check rows 17-24, hover flow).
+   Feel 11-19 (suite 1119-1242-223cec7e, rerun 1119-1610-eb3b06a8-uipr): 39 rows sent to owners as P0, live2 verdict per row in
+   suites/1119-1610-eb3b06a8-uipr/rows.txt: 33 confirmed ≠ live; 4 stale takes retaken (trims ae7a6d55 match ours, re-check 18:22;
+   dimension-variable 1da77c2a); open: sketch-line-chain (skasm + live2), drw-constraint-tangent retake 60784916 (live picks Tangent; ours
+   fails like the other drawing dropdowns). dx export dialog verified 3/3 on 64566cd2. TICKETS "Interaction feel suite 11-19" holds the
+   regressions (line-from-midpoint skasm, select-fillet-faces psui (live has no safe triangle), ver-row-tooltip + drw-copy-drag studios).
+   Next: re-check each owner's fix on its green with bin/wait-rows.sh <subject regex> <since> <label> <scenarios> (unit; uses
+   bin/uip-rerun.sh: vibe2 :691/:692, qa-bisect checkout, ~/tmp/qa/uip.lock; one alert line). The full 4-hourly suite run 1119-1302-291c74b0
+   (qa-suites loop) waits in vibex8's slot: compare it with suites-diff.py when done.
+   Done today: LOD A/B (asm 08ac528e6: zoom 530 -> 240, orbit 1191 -> 681 ms, faster); merge-dialog tab order verified (17c26dc1); cut GO
+   16:45 / 17:20 on eb3b06a8; split corpus copy re-saved 17:17 (= live 12/12, old in vibex7 ~/agents/qa-keep/corpus-bak-1119);
+   singularities volume + pipe Fillet wording noted in compat/accepted.txt; knifehandle Fillet 2 kernel message -> blend (low).
+   qa-psui-lod.sh builds through vibex7's slot (SLOT_MIN_GB=12) since earlyoom killed an LTO build there. qa-session-night is retired
+   (night-seq does it). qa-night-seq-1120 is armed for tonight; re-arm with 1121 tomorrow. bin/evwait.sh <units> = a wake-up helper.
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
    with NOSHAPE_PARITY_VALIDITY=1 (bin/suites-models.sh exports it) models.log prints per feature "CHECK <doc> feature <k>:
    <part> valid <true|false> raw f/e/v; ..." (PartState.check, query parts' "check"; not in report.json). suites-diff.py
