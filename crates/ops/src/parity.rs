@@ -8933,9 +8933,11 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 let fits = fits_of(p);
                 // By its name unless its volume fits other parts of ours and not that one (default names shift when
                 // ours has a part fewer: asm-welding-config's "Part 7" is our Part 6). (Not one another live part of that
-                // name took: asm-robotic-arm 07d06e's three "Part 1".)
+                // name took: asm-robotic-arm 07d06e's three "Part 1". Nor by the fit of a part another took: asm-isaac-ball
+                // c3fdd4's "Part 2" fits only our "Part 1", which live's "Part 1" took.)
                 let named: Vec<&(String, f64, String)> = solids.iter().filter(|(n, ..)| n == pname).collect();
-                let by_name = !named.is_empty() && named.iter().any(|s| !taken.contains(&s.2)) && (fits.is_empty() || fits.iter().any(|n| name_of(n) == pname));
+                let free_fits = fits.iter().any(|n| !taken.contains(n));
+                let by_name = !named.is_empty() && named.iter().any(|s| !taken.contains(&s.2)) && (!free_fits || fits.iter().any(|n| name_of(n) == pname));
                 // Several of ours by that name (asm-rack-pinion's two "Spur gear (8 teeth)"): one each, in order, by id;
                 // the first whose volume fits live's (asm-tvc-mount's SG90 import: 13 parts "….1_Peça", 2 to 2821 mm³).
                 let same = named;

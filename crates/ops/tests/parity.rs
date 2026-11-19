@@ -4012,6 +4012,39 @@ fn alike_named_live_parts_take_two_of_ours() {
     assert_eq!((r.bom_matching, r.bom_rows), (2, 2), "{r:?}");
 }
 
+/// Live's "Part 2" whose volume fits only our "Part 1", which live's "Part 1" already took (asm-isaac-ball c3fdd4: ours
+/// 4 mm³ over live's each): it is our "Part 2" by its name, not our "Part 1" twice.
+#[test]
+fn a_live_part_fitting_only_a_taken_part_of_ours_goes_by_its_name() {
+    let circle = |id: &str, x: f64| json!({ "btType": "BTMSketchCurve-4", "entityId": id, "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.004, "xCenter": x, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } });
+    let sketch = |f: &str, name: &str, c: Value| json!({ "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": f, "name": name,
+        "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+        "entities": [c], "constraints": [] });
+    let extrude = |f: &str, name: &str, of: &str, depth: &str| json!({ "btType": "BTMFeature-134", "featureType": "extrude", "featureId": f, "name": name, "parameters": [
+        { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+        { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualCreatedByQuery-137", "featureId": of, "entityType": "FACE" }] },
+        { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+        { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": depth }] });
+    let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [
+        sketch("FS1", "Sketch 1", circle("c1", 0.0)), extrude("FE1", "Extrude 1", "FS1", "20 mm"),
+        sketch("FS2", "Sketch 2", circle("c2", 0.03)), extrude("FE2", "Extrude 2", "FS2", "20.005 mm"),
+    ] });
+    // Ours: Part 1 v, Part 2 v * 1.00025. Live's Part 1 fits neither, live's Part 2 only our Part 1.
+    let v = std::f64::consts::PI * 0.004 * 0.004 * 0.02;
+    let parts = json!([{ "partId": "JGD", "name": "Part 1", "volume": [v * 0.9996, v * 0.9998] }, { "partId": "JpD", "name": "Part 2", "volume": [v * 0.99995, v * 1.0001] }]);
+    let at = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    let row = |n: &str| json!({ "itemSource": { "indentLevel": 0 }, "name": n, "quantity": 1, "partNumber": "", "description": "", "material": { "displayName": "" } });
+    let asm = json!({
+        "rootAssembly": {
+            "instances": [{ "id": "IA", "name": "Part 1 <1>", "type": "Part", "partId": "JGD", "elementId": "E1" }, { "id": "IB", "name": "Part 2 <1>", "type": "Part", "partId": "JpD", "elementId": "E1" }],
+            "occurrences": [{ "path": ["IA"], "fixed": true, "transform": at }, { "path": ["IB"], "fixed": true, "transform": at }] },
+        "features": { "features": [], "featureStates": {} },
+        "liveBom": { "root": { "bom": { "bomTable": { "items": [row("Part 1"), row("Part 2")] } } } } });
+    let mut ctx = Ctx::new();
+    let r = rebuild_assembly(&mut ctx, &scratch("fit-of-a-taken-part.noshape"), &asm, &[("E1".into(), studio, parts)]);
+    assert_eq!((r.bom_matching, r.bom_rows), (2, 2), "{r:?}");
+}
+
 /// Two parts one Extrude made, named by live, with live's per-feature lines but no volume band (asm-pattern-std
 /// 36b90f's AR-S1-108.2 / AR-S2-108.2): each is ours by the volume of live's line, not one part of ours for both.
 #[test]
