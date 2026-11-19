@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-19 07:07 UTC (new thread 20:05 after the account limit; ids: see How to run). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-19 10:45 UTC (new thread 20:05 after the account limit; ids: see How to run). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
@@ -16,27 +16,28 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
 - **Lead 11-19:** cpcurves Sweep 5's 8/9/2 (live splits the R16 circle into a CIRCLE arc + an OTHER curve) is live's
   representation, a known difference, not a target. Build hosts: the lowest 1-min load of vibex7/vibex8/vibe2 each
   time (DECISIONS a67911bef); private docs on vibex7 only.
-- **qa compat alert 814b48d8 (answered 07:05):** cpcurves Thicken 1 Ok -> "1 missing selection", Split 6 / mutualtrim
-  Fillet 1 message changes: stale saved corpus files (vibex7 ~/qa/corpus, saved 11-18 01:02 while Sweep 5-7 errored;
-  Thicken 1's 3 names hold one face twice, live's are 3 faces of 3 bodies). With live's references (models suite) all
-  keep their selections; qa to re-save. Real differences left: cpcurves 3D fit spline 4 tangency error (-> Sweep 8),
-  Split 3 names the wrong body "Curve 4"; mutualtrim Fillet 1 fails in the fillet (boolean) -> blend told.
-- **core-rp branch core-ring3 (on ec1882ba + skasm's 42b253d43 cherry-picked; NOT landed, has PROBE prints):**
-  (a) P0 (lead): a loft whose sections have different edge counts is refused before OCCT's unchecked ThruSections
-  (it crashed, signal 11): kernel T1 features::a_loft_whose_cut_sections_dont_match_is_refused_not_crashed on
-  tests/data/loft/wave-washer-ring.brep. (b) wave-washer ring: a closed path round 3+ profiles closes the loft: path
-  reopened at the first profile, one pipe per profile pair on its own open stretch (one pipe on a closed path ran
-  round past its sections), binormal fixed to the ring's axis (the Frenet frame twisted sections a quarter turn),
-  sections cut upright, smoothing on for closed path lofts (unsmoothed overshoots 14 %). T1 features_a::
-  a_path_loft_round_four_profiles_on_a_closed_path_is_a_ring (Pappus within 0.5 %) passes. The doc: OK but 2579 vs
-  live 2080.82 mm3: must not land as a wrong Ok (DECISIONS); land (a) alone if (b) stays off. (c) Thicken: one-sided
-  thicken of a sheet with a sharp inner edge uses OCCT's MakeOffset thickening, intersection join (simple offset kept
-  each face's offset whole): split Thicken 1 16022 -> 14511 (live 14590.06); kernel T1 features::a_sheets_faces_
-  meeting_at_an_angle_... (L sheet 380 / 420). Rest 0.5 %: walls JSe/JSm meet at a 5.3 deg kink; OCCT's edge between
-  their offsets is slanted (tol 0.29 mm) where it should be a vertical line; live's top edges lie on ours (edges.json).
-  Needs a model-suite A/B before landing (thicken is everywhere).
-- **Next:** finish ring (b) or land (a)+(c) without it; cpcurves 3D fit spline 4 + Split 3 body names; nuts: bool2's
-  fan fix 0bfc1ed0 is on main (Sweep 1 OK): re-run nuts vs live 135.268 mm3 / 29 faces, then decide nuts3 59df02227.
+- **LANDED 11-19:** Hole from the part leaves material above its start whole 7bf5efe3 (qa P1 session-ps2-1119; qa asked
+  to verify); surface sweep of an open profile faces profile tangent x path direction + fit spline end along an edge
+  82c035b7a (cpcurves fit spline 4, Sweep 8, Split 8, Split 5 errors gone; qa asked to re-save its stale corpus file).
+- **QUEUED 11-19:** loft sections of different edge counts refused before OCCT's unchecked loft e7db6358 (P0: a path
+  loft bent tighter than its profiles crashed the kernel, signal 11; T1 features::a_loft_whose_cut_sections_dont_
+  match_is_refused_not_crashed; full suite = main). Thicken one-sided intersection join 9d391e4c (split 11/12 -> 12/12;
+  private docs ALL-SAME; corpus singularities Thicken - Successful 15486.55 -> 20084.54 = A t - L t^2 exactly).
+- **qa compat alert 814b48d8:** stale corpus file (Thicken 1's 3 names hold one face twice); real differences fixed in
+  82c035b7a except cpcurves Split 3 past Swe 5 (Part 2 5/6/4 vs live 9/14/6); mutualtrim Fillet 1 -> blend.
+- **nuts (c2-config-parts-nuts):** on main Sweep 1 volume = live (135.2676), faces 29 = live; one face type off: live's
+  thread crest is an exact cylinder, ours OCCT's B-spline (also Revolve 2, Part Number 1). nuts3 59df02227 stays
+  dropped. WIP core-loft branch core-helixcyl 9c5711eab turns a helical sweep's crest/root into exact cylinders (kernel
+  T1 a_helical_teeths_crest_and_root_are_cylinders passes, Pappus volume) but OCCT's Boolean of a cylinder face wrapping
+  22 turns is invalid (thread::helical_teeth_add_to_the_core): parked. Probes vibex8 ~/tmp/core/nutsrec (ftypes, cylfit).
+- **Ring (core-rp branch core-ring3, rebased on main bfe09bcd5 with skasm's Sketch 4; uncommitted, PROBEs + env
+  NOSHAPE_RING_MODE):** path reopened at the first profile, a pipe per profile pair, binormal = ring axis, upright
+  cuts, smoothing on. T1 a_path_loft_round_four_profiles_on_a_closed_path_is_a_ring passes; wave-washer Loft 1 2126.10
+  vs live 2080.82 mm3 (+2.2 %, live banks its mid sections ~6 deg), 1.5 s vs live 67 ms: not landable (wrong Ok).
+- **live2 audit 3a4807fbd (docs/parity/missing-commands-1119.md row 4, low):** Routing curve multi-point edit: hidden
+  multiDx/multiDy/multiDz/multiRotationMatrix (step POINTS, pointsEditType MULTI) move the selected points together;
+  spec onshape-research/live/audit-1119/ps-featurespecs.json, std routingCurve.fs. Schema + evaluator; manipulator with psui.
+- **Next:** nuts: bool2's fan fix 0bfc1ed0 is on main: re-run nuts vs live 135.268 mm3 / 29 faces, decide nuts3 59df02227.
 - **Volume measure warning:** on impeller parts OCCT's plain Gauss VolumeProperties is ~1.2 % off (input 97755.8 vs
   mesh-converged ~96555, kernel props 95977.8 after the delete ~= mesh): the old "OCCT 97123.4" targets were plain
   Gauss. Compare with kernel props (replay prints them) or vibex7 ~/tmp/core/imp/mvol (mesh).
