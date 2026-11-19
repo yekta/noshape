@@ -1726,3 +1726,20 @@ fn an_impeller_lofts_shell_as_live() {
         assert!(near < 1e-3, "the rim's corner by live's {live:?}: {near} mm off");
     }
 }
+
+/// qa's weld-fillet document (SHELL-AFTER-WELD-FILLET), Part 3 before Shell 3 (its input as live's export, 342822.058
+/// mm3): 5 mm inward without its 45.96 mm2 chamfer face. One solid: on Linux the slabs also left a -0.001 mm3
+/// inside-out sliver beside the wall and the feature failed ("Could not shell part with selections."); live builds it.
+/// (Live's volume is 183072.3 mm3; ours is 30.6 mm3 under it, a gap of its own.)
+#[test]
+fn a_weld_fillet_part_shells_to_one_solid_without_its_inverted_sliver() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_brep(&dir.join("weld-fillet-part3-input.brep")).unwrap();
+    set_working_scale(1000.0).unwrap();
+    let rm: Vec<Shape> = s.faces().into_iter().filter(|f| (f.area().unwrap() * 1e6 - 45.9619).abs() < 1e-3 && f.centroid().unwrap().distance(DVec3::new(59.5026, -22.7487, -19.4974) * 1e-3) < 1e-6).collect();
+    assert_eq!(rm.len(), 1);
+    let r = shell_solid(&s, &rm, 0.005, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+    assert_eq!(r.count(ShapeType::Solid), 1);
+    let v = vol(&r) * 1e9;
+    assert!(r.is_valid() && (v - 183072.3).abs() < 2e-4 * 183072.3, "{v} mm3");
+}
