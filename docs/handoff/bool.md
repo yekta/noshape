@@ -4,41 +4,27 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-19 22:30 UTC (fresh bool thread after the 17:30-21:10 usage stall). Hosts by load (DECISIONS 11-19): read
+Updated 11-19 23:12 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2; builds + probes on the Mac (NOSHAPE_RB_HOST=mac,
 inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host; land queue vibe2
 (`NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`); private docs only vibex7 ~/lead-private. Never kill a process
-tree from a computed pid: `systemctl stop <unit>`.
+tree from a computed pid: `systemctl stop <unit>`. Agent ids: only /root/lead-scratch/roster.md (read before messaging).
 
-## Order (lead 11-19 20:41)
-1. bool-stack7 land. 2. HOLE-THROUGH-ROUND-POLE (TICKETS). 3. bool2-exact (below). 4. live2's Shell 3 ticket
-(P2 SHELL-AFTER-WELD-FILLET). 5. the rest by P0/P1: Shell end-to-end list (9 -> under 5 by 11-20 18:00), decline
-reasons ranked, speed list. Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
+## Order (lead 11-19 23:00)
+1. bool-stack7 land. 2. bool-pole2 land, then asm re-checks isaac Fastened 43. 3. "+1 face" shells' final unify (and
+f815832c's 22 faces vs live's 16). 4. Shell 3 Linux 2-solid split. 5. bool2-exact (below). 6. the rest by P0/P1.
+Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
 ## In flight
-- bool-stack7 (34 commits; tip 50e41e425 on main 0bfc1ed03): gate 1c8b8f4cf clean (replay taken 3044 -> 3138 +94 -0,
-  differing 6 -> 6; suite features 1332 -> 1336; crate tests pass; hats/dock SAME, udoc-1c8b8f4cf.out); knurls not run
-  in the gate (31 GB host). Knurls ours-only main vs branch: unit bool-kn-s7 (/root/bool-scratch/kn-s7.sh, runs on
-  vibex7 ~/tmp/bool/kn7 via slot; `journalctl -u bool-kn-s7`; "diff-lines 0" per knurl = clean).
-  Rebased on main 8403d168f as branch bool-land7 (worktree bool-tube; pushed origin/bool-land7), tip 07c3dc068. Four
-  conflicts: main's 9f550d1ad touch_only kept, with the stack's "only sheets decline a shared shape" on top; arrange's
-  -π directions = main's a1509406f (same case 553beda0); the plane / curved sheets' empty common = the stack's (adds
-  sphere, torus to main's e466cfa77); the cylinder face's angles = main's 1b382d666. Re-gate: unit
-  bool-gate-07c3dc068-x8 -> /root/bool-hat-scratch/chain-07c3dc068.out. Clean (and knurls clean) -> land from
-  bool-tube (`git switch bool-land7` first; the gate detaches it), then tell dx / core / blend / asm.
-- HOLE-THROUGH-ROUND-POLE: FIXED on bool-pole e87b6b170 (T1 bool_patterns::a_hole_down_a_corner_rounds_axis_through_its_ball;
-  case 0ea218c03ac1f745 in tests/data/booleans). Cause: OCCT's section of the hole's wall and the x bottom round is
-  empty (the y round's mirror pair gets the curve), so OCCT's cut keeps pieces inside the hole (an edge of 4 faces,
-  removes the whole 311 mm3) and ours declined. Fix: occt_sections, when no curve and the boundaries meet once, adds
-  where either face's edges pierce the other's cylinder / cone (edges_piercing) as seeds; seeded_sections, when the
-  seeded walk still finds none, intersects the surfaces over each face's uv box grown by a tenth; ours trims. Ours
-  removes 302.235 mm3 (exact integral 302.234; live's isaac cut 303.7 on its own geometry). Kernel 519 + brep 64 pass
-  (Mac), g++-13 ok. In the combined gate below. After it lands: tell asm (isaac 98/129 mates re-check).
-- bool-pole2 (worktree bool-docs, origin/bool-pole2, tip 330ea2052) = bool-land7 + bool-pole's 6 + e87b6b170. Gate
-  unit bool-gate-330ea2052-x7 (vibex7, gate.sh from bool-docs) -> /root/bool-hat-scratch/chain-330ea2052.out. It
-  also needs the knurls + hats/dock (udoc) before landing.
-- bool-pole (bool-hat, 6 commits on bool-stack7, tip 0d465cb70; rebase on bool-land7 after it lands; then its own
-  gate with the Shell check + udoc):
+- bool-land7 (= bool-stack7 rebased on main 8403d168f; worktree bool-tube, origin/bool-land7, tip 07c3dc068): gate
+  clean except the knurls. Running: unit bool-kn-s7b (/root/bool-scratch/kn-s7b.sh -> kn-s7b.out, "diff-lines 0" per
+  knurl = clean, ends KN-S7B-DONE) and unit bool-udoc-s7b (udoc-s7b.sh -> /root/bool-hat-scratch/udoc-07c3dc068.out,
+  all SAME, ends UDOC-DONE). Both clean -> in bool-tube `git switch bool-land7`, read `git diff --stat
+  $(git merge-base HEAD origin/main) HEAD`, land.sh; tell the lead in the same turn, then dx / core / blend / asm.
+- bool-pole2 (worktree bool-docs, origin/bool-pole2, tip 330ea2052) = bool-land7 + bool-pole's 6 + e87b6b170
+  (HOLE-THROUGH-ROUND-POLE: fixed, asm's repro 302.235 vs exact 302.234 mm3). Gate unit bool-gate-330ea2052-x7 ->
+  /root/bool-hat-scratch/chain-330ea2052.out (vibex7, waiting on the slot). Then knurls + udoc, land, tell asm.
+- bool-pole's 6 commits (now in bool-pole2):
   e4f8a8066 a sphere's pole edge split at the curves ending there (non-manifold cdd336b4 taken = OCCT);
   01775a048 straight edges in a row share one Geom_Line (unify joins them as OCCT's);
   fb3d29a2a Face Generated Vertex for every argument's coplanar face (0 new differences);
@@ -48,36 +34,35 @@ reasons ranked, speed list. Daily report: share as "ours N/M (general, direct), 
   b359e025, cb7bb22b, e1dc8c98, f1c35250, f302ef40; Shell corpus 1451f7cb, 43a947f0, 96d45f42, 9bee135f, c25f7a31.
   afcf858f3 slab union history differing only in vertex records = equivalent (lead 11-19); 0d465cb70 the gate's
   end-to-end Shell check (gate-host.py SHELLS / SHELLS_KNOWN).
-- Shell end to end (lead: 9 -> under 5 by 11-20 18:00, else tell the lead). Ours vs OCCT-only over core's 211 fuzz
-  shells (Mac bool-keep/shellcorpus): bool-pole differs in 9: 13186b07 b64c8b4e 9134b29f 8eebe1e2 (+1 face), f815832c
-  (+1 face, vol 5e-4), 8e657637 (+26 edges), b79e508b (-1 edge), 17488d26 (vol 5e-5), 99b55ec9 (vol 2e-8). Per shell:
-  - f815832c: Common 9e2bf7c0: ours 2.719411e-6 vs OCCT 2.720903e-6 m3, 59 vs 58 faces; probe_who_is_right: ours right
-    at 7 of 8 grid points. Likely OCCT's error: decision needed (lead).
-  - 17488d26 (and 7724 / 86b50d59): 36-slab union; coincident cylinder faces arg9 Face4 / arg24 Face2: OCCT Deleted,
-    ours Modified to both halves. Next: OCCT's same-domain representative (BOPAlgo_Builder_2.cxx FillSameDomainFaces).
-  - Unify family: b79e508b = 4dc6b1d4, da3ee477 / 71ca, f97ca580, 3b56cb83, 75780985 (tried and dropped: lines shared
-    per section; first argument's piece always; OCCT's rule literally; declining coincident cylinders).
-  - 99b55ec9: Common df5e46e1 equivalent (1.7e-8) but the Shell's volume string differs.
-  Scripts: /root/bool-scratch/shc-e2e2.sh <bin> <runs>, mac-shell-env.sh <bin> <ENV..>, mac-ab-vs.sh. Probes: xprobe
-  probe_who_is_right, probe_faces_on_plane, probe_edges_on_line, probe_unified_edges.
-- live2's Shell 3 ticket (P2 SHELL-AFTER-WELD-FILLET): platform-only. ops xshell3 (instrumented, bool-hat
-  uncommitted: crates/ops/tests/xshell3.rs, `mod xshell3;`, detail.rs DBGSHELL / DBGBLEND; patch
-  /root/bool-scratch/hat-dbg3.diff) on the Mac, main 91df536c0 and bool-pole2 alike: Fillet 1 Ok, Shell 3 Ok (parts 2
-  and 1 at 5 mm, both whole), the document 9.6 s. Linux release CLI (bool2-ab, has blend 92c8595b0): Shell 3 "Could
-  not shell part with selections.", 46-50 s; NOT the 30 s blend budget (NOSHAPE_BLEND_BUDGET=300 same). Running: the
-  instrumented ops test on Linux (vibe2 rb.sh, ~/tmp/bool/sh3) to see which part / check fails there.
-- Shell end to end: 69d3e1059 (bool-hat branch sh3-probe on 330ea2052; cherry-pick onto bool-pole2 after its gate):
-  the gate's Shell check takes volumes within 1e-7 relative as the same (the replay's); 99b55ec9 off SHELLS_KNOWN
-  (8.5e-8 apart, same faces / edges / history) -> 8 differing. Unify family (13186b07 b64c8b4e 9134b29f 8eebe1e2, all
-  +1 face +3 edges +2 vertices, same volume): 8eebe1e2's slab union da3ee477 puts the x 60..62 coincident cylinder
-  pieces on arg 9's / 10's surfaces (ours' "later argument in a fuse of 4+" rank), OCCT on arg 7's / 8's
-  (FillSameDomainFaces: unsplit original by least DS index, else the least index's piece). Scratch toggle
-  NOSHAPE_SD_RULE (bool-hat boolean.rs, uncommitted): 1 = OCCT's literal rule in fuses -> ours9 replay 6 -> 5
-  differing (da3ee477, 3b56cb83 = OCCT), Shell recordings 2ea4 / 4776 / bd8e newly differ, e2e unchanged: the union
-  and the Common then match OCCT's piece for piece, but the Shell's own ShapeUpgrade unify (shell.cpp after the
-  common, (r, true, true, false), lin tol 1e-7) merges ours' common 80 -> 22 faces, OCCT's 80 -> 21 (our
-  unify_same_domain wrapper gives both the same). Next: which pair the raw unify won't merge on ours' (edges / pcurves
-  of the converted result; dumps Mac bool-keep/dbg8-{rust1,occt}-common.brep, scratch print in shell.cpp).
+- bool-hat branch sh3-probe on 330ea2052: 69d3e1059 (the gate's Shell check takes volumes within 1e-7 relative as the
+  same; 99b55ec9 off SHELLS_KNOWN) and fb1ddd780 (Shell's slab unify, usd_any_order in boolean.cpp: where raw USD
+  leaves two faces on one cylinder apart, again with the faces reordered (faces_reordered k 1..3), fewest faces of the
+  same volume, valid). Cause of the "+1 face" family: in ours' face order USD moves the +x half of 8eebe1e2's R14 wall
+  onto the other half's cylinder with u -2pi off ([-pi, -2.11] for [pi, 4.17]), the shared edge reads as a seam, no
+  merge. Mac A/B (Shell corpus end to end, 211): 13186b07 b64c8b4e 9134b29f 8eebe1e2 now = OCCT (faces, edges,
+  history); OCCT's own results unchanged. Differing 8 -> 4 (17488d26, b79e508b, f815832c; 99b55ec9 the same under
+  69d3e1059's tolerance) = 3. Needs its own gate after bool-pole2 lands (or gate fb1ddd780, which includes pole2).
+  A second plain USD pass (NOSHAPE_SHELL_UNIFY2) was tried: fixes none, adds ae90ae72.
+- f815832c vs live (live/bool/q-f815/answers.txt: 2720.05 mm3, 16 faces; ours 2719.41 / 22, OCCT 2720.90 / 21). The
+  removed face is the R6 hole wall (face 4 of the case). Live's opening through the 0.5 mm 45-degree wall is one
+  cylinder face (25.28 mm2); ours is 7 faces there (cylinder 13.46 + 3.51, linear extrusions 0.06 / 3.74 / 3.80, two
+  0.09 mm2 planes): the planar face's slab, swept along its normal, ends obliquely at the hole's ellipse edge and
+  leaves a crescent of wall out. Trying (bool-hat working copy, NOSHAPE_SHELL_HOLE_PLUG): oblique_hole_plugs adds the
+  hole's ellipse section of the plane swept as the slab; the common trims it at the hole. A/B /root/bool-scratch/u4.sh.
+  Keep f815832c on SHELLS_KNOWN until ours = live.
+- Remaining Shell differences: 17488d26 (36-slab union, coincident cylinder faces arg9 Face4 / arg24 Face2: OCCT
+  Deleted, ours Modified to both; OCCT's same-domain representative, BOPAlgo_Builder_2.cxx FillSameDomainFaces);
+  b79e508b (-1 edge, unify family 4dc6b1d4 / da3ee477 / f97ca580 / 3b56cb83 / 75780985). Scratch toggle
+  NOSHAPE_SD_RULE (bool-hat boolean.rs): 1 = OCCT's literal rule in fuses, 2 = tree off; neither fixes the e2e list.
+  Scripts: /root/bool-scratch/u3.sh, u4.sh, shc-e2e2.sh, mac-shell-env.sh. Probes (xprobe, Mac bin/u4):
+  probe_list_faces (PROBE_A/B), probe_edges_at (PROBE_AT), probe_shell_case_faces (SHELL_CASE), probe_who_is_right.
+- live2's Shell 3 ticket (P2 SHELL-AFTER-WELD-FILLET): Mac Ok; Linux (vibe2, instrumented ops xshell3, doc
+  ~/tmp/bool/sh3/d.noshape) part 2 at 5 mm gives 2 solids: 183041.69 mm3 and an inside-out -0.00097 mm3 sliver, so
+  the feature's solid-count check fails. Fix in the bool-hat working copy: without_inverted_slivers at
+  op_shell_solid's exit (drops inside-out solids under 1e-2 t^3 beside others). Running: the Linux xshell3 with it
+  (task output; then commit, gate with the next Shell change). Debug (never commit): detail.rs DBGSHELL / DBGBLEND,
+  crates/ops/tests/xshell3.rs + `mod xshell3;`, shell.cpp NOSHAPE_SHELL_DEBUG dumps; full diff
+  /root/bool-scratch/hat-wip-2320.diff.
 
 ## From bool2 (owned since 11-19 20:45)
 - Landed 11-19: 41fcfd2c bool2-cbs (closed B-spline faces' period; 2a5740b0 gate exception backed by live capture
