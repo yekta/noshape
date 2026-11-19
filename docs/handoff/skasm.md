@@ -1,9 +1,9 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 21:47 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 22:45 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight 21:47: one land after suite M (vibex7, /root/skasm-scratch/suitem.out, log ~/agents/skasm-keep/suite-M-*.log)
+## In flight 22:45: one land after suite N (vibe2, /root/skasm-scratch/suiten.out, log ~/agents/skasm-keep/suite-N-*.log on vibe2; M was stopped unrun)
 Compare per document with suite J (vibex7 ~/tmp/skasm/suite-J-1119-1831.log.s.c: `sed` the "name: N/M features match"
 lines to "name N/M", LC_ALL=C sort, join, awk $2!=$3). None worse -> land.sh. The stack:
 - Extrude part order (3ff5480f): a New extrude's regions of one sketch go in drawing order (the lowest entity id of each
@@ -19,8 +19,15 @@ lines to "name N/M", LC_ALL=C sort, join, awk $2!=$3). None worse -> land.sh. Th
   clippy clean.
 - Feel tests: drawing on a face (`a_rectangle_drawn_on_a_face_is_solved_in_the_closing_clicks_frame`), Insert image's
   dialog + aspect (sketch tools matrix row), session 2d iso dimension placement; interaction-feel rows updated.
-- Open: live's A-rect (Corner 1 Rectangle at the vertex nearest (60, 0, 2) on sm-box): ours "Sheet metal corner not
-  found." there (our nearest vertex is (60, 0, 4)); the cut-face creators are Corner 1's in live. Not pinned yet.
+- A-rect corner (40c9ed20): sm-box's automatic miter leaves the bends a thickness-long plate stub apart; evCornerType
+  took the lone bend end as NOT_A_CORNER ("Sheet metal corner not found."). Now OPEN_CORNER with the stub's far end;
+  a Rectangle Corner override there cuts both bends' corner (corner_reliefs `mate`, the far bend clipped from its own
+  end); a moved bend end beside its kept bend takes the definition creator (Flange 1 / 2). Live's 28 / 62 / 36 and 8
+  creator pins: `a_corner_reliefs_cut_faces_are_the_corner_features`. Only with a Corner override (live's sm-box has
+  no default cut there: 23 faces both); whether a model default Rectangle cuts a mitred corner: not captured.
+- Offset distance (81be4f10, qa P1 OFFSET-EDIT-SCALES-SKETCH): an OffsetPair's Distance is no first dimension; its
+  edit moves the sources, copies stay (live psb 10-24 j (c)). scene `an_offsets_new_distance_moves_the_source_...`.
+- Search tools Alt+C row test (e9643735, sketch tools matrix).
 - sketch-vertical-key: psui's (lead 21:2x): the start view is live's Trimetric; the 11-06 take's zoom differs. After
   cf70e676 lands psui reruns; a gap left is the reach measure, mine with psui. No re-baseline.
 
