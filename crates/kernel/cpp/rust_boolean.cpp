@@ -23,6 +23,7 @@
 #include <BRepCheck_Shell.hxx>
 #include <BRepCheck_Solid.hxx>
 #include <BRepAdaptor_Curve.hxx>
+#include <BRepClass_FaceClassifier.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <BRepTools_WireExplorer.hxx>
 #include <BRepLib.hxx>
@@ -7077,7 +7078,8 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   // Kept as they are where everything at them is shared (an edge whose faces are all shared, in every argument, its
   // vertices with only such edges; a face with only such edges): OCCT keeps those. Where two other arguments' faces
   // on different planes meet one, their section reaches it and OCCT remakes it (Modified, at the same place: it never
-  // changes an input's tolerance), with the edges and faces on it: ours remakes it too. Where only faces on one plane
+  // changes an input's tolerance), with the edges and faces on it: ours remakes it too; where they only touch it (their
+  // section is it), OCCT keeps it, ours too (788f0e94: two plates sharing an edge, fused). Where only faces on one plane
   // meet it, OCCT keeps or remakes it as its rounding falls (corpus2 4006f865 kept, 1b2319a3 one corner remade, its
   // mirror image kept), and other surfaces aren't read here: declined.
   if (!shared.empty())
@@ -7133,7 +7135,51 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
       const gp_Pln pa = sa.Plane(), pb = sb.Plane();
       return pa.Axis().Direction().IsParallel(pb.Axis().Direction(), 1e-9) && pa.Distance(pb.Location()) <= 1e-7 ? 1 : 0;
     };
-    // 1: no section reaches it; 0: one may; -1: unknown.
+    // Two faces on different planes, each with `x` on its boundary, meeting only there (or, at a vertex, along a
+    // shared edge at it): their section is `x` itself and doesn't reach past it (two plates touching along a shared
+    // edge, each one's faces either side of it: OCCT keeps both as they were). A straight edge's planes meet along its
+    // line; at a vertex, a micrometre either way along the planes' line is in neither face or on a shared edge.
+    auto touch_only = [&](const TopoDS_Shape& x, bool vertex, const TopoDS_Face& fa, const TopoDS_Face& fb) {
+      if (!vertex)
+        return BRepAdaptor_Curve(TopoDS::Edge(x)).GetType() == GeomAbs_Line;
+      const gp_Pnt v = BRep_Tool::Pnt(TopoDS::Vertex(x));
+      const gp_Vec d = gp_Vec(BRepAdaptor_Surface(fa, false).Plane().Axis().Direction()).Crossed(gp_Vec(BRepAdaptor_Surface(fb, false).Plane().Axis().Direction()));
+      if (d.Magnitude() < 1e-9)
+        return false;
+      const gp_Vec u = d.Normalized();
+      // (Along a shared straight edge leaving the vertex that way.)
+      auto along_shared = [&](const gp_Vec& w) {
+        for (size_t i = 0; i < args.size(); ++i)
+          if (const NCollection_List<TopoDS_Shape>* l = ve[i].Seek(x))
+            for (const TopoDS_Shape& e : *l)
+            {
+              if (!is_shared(e) || BRepAdaptor_Curve(TopoDS::Edge(e)).GetType() != GeomAbs_Line)
+                continue;
+              TopoDS_Vertex v0, v1;
+              TopExp::Vertices(TopoDS::Edge(e), v0, v1);
+              const TopoDS_Vertex& other = v0.IsSame(x) ? v1 : v0;
+              if (other.IsNull())
+                continue;
+              const gp_Vec g(v, BRep_Tool::Pnt(other));
+              if (g.Magnitude() > 0 && g.Normalized().Crossed(w).Magnitude() < 1e-9 && g.Dot(w) > 0)
+                return true;
+            }
+        return false;
+      };
+      for (const double side : {1.0, -1.0})
+      {
+        const gp_Pnt q = v.Translated(u * (side * 1e-6));
+        const auto in = [&](const TopoDS_Face& f) {
+          const TopAbs_State st = BRepClass_FaceClassifier(f, q, 1e-7).State();
+          return st == TopAbs_IN || st == TopAbs_ON;
+        };
+        if (in(fa) && in(fb) && !along_shared(u * side))
+          return false;
+      }
+      return true;
+    };
+    // 2: faces on different planes touch it only (any others on one plane); 1: only faces on one plane meet it; 0: a
+    // section may reach it; -1: unknown.
     auto quiet = [&](const TopoDS_Shape& x, bool vertex) {
       std::vector<std::pair<size_t, TopoDS_Face>> own;
       for (size_t i = 0; i < args.size(); ++i)
@@ -7141,21 +7187,30 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
           for (const TopoDS_Shape& f : *l)
             if (!is_shared(f))
               own.emplace_back(i, TopoDS::Face(f));
-      int r = 1;
+      bool unknown = false, reach = false, touch = false;
       for (size_t a = 0; a < own.size(); ++a)
         for (size_t b = a + 1; b < own.size(); ++b)
           if (own[a].first != own[b].first)
-            r = std::min(r, one_plane(own[a].second, own[b].second));
-      return r;
+          {
+            const int p = one_plane(own[a].second, own[b].second);
+            if (p < 0)
+              unknown = true;
+            else if (p == 0 && touch_only(x, vertex, own[a].second, own[b].second))
+              touch = true;
+            else if (p == 0)
+              reach = true;
+          }
+      return unknown ? -1 : reach ? 0 : touch ? 2 : 1;
     };
     const TopAbs_ShapeEnum kinds[] = {TopAbs_VERTEX, TopAbs_EDGE, TopAbs_FACE};
     std::vector<uint32_t> steady;
     for (size_t k = 0; k + 4 < shared.size(); k += 5)
     {
       const TopoDS_Shape& x = input(srcs, shared[k + 1], kinds[shared[k]], shared[k + 2]);
-      if (shared[k] == 0 ? vertex_kept(x) : shared[k] == 1 ? edge_kept(x) : face_kept(x))
+      const int q = shared[k] < 2 ? quiet(x, shared[k] == 0) : 0;
+      if ((shared[k] == 0 ? vertex_kept(x) : shared[k] == 1 ? edge_kept(x) : face_kept(x)) || q == 2)
         steady.insert(steady.end(), shared.begin() + static_cast<std::ptrdiff_t>(k), shared.begin() + static_cast<std::ptrdiff_t>(k + 5));
-      else if (shared[k] < 2 && quiet(x, shared[k] == 0) != 0)
+      else if (shared[k] < 2 && q != 0)
         return decline("a shared shape OCCT may keep or remake");
     }
     shared = std::move(steady);

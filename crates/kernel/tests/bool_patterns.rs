@@ -3126,3 +3126,20 @@ fn a_cylinder_sheet_and_a_plane_sheet_have_no_common() {
 fn a_rounding_cut_tangent_to_a_blocks_walls_keeps_both_end_faces_as_occt() {
     recorded_as_occt("553beda0e7f5810f", 1e-9);
 }
+
+/// Two plates sharing one edge, fused (recorded): they only touch along it, so OCCT keeps both solids as they were,
+/// that edge shared by four faces, and every input Kept; ours did too only where nothing was shared ("a non-manifold
+/// result": the shared edge was taken for one OCCT remakes).
+#[test]
+fn plates_sharing_an_edge_fuse_as_they_were() {
+    recorded_as_occt("788f0e94f9c8c9d8", 1e-9);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "788f0e94f9c8c9d8").expect("the recorded Boolean");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    k::set_rust_boolean_only(false);
+    let r = r.expect("ours");
+    assert_eq!(r.shape.count(k::ShapeType::Solid), 2);
+    let changed: Vec<_> = r.history.records.iter().filter(|h| h.relation != k::Relation::Kept).collect();
+    assert!(changed.is_empty(), "{changed:?}");
+}

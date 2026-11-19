@@ -7097,9 +7097,11 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             continue;
         }
         let users: Vec<usize> = kept.iter().copied().filter(|&p| !pieces[p].inner.contains(&s) && pieces[p].loops.iter().flatten().any(|x| x.0 == s)).collect();
-        // (Not two arguments' whole edges lying on one another: OCCT keeps both solids as they were there.)
+        // (Not two arguments' whole edges lying on one another, other than one edge they share: OCCT keeps both solids
+        // as they were there.)
         let o = &sedges[s].origins;
-        let whole_pair = o.iter().map(|&e| cx.edges[e].arg).collect::<HashSet<u32>>().len() > 1 && o.iter().all(|&e| edge_pieces[e].len() == 1);
+        let one = |e: usize| shared.edge((cx.edges[e].arg, cx.edges[e].index));
+        let whole_pair = o.iter().map(|&e| cx.edges[e].arg).collect::<HashSet<u32>>().len() > 1 && o.iter().all(|&e| edge_pieces[e].len() == 1) && !o.iter().all(|&e| one(e) == one(o[0]));
         let Some(pairs) = (users.len() == 4 && u[0] == 2 && !whole_pair).then(|| across_material(&cx, &sedges[s].seg, s, &users, &pieces, &keep)).flatten() else {
             return Err(Decline("a non-manifold result"));
         };
