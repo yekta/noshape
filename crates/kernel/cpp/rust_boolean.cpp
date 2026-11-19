@@ -2101,9 +2101,19 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           bb.UpdateEdge(es[k], pf, BRep_Tool::CurveOnSurface(TopoDS::Edge(se.Reversed()), sf, a, z), s, loc, BRep_Tool::Tolerance(es[k]));
         else
           bb.UpdateEdge(es[k], pf, s, loc, BRep_Tool::Tolerance(es[k]));
-        // (A new degenerate edge has no curve of its own: its range is its curve's on the face.)
+        // (A new degenerate edge has no curve of its own: its range is its curve's on the face; a piece of a pole
+        // (a sphere's, curves coming to it) the part of that curve the Boolean gave it.)
         if (BRep_Tool::Degenerated(es[k]))
+        {
+          if (b.curves[11 * k + 1] == 1.0)
+          {
+            if (!(b.curves[11 * k + 2] < b.curves[11 * k + 3]))
+              return "a piece of a pole against its curve";
+            a = b.curves[11 * k + 2];
+            z = b.curves[11 * k + 3];
+          }
           bb.Range(es[k], s, loc, a, z);
+        }
       }
     }
     // Its edges' curves on a cylinder or cone (a plane's are made below).

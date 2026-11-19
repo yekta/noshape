@@ -954,6 +954,14 @@ fn a_sphere_knob_fused_onto_a_wheel_as_occt() {
     as_recorded("b2a1c0a5aff95e9f");
 }
 
+/// A box's common with a sphere about one of its corners (recorded, bool-corpus): the sphere's octant, as OCCT's. The
+/// three arcs meet at the sphere's pole: its degenerate edge in pieces between their angles, as a cone's apex ("a
+/// non-manifold result": the sphere's face wasn't split).
+#[test]
+fn a_spheres_octant_through_its_pole_as_occt() {
+    as_recorded("cdd336b4ea3c7cca");
+}
+
 /// prize-wheel-tim's fuse of three tools with flats at x ±1.2 mm into the hub under its sphere knob (recorded): OCCT's
 /// result. The sphere's sections by the flats lie outside the sphere's face: the two faces' parts of a section were
 /// apart, and an edge was made backwards between their ends (a 0.2 mm arc splitting a flat; "no point inside a face
