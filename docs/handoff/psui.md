@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-19 12:44 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-19 21:03 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -35,30 +35,43 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (updated 12:44 UTC 11-19; Ubeyd at 98 % weekly: keep this current, land small)
+## Now (updated 21:03 UTC 11-19; this thread replaced 4973e295 at 13:27, Ubeyd's weekly limit)
 
-1. LANDED 10:11 (03a8f126): HEAVY-ASM-SOFTWARE-FRAME renderer side (no 3D frame for a refresh that changes nothing:
-   `CameraGeometry::key`, `small_content_key` in `Scene::same_as`; `Style::software` = 1x MSAA + each body's coarsest
-   level), the list-1119 / nav-feel-1119 / tools-1119 rows, Shift+C. 1aef7f70 (coplanar on Metal/D3D12) landed 08:32.
-   asm owns the LOD meshes / load path.
-2. HEAVY-ASM: done. vibe2 llvmpipe asm-xdev-subs: steady frame 1.2 -> 0.11 s, first frame after the tab 5.97 -> 1.95 s,
-   wheel notch 3.62 -> 0.72 s; the one 9.2 s evaluate was load (reruns: base 6.2 / 3.0 s, new 3.6 / 3.9 s). asm's
-   d7691003 (software proxy at the coarsest level) on top: frames 0.04-0.07 s. Prewarm timing dropped (qa).
-3. Appearance swatch: = on vibe2 (next 3D frame, 60-120 ms after the swatch tick on llvmpipe; pxwatch.c / swclick2.sh
-   in /root/psui-scratch; app on MY display :394 only, :393 is asm's). Row says retake on a GPU.
-4. Routing curve Point edit type Multiple (core's missing-commands row 4), native in triad.rs: a click on a point
-   toggles it in selectedIndices, the triad at the selected points' centre moves each one's dx/dy/dz
-   (dialogs_feel_tests::a_routing_curves_multiple_triad_moves_the_selected_points). Test note: point items set
-   directly are reset by the editing logic; type offsets via set_expr_text. Not done: the triad's rotation rings,
-   an Edit reference's triad: asked of live (REQUESTS psui 11-19 13:0x, routing-multi).
-   NOW (lead): no ≠ rows of mine left but the two waiting on live (section cap, Hole callout); taking P0 rows that are =
-   with no test (interaction-feel.md "missing" in the test column: hover-p0, hover-pick, sel-feel, dialogs first).
-   Done: edge double-click (dialogs_feel_tests). Next: 862 sketch region look, 810 refusal texts, 884/885.
-   qa's suite rows (P0) arrive ~16:00 UTC: they go first.
-5. Open with live: Hole callout glyph size (REQUESTS 23:33), section preview over a shown plane (REQUESTS 22:48).
-   live is stopped until ~21:00 UTC: recheck asks go to live2.
+1. LANDED 13:59 (e87a2b3e): routing Multiple offset, the edge double-click / region look / constraint refusal
+   tests, the section cap (tan only while just picked), the Hole callout size.
+2. f117aeaf FAILED 18:20 (menu coverage: the chrome test's literal menu labels); live2 then showed live has NO safe
+   triangle (submenu-diag-1119), so the triangle is gone. Re-landing now: qa's P0 feel rows (qa-feel-1119 in
+   interaction-feel.md): a left press that closes an open menu gives the graphics nothing (face-rclick-select-fillet-
+   faces, the 05:51 regression), one Esc after a field's menu item (LeaveFocus only forward sets tabbed_out), no
+   readout under an analysis tool; the untested-row tests; Routing curve Multiple per live2 routing-multi with its
+   value box ("10.2 mm" / "45 deg", typed + Enter sets the drag's total, another Edit reference drops it) and the
+   arrow drag's blue start line. vibe2 scenarios (~/tmp/psui/fillet-faces): clear-all and clear-missing match.
+3. Next: the routing triad's centre ball drag (free, in the view plane); rerun qa's 7 rows on the landed build.
+4. asm FYI 11-19 (df6a2c16 queued): the Part Studio Mass panel's "Center of mass ☐ Override" X / Y / Z and "Mass
+   moments of inertia ☐ Override" 9 fields (live2 mass-override-1119, behaviours "asm (11-19)"): enabled only for a
+   part with a material, Lxy / Lyx not linked; written through doc.edit_studio as menus.rs mass_override
+   (PartProperties com_override, inertia_override column by column).
+5. Interaction-feel rows that match live with no test (grep "missing" in the Test column; P0 sections first).
+   Skipped: the two-block box counts (live's camera: iso + 10 wheel steps about an unknown pointer), the rollback
+   bar's hover colour (GPUI group_hover, no test hook), the spinner's 900 ms (`Instant`, not the test clock).
+   Asked of live2: the diagonal submenu move's timing (REQUESTS 16:37).
 6. Not to build: 3D Sketch, Fault analysis. Cleanup: vibex7 ~/tmp/psui/priv/dock.noshape when the tab work is over;
-   vibe2 ~/tmp/psui/hv binaries after the reruns. Branch psui-backup-1119 = pre-reset branch (all landed; delete).
+   vibe2 ~/tmp/psui/hv binaries. Branch psui-backup-1119 (all landed; delete).
+
+## Agents (lead 11-19 21:xx; use only these ids)
+
+- lead 818534eb-f6b1-4a00-bb48-ebf0f7cdbd8a; core 08a98761-3bbe-47ce-a91a-32b208f5c6b2; blend 459f6c19-c460-4ebf-96ca-bf92455f2e1e;
+  bool abdebc8b-6b39-4794-8390-eb02d6fa37e6 (bool2 merged in); live 349fe81d-db78-4931-8032-6dc3edc5d558 (live2 merged in);
+  studios 91339202-41f1-4465-91f4-65ccd26ea1b1; dx 6cfc89bd-1196-43ef-9225-0014546fee1e; qa ac50e7f2-4677-4cab-a57a-fd068a0c07bf;
+  asm d8d597e0-675c-497b-a804-544ceab99bbd; skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6. Context cap 200k (user 11-19).
+- P0 sketch-vertical-key (lead after compaction: "match live's default view orientation, re-baseline"): checked 21:1x:
+  ours already opens in live's start view, Camera::default = Trimetric (-0.433, 0.75, -0.5) = live's recorded start
+  camera direction (every live take with a camera); live's Isometric menu item is the true (-1, 1, -1)/√3, as ours
+  (view-cube-iso). The (64, -45) vs (61, -42) gap is the zoom of the camera-less 11-06 take (~0.2885 mm/px implied;
+  live's empty start is 0.2754 in 17 of 25 takes, 0.2507 in today's). live2 retook it with its camera (cf70e676):
+  live shows no Vertical at 0.2507. NEXT: once cf70e676 lands, run sketch-vertical-key on ours (uip-shots.sh); if ours
+  infers Vertical on live's camera, the gap is the reach measure (screen distance to the projected plumb line) — with
+  skasm. No orientation change, no re-baseline unless that run shows one.
 
 ## Open decisions
 

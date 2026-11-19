@@ -658,6 +658,7 @@ impl PartStudioView {
             arrow_dragging: self.manip_drag.map(|d| d.which),
             triad_hover: self.ui.triad_drag.as_ref().map(|d| d.handle).or(self.ui.triad_hover),
             triad_dragging: self.ui.triad_drag.is_some(),
+            triad_turn: self.ui.triad_drag.as_ref().or(self.ui.triad_box.as_ref().map(|b| &b.drag)).map(|d| (d.handle, d.origin, d.axes, d.value)),
             section_hover: self.ui.section_hover,
             section_dragging: if self.ui.section_base_drag {
                 Some(super::section_manip::SectionHandle::Base)
@@ -1229,6 +1230,8 @@ pub(super) struct ManipGeometry {
     arrow_dragging: Option<usize>,
     triad_hover: Option<usize>,
     triad_dragging: bool,
+    /// A triad drag (or its value box after it): its handle, the triad's origin and axes at its start, its value so far.
+    triad_turn: Option<(usize, DVec3, [DVec3; 3], f64)>,
     section_hover: Option<super::section_manip::SectionHandle>,
     section_dragging: Option<super::section_manip::SectionHandle>,
     /// The face under a dragged section base (its implicit points).
@@ -1255,7 +1258,7 @@ impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
                 Handle::Arrow(a) | Handle::StdArrow(a, _) => arrow_glyph(a, hover, drag, view, up),
                 Handle::Arc(h) | Handle::StdArc(h, _) => arc_glyph(h, hover, drag, view, up),
             }),
-            Manip::Triad(t) => super::triad::triad_glyph(&t, self.triad_hover, self.triad_dragging, view, up),
+            Manip::Triad(t) => super::triad::triad_glyph(&t, self.triad_hover, self.triad_dragging, self.triad_turn, view, up),
             Manip::Section(s) => {
                 use super::section_manip::SectionHandle;
                 let mut out = arrow_glyph(&s.arrow, self.section_hover == Some(SectionHandle::Arrow), self.section_dragging == Some(SectionHandle::Arrow), view, up);

@@ -739,6 +739,10 @@ pub struct UiState {
     pub dim_invalid: bool,
     /// The translate triad's hovered handle and running drag (triad.rs).
     pub triad_hover: Option<usize>,
+    /// Routing curve Multiple: the point under the pointer (its ring dark blue).
+    pub routing_point_hover: Option<usize>,
+    /// Routing curve Multiple's value box after an arrow or ring drag.
+    pub triad_box: Option<super::triad::TriadBox>,
     /// The pattern instance point under the pointer while "Instances to
     /// skip" is active (its index).
     pub toggle_hover: Option<(i64, i64)>,
@@ -1063,6 +1067,8 @@ impl UiState {
             dim_box_offset: Point::default(),
             dim_invalid: false,
             triad_hover: None,
+            routing_point_hover: None,
+            triad_box: None,
             toggle_hover: None,
             std_point_hover: None,
             triad_drag: None,

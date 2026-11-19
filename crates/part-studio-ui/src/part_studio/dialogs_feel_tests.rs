@@ -1246,3 +1246,110 @@ fn a_double_click_on_an_edge_selects_then_deselects_it(cx: &mut TestAppContext) 
     let second = click(cx);
     assert_eq!((first, second), (vec![edge], Vec::new()), "the first click selects the edge alone, the second (a double-click) deselects it");
 }
+
+/// Live2 routing-multi (11-19): in Multiple the triad is the full one (rings at the tips, a centre ball); a ring
+/// turns only the triad, 5° near a multiple, the points staying where they are; the X arrow then moves the selected
+/// points along the turned X (10.2 mm after 45° about Y: +7.2125 X, −7.2125 Z); an Edit reference puts the triad on its
+/// vertex, world-aligned, and moves keep the points' own references (only dx / dy / dz change).
+#[gpui::test]
+fn a_routing_curves_multiple_ring_turns_only_the_triad_and_its_arrows_follow_the_turn(cx: &mut TestAppContext) {
+    use noshape_model::params::{ParamValue, ParamValues};
+    let (window, view) = block(cx, "dlg-routing-ring");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("routingCurve", w, cx))).unwrap();
+    draw(cx, window);
+    let item = || {
+        let mut it = ParamValues::default();
+        it.set("referenceType", ParamValue::Enum("ORIGIN".into()));
+        it
+    };
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Routing curve dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.set_value("pointsEditType", ParamValue::Enum("MULTI".into()), cx);
+        d.set_value("points", ParamValue::Array(vec![item(), item(), item()]), cx);
+    }));
+    // (std's editing logic for the new points first: it would put back offsets typed before it ran.)
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| {
+        d.set_expr_text("points.1.dx", "40 mm", w, cx);
+        d.set_expr_text("points.2.dy", "40 mm", w, cx);
+    }))
+    .unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let triad = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).routing_triad(cx)).expect("Multiple mode's manipulator");
+    let at = |cx: &mut TestAppContext, w: glam::DVec3| cx.update(|cx| view.read(cx).viewport.read(cx).project(w)).expect("on screen");
+    let event = |cx: &mut TestAppContext, ev: ViewportEvent| {
+        let t = triad(cx);
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.triad_event(t, &ev, w, cx))).unwrap();
+        draw(cx, window);
+    };
+    let typed = cx.update(|cx| view.read(cx).routing_points(cx));
+    assert!(typed.len() == 3 && typed[1].1.distance(glam::DVec3::new(0.04, 0.0, 0.0)) < 1e-9, "the points typed: {typed:?}");
+    let drag = |cx: &mut TestAppContext, from: glam::DVec2, to: glam::DVec2| {
+        event(cx, ViewportEvent::ToolDown { position: from, modifiers: Modifiers::default(), click_count: 1 });
+        event(cx, ViewportEvent::ToolDrag { position: from + (to - from) * 0.5 });
+        event(cx, ViewportEvent::ToolDrag { position: to });
+        event(cx, ViewportEvent::ToolUp { position: to, modifiers: Modifiers::default() });
+    };
+    let mm = 1e-3;
+    for p in [glam::DVec3::new(40.0 * mm, 0.0, 0.0), glam::DVec3::new(0.0, 40.0 * mm, 0.0)] {
+        let position = at(cx, p);
+        event(cx, ViewportEvent::ToolDown { position, modifiers: Modifiers::default(), click_count: 1 });
+        event(cx, ViewportEvent::ToolUp { position, modifiers: Modifiers::default() });
+    }
+    let t = triad(cx);
+    assert!(t.full && t.shown && t.origin.distance(glam::DVec3::new(20.0 * mm, 20.0 * mm, 0.0)) < 1e-9, "the full triad at the two points' centre: {t:?}");
+    let before = cx.update(|cx| view.read(cx).routing_points(cx));
+    // The Z tip's ring (its tick's middle) turned 45° about Y: the ring's centre carried round the triad's origin.
+    let segs = cx.update(|cx| view.read(cx).triad_hit_segments(&t, cx));
+    let ring = (segs[8].0 + segs[8].1) * 0.5;
+    let turned = t.origin + glam::DQuat::from_axis_angle(glam::DVec3::Y, 44.0f64.to_radians()) * (ring - t.origin);
+    let (from, to) = (at(cx, ring), at(cx, turned));
+    drag(cx, from, to);
+    let t = triad(cx);
+    let x = glam::DVec3::new(1.0, 0.0, -1.0).normalize();
+    assert!(t.axes[0].distance(x) < 1e-9 && t.axes[1].distance(glam::DVec3::Y) < 1e-9, "the triad turned 45° about Y (44° snapped): {:?}", t.axes);
+    assert_eq!(cx.update(|cx| view.read(cx).routing_points(cx)), before, "the points stay where they were");
+    // The turned X arrow's middle dragged 40 px along it: both selected points move along it on the 0.1 mm step.
+    let segs = cx.update(|cx| view.read(cx).triad_hit_segments(&t, cx));
+    let (a, b) = (at(cx, segs[0].0), at(cx, segs[0].1));
+    let grab = (a + b) * 0.5;
+    drag(cx, grab, grab + (b - a).normalize() * 40.0);
+    let pts = cx.update(|cx| view.read(cx).routing_points(cx));
+    let moved = pts[1].1 - before[1].1;
+    let along = moved.dot(x);
+    assert!(along > 1.0 * mm && (along / (0.1 * mm) - (along / (0.1 * mm)).round()).abs() < 1e-4 && moved.distance(x * along) < 1e-8, "point 1 moved along the turned X on the 0.1 mm step: {moved:?}");
+    assert!((pts[2].1 - before[2].1).distance(moved) < 1e-9 && pts[0].1 == before[0].1, "point 2 by the same, point 0 stays: {pts:?}");
+    // Its value box: the move, selected; "10" + Enter makes it 10 mm in all, the box staying (live2 e7).
+    let shown = cx.update(|cx| view.read(cx).ui.triad_box.as_ref().map(|b| (b.drag.value, b.input.is_some())));
+    assert!(shown.is_some_and(|(v, field)| (v - along).abs() < 1e-9 && field), "the box after the drag: {shown:?}, moved {along}");
+    keys(cx, window, &["1", "0", "enter"]);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let pts = cx.update(|cx| view.read(cx).routing_points(cx));
+    let moved = pts[1].1 - before[1].1;
+    assert!(moved.distance(x * 10.0 * mm) < 1e-8 && (pts[2].1 - before[2].1).distance(moved) < 1e-8, "10 mm along the turned X in all: {moved:?}");
+    let kept = cx.update(|cx| view.read(cx).ui.triad_box.as_ref().map(|b| (b.drag.value, b.input.is_some())));
+    assert!(kept.is_some_and(|(v, field)| (v - 10.0 * mm).abs() < 1e-12 && field), "the box stays with 10 mm: {kept:?}");
+    // An Edit reference: the triad on that vertex, world-aligned; an X drag moves the points along world X only.
+    let vertex = cx.update(|cx| view.read(cx).display.bodies.first().and_then(|b| b.vertex_refs.first().cloned())).expect("a block vertex");
+    let vertex_at = cx.update(|cx| view.read(cx).vertex_position(&vertex)).expect("its position");
+    cx.update(|cx| dialog.update(cx, |d, cx| d.set_value("multiEditReference", ParamValue::Query(vec![vertex]), cx)));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let t = triad(cx);
+    assert!(t.origin.distance(vertex_at) < 1e-9 && t.axes == [glam::DVec3::X, glam::DVec3::Y, glam::DVec3::Z], "on the reference vertex, world-aligned: {t:?}");
+    assert!(cx.update(|cx| view.read(cx).ui.triad_box.is_none()), "another Edit reference drops the value box");
+    let before = cx.update(|cx| view.read(cx).routing_points(cx));
+    let segs = cx.update(|cx| view.read(cx).triad_hit_segments(&t, cx));
+    let (a, b) = (at(cx, segs[0].0), at(cx, segs[0].1));
+    let grab = (a + b) * 0.5;
+    drag(cx, grab, grab + (b - a).normalize() * 40.0);
+    let pts = cx.update(|cx| view.read(cx).routing_points(cx));
+    let moved = pts[1].1 - before[1].1;
+    let t = triad(cx);
+    assert!(moved.x > 1.0 * mm && moved.y.abs() < 1e-9 && moved.z.abs() < 1e-9 && (pts[2].1 - before[2].1).distance(moved) < 1e-9, "both points along world X: {moved:?}");
+    assert!(t.origin.distance(vertex_at + moved) < 1e-9, "the triad moved with them from the vertex: {:?}", t.origin);
+    let kinds = cx.update(|cx| dialog.read(cx).feature.params.array("points").iter().map(|it| it.enum_("referenceType").to_string()).collect::<Vec<_>>());
+    assert_eq!(kinds, vec!["ORIGIN"; 3], "the points keep their own reference");
+}

@@ -1570,6 +1570,28 @@ impl PartStudioView {
             let up = self.gpu.uploader();
             extra.push(noshape_render::Instance::new(noshape_render::Drawable::Points(up.upload_points(&noshape_render::PointData { points: sprites }))).per_primitive_color().unpickable().ignore_clip().layer(22));
         }
+        // Routing curve Multiple's points (live2 routing-multi p1-*): 16 px rings with a white centre, grey
+        // rgb(96,106,114), selected light blue rgb(162,185,223), under the pointer dark blue rgb(19,78,150).
+        if self.current_manip(cx).and_then(|m| m.triad()).is_some_and(|t| t.multi) {
+            use noshape_render::{LineSegment, PointSprite};
+            let selected = self.routing_selected(cx);
+            let sprites = self
+                .routing_points(cx)
+                .into_iter()
+                .map(|(k, p)| {
+                    let color = if self.ui.routing_point_hover == Some(k) {
+                        [0x13, 0x4e, 0x96, 255]
+                    } else if selected.contains(&k) {
+                        [0xa2, 0xb9, 0xdf, 255]
+                    } else {
+                        [0x60, 0x6a, 0x72, 255]
+                    };
+                    PointSprite { position: p.as_vec3().into(), color, pick_id: 0, size: ROUTING_POINT_PX, style: LineSegment::ON_TOP | PointSprite::HOLLOW | PointSprite::THICK, _pad: 0 }
+                })
+                .collect();
+            let up = self.gpu.uploader();
+            extra.push(noshape_render::Instance::new(noshape_render::Drawable::Points(up.upload_points(&noshape_render::PointData { points: sprites }))).per_primitive_color().unpickable().ignore_clip().layer(22));
+        }
         // A FeatureScript points manipulator (live 1709, Frame's alignment points): 7 px white dots ringed grey, the
         // chosen one ringed light blue, the hovered one blue.
         if let Some((_, points, index)) = self.std_points(cx) {
@@ -2378,8 +2400,11 @@ impl PartStudioView {
                 // The translate triad outlines the handle under the cursor.
                 if let Some(t) = self.current_manip(cx).and_then(|m| m.triad()) {
                     let h = self.triad_handle_at(&t, *position, cx);
-                    if h != self.ui.triad_hover {
+                    // Routing curve Multiple: a point's ring turns dark blue under the pointer.
+                    let point = if t.multi && h.is_none() { self.routing_point_at(*position, cx) } else { None };
+                    if h != self.ui.triad_hover || point != self.ui.routing_point_hover {
                         self.ui.triad_hover = h;
+                        self.ui.routing_point_hover = point;
                         self.refresh_scene(false, cx);
                     }
                 }
@@ -7318,6 +7343,7 @@ impl PartStudioView {
         // (NOSHAPE_GPUI_LABELS: as GPUI elements, for comparing).
         // The offset box takes a typed value (its click target / field).
         overlay.extend(self.section_value_field(cx));
+        overlay.extend(self.triad_value_box(cx));
         overlay.extend(self.render_center_of_mass(cx));
         if crate::overlay_labels::gpui_labels() {
             overlay.extend(self.render_section_value(cx).filter(|_| self.ui.section_offset_edit.is_none()));
@@ -8173,6 +8199,9 @@ pub(super) fn part_section(b: &noshape_model::display::BodyDisplay) -> &'static 
 /// A pattern instance point's diameter (live p1audit skip-02: 12 px, a
 /// 3 px ring).
 const TOGGLE_POINT_PX: f32 = 12.0;
+
+/// Routing curve Multiple's point ring (live2 routing-multi: Ø16 px, a 3.5 px ring round a Ø7 white centre).
+const ROUTING_POINT_PX: f32 = 16.0;
 
 /// A FeatureScript points manipulator's dot (live 1709: Frame's alignment points, ≈7 px with a grey ring).
 const STD_POINT_PX: f32 = 7.0;

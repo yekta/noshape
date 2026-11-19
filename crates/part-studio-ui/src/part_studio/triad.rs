@@ -6,14 +6,16 @@
 //! planar handle the two in its plane. Routing curve's Single mode puts it on
 //! the active point (live 1722), whose offsets it drags; clicking another
 //! point makes that one active. Its Multiple mode (std routingCurve.fs
-//! addMultiPointsManipulator / addMultiTriadManipulator): a click on a point
-//! toggles it in Selected points, the triad sits at the selected points'
-//! centre and moves them all.
+//! addMultiPointsManipulator / addMultiTriadManipulator, live2 routing-multi): a click on a point toggles it in
+//! Selected points; the full triad (rings at the tips, a centre ball) sits at their centre, or at the Edit reference
+//! moved by multiDx/Dy/Dz; its arrows and planes move the selected points along its axes, a ring turns only the triad
+//! (multiRotationMatrix).
 
 use super::PartStudioView;
 use super::manipulators::Manip;
 use crate::viewport::ViewportEvent;
 use glam::{DVec2, DVec3};
+use gpui_kit::component::Sizable as _;
 use gpui_kit::*;
 use noshape_model::params::ParamValue;
 use noshape_model::reference::Reference;
@@ -27,6 +29,17 @@ const HEAD_PX: f64 = 20.0;
 const PLANE_FROM: f64 = 0.32;
 const PLANE_TO: f64 = 0.58;
 const PARAMS: [&str; 3] = ["dx", "dy", "dz"];
+/// The full triad's rings: their centre past each arrow's tip, their radius and their tick's half length (live2
+/// routing-multi h-*.png).
+const RING_GAP_PX: f64 = 8.0;
+const RING_PX: f64 = 7.0;
+const TICK_PX: f64 = 20.0;
+/// The full triad's centre ball (radius, px).
+const BALL_PX: f64 = 8.0;
+/// Handles: 0–2 the arrows, 3–5 the planes, 6–8 the rings (at arrow k's tip), 9 the centre ball.
+const RING0: usize = 6;
+const BALL: usize = 9;
+const WORLD: [DVec3; 3] = [DVec3::X, DVec3::Y, DVec3::Z];
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Triad {
@@ -40,6 +53,10 @@ pub(super) struct Triad {
     pub multi: bool,
     /// Drawn and grabbable (Multiple mode with no point selected has only the points).
     pub shown: bool,
+    /// Its X, Y, Z (the world's unless a ring turned it: Routing curve Multiple's multiRotationMatrix).
+    pub axes: [DVec3; 3],
+    /// The full manipulator: rings at the arrow tips and the centre ball (Routing curve Multiple).
+    pub full: bool,
 }
 
 impl Triad {
@@ -62,10 +79,28 @@ pub(super) struct TriadDrag {
     pub item: Option<(&'static str, usize)>,
     /// Multiple mode: each selected point's index and its offsets when the drag started.
     pub points: Vec<(usize, DVec3)>,
+    /// The triad's origin and axes when the drag started, and multiDx/Dy/Dz then.
+    pub origin: DVec3,
+    pub axes: [DVec3; 3],
+    pub multi_offset: DVec3,
+    /// What the drag has done so far: a ring's turn (radians, about its axis), an arrow's move along it (meters).
+    pub value: f64,
 }
 
-fn axis(i: usize) -> DVec3 {
-    [DVec3::X, DVec3::Y, DVec3::Z][i]
+/// Routing curve Multiple's value box after an arrow or ring drag (live2 routing-multi rz-45-*, tx-after: "45 deg",
+/// "10.2 mm", its text selected; a typed value and Enter set the drag's total, the box stays): the drag it shows and,
+/// once released, its field.
+pub(super) struct TriadBox {
+    pub drag: TriadDrag,
+    /// The Edit reference it was made with: another reference drops it (live2 e8).
+    pub reference: Option<Reference>,
+    pub input: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
+}
+
+/// The axis ring `k` (at arrow k's tip, in the plane of axes k and k + 1) turns the triad about (live2 routing-multi:
+/// the ring at Z's tip turns X toward −Z; the assembly triad's `ManipHandle::ring_axis`).
+fn ring_axis(k: usize) -> usize {
+    (k + 2) % 3
 }
 
 /// The two axes of planar handle `h` (3 = YZ, 4 = XZ, 5 = XY).
@@ -110,7 +145,7 @@ impl PartStudioView {
         let value = |id: &str| p.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok().map(|q| q.value))).unwrap_or(0.0);
         let offset = DVec3::new(value("dx"), value("dy"), value("dz"));
         // At the parts' bounding box's centre: std's transformCopy.fs findCenter (box3dCenter), live2 manip-feel-1118 m6.
-        Some(Triad { origin: (lo + hi) * 0.5 + offset, offset, item: None, multi: false, shown: true })
+        Some(Triad { origin: (lo + hi) * 0.5 + offset, offset, item: None, multi: false, shown: true, axes: WORLD, full: false })
     }
 
     /// Routing curve's points (index, position) whose reference ours can
@@ -184,18 +219,36 @@ impl PartStudioView {
         e.dialog.read(cx).feature.params.expr("pointIndex").and_then(|x| x.cached.map(|q| q.value).or_else(|| x.text.trim().parse().ok())).map_or(0, |v| v.max(0.0) as usize)
     }
 
-    /// Routing curve, Single mode: the triad on the active point.
+    /// Multiple mode's multiDx / multiDy / multiDz and its turn (multiRotationMatrix's rows: the triad's axes).
+    fn routing_multi_frame(&self, cx: &App) -> Option<(DVec3, [DVec3; 3])> {
+        let p = &self.edit.as_ref()?.dialog.read(cx).feature.params;
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let num = |id: &str| p.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok().map(|q| q.value))).unwrap_or(0.0);
+        let axes = match p.get("multiRotationMatrix") {
+            Some(ParamValue::Text(t)) => parse_matrix(t).unwrap_or(WORLD),
+            _ => WORLD,
+        };
+        Some((DVec3::new(num("multiDx"), num("multiDy"), num("multiDz")), axes))
+    }
+
+    /// Routing curve: Multiple mode's full triad, else Single mode's on the active point.
     pub(super) fn routing_triad(&self, cx: &App) -> Option<Triad> {
         let pts = self.routing_points(cx);
         if self.routing_multi(cx) {
-            // Std's: at the selected points' centre of mass (an Edit reference moves it off them: not drawn here).
-            if !self.edit.as_ref()?.dialog.read(cx).feature.params.query("multiEditReference").is_empty() || pts.is_empty() {
+            if pts.is_empty() {
                 return None;
             }
             let sel = self.routing_selected(cx);
             let chosen: Vec<DVec3> = pts.iter().filter(|(i, _)| sel.contains(i)).map(|(_, p)| *p).collect();
-            let centre = chosen.iter().copied().sum::<DVec3>() / chosen.len().max(1) as f64;
-            return Some(Triad { origin: centre, offset: centre, item: None, multi: true, shown: !chosen.is_empty() });
+            let (moved, axes) = self.routing_multi_frame(cx)?;
+            // Std's: at the selected points' centre of mass, or at the Edit reference moved by multiDx/Dy/Dz (live2
+            // routing-multi e4: on the vertex itself, world-aligned once the reference is picked).
+            let reference = self.edit.as_ref()?.dialog.read(cx).feature.params.query("multiEditReference").first().cloned();
+            let origin = match reference {
+                Some(r) => self.vertex_position(&r)? + moved,
+                None => chosen.iter().copied().sum::<DVec3>() / chosen.len().max(1) as f64,
+            };
+            return Some(Triad { origin, offset: origin, item: None, multi: true, shown: !chosen.is_empty(), axes, full: true });
         }
         let k = self.routing_active(cx);
         let &(_, at) = pts.iter().find(|(i, _)| *i == k)?;
@@ -205,11 +258,11 @@ impl PartStudioView {
             "VERTEX" => self.vertex_position(it.query("vertex").first()?)?,
             _ => DVec3::ZERO,
         };
-        Some(Triad { origin: at, offset: at - base, item: Some(("points", k)), multi: false, shown: true })
+        Some(Triad { origin: at, offset: at - base, item: Some(("points", k)), multi: false, shown: true, axes: WORLD, full: false })
     }
 
     /// Routing curve: the point (other than Single mode's active one) under the cursor.
-    fn routing_point_at(&self, p: DVec2, cx: &App) -> Option<usize> {
+    pub(super) fn routing_point_at(&self, p: DVec2, cx: &App) -> Option<usize> {
         let k = if self.routing_multi(cx) { usize::MAX } else { self.routing_active(cx) };
         let vp = self.viewport.read(cx);
         self.routing_points(cx).into_iter().filter(|(i, _)| *i != k).filter_map(|(i, w)| Some((i, (vp.project(w)? - p).length()))).filter(|(_, d)| *d < 8.0).min_by(|a, b| a.1.total_cmp(&b.1)).map(|(i, _)| i)
@@ -232,6 +285,21 @@ impl PartStudioView {
         let vp = self.viewport.read(cx);
         let s = |w: DVec3| vp.project(w);
         let o = t.origin;
+        let axis = |i: usize| t.axes[i];
+        if t.full {
+            // The ball, then the rings (a ring or its tick).
+            if s(o).is_some_and(|c| c.distance(p) <= BALL_PX + 2.0) {
+                return Some(BALL);
+            }
+            for k in 0..3 {
+                let (c, side) = (o + axis(k) * (SHAFT_PX + HEAD_PX + RING_GAP_PX) * wpp, axis((k + 1) % 3));
+                let (Some(sc), Some(a), Some(b)) = (s(c), s(c - side * TICK_PX * wpp), s(c + side * TICK_PX * wpp)) else { continue };
+                let u = ((p - a).dot(b - a) / (b - a).length_squared().max(1e-9)).clamp(0.0, 1.0);
+                if sc.distance(p) <= RING_PX + 4.0 || (a + (b - a) * u).distance(p) <= 4.0 {
+                    return Some(RING0 + k);
+                }
+            }
+        }
         // Planar handles first: they sit between the shafts.
         for h in 3..6 {
             let (i, j) = plane_axes(h);
@@ -261,38 +329,218 @@ impl PartStudioView {
     pub(super) fn triad_hit_segments(&self, t: &Triad, cx: &App) -> Vec<(DVec3, DVec3, f64)> {
         let Some(wpp) = self.triad_wpp(t, cx).filter(|_| t.shown) else { return Vec::new() };
         let o = t.origin;
+        let axis = |i: usize| t.axes[i];
         let mut out: Vec<(DVec3, DVec3, f64)> = (0..3).map(|i| (o + axis(i) * 0.15 * SHAFT_PX * wpp, o + axis(i) * (SHAFT_PX + HEAD_PX) * wpp, 0.0)).collect();
         for h in 3..6 {
             let (i, j) = plane_axes(h);
             let (a, b) = (axis(i) * SHAFT_PX * wpp, axis(j) * SHAFT_PX * wpp);
             out.push((o + (a + b) * PLANE_FROM, o + (a + b) * PLANE_TO, 0.0));
         }
+        if t.full {
+            for k in 0..3 {
+                let (c, side) = (o + axis(k) * (SHAFT_PX + HEAD_PX + RING_GAP_PX) * wpp, axis((k + 1) % 3));
+                out.push((c - side * TICK_PX * wpp, c + side * TICK_PX * wpp, 0.0));
+            }
+            out.push((o, o + axis(0) * 1e-9, 0.0));
+        }
         out
     }
 
-    /// The point a drag of `handle` follows: on the arrow's axis, or in
-    /// the planar handle's plane, under the cursor.
-    fn triad_point(&self, origin: DVec3, handle: usize, p: DVec2, cx: &App) -> Option<DVec3> {
+    /// The point a drag of `handle` follows under the cursor: on the arrow's axis, in the planar handle's plane, in the
+    /// ring's plane, or (the ball) in the view's plane.
+    fn triad_point(&self, origin: DVec3, axes: &[DVec3; 3], handle: usize, p: DVec2, cx: &App) -> Option<DVec3> {
         let (ro, rd) = self.viewport.read(cx).ray(p);
         if handle < 3 {
-            let a = axis(handle);
+            let a = axes[handle];
             let w0 = origin - ro;
             let (b, d, e) = (a.dot(rd), a.dot(w0), rd.dot(w0));
             let denom = 1.0 - b * b;
-            (denom.abs() > 1e-9).then(|| origin + a * ((b * e - d) / denom))
-        } else {
-            let (i, j) = plane_axes(handle);
-            let n = axis(i).cross(axis(j));
-            let den = rd.dot(n);
-            (den.abs() > 1e-9).then(|| ro + rd * ((origin - ro).dot(n) / den))
+            return (denom.abs() > 1e-9).then(|| origin + a * ((b * e - d) / denom));
         }
+        let n = match handle {
+            BALL => rd,
+            h if h >= RING0 => axes[ring_axis(h - RING0)],
+            h => {
+                let (i, j) = plane_axes(h);
+                axes[i].cross(axes[j])
+            }
+        };
+        let den = rd.dot(n);
+        (den.abs() > 1e-9).then(|| ro + rd * ((origin - ro).dot(n) / den))
+    }
+
+    /// A ring drag: the triad turned about the ring's axis (5° near a multiple, std's angular snap), the points left
+    /// where they are (live2 routing-multi rz-*: only multiRotationMatrix changes).
+    fn triad_turn(&mut self, d: &TriadDrag, q: DVec3, position: DVec2, cx: &mut Context<Self>) {
+        let n = d.axes[ring_axis(d.handle - RING0)];
+        let (v0, v1) = (d.grab - d.origin, q - d.origin);
+        let deg = v0.cross(v1).dot(n).atan2(v0.dot(v1)).to_degrees();
+        let radius = self.viewport.read(cx).project(d.origin).map_or(0.0, |c| c.distance(position));
+        let turn = (super::manipulators::snap_degrees(deg.abs(), radius) * deg.signum()).to_radians();
+        if let Some(t) = &mut self.ui.triad_drag {
+            t.value = turn;
+        }
+        self.triad_apply_turn(d, turn, cx);
+    }
+
+    /// The triad turned `turn` (radians) from where drag `d` started, about its ring's axis.
+    fn triad_apply_turn(&mut self, d: &TriadDrag, turn: f64, cx: &mut Context<Self>) {
+        let r = glam::DQuat::from_axis_angle(d.axes[ring_axis(d.handle - RING0)], turn);
+        let axes = d.axes.map(|a| r * a);
+        if let Some(e) = &self.edit {
+            e.dialog.update(cx, |dlg, cx| dlg.set_value("multiRotationMatrix", ParamValue::Text(matrix_text(&axes)), cx));
+        }
+    }
+
+    /// Multiple mode's arrow, plane or ball drag: the move along the triad's (turned) axes, each on the 0.1 unit step
+    /// (live2 routing-multi tx: 10.2 mm along X turned 45° about Y moved the points +7.2125 X, −7.2125 Z); std's
+    /// multiTriadManipulatorHandler adds it to every selected point's offsets and keeps the triad's place in
+    /// multiDx/Dy/Dz (from the Edit reference, else the world's origin).
+    fn triad_move_points(&mut self, d: &TriadDrag, position: DVec2, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(q) = self.triad_point(d.grab, &d.axes, d.handle, position, cx) else { return };
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let unit = units.si_factor(Dim::LENGTH);
+        let step = |v: f64| (v / unit * 10.0).round() / 10.0 * unit;
+        let raw = q - d.grab;
+        let delta = match d.handle {
+            h if h < 3 => d.axes[h] * step(raw.dot(d.axes[h])),
+            BALL => DVec3::new(step(raw.x), step(raw.y), step(raw.z)),
+            h => {
+                let (i, j) = plane_axes(h);
+                d.axes[i] * step(raw.dot(d.axes[i])) + d.axes[j] * step(raw.dot(d.axes[j]))
+            }
+        };
+        if let Some(t) = self.ui.triad_drag.as_mut().filter(|t| t.handle < 3) {
+            t.value = delta.dot(d.axes[t.handle]);
+        }
+        self.triad_apply_move(d, delta, window, cx);
+    }
+
+    /// The selected points (and multiDx/Dy/Dz) moved `delta` from where drag `d` started.
+    fn triad_apply_move(&mut self, d: &TriadDrag, delta: DVec3, window: &mut Window, cx: &mut Context<Self>) {
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let exact = |v: f64| noshape_units::format_quantity_exact(Quantity::new((v * 1e9).round() / 1e9, Dim::LENGTH), &units);
+        let has_reference = self.edit.as_ref().is_some_and(|e| !e.dialog.read(cx).feature.params.query("multiEditReference").is_empty());
+        let moved = if has_reference { d.multi_offset + delta } else { d.origin + delta };
+        let Some(e) = &self.edit else { return };
+        e.dialog.update(cx, |dlg, cx| {
+            for (k, start) in &d.points {
+                for i in 0..3 {
+                    dlg.set_expr_text(&format!("points.{k}.{}", PARAMS[i]), &exact(start[i] + delta[i]), window, cx);
+                }
+            }
+            for (i, id) in ["multiDx", "multiDy", "multiDz"].into_iter().enumerate() {
+                dlg.set_expr_text(id, &exact(moved[i]), window, cx);
+            }
+        });
+    }
+
+    /// The value box's text: the drag's or the released box's turn ("45 deg") or move ("10.2 mm").
+    fn triad_box_text(&self, cx: &App) -> Option<(usize, String)> {
+        let d = self.ui.triad_drag.as_ref().filter(|d| d.handle < 3 || (RING0..BALL).contains(&d.handle)).or(self.ui.triad_box.as_ref().map(|b| &b.drag))?;
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let text = if d.handle >= RING0 { super::section_manip::deg_text(d.value.to_degrees()) } else { noshape_units::format_quantity(Quantity::new(d.value, Dim::LENGTH), &units) };
+        Some((d.handle, text))
+    }
+
+    /// Where the box sits: an arrow's beside its tip, a ring's above it (live2 tx-after: 12 px right of the X tip's ring,
+    /// level with it; rz-45-held: its corner 26 px left of and 100 px above the ring).
+    fn triad_box_corner(&self, handle: usize, cx: &App) -> Option<DVec2> {
+        let t = self.current_manip(cx)?.triad().filter(|t| t.multi && t.shown)?;
+        let wpp = self.triad_wpp(&t, cx)?;
+        let k = if handle >= RING0 { handle - RING0 } else { handle };
+        let tip = self.viewport.read(cx).project(t.origin + t.axes[k] * (SHAFT_PX + HEAD_PX + RING_GAP_PX) * wpp)?;
+        Some(if handle >= RING0 { tip + DVec2::new(-26.0, -100.0) } else { tip + DVec2::new(12.0, -13.0) })
+    }
+
+    /// The box as a field, focused with its text selected.
+    pub(super) fn open_triad_box(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        use gpui_kit::component::input::{InputEvent, InputState};
+        let Some((_, text)) = self.triad_box_text(cx) else { return };
+        let input = cx.new(|cx| InputState::new(window, cx).default_value(text));
+        let sub = cx.subscribe_in(&input, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
+            if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+                let typed = st.read(cx).value().to_string();
+                this.commit_triad_box(&typed, matches!(ev, InputEvent::PressEnter { .. }), window, cx);
+            }
+        });
+        input.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
+        if let Some(b) = &mut self.ui.triad_box {
+            b.input = Some((input, sub));
+        }
+        cx.notify();
+    }
+
+    /// A typed value is the drag's total from where it started (live2 e7: 9.7 mm dragged, "10" + Enter: 10 mm in all; a
+    /// bare number in the workspace unit); after Enter the box stays, its new text selected; leaving it closes it.
+    fn commit_triad_box(&mut self, typed: &str, enter: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(b) = self.ui.triad_box.take() else { return };
+        let d = b.drag;
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let vars = self.scope_variables(None, cx);
+        let dim = if d.handle >= RING0 { Dim::ANGLE } else { Dim::LENGTH };
+        let text = noshape_model::quantity_text::commit_text(typed, dim, &units, &vars);
+        let value = noshape_units::evaluate_as(&text, dim, &units, &vars).map(|q| q.value).unwrap_or(d.value);
+        if d.handle >= RING0 {
+            self.triad_apply_turn(&d, value, cx);
+        } else {
+            self.triad_apply_move(&d, d.axes[d.handle] * value, window, cx);
+        }
+        if !enter {
+            window.focus(&self.focus, cx);
+            self.rebuild_scene(cx);
+            return;
+        }
+        self.ui.triad_box = Some(TriadBox { drag: TriadDrag { value, ..d }, reference: b.reference, input: None });
+        self.open_triad_box(window, cx);
+        self.rebuild_scene(cx);
+    }
+
+    /// The value box over the graphics: the drag's value while it lasts, then its field (Esc closes it; the next Esc
+    /// cancels the dialog).
+    pub(super) fn triad_value_box(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        // Another Edit reference drops it (live2 e8).
+        let reference = self.edit.as_ref().and_then(|e| e.dialog.read(cx).feature.params.query("multiEditReference").first().cloned());
+        if self.ui.triad_box.as_ref().is_some_and(|b| b.reference != reference) {
+            self.ui.triad_box = None;
+        }
+        let (handle, text) = self.triad_box_text(cx)?;
+        let at = self.triad_box_corner(handle, cx)?;
+        let frame = div().absolute().left(px(at.x as f32)).top(px(at.y as f32)).w(px(75.)).h(px(26.)).border_1().border_color(gpui_kit::rgb(0x1651b0)).bg(gpui_kit::rgb(0xffffff));
+        let input = self.ui.triad_box.as_ref().filter(|_| self.ui.triad_drag.is_none()).and_then(|b| b.input.as_ref()).map(|i| i.0.clone());
+        let Some(input) = input else {
+            return Some(frame.flex().items_center().justify_end().px(px(3.)).text_size(px(13.33)).text_color(crate::theme::p().text).child(text).into_any_element());
+        };
+        let field = gpui_kit::component::input::Input::new(&input).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right);
+        Some(
+            frame
+                .id("triad-value-field")
+                .debug_selector(|| "triad-value-field".into())
+                .occlude()
+                .px(px(3.))
+                .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                    if ev.keystroke.key == "escape" {
+                        cx.stop_propagation();
+                        this.ui.triad_box = None;
+                        window.focus(&this.focus, cx);
+                        this.rebuild_scene(cx);
+                    }
+                }))
+                .child(gpui_kit::base::input::input_frame(div().size_full().flex().items_center().child(field)))
+                .into_any_element(),
+        )
     }
 
     pub(super) fn triad_event(&mut self, t: Triad, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
         match ev {
             ViewportEvent::ToolDown { position, .. } => {
-                // Routing curve: a click on another point makes it the active one.
-                if let Some(k) = self.routing_point_at(*position, cx) {
+                // Routing curve: a click on another point makes it the active one (Multiple: toggles it; the triad's
+                // handles over a point come first, its ball sitting on a lone selected one).
+                let on_handle = t.full && self.triad_handle_at(&t, *position, cx).is_some();
+                if let Some(k) = self.routing_point_at(*position, cx).filter(|_| !on_handle) {
                     if t.multi {
                         self.routing_toggle(k, cx);
                     } else if let Some(e) = &self.edit {
@@ -302,16 +550,28 @@ impl PartStudioView {
                     return true;
                 }
                 let Some(handle) = self.triad_handle_at(&t, *position, cx) else { return false };
-                let Some(grab) = self.triad_point(t.origin, handle, *position, cx) else { return false };
+                let Some(grab) = self.triad_point(t.origin, &t.axes, handle, *position, cx) else { return false };
                 let points = if t.multi { self.routing_selected(cx).into_iter().filter_map(|k| Some((k, self.routing_offset(k, cx)?))).collect() } else { Vec::new() };
-                self.ui.triad_drag = Some(TriadDrag { handle, start: t.offset, grab, item: t.item, points });
+                let multi_offset = if t.multi { self.routing_multi_frame(cx).map_or(DVec3::ZERO, |f| f.0) } else { DVec3::ZERO };
+                self.ui.triad_drag = Some(TriadDrag { handle, start: t.offset, grab, item: t.item, points, origin: t.origin, axes: t.axes, multi_offset, value: 0.0 });
+                // A new drag drops the last one's box.
+                self.ui.triad_box = None;
                 true
             }
             ViewportEvent::ToolDrag { position, .. } => {
                 let Some(d) = self.ui.triad_drag.clone() else { return false };
+                if d.handle >= RING0 && d.handle < BALL {
+                    let Some(q) = self.triad_point(d.origin, &d.axes, d.handle, *position, cx) else { return true };
+                    self.triad_turn(&d, q, *position, cx);
+                    return true;
+                }
+                if t.multi {
+                    self.triad_move_points(&d, *position, window, cx);
+                    return true;
+                }
                 // The plane / axis through where the drag started.
                 let origin = d.grab;
-                let Some(q) = self.triad_point(origin, d.handle, *position, cx) else { return true };
+                let Some(q) = self.triad_point(origin, &d.axes, d.handle, *position, cx) else { return true };
                 let delta = q - d.grab;
                 let axes: Vec<usize> = if d.handle < 3 { vec![d.handle] } else { let (i, j) = plane_axes(d.handle); vec![i, j] };
                 let units = self.doc.read(cx).session.doc.settings.units;
@@ -322,15 +582,7 @@ impl PartStudioView {
                         let unit = units.si_factor(Dim::LENGTH);
                         let text = |v: f64| noshape_units::format_quantity_with(Quantity::new((v / unit * 10.0).round() / 10.0 * unit, Dim::LENGTH), &units, 1);
                         for i in axes {
-                            if !t.multi {
-                                dlg.set_expr_text(&t.path(i), &text(d.start[i] + delta[i]), window, cx);
-                                continue;
-                            }
-                            // Std's multiTriadManipulatorHandler: each selected point's offsets move by the drag (its
-                            // frame is the world's: origin or vertex based).
-                            for (k, start) in &d.points {
-                                dlg.set_expr_text(&format!("points.{k}.{}", PARAMS[i]), &text(start[i] + delta[i]), window, cx);
-                            }
+                            dlg.set_expr_text(&t.path(i), &text(d.start[i] + delta[i]), window, cx);
                         }
                     });
                 }
@@ -338,7 +590,13 @@ impl PartStudioView {
             }
             ViewportEvent::ToolUp { .. } => {
                 let Some(d) = self.ui.triad_drag.take() else { return false };
-                if t.multi {
+                if t.multi || d.handle >= RING0 {
+                    // An arrow or a ring that moved keeps its value box, its text selected (live2 rz-45-released).
+                    if t.multi && (d.handle < 3 || (RING0..BALL).contains(&d.handle)) && d.value != 0.0 {
+                        let reference = self.edit.as_ref().and_then(|e| e.dialog.read(cx).feature.params.query("multiEditReference").first().cloned());
+                        self.ui.triad_box = Some(TriadBox { drag: d, reference, input: None });
+                        self.open_triad_box(window, cx);
+                    }
                     self.rebuild_scene(cx);
                     return true;
                 }
@@ -359,6 +617,23 @@ impl PartStudioView {
 /// A Selected points item's point index.
 fn index_value(it: &noshape_model::params::ParamValues) -> Option<usize> {
     it.expr("indexValue").and_then(|x| x.cached.map(|q| q.value).or_else(|| x.text.trim().parse().ok())).map(|v: f64| v.max(0.0) as usize)
+}
+
+/// multiRotationMatrix's text ("[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]", live's) as the triad's axes,
+/// one per row (std stores the transpose of the manipulator's linear part).
+fn parse_matrix(t: &str) -> Option<[DVec3; 3]> {
+    let v: Vec<f64> = t.split(['[', ']', ',']).map(str::trim).filter(|x| !x.is_empty()).map(str::parse).collect::<Result<_, _>>().ok()?;
+    (v.len() == 9 && v.iter().all(|x| x.is_finite())).then(|| [DVec3::new(v[0], v[1], v[2]), DVec3::new(v[3], v[4], v[5]), DVec3::new(v[6], v[7], v[8])])
+}
+
+fn matrix_text(axes: &[DVec3; 3]) -> String {
+    let n = |x: f64| {
+        let x = (x * 1e12).round() / 1e12;
+        let x = if x == 0.0 { 0.0 } else { x };
+        if x.fract() == 0.0 { format!("{x:.1}") } else { format!("{x}") }
+    };
+    let row = |a: &DVec3| format!("[{}, {}, {}]", n(a.x), n(a.y), n(a.z));
+    format!("[{}, {}, {}]", row(&axes[0]), row(&axes[1]), row(&axes[2]))
 }
 
 /// Whether `p` is inside the convex quad `q`.
@@ -389,30 +664,36 @@ impl Manip {
     }
 }
 
-/// The triad's glyph for a frame's view (built by the renderer, see
-/// `manipulators::ManipGeometry`): `hover` the hovered or dragged handle.
-pub(super) fn triad_glyph(t: &Triad, hover: Option<usize>, dragging: bool, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
+/// The triad's glyph for a frame's view (built by the renderer, see `manipulators::ManipGeometry`): `hover` the hovered
+/// or dragged handle, `turn` a ring drag's (handle, origin and axes at its start, angle so far).
+pub(super) fn triad_glyph(t: &Triad, hover: Option<usize>, dragging: bool, turn: Option<(usize, DVec3, [DVec3; 3], f64)>, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
     let Some(wpp) = view.world_per_px(t.origin).filter(|_| t.shown) else { return Vec::new() };
     let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
     let view_dir = view.direction();
     let o = t.origin;
+    let axis = |i: usize| t.axes[i];
     let mut back = LineData::default();
     let mut front = LineData::default();
-    // Like the extrude arrow: white strokes over a light gray outline
-    // (blue on the hovered handle).
-    // Live (part-studio/444): a hovered handle turns blue, outline
-    // rgb(63,111,172) and inner rgb(151,177,217).
-    let gray = crate::theme::rgb8(0xa8adb2);
-    let blue = crate::theme::rgb8(0x3f6fac);
-    let blue_inner = crate::theme::rgb8(0x97b1d9);
-    let white = crate::theme::rgb8(0xffffff);
+    // Transform's: like the extrude arrow, white strokes over a light grey outline; a hovered handle blue, outline
+    // rgb(63,111,172) and inner rgb(151,177,217) (live part-studio/444). The full triad (live2 routing-multi): light grey
+    // hollow strokes, edge ≈ rgb(152,158,164), core rgb(215,217,219), ~4 px; the hovered handle solid rgb(107,144,195)
+    // edged rgb(85,128,180).
+    let (gray, white, blue, blue_inner, edge_px, core_px) = if t.full {
+        (crate::theme::rgb8(0x989ea4), crate::theme::rgb8(0xd7d9db), crate::theme::rgb8(0x5580b4), crate::theme::rgb8(0x6b90c3), 4.0, 2.0)
+    } else {
+        (crate::theme::rgb8(0xa8adb2), crate::theme::rgb8(0xffffff), crate::theme::rgb8(0x3f6fac), crate::theme::rgb8(0x97b1d9), 3.0, 1.5)
+    };
     // While dragging, the other handles go translucent (part-studio/445).
     let fade = |c: [u8; 4], on: bool| if dragging && !on { [c[0], c[1], c[2], 70] } else { c };
     let mut stroke = |pts: &[DVec3], on: bool| {
         let p: Vec<[f32; 3]> = pts.iter().map(|w| f(*w)).collect();
-        back.push_polyline(&p, fade(if on { blue } else { gray }, on), 0, 3.0, LineSegment::ON_TOP);
-        front.push_polyline(&p, fade(if on { blue_inner } else { white }, on), 0, 1.5, LineSegment::ON_TOP);
+        back.push_polyline(&p, fade(if on { blue } else { gray }, on), 0, edge_px, LineSegment::ON_TOP);
+        front.push_polyline(&p, fade(if on { blue_inner } else { white }, on), 0, core_px, LineSegment::ON_TOP);
     };
+    let circle = |c: DVec3, u: DVec3, v: DVec3, r: f64| (0..=24).map(|k| {
+        let a = k as f64 / 24.0 * std::f64::consts::TAU;
+        c + (u * a.cos() + v * a.sin()) * r
+    }).collect::<Vec<_>>();
     for i in 0..3 {
         let dir = axis(i);
         let base = o + dir * SHAFT_PX * wpp;
@@ -420,7 +701,7 @@ pub(super) fn triad_glyph(t: &Triad, hover: Option<usize>, dragging: bool, view:
         let side = dir.cross(view_dir).try_normalize().unwrap_or_else(|| dir.any_orthonormal_vector());
         let (l, r) = (base + side * HEAD_PX * 0.4 * wpp, base - side * HEAD_PX * 0.4 * wpp);
         let on = hover == Some(i);
-        stroke(&[o, base], on);
+        stroke(&[o + dir * if t.full { BALL_PX * wpp } else { 0.0 }, base], on);
         stroke(&[l, apex, r, l], on);
     }
     for h in 3..6 {
@@ -428,6 +709,39 @@ pub(super) fn triad_glyph(t: &Triad, hover: Option<usize>, dragging: bool, view:
         let (a, b) = (axis(i) * SHAFT_PX * wpp, axis(j) * SHAFT_PX * wpp);
         let quad = [o + a * PLANE_FROM + b * PLANE_FROM, o + a * PLANE_TO + b * PLANE_FROM, o + a * PLANE_TO + b * PLANE_TO, o + a * PLANE_FROM + b * PLANE_TO];
         stroke(&[quad[0], quad[1], quad[2], quad[3], quad[0]], hover == Some(h));
+    }
+    if t.full {
+        // Each tip's ring, in the plane of its axis and the next, and its tick across.
+        for k in 0..3 {
+            let (c, side) = (o + axis(k) * (SHAFT_PX + HEAD_PX + RING_GAP_PX) * wpp, axis((k + 1) % 3));
+            let on = hover == Some(RING0 + k);
+            stroke(&circle(c, axis(k), side, RING_PX * wpp), on);
+            stroke(&[c - side * TICK_PX * wpp, c + side * TICK_PX * wpp], on);
+        }
+        let (u, v) = (view_dir.any_orthonormal_vector(), view_dir.cross(view_dir.any_orthonormal_vector()));
+        stroke(&circle(o, u, v, BALL_PX * wpp), hover == Some(BALL));
+    }
+    // A ring drag: a blue arc at the ring's distance from where the ring was, a tick across its start (live2
+    // routing-multi rz-45-held).
+    // An arrow drag: a blue line from where the triad was, a tick across its start (live2 routing-multi tx-after).
+    if let Some((h, o0, axes0, moved)) = turn.filter(|x| x.0 < 3 && x.3 != 0.0 && t.full) {
+        let (u, side) = (axes0[h], axes0[(h + 1) % 3]);
+        front.push_polyline(&[f(o0), f(o0 + u * moved)], blue, 0, 2.0, LineSegment::ON_TOP);
+        front.push_polyline(&[f(o0 - side * TICK_PX * wpp), f(o0 + side * TICK_PX * wpp)], blue, 0, 2.0, LineSegment::ON_TOP);
+    }
+    if let Some((h, o0, axes0, angle)) = turn.filter(|t| t.0 >= RING0 && t.0 < BALL) {
+        let k = h - RING0;
+        let n = axes0[ring_axis(k)];
+        let (u, r) = (axes0[k], (SHAFT_PX + HEAD_PX + RING_GAP_PX) * wpp);
+        let v = n.cross(u);
+        let steps = ((angle.abs() / std::f64::consts::TAU * 96.0).ceil() as usize).max(1);
+        let arc: Vec<[f32; 3]> = (0..=steps).map(|s| {
+            let a = angle * s as f64 / steps as f64;
+            f(o0 + (u * a.cos() + v * a.sin()) * r)
+        }).collect();
+        let start = o0 + u * r;
+        front.push_polyline(&arc, blue, 0, 2.0, LineSegment::ON_TOP);
+        front.push_polyline(&[f(start - u * TICK_PX * wpp), f(start + u * TICK_PX * wpp)], blue, 0, 2.0, LineSegment::ON_TOP);
     }
     vec![
         Instance::new(Drawable::Lines(up.upload_lines(&back))).per_primitive_color().unpickable().ignore_clip().layer(40),
