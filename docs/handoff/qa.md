@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 21:49)
+# QA handoff (agent qa; current state only, updated 2026-11-19 21:53)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -80,7 +80,12 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    P1 walk 21:36 on a58eee8c (sketch -> extrude -> fillet -> pattern -> edit -> undo -> suppress): all build; P2 PATTERN-CHECK-STAYS-
    ENABLED (psui) + live request (REQUESTS qa 11-19 21:36: ✓ after emptying, tooltip on click); reopen, rollback drag, reorder OK. Walk 21:4x: Shell, Boolean union,
    Mirror (auto Add + merge scope), face area readout, Esc keeps selection (live), view cube Top, face menu, Section view: all OK.
-   Next walk: Hole (sketch points), mass properties, measure two entities, then P2 assemblies.
+   Mirror's self-switch to Add confirmed by live's take (mirror-part-right-plane step 4 passes, tabs compared). 21:52: live's capture
+   closed PATTERN-CHECK-STAYS-ENABLED (live keeps ✓ enabled) and gave P1 TOOLBAR-TOOLTIP-AFTER-CLICK (psui told). Hole try on
+   qa-scratch/walk2/h.noshape: my point landed just off the block's top face (Merge scope empty = live's 8559 off-part case; not a bug).
+   Next walk: Hole again with the point well inside the face (sketch on the top face, view normal 'n' first, point at the face centre;
+   expect Merge scope "Part 1" auto, behaviours 6225), mass properties, measure two entities, then P2 assemblies. App runs: units
+   qa-xvfb110 + qa-walk*-app (systemd-run, NOSHAPE_CONFIG_DIR per doc), tool search alt+c + name + Return.
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
