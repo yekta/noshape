@@ -2502,6 +2502,22 @@ impl Ctx<'_> {
             Path::Ellipse(el) => el.at(t),
             Path::Nurbs { c, .. } => c.at(t),
         };
+        // (The face's own edge, another argument's copy of it (between the same vertices, on it all along): nothing
+        // inside the face; OCCT's edges are one common block there (Shell's common f9b29e1d: a part's B-spline arc and
+        // the tool's face's rim, 1e-17 apart, split 13 times where the arc's points fell 0.04-0.26 um either side of
+        // the rim). A B-spline's only: a line's, arc's or ellipse's copy still goes on to its pieces (a Shell's slabs: shell
+        // a_sunk_boss_keeps_its_wall_as_live).)
+        let mut ends = s.v;
+        ends.sort_unstable();
+        let rim = self.faces[f].edges.iter().any(|&(x, _)| {
+            let mut w = self.edges[x].v;
+            w.sort_unstable();
+            let reach = self.pool.pair(self.edges[e].t, self.edges[x].t);
+            x != e && w == ends && (matches!(self.edges[e].g, Geo::Nurbs { .. }) || matches!(self.edges[x].g, Geo::Nurbs { .. })) && [0.25, 0.5, 0.75].iter().all(|&k| self.edge_point_near(x, point(t0 + (t1 - t0) * k)).0 <= reach)
+        });
+        if rim {
+            return Ok(());
+        }
         // (Running on past a free-form face's own edge (on_free_surface's `past_face`): only its part over the face, from
         // where it leaves the surface, a new point there, as OCCT's pave on the face's edge.)
         let (mut t0, mut t1, mut e0, mut e1) = (t0, t1, End::Vertex(s.v[0]), End::Vertex(s.v[1]));

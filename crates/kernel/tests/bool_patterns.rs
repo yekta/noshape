@@ -3159,6 +3159,14 @@ fn an_asymmetric_blend_ring_keeps_its_edge_on_the_boss_whole_as_live() {
     assert!((on_boss.iter().map(|i| i.length).sum::<f64>() - 51.054e-3).abs() < 1e-5);
 }
 
+/// A Shell's common (recorded): the part's B-spline arc and the rim of the tool's B-spline face are one curve (1e-17
+/// apart, between the same vertices). As OCCT's: the arc whole, not split where its points fall a fraction of a
+/// micrometre either side of the rim (ours made 13 vertices on each of four such arcs).
+#[test]
+fn an_edge_along_another_arguments_face_rim_stays_whole() {
+    recorded_as_occt("f9b29e1da054394b", 1e-9);
+}
+
 /// Two plates sharing one edge, fused (recorded): they only touch along it, so OCCT keeps both solids as they were,
 /// that edge shared by four faces, and every input Kept; ours did too only where nothing was shared ("a non-manifold
 /// result": the shared edge was taken for one OCCT remakes).
