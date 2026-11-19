@@ -402,6 +402,9 @@ fn guided_error(e: k::KernelError) -> crate::regen::eval::FeatureError {
 /// Onshape's LOFT_CONFLICTING_CONDITIONS.
 const LOFT_CONFLICT: &str = "The selected end condition or guide constraint may be in conflict.";
 
+/// Onshape's BSURF_INCONSISTENT_CONDITIONS_ERROR.
+const LOFT_INCONSISTENT: &str = "Inconsistent boundary conditions will result in poor surface quality.";
+
 /// loft.fs collectGuideDerivatives (live "psb (10-26 c)"): a guide's
 /// continuity is checked where it meets each profile. Normal / Tangent to
 /// guide need a planar guide (its sketch's plane, else the plane of its
@@ -449,7 +452,12 @@ fn guide_conditions(ev: &EvalCtx, profiles: &[Shape]) -> FResult<()> {
             };
             for (_, t) in tangents()? {
                 let c = t.normalize().dot(n.normalize()).abs();
-                if (kind == "NORMAL_TO_GUIDE" && c < 1.0 - TOL) || (kind == "TANGENT_TO_GUIDE" && c > TOL) {
+                // A profile leaving the guide's plane aslant: Normal to guide is Parasolid's inconsistent boundary (live
+                // core q-guided-loft b / c), Tangent to guide a conflict (d; LG5 with the profile along the normal).
+                if kind == "NORMAL_TO_GUIDE" && c < 1.0 - TOL {
+                    return err(LOFT_INCONSISTENT);
+                }
+                if kind == "TANGENT_TO_GUIDE" && c > TOL {
                     return err(LOFT_CONFLICT);
                 }
             }
@@ -471,6 +479,36 @@ fn guide_conditions(ev: &EvalCtx, profiles: &[Shape]) -> FResult<()> {
                     return err(LOFT_CONFLICT);
                 }
             }
+        }
+    }
+    Ok(())
+}
+
+/// Whether each guide meeting `profile` leaves it within the tangent plane its end condition sets: along a direction, the
+/// plane of the profile's tangent and that direction; across one, the plane normal to it.
+fn guides_leave_within(profile: &Shape, guides: &[Shape], cond: k::LoftEnd) -> FResult<()> {
+    let (along, v) = match cond {
+        k::LoftEnd::AlongDirection(_, v) => (true, v),
+        k::LoftEnd::AcrossDirection(_, v) => (false, v),
+        _ => return Ok(()),
+    };
+    if profile.shape_type() == ShapeType::Vertex {
+        return Ok(());
+    }
+    let nearest = |s: &Shape, p: DVec3| {
+        let d = |e: &Shape| k::make_vertex(p).and_then(|x| k::distance(&x, e)).map_or(f64::MAX, |x| x.distance);
+        s.edges().into_iter().min_by(|a, b| d(a).total_cmp(&d(b)))
+    };
+    for g in guides {
+        let d = k::distance(g, profile)?;
+        if d.distance > 1e-6 {
+            continue;
+        }
+        let (Some(ge), Some(pe)) = (nearest(g, d.point_a), nearest(profile, d.point_a)) else { continue };
+        let (gt, pt) = (edge_tangent_near(&ge, d.point_a)?.normalize(), edge_tangent_near(&pe, d.point_a)?.normalize());
+        let off = if along { gt.dot(pt.cross(v).normalize_or_zero()) } else { gt.dot(v.normalize()) };
+        if off.abs() > 1e-6 {
+            return err(LOFT_CONFLICT);
         }
     }
     Ok(())
@@ -1187,6 +1225,15 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
     if !guide_refs.is_empty() {
         let guides = wires_from(&resolve_curves(ev, &guide_refs)?)?;
         guide_conditions(ev, &shapes)?;
+        // Start / end conditions with guides (live core q-guided-loft e / f): the condition sets the surface's tangent
+        // plane along the profile; a guide leaving the profile out of it conflicts.
+        let vals = ev.params;
+        let normal = |s: &Section| s.profile.as_ref().map(|p| p.frame.normal).or(s.point_normal);
+        let (first, last) = (&sections[0], &sections[sections.len() - 1]);
+        let start = loft_end(ev, vals, ["startCondition", "startMagnitude", "startDirection"], &first.shape, normal(first), "start")?;
+        let end = loft_end(ev, vals, ["endCondition", "endMagnitude", "endDirection"], &last.shape, normal(last), "end")?;
+        guides_leave_within(&first.shape, &guides, start)?;
+        guides_leave_within(&last.shape, &guides, end)?;
         // Surface lofts of open profiles (live "psb (10-26 c)"): Trim guides
         // and Trim profiles.
         let open = !solid && shapes.iter().all(|s| s.shape_type() != ShapeType::Face && s.is_closed().is_ok_and(|c| !c));

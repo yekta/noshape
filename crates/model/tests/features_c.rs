@@ -2289,6 +2289,102 @@ fn a_profile_on_a_closed_path_sweeps_the_whole_loop() {
     }
 }
 
+/// Live core q-guided-loft (11-17): lines (0,0)-(40,0) and (0,60)-(40,60) on Top lofted as a surface along 3-point arcs
+/// via (-8, 30, 10) and (48, 30, 10). Defaults: one face of 3269.1654 mm², straight across between the guides (z 10 at
+/// x 4 and x 20, y 30). Both guides Normal to guide fail BSURF_INCONSISTENT_CONDITIONS_ERROR; guide 1 Tangent to guide,
+/// or Start Normal to profile with the guides, LOFT_START_OR_END_CONDITIONS_WITH_GUIDES_FAILED.
+#[test]
+fn a_guided_loft_with_guide_and_end_conditions_as_live() {
+    let mm = |v: f64| v * 1e-3;
+    let run = |g1: &str, g2: &str, start: Option<(&str, &str)>| -> Result<(f64, f64, f64), String> {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let p1 = sk.add_line(DVec2::ZERO, DVec2::new(mm(40.0), 0.0)).0;
+        let p2 = sk.add_line(DVec2::new(0.0, mm(60.0)), DVec2::new(mm(40.0), mm(60.0))).0;
+        let ends = [(0.0, 0.0), (0.0, 60.0), (40.0, 0.0), (40.0, 60.0)].map(|(x, y)| sk.add_point(DVec2::new(mm(x), mm(y))).0);
+        let top = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let up = s.add("cPlane", |p| {
+            p.set("entities", q(Reference::Plane(DatumPlane::Top)));
+            p.set("offset", expr("10 mm"));
+        });
+        let mut sk = noshape_sketch::Sketch::new();
+        let mids = [(-8.0, 30.0), (48.0, 30.0)].map(|(x, y)| sk.add_point(DVec2::new(mm(x), mm(y))).0);
+        let mid = s.sketch(Reference::FeaturePlane(up), sk);
+        let pt = |sketch: FeatureId, entity: u32| Reference::SketchEntity { sketch, entity };
+        // Each arc on the plane through its three points.
+        let mut guides = Vec::new();
+        for (k, (a, m, b)) in [(DVec3::ZERO, DVec3::new(-8.0, 30.0, 10.0), DVec3::new(0.0, 60.0, 0.0)), (DVec3::new(40.0, 0.0, 0.0), DVec3::new(48.0, 30.0, 10.0), DVec3::new(40.0, 60.0, 0.0))].into_iter().enumerate() {
+            let plane = s.add("cPlane", |p| {
+                p.set("cplaneType", en("THREE_POINT"));
+                p.set("entities", ParamValue::Query(vec![pt(top, ends[2 * k]), pt(mid, mids[k]), pt(top, ends[2 * k + 1])]));
+            });
+            // (A sketch's own frame on the plane: read from an empty one.)
+            let probe = s.sketch(Reference::FeaturePlane(plane), noshape_sketch::Sketch::new());
+            let r = s.ok();
+            let f = r.context.sketch(probe).expect("sketch").frame;
+            let uv = |w: DVec3| DVec2::new((w * 1e-3 - f.origin).dot(f.x), (w * 1e-3 - f.origin).dot(f.y));
+            let (a, m, b) = (uv(a), uv(m), uv(b));
+            // The circle through the three, and the arc from a to b counter-clockwise through m (else b to a).
+            let d = 2.0 * (a.x * (m.y - b.y) + m.x * (b.y - a.y) + b.x * (a.y - m.y));
+            let c = DVec2::new(
+                (a.length_squared() * (m.y - b.y) + m.length_squared() * (b.y - a.y) + b.length_squared() * (a.y - m.y)) / d,
+                (a.length_squared() * (b.x - m.x) + m.length_squared() * (a.x - b.x) + b.length_squared() * (m.x - a.x)) / d,
+            );
+            let ang = |p: DVec2| (p - c).y.atan2((p - c).x);
+            let tau = std::f64::consts::TAU;
+            let ccw = (ang(m) - ang(a)).rem_euclid(tau) < (ang(b) - ang(a)).rem_euclid(tau);
+            let mut sk = noshape_sketch::Sketch::new();
+            let e = if ccw { sk.add_arc(c, a, b) } else { sk.add_arc(c, b, a) }.0;
+            let g = s.sketch(Reference::FeaturePlane(plane), sk);
+            guides.push(pt(g, e));
+        }
+        let item = |id: &str, r: Reference| {
+            let mut v = ParamValues::default();
+            v.set(id, ParamValue::Query(vec![r]));
+            v
+        };
+        let guide = |r: Reference, c: &str| {
+            let mut v = item("guideEntities", r);
+            v.set("guideDerivativeType", en(c));
+            v
+        };
+        let gs = vec![guide(guides[0].clone(), g1), guide(guides[1].clone(), g2)];
+        s.add("loft", |p| {
+            p.set("bodyType", en("SURFACE"));
+            p.set("wireProfilesArray", ParamValue::Array(vec![item("wireProfileEntities", pt(top, p1)), item("wireProfileEntities", pt(top, p2))]));
+            p.set("addGuides", ParamValue::Bool(true));
+            p.set("guidesArray", ParamValue::Array(gs));
+            if let Some((c, m)) = start {
+                p.set("startCondition", en(c));
+                p.set("startMagnitude", expr(m));
+            }
+        });
+        let r = s.regen();
+        let st = r.display.features.last().unwrap();
+        if st.status != FeatureStatus::Ok {
+            return Err(st.message.clone().unwrap_or_default());
+        }
+        let faces: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Surface).flat_map(|b| b.shape.faces()).collect();
+        let area = faces.iter().map(|f| f.area().unwrap()).sum::<f64>() * 1e6;
+        // Where the lines x 20 / x 4, y 30 (parallel to Z) meet it.
+        let z_at = |x: f64| faces.iter().find_map(|f| f.project_point(DVec3::new(mm(x), mm(30.0), mm(10.0))).ok().filter(|p| (p.point.truncate() - DVec2::new(mm(x), mm(30.0))).length() < 1e-6).map(|p| p.point.z / 1e-3));
+        Ok((area, z_at(20.0).unwrap_or(f64::NAN), z_at(4.0).unwrap_or(f64::NAN)))
+    };
+    let (area, z20, z4) = run("DEFAULT", "DEFAULT", None).unwrap();
+    // (Both are fitted surfaces: within 1.5e-5 of live's area.)
+    assert!((area - 3269.1654).abs() < 0.05 && (z20 - 10.0).abs() < 1e-4 && (z4 - 10.0).abs() < 1e-4, "{area} mm², z {z20} / {z4}");
+    let inconsistent = "Inconsistent boundary conditions will result in poor surface quality.";
+    let conflict = "The selected end condition or guide constraint may be in conflict.";
+    for (g1, g2, start, want) in [
+        ("NORMAL_TO_GUIDE", "NORMAL_TO_GUIDE", None, inconsistent),
+        ("TANGENT_TO_GUIDE", "DEFAULT", None, conflict),
+        ("DEFAULT", "DEFAULT", Some(("NORMAL_TO_PROFILE", "1")), conflict),
+        ("DEFAULT", "DEFAULT", Some(("NORMAL_TO_PROFILE", "2")), conflict),
+    ] {
+        assert_eq!(run(g1, g2, start).err().as_deref(), Some(want), "{g1} {g2} {start:?}");
+    }
+}
+
 /// Live q-thin-wall-side-1119: a closed wall's Thickness 1 goes along its edge's direction × the path's from the wall: an
 /// R 17 circle on Right (counter-clockwise about +X) swept 60 mm along -X from its centre is R 16-17 inside (6220.354
 /// mm3), along +X R 17-18 outside (6597.345), and at the end of a path running -X onto it outside too.
