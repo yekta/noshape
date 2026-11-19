@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-19 21:25 UTC (fresh blend thread 11-19 21:10 after the old one stalled at the usage limit). History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-19 22:55 UTC (fresh blend thread 11-19 21:10 after the old one stalled at the usage limit). History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -30,13 +30,25 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 - 805e29 exact edges (blend2, uncommitted on 61320d427): analytic_blend_edges now also runs when no face was converted
   (the edges between OCCT's own cylinders); all 16 convert (8 lines, 8 circles, lengths equal) but the reshaped solid is
   invalid: one cylinder face's area negative (ZZ_ANA trace, bin/805t1.sh). Next: that face's pcurves / orientation.
-- Suspension splice (blend13, uncommitted on 8d9420223 = step 1 make_edge_on): step 2 face_with_edge_replaced passed
-  (kernel core:: 56 ok, g13 OK; clippy warnings only in the zz_lca_splice probe in crash_inputs.rs: drop the probe from
-  the land, keep it in parked/). Step 3 = blend_section.rs canal_corners (each B-spline patch with round / tube / plane
-  / torus neighbours rebuilt as a canal, face by face, sewn, unified) hooked in detail.rs fillet() after naming; T1
-  features_c::rounds_running_into_a_tube_close_on_canals_as_live (70/156/86, 8 canals 158.817, 1763356.88 mm3 +-12;
-  data suspension-lca-fillet3-input.brep untracked: add it). Compile fixed 21:20; bin/lca-t1.sh <host> -> logs/lca-t1.out.
-  Then: strict suite + userdocs + g13, land steps 1-3 together.
+- NOW (lead 22:50, outranks the splice): dx's car Fillet 1 (blocks c2-surf-intro-boundary / -fill / -mutualtrim /
+  -offset / -ruled at "Derived 1"). Car Part Studio Fillet 1: EDGE 0.6 in, tangent on, one edge (right top B-spline
+  296.776 mm, (0,0,10.728) -> (50.517,254,30.343) mm) of a closed 5-face solid (4 surface lofts + mirror, Add). Ours
+  "Failed to fillet selections." ~1.5 s; live OK 7/14/9, 1289903.86 mm3, 81475.79 mm2 (before: 5/9/6, 1316056.85 /
+  85055.72). Repro /root/dx-scratch/si-save/c2-surf-intro-offset.noshape (2nd Part Studio), needs dx fb8f84f42 (blend5
+  branch blend-car = main + it). Live per-rollback: /root/parity/models/c2-surf-intro-boundary/derived/
+  b7635b82f8e8a430971f91c9/live.jsonl index 16. bin/car-dump.sh <host> -> host ~/tmp/blend/cdump, logs/car-dump.out.
+- 805e29 exact edges (blend2 62616b568, rebased): pcurves moved into the old edge's period (edge_on_curve), volume
+  check 1e-8 for edges only; T1 passes, kernel 531 / features_c 103 ok. Gate unit blend-gate805 (bin/gate805.sh):
+  g13-805.log, ud-805.log (vibex7), suite-e805.cmp (vibe2). Land when clean.
+- Suspension splice (blend13, uncommitted on 8d9420223 = step 1 make_edge_on; diff is all this thread's, checked
+  22:35): step 2 face_with_edge_replaced passed (kernel 56 ok, g13 OK). Step 3 canal_corners in blend_section.rs +
+  detail.rs hook; T1 features_c::rounds_running_into_a_tube_close_on_canals_as_live (data brep untracked: add it).
+  Fixed: compile, patch found by its 4 corners (was by area: all 8 are 241.324). Now 3 of 8 corners splice (z -15);
+  z +15 fail: round / tube face_with_edge_replaced invalid (wire self-intersecting 18 + face 27; UV u -1.59..6.28,
+  tube 0..11.5: the run's pcurves a period off / crossing the seam), canal face_on status 32 (also on good corners,
+  sew fixes it). Next: pcurves of the run in the period of the kept wire (FixShifted isn't enough), seam of the pipe
+  profile opposite the canal. Debug: ZZ_CANAL (blend_section.rs eprintln, build.cpp zz_statuses): strip before land.
+  bin/lca-t1.sh [host] -> logs/lca-t1.out + lca-full.log. Probe parked/zz-lca-splice-probe.patch (drop from land).
 - Mutualtrim Fillet 1 (blend4, parked): split_on turns closed touch loops into zero-area faces.
 - Agent ids (restart 11-19 21:10): studios 91339202-41f1-4465-91f4-65ccd26ea1b1, dx 6cfc89bd-1196-43ef-9225-0014546fee1e,
   qa ac50e7f2-4677-4cab-a57a-fd068a0c07bf, psui 7e3f2635-05e1-47c0-8594-9dbc0e9a79d7, asm d8d597e0-675c-497b-a804-544ceab99bbd,
