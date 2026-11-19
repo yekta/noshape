@@ -90,8 +90,14 @@
 #include <TopoDS_Shell.hxx>
 #include <TopoDS_Solid.hxx>
 #include <TopoDS_Wire.hxx>
-#include <ShapeUpgrade_ShapeDivideClosed.hxx>
-#include <ShapeUpgrade_ShapeDivideClosedEdges.hxx>
+#include <ShapeUpgrade_ClosedEdgeDivide.hxx>
+#include <ShapeUpgrade_ClosedFaceDivide.hxx>
+#include <ShapeUpgrade_FaceDivide.hxx>
+#include <ShapeUpgrade_ShapeDivide.hxx>
+#include <ShapeUpgrade_SplitSurface.hxx>
+#include <ShapeUpgrade_WireDivide.hxx>
+#include <NCollection_Map.hxx>
+#include <TopTools_ShapeMapHasher.hxx>
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
@@ -2225,8 +2231,32 @@ struct BodyWriter
 class SafeSweptToElementary : public ShapeCustom_SweptToElementary
 {
 public:
+  // (A spindle torus too, which OCCT leaves a revolution: written whole as live writes cf-snap-hook's hole rounds.)
+  bool NewSurface(const TopoDS_Face& F, occ::handle<Geom_Surface>& S, TopLoc_Location& L, double& Tol, bool& RevWires, bool& RevFace) override
+  {
+    if (ShapeCustom_SweptToElementary::NewSurface(F, S, L, Tol, RevWires, RevFace))
+      return true;
+    const auto sp = spindle_torus(F);
+    if (!sp)
+      return false;
+    L        = sp->loc;
+    S        = sp->torus;
+    Tol      = BRep_Tool::Tolerance(F);
+    RevWires = RevFace = sp->mirror;
+    return true;
+  }
   bool NewCurve2d(const TopoDS_Edge& E, const TopoDS_Face& F, const TopoDS_Edge& NewE, const TopoDS_Face& NewF, occ::handle<Geom2d_Curve>& C, double& Tol) override
   {
+    if (const auto sp = spindle_torus(F))
+    {
+      double f, l;
+      const auto c = BRep_Tool::CurveOnSurface(E, F, f, l);
+      if (c.IsNull())
+        return false;
+      C   = spindle_pcurve(*sp, c);
+      Tol = BRep_Tool::Tolerance(E);
+      return true;
+    }
     TopLoc_Location loc;
     const occ::handle<Geom_Surface> S = BRep_Tool::Surface(F, loc);
     const bool swept = !S.IsNull() && S->IsKind(STANDARD_TYPE(Geom_SweptSurface));
@@ -2293,6 +2323,61 @@ public:
     return BRep_Tool::Continuity(E, F1, F2);
   }
 };
+
+// An offset face whose surface is a plane, cylinder, cone, sphere or torus (OCCT's equivalent of an offset of one), or a
+// circle turned about an axis (the offset circle turned), as that surface, the same (u, v): a Shell's wall over a round
+// (cf-snap-hook) written as live writes it, a torus (before, OFFSET_SURF that won't go round, cut in two). Within 1e-9 m
+// at a 5 x 5 grid of the face's domain.
+TopoDS_Shape offsets_as_surfaces(const TopoDS_Shape& s)
+{
+  occ::handle<FaceSurfaces> mod = new FaceSurfaces;
+  for (TopExp_Explorer ef(s, TopAbs_FACE); ef.More(); ef.Next())
+  {
+    const TopoDS_Face F = TopoDS::Face(ef.Current().Oriented(TopAbs_FORWARD));
+    TopLoc_Location   loc;
+    const auto        off = occ::down_cast<Geom_OffsetSurface>(BRep_Tool::Surface(F, loc));
+    if (off.IsNull() || mod->surfaces.IsBound(F))
+      continue;
+    std::vector<occ::handle<Geom_Surface>> candidates;
+    if (const occ::handle<Geom_Surface> same = off->Surface(); !same.IsNull())
+      candidates.push_back(same);
+    if (const auto sr = occ::down_cast<Geom_SurfaceOfRevolution>(off->BasisSurface()))
+    {
+      occ::handle<Geom_Curve> basis = sr->BasisCurve();
+      while (const auto t = occ::down_cast<Geom_TrimmedCurve>(basis))
+        basis = t->BasisCurve();
+      if (const auto circle = occ::down_cast<Geom_Circle>(basis))
+        for (const double r : {circle->Radius() + off->Offset(), circle->Radius() - off->Offset()})
+          if (r > Precision::Confusion())
+          {
+            gp_Circ c = circle->Circ();
+            c.SetRadius(r);
+            candidates.push_back(new Geom_SurfaceOfRevolution(new Geom_Circle(c), sr->Axis()));
+          }
+    }
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(F, u0, u1, v0, v1);
+    for (const occ::handle<Geom_Surface>& c : candidates)
+    {
+      double worst = 0;
+      for (int i = 0; i <= 4; ++i)
+        for (int j = 0; j <= 4; ++j)
+        {
+          const double u = u0 + (u1 - u0) * i / 4, v = v0 + (v1 - v0) * j / 4;
+          worst          = std::max(worst, c->Value(u, v).Distance(off->Value(u, v)));
+        }
+      if (worst < 1e-9)
+      {
+        mod->surfaces.Bind(F, c);
+        break;
+      }
+    }
+  }
+  if (mod->surfaces.IsEmpty())
+    return s;
+  BRepTools_Modifier m(s, mod);
+  return m.IsDone() ? m.ModifiedShape(s) : s;
+}
 
 // A closed B-surface face that won't go round periodic, made by approximating another face's surface offset over
 // that surface's own (u, v) (a Shell's wall: cf-hose-routing's inner walls, degree-12 sections of the outer walls'
@@ -2381,9 +2466,62 @@ TopoDS_Shape offsets_restored(const TopoDS_Shape& s)
   return m.IsDone() ? m.ModifiedShape(s) : s;
 }
 
+using ShapeSet = NCollection_Map<TopoDS_Shape, TopTools_ShapeMapHasher>;
+
+// Closed faces cut in two, only those in `faces`.
+class CutFaces : public ShapeUpgrade_ClosedFaceDivide
+{
+public:
+  explicit CutFaces(const ShapeSet& faces) : faces(faces)
+  {
+    SetNbSplitPoints(1);
+    SetWireDivideTool(nullptr);
+  }
+  bool SplitSurface(const double area) override { return faces.Contains(myFace) && ShapeUpgrade_ClosedFaceDivide::SplitSurface(area); }
+
+private:
+  ShapeSet faces;
+};
+
+// Closed edges cut in two, only those in `edges`.
+class CutEdges : public ShapeUpgrade_ClosedEdgeDivide
+{
+public:
+  explicit CutEdges(const ShapeSet& edges) : edges(edges) {}
+  bool Compute(const TopoDS_Edge& e) override
+  {
+    Clear();
+    return edges.Contains(e) && ShapeUpgrade_ClosedEdgeDivide::Compute(e);
+  }
+
+private:
+  ShapeSet edges;
+};
+
+TopoDS_Shape faces_cut(const TopoDS_Shape& s, const ShapeSet& faces)
+{
+  ShapeUpgrade_ShapeDivide d(s);
+  d.SetSplitFaceTool(new CutFaces(faces));
+  d.Perform();
+  return d.Result();
+}
+
+TopoDS_Shape edges_cut(const TopoDS_Shape& s, const ShapeSet& edges)
+{
+  occ::handle<ShapeUpgrade_WireDivide> w = new ShapeUpgrade_WireDivide;
+  w->SetEdgeDivideTool(new CutEdges(edges));
+  occ::handle<ShapeUpgrade_FaceDivide> f = new ShapeUpgrade_FaceDivide;
+  f->SetWireDivideTool(w);
+  f->SetSplitSurfaceTool(nullptr);
+  ShapeUpgrade_ShapeDivide d(s);
+  d.SetSplitFaceTool(f);
+  d.Perform();
+  return d.Result();
+}
+
 TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, RoundSplines round, bool offsets)
 {
-  TopoDS_Shape r = swept_to_elementary(s);
+  TopoDS_Shape r = swept_to_elementary(offsets_as_surfaces(s));
   for (TopExp_Explorer ef(r, TopAbs_FACE); ef.More() && keep_spun; ef.Next())
   {
     TopLoc_Location                 loc;
@@ -2402,39 +2540,41 @@ TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, RoundSplines round,
   r = ShapeCustom::ConvertToBSpline(r, round == RoundSplines::Acis, !keep_spun, !offsets, false);
   if (offsets)
     r = offsets_restored(r);
-  bool split = false;
-  for (TopExp_Explorer ef(r, TopAbs_FACE); ef.More() && !split; ef.Next())
+  // Faces closed on a surface that isn't periodic are cut in two, only they (cf-snap-hook's x_t read back 136 faces for
+  // 128 when one such face had every closed face cut).
+  ShapeSet split;
+  for (TopExp_Explorer ef(r, TopAbs_FACE); ef.More(); ef.Next())
   {
     const TopoDS_Face& F = TopoDS::Face(ef.Current());
     TopLoc_Location    loc;
     if (periodic_face(basis_surface(BRep_Tool::Surface(F, loc)), F, round))
       continue;
-    for (TopExp_Explorer ee(F, TopAbs_EDGE); ee.More() && !split; ee.Next())
-      split = BRep_Tool::IsClosed(TopoDS::Edge(ee.Current()), F);
+    for (TopExp_Explorer ee(F, TopAbs_EDGE); ee.More(); ee.Next())
+      if (BRep_Tool::IsClosed(TopoDS::Edge(ee.Current()), F))
+      {
+        split.Add(F);
+        break;
+      }
   }
-  if (split)
-  {
-    ShapeUpgrade_ShapeDivideClosed d(r);
-    d.SetNbSplitPoints(1);
-    d.Perform();
-    r = d.Result();
-  }
+  if (!split.IsEmpty())
+    r = faces_cut(r, split);
   // A closed edge needs a periodic curve (circle, ellipse): an XT trimmed
   // curve on an open basis may not start where it ends (Onshape G13: the
-  // closed intersection loops of two cylinders). Split the others.
-  bool closed = false;
+  // closed intersection loops of two cylinders). Split the others, only them (cf-hose-routing: one tolerant end ring
+  // had all of a hose's rings cut).
+  ShapeSet cut;
   NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> ef;
   TopExp::MapShapesAndAncestors(r, TopAbs_EDGE, TopAbs_FACE, ef);
-  for (TopExp_Explorer ee(r, TopAbs_EDGE); ee.More() && !closed; ee.Next())
+  for (TopExp_Explorer ee(r, TopAbs_EDGE); ee.More(); ee.Next())
   {
     const TopoDS_Edge& e = TopoDS::Edge(ee.Current());
-    if (BRep_Tool::Degenerated(e) || !TopExp::FirstVertex(e).IsSame(TopExp::LastVertex(e)))
+    if (cut.Contains(e) || BRep_Tool::Degenerated(e) || !TopExp::FirstVertex(e).IsSame(TopExp::LastVertex(e)))
       continue;
     double                  f, l;
     occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l);
     while (auto t = occ::down_cast<Geom_TrimmedCurve>(c))
       c = t->BasisCurve();
-    closed = c.IsNull() || (occ::down_cast<Geom_Circle>(c).IsNull() && occ::down_cast<Geom_Ellipse>(c).IsNull() && ring_bspline(c, f, l).IsNull());
+    bool closed = c.IsNull() || (occ::down_cast<Geom_Circle>(c).IsNull() && occ::down_cast<Geom_Ellipse>(c).IsNull() && ring_bspline(c, f, l).IsNull());
     // (Nor one off its faces by more than the precision: a tolerant edge has no curve of its own, and Parasolid
     // dropped the hoses whose inner walls' end rings were such, closed on one vertex: live 2975, 3016; split, 3054.)
     if (!closed && ef.Contains(e))
@@ -2454,14 +2594,11 @@ TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, RoundSplines round,
           closed = c3->Value(f + (l - f) * i / 20.0).Distance(sf->Value(uv.X(), uv.Y()).Transformed(loc.Transformation())) > kPrecision;
         }
       }
+    if (closed)
+      cut.Add(e);
   }
-  if (closed)
-  {
-    ShapeUpgrade_ShapeDivideClosedEdges d(r);
-    d.SetNbSplitPoints(1);
-    d.Perform();
-    r = d.Result();
-  }
+  if (!cut.IsEmpty())
+    r = edges_cut(r, cut);
   return r;
 }
 

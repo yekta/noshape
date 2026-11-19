@@ -257,6 +257,38 @@ fn an_iges_spindle_torus_in_halves_reads_as_one_face() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// The same spindle-rounded boss shelled from its bottom (its inner round an offset of the round) writes to x_t with
+/// both rounds whole tori, as live writes cf-snap-hook's (ours cut its offsets in two: 136 faces read back for 128).
+#[test]
+fn a_spindle_round_and_its_shell_offset_write_to_xt_as_whole_tori() {
+    let dir = std::env::temp_dir().join(format!("noshape-xt-spindle-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let p = |x: f64, z: f64| DVec3::new(x, 0.0, z);
+    let a = std::f64::consts::FRAC_1_SQRT_2 * 2.5;
+    let edges = [
+        make_line(p(0.0, 0.0), p(4.5, 0.0)).unwrap(),
+        make_line(p(4.5, 0.0), p(4.5, 7.5)).unwrap(),
+        make_arc_3pts(p(4.5, 7.5), p(2.0 + a, 7.5 + a), p(2.0, 10.0)).unwrap(),
+        make_line(p(2.0, 10.0), p(0.0, 10.0)).unwrap(),
+        make_line(p(0.0, 10.0), p(0.0, 0.0)).unwrap(),
+    ];
+    let profile = make_face(&Plane::new(DVec3::ZERO, DVec3::Y, DVec3::X), &make_wire(&edges).unwrap(), &[]).unwrap();
+    let boss = revolve(&profile, DVec3::ZERO, DVec3::Z, std::f64::consts::TAU).unwrap().shape;
+    let bottom = boss.faces().into_iter().find(|f| f.centroid().is_ok_and(|c| c.z.abs() < 1e-9)).unwrap();
+    let cup = shell(&boss, &[bottom], 1.0, ShellSide::Inside, JoinType::Arc).unwrap().shape;
+    let kinds = |s: &Shape| s.faces().iter().map(|f| format!("{:?}", f.face_surface().unwrap()).split([' ', '(', '{']).next().unwrap().to_string()).collect::<Vec<_>>();
+    let model = kinds(&cup);
+    assert!(model.iter().any(|k| k == "Offset"), "the case: the inner round an offset ({model:?})");
+    let path = dir.join("cup.x_t");
+    write_parasolid(&path, std::slice::from_ref(&cup), LengthUnit::Millimeter, false).unwrap();
+    let back = read_parasolid(&path, LengthUnit::Millimeter).unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(back.count(ShapeType::Face), cup.count(ShapeType::Face), "{:?}", kinds(&back));
+    assert_eq!(kinds(&back).iter().filter(|k| *k == "Torus").count(), 2, "{:?}", kinds(&back));
+    let (v0, v1) = (volume_properties(&cup).unwrap().mass, volume_properties(&back).unwrap().mass);
+    assert!((v1 - v0).abs() < 1e-6 * v0, "{v1} vs {v0}");
+}
+
 /// A sphere written as a B-spline surface (an IGES writer's rational surfaces: live's o-ring) reads as a sphere, as
 /// Onshape's import.
 #[test]
@@ -2020,7 +2052,8 @@ fn a_step_surface_models_closed_shell_reads_as_a_solid() {
 /// outer walls, approximated as non-rational degree-12 single-span B-surfaces) won't go round periodic, and Parasolid
 /// dropped the hoses whose walls were written so (live 2452, 2975). Written as live writes its own hose, offsets of the
 /// periodic outer walls (OFFSET_SURF), every face whole: 12 faces read back (before, the one stiff seam had every
-/// closed face split in two: 22 / 44 / 24); live imports the four hoses so (3054).
+/// closed face split in two: 22 / 44 / 24); live imports the four hoses so (3054). Only its tolerant end rings are cut
+/// (10-20 nm off their walls), the others kept whole (before, one tolerant ring had all twelve cut: 12 / 34 / 24).
 #[test]
 fn a_hoses_walls_write_whole() {
     let dir = std::env::temp_dir().join(format!("noshape-xt-hose-{}", std::process::id()));
@@ -2030,8 +2063,9 @@ fn a_hoses_walls_write_whole() {
     let file = dir.join("hose.x_t");
     write_parasolid(&file, std::slice::from_ref(&hose), LengthUnit::Meter, false).unwrap();
     let back = read_parasolid(&file, LengthUnit::Meter).unwrap();
-    // (Its inner walls' end rings split in two: tolerant edges closed on one vertex made Parasolid drop the hose, live 3054.)
-    assert_eq!((back.count(ShapeType::Face), back.count(ShapeType::Edge), back.count(ShapeType::Vertex)), (12, 34, 24), "every face whole");
+    // (Its inner walls' tolerant end rings split in two: tolerant edges closed on one vertex made Parasolid drop the hose,
+    // live 3054.)
+    assert_eq!((back.count(ShapeType::Face), back.count(ShapeType::Edge), back.count(ShapeType::Vertex)), (12, 28, 18), "every face whole, six rings cut");
     // (The model's inner walls are the offsets approximated, ~1 nm off on the 1 mm wall: 1e-6 of the volume.)
     let (v0, v1) = (hose.volume().unwrap(), back.volume().unwrap());
     assert!((v1 - v0).abs() < 2e-6 * v0, "{v1} vs {v0}");
@@ -2430,4 +2464,3 @@ fn a_solid_of_disconnected_pieces_imports_as_a_part_each() {
     let v: f64 = pieces.iter().map(|p| volume_properties(&p.shape).unwrap().mass).sum();
     assert!((v - 3e-6).abs() < 1e-12, "{v}");
 }
-

@@ -14,6 +14,9 @@
 #include <IntCurvesFace_Intersector.hxx>
 #include <TopAbs_State.hxx>
 #include <memory>
+#include <optional>
+#include <Geom2d_Curve.hxx>
+#include <TopLoc_Location.hxx>
 #include <vector>
 #include <GProp_GProps.hxx>
 #include <Geom_BSplineSurface.hxx>
@@ -228,6 +231,18 @@ std::string rust_last_decline();
 occ::handle<Geom_Surface> as_plane(const occ::handle<Geom_Surface>& s, const TopoDS_Face& f);
 // A B-spline face lying on a cylinder: that cylinder (rust_boolean.cpp); else `s`.
 occ::handle<Geom_Surface> as_cylinder(const occ::handle<Geom_Surface>& s, const TopoDS_Face& f);
+// A face on a circle turned about an axis closer to its centre than its radius (a spindle torus, which OCCT leaves a
+// revolution: cf-snap-hook's hole rounds) as that torus; its curves map over exactly: u as it was, v turned by the
+// circle's start (`phi`), or run backwards (`mirror`: the torus' normal the other way). boolean.cpp.
+struct SpindleTorus
+{
+  occ::handle<Geom_Surface> torus;
+  TopLoc_Location           loc;
+  double                    phi;
+  bool                      mirror;
+};
+std::optional<SpindleTorus> spindle_torus(const TopoDS_Face& F);
+occ::handle<Geom2d_Curve>   spindle_pcurve(const SpindleTorus& sp, const occ::handle<Geom2d_Curve>& c);
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
                   double fuzzy = 0, bool touching_only = false, bool scaled_inputs = false);
