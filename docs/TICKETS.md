@@ -863,6 +863,12 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   (a part face). Seen twice (a rectangle before Revolve 1, a circle on Top). (b) Outside sketch mode, hover the circle's
   centre point and move off to empty space: the orange centre dot stays (1.5 s later, and after Shift+7); the rim's
   hover clears as it should, and so does a part face's (live clears a hover when the pointer leaves the entity).
+- [ ] P1 **OFFSET-EDIT-SCALES-SKETCH (skasm)**: in a sketch with no dimensions yet, Offset (O) a free circle, Enter, type 3,
+  Enter: ours treats the offset's distance as the sketch's first dimension and scales the whole sketch by 3/5 about its
+  centre (green f3bc85da, walk 22:3x: copy r 56 -> 33 px, source r 40 -> 24 px, any other free geometry shrinks too).
+  Live (behaviours psb 10-24 j (c), same flow on a free Ø-r5 circle, 5 -> 3): no scaling; the copy keeps r 10 and the
+  free source grows to r 7 (the solver moves the source). The first-dimension scaling (behaviours 34917) is live's for the
+  Dimension tool / typed box. Offset's default 5 mm box, arrow and pointer-independent preview are = live.
 
 ## Interaction feel suite 11-19 (qa 16:20: run 1119-1242-223cec7e on vibex8, failures re-run on green eb3b06a8 on vibe2)
 2110/2172 scenarios (05:51 run on a67911be: 2126). 67 failing; 28 pass on the re-run (load flakes or fixed). The 39 still failing
