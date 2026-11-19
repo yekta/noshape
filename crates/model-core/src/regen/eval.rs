@@ -500,6 +500,10 @@ impl<'a> EvalCtx<'a> {
             match &s.kind {
                 ParamKind::Num(n) => {
                     let Ok(v) = self.eval_num_in(vals, s.id, n.kind) else { continue };
+                    // Live (live2 feature-dialogs-1119): a count of 2.5 is refused, the field marked.
+                    if matches!(n.kind, NumKind::Integer) && (v - v.round()).abs() > 1e-9 {
+                        return err_at(&[s.id], "Enter a valid expression.");
+                    }
                     // Live (L32, L45, L55): Onshape's text for a value out of
                     // its range, with the field marked: the dialog's refusal of
                     // a typed value. One a variable gives is out of range at

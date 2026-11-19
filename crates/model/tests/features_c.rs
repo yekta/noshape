@@ -1417,6 +1417,22 @@ fn a_variables_value_out_of_range_is_out_of_range() {
     }
 }
 
+/// Live (live2 feature-dialogs-1119): a Linear pattern's Instance count of 2.5 is refused ("Enter a valid expression.",
+/// the field marked); 1 + 2 is 3.
+#[test]
+fn a_count_that_is_not_whole_is_not_a_valid_expression() {
+    for (count, ok) in [("2.5", false), ("1 + 2", true)] {
+        let mut s = Studio::new();
+        s.add("linearPattern", |p| p.set("instanceCount", expr(count)));
+        let r = s.regen();
+        let st = r.display.features.last().unwrap();
+        assert_eq!(st.message.as_deref() == Some("Enter a valid expression."), !ok, "{count}: {:?}", st.message);
+        if !ok {
+            assert_eq!(st.faulty, vec!["instanceCount".to_string()]);
+        }
+    }
+}
+
 #[test]
 fn flat_spiral_planes_and_ruled_overrides() {
     // Height 0 (a flat spiral) is out of Onshape's range (live L32).
