@@ -490,6 +490,8 @@ pub struct PlacedTooltip {
     user: bool,
     /// Fades in over this long once shown, from this opacity (a feature row's, live feel/list-1118).
     fade: Option<(std::time::Duration, f32)>,
+    /// The expanded block upright, not italic (a version's description).
+    upright: bool,
 }
 
 /// A feature list row's tooltip: shown 80 ms after the pointer arrives, fully by ~200 ms (live feel/list-1118, three runs:
@@ -535,7 +537,7 @@ impl Render for PlacedTooltip {
             .map(|d| if self.user { d.child(user_text(self.text.clone())) } else { d.child(self.text.clone()) });
         // Live `.tooltip-expand`: the expanded fill, 4 px padding, at most
         // 400 px wide, under the title.
-        let extra = self.expanded.as_ref().filter(|(_, shown)| *shown).map(|(text, _)| div().max_w(px(RICH_TOOLTIP_W)).p(px(4.)).line_height(px(18.)).bg(gpui_kit::rgb(0xffffff)).italic().child(text.clone()));
+        let extra = self.expanded.as_ref().filter(|(_, shown)| *shown).map(|(text, _)| div().max_w(px(RICH_TOOLTIP_W)).p(px(4.)).line_height(px(18.)).bg(gpui_kit::rgb(0xffffff)).when(!self.upright, |d| d.italic()).child(text.clone()));
         let content = div()
             .debug_selector(|| "placed-tooltip".into())
             .font_family(cx.theme().font_family.clone())
@@ -617,7 +619,7 @@ fn tip_with(el: Stateful<Div>, text: SharedString, side: TipSide, user: bool) ->
         .on_any_mouse_down(move |_, _, _| p3.set(true))
         .tooltip(move |_, cx| {
             let (text, anchor, pressed) = (text.clone(), anchor.get(), pressed.clone());
-            cx.new(|_| PlacedTooltip { text, side, anchor, width: Default::default(), pressed, expanded: None, user, fade: Some((TOOLTIP_FADE_IN, 0.)) }).into()
+            cx.new(|_| PlacedTooltip { text, side, anchor, width: Default::default(), pressed, expanded: None, user, fade: Some((TOOLTIP_FADE_IN, 0.)), upright: false }).into()
         })
 }
 
@@ -654,10 +656,27 @@ pub fn with_side_tooltip_expanded(row: Stateful<Div>, text: impl Into<SharedStri
                     });
                 })
                 .detach();
-                PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: Some((extra, false)), user: false, fade: Some((TOOLTIP_FADE_IN, 0.)) }
+                PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: Some((extra, false)), user: false, fade: Some((TOOLTIP_FADE_IN, 0.)), upright: false }
             })
             .into()
         })
+}
+
+/// A version row's tooltip (live2 doc-feel-1119 L31): beside the row after 2.27 s, "Open version V1" over the version's
+/// description (upright, on white), the title alone without one.
+pub const VERSION_TIP_DELAY: std::time::Duration = std::time::Duration::from_millis(2270);
+
+pub fn with_described_side_tooltip(row: Stateful<Div>, text: impl Into<SharedString>, description: Option<SharedString>, delay: std::time::Duration) -> Stateful<Div> {
+    let text: SharedString = text.into();
+    let anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+    let a2 = anchor.clone();
+    row.relative()
+        .child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+        .tooltip(move |_, cx| {
+            let (text, expanded, anchor) = (text.clone(), description.clone().map(|d| (d, true)), anchor.get());
+            cx.new(|_| PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded, user: false, fade: Some((TOOLTIP_FADE_IN, 0.)), upright: true }).into()
+        })
+        .tooltip_show_delay(delay)
 }
 
 /// [`with_user_side_tooltip`] whose text and place are worked out when the
@@ -667,7 +686,7 @@ pub fn with_side_tooltip_expanded(row: Stateful<Div>, text: impl Into<SharedStri
 pub fn with_lazy_side_tooltip(row: Stateful<Div>, anchor: impl Fn() -> Bounds<Pixels> + 'static, text: impl Fn(&App) -> SharedString + 'static) -> Stateful<Div> {
     row.tooltip(move |_, cx| {
         let (text, anchor) = (text(cx), anchor());
-        cx.new(|_| PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: None, user: true, fade: Some(ROW_TIP_FADE) }).into()
+        cx.new(|_| PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: None, user: true, fade: Some(ROW_TIP_FADE), upright: false }).into()
     })
     .tooltip_show_delay(ROW_TIP_DELAY)
 }

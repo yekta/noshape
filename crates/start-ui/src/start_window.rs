@@ -361,9 +361,8 @@ pub struct StartView {
     view: ViewMode,
     sort: SortKey,
     descending: bool,
-    /// The sort arrow shows once a header was clicked this session (live
-    /// documents/20, 80: the default order is unmarked).
-    sort_shown: bool,
+    /// The list header under the pointer (its grey ▲▼ pair).
+    hover_header: Option<&'static str>,
     search: Entity<InputState>,
     query: String,
     /// The selected row (the last clicked); with Ctrl / Shift + click, `also` holds the others, valid while `selected`
@@ -595,7 +594,7 @@ impl StartView {
             view: prefs.view,
             sort: prefs.sort,
             descending: prefs.descending,
-            sort_shown: false,
+            hover_header: None,
             search,
             query: String::new(),
             selected: None,
@@ -783,7 +782,6 @@ impl StartView {
     }
 
     fn set_sort(&mut self, key: SortKey, cx: &mut Context<Self>) {
-        self.sort_shown = true;
         if self.sort == key {
             self.descending = !self.descending;
         } else {
@@ -2964,7 +2962,7 @@ impl StartView {
 
     /// Onshape documents page top bar: 40 px `#eaeaea`, logo at the left,
     /// the search box (390 px, with its square search button) centered.
-    fn render_title_bar(&self, cx: &mut Context<Self>) -> AnyElement {
+    fn render_title_bar(&self, search_focused: bool, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         TitleBar::new()
             .h(px(crate::ui::NAVBAR_H))
@@ -2997,8 +2995,8 @@ impl StartView {
                                         .flex_1()
                                         .h_full()
                                         .bg(pal.panel)
-                                        .border_1()
-                                        .border_color(pal.border_strong)
+                                        // Focused: a 2 px rgb(62,148,255) border (live2 doc-feel-1119 L06).
+                                        .map(|d| if search_focused { d.border_2().border_color(rgb(0x3e94ff)) } else { d.border_1().border_color(pal.border_strong) })
                                         .rounded_l(px(2.))
                                         // The whole box left of the ▾ takes clicks (input_frame).
                                         .child(gpui_kit::base::input::input_frame(div().flex_1().h_full().flex().items_center().map(|d| crate::ui_script::mark(d, || "field:Search".into())).child(Input::new(&self.search).text_size(px(14.)).appearance(false).small().h(px(26.)).cleanable(true).pl(px(12.)))))
@@ -3815,7 +3813,18 @@ impl StartView {
     /// its right edge; sortable columns show ▲/▼.
     fn list_header_cell(&self, id: &'static str, label: &'static str, key: Option<SortKey>, cx: &mut Context<Self>) -> Stateful<Div> {
         let pal = p();
-        let active = self.sort_shown && key == Some(self.sort);
+        // The sorted column shows its arrows, the default order's too (live2 doc-feel-1119 L03: ▼ beside Modified).
+        let active = key == Some(self.sort);
+        let hovered = key.is_some() && self.hover_header == Some(id);
+        // The ▲▼ pair (live2 doc-feel-1119 L03): the sorted direction #333 over #d7d7d7, a hovered column's both #999.
+        let pair = (active || hovered).then(|| {
+            let (up, down) = match (active, self.descending) {
+                (true, true) => (rgb(0xd7d7d7), rgb(0x333333)),
+                (true, false) => (rgb(0x333333), rgb(0xd7d7d7)),
+                _ => (rgb(0x999999), rgb(0x999999)),
+            };
+            v_flex().gap(px(-4.)).child(os::glyph(os::GLYPH_CARET_UP, 10., up)).child(os::glyph(os::GLYPH_CARET, 10., down))
+        });
         h_flex()
             .id(id)
             .map(|d| crate::ui_script::mark(d, move || format!("col_header:{label}")))
@@ -3826,10 +3835,21 @@ impl StartView {
             .font_weight(FontWeight::SEMIBOLD)
             .text_color(pal.text)
             .child(label)
-            .when(active, |d| d.child(os::glyph(os::GLYPH_CARET, 9., pal.text_muted).when(!self.descending, |i| i.rotate(gpui_kit::percentage(0.5)))))
+            .children(pair)
             .child(div().flex_1())
             .child(div().w(px(2.)).h(px(22.)).flex_none().bg(pal.border))
-            .when_some(key, |d, k| d.cursor_pointer().hover(|d| d.bg(rgb(0xf5f5f5))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_sort(k, cx))))
+            .when_some(key, |d, k| {
+                d.cursor_pointer()
+                    .hover(|d| d.bg(rgb(0xeeeeee)))
+                    .on_hover(cx.listener(move |this, on: &bool, _, cx| {
+                        let now = if *on { Some(id) } else { this.hover_header.filter(|h| *h != id) };
+                        if now != this.hover_header {
+                            this.hover_header = now;
+                            cx.notify();
+                        }
+                    }))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_sort(k, cx)))
+            })
     }
 
     /// "+ Add" (live documents/81): opens the column panel under the button's
@@ -4158,7 +4178,8 @@ impl StartView {
                                     .min_w_0()
                                     .truncate()
                                     .text_color(if d.broken { pal.warning } else { pal.text })
-                                    .child(crate::ui::user_text(d.name.clone()))
+                                    // A search's match bold in the name (live2 doc-feel-1119 L08).
+                                    .child(crate::ui::user_text(d.name.clone()).with_highlights(bold_match(&d.name, &self.query)))
                                     .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                                         let m = ev.modifiers();
                                         if d5.trashed || m.shift || toggles(&m) {
@@ -4478,7 +4499,10 @@ impl Render for StartView {
                     }
                 }),
             )
-            .child(self.render_title_bar(cx))
+            .child({
+                let focused = self.search.read(cx).focus_handle(cx).is_focused(window);
+                self.render_title_bar(focused, cx)
+            })
             .child(body.cached(StyleRefinement::default().w_full().flex_1().min_h_0()))
             .child(self.render_footer())
             .children(self.shortcut_sheet.as_ref().map(|(s, _)| s.clone().into_any_element()))
@@ -5343,11 +5367,35 @@ fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl
 #[path = "start_bench.rs"]
 mod bench;
 
+/// Where `query` (trimmed, any case) first shows in `name`, bold.
+fn bold_match(name: &str, query: &str) -> Vec<(std::ops::Range<usize>, HighlightStyle)> {
+    let q = query.trim();
+    if q.is_empty() {
+        return Vec::new();
+    }
+    let lower = name.to_lowercase();
+    // (Lowercasing can change byte lengths: only an ASCII-safe match is marked.)
+    if lower.len() != name.len() {
+        return Vec::new();
+    }
+    let q = q.to_lowercase();
+    lower.find(&q).map(|i| vec![(i..i + q.len(), HighlightStyle { font_weight: Some(FontWeight::BOLD), ..Default::default() })]).unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{SelectAllRows, SelectNext, SelectPrev, ToggleRow, click_rows, history_change_matches, import_failed, key_bindings, lib, move_rows, rows_to_move, toggles};
+    use super::{SelectAllRows, SelectNext, SelectPrev, ToggleRow, bold_match, click_rows, history_change_matches, import_failed, key_bindings, lib, move_rows, rows_to_move, toggles};
     use gpui_kit::Modifiers;
     use std::path::PathBuf;
+
+    /// Live2 doc-feel-1119 L08: a search's match is bold in the names, any case.
+    #[test]
+    fn a_searchs_match_is_bold_in_the_names() {
+        let spans = |name: &str, q: &str| bold_match(name, q).into_iter().map(|(r, _)| r).collect::<Vec<_>>();
+        assert_eq!(spans("uip Bracket", "brack"), vec![4..9]);
+        assert_eq!(spans("uip Bracket", "  "), Vec::<std::ops::Range<usize>>::new());
+        assert_eq!(spans("uip Bracket", "plate"), Vec::<std::ops::Range<usize>>::new());
+    }
 
     /// A file that doesn't translate toasts in live's words (errors-1118), other failures after "Import failed: ".
     #[test]
@@ -5479,3 +5527,4 @@ mod tests {
         assert!(!history_change_matches(&f, &change(2, 10), &tabs));
     }
 }
+

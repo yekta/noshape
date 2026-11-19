@@ -88,6 +88,8 @@ struct Row {
     key: String,
     /// Microversions between this row and the next row down its branch.
     changes: Vec<MicroversionId>,
+    /// A version's description (its row's tooltip).
+    description: String,
 }
 
 pub struct HistoryPanel {
@@ -552,13 +554,13 @@ fn build_rows(graph: &VersionGraph, lanes: &[BranchId]) -> Vec<Row> {
         let author = info.get(&b.head).map(|m| m.author.clone()).unwrap_or_default();
         // A workspace sits above the versions made from its head.
         let time = graph.versions.iter().filter(|v| v.microversion == b.head).map(|v| v.created).fold(time_of(b.head).max(b.created), i64::max);
-        rows.push(Row { kind: RowKind::Workspace(b.id), mv: b.head, lane: lanes.iter().position(|x| *x == b.id).unwrap_or(0), time, name: b.name.clone(), author, key: format!("w{}", b.id.0), changes: vec![] });
+        rows.push(Row { kind: RowKind::Workspace(b.id), mv: b.head, lane: lanes.iter().position(|x| *x == b.id).unwrap_or(0), time, name: b.name.clone(), author, key: format!("w{}", b.id.0), changes: vec![], description: String::new() });
     }
     for v in &graph.versions {
-        rows.push(Row { kind: RowKind::Version, mv: v.microversion, lane: lane_of(v.microversion), time: v.created, name: v.name.clone(), author: v.author.clone(), key: format!("v{}", v.id.0), changes: vec![] });
+        rows.push(Row { kind: RowKind::Version, mv: v.microversion, lane: lane_of(v.microversion), time: v.created, name: v.name.clone(), author: v.author.clone(), key: format!("v{}", v.id.0), changes: vec![], description: v.description.clone() });
     }
     if let Some(root) = graph.microversions.iter().find(|m| m.parents.is_empty()) {
-        rows.push(Row { kind: RowKind::Start, mv: root.id, lane: 0, time: root.created, name: "Start".into(), author: root.author.clone(), key: "start".into(), changes: vec![] });
+        rows.push(Row { kind: RowKind::Start, mv: root.id, lane: 0, time: root.created, name: "Start".into(), author: root.author.clone(), key: "start".into(), changes: vec![], description: String::new() });
     }
     // Where branches meet (live 2383): each merge's point in its workspace and the source's point it took, as rows
     // of their own unless a version or the start is there already.
@@ -566,11 +568,11 @@ fn build_rows(graph: &VersionGraph, lanes: &[BranchId]) -> Vec<Row> {
     let live_branch = |b: BranchId| graph.branches.iter().any(|x| x.id == b && !x.deleted);
     for m in graph.microversions.iter().filter(|m| m.parents.len() >= 2 && live_branch(m.branch)) {
         if shown.insert(m.id) {
-            rows.push(Row { kind: RowKind::Merge, mv: m.id, lane: lane_of(m.id), time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("m{}", m.id), changes: vec![] });
+            rows.push(Row { kind: RowKind::Merge, mv: m.id, lane: lane_of(m.id), time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("m{}", m.id), changes: vec![], description: String::new() });
         }
         let src = m.parents[1];
         if let Some(s) = info.get(&src).filter(|s| live_branch(s.branch)) && shown.insert(src) {
-            rows.push(Row { kind: RowKind::Merged, mv: src, lane: lane_of(src), time: s.created, name: s.description.clone(), author: s.author.clone(), key: format!("s{}", src), changes: vec![] });
+            rows.push(Row { kind: RowKind::Merged, mv: src, lane: lane_of(src), time: s.created, name: s.description.clone(), author: s.author.clone(), key: format!("s{}", src), changes: vec![], description: String::new() });
         }
     }
     let rank = |k: RowKind| match k {
@@ -1115,7 +1117,7 @@ impl Render for HistoryPanel {
             found.sort_by_key(|m| std::cmp::Reverse(m.seq));
             for m in found {
                 let lane = lanes.iter().position(|b| *b == m.branch).unwrap_or(0);
-                let c = Row { kind: RowKind::Change, mv: m.id, lane, time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("c{}", m.id), changes: vec![] };
+                let c = Row { kind: RowKind::Change, mv: m.id, lane, time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("c{}", m.id), changes: vec![], description: String::new() };
                 placed.push(Placed { row: Rc::new(c), y, change: true });
                 y += CHANGE_H;
             }
@@ -1134,7 +1136,7 @@ impl Render for HistoryPanel {
                 let limit = CHANGES_PAGE + self.more_changes.get(&r.key).copied().unwrap_or(0);
                 for mv in changes.iter().take(limit) {
                     let Some(m) = info.get(mv) else { continue };
-                    let c = Row { kind: RowKind::Change, mv: *mv, lane: r.lane, time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("c{}", mv), changes: vec![] };
+                    let c = Row { kind: RowKind::Change, mv: *mv, lane: r.lane, time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("c{}", mv), changes: vec![], description: String::new() };
                     placed.push(Placed { row: Rc::new(c), y, change: true });
                     y += CHANGE_H;
                 }
@@ -1500,14 +1502,13 @@ impl Render for HistoryPanel {
                     })
                     .when(picked, |d| d.bg(rgb(crate::compare_mode::BASE_ROW)))
                     .when(!selected && compare_side.is_none(), |d| d.hover(|d| d.bg(crate::theme::themed(0xdef1fb, 0x666666))))
-                    // Beside the panel's right edge, not under the pointer (qa HISTFEEL-CHANGE-TOOLTIP).
-                    .tip(
-                        match r.kind {
-                            RowKind::Workspace(_) => format!("Open workspace {}", r.name),
-                            _ => format!("Open version {}", r.name),
-                        },
-                        crate::ui::TipSide::Right,
-                    )
+                    // Beside the panel's right edge, not under the pointer (qa HISTFEEL-CHANGE-TOOLTIP); a version's after
+                    // 2.27 s with its description under the title (live2 doc-feel-1119 L31).
+                    .map(|d| match r.kind {
+                        RowKind::Workspace(_) => d.tip(format!("Open workspace {}", r.name), crate::ui::TipSide::Right),
+                        RowKind::Version => crate::ui::with_described_side_tooltip(d, format!("Open version {}", r.name), (!r.description.trim().is_empty()).then(|| r.description.clone().into()), crate::ui::VERSION_TIP_DELAY),
+                        _ => d.tip(format!("Open version {}", r.name), crate::ui::TipSide::Right),
+                    })
                     .child(graph_column(&r.key))
                     .child(
                         v_flex()

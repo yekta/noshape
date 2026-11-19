@@ -1622,8 +1622,10 @@ impl Workspace {
             let copied = cx.try_global::<crate::doc_dialogs::CopiedTab>().is_some_and(|c| c.0.is_some());
             let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
                 use crate::os_menu::OsMenuItem as I;
+                // 207 px wide (live2 doc-feel-1119 L14), not the dropdowns' 253.
                 let m = m
                     .dropdown()
+                    .min_width(207.)
                     .item(I::new("Create Material Library").icon_name("material-library").on_click(move |_, w, cx| v9.update(cx, |t, cx| t.add_tab("materiallibrary", w, cx))))
                     .item(I::new("Create Feature Studio").icon_name("feature-studio").on_click(move |_, w, cx| v5.update(cx, |t, cx| t.add_tab("featurestudio", w, cx))))
                     .separator()
@@ -1851,7 +1853,8 @@ impl Workspace {
                     .child(div().flex_none().when(compare_off, |d| d.opacity(0.5)).child(crate::assets::icon(tab_icon(kind), 20., cx)))
                     .child(match self.renaming_tab.as_ref().filter(|r| r.0 == id) {
                         // Tab › Rename / double-click: the name becomes a field.
-                        Some((_, st, _)) => div().w(px(150.)).child(gpui_kit::component::input::Input::new(st).h(px(22.)).text_size(px(14.)).px(px(3.)).text_color(pal.text)).into_any_element(),
+                        // A 1 px #333 square border, no focus ring (live2 doc-feel-1119 L11).
+                        Some((_, st, _)) => div().w(px(157.)).h(px(21.)).border_1().border_color(gpui_kit::rgb(0x333333)).bg(gpui_kit::rgb(0xffffff)).child(gpui_kit::component::input::Input::new(st).appearance(false).h(px(19.)).text_size(px(14.)).px(px(2.)).text_color(pal.text)).into_any_element(),
                         None => div().min_w_0().truncate().when(compare_off, |d| d.opacity(0.5)).child(crate::ui::user_text(name)).into_any_element(),
                     })
                     .children(compare_dot.map(|dot| div().flex_none().ml(px(3.)).when(compare_off, |d| d.opacity(0.55)).child(dot)))

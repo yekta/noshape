@@ -78,7 +78,7 @@ fn click(cx: &mut TestAppContext, window: AnyWindowHandle, at: Point<gpui_kit::P
     draw(cx, window);
 }
 
-/// Live2 feel/studios.json versionsPanel: a version row tooltips "Open version V1"; a single click on its name opens it
+/// Live2 feel/studios.json versionsPanel: a version row tooltips "Open version V1" (after 2.27 s, live2 doc-feel-1119); a single click on its name opens it
 /// (a double click too); a click in the graph column opens nothing; "Show changes…" lists its changes without opening
 /// the row; a click on Main goes back to the workspace.
 #[gpui::test]
@@ -89,7 +89,10 @@ fn version_rows_open_on_a_click_of_their_name_and_the_graph_column_opens_nothing
     let name = point(v1.origin.x + px(160.), v1.origin.y + px(15.));
     crate::ui_script::clear_tooltip();
     VisualTestContext::from_window(window, cx).simulate_mouse_move(name, None, Modifiers::default());
-    cx.executor().advance_clock(std::time::Duration::from_millis(500));
+    cx.executor().advance_clock(std::time::Duration::from_millis(2000));
+    draw(cx, window);
+    assert_eq!(crate::ui_script::shown_tooltip(), None, "not yet at 2 s (live2 doc-feel-1119: 2.27 s)");
+    cx.executor().advance_clock(std::time::Duration::from_millis(400));
     draw(cx, window);
     assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Open version V1"), "the row's tooltip");
     // Beside the panel's right edge (the row's), not under the pointer (qa HISTFEEL-CHANGE-TOOLTIP).
