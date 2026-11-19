@@ -907,6 +907,9 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   = the hole centre › ✓. Also seen: the first ✓ placed the table snapped at the sheet's bottom-right corner (= live: "On ✓
   the table was placed snapped to the fixed corner"), the second left it at the pointer (top left, over the ✓ button,
   off the sheet), with the same fixed corner (2nd icon, default).
+  qa 23:07: a plain Table (2 × 2) IS saved ("Part 1 Drawing 1 :: Table"), so it's the Hole table's commit only. After that
+  Table's ✓ its placement guide (pink dashed line at the ✓ button's x, red × at the sheet top) stayed drawn with the pointer
+  elsewhere, until the next pointer action.
 
 ## Interaction feel suite 11-19 (qa 16:20: run 1119-1242-223cec7e on vibex8, failures re-run on green eb3b06a8 on vibe2)
 2110/2172 scenarios (05:51 run on a67911be: 2126). 67 failing; 28 pass on the re-run (load flakes or fixed). The 39 still failing
