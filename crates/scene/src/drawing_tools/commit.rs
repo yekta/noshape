@@ -1134,6 +1134,9 @@ pub fn set_drawing_props(d: &mut Drawing, f: impl FnOnce(&mut DrawingProps)) {
         && d.props.precision == before.precision
     {
         d.props.precision = Some(noshape_model::drawing::format::units_switch_precision(u));
+        if d.props.tolerance_precision == before.tolerance_precision {
+            d.props.tolerance_precision = Some(noshape_model::drawing::format::units_switch_tolerance_precision(u));
+        }
         // The chamfer dimension keeps its own length precision (live2 drawprops-1119: 5/8 X 45.0°, 15.000 X 45.0°).
         if d.props.chamfer_length_precision.is_none() {
             d.props.chamfer_length_precision = Some(noshape_model::drawing::format::default_digits(unit_of(&before)) as u8);

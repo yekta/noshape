@@ -561,7 +561,9 @@ impl Render for PlacedTooltip {
                     window.request_animation_frame();
                 }
             }, |_, _, _, _| {}).absolute().top_0().left_0().size_full());
-        let mid_y = a.center().y - h * 0.5;
+        // A version's tip grown into its description stays centred on the row (live2 versions-1119: its top 13 px up).
+        let grown = self.upright && self.expanded.as_ref().is_some_and(|(_, shown)| *shown);
+        let mid_y = a.center().y - h * if grown { 1.0 } else { 0.5 };
         // Placed from the measured width (a fixed-width centering strip got
         // flipped to the far side by `anchored` near the window's edge: the
         // bottom-right tools' tooltips showed 600 px to their left).
@@ -677,9 +679,13 @@ pub fn with_side_tooltip_expanded(row: Stateful<Div>, text: impl Into<SharedStri
         })
 }
 
-/// A version row's tooltip (live2 doc-feel-1119 L31): beside the row after 2.27 s, "Open version V1" over the version's
-/// description (upright, on white), the title alone without one.
-pub const VERSION_TIP_DELAY: std::time::Duration = std::time::Duration::from_millis(2270);
+/// A version row's tooltip, in two stages (live2 versions-1119): "Open version V1" on one line beside the row 130 ms
+/// after the pointer arrives, fading in until ~495 ms; at ~2.3 s it grows into the version's description (upright, on
+/// white) under the title. Without a description it stays one line.
+pub const VERSION_TIP_DELAY: std::time::Duration = std::time::Duration::from_millis(130);
+/// When the version tooltip's description unfolds, after it shows (live2 versions-1119: ~2.3 s after the hover).
+pub const VERSION_TIP_EXPAND: std::time::Duration = std::time::Duration::from_millis(2170);
+const VERSION_TIP_FADE: std::time::Duration = std::time::Duration::from_millis(365);
 
 pub fn with_described_side_tooltip(row: Stateful<Div>, text: impl Into<SharedString>, description: Option<SharedString>, delay: std::time::Duration) -> Stateful<Div> {
     let text: SharedString = text.into();
@@ -688,8 +694,23 @@ pub fn with_described_side_tooltip(row: Stateful<Div>, text: impl Into<SharedStr
     row.relative()
         .child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
         .tooltip(move |_, cx| {
-            let (text, expanded, anchor) = (text.clone(), description.clone().map(|d| (d, true)), anchor.get());
-            cx.new(|_| PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded, user: false, fade: Some((TOOLTIP_FADE_IN, 0.)), upright: true }).into()
+            let (text, expanded, anchor) = (text.clone(), description.clone().map(|d| (d, false)), anchor.get());
+            cx.new(|cx| {
+                if expanded.is_some() {
+                    cx.spawn(async move |this: WeakEntity<PlacedTooltip>, cx| {
+                        cx.background_executor().timer(VERSION_TIP_EXPAND).await;
+                        let _ = this.update(cx, |t, cx| {
+                            if let Some((_, shown)) = &mut t.expanded {
+                                *shown = true;
+                            }
+                            cx.notify();
+                        });
+                    })
+                    .detach();
+                }
+                PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded, user: false, fade: Some((VERSION_TIP_FADE, 0.)), upright: true }
+            })
+            .into()
         })
         .tooltip_show_delay(delay)
 }

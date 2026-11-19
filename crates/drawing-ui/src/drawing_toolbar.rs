@@ -263,13 +263,15 @@ impl DrawingEditor {
         let menu = |items: &[(SkTool, &'static str, &'static str)]| -> Vec<MenuEntry> {
             items.iter().map(|&(t, label, icon)| MenuEntry::item(label, move |e, _, cx| e.set_tool(Tool::Sketch { tool: t, pts: vec![], from: None }, cx)).with_icon(icon)).collect()
         };
+        // The ▾ rows without their keys (live's takes: "Coincident", "Center point rectangle"; the Dimension ▾ rows keep
+        // theirs, "Radial dimension (shift+r)").
         let cons: Vec<MenuEntry> = [
-            (SkCon::Horizontal, "Horizontal (h)", "horizontal"),
-            (SkCon::Vertical, "Vertical (v)", "vertical"),
-            (SkCon::Coincident, "Coincident (i)", "coincident"),
-            (SkCon::Perpendicular, "Perpendicular (shift+l)", "perpendicular"),
-            (SkCon::Parallel, "Parallel (b)", "parallel"),
-            (SkCon::Tangent, "Tangent (t)", "tangent"),
+            (SkCon::Horizontal, "Horizontal", "horizontal"),
+            (SkCon::Vertical, "Vertical", "vertical"),
+            (SkCon::Coincident, "Coincident", "coincident"),
+            (SkCon::Perpendicular, "Perpendicular", "perpendicular"),
+            (SkCon::Parallel, "Parallel", "parallel"),
+            (SkCon::Tangent, "Tangent", "tangent"),
         ]
         .iter()
         .map(|&(k, label, icon)| MenuEntry::item(label, move |e, _, cx| e.set_tool(Tool::Constrain { kind: k, picks: vec![] }, cx)).with_icon(icon))
@@ -279,7 +281,7 @@ impl DrawingEditor {
                 tool("dr-sk-line", "drawing-line", "Line (l)", cur == Some(SkTool::Line), sk(SkTool::Line)),
                 tool("drg-sk-circle-main", "circle", "Center point circle (c)", matches!(cur, Some(SkTool::Circle | SkTool::Circle3)), sk(SkTool::Circle)).with_more("dr-sk-circle-more", menu(&[(SkTool::Circle, "Center point circle (c)", "circle"), (SkTool::Circle3, "3 point circle", "three-point-circle")])),
                 tool("dr-sk-tarc", "tangent-arc", "Tangent arc", cur == Some(SkTool::TangentArc), sk(SkTool::TangentArc)),
-                tool("drg-sk-rect-main", "corner-rectangle", "Corner rectangle (g)", matches!(cur, Some(SkTool::CornerRect | SkTool::CenterRect)), sk(SkTool::CornerRect)).with_more("dr-sk-rect-more", menu(&[(SkTool::CornerRect, "Corner rectangle (g)", "corner-rectangle"), (SkTool::CenterRect, "Center point rectangle (r)", "center-rectangle")])),
+                tool("drg-sk-rect-main", "corner-rectangle", "Corner rectangle (g)", matches!(cur, Some(SkTool::CornerRect | SkTool::CenterRect)), sk(SkTool::CornerRect)).with_more("dr-sk-rect-more", menu(&[(SkTool::CornerRect, "Corner rectangle", "corner-rectangle"), (SkTool::CenterRect, "Center point rectangle", "center-rectangle")])),
                 tool("drg-sk-spline-main", "spline", "Spline", matches!(cur, Some(SkTool::Spline | SkTool::SplinePoint)), sk(SkTool::Spline)).with_more("dr-sk-spline-more", menu(&[(SkTool::Spline, "Spline", "spline"), (SkTool::SplinePoint, "Spline point", "spline-point")])),
                 tool("dr-sk-point", "point-sketch", "Sketch point", cur == Some(SkTool::Point), sk(SkTool::Point)),
                 tb("dr-sk-hatch", "hatch-region", "Hatch region", self.hatch_dlg.is_some(), |e, w, cx| {

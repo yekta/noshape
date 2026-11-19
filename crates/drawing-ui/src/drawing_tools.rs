@@ -1487,7 +1487,10 @@ impl DrawingEditor {
                             if e.modifiers.alt {
                                 self.alt_duplicate(pick, start, cx);
                             }
-                            match self.start_drag(pick, start) {
+                            // Alt moves the copied thing whole: a selected note's side grip or a leader's handle under
+                            // the press doesn't take it (ui-parity drw-copy-annotation-drag: the press on the note's
+                            // left end resized it).
+                            match self.start_drag(pick, start, !e.modifiers.alt) {
                                 Drag::SelectBox { .. } if len(sub(lp, start_px)) <= BOX_START_PX => self.drag.clone(),
                                 d => d,
                             }
@@ -2164,11 +2167,12 @@ impl DrawingEditor {
         }
     }
 
-    fn start_drag(&mut self, pick: Option<u32>, start: [f64; 2]) -> Drag {
-        if let Some(d) = self.leader_bend_drag(start).or_else(|| self.leader_node_drag(start)).or_else(|| self.leader_end_drag(start)) {
+    /// The drag a press at `start` begins; `handles`: a selected note's grips and leaders' handles can take it.
+    fn start_drag(&mut self, pick: Option<u32>, start: [f64; 2], handles: bool) -> Drag {
+        if handles && let Some(d) = self.leader_bend_drag(start).or_else(|| self.leader_node_drag(start)).or_else(|| self.leader_end_drag(start)) {
             return d;
         }
-        if let Some(d) = self.note_grip_drag(start) {
+        if handles && let Some(d) = self.note_grip_drag(start) {
             return d;
         }
         if let Some(d) = self.extra_start_drag(pick, start) {

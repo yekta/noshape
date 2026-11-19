@@ -4540,6 +4540,10 @@ fn drawing_properties_get_and_set() {
     // Millimeters 0.12; this mm drawing's chamfer 0.12).
     let r = call(&mut ctx, "drawing_properties", json!({ "drawing": tab, "set": { "units": "InchFraction" } }));
     assert_eq!((r["properties"]["precision"].clone(), r["properties"]["chamfer_length_precision"].clone()), (json!(8), json!(2)), "{r}");
+    // The tolerance precision too (live2 drawprops-1119 retake: 1/256, 1/256", 0.1).
+    assert_eq!(r["properties"]["tolerance_precision"], 8, "{r}");
+    let r = call(&mut ctx, "drawing_properties", json!({ "drawing": tab, "set": { "units": "Millimeter" } }));
+    assert_eq!((r["properties"]["precision"].clone(), r["properties"]["tolerance_precision"].clone()), (json!(2), json!(1)), "{r}");
     let r = call(&mut ctx, "drawing_properties", json!({ "drawing": tab, "set": { "units": "Millimeter", "precision": 1 } }));
     assert_eq!(r["properties"]["precision"], 1, "a precision set with the units stays: {r}");
     // Locked: nothing but the lock changes.
@@ -10311,4 +10315,34 @@ fn studios_hole_plate_callouts_and_table_as_live() {
             "{t}"
         );
     }
+}
+
+/// ui-parity drw-view-replicate-region-place (qa 11-19): a region with a two-vertex linear dimension placed on another
+/// view nearer the edge's far end still lands: the box snaps by the vertex under which both ends land, not just the
+/// nearest (live "Successfully replicated 1/1 annotations"; ours replicated none).
+#[test]
+fn a_region_placed_nearer_a_dimensions_far_end_still_replicates_it() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "replicate-far-end.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let view = |o: &str| g["views"].as_array().unwrap().iter().find(|v| v["orientation"] == o).unwrap_or_else(|| panic!("{o}: {g}")).clone();
+    let (front, top) = (view("front"), view("top"));
+    let flat = |v: &Value| -> Vec<([f64; 2], [f64; 2])> {
+        v["edges"].as_array().unwrap().iter().filter(|e| e["type"] == "line" && (num(&e["a"][1]) - num(&e["b"][1])).abs() < 1e-6).map(|e| {
+            let (p, q) = ([num(&e["a"][0]), num(&e["a"][1])], [num(&e["b"][0]), num(&e["b"][1])]);
+            if p[0] < q[0] { (p, q) } else { (q, p) }
+        }).collect()
+    };
+    let (a, b) = flat(&front).into_iter().max_by(|x, y| x.0[1].total_cmp(&y.0[1])).expect("the Front's top edge");
+    let len = b[0] - a[0];
+    call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "picks": [a, b], "place": [(a[0] + b[0]) / 2.0, a[1] + 10.0] }));
+    let (_, b2) = flat(&top).into_iter().find(|(p, q)| ((q[0] - p[0]) - len).abs() < 1e-6).expect("a Top edge as long");
+    // The box placed with the dimension's left end 1 mm by the Top edge's right end.
+    let region = [[a[0] - 1.3 * len, a[1] - 5.0], [b[0] + 5.0, a[1] + 15.0]];
+    let c = [(region[0][0] + region[1][0]) / 2.0, (region[0][1] + region[1][1]) / 2.0];
+    let at = [c[0] + b2[0] - a[0] + 1.0, c[1] + b2[1] - a[1] + 0.5];
+    let rep = call(&mut ctx, "drawing_replicate", json!({ "drawing": tab, "from": front["id"], "to": top["id"], "region": region, "at": at }));
+    assert_eq!(rep["message"], "Successfully replicated 1/1 annotations", "{rep}");
 }

@@ -1861,13 +1861,13 @@ fn the_surface_finish_symbol_follows_the_pointer_before_and_after_a_click(cx: &m
     assert_eq!(shown(cx, free).map(|s| s.0), Some(free), "the next symbol at the pointer");
 }
 
-/// Live2 ann-1118 (GTOL retake): a click on the lit edge anchors a leader with its arrow at the point clicked; the
-/// frame then follows the pointer on it and a second click places frame and leader.
+/// Live2 gtol-1119 (as the 11-07 take; ann-1118's leader didn't reproduce): a click on the lit edge places a ⌖ frame
+/// right there, no leader, moving with the view; the next click places a second frame; both stay.
 #[gpui::test]
-fn a_geometric_tolerance_clicked_on_an_edge_follows_on_a_leader_until_the_second_click(cx: &mut TestAppContext) {
+fn a_geometric_tolerance_clicked_on_an_edge_is_placed_there_and_the_next_click_places_another(cx: &mut TestAppContext) {
     use noshape_model::drawing::AnnotationKind;
     SUGGESTED.set(true);
-    let (window, editor) = drawing(cx, "feel-gdt-leader");
+    let (window, editor) = drawing(cx, "feel-gdt-edge");
     real_sheet(cx, window, &editor);
     let (a, b, out) = horizontal_edge(cx, &editor);
     cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Gdt, cx)));
@@ -1875,26 +1875,13 @@ fn a_geometric_tolerance_clicked_on_an_edge_follows_on_a_leader_until_the_second
     let gdts = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).drawing_sheet().annotations.iter().filter(|x| matches!(x.kind, AnnotationKind::Gdt { .. })).cloned().collect::<Vec<_>>());
     let mid = [(a[0] + b[0]) / 2.0, a[1]];
     click_sheet(cx, window, &editor, mid);
-    assert!(gdts(cx).is_empty(), "the first click on the edge places nothing");
-    let far = [mid[0] + 40.0, a[1] + out * 30.0];
-    cx.update_window(window, |_, _, cx| {
-        editor.update(cx, |e, cx| {
-            e.cursor = far;
-            e.update_preview(cx);
-        })
-    })
-    .unwrap();
-    cx.update(|cx| {
-        let e = editor.read(cx);
-        let tip = e.note_leader.as_ref().and_then(|l| Some(e.placement(l.view?)?.to_sheet(l.point))).expect("a leader anchored");
-        assert!((tip[0] - mid[0]).hypot(tip[1] - mid[1]) < 0.05, "its arrow at the point clicked: {tip:?} for {mid:?}");
-        let shown = e.preview.as_ref().and_then(|d| d.sheets.get(e.sheet)).and_then(|s| s.annotations.last()).cloned().expect("the frame previewed");
-        assert!(matches!(&shown.kind, AnnotationKind::Gdt { leaders, .. } if leaders.len() == 1), "on its leader: {:?}", shown.kind);
-        assert!(e.overlay.lines.is_empty(), "no rubber band");
-    });
-    click_sheet(cx, window, &editor, far);
     let placed = gdts(cx);
-    assert!(matches!(placed.as_slice(), [g] if matches!(&g.kind, AnnotationKind::Gdt { leaders, .. } if leaders.len() == 1)), "placed with its leader: {placed:?}");
+    assert!(matches!(placed.as_slice(), [g] if matches!(&g.kind, AnnotationKind::Gdt { leaders, .. } if leaders.is_empty()) && g.view_group.is_some()), "one frame on the edge, no leader, with its view: {placed:?}");
+    assert!((placed[0].position[0] - mid[0]).hypot(placed[0].position[1] - mid[1]) < 0.05, "at the click: {:?} for {mid:?}", placed[0].position);
+    assert!(cx.update(|cx| editor.read(cx).note_leader.is_none()), "no leader anchored");
+    let above = [mid[0], a[1] + out * 8.0];
+    click_sheet(cx, window, &editor, above);
+    assert_eq!(gdts(cx).len(), 2, "the second click places a second frame");
 }
 
 /// Live2 errors-1118: a view whose part no longer resolves goes blank (no "No parts to show" box) and the sheet shows
@@ -2474,4 +2461,55 @@ fn the_callout_tool_lights_an_edge_within_the_pickbox(cx: &mut TestAppContext) {
             assert_eq!(lit == edge, lights, "{} px off the edge: lit {lit:?}", sign * px);
         }
     }
+}
+
+/// ui-parity drw-copy-annotation-drag (qa 11-19 regression): Alt+drag on a selected note, pressed on its end where its
+/// side grip is, leaves a copy and lands the dragged one where the pointer is released (live: 40.4 mm along; ours
+/// resized the note from its grip).
+#[gpui::test]
+fn an_alt_drag_copies_a_note_and_lands_it_where_released(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    SETUP.set(Some(|ctx, dw| {
+        call(ctx, "drawing_note", json!({ "drawing": dw, "text": "TEMP", "position": [60, 40] }));
+    }));
+    let (window, editor) = drawing(cx, "feel-note-alt-drag");
+    real_sheet(cx, window, &editor);
+    let at = cx.update(|cx| {
+        let e = editor.read(cx);
+        let a = e.current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Note { .. })).expect("the note");
+        let (b, picks) = (e.built.clone().expect("built"), e.picks_of(Sel::Annotation(a.id)));
+        let t = b.geometry.texts.iter().find(|t| picks.contains(&t.pick)).expect("its text");
+        let q = noshape_model::drawing::font::text_box(t);
+        [q.iter().map(|p| p[0]).sum::<f64>() / 4.0, q.iter().map(|p| p[1]).sum::<f64>() / 4.0]
+    });
+    let before: Vec<[f64; 2]> = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().map(|a| a.position).collect());
+    // Selected, as after the take's Esc (a note stays selected).
+    cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let id = e.current_sheet().annotations[0].id;
+            e.selection = vec![Sel::Annotation(id)];
+            cx.notify();
+        })
+    });
+    draw(cx, window);
+    // Pressed on its left end, where the selected note's side grip is (the take's press, at the note's anchor).
+    let at = cx.update(|cx| editor.read(cx).note_grips().and_then(|(_, g)| g.into_iter().find(|g| g.0 == 0)).map(|g| g.1)).unwrap_or(at);
+    let alt = Modifiers { alt: true, ..Default::default() };
+    let p = at_window(cx, &editor, at);
+    let q = at_window(cx, &editor, [at[0] + 40.0, at[1]]);
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(p, None, alt);
+    v.simulate_mouse_down(p, MouseButton::Left, alt);
+    for k in 1..=10 {
+        let m = p + (q - p) * (k as f32 / 10.);
+        VisualTestContext::from_window(window, cx).simulate_mouse_move(m, Some(MouseButton::Left), alt);
+        draw(cx, window);
+    }
+    VisualTestContext::from_window(window, cx).simulate_mouse_up(q, MouseButton::Left, alt);
+    draw(cx, window);
+    let mut after: Vec<[f64; 2]> = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().map(|a| a.position).collect());
+    after.sort_by(|a, b| a[0].total_cmp(&b[0]));
+    assert_eq!(after.len(), 2, "a copy: {before:?} -> {after:?}");
+    assert!((after[0][0] - before[0][0]).abs() < 1e-6, "one stays: {before:?} -> {after:?}");
+    assert!((after[1][0] - before[0][0] - 40.0).abs() < 1.0, "the other 40 mm along: {before:?} -> {after:?}");
 }

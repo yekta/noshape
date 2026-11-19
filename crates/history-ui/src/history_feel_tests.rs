@@ -39,7 +39,8 @@ fn panel_with(cx: &mut TestAppContext, name: &str, edits: usize) -> (AnyWindowHa
         for e in 0..edits {
             call("variable_create", json!({ "name": format!("v{k}_{e}"), "value": format!("{k} mm") }));
         }
-        call("history_create_version", json!({ "name": format!("V{k}") }));
+        let description = if k == 1 { "block and routing curve" } else { "" };
+        call("history_create_version", json!({ "name": format!("V{k}"), "description": description }));
     }
     let session = crate::session::Session::open(&path).unwrap();
     let (window, view, doc) = cx.update(|cx| {
@@ -78,7 +79,8 @@ fn click(cx: &mut TestAppContext, window: AnyWindowHandle, at: Point<gpui_kit::P
     draw(cx, window);
 }
 
-/// Live2 feel/studios.json versionsPanel: a version row tooltips "Open version V1" (after 2.27 s, live2 doc-feel-1119); a single click on its name opens it
+/// Live2 feel/studios.json versionsPanel: a version row tooltips "Open version V1" on one line at 130 ms, grown into its
+/// description at ~2.3 s and still centred on the row (live2 versions-1119); a single click on its name opens it
 /// (a double click too); a click in the graph column opens nothing; "Show changes…" lists its changes without opening
 /// the row; a click on Main goes back to the workspace.
 #[gpui::test]
@@ -89,15 +91,23 @@ fn version_rows_open_on_a_click_of_their_name_and_the_graph_column_opens_nothing
     let name = point(v1.origin.x + px(160.), v1.origin.y + px(15.));
     crate::ui_script::clear_tooltip();
     VisualTestContext::from_window(window, cx).simulate_mouse_move(name, None, Modifiers::default());
-    cx.executor().advance_clock(std::time::Duration::from_millis(2000));
+    cx.executor().advance_clock(std::time::Duration::from_millis(100));
     draw(cx, window);
-    assert_eq!(crate::ui_script::shown_tooltip(), None, "not yet at 2 s (live2 doc-feel-1119: 2.27 s)");
-    cx.executor().advance_clock(std::time::Duration::from_millis(400));
+    assert_eq!(crate::ui_script::shown_tooltip(), None, "not yet at 100 ms (live2 versions-1119: 130 ms)");
+    cx.executor().advance_clock(std::time::Duration::from_millis(60));
     draw(cx, window);
-    assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Open version V1"), "the row's tooltip");
+    assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Open version V1"), "the one-line tip first");
     // Beside the panel's right edge (the row's), not under the pointer (qa HISTFEEL-CHANGE-TOOLTIP).
     let tip = VisualTestContext::from_window(window, cx).debug_bounds("placed-tooltip").expect("the tooltip");
     assert!(tip.left() >= v1.right() && tip.left() - v1.right() < px(6.), "right of the row: {tip:?} by {v1:?}");
+    assert!(tip.size.height < px(30.), "one line: {tip:?}");
+    cx.executor().advance_clock(std::time::Duration::from_millis(2200));
+    draw(cx, window);
+    draw(cx, window);
+    assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Open version V1 block and routing curve"), "grown at ~2.3 s");
+    let grown = VisualTestContext::from_window(window, cx).debug_bounds("placed-tooltip").expect("the tooltip");
+    assert!((f32::from(grown.size.width) - 300.).abs() < 0.5, "300 px wide: {grown:?}");
+    assert!((f32::from(grown.top()) - (f32::from(tip.top()) - 13.)).abs() < 0.5, "its top 13 px up: {tip:?} -> {grown:?}");
     click(cx, window, point(v1.origin.x + px(40.), v1.origin.y + px(15.)), 1);
     assert_eq!(viewing(cx), None, "a click in the graph column opens nothing");
     click(cx, window, name, 1);

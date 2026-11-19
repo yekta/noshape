@@ -3409,7 +3409,8 @@ impl SheetGeometry {
             // ANSI: on the line, centred (horizontal text on a sloped line
             // too, the line broken around its box).
             let angle = if along { angle } else { 0.0 };
-            if text.upper.is_none() && !text.boxed && text.above.is_none() && text.below.is_none() && !text.oval {
+            // A fractional value stacked as the others (live2 drawprops-1119: "3 19/128" on a linear dimension).
+            if text.upper.is_none() && !text.boxed && text.above.is_none() && text.below.is_none() && !text.oval && !text.fraction {
                 self.texts.push(Text2 { pos: c, height: h, text: text.main.clone(), angle, anchor: Anchor::Center, pick });
             } else {
                 self.dim_label(c, angle, 0.5, true, text, h, pick);
@@ -4140,6 +4141,11 @@ mod tests {
         let mut g2 = SheetGeometry::new(200.0, 200.0);
         g2.dim_label([100.0, 100.0], 0.0, 0.0, false, &inline, h, 1);
         assert_eq!(g2.texts.len(), 1, "without the flag it stays one text");
+        // A linear dimension's value inline on its line (ANSI) is stacked too (live2 drawprops-1119: "3 19/128").
+        let mut g3 = SheetGeometry::new(200.0, 200.0);
+        g3.style.iso = false;
+        g3.linear_dimension_text([50.0, 100.0], [150.0, 100.0], 10.0, DimOrientation::Horizontal, &DimText { main: "1 147/256".into(), fraction: true, ..Default::default() }, 1);
+        assert_eq!(g3.texts.iter().map(|t| t.text.as_str()).collect::<Vec<_>>(), ["1", "147", "256"]);
     }
 
     /// Drawing properties › Inspection: Solid fill in its own colour (live's

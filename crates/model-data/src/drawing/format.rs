@@ -66,6 +66,15 @@ pub fn units_switch_precision(u: DimUnits) -> u8 {
     }
 }
 
+/// The tolerance precision Drawing properties takes when its Units change to `u` (live2 drawprops-1119 retake:
+/// 1/256 for Inches fractional and Feet and inches, 0.1 for Millimeters).
+pub fn units_switch_tolerance_precision(u: DimUnits) -> u8 {
+    match u {
+        DimUnits::Millimeter => 1,
+        _ => units_switch_precision(u),
+    }
+}
+
 /// Inches as a whole number and a reduced fraction to 1/`2^bits` (live numfmt-1118: the precision's digits pick the
 /// denominator, the drawing's 0.123 is 1/8": 2.7 in reads "2 3/4").
 fn inch_fraction(inches: f64, bits: u8) -> String {

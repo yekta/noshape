@@ -96,10 +96,26 @@ impl SheetPick<'_> {
                 (b[0][0] + d[0]..=b[1][0] + d[0]).contains(&s[0]) && (b[0][1] + d[1]..=b[1][1] + d[1]).contains(&s[1])
             };
             let first = r.items.iter().flat_map(|(a, pts)| a.refs.iter().zip(pts)).find_map(|(rf, p)| kind_of(&rf.point).map(|k| (k, map(*p))));
-            if let Some((k, q)) = first
-                && let Some(s) = geo.snaps.iter().filter(|s| s.kind == k && inside(s.p)).min_by(|a, b| dist(a.p, q).total_cmp(&dist(b.p, q)))
-            {
-                corr = [s.p[0] - q[0], s.p[1] - q[1]];
+            if let Some((k, q)) = first {
+                // Nearest first, the first under which every point of that annotation lands on one of its kind (a
+                // linear dimension's far end too: live drw-view-replicate-region-place, the box clicked nearer the
+                // edge's other end); else the nearest.
+                let mut near: Vec<[f64; 2]> = geo.snaps.iter().filter(|s| s.kind == k && inside(s.p)).map(|s| s.p).collect();
+                near.sort_by(|a, b| dist(*a, q).total_cmp(&dist(*b, q)));
+                let item = r.items.iter().find(|(a, _)| a.refs.iter().any(|rf| kind_of(&rf.point).is_some()));
+                let lands = |c: [f64; 2]| {
+                    item.is_some_and(|(a, pts)| {
+                        a.refs.iter().zip(pts).all(|(rf, p)| {
+                            let m = map(*p);
+                            let m = [m[0] + c[0], m[1] + c[1]];
+                            kind_of(&rf.point).is_some_and(|k| geo.snaps.iter().any(|s| s.kind == k && dist(s.p, m) < MATCH_TOL))
+                        })
+                    })
+                };
+                let best = near.iter().map(|p| [p[0] - q[0], p[1] - q[1]]).find(|c| lands(*c)).or_else(|| near.first().map(|p| [p[0] - q[0], p[1] - q[1]]));
+                if let Some(c) = best {
+                    corr = c;
+                }
             }
         }
         let map = |p: [f64; 2]| {
