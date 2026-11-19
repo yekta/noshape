@@ -1234,6 +1234,15 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
                 }
             }
         };
+        // OCCT's chamfer of straight concave edges taking material off (asm-isaac-ball's a2e4a2 Chamfer 2, 568 mm³ where
+        // live adds 40.31): the corners filled as live's.
+        // (Its own failures leave OCCT's: cli-draft-hang's Chamfer 4, faces it can't orient.)
+        if super::blend_section::concave_planar_lines(&body.shape, &edges).unwrap_or(false)
+            && res.shape.volume()? < body.shape.volume()?
+            && super::blend_section::planar_concave_chamfer(ev, bi, &edges, spec, &reference).unwrap_or(false)
+        {
+            continue;
+        }
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));
         let (shape, face_names) = match joined_edges(&res) {

@@ -5024,3 +5024,30 @@ fn face_pattern_caps_a_pocket_on_a_split_cylinder() {
     let v = volume(&s.ok(), 0);
     assert!(near(v, PI * rr * rr * mm(20.0) - 4.0 * seed_pocket, 1e-12), "{} mm³", v * 1e9);
 }
+
+/// asm-isaac-ball's a2e4a2 Chamfer 2 on Part 1 as Extrude 11 leaves it: Two offsets 5.5 / 6 on a slot's concave 7 mm
+/// corner that a hole runs through. Live (q-isaac-ch2): the corner filled, +40.31 mm³ (the 5.5 x 6 x 7 prism less the
+/// hole), one chamfer plane of 19.888 mm² the hole pierces, 53 faces (OCCT's took 568 mm³ off).
+#[test]
+fn a_concave_chamfer_a_hole_runs_through_fills_the_corner_as_live() {
+    let brep = include_str!("data/isaac-chamfer2-input.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let e = b.shape.edges().iter().position(|e| e.edge_info().is_ok_and(|i| near(i.length, mm(7.0), mm(1e-3)) && i.start.distance(DVec3::new(mm(-208.904), mm(13.25), mm(80.177))) < mm(1e-2))).expect("the corner");
+    let edge = Reference::Edge((*b.edges[e]).clone());
+    s.add("chamfer", move |p| {
+        p.set("entities", ParamValue::Query(vec![edge]));
+        p.set("chamferType", en("TWO_OFFSETS"));
+        p.set("width1", expr("5.5 mm"));
+        p.set("width2", expr("6 mm"));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    assert_eq!(shape.faces().len(), 53);
+    let v = volume(&r, 0) * 1e9;
+    assert!((41577.89..41610.15).contains(&v), "{v} mm³ (live 41594.47)");
+    let slanted: Vec<f64> = shape.faces().iter().filter(|f| f.face_plane().ok().flatten().is_some_and(|p| p.normal.x.abs() > 0.5 && p.normal.z.abs() > 0.5)).map(|f| f.area().unwrap() / (mm(1.0) * mm(1.0))).collect();
+    assert!(slanted.len() == 1 && (slanted[0] - 19.888).abs() < 0.01, "chamfer faces {slanted:?} mm² (live 19.888)");
+}

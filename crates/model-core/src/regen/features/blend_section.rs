@@ -3134,6 +3134,103 @@ pub fn planar_chamfer_cut(ev: &mut EvalCtx, bi: usize, edges: &[usize], d: f64) 
     Ok(true)
 }
 
+/// Whether every one of `edges` is a straight concave edge between two planes (their corner open).
+pub fn concave_planar_lines(shape: &Shape, edges: &[usize]) -> FResult<bool> {
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    let (faces, ef) = (shape.faces(), shape.edge_faces()?);
+    for &e in edges {
+        let info = shape.sub_shape(ShapeType::Edge, e)?.edge_info()?;
+        let k::Curve::Line { .. } = info.curve else { return Ok(false) };
+        let Some(fs) = ef.get(e).filter(|f| f.len() == 2) else { return Ok(false) };
+        let ff = [&faces[fs[0] as usize], &faces[fs[1] as usize]];
+        if !ff.iter().all(|f| f.is_planar()) {
+            return Ok(false);
+        }
+        let fr = frame_at(shape, ff, (info.start + info.end) * 0.5, (info.end - info.start).normalize(), scale)?;
+        if fr.u[0].dot(fr.m[1]) >= -1e-9 || fr.u[1].dot(fr.m[0]) >= -1e-9 {
+            return Ok(false);
+        }
+    }
+    Ok(!edges.is_empty())
+}
+
+/// Chamfers of straight concave edges between two planes ([`concave_planar_lines`]) as live builds them where OCCT's
+/// takes material off instead (asm-isaac-ball's a2e4a2 Chamfer 2: a slot's corner a hole runs through, 568 mm³ taken
+/// where live adds 40.31): each corner filled with its chamfer's prism along the edge, less every hole crossing it (the
+/// hole runs on through the chamfer face). `spec`'s first distance on the `reference` faces. False where it doesn't
+/// apply or doesn't come out one valid solid with more material.
+pub fn planar_concave_chamfer(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: k::ChamferSpec, reference: &[Shape]) -> FResult<bool> {
+    use super::sheetmetal_util::{body_named, bool_named};
+    let (d1, d2) = match spec {
+        k::ChamferSpec::Equal(d) => (d, d),
+        k::ChamferSpec::TwoDistances(a, b) => (a, b),
+        k::ChamferSpec::DistanceAngle(..) => return Ok(false),
+    };
+    let body = ev.ctx.bodies[bi].clone();
+    let shape = &body.shape;
+    if !concave_planar_lines(shape, edges)? {
+        return Ok(false);
+    }
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    let (faces, ef) = (shape.faces(), shape.edge_faces()?);
+    // The part's holes: cylinders whose material is outside them.
+    let holes: Vec<(&Shape, DVec3, DVec3, f64)> = faces
+        .iter()
+        .filter_map(|f| match f.face_surface() {
+            Ok(k::Surface::Cylinder { origin, axis, radius, .. }) => Some((f, origin, axis.normalize(), radius)),
+            _ => None,
+        })
+        .filter(|(f, origin, axis, _)| {
+            let c = f.centroid().unwrap_or(*origin);
+            let out = c - *origin - *axis * (c - *origin).dot(*axis);
+            f.normal_at_point(c).is_ok_and(|n| n.dot(out) < 0.0)
+        })
+        .collect();
+    let mut tools = Vec::new();
+    for (i, &e) in edges.iter().enumerate() {
+        let edge = shape.sub_shape(ShapeType::Edge, e)?;
+        let info = edge.edge_info()?;
+        let fs = &ef[e];
+        let ff = [&faces[fs[0] as usize], &faces[fs[1] as usize]];
+        let (a, b) = (info.start, info.end);
+        let fr = frame_at(shape, ff, (a + b) * 0.5, (b - a).normalize(), scale)?;
+        let on_first = reference.get(i).is_some_and(|r| r.is_same(ff[0]));
+        let (ua, ub) = if on_first { (fr.u[0] * d1, fr.u[1] * d2) } else { (fr.u[1] * d1, fr.u[0] * d2) };
+        let lines = [k::make_line(a, a + ua)?, k::make_line(a + ua, a + ub)?, k::make_line(a + ub, a)?];
+        let section = k::make_face_from_wire(&k::make_wire(&lines)?, true)?;
+        let mut tool = k::extrude(&section, b - a)?.shape;
+        let reach = tool.bounding_box(true)?;
+        for (f, origin, axis, radius) in &holes {
+            let Ok(fb) = f.bounding_box(true) else { continue };
+            if fb.min.cmpgt(reach.max).any() || reach.min.cmpgt(fb.max).any() {
+                continue;
+            }
+            let cyl = k::make_cylinder(&k::Plane::from_normal(*origin - *axis * scale * 2.0, *axis), *radius, scale * 4.0, std::f64::consts::TAU)?;
+            tool = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&tool), std::slice::from_ref(&cyl), &k::BooleanOptions::default())?.shape;
+        }
+        let ename = body.edges[e].clone();
+        let blend = Arc::new(TopoName::face(ev.feature, Role::Blend(ename.clone())));
+        let generated = Arc::new(TopoName::face(ev.feature, Role::Generated(ename)));
+        // Its chamfer face: the one through both offset lines.
+        let mid = (b - a) * 0.5;
+        let names: Vec<Name> = tool
+            .faces()
+            .iter()
+            .map(|f| if f.contains_point(a + ua + mid, scale * 1e-9).unwrap_or(false) && f.contains_point(a + ub + mid, scale * 1e-9).unwrap_or(false) { blend.clone() } else { generated.clone() })
+            .collect();
+        tools.push(NamedShape::new(tool, names));
+    }
+    let (fused, names) = bool_named(ev, k::BooleanOp::Fuse, &body_named(&body), &tools)?;
+    let fused = NamedShape::new(fused, names);
+    let un = k::unify_same_domain(&fused.shape)?;
+    if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 || un.shape.volume()? <= shape.volume()? {
+        return Ok(false);
+    }
+    let names = ev.name_result(&[&fused.names], &un.history, &un.shape, &BTreeMap::new(), None);
+    ev.replace_body(bi, un.shape, names);
+    Ok(true)
+}
+
 /// An Offset chamfer of `edges` on one plane face whose sides run straight along its normal (a tube's end): the part
 /// less [`k::rim_chamfer::prism_rim_chamfer`]'s tool, each chamfer face named for its edge. `spec`'s first distance
 /// on the `reference` faces (the plane face or the sides). False where it doesn't apply or doesn't come out one valid
