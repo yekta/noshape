@@ -326,6 +326,24 @@ fn reapply_reevaluates_up_to_next_per_instance() {
     assert!(pillars.iter().all(|v| near(*v, area * 0.02, 1e-4)), "{pillars:?}");
 }
 
+/// Up to next reaches a surface as well as a part (std's BoundingType: "the next solid body or surface body";
+/// c2-surf-workshop-split's surface Extrude 1 up to its Boundary surface, ours "Parts or Surfaces must be present").
+#[test]
+fn up_to_next_reaches_a_surface() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let line = sk.add_line(DVec2::new(-0.05, 0.03), DVec2::new(0.05, 0.03)).0;
+    let s = t.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let line = Reference::SketchEntity { sketch: s, entity: line };
+    t.add("extrude", &[("bodyType", en("SURFACE")), ("surfaceEntities", q(vec![line])), ("depth", e("100 mm")), ("symmetric", b(true))]);
+    let cs = t.sketch(Reference::Plane(DatumPlane::Top), circle(DVec2::ZERO, 0.003));
+    let r = t.regions(cs)[0].clone();
+    let pillar = t.add("extrude", &[("entities", q(vec![r])), ("endBound", en("UP_TO_NEXT")), ("operationType", en("NEW"))]);
+    let res = t.ok();
+    let v: Vec<f64> = res.context.bodies.iter().filter(|b| b.id.feature == pillar).map(|b| b.shape.volume().unwrap()).collect();
+    assert!(v.len() == 1 && near(v[0], PI * 0.003f64.powi(2) * 0.03, 1e-6), "{v:?}");
+}
+
 #[test]
 fn reapply_respects_feature_list_order() {
     // Boss then a hole through the boss, selected in reverse order.

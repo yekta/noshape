@@ -224,9 +224,10 @@ pub fn require_parts(ev: &EvalCtx) -> FResult<()> {
     }
 }
 
-/// What Up to next extrudes up to: the parts.
+/// What Up to next extrudes up to: the parts and surfaces (std's BoundingType: "the next solid body or surface body";
+/// c2-surf-workshop-split's surface Extrude 1 up to its Boundary surface).
 pub fn next_parts(ev: &EvalCtx) -> FResult<k::Shape> {
-    let solids: Vec<k::Shape> = ev.ctx.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| b.shape.clone()).collect();
+    let solids: Vec<k::Shape> = ev.ctx.bodies.iter().filter(|b| matches!(b.kind, BodyKind::Solid | BodyKind::Surface)).map(|b| b.shape.clone()).collect();
     if solids.is_empty() {
         return err("Parts or Surfaces must be present in the Part Studio.");
     }
