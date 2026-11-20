@@ -36,9 +36,14 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
   Title block's auto / DejaVu S / Color; MBD status note; Reference manager's Version graph; Drawing properties'
   Auxiliary; Undo / Redo / Update toolbar tips; menu rows Hide revision callouts, BOM Switch to, cell Size ▸,
   Switch to reference.
-- b15 (running 06:43): app build + ops e2e + shots of drw-custom-table-add, drw-insert-view-top-1to1 on vibe2 (the
-  shot script now takes the first free display from :395 up, skipping skasm's :391-399, so :402). Compare with live
-  ct-2-add / uip drw-insert-view-top-1to1-3; our search box's 2 px focus ring vs live's 1 px border is still open.
+- b15 (06:43-07:05, vibe2 :402): drw-custom-table-add 11/11, drw-insert-view-top-1to1 9/9; ops e2e 260 ok. Look vs
+  live iv-3: as live but our search box kept its focus ring after a row click (live's focus goes to the row):
+  fixed (a press in the list focuses the editor; test). Fix-forward of b6c84b49 (coverage: the sort rows in MENUS)
+  queued 07:03 as 0c681a1c (22 commits, carries 5a1b564a / 019a2040).
+- qa 11-20 (green 0bc7e772e): 9 of 10 to-verify rows verified (6c3c0a8fe); FEEL-DRW-WHEEL-ZOOM-SLOW stays open (qa
+  re-times it 02:00-04:00).
+- Next gap: Datum target's Distance fields have live's precision ▾ (live uip drw-datum-target-hide-dim-5): ours has
+  none (model DatumTargetOpts x / y precision, the position dims' format, drawing_datum op params, e2e).
 
 ## Next, in order
 1. Lead 11-20: the drawing matrix's items not yet matching, by use (dialogs, menus, placement, rarer panels): check

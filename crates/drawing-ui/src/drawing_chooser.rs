@@ -909,7 +909,9 @@ impl DrawingEditor {
             (_, Some(q)) => docs.retain(|d| d.name.to_lowercase().contains(&q)),
             _ => docs.sort_by_key(|d| std::cmp::Reverse(d.modified)),
         }
-        let mut list = v_flex().id("dr-ch-other-list").flex_1().min_h_0().overflow_y_scroll();
+        let mut list = v_flex().id("dr-ch-other-list").flex_1().min_h_0().overflow_y_scroll()
+            // A press in the list takes the focus from the search box (live drw-insert-view-top-1to1 s2: the row's).
+            .on_mouse_down(MouseButton::Left, cx.listener(|this, _: &MouseDownEvent, window, cx| window.focus(&this.focus, cx)));
         for (i, d) in docs.into_iter().enumerate() {
             let path = d.path.clone();
             // Live: the name, then its latest version (or Start).
@@ -1078,7 +1080,9 @@ impl DrawingEditor {
                 .child(label)
         };
         let row_base = |id: SharedString, indent: f32| h_flex().id(id).min_h(px(22.)).pl(px(6. + indent)).pr(px(6.)).gap(px(6.)).cursor_pointer().hover(|d| d.bg(pal.row_hover)).text_size(px(13.33));
-        let mut list = v_flex().id("dr-chooser-list").flex_1().min_h_0().overflow_y_scroll();
+        let mut list = v_flex().id("dr-chooser-list").flex_1().min_h_0().overflow_y_scroll()
+            // A press in the list takes the focus from the search box (live drw-insert-view-top-1to1 s2: the row's).
+            .on_mouse_down(MouseButton::Left, cx.listener(|this, _: &MouseDownEvent, window, cx| window.focus(&this.focus, cx)));
         // The rows as live's recorder reads the picker (a checkbox per row; `child` under a studio).
         let mut read_rows: Vec<serde_json::Value> = Vec::new();
         let row_read = |label: &str, child: bool| serde_json::json!({ "label": label, "kind": "boolean", "checked": false, "child": child });
