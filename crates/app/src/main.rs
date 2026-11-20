@@ -252,6 +252,7 @@ fn register_drawing_hooks() {
         export_rules_link: preferences_window::export_rules_link,
         light_model_space: || preferences_window::ListPrefs::load().drawing_light_model_space,
         studio_context: part_studio::committed_context,
+        last_viewed_config: release_dialog::last_viewed_config,
     });
 }
 

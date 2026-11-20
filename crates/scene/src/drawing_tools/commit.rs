@@ -890,9 +890,9 @@ pub fn apply_hatches(sketch: &mut noshape_model::drawing::sheet_sketch::SheetSke
 
 /// The Custom table dialog's table kind: Part Studio `studio` at `version` (this document's version id, another
 /// document's version key, None: the workspace), custom table `name` of Feature Studio `fs` (at `fs_version`, another
-/// document's version, or this workspace).
-pub fn custom_table_kind(studio: noshape_model::document::TabId, version: Option<String>, fs: noshape_model::document::TabId, name: String, fs_version: Option<String>, bottom_to_top: bool) -> TableKind {
-    TableKind::Custom { studio, version, fs, name, fs_version, bottom_to_top }
+/// document's version, or this workspace), the studio's configuration `config` (empty: its default).
+pub fn custom_table_kind(studio: noshape_model::document::TabId, version: Option<String>, fs: noshape_model::document::TabId, name: String, fs_version: Option<String>, bottom_to_top: bool, config: noshape_model::configuration::ConfigValues) -> TableKind {
+    TableKind::Custom { studio, version, fs, name, fs_version, bottom_to_top, config }
 }
 
 /// A custom table placed by the Custom table dialog's click.

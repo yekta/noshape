@@ -383,6 +383,7 @@ pub fn ops() -> Vec<Op> {
                     opt("document", json!({ "type": "string" }), "Select a Part Studio › Other documents: another document's file (path) whose Part Studio `studio` to use."),
                     opt("version", json!({ "type": "string" }), "With `document`: its named version (\"V1\")."),
                     opt("view", json!({ "type": "integer" }), "A view whose Part Studio to use."),
+                    opt("configuration", json!({ "type": ["object", "null"] }), "Select a Part Studio › a configured studio's inputs: {input name or id: value} (a list input takes its option's name); null: its default. Kept while the Part Studio stays."),
                     opt("position", point(), "Where the fixed corner goes (sheet mm; inserting)."),
                     opt("corner", json!({ "type": "string", "enum": ["top_left", "top_right", "bottom_left", "bottom_right"], "default": "top_right" }), "Fixed corner."),
                     opt("bottom_to_top", json!({ "type": "boolean", "default": false }), "Row order bottom to top."),
@@ -2249,18 +2250,21 @@ fn custom_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         },
         None => None,
     };
-    let (old_studio, old_fs, old_name, old_fs_version, old_btt) = match &old {
-        Some((TableKind::Custom { studio, fs, name, fs_version, bottom_to_top, .. }, _)) => (Some(*studio), Some(*fs), Some(name.clone()), fs_version.clone(), *bottom_to_top),
-        _ => (None, None, None, None, false),
+    let (old_studio, old_fs, old_name, old_fs_version, old_btt, old_config) = match &old {
+        Some((TableKind::Custom { studio, fs, name, fs_version, bottom_to_top, config, .. }, _)) => (Some(*studio), Some(*fs), Some(name.clone()), fs_version.clone(), *bottom_to_top, config.clone()),
+        _ => (None, None, None, None, false, Default::default()),
     };
     if a.get("version").is_some() && a.get("document").is_none() {
         return Err(OpError::param("version", "`version` goes with `document` (another document's version)"));
     }
     // The Part Studio: another document's, given, the view's, the edited table's, else the first in the drawing.
-    let mut version = old.as_ref().and_then(|o| match &o.0 {
+    let old_version = old.as_ref().and_then(|o| match &o.0 {
         TableKind::Custom { version, .. } => version.clone(),
         _ => None,
     });
+    let mut version = old_version.clone();
+    // The studio's configuration inputs (another document's from its snapshot).
+    let mut inputs: Option<Vec<noshape_model::configuration::ConfigInput>> = None;
     let studio = match (a.opt_str("studio")?, a.opt_u64("view")?) {
         (_, _) if a.get("document").is_some() => {
             let document = a.str("document")?;
@@ -2270,6 +2274,9 @@ fn custom_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let studios: Vec<&noshape_model::document::Tab> = snapshot.ordered_tabs().into_iter().filter(|t| matches!(t.content, TabContent::PartStudio(_))).collect();
             let tab = studios.iter().find(|t| t.name == name || t.id.to_string() == name).ok_or_else(|| OpError::param("studio", &format!("no Part Studio `{name}` in {} {}; there: {}", path.display(), v.label, studios.iter().map(|t| t.name.as_str()).collect::<Vec<_>>().join(", "))))?;
             version = Some(crate::derived::ExternalRef { path: path.clone(), microversion: v.microversion, tab: tab.id.to_string() }.key());
+            if let TabContent::PartStudio(ps) = &tab.content {
+                inputs = Some(ps.configuration.inputs.clone());
+            }
             tab.id
         }
         (Some(s), _) => {
@@ -2313,7 +2320,23 @@ fn custom_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     };
     let bottom_to_top = a.bool_or("bottom_to_top", old_btt)?;
     let corner = enum_arg(a, "corner", &CORNERS, old.as_ref().map_or(TableCorner::TopRight, |o| o.1))?;
-    let kind = dt::custom_table_kind(studio, version, fs, name, fs_version, bottom_to_top);
+    let kept = if old_studio == Some(studio) && old_version == version { old_config } else { Default::default() };
+    let config = match a.value.get("configuration") {
+        None => kept,
+        Some(Value::Null) => Default::default(),
+        Some(Value::Object(m)) => {
+            let inputs = inputs.unwrap_or_else(|| match doc.tab(studio).map(|t| &t.content) {
+                Some(TabContent::PartStudio(ps)) => ps.configuration.inputs.clone(),
+                _ => Vec::new(),
+            });
+            if inputs.is_empty() {
+                return Err(OpError::param("configuration", "the Part Studio has no configuration"));
+            }
+            super::drawing_more::config_values(&inputs, kept, m)?
+        }
+        Some(_) => return Err(OpError::param("configuration", "an object {input: value}, or null")),
+    };
+    let kind = dt::custom_table_kind(studio, version, fs, name, fs_version, bottom_to_top, config);
     let sheet = t.sheet;
     let (id, description) = match edit {
         Some(id) => {

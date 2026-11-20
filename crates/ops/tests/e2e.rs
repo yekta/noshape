@@ -4287,6 +4287,23 @@ export const partFaces = defineTable(function(context is Context, definition is 
     assert!(t["rows"][0][1].as_str().unwrap().parse::<u32>().unwrap() >= 7, "{t}");
     let e = try_call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "id": other, "version": "V1" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("version"), "{e:?}");
+    // A configured Part Studio at one of its configurations (Select a Part Studio › the studio's inputs, live
+    // cfg-choosers-1120); kept by other property edits; null: its default.
+    let e = try_call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "id": id, "configuration": { "Size": "Large" } })).unwrap_err();
+    assert!(e.param.as_deref() == Some("configuration") && e.message.contains("no configuration"), "{e:?}");
+    call(&mut ctx, "config_add_input", json!({ "tab": "Part Studio 1", "kind": "list", "name": "Size" }));
+    let large = call(&mut ctx, "config_add_option", json!({ "tab": "Part Studio 1", "input": "Size", "name": "Large" }))["option"].clone();
+    let table = |r: &Value, id: u64| r["tables"].as_array().unwrap().iter().find(|t| t["id"] == id).unwrap().clone();
+    let r = call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "id": id, "configuration": { "Size": "Large" } }));
+    let t = table(&r, id);
+    assert!(t["configuration"].as_object().is_some_and(|c| c.values().any(|v| *v == large)), "{t}");
+    assert!(t["rows"][0][1].as_str().unwrap().parse::<u32>().unwrap() >= 7, "{t}");
+    let r = call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "id": id, "bottom_to_top": true }));
+    assert!(table(&r, id)["configuration"].is_object(), "kept");
+    let r = call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "id": id, "configuration": null }));
+    assert!(table(&r, id).get("configuration").is_none(), "the default");
+    let e = try_call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "id": id, "configuration": { "Colour": "Red" } })).unwrap_err();
+    assert!(e.param.as_deref() == Some("configuration") && e.message.contains("Size"), "{e:?}");
 }
 
 #[test]

@@ -21,6 +21,7 @@ use noshape_model::BodyId;
 use noshape_model::document::{TabContent, TabId};
 use noshape_model::drawing::views::{self, SourceKey};
 use noshape_model::drawing::ViewOrientation;
+use noshape_model::configuration::{ConfigInput, ConfigInputKind, ConfigValues};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -92,6 +93,8 @@ pub struct ChooserState {
     /// Custom table › Add's "Select a Part Studio" (live custom-tables 262, 279): Part Studios only, a pick is the
     /// custom table's.
     pub studio: bool,
+    /// Its configured studios' inputs as set in the list (live cfg-choosers-1120), taken with the studio.
+    pub studio_config: HashMap<TabId, ConfigValues>,
     /// Current document › Version graph: the list shown, and the version
     /// chosen (new views are pinned to it).
     pub graph: bool,
@@ -287,11 +290,143 @@ impl DrawingEditor {
             self.chooser.search = None;
         }
         self.chooser.composite = false;
+        if !self.chooser.studio {
+            self.chooser.studio_config.clear();
+        }
         self.chooser.studio = true;
         self.chooser.other = false;
         self.insert.chooser = Some(0);
         self.ensure_sources(false, cx);
         cx.notify();
+    }
+
+    /// A configured studio's › / ⌄ in Select a Part Studio: shows its inputs under the row.
+    fn config_expander(&self, id: TabId, open: bool, cx: &mut Context<Self>) -> AnyElement {
+        div()
+            .id(SharedString::from(format!("dr-ch-cfg-exp-{id}")))
+            .debug_selector(move || format!("dr-ch-cfg-exp-{id}"))
+            .w(px(14.))
+            .h_full()
+            .flex()
+            .flex_none()
+            .items_center()
+            .child(crate::assets::icon(if open { "chevron-down" } else { "chevron-right" }, 14., cx))
+            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                cx.stop_propagation();
+                if let Some(i) = this.chooser.open.iter().position(|t| *t == id) {
+                    this.chooser.open.remove(i);
+                } else {
+                    this.chooser.open.push(id);
+                }
+                cx.notify();
+            }))
+            .into_any_element()
+    }
+
+    /// A configured studio's configuration buttons (live cfg-choosers-1120): "Set to last viewed configuration" and
+    /// its ▾ (Set to last viewed | Reset to default).
+    fn config_buttons(&self, id: TabId, cx: &mut Context<Self>) -> AnyElement {
+        use crate::os_ui::OsDropdownExt as _;
+        use gpui_kit::component::button::{Button, ButtonVariants as _};
+        let line = gpui_kit::rgb(0xaaaaaa);
+        let ed = cx.entity();
+        let set = move |this: &mut Self, last: bool, cx: &mut Context<Self>| {
+            let config = if last { crate::drawing_hooks::last_viewed_config(id) } else { Some(ConfigValues::default()) };
+            if let Some(c) = config {
+                this.chooser.studio_config.insert(id, c);
+                if !this.chooser.open.contains(&id) {
+                    this.chooser.open.push(id);
+                }
+            }
+            cx.notify();
+        };
+        h_flex()
+            .w(px(57.))
+            .h(px(30.))
+            .flex_none()
+            .rounded(px(3.))
+            .border_1()
+            .border_color(line)
+            .child(
+                div()
+                    .id(SharedString::from(format!("dr-ch-cfg-last-{id}")))
+                    .debug_selector(move || format!("dr-ch-cfg-last-{id}"))
+                    .w(px(35.))
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .border_r_1()
+                    .border_color(line)
+                    .tooltip(crate::ui::tooltip("Set to last viewed configuration"))
+                    .child(crate::assets::icon("configuration", 20., cx))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        cx.stop_propagation();
+                        set(this, true, cx);
+                    })),
+            )
+            .child(
+                div().on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation()).child(
+                    Button::new(SharedString::from(format!("dr-ch-cfg-menu-{id}")))
+                        .ghost()
+                        .w(px(20.))
+                        .h(px(28.))
+                        .rounded(px(0.))
+                        .child(crate::ui::glyph("ui-caret-down", 10., gpui_kit::rgb(0x000000)))
+                        .os_dropdown_menu(SharedString::from(format!("dr-ch-cfg-menu-{id}-dd")), true, move |menu, _, _| {
+                            let (e1, e2) = (ed.clone(), ed.clone());
+                            menu.item(crate::os_menu::OsMenuItem::new("Set to last viewed").on_click(move |_, _, cx| e1.update(cx, |t, cx| set(t, true, cx))))
+                                .item(crate::os_menu::OsMenuItem::new("Reset to default").on_click(move |_, _, cx| e2.update(cx, |t, cx| set(t, false, cx))))
+                        }),
+                ),
+            )
+            .into_any_element()
+    }
+
+    /// A configured studio's inputs under its row (live cfg-choosers-1120): the name left (with its default once
+    /// another value is set: "Size: (Default: Small)"), the value a full-width list or a checkbox.
+    fn config_rows(&self, id: TabId, inputs: &[ConfigInput], cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let cur = self.chooser.studio_config.get(&id).cloned().unwrap_or_default();
+        let ed = cx.entity();
+        let mut out = Vec::new();
+        for input in inputs {
+            let iid = input.id.clone();
+            let set = {
+                let ed = ed.clone();
+                move |value: String, cx: &mut App| {
+                    let iid = iid.clone();
+                    ed.update(cx, |this, cx| {
+                        this.chooser.studio_config.entry(id).or_default().0.insert(iid, value);
+                        cx.notify();
+                    })
+                }
+            };
+            let field: AnyElement = match &input.kind {
+                ConfigInputKind::List { options, default } => {
+                    let value = cur.0.get(&input.id).cloned().unwrap_or_else(|| default.clone());
+                    let at = options.iter().position(|o| o.id == value).unwrap_or(0);
+                    let label = match options.iter().find(|o| o.id == *default) {
+                        Some(d) if value != *default => format!("{}: (Default: {})", input.name, d.name),
+                        _ => input.name.clone(),
+                    };
+                    let ids: Vec<String> = options.iter().map(|o| o.id.clone()).collect();
+                    let names: Vec<String> = options.iter().map(|o| o.name.clone()).collect();
+                    let list = crate::os_ui::select_field_flat(SharedString::from(format!("dr-ch-cfg-{id}-{}", input.id)), names, Vec::new(), 0, at, move |i, _, cx| {
+                        if let Some(v) = ids.get(i) {
+                            set(v.clone(), cx);
+                        }
+                    });
+                    h_flex().gap(px(8.)).child(div().flex_none().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child(label)).child(div().flex_1().min_w_0().child(list)).into_any_element()
+                }
+                ConfigInputKind::Checkbox { default } => {
+                    let on = cur.0.get(&input.id).map(|v| v == "true").unwrap_or(*default);
+                    crate::os_ui::checkbox(SharedString::from(format!("dr-ch-cfg-{id}-{}", input.id)), input.name.clone(), on).on_click(move |_, _, cx| set(if on { "false" } else { "true" }.into(), cx)).into_any_element()
+                }
+                _ => continue,
+            };
+            out.push(div().pl(px(44.)).pr(px(26.)).py(px(3.)).child(field).into_any_element());
+        }
+        out
     }
 
     pub fn close_studio_chooser(&mut self) {
@@ -306,13 +441,13 @@ impl DrawingEditor {
     /// A Part Studio picked for the custom table: this document's (at the Version graph's version), or the opened
     /// other document's at its version.
     fn pick_custom_studio(&mut self, id: TabId, name: String, window: &mut Window, cx: &mut Context<Self>) {
-        let version = match self.chooser.other_doc.clone().filter(|_| self.chooser.other) {
-            Some(d) => d.key(id).map(|k| k.0),
-            None => self.chooser.version.as_ref().map(|v| v.id.clone()),
+        let (version, config) = match self.chooser.other_doc.clone().filter(|_| self.chooser.other) {
+            Some(d) => (d.key(id).map(|k| k.0), ConfigValues::default()),
+            None => (self.chooser.version.as_ref().map(|v| v.id.clone()), self.chooser.studio_config.get(&id).cloned().unwrap_or_default()),
         };
         self.close_studio_chooser();
         window.focus(&self.focus, cx);
-        self.pick_studio(id, version, name, cx);
+        self.pick_studio(id, version, config, name, cx);
     }
 
     /// A composite part picked: the cut list table's, placed by the next click.
@@ -920,7 +1055,13 @@ impl DrawingEditor {
                 read_rows.push(row_read(&name, false));
                 let pic = pic_of(id, ThumbOf::Part(None));
                 if self.chooser.studio {
-                    // Live 279: 40 px rows, a 70 × 40 picture, the name light.
+                    let inputs = match self.doc.read(cx).session.doc.tab(id).map(|t| &t.content) {
+                        Some(TabContent::PartStudio(ps)) => ps.configuration.inputs.clone(),
+                        _ => Vec::new(),
+                    };
+                    let open = !inputs.is_empty() && self.chooser.open.contains(&id);
+                    // Live 279: 40 px rows, a 70 × 40 picture, the name light; a configured studio's › and its
+                    // configuration buttons (cfg-choosers-1120).
                     let shown = name.clone();
                     list = list.child(
                         h_flex()
@@ -935,11 +1076,18 @@ impl DrawingEditor {
                             .hover(|d| d.bg(pal.row_hover))
                             .text_size(px(13.33))
                             .font_weight(FontWeight::LIGHT)
+                            .when(!inputs.is_empty(), |d| d.child(self.config_expander(id, open, cx)))
                             .child(thumb_sized(pic, 70., 40.))
-                            .child(div().truncate().child(crate::ui::user_text(name.clone())))
+                            .child(div().flex_1().min_w_0().truncate().child(crate::ui::user_text(name.clone())))
+                            .when(!inputs.is_empty(), |d| d.child(self.config_buttons(id, cx)))
                             .tooltip(crate::ui::tooltip(name.clone()))
                             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.pick_custom_studio(id, name.clone(), window, cx))),
                     );
+                    if open {
+                        for row in self.config_rows(id, &inputs, cx) {
+                            list = list.child(row);
+                        }
+                    }
                     continue;
                 }
                 list = list.child(row_base(SharedString::from(format!("dr-ch-ps-{id}")), 20.).min_h(px(38.)).child(thumb(pic)).child(div().truncate().child(crate::ui::user_text(name))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_tree(id, None, cx))));

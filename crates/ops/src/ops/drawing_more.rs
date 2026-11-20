@@ -211,31 +211,16 @@ fn table_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let corner = enum_arg(a, "corner", &CORNERS, old.corner)?;
     // Cut list › Change configuration... (live request 1638 (b)): None
     // unchanged, Some(None) back to the view's.
-    let new_config: Option<Option<noshape_model::configuration::ConfigValues>> = match a.get("configuration") {
+    let new_config: Option<Option<noshape_model::configuration::ConfigValues>> = match a.value.get("configuration") {
         None => None,
         Some(Value::Null) => Some(None),
         Some(Value::Object(m)) => {
-            use noshape_model::configuration::ConfigInputKind;
             let key = noshape_model::drawing::views::table_source(&t.d.sheets[sheet], &old).ok_or_else(|| OpError::param("table", "the table's view has no source"))?;
             let inputs = match od.doc().tab(key.tab).map(|x| &x.content) {
                 Some(noshape_model::document::TabContent::PartStudio(ps)) => ps.configuration.inputs.clone(),
                 _ => Vec::new(),
             };
-            let mut values = key.config.clone();
-            for (k, v) in m {
-                let names: Vec<&str> = inputs.iter().map(|i| i.name.as_str()).collect();
-                let input = inputs.iter().find(|i| i.id == *k || i.name == *k).ok_or_else(|| OpError::param("configuration", &format!("no input `{k}` (the Part Studio's: {})", names.join(", "))))?;
-                let text = v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string());
-                let text = match &input.kind {
-                    ConfigInputKind::List { options, .. } => {
-                        let opts: Vec<&str> = options.iter().map(|o| o.name.as_str()).collect();
-                        options.iter().find(|o| o.name == text || o.id == text).map(|o| o.id.clone()).ok_or_else(|| OpError::param("configuration", &format!("`{}` takes one of {}", input.name, opts.join(", "))))?
-                    }
-                    _ => text,
-                };
-                values.0.insert(input.id.clone(), text);
-            }
-            Some(Some(values))
+            Some(Some(config_values(&inputs, key.config.clone(), m)?))
         }
         Some(_) => return Err(OpError::param("configuration", "an object {input: value}, or null")),
     };
@@ -286,6 +271,26 @@ fn table_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
     };
     done(od, t, description, "table", id)
+}
+
+/// `configuration` {input id or name: value} over `values` (a list input takes its option's id or name), as
+/// `inputs` (a Part Studio's) define them.
+pub(crate) fn config_values(inputs: &[noshape_model::configuration::ConfigInput], mut values: noshape_model::configuration::ConfigValues, m: &serde_json::Map<String, Value>) -> Result<noshape_model::configuration::ConfigValues, OpError> {
+    use noshape_model::configuration::ConfigInputKind;
+    for (k, v) in m {
+        let names: Vec<&str> = inputs.iter().map(|i| i.name.as_str()).collect();
+        let input = inputs.iter().find(|i| i.id == *k || i.name == *k).ok_or_else(|| OpError::param("configuration", &format!("no input `{k}` (the Part Studio's: {})", names.join(", "))))?;
+        let text = v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string());
+        let text = match &input.kind {
+            ConfigInputKind::List { options, .. } => {
+                let opts: Vec<&str> = options.iter().map(|o| o.name.as_str()).collect();
+                options.iter().find(|o| o.name == text || o.id == text).map(|o| o.id.clone()).ok_or_else(|| OpError::param("configuration", &format!("`{}` takes one of {}", input.name, opts.join(", "))))?
+            }
+            _ => text,
+        };
+        values.0.insert(input.id.clone(), text);
+    }
+    Ok(values)
 }
 
 fn paste_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

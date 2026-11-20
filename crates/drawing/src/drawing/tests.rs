@@ -2451,7 +2451,7 @@ export const partFaces = defineTable(function(context is Context, definition is 
     let studio = studio_tab(&doc);
     drawing.sheets[0].views.clear();
     drawing.sheets[0].tables.clear();
-    let kind = TableKind::Custom { studio, version: None, fs, name: "partFaces".into(), fs_version: None, bottom_to_top: false };
+    let kind = TableKind::Custom { studio, version: None, fs, name: "partFaces".into(), fs_version: None, bottom_to_top: false, config: Default::default() };
     drawing.sheets[0].tables.push(Table::new(1, kind, [400.0, 280.0]));
     assert_eq!(drawing.sheets[0].tables[0].type_name(), "Custom table");
     // The studio is a source although no view shows it.

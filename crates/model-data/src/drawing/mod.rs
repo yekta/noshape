@@ -1679,6 +1679,9 @@ pub enum TableKind {
         fs_version: Option<String>,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         bottom_to_top: bool,
+        /// The Part Studio's configuration (Select a Part Studio › its inputs; empty: the default).
+        #[serde(default, skip_serializing_if = "ConfigValues::is_empty")]
+        config: ConfigValues,
     },
 }
 

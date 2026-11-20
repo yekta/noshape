@@ -820,8 +820,8 @@ pub struct CustomTableKey {
 
 impl CustomTableKey {
     pub fn of(kind: &TableKind) -> Option<Self> {
-        let TableKind::Custom { studio, version, fs, name, fs_version, .. } = kind else { return None };
-        Some(Self { source: SourceKey { version: version.clone(), ..SourceKey::studio(*studio) }, fs: *fs, fs_version: fs_version.clone(), name: name.clone() })
+        let TableKind::Custom { studio, version, fs, name, fs_version, config, .. } = kind else { return None };
+        Some(Self { source: SourceKey { version: version.clone(), config: config.clone(), ..SourceKey::studio(*studio) }, fs: *fs, fs_version: fs_version.clone(), name: name.clone() })
     }
 }
 

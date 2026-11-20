@@ -645,6 +645,11 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if let Some(ti) = data.title {
                 j["title"] = json!(ti);
             }
+            if let noshape_model::drawing::TableKind::Custom { config, .. } = &t.kind
+                && !config.is_empty()
+            {
+                j["configuration"] = json!(config.0);
+            }
             // A BOM's rows by part (the table shows numbers and descriptions only).
             if let (noshape_model::drawing::TableKind::Bom { structured, bottom_to_top, .. }, Some(s)) = (&t.kind, source) {
                 let mut names: Vec<String> = if s.assembly && *structured {

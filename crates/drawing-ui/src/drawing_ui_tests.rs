@@ -1617,3 +1617,38 @@ fn custom_table_add_picks_a_part_studio_in_the_chooser(cx: &mut TestAppContext) 
     let (studio_mode, open, dlg) = state(cx);
     assert!(!studio_mode && open.is_none() && dlg.as_ref().is_some_and(|d| !d.2), "Esc closes it, the dialog stays: {dlg:?}");
 }
+
+/// Live cfg-choosers-1120: a configured studio's row in Select a Part Studio has a › that shows its inputs under it
+/// (a list per input) and the configuration buttons; the studio picked takes the configuration set there.
+#[gpui::test]
+fn custom_table_add_takes_a_configured_studios_configuration(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::{TableTool, Tool};
+    SUGGESTED.set(true);
+    SETUP.set(Some(|ctx, _| {
+        call(ctx, "config_add_input", json!({ "tab": "Part Studio 1", "kind": "list", "name": "Size" }));
+        call(ctx, "config_add_option", json!({ "tab": "Part Studio 1", "input": "Size", "name": "Large" }));
+    }));
+    let (window, editor) = drawing(cx, "ct-studio-config");
+    real_sheet(cx, window, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Table { kind: TableTool::Custom, view: None, origin: None }, cx)));
+    draw(cx, window);
+    press(cx, window, "ct-add");
+    let (studio, input, large) = cx.update(|cx| {
+        let doc = &editor.read(cx).doc.read(cx).session.doc;
+        let tab = doc.ordered_tabs().into_iter().find(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_))).unwrap();
+        let noshape_model::TabContent::PartStudio(ps) = &tab.content else { unreachable!() };
+        let i = ps.configuration.inputs.first().expect("Size").clone();
+        let noshape_model::configuration::ConfigInputKind::List { options, .. } = &i.kind else { panic!("a list") };
+        (tab.id, i.id.clone(), options.iter().find(|o| o.name == "Large").expect("Large").id.clone())
+    });
+    let list = format!("dr-ch-cfg-{studio}-{input}");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    assert!(vcx.debug_bounds(Box::leak(format!("dr-ch-cfg-last-{studio}").into_boxed_str())).is_some(), "its configuration buttons");
+    assert!(vcx.debug_bounds(Box::leak(list.clone().into_boxed_str())).is_none(), "its inputs folded");
+    press(cx, window, &format!("dr-ch-cfg-exp-{studio}"));
+    assert!(cx.update(|cx| editor.read(cx).chooser.studio), "the › keeps the chooser open");
+    pick(cx, window, &list, "Large");
+    press(cx, window, &format!("dr-ch-ps-{studio}"));
+    let config = cx.update(|cx| editor.read(cx).custom_tables.dlg.as_ref().map(|d| (d.studio, d.config.0.get(&input).cloned())));
+    assert_eq!(config, Some((Some(studio), Some(large))), "the studio at Size Large");
+}

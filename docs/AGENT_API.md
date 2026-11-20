@@ -4671,6 +4671,7 @@ Examples:
 | `document` | string |  | Select a Part Studio › Other documents: another document's file (path) whose Part Studio `studio` to use. |
 | `version` | string |  | With `document`: its named version ("V1"). |
 | `view` | integer |  | A view whose Part Studio to use. |
+| `configuration` | object or null |  | Select a Part Studio › a configured studio's inputs: {input name or id: value} (a list input takes its option's name); null: its default. Kept while the Part Studio stays. |
 | `position` | array of number |  | Where the fixed corner goes (sheet mm; inserting). |
 | `corner` | one of `top_left`, `top_right`, `bottom_left`, `bottom_right` |  | Fixed corner. |
 | `bottom_to_top` | boolean |  | Row order bottom to top. |

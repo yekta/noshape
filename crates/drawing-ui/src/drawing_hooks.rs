@@ -43,6 +43,8 @@ pub struct Hooks {
     /// document's current state in that configuration (a drawing of it then
     /// doesn't regenerate it again).
     pub studio_context: StudioContext,
+    /// A Part Studio's last viewed configuration (Select a Part Studio › Set to last viewed configuration).
+    pub last_viewed_config: fn(TabId) -> Option<noshape_model::configuration::ConfigValues>,
 }
 
 /// [`Hooks::studio_context`]: the document, the Part Studio tab, the configuration.
@@ -70,6 +72,7 @@ pub fn register_for_tests() {
         export_rules_link: |id| div().id(id),
         light_model_space: || true,
         studio_context: |_, _, _, _| None,
+        last_viewed_config: |_| None,
     });
 }
 
@@ -111,6 +114,10 @@ pub fn export_rules_link(id: &'static str) -> Stateful<Div> {
 
 pub fn light_model_space() -> bool {
     (hooks().light_model_space)()
+}
+
+pub fn last_viewed_config(tab: TabId) -> Option<noshape_model::configuration::ConfigValues> {
+    (hooks().last_viewed_config)(tab)
 }
 
 pub fn studio_context(doc: &Entity<DocModel>, tab: TabId, config: &noshape_model::configuration::ConfigValues, cx: &App) -> Option<std::sync::Arc<noshape_model::regen::context::Context>> {

@@ -460,6 +460,9 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Rename...", Op("drawing_sheet")),
     ("drawing:Reorder inspection items...", Op("drawing_inspection")),
     ("drawing:Replace...", Op("drawing_replace")),
+    // Custom table › Add › a configured studio's ▾ (its configuration: drawing_custom_table `configuration`).
+    ("drawing:Reset to default", Op("drawing_custom_table")),
+    ("drawing:Set to last viewed", Op("drawing_custom_table")),
     ("drawing:Change configuration...", Op("drawing_change_configuration")),
     ("drawing:Replicate annotations\\tbeta", Op("drawing_replicate")),
     ("drawing:Revision table properties...", Op("drawing_table_properties")),

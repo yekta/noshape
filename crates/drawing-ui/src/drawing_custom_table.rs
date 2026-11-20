@@ -16,6 +16,7 @@ use gpui_kit::component::{Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::TabContent;
+use noshape_model::configuration::ConfigValues;
 use noshape_model::document::TabId;
 use noshape_model::drawing::tables::{CustomTableKey, custom_table_keys};
 use noshape_model::drawing::{SheetLayer, Table, TableCorner, TableKind};
@@ -44,6 +45,8 @@ pub struct CustomDlg {
     pub version: Option<String>,
     /// Another document's Part Studio: its name there.
     pub external: Option<String>,
+    /// The Part Studio's configuration (Select a Part Studio › its inputs; empty: the default).
+    pub config: ConfigValues,
     pub chosen: Option<TableRef>,
     pub bottom_to_top: bool,
     pub corner: TableCorner,
@@ -101,7 +104,7 @@ impl DrawingEditor {
             };
             let studios = self.drawing_studios(None, cx);
             let studio = from_view.filter(|t| studios.iter().any(|s| s.0 == *t)).or_else(|| studios.first().map(|s| s.0));
-            self.custom_tables.dlg = Some(CustomDlg { table: None, original: None, studio, version: None, external: None, chosen: None, bottom_to_top: false, corner: TableCorner::TopRight, picker: None });
+            self.custom_tables.dlg = Some(CustomDlg { table: None, original: None, studio, version: None, external: None, config: ConfigValues::default(), chosen: None, bottom_to_top: false, corner: TableCorner::TopRight, picker: None });
         } else if !active && inserting {
             self.custom_tables.dlg = None;
             self.close_studio_chooser();
@@ -112,18 +115,18 @@ impl DrawingEditor {
     /// fixed corner).
     pub fn open_custom_props(&mut self, id: u64, cx: &mut Context<Self>) {
         let Some(t) = self.current_sheet().table(id).cloned() else { return };
-        let TableKind::Custom { studio, version, bottom_to_top, .. } = &t.kind else { return };
+        let TableKind::Custom { studio, version, bottom_to_top, config, .. } = &t.kind else { return };
         let chosen = table_ref(&t.kind, &self.doc.read(cx).session.doc);
         let external = version.as_deref().and_then(crate::derived::ExternalRef::parse).and_then(|e| crate::derived::external_snapshot(&e.path, e.microversion).ok()).and_then(|d| d.tab(*studio).map(|t| t.name.clone()));
         self.tool = Tool::Select;
-        self.custom_tables.dlg = Some(CustomDlg { table: Some(id), original: Some((t.kind.clone(), t.corner)), studio: Some(*studio), version: version.clone(), external, chosen, bottom_to_top: *bottom_to_top, corner: t.corner, picker: None });
+        self.custom_tables.dlg = Some(CustomDlg { table: Some(id), original: Some((t.kind.clone(), t.corner)), studio: Some(*studio), version: version.clone(), external, config: config.clone(), chosen, bottom_to_top: *bottom_to_top, corner: t.corner, picker: None });
         cx.notify();
     }
 
     /// The dialog's table kind.
     fn custom_kind(d: &CustomDlg) -> Option<TableKind> {
         let (studio, t) = (d.studio?, d.chosen.as_ref()?);
-        Some(noshape_scene::drawing_tools::custom_table_kind(studio, d.version.clone(), t.fs, t.name.clone(), t.version.clone(), d.bottom_to_top))
+        Some(noshape_scene::drawing_tools::custom_table_kind(studio, d.version.clone(), t.fs, t.name.clone(), t.version.clone(), d.bottom_to_top, d.config.clone()))
     }
 
     /// Editing a table: apply the dialog live.
@@ -386,13 +389,15 @@ impl DrawingEditor {
         self.open_cell_format_panel(t.id, r, c, window, cx);
     }
 
-    /// A Part Studio chosen: from the chooser (`version` as [`CustomDlg::version`]) or the dialog's dropdown.
-    pub(crate) fn pick_studio(&mut self, tab: TabId, version: Option<String>, name: String, cx: &mut Context<Self>) {
+    /// A Part Studio chosen: from the chooser (`version` as [`CustomDlg::version`], at configuration `config`) or the
+    /// dialog's dropdown.
+    pub(crate) fn pick_studio(&mut self, tab: TabId, version: Option<String>, config: ConfigValues, name: String, cx: &mut Context<Self>) {
         let external = version.as_deref().and_then(crate::derived::ExternalRef::parse).map(|_| name);
         if let Some(d) = &mut self.custom_tables.dlg {
             d.studio = Some(tab);
             d.version = version;
             d.external = external;
+            d.config = config;
             d.picker = None;
         }
         self.ensure_sources(false, cx);
@@ -514,12 +519,15 @@ impl DrawingEditor {
             .iter()
             .map(|(t, n)| {
                 let (t, n2) = (*t, n.clone());
-                (n.clone(), Some(t) == d.studio && d.external.is_none(), std::rc::Rc::new(move |e: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| e.pick_studio(t, None, n2.clone(), cx)) as Set)
+                let on = Some(t) == d.studio && d.external.is_none();
+                // The chosen one keeps its configuration.
+                let config = if on { d.config.clone() } else { ConfigValues::default() };
+                (n.clone(), on, std::rc::Rc::new(move |e: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| e.pick_studio(t, None, config.clone(), n2.clone(), cx)) as Set)
             })
             .collect();
         if let (Some(t), Some(n)) = (d.studio, d.external.clone()) {
-            let (v, n2) = (d.version.clone(), n.clone());
-            studio_items.push((n, true, std::rc::Rc::new(move |e: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| e.pick_studio(t, v.clone(), n2.clone(), cx)) as Set));
+            let (v, config, n2) = (d.version.clone(), d.config.clone(), n.clone());
+            studio_items.push((n, true, std::rc::Rc::new(move |e: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| e.pick_studio(t, v.clone(), config.clone(), n2.clone(), cx)) as Set));
         }
         let table_items: Vec<(String, bool, Set)> = mine
             .iter()
