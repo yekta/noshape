@@ -4359,7 +4359,13 @@ impl FeatureDialog {
 /// units ("6.35 mm" for "0.25 in").
 pub fn shown_length(f: &Feature, id: &str, units: &UnitPrefs, vars: &std::collections::BTreeMap<String, noshape_units::Quantity>) -> Option<String> {
     let e = f.params.expr(id)?;
-    let q = noshape_units::evaluate_as(&e.text, noshape_units::Dim::LENGTH, units, vars).ok()?;
+    // (A Variable's angle and number values too: its row reads them evaluated.)
+    let dim = match id {
+        "angleValue" => noshape_units::Dim::ANGLE,
+        "numberValue" => noshape_units::Dim::UNITLESS,
+        _ => noshape_units::Dim::LENGTH,
+    };
+    let q = noshape_units::evaluate_as(&e.text, dim, units, vars).ok()?;
     Some(noshape_units::format_quantity(q, units))
 }
 

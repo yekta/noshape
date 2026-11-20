@@ -548,15 +548,17 @@ pub fn display_name_computed(f: &Feature, shown: &dyn Fn(&str) -> Option<String>
     }
     let name = f.params.text("name");
     // Measured / From import: the evaluated value, "?" until there is one
-    // (live: a new Measured variable reads "#? = ?").
+    // (live: a new Measured variable reads "#? = ?"). A typed value shows evaluated in the document's units when the
+    // caller can (live parity-open-1120 vl3: "#w = 30 mm" for #h * 3), else as typed.
+    let typed = |id: &str| shown(id).or_else(|| f.params.expr(id).map(|e| e.text.clone()));
     let value = if f.params.is("mode", "MEASURED") || f.params.is("mode", "TABLE") {
         Some(shown("measuredValue").unwrap_or_else(|| "?".into()))
     } else {
         match f.params.get("variableType") {
-        Some(ParamValue::Enum(k)) if k == "ANGLE" => f.params.expr("angleValue").map(|e| e.text.clone()),
-        Some(ParamValue::Enum(k)) if k == "NUMBER" => f.params.expr("numberValue").map(|e| e.text.clone()),
-        Some(ParamValue::Enum(k)) if k == "ANY" => Some(f.params.text("anyValue").to_string()),
-            _ => f.params.expr("lengthValue").map(|e| e.text.clone()),
+            Some(ParamValue::Enum(k)) if k == "ANGLE" => typed("angleValue"),
+            Some(ParamValue::Enum(k)) if k == "NUMBER" => typed("numberValue"),
+            Some(ParamValue::Enum(k)) if k == "ANY" => Some(f.params.text("anyValue").to_string()),
+            _ => typed("lengthValue"),
         }
     }
     .unwrap_or_default();

@@ -8124,6 +8124,25 @@ mod listed_name_tests {
         assert!(name.starts_with("Ø 6.35 mm"), "{name}");
         assert_ne!(name, "Hole 1");
     }
+
+    /// Live parity-open-1120 vl3 (VARIABLE-ROW-LABEL-VALUE): a Variable's row shows its value evaluated in the
+    /// document's units, 3 decimals without trailing zeros ("#w = 30 mm" for #h * 3, h = 10 mm), not the expression.
+    #[::core::prelude::v1::test]
+    fn a_variable_row_shows_its_evaluated_value() {
+        use noshape_model::params::ParamValue;
+        let units = noshape_units::UnitPrefs::default();
+        let vars = std::collections::BTreeMap::from([("h".to_string(), noshape_units::Quantity::new(0.01, noshape_units::Dim::LENGTH))]);
+        let mut f = PartStudio::new().new_feature("assignVariable", &units).unwrap();
+        f.params.set("name", ParamValue::Text("w".into()));
+        let mut row = |value: &str| {
+            f.params.set("lengthValue", ParamValue::Expr(noshape_units::ExprValue::new(value)));
+            listed_name(&f, &[], &units, &vars)
+        };
+        assert_eq!(row("#h * 3"), "#w = 30 mm");
+        assert_eq!(row("#h / 3"), "#w = 3.333 mm");
+        assert_eq!(row("#h / 4"), "#w = 2.5 mm");
+        assert_eq!(row("#nope * 2"), "#w = #nope * 2", "what doesn't evaluate shows as typed");
+    }
 }
 
 /// Whether a feature row gets the yellow ⚠ badge on its icon: a warning, or
