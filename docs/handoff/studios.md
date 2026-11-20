@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 02:16 UTC.
+Updated 2026-11-20 04:50 UTC.
 
 ## In flight
 
@@ -19,55 +19,16 @@ origin/main` first. Builds / tests on the lowest 1-min load of vibex7 / vibex8 /
 read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edited during a running sync: `touch` edited files before
 the next run. Run the full ops e2e before any drawing land. vibex8 is qa's quiet speed window 02:00-04:00 (lead 11-20):
 nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdshots-host.sh (PD_HOST=vibe2 PD_DISP=395). A few app runs don't take ~/bin/slot (DECISIONS 11-15).
-- Local, b4 batch (screens of 13 rarer dialogs vs live): View properties' selects at 13.33 px and Name centred;
-  Move to sheet 223 px, ✓ pale until another sheet, Sheet list 120 px; Export Drawing title regular weight (all
-  modals' #666 titles), tighter field spacing; Datum target carets not squashed (.small()), tabs sized to text;
-  hole callout's Dual dimension the stacked [XX]/x.xx icon; Hole table panel rebuilt as live (200 px, Views group
-  with ⌄ Top ×, nested Origin / X / Y / Holes to exclude / X Y flip icons, one sheet as text, corners as Table
-  properties'); Reference manager's disabled button white text (asm too) + "?" strip; Custom template starts on ANSI
-  in any units (app and the drawing_create op). Matched as is: Styles, MBD status, Replicate annotations (nothing
-  opens with nothing selected for replication, as live), title-block double-click (alignment fix queued).
-  Also: live's centermark retake (996d6b8a): a Single click on a circle with an automatic mark replaces it and
-  stays after Esc; the matrix accepts three click-spot menu rows (surface finish on edge Flip / Add leader, ordinate
-  Reset ordinate: live's later takes show ours): 1213 = + 446 shown of 1874, 0 ≠, 174 present-only.
-- Queued 8a7a67f6e (11-20 02:15; 68a4f22e / 988d0416 failed 01:49 on the flaky assembly box test, now T2 on
-  main cf738a75c): b4/b5 above plus cut list Standard column and 295 px BOM / Cut list properties.
-- Local b6/b7 (tested on the Mac, screens on vibex8): Image properties a docked ✓ ✕ panel; aligned section's boxed
-  query fields; Detail view without ✓ while creating, shapes greyed once the profile exists, no hint line; a section
-  tab click unfocuses the label; properties rows 26 px; panels hide the sheet from the pointer (56 panel roots:
-  pointer_off_sheet, feel test nothing_lights_under_a_panel); hole callout palette 30 px fields for one line, no
-  count in the body; a callout lights every hole it counts; hole / cut list body cells left-aligned; no tag axis
-  without location data; a placed hole table stays selected.
-- Local b8 (Mac-tested): a merged cell's rows lit and its outline whole (live drw-hole-table-cell-panel 13); the
-  Cell panel by the selected cell (10 px left, bottom 59 px above; live cell-panel / cell-format 13); a hole table's
-  selected cells light their holes, centre marks and tags blue; "In progress" pills 12 px; hole callout palette's
-  tolerance row as live drw-hcallout-fit 26 (Precision combo reads the value, tolerance icon, Fit type / Hole class /
-  Fit standard in that row, no shaft class; stacked-visibility toggle + stacking list beside the dual; "Fit type"
-  tooltip on the fit's kind, scenarios renamed). Committed 3c74d2225 (b6-b8; hole table shots match live).
-- Local b9/b10 (shots b9 on vibe2 :395 compared): hole callout Fit starts Clearance (dimension: User defined) and the
-  stacked toggles sit before Override (hcallout-fit 26); hatch Scale / Angle carets toggle their lists (a second
-  click closes, os_ui::remember_dropdown), values #333; BOM body cells left-aligned (bom-table 2); Inspection item
-  panel as live (420 px, ✓ pale until an item, ✕, half-width tabs, Number in a grey box, Text height · shape · size
-  74/166/166) with a per-item text height (`inspection_height`, op drawing_inspection `text_height`, drawing_get
-  `inspection_text_height`); no prompt toast on opening it. Matrix: view / image / table-cell / hole-table-cell menus in
-  MENUDUMP with submenu rows, menu keys by submenu + "Switch to …" rows, other panels' texts dropped from Drawing
-  properties / Move to sheet page dumps, View properties visible-only: 1224 = + 456 shown of 1855, 0 ≠, 133
-  present-only. Not copied: live's revdel step 10 stale selection box of the deleted table (a live draw glitch).
-  Left in b9: revision-table 3 has no table on live's side; bom-switch-to-bom 8 live clicked the Sheets tree.
-  Committed aa1e7842a (rebased 11-20 03:08).
-- DOCS-CRUMB-TOOLTIP (qa 11-20, lead: studios fixes): psui's be41a8c2b gate blocked any element drawn in a released
-  one's bounds; now keyed to the released element's id (vendor gpui-pre window.rs / div.rs / text.rs, NOSHAPE.md);
-  test a_clicked_crumb_turned_title_shows_its_tooltip (fails on the old gate), psui's chrome row green. Committed
-  979edd4d1 + TICKETS c6b34e769. When it lands: tell psui what changed in vendor gpui (lead).
-- b10 on vibe2 (03:19 build): full ops e2e 260/260; hcallout-fit 43/43, hatch-panel 39/39, bom-table 4/4,
-  inspection-item 9/9, inspection-table-iso-scrolled (live's ISO retake) 10/10, docs-folder-crumb 3/3 (crumb fixed in
-  the app). Fixed after it: Inspection item's Text height value and live-look selects; Create Drawing's state as
-  `texts` (live records the modal's text as one innerText string).
-- VER-COMPARE-READOUT (qa 11-20): Compare draws no measure readout (menus.rs render_measure_panel; test hooks'
-  TEST_COMPARE; measure feel row). Committed + TICKETS.
+- Branch (11-20 04:50, rebased on origin/main): the 9 commits b4-b10 (drawing panels as live's screens, Inspection item,
+  DOCS-CRUMB-TOOLTIP's id-keyed tooltip gate in vendor gpui, VER-COMPARE-READOUT) + b12: custom table picker in Select
+  a Part Studio (05466abc0 line), FS editor feel, VS old-value chip, drawing feel, 8 feel TICKETS rows "to verify".
+  Gates before land: b11 shots (vibe2 :395: inspection-item, create-drawing-custom-template, ver-compare-hover-part),
+  Mac round 2 (drawing-ui lib + clippy), full ops e2e. Then land, tell psui the vendor gpui gate change
+  (`Window::tooltip_released_on(id)` / `set_tooltip_released_on(bounds, id)`, test
+  a_clicked_crumb_turned_title_shows_its_tooltip) and the gpui-base editor patches (close_brace_outdent, select_line,
+  wheel step).
 - Matrix with b10's runs and submenu rows: 1224 = + 511 shown of 1855, 0 ≠, 78 present-only.
-- b11 on vibex8 :394 (04:02): inspection-item, create-drawing-custom-template, ver-compare-hover-part; then land.
-- psui via lead 11-20: version row menu without "Releases": ours already lists none there (qa's run = live's rows).
+- Live request filed 11-20 04:47: configured studio rows in the drawing choosers (chevron, insert-icon + ▾).
 
 ## Next, in order
 1. Lead 11-20: the drawing matrix's items not yet matching, by use (dialogs, menus, placement, rarer panels): check
@@ -86,7 +47,8 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
    frame comes back (drawing_view `FrameCam`; qa rechecks D3 timing quiet). Custom table › Add: the Insert view
    chooser in a studio mode ("Select a Part Studio", Part Studios only, 40 px right of the dialog), Other documents
    real (`drawing_custom_table` `document` / `version`; the kind's `version` an ExternalRef key).
-3. Custom table picker leftovers: configured studios' chevron + configuration pair (live 279) not drawn.
+3. Custom table picker leftovers: configured studios' chevron + configuration pair (live 279) not drawn; nor in
+   Insert view. Waits on live's capture (REQUESTS 11-20 04:47); the custom table kind has no configuration yet.
 4. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
