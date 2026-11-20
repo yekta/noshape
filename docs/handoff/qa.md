@@ -98,8 +98,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    reopened; SAVED-DOC-REFS-LOST (skasm revert 83423fa5) verified 5ca8588b0; dx 0036 snap-hook DXF verified b2b0cf9a9 (bin/snapdxf.py on
    vibex7: saved suite doc -> drawing placed as live -> DXF 2018 -> dxfdiff). Seat lip: Ok in every release (not a ticket). OPEN:
    - car Fillet 1 verified b05f1c014 (Derived 1 matches in 5 surf-intro docs); next diff P2 SUITE-INTRO-TAILFIN-INTERSECTED -> skasm.
-   - asm DRAG-START 83a8003d9, CHAMFER-ASYM afc395406, skasm 4e51cce3 9453f8650 verified (flange handle -> psui a21e5b8f).
-     psui 37741d38: 7f6c5e1ae (5 verified; ROLLBACK-DROP-ROW lit row + SECTION-ARROW-FOOT length reopened; DIM-PICK values on skasm's green).
+   - Verified: asm DRAG-START, CHAMFER-ASYM, skasm 4e51cce3 (9453f8650), psui 37741d38 (7f6c5e1ae) and a21e5b8f (698df935f).
    - New model index: debug run 1120-1028-4e51cce3-models (bin/models-now.sh, vibex7 alone, 29 min incl. build): 99/152, 1505/2051;
      SCORE re-baselined 8b2a688ba; owners' rows SUITE-NEW-INDEX-1120-* + P1 SUITE-IMPELLER-FILLET3 (core: load/order dependent) 7066344c1.
      Release run (unit qa-models-rel, qa-speed worktree, vibex7) -> suites/1120-1206-f689de1b-models-rel: the index row comes from it
@@ -108,6 +107,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
      x86 speed only from the window) -> nightly/pm-1121. vibex8's feel re-time goes after it.
    - Compat: FILLET-ORIENT verified 86d1cbc4; P0 COMPAT-RUSTZERO-FILLET1 -> blend (missed since 10:13: read new compat DIFF docs per green,
      not just the alert tail). Gyro: bool 1b68aa85 queued, unit qa-wait-compat-gyro-revolve. psui a21e5b8f verified 698df935f (3 rows + cfg labels); P2 FEEL-CONFIG-BOX-WIDTH to psui.
+     17:00 cut (lead 14:2x): candidate = first green with psui's aba58c71 (unit qa-wait-cut17, 'walk it'), then bin/prerel-run.sh <label>
+     (base now v0.4.62, sets vibe2 up itself; dry run qa-prerel-dry); GO/NO-GO by 16:15. v0.4.62 published check + rel-compat: unit qa-pub-0462.
    - Seat lip: a47534be5 (Ok in 0.4.43-0.4.61 + green; vibex7 ~/agents/qa-keep/seatlip-hat8-1120.txt).
 00a. **05:00 cut HELD (lead 04:0x) until a green has core's 2f4f3bc5 (singularities Sketch 2; Mirror 2 is as live, accepted in
    compat/accepted.txt; 2f4f's subject added to cut-must.txt).** Unit qa-prerel-2f4f (bin/prerel-when.sh "<subject>" cut0500): when
