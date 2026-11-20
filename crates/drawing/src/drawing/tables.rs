@@ -621,7 +621,9 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
                     }
                 }
             }
-            TableData { title: None, header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden, ..Default::default() }
+            // Body cells left-aligned under centred headers (live drw-bom-table 2: "1" at Item's and Quantity's left).
+            let col_align = vec![CellAlign::Left; header.as_ref().map_or(0, |h| h.len())];
+            TableData { title: None, header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden, col_align, ..Default::default() }
         }
         TableKind::Hole { precision, origin: stored, flip_x, flip_y, show_location, collapse_tags, bottom_to_top, exclude, x_dir, .. } => {
             // Live (behaviours 1983): TAG | X LOC | Y LOC | SIZE | QTY, a

@@ -529,14 +529,20 @@ impl DrawingEditor {
             let (ed, input2) = (ed.clone(), input.clone());
             let field = std::rc::Rc::new(std::cell::Cell::new(Bounds::<Pixels>::default()));
             let probe = field.clone();
+            // A second click on the caret only closes its list (live drw-hatch-panel 15 / 19).
+            let was_open: std::rc::Rc<std::cell::Cell<bool>> = Default::default();
+            let pressed = was_open.clone();
             h_flex()
                 .w(px(188.))
                 .relative()
                 .border_b_1()
                 .border_color(gpui_kit::rgb(RULE))
                 .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
-                .child(div().flex_1().child(Input::new(input).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall()))
-                .child(crate::ui_script::wrap(Button::new(id).ghost().xsmall().dropdown_caret(true).on_click(move |_, window, cx| {
+                .child(div().flex_1().child(Input::new(input).text_size(px(13.33)).text_color(gpui_kit::rgb(0x333333)).appearance(false).xsmall()))
+                .child(crate::ui_script::wrap(div().capture_any_mouse_down(move |_, _, cx| pressed.set(crate::os_ui::dropdown_open(id, cx))).child(Button::new(id).ghost().xsmall().dropdown_caret(true).on_click(move |_, window, cx| {
+                    if was_open.take() {
+                        return;
+                    }
                     let (items, current, ed, input2, b) = (items.clone(), current.clone(), ed.clone(), input2.clone(), field.get());
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
                         m = m.min_width(f32::from(b.size.width) + 2.).row_height(26.).text_px(12.).max_height(203., 1.);
@@ -549,8 +555,9 @@ impl DrawingEditor {
                         }
                         m
                     });
+                    crate::os_ui::remember_dropdown(id, &menu);
                     crate::os_menu::open_anchored(point(b.origin.x - px(1.), b.origin.y + b.size.height + px(1.)), Anchor::TopLeft, menu, window, cx);
-                }).into_any_element(), move || format!("dropdown:{name}")))
+                })).into_any_element(), move || format!("dropdown:{name}")))
                 .into_any_element()
         };
         let scales: Vec<String> = std::iter::once("Auto".to_string()).chain((1..=10).map(|k| format!("{k}.0"))).collect();

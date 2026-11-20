@@ -276,9 +276,11 @@ impl DrawingEditor {
         f.suffix = val(&d.suffix);
         let was_fit = matches!(f.tolerance, noshape_model::drawing::Tolerance::Fit { .. });
         noshape_ops::drawing::set_tolerance(f, d.tol, m(&d.tol_a).unwrap_or(0.0), m(&d.tol_b).unwrap_or(0.0));
-        // A hole callout's new fit has no class yet (live2 drw-hcallout-fit: Fit › None, "⌀.197 THRU").
+        // A hole callout's new fit is a Clearance one with no class yet (live2 drw-hcallout-fit: Fit › Clearance,
+        // None, "⌀.197 THRU"; a dimension's starts User defined).
         if let (true, false, noshape_model::drawing::Tolerance::Fit { hole, .. }) = (d.hole, was_fit, &mut f.tolerance) {
             hole.clear();
+            f.fit.fit_type = noshape_model::drawing::FitType::Clearance;
         }
         // A typed value overrides the dimension's text (D39).
         let typed = d.retext.clone().unwrap_or_else(|| val(&d.value));
@@ -837,6 +839,8 @@ impl DrawingEditor {
         };
         // The toggles row.
         let radial = matches!(d.cur.kind, AnnotationKind::RadialDimension { .. });
+        // A hole callout's Override box, after the fit toggles (live2 drw-hcallout-fit 26).
+        let mut hole_override: Option<AnyElement> = None;
         let mut toggles = h_flex().gap(px(if hole { 4. } else { 2. })).child(crate::ui_script::wrap(div().id("dp-sym-tip").tooltip(crate::ui::tooltip("Insert symbol")).child(symbols).into_any_element(), || "button:Symbols".into()));
         if hole {
             // Live (behaviours "Hole callout palette (single)"): symbol · inspection · dual dimension · Override (no
@@ -845,11 +849,13 @@ impl DrawingEditor {
             let oval = div().px(px(3.)).rounded_full().border_1().border_color(blue).text_size(px(11.)).text_color(ink).child("XX").into_any_element();
             // Live 460: the dimension palette's stacked [XX] over x.xx, 45 px.
             let dual = v_flex().items_center().line_height(px(11.)).child(div().text_size(px(12.)).text_color(blue).child("[XX]")).child(div().text_size(px(8.)).text_color(ink).child("x.xx")).into_any_element();
-            toggles = toggles.child(icon_toggle("dp-insp", oval, "Inspection dimension", fmt.inspection_frame, |d| d.cur.format.inspection_frame = !d.cur.format.inspection_frame, cx)).child(crate::ui_script::mark(div().id("dp-dual-tip"), || "dropdown:Dual dimension".into()).tooltip(crate::ui::tooltip("Dual dimension")).child(pbutton("dp-dual", dual, 45., dual_items, false))).child(
+            toggles = toggles.child(icon_toggle("dp-insp", oval, "Inspection dimension", fmt.inspection_frame, |d| d.cur.format.inspection_frame = !d.cur.format.inspection_frame, cx)).child(crate::ui_script::mark(div().id("dp-dual-tip"), || "dropdown:Dual dimension".into()).tooltip(crate::ui::tooltip("Dual dimension")).child(pbutton("dp-dual", dual, 45., dual_items, false)));
+            hole_override = Some(
                 div().pl(px(8.)).child(crate::drawing_chrome::DrCheckbox::new("dp-override").label("Override precision/tolerance").checked(opts.override_tol).tooltip("Click to override the precision and tolerance from the hole feature").on_click(cx.listener(|this, v: &bool, _, cx| {
                     let v = *v;
                     this.edit_palette(|d| d.cur.hole.get_or_insert_with(Default::default).override_tol = v, cx)
-                }))),
+                })))
+                .into_any_element(),
             );
         } else {
             // Live drawing/15: [Ø ▾] 45, reset text position, parentheses,
@@ -995,7 +1001,7 @@ impl DrawingEditor {
         let hole_prec = if hole_value.is_empty() { small(prec_label.clone()) } else { div().text_size(px(13.33)).text_color(gpui_kit::rgb(0x999999)).child(hole_value.clone()).into_any_element() };
         let (fit_lists, fit_vis, fit_stack) = if show_tol && fit { let (l, v, s) = fit_parts(); (l, Some(v), Some(s)) } else { (Vec::new(), None, None) };
         let (row_fits, fit_row) = if hole {
-            toggles = toggles.children(fit_vis).children(fit_stack);
+            toggles = toggles.children(fit_vis).children(fit_stack).children(hole_override.take());
             (fit_lists, None)
         } else {
             (Vec::new(), (!fit_lists.is_empty()).then(|| h_flex().gap(px(3.)).pt(px(3.)).children(fit_lists).children(fit_vis).children(fit_stack).into_any_element()))

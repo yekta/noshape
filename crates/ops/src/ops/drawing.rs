@@ -558,6 +558,9 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if let Some(n) = a.inspection_chars {
                 j["inspection_border_size"] = json!(n);
             }
+            if let Some(h) = a.inspection_height {
+                j["inspection_text_height"] = json!(h);
+            }
             // The annotation menus' state, when not the defaults.
             // Follows model geometry (Detach from geometry clears it).
             if !a.refs.is_empty() {

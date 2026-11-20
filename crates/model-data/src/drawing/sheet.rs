@@ -2758,7 +2758,7 @@ impl SheetGeometry {
                     pts = self.lines[l0..l1].iter().flat_map(|l| l.points.iter().copied()).collect();
                 }
                 let at = if pts.is_empty() { a.position } else { [pts.iter().map(|p| p[0]).fold(f64::MAX, f64::min), pts.iter().map(|p| p[1]).fold(f64::MIN, f64::max)] };
-                let own = InspectionStyle { shape: a.inspection_shape.unwrap_or(style.shape), chars: a.inspection_chars.unwrap_or(style.chars), ..style.clone() };
+                let own = InspectionStyle { shape: a.inspection_shape.unwrap_or(style.shape), chars: a.inspection_chars.unwrap_or(style.chars), text_height: a.inspection_height.unwrap_or(style.text_height), ..style.clone() };
                 self.inspection_bubble(at, n, &own, inspection_pick(a.id));
             }
         }

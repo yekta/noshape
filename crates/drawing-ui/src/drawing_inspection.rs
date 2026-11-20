@@ -32,6 +32,10 @@ pub struct InspectionDlg {
     /// The items' border shape and size in characters (None: the drawing's).
     pub shape: Option<InspectionShape>,
     pub chars: Option<u8>,
+    /// The items' text height (drawing units; the drawing's Inspection items › Text to start).
+    pub height: Option<Entity<InputState>>,
+    /// An item was placed since the dialog opened (its ✓ is pale until then, live drw-inspection-item 6 / 7).
+    pub placed: bool,
 }
 
 impl DrawingEditor {
@@ -41,12 +45,14 @@ impl DrawingEditor {
             None => {
                 let next = self.drawing.next_inspection_number().to_string();
                 let number = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(next));
-                Some(InspectionDlg { automatic: false, scope: 0, reorder: None, edit: None, hover: None, number: Some(number), shape: None, chars: None })
+                let height = Some(self.inspection_height_field(None, window, cx));
+                Some(InspectionDlg { automatic: false, scope: 0, reorder: None, edit: None, hover: None, number: Some(number), shape: None, chars: None, height, placed: false })
             }
         };
         self.set_preview(None, cx);
         self.tool = Tool::Select;
-        self.status = self.inspection.as_ref().map(|_| "Inspection item: click a dimension or annotation".into());
+        // (No prompt: live drw-inspection-item 6 shows the dialog alone.)
+        self.status = None;
         cx.notify();
     }
 
@@ -54,7 +60,7 @@ impl DrawingEditor {
     /// starts empty).
     pub fn start_reorder_inspection(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false));
-        self.inspection = Some(InspectionDlg { automatic: false, scope: 0, reorder: Some(st), edit: None, hover: None, number: None, shape: None, chars: None });
+        self.inspection = Some(InspectionDlg { automatic: false, scope: 0, reorder: Some(st), edit: None, hover: None, number: None, shape: None, chars: None, height: None, placed: false });
         self.status = Some("Reorder inspection items: click the items in their new order".into());
         cx.notify();
     }
@@ -65,11 +71,26 @@ impl DrawingEditor {
     pub fn edit_inspection(&mut self, id: u64, window: &mut Window, cx: &mut Context<Self>) {
         let Some(a) = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id) else { return };
         let Some(n) = a.inspection else { return };
-        let (shape, chars) = (a.inspection_shape, a.inspection_chars);
+        let (shape, chars, own) = (a.inspection_shape, a.inspection_chars, a.inspection_height);
         let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(n.to_string()));
-        self.inspection = Some(InspectionDlg { automatic: false, scope: 0, reorder: None, edit: Some((id, st)), hover: None, number: None, shape, chars });
+        let height = Some(self.inspection_height_field(own, window, cx));
+        self.inspection = Some(InspectionDlg { automatic: false, scope: 0, reorder: None, edit: Some((id, st)), hover: None, number: None, shape, chars, height, placed: true });
         self.selection = vec![Sel::Annotation(id)];
         cx.notify();
+    }
+
+    /// The Text height field: `own` (mm) or the drawing's, four decimals in the drawing's units ("0.0800").
+    fn inspection_height_field(&self, own: Option<f64>, window: &mut Window, cx: &mut Context<Self>) -> Entity<InputState> {
+        let text = crate::drawing_note::note_height_text(own.unwrap_or(self.drawing.props.inspection_text_height), self.drawing.units_mm);
+        cx.new(|cx| InputState::new(window, cx).select_on_focus(true).default_value(text))
+    }
+
+    /// The dialog's text height for its items in mm (None: the drawing's).
+    fn inspection_height(&self, cx: &App) -> Option<f64> {
+        let st = self.inspection.as_ref()?.height.as_ref()?;
+        let h = crate::drawing_note::parse_note_height(&st.read(cx).value(), self.drawing.units_mm)?;
+        let shown = |mm: f64| crate::drawing_note::note_height_text(mm, self.drawing.units_mm);
+        (shown(h) != shown(self.drawing.props.inspection_text_height)).then_some(h)
     }
 
     /// The annotation whose inspection bubble is under pick `pick`.
@@ -101,6 +122,7 @@ impl DrawingEditor {
         let reorder = d.reorder.as_ref().map(|st| st.read(cx).value().trim().parse::<u32>().unwrap_or(1));
         let typed = d.number.as_ref().and_then(|st| st.read(cx).value().trim().parse::<u32>().ok());
         let (shape, chars) = (d.shape, d.chars);
+        let height = self.inspection_height(cx);
         let prev = d.hover;
         let id = match self.sel_at(self.hover, self.cursor) {
             Some(Sel::Annotation(id)) if reorder.is_some() || self.drawing.sheets[self.sheet].annotations.iter().any(|a| a.id == id && a.inspection.is_none()) => Some(id),
@@ -118,7 +140,7 @@ impl DrawingEditor {
             if let Some(a) = dr.sheets[self.sheet].annotations.iter_mut().find(|a| a.id == id) {
                 a.inspection = Some(n);
                 if reorder.is_none() {
-                    (a.inspection_shape, a.inspection_chars) = (shape, chars);
+                    (a.inspection_shape, a.inspection_chars, a.inspection_height) = (shape, chars, height);
                 }
             }
             dr
@@ -137,13 +159,14 @@ impl DrawingEditor {
 
     /// Checkmark: apply an edited number, close the dialog.
     fn close_inspection(&mut self, cx: &mut Context<Self>) {
+        let height = self.inspection_height(cx);
         if let Some(InspectionDlg { edit: Some((id, st)), shape, chars, .. }) = self.inspection.take()
             && let Ok(n) = st.read(cx).value().trim().parse::<u32>()
         {
             self.edit_sheet("Edit inspection item", cx, |s| {
                 noshape_scene::drawing_tools::set_inspection(s, id, Some(n));
                 if let Some(a) = s.annotations.iter_mut().find(|a| a.id == id) {
-                    (a.inspection_shape, a.inspection_chars) = (shape, chars);
+                    (a.inspection_shape, a.inspection_chars, a.inspection_height) = (shape, chars, height);
                 }
             });
         }
@@ -160,6 +183,7 @@ impl DrawingEditor {
         }
         let reorder = d.reorder.clone();
         let (field, shape, chars) = (d.number.clone(), d.shape, d.chars);
+        let height = self.inspection_height(cx);
         self.update_hover(cx);
         let Some(Sel::Annotation(id)) = self.sel_at(self.hover, self.cursor) else { return true };
         let typed = |st: &Entity<InputState>| st.read(cx).value().trim().parse::<u32>().ok();
@@ -171,12 +195,13 @@ impl DrawingEditor {
         self.preview = None;
         if let Some(d) = &mut self.inspection {
             d.hover = None;
+            d.placed = true;
         }
         let manual = reorder.is_none();
         self.edit_sheet("Inspection item", cx, |s| {
             noshape_scene::drawing_tools::set_inspection(s, id, Some(number));
             if manual && let Some(a) = s.annotations.iter_mut().find(|a| a.id == id) {
-                (a.inspection_shape, a.inspection_chars) = (shape, chars);
+                (a.inspection_shape, a.inspection_chars, a.inspection_height) = (shape, chars, height);
             }
         });
         // The Number field increments after each item (Onshape).
@@ -201,6 +226,7 @@ impl DrawingEditor {
             _ => Scope::Drawing,
         };
         let (shape, chars) = (d.shape, d.chars);
+        let height = self.inspection_height(cx);
         let mut n = 0;
         self.edit("Inspection items", cx, |dr| {
             let before: Vec<Vec<bool>> = dr.sheets.iter().map(|s| s.annotations.iter().map(|a| a.inspection.is_some()).collect()).collect();
@@ -208,11 +234,14 @@ impl DrawingEditor {
             for (s, had) in dr.sheets.iter_mut().zip(&before) {
                 for (a, had) in s.annotations.iter_mut().zip(had) {
                     if a.inspection.is_some() && !had {
-                        (a.inspection_shape, a.inspection_chars) = (shape, chars);
+                        (a.inspection_shape, a.inspection_chars, a.inspection_height) = (shape, chars, height);
                     }
                 }
             }
         });
+        if let Some(d) = &mut self.inspection {
+            d.placed |= n > 0;
+        }
         self.status = Some(format!("{n} inspection items added").into());
         cx.notify();
     }
@@ -274,14 +303,18 @@ impl DrawingEditor {
         let reorder = d.reorder.clone();
         let edit = d.edit.as_ref().map(|e| e.1.clone());
         let number = d.number.clone();
+        let height = d.height.clone();
+        let ready = d.placed || d.reorder.is_some();
         let tab = |id: &'static str, label: &'static str, on: bool, value: bool, cx: &mut Context<Self>| {
+            // Live drw-inspection-item 6: the two tabs share the width, 29 px.
             div()
                 .id(id)
                 .map(|d| crate::ui_script::mark(d, || format!("tab:{label}")))
-                .h(px(26.))
-                .px(px(9.))
+                .flex_1()
+                .h(px(29.))
                 .flex()
                 .items_center()
+                .justify_center()
                 .text_size(px(13.33))
                 .cursor_pointer()
                 .border_b_1()
@@ -327,12 +360,13 @@ impl DrawingEditor {
             .collect();
         let shape_label = shape_items.iter().find(|i| i.1 == own_shape).map(|i| i.0.clone()).unwrap_or_default();
         let chars_label = chars_items.iter().find(|i| i.1 == own_chars).map(|i| i.0.clone()).unwrap_or_default();
+        let fields = serde_json::json!([{ "label": "Border shape", "kind": "select", "value": shape_label }, { "label": "Border size", "kind": "select", "value": chars_label }]);
         let ed2 = ed.clone();
         let items2 = shape_items.clone();
         let shapes = {
             let mark = format!("dropdown:{}", shape_label);
             Button::new("insp-shape").label(shape_label).map(move |b| crate::ui_script::mark(b, move || mark.clone()))
-        }.ghost().small().w(px(120.)).dropdown_caret(true).os_dropdown_menu("insp-shape-dd", true, move |mut m, _, _| {
+        }.ghost().small().w_full().dropdown_caret(true).os_dropdown_menu("insp-shape-dd", true, move |mut m, _, _| {
             for (label, v) in &items2 {
                 let (e, v) = (ed2.clone(), *v);
                 m = m.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(v == own_shape).on_click(move |_, _, cx| {
@@ -351,7 +385,7 @@ impl DrawingEditor {
         let widths = {
             let mark = format!("dropdown:{}", chars_label);
             Button::new("insp-chars").label(chars_label).map(move |b| crate::ui_script::mark(b, move || mark.clone()))
-        }.ghost().small().w(px(120.)).dropdown_caret(true).os_dropdown_menu("insp-chars-dd", true, move |mut m, _, _| {
+        }.ghost().small().w_full().dropdown_caret(true).os_dropdown_menu("insp-chars-dd", true, move |mut m, _, _| {
             for (label, v) in &items2 {
                 let (e, v) = (ed2.clone(), *v);
                 m = m.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(v == own_chars).on_click(move |_, _, cx| {
@@ -380,12 +414,29 @@ impl DrawingEditor {
         } else {
             body = body.child(h_flex().child(tab("insp-manual", "Manual", !automatic, false, cx)).child(tab("insp-auto", "Automatic", automatic, true, cx)));
             text.extend(["Manual".into(), "Automatic".into()]);
-            // Number in both modes (live behaviours D6: Automatic adds Scope and Preview), and when editing an item.
+            // Number in both modes (live behaviours D6: Automatic adds Scope and Preview), and when editing an item:
+            // its value in a small grey box sized to it (live drw-inspection-item 6).
             if let Some(st) = edit.as_ref().or(number.as_ref()) {
-                body = body.child(row("Number:", Input::new(st).small().into_any_element()));
-                text.extend(["Number:".into(), st.read(cx).value().to_string()]);
+                let v = st.read(cx).value().to_string();
+                let w = 8. * v.chars().count().max(1) as f32 + 6.;
+                body = body.child(
+                    h_flex()
+                        .h(px(26.))
+                        .px(px(5.))
+                        .gap(px(3.))
+                        .child(div().text_size(px(12.)).child("Number:"))
+                        .child(div().w(px(w)).bg(gpui_kit::rgb(0xefefef)).child(Input::new(st).appearance(false).text_size(px(12.)).xsmall())),
+                );
+                text.extend(["Number:".into(), v]);
             }
-            body = body.child(h_flex().px(px(6.)).gap(px(6.)).h(px(30.)).child(shapes).child(widths));
+            // Text height · Border shape · Border size, each underlined with its caret (live: 74 / 166 / 166 px).
+            let cell = |w: f32, child: AnyElement| div().w(px(w)).h(px(24.)).flex().items_center().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).child(child);
+            let mut opts = h_flex().px(px(1.)).gap(px(3.)).h(px(28.));
+            if let Some(h) = height.as_ref() {
+                let field = h_flex().w_full().pr(px(4.)).child(div().flex_1().child(Input::new(h).appearance(false).text_size(px(13.33)).text_color(gpui_kit::rgb(0x333333)).xsmall())).child(crate::ui::glyph("ui-select-caret", 8., gpui_kit::rgb(0x555555)));
+                opts = opts.child(cell(74., crate::ui_script::wrap(field.into_any_element(), || "dropdown:Text height".into())));
+            }
+            body = body.child(opts.child(cell(166., shapes.into_any_element())).child(cell(166., widths.into_any_element())));
             text.extend(shape_items.iter().map(|i| i.0.clone()));
             text.extend(chars_items.iter().map(|i| i.0.clone()));
             if automatic {
@@ -414,14 +465,20 @@ impl DrawingEditor {
                 text.push("Preview".into());
             }
         }
-        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": text[0], "text": text }));
+        crate::ui_script::note_dialog(|| {
+            let mut j = serde_json::json!({ "kind": "drawing-panel", "title": text[0], "text": text });
+            if reorder.is_none() {
+                j["fields"] = fields;
+            }
+            j
+        });
         Some(
             v_flex()
                 .id("dr-inspection-dlg")
                 .absolute()
                 .top(px(DIALOG_TOP))
                 .left(px(self.dialog_left()))
-                .w(px(240.))
+                .w(px(420.))
                 .bg(pal.dialog_bg)
                 .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(pal.text)
@@ -435,6 +492,7 @@ impl DrawingEditor {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd3d7d9))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(if reorder.is_some() { "Reorder inspection items" } else { "Inspection item" }))
+                        // ✓ pale until an item is placed, then ✕ (live drw-inspection-item 6 / 7).
                         .child(
                             div()
                                 .id("insp-ok")
@@ -443,10 +501,25 @@ impl DrawingEditor {
                                 .flex()
                                 .items_center()
                                 .justify_center()
-                                .bg(gpui_kit::rgb(0x009500))
+                                .bg(gpui_kit::rgb(if ready { 0x009500 } else { crate::drawing_chrome::OK_DISABLED }))
                                 .cursor_pointer()
                                 .child(crate::drawing_chrome::ok_check(18.))
-                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_inspection(cx))),
+                                .when(ready, |d| d.on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_inspection(cx)))),
+                        )
+                        .child(
+                            div()
+                                .id("insp-cancel")
+                                .w(px(28.))
+                                .h(px(27.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .cursor_pointer()
+                                .child(crate::drawing_chrome::cancel_x(cx))
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.cancel_inspection(cx);
+                                    cx.notify();
+                                })),
                         ),
                 )
                 .child(body)

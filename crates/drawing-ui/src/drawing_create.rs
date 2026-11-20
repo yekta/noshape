@@ -586,7 +586,28 @@ impl Render for CreateDrawingDialog {
         let suggested = self.suggested && has_source;
         // Live's recorder: the header's text (its name box's label) and the name field (recordings from 11-08 on).
         let name = self.name.read(cx).value().to_string();
-        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "modal", "title": "Create Drawing: New drawing name", "fields": [{ "label": null, "kind": "input", "value": name }], "buttons": ["OK", "Cancel"] }));
+        // Its texts too (the drawing matrix reads them; live's recorder lists only the name field).
+        let mut text: Vec<String> = ["Create Drawing:", "Existing templates", "Custom template", "Options", "Suggested views", "No views"].map(String::from).to_vec();
+        if suggested {
+            text.push("Suggested views provide only necessary views when MBD data is present.".into());
+        }
+        if custom {
+            let ct = self.ct;
+            text.extend(["Standard", "ANSI", "ISO", "Language", "Size", "Units", "Decimal separator", "Period (12.34)", "Comma (12,34)", "Projection", "Third angle (ANSI)", "First angle (ISO)", "Border", "Include", "Do not include", "Titleblock"].map(String::from));
+            if ct.border {
+                text.extend(["Horizontal zones", "Vertical zones", "Start zones", "Bottom right", "Top left"].map(String::from));
+            }
+            text.push(TitleLanguage::ALL.get(ct.language).map(|l| l.name().to_string()).unwrap_or_default());
+            text.extend(custom_sizes(ct.standard).get(ct.size).map(|(_, s)| s.list_name().to_string()));
+            text.extend(CUSTOM_UNITS.iter().find(|(u, _)| *u == ct.units).map(|(_, n)| n.to_string()));
+        } else {
+            text.extend(SOURCES.iter().map(|(l, _)| l.to_string()));
+            text.extend(["All", "ANSI", "ISO", "JIS", "Template", "Document"].map(String::from));
+            if self.source_filter == RECENT {
+                text.push("Show Noshape drawing templates".into());
+            }
+        }
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "modal", "title": "Create Drawing: New drawing name", "fields": [{ "label": null, "kind": "input", "value": name }], "buttons": ["OK", "Cancel"], "text": text }));
         let body = if custom { self.render_custom(cx) } else { self.render_existing(cx) };
         // Modal backdrop with the dialog centered.
         div()

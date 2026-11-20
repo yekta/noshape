@@ -19,10 +19,6 @@ origin/main` first. Builds / tests on the lowest 1-min load of vibex7 / vibex8 /
 read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edited during a running sync: `touch` edited files before
 the next run. Run the full ops e2e before any drawing land. vibex8 is qa's quiet speed window 02:00-04:00 (lead 11-20):
 nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdshots-host.sh (PD_HOST=vibe2 PD_DISP=395). A few app runs don't take ~/bin/slot (DECISIONS 11-15).
-- Landed f450d0dd (11-20 by 00:10: Labs brand, HISTORY-ROW-NAME-OVERLAP, Pro menus, Measure 1-2).
-- Queued 68a4f22e (11-20 00:31; carries 988d0416 and the lead's 81d16ffcd / 7458597fb rebased): brand ruling,
-  COMPARE-COMMON-PARTS-MISSING, table alignment line, runner rules, note lists, title field alignment, matrix doc
-  (1210 = + 446 shown of 1874), Preferences "Noshape".
 - Local, b4 batch (screens of 13 rarer dialogs vs live): View properties' selects at 13.33 px and Name centred;
   Move to sheet 223 px, ✓ pale until another sheet, Sheet list 120 px; Export Drawing title regular weight (all
   modals' #666 titles), tighter field spacing; Datum target carets not squashed (.small()), tabs sized to text;
@@ -47,8 +43,17 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
   selected cells light their holes, centre marks and tags blue; "In progress" pills 12 px; hole callout palette's
   tolerance row as live drw-hcallout-fit 26 (Precision combo reads the value, tolerance icon, Fit type / Hole class /
   Fit standard in that row, no shaft class; stacked-visibility toggle + stacking list beside the dual; "Fit type"
-  tooltip on the fit's kind, scenarios renamed). Committed 3c74d2225 (b6-b8; hole table shots match live); palette /
-  hatch / BOM / inspection / revision shots on vibe2 (tag b9), then land.
+  tooltip on the fit's kind, scenarios renamed). Committed 3c74d2225 (b6-b8; hole table shots match live).
+- Local b9/b10 (shots b9 on vibe2 :395 compared): hole callout Fit starts Clearance (dimension: User defined) and the
+  stacked toggles sit before Override (hcallout-fit 26); hatch Scale / Angle carets toggle their lists (a second
+  click closes, os_ui::remember_dropdown), values #333; BOM body cells left-aligned (bom-table 2); Inspection item
+  panel as live (420 px, ✓ pale until an item, ✕, half-width tabs, Number in a grey box, Text height · shape · size
+  74/166/166) with a per-item text height (`inspection_height`, op drawing_inspection `text_height`, drawing_get
+  `inspection_text_height`); no prompt toast on opening it. Matrix: view / image / table-cell / hole-table-cell menus in
+  MENUDUMP with submenu rows, menu keys by submenu + "Switch to …" rows, other panels' texts dropped from Drawing
+  properties / Move to sheet page dumps, View properties visible-only: 1224 = + 456 shown of 1855, 0 ≠, 133
+  present-only. Not copied: live's revdel step 10 stale selection box of the deleted table (a live draw glitch).
+  Left in b9: revision-table 3 has no table on live's side; bom-switch-to-bom 8 live clicked the Sheets tree.
 - psui via lead 11-20: version row menu without "Releases": ours already lists none there (qa's run = live's rows).
 
 ## Next, in order
@@ -59,7 +64,9 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
    /root/studios-scratch/uip-merged). Left at 11-20 00:23: 174 present-only (Create Drawing custom template tab,
    Move to sheet / Replicate page chrome, small rests). b4 compared (above); next: rescreenshot b4 with the new
    build, then the remaining panels (inspection / revision tables, BOM properties, section / detail view panels).
-2. live's retakes asked 11-19 ~22:40: drw-revision-table-delete, drw-inspection-table-iso-scrolled.
+2. live's retakes landed (e4ff71a8e, 11-20): drw-inspection-table-iso-scrolled now ISO A4 (live-1120-inspection-s2:
+   Front's edge selected tan after step 2, 40 preview at the pointer): run ours after the rebase and compare.
+   drw-revision-table-delete: live's stale box after Delete is a glitch, not copied.
 3. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
@@ -81,36 +88,6 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
   typing. (4) Split below (row 1): header + row 1 stay; a second table, header repeated + row 2, ~12 px below, same x
   and width. (5) the assembly's BOM changed: the sheet waits; ~3.1 s later "Update from this workspace (ctrl+q)"
   turns enabled (yellow); a click updates (qty 1 -> 2), keeps the split, disables it again; no toast.
-- live near-snap retake (bm 4092, live/studios/near-snap-1118/): nearer vertex wins at the midpoint, no stickiness,
-  reach 6.8 px: ours the same (row stays "=").
-- live drawing constants + number formats (behaviours "… drawing pick/snap constants", "server-side number formats by
-  experiment" §3; live/psui/numfmt-1118/). Done locally: tools pick within PICKBOX 7 px (hover_at, hovered_edge_sel,
-  centermark_point, section edge), grips GRIPSIZE 6 px (detail circle resize, aux indicator); fractional inches round
-  to the precision (digits = power of two, drawing 0.123 = 1/8": "2 3/4"), feet and inches `1'-2 1/4"`, the fractional
-  precision list 0" … 1/256", an explicit unit's button bare ("ft in"). Fraction stacked: done 11-18 (the reader joins its
-  pieces "2 3 4": no take reads one yet); the last 5 px picks (detail loop, hole table X direction, leader anchor) now PICKBOX / GRIPSIZE;
-  24 h time H:mm done (history rows keep the time on older days).
-- live2 workspaces (behaviours "studios (lead 11-18 ~02:23, feel): workspaces", live/studios/ws-1118/). Done locally:
-  Delete on every non-default workspace row (current too, none on the default), deleting the one you're in lands
-  viewing its branched-from version ("…and navigate you to V1."), notice "Deleted workspace B2." + Restore, ops
-  history_delete_branch / history_restore_branch; Branch dialog's "Name is required and cannot exceed 256
-  characters." with Create off, default name from the live workspaces; a Merge deletes what the source deleted even if
-  the target edited it (model-core merge.rs); navbar workspace name's tooltip. Duplicate names (lead 11-18,
-  DECISIONS): local, the store's unique index dropped on a writable open (no version bump), ops' `branch` by id or a
-  unique name, an ambiguous name lists the ids. Merge preview "Edited" tooltip "Last change by
-  <user> at <time>": done 11-18; switch's centred "Loading
-  workspace…" spinner (ours switches at once: not a target unless slow); Create workspace and edit properties ->
-  Properties modal fields (Name *, Description, Category "Onshape Workspace" greyed, Apply / Save greyed, Close):
-  ours already (version_properties).
-- live2 drawing creation (behaviours "studios (lead 11-18 ~02:07, feel): drawing creation", live/studios/
-  drw-create-1118/): Create Drawing shows in 237 ms on "Recently opened" with "Retrieving templates…", OK disabled
-  while it loads, no focus, Options Suggested / No views remembered; Enter after the list loaded creates (tab 1.9 s).
-  First view (No views): the preview's centre on the pointer, no snap to the sheet centre. No Auto-dimension tool.
-- live2 custom features (behaviours "studios (lead 11-18 ~01:53, feel): custom features", live/studios/
-  custom-feature-1118/): dialog rows, conditional field, red title / pink field: ours already (test
-  a_custom_features_dialog_is_generated_and_fails_as_live). ✓ disabled while the error names a field, click / Enter
-  do nothing: ours (live2 11-19 03:26 corrected its 11-18 note).
-  FS save -> Part Studio regenerates, an open dialog keeps its labels: ours already (tested).
 - live VS / FS (live/studios/vs-fs-feel-1117/): VS add-row focus to the next Name, duplicate -> "w_0"; FS
   autocomplete Enter inserts, Tab closes + inserts a tab, Esc keeps text; FS errors while typing (<0.5 s) red x at
   gutter line 1 + squiggle, Ctrl/Cmd+S commits, Commit pales, a fixed error greys ~150 ms, gone ~500 ms. VSFEEL bubble:

@@ -83,7 +83,8 @@ OURS_TITLES = {
     "Move to sheet / Replicate": ["Move to sheet", "Replicate region"],
     "Styles panel": ["Styles"],
     "Table": ["Table properties"],
-    "Hole table": ["Cell"],
+    # drawing-holetable-titleblock.json's tbDbl is the title block's Note panel.
+    "Hole table": ["Cell", "Note"],
     "MBD status": ["MBD status"],
     "Change to version": ["Reference manager"],
 }
@@ -124,6 +125,8 @@ ACCEPTED_MENU = {
     ("surface-finish-on-edge", "Add leader"): "live2 drw-surface-finish-flip: Flip, no Add leader, on an edge without a leader",
     ("surface-finish-on-edge", "Flip (ours only)"): "live2 drw-surface-finish-flip: Flip on an edge without a leader",
     ("ordinate", "Reset ordinate (ours only)"): "live2 drw-ordinate-value-rclick: on a value's text",
+    ("table-cell (click the table, click the cell again, then right-click)", "Merge ▸ All | Horizontal | Vertical"):
+        "live2 drw-table-cells-resize s9: Merge greyed for one cell; its rows on a block (drw-table-cells-merge s11)",
 }
 # Texts in the dumps that are user content, the recording's document, units or the dump format, not UI.
 NOISE = re.compile(r"^(Part \d|Part Studio \d|Sheet\d|Drawing \d|Assembly \d|Front|Top|Right|Left|Back|Bottom|Isometric|"
@@ -156,6 +159,22 @@ def menu_row_in_sources(src, row):
 
 def key(s):
     return re.sub(r"\s*\((?:[a-z]|shift\+[a-z]|ctrl\+[a-z])\)$", "", norm(s).rstrip("…").strip()).lower()
+
+
+def menu_key(row):
+    """A menu row's key: a submenu with its rows ("Merge ▸ All | Horizontal | Vertical"), or its name alone where the
+    dump notes "(…)" in place of rows; a row naming a tab or document ("Switch to <tab>") by its words before the name."""
+    row = row.replace("\tbeta", "")
+    name, arrow, subs = norm(row).partition("▸")
+    if arrow and (not subs.strip() or subs.strip().startswith("(")):
+        row = name
+    k = key(re.sub(r"\s+", " ", row.replace("▸", " ▸ ")))
+    return re.sub(r"^(switch to|insert custom table of) .*", r"\1 …", k)
+
+
+def menu_keys(row):
+    """Every key a menu row matches: its own and its name's (live's dumps list a submenu by its name)."""
+    return {menu_key(row), menu_key(row.partition("▸")[0])}
 
 
 VOID = {"area", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
@@ -202,7 +221,7 @@ def strip_hidden(raw):
 
 # Surfaces whose dumps' hidden elements live never shows (live2 11-16, holes-plate: a hole table has no Title row,
 # Reorder items or Collapse tags row in its dialog, no insert / remove / merge rows in its Cell popup).
-HIDDEN_IS_ABSENT = {"Hole table"}
+HIDDEN_IS_ABSENT = {"Hole table", "View properties"}
 # Texts live never lets a user reach (live2 11-17): display:none in every drawing panel dump (Reorder items, Cut from
 # section), or options of the note editor's Flag notes lists, which are disabled in every note and table cell; the
 # inspection table's 9th column of the 10-18 dumps (live 11-17: 8 columns).
@@ -217,7 +236,9 @@ NEVER_SHOWN_IN = {
     "Hole/thread callout": {"Precision:", "Tolerance: None", "Shaft class", "Reset text position", "Parentheses", "Toggle radius/diameter dimension", "Varies", "«Varies»"},
     "Custom table": PAGE_CHROME | {"Switch to Custom tables : pvz 2parts", "Switch to fs tables", "pvz 2parts", "onshape cone", "sketch start test"},
     "Insert DXF or DWG": PAGE_CHROME,
-    "Move to sheet / Replicate": {"Hide auto centermarks", "Switch to asb drawing src"},
+    "Move to sheet / Replicate": {"Hide auto centermarks", "Switch to asb drawing src", "Undo (ctrl+z)", "Redo (ctrl+y)", "Update from this workspace (ctrl+q)"},
+    # The page's hidden Inspection table, Styles and MBD status panels (their own surfaces count them).
+    "Drawing properties": {"Inspection table", "View:", "All sheets", "Current sheet", "All models", "Styles", "Revert to drawing properties", "MBD status", "Model:"},
     "Create Drawing": {"Creating drawing…"},
     "Hole table": {"Formulas", "Data Types"},
     "Hatch region": {"Apply to", "All instances in all views"},
@@ -438,9 +459,9 @@ def main():
     for entity, items in menus(args.dom).items():
         # Our menu of that entity (an entity name's words after the first, e.g. "dimension (with an inspection item)").
         mine = ours_menus.get(entity.split(" ")[0])
-        mine_keys = {key(r.removesuffix(" ▸")) for r in mine or []}
+        mine_keys = {k for r in mine or [] for k in menu_keys(r)}
         for it in items:
-            k = key(it)
+            k = menu_key(it)
             if mine is not None:
                 st = "=" if k in mine_keys else ("≠" if in_sources(src, it) else "missing")
                 if st != "=" and (entity, it) in ACCEPTED_MENU:
@@ -450,7 +471,7 @@ def main():
                 rows.append((f"Menu: {entity}", it, status(menu_seen.get(k), menu_row_in_sources(src, it)), ""))
         # A row of ours live's menu doesn't have.
         for r in mine or []:
-            if r != "——" and key(r.removesuffix(" ▸")) not in {key(x) for x in items}:
+            if r != "——" and not menu_keys(r) & {k for x in items for k in menu_keys(x)}:
                 name = f"{r} (ours only)"
                 note = ACCEPTED_MENU.get((entity, name))
                 rows.append((f"Menu: {entity}", name, "accepted" if note else "≠", note or "our menu"))

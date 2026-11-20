@@ -518,7 +518,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "inspection",
             summary: "Inspection items: number annotations (manual, reorder, automatic), edit, move, remove, hide, border shape",
-            description: "The Inspection item tool and its menus. add: number `annotations` in order, from `number` (the dialog's Number field, or Reorder inspection items) or the drawing's next number, with the dialog's `shape` and `border_size` (\"Inspection item\"). automatic: number every dimension and annotation of `scope` (drawing, sheet, or the view `view`) (\"Inspection items\"). edit: annotation `id` gets `number` (\"Edit inspection item\"). move: `id`'s number moves to annotation `to` (\"Move inspection item\"). remove: `annotations` lose theirs (\"Remove inspection item\"); remove_all (\"Remove all inspection items\"). hide / show: the toolbar's Hide inspection items toggle (\"Hide inspection items\" / \"Show inspection items\"). shape: the bubbles' border `shape` (\"Inspection border shape\"). drawing_get lists each annotation's `inspection` number (and its own `inspection_shape` / `inspection_border_size`).",
+            description: "The Inspection item tool and its menus. add: number `annotations` in order, from `number` (the dialog's Number field, or Reorder inspection items) or the drawing's next number, with the dialog's `shape`, `border_size` and `text_height` (\"Inspection item\"). automatic: number every dimension and annotation of `scope` (drawing, sheet, or the view `view`) (\"Inspection items\"). edit: annotation `id` gets `number` (\"Edit inspection item\"). move: `id`'s number moves to annotation `to` (\"Move inspection item\"). remove: `annotations` lose theirs (\"Remove inspection item\"); remove_all (\"Remove all inspection items\"). hide / show: the toolbar's Hide inspection items toggle (\"Hide inspection items\" / \"Show inspection items\"). shape: the bubbles' border `shape` (\"Inspection border shape\"). drawing_get lists each annotation's `inspection` number (and its own `inspection_shape` / `inspection_border_size` / `inspection_text_height`).",
             fields: with(
                 common(),
                 vec![
@@ -531,6 +531,7 @@ pub fn ops() -> Vec<Op> {
                     opt("view", json!({ "type": "integer" }), "View (scope view)."),
                     opt("shape", json!({ "type": "string", "enum": ["circle", "diamond", "double_circle", "flag", "hexagon", "octagon", "rectangle", "square_circle", "triangle"] }), "Border shape: the drawing's (shape), or the added items' own (add; omitted: the drawing's)."),
                     opt("border_size", json!({ "type": "integer", "minimum": 0, "maximum": 5 }), "Border size in characters, 0 Tight Fit (add; omitted: the drawing's)."),
+                    opt("text_height", json!({ "type": "number", "exclusiveMinimum": 0 }), "The number's text height in mm (add; omitted: the drawing's Inspection items › Text)."),
                 ],
             ),
             mutates: true,
@@ -2582,6 +2583,11 @@ fn inspection(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 Some(_) => return Err(OpError::param("border_size", "0 (Tight Fit) to 5 characters")),
                 None => None,
             };
+            let height = match a.opt_f64("text_height")? {
+                Some(h) if h > 0.0 && h.is_finite() => Some(h),
+                Some(_) => return Err(OpError::param("text_height", "a height in mm greater than 0")),
+                None => None,
+            };
             for (k, id) in list(&t)?.into_iter().enumerate() {
                 // The Number field counts up after each item.
                 let n = first.map(|f| f + k as u32).unwrap_or_else(|| t.d.next_inspection_number());
@@ -2589,6 +2595,7 @@ fn inspection(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 if let Some(x) = t.d.sheets[si].annotations.iter_mut().find(|x| x.id == id) {
                     x.inspection_shape = shape.or(x.inspection_shape);
                     x.inspection_chars = chars.or(x.inspection_chars);
+                    x.inspection_height = height.or(x.inspection_height);
                 }
             }
             "Inspection item"

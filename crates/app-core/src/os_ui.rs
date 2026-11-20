@@ -812,6 +812,12 @@ thread_local! {
 
 /// Whether the dropdown `id` ([`OsDropdownExt::os_dropdown_menu`]) has its menu open: its button keeps the open look
 /// while the pointer is in the menu (live dk-913b: the documents page's Create stays #769fcc).
+/// Remembers `menu` as dropdown `id`'s (a list a caller opens itself, e.g. under a whole combo field), so that
+/// `dropdown_open` sees it: a second click on its button then only closes it.
+pub fn remember_dropdown(id: &str, menu: &Entity<crate::os_menu::OsMenu>) {
+    OPEN_DROPDOWNS.with(|o| o.borrow_mut().insert(id.to_string(), menu.downgrade()));
+}
+
 pub fn dropdown_open(id: &str, cx: &App) -> bool {
     OPEN_DROPDOWNS.with(|o| o.borrow().get(id).is_some_and(|m| crate::os_menu::is_open_menu(m, cx)))
 }

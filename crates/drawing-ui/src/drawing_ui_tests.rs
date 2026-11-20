@@ -1130,7 +1130,7 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
                 t if format!("{t:?}").contains("Centermark") => "centermark".into(),
                 _ => continue,
             };
-            if !seen.insert(name.clone()) {
+            if seen.contains(&name) {
                 continue;
             }
             // A text's middle (a callout's, away from its leader), else a line's.
@@ -1146,6 +1146,7 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
                 _ => None,
             });
             if let Some(at) = at {
+                seen.insert(name.clone());
                 out.push((name, pick as u32, at));
             }
         }
@@ -1161,7 +1162,19 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
             })
             .collect()
     };
+    // The matrix's form: a submenu with its rows ("Insert ▸ Column Left | Column Right | …").
+    fn full(entries: &[MenuEntry]) -> Vec<String> {
+        entries
+            .iter()
+            .map(|m| match m {
+                MenuEntry::Item { label, .. } => label.to_string(),
+                MenuEntry::Separator => "——".into(),
+                MenuEntry::Submenu(label, rows) => format!("{label} ▸ {}", full(rows).into_iter().filter(|r| r != "——").collect::<Vec<_>>().join(" | ")).trim_end().to_string(),
+            })
+            .collect()
+    }
     let mut dump = serde_json::Map::new();
+    let mut dump_full = serde_json::Map::new();
     let empty = cx.update(|cx| editor.update(cx, |e, cx| {
         e.cursor = [5.0, 5.0];
         e.hover = None;
@@ -1169,6 +1182,7 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
         e.context_menu_entries(None, cx)
     }));
     dump.insert("empty-sheet".into(), json!(flat(&empty)));
+    dump_full.insert("empty-sheet".into(), json!(full(&empty)));
     for (name, pick, at) in entities {
         let rows = cx.update(|cx| editor.update(cx, |e, cx| {
             e.cursor = at;
@@ -1176,9 +1190,41 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
             e.selection.clear();
             e.context_menu_entries(Some(pick), cx)
         }));
-        dump.insert(name, json!(flat(&rows)));
+        dump.insert(name.clone(), json!(flat(&rows)));
+        dump_full.insert(name, json!(full(&rows)));
     }
-    println!("MENUDUMP {}", Value::Object(dump.clone()));
+    // A cell of a general table and of a hole table, selected (click the table, then the cell again).
+    let hole_table = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let view = e.built.as_ref()?.placements.first()?.id;
+            let id = e.current_sheet().next_table_id();
+            let kind = noshape_model::drawing::TableKind::Hole { view, origin: [0.0; 2], origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, collapse_tags: false, bottom_to_top: false, exclude: Vec::new(), x_dir: None, more: Vec::new() };
+            e.edit_sheet("Hole table", cx, |s| s.tables.push(noshape_model::drawing::Table::new(id, kind, [300.0, 200.0])));
+            Some(id)
+        })
+    });
+    draw(cx, window);
+    let general = cx.update(|cx| editor.read(cx).current_sheet().tables.iter().find(|t| matches!(t.kind, noshape_model::drawing::TableKind::General { .. })).map(|t| t.id));
+    for (name, id) in [("table-cell", general), ("hole-table-cell", hole_table)] {
+        let Some(id) = id else { continue };
+        let rows = cx.update(|cx| editor.update(cx, |e, cx| {
+            e.selection = vec![crate::drawing_view::Sel::Table(id)];
+            e.cell_sel = Some(crate::drawing_cells::CellSel { table: id, a: (1, 0), b: (1, 0) });
+            let rows = e.table_entries(id, cx);
+            e.cell_sel = None;
+            e.selection.clear();
+            rows
+        }));
+        dump_full.insert(name.into(), json!(full(&rows)));
+    }
+    let image_rows = cx.update(|cx| {
+        let e = editor.read(cx);
+        e.current_sheet().images.first().map(|i| full(&e.image_entries(i.id, cx)).into_iter().filter(|r| r != "Paste").collect::<Vec<_>>())
+    });
+    if let Some(rows) = image_rows {
+        dump_full.insert("image".into(), json!(rows));
+    }
+    println!("MENUDUMP {}", Value::Object(dump_full));
     let tail = ["——", "Clear selection", "Zoom to fit", "Delete"];
     let with_tail = |rows: &[&str]| -> Vec<String> { rows.iter().chain(tail.iter()).map(|r| r.to_string()).collect() };
     let live: Vec<(&str, Vec<String>)> = vec![
@@ -1384,6 +1430,20 @@ fn a_hole_callout_lights_the_holes_it_counts(cx: &mut TestAppContext) {
     draw(cx, window);
     let lit = cx.update(|cx| editor.read(cx).reference_edge_picks(id).len());
     assert!(lit >= kin, "the {kin} holes it counts light, not only its own: {lit} edges");
+
+    // Live drw-hcallout-fit 26: Override › Tolerance › Fit starts a Clearance fit with no hole class (a dimension's
+    // starts User defined).
+    let fit = cx.update_window(window, |_, w, cx| {
+        editor.update(cx, |e, cx| {
+            e.open_hole_callout(id, w, cx);
+            e.edit_palette(|d| d.cur.hole.get_or_insert_with(Default::default).override_tol = true, cx);
+            e.edit_palette(|d| d.tol = "Fit", cx);
+            e.palette.as_ref().map(|d| (d.cur.format.fit.fit_type, d.cur.format.tolerance.clone()))
+        })
+    });
+    let (kind, tol) = fit.unwrap().expect("the palette");
+    assert_eq!(kind, noshape_model::drawing::FitType::Clearance);
+    assert!(matches!(&tol, noshape_model::drawing::Tolerance::Fit { hole, .. } if hole.is_empty()), "no hole class yet: {tol:?}");
 }
 
 /// Live drw-hole-table-cell-panel 13: a click in a size's merged SIZE cell outlines the whole cell (A1–A3), not the

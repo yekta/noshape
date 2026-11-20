@@ -2070,6 +2070,9 @@ pub struct Annotation {
     pub inspection_shape: Option<InspectionShape>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inspection_chars: Option<u8>,
+    /// Its text height in mm (None: the drawing's Inspection items › Text).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inspection_height: Option<f64>,
     /// Arrows flipped to outside the extension lines (the selected
     /// dimension's flip node).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -2606,7 +2609,7 @@ impl AnnotationKind {
 
 impl Default for Annotation {
     fn default() -> Self {
-        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, inspection_shape: None, inspection_chars: None, flip_arrows: false, text_along: None, loose: false, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None, style: None, hole: None, target: None, sketch_dim: None, model: None, title_field: None, one_edge: false }
+        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, inspection_shape: None, inspection_chars: None, inspection_height: None, flip_arrows: false, text_along: None, loose: false, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None, style: None, hole: None, target: None, sketch_dim: None, model: None, title_field: None, one_edge: false }
     }
 }
 

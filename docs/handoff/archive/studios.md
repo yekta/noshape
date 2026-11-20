@@ -1253,3 +1253,39 @@ Next, in order:
   wasn't run.
 - Live asked for the exact rules (REQUESTS 01:54 UTC: needs "#"? underscores and case? prefix / substring /
   subsequence? order, look, max rows, keys, what's inserted, which fields); the lead names live's document e35e75e4.
+
+## 11-20 early (moved from the handoff)
+- Landed f450d0dd (11-20 by 00:10: Labs brand, HISTORY-ROW-NAME-OVERLAP, Pro menus, Measure 1-2).
+- Queued 68a4f22e (11-20 00:31; carries 988d0416 and the lead's 81d16ffcd / 7458597fb rebased): brand ruling,
+  COMPARE-COMMON-PARTS-MISSING, table alignment line, runner rules, note lists, title field alignment, matrix doc
+  (1210 = + 446 shown of 1874), Preferences "Noshape".
+- live near-snap retake (bm 4092, live/studios/near-snap-1118/): nearer vertex wins at the midpoint, no stickiness,
+  reach 6.8 px: ours the same (row stays "=").
+- live drawing constants + number formats (behaviours "… drawing pick/snap constants", "server-side number formats by
+  experiment" §3; live/psui/numfmt-1118/). Done locally: tools pick within PICKBOX 7 px (hover_at, hovered_edge_sel,
+  centermark_point, section edge), grips GRIPSIZE 6 px (detail circle resize, aux indicator); fractional inches round
+  to the precision (digits = power of two, drawing 0.123 = 1/8": "2 3/4"), feet and inches `1'-2 1/4"`, the fractional
+  precision list 0" … 1/256", an explicit unit's button bare ("ft in"). Fraction stacked: done 11-18 (the reader joins its
+  pieces "2 3 4": no take reads one yet); the last 5 px picks (detail loop, hole table X direction, leader anchor) now PICKBOX / GRIPSIZE;
+  24 h time H:mm done (history rows keep the time on older days).
+- live2 workspaces (behaviours "studios (lead 11-18 ~02:23, feel): workspaces", live/studios/ws-1118/). Done locally:
+  Delete on every non-default workspace row (current too, none on the default), deleting the one you're in lands
+  viewing its branched-from version ("…and navigate you to V1."), notice "Deleted workspace B2." + Restore, ops
+  history_delete_branch / history_restore_branch; Branch dialog's "Name is required and cannot exceed 256
+  characters." with Create off, default name from the live workspaces; a Merge deletes what the source deleted even if
+  the target edited it (model-core merge.rs); navbar workspace name's tooltip. Duplicate names (lead 11-18,
+  DECISIONS): local, the store's unique index dropped on a writable open (no version bump), ops' `branch` by id or a
+  unique name, an ambiguous name lists the ids. Merge preview "Edited" tooltip "Last change by
+  <user> at <time>": done 11-18; switch's centred "Loading
+  workspace…" spinner (ours switches at once: not a target unless slow); Create workspace and edit properties ->
+  Properties modal fields (Name *, Description, Category "Onshape Workspace" greyed, Apply / Save greyed, Close):
+  ours already (version_properties).
+- live2 drawing creation (behaviours "studios (lead 11-18 ~02:07, feel): drawing creation", live/studios/
+  drw-create-1118/): Create Drawing shows in 237 ms on "Recently opened" with "Retrieving templates…", OK disabled
+  while it loads, no focus, Options Suggested / No views remembered; Enter after the list loaded creates (tab 1.9 s).
+  First view (No views): the preview's centre on the pointer, no snap to the sheet centre. No Auto-dimension tool.
+- live2 custom features (behaviours "studios (lead 11-18 ~01:53, feel): custom features", live/studios/
+  custom-feature-1118/): dialog rows, conditional field, red title / pink field: ours already (test
+  a_custom_features_dialog_is_generated_and_fails_as_live). ✓ disabled while the error names a field, click / Enter
+  do nothing: ours (live2 11-19 03:26 corrected its 11-18 note).
+  FS save -> Part Studio regenerates, an open dialog keeps its labels: ours already (tested).

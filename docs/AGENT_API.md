@@ -4829,7 +4829,7 @@ Examples:
 
 Inspection items: number annotations (manual, reorder, automatic), edit, move, remove, hide, border shape (edits the document (one undoable history entry)).
 
-The Inspection item tool and its menus. add: number `annotations` in order, from `number` (the dialog's Number field, or Reorder inspection items) or the drawing's next number, with the dialog's `shape` and `border_size` ("Inspection item"). automatic: number every dimension and annotation of `scope` (drawing, sheet, or the view `view`) ("Inspection items"). edit: annotation `id` gets `number` ("Edit inspection item"). move: `id`'s number moves to annotation `to` ("Move inspection item"). remove: `annotations` lose theirs ("Remove inspection item"); remove_all ("Remove all inspection items"). hide / show: the toolbar's Hide inspection items toggle ("Hide inspection items" / "Show inspection items"). shape: the bubbles' border `shape` ("Inspection border shape"). drawing_get lists each annotation's `inspection` number (and its own `inspection_shape` / `inspection_border_size`).
+The Inspection item tool and its menus. add: number `annotations` in order, from `number` (the dialog's Number field, or Reorder inspection items) or the drawing's next number, with the dialog's `shape`, `border_size` and `text_height` ("Inspection item"). automatic: number every dimension and annotation of `scope` (drawing, sheet, or the view `view`) ("Inspection items"). edit: annotation `id` gets `number` ("Edit inspection item"). move: `id`'s number moves to annotation `to` ("Move inspection item"). remove: `annotations` lose theirs ("Remove inspection item"); remove_all ("Remove all inspection items"). hide / show: the toolbar's Hide inspection items toggle ("Hide inspection items" / "Show inspection items"). shape: the bubbles' border `shape` ("Inspection border shape"). drawing_get lists each annotation's `inspection` number (and its own `inspection_shape` / `inspection_border_size` / `inspection_text_height`).
 
 Examples:
 
@@ -4851,6 +4851,7 @@ Examples:
 | `view` | integer |  | View (scope view). |
 | `shape` | one of `circle`, `diamond`, `double_circle`, `flag`, `hexagon`, `octagon`, `rectangle`, `square_circle`, `triangle` |  | Border shape: the drawing's (shape), or the added items' own (add; omitted: the drawing's). |
 | `border_size` | integer |  | Border size in characters, 0 Tight Fit (add; omitted: the drawing's). |
+| `text_height` | number |  | The number's text height in mm (add; omitted: the drawing's Inspection items › Text). |
 
 #### drawing_properties
 
