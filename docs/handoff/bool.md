@@ -60,9 +60,13 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   crosses itself in UV, 1.1e-4 degenerate edge; all 79 open edges border it). Our own Booleans (Mac bool-keep/ringsr,
   probe_corpus_meshes): the 273-face cut 331fd52c meshes with 0 holes (unified too); c40a49c4 (cut 103 -> 133) opens
   9. So likely the x_t write/read (dx's) or c40a49c4; Shell 1 alone: 44 faces, 8 folds, 0 holes.
-- bool-k25x10 (d2a26a12a = 2f452d3b3): gate PASS except knurls not run (CHECK; /root/bool-tube-scratch/gate-2f452d3b3.log);
-  knurls ours-only on vibex7 (/root/bool-scratch/kn-k25.sh -> kn-k25.out); land on equal lines (bool-tube is detached by
-  the 98ef gate: land from a fresh worktree of branch bool-k25x10).
+- bool-k25x10 2f452d3b3 QUEUED as aa015bd5 (11-20 ~10:50; knurls ours-only on vibex7 0 diff lines in all 5). Then rebase bool-sh3r.
+- P0 COMPAT-GYRO-REVOLVE (qa): Gyro (vibex7 ~/qa/tickets/Gyro.noshape) Revolve 1 "Error regenerating." with the Rust
+  Boolean, Ok with NOSHAPE_BOOL_RUST=0. Its one fuse 2b68c8a5422a54b2 (vibex7 ~/tmp/bool/gyrec, Mac bool-keep/gyrec)
+  replays equal to OCCT; probing unify / inside-out after it (worktree bool-gyro, probe in bool_patterns.rs, built in
+  vibex7 ~/agents/bool-gate-base: .io.sh). Scripts /root/bool-scratch/gyro/gy.py (regen), gf.py (feature dump).
+- 850efe: cx3 probe (/root/bool-scratch/cx3.out, notes m85-notes.txt): right group refused "crosses seam", left 23/24
+  by volume (merged face too big), 2/3/4 never grouped with them.
 - bool-sh3 (rebased on main 3ac2565d6 in worktree bool-sh3r, branch bool-sh3r, tip c26a788e0, not pushed; origin/bool-sh3, tip a0b85fef4 = + d494b222e, a0b85fef4 (standoffs speed, below); 5b38e5c92 the 50 um rule removed; d2a26a12a the Ø25×10 knurl's touch (P2 below);
   1f27fa8ca the unify's segmented volume recheck (free-form fuse, P2 below); 8b6d6faba + Shell's stray-pcurve refit after its unify (2756e521: a 45° cone's merged
   face had an edge pcurve 0.83 mm off, read 77 mm3 heavy in ours and OCCT; now 32108.414, live 32108.426 / 45 faces (q-2756e521),
