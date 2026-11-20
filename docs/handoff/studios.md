@@ -22,12 +22,13 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
 - Landed 09:57: 782f4c47 as f29e6eb2 (the Windows CI wheel-notch fix and the 18 commits with it).
 - Landed 11:43: 35451185 as 2ce8ad6e (18 commits: the fc8e6c91 batch, drawing_datum_target op, panel-lists s21-24,
   FS bracket box, coverage Resize...).
-- Queued 11:46 as b5048cc1 (4 commits): Flip / Rotate 30 px apart; a selected dimension = live dsel3 (black text on an
-  orange box, lines and grips orange; push_annotation_look, test); section End type select `dropdown:<shown>`
-  (drw-section-blind-offset 5/11 -> 9/11); handoff. No crates/drawing change.
-- Uncommitted (patch also in /root/studios-scratch/reader-grips.patch): drawing_ui_state counts a selected dimension's
-  grips in a view box (live drw-styles-radial s3 EDGE Top). b27d (baseline, 21 drw-dimension takes) DONE; b28d (with
-  the change) running into /root/studios-scratch/b28d.log. Compare the score lines; commit + land only if nothing drops.
+- Landed 12:25: b5048cc1 as 16e0a7e3 (Flip / Rotate 30 px apart; a selected dimension = live dsel3; section End
+  type `dropdown:<shown>`).
+- Uncommitted, checked by b30 (/root/studios-scratch/b30.log; baseline b27d, 21 drw-dimension takes all full):
+  drawing_ui_state counts a selected dimension's grips, and a hovered selected one in full for recorders >= 11-15
+  (`EDGE+`; the 11-06 drw-dimension-radius s3 read nothing); drawing_view keeps a hovered selected dimension orange;
+  drawing_tools made_by_tool selects a Diameter after Escape (live drw-styles-radial s7). b29 (without Diameter):
+  dimension takes unchanged, styles-radial 7 -> 10/18. Commit + land if b30 drops nothing.
 - Live's 08:08 takes, drafts in /root/live-scratch/st0808 (scenario + out/<take>.json; copied untracked into
   tests/ui-parity/ and live/): styles-radial (live's s11 click opened Inspection table: retake asked), section-blind-
   offset (s8 Esc keeps the panel in live: asked). Others not recorded at 11:40.
