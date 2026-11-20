@@ -3114,6 +3114,21 @@ fn a_chamfer_round_a_whole_face_stops_where_its_strips_meet() {
     assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
 
+/// Edges in line on one face (a U's two arm ends, bracket03-mattie's Chamfer 1, live OK) don't set back into each
+/// other: only side-by-side edges facing each other stop a rim chamfer.
+#[test]
+fn a_rim_chamfer_of_edges_in_line_builds() {
+    let mut t = T::new();
+    let (_, regions) = t.sketch(&[&[(0.0, 0.0), (40.0, 0.0), (40.0, 40.0), (25.0, 40.0), (25.0, 10.0), (15.0, 10.0), (15.0, 40.0), (0.0, 40.0)]], &[]);
+    t.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+    let top = t.edges_where(|i| !vertical(i) && (i.start.z - 0.01).abs() < 1e-9);
+    assert_eq!(top.len(), 8);
+    let f = t.chamfer(top, "1 mm");
+    let (st, msg, v) = status(&mut t, f);
+    let faces = t.regen().context.bodies.first().map_or(0, |b| b.faces.len());
+    assert!(st == FeatureStatus::Ok && faces == 18 && (v - 12890.0).abs() < 5.0, "{st:?} {msg:?} {v:.4} mm³ {faces} faces");
+}
+
 /// qa CYL-UNIFY-OPPOSITE (live request 1584): a Ø12 circle on Front extruded
 /// 10 mm (New), then the same region 10 mm the other way (Add): one part of 3
 /// faces, one 753.98 mm² cylinder over the full 20 mm.

@@ -1,33 +1,31 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-20 04:30 UTC (fresh thread 21:10 after the 17:30 usage stall). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-20 06:40 UTC (fresh thread 21:10 after the 17:30 usage stall). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
-## In flight (11-20 night)
-- **LANDED 11-20:** singularities Sketch 2 P0 2f4f3bc5 -> a2e7c966 (04:19); TICKETS row fixed 2a43b78ba (live ends with 3
-  parts, not 5; Mirror 2's "no change" is right for qa's saved input: it mirrors the singularity loft's body, which ours
-  can't build, so the copy points it at Extrude 1's sheet). Verify on the first green with a2e7c966 (watcher ->
-  userdocs.py v0.4.61 vs green on vibex7 ~/tmp/core/qs copy; m2.py prints parts per feature). Ring core-rp landed.
-- **T2-NIGHTLY-22-FAILURES (lead P2), branch core-t2 in core-lam:** b5f4857cf chamfer whole rim fails once strips
-  overlap (live q-chamfer-top-face-1120) + std_oracle Boolean nothing-selected + planar corpus / profdocs skips +
-  regen_profile scratch per bench; d5ab386c1 pattern seed in its own merge scope joins (Part x200 one part) + face
-  pattern round-tangent copy fails (kern M1). All pass on vibex8 (core-icd base), model full 558/0, clippy clean.
-  Parity suite: core-lam .ss.sh on vibex7 -> ~/tmp/core/g/run-t2.log, compare run-filbase.log; then land.
-- **parting_line_draft_on_curves_as_live case B (saddle):** cause 48beead66 (an open parting edge runs on 10% past its
-  ends): the saddle curve's pieces ran into each other. Fix in core-icd shell.cpp (uncommitted): run on only at ends no
-  other parting edge shares. Test + g++-13 on vibex7 -> core-scratch/t2d.out; then move to core-t2.
-- **Snap-hook mirrored hooks (dx; live core q-snaphook-shell-edges-1120):** core-fil 8fbd2f175 (branch; worktree
-  detached at e26a927c2 for the base suite: re-checkout after): single fillet face's new edges clockwise about its
-  outward normal (orient_round_edges over bodies holding its blend faces only, so reuse holds); reverse_edge_curves keeps
-  continuity. Suite run-fil.log 95/126 docs, 1357/1585 features; base run-filbase.log running on vibex7 (slot): explain
-  the one doc lost vs ring5, then land. Left: chained Fillet 3 edges (rule unknown), JSd.
+## In flight (11-20 morning)
+- **LANDED 11-20:** singularities Sketch 2 P0 2f4f3bc5 -> a2e7c966 (04:19); TICKETS row 2a43b78ba (live = 3 parts).
+- **T2-NIGHTLY-22-FAILURES (lead P2), branch core-t2 in core-lam:** b5f4857cf chamfer rim fails once strips overlap
+  (live q-chamfer-top-face-1120; since narrowed to side-by-side edges facing each other: in-line edges flagged
+  bracket03-mattie's Chamfer 1) + std_oracle / corpus skips / regen_profile; d5ab386c1 pattern seed scope + face pattern
+  round-tangent; 9de5457d6 parting-line draft (saddle pieces run on only at free ends). Suite run-t2.log 95/126,
+  1370/1585 (base 1357); only loss bracket03 -> fixed, tests + clippy on vibex8 -> core-scratch/ct.out; then land.
+- **isaac Mirror 1 speed (lead P1), branch core-speed in core-rp (vibe2):** 12.8-14.6 s all op_unify's
+  merge_cylinder_groups. Cause: the merged face built on the first face's own surface; B.UpdateEdge on the shared
+  boundary edges replaced that face's pcurves, left wrong when a try is rejected -> neighbours invalid, slow each-valid
+  pass (1040 whole checks), result invalid with a third of the volume lost (59.5 vs 89.2 cm3). Fix: a copy of the
+  surface + failed groups not retried while their faces are unchanged. Replay unify-54 (~/agents/core-keep/isaac on
+  vibe2; crash_inputs replay_one, "unify" case): 14.3 s -> ~1 s, valid, volume kept, 235 faces. Next: kernel tests,
+  g++-13, parity suite, CLI time on ~/tmp/core/isaac.noshape (iz.py), land; report ms before/after.
+- **Next (lead P1 after isaac):** c2-config-parts-screws Sweep 1 "not a valid solid" 2409 ms (live 42 ms, valid): sweep
+  or the Boolean after it? Boolean -> bool with a repro. qa may send a P0 (hats "Seat lip 45 chamfer" selections): first.
+- **LANDED 06:10:** fillet orientation 8c88ddb0 -> d80c2c58 (core-fil targets removed). core-icd rebased on it, landing.
 - **Arc sense, core-arc b0c0b00c9 (not landed):** sketch Entity.clockwise (live core q-arc-sense-1120). Snap-hook
   re-import via PARITY_SAVE queued on vibex7 -> core-scratch/arc-sh.out, dircmp.py on ~/tmp/core/sh2/ours.json.
-- **manualblend Intersection curve 1, core-icd bde5bbcbd (on 8ea35ce62 = the fillet commit):** curves run
-  n(group1) x n(group2) as live's ic1-normals.json; reverse_edge_curves also turns a wire's free edges. Land after
-  core-fil.
+- **manualblend Intersection curve 1, core-icd 5efc58479:** curves run n(group1) x n(group2) as live's ic1-normals.json;
+  reverse_edge_curves also turns a wire's free edges. land.sh 06:45 -> core-scratch/land-icd.out.
 - **core-bis core-fit1 (fit spline 8dec3093f + loft_to_point 189a47069, not landed):** AlongDirection arm fix
   uncommitted with LTPDBG prints (solid_a.rs); debug run on vibex8 -> dbg.out. Then strip prints, .par.sh, land.
 - **bool-land7 e3078f89:** if a model result moves after it lands, tell bool.

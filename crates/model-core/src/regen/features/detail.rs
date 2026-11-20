@@ -231,16 +231,21 @@ fn meeting_strips_overlap(shape: &Shape, edges: &[usize], d: f64) -> bool {
         return false;
     }
     let line = |e: usize| match all.get(e).map(|s| s.edge_info()) {
-        Some(Ok(i)) if matches!(i.curve, k::Curve::Line { .. }) => Some((i.start, (i.end - i.start).normalize_or_zero())),
+        Some(Ok(i)) if matches!(i.curve, k::Curve::Line { .. }) => Some((i.start, i.end)),
         _ => None,
     };
-    let lines: Vec<(usize, DVec3, DVec3)> = edges.iter().filter_map(|&e| line(e).map(|(a, u)| (e, a, u))).collect();
-    lines.iter().enumerate().any(|(i, &(e, a, u))| {
-        lines[i + 1..].iter().any(|&(f, b, v)| {
+    let lines: Vec<(usize, DVec3, DVec3)> = edges.iter().filter_map(|&e| line(e).map(|(a, z)| (e, a, z))).collect();
+    // Two parallel edges of one planar face, side by side (not in line) and facing each other along a stretch, closer
+    // than both setbacks.
+    lines.iter().enumerate().any(|(i, &(e, a, az))| {
+        let u = (az - a).normalize_or_zero();
+        lines[i + 1..].iter().any(|&(f, b, bz)| {
             let shared = ef.get(e).zip(ef.get(f)).and_then(|(x, y)| x.iter().find(|g| y.contains(g)).copied());
             let planar = shared.is_some_and(|g| matches!(faces.get(g as usize).map(|f| f.face_surface()), Some(Ok(k::Surface::Plane(_)))));
-            let across = (b - a) - u * (b - a).dot(u);
-            planar && u.cross(v).length() < 1e-9 && across.length() < 2.0 * d - 1e-9
+            let across = ((b - a) - u * (b - a).dot(u)).length();
+            let (t0, t1) = ((b - a).dot(u), (bz - a).dot(u));
+            let facing = t0.max(t1).min((az - a).length()) - t0.min(t1).max(0.0) > 1e-9;
+            planar && u.cross((bz - b).normalize_or_zero()).length() < 1e-9 && across > 1e-9 && facing && across < 2.0 * d - 1e-9
         })
     })
 }
