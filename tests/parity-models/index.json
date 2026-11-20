@@ -36,6 +36,15 @@
   "original": "https://cad.onshape.com/documents/1e283d51e8f758d257c55592/w/95b1d9ccabf0bc2712d173ad/e/d0dd4e5215baf125deb59020"
  },
  {
+  "name": "c2-body-draft-naming",
+  "document": "490d3955c43af0a5d11ca04b",
+  "workspace": "87cc1b4aaf8f5d2aee200c16",
+  "element": "5860be1d9bafd1c499a87379",
+  "url": "https://cad.onshape.com/documents/490d3955c43af0a5d11ca04b/w/87cc1b4aaf8f5d2aee200c16/e/5860be1d9bafd1c499a87379",
+  "title": "naming",
+  "original": "https://cad.onshape.com/documents/4f70047352a88eee9dd3747d/w/daebf7bdde9c10dc8f68e8bc/e/a856325066350eba4a34063b"
+ },
+ {
   "name": "c2-bottle-split",
   "document": "0abda06233badd06f927381c",
   "workspace": "36ebdf1ba1ba87516e4de990",
@@ -106,6 +115,15 @@
   "url": "https://cad.onshape.com/documents/2d04ed7e513dd74c1b807a47/w/e7e40d28e84cb6489bc7a023/e/a8db78216ef207e18a1e6ae3",
   "title": "Configurable Parts - Copy: Standoffs",
   "original": "https://cad.onshape.com/documents/dd3c062a6579b210fbdd34a1/w/dea58f973a3bd0ca25be1414/e/40d48a14d3c582672ddb1306"
+ },
+ {
+  "name": "c2-constrained-surface",
+  "document": "424ebd4abeda4cfb4b49bad4",
+  "workspace": "e45d0b825f55697eaa0cfda0",
+  "element": "8a1669b30571c234db03d1f4",
+  "url": "https://cad.onshape.com/documents/424ebd4abeda4cfb4b49bad4/w/e45d0b825f55697eaa0cfda0/e/8a1669b30571c234db03d1f4",
+  "title": "3D Constrained Surface",
+  "original": "https://cad.onshape.com/documents/807372671dcb7461773b9ccc/w/e2fec4602934dcf339a31cdd/e/97702a2d2ddffdc68b79bf94"
  },
  {
   "name": "c2-curve-pattern-composite",
@@ -369,6 +387,24 @@
   "original": "https://cad.onshape.com/documents/9190d114354a31d33ed2eb4f/w/e7f6e0681f2e4c2a355010d4/e/7b174401767c67708d95d194"
  },
  {
+  "name": "c2-sm-jog-panel",
+  "document": "ec1797484ba3bb4700daa505",
+  "workspace": "3294931978b40c417e22b6f1",
+  "element": "f51eef388f2f44433a98ddf8",
+  "url": "https://cad.onshape.com/documents/ec1797484ba3bb4700daa505/w/3294931978b40c417e22b6f1/e/f51eef388f2f44433a98ddf8",
+  "title": "Panel sub panel tests",
+  "original": "https://cad.onshape.com/documents/5721860bbadcdf203ea7330f/w/b71bb8b937900b990b9df4a8/e/bf0f5c69e1c3c94c4f6f7afd"
+ },
+ {
+  "name": "c2-sm-loft-basic",
+  "document": "35245dc6fdf5f28b24bd7bb2",
+  "workspace": "a9edc188b7ada274e6a9c8c5",
+  "element": "2637ec8bda7aff54b82253a4",
+  "url": "https://cad.onshape.com/documents/35245dc6fdf5f28b24bd7bb2/w/a9edc188b7ada274e6a9c8c5/e/2637ec8bda7aff54b82253a4",
+  "title": "Sheet metal loft",
+  "original": "https://cad.onshape.com/documents/f14420e9139dad0b33ef886b/w/7ff554bbd145a5db3e7eeb37/e/97a5a9c9d5ad659e5015be77"
+ },
+ {
   "name": "c2-sm-louver",
   "document": "4a3581f34d22b68dc66bfbd7",
   "workspace": "a042d971c99deeef837d9546",
@@ -376,6 +412,15 @@
   "url": "https://cad.onshape.com/documents/4a3581f34d22b68dc66bfbd7/w/a042d971c99deeef837d9546/e/5b62ed6853c265dee89ac70e",
   "title": "louver",
   "original": "https://cad.onshape.com/documents/a7a965d0eaa947af5ec136cb/w/4748274fd54cea50a888b527/e/0529fa035880347fd51927ed"
+ },
+ {
+  "name": "c2-sm-modify-joint",
+  "document": "1f47b77c4015664780a3b287",
+  "workspace": "be56cbf03d4eb506ebee61b7",
+  "element": "f7c79c9f945eb2bd446667b8",
+  "url": "https://cad.onshape.com/documents/1f47b77c4015664780a3b287/w/be56cbf03d4eb506ebee61b7/e/f7c79c9f945eb2bd446667b8",
+  "title": "Sheet Metal Test - Copy",
+  "original": "https://cad.onshape.com/documents/474b34651fbcef40da0ed8fd/w/94e58f58c639c9a69749fa8e/e/9d8090e24c49373cd539e37a"
  },
  {
   "name": "c2-sm-rocker-enclosure-body",
