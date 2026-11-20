@@ -23,6 +23,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   runs of the unfixed binary on vibe2 (lavapipe) all exited 0. Reopen if it comes back on CI.
 
 ## qa, 2026-11-20
+- [ ] P1 **SINGULARITIES-SKETCH2-UNSOLVED (core)**: corpus c2-surf-workshop-singularities (compat vs v0.4.61). Live: Sketch 2
+  OK (its PIERCE constraint on edge JGJ of Mirror 3's sheet JGD, refs.jsonl), 5 parts at the end. Ours since green 624c6db7
+  (11-19 22:50; e61f91fe 22:14 OK): Sketch 2 "Sketch could not be solved.", Mirror 2 "Boolean resulted in no geometry change",
+  2 parts (Part 1, Part 2, Surface 1 gone). Range e61f91fe..624c6db7 has one modelling change before Sketch 2: core 4a52a26bb
+  (a mirrored surface joins the surfaces it touches; Mirror 3 one 2-face sheet), so the pierced edge likely no longer
+  resolves. Not bisected. Still in 5b62f6ca. Evidence: qa-scratch/compat/38e72d88.txt.
 - [ ] P0 **SKETCH-DIM-PLACE-CLICK-SELECTS (skasm; user case "#variable in a sketch dimension")**: ui-parity
   sketch-dimension-variable (Top sketch, rectangle (60,0)-(90,20), Esc, d, click the line at (75,0), click (75,-8) to place,
   type "#width", Enter). Live (live2's 11-19 retake): the second click places the dimension (selection 0) and its box takes
