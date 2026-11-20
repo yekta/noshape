@@ -432,7 +432,7 @@ impl DrawingEditor {
         let select = |id: &'static str, label: String, items: Vec<(String, bool, Set)>| {
             let ed = ed.clone();
             let mark = format!("dropdown:{label}");
-            Button::new(id).label(label).map(move |b| crate::ui_script::mark(b, move || mark.clone())).ghost().xsmall().w_full().dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+            Button::new(id).label(label).map(move |b| crate::ui_script::mark(b, move || mark.clone())).ghost().xsmall().w_full().text_size(px(13.33)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
                 for (l, on, f) in &items {
                     let (e, f) = (ed.clone(), f.clone());
                     m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| e.update(cx, |t, cx| f(t, cx))));
@@ -462,14 +462,19 @@ impl DrawingEditor {
                 let k = *k;
                 let on = corner == k;
                 let (top, left) = (matches!(k, TableCorner::TopLeft | TableCorner::TopRight), matches!(k, TableCorner::TopLeft | TableCorner::BottomLeft));
+                // Live ct-2-add: 26 px, a #d3d7d9 frame; the chosen one pressed (#e6e6e6 in #c8c8c8) on a 2 px blue foot.
                 div()
                     .id(("ct-corner", i))
-                    .size(px(24.))
+                    .debug_selector(move || format!("ct-corner-{i}"))
+                    .size(px(26.))
                     .relative()
+                    .flex()
+                    .items_center()
+                    .justify_center()
                     .cursor_pointer()
                     .border_1()
-                    .border_color(gpui_kit::rgb(0x909090))
-                    .when(on, |e| e.border_b_2().border_color(pal.accent))
+                    .border_color(gpui_kit::rgb(if on { 0xc8c8c8 } else { 0xd3d7d9 }))
+                    .when(on, |e| e.bg(gpui_kit::rgb(0xe6e6e6)).child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
                     .child(crate::ui::glyph("table", 20., ink))
                     .child(div().absolute().size(px(4.)).rounded_full().bg(ink).when(top, |e| e.top(px(1.))).when(!top, |e| e.bottom(px(1.))).when(left, |e| e.left(px(1.))).when(!left, |e| e.right(px(1.))))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -482,14 +487,21 @@ impl DrawingEditor {
             })
             .collect();
         // An icon button (Add / Insert): full width until something is chosen.
+        let open = d.picker.clone();
         let action = |id: &'static str, icon: &'static str, label: &'static str, enabled: bool, full: bool, cx: &mut Context<Self>| {
+            let pressed = match &open {
+                Some(Picker::Studio) => id == "ct-add",
+                Some(Picker::Table { .. }) => id == "ct-insert",
+                None => false,
+            };
             h_flex()
                 .id(id)
                 .debug_selector(move || id.into())
                 .map(|d| crate::ui_script::mark(d, || format!("button:{label}")))
-                .h(px(28.))
+                .relative()
+                .h(px(26.))
                 .when(full, |b| b.flex_1())
-                .when(!full, |b| b.w(px(64.)).flex_none())
+                .when(!full, |b| b.w(px(69.)).flex_none())
                 .justify_center()
                 .gap(px(4.))
                 .border_1()
@@ -498,6 +510,7 @@ impl DrawingEditor {
                 .text_size(px(14.))
                 .when(!enabled, |b| b.opacity(0.4))
                 .when(enabled, |b| b.cursor_pointer().hover(|b| b.bg(p().panel_hover)))
+                .when(pressed, |b| b.bg(gpui_kit::rgb(0xe6e6e6)).child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(p().accent)))
                 .child(crate::ui::glyph(icon, 18., ink))
                 .child(label)
                 .when(enabled, |b| {
@@ -561,9 +574,9 @@ impl DrawingEditor {
         let add_row = h_flex().px(px(4.)).pt(px(4.)).gap(px(4.)).child(action("ct-add", "insert", "Add", true, studio_name.is_none(), cx)).when_some(studio_name.clone(), |r, n| r.child(div().flex_1().child(select("ct-studio", n, studio_items))));
         let insert_row = h_flex()
             .px(px(4.))
-            .pt(px(4.))
+            .pt(px(2.))
             .gap(px(4.))
-            .child(action("ct-insert", "featurescript-table", "Insert", d.studio.is_some(), d.chosen.is_none(), cx))
+            .child(action("ct-insert", "table-insert", "Insert", d.studio.is_some(), d.chosen.is_none(), cx))
             .when_some(d.chosen.as_ref().map(|t| t.display.clone()), |r, n| r.child(div().flex_1().child(select("ct-table", n, table_items))));
         let close = |id: &'static str, cx: &mut Context<Self>| {
             div().id(id).w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_custom_dlg(false, cx)))
@@ -619,9 +632,16 @@ impl DrawingEditor {
             dlg = dlg.child(add_row).child(insert_row);
         }
         dlg = dlg
-            .child(row("Order", select("ct-order", if d.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, orders).into_any_element()))
-            .child(div().px(px(8.)).pt(px(4.)).text_size(px(11.)).child("Select fixed corner"))
-            .child(h_flex().px(px(8.)).pt(px(4.)).gap(px(26.)).children(corners));
+            .child(
+                h_flex()
+                    .mt(px(4.))
+                    .min_h(px(28.))
+                    .px(px(8.))
+                    .child(div().w(px(68.)).flex_none().text_size(px(12.)).child("Order"))
+                    .child(div().flex_1().min_w_0().child(select("ct-order", if d.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, orders))),
+            )
+            .child(div().px(px(8.)).pt(px(6.)).text_size(px(11.)).child("Select fixed corner"))
+            .child(h_flex().pl(px(15.)).pt(px(5.)).gap(px(26.)).children(corners));
         // The pickers sit beside the dialog.
         let picker = d.picker.clone().filter(|pk| *pk != Picker::Studio).map(|pk| self.render_custom_picker(pk, &mine, &ws, cx));
         Some(div().absolute().top_0().left_0().child(dlg).children(picker).into_any_element())

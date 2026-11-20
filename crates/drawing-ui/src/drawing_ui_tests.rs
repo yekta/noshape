@@ -1582,6 +1582,26 @@ fn a_dimension_dragged_from_unselected_ends_unselected(cx: &mut TestAppContext) 
     assert_eq!(cx.update(|cx| editor.read(cx).selection.clone()), vec![Sel::Annotation(id)], "a selected one stays selected");
 }
 
+/// Live ct-2-add (cfg-choosers-1120): the Custom table dialog's Add and Insert are 26 px, 2 px apart; the fixed corners
+/// 26 px on a 52 px pitch, 15 px in.
+#[gpui::test]
+fn custom_table_dialog_rows_as_live(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::{TableTool, Tool};
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "ct-rows");
+    real_sheet(cx, window, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Table { kind: TableTool::Custom, view: None, origin: None }, cx)));
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let at = |vcx: &mut gpui_kit::VisualTestContext, id: &'static str| vcx.debug_bounds(id).unwrap_or_else(|| panic!("no {id}"));
+    let (dlg, add, insert) = (at(&mut vcx, "dr-custom-dlg"), at(&mut vcx, "ct-add"), at(&mut vcx, "ct-insert"));
+    assert_eq!((add.size.height, insert.size.height), (px(26.), px(26.)), "Add and Insert");
+    assert_eq!(insert.origin.y - add.bottom(), px(2.), "2 px apart");
+    let (c0, c1) = (at(&mut vcx, "ct-corner-0"), at(&mut vcx, "ct-corner-1"));
+    assert_eq!(c0.size.width, px(26.), "a corner button");
+    assert_eq!((c0.origin.x - dlg.origin.x, c1.origin.x - c0.origin.x), (px(15.), px(52.)), "15 px in, 52 px apart");
+}
+
 /// Live drawing/262 (dom drawing-custom-table-select-part-studio): Custom table › Add opens "Select a Part Studio",
 /// the Insert view chooser's look (Current document | Other documents, the document, Part Studios only, no kinds,
 /// filters or Import), 40 px right of the dialog; a pick is the table's Part Studio and closes it; Esc closes it too.
