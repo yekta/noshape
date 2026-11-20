@@ -63,7 +63,7 @@ pub fn take_request() -> Option<CreateRequest> {
 
 
 /// Template sources of the Existing templates tab (label, icon).
-const SOURCES: [(&str, &str); 6] = [("noshape", "noshape-logo"), ("Owned by me", "src-owned"), ("Recently opened", "src-recent"), ("Created by me", "src-created"), ("Shared with me", "src-shared"), ("Public", "src-public")];
+const SOURCES: [(&str, &str); 6] = [("Noshape", "noshape-logo"), ("Owned by me", "src-owned"), ("Recently opened", "src-recent"), ("Created by me", "src-created"), ("Shared with me", "src-shared"), ("Public", "src-public")];
 
 pub enum CreateDrawingEvent {
     Create { name: String, template: DrawingTemplate, source: Option<DrawingSource>, suggested: bool, dwt: Option<Box<DwtTab>> },
@@ -121,7 +121,7 @@ pub struct CreateDrawingDialog {
     selected_dwt: Option<usize>,
     name: Entity<InputState>,
     rows: Vec<TemplateRow>,
-    /// Template source (index into [`SOURCES`]; 0 = the built-in templates, "noshape").
+    /// Template source (index into [`SOURCES`]; 0 = the built-in templates, "Noshape").
     source_filter: usize,
     /// Recently opened: indices into `rows`, most recent first.
     recent: Vec<usize>,

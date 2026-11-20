@@ -483,6 +483,11 @@ impl OsMenu {
         self
     }
 
+    /// Where it was last drawn (tests).
+    pub fn shown_bounds(&self) -> Bounds<Pixels> {
+        self.bounds.get()
+    }
+
     /// Its rows, "———" for a separator (UI tests compare a whole menu with live's).
     pub fn labels(&self) -> Vec<String> {
         self.items
@@ -913,7 +918,8 @@ impl Render for OsMenu {
             // Live (fs-compact-snippet-menu): the compact toolbar's snippet list is a 675 px box that scrolls.
             .map(|d| match (snippets, max_height) {
                 (true, _) => d.child(div().id("snippet-scroll").max_h(px(671.)).overflow_y_scroll().children(rows)),
-                (false, Some((h, _))) => d.child(div().id("menu-scroll").max_h(px(h - 2.)).overflow_y_scroll().children(rows)),
+                // The list's whole height is `h`: its border, and a dropdown's 4 px padding above and below too.
+                (false, Some((h, _))) => d.child(div().id("menu-scroll").max_h(px(h - if dropdown { 10. } else { 2. })).overflow_y_scroll().children(rows)),
                 _ => d.children(rows),
             })
             .child(canvas(move |b, _, _| bounds.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())

@@ -664,6 +664,51 @@ fn tab_in_a_note_inserts_a_tab(cx: &mut TestAppContext) {
     assert_eq!(text.as_deref(), Some("a\tb"));
 }
 
+/// Live 726: a double-clicked title field's Note editor shows the field's alignment (a centred one Center / Middle).
+#[gpui::test]
+fn a_title_field_edits_with_its_alignment(cx: &mut TestAppContext) {
+    use noshape_model::drawing::{build::PickTarget, note::{NoteAlign, NoteVAlign}, sheet::Anchor};
+    let (window, editor) = drawing(cx, "title-field-align");
+    real_sheet(cx, window, &editor);
+    let key = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        b.title_cells.iter().find_map(|(p, _)| match b.picks.get(*p as usize) {
+            Some(PickTarget::TitleField(k)) if b.geometry.texts.iter().any(|t| t.pick == *p && t.anchor == Anchor::Center) => Some(k.clone()),
+            _ => None,
+        })
+    });
+    let key = key.expect("a centred title field");
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_title_field(key.clone(), w, cx))).unwrap();
+    let style = cx.update(|cx| match &editor.read(cx).panel {
+        Some(crate::drawing_view::Panel::Note { style, field: Some(_), .. }) => Some((style.align, style.valign)),
+        _ => None,
+    });
+    assert_eq!(style, Some((NoteAlign::Center, NoteVAlign::Middle)), "{key}");
+}
+
+/// Live's note popups (dom drawing-note-popups, nt-pop-drawprop): Insert drawing property's 22 rows in a list 206 px
+/// wide and at most 341 px tall (scrolled), the symbols in one 47 px wide, not the "+" menu's 253 px.
+#[gpui::test]
+fn the_note_insert_lists_are_lives_size(cx: &mut TestAppContext) {
+    let (window, editor) = drawing(cx, "note-insert-lists");
+    real_sheet(cx, window, &editor);
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_note_panel(None, [100.0, 100.0], w, cx))).unwrap();
+    draw(cx, window);
+    for (button, list, rows, w) in [("note-dprop", "note-dprop-dd", 22, 206.0), ("note-symbol", "note-symbol-dd", 15, 47.0)] {
+        press(cx, window, button);
+        let (labels, b) = cx.update(|cx| (noshape_app_core::os_ui::open_dropdown_labels(list, cx), noshape_app_core::os_ui::open_dropdown_bounds(list, cx)));
+        assert_eq!(labels.map(|l| l.len()), Some(rows), "{list}'s rows");
+        // (The list's bounds are inside its 1 px border.)
+        let b = b.expect("open");
+        let (outer_w, outer_h) = (f32::from(b.size.width) + 2.0, f32::from(b.size.height) + 2.0);
+        assert!(outer_h <= 341.5, "{list}: {outer_h} px tall");
+        assert!((w..w + 30.0).contains(&outer_w), "{list}: {outer_w} px wide");
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+        draw(cx, window);
+    }
+}
+
 /// Live2 tables_live2_1013 (dw4-resized): dragging a BOM's inner border moves that border only (the left column
 /// widens, the right one narrows, the total stays); a general table's grows the column on the fixed corner's side
 /// (live 1613 (b)).

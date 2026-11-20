@@ -300,7 +300,21 @@ impl DrawingEditor {
         let Some(b) = self.built.as_ref() else { return };
         let target = noshape_model::drawing::build::PickTarget::TitleField(key.clone());
         let Some(&(pick, r)) = b.title_cells.iter().find(|(p, _)| b.picks.get(*p as usize) == Some(&target)) else { return };
-        let h = b.geometry.texts.iter().find(|t| t.pick == pick).map(|t| t.height).unwrap_or(self.drawing.props.ann_text_height);
+        let shown = b.geometry.texts.iter().find(|t| t.pick == pick);
+        let h = shown.map(|t| t.height).unwrap_or(self.drawing.props.ann_text_height);
+        // The editor has the field's alignment (live 726: a centred title field shows Center and Middle, as the
+        // note it becomes once exploded).
+        let style = {
+            use noshape_model::drawing::{note::{NoteAlign, NoteVAlign}, sheet::Anchor};
+            let anchor = shown.map(|t| t.anchor);
+            let align = if matches!(anchor, Some(Anchor::Center | Anchor::TopCenter | Anchor::BottomCenter)) { NoteAlign::Center } else { NoteAlign::Left };
+            let valign = match anchor {
+                Some(Anchor::Center) => NoteVAlign::Middle,
+                Some(Anchor::BottomLeft | Anchor::BottomCenter) => NoteVAlign::Bottom,
+                _ => NoteVAlign::Top,
+            };
+            noshape_model::drawing::note::NoteStyle { align, valign, ..Default::default() }
+        };
         let text = self.drawing.sheets[self.sheet].title_field(&key).unwrap_or("").to_string();
         // Its properties as fields (live S18: grey "----" while empty).
         let content = self.note_content(&text);
@@ -309,7 +323,7 @@ impl DrawingEditor {
         input.update(cx, |s, cx| s.set_tab_size(gpui_kit::component::input::TabSize { tab_size: 4, hard_tabs: true }, cx));
         let height = self.input(&crate::drawing_note::note_height_text(h, self.drawing.units_mm), window, cx);
         let pos = [r[0] + 1.0, r[3] - 1.0];
-        self.panel = Some(Panel::Note { input, edit: None, pos, height, style: Default::default(), field: Some(key) });
+        self.panel = Some(Panel::Note { input, edit: None, pos, height, style, field: Some(key) });
         cx.notify();
     }
 

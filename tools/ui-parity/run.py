@@ -363,12 +363,19 @@ LIVE_BRAND = [
     ("Onshape Default revision table", "Noshape Default revision table"),
     ("Onshape default", "Noshape default"),
     ("Onshape controlled", "Noshape controlled"),
+    ("Show Onshape drawing templates", "Show Noshape drawing templates"),
 ]
 
 
+# Live's brand as a whole string (Create Drawing's template source "Onshape").
+LIVE_BRAND_WHOLE = {"Onshape": "Noshape"}
+
+
 def noshape_names(x):
-    """`x` with live's brand phrases in ours' words (`LIVE_BRAND`), in every string."""
+    """`x` with live's brand phrases in ours' words (`LIVE_BRAND`, `LIVE_BRAND_WHOLE`), in every string."""
     if isinstance(x, str):
+        if x in LIVE_BRAND_WHOLE:
+            return LIVE_BRAND_WHOLE[x]
         for a, b in LIVE_BRAND:
             x = x.replace(a, b)
         return x

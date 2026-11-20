@@ -208,7 +208,7 @@ impl DrawingEditor {
         };
         // 45 × 30 popup buttons: the icon and a 8 × 4 caret.
         let popup = |id: &'static str, icon: &'static str, tip: &'static str, enabled: bool, cx: &App| {
-            crate::ui_script::mark(div().id(id), move || format!("button:{tip}"))
+            crate::ui_script::mark(div().id(id).debug_selector(move || id.to_string()), move || format!("button:{tip}"))
                 .w(px(45.))
                 .h(px(30.))
                 .p(px(1.))
@@ -344,6 +344,9 @@ impl DrawingEditor {
         let insert_menu = |items: Vec<(String, String)>, fields: bool| {
             let (inp, ed) = (input.clone(), ed.clone());
             move |mut m: crate::os_menu::OsMenu, _: &mut Window, _: &mut Context<crate::os_menu::OsMenu>| {
+                // Live's note popups (dom drawing-note-popups, nt-pop-drawprop): a property list 206 px wide, 26 px
+                // rows 5 px in, at most 341 px tall then scrolled, 1 px under its button; the symbols 47 px, 21 px rows.
+                m = if fields { m.min_width(206.).row_height(26.).text_inset(5.).max_height(341., 1.) } else { m.min_width(47.).row_height(21.).text_inset(5.) };
                 for (label, token) in &items {
                     let (inp, ed, token) = (inp.clone(), ed.clone(), token.clone());
                     m = m.item(crate::os_menu::OsMenuItem::new(label.clone()).on_click(move |_, w, cx| {
@@ -371,6 +374,7 @@ impl DrawingEditor {
         sheet_props.extend(custom(CustomTarget::Part, noshape_model::drawing::format::PART_CUSTOM));
         let symbol_btn = crate::ui_script::mark(div(), || "button:Insert symbol".into())
             .id("note-symbol")
+            .debug_selector(|| "note-symbol".into())
             .w(px(45.))
             .h(px(30.))
             .p(px(1.))

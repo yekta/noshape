@@ -74,6 +74,46 @@ SURFACES = [
     ("Change to version", ["drawing-change-to-version.txt"], []),
 ]
 CLOUD = {"Add comment"}
+# Our panels' titles where they aren't live's (a surface's tabs, a palette): what ours shows under them counts for it.
+OURS_TITLES = {
+    "Drawing properties": ["Annotations", "Dimensions", "Tables", "Views"],
+    "Title block": ["Note"],
+    "Hole/thread callout": ["Dimension palette"],
+    "Ordinate dimension": ["Dimension palette"],
+    "Move to sheet / Replicate": ["Move to sheet", "Replicate region"],
+    "Styles panel": ["Styles"],
+    "Table": ["Table properties"],
+    "Hole table": ["Cell"],
+    "MBD status": ["MBD status"],
+    "Change to version": ["Reference manager"],
+}
+
+
+def ours_shown(run_dir):
+    """Every text our build showed in a panel (its fields, an open list or menu, the tooltip), by the panel's title."""
+    pool = defaultdict(set)
+
+    def walk(v, out):
+        if isinstance(v, str):
+            out.add(norm(v))
+        elif isinstance(v, list):
+            for x in v:
+                walk(x, out)
+        elif isinstance(v, dict):
+            for x in v.values():
+                walk(x, out)
+    for p in glob.glob(f"{run_dir}/*.json"):
+        try:
+            steps = json.loads(Path(p).read_text()).get("steps", [])
+        except (ValueError, OSError):
+            continue
+        for s in steps:
+            st = s.get("state") or {}
+            d = st.get("dialog")
+            if isinstance(d, dict) and isinstance(d.get("title"), str):
+                for part in (d, st.get("list"), st.get("tooltip")):
+                    walk(part, pool[d["title"]])
+    return pool
 ACCEPTED = {
     "Formulas": "live 1735: no Formulas in the hole table's Cell panel or menus",
     "All views in a hole table must be of a common singular part": "live 1744: other parts' views aren't pickable, no error",
@@ -342,6 +382,7 @@ def main():
     ap.add_argument("--ours-menus", help="our menus per entity (the MENUDUMP json of drawing-ui's drawing_context_menus_are_lives test)")
     args = ap.parse_args()
     src = sources()
+    shown = ours_shown(args.run)
 
     # What live's recordings show, and how ours compared.
     tool_seen = defaultdict(lambda: [0, 0])  # tool -> [states ours matched (tool active alike), states not]
@@ -403,6 +444,13 @@ def main():
         for r in mine or []:
             if r != "——" and key(r.removesuffix(" ▸")) not in {key(x) for x in items}:
                 rows.append((f"Menu: {entity}", f"{r} (ours only)", "≠", "our menu"))
+    elsewhere = {}
+    for sf, it, st, _ in rows:
+        if st in ("=", "≠") and (sf.startswith(("Toolbar", "Menu:"))):
+            k = key(re.sub(r"\s*\([^)]*\)$", "", it.removesuffix(" (ours only)")))
+            if not it.endswith(" (ours only)") and elsewhere.get(k) != "≠":
+                elsewhere[k] = st
+                elsewhere[key(it)] = st
     for surface, globs_, titles in SURFACES:
         texts = []
         for g in globs_:
@@ -415,22 +463,31 @@ def main():
                 continue
             seen = [sum(text_seen[(ti, t)][i] for ti in titles if (ti, t) in text_seen) for i in (0, 1)]
             rows.append((surface, t, status(seen, in_sources(src, t)), "recorded"))
+        mine = set().union(*(v for k, v in shown.items() if any(k == ti or k.startswith(ti) for ti in titles + OURS_TITLES.get(surface, []))))
+        # A right-click menu live's panel dump caught open: our menus' rows (the MENUDUMP of our build).
+        mine |= {norm(r.removesuffix(" ▸")) for rows_ in ours_menus.values() for r in rows_}
         for t in texts:
             if t in recorded:
                 continue
-            rows.append((surface, t, status(None, in_sources(src, t)), "dump"))
+            st = status(None, in_sources(src, t))
+            # A full-page dump's toolbar button or a right-click row live's menu dumps list: that item's status.
+            if st == "present" and key(t) in elsewhere:
+                rows.append((surface, t, elsewhere[key(t)], "dump (toolbar / menu item)"))
+                continue
+            # Live's dump has it and our build showed it in that panel (no take compares the two states).
+            rows.append((surface, t, "shown" if st == "present" and norm(t) in mine else st, "dump"))
 
     # Cloud-only rows (out of scope) and dump texts live itself no longer shows (docs/parity/audit-drawing-dataexchange.md).
     rows = [(sf, it, "n/a" if it in CLOUD else ("accepted" if it in ACCEPTED and st != "=" else st), ACCEPTED.get(it, note) if st != "=" else note)
             for sf, it, st, note in rows]
-    kinds = ["=", "≠", "present", "missing", "accepted", "n/a"]
+    kinds = ["=", "shown", "≠", "present", "missing", "accepted", "n/a"]
     counts = defaultdict(lambda: defaultdict(int))
     for sf, _, st, _ in rows:
         group = "Toolbar" if sf.startswith("Toolbar") else "Right-click menus" if sf.startswith("Menu:") else "Panels and dialogs"
         counts[group][st] += 1
         counts["All"][st] += 1
-    print("| surface | items | = matching | ≠ differs | present, not compared | missing | accepted (live has none) | n/a (cloud) |")
-    print("|---|---|---|---|---|---|---|---|")
+    print("| surface | items | = matching | shown (live's dump, ours' panel) | ≠ differs | present, not compared | missing | accepted (live has none) | n/a (cloud) |")
+    print("|---|---|---|---|---|---|---|---|---|")
     for g in ("Toolbar", "Right-click menus", "Panels and dialogs", "All"):
         c = counts[g]
         print(f"| {g} | {sum(c.values())} | " + " | ".join(str(c[k]) for k in kinds) + " |")
@@ -445,8 +502,8 @@ def main():
         if sf.startswith("Menu:"):
             print(f"| {sf.removeprefix('Menu: ')} | {it} | {st} |")
     print("\n### Panels and dialogs\n")
-    print("| surface | items | = | ≠ | present, not compared | missing | accepted | ≠, missing and accepted items | not compared (first 10) |")
-    print("|---|---|---|---|---|---|---|---|---|")
+    print("| surface | items | = | shown | ≠ | present, not compared | missing | accepted | ≠, missing and accepted items | not compared (first 10) |")
+    print("|---|---|---|---|---|---|---|---|---|---|")
     by_surface = defaultdict(list)
     for r in rows:
         if not r[0].startswith(("Toolbar", "Menu:")):
@@ -458,7 +515,7 @@ def main():
         odd = "; ".join(f"{r[1]} ({r[2]}{': ' + r[3] if r[2] == 'accepted' else ''})" for r in rs if r[2] in ("≠", "missing", "accepted"))
         todo = [r[1] for r in rs if r[2] == "present"]
         more = f" … +{len(todo) - 10}" if len(todo) > 10 else ""
-        print(f"| {sf} | {len(rs)} | {c['=']} | {c['≠']} | {c['present']} | {c['missing']} | {c['accepted']} | {odd} | {'; '.join(todo[:10])}{more} |")
+        print(f"| {sf} | {len(rs)} | {c['=']} | {c['shown']} | {c['≠']} | {c['present']} | {c['missing']} | {c['accepted']} | {odd} | {'; '.join(todo[:10])}{more} |")
     if args.details:
         print("\n### Every item\n\n| surface | item | status | source |\n|---|---|---|---|")
         for sf, it, st, note in rows:
