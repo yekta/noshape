@@ -27,6 +27,9 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   general rule for live's drag model is found (no per-case rules). The same holds for where under-defined geometry
   settles in a plain solve; a case live fails to solve at all is a live defect.
 
+- 11-20 (lead) Drawing DXF/DWG exports, like STL (11-16): a row passes when each file's curves lie on the other's within
+  0.010 in on paper, per layer, and the curve kinds match where they overlap (LINE / ARC / CIRCLE / SPLINE: a curve live
+  writes as a SPLINE or ARC is never our run of LINEs). Entity counts per type are reported, not scored.
 - 11-16 STL exports: compared by area, volume and chordal deviation within live's tolerances, not by exact triangle
   count. OCCT BRepMesh's minimum segments per arc / rows per cone (radijator +144/+150) are parked (P3), no OCCT patch.
   A row passes when every live vertex is within live's chord tolerance of ours and the mean deviation |ΔV|/area is
