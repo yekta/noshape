@@ -49,10 +49,17 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   Newton clamped to non-periodic bounds; 48 ms vs 1.1 s Mac, OCCT 324; T2 test a_screws_thread_cut_as_fast_as_occts;
   worktree bool-thread has it alone). Land on PASS (knurls: kn-k25.sh pattern on vibex7).
 - shfall swapped to rec1 on all hosts 09:16 (98 cases; 11-02 set = shfall-1102, report-only).
-- isaac 850efe JVJ 15 nm (skasm P1, lead 09:00): Extrude 4 cut = 7c230926d5dd84eb (Mac bool-keep/m85r, model
-  m85m): all 42 plane/plane lines exact (<1e-12) ours and OCCT, with unify; asked skasm what they measured against.
-- rings-loft STL (dx, low): Shell 1's face 23 (offset -1 mm of a B-spline) gets no triangulation: its wire crosses
-  itself in UV around a 1.1e-4 degenerate edge; all 79 open edges border it. Shell builder fix, not the mesher.
+- P1 isaac 850efe (skasm 09:40; root of the 30 s Fillet 3, blend.as_is timeout): Extrude 6 union 3b6725b2ffc81970
+  (Mac bool-keep/m85r; model m85m): tool r4 cylinders coaxial with Extrude 2's to 1e-12 mm, same x dir. Ours = OCCT
+  39 faces; unify leaves each side's r4 pieces apart (ours 33/85/50, live 28/68/40 = each side one face): OCCT's USD
+  merge loses 704 mm3 (= pi 4^2 14, faces invalid; dump NOSHAPE_USD_DUMP in bool-hat), usd_kept_volume refuses it,
+  and merge_cylinder_groups doesn't take the groups. Next: why (bool-hat NOSHAPE_DBG_CYLG prints each group's
+  boundary edges / chains; .cx.sh probe_coaxial PROBE_R=4) and extend it (left: faces 2,3,4,23,24; right 13,14,17,18).
+  (JVJ 15 nm was skasm's sketch solve, theirs.)
+- rings-loft STL (dx, low): in dx's x_t round trip face 23 (offset -1 mm of a B-spline) gets no triangulation (wire
+  crosses itself in UV, 1.1e-4 degenerate edge; all 79 open edges border it). Our own Booleans (Mac bool-keep/ringsr,
+  probe_corpus_meshes): the 273-face cut 331fd52c meshes with 0 holes (unified too); c40a49c4 (cut 103 -> 133) opens
+  9. So likely the x_t write/read (dx's) or c40a49c4; Shell 1 alone: 44 faces, 8 folds, 0 holes.
 - bool-k25x10 (d2a26a12a = 2f452d3b3): gate PASS except knurls not run (CHECK; /root/bool-tube-scratch/gate-2f452d3b3.log);
   knurls ours-only on vibex7 (/root/bool-scratch/kn-k25.sh -> kn-k25.out); land on equal lines (bool-tube is detached by
   the 98ef gate: land from a fresh worktree of branch bool-k25x10).
