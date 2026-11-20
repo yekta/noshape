@@ -110,8 +110,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
    `table_section`, sticky header from `ct.panel_scroll` + `grid_tops`, `h_scrollbar(16, 18)` pinned; the grid is
    flex_none so wide custom tables scroll sideways at all). run128 green. On green: tell qa (DIM readout, rollback
    drop row, section arrow foot, midpoint rest, leave-window, fast-off clear) and studios/asm/skasm as listed below.
-3h. 428c82765 (after 620709c4 lands): MEASURE-CIRCLE-DEFAULT-PLANE (live parity-open-1120 ms3: circle + Top = Min dist ·
-   Center dist; on Top Face tangent angle · Center dist · Min dist) in the default-plane filter; tick the ticket then.
+3h. 620709c4 FAILED 07:55 (alone) on two tests: the 3D click rows read the selection before a click's GPU pick
+   came back (now `pointer.settle` after each click), and my triple-click test predated studios' FS-TRIPLE-CLICK-NEWLINE
+   (82..92 now, the newline taken as live). Fixed in e246c4862; rebased on main 07:57 with MEASURE-CIRCLE-DEFAULT-PLANE
+   (df5964632, ticket ticked "to verify"). Re-land the whole stack; on green tell qa / studios / asm / skasm (3g).
    Config box label column: ours 80 px fixed, live ~32 for "Size": REQUESTS 06:40 (no change until live answers).
 3e. qa P0 FEEL-DIM-PICK-READOUT (15e785522, live R3 cov2-dim-orient): the sketch readout reads the Dimension tool's
    picks (`SketchEditor::readout_entities`); sketch_ui_tests::the_dimension_tools_picks_fill_the_readout. Tick it and
