@@ -2739,15 +2739,15 @@ struct BodyTopo {
     /// The edges and vertices Onshape's topology has (no seams, degenerated
     /// edges or vertices on full circles).
     shown: noshape_kernel::ShownTopology,
-    /// Face -> its cylinder's axis and radius (None: not a cylinder), on first use: a face's surface once per view
-    /// (cf-fill-pattern's plate, ~1000 hole rims, rebuilt its surface and UV bounds for each rim).
-    cylinders: HashMap<u32, Option<(DVec3, f64)>>,
+    /// Face -> its cylinder's origin, axis and radius (None: not a cylinder), on first use: a face's surface once per
+    /// view (cf-fill-pattern's plate, ~1000 hole rims, rebuilt its surface and UV bounds for each rim).
+    cylinders: HashMap<u32, Option<(DVec3, DVec3, f64)>>,
 }
 
 impl BodyTopo {
-    fn cylinder(&mut self, shape: &Shape, face: u32) -> Option<(DVec3, f64)> {
+    fn cylinder(&mut self, shape: &Shape, face: u32) -> Option<(DVec3, DVec3, f64)> {
         *self.cylinders.entry(face).or_insert_with(|| match shape.sub_shape(ShapeType::Face, face as usize).and_then(|f| f.face_surface()) {
-            Ok(Surface::Cylinder { axis, radius, .. }) => Some((axis, radius)),
+            Ok(Surface::Cylinder { origin, axis, radius, .. }) => Some((origin, axis, radius)),
             _ => None,
         })
     }
@@ -2820,11 +2820,22 @@ fn model_edge(body: &Arc<Body>, edge_index: usize, frame: &ViewFrame, topo: &mut
         _ => conic_of(&e, info.first_param, info.last_param),
     };
     let exact = matches!(info.curve, Curve::Circle { .. } | Curve::Ellipse { .. });
-    let freeform = !exact && !matches!(info.curve, Curve::Line { .. }) && conic3.is_none();
+    // Any other curve on a cylinder seen along its axis is drawn on that cylinder's circle: live writes it as an ARC /
+    // CIRCLE (c2-housing-draft's hole through a drafted rib, two SPLINEs here before).
+    let around = (!exact && !matches!(info.curve, Curve::Line { .. }))
+        .then(|| {
+            let faces = topo.ef.get(edge_index).cloned().unwrap_or_default();
+            faces.into_iter().find_map(|f| topo.cylinder(&body.shape, f).filter(|(_, a, _)| a.normalize().dot(frame.dir).abs() > 1.0 - 1e-9))
+        })
+        .flatten();
+    let freeform = !exact && !matches!(info.curve, Curve::Line { .. }) && conic3.is_none() && around.is_none();
     // (Only a true circle or ellipse: a B-spline on one stays the fitted points' curve, live's SPLINE where its own
     // model has a B-spline there; c2-rings-loft ELLIPSE 217 for 95, c2-extension-spring 16 for 0 otherwise.)
     let v2 = |v: DVec3| [v.dot(frame.right), v.dot(frame.up)];
-    let conic = conic3.filter(|_| exact).map(|(c, a, b)| [frame.project(c), v2(a), v2(b)]);
+    let conic = conic3
+        .filter(|_| exact)
+        .map(|(c, a, b)| [frame.project(c), v2(a), v2(b)])
+        .or_else(|| around.map(|(o, _, r)| [frame.project(o), [r, 0.0], [0.0, r]]));
     let geom = match info.curve {
         Curve::Line { .. } => EdgeGeom::Line { a: frame.project(info.start), b: frame.project(info.end) },
         Curve::Circle { center, axis, radius, .. } => {
@@ -2838,7 +2849,7 @@ fn model_edge(body: &Arc<Body>, edge_index: usize, frame: &ViewFrame, topo: &mut
             };
             let faces = topo.ef.get(edge_index).cloned().unwrap_or_default();
             let bore = faces.into_iter().any(|f| {
-                matches!(topo.cylinder(&body.shape, f), Some((a, rc)) if (rc - radius).abs() <= radius * 1e-6 + 1e-12 && a.normalize().dot(axis).abs() > 1.0 - 1e-6)
+                matches!(topo.cylinder(&body.shape, f), Some((_, a, rc)) if (rc - radius).abs() <= radius * 1e-6 + 1e-12 && a.normalize().dot(axis).abs() > 1.0 - 1e-6)
                     && body.shape.sub_shape(ShapeType::Face, f as usize).is_ok_and(|face| face.normal_at_point(mid3).is_ok_and(|n| n.dot(to_axis) > 0.0))
             });
             let mid = frame.project(mid3);
@@ -4371,6 +4382,26 @@ mod tests {
         assert_eq!(alone.ends.len(), 1, "{:?}", alone.ends);
         let covered = project_bodies(ViewId(1), &pbs, &frame, true, &|_, _| true);
         assert!(covered.ends.is_empty(), "{:?}", covered.ends);
+    }
+
+    /// A hole through a tube's wall: its rims (no circles in the model) are drawn on the hole's circle seen along the
+    /// hole, as live's CIRCLE (c2-housing-draft); seen from the side they stay free-form.
+    #[test]
+    fn edges_on_a_cylinder_seen_along_it_are_its_circle() {
+        let f = crate::reference::FeatureId(1);
+        let tube = noshape_kernel::make_cylinder(&noshape_kernel::Plane::new(DVec3::new(-0.03, 0.0, 0.0), DVec3::X, DVec3::Y), 0.02, 0.06, std::f64::consts::TAU).unwrap();
+        let tool = noshape_kernel::make_cylinder(&noshape_kernel::Plane::new(DVec3::new(0.0, 0.0, -0.03), DVec3::Z, DVec3::X), 0.004, 0.06, std::f64::consts::TAU).unwrap();
+        let body = Arc::new(Body::new(BodyId { feature: f, index: 0 }, "Part 0".into(), BodyKind::Solid, noshape_kernel::cut(&tube, &tool).unwrap().shape, Vec::new(), 0, f));
+        let pbs = [ProjBody { body: &body, shape: body.shape.clone(), edge_map: None }];
+        let rims = |dir: DVec3, up: DVec3| {
+            let g = project_bodies(ViewId(1), &pbs, &ViewFrame::new(dir, up), true, &|_, _| true);
+            assert!(g.error.is_none(), "{:?}", g.error);
+            g.model_edges.into_iter().filter(|m| !matches!(m.geom, EdgeGeom::Line { .. } | EdgeGeom::Circle { .. })).collect::<Vec<_>>()
+        };
+        let top = rims(DVec3::NEG_Z, DVec3::Y);
+        assert!(!top.is_empty() && top.iter().all(|m| !m.freeform && m.conic.is_some_and(|c| c[0][0].hypot(c[0][1]) < 1e-9 && (c[1][0].hypot(c[1][1]) - 0.004).abs() < 1e-9)), "{:?}", top.iter().map(|m| m.conic).collect::<Vec<_>>());
+        let side = rims(DVec3::NEG_Y, DVec3::Z);
+        assert!(!side.is_empty() && side.iter().all(|m| m.freeform && m.conic.is_none()));
     }
 
     /// Centermarks: a hole whole or in pieces; not a quarter round, nor c2-sm-louver's two quarter bends on one axis
