@@ -30,6 +30,10 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
   (`EDGE+`; the 11-06 drw-dimension-radius s3 read nothing); drawing_view keeps a hovered selected dimension orange;
   drawing_tools made_by_tool selects a Diameter after Escape (live drw-styles-radial s7). b29 (without Diameter):
   dimension takes unchanged, styles-radial 7 -> 10/18. Commit + land if b30 drops nothing.
+- Live's final 08:08 takes + the revision-table-delete retake: queue commit 5c17506c1 (live, not landed at 12:50).
+  Untracked copies of its six new takes are in tests/ui-parity (+ live/); revision-table-delete's in
+  /root/studios-scratch/rtd. DELETE the untracked copies before land.sh once 5c17506c lands (else the rebase stops on
+  untracked files). Shots: b30 (25 takes), then b30b (inspection-diameter, sheet-properties-iso, revision-table-delete).
 - Live's 08:08 takes, drafts in /root/live-scratch/st0808 (scenario + out/<take>.json; copied untracked into
   tests/ui-parity/ and live/): styles-radial (live's s11 click opened Inspection table: retake asked), section-blind-
   offset (s8 Esc keeps the panel in live: asked). Others not recorded at 11:40.
