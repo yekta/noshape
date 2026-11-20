@@ -3488,3 +3488,29 @@ fn a_snap_mode_drag_draws_its_part_as_a_03_ghost(cx: &mut TestAppContext) {
     })
     .unwrap();
 }
+
+/// Interaction-feel "Snap mode lines" (live2 snapmode-1118: no dashed line or 8 px box in 3 drags over 23 pointer
+/// stops): a snap-mode drag onto a target adds no line and no point to the scene, only the two connectors' triads.
+#[gpui::test]
+fn a_snap_mode_drag_draws_no_line_or_box_to_its_target(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "snap-lines");
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let marks = |v: &AssemblyView, cx: &gpui_kit::App| {
+                let s = v.viewport.read(cx).scene();
+                let lines = s.instances.iter().filter(|i| matches!(i.drawable, noshape_render::Drawable::Lines(_))).count();
+                let points = s.instances.iter().filter(|i| matches!(i.drawable, noshape_render::Drawable::Points(_))).count();
+                (lines, points)
+            };
+            let pin = instance(v, "Part 2 <1>", cx);
+            v.refresh_scene(false, cx);
+            let before = marks(v, cx);
+            let source = face_connector(v, "Part 2 <1>", true, cx);
+            let target = face_connector(v, "Part 1 <1>", true, cx);
+            v.snap_drag = Some(super::SnapDrag { top: pin, press: glam::DVec2::ZERO, started: true, sources: vec![source], source_ix: 0, target: Some(target), start: Default::default(), grab: glam::DVec3::ZERO, normal: glam::DVec3::Z, off_parts: false });
+            v.refresh_scene(false, cx);
+            assert_eq!(marks(v, cx), before, "(lines, points) as before the drag");
+        })
+    })
+    .unwrap();
+}

@@ -865,3 +865,101 @@ fn a_part_hovered_in_the_graphics_lights_nothing_in_the_list(cx: &mut TestAppCon
     });
     assert_eq!(crate::ui_script::shown_tooltip(), None, "no flyout");
 }
+
+/// Interaction-feel "Insert preview": an inserted instance follows the pointer, selected (the solid orange) and drawn
+/// see-through for its hidden edges; a click drops it there, deselected, and the pointer moves on without it.
+#[gpui::test]
+fn an_inserted_instance_follows_the_pointer_and_a_click_drops_it(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "insert-preview", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    let pin = cx.update(|cx| view.read(cx).assembly(cx).and_then(|a| a.instances.iter().find(|i| i.name == "Part 2 <1>")).unwrap().id);
+    cx.update(|cx| view.update(cx, |v, cx| v.start_placing(vec![pin], cx)));
+    // Its box centre on screen (it is placed with that centre on the pointer's ray over empty space).
+    let centre = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let (lo, hi) = v.result.instance_bounds(pin).unwrap();
+            v.viewport.read(cx).project((lo + hi) * 0.5).unwrap()
+        })
+    };
+    let (a, b) = (DVec2::new(70.0, 70.0), DVec2::new(150.0, 100.0));
+    for at in [a, b] {
+        move_to(cx, window, &view, at);
+        wait_until(cx, window, &view, |v, cx| v.viewport.read(cx).project({
+            let (lo, hi) = v.result.instance_bounds(pin).unwrap();
+            (lo + hi) * 0.5
+        }).is_some_and(|c| (c - at).length() < 1.0));
+        let c = centre(cx);
+        assert!((c - at).length() < 1.0, "on the pointer at {at:?}: {c:?}");
+        cx.update(|cx| {
+            let v = view.read(cx);
+            assert_eq!(v.placing.as_deref(), Some(&[pin][..]), "still following");
+            assert_eq!(v.selected, vec![pin], "selected: drawn orange");
+            assert!(v.scene_options(cx).xray_tops.contains(&pin), "its hidden edges show through");
+        });
+    }
+    let w = at_window(cx, &view, b);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(w, Modifiers::default());
+    wait_until(cx, window, &view, |v, _| v.placing.is_none());
+    settle(cx, window, &view);
+    let dropped = centre(cx);
+    assert!((dropped - b).length() < 1.0, "dropped where it was: {dropped:?}");
+    cx.update(|cx| assert!(!view.read(cx).selected.contains(&pin), "deselected once placed"));
+    move_to(cx, window, &view, a);
+    let after = centre(cx);
+    assert!((after - dropped).length() < 1e-6, "it stays when the pointer moves on: {after:?}");
+}
+
+/// Interaction-feel "Short press": a press and release on a free part without moving is a click; it takes the face
+/// under the pointer, and the triad stands at the click point; a drag of the triad's centre ball moves the triad, not
+/// the part.
+#[gpui::test]
+fn a_short_press_selects_the_face_and_the_triads_ball_moves_only_the_triad(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "short-press", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    let part = cx.update(|cx| view.read(cx).assembly(cx).and_then(|a| a.instances.iter().find(|i| i.name == "Part 1 <1>")).unwrap().id);
+    let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
+    // Off the face's centre: the triad goes to the click point (live triad-click-1120, asm 3087's Move to origin).
+    let on_part = (lo + hi) * 0.5 + DVec2::new((hi.x - lo.x) * 0.25, 0.0);
+    move_to(cx, window, &view, on_part);
+    wait_until(cx, window, &view, |v, _| v.hover.is_some());
+    let w = at_window(cx, &view, on_part);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(w, Modifiers::default());
+    wait_until(cx, window, &view, |v, _| !v.ui.entity_sel.is_empty());
+    settle(cx, window, &view);
+    let triad = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let f = v.manipulator(cx).expect("a triad");
+            v.viewport.read(cx).project(f.origin).unwrap()
+        })
+    };
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert_eq!(v.ui.entity_sel.len(), 1, "one entity taken");
+        let (path, r) = &v.ui.entity_sel[0];
+        assert_eq!(path, &vec![part], "on Part 1 <1>");
+        let o = v.result.occurrences.iter().find(|o| o.top() == part).unwrap();
+        assert!(o.face_refs.contains(r), "a face: {r:?}");
+        assert!(v.drag.as_ref().is_none_or(|d| !d.started), "no drag");
+    });
+    let at = triad(cx);
+    assert!((at - on_part).length() < 2.0, "the triad at the click point: {at:?} for {on_part:?}");
+    let before = cx.update(|cx| view.read(cx).result.instance_bounds(part).unwrap());
+    // Into empty space: near a face's dot live's ball snaps as connector placement does (Part Studio ball-1119: 50 px,
+    // turned to the face's frame); ours within 14 px, unturned (triad_snap). The assembly's reach is asked in REQUESTS 11-20.
+    let to = DVec2::new(40.0, 40.0);
+    drag(cx, window, &view, at, to);
+    let moved = triad(cx);
+    assert!((moved - to).length() < 2.0, "the triad followed the ball: {moved:?} for {to:?}");
+    let after = cx.update(|cx| view.read(cx).result.instance_bounds(part).unwrap());
+    assert!((after.0 - before.0).length() < 1e-9 && (after.1 - before.1).length() < 1e-9, "the part stayed");
+}

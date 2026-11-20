@@ -2832,3 +2832,29 @@ fn a_box_dragged_right_is_the_window_box_and_left_the_crossing_box(cx: &mut Test
         draw(cx, window);
     }
 }
+
+/// ui-parity drw-revision-table-delete: a revision table placed at (150, 150) over Top's box, Esc, then right-clicked
+/// at (70, 130) on its Revision cell: the reader keeps reading Top's box (the table's orange there), never Front's.
+#[gpui::test]
+fn a_right_clicked_revision_table_reads_in_tops_box_not_fronts(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::TableTool;
+    START.set(Some("block-drawing"));
+    let (window, editor) = drawing(cx, "feel-revtable-rclick");
+    real_sheet(cx, window, &editor);
+    let read = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).ui_drawing_state(cx)["selection"].clone());
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Table { kind: TableTool::Revision, view: None, origin: None }, cx)));
+    draw(cx, window);
+    click_at(cx, window, &editor, [150.0, 150.0], Modifiers::default());
+    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+    draw(cx, window);
+    let p = at_window(cx, &editor, [70.0, 130.0]);
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(p, None, Modifiers::default());
+    v.simulate_mouse_down(p, MouseButton::Right, Modifiers::default());
+    v.simulate_mouse_up(p, MouseButton::Right, Modifiers::default());
+    draw(cx, window);
+    let sel = cx.update(|cx| editor.read(cx).selection.clone());
+    assert!(matches!(sel[..], [Sel::Table(_)]), "the table taken by the right-click: {sel:?}");
+    let s = read(cx);
+    assert_eq!(s, json!([{ "kind": "EDGE", "owner": "Top" }]), "its orange read in Top's box alone");
+}

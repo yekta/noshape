@@ -769,6 +769,17 @@ def select_unread(a, b, step):
         b["list"] = None
 
 
+def deleted_paint_read(a, b, paint):
+    """A step after a menu's Delete, before the next click: live's recorder reads the deleted item's left-over paint as
+    the selection it had before (`paint`); ours, repainted at once, reads what is there. Not compared while live's
+    reading is that paint."""
+    if not paint or not (isinstance(a, dict) and isinstance(b, dict)):
+        return
+    da, db = a.get("drawing"), b.get("drawing")
+    if isinstance(da, dict) and isinstance(db, dict) and da.get("selection") == paint:
+        db["selection"] = da["selection"]
+
+
 def document_loading(a, b):
     """A document live's recorder read before its page had loaded (docs-doc-menu-versions-and-history: Versions and
     history from the documents page, read at once: no workspace, no tabs, no features yet), where ours has it open:
@@ -1293,6 +1304,21 @@ def compare(live, ours, whole_document=True):
             rest = False
         if rest:
             resting.add(f"step {s.get('step')}")
+    # A menu's Delete: live keeps painting what it deleted (its orange frame and grips) until the next click repaints
+    # the sheet, and its recorder reads that paint as the selection it had (live retake 2 of drw-revision-table-delete,
+    # behaviours 11-20: "EDGE Top" 3 s after Delete, gone after a click on empty sheet). Each step from the Delete to
+    # that click: live's reading before the Delete.
+    deleted_paint, before, paint = {}, None, None
+    for s in steps:
+        do = s.get("do") if isinstance(s.get("do"), dict) else {}
+        on = do.get("on") if isinstance(do.get("on"), dict) else {}
+        if do.get("do") == "click" and on.get("menu") == "Delete":
+            paint = before
+        elif do.get("do") in ("click", "rclick", "dclick"):
+            paint = None
+        if paint is not None:
+            deleted_paint[f"step {s.get('step')}"] = paint
+        before = ((s.get("state") or {}).get("drawing") or {}).get("selection")
     # The view a click or right-click is on, until a step moves the pointer (view_frame_late).
     frame_late, clicked = {}, None
     for s in steps:
@@ -1649,6 +1675,7 @@ def compare(live, ours, whole_document=True):
                 if isinstance(dr, dict) and isinstance(dr.get("annotations"), list):
                     dr["annotations"] = [x for x in dr["annotations"] if not (isinstance(x, dict) and x.get("kind") == "centermark")]
         select_unread(a, b, step)
+        deleted_paint_read(a, b, deleted_paint.get(name))
         document_loading(a, b)
         hole_callout_export_text(a, b)
         view_frame_late(a, b, frame_late.get(name))

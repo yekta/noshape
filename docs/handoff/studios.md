@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 21:22 UTC.
+Updated 2026-11-20 23:46 UTC.
 
 ## In flight
 
@@ -20,19 +20,26 @@ tools/ui-parity to vibe2:agents/studios/src first). Crate tests on vibex7 / vibe
 11-20 21:xx: a hung test held a vibex8 slot 43 min). `touch` edited files before rb.sh. Full ops e2e before a drawing
 land. vibex8 02:00-04:00 is qa's quiet window. Never `git checkout <file>` over uncommitted work (21:20 it wiped the
 e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
-- QUEUED 1efc6dad (22:47): the 96c5ff9f fix-forward. 96c5ff9f failed on a Variable Studio's own configuration
-  variables (#t) never being in scope in its table (now in studio_evaluation_as / studio_variables_at) and on two
-  explode feel tests (they need `open_assembly_with_front`: panels and the yellow banner draw in the front host).
-  Carries: P0 19:18 diagnostics (drawing_get `error`, fixture prints the views, `drop_cached_views()` at fixture
-  start, failed views cached by view_key test); live dm batches 1-2 (drawing configuration inputs, merge takes the
-  branch's configured values, variable_create refuses an undefined name); drw-custom-table-split; asm feel tests.
-- To land next (lead OK 22:48): T2 `hlr::exact_hlr_on_8_threads_gives_the_single_threads_answer` + a
-  NOSHAPE_WORK_TRACE "load failed" line in hlr.cpp (branch studios-hlr-wip; g++-13 check x57 on vibex7). Result:
-  0 load failures, 0 differing answers in 1,800 + 2,000 exact HLRs (8 threads; 6 HLR beside 2 re-meshing): no mutex,
-  retry kept. If the fixture's views printout catches the 19:18 empty view again, that is P1 again.
-- Then: the 16 asm feel rows left: Fields, Toolbar's place / grip, Connector chip, Animate…, Named positions empty,
-  Insert preview, Snap mode ghost / lines, Camera menu, Suppressed mate, Failed mate's marks, Graphics → list (2),
-  Implicit over an edge, Drag feel (software GL), Short press.
+- LANDED 1efc6dad as 4bdda20e (23:09): the 96c5ff9f fix-forward (a Variable Studio's own configuration variables in
+  its table's scope; explode feel tests in the front host) with the P0 19:18 diagnostics and live dm batches 1-2.
+- QUEUED 347239f5 (23:18), 2 commits: T2 `hlr::exact_hlr_on_8_threads_gives_the_single_threads_answer` + a
+  NOSHAPE_WORK_TRACE "load failed" line (g++-13 clean; 0 load failures, 0 differing answers in 1,800 + 2,000 exact
+  HLRs, 6 HLR threads beside 2 re-meshing: no mutex, retry kept; if the fixture's views printout catches the 19:18
+  empty view again, P1 again); 6 asm feel tests (Camera menu, Suppressed mate, Failed mate's marks, Graphics → list
+  (2), Implicit over an edge, Snap mode ghost).
+- Told asm 23:15: in a test window the instance list's rows slice isn't redrawn after a document edit (set_fixed
+  false/true: the fixed icon stays; a notify on the view or on slices.rows doesn't redraw it; window.refresh() does).
+  Not checked in the app. Feel tests that change the list must build the state before opening (open_from_top_when).
+- Night ui-parity 8 (psui 1120-night-ui-a06ec927): 8/8 with this branch (23:46). drw-centermark: the scenario's expect
+  said the mark goes on Esc (old dx capture); live retake 996d6b8a keeps it: expect updated. drw-revision-table-delete:
+  live paints a deleted table until the next click and its recorder reads that paint ("EDGE Top", behaviours retake
+  2); run.py `deleted_paint_read` leaves ours uncompared there (whole night suite re-scored: only that scenario
+  changes). Ours reads Front there: the pointer rests on Front where the menu's Delete row was.
+- Asm feel rows (lead 23:28: Insert preview / Snap mode lines / Short press first; Drag feel skipped, live has no
+  server-side number): those 3 pass. Short press: live's ball snaps as connector placement in a Part Studio
+  (behaviours ball-1119: 50 px, turns to the face frame); ours 14 px unturned (`triad_snap`): smaller, not larger.
+  Assembly reach asked in REQUESTS 23:41; the test drops it in empty space until then. Next: Fields,
+  Toolbar's place / grip, Connector chip, Animate…, Named positions empty (6 left).
 - Then: re-shoot drw-custom-table-split + drw-datum-empty-field (start block-drawing-table-2parts), re-run the matrix.
 
 ## Next, in order
