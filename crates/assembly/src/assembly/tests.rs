@@ -2901,6 +2901,75 @@ fn a_flexible_subassembly_keeps_its_relations() {
     assert!((d3.abs() - 2.0 * d2.abs()).abs() < 1e-4, "block 3 moves twice as far: {d2} / {d3}");
 }
 
+/// ASM-FLEX-SUB-RIGID (live flexsub-1120): a flexible subassembly with an assembly linear pattern or a tangent mate
+/// inside stays flexible: a drag from the parent moves the seed with its copy following, and the tangent part in its
+/// plane.
+#[test]
+fn a_flexible_subassembly_keeps_its_patterns_and_tangent_mates() {
+    let mut f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    let b = &r.context.bodies[0];
+    let edge = b
+        .edges
+        .iter()
+        .enumerate()
+        .find_map(|(i, n)| match b.shape.sub_shape(noshape_kernel::ShapeType::Edge, i).ok()?.edge_info().ok()?.curve {
+            noshape_kernel::Curve::Line { direction, .. } if direction.x.abs() > 0.99 => Some(Reference::Edge((**n).clone())),
+            _ => None,
+        })
+        .unwrap();
+    // Block 2 slides on block 1 (fixed), a linear pattern copies it 50 mm along X; block 3 lies on block 1's top (Tangent).
+    let mut sub = Assembly {
+        instances: vec![
+            part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
+            part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.0, 0.0, 0.015), false),
+            part_instance(3, "Block <3>", f.studios[0], body.clone(), DVec3::new(0.0, 0.03, 0.012), false),
+        ],
+        mates: vec![
+            mate(10, MateType::Slider, conn(1, top.clone(), Inference::Centroid), conn(2, bottom.clone(), Inference::Centroid)),
+            mate(11, MateType::Tangent, MateConnectorRef::on(InstanceId(1), vec![], top.clone()), MateConnectorRef::on(InstanceId(3), vec![], bottom.clone())),
+        ],
+        ..Default::default()
+    };
+    sub.patterns.push(InstancePattern {
+        id: MateId(70),
+        name: "Linear pattern 1".into(),
+        kind: PatternKind::Linear { direction: conn(1, edge, Inference::Midpoint).linear_direction(), distance: ExprValue::new("50 mm"), count: 2, opposite: false, equal_spacing: false, second: None, centered: false, third: None },
+        seeds: vec![InstanceId(2)],
+        generated: vec![],
+        suppressed: false,
+    });
+    let copy = sub.sync_pattern(MateId(70))[0];
+    let sub_tab = f.doc.add_tab("Sub", TabContent::Assembly(Box::new(sub)));
+    let mut sub_inst = Instance::new(InstanceId(5), "Sub <1>".into(), InstanceSource::Assembly { assembly: sub_tab, config: ConfigValues::default() }, Placement { translation: [0.0, 0.0, 0.01], rotation: [0.0, 0.0, 0.0, 1.0] });
+    sub_inst.lock = SubassemblyLock::Flexible;
+    let asm = Assembly {
+        instances: vec![part_instance(1, "Base <1>", f.studios[0], body.clone(), DVec3::ZERO, true), sub_inst],
+        mates: vec![mate(20, MateType::Fastened, conn(1, top, Inference::Centroid), MateConnectorRef::on(InstanceId(5), vec![InstanceId(1)], Reference::Implicit { on: Box::new(bottom), inference: Inference::Centroid }))],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.prepared.flexible.contains(&InstanceId(5)), "a pattern or a tangent mate no longer makes it rigid");
+    assert!(res.mates.iter().all(|m| m.ok), "{:?}", res.mates);
+    let at = |s: &eval::Solved, child: InstanceId| s.nested_world(&[InstanceId(5), child]).unwrap().origin;
+    let (seed0, copy0) = (at(&res.solved, InstanceId(2)), at(&res.solved, copy));
+    assert!((copy0 - seed0 - DVec3::new(0.05, 0.0, 0.0)).length() < 1e-6, "the copy 50 mm along X: {seed0:?} {copy0:?}");
+    // Block 2 dragged up 10 mm from the parent: its copy goes with it.
+    let s = res.prepared.solve(&SolveOptions { nested_drags: vec![(vec![InstanceId(5), InstanceId(2)], DVec3::ZERO, DVec3::new(0.0, 0.0, seed0.z + 0.01))], ..Default::default() });
+    let (seed1, copy1) = (at(&s, InstanceId(2)), at(&s, copy));
+    assert!((seed1.z - seed0.z - 0.01).abs() < 1e-3, "the seed moved up: {seed0:?} -> {seed1:?}");
+    assert!((copy1 - seed1 - DVec3::new(0.05, 0.0, 0.0)).length() < 1e-6, "the copy followed: {seed1:?} {copy1:?}");
+    // Block 3 dragged 15 mm along X: it slides on block 1's top.
+    let p3 = at(&res.solved, InstanceId(3));
+    assert!((p3.z - 0.02).abs() < 1e-6, "block 3 on block 1's top: {p3:?}");
+    let s = res.prepared.solve(&SolveOptions { nested_drags: vec![(vec![InstanceId(5), InstanceId(3)], DVec3::ZERO, p3 + DVec3::new(0.015, 0.0, 0.0))], ..Default::default() });
+    let q3 = at(&s, InstanceId(3));
+    assert!((q3.x - p3.x - 0.015).abs() < 1e-3 && (q3.z - 0.02).abs() < 1e-6, "slid in the plane: {p3:?} -> {q3:?}");
+}
+
 #[test]
 fn flexible_subassembly_moves_in_parent_and_locks() {
     let mut f = doc_with(vec![block_studio()]);

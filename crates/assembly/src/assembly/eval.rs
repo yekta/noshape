@@ -2686,10 +2686,10 @@ impl AssemblyEvaluator {
             }
         };
         let (sub_leaves, sub_nodes, sub_prep, solved) = (done.0.clone(), done.1.clone(), &done.2, &done.3);
-        // Flexible (Onshape's default): its mates and relations join this
-        // assembly's solve, with those of the flexible subassemblies inside it.
-        // Subassemblies with patterns or tangent mates stay rigid.
-        let flexible = mirror.is_none() && inst.lock.is_flexible() && !suppressed && sub.patterns.is_empty() && !sub.mates.iter().any(|m| m.mate_type == MateType::Tangent && !m.suppressed);
+        // Flexible (Onshape's default): its mates, relations and linear / circular patterns join this assembly's
+        // solve, with those of the flexible subassemblies inside it (live flexsub-1120). With a mirror, part pattern
+        // or replicate it stays rigid.
+        let flexible = mirror.is_none() && inst.lock.is_flexible() && !suppressed && sub.patterns.iter().all(|p| p.suppressed || matches!(p.kind, PatternKind::Linear { .. } | PatternKind::Circular { .. }));
         node.rigid = solved.instance_dof.values().all(|d| *d == 0) && sub.fixed_instances().len() == 1 && sub_prep.failed_mates.is_empty();
         let place: HashMap<InstanceId, DMat4> = solved.placements.iter().map(|(id, p)| (*id, frame_matrix(&placement_to_frame(p)))).collect();
         if flexible {
@@ -3258,7 +3258,7 @@ impl AssemblyEvaluator {
             }
             let mut sm = SolverMate::default();
             if m.mate_type == MateType::Tangent {
-                match self.tangent_pair(asm, &leaves, &prepared, &stored, m, &units) {
+                match self.tangent_pair((asm, &[]), &leaves, &prepared, &stored, m, &units) {
                     Ok((a, b, pair)) => {
                         sm.a = a;
                         sm.b = b;
@@ -3361,8 +3361,19 @@ impl AssemblyEvaluator {
                 }
                 Ok((b, f.mul(&implicit_move(c, &units))))
             };
-            for m in sub.mates.iter().filter(|m| !m.suppressed && m.mate_type != MateType::Tangent) {
+            for m in sub.mates.iter().filter(|m| !m.suppressed) {
                 if m.connectors().any(|c| c.instance != InstanceId::ORIGIN && sub.instance(c.instance).is_none_or(|i| i.suppressed)) {
+                    continue;
+                }
+                // (Live flexsub-1120: a Tangent inside still turns from the parent.)
+                if m.mate_type == MateType::Tangent {
+                    let Ok((a, b, pair)) = self.tangent_pair((sub, prefix), &leaves, &prepared, &stored, m, &units) else { continue };
+                    let (a_local, b_local) = (sub_resolve(&m.a).map(|x| x.1).unwrap_or_default(), sub_resolve(&m.b).map(|x| x.1).unwrap_or_default());
+                    let mut sm = SolverMate { a, a_local, b, b_local, geom: Some(pair), ..Default::default() };
+                    fill_solver_mate(m, &mut sm, &units);
+                    synth_of.insert(m.id, MateId(synth));
+                    prepared.mates.push((MateId(synth), m.mate_type, sm));
+                    synth += 1;
                     continue;
                 }
                 let (Ok(a), Ok(b)) = (sub_resolve(&m.a), sub_resolve(&m.b)) else { continue };
@@ -3383,6 +3394,21 @@ impl AssemblyEvaluator {
                 prepared.mates.push((MateId(synth), m.mate_type, sm));
                 synth += 1;
             }
+            // Its linear and circular patterns: each copy follows its seed (live flexsub-1120: the Arm and its copy turn
+            // together from the parent).
+            let key_of = |c: InstanceId| -> Vec<InstanceId> { prefix.iter().copied().chain(std::iter::once(c)).collect() };
+            for p in sub.patterns.iter().filter(|p| !p.suppressed) {
+                let world_of = |b: usize, f: &Frame| prepared_pose(&stored, &prepared, b).mul(f);
+                let Some(Ok((ab, al, step))) = pattern_steps(p, &sub_resolve, &world_of, &units) else { continue };
+                for g in &p.generated {
+                    let (Some(&(sb, soff)), Some(&(gb, goff))) = (prepared.nested_body_of.get(&key_of(g.seed)), prepared.nested_body_of.get(&key_of(g.instance))) else { continue };
+                    if sb == gb {
+                        continue;
+                    }
+                    let sm = SolverMate { a: sb, a_local: soff, b: gb, b_local: goff, follow: Some(Follow { axis_body: ab, axis_local: al, xform: step(g.index) }), ..Default::default() };
+                    prepared.mates.push((MateId(u64::MAX - prepared.mates.len() as u64), MateType::Fastened, sm));
+                }
+            }
             // Its relations, in its own variables (a gearbox driven from the parent).
             let _vars = AsmVarsGuard::push(doc, sub);
             for r in sub.relations.iter().filter(|r| !r.suppressed) {
@@ -3402,63 +3428,14 @@ impl AssemblyEvaluator {
                 stored.get(&rep).copied().unwrap_or_default().mul(f)
             };
             let make: Box<FollowMaker> = match &p.kind {
-                PatternKind::Linear { direction, distance, count, opposite, equal_spacing, second, third, .. } => {
-                    let (ab, al) = match follow_of(direction) {
-                        Ok(x) => x,
-                        Err(e) => {
-                            prepared.failed_patterns.push((p.id, e));
-                            continue;
-                        }
-                    };
-                    // A direction's step: its distance (over its count when spaced equally), against it when opposite.
-                    let step = |distance: &ExprValue, count: u32, equal: bool, opposite: bool| {
-                        let d = eval_len(&Some(distance.clone()), &units);
-                        let d = if equal && count > 1 { d / (count - 1) as f64 } else { d };
-                        if opposite { -d } else { d }
-                    };
-                    let d1 = step(distance, *count, *equal_spacing, *opposite);
-                    let a_world = world_of(ab, &al);
-                    // The second and third directions' steps expressed in the first direction's frame.
-                    let mut more = [DVec3::ZERO; 2];
-                    let mut failed = None;
-                    for (slot, dir) in [second.as_ref(), third.as_deref().filter(|_| second.is_some())].into_iter().enumerate() {
-                        let Some(s) = dir else { continue };
-                        match follow_of(&s.direction) {
-                            Ok((b2, l2)) => more[slot] = a_world.rotation.inverse() * world_of(b2, &l2).z() * step(&s.distance, s.count, s.equal_spacing, s.opposite),
-                            Err(e) => failed = Some(e),
-                        }
-                    }
-                    if let Some(e) = failed {
+                PatternKind::Linear { .. } | PatternKind::Circular { .. } => match pattern_steps(p, &follow_of, &world_of, &units) {
+                    Some(Ok((ab, al, step))) => Box::new(move |index, _, _| Some((ab, al, step(index)))),
+                    Some(Err(e)) => {
                         prepared.failed_patterns.push((p.id, e));
                         continue;
                     }
-                    let [v2, v3] = more;
-                    Box::new(move |index, _, _| {
-                        let [i, j, k] = super::grid_steps(index);
-                        Some((ab, al, FollowXform::Rigid(Frame::new(DVec3::Z * d1 * i + v2 * j + v3 * k, DQuat::IDENTITY))))
-                    })
-                }
-                PatternKind::Circular { axis, angle, count, opposite, equal_spacing, .. } => {
-                    let (ab, al) = match follow_of(axis) {
-                        Ok(x) => x,
-                        Err(e) => {
-                            prepared.failed_patterns.push((p.id, e));
-                            continue;
-                        }
-                    };
-                    let mut step = eval_angle(&Some(angle.clone()), &units);
-                    if *equal_spacing && *count > 1 {
-                        let full = (step.abs() - std::f64::consts::TAU).abs() < 1e-9;
-                        step /= if full { *count as f64 } else { (*count - 1) as f64 };
-                    }
-                    if *opposite {
-                        step = -step;
-                    }
-                    Box::new(move |index, _, _| {
-                        let back = if index & super::CENTERED_BACK != 0 { -1.0 } else { 1.0 };
-                        Some((ab, al, FollowXform::Rigid(Frame::new(DVec3::ZERO, DQuat::from_rotation_z(step * (index & 0x7fff) as f64 * back)))))
-                    })
-                }
+                    None => continue,
+                },
                 PatternKind::Mirror { plane, placement, mirrored_studios, .. } => {
                     // Each seed's part symmetry (live's Symmetry column; Auto
                     // position uses it).
@@ -3629,13 +3606,15 @@ impl AssemblyEvaluator {
         Ok(PreparedRelation { id: r.id, kind: relation_kind(r.relation_type), a: ma.id, b: mb.id, ratio, reverse: r.reverse, values, base: r.base })
     }
 
-    /// Contact geometry for a tangent mate: (body a, body b, geometry in body coordinates).
-    fn tangent_pair(&self, asm: &Assembly, leaves: &[LeafInstance], prepared: &Prepared, stored: &HashMap<InstanceId, Frame>, m: &super::Mate, units: &UnitPrefs) -> Result<(usize, usize, TangentPair), String> {
+    /// Contact geometry for a tangent mate of `asm` (a flexible subassembly's at `prefix`, this assembly's when empty):
+    /// (body a, body b, geometry in body coordinates).
+    fn tangent_pair(&self, (asm, prefix): (&Assembly, &[InstanceId]), leaves: &[LeafInstance], prepared: &Prepared, stored: &HashMap<InstanceId, Frame>, m: &super::Mate, units: &UnitPrefs) -> Result<(usize, usize, TangentPair), String> {
         let geom = |c: &MateConnectorRef| -> Result<(usize, TangentGeom, Vec<TangentFace>), String> {
             if c.connector.is_some() || c.instance == InstanceId::ORIGIN {
                 return Err("Geometry is not supported for tangent mate.".into());
             }
-            let mut full = vec![c.instance];
+            let mut full = prefix.to_vec();
+            full.push(c.instance);
             full.extend(c.path.iter().copied());
             // Live E15: a face of a lost part: "Selection is invalid."
             let leaf = leaves.iter().find(|l| l.path == full).ok_or(if asm.instance(c.instance).is_some() { "Selection is invalid." } else { "Instance no longer exists" })?;
@@ -3649,10 +3628,11 @@ impl AssemblyEvaluator {
                     let (bi, off) = *prepared.nested_body_of.get(key).ok_or("Instance no longer exists")?;
                     (bi, off.mul(&matrix_frame(rest)))
                 }
-                None => {
+                None if prefix.is_empty() => {
                     let (bi, off) = *prepared.body_of.get(&c.instance).ok_or("Instance no longer exists")?;
                     (bi, off.mul(&matrix_frame(&leaf.inner)))
                 }
+                None => return Err("Instance no longer exists".into()),
             };
             let chain = if m.tangent_propagation { tangent_chain(&leaf.regen.context, leaf.body.as_ref(), &entity, units) } else { Vec::new() };
             // A single face needs no propagation.
@@ -3686,6 +3666,60 @@ impl AssemblyEvaluator {
 
 /// Pattern index + seed + copy -> (axis body, axis frame, follower transform).
 type FollowMaker<'a> = dyn Fn(u64, InstanceId, InstanceId) -> Option<(usize, Frame, FollowXform)> + 'a;
+
+/// A copy's transform by its pattern index, about its pattern's axis frame.
+type PatternStep = Box<dyn Fn(u64) -> FollowXform>;
+/// (Axis body, axis frame in it, each copy's step.)
+type PatternFollowers = (usize, Frame, PatternStep);
+/// A connector's (body, frame in it).
+type BodyResolver<'a> = dyn Fn(&MateConnectorRef) -> Result<(usize, Frame), String> + 'a;
+
+/// A linear or circular pattern's followers; None for the other kinds. `world_of`: a body frame in world coordinates
+/// at the start.
+fn pattern_steps(p: &super::InstancePattern, follow_of: &BodyResolver, world_of: &dyn Fn(usize, &Frame) -> Frame, units: &UnitPrefs) -> Option<Result<PatternFollowers, String>> {
+    match &p.kind {
+        PatternKind::Linear { direction, distance, count, opposite, equal_spacing, second, third, .. } => Some((|| {
+            let (ab, al) = follow_of(direction)?;
+            // A direction's step: its distance (over its count when spaced equally), against it when opposite.
+            let step = |distance: &ExprValue, count: u32, equal: bool, opposite: bool| {
+                let d = eval_len(&Some(distance.clone()), units);
+                let d = if equal && count > 1 { d / (count - 1) as f64 } else { d };
+                if opposite { -d } else { d }
+            };
+            let d1 = step(distance, *count, *equal_spacing, *opposite);
+            let a_world = world_of(ab, &al);
+            // The second and third directions' steps expressed in the first direction's frame.
+            let mut more = [DVec3::ZERO; 2];
+            for (slot, dir) in [second.as_ref(), third.as_deref().filter(|_| second.is_some())].into_iter().enumerate() {
+                let Some(s) = dir else { continue };
+                let (b2, l2) = follow_of(&s.direction)?;
+                more[slot] = a_world.rotation.inverse() * world_of(b2, &l2).z() * step(&s.distance, s.count, s.equal_spacing, s.opposite);
+            }
+            let [v2, v3] = more;
+            let at: PatternStep = Box::new(move |index| {
+                let [i, j, k] = super::grid_steps(index);
+                FollowXform::Rigid(Frame::new(DVec3::Z * d1 * i + v2 * j + v3 * k, DQuat::IDENTITY))
+            });
+            Ok((ab, al, at))
+        })()),
+        PatternKind::Circular { axis, angle, count, opposite, equal_spacing, .. } => Some(follow_of(axis).map(|(ab, al)| {
+            let mut step = eval_angle(&Some(angle.clone()), units);
+            if *equal_spacing && *count > 1 {
+                let full = (step.abs() - std::f64::consts::TAU).abs() < 1e-9;
+                step /= if full { *count as f64 } else { (*count - 1) as f64 };
+            }
+            if *opposite {
+                step = -step;
+            }
+            let at: PatternStep = Box::new(move |index| {
+                let back = if index & super::CENTERED_BACK != 0 { -1.0 } else { 1.0 };
+                FollowXform::Rigid(Frame::new(DVec3::ZERO, DQuat::from_rotation_z(step * (index & 0x7fff) as f64 * back)))
+            });
+            (ab, al, at)
+        })),
+        _ => None,
+    }
+}
 
 fn prepared_pose(stored: &HashMap<InstanceId, Frame>, prepared: &Prepared, body: usize) -> Frame {
     let rep = stored.get(&prepared.reps[body]).copied().unwrap_or_default();
