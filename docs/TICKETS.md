@@ -87,6 +87,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   ring; ours leaves a ~20 px gap between the ring and the shaft's foot; the cap reads paler (mean rgb(225,199,164) vs live 231,194,149; cameras
   differ slightly, unsure). Menu item, dialog place / tabs / chip and timings match (dialog 85-250 ms, live 96-180). qa-scratch/feel1120/r/man.png (left live)
 
+- [ ] P1 DRW-DIALOG-FIRST-FOCUS (studios; qa 11-20 04:59, studios' 7d3a6e28b checked on green 2a43b78b vs live/drawing 1047-lnk-front-props and
+  1037-lnk-move-to-sheet-dialog) View properties opens with its first field (View orientation select) focused in live (blue underline) and
+  Move to sheet with its Sheet select focused; ours opens both with no field focused (grey underlines). Everything 7d3a6e28b changed matches
+  (View properties 296 px / 13.33 px selects / Name centred, Move to sheet 223 px with ✓ pale, Hole table panel, Datum target carets and tabs,
+  Export Drawing's regular-weight title). qa-scratch/tickets/drwdlg-view-properties.png, drwdlg-move-to-sheet.png
+- [ ] P3 DRW-EXPORT-HIDE-INSPECTION-SIZE (studios; qa 11-20 04:59, vs live/drawing 1358-dk-export-default) Export Drawing: "Hide inspection
+  items" is a size smaller than live's (checkbox ~11 px vs ~13, label 128 px vs 132, row at y 617 vs 622) and the dialog ends 5-9 px higher
+  (label pitch 74 px vs 75). qa-scratch/tickets/drwdlg-export-drawing.png
+
 ## qa, 2026-11-20
 - [ ] P2 **ORACLE-ASM-R3-TOLERANCE (asm)**: the T2 test `model/tests/oracle_asm::assemblies_match_live` fails in every
   nightly T2 since 11-14 (vibex6 ~/lead/t2-*.log; 11-20 on 5b62f6ca8) on R3 only: instance B's transform vs live's differs
