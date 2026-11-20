@@ -207,6 +207,13 @@ pub fn tab_items(session: &Session, provider: &dyn DerivedProvider, tab: TabId) 
                 InstanceSource::Part { studio, body, config } => push(out, one_part(*studio, body, config)),
                 InstanceSource::PartStudio { studio, config } => push(out, all_parts(*studio, config)),
                 InstanceSource::Assembly { assembly: sub, .. } => assembly(session, *sub, seen, out, tab_item, all_parts, one_part),
+                // A part linked from another document's version (live parity-open-1120 rl1: listed as a local one).
+                InstanceSource::External { key, body: Some(body), .. } => {
+                    if let Some(r) = crate::derived::ExternalRef::parse(key) {
+                        let name = inst.name.rsplit_once(" <").map_or(inst.name.as_str(), |(n, _)| n);
+                        push(out, linked_part_items(session, &r, body, name));
+                    }
+                }
                 _ => {}
             }
         }

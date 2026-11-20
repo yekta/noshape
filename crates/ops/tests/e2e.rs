@@ -6237,6 +6237,11 @@ fn a_linked_parts_properties_save_into_its_version() {
     let rel = call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Assembly 1", "instance": p["instance"], "name": "R1" }));
     assert_eq!(rel["items"].as_array().map(Vec::len), Some(1), "{rel}");
     assert_eq!((rel["items"][0]["name"].as_str(), rel["items"][0]["part_number"].as_str(), rel["items"][0]["linked"]["version"].as_str()), (Some("Part 2"), Some("Q2464"), Some("V1")), "{rel}");
+    // Release… on the assembly (live parity-open-1120 rl1): its linked part listed once, at its version.
+    let rel = call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Assembly 1", "name": "R2", "draft": true }));
+    let linked: Vec<&Value> = rel["items"].as_array().unwrap().iter().filter(|i| i["linked"]["version"] == "V1").collect();
+    assert_eq!(linked.len(), 1, "{rel}");
+    assert_eq!((linked[0]["name"].as_str(), linked[0]["part_number"].as_str()), (Some("Part 2"), Some("Q2464")), "{rel}");
     // The source's workspace keeps its own (none).
     call(&mut ctx, "document_open", json!({ "path": lib.to_str().unwrap() }));
     let a = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));

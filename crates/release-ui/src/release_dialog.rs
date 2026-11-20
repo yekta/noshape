@@ -2057,7 +2057,8 @@ impl Render for ReleaseDialog {
                 ItemKind::VariableStudio => "variable-studio",
                 ItemKind::File => "file",
             };
-            let removable = self.mode != Mode::Review && !self.dependents.contains(&(row.item.tab, row.item.part.clone()));
+            let dependent = self.dependents.contains(&(row.item.tab, row.item.part.clone()));
+            let removable = self.mode != Mode::Review && !dependent;
             let picture = self.thumbs.get(&crate::release_thumbs::key(&row.item)).cloned();
             // A configured item's name reads plainly; its configuration is in the name's tooltip (live release-gaps-1118).
             let config_tip = noshape_ops::release::config_tooltip(&self.doc.read(cx).session, &row.item);
@@ -2111,9 +2112,10 @@ impl Render for ReleaseDialog {
                                     // Live (release.json): a click on the name does nothing (the dialog stays).
                                     div().id(SharedString::from(format!("rel-name-{i}"))).truncate().child(row.item.name.clone()).when_some(config_tip, |d, t| d.tooltip(crate::ui::tooltip(t)))
                                 })
-                                // Help (add-item-version2): an item linked from another
-                                // version shows the version icon after its name.
-                                .when_some(row.item.document.as_ref(), |d, l| {
+                                // Help (add-item-version2): an item added from another
+                                // version shows the version icon after its name; one an
+                                // assembly brings in reads as a local part (live rl1).
+                                .when_some(row.item.document.as_ref().filter(|_| !dependent), |d, l| {
                                     d.child(
                                         div()
                                             .id(SharedString::from(format!("rel-linked-{i}")))
