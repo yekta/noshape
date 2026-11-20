@@ -205,6 +205,9 @@ pub struct Translator<'a> {
     /// Part Studios Derived features take parts from (features.json `derivedSources`: element id → `{ doc, live }`),
     /// and those built: element id → (our tab id, live's part id → ours).
     derived_sources: Map<String, Value>,
+    /// Onshape's standard frame profile studios' sizes (features.json `profileOptions`: element → option id → display
+    /// name): the option ids don't tell the size (live: `L8x4x0_75` is L3x2x0.1875).
+    profile_options: Map<String, Value>,
     /// Live's frames of in-feature mate connectors (`connectorFrames`, an assembly studio's `<element>.connectors.json`,
     /// read with evMateConnector: live 2632): sub-feature id → `{ origin_mm, x, z }`.
     connector_frames: Map<String, Value>,
@@ -494,7 +497,7 @@ impl<'a> Translator<'a> {
                 config_defaults.entry(k.to_string()).or_insert_with(|| v.to_string());
             }
         }
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, stale_uses: false, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, live_states: doc["featureStates"].clone(), sub_feature: None, array_item: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), derived_sketches: HashMap::new(), sketch_tabs: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, stale_uses: false, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, live_states: doc["featureStates"].clone(), sub_feature: None, array_item: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), profile_options: doc["profileOptions"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), derived_sketches: HashMap::new(), sketch_tabs: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -2597,7 +2600,7 @@ impl<'a> Translator<'a> {
     fn studio_sketch(&mut self, p: &Value) -> Result<String, String> {
         let ns = p["namespace"].as_str().unwrap_or("");
         let element = ns.split("::").find_map(|x| x.strip_prefix('e')).ok_or_else(|| format!("profile studio `{ns}`: no element"))?;
-        if let Some(v) = library_profile(p) {
+        if let Some(v) = library_profile(p, self.profile_options.get(element).and_then(Value::as_object)) {
             return v;
         }
         // A Part Studio fetched beside the document as a Derived's source (derived/<element>/): built on first use.
@@ -3050,6 +3053,22 @@ impl<'a> Translator<'a> {
         if text.contains("qAllModifiableSolidBodies()") && !text.contains("qOwnedByBody") {
             let parts = self.call("query_parts", json!({}))?;
             return Ok(parts["parts"].as_array().into_iter().flatten().filter_map(|p| p["id"].as_str().map(str::to_string)).collect());
+        }
+        // qCreatedBy(makeId("F…"), EntityType.EDGE): a sketch's curves, not its construction (c2-cov-frame-endcap's
+        // Frame 1 paths).
+        if let Some(sk) = text.split("qCreatedBy(makeId(\"").nth(1).and_then(|r| r.split('"').next())
+            && text.contains("EntityType.EDGE")
+        {
+            let mut curves: Vec<(&String, &String)> = self
+                .sketch_entities
+                .iter()
+                .filter(|((s, e), c)| s == sk && !e.contains('.') && !self.construction.contains(&(s.clone(), e.clone())) && !self.sketch_points.iter().any(|(ps, pc)| ps == sk && pc == *c))
+                .map(|((_, e), c)| (e, c))
+                .collect();
+            curves.sort();
+            if !curves.is_empty() {
+                return Ok(curves.into_iter().map(|(_, c)| c.clone()).collect());
+            }
         }
         // qCreatedBy(makeId("F…"), EntityType.VERTEX): a sketch's points.
         if let Some(sk) = text.split("qCreatedBy(makeId(\"").nth(1).and_then(|r| r.split('"').next())
@@ -10513,8 +10532,9 @@ const AISC_PREFIXES: [(&str, &str); 12] = [("HP", "HP-shape"), ("MC", "MC-shape"
 const AISC_ELEMENTS: [(&str, &str); 1] = [("71bc1272ef1cf54ba5407618", "L-angle")];
 
 /// A Frame's `profileSketch` from Onshape's standard frame profiles (another document, configured): ours of the
-/// built-in library at the same size (`frame-library:<standard>/<profile>`). None for any other profile.
-fn library_profile(p: &Value) -> Option<Result<String, String>> {
+/// built-in library at the same size (`frame-library:<standard>/<profile>`), the size its option's display name in
+/// `names` when fetched. None for any other profile.
+fn library_profile(p: &Value, names: Option<&Map<String, Value>>) -> Option<Result<String, String>> {
     use noshape_model::regen::features::frame_library as fl;
     let ns = p["namespace"].as_str().unwrap_or("");
     let doc = ns.split("::").find_map(|x| x.strip_prefix('d'))?;
@@ -10522,6 +10542,7 @@ fn library_profile(p: &Value) -> Option<Result<String, String>> {
     let &(_, standard, profile) = FRAME_LIBRARY_DOCS.iter().find(|(d, ..)| *d == doc)?;
     let config = p["configuration"].as_array().map(Vec::as_slice).unwrap_or_default();
     let value = config.iter().find(|c| c["btType"].as_str().is_some_and(|t| t.starts_with("BTMParameterEnum"))).and_then(|c| c["value"].as_str()).unwrap_or("Default");
+    let value = names.and_then(|n| n.get(value)).and_then(Value::as_str).unwrap_or(value);
     let rounded = config.iter().any(|c| c["parameterId"] == "Rounded" && c["value"] == true);
     let profile = match profile {
         "" => AISC_ELEMENTS.iter().find(|(e, _)| *e == element).map(|(_, p)| *p).or_else(|| AISC_PREFIXES.iter().find(|(x, _)| value.strip_prefix(x).is_some_and(|r| r.starts_with(|c: char| c.is_ascii_digit()))).map(|(_, p)| *p)).filter(|p| !p.is_empty()),
@@ -10532,10 +10553,13 @@ fn library_profile(p: &Value) -> Option<Result<String, String>> {
 }
 
 /// Our library size for an Onshape configuration value: its encoded name (non-alphanumerics `_`, a leading digit
-/// behind one: `_2__x_0_1875_` for `2" x 0.1875"`), else the same numbers ("L8x4x0_75" for L8x4x3/4).
+/// behind one: `_2__x_0_1875_` for `2" x 0.1875"`), else the same numbers ("L8x4x0_75" for L8x4x0.75).
 fn library_size(standard: &str, profile: &str, value: &str) -> Option<&'static str> {
     use noshape_model::regen::features::frame_library as fl;
     let (sizes, default) = fl::sizes(standard, profile);
+    if let Some(s) = sizes.iter().find(|s| **s == value) {
+        return Some(s);
+    }
     if value == "Default" {
         return Some(default);
     }
@@ -10902,18 +10926,23 @@ mod tests {
         assert!(!super::empty_live_query(&nested));
     }
 
-    /// Onshape's standard frame profiles map to the built-in library at their configured size (c2-hgr-riser-weldment's
-    /// ANSI Rectangular bar 2" x 0.1875", AISC L8x4x3/4; c2-saw-table-frame-weldment's ANSI tube).
+    /// Onshape's standard frame profiles map to the built-in library at their option's display name (live's profile
+    /// studios: c2-hgr-riser-weldment's ANSI Rectangular bar 2" x 0.1875" and AISC `L8x4x0_75` = L3x2x0.1875;
+    /// c2-cov-frame-endcap's ANSI tube `_2__x_6__x_0_1875_` = 2" x 2" x 0.083"), else at the option id's numbers.
     #[test]
     fn standard_frame_profiles_are_the_built_in_library() {
-        let pick = |doc: &str, element: &str, config: Value| library_profile(&json!({ "namespace": format!("d{doc}::v0::e{element}::m0"), "configuration": config }));
+        let pick = |doc: &str, element: &str, config: Value, names: Value| library_profile(&json!({ "namespace": format!("d{doc}::v0::e{element}::m0"), "configuration": config }), names.as_object());
         let size = |v: &str| json!([{ "btType": "BTMParameterEnum-145", "parameterId": "List_x", "value": v }]);
-        assert_eq!(pick("aa06d5468b3bc366947ba7f0", "6b92c44fcf228039bd90042b", size("_2__x_0_1875_")), Some(Ok("frame-library:ANSI/Rectangular bar\tSize=2in x 0.1875in".into())));
-        assert_eq!(pick("222d833563d2b359395e721d", "71bc1272ef1cf54ba5407618", size("L8x4x0_75")), Some(Ok("frame-library:AISC/L-angle\tSize=L8x4x3/4".into())));
-        assert_eq!(pick("222d833563d2b359395e721d", "71bc1272ef1cf54ba5407618", size("Default")), Some(Ok("frame-library:AISC/L-angle\tSize=L2x2x1/8".into())));
-        assert!(pick("afd89bc349544bd249b47b01", "94de058aece357024ba47a5a", size("_2__x_6__x_0_1875_")).is_some_and(|v| v.is_ok_and(|v| v.starts_with("frame-library:ANSI/Rectangular tube\tSize="))));
-        assert!(pick("aa06d5468b3bc366947ba7f0", "e", size("_9__x_9_")).is_some_and(|v| v.is_err()));
-        assert_eq!(pick("0123456789abcdef01234567", "e", size("_2__x_0_1875_")), None);
+        let angles = json!({ "Default": "L2x2x0.125", "L8x4x0_75": "L3x2x0.1875" });
+        assert_eq!(pick("aa06d5468b3bc366947ba7f0", "6b92c44fcf228039bd90042b", size("_2__x_0_1875_"), Value::Null), Some(Ok("frame-library:ANSI/Rectangular bar\tSize=2in x 0.1875in".into())));
+        assert_eq!(pick("222d833563d2b359395e721d", "71bc1272ef1cf54ba5407618", size("L8x4x0_75"), angles.clone()), Some(Ok("frame-library:AISC/L-angle\tSize=L3x2x0.1875".into())));
+        assert_eq!(pick("222d833563d2b359395e721d", "71bc1272ef1cf54ba5407618", size("Default"), angles), Some(Ok("frame-library:AISC/L-angle\tSize=L2x2x0.125".into())));
+        let mut tube = size("_2__x_6__x_0_1875_");
+        tube.as_array_mut().unwrap().push(json!({ "btType": "BTMParameterBoolean-144", "parameterId": "Rounded", "value": true }));
+        let names = json!({ "_2__x_6__x_0_1875_": "2\" x 2\" x 0.083\"" });
+        assert_eq!(pick("afd89bc349544bd249b47b01", "94de058aece357024ba47a5a", tube, names), Some(Ok("frame-library:ANSI/Rectangular tube\tSize=2\" x 2\" x 0.083\";Rounded=true".into())));
+        assert!(pick("aa06d5468b3bc366947ba7f0", "e", size("_9__x_9_"), Value::Null).is_some_and(|v| v.is_err()));
+        assert_eq!(pick("0123456789abcdef01234567", "e", size("_2__x_0_1875_"), Value::Null), None);
         assert_eq!(size_numbers("1/32in (0.03125)"), vec![0.03125, 0.03125]);
     }
 }

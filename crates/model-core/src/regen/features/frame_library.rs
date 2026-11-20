@@ -30,8 +30,9 @@ struct SizeList {
 static LISTS: LazyLock<BTreeMap<String, BTreeMap<String, SizeList>>> = LazyLock::new(|| serde_json::from_str(include_str!("frame_library.json")).unwrap_or_default());
 
 /// AISC's shapes, smallest first as live lists them (C3x3.5 first): each size's name and its dimensions in inches
-/// from the AISC Shapes Database v15.0 (W / M / S / HP / C / MC / tees: d, bf, tw, tf; L: d, b, t; Pipe and round
-/// HSS: OD, t design; rectangular and square HSS: Ht, B, t design).
+/// from the AISC Shapes Database v15.0 (W / M / S / HP / C / MC / tees: d, bf, tw, tf; Pipe and round HSS: OD, t
+/// design; rectangular and square HSS: Ht, B, t design); L-angles are live's L-angle studio's sizes, names and order
+/// (d, b, t, kdes).
 type SizeTable = Vec<(String, Vec<f64>)>;
 static AISC: LazyLock<BTreeMap<String, SizeTable>> = LazyLock::new(|| {
     let raw: BTreeMap<String, Vec<Vec<serde_json::Value>>> = serde_json::from_str(include_str!("frame_library_aisc.json")).unwrap_or_default();
@@ -233,6 +234,34 @@ fn tee(d: f64, bf: f64, tw: f64, tf: f64) -> Result<FrameProfile, String> {
     Ok(FrameProfile { standard: String::new(), description: String::new(), outer, holes: Vec::new(), min: DVec2::new(m(-bf / 2.0), 0.0), max: DVec2::new(m(bf / 2.0), m(d)) })
 }
 
+/// AISC's angle as live's L-angle studio draws it (mm): the heel at the origin, the leg `d` along y and `b` along x,
+/// the root fillet `kd − t` (`kd`: the heel to the fillet's end), each toe a 0.1·t flat and a 0.9·t arc into the inner face (9 edges).
+fn aisc_angle(d: f64, b: f64, t: f64, kd: f64) -> Result<FrameProfile, String> {
+    let (r, toe) = (kd - t, 0.9 * t);
+    if t <= 0.0 || r < 0.0 || kd + toe > d.min(b) {
+        return Err("Angle thickness is too large".into());
+    }
+    let p = |x: f64, y: f64| DVec2::new(x * 1e-3, y * 1e-3);
+    let line = |a: DVec2, b: DVec2| k::Segment2d::Line { a, b };
+    let s = std::f64::consts::FRAC_1_SQRT_2;
+    let mut outer = vec![
+        line(p(0.0, 0.0), p(b, 0.0)),
+        line(p(b, 0.0), p(b, 0.1 * t)),
+        k::Segment2d::Arc3 { a: p(b, 0.1 * t), mid: p(b - toe + toe * s, 0.1 * t + toe * s), b: p(b - toe, t) },
+        line(p(b - toe, t), p(kd, t)),
+    ];
+    if r > 0.0 {
+        outer.push(k::Segment2d::Arc3 { a: p(kd, t), mid: p(kd - r * s, kd - r * s), b: p(t, kd) });
+    }
+    outer.extend([
+        line(p(t, kd), p(t, d - toe)),
+        k::Segment2d::Arc3 { a: p(t, d - toe), mid: p(0.1 * t + toe * s, d - toe + toe * s), b: p(0.1 * t, d) },
+        line(p(0.1 * t, d), p(0.0, d)),
+        line(p(0.0, d), p(0.0, 0.0)),
+    ]);
+    Ok(FrameProfile { standard: String::new(), description: String::new(), outer, holes: Vec::new(), min: p(0.0, 0.0), max: p(b, d) })
+}
+
 /// An AISC shape from its published dimensions (inches).
 fn aisc_profile(profile: &str, d: &[f64]) -> Result<FrameProfile, String> {
     let mm: Vec<f64> = d.iter().map(|v| v * 25.4).collect();
@@ -240,7 +269,7 @@ fn aisc_profile(profile: &str, d: &[f64]) -> Result<FrameProfile, String> {
         ("W-shape" | "M-shape" | "S-shape" | "HP-shape", [d, bf, tw, tf]) => fp::ibeam(*d, *bf, *tw, *tf),
         ("C-shape" | "MC-shape", [d, bf, tw, tf]) => fp::channel(*d, *bf, *tw, *tf),
         ("WT-shape" | "MT-shape" | "ST-shape", [d, bf, tw, tf]) => tee(*d, *bf, *tw, *tf),
-        ("L-angle", [a, b, t]) => fp::angle(*a, *b, *t),
+        ("L-angle", [d, b, t, kd]) => aisc_angle(*d, *b, *t, *kd),
         ("Pipe" | "Round", [od, t]) => fp::round_tube(*od, *t),
         // HSS: AISC's outside corner radius is twice the design wall.
         ("Rectangular" | "Square", [ht, b, t]) => rounded_tube(*b, *ht, *t),
@@ -248,9 +277,9 @@ fn aisc_profile(profile: &str, d: &[f64]) -> Result<FrameProfile, String> {
     }
 }
 
-/// Whether a profile has the Rounded checkbox (live: ISO's Rectangular tube).
+/// Whether a profile has the Rounded checkbox (live: ISO's and ANSI's Rectangular tube).
 pub fn has_rounded(standard: &str, profile: &str) -> bool {
-    standard == "ISO" && profile == "Rectangular tube"
+    matches!(standard, "ISO" | "ANSI") && profile == "Rectangular tube"
 }
 
 /// The `profileSketch` value of a library profile with its configuration.
@@ -329,6 +358,26 @@ fn dims(size: &str) -> Option<Vec<f64>> {
     s.split(['x', 'X']).map(|p| swg_mm(p).or_else(|| length_mm(p))).collect()
 }
 
+/// Whether two AISC size names are one size: an earlier save's fractions ("L2-1/2x2-1/2x3/16") as live's decimals
+/// ("L2.5x2.5x0.1875").
+fn same_size(a: &str, b: &str) -> bool {
+    let nums = |s: &str| -> Option<Vec<f64>> {
+        let s = s.trim_start_matches(|c: char| c.is_ascii_alphabetic());
+        s.split('x')
+            .map(|p| {
+                let (whole, frac) = match p.split_once('-') {
+                    Some((w, f)) => (w.parse::<f64>().ok()?, f),
+                    None if p.contains('/') => (0.0, p),
+                    None => return p.parse().ok(),
+                };
+                let (n, d) = frac.split_once('/')?;
+                Some(whole + n.parse::<f64>().ok()? / d.parse::<f64>().ok()?)
+            })
+            .collect()
+    };
+    a.starts_with(|c: char| c.is_ascii_alphabetic()) && nums(a).zip(nums(b)).is_some_and(|(x, y)| x.len() == y.len() && x.iter().zip(&y).all(|(p, q)| (p - q).abs() < 1e-9))
+}
+
 /// A rectangle `2·hw` × `2·hh` (mm) about the origin with corners of radius `r`: four arcs and four lines (metres).
 fn rounded_rect(hw: f64, hh: f64, r: f64) -> Vec<k::Segment2d> {
     let m = |v: f64| v * 1e-3;
@@ -388,7 +437,7 @@ fn more_section(kind: &str, d: &[f64]) -> Result<FrameProfile, String> {
 pub fn profile(standard: &str, profile: &str, size: &str, rounded: bool) -> Result<FrameProfile, String> {
     let bad = || format!("Unknown frame profile size \"{size}\"");
     if standard == "AISC" {
-        let d = AISC.get(profile).and_then(|l| l.iter().find(|(n, _)| n == size)).map(|(_, d)| d.clone()).ok_or_else(bad)?;
+        let d = AISC.get(profile).and_then(|l| l.iter().find(|(n, _)| n == size).or_else(|| l.iter().find(|(n, _)| same_size(n, size)))).map(|(_, d)| d.clone()).ok_or_else(bad)?;
         let mut p = aisc_profile(profile, &d)?;
         p.standard = standard.to_string();
         p.description = format!("{profile} {size}");
@@ -415,6 +464,8 @@ pub fn profile(standard: &str, profile: &str, size: &str, rounded: bool) -> Resu
     let d = dims(size).ok_or_else(bad)?;
     let mut p = match (profile, d.as_slice()) {
         ("Rectangular bar", [w, t]) => fp::flat_bar(*w, *t),
+        // ANSI's studio: corners of the larger side / 20 outside, (side − wall) / 20 inside.
+        ("Rectangular tube", [w, h, t]) if rounded && standard == "ANSI" => tube_with_corners(*w, *h, *t, w.max(*h) / 20.0, (w.max(*h) - t) / 20.0),
         ("Rectangular tube", [w, h, t]) if rounded => rounded_tube(*w, *h, *t),
         ("Rectangular tube", [w, h, t]) => fp::rect_tube(*w, *h, *t),
         ("Round bar", [d, ..]) => fp::round_bar(*d),
@@ -609,6 +660,30 @@ mod tests {
         // The outer loop and the hole, each four arcs and four lines.
         assert_eq!(svg.matches('A').count(), 8, "{svg}");
         assert_eq!(svg.matches('Z').count(), 2, "{svg}");
+    }
+
+    /// Live's AISC L-angle studio (live 2026-11-20, behaviours "Standard frame profile studios"): L2x2x0.125 is 317.649 mm²
+    /// with its root fillet, toe arcs and end flats (9 edges); an earlier save's "L2x2x1/8" is that size. ANSI's rounded
+    /// tube 2" x 2" x 0.083" has corners of 2.54 mm outside and 2.43459 mm inside.
+    #[test]
+    fn aisc_angles_and_ansi_rounded_tubes_are_live_studios_sections() {
+        let (sizes, default) = sizes("AISC", "L-angle");
+        assert_eq!((sizes.len(), default, sizes[1]), (127, "L2x2x0.125", "L2x2x0.1875"));
+        let p = profile("AISC", "L-angle", "L2x2x0.125", false).unwrap();
+        assert_eq!(p.outer.len(), 9);
+        let area = p.face().unwrap().area().unwrap() * 1e6;
+        assert!((area - 317.649).abs() < 1e-3, "{area}");
+        let old = profile("AISC", "L-angle", "L2-1/2x2-1/2x3/16", false).unwrap();
+        assert!((old.max.x - 0.0635).abs() < 1e-12 && (old.max.y - 0.0635).abs() < 1e-12);
+        let tall = profile("AISC", "L-angle", "L3x2x0.1875", false).unwrap();
+        assert!((tall.max.y - 0.0762).abs() < 1e-12 && (tall.max.x - 0.0508).abs() < 1e-12);
+        assert!(has_rounded("ANSI", "Rectangular tube"));
+        let t = profile("ANSI", "Rectangular tube", "2\" x 2\" x 0.083\"", true).unwrap();
+        let (w, wall): (f64, f64) = (50.8, 0.083 * 25.4);
+        let (ro, ri) = (w / 20.0, (w - wall) / 20.0);
+        let expected = w * w - (w - 2.0 * wall).powi(2) - (4.0 - std::f64::consts::PI) * (ro * ro - ri * ri);
+        let area = t.face().unwrap().area().unwrap() * 1e6;
+        assert!((area - expected).abs() < 1e-6, "{area} vs {expected}");
     }
 
     #[test]

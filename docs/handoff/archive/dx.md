@@ -3704,3 +3704,47 @@ State as of 2026-11-20 04:2x UTC. Rewritten, not appended (DECISIONS.md 11-15); 
 - sheet-metal-plus .3mf / .obj: live2 meshcheck-1119 (16:0x): live makes 3 parts of each (580567.98, 36048.84,
   10142.77 mm³), nothing hollowed; the suite expects the model's parts for OBJ / 3MF when they differ from the STL's.
   Boolean is bool's P0 (lead 11-16). Score it once fixed. Remove vibe5 ~/agents/dx/target-g13 when no longer needed.
+
+## Archived 2026-11-20 13:5x: Earlier (00:10 11-20)
+- Fan-blade HLR sampling: TICKETS P3. surf-intro: see the 03:0x bullet below (archive has the 00:10 rerun).
+- LANDED 04:49 as d9b795e0 (c63e548b, 8 commits): fb8f84f42 (surf-intro refs + open-profile loft), BRAND-IN-UI-TEXT
+  (qa verifies), hex chain_pieces both ways (9023ff0d, 5dd3534a 04:22), STEP one-loop torus, HLR P1 = OCCT patch 0036
+  (HLRBRep_Data::RejectedPoint: an IN end crossing tangent to a boundary's middle, unpaired, rejected; snap-hook 7 stray
+  pieces -> 0, rings-loft Right 159 -> 151; libs installed by the lead on vibe2/vibex6-8, /root/occt, Mac, *.pre0036).
+- snap-hook model mirror (all 4 hooks about their own x; Shell OFFSET_EDGE hookVector from evAxis, our edge opposite
+  Parasolid's, /root/dx-scratch/snaphook.fs line 96): reported to the lead 00:50. faceblend Right's extra line: blend's.
+- sm-louver DXF (05:0x, PARKED, small): geometry as live except the Right view's flange tangent edge: HLR hides 0.64 mm
+  of it at each louver (10 pieces; live one 0.73 in line) and the DXF loses its 17 mm bottom piece (0.35 mm on paper).
+  Not on our STEP re-read (one piece) -> the model's own shape. The type-count gap is sub-0.001 in stubs (live writes
+  tangent edges seen end-on as 0.0005 in LINEs: TANGENT 121/243). Probe diff /root/dx-scratch/smlv-probe.diff
+  (DXPROBE in project_bodies + kernel hlr probe), Mac dx-keep/exone.sh (exchange suite on exs-one = sm-louver).
+- surf-intro (03:0x, blend's 6b6b3b4a0 + fb8f84f42, Mac sitrace2.sh, si-blend.diff applied for the run): all 5 past
+  Derived 1, rebuild 300-490 ms (live 359-1202). Next stop in 4: Tail fin extrude UP_TO_VERTEX 3483.23 vs 3567.19 mm²:
+  the car's rear vertices (y 254, z 30.343) at x +-33.142, live +-33.941 (Fillet 1's end): sent to blend 03:0x.
+  offset doc: Offset surfaces 1 9588.57 vs 9591.44 (likely the same). CLI queries: Mac dx-keep/siq.sh, si-q/.
+- P1 Gear Lab DONE on my side (06:2x): 8f5622 18.1 s (live 1153 ms); interpreter ~60 ms, the rest 2 OCCT fuses:
+  body ∪ its herringbone mirror 14.4 s (occt), core ∪ 40 teeth 3.3 s (occt_tree). Sent to bool 06:21 with the
+  recorded cases vibex7 ~/agents/dx-keep/gl-bool (.brep/.txt). gl13 2d7dc1: 0.8 + 0.9 s, live 515 ms. Repro: vibex7
+  ~/agents/dx-keep/gl.sh <tag> [gl40|gl13] (parity_models + NOSHAPE_FS_PROFILE; NOSHAPE_RECORD_BOOLEANS for cases).
+- URDF-RIGID-SUBASM-SINGLE-LINK LANDED b7c2c4e8a (ticket [x]); open: live's file shape (REQUESTS dx 05:44). Nightly
+  dump-test LANDED 3b9ec80cc; dx-nightly worktree + vibe2 target removed 07:4x.
+- EXCHANGE TOP-3 LANDED 09:29 as 072a6c50 (2f406fa1). Rings "ours.stl" face 23 no triangles: bool's Shell builder, low.
+- DXF SCORING (DECISIONS 11-20) QUEUED bdf50182 + 6047caa6 (with the hole-rim circle, the tangent-beside-a-curve HLR
+  fix, the isaac speed fix, five-point ARC fit). Mac exall-b1: DXF 2/10 (duct, louver); ops e2e 262/262. Rows left:
+  snap-hook 0.107 in of the Iso's tangent ellipse (edge 52) dropped as lying on the fillet's own silhouette, which
+  touches it within 0.16 mm (model); live draws both. No tolerance separates it: on-curve tol x0.02 / x0.1 -> snap
+  0.033 / 0.067 in but faceblend +0.027 / +0.028, rings-loft +0.029 / +0.019 in of tangent pieces live drops (parked); bottle-split
+  Front's lip arc: P3 HLR-TORUS-SELF-OCCLUSION (lead 11-20: parked; collect other drawings showing it for one patch); extension-spring an extra seam LINE + an edge live splits
+  into spline + line (model topology); hex-bookcase a 0.05 in rim quarter on the dowel mesh (coincident, our
+  under-the-mesh rule hides it); housing-draft live's 4-LINE runs + 0.057 in bow (projection); faceblend ELLIPSE vs
+  SPLINE (model); rings-loft model; clamp-guillem Top edges inside another part (known). Probe: model_edge eprintln
+  of curve + face surfaces under DXEDGE (not committed; recipe in this line), Mac `export DXEDGE=1; exall.sh`.
+  Tools: /root/dx-scratch/bin/near.py, dxfgeo.py; files /root/dx-scratch/dxf-a9/.
+- DRAWING SPEED (lead 11-20): P1 ISAAC-DRAWING-VIEW-SPEED fixed, queued (bdf50182) (shared assembly evaluator: ops
+  doc.rs prime_sources, app-core DocModel::assemblies, assembly_view / drawing_view take it; tell asm on landing):
+  isaac Front 37.4 -> 1.60 s (live 10.7), Create 37.5 -> 2.49 (18.2); infento 19.5 -> 4.3. Timing:
+  dx_perf::timed_saved_drawing_views (uncommitted) + Mac dx-keep/dvspeed.sh (copy /root/dx-scratch/dvspeed.sh).
+  All others under live's (TICKETS row).
+- The Mac's dx-main release target links a PRIVATE TKHLR (OCCT_ROOT=~/noshape-host/dx-keep/hlr/root, counters only
+  with DXHLR=1); rebuild with the normal OCCT_ROOT for timings.
+

@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-20 07:4x UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-20 13:5x UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -9,64 +9,27 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
-## Now (12:5x 11-20): FRAME PROFILES (lead "build it") + vibex8 suite speed
-- Suite speed done: Mac release r1 = 2 docs >= 2x/100 ms (impeller, config-screws); routed bool/blend/core/skasm.
-  RUNNING: vibex8 release suite x1 (local log /root/dx-scratch/pm-x1.log, vibex8 ~/agents/dx-keep/pm-x1.log +
-  pm-x1/report.json; script pmx.sh <tag> [only]); next: filter >= 2x & >= 100 ms, profile new ones, route, report.
-  DON'T rb.sh dx-land to vibex8 until x1's build is done (resync). impeller Fillet 3 39/113/71 is load-dependent (blend).
-- LANDING 3b980fee (QUEUED): Parasolid blend face side from tangent neighbour (replace-face Import 1 = live) +
-  sketch_create on {"mate_connector": …} (hgr Bottom). Replace face 1 routed to core.
-- UNCOMMITTED -> committed locally as "frame profiles" (not landed): parity.rs library_profile / library_size /
-  size_numbers (Onshape's standard profile docs -> frame-library:<std>/<profile>\tSize=…), unit test
-  standard_frame_profiles_are_the_built_in_library; studio_sketch builds a derived/<element>/ studio on first use.
-  RUNNING: vibex7 fx2x.sh (unit test + pmx fxf for hgr, saw-table, cov-frame-endcap/gusset) -> /root/dx-scratch/fx2.log
-  (synced BEFORE the derived-studio change). live fetched hgr's derived/{292796f4…, aaabdce9…} (Frame 1/5 studios).
-  Next: rerun fxf on vibex7 with all changes; check ANSI tube Rounded (ours: ISO only) and AISC "Default" size vs live;
-  then land and report to lead.
-- Mac off limits until 13:44 UTC (lead): no rb.sh/ssh/scp to the Mac.
-
-## Earlier (00:10 11-20)
-- Fan-blade HLR sampling: TICKETS P3. surf-intro: see the 03:0x bullet below (archive has the 00:10 rerun).
-- LANDED 04:49 as d9b795e0 (c63e548b, 8 commits): fb8f84f42 (surf-intro refs + open-profile loft), BRAND-IN-UI-TEXT
-  (qa verifies), hex chain_pieces both ways (9023ff0d, 5dd3534a 04:22), STEP one-loop torus, HLR P1 = OCCT patch 0036
-  (HLRBRep_Data::RejectedPoint: an IN end crossing tangent to a boundary's middle, unpaired, rejected; snap-hook 7 stray
-  pieces -> 0, rings-loft Right 159 -> 151; libs installed by the lead on vibe2/vibex6-8, /root/occt, Mac, *.pre0036).
-- snap-hook model mirror (all 4 hooks about their own x; Shell OFFSET_EDGE hookVector from evAxis, our edge opposite
-  Parasolid's, /root/dx-scratch/snaphook.fs line 96): reported to the lead 00:50. faceblend Right's extra line: blend's.
-- sm-louver DXF (05:0x, PARKED, small): geometry as live except the Right view's flange tangent edge: HLR hides 0.64 mm
-  of it at each louver (10 pieces; live one 0.73 in line) and the DXF loses its 17 mm bottom piece (0.35 mm on paper).
-  Not on our STEP re-read (one piece) -> the model's own shape. The type-count gap is sub-0.001 in stubs (live writes
-  tangent edges seen end-on as 0.0005 in LINEs: TANGENT 121/243). Probe diff /root/dx-scratch/smlv-probe.diff
-  (DXPROBE in project_bodies + kernel hlr probe), Mac dx-keep/exone.sh (exchange suite on exs-one = sm-louver).
-- surf-intro (03:0x, blend's 6b6b3b4a0 + fb8f84f42, Mac sitrace2.sh, si-blend.diff applied for the run): all 5 past
-  Derived 1, rebuild 300-490 ms (live 359-1202). Next stop in 4: Tail fin extrude UP_TO_VERTEX 3483.23 vs 3567.19 mm²:
-  the car's rear vertices (y 254, z 30.343) at x +-33.142, live +-33.941 (Fillet 1's end): sent to blend 03:0x.
-  offset doc: Offset surfaces 1 9588.57 vs 9591.44 (likely the same). CLI queries: Mac dx-keep/siq.sh, si-q/.
-- P1 Gear Lab DONE on my side (06:2x): 8f5622 18.1 s (live 1153 ms); interpreter ~60 ms, the rest 2 OCCT fuses:
-  body ∪ its herringbone mirror 14.4 s (occt), core ∪ 40 teeth 3.3 s (occt_tree). Sent to bool 06:21 with the
-  recorded cases vibex7 ~/agents/dx-keep/gl-bool (.brep/.txt). gl13 2d7dc1: 0.8 + 0.9 s, live 515 ms. Repro: vibex7
-  ~/agents/dx-keep/gl.sh <tag> [gl40|gl13] (parity_models + NOSHAPE_FS_PROFILE; NOSHAPE_RECORD_BOOLEANS for cases).
-- URDF-RIGID-SUBASM-SINGLE-LINK LANDED b7c2c4e8a (ticket [x]); open: live's file shape (REQUESTS dx 05:44). Nightly
-  dump-test LANDED 3b9ec80cc; dx-nightly worktree + vibe2 target removed 07:4x.
-- EXCHANGE TOP-3 LANDED 09:29 as 072a6c50 (2f406fa1). Rings "ours.stl" face 23 no triangles: bool's Shell builder, low.
-- DXF SCORING (DECISIONS 11-20) QUEUED bdf50182 + 6047caa6 (with the hole-rim circle, the tangent-beside-a-curve HLR
-  fix, the isaac speed fix, five-point ARC fit). Mac exall-b1: DXF 2/10 (duct, louver); ops e2e 262/262. Rows left:
-  snap-hook 0.107 in of the Iso's tangent ellipse (edge 52) dropped as lying on the fillet's own silhouette, which
-  touches it within 0.16 mm (model); live draws both. No tolerance separates it: on-curve tol x0.02 / x0.1 -> snap
-  0.033 / 0.067 in but faceblend +0.027 / +0.028, rings-loft +0.029 / +0.019 in of tangent pieces live drops (parked); bottle-split
-  Front's lip arc: P3 HLR-TORUS-SELF-OCCLUSION (lead 11-20: parked; collect other drawings showing it for one patch); extension-spring an extra seam LINE + an edge live splits
-  into spline + line (model topology); hex-bookcase a 0.05 in rim quarter on the dowel mesh (coincident, our
-  under-the-mesh rule hides it); housing-draft live's 4-LINE runs + 0.057 in bow (projection); faceblend ELLIPSE vs
-  SPLINE (model); rings-loft model; clamp-guillem Top edges inside another part (known). Probe: model_edge eprintln
-  of curve + face surfaces under DXEDGE (not committed; recipe in this line), Mac `export DXEDGE=1; exall.sh`.
-  Tools: /root/dx-scratch/bin/near.py, dxfgeo.py; files /root/dx-scratch/dxf-a9/.
-- DRAWING SPEED (lead 11-20): P1 ISAAC-DRAWING-VIEW-SPEED fixed, queued (bdf50182) (shared assembly evaluator: ops
-  doc.rs prime_sources, app-core DocModel::assemblies, assembly_view / drawing_view take it; tell asm on landing):
-  isaac Front 37.4 -> 1.60 s (live 10.7), Create 37.5 -> 2.49 (18.2); infento 19.5 -> 4.3. Timing:
-  dx_perf::timed_saved_drawing_views (uncommitted) + Mac dx-keep/dvspeed.sh (copy /root/dx-scratch/dvspeed.sh).
-  All others under live's (TICKETS row).
-- The Mac's dx-main release target links a PRIVATE TKHLR (OCCT_ROOT=~/noshape-host/dx-keep/hlr/root, counters only
-  with DXHLR=1); rebuild with the normal OCCT_ROOT for timings.
+## Now (13:5x 11-20): FRAME PROFILES (lead "build it") + URDF REWRITE (lead "go on")
+- FRAMES (dx-land, uncommitted on top of 45ebed800 + ce6f7a10): live 13:50 (behaviours "Standard frame profile
+  studios", parity/models/<m>/derived/<element>/options.tsv) says option ids don't tell the size, display names do.
+  Done: tests/parity.rs passes options.tsv as features `profileOptions`; library_profile maps id -> display name;
+  frame_library: AISC L-angles = live studio's 127 sizes/names/order (L2x2x0.125 …) with kdes, drawn as live (root
+  fillet kdes-t, toe arcs 0.9t, end flats 0.1t, d along y; 317.649 mm2 as live), old fraction names still read;
+  ANSI Rectangular tube has Rounded (r = max(w,h)/20, (max-t)/20). parity.rs qCreatedBy(F…, EDGE) handler (endcap
+  Frame 1 paths). Test run fr3 (vibex7). Next: fxf rerun (vibex7 ~/agents/dx-keep/fx2x.sh), commit, land, report.
+  fx3 (vibex7, before these) = baseline.
+- URDF (worktree /root/projects/noshape-wt/dx-urdf, branch dx-urdf, uncommitted): crates/ops/src/urdf.rs (live's
+  file shape: links/joints sorted, connector links, inertia, launch, visual per part, zip launch/meshes/urdf) +
+  live 13:37 joint types: Slider prismatic ±10000, Cylindrical / Pin slot / Planar / Ball chains through empty links,
+  limits (revolute/prismatic, effort 1 velocity 1), names numbered _1, links named in instance order; nothing fixed ->
+  root = heaviest fastened/rigid cluster, tie the later (INFERRED from live's 4 captures, not stated by live).
+  eval.rs: Prepared.flex_mates, pub mate_limits. Test run urdf2 (vibex8). Next: AGENT_API regen, full ops e2e,
+  commit, land, TICKETS URDF-LIVE-FILE-SHAPE [x] (open: Parallel/Tangent/Width not joints, root rule inferred).
+- LANDING 3b980fee (QUEUED 12:2x): Parasolid blend face side + sketch on a mate connector (hgr Bottom).
+- x86 suite speed: lead "not real" (host load); qa runs the release suite in tonight's 02:00-04:00 vibex8 window;
+  Mac numbers stand (pm-r1-report.json in /root/dx-scratch).
+- MAC OFF until the lead says it is back (lead 13:5x: user wants it alone until 18:05 UTC, tunnel shut): no
+  NOSHAPE_RB_HOST=mac, no ssh/scp, no Mac scripts. Build on vibex7/vibex8.
 
 ## In flight: data exchange (lead 08:0x)
 Task: 10 corpus docs x every format + a drawing vs live's exports; re-import live's STEP / x_t; times vs live's.

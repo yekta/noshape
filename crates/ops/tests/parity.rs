@@ -696,6 +696,15 @@ pub(crate) fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
             features["derivedSources"][element.as_str()] = json!({ "doc": doc, "live": lines, "refs": refs });
         }
     }
+    // Onshape's standard frame profile studios (derived/<element>/options.tsv: index, option id, display name).
+    for d in std::fs::read_dir(dir.join("derived")).into_iter().flatten().flatten().map(|e| e.path()) {
+        let (Some(element), Ok(text)) = (d.file_name().map(|n| n.to_string_lossy().to_string()), std::fs::read_to_string(d.join("options.tsv"))) else { continue };
+        for row in text.lines().filter(|l| !l.starts_with('#')).map(|l| l.split('\t').collect::<Vec<_>>()) {
+            if let [_, id, name, ..] = row.as_slice() {
+                features["profileOptions"][element.as_str()][*id] = json!(name);
+            }
+        }
+    }
     Some((features, live, refs))
 }
 
