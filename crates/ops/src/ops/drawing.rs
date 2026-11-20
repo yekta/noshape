@@ -90,7 +90,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "get",
             summary: "A drawing sheet's views (with their edges in sheet coordinates), annotations and tables",
-            description: "Coordinates are sheet millimeters from the sheet's lower-left corner. Each view lists its kind, parent, scale, sheet bounds and the model edges as drawn (lines with end points, circles/arcs with center and radius, all in sheet mm) so you can click them with drawing_dimension.",
+            description: "Coordinates are sheet millimeters from the sheet's lower-left corner. Each view lists its kind, parent, scale, sheet bounds, `error` when it couldn't be computed (the app's red frame) and the model edges as drawn (lines with end points, circles/arcs with center and radius, all in sheet mm) so you can click them with drawing_dimension.",
             fields: vec![doc_field(), drawing_field(), sheet_field(), opt("edges", json!({ "type": "boolean", "default": true }), "Include each view's edges: its model edges (line / circle / arc / curve) and the silhouettes of curved faces (`silhouette`), in sheet mm.")],
             mutates: false,
             destructive: false,
@@ -473,6 +473,10 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             let pl = m.built.as_ref().and_then(|b| b.placement(v.id)).copied();
             if let Some(pl) = pl {
                 j["bounds"] = json!({ "min": pt(pl.min), "max": pt(pl.max) });
+            }
+            // A view that couldn't be computed says why, as its red frame's tooltip.
+            if let Some(e) = m.geoms.get(&v.id).and_then(|g| g.error.clone()) {
+                j["error"] = json!(e);
             }
             if edges
                 && let (Some(pl), Some(g)) = (pl, m.geoms.get(&v.id))

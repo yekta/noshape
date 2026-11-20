@@ -869,6 +869,7 @@ pub fn yellow_banner(text: String, done: impl Fn(&ClickEvent, &mut Window, &mut 
         .child(crate::ui_script::mark(
             div()
                 .id("banner-done")
+                .debug_selector(|| "banner-done".into())
                 .h(px(22.))
                 .px(px(10.))
                 .flex()

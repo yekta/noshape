@@ -129,9 +129,15 @@ impl DrawingEditor {
                         *config = Some(values);
                     }
                 }),
-                None => self.edit("Change configuration", cx, |dr| {
-                    noshape_scene::drawing_tools::view_edit::change_configuration(dr, tab, &part, &values);
-                }),
+                None => {
+                    let defaults = match self.doc.read(cx).session.doc.tab(tab).map(|t| &t.content) {
+                        Some(TabContent::PartStudio(ps)) => ps.configuration.defaults(),
+                        _ => Default::default(),
+                    };
+                    self.edit("Change configuration", cx, |dr| {
+                        noshape_scene::drawing_tools::view_edit::change_configuration(dr, tab, &part, &values, &defaults);
+                    })
+                }
             }
             self.ensure_sources(false, cx);
         }

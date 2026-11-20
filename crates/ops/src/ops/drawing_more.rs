@@ -391,12 +391,13 @@ fn change_configuration(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let sheet = t.sheet;
     let v = view_arg(&t, a, "view")?;
     let (key, part) = noshape_model::drawing::views::view_source(&t.d.sheets[sheet], v).ok_or_else(|| OpError::param("view", "the view shows no model"))?;
-    if !matches!(od.doc().tab(key.tab).map(|x| &x.content), Some(noshape_model::document::TabContent::PartStudio(ps)) if !ps.configuration.inputs.is_empty()) {
-        return Err(OpError::param("view", "its reference has no configuration inputs"));
-    }
+    let defaults = match od.doc().tab(key.tab).map(|x| &x.content) {
+        Some(noshape_model::document::TabContent::PartStudio(ps)) if !ps.configuration.inputs.is_empty() => ps.configuration.defaults(),
+        _ => return Err(OpError::param("view", "its reference has no configuration inputs")),
+    };
     let mut config = key.config.clone();
     config.0.extend(super::source_config_arg(od, key.tab, a)?.0);
-    ve::change_configuration(&mut t.d, key.tab, &part, &config);
+    ve::change_configuration(&mut t.d, key.tab, &part, &config, &defaults);
     let tab = t.tab;
     commit(od, tab, sheet, t.d, "Change configuration")?;
     Ok(reply(od, tab, sheet, false)?.into())

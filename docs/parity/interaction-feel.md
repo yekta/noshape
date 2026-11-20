@@ -193,20 +193,20 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | A / Q | flip primary axis / reorient secondary 90° | the same (`flip`, `reorient`) | ui-parity asm-revolute-pin-hole-flip | = |
 | A / Q: what moves (live2 mate-keys-1118, Revolute on pin-block) | only the free instance (the first chip's); Q turns it −90° about the mate's Z round the connectors' origin (twice: 180°); A turns it 180° about the connector's Y there (the pin's z −5 → +25 mm about the z = 10 connector); the first A right after opening an edit did nothing (one run) | the same: only the free instance moves; Q a quarter turn about the connectors' Z, −90° on pin-block (d9fce0c0); A in a fresh edit 180° about the connector's Y (the flip and half a turn of the held free angle, assembly_behaviors `flip_or_reorient`) | q_in_an_edited_revolute_turns_the_free_part_a_quarter, a_in_an_edited_revolute_turns_the_free_part_over_about_y, an_edited_revolutes_q_and_a_turn_the_free_part_as_live | = |
 | I / J / H / K | Insert / hide-show mates / Show mates mode / hide-show connectors | the same (actions.rs) | ui-parity asm-h-key-show-mates-mode, asm-j-shows-mates, asm-i-key-insert-escape | = |
-| Ctrl+M / Shift+S | Mate connector / Snap mode | the same | – | = |
+| Ctrl+M / Shift+S | Mate connector / Snap mode | the same | `the_shortcut_map_matches_lives` (the keys), GPU feel `the_assembly_keys_act_as_live` (Shift+S) | = |
 | Dialog on open | 220 px at the graphics' top left, "Fastened 1", the row in the list at once, red | the same (`assembly_mate_dialog`) | ui-parity asm-m-fastened-escape | = |
 | Fields | type ▾; Mate connectors with Reorder items; chips "… (Click to edit)" ×; Offset; Simulation connection; Flip / Reorient / ▶ / Solve | the same | – | = |
-| Type order | Slider, Cylindrical, Revolute, Pin slot, Planar, Ball, Fastened, Parallel | the same (`MATE_TYPE_ORDER`) | – | = |
+| Type order | Slider, Cylindrical, Revolute, Pin slot, Planar, Ball, Fastened, Parallel | the same (`MATE_TYPE_ORDER`) | `the_type_select_lists_lives_order` | = |
 | Which part moves | the first pick's part moves onto the second; a fixed part never | the same (`new_mate_stays`) | `a_mate_gets_its_heads_up_check_after_the_second_pick` | = |
-| After the second pick | the part jumps to its mated place, no animation | the same | – | = |
+| After the second pick | the part jumps to its mated place, no animation | the same | GPUI `a_new_mates_preview_moves_the_first_pick_alone_and_its_group_after_the_check` (the jump; no animation: no test) | = |
 | Mate axes | X/Y/Z 50 px at the connector (screen size) | the same (`ScreenTriads`, camera geometry) | `mate_axes_stay_50_px_at_any_zoom` | = |
 | Floating toolbar | grip, type, flip, reorient, Solve, ✓, ✗ | the same (`render_mate_hud`) | ui-parity asm-fastened-two-faces | = |
 | Toolbar's place | top left ~12 px right of and 14 px below the second pick (live2 18:20) | the same (`render_mate_hud`) | – | = |
 | Toolbar's grip (live2 place-1118) | a press-drag on the top grip moves the toolbar with the pointer; it stays where released; Esc ×2 still cancels the mate | the same (green 548d795fb, pin-block: dragged (−300, +400), stayed, Esc ×2 cancelled) | – | = |
-| Type switch | connectors, Offset, flip and reorient kept; the name follows the type; offset fields follow it | the same (`set_type`, `offset_axes`) | – | = |
+| Type switch | connectors, Offset, flip and reorient kept; the name follows the type; offset fields follow it | the same (`set_type`, `offset_axes`) | GPUI `a_new_mates_type_switch_takes_that_types_next_name` (offsets: no test) | = |
 | Connector chip | Click to edit: the Mate connector sub-dialog beside (Realign adds the axis fields) | the same | – | = |
 | ▶ preview | 90 frames out and back from the mate's zero (a turn, ¼ of the view's width) | the same (asm 43736c55, e9941770) | asm's tests | = |
-| Mate row hover | both parts outlined, the marker, a flyout with the name and parameters | the same (`list_hover_mate`, `mate_tooltip`) | – | = |
+| Mate row hover | both parts outlined, the marker, a flyout with the name and parameters | the same (`list_hover_mate`, `mate_tooltip`) | GPU `a_hovered_mate_row_lights_both_parts_and_its_glyph`, `a_mate_rows_flyout_shows_the_type_alone_until_a_parameter_is_set` | = |
 | Mate menu | Rename … Delete | the same | `two_selected_mates_have_lives_menu`, ui-parity | = |
 | Animate… | … Playback type Reciprocate ▾ and an icon button "Reverse playback" (live2 18:30) | the same | – | = |
 | Named positions, empty | the how-to text and its help link, Add named position | the same (17:18) | – | = |
@@ -214,7 +214,7 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Insert preview | the instance follows the pointer, solid orange; a click drops it | the same | – | = |
 | Insert preview's hidden edges | outlined orange through other parts; nothing lit under the pointer | the same (`xray_tops`, hidden-only #ffc04c edges, `Instance::see_through_self`: not through the preview itself) | render `see_through_self_lines_skip_their_own_mesh` | = (fixed) |
 | Insert Esc, pending | drops only the instance on the pointer, keeps the dialog | the same (asm e9941770) | asm-insert-esc-pending (live take: REQUESTS 2985, answered) | = |
-| Insert Esc, none pending | closes and removes the session's instances | the same (`cancel_insert`) | – | = |
+| Insert Esc, none pending | closes and removes the session's instances | the same (`cancel_insert`) | GPUI `cancelling_an_insertion_offers_restore`, `closing_the_insert_dialog_after_esc_leaves_no_redo` | = |
 | Insert ✓ | keeps all, the pending one at identity; one undo step | the same (asm e9941770) | asm-insert-ok-pending (live take: REQUESTS 2985, answered) | = |
 | Ring snap | 5° / 1° / 0.1° by the arc at the pointer's radius ≤ 50 px, within 0.4 × (1 + level/3) of a step | the same (asm 641ab465, `ring_snap`) | asm's tests | = |
 | Snap mode ghost | the source part at 0.3 opacity | the same (17:18) | – | = |
@@ -226,20 +226,20 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
 | Exploded views panel | 3rd of the strip; empty: Add exploded view, illustration, how-to, help link | the same (Simulation left out: cloud) | ui-parity asm-explode-panel, asm-explode-add-view | = |
-| Add exploded view | "Explode 1" in edit mode: yellow "Editing Explode 1 / Done", toolbar only undo/redo, the blue how-to, the rollback bar | the same | – | = |
+| Add exploded view | "Explode 1" in edit mode: yellow "Editing Explode 1 / Done", toolbar only undo/redo, the blue how-to, the rollback bar | the same | GPUI `an_exploded_views_done_puts_the_parts_back` (editing, the banner) | = |
 | Selecting an instance | orange outline through other parts (in explode edit mode too, live2 11-14), a triad (3 arrows, 3 rings, centre) | the same (render `Instance::outline_through`: the silhouette's outline outside its own image, no depth test) | render `an_outline_through_shows_past_the_part_in_front` | = (fixed) |
-| Arrow drag | moves live, no value box; on release the Explode step dialog; only that arrow stays | the same | – | = |
+| Arrow drag | moves live, no value box; on release the Explode step dialog; only that arrow stays | the same | GPUI `a_short_explode_arrow_drag_makes_a_0_mm_step` (the dialog on release) | = |
 | Ring drag | a Rotation step, 5° steps, Specify axis | the same (`ring_snap`, 17:18; was 1°) | `explode_drag_values_round` | = |
 | ✓ / Esc on the step | keeps / removes the step | the same | GPUI `esc_on_a_new_explode_step_removes_it_and_ends_the_editing` | = |
-| Done | back to mated positions, toolbar back | the same | – | = |
-| Row click | selects (blue), tooltip with its name, no explode | the same (17:18: the tooltip) | – | = |
+| Done | back to mated positions, toolbar back | the same | GPUI `an_exploded_views_done_puts_the_parts_back` (the toolbar: no test) | = |
+| Row click | selects (blue), tooltip with its name, no explode | the same (17:18: the tooltip) | GPUI `an_exploded_views_row_click_only_selects_and_a_hovered_step_lights_its_parts` (the tooltip: no test) | = |
 | Row menus | collapsed: Activate, Rename, Reset starting position, Duplicate, Delete; active: Collapse, Rename, Show / Hide all explode lines, Delete | the same | ui-parity asm-explode-row-menu, -row-menu-editing | = |
-| Activate | the exploded state, editing again; a hovered step row outlines its instances | the same (17:18: the outline, `step_hover`) | – | = |
+| Activate | the exploded state, editing again; a hovered step row outlines its instances | the same (17:18: the outline, `step_hover`) | GPUI `activating_an_exploded_view_jumps_to_it_and_to_fit`, `an_exploded_views_row_click_only_selects_and_a_hovered_step_lights_its_parts` | = |
 | Camera menu | Isometric … Section view… | the same (camera_menu.rs) | – | = |
-| Section view… | opens empty with the blue hint "Select a plane, planar face, cylinder, cone, or mate connector." (live2 18:20); Exclude / Include; Items to exclude | the same (the Part Studio's hint) | – | = |
-| Section: a face click | adds a plane through the face (live2 18:20) | the same (`section_pick`) | – | = |
-| Section Esc | cancels | the same | – | = |
-| Named views | New view name + "+", No views created, Select a view + ⊗ | the same (named_views_dialog.rs) | – | = |
+| Section view… | opens empty with the blue hint "Select a plane, planar face, cylinder, cone, or mate connector." (live2 18:20); Exclude / Include; Items to exclude | the same (the Part Studio's hint) | GPUI `a_section_view_opens_empty_takes_a_face_and_esc_cancels_it` | = |
+| Section: a face click | adds a plane through the face (live2 18:20) | the same (`section_pick`) | GPUI `a_section_view_opens_empty_takes_a_face_and_esc_cancels_it` | = |
+| Section Esc | cancels | the same | GPUI `a_section_view_opens_empty_takes_a_face_and_esc_cancels_it` | = |
+| Named views | New view name + "+", No views created, Select a view + ⊗ | the same (named_views_dialog.rs) | GPUI `a_named_view_is_no_undo_step` (Add, ⊗; the empty text: no test) | = |
 
 ### Instance list (fields.json): 22 / 22
 
@@ -251,7 +251,7 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Plain click | toggles the row | the same (`list_click`) | ui-parity asm-select-mate-row | = |
 | Ctrl+click | opens the context menu (live2 18:20; behaviours "skb (10-24)" (3)) | the same | GPUI `ctrl_click_opens_a_rows_menu_and_a_right_click_adds_its_row` | = |
 | Shift+click | the range from the last clicked row, added; after a deselecting click from the top row | the same (17:18: the top row) | GPUI `shift_click_adds_the_rows_from_the_last_clicked_one` | = |
-| Esc / empty graphics | Esc keeps the selection; an empty graphics click clears | the same | – | = |
+| Esc / empty graphics | Esc keeps the selection; an empty graphics click clears | the same | GPU feel `esc_keeps_the_selection_and_an_empty_graphics_click_clears_it` | = |
 | Double-click an instance | its Part Studio, the part selected, "<assembly> displayed" bar | the same (17:18, `show_in_context`) | GPUI `a_double_click_on_an_instance_row_shows_its_part_studio_with_the_assembly` | = |
 | Rename | none for instances; Instance properties… (Reference designator) | the same | ui-parity asm-menu-instance-properties | = |
 | One instance's menu | Properties… … Delete | the same | `the_instance_and_top_row_menus_are_lives` | = |

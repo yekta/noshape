@@ -487,6 +487,63 @@ fn a_mate_rows_double_click_edits_the_mate(cx: &mut TestAppContext) {
     cx.update(|cx| assert_eq!(view.read(cx).mate.as_ref().and_then(|m| m.editing), Some(id), "a double-click opens Fastened 1's dialog"));
 }
 
+/// Interaction-feel "Mate row hover": a hovered mate row lights both its parts and shows its glyph in the frame it
+/// arrives; off the row both go (the flyout's rows: `a_mate_rows_flyout_shows_the_type_alone_until_a_parameter_is_set`).
+#[gpui::test]
+fn a_hovered_mate_row_lights_both_parts_and_its_glyph(cx: &mut TestAppContext) {
+    let (window, view) = mated_blocks(cx, "mate-row-hover");
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.show_mates = false;
+        v.refresh_scene(false, cx);
+    }));
+    draw(cx, window);
+    let id = cx.update(|cx| view.read(cx).result.mates[0].id);
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        let (scene, built) = (v.viewport.read(cx).scene(), v.built.as_ref().unwrap());
+        let a = v.assembly(cx).unwrap();
+        let mut names: Vec<String> = a.instances.iter().filter(|i| built.picks.faces_of(i.id).iter().any(|f| scene.states[*f as usize] & noshape_render::state::ACCENT != 0)).map(|i| i.name.clone()).collect();
+        names.sort();
+        (names, v.ui.overlay_mates.contains(&id))
+    });
+    assert_eq!(lit(cx), (vec![], false), "at rest, mates hidden: nothing lit, no glyph");
+    let at = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("mate-row Fastened 1").expect("Fastened 1's row").center();
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(at, None, Modifiers::default());
+    draw(cx, window);
+    assert_eq!(lit(cx), (vec!["Part 1 <1>".to_string(), "Part 2 <1>".to_string()], true), "hovered: both parts and the glyph");
+    let off = at_window(cx, &view, DVec2::new(20.0, 20.0));
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(off, None, Modifiers::default());
+    draw(cx, window);
+    assert_eq!(lit(cx), (vec![], false), "off the row: gone");
+}
+
+/// Interaction-feel "Esc / empty graphics" (assembly instance list): a part clicked in the graphics stays selected
+/// through Esc; a click on the empty graphics clears it.
+#[gpui::test]
+fn esc_keeps_the_selection_and_an_empty_graphics_click_clears_it(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (window, view) = mated_blocks(cx, "esc-empty");
+    let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
+    let on_part = (lo + hi) * 0.5;
+    move_to(cx, window, &view, on_part);
+    wait_until(cx, window, &view, |v, _| v.hover.is_some());
+    let w = at_window(cx, &view, on_part);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(w, Modifiers::default());
+    wait_until(cx, window, &view, |v, _| !v.selected.is_empty() || !v.ui.entity_sel.is_empty());
+    settle(cx, window, &view);
+    let taken = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).selected.len() + view.read(cx).ui.entity_sel.len());
+    assert!(taken(cx) > 0, "the click took the part");
+    press(cx, window, &view, crate::actions::Cancel);
+    assert!(taken(cx) > 0, "Esc keeps the selection");
+    let empty = DVec2::new(20.0, 20.0);
+    move_to(cx, window, &view, empty);
+    let w = at_window(cx, &view, empty);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(w, Modifiers::default());
+    wait_until(cx, window, &view, |v, _| v.selected.is_empty() && v.ui.entity_sel.is_empty());
+    settle(cx, window, &view);
+    assert_eq!(taken(cx), 0, "an empty graphics click clears it");
+}
+
 /// Live selother-ball-1119: Select other (`) with the pointer over the background off a part's silhouette edge lists
 /// "Edge of Part 1 <1>" and the part out to 8 px, the face behind that edge and the part from 9 to 11 px, and nothing
 /// from 12 px.

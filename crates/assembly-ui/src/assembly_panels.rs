@@ -2960,6 +2960,7 @@ impl AssemblyView {
                 tree = tree.child(
                     h_flex()
                         .id(SharedString::from(format!("ex-row-{i}")))
+                        .debug_selector(move || format!("ex-row-{i}"))
                         .map(|d| crate::ui_script::mark(d, || format!("panel_row:{name}")))
                         .h(px(26.))
                         .border_l(px(5.))
@@ -3100,6 +3101,7 @@ impl AssemblyView {
                     steps = steps.child(
                         h_flex()
                             .id(SharedString::from(format!("ex-step-{i}-{k}")))
+                            .debug_selector(move || format!("ex-step-{i}-{k}"))
                             .h(px(26.))
                             .pl(px(5. + 20. + 15.))
                             .when(step_sel, |d| d.bg(pal.accent_soft))

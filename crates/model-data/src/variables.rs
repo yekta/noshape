@@ -628,6 +628,11 @@ fn ref_variables(doc: &crate::Document, r: &StudioRef, visiting: &mut Vec<TabId>
 /// the tables inserted into it in scope.
 pub fn studio_evaluation(doc: &crate::Document, studio: TabId) -> noshape_units::TableEvaluation {
     let Some(vs) = studio_of(doc, studio) else { return VariableStudio::default().evaluate(&doc.settings.units) };
+    studio_evaluation_as(doc, studio, vs)
+}
+
+/// [`studio_evaluation`] with the studio's table as `vs` (a row about to be added, checked first).
+pub fn studio_evaluation_as(doc: &crate::Document, studio: TabId, vs: &VariableStudio) -> noshape_units::TableEvaluation {
     let vs = vs.configured(&vs.configuration.active);
     let mut outer = BTreeMap::new();
     let mut visiting = vec![studio];

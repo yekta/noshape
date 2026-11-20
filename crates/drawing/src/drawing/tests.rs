@@ -5833,3 +5833,34 @@ fn a_dragged_view_takes_its_aligned_family_as_live() {
     assert_eq!(moved(&sheet, 3, [0.0, -40.0]), vec![(3, [200.0, 40.0])]);
     assert_eq!(moved(&sheet, 1, [0.0, -20.0]).iter().map(|x| x.0).collect::<Vec<_>>(), vec![1]);
 }
+
+/// A view that can't be computed is cached as a good one, under its inputs: asked again (every frame) it is the same
+/// answer, computed once; its inputs changed, it is computed anew (lead 11-20, the 19:18 red's follow-up).
+#[test]
+fn a_failed_view_is_computed_once_until_its_inputs_change() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let set_part = |d: &mut Drawing, p: Option<crate::reference::BodyId>| match d.sheets[0].view_mut(ViewId(1)).map(|v| &mut v.kind) {
+        Some(ViewKind::Base { part, .. }) => *part = p,
+        _ => panic!("view 1 is a base view"),
+    };
+    let real = match &drawing.sheets[0].view(ViewId(1)).unwrap().kind {
+        ViewKind::Base { part, .. } => part.clone(),
+        _ => panic!("view 1 is a base view"),
+    };
+    let gone = |index| Some(crate::reference::BodyId { feature: crate::reference::FeatureId(u64::MAX - 7), index });
+    set_part(&mut drawing, gone(0));
+    let first = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
+    assert_eq!(first.error.as_deref(), Some(views::PART_NOT_RESOLVED));
+    for _ in 0..3 {
+        let again = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
+        assert!(std::sync::Arc::ptr_eq(&first, &again), "asked again: the cached failure, not computed anew");
+    }
+    set_part(&mut drawing, gone(1));
+    let other = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
+    assert!(!std::sync::Arc::ptr_eq(&first, &other) && other.error.is_some(), "another part: computed anew");
+    set_part(&mut drawing, real);
+    let good = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
+    assert!(good.error.is_none() && !good.edges.is_empty(), "the part back: drawn ({:?})", good.error);
+}

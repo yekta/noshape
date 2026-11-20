@@ -84,6 +84,8 @@ pub fn merge_part_studio_with(base: &PartStudio, ours: &PartStudio, theirs: &Par
     // Configuration / properties: take theirs if only they changed.
     if ours.configuration == base.configuration && theirs.configuration != base.configuration {
         result.configuration = theirs.configuration.clone();
+    } else if theirs_wins && theirs.configuration != base.configuration {
+        merge_configuration_from_source(&base.configuration, &theirs.configuration, &mut result.configuration);
     }
     if ours.part_properties == base.part_properties && theirs.part_properties != base.part_properties {
         result.part_properties = theirs.part_properties.clone();
@@ -99,6 +101,30 @@ pub fn merge_part_studio_with(base: &PartStudio, ours: &PartStudio, theirs: &Par
     }
     result.rollback = None;
     (result, report)
+}
+
+/// A Merge where both sides changed the configuration: the source's inputs if it changed them, and each configured
+/// parameter the source changed takes the source's whole value list (live dm batch 2: Main's Large 50 mm lost to B1's
+/// Small 25 / Large 45, no conflict).
+fn merge_configuration_from_source(base: &crate::configuration::Configuration, theirs: &crate::configuration::Configuration, result: &mut crate::configuration::Configuration) {
+    if theirs.inputs != base.inputs {
+        result.inputs = theirs.inputs.clone();
+    }
+    let same = |a: &crate::configuration::ConfiguredParam, b: &crate::configuration::ConfiguredParam| a.feature == b.feature && a.param == b.param;
+    for t in &theirs.configured {
+        if base.configured.contains(t) {
+            continue;
+        }
+        match result.configured.iter_mut().find(|r| same(r, t)) {
+            Some(r) => *r = t.clone(),
+            None => result.configured.push(t.clone()),
+        }
+    }
+    for b in &base.configured {
+        if !theirs.configured.iter().any(|t| same(t, b)) {
+            result.configured.retain(|r| !same(r, b));
+        }
+    }
 }
 
 /// Merge serialized tabs; returns merged bytes (None = deleted).

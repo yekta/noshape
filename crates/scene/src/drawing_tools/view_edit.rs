@@ -204,7 +204,13 @@ pub fn replace_reference(d: &mut Drawing, old: noshape_model::document::TabId, o
 /// the views derived from them (one drawing edit "Change configuration";
 /// live behaviours S6: every view of the reference changes, from either
 /// tab of the panel). Returns how many base views changed.
-pub fn change_configuration(d: &mut Drawing, tab: noshape_model::document::TabId, part: &Option<noshape_model::BodyId>, config: &noshape_model::configuration::ConfigValues) -> usize {
+/// Every input is stored, those not given at the reference's `defaults` (live dm batch 2: unchecking Boss gives every
+/// view "Boss=false;Height=10+mm;Size=Small").
+pub fn change_configuration(d: &mut Drawing, tab: noshape_model::document::TabId, part: &Option<noshape_model::BodyId>, config: &noshape_model::configuration::ConfigValues, defaults: &noshape_model::configuration::ConfigValues) -> usize {
+    let mut config = config.clone();
+    for (k, v) in &defaults.0 {
+        config.0.entry(k.clone()).or_insert_with(|| v.clone());
+    }
     let mut n = 0;
     for v in d.sheets.iter_mut().flat_map(|s| s.views.iter_mut()) {
         if let ViewKind::Base { source, part: p, config: c, .. } = &mut v.kind

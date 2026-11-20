@@ -1416,6 +1416,80 @@ fn variable_studio_tables_in_part_studios() {
     assert_eq!(e.param.as_deref(), Some("column_widths"), "{e:?}");
 }
 
+/// A Variable Studio using another's variables (live dm3, behaviours "Data-management coverage (11-20)"): Derived's
+/// h = #w * 2 is refused until Dims is inserted; a Part Studio inserting only Derived sees Dims' #w too, an inch value
+/// in the document's units.
+#[test]
+fn a_variable_studio_uses_an_inserted_studios_variables() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "vs-derived.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [10, 10]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "tab_create", json!({ "kind": "variablestudio", "name": "Dims" }));
+    call(&mut ctx, "variable_create", json!({ "tab": "Dims", "name": "w", "value": "0.5 in" }));
+    call(&mut ctx, "tab_create", json!({ "kind": "variablestudio", "name": "Derived" }));
+    let e = try_call(&mut ctx, "variable_create", json!({ "tab": "Derived", "name": "h", "value": "#w * 2" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("value"), "refused before Dims is inserted: {e:?}");
+    call(&mut ctx, "variable_insert_studio", json!({ "tab": "Derived", "studio": "Dims" }));
+    call(&mut ctx, "variable_create", json!({ "tab": "Derived", "name": "h", "value": "#w * 2" }));
+    call(&mut ctx, "variable_insert_studio", json!({ "tab": "Part Studio 1", "studio": "Derived" }));
+    let ex = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "#h" } }));
+    assert_eq!(ex["feature_status"]["status"], "Ok", "{ex}");
+    let vol = num(&call(&mut ctx, "query_parts", json!({}))["parts"][0]["volume"]);
+    assert!((vol - 2540.0).abs() < 1e-6, "#h = 25.4 mm: {vol}");
+    let l = call(&mut ctx, "variable_list", json!({ "tab": "Part Studio 1" }));
+    assert_eq!((l["visible_at_end"]["#w"].as_str(), l["visible_at_end"]["#h"].as_str()), (Some("12.7 mm"), Some("25.4 mm")), "{l}");
+}
+
+/// A configured Variable Studio (live dm batch 2, "Cfg"): its configuration variable t (5 mm by default) is passed as
+/// 7 mm by the Part Studio inserting it, where th = #t * 2 is 14 mm; "#t * 2" is refused until t exists.
+#[test]
+fn a_part_studio_passes_a_variable_studios_configuration_variable() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "vs-config-var.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [10, 10]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "variable_create_studio", json!({}));
+    let vs = "Variable Studio 1";
+    call(&mut ctx, "variable_studio_settings", json!({ "tab": vs, "insert_into_all": false }));
+    let e = try_call(&mut ctx, "variable_create", json!({ "tab": vs, "name": "th", "value": "#t * 2" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("value"), "{e:?}");
+    call(&mut ctx, "config_add_input", json!({ "tab": vs, "kind": "variable", "name": "t", "value": "5 mm" }));
+    call(&mut ctx, "variable_create", json!({ "tab": vs, "name": "th", "value": "#t * 2" }));
+    call(&mut ctx, "variable_insert_studio", json!({ "studio": vs, "configuration": { "t": "7 mm" } }));
+    let ex = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "#th" } }));
+    assert_eq!(ex["feature_status"]["status"], "Ok", "{ex}");
+    let vol = num(&call(&mut ctx, "query_parts", json!({}))["parts"][0]["volume"]);
+    assert!((vol - 1400.0).abs() < 1e-6, "#th = 14 mm: {vol}");
+    let l = call(&mut ctx, "variable_list", json!({ "tab": "Part Studio 1" }));
+    assert_eq!(l["visible_at_end"]["#th"].as_str(), Some("14 mm"), "{l}");
+}
+
+/// A Merge where both workspaces changed the same configured parameter (live dm batch 2, cov-dm-config): the branch's
+/// whole value list wins, Main's own change is lost.
+#[test]
+fn a_merge_takes_the_branchs_configured_values() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "merge-config.noshape");
+    call(&mut ctx, "config_add_input", json!({ "kind": "list", "name": "Size" }));
+    call(&mut ctx, "config_add_option", json!({ "input": "Size", "name": "Large" }));
+    call(&mut ctx, "config_configure", json!({ "feature": "Extrude 1", "param": "depth", "input": "Size" }));
+    call(&mut ctx, "config_set_value", json!({ "feature": "Extrude 1", "param": "depth", "configuration": "Large", "value": "40 mm" }));
+    let main = call(&mut ctx, "document_info", json!({}))["branch"].as_str().unwrap().to_string();
+    call(&mut ctx, "history_create_version", json!({ "name": "base" }));
+    call(&mut ctx, "history_create_branch", json!({ "name": "B1" }));
+    call(&mut ctx, "config_set_value", json!({ "feature": "Extrude 1", "param": "depth", "configuration": "Default", "value": "25 mm" }));
+    call(&mut ctx, "config_set_value", json!({ "feature": "Extrude 1", "param": "depth", "configuration": "Large", "value": "45 mm" }));
+    call(&mut ctx, "history_switch_branch", json!({ "branch": main }));
+    call(&mut ctx, "config_set_value", json!({ "feature": "Extrude 1", "param": "depth", "configuration": "Large", "value": "50 mm" }));
+    call(&mut ctx, "history_merge", json!({ "branch": "B1" }));
+    let c = call(&mut ctx, "config_list", json!({}));
+    let values = &c["configured"][0]["values"];
+    let mut got: Vec<String> = values.as_object().unwrap_or_else(|| panic!("{c}")).values().map(|v| v.as_str().unwrap_or_default().to_string()).collect();
+    got.sort();
+    assert_eq!(got, ["25 mm", "45 mm"], "{c}");
+}
+
 /// A Variable Studio's Configuration panel through the config ops: a List
 /// input, a row, a configured Value, the configuration a Part Studio
 /// inserts the studio in, the row menu and Unconfigure.
@@ -4189,6 +4263,39 @@ fn drawing_jogged_and_aligned_sections() {
     assert_eq!(av["kind"], "aligned_section", "{av}");
     assert!(last(&mut ctx).ends_with(":: Aligned section view"));
 
+}
+
+/// A drawing of a configured Part Studio (live dm2, behaviours "Data-management coverage (11-20)"): its views show the
+/// given configuration's geometry, the default drawing's the default's.
+#[test]
+fn a_drawing_of_a_configuration_shows_its_geometry() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_config.noshape");
+    call(&mut ctx, "config_add_input", json!({ "kind": "list", "name": "Size" }));
+    call(&mut ctx, "config_add_option", json!({ "input": "Size", "name": "Large" }));
+    call(&mut ctx, "config_configure", json!({ "feature": "Extrude 1", "param": "depth", "input": "Size" }));
+    call(&mut ctx, "config_set_value", json!({ "feature": "Extrude 1", "param": "depth", "configuration": "Large", "value": "40 mm" }));
+    call(&mut ctx, "config_add_input", json!({ "kind": "checkbox", "name": "Boss" }));
+    // The base (Front) view: its height over its width (the 20 or 40 mm depth over the 80 mm block), its centre and
+    // configuration.
+    let base = |ctx: &mut Ctx, drawing: &Value| {
+        let g = call(ctx, "drawing_get", json!({ "drawing": drawing, "edges": false }));
+        let v = g["views"].as_array().unwrap().iter().find(|v| v["kind"] == "base").unwrap().clone();
+        let (lo, hi) = (&v["bounds"]["min"], &v["bounds"]["max"]);
+        let aspect = (num(&hi[1]) - num(&lo[1])) / (num(&hi[0]) - num(&lo[0]));
+        (aspect, [(num(&lo[0]) + num(&hi[0])) / 2.0, (num(&lo[1]) + num(&hi[1])) / 2.0], v["id"].clone(), v["configuration"].clone())
+    };
+    let create = |ctx: &mut Ctx, config: Value| call(ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true, "configuration": config }))["drawing"].clone();
+    let (first, second) = (create(&mut ctx, json!({})), create(&mut ctx, json!({ "Size": "Large" })));
+    let ((default, at, view, _), (large, ..)) = (base(&mut ctx, &first), base(&mut ctx, &second));
+    assert!((default - 0.25).abs() < 0.03 && (large - 0.5).abs() < 0.03, "default {default}, Large {large}");
+    // Sheets panel › reference › Change configuration... (live dm batch 2): the views change in place, each storing
+    // every input of the reference.
+    call(&mut ctx, "drawing_change_configuration", json!({ "drawing": first, "view": view, "configuration": { "Size": "Large" } }));
+    let (changed, at2, _, config) = base(&mut ctx, &first);
+    assert!((changed - 0.5).abs() < 0.03, "Large: {changed}");
+    assert!((at[0] - at2[0]).abs() < 0.01 && (at[1] - at2[1]).abs() < 0.01, "kept in place: {at:?} -> {at2:?}");
+    assert_eq!(config.as_object().map(|o| o.len()), Some(2), "Size and Boss: {config}");
 }
 
 #[test]

@@ -599,8 +599,18 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             if let Some(k) = a.opt_str("kind")? {
                 kind_of(k)?;
             }
-            value_text(a.get("value").expect("required"))?;
+            let value = value_text(a.get("value").expect("required"))?;
             let units = od.doc().settings.units;
+            // A value naming no variable this studio sees is refused (live dm3: 400 "Bad variable expression: #w * 2"
+            // until the studio defining #w is inserted).
+            let mut probe = vs_studio(od, tab)?.clone();
+            vs::add_variable(&mut probe, &name, &units);
+            let last = probe.variables.len() - 1;
+            vs::set_value(&mut probe, last, &value, &units);
+            let undefined = |e: &noshape_units::VarError| matches!(e, noshape_units::VarError::Undefined(_) | noshape_units::VarError::Eval(noshape_units::EvalError::UndefinedVariable(_)));
+            if noshape_model::variables::studio_evaluation_as(od.doc(), tab, &probe).results.last().is_some_and(|r| r.as_ref().is_err_and(undefined)) {
+                return Err(OpError::param("value", &format!("Bad variable expression: {value}")));
+            }
             vs_edit(od, tab, "Add variable", |s| vs::add_variable(s, &name, &units))?;
             let i = vs_studio(od, tab)?.variables.len() - 1;
             vs_set_fields(od, tab, i, a)?;

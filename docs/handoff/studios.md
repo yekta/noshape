@@ -9,56 +9,36 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 18:03 UTC.
+Updated 2026-11-20 21:22 UTC.
 
 ## In flight
 
-Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2
-tools/tiers/land.sh` (`--no-precheck` only when the code was clippy-checked unchanged); read `git diff --stat
-origin/main` first. App builds for shots on vibex7 / vibex6, never vibe2 (its one slot is the land queue's, lead 11-20 08:50; `scp -3 vibex7:tmp/studios/noshape vibe2:tmp/studios/noshape`, shots on vibe2); crate tests on the Mac or the lowest 1-min load of vibex7 / vibex8 (`NOSHAPE_RB_HOST=… tools/tiers/rb.sh`;
-read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edited during a running sync: `touch` edited files before
-the next run. Run the full ops e2e before any drawing land. vibex8 is qa's quiet speed window 02:00-04:00 (lead 11-20):
-nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdshots-host.sh (PD_HOST=vibe2 PD_DISP=395: first free display, never skasm's :391-399). A few app runs don't take ~/bin/slot (DECISIONS 11-15).
-- No Mac until the lead says it is back (user, not before 18:05 UTC): rb.sh / land.sh with NOSHAPE_RB_HOST=vibex7 or
-  vibex8; app builds on vibex6 when vibex7's slots are full (b35 waited 50 min there 15:37-16:27).
-- Landed 12:25: b5048cc1 as 16e0a7e3. Queued 16:5x: 491f2b01 (3 commits: tables / dimensions / panels as live's 11-20
-  takes; run.py panel fields for old recorders; Edge to edge centerline on a silhouette).
-- Checks for 491f2b01: b34 (78 takes, /root/studios-scratch/b34.scores) 74 full; b35 (43 table takes) 42 full. Not
-  full, not emulated: drw-inspection-diameter 13/15 (s13-14 live's repaint lag), drw-revision-table-delete 7/10 (live's
-  stale paint of the deleted table), drw-styles-radial 14/18 (after Styles docks, live's reader stretches sheet_px:
-  1879 px wide, 0.193 mm/px vs 0.255, so it reads the wrong boxes). x35/x36/x37 on vibex8: drawing 260, drawing-ui
-  128, full ops e2e 263, coverage 11, clippy clean.
-- Reader marks (drawing_ui_state): `+` new (>= live2 11-15.1), `-` old, `*` since 11-18.1 (a table just placed; any
-  selected table's grips), `^` since 11-08.1 (a hovered selected dimension's text). Recorders without "live2" read no
-  drawing-panel fields (run.py panel_fields_unread).
-- Matrix 17:16 (docs/parity/drawing-matrix.md, runs through b35 merged in /root/studios-scratch/uip-merged): 1235 =,
-  563 shown of 1842, 0 differ, 2 present-only, both asked of live (REQUESTS "studios (2026-11-20 17:15 UTC)"):
-  Datum "This field cannot be empty" (take drw-datum-empty-field) and "Split custom table below" (needs a two-part
-  start, block-drawing-table-2parts; take drw-custom-table-split). Re-run the matrix when they land.
-- Live's drawing coverage batches 1-3 (behaviours "## Drawing coverage (11-20)", shots live/drwcov/shots-b2b3/): queued
-  by live, not on main at 16:50. Done ahead: Edge to edge on a silhouette. Already as live: 2 point circle centerline
-  (centre, then a point). To check when the takes land: Centermark on a circle with its auto centermark adds nothing;
-  the 5 dimension takes (chamfer, arc length, max/min, virtual sharp, foreshorten) and batch 1's five.
-- b23 DONE 09:52 (vibex7 build): hide-dim 12/12, inspection-table-iso-scrolled 10/10, panel-lists 25/27 (still the
-  (285, 447) ▾: ours' Targets box in Angle mode is 370 px, under live's 400, so no scrollbar), revision-table-delete
-  7/10 (live's s7-s10 "EDGE Top" is the deleted table's stale paint). Both asked of live: REQUESTS "studios
-  (2026-11-20 09:55 UTC)".
-- Lead 11-20 17:2x: non-drawing areas in suite 1120-0407 (main 81d23c9b, 02:56 build): 671 doc/docs/fs/prefs/rel/
-  tab/variable/ver/vs takes, 598 matched, 70 differed, 3 not run. Re-shot on b35 (s36: 69 takes, s37: 4) and
-  rescored: all 73 match. 61 were the brand renames (62bb68a2a), 2 the crumb tooltip / Compare readout (11-20 06:10),
-  7 Properties takes a run.py bug (brand pass ran before the category normalisation: f29fe434, suite 2043 -> 2050).
-  ver-*-copy-link (4) exist only in /root/parity/ui/scenarios (old copy), not in the repo.
-- To land after 226bafad (CHECKING since 17:15): c70f0dfd (matrix) + f29fe434 (run.py).
-- Lead 11-20 17:4x: interaction-feel rows without a test in our sections (docs/parity/interaction-feel.md): 58 ->
-  33. Queued 18:03: 74cf59e2 (25 rows: 4 drawing, 11 documents / tabs, 8 instance list, 2 existing asm tests cited).
-  start-ui feel tests in start_feel_tests.rs (one hooks registration for the crate: `feel_tests::register_test_hooks`;
-  the fixture waits for the page's own folder scan before setting its documents). Left (asm): mates 13 (Fields, Type
-  order, toolbar place / grip, connector chip, Animate, named positions empty, snap ghost / lines; partial: Ctrl+M,
-  after the second pick, type switch, mate row hover, insert preview, insert Esc), views 10, list 4 (row tooltip:
-  every_instance_row_tooltips_its_name contradicts the row's "only a cut-off name"), 3D 4.
-- Live 18:0x: drw-custom-table-split + drw-datum-empty-field queued with start block-drawing-table-2parts (behaviours
-  "drawing matrix takes (11-20)"): shoot both, then re-run the matrix.
-- qa 11-20: 9 of 10 to-verify rows verified (6c3c0a8fe); FEEL-DRW-WHEEL-ZOOM-SLOW stays open (re-timed 02:00-04:00).
+Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE_RB_HOST=vibex8
+NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; read `git diff --stat origin/main...HEAD` first. App builds for
+shots on vibex7 / vibex6 (never vibe2: its slot is the land queue's), shots on vibe2 (rsync tests/ui-parity +
+tools/ui-parity to vibe2:agents/studios/src first). Crate tests on vibex7 / vibex8, every run under `timeout` (lead
+11-20 21:xx: a hung test held a vibex8 slot 43 min). `touch` edited files before rb.sh. Full ops e2e before a drawing
+land. vibex8 02:00-04:00 is qa's quiet window. Never `git checkout <file>` over uncommitted work (21:20 it wiped the
+e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
+- To land (WIP 49a54ca7f + edits; checks x52 / x53 on vibex8 running 21:2x):
+  - P0 19:18 follow-up: drawing_get reports a view's `error`; the drawing-ui fixture's panic prints the views and the
+    fixture starts with `drop_cached_views()` (T1's tests share one process); test
+    `a_failed_view_is_computed_once_until_its_inputs_change` (failures cached by view_key, as main already did). The
+    "don't cache failed views" try was reverted: it made a part-gone view recompute every frame (hung
+    feel::a_view_whose_part_is_gone_goes_blank_with_failed_to_resolve_part).
+  - Live drw-custom-table-split: the original stays selected (fill_os_menu `keeps`). Not re-shot yet.
+  - Live dm batches 1-2: drawing Change configuration stores every input (defaults filled; app + op); merge from a
+    branch takes the branch's configured values (merge.rs `merge_configuration_from_source`); variable_create refuses
+    a value naming no visible variable ("Bad variable expression: …", param value); e2e tests for the four.
+  - Feel (asm): 16 rows with tests now (feel doc), 16 left: Fields, Toolbar's place / grip, Connector chip, Animate…,
+    Named positions empty, Insert preview, Snap mode ghost / lines, Camera menu, Suppressed mate, Failed mate's marks,
+    Graphics → list (2), Implicit over an edge, Drag feel (software GL), Short press.
+- Next (lead P1, after this land): random OCCT HLR load failures (hlr.cpp retries a load once, then falls back to the
+  triangulation: the likely 19:18 "no line on the first view"). Stress test drafted in
+  /root/studios-scratch/hlr_stress.rs (200 serial vs 8 threads x 200 on one shape; T2). If only parallel fails:
+  serialise HLR's load / Update behind a mutex (or find the shared state), drop the retry if unneeded. Kernel C++:
+  compile with g++-13 against /opt/occt before landing.
+- Then: re-shoot drw-custom-table-split + drw-datum-empty-field (start block-drawing-table-2parts), re-run the matrix.
 
 ## Next, in order
 1. Lead 11-20: the drawing matrix's items not yet matching, by use (dialogs, menus, placement, rarer panels): check

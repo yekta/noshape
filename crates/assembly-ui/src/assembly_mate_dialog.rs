@@ -1286,6 +1286,12 @@ pub fn flip_icon_name(on: bool) -> &'static str {
 mod limit_text_tests {
     use super::*;
 
+    /// Interaction-feel "Type order": the type select lists live's eight in live's order.
+    #[::core::prelude::v1::test]
+    fn the_type_select_lists_lives_order() {
+        assert_eq!(MATE_TYPE_ORDER.map(|t| t.name()), ["Slider", "Cylindrical", "Revolute", "Pin slot", "Planar", "Ball", "Fastened", "Parallel"]);
+    }
+
     #[::core::prelude::v1::test]
     fn limits_commit_with_units_like_onshape() {
         // qa4 round 4 S2-a: "50" → "50 mm" (offsets do the same); rotations

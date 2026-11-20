@@ -4094,7 +4094,7 @@ Examples:
 
 A drawing sheet's views (with their edges in sheet coordinates), annotations and tables.
 
-Coordinates are sheet millimeters from the sheet's lower-left corner. Each view lists its kind, parent, scale, sheet bounds and the model edges as drawn (lines with end points, circles/arcs with center and radius, all in sheet mm) so you can click them with drawing_dimension.
+Coordinates are sheet millimeters from the sheet's lower-left corner. Each view lists its kind, parent, scale, sheet bounds, `error` when it couldn't be computed (the app's red frame) and the model edges as drawn (lines with end points, circles/arcs with center and radius, all in sheet mm) so you can click them with drawing_dimension.
 
 Examples:
 

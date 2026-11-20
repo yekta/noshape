@@ -1521,6 +1521,98 @@ fn activating_an_exploded_view_jumps_to_it_and_to_fit(cx: &mut TestAppContext) {
     .unwrap();
 }
 
+/// Interaction-feel "Add exploded view" / "Done": Add exploded view opens "Explode 1" editing (the yellow banner);
+/// its step moves the pin; the banner's Done puts the parts back where the mates have them and ends the editing.
+#[gpui::test]
+fn an_exploded_views_done_puts_the_parts_back(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "explode-done");
+    let (pin, before) = cx.update(|cx| {
+        let v = view.read(cx);
+        let pin = instance(v, "Part 2 <1>", cx);
+        (pin, v.result.instance_bounds(pin).unwrap())
+    });
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.add_exploded_view(cx);
+        let step: noshape_model::assembly::ExplodeStep = serde_json::from_value(json!({ "instances": [pin], "translation": [0.0, 0.0, 0.5], "rotation_axis": null, "rotation_angle": 0.0 })).unwrap();
+        v.push_explode_step(step, cx);
+    }));
+    draw(cx, window);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.explode_edit && v.explode == Some(0), "editing Explode 1");
+        assert!((v.result.instance_bounds(pin).unwrap().0.z - before.0.z - 0.5).abs() < 1e-6, "the step moved the pin");
+    });
+    let done = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("banner-done").expect("the banner's Done");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(done.center(), gpui_kit::Modifiers::none());
+    draw(cx, window);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(!v.explode_edit && v.explode.is_none(), "Done ends the editing");
+        assert!((v.result.instance_bounds(pin).unwrap().0 - before.0).length() < 1e-6, "the pin back at its mated place");
+        assert_eq!(v.assembly(cx).unwrap().exploded_views[0].steps.len(), 1, "the step kept");
+    });
+    assert!(gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("banner-done").is_none(), "the banner gone");
+}
+
+/// Interaction-feel "Row click" / "Activate" (Exploded views panel): a click on a view's row selects it and explodes
+/// nothing; activated, a hovered step row lights its instances.
+#[gpui::test]
+fn an_exploded_views_row_click_only_selects_and_a_hovered_step_lights_its_parts(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "explode-row");
+    let pin = cx.update(|cx| instance(view.read(cx), "Part 2 <1>", cx));
+    cx.update(|cx| view.update(cx, |v, cx| {
+        let step: noshape_model::assembly::ExplodeStep = serde_json::from_value(json!({ "instances": [pin], "translation": [0.0, 0.0, 0.5], "rotation_axis": null, "rotation_angle": 0.0 })).unwrap();
+        v.edit("Insert : Explode 1", cx, |a| a.exploded_views.push(noshape_model::assembly::ExplodedView { name: "Explode 1".into(), steps: vec![step] }));
+        v.panel = Some(super::SidePanel::Explode);
+        cx.notify();
+    }));
+    draw(cx, window);
+    let row = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("ex-row-0").expect("Explode 1's row");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(gpui_kit::point(row.left() + px(80.), row.center().y), gpui_kit::Modifiers::none());
+    draw(cx, window);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert_eq!(v.ui.explode_sel, Some((0, None)), "the row selected");
+        assert!(v.explode.is_none() && !v.explode_edit, "no explode");
+    });
+    cx.update(|cx| view.update(cx, |v, cx| v.activate_explode_from_menu(0, cx)));
+    draw(cx, window);
+    let step = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("ex-step-0-0").expect("the active view's step row");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(step.center(), None, gpui_kit::Modifiers::none());
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| view.read(cx).ui.step_hover.clone()), vec![pin], "the hovered step lights its instance");
+}
+
+/// Interaction-feel "Section view…" / "Section: a face click" / "Section Esc": opened with nothing under the pointer
+/// the dialog is empty under the blue hint; a face click adds a plane through the face and takes the hint away; Esc
+/// cancels, no section left.
+#[gpui::test]
+fn a_section_view_opens_empty_takes_a_face_and_esc_cancels_it(cx: &mut TestAppContext) {
+    use noshape_scene::{asm_scene::AsmPickTarget, builder::PickKind};
+    let (window, view) = pattern_assembly(cx, "section-feel");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.hover = None;
+            v.toggle_section(w, cx);
+            let s = v.ui.section.as_ref().expect("the dialog");
+            assert!(s.dialog.is_some() && s.planes.is_empty(), "opened empty");
+            assert_eq!(v.message.as_ref().map(|(e, m)| (*e, m.as_str())), Some((false, "Select a plane, planar face, cylinder, cone, or mate connector.")), "the blue hint");
+            let top = face_connector(v, "Part 1 <1>", true, cx);
+            let Reference::Implicit { on, .. } = &top.reference else { panic!("an implicit connector") };
+            let id = instance(v, "Part 1 <1>", cx);
+            let occ = v.result.occurrences.iter().position(|o| o.top() == id).unwrap();
+            v.section_pick(AsmPickTarget { path: vec![id], reference: (**on).clone(), kind: PickKind::Face, occ, anchor: None }, cx);
+            let s = v.ui.section.as_ref().unwrap();
+            assert_eq!(s.planes.len(), 1, "a plane through the face");
+            assert!(s.planes[0].normal.z.abs() > 0.99, "parallel to the top face: {:?}", s.planes[0].normal);
+            assert!(v.message.is_none(), "the hint gone");
+            v.on_cancel(&crate::actions::Cancel, w, cx);
+            assert!(v.ui.section.is_none(), "Esc cancels: no section");
+        })
+    })
+    .unwrap();
+}
+
 /// Live extras-1118: opening Linear pattern adds its red row at once, counted in "Instances (N)".
 #[gpui::test]
 fn an_opened_linear_pattern_counts_its_row(cx: &mut TestAppContext) {
@@ -2220,6 +2312,17 @@ fn a_new_mates_type_switch_takes_that_types_next_name(cx: &mut TestAppContext) {
     .unwrap();
     let name = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).mate.as_ref().unwrap().dialog.read(cx).name.clone());
     assert_eq!(name(cx), "Fastened 2");
+    // (Interaction-feel "Type switch": the picks, the flip and the reorient stay through every switch.)
+    let kept = cx.update(|cx| {
+        let (a, b) = (face_connector(view.read(cx), "Part 1 <1>", true, cx), face_connector(view.read(cx), "Part 2 <1>", false, cx));
+        let d = view.read(cx).mate.as_ref().unwrap().dialog.clone();
+        d.update(cx, |d, _| (d.a, d.b, d.flip_primary, d.reorient) = (Some(a.clone()), Some(b.clone()), true, 1));
+        (Some(a), Some(b), true, 1u8)
+    });
+    let state = |cx: &mut TestAppContext| cx.update(|cx| {
+        let d = view.read(cx).mate.as_ref().unwrap().dialog.read(cx);
+        (d.a.clone(), d.b.clone(), d.flip_primary, d.reorient)
+    });
     let switch = |cx: &mut TestAppContext, t: MateType| {
         cx.update(|cx| {
             let d = view.read(cx).mate.as_ref().unwrap().dialog.clone();
@@ -2232,6 +2335,7 @@ fn a_new_mates_type_switch_takes_that_types_next_name(cx: &mut TestAppContext) {
     assert_eq!(name(cx), "Slider 1");
     switch(cx, MateType::Fastened);
     assert_eq!(name(cx), "Fastened 2");
+    assert_eq!(state(cx), kept, "the connectors, flip and reorient kept");
 }
 
 /// qa session-asm-1119 (2b): ✕ / Esc in the Insert dialog takes its instances back and shows the blue "Assembly

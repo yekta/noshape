@@ -42,6 +42,9 @@ fn drawing(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Draw
     for ext in ["", "-wal", "-shm"] {
         let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
     }
+    // A fresh compute: T1's tests share one process, and an identical fixture would reuse an earlier test's sources
+    // and views.
+    noshape_ops::drawing::drop_cached_views();
     if let Some(name) = START.take() {
         let starts: Value = serde_json::from_str(&std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/ui-parity/starts.json")).unwrap()).unwrap();
         noshape_ops::ui_parity::build_start(&mut Ctx::new(), &path, &starts[name]).unwrap();
@@ -69,7 +72,7 @@ fn drawing(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Draw
             let num = |v: &Value| v.as_f64().unwrap();
             let len = |e: &Value| (num(&e["b"][0]) - num(&e["a"][0])).hypot(num(&e["b"][1]) - num(&e["a"][1]));
             let edges = g["views"][0]["edges"].as_array().unwrap();
-            let long = edges.iter().filter(|e| e["type"] == "line").max_by(|a, b| len(a).total_cmp(&len(b))).unwrap();
+            let long = edges.iter().filter(|e| e["type"] == "line").max_by(|a, b| len(a).total_cmp(&len(b))).unwrap_or_else(|| panic!("no line on the first view: {}", g["views"]));
             let mid = [(num(&long["a"][0]) + num(&long["b"][0])) / 2.0, (num(&long["a"][1]) + num(&long["b"][1])) / 2.0];
             call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "picks": [mid], "place": [mid[0], mid[1] + 20.0] }));
         }
