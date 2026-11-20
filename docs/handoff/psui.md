@@ -6,8 +6,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
 ## Setup
 
 - Worktree /root/projects/noshape-wt/psui, branch agent/psui. Commit as yekta (AGENTS.md), subject "psui: …".
-- Mac off limits until 21:35 UTC 11-20 (lead; tunnel shut): build on vibex7/vibex8. Builds and crate tests: plain `NOSHAPE_RB_HOST=vibex8 tools/tiers/rb.sh bash -c "$(cat script)"` (DECISIONS 9e5b481d4;
-  ~/bin/slot only for suites, gates, timing pairs). Scripts in /root/psui-scratch/run*.sh. The GPUI dialog matrix is
+- Builds and crate tests on the Mac (lead 11-20 23:10): plain `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh bash -c "$(cat
+  script)"` (headless, ~/noshape-host only, 2 slots shared with bool/blend/core); vibex8 when it is busy. ~/bin/slot
+  only for suites, gates, timing pairs (DECISIONS 9e5b481d4). Scripts in /root/psui-scratch/run*.sh. The GPUI dialog matrix is
   `dialogs::the_dialogs_matrix_matches_live` (rows filter: DIALOG_ROW=…).
 - Scenario / app runs: vibex6, at most 3 app instances (shared with studios). Heavy runs (scenario shards) through
   `~/bin/slot <cmd>` there (one per host, waits for 10 GB free). The app build there OOMs under load: scripts build
