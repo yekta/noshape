@@ -224,7 +224,7 @@ pub fn variable(ev: &mut EvalCtx) -> FResult<()> {
                         _ => err("Only two entities can be selected for distance measurement."),
                     };
                 };
-                let d = measure::entity_distance(&ev.ctx, a, b, ev.is("minmax", "MAXIMUM")).ok_or_else(|| crate::regen::eval::FeatureError::new("Could not measure between the selections".to_string()))?;
+                let d = measure::entity_distance(&ev.ctx, a, b, ev.is("minmax", "MAXIMUM"), ev.bool("extendEntities")).ok_or_else(|| crate::regen::eval::FeatureError::new("Could not measure between the selections".to_string()))?;
                 // std variable.fs selectDistanceComponent: the value along the
                 // chosen axis, whether or not the Axis measurements group is
                 // open (a group's fold is the dialog's only).

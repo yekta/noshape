@@ -7521,40 +7521,72 @@ fn context_points(e: &Value, closed: bool) -> Result<Vec<glam::DVec3>, String> {
     Ok(points)
 }
 
-/// A sketch's frame ([origin, x, y]) from where its curves' ends and points (`sketch`'s entities, in its own coordinates)
-/// lie in live's sketch bodies (`bodies`: `{ "bodies": [{ "vertices": [{ "point" }] }] }`): the plane through those points,
-/// turned and moved in it (or mirrored) so every one of the sketch's points lands on one of live's. `None` when they
-/// don't all land, or are too few to tell.
-/// A mate connector on live's frame (`{ origin_mm, x, z }`, world): on the Origin, moved there, its Z turned to the
-/// frame's by a flip (−Z) or a quarter turn about X (∓Y). `None` for frames whose x isn't the world's X.
+/// A mate connector on live's frame (`{ origin_mm, x, z }`, world): on the Origin, moved there, its axes turned to the
+/// frame's by a flip, a secondary axis and a rotation. `None` for a frame not on the world's axes.
 fn connector_at_frame(frame: &Value) -> Option<Map<String, Value>> {
-    let v = |k: &str| -> Option<[f64; 3]> { Some([frame[k][0].as_f64()?, frame[k][1].as_f64()?, frame[k][2].as_f64()?]) };
+    use glam::{DMat3, DVec3};
+    let v = |k: &str| -> Option<DVec3> { Some(DVec3::new(frame[k][0].as_f64()?, frame[k][1].as_f64()?, frame[k][2].as_f64()?)) };
     let (o, x, z) = (v("origin_mm")?, v("x")?, v("z")?);
-    let near = |a: [f64; 3], b: [f64; 3]| (0..3).all(|i| (a[i] - b[i]).abs() < 1e-9);
-    if !near(x, [1.0, 0.0, 0.0]) {
-        return None;
+    // Ours builds the frame as live's (refgeom): flip about X, the secondary axis's quarter turn about Z, the move in
+    // that frame, then the rotation. The simplest choice giving live's axes, a flip or secondary axis before a
+    // rotation (a flip rather than ABOUT_X 180: asm-corexy d0d597's Transform 1 moved in the flipped frame, Y and Z
+    // the other way).
+    let turn = |axis: DVec3, a: f64, v: DVec3| DMat3::from_axis_angle(axis, a) * v;
+    let quarters = [("", 0.0), ("PLUS_Y", -1.0), ("MINUS_Y", 1.0), ("MINUS_X", 2.0)];
+    let rotations = [("", 0.0), ("ABOUT_X", 1.0), ("ABOUT_X", -1.0), ("ABOUT_Y", 1.0), ("ABOUT_Y", -1.0), ("ABOUT_Z", 1.0), ("ABOUT_Z", -1.0), ("ABOUT_X", 2.0), ("ABOUT_Y", 2.0)];
+    let mut best: Option<(usize, bool, usize, usize)> = None;
+    for flip in [true, false] {
+        for (qi, q) in quarters.iter().enumerate() {
+            for (ri, r) in rotations.iter().enumerate() {
+                let (mut cx, mut cz) = (DVec3::X, DVec3::Z);
+                if flip {
+                    cz = turn(cx, std::f64::consts::PI, cz);
+                }
+                cx = turn(cz, q.1 * std::f64::consts::FRAC_PI_2, cx);
+                let axis = match r.0 {
+                    "ABOUT_X" => cx,
+                    "ABOUT_Y" => cz.cross(cx),
+                    _ => cz,
+                };
+                let a = r.1 * std::f64::consts::FRAC_PI_2;
+                let (rx, rz) = (turn(axis, a, cx), turn(axis, a, cz));
+                let cost = usize::from(flip) + usize::from(q.1 != 0.0) + 2 * usize::from(r.1 != 0.0);
+                if rx.distance(x) < 1e-9 && rz.distance(z) < 1e-9 && best.is_none_or(|b| cost < b.0) {
+                    best = Some((cost, flip, qi, ri));
+                }
+            }
+        }
     }
+    let (_, flip, qi, ri) = best?;
+    let (q, r) = (quarters[qi], rotations[ri]);
+    let mut cz = DVec3::Z;
+    if flip {
+        cz = -cz;
+    }
+    let cx = turn(cz, q.1 * std::f64::consts::FRAC_PI_2, DVec3::X);
     let mut p = Map::new();
     p.insert("originQuery".into(), json!(["origin"]));
     p.insert("transform".into(), json!(true));
-    // (A flip comes before the move, which runs in the flipped frame (Y and Z the other way): asm-corexy d0d597's
-    // Transform 1 base at +4.25 mm landed at −4.25 and turned the idler wheel over.)
-    let flip = near(z, [0.0, 0.0, -1.0]);
-    let o = if flip { [o[0], -o[1], -o[2]] } else { o };
-    for (k, c) in ["translationX", "translationY", "translationZ"].iter().zip(o) {
-        p.insert((*k).into(), json!(format!("{c} mm")));
+    for (k, c) in ["translationX", "translationY", "translationZ"].iter().zip([o.dot(cx), o.dot(cz.cross(cx)), o.dot(cz)]) {
+        p.insert((*k).into(), json!(format!("{} mm", (c * 1e9).round() / 1e9 + 0.0)));
     }
     if flip {
         p.insert("flipPrimary".into(), json!(true));
-    } else if near(z, [0.0, -1.0, 0.0]) || near(z, [0.0, 1.0, 0.0]) {
-        p.insert("rotationType".into(), json!("ABOUT_X"));
-        p.insert("rotation".into(), json!(if z[1] < 0.0 { "90 deg" } else { "-90 deg" }));
-    } else if !near(z, [0.0, 0.0, 1.0]) {
-        return None;
+    }
+    if q.1 != 0.0 {
+        p.insert("secondaryAxisType".into(), json!(q.0));
+    }
+    if r.1 != 0.0 {
+        p.insert("rotationType".into(), json!(r.0));
+        p.insert("rotation".into(), json!(format!("{} deg", r.1 * 90.0)));
     }
     Some(p)
 }
 
+/// A sketch's frame ([origin, x, y]) from where its curves' ends and points (`sketch`'s entities, in its own coordinates)
+/// lie in live's sketch bodies (`bodies`: `{ "bodies": [{ "vertices": [{ "point" }] }] }`): the plane through those points,
+/// turned and moved in it (or mirrored) so every one of the sketch's points lands on one of live's. `None` when they
+/// don't all land, or are too few to tell.
 fn frame_from_bodies(sketch: &Value, bodies: &Value) -> Option<[[f64; 3]; 3]> {
     use glam::{DVec2, DVec3};
     const TOL: f64 = 1e-6;
@@ -10849,8 +10881,9 @@ mod tests {
     }
 
     /// An in-feature mate connector on live's frame (live 2632, asm-corexy's Transforms): on the Origin, moved to the
-    /// frame's origin, turned to its Z (a flip for −Z, a quarter turn about X for −Y); a frame turned about Z isn't
-    /// taken. A flip comes before the move, so a flipped frame's move runs along −Y and −Z.
+    /// frame's origin, turned to its axes (a flip for −Z, a quarter turn about X for −Y, the secondary axis for an X
+    /// turned about Z: c2-hgr-riser-weldment's Side, X +Y and Z −X). A flip comes before the move, so a flipped frame's
+    /// move runs along −Y and −Z; a secondary axis's too (its X and Y).
     #[test]
     fn an_in_feature_connector_takes_lives_frame() {
         let at = |o: [f64; 3], x: [f64; 3], z: [f64; 3]| connector_at_frame(&json!({ "origin_mm": o, "x": x, "z": z }));
@@ -10859,7 +10892,15 @@ mod tests {
         let side = at([0.0, -4.0, 0.0], [1.0, 0.0, 0.0], [0.0, -1.0, 0.0]).unwrap();
         assert_eq!((&side["translationY"], &side["rotationType"], &side["rotation"]), (&json!("-4 mm"), &json!("ABOUT_X"), &json!("90 deg")));
         assert!(at([0.0; 3], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]).unwrap().get("flipPrimary").is_none());
-        assert!(at([0.0; 3], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]).is_none());
+        let turned = at([1.0, 2.0, 3.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]).unwrap();
+        assert_eq!((&turned["secondaryAxisType"], &turned["translationX"], &turned["translationY"]), (&json!("MINUS_Y"), &json!("2 mm"), &json!("-1 mm")));
+        assert!(turned.get("rotationType").is_none() && turned.get("flipPrimary").is_none());
+        let hgr_side = at([1.0, 2.0, 3.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]).unwrap();
+        assert_eq!(
+            (&hgr_side["secondaryAxisType"], &hgr_side["rotationType"], &hgr_side["rotation"], &hgr_side["translationX"], &hgr_side["translationY"], &hgr_side["translationZ"]),
+            (&json!("MINUS_Y"), &json!("ABOUT_X"), &json!("-90 deg"), &json!("2 mm"), &json!("-1 mm"), &json!("3 mm"))
+        );
+        assert!(at([0.0; 3], [1.0, 0.0, 0.0], [1.0, 0.0, 0.0]).is_none(), "not a frame");
     }
 
     /// A mate connector's own flip, secondary axis and Move go on its mate end (asm-infento-subs' Fastened 18: Mate

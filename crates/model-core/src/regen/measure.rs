@@ -944,11 +944,17 @@ pub struct EntityDistance {
 /// Minimum (or, with `maximum`, the largest) distance between the shapes of
 /// two references. The maximum starts from points sampled on both (their
 /// vertices, mesh nodes and edge polylines) and is refined on the exact
-/// geometry (`refine_max`).
-pub fn entity_distance(ctx: &Context, a: &Reference, b: &Reference, maximum: bool) -> Option<EntityDistance> {
-    let (sa, sb) = (resolve_shapes(ctx, a), resolve_shapes(ctx, b));
+/// geometry (`refine_max`). With `extend` the minimum is to the entities' surfaces and curves extended (std
+/// variable.fs extendSide0 / extendSide1: a plane, line, cylinder or circle; c2-hgr-riser-weldment's BraceMFDist).
+pub fn entity_distance(ctx: &Context, a: &Reference, b: &Reference, maximum: bool, extend: bool) -> Option<EntityDistance> {
+    let (mut sa, mut sb) = (resolve_shapes(ctx, a), resolve_shapes(ctx, b));
     if sa.is_empty() || sb.is_empty() {
         return None;
+    }
+    if extend && !maximum {
+        let reach = extension_reach(sa.iter().chain(&sb));
+        sa = sa.iter().map(|s| extended(s, reach)).collect();
+        sb = sb.iter().map(|s| extended(s, reach)).collect();
     }
     if !maximum {
         let mut best: Option<EntityDistance> = None;
@@ -977,6 +983,46 @@ pub fn entity_distance(ctx: &Context, a: &Reference, b: &Reference, maximum: boo
         let (p, q) = refine_max(&sa, &sb, p, q);
         EntityDistance { distance: p.distance(q), delta: q - p }
     })
+}
+
+/// Half the size of an extended entity: ten times the selections' extent, and a metre more.
+fn extension_reach<'a>(shapes: impl Iterator<Item = &'a Shape>) -> f64 {
+    let (mut lo, mut hi) = (DVec3::splat(f64::MAX), DVec3::splat(f64::MIN));
+    for b in shapes.filter_map(|s| s.bounding_box(false).ok()) {
+        (lo, hi) = (lo.min(b.min), hi.max(b.max));
+    }
+    10.0 * (hi - lo).max(DVec3::ZERO).length() + 1.0
+}
+
+/// A face as its plane or cylinder, an edge as its line or circle, `reach` each way about the entity; others as they
+/// are.
+fn extended(s: &Shape, reach: f64) -> Shape {
+    let Ok(b) = s.bounding_box(false) else { return s.clone() };
+    let mid = (b.min + b.max) * 0.5;
+    let made = match s.shape_type() {
+        ShapeType::Face => match s.face_surface() {
+            Ok(k::Surface::Plane(p)) => {
+                let at = mid - p.normal * (mid - p.origin).dot(p.normal);
+                k::make_plane_face(&k::Plane::new(at, p.normal, p.x_dir), -reach, reach, -reach, reach)
+            }
+            Ok(k::Surface::Cylinder { origin, axis, x_dir, radius }) => {
+                let at = origin + axis * (mid - origin).dot(axis) - axis * reach;
+                k::make_cylinder(&k::Plane::new(at, axis, x_dir), radius, 2.0 * reach, std::f64::consts::TAU)
+                    .map(|c| c.sub_shapes(ShapeType::Face).into_iter().find(|f| matches!(f.face_surface(), Ok(k::Surface::Cylinder { .. }))).unwrap_or_else(|| s.clone()))
+            }
+            _ => return s.clone(),
+        },
+        ShapeType::Edge => match s.edge_curve() {
+            Ok(k::Curve::Line { origin, direction }) => {
+                let at = origin + direction * (mid - origin).dot(direction);
+                k::make_line(at - direction * reach, at + direction * reach)
+            }
+            Ok(k::Curve::Circle { center, axis, radius, .. }) => k::make_circle(center, axis, radius),
+            _ => return s.clone(),
+        },
+        _ => return s.clone(),
+    };
+    made.unwrap_or_else(|_| s.clone())
 }
 
 fn sample_points(shapes: &[Shape]) -> Vec<glam::DVec3> {
@@ -1062,6 +1108,23 @@ mod tests {
         let top = a.faces().into_iter().find(|x| x.bounding_box(false).unwrap().min.z > 0.019).unwrap();
         let f = face_property_variance(std::slice::from_ref(&top)).unwrap();
         assert!(near(f.area * 1e6, 1.793e-2, 0.02) && near(f.moment * 1e12, 2400.0, 1e-6) && near(f.perimeter * 1e3, 1.33e-4, 0.01), "{f:?}");
+    }
+
+    /// A measured variable's Extend entities: two parallel faces 10 apart across, offset 10 sideways, are 10 apart on
+    /// their planes (√200 as they are); an edge's line reaches a face it points at.
+    #[test]
+    fn extended_entities_are_planes_and_lines() {
+        let cube = |x: f64, y: f64| k::make_box(&k::Plane::new(DVec3::new(x, y, 0.0), DVec3::Z, DVec3::X), 10.0, 10.0, 10.0).unwrap();
+        let (a, b) = (cube(0.0, 0.0), cube(20.0, 20.0));
+        let at_x = |c: &Shape, x: f64| c.faces().into_iter().find(|f| f.bounding_box(false).is_ok_and(|bb| (bb.min.x - x).abs() < 1e-6 && (bb.max.x - x).abs() < 1e-6)).unwrap();
+        let (fa, fb) = (at_x(&a, 10.0), at_x(&b, 20.0));
+        let dist = |x: &Shape, y: &Shape| k::part_distance(x, y).unwrap().distance;
+        assert!((dist(&fa, &fb) - 200f64.sqrt()).abs() < 1e-6);
+        let reach = extension_reach([&fa, &fb].into_iter());
+        assert!((dist(&extended(&fa, reach), &extended(&fb, reach)) - 10.0).abs() < 1e-6);
+        let edge = k::make_line(DVec3::new(-5.0, 25.0, 5.0), DVec3::new(0.0, 25.0, 5.0)).unwrap();
+        assert!((dist(&extended(&edge, extension_reach([&edge, &fb].into_iter())), &fb) - 0.0).abs() < 1e-6);
+        assert!((dist(&edge, &fb) - 20.0).abs() < 1e-6);
     }
 
     /// MEASURE-MAX-DIST (qa 10-27): Max dist between two Ø40 × 30 cylinders 50 apart is exact, from the rims:

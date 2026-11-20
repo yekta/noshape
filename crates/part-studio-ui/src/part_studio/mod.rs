@@ -1072,7 +1072,7 @@ impl PartStudioView {
             // "#d = 95.635 mm" (`measuredValue`).
             let mut out: std::collections::HashMap<String, String> = self.computed_values(d.feature.id, cx).into_iter().collect();
             let measured = match (refs.as_slice(), &self.context) {
-                ([a, b], Some(ctx)) => noshape_model::regen::measure::entity_distance(ctx, a, b, p.is("minmax", "MAXIMUM")),
+                ([a, b], Some(ctx)) => noshape_model::regen::measure::entity_distance(ctx, a, b, p.is("minmax", "MAXIMUM"), p.bool("extendEntities")),
                 _ => None,
             };
             if let Some(m) = measured {
