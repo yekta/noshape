@@ -4130,7 +4130,25 @@ fn parity_assemblies() {
                 }
                 (!seen.is_empty()).then_some(Value::Array(list))
             };
-            let (Some(mut features), Some(parts)) = (read(&e.path()), read(&dir.join("studios").join(format!("{element}.parts.json"))).or_else(last_state).or_else(from_instances).or_else(|| (profile_sources.contains(element) || sketch_sources.contains(element)).then(|| json!([])))) else { continue };
+            let (Some(mut features), Some(mut parts)) = (read(&e.path()), read(&dir.join("studios").join(format!("{element}.parts.json"))).or_else(last_state).or_else(from_instances).or_else(|| (profile_sources.contains(element) || sketch_sources.contains(element)).then(|| json!([])))) else { continue };
+            // Live's lines list no composite parts (asm-infento-subs 1dc32b's Seatboard, Ducktail board, 7" Wheel asm):
+            // those of its metadata, with their volume band and centroid from <element>.mass.json.
+            if let (Some(list), Some(m)) = (parts.as_array_mut(), read(&dir.join("studios").join(format!("{element}.metadata.json")))) {
+                let mass = read(&dir.join("studios").join(format!("{element}.mass.json")));
+                let configs = &m["configurations"];
+                let items = configs["default"]["items"].as_array().or_else(|| configs.as_object()?.values().next()?["items"].as_array()).cloned().unwrap_or_default();
+                for it in items.iter().filter(|it| it["partType"] == "composite") {
+                    let Some(pid) = it["partId"].as_str() else { continue };
+                    if list.iter().any(|p| p["partId"] == pid) {
+                        continue;
+                    }
+                    let name = it["properties"].as_array().into_iter().flatten().find(|p| p["name"] == "Name").and_then(|p| p["value"].as_str());
+                    let body = mass.as_ref().map(|m| &m["bodies"][pid]);
+                    let volume = body.and_then(|b| b["volume"].as_array()).filter(|v| v.len() >= 3).map(|v| json!([v[1], v[2]]));
+                    let centroid = body.and_then(|b| b["centroid"].as_array()).filter(|c| c.len() >= 3).map(|c| json!(c[..3]));
+                    list.push(json!({ "partId": pid, "name": name, "volume": volume, "centroid": centroid, "bodyType": "composite" }));
+                }
+            }
             if !live.is_empty() {
                 features["live"] = Value::Array(live.clone());
             }

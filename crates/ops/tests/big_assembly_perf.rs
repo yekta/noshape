@@ -290,6 +290,58 @@ fn big_assembly_1000_regenerate_profile() {
     println!("a1000 regenerate: median {:.1} ms", ms(stats(times).median));
 }
 
+/// Where a suite assembly's cold open goes (lead 11-20: isaac-ball 140 s): each Part Studio its instances use,
+/// regenerated alone as the open does, split into its features' time and the rest (the display: meshes), slowest
+/// first, then the slowest features. `NOSHAPE_PERF_DOCS=<a.noshape>`.
+#[test]
+#[ignore]
+fn suite_assembly_open_profile() {
+    use noshape_model::configuration::ConfigValues;
+    use noshape_model::document::TabId;
+    let Ok(docs) = std::env::var("NOSHAPE_PERF_DOCS") else { return };
+    for path in docs.split(',').filter(|p| !p.is_empty()) {
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_open", json!({ "path": path }));
+        let doc = ctx.doc(Some(path)).unwrap().doc().clone();
+        let mut uses: Vec<(TabId, ConfigValues)> = Vec::new();
+        for a in doc.tabs.iter().filter_map(|t| if let TabContent::Assembly(a) = &t.content { Some(a) } else { None }) {
+            for i in &a.instances {
+                if let InstanceSource::Part { studio, config, .. } | InstanceSource::PartStudio { studio, config } | InstanceSource::MirroredPart { studio, config, .. } = &i.source
+                    && !uses.iter().any(|(s, c)| s == studio && c == config)
+                {
+                    uses.push((*studio, config.clone()));
+                }
+            }
+        }
+        let mut ev = noshape_ops::derived::assembly_evaluator(Default::default());
+        let (mut studios, mut features) = (Vec::new(), Vec::new());
+        let all = Instant::now();
+        for (tab, config) in uses {
+            let t = Instant::now();
+            let Some(r) = ev.studio(&doc, tab, &config) else { continue };
+            let wall = ms(t.elapsed());
+            let Some(tab) = doc.tab(tab) else { continue };
+            let eval: f64 = r.display.features.iter().map(|f| f64::from(f.time_ms)).sum();
+            studios.push((wall, eval, tab.name.clone(), r.display.features.len()));
+            if let TabContent::PartStudio(ps) = &tab.content {
+                for f in &r.display.features {
+                    let name = ps.features.iter().find(|x| x.id == f.id).map_or_else(|| format!("{:?}", f.id), |x| format!("{} ({})", x.name, x.type_id));
+                    features.push((f64::from(f.time_ms), tab.name.clone(), name, format!("{:?}", f.status)));
+                }
+            }
+        }
+        studios.sort_by(|a, b| b.0.total_cmp(&a.0));
+        features.sort_by(|a, b| b.0.total_cmp(&a.0));
+        println!("{path}: {} Part Studio uses, {:.0} ms one after another", studios.len(), ms(all.elapsed()));
+        for (wall, eval, name, n) in studios.iter().take(15) {
+            println!("  studio {name}: {wall:.0} ms ({eval:.0} ms in its {n} features, {:.0} ms display / meshes)", wall - eval);
+        }
+        for (t, studio, name, status) in features.iter().take(25) {
+            println!("  feature {studio} › {name}: {t:.0} ms ({status})");
+        }
+    }
+}
+
 /// The parity suite's own assemblies against live (lead 11-19, PLAN 2.7): open, a mate added, a drag and an insert
 /// on rebuilt documents (`NOSHAPE_PARITY_SAVE` keeps them), `NOSHAPE_PERF_DOCS=<a.noshape>,<b.noshape>`.
 #[test]

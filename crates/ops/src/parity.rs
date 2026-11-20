@@ -14,6 +14,7 @@
 use crate::{Ctx, registry};
 use serde_json::{Map, Value, json};
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use std::path::Path;
 
 /// How a translated selection names an in-feature mate connector until its feature is added.
@@ -204,7 +205,7 @@ pub struct Translator<'a> {
     tab: Option<String>,
     /// Part Studios Derived features take parts from (features.json `derivedSources`: element id → `{ doc, live }`),
     /// and those built: element id → (our tab id, live's part id → ours).
-    derived_sources: Map<String, Value>,
+    derived_sources: HashMap<String, Arc<Value>>,
     /// Onshape's standard frame profile studios' sizes (features.json `profileOptions`: element → option id → display
     /// name): the option ids don't tell the size (live: `L8x4x0_75` is L3x2x0.1875).
     profile_options: Map<String, Value>,
@@ -497,7 +498,7 @@ impl<'a> Translator<'a> {
                 config_defaults.entry(k.to_string()).or_insert_with(|| v.to_string());
             }
         }
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, stale_uses: false, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, live_states: doc["featureStates"].clone(), sub_feature: None, array_item: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), profile_options: doc["profileOptions"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), derived_sketches: HashMap::new(), sketch_tabs: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, stale_uses: false, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, live_states: doc["featureStates"].clone(), sub_feature: None, array_item: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().into_iter().flatten().map(|(e, v)| (e.clone(), Arc::new(v.clone()))).collect(), profile_options: doc["profileOptions"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), derived_sketches: HashMap::new(), sketch_tabs: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -1579,6 +1580,10 @@ impl<'a> Translator<'a> {
         let mut t = Translator::open_in(&mut *self.ctx, &name, &doc, refs)?;
         for (e, tab) in parent_studios {
             t.studios.entry(e).or_insert(tab);
+        }
+        // (Its own Derived's sources, fetched with ours: 4ce5c7's fed22d's b7e381.)
+        for (e, src) in &self.derived_sources {
+            t.derived_sources.entry(e.clone()).or_insert_with(|| src.clone());
         }
         for k in 0..t.len() {
             let step = t.step(k);
@@ -4372,7 +4377,6 @@ impl<'a> Translator<'a> {
 
     fn pattern_copy(&mut self, pattern: &str, index: i64, seed: &str) -> Result<String, String> {
         use noshape_model::reference::{Reference, Role, TopoName};
-        use std::sync::Arc;
         let ours = self.feature_ids.get(pattern).cloned().ok_or_else(|| format!("COPY: pattern {pattern} was not built"))?;
         // A part's copy: the part holding the copy of one of its faces (cf-fix-pcb's components).
         if seed.starts_with("body:") {
@@ -8956,6 +8960,43 @@ pub fn trace_live_pattern(feature: &str, feature_type: &str, live: &[Value], k: 
     }
 }
 
+/// A Derived from another studio the assembly fetched (asm-tvc-mount's Derived 2 takes 41b795's parts, fetched as an
+/// instance's studio, not as the Derived's source): that one as its source, and so for its sources' own Derived
+/// (asm-scissor-lift's 4ce5c7 derives fed22d, which derives b7e381 and 37a1a7, which derives 8f7baa). Each is made once
+/// (`shared`) for every studio's translator to share: they are tens of MB of live's lines.
+fn fetched_derived_sources(studio: &Value, element: &str, studios: &[(String, Value, Value)], shared: &mut HashMap<String, Arc<Value>>) -> Vec<(String, Arc<Value>)> {
+    let mut out = Vec::new();
+    let mut seen: HashSet<String> = HashSet::from([element.to_string()]);
+    let mut pending = derived_elements(studio);
+    while let Some(source) = pending.pop() {
+        if !seen.insert(source.clone()) {
+            continue;
+        }
+        if let Some(fetched) = studio["derivedSources"].get(&source) {
+            pending.extend(derived_elements(&fetched["doc"]));
+            continue;
+        }
+        let Some((_, other, _)) = studios.iter().find(|(e, ..)| *e == source) else { continue };
+        pending.extend(derived_elements(other));
+        let src = shared.entry(source.clone()).or_insert_with(|| Arc::new(json!({ "doc": other, "live": other["live"], "refs": "" }))).clone();
+        out.push((source, src));
+    }
+    out
+}
+
+/// The Part Studios a studio's Derived and Derived mirror features take (their elements).
+fn derived_elements(studio: &Value) -> Vec<String> {
+    studio["features"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|f| f["featureType"] == "importDerived" || f["featureType"] == "derivedMirror")
+        .flat_map(|f| f["parameters"].as_array().into_iter().flatten())
+        .filter(|p| p["parameterId"] == "buildFunction" || p["parameterId"] == "partStudio")
+        .filter_map(|p| p["namespace"].as_str()?.split("::").find_map(|x| x.strip_prefix('e')).map(str::to_string))
+        .collect()
+}
+
 /// A part's volume band (m³, lo and hi) in an assembly corpus' parts list: `volume` [lo, hi] from `.mass.json`, else
 /// `volume_band` of live's per-feature lines (where `volume` is the number).
 fn volume_band(p: &Value) -> Option<(f64, f64)> {
@@ -9225,6 +9266,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         .filter(|(e, _, _)| sources.contains(e))
         .map(|(e, s, _)| (e.clone(), s["configuration"]["configurationParameters"].as_array().into_iter().flatten().filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].clone()))).collect()))
         .collect();
+    let mut shared_sources: HashMap<String, Arc<Value>> = HashMap::new();
     for (element, studio, parts) in ordered {
         let name = format!("Studio {}", &element[..element.len().min(6)]);
         // The studio's part ids in creation order (see Translator::part_order).
@@ -9268,19 +9310,6 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             let bands: Vec<Value> = parts.as_array().into_iter().flatten().filter_map(|p| volume_band(p).map(|(lo, hi)| json!([lo, hi]))).collect();
             studio["partVolumes"] = json!(bands);
         }
-        // A Derived from another studio the assembly fetched (asm-tvc-mount's Derived 2 takes 41b795's parts, fetched
-        // as an instance's studio, not as the Derived's source): that one as its source.
-        for f in studio["features"].as_array().cloned().into_iter().flatten().filter(|f| f["featureType"] == "importDerived" || f["featureType"] == "derivedMirror") {
-            for p in f["parameters"].as_array().into_iter().flatten().filter(|p| p["parameterId"] == "buildFunction" || p["parameterId"] == "partStudio") {
-                let Some(source) = p["namespace"].as_str().and_then(|n| n.split("::").find_map(|x| x.strip_prefix('e'))) else { continue };
-                if source == element || !studio["derivedSources"][source].is_null() {
-                    continue;
-                }
-                if let Some((_, other, _)) = studios.iter().find(|(e, ..)| e == source) {
-                    studio["derivedSources"][source] = json!({ "doc": other, "live": other["live"], "refs": "" });
-                }
-            }
-        }
         let studio = &studio;
         // Live's per-feature geometry (the studio's `live` lines, `<element>.live.jsonl`) for its id-only queries.
         // Live's evaluated references (`<element>.refs.jsonl`, as a model's refs.jsonl) win over its bodies lines.
@@ -9297,6 +9326,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         };
         t.other_studios = built.clone();
         t.other_defaults = defaults.clone();
+        for (e, src) in fetched_derived_sources(studio, element, studios, &mut shared_sources) {
+            t.derived_sources.entry(e).or_insert(src);
+        }
         for k in 0..t.len() {
             trace(&format!("{name}: feature {k}"));
             let step = t.step(k);
@@ -10647,6 +10679,22 @@ mod tests {
         let inputs = choice_inputs(&features, instances.iter());
         assert_eq!(inputs.len(), 1);
         assert_eq!((&inputs[0]["parameterId"], &inputs[0]["defaultValue"]), (&json!("Manufacture"), &json!(false)));
+    }
+
+    /// A Derived's source fetched as another instance's studio is its source, and so are that source's own Derived
+    /// sources the assembly fetched (asm-scissor-lift 4ce5c7 → fed22d → b7e381, 37a1a7 → 8f7baa); one not fetched stays
+    /// missing.
+    #[test]
+    fn a_derived_sources_own_sources_come_from_the_fetched_studios() {
+        let derives = |sources: &[&str]| json!({ "features": sources.iter().map(|s| json!({ "featureType": "importDerived", "parameters": [
+            { "parameterId": "partStudio", "namespace": format!("d1::v2::e{s}::m3") }] })).collect::<Vec<_>>() });
+        let studio = |e: &str, sources: &[&str]| (e.to_string(), derives(sources), json!([]));
+        let studios = [studio("fed22d", &["b7e381", "37a1a7"]), studio("37a1a7", &["8f7baa", "b7e381"]), studio("b7e381", &[]), studio("8f7baa", &["0da59a"])];
+        let top = derives(&["fed22d"]);
+        let mut shared = HashMap::new();
+        let mut got: Vec<String> = fetched_derived_sources(&top, "4ce5c7", &studios, &mut shared).into_iter().map(|(e, _)| e).collect();
+        got.sort();
+        assert_eq!(got, ["37a1a7", "8f7baa", "b7e381", "fed22d"]);
     }
 
     /// A composite part is live's "composite" with no topology of its own (asm-infento-subs 1dc32b's Large wheel asm:
