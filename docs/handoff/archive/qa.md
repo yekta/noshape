@@ -2262,6 +2262,40 @@ selection, measure, section view; then P2 assembly and drawing passes; verify th
    (night-seq does it). qa-night-seq-1120 is armed for tonight; re-arm with 1121 tomorrow. bin/evwait.sh <units> = a wake-up helper.
 
 ## 11-20 moved (from the handoff 11-20 00:18)
+- (moved 01:05) 11-19 walks 21:36-22:5x:
+   P1 walk 21:36 on a58eee8c (sketch -> extrude -> fillet -> pattern -> edit -> undo -> suppress): all build; P2 PATTERN-CHECK-STAYS-
+   ENABLED (psui) + live request (REQUESTS qa 11-19 21:36: ✓ after emptying, tooltip on click); reopen, rollback drag, reorder OK. Walk 21:4x: Shell, Boolean union,
+   Mirror (auto Add + merge scope), face area readout, Esc keeps selection (live), view cube Top, face menu, Section view: all OK.
+   Mirror's self-switch to Add confirmed by live's take (mirror-part-right-plane step 4 passes, tabs compared). 21:52: live's capture
+   closed PATTERN-CHECK-STAYS-ENABLED (live keeps ✓ enabled) and gave P1 TOOLBAR-TOOLTIP-AFTER-CLICK (psui told). Hole try on
+   qa-scratch/walk2/h.noshape: my point landed just off the block's top face (Merge scope empty = live's 8559 off-part case; not a bug).
+   Walk 21:55: Hole (point inside the face) = live: Merge scope "Part 1" auto, callout preview; mass properties (bottom-right icon
+   "Display mass and section properties"): volume / area, red chip, blank CoM / inertia without material = live (the one-time toast
+   3.6 s after the first open not caught: shots too early; parity interaction.md 5.2 says =); face + hole rim measure readout plausible.
+   P2 assemblies 21:58 (walk2 Assembly 1): Insert dialog, 2 instances, fit, free drag, Fastened between hole faces (HUD, Solve),
+   BOM panel = live (Item | Quantity | Part number | Description, "1 | 2"). Lead 22:5x: drop "☐ Simulation connection" from the
+   mate dialog (left-out feature; lead tells skasm): verify it's gone on the green after skasm lands.
+   Drawings 22:00: Create Drawing dialog = live (No views default, ANSI_A_INCH), Suggested views (Top/Front/Right/iso, hole centre
+   mark), tab after the active tab, tab menu Export… -> PDF 1.5 one page = the sheet. STEP round trip 22:04 OK (export AP242 8 faces,
+   + › Import… back: Import 1, Part 1); P2 BRAND-IN-UI-TEXT filed ("Import to Onshape" title). 22:05: compat ALERTs vs 0.4.61 (3 Fillet messages, blend
+   74ebd649c wording) accepted in compat/accepted.txt. Drawing dimension 22:05 OK (edge lit, bold
+   preview, placed 4.337 in = the part's 110.2 mm). Spot rows 25-32 22:15 all =: 7/7 scenarios 164/164 on the 0.4.61 app
+   (suites/1119-2210-v0461-spot2) + by hand (snap squares 17 px on end / midpoint, target line lit mid-draw = live's 'coincident on a
+   line', free end blue, 5 px drag threshold, line hover lit at 6 px not 9, two lines: every constraint enabled). Row 73 (perp x lit
+   edge) only via its unit tests. P1 walk 22:12 on green f3bc85da (walk3/r.noshape): Chamfer (Enter applies, 2nd Enter commits = live),
+   first dimension scales the whole sketch about its bbox centre (= live 34917), Revolve (region field stays active: multi-pick =
+   live FD7), Circular pattern 4x round a chamfer edge: all OK. P0 STALE-SKETCH-HOVER (psui) filed (22:2x narrowed: one-event lag;
+   after-✓ outline; a cancelled sketch's lit point stays). Walk 22:2x: Trim, Plane (offset 25), Loft (2 sketches), Sweep (auto Add
+   on Part 1), Offset (5 mm box, arrow) OK; P1 OFFSET-EDIT-SCALES-SKETCH (skasm, told). Variable Studio (tab after active, Length 0 mm,
+   #len autocomplete, VS edit rebuilds the Part Studio) and configurations (Configure Part Studio list, field right-click Configure,
+   toast, Long 4 mm chamfer) = live. Walk 22:3x-22:43 (green 624c6db77): Insert with Configuration ▾, Revolute (HUD, Solve), limit
+   rows, drag clamp, Part 2 Fix, drawing Update (ctrl+q) redraws views keeping the dimension, Sheet properties Size B = live; filed
+   P1 ASM-DRAG-UNFIXED-GROUP + P1 ASM-LIMIT-TYPED-NO-PREVIEW (asm, told). Sheet metal 22:4x (Part Studio 2): Sheet metal model
+   Extrude of an open L, Flange 25 mm, table (Bend A/B 2.3 mm 90° Up K 0.45) + flat view = live; closed rectangle fails 'Failed to
+   extrude selections.': live builds it (warning, no flat) -> P2 SMM-EXTRUDE-CLOSED-PROFILE (skasm). asm's b146b56f (both P1s): verify by hand on its green.
+   Walk 22:5x: Slider (slides on axis), Planar (moves in plane), Exploded view (step dialog, Done -> assembled) = live; BOM Part number
+   edit (Enter moves down, written to Part 1's Properties) = live (Tab keeps the cell: live's BOM Tab not recorded); drawing Note, Hole
+   table (Origin gate, A1 tag, Ø.250 ↧.472, corner placement) = live. BRAND-IN-UI-TEXT += Properties categories "Onshape Part" (dx told).
 0z. **Heavy-model feel (lead 09:10)**: live measures c2-loft-guide-curves-driven-pattern (Part Studio, live 125 bodies; ours 124, Sweep 1
    fails: P1 DRIVEN-PATTERN-SWEEP core) + asm-xdev-subs (ours only exists in the assembly suite's scratch: not prepared). Ours:
    qa-scratch/heavy (heavy.py: live's moves / offsets / 600x400 poll at 140 ms + NOSHAPE_FRAME_LOG; hvs.sh on :154 1920x1080 with
