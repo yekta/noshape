@@ -1584,7 +1584,8 @@ thread_local std::vector<occ::handle<Geom_Surface>> t_joined_pieces;
 
 std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, const std::vector<TopoDS_Shape>& image,
                                         const std::vector<FaceShare>& share, const TopoDS_Shape& out, double diag,
-                                        std::optional<std::pair<ChangeKey, double>>* memo = nullptr)
+                                        std::optional<std::pair<ChangeKey, double>>* memo = nullptr,
+                                        std::pair<std::vector<TopoDS_Shape>, std::vector<TopoDS_Shape>>* changed = nullptr)
 {
   ShapeIMap outf;
   for (TopExp_Explorer x(out, TopAbs_FACE); x.More(); x.Next())
@@ -1604,6 +1605,8 @@ std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, con
   for (TopExp_Explorer x(out, TopAbs_FACE); x.More(); x.Next())
     if (!kept.Contains(x.Current()))
       after.push_back(x.Current());
+  if (changed != nullptr)
+    *changed = {before, after};
   ChangeKey key;
   if (memo != nullptr)
   {
@@ -2061,6 +2064,19 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     }
     return std::abs(d) <= 1e-9 * std::abs(volume0());
   };
+  // A change OCCT's integrals put just past the bound, within 1e-8 of the box's volume: the segmented integrals of
+  // the faces it changed decide (about the box's middle). OCCT's are loose on cylinder pieces our Boolean bounds by
+  // B-spline edges (MIRROR-HANG-402's fuse: 9.7e-13 m³ on 1e-9 of 2.4e-4, the merge to live's 15 faces refused; the
+  // segmented integrals 2.1e-13, and all three agree on the merged solid).
+  auto precise_keeps_volume = [&](const std::optional<double>& change, const std::pair<std::vector<TopoDS_Shape>, std::vector<TopoDS_Shape>>& changed) {
+    if (!change || std::abs(*change) > 1e-8 * most || changed.first.empty())
+      return false;
+    double x0, y0, z0, x1, y1, z1;
+    box.Get(x0, y0, z0, x1, y1, z1);
+    const gp_XYZ o(0.5 * (x0 + x1), 0.5 * (y0 + y1), 0.5 * (z0 + z1));
+    const KernelTimer timer("usd.precise");
+    return std::abs(faces_volume_precise(changed.second, o) - faces_volume_precise(changed.first, o)) <= 1e-9 * std::abs(volume0());
+  };
   // USD's result depends on the order of the faces too (a notched cylinder
   // fused with its mirror, qa OCCT-MIRROR-OVERCOUNT: one order of the same
   // faces merged to 4, the other gave 4/3 the volume from every start).
@@ -2114,8 +2130,9 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     u.Build();
     fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.check");
-    const std::optional<double> change = usd_volume_change(sf, image, share, u.Shape(), diag, &memo);
-    if (!keeps_volume(change, u.Shape()))
+    std::pair<std::vector<TopoDS_Shape>, std::vector<TopoDS_Shape>> changed;
+    const std::optional<double> change = usd_volume_change(sf, image, share, u.Shape(), diag, &memo, &changed);
+    if (!keeps_volume(change, u.Shape()) && !precise_keeps_volume(change, changed))
     {
       // (The same merge rejected three times running: the faces' order doesn't change it here, so neither will the
       // rest: cf-spur-gear's Boolean 2 tried eight, 86 ms each. A notched cylinder fused with its mirror is kept at
