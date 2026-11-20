@@ -108,6 +108,15 @@
   "original": "https://cad.onshape.com/documents/dd3c062a6579b210fbdd34a1/w/dea58f973a3bd0ca25be1414/e/40d48a14d3c582672ddb1306"
  },
  {
+  "name": "c2-curve-pattern-composite",
+  "document": "145d75bd04e01d77c895b12d",
+  "workspace": "442aba5af93107dd5b09b21d",
+  "element": "8e93ac15d93119dcd525b939",
+  "url": "https://cad.onshape.com/documents/145d75bd04e01d77c895b12d/w/442aba5af93107dd5b09b21d/e/8e93ac15d93119dcd525b939",
+  "title": "Curve pattern",
+  "original": "https://cad.onshape.com/documents/f9f4dd111e1538126617603d/w/7f3de46157e594d782cad7f3/e/1413104f6b8732f9dec138f5"
+ },
+ {
   "name": "c2-duct-multipart",
   "document": "f507da79a654a2111e542077",
   "workspace": "227d4dcfbfa1e074882cca83",
@@ -169,6 +178,15 @@
   "url": "https://cad.onshape.com/documents/205d4295a9abf6b8c377ea00/w/1daa87c44eff8bba900df70b/e/b35419b28f3c7aedf3ece3bb",
   "title": "hex-book-case-end-piece",
   "original": "https://cad.onshape.com/documents/77a140a6d84dce3c0f25b09f/w/5e87c2d19f3946290dacece0/e/5b9c7d8378748b80979f8649"
+ },
+ {
+  "name": "c2-hgr-riser-weldment",
+  "document": "fc66207cfeeb3bd46c186ade",
+  "workspace": "1fda3e92e14ff9f15c6ee61f",
+  "element": "f0cde08c31d733beb0bf70ba",
+  "url": "https://cad.onshape.com/documents/fc66207cfeeb3bd46c186ade/w/1fda3e92e14ff9f15c6ee61f/e/f0cde08c31d733beb0bf70ba",
+  "title": "HGR Riser",
+  "original": "https://cad.onshape.com/documents/bff02d005656847fc9036273/w/88252827e11ff2576d92cffc/e/ad7259c06cf7220b3fac5bec"
  },
  {
   "name": "c2-housing-draft",
@@ -261,6 +279,15 @@
   "original": "https://cad.onshape.com/documents/1548a76aebc97d118c82a341/w/b73148053dc237ac2730fbb4/e/55012f036c163a2fbccf1a72"
  },
  {
+  "name": "c2-projected-curve-enclose",
+  "document": "093781285922ed0e1407b21f",
+  "workspace": "5b1f84f8f9ff0f383a0474c4",
+  "element": "726e0b2b08a1a93276264d7b",
+  "url": "https://cad.onshape.com/documents/093781285922ed0e1407b21f/w/5b1f84f8f9ff0f383a0474c4/e/726e0b2b08a1a93276264d7b",
+  "title": "Practica de survaces proyected curve, mutual trim y enclose.",
+  "original": "https://cad.onshape.com/documents/bfe00097a9bd7e206459fb8b/w/2c76a02a95dd3375bbde8a18/e/5d9e0e601756b886d45a73c5"
+ },
+ {
   "name": "c2-replace-face-exercise",
   "document": "b05f832339dbc5bd9db657f9",
   "workspace": "5fcfb0664518ec141ddea991",
@@ -322,6 +349,15 @@
   "url": "https://cad.onshape.com/documents/e5f0c4522d6889aea4fb5360/w/24fb89e186dee8193bd6dec9/e/0d8872df7f6926715e991931",
   "title": "exhaust clamp",
   "original": "https://cad.onshape.com/documents/42aa955348748e3a90ab2f94/w/57ff6168d66290cd7d3bbfe2/e/b6e504423b6e30285975825d"
+ },
+ {
+  "name": "c2-sm-hem-flange",
+  "document": "6ebb0397e98f48b019bddb60",
+  "workspace": "8cf4520161b8df3951f19461",
+  "element": "5cba7a32af97b00db8d0bae3",
+  "url": "https://cad.onshape.com/documents/6ebb0397e98f48b019bddb60/w/8cf4520161b8df3951f19461/e/5cba7a32af97b00db8d0bae3",
+  "title": "recurso sheet metal flange, hem.",
+  "original": "https://cad.onshape.com/documents/23f311131d2673875b23d22b/w/33ba80d03fea780f81cbbb6b/e/08588549cfc00e6997c40558"
  },
  {
   "name": "c2-sm-hem-plus",
@@ -583,6 +619,15 @@
   "url": "https://cad.onshape.com/documents/2fef3a91f55c570a794547bc/w/f1b09257f22a9b9bef324417/e/1cbf81304d759dc76a430948",
   "title": "Surface Modelling Workshop: Sweep",
   "original": "https://cad.onshape.com/documents/0efc2ee6cb3a989b875b3fac/w/e8f5d5dc18cb482207c7af19/e/92032fb77f89ad73de3176e6"
+ },
+ {
+  "name": "c2-surfaces-lofts-projected",
+  "document": "ffab454c77fa09e0aa1538b2",
+  "workspace": "5bd693d390a6f4db442688f0",
+  "element": "e526ea7e5be39eded0566c5b",
+  "url": "https://cad.onshape.com/documents/ffab454c77fa09e0aa1538b2/w/5bd693d390a6f4db442688f0/e/e526ea7e5be39eded0566c5b",
+  "title": "Surfaces",
+  "original": "https://cad.onshape.com/documents/2f74987f6e18678f9ccda2dd/w/e426a243f526b2744e40e8c7/e/ff9cdc135bfcc65dce182e72"
  },
  {
   "name": "c2-tpd-fillet-variable",
