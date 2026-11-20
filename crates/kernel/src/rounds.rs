@@ -24,7 +24,11 @@ pub fn delete_planar_rounds(solid: &Shape, del: &[Shape]) -> Option<OpResult> {
         gone[solid.index_of(f, ShapeType::Face)?] = true;
     }
     let surfaces: Vec<Surface> = faces.iter().map(|f| f.face_surface().ok()).collect::<Option<_>>()?;
-    if gone.iter().zip(&surfaces).any(|(g, s)| *g && !matches!(s, Surface::Cylinder { .. } | Surface::Sphere { .. } | Surface::Torus { .. })) {
+    let ef = solid.edge_faces().ok()?;
+    // A free-form corner between rounds (OCCT's patch where three meet: c2-replace-face-exercise's drafted pocket) beside
+    // a round taken too.
+    let corner = |f: usize| ef.iter().any(|fs| fs.contains(&(f as u32)) && fs.iter().any(|&o| gone[o as usize] && matches!(surfaces[o as usize], Surface::Cylinder { .. })));
+    if (0..faces.len()).any(|f| gone[f] && !matches!(surfaces[f], Surface::Cylinder { .. } | Surface::Sphere { .. } | Surface::Torus { .. }) && !(matches!(surfaces[f], Surface::BSpline { .. } | Surface::Bezier { .. }) && corner(f))) {
         return None;
     }
     // Cylinders about parallel axes only: a prism's rounds, which the kernel's own prism case edits in place.
@@ -37,7 +41,6 @@ pub fn delete_planar_rounds(solid: &Shape, del: &[Shape]) -> Option<OpResult> {
         _ => None,
     };
     let edges = solid.edges();
-    let ef = solid.edge_faces().ok()?;
     let lines: Vec<Option<(DVec3, DVec3)>> = edges.iter().map(|e| matches!(e.edge_info().ok()?.curve, Curve::Line { .. }).then(|| e.endpoints().ok()).flatten()).collect();
     let other = |ei: usize, f: usize| -> Option<usize> {
         match ef.get(ei)?.as_slice() {
