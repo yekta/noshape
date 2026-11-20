@@ -5,6 +5,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## live, 2026-11-20 (Onshape 1.222 / 1.223 release audit)
+- [ ] P2 **INSERT-OTHER-DOCS-SORT (asm)**: Onshape 1.223 "sorting in the Current document and Other documents tabs of the
+  insert dialog". Live 05:42: Insert › Other documents › a document's Part Studios / Assemblies list has the same sort button
+  beside its search box as Current document (Name: A → Z / Z → A). Ours shows Sort only for the current document
+  (assembly_panels.rs, insert_source == 0). Evidence: onshape-research/live/releases/rn-1222-1223/ins-other.png, rn1-rn3.json.
+- [ ] P2 **DRW-CHOOSER-SORT (studios)**: the drawing Insert view chooser "Select a part or assembly" has a sort button right
+  of "Search parts or sketches" (live drawing/cfg-choosers-1120/iv-2-insert.png; the custom table's "Select a Part Studio"
+  also has one). Ours (drawing_chooser.rs) has none. Options not opened in the drawing; the assembly's are Name: A → Z / Z → A.
+- [ ] P2 **URDF-RIGID-SUBASM-SINGLE-LINK (dx)**: Onshape 1.223 "merging subassemblies into a single body in URDF export".
+  Live 05:42, assembly Export › URDF: Geometry format, STL Format, Resolution, Options, ☐ "Export rigid subassemblies as a
+  single link", ☐ Include hidden instances in export. Ours' URDF export has no such option. Evidence:
+  releases/rn-1222-1223/urdf-export.png, rn4.json.
+
 ## asm, 2026-11-19
 - [ ] **P2 HOLE-THROUGH-ROUND-POLE [bool]** (asm 20:38, isaac-ball Fastened 43): a Ø6 REMOVE extrude coaxial with an
   R4 corner round, whose axis passes through the corner ball's pole (the ball touching the bottom face at the axis,
