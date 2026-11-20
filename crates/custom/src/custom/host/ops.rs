@@ -698,8 +698,19 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
         let index = |ev: &EvalCtx, id: &BodyId| ev.ctx.bodies.iter().position(|b| &b.id == id);
         let body_named = |ev: &EvalCtx, i: usize| crate::regen::features::helpers_a::body_named(&ev.ctx.bodies[i]);
-        let tools: Vec<BodyId> = ev.resolve_bodies(&tool_refs).into_iter().map(|i| ev.ctx.bodies[i].id.clone()).collect();
-        let targets: Vec<BodyId> = ev.resolve_bodies(&target_refs).into_iter().map(|i| ev.ctx.bodies[i].id.clone()).filter(|t| !tools.contains(t) || kind.as_ref() == "UNION").collect();
+        // In the query's order: a union keeps the first (live qa5: the first-picked tool survives; std Jog's moving
+        // piece, last of its compose union, is gone after it).
+        let in_order = |ev: &EvalCtx, refs: &[Reference]| {
+            let mut out: Vec<BodyId> = Vec::new();
+            for i in refs.iter().flat_map(|r| ev.resolve_bodies(std::slice::from_ref(r))) {
+                if !out.contains(&ev.ctx.bodies[i].id) {
+                    out.push(ev.ctx.bodies[i].id.clone());
+                }
+            }
+            out
+        };
+        let tools: Vec<BodyId> = in_order(ev, &tool_refs);
+        let targets: Vec<BodyId> = in_order(ev, &target_refs).into_iter().filter(|t| !tools.contains(t) || kind.as_ref() == "UNION").collect();
         match &*kind {
             "UNION" => {
                 let mut all: Vec<BodyId> = targets.clone();
@@ -2019,8 +2030,9 @@ fn op_delete_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (cx, id, def) = args(i, &a)?;
     let faces = evaluate_refs(i, &cx, def.get("deleteFaces"))?;
     let leave_open = def_bool(&def, "leaveOpen", false);
-    run_op(i, &cx, &id, "DIRECT_EDIT_DELETE_FACE_FAILED", |ev| {
+    let split = run_op(i, &cx, &id, "DIRECT_EDIT_DELETE_FACE_FAILED", |ev| {
         let mut fresh = 0u32;
+        let mut split: Vec<(BodyId, BodyId)> = Vec::new();
         for (bi, fs) in by_body(ev.resolve_faces(&faces)).into_iter().rev() {
             let body = ev.ctx.bodies[bi].clone();
             if leave_open {
@@ -2053,7 +2065,9 @@ fn op_delete_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                             b.kind = BodyKind::Surface;
                         }
                     } else {
-                        push_body(ev, BodyId { feature: ev.feature, index: fresh }, BodyKind::Surface, piece, names);
+                        let piece_id = BodyId { feature: ev.feature, index: fresh };
+                        push_body(ev, piece_id.clone(), BodyKind::Surface, piece, names);
+                        split.push((piece_id, body.id.clone()));
                         fresh += 1;
                     }
                 }
@@ -2065,8 +2079,22 @@ fn op_delete_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let new = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), None);
             ev.replace_body(bi, res.shape, new);
         }
-        Ok(())
+        Ok(split)
     })?;
+    // A sheet that falls apart keeps its attributes on every piece, hidden as it is (Parasolid's split body: std
+    // Jog's fixed side, split off the sheet metal model, is the model after its union).
+    let mut st = cx.state.lock();
+    let (marker, feature) = (super::marker_of(&id), st.feature);
+    for (piece, from) in split {
+        let piece = super::wrap_body_id(&piece, marker, st.op_bits(marker), feature);
+        let copies: Vec<Value> = st.attributes_of(&Reference::Body(from.clone())).into_iter().cloned().collect();
+        for v in copies {
+            st.push_attribute(Reference::Body(piece.clone()), v);
+        }
+        if st.hidden.contains(&from) {
+            st.hidden.insert(piece);
+        }
+    }
     Ok(Value::Undefined)
 }
 

@@ -3548,6 +3548,52 @@ export const notch = defineFeature(function(context is Context, id is Id, defini
     assert_eq!(custom::run::output_of(fid).unwrap().output, "created 10, on the block 10\nconcave 2, faces created 3\nvertices 8, the tool's faces 0, the block's 7\n");
 }
 
+/// A union of tools keeps the first in the query's order, whichever was made first (live qa5: the first-picked tool
+/// survives; std Jog's compose union keeps its fixed side, the moving piece's query then finds nothing: c2-sm-jog-panel's
+/// Jog 3). A sheet opDeleteFace leaves in pieces keeps its attributes on each (std Jog's fixed side is the model after).
+#[test]
+fn a_union_keeps_its_first_tool_and_pieces_keep_their_attributes() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Order" }
+export const order = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        fCuboid(context, id + "a", { "corner1" : vector(0, 0, 0) * meter, "corner2" : vector(10, 10, 10) * millimeter });
+        fCuboid(context, id + "b", { "corner1" : vector(5, 0, 0) * millimeter, "corner2" : vector(15, 10, 10) * millimeter });
+        const a = evaluateQuery(context, qCreatedBy(id + "a", EntityType.BODY));
+        const b = evaluateQuery(context, qCreatedBy(id + "b", EntityType.BODY));
+        opBoolean(context, id + "union", { "tools" : qUnion([b[0], a[0]]), "operationType" : BooleanOperationType.UNION });
+        println("a " ~ size(evaluateQuery(context, a[0])) ~ ", b " ~ size(evaluateQuery(context, b[0])));
+        fCuboid(context, id + "c", { "corner1" : vector(30, 0, 0) * millimeter, "corner2" : vector(40, 10, 10) * millimeter });
+        const faces = qCreatedBy(id + "c", EntityType.FACE);
+        opExtractSurface(context, id + "sheet", { "faces" : qUnion([qContainsPoint(faces, vector(35, 5, 10) * millimeter), qContainsPoint(faces, vector(35, 5, 0) * millimeter), qContainsPoint(faces, vector(40, 5, 5) * millimeter)]) });
+        const sheet = qCreatedBy(id + "sheet", EntityType.BODY);
+        setAttribute(context, { "entities" : sheet, "attribute" : "kept" });
+        opDeleteFace(context, id + "split", { "deleteFaces" : qContainsPoint(qOwnedByBody(sheet, EntityType.FACE), vector(40, 5, 5) * millimeter), "includeFillet" : false, "capVoid" : false, "leaveOpen" : true });
+        var kept = 0;
+        const pieces = evaluateQuery(context, qBodyType(qEverything(EntityType.BODY), BodyType.SHEET));
+        for (var p in pieces)
+            kept += size(getAttributes(context, { "entities" : p, "attributePattern" : "kept" }));
+        println("pieces " ~ size(pieces) ~ ", with the attribute " ~ kept);
+    });
+"#,
+    );
+    let mut doc = Document::new();
+    let fs = doc.add_tab("Feature Studio 1", TabContent::FeatureStudio(FeatureStudio::new(&src)));
+    let scripts = DocumentScripts::from_document(&doc);
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&custom::type_id(fs, "order"), &units).unwrap();
+    let fid = f.id;
+    ps.features.push(f);
+    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions { custom_features: Some(scripts), ..Default::default() });
+    assert_ok(&r);
+    assert_eq!(custom::run::output_of(fid).unwrap().output, "a 0, b 1\npieces 2, with the attribute 2\n");
+}
+
 /// evEdgeConvexity on every edge of a block with rounded corners, a pocket, a boss and a through hole: its outer edges,
 /// the rounds' ends, the pocket's rim and the boss' top convex; the pocket's walls and floor and the boss' foot concave;
 /// the rounds' sides smooth (cf-lighten's Lighten picks its shelled tools' edges so).

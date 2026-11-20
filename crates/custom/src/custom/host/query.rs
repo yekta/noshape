@@ -983,7 +983,9 @@ impl<'a> QueryCx<'a> {
         // was: cf-lighten's Lighten tracks its tools' caps through shell, enclose and a Boolean.
         if let Some(Reference::Face(n)) = self.st.transient_ref(id) {
             for (bi, b) in self.st.ctx.bodies.iter().enumerate() {
-                out.extend(b.faces.iter().enumerate().filter(|(_, m)| ***m != *n && derives_from(m, n)).map(|(fi, _)| Ent::Face(bi, fi)));
+                let kin = self.st.tracking_kin.get(id).map_or(&[][..], |k| &k[..]);
+                let earlier = |m: &TopoName| kin.iter().any(|k| derives_from(m, k));
+                out.extend(b.faces.iter().enumerate().filter(|(_, m)| ***m != *n && derives_from(m, n) && !earlier(m)).map(|(fi, _)| Ent::Face(bi, fi)));
             }
         }
         if let Some(snap) = self.st.snapshots.get(id) {
@@ -3047,7 +3049,7 @@ pub fn kernel_error(e: k::KernelError) -> String {
 }
 
 /// Whether face name `n` is made from `of`: an offset, a region generated from, a copy or a piece of it, at any depth.
-fn derives_from(n: &TopoName, of: &TopoName) -> bool {
+pub(super) fn derives_from(n: &TopoName, of: &TopoName) -> bool {
     if n == of {
         return true;
     }

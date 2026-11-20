@@ -2857,6 +2857,11 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let owners: Vec<(Reference, FeatureId)> = links.iter().filter(|(to, _)| !matches!(to, Reference::Body(_))).filter_map(|(to, from)| Some((to.clone(), *owner.get(from)?))).collect();
             Arc::make_mut(d).label_owners = owners;
         }
+        // A part entity holds its definition entity's association alone: an old one goes (c2-sm-jog-panel's Jog 3
+        // splits the flat off a wall that keeps its id; live's Jog 4 then picks the flat as one wall).
+        let tag = std_tag("sheetMetalAttribute.fs", "SMAssociationAttribute");
+        let ents: std::collections::HashSet<&Reference> = links.iter().map(|(to, _)| to).filter(|to| !matches!(to, Reference::Body(_))).collect();
+        st.retain_attributes(|(r, v)| !(v.get("attribute").tag() == tag && ents.contains(r)));
         for ((to, _), attrs) in links.into_iter().zip(assoc) {
             for attr in attrs {
                 st.push_attribute(to.clone(), Value::map_from([("attribute", attr)]));

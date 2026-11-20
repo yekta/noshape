@@ -1,21 +1,23 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-20 18:42 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-20 20:02 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-20 18:42 UTC)
-- Landing now: a part whose curved faces the flat placing crosses (a hem's rolled walls) still tells a loop of bends
-  that can't unfold (live c2-sm-hem-flange Hem 1 WARNING "Sheet metal model cannot be unfolded.", behaviours "skasm
-  15:34 (11-20)"); a curved face it doesn't cross (cf-sheet-metal-model-plus's cylindrical bends) skips the check.
-  SM docs 219 -> 222/295; test a_hem_on_a_box_that_cannot_unfold_keeps_the_warning.
+## In flight (11-20 20:02 UTC)
+- Landing next (after a full-parity A/B, vibex7): c2-sm-jog-panel 5 -> 12/12 (SM docs 222 -> 229/295, 17/24). Four
+  host fixes: opBoolean keeps its tools in query order (a union keeps the first: live qa5 "the first-picked tool
+  survives"; resolve_bodies sorted them by body index, so std Jog's compose kept the moving piece and its query found
+  the whole sheet); opDeleteFace pieces keep the body's attributes (wrap_body_id after run_op: ids are renamed); a
+  rebuilt SM part entity drops its old association attribute before getting its definition entity's (Jog 4 picked
+  a flat holding two); tracking leaves out pieces split off before the id was given (tracking_kin).
+  Test custom_features::a_union_keeps_its_first_tool_and_pieces_keep_their_attributes.
+- LANDED 381554f1: Hem 1 (c2-sm-hem-flange) keeps "Sheet metal model cannot be unfolded." (219 -> 222/295).
 - LANDED 9f5250bf: SM loft profiles with different corner counts walk the least total fold (host/loft.rs).
 - Loft apex PARKED (c2-sm-loft-basic 38 vs 40 faces, +4.2 mm3): where 4 bends meet live makes 9 small faces (3 spline
   bend ends JY+ / JYC / JYK, bend 3's ends planar square to its axis, small planes at each wall's apex end, a 0.03 mm2
   spline KYCB); the base ends in a vertical cut (0, 202.166) -> (1.359, 201.497). Parasolid's own rule; small payoff.
-- Jog 3 (c2-sm-jog-panel, line y 102 on Jog 2's raised section): std checkSplitResults (sheetMetalBendUtils.fs:475)
-  throws: fixed edge (y 101.27, z 2.431) and moving edge (y 102.73, z 3.46) share no face (a jog-surface crease
-  between?). Debug: std throws with a custom regenError message (FS println goes to notices, not stderr); restore
-  edited files with a fresh mtime (rb.sh rsync keeps the old one and cargo skips the rebuild).
+- Debug std: throw a custom regenError message (FS println goes to notices, not stderr); restore edited files with a
+  fresh mtime (rb.sh rsync keeps the old one and cargo skips the rebuild). NOSHAPE_FS_TRACE=1 names the throw's line.
 - LANDED 6d80df66: Unfold unrolls only its bend, Refold puts back the held side (unfold-refold 6/6, 212/295).
 - LANDED eca6e645: Thicken / Convert flat lies by the largest wall (`Definition::extracted`); Sized relief ends
   depth + R tan(a/2) in (live 8.3 mm). 201 -> 209/295.
@@ -26,7 +28,7 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   and we build the lower triangle as its own wall, so the bottom-front bend starts at x 3.45 with a slanted end
   (diagonal crosses z 2.3 at x 5.75). Fix: build coplanar rip pieces as one wall (needs topology reindexing:
   def_topo, pieces). A coplanar-rip filter in corner_rip / edge_rip lookups had no effect.
-- Next differences: forms Sketch 3 frame (P2 ticket), Form 5/7; jog Jog 3 (above).
+- Next differences: forms Sketch 3 frame (P2 ticket), Form 5/7.
 - Tools: /root/skasm-scratch/pm.sh (ONLY=, SAVE=, build + run), pmrun.sh (TRACE run of the kept binary), smlist.txt
   (24 SM docs), CLI batch on saved docs: ~/tmp/skasm/saved (copy .noshape + -wal), hemq*.sh / jq.sh / jogq.sh.
 - Feel stack 4e51cce3 verified by qa (green f380b6928); P2 drawn_failed LANDED 8fd60c7a.

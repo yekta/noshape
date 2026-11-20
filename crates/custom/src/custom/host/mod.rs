@@ -218,6 +218,9 @@ pub struct CtxState {
     /// Geometry of entities when they got their transient ids (TRACKING
     /// queries find what they became after an operation renamed them).
     pub snapshots: HashMap<Arc<str>, query::Snapshot>,
+    /// A tracked face's pieces split off before it got its transient id: tracking it never gives them (std Jog's
+    /// moving face after its split keeps the face's name, the held piece derives from it).
+    pub tracking_kin: HashMap<Arc<str>, Vec<TopoName>>,
     /// Bodies hidden from the Part Studio (std sheet metal definition
     /// sheets): skipped by `qEverything` & co., found by attribute queries.
     pub hidden: HashSet<BodyId>,
@@ -374,6 +377,7 @@ impl FsContext {
                 hidden,
                 sm_built: HashMap::new(),
                 snapshots: HashMap::new(),
+                tracking_kin: HashMap::new(),
                 holes: HashMap::new(),
                 dependencies: HashMap::new(),
                 splits: HashMap::new(),
@@ -673,6 +677,12 @@ impl CtxState {
         };
         if let Some(snap) = snapshot {
             self.snapshots.insert(id.clone(), snap);
+        }
+        if let Reference::Face(n) = r {
+            let kin: Vec<TopoName> = self.ctx.bodies.iter().flat_map(|b| b.faces.iter()).filter(|m| ***m != *n && query::derives_from(m, n)).map(|m| (**m).clone()).collect();
+            if !kin.is_empty() {
+                self.tracking_kin.insert(id.clone(), kin);
+            }
         }
         self.transient_ids.insert(id.clone(), r.clone());
         self.transient_of.insert(r.clone(), id.clone());
