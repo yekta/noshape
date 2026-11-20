@@ -19,11 +19,11 @@ origin/main` first. App builds for shots on vibex7 / vibex6, never vibe2 (its on
 read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edited during a running sync: `touch` edited files before
 the next run. Run the full ops e2e before any drawing land. vibex8 is qa's quiet speed window 02:00-04:00 (lead 11-20):
 nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdshots-host.sh (PD_HOST=vibe2 PD_DISP=395: first free display, never skasm's :391-399). A few app runs don't take ~/bin/slot (DECISIONS 11-15).
-- Queued: c8ab739d (07:35, #4) carries 5a1b564a / 019a2040 / 0c681a1c (b6c84b49's fix forward: the chooser's sort
+- Landed 08:58: c8ab739d as 82a4a909, carrying 5a1b564a / 019a2040 / 0c681a1c (b6c84b49's fix forward: the chooser's sort
   rows in coverage MENUS), Datum target Precision ▾ per distance (DatumTargetOpts::precisions, drawn by sheet.rs
   `basic`), live's release-history 120 (an assembly's Release… lists its linked parts, no version icon on them; ops
   release::tab_items; e2e), matrix doc, ticket DRW-DATUM-TARGET-OP (datum targets have no op). Ops e2e 261, drawing 259.
-- Local, not queued (land with the next batch, after c8ab739d): c80343986 chooser search box border; 60f279179 Datum
+- Queued 09:01 as 782f4c47 (18 commits, with the P0 fix 43656cbca: the Feature Studio wheel-notch test within 0.5 px, Windows CI red from c249e0ed9): c80343986 chooser search box border; 60f279179 Datum
   target's emptied Instance count red + "This field cannot be empty", View properties' reverse tip; 600063d0b Datum
   target distance fields as live (25 px, centred, ▾ joined); 7649da91f / b12ac2198 / a715b5219 more `texts` (Version
   graph, hole Tolerance, Precision, Create Drawing's Language / Size options + Owner, the Auxiliary prefix); 312017e9c
