@@ -2044,11 +2044,15 @@ static bool analytic_only(const TopoDS_Shape& s)
   return true;
 }
 
+// Each face's on OCCT's pool, added in the faces' order: the same sum as one by one (c2-config-parts-standoffs' unify,
+// a fifth of a regeneration on one thread).
 double faces_volume_precise(const std::vector<TopoDS_Shape>& fs, const gp_XYZ& o)
 {
+  std::vector<double> each(fs.size(), 0.0);
+  OSD_Parallel::For(0, (int)fs.size(), [&](int i) { each[(size_t)i] = face_moments(TopoDS::Face(fs[(size_t)i]), true, o)[0]; }, fs.size() < 2);
   double v = 0;
-  for (const TopoDS_Shape& f : fs)
-    v += face_moments(TopoDS::Face(f), true, o)[0];
+  for (const double x : each)
+    v += x;
   return v;
 }
 

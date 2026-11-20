@@ -2005,20 +2005,19 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     most = solids * (x1 - x0) * (y1 - y0) * (z1 - z0);
   }
   lap.reset();
+  std::vector<TopoDS_Shape> sf;
+  for (TopExp_Explorer x(s, TopAbs_FACE); x.More(); x.Next())
+    sf.push_back(x.Current());
   std::optional<double> v0;
   auto volume0 = [&] {
     if (!v0)
     {
+      // (Its faces' shares on all threads: c2-config-parts-standoffs' thread, 12 ms a regeneration on one.)
       const KernelTimer timer("usd.volume");
-      GProp_GProps      g0;
-      BRepGProp::VolumeProperties(s, g0);
-      v0 = g0.Mass();
+      v0 = faces_volume(sf);
     }
     return *v0;
   };
-  std::vector<TopoDS_Shape> sf;
-  for (TopExp_Explorer x(s, TopAbs_FACE); x.More(); x.Next())
-    sf.push_back(x.Current());
   // Each face of `s` in the copy USD gets (through `rotated`, the wires' rotation, when given) as `in` uses it,
   // and its face_share.
   auto images = [&](const BRepBuilderAPI_Copy& cp, const HHist& rotated, const TopoDS_Shape& in,
