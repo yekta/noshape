@@ -226,6 +226,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (label pitch 74 px vs 75). qa-scratch/tickets/drwdlg-export-drawing.png
 
 ## qa, 2026-11-20
+- [ ] P1 COMPAT-CRASH957-CHAMFER3 (bool; qa 11-20 15:4x from compat vs v0.4.62) ticket doc crash957-after-del-sk4 (vibex7 ~/qa/tickets):
+  Chamfer 3 Ok in v0.4.62 and on greens up to 97ea6b36 -> Error 'Select edges or faces to chamfer.' from 0a0b9a49 (still c226f9a4 /
+  18809b4c; 0.4.61 had Error 'Failed to chamfer selections.'); Fillet 2 Error message 'Failed to fillet selections.' -> 'Select edges
+  or faces to fillet.'. Geometry commits in 97ea6b369..0a0b9a49: bool 593b072ac (Gyro), 347654fdf (glued fuse on one plane), 0a0b9a49a
+  (Newton points on a bound). Not a cut blocker (ticket document; lead 11-20).
 - [x] (accepted, lead 11-20 15:0x: bool and qa checked face by face; an accepted change, not a NO-GO) P1 COMPAT-DOCK-BGOVDE-MERGE (bool; qa 11-20 13:5x from compat 452420b2, vibex7) the user's AppleWatchDock, Part Studio "B - Cakil Tasi":
   B Govde 85/206/126 faces/edges/vertices in 0.4.61 and up to 86d1cbc4 -> 83/200/122 on 452420b2, volume 19945.54 mm³ both. The only
   geometry commit in the range is bool 61295b96f (USD's merge of coaxial pieces back), the change 33c176a43 noted with no live capture.
