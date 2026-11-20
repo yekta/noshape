@@ -162,6 +162,7 @@
 #include <Geom_ConicalSurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <ShapeFix_Edge.hxx>
+#include <Geom_Ellipse.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
 #include <GCPnts_TangentialDeflection.hxx>
 #include <GeomAPI_IntSS.hxx>
@@ -280,6 +281,118 @@ TopoDS_Shape single_solid(const TopoDS_Shape& s)
     for (TopExp_Explorer e(s, TopAbs_SOLID); e.More(); e.Next())
       return e.Current();
   return s;
+}
+
+// An edge's ellipse (its curve under any trims), with its range; null when not an ellipse.
+static occ::handle<Geom_Ellipse> ellipse_of(const TopoDS_Edge& e, double& f, double& l)
+{
+  occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l);
+  while (!c.IsNull() && c->IsKind(STANDARD_TYPE(Geom_TrimmedCurve)))
+    c = occ::down_cast<Geom_TrimmedCurve>(c)->BasisCurve();
+  return occ::down_cast<Geom_Ellipse>(c);
+}
+
+// The same ellipse (however each is parameterised).
+static bool same_ellipse(const gp_Elips& a, const gp_Elips& b)
+{
+  return a.Location().Distance(b.Location()) < 1e-7 && std::abs(a.MajorRadius() - b.MajorRadius()) < 1e-7 &&
+         std::abs(a.MinorRadius() - b.MinorRadius()) < 1e-7 && a.Axis().Direction().IsParallel(b.Axis().Direction(), 1e-9) &&
+         a.XAxis().Direction().IsParallel(b.XAxis().Direction(), 1e-9);
+}
+
+// Pieces of one ellipse joined where they meet at a vertex no other edge uses, between the same two faces: OCCT's
+// unify joins lines and circles only, so an oblique hole's rim a slab cut stayed in two (f815832c; live: one edge).
+// The history of the joins in `hist`; `s` itself when nothing joins.
+static TopoDS_Shape with_ellipse_pieces_joined(const TopoDS_Shape& s, HHist& hist)
+{
+  TopoDS_Shape cur = s;
+  const double period = 2 * M_PI;
+  for (int pass = 0; pass < 16; ++pass)
+  {
+    TopTools_IndexedDataMapOfShapeListOfShape ve, ef;
+    TopExp::MapShapesAndUniqueAncestors(cur, TopAbs_VERTEX, TopAbs_EDGE, ve);
+    TopExp::MapShapesAndUniqueAncestors(cur, TopAbs_EDGE, TopAbs_FACE, ef);
+    occ::handle<BRepTools_ReShape>                       rs = new BRepTools_ReShape;
+    NCollection_Map<TopoDS_Shape, TopTools_ShapeMapHasher> used;
+    int                                                  joined = 0;
+    for (int i = 1; i <= ve.Extent(); ++i)
+    {
+      if (ve(i).Extent() != 2)
+        continue;
+      const TopoDS_Edge e1 = TopoDS::Edge(ve(i).First().Oriented(TopAbs_FORWARD));
+      const TopoDS_Edge e2 = TopoDS::Edge(ve(i).Last().Oriented(TopAbs_FORWARD));
+      if (used.Contains(e1) || used.Contains(e2) || BRep_Tool::Degenerated(e1) || BRep_Tool::Degenerated(e2))
+        continue;
+      double                          f1, l1, f2, l2;
+      const occ::handle<Geom_Ellipse> c1 = ellipse_of(e1, f1, l1), c2 = ellipse_of(e2, f2, l2);
+      if (c1.IsNull() || c2.IsNull() || !same_ellipse(c1->Elips(), c2->Elips()))
+        continue;
+      const TopTools_ListOfShape& fa = ef.FindFromKey(e1);
+      const TopTools_ListOfShape& fb = ef.FindFromKey(e2);
+      if (fa.Extent() != 2 || fb.Extent() != 2)
+        continue;
+      bool same_faces = true;
+      for (const TopoDS_Shape& f : fa)
+      {
+        bool in_b = false;
+        for (const TopoDS_Shape& g : fb)
+          in_b = in_b || f.IsSame(g);
+        same_faces = same_faces && in_b && !BRep_Tool::IsClosed(e1, TopoDS::Face(f)) && !BRep_Tool::IsClosed(e2, TopoDS::Face(f));
+      }
+      if (!same_faces)
+        continue;
+      TopoDS_Vertex a1, b1, a2, b2;
+      TopExp::Vertices(e1, a1, b1);
+      TopExp::Vertices(e2, a2, b2);
+      const TopoDS_Vertex v = TopoDS::Vertex(ve.FindKey(i));
+      if (!(a1.IsSame(v) || b1.IsSame(v)) || !(a2.IsSame(v) || b2.IsSame(v)))
+        continue;
+      // On e1's ellipse: e2 from v to its other end w, continuing e1 past v (forward past l1 or back before f1).
+      const gp_Elips      el    = c1->Elips();
+      const TopoDS_Vertex w     = a2.IsSame(v) ? b2 : a2;
+      const bool          ahead = b1.IsSame(v);
+      const auto          on1   = [&](const gp_Pnt& p, double from) {
+        const double q = std::remainder(ElCLib::Parameter(el, p) - from, period);
+        return ahead ? (q < 0 ? q + period : q) : (q > 0 ? q - period : q);
+      };
+      const double dw = on1(BRep_Tool::Pnt(w), ahead ? l1 : f1);
+      const double dm = on1(BRepAdaptor_Curve(e2).Value(0.5 * (f2 + l2)), ahead ? l1 : f1);
+      if (std::abs(dm) >= std::abs(dw) || std::abs(dm) < 1e-9)
+        continue;
+      const TopoDS_Vertex a     = ahead ? a1 : w;
+      const TopoDS_Vertex b     = ahead ? w : b1;
+      const double        start = ahead ? f1 : f1 + dw;
+      const double        len   = (l1 - f1) + std::abs(dw);
+      if (a.IsSame(b) || len >= period - 1e-9)
+        continue;
+      const double tol = std::max(BRep_Tool::Tolerance(e1), BRep_Tool::Tolerance(e2));
+      BRep_Builder bb;
+      TopoDS_Edge  e;
+      bb.MakeEdge(e, c1, tol);
+      bb.Add(e, a.Oriented(TopAbs_FORWARD));
+      bb.Add(e, b.Oriented(TopAbs_REVERSED));
+      bb.Range(e, start, start + len);
+      bb.UpdateVertex(a, start, e, BRep_Tool::Tolerance(a));
+      bb.UpdateVertex(b, start + len, e, BRep_Tool::Tolerance(b));
+      ShapeFix_Edge sfe;
+      for (const TopoDS_Shape& f : fa)
+        sfe.FixAddPCurve(e, TopoDS::Face(f), false, tol);
+      sfe.FixSameParameter(e);
+      rs->Replace(e1, e);
+      rs->Remove(e2);
+      used.Add(e1);
+      used.Add(e2);
+      ++joined;
+    }
+    if (joined == 0)
+      break;
+    cur = rs->Apply(cur);
+    if (hist.IsNull())
+      hist = rs->History();
+    else
+      hist->Merge(rs->History());
+  }
+  return cur;
 }
 
 // `s` without its tiny inside-out solids (under a hundredth of t³) beside the others: a slab construction's leftover
@@ -10229,6 +10342,23 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
   HHist              hs;
   const TopoDS_Shape unified = usd_any_order(r, 1e-7, hs);
   lap("unify");
+  {
+    HHist              jh;
+    const TopoDS_Shape joined = with_ellipse_pieces_joined(unified, jh);
+    const double       v0     = volume_of(unified);
+    // (The volume may move by the split pieces' pcurves: f815832c's 2720.0603 mm3 split, 2719.9237 by the adaptive
+    // integral, both 2720.0497 joined; live 2720.0509.)
+    if (!jh.IsNull() && valid_solid(single_solid(joined)) && std::abs(volume_of(joined) - v0) <= 1e-5 * std::abs(v0))
+    {
+      if (dbg)
+        std::fprintf(stderr, "slabs: ellipse pieces joined\n");
+      if (hs.IsNull())
+        hs = jh;
+      else
+        hs->Merge(jh);
+      unified = joined;
+    }
+  }
   const TopoDS_Shape split = single_solid(r);
   r = single_solid(unified);
   // Unify can break a valid result (qa5 P1-16 at 1 mm): keep the split one.
@@ -10582,11 +10712,12 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
   if (!done)
     fail_op("shell failed");
   // Walls that fill the whole part leave no cavity: Parasolid fails (live q-b79e508b: 19.9 mm walls in a 20 mm plate,
-  // SHELL_FAILED; ours returned the part unchanged).
+  // SHELL_FAILED; ours returned the part unchanged). Within 1e-6: the part rebuilt from its slabs reads up to ~1e-7 off
+  // its own volume (8ec111cc's 25 mm walls, 0.011 mm³ under, its rim's pieces joined).
   if (!outward)
   {
     const double v0 = volume_of(solid.shape), v1 = volume_of(b.result);
-    if (v0 > 0 && v1 >= v0 * (1 - 1e-9))
+    if (v0 > 0 && v1 >= v0 * (1 - 1e-6))
       fail_op("shell failed (Parasolid: the walls fill the part, no cavity: live q-b79e508b)");
   }
   return make_result({solid.shape}, without_inverted_slivers(b.result, thickness), b.history.get());

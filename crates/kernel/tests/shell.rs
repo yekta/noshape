@@ -872,10 +872,26 @@ fn an_oblique_hole_s_wall_ends_on_its_cylinder_as_live() {
     let rm: Vec<Shape> = s.faces().into_iter().filter(|f| (f.area().unwrap() * 1e6 - 560.8285).abs() < 1e-3).collect();
     assert_eq!(rm.len(), 1);
     let r = shell_solid(&s, &rm, 0.5e-3, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
-    assert!((vol(&r) * 1e9 - 2720.0509).abs() < 0.01, "{} mm³", vol(&r) * 1e9);
+    assert!((vol(&r) * 1e9 - 2720.0509).abs() < 0.005, "{} mm³", vol(&r) * 1e9);
     assert_eq!(r.count(ShapeType::Face), 16);
     let walls: Vec<f64> = r.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { .. }))).map(|f| f.area().unwrap() * 1e6).collect();
     assert!(walls.iter().any(|a| (a - 25.282).abs() < 1e-3), "{walls:?}");
+    // The hole's rim on the 45° wall is one edge each side, as live's: no vertex between two pieces of one ellipse.
+    let centre = |e: &Shape| match e.edge_info().unwrap().curve {
+        Curve::Ellipse { center, .. } => Some(center),
+        _ => None,
+    };
+    let edges = r.edges();
+    for (v, es) in r.vertex_edges().unwrap().iter().enumerate() {
+        let mut es = es.clone();
+        es.sort_unstable();
+        es.dedup();
+        if let [a, b] = es[..]
+            && let (Some(ca), Some(cb)) = (centre(&edges[a as usize]), centre(&edges[b as usize]))
+        {
+            assert!((ca - cb).length() > 1e-9, "vertex {v} splits an ellipse at {:?} mm", r.vertices()[v].vertex_point().unwrap() * 1e3);
+        }
+    }
 }
 
 /// Fuzz part b79e (metres), a 20 mm plate shelled 19.9 mm inward with one side removed: the walls fill the plate, no
