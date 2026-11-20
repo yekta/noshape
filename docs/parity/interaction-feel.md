@@ -246,7 +246,7 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
 | Hovered row | light blue, an eye at the right end | the same | – | = |
-| Row tooltip | only for a cut-off name (a row whose name fits has none; the fix icon's "Part is fixed"), live2 11-14 | the same (the name measured against its room), at 80 ms (`ROW_TIP_DELAY`) | – | = (fixed) |
+| Row tooltip | every instance row's name area tips its name, cut off or not; an icon column its icon's own tip ("Part is fixed", a lock's named position) or none (live2 asm-feel2 (a) 11-17, which retracts 11-14's "a row whose name fits has none": probed over the icon columns) | the same, at 80 ms (`ROW_TIP_DELAY`); the next row's at once | every_instance_row_tooltips_its_name | = |
 | 3D highlight on hover | ~0.85 s after the pointer arrives on live2's software-GL host; its graphics hover takes ~0.73 s too (live2 18:20 (6)): the host, not a delay of Onshape's | at once | – | = |
 | Plain click | toggles the row | the same (`list_click`) | ui-parity asm-select-mate-row | = |
 | Ctrl+click | opens the context menu (live2 18:20; behaviours "skb (10-24)" (3)) | the same | – | = |
