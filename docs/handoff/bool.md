@@ -4,72 +4,47 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-20 04:16 UTC. Hosts by load (DECISIONS 11-19): read
-`ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2; builds + probes on the Mac (NOSHAPE_RB_HOST=mac,
-inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host; land queue vibe2
-(`NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`); private docs only vibex7 ~/lead-private. Never kill a process
-tree from a computed pid: `systemctl stop <unit>`. Agent ids: only /root/lead-scratch/roster.md (read before messaging).
+Updated 11-20 13:57 UTC. Hosts by load (DECISIONS 11-19): read
+`ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is OFF
+until the lead says (11-20 14:00 -> 18:05: no rb.sh mac, ssh or scp), else builds + probes there (NOSHAPE_RB_HOST=mac,
+inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
+(a background task dies at 2 h); land queue vibe2 (`NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`); private docs
+only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `systemctl stop <unit>`. Agent ids: only
+/root/lead-scratch/roster.md (read before messaging).
 
-## Order (lead 11-19 23:00)
-1. bool-stack7 land. 2. bool-pole2 land, then asm re-checks isaac Fastened 43. 3. "+1 face" shells' final unify (and
-f815832c's 22 faces vs live's 16). 4. Shell 3 Linux 2-solid split. 5. bool2-exact (below). 6. the rest by P0/P1.
+## Order (lead 11-20 12:20)
+Both P0s landed (isaac drag revert 61295b96, Gyro 593b072a). Now: dx's speed items (impeller-loft Extrude Bohrungssitz
+op_boolean 666 ms; screws Sweep 1's sections_ahead 907 ms) and 850efe. End a turn after each land.
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
 ## In flight
-- bool-land7 (= bool-stack7 rebased; worktree bool-tube): e3078f89 FAILED in the queue 03:49 (assembly pem_*_nuts_match_live,
-  7 tests: a676feb46's strip drop took the PEM S nut's 7 um flat between two planes 138 degrees apart, one of live's 92
-  faces). Fix fee56483e: a narrow face is dropped as a step only between parallel planes (assembly pem filter 24 pass).
-  land.sh again 04:04 -> QUEUED: tell the lead; watch `land.sh --status` in bool-tube.
-- bool-pole2 (worktree bool-docs, origin/bool-pole2, tip 330ea2052; knurls clean 01:38; udoc moved to vibex7 01:45: unit bool-udoc-p2b, udoc-p2b.sh) = bool-land7 + bool-pole's 6 + e87b6b170
-  (HOLE-THROUGH-ROUND-POLE: fixed, asm's repro 302.235 vs exact 302.234 mm3). Gate 01:11 (/root/bool-docs-scratch/gate-330ea2052.log):
-  CHECK only for: 24 declined by the 50 um rule (the TO WIN BACK list), c2-parting-line-draft Rib 1 73/234/164 ->
-  73/213/143 (live 73/214/144, nearer); differing 7 -> 4 (none new), shfall 3 -> 1; shells 8 = main's 8, 2756e521 /
-  8e657637 as OCCT now; crate tests pass. Running: unit bool-kn-p2 (kn-p2.sh -> /root/bool-scratch/kn-p2.out,
-  KN-P2-DONE) and unit bool-udoc-p2 (udoc-p2.sh -> /root/bool-hat-scratch/udoc-p2.out, UDOC-DONE; vibex7 udoc2/).
-  Both clean -> land (after bool-land7), tell asm (isaac Fastened 43).
-- bool-pole's 6 commits (now in bool-pole2):
-  e4f8a8066 a sphere's pole edge split at the curves ending there (non-manifold cdd336b4 taken = OCCT);
-  01775a048 straight edges in a row share one Geom_Line (unify joins them as OCCT's);
-  fb3d29a2a Face Generated Vertex for every argument's coplanar face (0 new differences);
-  4b1784e6c the 50 um rule (Shell slab Boolean with an input edge >= 5e-5 tolerance is OCCT's; removes 5 differing).
-  Declined by it, TO WIN BACK with a narrower signal: gate corpora 0670c350, 280af0bc, 2b9c38da, 2c9c42e4, 30afb30c,
-  475df60e, 570dfc37, 5fc0970a, 70b3fb42, 818552c9, 83b621a3, 8e91c517, 922c847a, 952c2efc, a1186078, a7bdd15b,
-  b359e025, cb7bb22b, e1dc8c98, f1c35250, f302ef40; Shell corpus 1451f7cb, 43a947f0, 96d45f42, 9bee135f, c25f7a31.
-  Rule off (bool-hat debug NOSHAPE_SLAB_TOL_RULE=0, Mac u14): 20 of the 21 = OCCT; 570dfc37 (old shfall only, so
-  report-only now) differs: OCCT keeps arg5's vertex (82.95, 41.75, 5) mm at tol 1e-4, ours deletes it. Shell corpus
-  end to end (u16/u21): rule off = rule on = OCCT once a8e67f355's pcurve refit is in (2756e521 was the one off).
-  rec1 (new shfall) rule on / off (Mac u41, 04:14): 65 of 103 taken both, the same 4 differ (OCCT vs its own recording);
-  the rule's 8 declines fall to other reasons. Dropped: bool-sh3 5b38e5c92.
-  afcf858f3 slab union history differing only in vertex records = equivalent (lead 11-19); 0d465cb70 the gate's
-  end-to-end Shell check (gate-host.py SHELLS / SHELLS_KNOWN).
-- Gate 98ef1c012 (unit bool-gate-98ef1c012-x8, out /root/bool-hat-scratch/chain-98ef1c012.out, from 09:17):
-  branch bool-gl (worktree bool-gl, pushed) = 3d8d16e5e Gear Lab glue (isaac-ball 8f5622 gl40 930 ms vs live 1153;
-  fuse_glued: N facing face pairs on one plane by outline; located refusal only on free-form surfaces) +
-  98ef1c012 screws thread (c2-config-parts-screws Sweep 1 cut b95e3b88: refined_section's projections by next_uv,
-  Newton clamped to non-periodic bounds; 48 ms vs 1.1 s Mac, OCCT 324; T2 test a_screws_thread_cut_as_fast_as_occts;
-  worktree bool-thread has it alone). Land on PASS (knurls: kn-k25.sh pattern on vibex7).
-- shfall swapped to rec1 on all hosts 09:16 (98 cases; 11-02 set = shfall-1102, report-only).
-- P1 isaac 850efe (skasm 09:40; root of the 30 s Fillet 3, blend.as_is timeout): Extrude 6 union 3b6725b2ffc81970
-  (Mac bool-keep/m85r; model m85m): tool r4 cylinders coaxial with Extrude 2's to 1e-12 mm, same x dir. Ours = OCCT
-  39 faces; unify leaves each side's r4 pieces apart (ours 33/85/50, live 28/68/40 = each side one face): OCCT's USD
-  merge loses 704 mm3 (= pi 4^2 14, faces invalid; dump NOSHAPE_USD_DUMP in bool-hat), usd_kept_volume refuses it,
-  and merge_cylinder_groups doesn't take the groups. Next: why (bool-hat NOSHAPE_DBG_CYLG prints each group's
-  boundary edges / chains; .cx.sh probe_coaxial PROBE_R=4) and extend it (left: faces 2,3,4,23,24; right 13,14,17,18).
-  (JVJ 15 nm was skasm's sketch solve, theirs.)
+- Gear Lab + screws (worktree bool-gl, 3d8d16e5e + 98ef1c012) QUEUED 13:12 as 2c7debe4 (gate PASS; knurls ours-only 0
+  diff lines in all 5). On land: tell lead, dx (screws Sweep 1 3992 -> 357 ms on loaded vibex8; ~950 -> ~85 ms Mac
+  scale, live 42: under the 100 ms rule) and core. Sweep 1 is still "not a valid solid" on main and branch: core's
+  sweep (their helix repro), check with core.
+- 850efe Extrude 6 (worktree bool-m85, branch bool-m85, 68e96d2fc on main 698df935f): merge_cylinder_groups_with takes
+  pieces on trimmed cylinders, tries the next same-angle ruling pair when the seam crosses a slot side, maps the
+  pieces' own p-curves (GeomProjLib's were 11 um off), sets a chain's direction from its first non-degenerate edge, and
+  checks the merged face's volume with `both` (before + reversed F) within a slack from the p-curves' measured
+  deviation. 28 faces = live (was 33, OCCT 31); T1 slotted_coaxial_cylinder_bands_unify_as_live (tests/data/unify/
+  coaxial-cylinders-slotted). grooves_crossing_37_um_above_the_end now measures the single cuts unmerged (their merged
+  cylinder 1.4e-4 mm3 off by p-curve nm). Full gate on vibex7 since 13:45 (unit bool-gate-m85, out
+  /root/bool-hat-scratch/chain-bool-m85.out). PASS -> land, tell skasm (root of the 30 s Fillet 3) and lead.
+- impeller-loft Extrude Bohrungssitz Ansaugflansch (dx): ours declines (boolean.rust 150 ms), OCCT's Boolean takes it:
+  Edge-Face x813 797 ms, boolean.build 633, Face-Face x150 387, unify.bands 212 (vibex8 loaded, ~4.5x the Mac).
+  Recording its Booleans (vibex8 ~/tmp/bool/imprec, task via slot) to find the case and why ours declines.
+- AppleWatchDock B Govde 85 -> 83 faces after the revert (qa P1 COMPAT-DOCK-BGOVDE-MERGE): settle by live's count
+  after Rib Round 1.
+- Declined by the 50 um rule (4b1784e6c), TO WIN BACK with a narrower signal: gate corpora 0670c350, 280af0bc,
+  2b9c38da, 2c9c42e4, 30afb30c, 475df60e, 570dfc37, 5fc0970a, 70b3fb42, 818552c9, 83b621a3, 8e91c517, 922c847a,
+  952c2efc, a1186078, a7bdd15b, b359e025, cb7bb22b, e1dc8c98, f1c35250, f302ef40; Shell corpus 1451f7cb, 43a947f0,
+  96d45f42, 9bee135f, c25f7a31. Rule off: 20 of the 21 = OCCT; 570dfc37 (report-only) keeps OCCT's vertex
+  (82.95, 41.75, 5) mm at tol 1e-4, ours deletes it.
+- shfall = rec1 on all hosts since 11-20 09:16 (98 cases; 11-02 set = shfall-1102, report-only).
 - rings-loft STL (dx, low): in dx's x_t round trip face 23 (offset -1 mm of a B-spline) gets no triangulation (wire
   crosses itself in UV, 1.1e-4 degenerate edge; all 79 open edges border it). Our own Booleans (Mac bool-keep/ringsr,
   probe_corpus_meshes): the 273-face cut 331fd52c meshes with 0 holes (unified too); c40a49c4 (cut 103 -> 133) opens
   9. So likely the x_t write/read (dx's) or c40a49c4; Shell 1 alone: 44 faces, 8 folds, 0 holes.
-- bool-k25x10 2f452d3b3 QUEUED as aa015bd5 (11-20 ~10:50; knurls ours-only on vibex7 0 diff lines in all 5). Then rebase bool-sh3r.
-- P0 isaac drag (asm bisect: 33c176a43 parked USD's roomy merge, 802 ms -> 9.6 s a frame): revert QUEUED as 5f9be914
-  (11-20 11:50, branch bool-rv33). Redo the AppleWatchDock B Govde concern (85 -> 83 faces after Rib Round 1) later.
-- P0 COMPAT-GYRO-REVOLVE: 04ac97c9e (bool-gyro, pushed): 9d77e079e read a whole torus/sphere shell by `reversed`
-  only; Gyro's tori are in left-handed frames (3 voids -> 3 inside-out solids). Now handedness counts, voids go to
-  OCCT. Gate on vibex7 --no-speed --no-suite since 11:51 (unit bool-gate-04ac97c9e-x7, out
-  /root/bool-hat-scratch/chain-04ac97c9e.out); land before 16:30 (17:00 release), tell lead at 15:30 if late.
-- 850efe Extrude 6: right group refused "crosses seam": the lowest same-angle pair runs along the slots' rulings;
-  fix (bool-hat, /root/bool-scratch/seamfix.py) tries pairs in order: then the merged face fails the volume check
-  (7.62e-7 vs 7.09e-7), as the left 23/24 (2.56e-7 vs 2.30e-7): next, why the built face covers more.
 - bool-sh3 (rebased on main 3ac2565d6 in worktree bool-sh3r, branch bool-sh3r, tip c26a788e0, not pushed; origin/bool-sh3, tip a0b85fef4 = + d494b222e, a0b85fef4 (standoffs speed, below); 5b38e5c92 the 50 um rule removed; d2a26a12a the Ø25×10 knurl's touch (P2 below);
   1f27fa8ca the unify's segmented volume recheck (free-form fuse, P2 below); 8b6d6faba + Shell's stray-pcurve refit after its unify (2756e521: a 45° cone's merged
   face had an edge pcurve 0.83 mm off, read 77 mm3 heavy in ours and OCCT; now 32108.414, live 32108.426 / 45 faces (q-2756e521),
