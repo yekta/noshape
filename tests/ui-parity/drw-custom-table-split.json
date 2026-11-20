@@ -1,0 +1,101 @@
+{
+ "name": "drw-custom-table-split",
+ "about": "block-drawing-table-2parts (block-drawing-table plus a 20 x 20 x 10 mm Part 2 at (60, 0)): a Part faces custom table placed (rows Part 1, Part 2); a right-click on the Part 1 row (its menu: Split custom table below); a click on Split custom table below; Escape",
+ "area": "drawing",
+ "source": "studios REQUESTS 11-20 17:15 (drawing matrix: the last present-only rows); scenario written and recorded by live 11-20",
+ "start": "block-drawing-table-2parts",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Custom table"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Select a custom table"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "Part faces"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Done"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     150,
+     150
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sheet_point": [
+     112,
+     139
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Split custom table below"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  }
+ ]
+}

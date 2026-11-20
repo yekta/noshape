@@ -1,0 +1,177 @@
+{
+ "name": "drw-datum-empty-field",
+ "about": "block-drawing: Datum tool, the Label field (A) emptied with Backspace, the pointer on the field and then on the panel header (~1.2 s each); Datum target tab, a target placed (a point on Front, then its location), Length > Angle, the Instance count field (1) emptied, the pointer on it and on the header; Escape",
+ "area": "drawing",
+ "source": "studios REQUESTS 11-20 17:15 (drawing matrix: the last present-only rows); scenario written and recorded by live 11-20",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Datum"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     187,
+     147
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "key",
+   "key": "Backspace"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     187,
+     147
+    ]
+   },
+   "ms": 1200
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     145,
+     90
+    ]
+   },
+   "ms": 1200
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Datum target"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      40,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      60,
+      0,
+      30
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Length"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Angle"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     208,
+     562
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "key",
+   "key": "Backspace"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     208,
+     562
+    ]
+   },
+   "ms": 1200
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     145,
+     90
+    ]
+   },
+   "ms": 1200
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  }
+ ]
+}
