@@ -4,10 +4,10 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-20 21:00 UTC. Hosts by load (DECISIONS 11-19): read
-`ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is OFF
-until the lead says (11-20 18:xx -> 21:35: no rb.sh mac, ssh or scp), else builds + probes there (NOSHAPE_RB_HOST=mac,
-inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
+Updated 11-20 22:03 UTC. Hosts by load (DECISIONS 11-19): read
+`ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
+(lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
+bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
 (a background task dies at 2 h); land queue vibe2 (`NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`); private docs
 only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `systemctl stop <unit>`. Agent ids: only
 /root/lead-scratch/roster.md (read before messaging).
@@ -18,34 +18,32 @@ op_boolean 666 ms; screws Sweep 1's sections_ahead 907 ms) and 850efe. End a tur
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
 ## In flight
-- COMPAT-CRASH957-CHAMFER3: LANDED 43c2644a (20:10), qa asked to re-verify; worktree + targets removed.
+- COMPAT-CRASH957-CHAMFER3: LANDED 43c2644a (20:10), qa verified on green 00bc521e and ticked it. Closed.
 - 850efe Extrude 6 (worktree/branch bool-m85, 4f4fa433f on main 698df935f): 68e96d2fc + 4f4fa433f (replace_by refuses
   a merged cylinder face whose UVBounds u span > 2 pi: c2-fan-blade-sweep's 9 thread-land strips were one 7.7-turn
   face, Boolean 2's cut then OCCT's and invalid; T1 a_threads_helical_land_stays_in_strips_on_unify, case 935abddf).
   fan-blade now 56/139/84 valid = main (live 56/143/88, a gap of main's too). Full gate on vibex8 (unit
   bool-gate-m85b, script /root/bool-scratch/gate-m85.sh, out /root/bool-hat-scratch/chain-bool-m85.out, from 20:06).
   PASS -> land, tell skasm (root of the 30 s Fillet 3) + lead; rm worktree, vibex7/8 ~/agents/bool-m85{,-gate}.
-- impeller Extrude (worktree/branch bool-imp, 2d59d7104 on main 55749fd6f): free-form face's edges imprinted on
+- impeller Extrude (worktree/branch bool-imp, 1b2e274a3 on main 55749fd6f): free-form face's edges imprinted on
   another free-form face of its surface (edge_over_free_face bsplines, free::past_patch_along); ours = OCCT 97/221/141,
-  ~1.0 s vs OCCT 1.8 s; T1 impeller_seats_on_its_free_form_wall_fuse_as_occt (case 23c0c38476a63ecf, 1.09 MB).
-  Chain on vibex7 (unit bool-imp-chain: bool_patterns + brep tests, then full gate; out
-  /root/bool-hat-scratch/chain-bool-imp.out). PASS -> land, tell dx + lead.
-- SHELL-AFTER-WELD-FILLET (worktree/branch bool-sh3w, on main 55749fd6f): 407bb5cf6's without_inverted_slivers alone
-  (conflict resolved: main's return, no walls-fill check) + T1 a_weld_fillet_part_shells_to_one_solid_without_its_
-  inverted_sliver (tests/data/shell/weld-fillet-part3-input.brep = qa doc's Part 3 before Shell 3). qa doc regenerates
-  Shell 3 Ok. Check running: /root/bool-scratch/sh3t.sh (unit bool-sh3t, out sh3t.out: shell:: on the branch, then the
-  T1 against main's shell.cpp, which should fail; the script restores shell.cpp). Then gate (after a gate host frees),
-  land, tell qa + lead.
-  FOLLOW-UP (own ticket): Part 3 = live's input (342822.058 mm3) but ours 183041.69 / 141 faces vs live 183072.272 /
+  ~1.0 s vs OCCT 1.8 s; T1 impeller_seats_on_its_free_form_wall_fuse_as_occt (case 23c0c38476a63ecf, 1.09 MB, rel
+  1e-7: volume 2.6e-8 off OCCT). Amended ~22:00: a both-free imprint that declines with nothing added is skipped
+  (a7ab967d + an_edge_along_..._rim declined "an edge on another argument's free-form face" otherwise); bool_patterns
+  155 ok + brep ok. Gate queued on vibex7 after sh3w (unit bool-imp-gate waits on bool-gate-sh3w; script
+  /root/bool-scratch/imp-gate.sh, out /root/bool-hat-scratch/chain-bool-imp.out). PASS -> land, tell dx + lead.
+- SHELL-AFTER-WELD-FILLET (worktree/branch bool-sh3w, a4cfa07d3 on main 55749fd6f): 407bb5cf6's
+  without_inverted_slivers alone + T1 a_weld_fillet_part_shells_to_one_solid_without_its_inverted_sliver
+  (tests/data/shell/weld-fillet-part3-input.brep = qa doc's Part 3 before Shell 3). shell:: 33 ok; the T1 fails on main.
+  Gate on vibex7 (unit bool-gate-sh3w, /root/bool-scratch/gate-sh3w.sh, out chain-bool-sh3w.out, from 21:36).
+  PASS -> land, tell qa + lead.
+  FOLLOW-UP (own ticket): Part 3 = live's input (342822.058 mm3) but ours 183041.69 vs live 183072.272 /
   59 faces / 156 edges / 93 vertices (41 planes, 14 cyl, 4 cones), 30 Shell faces 32018.992 mm2 (per-face areas:
-  /root/live-scratch/shellq/shell3-topo.json). Our Shell on live's x_t Part 3 fails ("shell failed"). Part 2 = live.
+  /root/live-scratch/shellq/shell3-topo.json). (The 141 faces were Part 3 at the END of the doc, not after Shell 3.)
+  Our Shell on live's x_t Part 3 fails ("shell failed"). Part 2 = live. Probe: bool-hat branch sh3-probe2 (= bool-sh3w
+  + shell::zz_probe_weld_part3, all methods' faces), Mac, unit bool-p3probe, out /root/bool-scratch/p3probe.out.
+  (bool-hat's old sh3-probe debug is WIP commit on branch sh3-probe; patch /root/bool-scratch/bool-hat-sh3-probe-old.patch.)
   Files: vibex7 ~/tmp/bool/sh3w/{d.noshape (qa doc copy), pre-shell3.x_t, dump/shell-17 (Part 3), shell-18 (Part 2)}.
-- impeller-loft Extrude Bohrungssitz Ansaugflansch (dx; worktree bool-imp, uncommitted, DEBUG under NOSHAPE_DBG_ON +
-  test zz_probe_case to strip): case vibex8 ~/tmp/bool/impslow/23c0c38476a63ecf (fuse, 58-face part + 9 seats, OCCT
-  1773 ms). Declined "a piece's point on another solid's face": face 79 (seat's extrusion, z -5..0) runs on face 26
-  (part's NURBS wall, z -4..0), its samples past 26's patch 1 mm off. free::past_patch_along (free.rs) skips those in
-  same_surface; now declines "coincident pieces differ": 26's bottom edge (z -4) isn't imprinted on 79 (79 one piece
-  z -5..0, 26's piece z -4..0). Next: imprint coincident free-form faces' edges as for planes. FULL path = OCCT's.
 - screws Sweep 1: speed landed 0a0b9a49; "not a valid solid" was my 13:06 A/B parity (maybe before core's 0f8993ef8);
   core finds main valid. Closed unless core says otherwise.
 - AppleWatchDock B Govde 85 -> 83 faces after the revert (qa P1 COMPAT-DOCK-BGOVDE-MERGE): settle by live's count
