@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-20 04:02)
+# QA handoff (agent qa; current state only, updated 2026-11-20 04:08)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -87,7 +87,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    compat/accepted.txt; 2f4f's subject added to cut-must.txt).** Unit qa-prerel-2f4f (bin/prerel-when.sh "<subject>" cut0500): when
    that commit is in the green, bin/prerel-run.sh uploads it to vibe2 and runs userdocs + prerel-edits + prerel-open (pixel diff at 90 s)
    -> qa-scratch/prerel/cut0500-<sha>.txt and a qa-alerts line. Then read that + the compat loop's compat/<sha>.txt and send the lead GO.
-   TICKETS sweep done (f79c29aca and after): ~200 fixed rows verified / closed, 2 reopened (blend CHAMFER-ASYM, skasm SNAP-INSERT-FACE).
+   TICKETS sweep done (f79c29aca and after): ~200 fixed rows verified / closed, 2 reopened (blend CHAMFER-ASYM, skasm SNAP-INSERT-FACE): no owner commit by 04:08, both owners told 04:09; walk on their word. Night ui suite done 04:06 (2145/2172); last "not run" (vs-ps-own-table-menu) matched alone: all routed.
    Night ui run (1120-night-ui-a06ec927, vibex8) finishing: sent P1 ANALYSIS-READOUT-HIDDEN (psui, fix in its next land; waiter
    qa-wait-psui-readout), P2 ASM-INSTANCE-PROPS-FIELD (asm), DOCS-CRUMB-TOOLTIP and VER-COMPARE-READOUT (studios); re-run-alone
    matches were artefacts. When score.log lands: diff vs 1119-1302 for the last ~40, route, then restart qa-suites (rm suites/stop).
