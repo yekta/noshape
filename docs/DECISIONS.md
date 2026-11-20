@@ -47,6 +47,10 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   contradicts itself on an exact symmetry (the same arguments rotated or mirrored) and ours gives both copies OCCT's
   other answer (bool2-exact shfall 5101adb8 = 6bb081c8 turned 90°: OCCT 1.93 mm³ off on one). Any other OCCT
   difference still needs live.
+- 11-20 (lead) bool's shfall gate is the 103-case OCCT set re-recorded 11-19 at today's tolerances (vibex8
+  bool-keep/shrec/rec1). The 11-02 set stays as shfall-1102, a report-only run: each brep land lists any new difference
+  from its last run and does not block. Cases where OCCT disagrees with its own recording on every replay are dropped,
+  each named with its reason in the corpus README.
 - 11-16 A vertex live leaves splitting one edge into two pieces of the same curve (no new geometry; e.g. impeller f24's
   split 47 µm from a corner) is a known live difference when the faces match, the volume is within tolerance and no
   later feature references it. Record it with its measurements in the suite's known-differences table.
