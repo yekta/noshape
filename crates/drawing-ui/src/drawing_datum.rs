@@ -428,7 +428,9 @@ impl DrawingEditor {
 
     pub fn render_datum_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let d = self.datum_dlg.as_ref()?;
-        crate::ui_script::note_dialog(|| crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Datum" }), datum_dlg_texts(d)));
+        // The X / Y flips' tip as `texts` (the drawing matrix; live drawing-datum-target-after).
+        let flips = d.rows.iter().any(|r| !r.ann.target.as_ref().is_some_and(|t| t.angular));
+        crate::ui_script::note_dialog(|| crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Datum", "texts": if flips { vec!["Opposite direction"] } else { vec![] } }), datum_dlg_texts(d)));
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);
         let ed = cx.entity();
@@ -632,7 +634,7 @@ impl DrawingEditor {
                     };
                     let flip = |id: (&'static str, usize), label: &'static str, on: bool, x: bool, cx: &mut Context<Self>| {
                         v_flex().w(px(25.)).items_center().child(div().text_size(px(10.)).whitespace_nowrap().child(label)).child(
-                            div().id(id).size(px(20.)).flex().items_center().justify_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).when(on, |e| e.bg(gpui_kit::rgb(0xdfe7ee))).cursor_pointer().child(div().text_size(px(11.)).child("⤢")).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            div().id(id).tooltip(crate::ui::tooltip("Opposite direction")).size(px(20.)).flex().items_center().justify_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).when(on, |e| e.bg(gpui_kit::rgb(0xdfe7ee))).cursor_pointer().child(div().text_size(px(11.)).child("⤢")).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 if let Some(d) = &mut this.datum_dlg
                                     && let Some(r) = d.rows.get_mut(k)
                                 {

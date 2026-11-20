@@ -406,7 +406,7 @@ impl DrawingEditor {
                     t.text("Excluded parts");
                 }
             }
-            crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Section view", "fields": fields }), t.0)
+            crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Section view", "fields": fields, "texts": if d.offset.is_some() { vec!["Offset distance"] } else { vec![] } }), t.0)
         });
         Some(
             v_flex()
@@ -645,7 +645,7 @@ impl DrawingEditor {
                                     .gap(px(6.))
                                     .child(crate::drawing_chrome::DrCheckbox::new("ds-offset").label("Offset").checked(d.offset.is_some()).on_click(cx.listener(|this, v: &bool, w, cx| this.toggle_section_offset(*v, w, cx))))
                                     .when_some(d.offset.as_ref().map(|x| x.0.clone()), |e, st| {
-                                        e.child(div().flex_1().child(Input::new(&st).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).small())).child(
+                                        e.child(div().id("ds-offset-in").flex_1().tooltip(crate::ui::tooltip("Offset distance")).child(Input::new(&st).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).small())).child(
                                             div()
                                                 .id("ds-offset-flip")
                                                 .size(px(24.))

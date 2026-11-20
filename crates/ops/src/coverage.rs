@@ -384,6 +384,9 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Add jog", Op("drawing_annotation_edit")),
     ("drawing:Add leader", Op("drawing_annotation_edit")),
     ("drawing:Add node", Op("drawing_annotation_edit")),
+    // The source chooser's sort (the document's tabs as document_info lists them, in the caller's order).
+    ("drawing:Name: A → Z", Op("document_info")),
+    ("drawing:Name: Z → A", Op("document_info")),
     ("drawing:Reset ordinate", Op("drawing_annotation_edit")),
     ("drawing:Add revision callout", Op("drawing_revision_callout")),
     ("drawing:Add stacked callouts...", Op("drawing_annotation_edit")),
