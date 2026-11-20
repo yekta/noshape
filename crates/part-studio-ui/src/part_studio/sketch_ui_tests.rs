@@ -1520,6 +1520,38 @@ fn a_dimension_placed_under_a_line_in_iso_opens_its_box(cx: &mut TestAppContext)
     assert_eq!((dims, text.as_deref()), (1, Some("80 mm")), "placed, its box open with the width");
 }
 
+/// Live (ui-parity sketch-dimension-variable, qa SKETCH-DIM-PLACE-CLICK-SELECTS): on Top a rectangle's bottom line lies
+/// in the Front plane; with it picked, a placement click 8 mm under it, over the Front plane, places its dimension (the
+/// box open for "#width"), not a second pick of the plane the line lies in.
+#[gpui::test]
+fn a_dimension_placed_over_the_plane_its_line_lies_in_opens_its_box(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "dim-place-own-trace", Tool::CornerRect);
+    let at = |cx: &mut TestAppContext, x: f64, y: f64| { let p = on_screen(cx, &view, DVec2::new(x, y)); (p.x, p.y) };
+    let (a, b) = (at(cx, 0.06, 0.0), at(cx, 0.09, 0.02));
+    click(cx, window, &view, a);
+    click(cx, window, &view, b);
+    keys(cx, window, &["escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Dimension, w, cx))).unwrap();
+    draw(cx, window);
+    let (line, place) = (at(cx, 0.075, 0.0), at(cx, 0.075, -0.008));
+    click(cx, window, &view, line);
+    // The Front plane under the pointer, as the GPU's pick gives it there.
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let (vp, at) = (v.viewport.clone(), DVec2::new(place.0, place.1));
+            v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: at, modifiers: Modifiers::default() }, w, cx);
+            v.hover = Some(Reference::Plane(DatumPlane::Front));
+            v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+            v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: at, modifiers: Modifiers::default() }, w, cx);
+        });
+    })
+    .unwrap();
+    draw(cx, window);
+    let dims = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.constraints().filter(|c| c.kind.is_dimension()).count());
+    let text = cx.update(|cx| view.read(cx).dim_input.as_ref().map(|(_, st, _)| st.read(cx).value().to_string()));
+    assert_eq!((dims, text.as_deref()), (1, Some("30 mm")), "placed, its box open with the width, the plane not picked");
+}
+
 /// Live2 11-17 sketch-dim-sel: with the Dimension tool a pick previews the dimension at once (the line kept selected);
 /// the placement click creates it and opens its box, the measured value with its unit pre-selected; Esc in the box
 /// keeps the dimension, the tool on; "1abc" Enter keeps the box (invalid), the first Esc restores the measured text

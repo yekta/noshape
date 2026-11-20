@@ -1288,7 +1288,8 @@ impl PartStudioView {
                 let picks = self.sketch.as_ref().filter(|_| tool_now == Some(Tool::Dimension)).map(|s| s.tool_picks()).unwrap_or_default();
                 let round_pick = self.sketch_data(cx).is_some_and(|d| picks.iter().any(|e| matches!(d.sketch.kind(*e), Some(noshape_sketch::EntityKind::Circle | noshape_sketch::EntityKind::Arc))));
                 let plane_area = |r: &Reference| matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. });
-                let skip_plane = |r: &Reference| !picks.is_empty() && plane_area(r) && (round_pick || self.is_own_sketch_plane(r, cx));
+                // Nor a plane the picked lines lie in (qa SKETCH-DIM-PLACE-CLICK-SELECTS: on Top, the bottom line in Front).
+                let skip_plane = |r: &Reference| !picks.is_empty() && plane_area(r) && (round_pick || self.is_own_sketch_plane(r, cx) || self.plane_holds_lines(r, &picks, cx));
                 // Offset on a model face (live q-off): its outer loop, offset as one chain.
                 if hovered.is_none()
                     && tool_now == Some(Tool::Offset)
@@ -1573,6 +1574,13 @@ impl PartStudioView {
         self.reference_plane(r).is_some_and(|f| {
             f.normal.cross(ed.frame.normal).length() < 1e-9 && (f.origin - ed.frame.origin).dot(ed.frame.normal).abs() < 1e-9
         })
+    }
+
+    /// Whether the open sketch's lines `picks` (all lines) lie in plane `r`.
+    fn plane_holds_lines(&self, r: &Reference, picks: &[noshape_sketch::EntityId], cx: &App) -> bool {
+        let (Some(ed), Some(d), Some(f)) = (self.sketch.as_ref(), self.sketch_data(cx), self.reference_plane(r)) else { return false };
+        let on = |q: DVec2| (ed.frame.to_world(q) - f.origin).dot(f.normal).abs() < 1e-9;
+        picks.iter().all(|e| matches!(d.sketch.curve(*e), Some(noshape_sketch::Curve2::Line { a, b }) if on(a) && on(b)))
     }
 
     /// Plane frame of a plane-like reference (datum / feature plane, planar face).

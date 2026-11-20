@@ -3,7 +3,7 @@
 Updated 2026-11-20 00:50 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight 00:30: landing the stack (suite O = J on every document: 95/126, 1354/1585; log ~/agents/skasm-keep/suite-O-1120-0010.log on vibex6)
+## In flight: stack QUEUED e0837465 (suite O = J on every document: 95/126, 1354/1585); P0 dim-place fix landing on top
 Compare per document with suite J (vibex7 ~/tmp/skasm/suite-J-1119-1831.log.s.c: `sed` the "name: N/M features match"
 lines to "name N/M", LC_ALL=C sort, join, awk $2!=$3). None worse -> land.sh. The stack:
 - Extrude part order (3ff5480f): a New extrude's regions of one sketch go in drawing order (the lowest entity id of each
@@ -40,6 +40,10 @@ lines to "name N/M", LC_ALL=C sort, join, awk $2!=$3). None worse -> land.sh. Th
   / SPLINE by control points) on MODELSKETCH_VISIBLE (`curves_document` / `curves_dxf` / `curves_dwg`); no construction
   curves, points or external refs (sketch_export `sketch_curves`; a face: `outline_curves`, else sampled lines). SVG
   keeps the sheet path. ops e2e sketch_paste_export pins layer, kinds, radius, AC1014, construction left out.
+- Dimension place click over a plane (qa P0 SKETCH-DIM-PLACE-CLICK-SELECTS, ui-parity sketch-dimension-variable): on Top
+  the rectangle's bottom line lies in Front; with it picked, the place click 8 mm under it hovered Front (past the line's
+  8.5 px reach since 24441238) and took it as a second pick. sketch.rs `plane_holds_lines`: a plane every picked line
+  lies in is skipped (the click places). Pin `a_dimension_placed_over_the_plane_its_line_lies_in_opens_its_box`.
 - Simulation connection removed (77fa48ed, lead; DECISIONS 11-16): mate dialog field + flyout row + model-data/ops
   fields, run.py drops the two labels, scenario asm-slider-simulation-connection deleted. ops e2e assembly 14, coverage,
   assembly-ui 97, clippy clean (vibex8).
