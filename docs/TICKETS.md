@@ -226,7 +226,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (label pitch 74 px vs 75). qa-scratch/tickets/drwdlg-export-drawing.png
 
 ## qa, 2026-11-20
-- [ ] P1 COMPAT-CRASH957-CHAMFER3 (bool; qa 11-20 15:4x from compat vs v0.4.62) ticket doc crash957-after-del-sk4 (vibex7 ~/qa/tickets):
+- [ ] (bool 16:1x: cause 347654fdf, Mirror 1's glued fuse leaves the pocket arcs on the mirror plane as doubled edges (20/60/32 vs OCCT's 20/59/32); fix 42aea9f11 in its gate) P1 COMPAT-CRASH957-CHAMFER3 (bool; qa 11-20 15:4x from compat vs v0.4.62) ticket doc crash957-after-del-sk4 (vibex7 ~/qa/tickets):
   Chamfer 3 Ok in v0.4.62 and on greens up to 97ea6b36 -> Error 'Select edges or faces to chamfer.' from 0a0b9a49 (still c226f9a4 /
   18809b4c; 0.4.61 had Error 'Failed to chamfer selections.'); Fillet 2 Error message 'Failed to fillet selections.' -> 'Select edges
   or faces to fillet.'. Geometry commits in 97ea6b369..0a0b9a49: bool 593b072ac (Gyro), 347654fdf (glued fuse on one plane), 0a0b9a49a
