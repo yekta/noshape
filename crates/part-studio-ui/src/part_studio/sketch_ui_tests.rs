@@ -1527,7 +1527,7 @@ fn a_dimension_placed_under_a_line_in_iso_opens_its_box(cx: &mut TestAppContext)
 
 /// Live (ui-parity sketch-dimension-variable, qa SKETCH-DIM-PLACE-CLICK-SELECTS): on Top a rectangle's bottom line lies
 /// in the Front plane; with it picked, a placement click 8 mm under it, over the Front plane, places its dimension (the
-/// box open for "#width"), not a second pick of the plane the line lies in.
+/// box open for "#width"), not a second pick of the plane the line lies in. The pick alone reads its Length, as live's.
 #[gpui::test]
 fn a_dimension_placed_over_the_plane_its_line_lies_in_opens_its_box(cx: &mut TestAppContext) {
     let (window, view) = sketch_with(cx, "dim-place-own-trace", Tool::CornerRect);
@@ -1540,6 +1540,9 @@ fn a_dimension_placed_over_the_plane_its_line_lies_in_opens_its_box(cx: &mut Tes
     draw(cx, window);
     let (line, place) = (at(cx, 0.075, 0.0), at(cx, 0.075, -0.008));
     click(cx, window, &view, line);
+    let units = cx.update(|cx| view.read(cx).doc.read(cx).session.doc.settings.units);
+    let readout = cx.update(|cx| { let v = view.read(cx); v.sketch.as_ref().unwrap().selection_readout(&v.sketch_data(cx).unwrap(), &units) });
+    assert_eq!(readout.iter().map(|(l, t)| (l.as_str(), t.as_str())).collect::<Vec<_>>(), [("Length", "30.000 mm")], "the picked line's readout, as live's");
     // The Front plane under the pointer, as the GPU's pick gives it there.
     cx.update_window(window, |_, w, cx| {
         view.update(cx, |v, cx| {
