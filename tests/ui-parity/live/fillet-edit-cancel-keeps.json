@@ -1,19 +1,23 @@
 {
  "scenario": "fillet-edit-cancel-keeps",
- "recorded": "2026-11-12T11:55:49.509Z",
+ "recorded": "2026-11-20T01:05:47.138Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "1dcef23c33afc0ff8f03f462",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "c23ee24b1f65af532d6d5e96",
   "start": "block-fillet",
-  "startElement": "56449b9c8d94cbb3e8a02724",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "8ef4b24dee8da1135e478009",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -92,9 +96,9 @@
     -116.913,
     77.942
    ],
-   "width_mm": 460.686,
+   "width_mm": 419.494,
    "height_mm": 243.974,
-   "mmPerPixel": 0.275365,
+   "mmPerPixel": 0.250744,
    "orthographic": true
   },
   "measure": null
@@ -139,7 +143,7 @@
        "label": "Entities to fillet",
        "kind": "query",
        "items": [
-        "Unknown of Extrude 1"
+        "Edge of Extrude 1"
        ],
        "active": true,
        "state": "ok"
@@ -223,7 +227,7 @@
         "label": "Entities to fillet",
         "kind": "query",
         "items": [
-         "Unknown of Extrude 1"
+         "Edge of Extrude 1"
         ],
         "active": true,
         "state": "ok"
@@ -366,14 +370,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 35695
+   "t": 37851
   },
   {
    "step": 2,
@@ -408,7 +412,7 @@
        "label": "Entities to fillet",
        "kind": "query",
        "items": [
-        "Unknown of Extrude 1"
+        "Edge of Extrude 1"
        ],
        "active": true,
        "state": "ok"
@@ -492,7 +496,7 @@
         "label": "Entities to fillet",
         "kind": "query",
         "items": [
-         "Unknown of Extrude 1"
+         "Edge of Extrude 1"
         ],
         "active": true,
         "state": "ok"
@@ -635,14 +639,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 40500
+   "t": 42291
   },
   {
    "step": 3,
@@ -689,7 +693,7 @@
        "label": "Entities to fillet",
        "kind": "query",
        "items": [
-        "Unknown of Extrude 1"
+        "Edge of Extrude 1"
        ],
        "active": true,
        "state": "ok"
@@ -773,7 +777,7 @@
         "label": "Entities to fillet",
         "kind": "query",
         "items": [
-         "Unknown of Extrude 1"
+         "Edge of Extrude 1"
         ],
         "active": true,
         "state": "ok"
@@ -916,14 +920,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 43263
+   "t": 44667
   },
   {
    "step": 4,
@@ -964,7 +968,7 @@
        "label": "Entities to fillet",
        "kind": "query",
        "items": [
-        "Unknown of Extrude 1"
+        "Edge of Extrude 1"
        ],
        "active": true,
        "state": "ok"
@@ -1048,7 +1052,7 @@
         "label": "Entities to fillet",
         "kind": "query",
         "items": [
-         "Unknown of Extrude 1"
+         "Edge of Extrude 1"
         ],
         "active": true,
         "state": "ok"
@@ -1191,14 +1195,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 45747
+   "t": 46636
   },
   {
    "step": 5,
@@ -1249,7 +1253,7 @@
        "label": "Entities to fillet",
        "kind": "query",
        "items": [
-        "Unknown of Extrude 1"
+        "Edge of Extrude 1"
        ],
        "active": true,
        "state": "ok"
@@ -1333,7 +1337,7 @@
         "label": "Entities to fillet",
         "kind": "query",
         "items": [
-         "Unknown of Extrude 1"
+         "Edge of Extrude 1"
         ],
         "active": true,
         "state": "ok"
@@ -1476,14 +1480,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 49539
+   "t": 50087
   },
   {
    "step": 6,
@@ -1524,7 +1528,7 @@
        "label": "Entities to fillet",
        "kind": "query",
        "items": [
-        "Unknown of Extrude 1"
+        "Edge of Extrude 1"
        ],
        "active": true,
        "state": "ok"
@@ -1608,7 +1612,7 @@
         "label": "Entities to fillet",
         "kind": "query",
         "items": [
-         "Unknown of Extrude 1"
+         "Edge of Extrude 1"
         ],
         "active": true,
         "state": "ok"
@@ -1751,14 +1755,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 54188
+   "t": 54387
   },
   {
    "step": 7,
@@ -1850,14 +1854,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 57502
+   "t": 57584
   },
   {
    "step": 8,
@@ -1943,14 +1947,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 62190
+   "t": 61895
   },
   {
    "step": 9,
@@ -1991,7 +1995,7 @@
        "label": "Entities to fillet",
        "kind": "query",
        "items": [
-        "Unknown of Extrude 1"
+        "Edge of Extrude 1"
        ],
        "active": true,
        "state": "ok"
@@ -2075,7 +2079,7 @@
         "label": "Entities to fillet",
         "kind": "query",
         "items": [
-         "Unknown of Extrude 1"
+         "Edge of Extrude 1"
         ],
         "active": true,
         "state": "ok"
@@ -2218,14 +2222,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 66599
+   "t": 67866
   },
   {
    "step": 10,
@@ -2260,7 +2264,7 @@
        "label": "Entities to fillet",
        "kind": "query",
        "items": [
-        "Unknown of Extrude 1"
+        "Edge of Extrude 1"
        ],
        "active": true,
        "state": "ok"
@@ -2344,7 +2348,7 @@
         "label": "Entities to fillet",
         "kind": "query",
         "items": [
-         "Unknown of Extrude 1"
+         "Edge of Extrude 1"
         ],
         "active": true,
         "state": "ok"
@@ -2487,14 +2491,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 71303
+   "t": 72146
   },
   {
    "step": 11,
@@ -2590,14 +2594,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 75628
+   "t": 75831
   },
   {
    "step": 12,
@@ -2683,14 +2687,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 80271
+   "t": 80146
   }
  ]
 }

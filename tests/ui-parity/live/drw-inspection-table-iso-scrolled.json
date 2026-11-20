@@ -1,6 +1,6 @@
 {
  "scenario": "drw-inspection-table-iso-scrolled",
- "recorded": "2026-11-19T21:32:25.534Z",
+ "recorded": "2026-11-20T01:26:18.730Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -12,12 +12,12 @@
   "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "058d102124380e1d6622db6d",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "c6a027059e23bd105b576752",
   "start": "block-drawing-iso",
-  "startElement": "7fc07371758a5353920f612d",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -98,7 +98,20 @@
     }
    ],
    "annotations": [],
-   "selection": []
+   "selection": [],
+   "viewport": {
+    "sheet_px": [
+     615,
+     85,
+     1339,
+     644
+    ],
+    "sheet_mm": [
+     210,
+     297
+    ],
+    "mmPerPixel": 0.29006
+   }
   }
  },
  "steps": [
@@ -193,19 +206,32 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       615,
+       85,
+       1339,
+       644
+      ],
+      "sheet_mm": [
+       210,
+       297
+      ],
+      "mmPerPixel": 0.29006
+     }
     }
    },
-   "t": 226786
+   "t": 230877
   },
   {
    "step": 2,
    "do": {
     "do": "click",
     "on": {
-     "px": [
-      825,
-      295
+     "sheet_point": [
+      60.91,
+      226.2
      ]
     }
    },
@@ -293,19 +319,37 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Front"
+      }
+     ],
+     "viewport": {
+      "sheet_px": [
+       615,
+       85,
+       1339,
+       644
+      ],
+      "sheet_mm": [
+       210,
+       297
+      ],
+      "mmPerPixel": 0.29006
+     }
     }
    },
-   "t": 251012
+   "t": 258643
   },
   {
    "step": 3,
    "do": {
     "do": "click",
     "on": {
-     "px": [
-      825,
-      255
+     "sheet_point": [
+      60.91,
+      237.8
      ]
     }
    },
@@ -398,14 +442,27 @@
        "text": "40.00",
        "position": [
         60.9,
-        237.8
+        238.1
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       615,
+       85,
+       1339,
+       644
+      ],
+      "sheet_mm": [
+       210,
+       297
+      ],
+      "mmPerPixel": 0.29006
+     }
     }
    },
-   "t": 275123
+   "t": 286670
   },
   {
    "step": 4,
@@ -503,14 +560,27 @@
        "text": "40.00",
        "position": [
         60.9,
-        237.8
+        238.1
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       615,
+       85,
+       1339,
+       644
+      ],
+      "sheet_mm": [
+       210,
+       297
+      ],
+      "mmPerPixel": 0.29006
+     }
     }
    },
-   "t": 301042
+   "t": 313070
   },
   {
    "step": 5,
@@ -643,14 +713,27 @@
        "text": "40.00",
        "position": [
         60.9,
-        237.8
+        238.1
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       615,
+       85,
+       1339,
+       644
+      ],
+      "sheet_mm": [
+       210,
+       297
+      ],
+      "mmPerPixel": 0.29006
+     }
     }
    },
-   "t": 325347
+   "t": 338986
   },
   {
    "step": 6,
@@ -778,14 +861,27 @@
        "text": "40.00",
        "position": [
         60.9,
-        237.8
+        238.1
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       615,
+       85,
+       1339,
+       644
+      ],
+      "sheet_mm": [
+       210,
+       297
+      ],
+      "mmPerPixel": 0.29006
+     }
     }
    },
-   "t": 351484
+   "t": 365995
   },
   {
    "step": 7,
@@ -933,14 +1029,27 @@
        "text": "40.00",
        "position": [
         60.9,
-        237.8
+        238.1
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       615,
+       85,
+       1339,
+       644
+      ],
+      "sheet_mm": [
+       210,
+       297
+      ],
+      "mmPerPixel": 0.29006
+     }
     }
    },
-   "t": 379179
+   "t": 394653
   },
   {
    "step": 8,
@@ -1068,14 +1177,27 @@
        "text": "40.00",
        "position": [
         60.9,
-        237.8
+        238.1
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       615,
+       85,
+       1339,
+       644
+      ],
+      "sheet_mm": [
+       210,
+       297
+      ],
+      "mmPerPixel": 0.29006
+     }
     }
    },
-   "t": 404792
+   "t": 421399
   },
   {
    "step": 9,
@@ -1207,14 +1329,27 @@
        "text": "40.00",
        "position": [
         60.9,
-        237.8
+        238.1
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       615,
+       85,
+       1339,
+       644
+      ],
+      "sheet_mm": [
+       210,
+       297
+      ],
+      "mmPerPixel": 0.29006
+     }
     }
    },
-   "t": 431589
+   "t": 448483
   }
  ]
 }
