@@ -19,6 +19,7 @@
 #include <BRepLib.hxx>
 #include <Geom_Line.hxx>
 #include <Geom_Plane.hxx>
+#include <Geom_ElementarySurface.hxx>
 #include <Geom_RectangularTrimmedSurface.hxx>
 #include <Geom_SurfaceOfLinearExtrusion.hxx>
 #include <Geom_TrimmedCurve.hxx>
@@ -1164,6 +1165,50 @@ rust::Vec<rust::String> read_step_pmi(rust::Str path)
 
 namespace
 {
+// Left-handed elementary surfaces (a revolve's, a mirror's) made right-handed first: the writer's own DirectFaces would
+// otherwise reverse the wires step_forward_wires stores forward.
+TopoDS_Shape step_direct_faces(const TopoDS_Shape& in)
+{
+  for (TopExp_Explorer ef(in, TopAbs_FACE); ef.More(); ef.Next())
+  {
+    TopLoc_Location           loc;
+    occ::handle<Geom_Surface> g = BRep_Tool::Surface(TopoDS::Face(ef.Current()), loc);
+    if (auto t = occ::down_cast<Geom_RectangularTrimmedSurface>(g))
+      g = t->BasisSurface();
+    if (auto e = occ::down_cast<Geom_ElementarySurface>(g); !e.IsNull() && !e->Position().Direct())
+      return ShapeCustom::DirectFaces(in);
+  }
+  return in;
+}
+
+// Each face's wires stored forward, their edges reversed instead. STEP's writer reorders a wire as it stands forward on
+// the forward face, where a reversed wire's seam takes the other side's p-curves, and ran a torus face's circles
+// backwards, its loop bounding the rest of the torus (bool's Shell case 17488d26: a round's quarter, 435.1 mm², read by
+// live as the other three quarters, 1933.6 mm²).
+TopoDS_Shape step_forward_wires(const TopoDS_Shape& in)
+{
+  occ::handle<BRepTools_ReShape> re  = new BRepTools_ReShape;
+  bool                           any = false;
+  for (TopExp_Explorer ef(in, TopAbs_FACE); ef.More(); ef.Next())
+    for (TopoDS_Iterator iw(ef.Current().Oriented(TopAbs_FORWARD)); iw.More(); iw.Next())
+    {
+      if (iw.Value().ShapeType() != TopAbs_WIRE || iw.Value().Orientation() != TopAbs_REVERSED)
+        continue;
+      std::vector<TopoDS_Shape> edges;
+      for (TopoDS_Iterator ie(iw.Value()); ie.More(); ie.Next())
+        edges.push_back(ie.Value());
+      BRep_Builder B;
+      TopoDS_Wire  w;
+      B.MakeWire(w);
+      for (auto e = edges.rbegin(); e != edges.rend(); ++e)
+        B.Add(w, *e);
+      w.Closed(iw.Value().Closed());
+      re->Replace(iw.Value(), w);
+      any = true;
+    }
+  return any ? re->Apply(in) : in;
+}
+
 // Offset surfaces and linear extrusions as B-surfaces, as live's STEP and IGES write them (c2-rings-loft: B-spline
 // surfaces, no OFFSET_SURFACE / SURFACE_OF_LINEAR_EXTRUSION, IGES 140 / 122): with no p-curves in the file (as live's) a reader projects the
 // faces' boundaries onto those surfaces and missed (ours read the ring's Part 1 back at 176 mm³ for 440.8). Only a
@@ -1334,7 +1379,7 @@ void write_step_impl(const OcShapeList& shapes, rust::Slice<const rust::String> 
       s = BRepBuilderAPI_Transform(s.Located(TopLoc_Location()), s.Location().Transformation(), true).Shape();
     if (yard)
       s = BRepBuilderAPI_Transform(s, third, true).Shape();
-    s = step_bsurfaces(compact_bspline_edges(s));
+    s = step_bsurfaces(compact_bspline_edges(step_forward_wires(step_direct_faces(s))));
     TDF_Label l = st->AddShape(s, false);
     if (i < names.size() && !names[i].empty())
     {

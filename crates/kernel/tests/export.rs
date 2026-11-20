@@ -2491,3 +2491,110 @@ fn a_solid_of_disconnected_pieces_imports_as_a_part_each() {
     let v: f64 = pieces.iter().map(|p| volume_properties(&p.shape).unwrap().mass).sum();
     assert!((v - 3e-6).abs() < 1e-12, "{v}");
 }
+
+/// A concave round revolved whole (metres): its torus face is bounded by one loop, its two circles and the seam between them.
+fn revolved_round(big: f64, small: f64) -> Shape {
+    let p = |x: f64, z: f64| DVec3::new(x, 0.0, z);
+    // In XZ: the rectangle 0..R × 0..r without the quarter disc about (R, 0).
+    let profile = make_wire(&[
+        make_line(p(0.0, 0.0), p(big - small, 0.0)).unwrap(),
+        make_arc(p(big, 0.0), DVec3::Y, DVec3::NEG_X, small, 0.0, std::f64::consts::FRAC_PI_2).unwrap(),
+        make_line(p(big, small), p(0.0, small)).unwrap(),
+        make_line(p(0.0, small), p(0.0, 0.0)).unwrap(),
+    ])
+    .unwrap();
+    revolve(&make_face_from_wire(&profile, true).unwrap(), DVec3::ZERO, DVec3::Z, std::f64::consts::TAU).unwrap().shape
+}
+
+/// The one torus face of a STEP file as a reader without p-curves sees it (as live does): the band of the torus between its
+/// two latitude circles on the side left of each circle's edge, as its bound runs it, about the face's normal; as a
+/// share of the whole torus.
+fn step_torus_band(text: &str) -> f64 {
+    use std::f64::consts::{PI, TAU};
+    let ents: std::collections::HashMap<&str, &str> = text
+        .split(';')
+        .filter_map(|s| {
+            let (k, v) = s.trim().split_once('=')?;
+            Some((k.trim().strip_prefix('#')?, v.trim()))
+        })
+        .collect();
+    fn refs(s: &str) -> Vec<&str> {
+        s.split('#').skip(1).map(|r| &r[..r.find(|c: char| !c.is_ascii_digit()).unwrap_or(r.len())]).collect()
+    }
+    fn nums(s: &str) -> Vec<f64> {
+        s[s.rfind('\'').map_or(0, |i| i + 1)..].split(|c: char| !(c.is_ascii_digit() || "+-.eE".contains(c))).filter_map(|x| x.parse().ok()).collect()
+    }
+    let last = |s: &str| ents[*refs(s).last().unwrap()];
+    let point = |id: &str| {
+        let n = nums(ents[id]);
+        DVec3::new(n[0], n[1], n[2])
+    };
+    let axis = |id: &str| {
+        let r = refs(ents[id]);
+        (point(r[0]), point(r[1]).normalize(), point(r[2]).normalize())
+    };
+    let sign = |s: &str| if s.ends_with(".T.)") { 1.0 } else { -1.0 };
+    let face = ents.values().copied().find(|f| f.starts_with("ADVANCED_FACE") && last(f).starts_with("TOROIDAL_SURFACE")).expect("a torus face");
+    let surface = last(face);
+    let (c, z, _) = axis(refs(surface)[0]);
+    let n = nums(surface);
+    let (big, small) = (n[n.len() - 2], n[n.len() - 1]);
+    let mut sides = Vec::new();
+    for bound in &refs(face)[..refs(face).len() - 1] {
+        for oriented in refs(ents[refs(ents[*bound])[0]]) {
+            let o = ents[oriented];
+            let (edge, curve) = (last(o), last(last(o)));
+            let along = sign(o) * sign(edge) * sign(ents[*bound]);
+            if !curve.starts_with("CIRCLE") {
+                continue;
+            }
+            let (cc, a, x) = axis(refs(curve)[0]);
+            if a.dot(z).abs() < 1.0 - 1e-6 {
+                continue;
+            }
+            let rc = *nums(curve).last().unwrap();
+            let p = cc + x * rc;
+            let d = a.cross(x) * along;
+            let rad = (p - c - z * (p - c).dot(z)).normalize();
+            let mut v = ((p - c).dot(z) / small).atan2((rc - big) / small);
+            if v < -PI + 1e-6 {
+                v += TAU;
+            }
+            let normal = (p - (c + rad * big)).normalize() * sign(face);
+            sides.push((v, normal.cross(d).dot(rad * -v.sin() + z * v.cos()) > 0.0));
+        }
+    }
+    sides.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let band = |v0: f64, v1: f64| (big * (v1 - v0) + small * (v1.sin() - v0.sin())) / (TAU * big);
+    match sides[..] {
+        [(a, true), (b, false)] => band(a, b),
+        [(a, false), (b, true)] => band(b, a + TAU),
+        _ => panic!("the loop's circles disagree: {sides:?}"),
+    }
+}
+
+/// A torus face bounded by one loop (two circles and the seam between them) is written to STEP bounding the same part of
+/// the torus: as a revolve leaves it, mirrored, and with its wire stored out of chain order (bool's Shell case 17488d26,
+/// a round's quarter of a torus, 435.1 mm², was written bounding the other three quarters, as live read it).
+#[test]
+fn a_one_loop_torus_face_round_trips_through_step() {
+    use std::f64::consts::{FRAC_PI_2, TAU};
+    let (big, small) = (0.012, 0.005);
+    let quarter = TAU * small * (big * FRAC_PI_2 - small) / (TAU * TAU * big * small);
+    let round = revolved_round(big, small);
+    let mirrored = round.transformed(&Transform::Mirror(Plane::from_normal(DVec3::ZERO, DVec3::Y))).unwrap();
+    // The round's torus face with its wire stored seam, inner circle, top circle, seam (the revolve stores them chained).
+    let unchained = read_brep(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/step/torus-face-unchained.brep")).unwrap();
+    let dir = std::env::temp_dir().join(format!("noshape-torus-step-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    for (name, shape) in [("round", round), ("mirrored", mirrored), ("unchained", unchained)] {
+        let path = dir.join(format!("{name}.step"));
+        write_step(&path, &[ExportShape { shape: shape.clone(), name: Some("Part 1".into()), color: None }], LengthUnit::Meter).unwrap();
+        let share = step_torus_band(&std::fs::read_to_string(&path).unwrap());
+        assert!((share - quarter).abs() < 1e-6, "{name}: the round's loop bounds {:.4} of the torus, not its {quarter:.4}", share);
+        let back = read_step(&path, LengthUnit::Meter).unwrap();
+        let (a0, a1) = (shape.area().unwrap(), back[0].shape.area().unwrap());
+        assert!((a1 - a0).abs() < 1e-6 * a0, "{name}: area {a1} vs {a0}");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}

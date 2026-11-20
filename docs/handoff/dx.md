@@ -9,7 +9,7 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
-## Now (23:22)
+## Now (00:10 11-20)
 - C (fan-blade HLR sampling) PARKED by the lead (1.66x < 2x): TICKETS FAN-BLADE-VIEWS-HLR-SAMPLING (P3).
 - surf-intro rerun with live2's refs (Mac, dx-main): all 5 (boundary / fill / mutualtrim / offset / ruled) still stop
   at "Derived 1". Cause 1: live's refs for queries inside an array item ("wireProfilesArray[1].wireProfileEntities")
@@ -20,23 +20,22 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
   in ours (live 7/14/9): sent to blend 22:3x with repro /root/dx-scratch/si-save/c2-surf-intro-offset.noshape (needs
   fb8f84f42). Rebuild 130 ms -> ~1.5 s (live 0.36-1.2 s): the lofts now build + the failing fillet; recheck after
   blend's fix. Mac scripts: ~/noshape-host/dx-keep/sitrace.sh (copy /tmp/sitrace.sh), sisurf.sh.
-- QUEUED aaa5aac6 (23:1x, vibe2): fb8f84f42 as fb5f7a232 + handoffs. asm-pattern-std A/B (vibex8): A = B, 162/162
+- QUEUED 695043d3 (re-queued 23:37 after the queue's qa.md bug): fb8f84f42 + handoffs. asm-pattern-std A/B (vibex8): A = B, 162/162
   occurrences, 92/92 mates, 17/17 BOM rows, the same 12 "difference:" lines.
-- BRAND-IN-UI-TEXT (qa P2), uncommitted in dx-land: "Import to Noshape", Properties' Category "Noshape Part / Assembly /
-  Part Studio" (shown_category; stored kinds keep live's "Onshape …"), drawing title-block part.category /
-  drawing.category "Noshape …". Tests + clippy + drawing tests + full ops e2e on vibex8 (/root/dx-scratch/brand-tests.log).
+- BRAND-IN-UI-TEXT (qa P2): QUEUED 3a531aae (00:0x 11-20, with 695043d3): "Import to Noshape", Properties' Category
+  "Noshape …" (shown_category; stored kinds keep live's "Onshape …"), drawing category fields "Noshape …". Tests +
+  clippy + drawing 255 + full ops e2e 260 green (vibex8). qa verifies on green.
+- hex-bookcase recheck after d864cf7e1 (vibex7 ~/tmp/dx/exch-hb.log): DXF 0 ELLIPSE / 185 LINE / 15 LWPOLYLINE for
+  live's 2 / 206 / 25 (was 211 / 17 before the deterministic drawings); other rows match, times 15/15. Low priority.
 - DRW-HOLE-TABLE-NOT-SAVED: closed by qa (a click after ✓ places it, = live).
-- STEP torus (lead 23:1x, P1; bool's Shell case 17488d26, files /root/bool-scratch/dx-17488d26): live read our round's
-  quarter of a torus (435.1 mm²) as the other 3/4 (1933.6). Cause: OCCT's STEP writer runs DirectFaces (a revolve's
-  left-handed torus -> right-handed, its wire stored REVERSED), then reorders each wire as it stands forward on the
-  forward face: a reversed wire's seam takes the other side's p-curves and, when the wire isn't stored chained (bool's
-  seam, inner circle, top circle, seam), the loop's circles come out backwards. Our own reader repairs it (reads 435).
-  Fix (uncommitted, dx-land): io.cpp step_direct_faces + step_forward_wires before AddShape. T1
-  export::a_one_loop_torus_face_round_trips_through_step (fixture tests/data/step/torus-face-unchained.brep, ours;
-  oracle step_torus_band reads the file's loop as live does): fails without (0.8163 of the torus), passes with; bool's
-  case writes 435.0966. Kernel export:: 58/58, clippy clean (Mac). Exchange A/B (DXSTEPOLD=1 env switch, TEMPORARY in
-  io.cpp: remove before commit): Mac exstep.sh, logs ~/noshape-host/dx-keep/exstep/{old,new}.log + ours.step per doc;
-  check new's .step with /root/dx-scratch/bin/steptorus.py. Then commit + land; tell bool (no change on their side).
+- STEP torus (lead 23:1x, P1, bool's Shell case 17488d26): live read our round's quarter of a torus (435.1 mm²) as
+  the other 3/4 (1933.6). Cause: OCCT's STEP writer runs DirectFaces (left-handed torus -> right-handed, wire stored
+  REVERSED), then reorders each wire forward on the forward face: a reversed wire's seam takes the other side's
+  p-curves and an unchained wire's circles come out backwards. Our reader repairs it (reads 435), hiding it. Fix
+  io.cpp step_direct_faces + step_forward_wires; T1 export::a_one_loop_torus_face_round_trips_through_step (fixture
+  tests/data/step/torus-face-unchained.brep; oracle step_torus_band reads the loop as live does). Exchange A/B (Mac):
+  every row and score unchanged; torus oracle on all 22 docs' STEP: only motor-mount-jack's R 9.5 face changed,
+  309.56 -> 253.01 mm², = live's own STEP (was wrong before too); knob-jason / pulley = live's. Landing 00:3x.
 - blend (23:4x): car Fillet 1 fixed (7/14/9, 81479.1 mm² vs live 81479.51), lands after its gate: once it and
   fb8f84f42 are on main, rerun the 5 surf-intro docs (Mac sitrace.sh) for "Derived 1" and the rebuild time.
 - Next: the rest of "Next, in order".
