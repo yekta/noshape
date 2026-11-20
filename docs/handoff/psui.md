@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-20 22:22 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-20 23:00 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -35,7 +35,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (22:22 UTC 11-20)
+## Now (23:00 UTC 11-20)
 
 1. LANDED: 6f48184a (FS notices compile off the UI thread; A/B 6 max prepaint 534 -> 28 ms on 850efe, 549 -> 37 on
    de4eff), 18809b4c (spinner on the executor clock), 1c6e56e4 + 5c3f3bb7 (revert of a5505f50). Worktrees psui-fsn,
@@ -80,6 +80,16 @@ docs/DECISIONS.md (read first; it wins over anything here).
      (which rule puts "Section view…" in a row menu).
    - Sheet metal titleState errors (bend-alignment-hold-line, hem-in-place-closed, bend/jog-new-edit-reedit,
      bend-angle-align-to-geometry) are skasm's features.
+6. NOW (lead 22:3x) a) night suite 1120-night-ui-a06ec927 (2145/2172; 26 listed in uip.log): its 14 Part Studio ones
+   were in ps1/ps2 and match on main but sketch-dimension-variable (live retake). Not run / flaky there, matched at
+   14:47: config-input-menu-copy-table, config-row-move-up, ruled-surface-aligned-direction, ver-compare-hover-part
+   (ours "Diameter 10 mm" readout in compare mode when quick; live none: asked in fc-1120 (10)). Rerun x2 on main:
+   ~/tmp/psui/ps3 on vibex8, log /root/psui-scratch/ps3.log. The rest are other owners' (drw/doc/asm/vs).
+   b) feel coverage: an audit of interaction-feel.md (28 candidates): 21 measured, 7 partly. Batch fc-1120 for live in
+   REQUESTS (22:24, 10 items: dense hover, solver drag, region hover, redo, fillet chain, Extrude Enter/Tab preview,
+   mate connector points, click-through, panel collapse / resize, compare readout; plus the Section view ETA). Write a
+   test per item as its row arrives. Done: latency_tests gained menu / sketch enter / ✓ / Undo (Mac release: 8.6 /
+   17 / 17 / 17 ms vs live 117 / 226 / 117 / 107).
 4b. Flange handle vs live flange-handle-1120: the orange inside the heads is the selected edge seen through the hollow
    heads: nothing more to draw.
 5. Cleanup done 18:56 (vibex6 A/B binaries and hf/, vibex8 target/release).

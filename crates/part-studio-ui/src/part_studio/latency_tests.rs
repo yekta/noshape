@@ -1,7 +1,8 @@
 //! Speed of everyday Part Studio interactions on live's 30-feature part (tests/perf/live-30-features.noshape), with
 //! real frames and the GPU's own pick (docs/PLAN.md 2.7: at least twice as fast as live where the work is local):
 //! a face lighting under the pointer, a click's selection, a feature dialog opening on its preview, a dragged
-//! dimension's preview, and the part redrawn after ✓. Wall-clock medians in a release build: T2.
+//! dimension's preview, the part redrawn after ✓, a context menu, a sketch entered and left, and Undo. Wall-clock
+//! medians in a release build: T2.
 
 use super::feel::{Pointer, gpu_pointer};
 use super::*;
@@ -17,7 +18,7 @@ struct Target {
     max_ms: f64,
 }
 
-const TARGETS: [Target; 5] = [
+const TARGETS: [Target; 9] = [
     // "Pre-highlight": on a hardware-GL desktop ≈ 10–50 ms + one pick (2–10 ms) after the pointer stops.
     Target { what: "hover: a face lit after a jump", live: "10-50 ms + pick (2-10)", max_ms: 30.0 },
     // Live psui/timings-1117 (software GL): pointerup → the selected face drawn 57–67 ms; held to one 60 Hz frame.
@@ -32,6 +33,13 @@ const TARGETS: [Target; 5] = [
     // 107 ms, settled 1.1 s; sketch enter / exit and undo settled 0.9–1.3 s; a tab switch's list 1.5–1.7 s; a
     // document opened: the part shaded 7.6 s, the feature list 11.4 s.
     Target { what: "commit: the part redrawn after ✓", live: "310-350 ms", max_ms: 155.0 },
+    // Live ui-speed-1118 (block, input → 60 fps screen frames): a face's context menu shown 117 ms after the
+    // right-click; a sketch entered on a selected face 226 ms (first change), left with ✓ 117 ms (the list), its
+    // Undo 107 ms (the list).
+    Target { what: "menu: the context menu shown", live: "117 ms", max_ms: 58.5 },
+    Target { what: "sketch: entered on a selected plane", live: "226 ms", max_ms: 113.0 },
+    Target { what: "sketch: left with ✓, the part redrawn", live: "117 ms", max_ms: 58.5 },
+    Target { what: "undo: the sketch undone and redrawn", live: "107 ms", max_ms: 53.5 },
 ];
 
 /// The 30-feature part in a test window drawing real frames, regenerated and shown.
@@ -112,14 +120,15 @@ fn everyday_interactions_beat_live_on_the_30_feature_part(cx: &mut TestAppContex
     let (window, view) = thirty_features(cx);
     let pointer = Pointer::new(cx, window, &view);
     let (a, b) = two_points_on_the_part(cx, &view);
-    let mut ms: [Vec<f64>; 5] = Default::default();
+    let mut ms: [Vec<f64>; 9] = Default::default();
     // A while of slow hovering over the part first, as anyone's session starts (the pick's running average settles).
     for k in 0..40 {
         move_to(cx, window, &pointer, a + DVec2::new(k as f64 * 1.5, 0.0));
         pump(cx, window, &view, Duration::from_millis(16));
     }
 
-    // Hover and click, alternating between the two points.
+    // Hover and click, alternating between the two points (the first place something lit is kept for the menu).
+    let mut lit_at = None;
     for i in 0..RUNS * 2 {
         let (from, at) = if i % 2 == 0 { (b, a) } else { (a, b) };
         cx.update(|cx| view.update(cx, |v, cx| {
@@ -142,6 +151,9 @@ fn everyday_interactions_beat_live_on_the_30_feature_part(cx: &mut TestAppContex
         });
         ms[0].push(t);
         let lit = cx.update(|cx| view.read(cx).hover.clone());
+        if lit_at.is_none() && lit.is_some() {
+            lit_at = Some(at);
+        }
         let t = timed(cx, window, &view, |cx| gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(win, Modifiers::default()), |cx| {
             let v = view.read(cx);
             v.selection.first() == lit.as_ref() && v.ui.scene_task.is_none()
@@ -178,6 +190,46 @@ fn everyday_interactions_beat_live_on_the_30_feature_part(cx: &mut TestAppContex
             cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_open_dialog(w, cx))).unwrap();
         }, |cx| view.read(cx).edit.is_none() && view.read(cx).display_seq > s0 && !view.read(cx).ui_busy());
         ms[4].push(t);
+    }
+
+    // The context menu of what is under the pointer, a sketch on Top, ✓, and the sketch's Undo.
+    let at = lit_at.expect("something lit under the pointer");
+    move_to(cx, window, &pointer, at);
+    pump(cx, window, &view, Duration::from_millis(300));
+    let win = pointer.window_point(cx, at);
+    for _ in 0..RUNS {
+        let t = timed(cx, window, &view, |cx| {
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            vcx.simulate_mouse_down(win, gpui_kit::MouseButton::Right, Modifiers::default());
+            vcx.simulate_mouse_up(win, gpui_kit::MouseButton::Right, Modifiers::default());
+        }, |cx| view.read(cx).context_menu.is_some());
+        ms[5].push(t);
+        cx.update(|cx| view.update(cx, |v, cx| v.close_context_menu(cx)));
+        pump(cx, window, &view, Duration::from_millis(50));
+
+        let t = timed(cx, window, &view, |cx| {
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                v.selection = vec![Reference::Plane(DatumPlane::Top)];
+                v.start_feature("sketch", w, cx);
+            }))
+            .unwrap();
+        }, |cx| view.read(cx).sketch.is_some() && !view.read(cx).ui_busy());
+        ms[6].push(t);
+        let s0 = seq(cx);
+        let t = timed(cx, window, &view, |cx| {
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                let _ = v.finish_sketch(w, cx);
+            })).unwrap();
+        }, |cx| view.read(cx).sketch.is_none() && view.read(cx).display_seq > s0 && !view.read(cx).ui_busy());
+        ms[7].push(t);
+        let count = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).map_or(0, |s| s.features.len()));
+        let (n, s0) = (count(cx), seq(cx));
+        let t = timed(cx, window, &view, |cx| {
+            cx.update(|cx| view.read(cx).doc.clone()).update(cx, |d, cx| d.undo(cx));
+        }, |cx| view.read(cx).display_seq > s0 && !view.read(cx).ui_busy());
+        ms[8].push(t);
+        assert_eq!(count(cx), n - 1, "Undo took the sketch out");
+        cx.update(|cx| view.update(cx, |v, _| v.selection.clear()));
     }
 
     let mut report = vec![format!("{:<40} {:>9} {:>9}  live", "", "median", "target")];
