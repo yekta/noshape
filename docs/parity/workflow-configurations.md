@@ -19,7 +19,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | 1.4 | "w" again | created as w_0 + info bubble "Renamed some new variables to avoid name conflicts." | same text; **the bubble never goes away** (still there 5 min later) and later **covers the feature dialog header (title, ✓ ✕)** | ✅ (bubble at the window top centre, gone within 7 s) | a6c56638 10-28 |
 | 1.5 | Value "30" Enter | "30 mm" | "30 mm" | ✅ | a6c56638 10-28 |
 | 1.6 | Type list | Length, Angle, Number, Any, Measured, From import | same | ✅ | a6c56638 10-28 |
-| 1.7 | Value "#h * 3" (h from a Variable Studio) | accepted | accepted; list "#w = #h * 3" | ✅ (list "#w = #h * 3"; live label not captured) | a6c56638 10-28 |
+| 1.7 | Value "#h * 3" (h from a Variable Studio) | accepted | accepted; list "#w = #h * 3" | ✗ list label: live 11-20 (parity-open-1120) shows the evaluated value "#w = 30 mm", ours "#w = #h * 3" (VARIABLE-ROW-LABEL-VALUE); the value itself ✅ | a6c56638 10-28 |
 | 1.8 | Double-click Extrude 1 **while the Variable table panel is open** | edit dialog opens | **row only selected, no dialog**; the keys typed next went to the viewport ("#" = Shift+3 → Left view) | ✅ later (C4 fixed, pass 3: the edit dialog opens) | a6c56638 10-28 |
 
 ## 2. Create variable popup, configuration variable

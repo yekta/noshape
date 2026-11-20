@@ -204,7 +204,7 @@ REVOLVED faces "revolved". F8 isn't one in the file (see above).
 | I1 g25-b.step, g29-{none,auto,basic,advanced}.step, g47-1part.step | 7582.977753, 18 faces (10-30: 7582.693101) | live HIGH 7582.976771 (band 7576.2420 – 7589.5825) | ✅ volume (Δ +0.001; the degenerate blend patch now integrates as live's); blend areas not re-measured | dx CLI 11-01 |
 | I1 g29-bsurf.step | 7582.996307 (was 7582.995361) | as above | ✅ band | dx CLI 11-01 |
 | I1 g25-b.sat | 7582.989336 (the 10-30 SAT fix) | live HIGH 7582.993215 | ✅ band, analytic faces exact (10-30 row) | dx CLI 11-01 |
-| qa-hang402-11parts.step (new sample) | 11 parts (Part 1 … Part 11), 0 errors | ? | ? live value unknown |  |
+| qa-hang402-11parts.step (new sample) | 11 parts (Part 1 … Part 11), 0 errors | live 11-20 (parity-open-1120, REST import, 12 s): **9 parts**, Import 1 OK with no message; the bodies at x −52…68 (Part 2) and −50…70 (Part 7) are silently missing, the other 8 boxes (182667.233 mm³ each) and Part 6 match ours | ✅ ours imports all 11 (live drops 2 valid bodies: a live failure, not a target) |  |
 
 Open in this sheet after this run: IM2 / IM2b B-spline volumes and faces (kern), the McMaster helix edges, g50 F8 (live EXTRUDED), the two
 zips (as live: not translated), the Meter STL value (live unknown), qa-hang402 (live unknown).

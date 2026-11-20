@@ -15,6 +15,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Distance 0 mm: red title rgb(170,37,45) and the Distance field invalid as in a Part Studio (background #f9ebec,
   1 px bottom border #bd3039, class os-invalid); Instance count unchanged. Ours leaves Distance white (TICKETS
   NUMBER-FIELD-ERROR-MARK residual).
+- [ ] P2 **VARIABLE-ROW-LABEL-VALUE (studios)**: workflow-configurations 1.7. Live: an unnamed Variable's Features
+  row reads "#name = <evaluated value>" in document units, 3 decimals with trailing zeros dropped: "#w = 30 mm" for
+  #h * 3 (h = 10 mm in a Variable Studio), "#q = 32 mm" for #w + 2 mm, "#t = 3.333 mm" for #h / 3, "#u = 2.5 mm";
+  tooltip "#w = 30 mm [Variable]". Ours shows the typed expression, "#w = #h * 3" (model-core interaction.rs:557).
 - [ ] P2 **ASM-FACE-TAB-REFERENCE-FRAME (asm)**: assembly.md LA49. Live: Mass and section properties › Face with
   "Mate connector for reference frame" set (a connector on the corner (40,20,10) of a 40x20x10 block, world axes, top
   face picked): Lxx 106666.667, Lxy = Lyx 160000, Lyy 426666.667, Lzz 533333.333 mm⁴ (parallel axis to the
