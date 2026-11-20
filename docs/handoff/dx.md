@@ -9,15 +9,21 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
-## Now (12:3x 11-20): SUITE SPEED done, reported (lead 11-20 ~11:45)
-Mac release parity_models r1 (Mac dx-keep/pm-r1/report.json, local /root/dx-scratch/pm-r1-report.json): only 2 of
-158 docs >= 2x live AND >= 100 ms slower (qa's 28 were a debug build): c2-impeller-loft 10629 / 2773 ms,
-c2-config-parts-screws 1126 / 266. Profiles (pmprof.sh <tag> <doc>; pm-pf1/pf2.log): nothing mine (FS, translator,
-plumbing all small). Routed with ms: bool (screws Sweep 1 940 ms rust boolean sections_ahead; impeller Extrude
-Bohrungssitz 666), blend (impeller Fillet 3 1839 / Ansaugflansch 1654 / Flansch 1002 / Fillet 4 361; knifehandle
-Fillet 3 306), core (Delete face 2 622 op_defeature; parting-line Drafts 224/219), skasm (rocker Mirror 3 160).
-Open: an x86 (vibex8) release run would show gaps the fast Mac hides; offered to the lead.
-- Lands: 6047caa6 LANDED 535d63f6; c09079ab queued; handoff commits local.
+## Now (12:5x 11-20): FRAME PROFILES (lead "build it") + vibex8 suite speed
+- Suite speed done: Mac release r1 = 2 docs >= 2x/100 ms (impeller, config-screws); routed bool/blend/core/skasm.
+  RUNNING: vibex8 release suite x1 (local log /root/dx-scratch/pm-x1.log, vibex8 ~/agents/dx-keep/pm-x1.log +
+  pm-x1/report.json; script pmx.sh <tag> [only]); next: filter >= 2x & >= 100 ms, profile new ones, route, report.
+  DON'T rb.sh dx-land to vibex8 until x1's build is done (resync). impeller Fillet 3 39/113/71 is load-dependent (blend).
+- LANDING 3b980fee (QUEUED): Parasolid blend face side from tangent neighbour (replace-face Import 1 = live) +
+  sketch_create on {"mate_connector": …} (hgr Bottom). Replace face 1 routed to core.
+- UNCOMMITTED -> committed locally as "frame profiles" (not landed): parity.rs library_profile / library_size /
+  size_numbers (Onshape's standard profile docs -> frame-library:<std>/<profile>\tSize=…), unit test
+  standard_frame_profiles_are_the_built_in_library; studio_sketch builds a derived/<element>/ studio on first use.
+  RUNNING: vibex7 fx2x.sh (unit test + pmx fxf for hgr, saw-table, cov-frame-endcap/gusset) -> /root/dx-scratch/fx2.log
+  (synced BEFORE the derived-studio change). live fetched hgr's derived/{292796f4…, aaabdce9…} (Frame 1/5 studios).
+  Next: rerun fxf on vibex7 with all changes; check ANSI tube Rounded (ours: ISO only) and AISC "Default" size vs live;
+  then land and report to lead.
+- Mac off limits until 13:44 UTC (lead): no rb.sh/ssh/scp to the Mac.
 
 ## Earlier (00:10 11-20)
 - Fan-blade HLR sampling: TICKETS P3. surf-intro: see the 03:0x bullet below (archive has the 00:10 rerun).

@@ -2592,10 +2592,23 @@ impl<'a> Translator<'a> {
     }
 
     /// [`Self::param`]'s `profileSketch` of another Part Studio: its element from the namespace ("e<element>::m…"),
-    /// its sketch from the query's feature. That studio is built at its default configuration: another one is reported.
-    fn studio_sketch(&self, p: &Value) -> Result<String, String> {
+    /// its sketch from the query's feature; one of Onshape's standard profiles is ours of the built-in library. That studio
+    /// is built at its default configuration: another one is reported.
+    fn studio_sketch(&mut self, p: &Value) -> Result<String, String> {
         let ns = p["namespace"].as_str().unwrap_or("");
         let element = ns.split("::").find_map(|x| x.strip_prefix('e')).ok_or_else(|| format!("profile studio `{ns}`: no element"))?;
+        if let Some(v) = library_profile(p) {
+            return v;
+        }
+        // A Part Studio fetched beside the document as a Derived's source (derived/<element>/): built on first use.
+        if !self.other_studios.contains_key(element) && self.derived_sources.contains_key(element) {
+            let mut problems = Vec::new();
+            let (tab, made) = self.derived_source(element, &mut problems)?;
+            self.notes.extend(problems.into_iter().map(|p| format!("profile studio {element}: {p}")));
+            // Its sketches by live's feature id (`sketch:<id>` ↦ `body:<ours>.…`).
+            let sketches = made.iter().filter_map(|(k, v)| Some((k.strip_prefix("sketch:")?.to_string(), v.strip_prefix("body:")?.split('.').next()?.to_string()))).collect();
+            self.other_studios.insert(element.to_string(), (tab, sketches));
+        }
         let (tab, ids) = self.other_studios.get(element).ok_or_else(|| format!("profile studio {element} not built"))?;
         let q = &p["partQuery"]["queries"][0];
         let fid = q["featureId"].as_str().ok_or("profile sketch: no feature in its query")?;
@@ -10479,6 +10492,105 @@ fn library_form(p: &Value) -> Result<String, String> {
     Ok(format!("{}{form}\t{}", noshape_model::sheetmetal::forms::PREFIX, cfg.join(";")))
 }
 
+/// Onshape's frame profile library documents (its help, "Onshape Frame Profiles Library"): the standard of our
+/// built-in library each is and its one profile (AISC's document has a Part Studio per shape).
+const FRAME_LIBRARY_DOCS: [(&str, &str, &str); 9] = [
+    ("fb43e175708c35044f398086", "ISO", "Rectangular bar"),
+    ("314151a71d716828eb4c8fee", "ISO", "Rectangular tube"),
+    ("9c903644ea11db6adcea465a", "ISO", "Round bar"),
+    ("2b0ae53bcb8f9f64dbe0b46b", "ISO", "Round tube"),
+    ("aa06d5468b3bc366947ba7f0", "ANSI", "Rectangular bar"),
+    ("afd89bc349544bd249b47b01", "ANSI", "Rectangular tube"),
+    ("c78d9408bd2a4f9a4d96ee47", "ANSI", "Round bar"),
+    ("960efb7145a7c51864404e8c", "ANSI", "Round tube"),
+    ("222d833563d2b359395e721d", "AISC", ""),
+];
+
+/// AISC's shapes by their sizes' prefix ("L8x4x0_75"); HSS names don't tell a round from a square one.
+const AISC_PREFIXES: [(&str, &str); 12] = [("HP", "HP-shape"), ("MC", "MC-shape"), ("MT", "MT-shape"), ("ST", "ST-shape"), ("WT", "WT-shape"), ("Pipe", "Pipe"), ("C", "C-shape"), ("L", "L-angle"), ("M", "M-shape"), ("S", "S-shape"), ("W", "W-shape"), ("HSS", "")];
+
+/// AISC's shapes by their Part Studio, for a size named "Default".
+const AISC_ELEMENTS: [(&str, &str); 1] = [("71bc1272ef1cf54ba5407618", "L-angle")];
+
+/// A Frame's `profileSketch` from Onshape's standard frame profiles (another document, configured): ours of the
+/// built-in library at the same size (`frame-library:<standard>/<profile>`). None for any other profile.
+fn library_profile(p: &Value) -> Option<Result<String, String>> {
+    use noshape_model::regen::features::frame_library as fl;
+    let ns = p["namespace"].as_str().unwrap_or("");
+    let doc = ns.split("::").find_map(|x| x.strip_prefix('d'))?;
+    let element = ns.split("::").find_map(|x| x.strip_prefix('e')).unwrap_or("");
+    let &(_, standard, profile) = FRAME_LIBRARY_DOCS.iter().find(|(d, ..)| *d == doc)?;
+    let config = p["configuration"].as_array().map(Vec::as_slice).unwrap_or_default();
+    let value = config.iter().find(|c| c["btType"].as_str().is_some_and(|t| t.starts_with("BTMParameterEnum"))).and_then(|c| c["value"].as_str()).unwrap_or("Default");
+    let rounded = config.iter().any(|c| c["parameterId"] == "Rounded" && c["value"] == true);
+    let profile = match profile {
+        "" => AISC_ELEMENTS.iter().find(|(e, _)| *e == element).map(|(_, p)| *p).or_else(|| AISC_PREFIXES.iter().find(|(x, _)| value.strip_prefix(x).is_some_and(|r| r.starts_with(|c: char| c.is_ascii_digit()))).map(|(_, p)| *p)).filter(|p| !p.is_empty()),
+        p => Some(p),
+    };
+    let Some(profile) = profile else { return Some(Err(format!("{standard} frame profile {element}: not one of ours"))) };
+    Some(library_size(standard, profile, value).map(|size| fl::value(standard, profile, size, rounded)).ok_or_else(|| format!("{standard} {profile}: no size of ours for `{value}`")))
+}
+
+/// Our library size for an Onshape configuration value: its encoded name (non-alphanumerics `_`, a leading digit
+/// behind one: `_2__x_0_1875_` for `2" x 0.1875"`), else the same numbers ("L8x4x0_75" for L8x4x3/4).
+fn library_size(standard: &str, profile: &str, value: &str) -> Option<&'static str> {
+    use noshape_model::regen::features::frame_library as fl;
+    let (sizes, default) = fl::sizes(standard, profile);
+    if value == "Default" {
+        return Some(default);
+    }
+    let encoded = |s: &str| {
+        let e: String = s.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
+        if e.starts_with(|c: char| c.is_ascii_digit()) { format!("_{e}") } else { e }
+    };
+    if let Some(s) = sizes.iter().find(|s| encoded(s) == value) {
+        return Some(s);
+    }
+    let want = size_numbers(value);
+    sizes.into_iter().find(|s| {
+        let n = size_numbers(s);
+        !want.is_empty() && n.len() == want.len() && n.iter().zip(&want).all(|(a, b)| (a - b).abs() < 1e-9)
+    })
+}
+
+/// The numbers of a size name or its configuration value: `3/4` a fraction, `0.75` or `0_75` a decimal.
+fn size_numbers(s: &str) -> Vec<f64> {
+    let b = s.as_bytes();
+    let digits = |i: usize| b.get(i).is_some_and(u8::is_ascii_digit);
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < b.len() {
+        if !digits(i) {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while digits(i) {
+            i += 1;
+        }
+        let mut text = s[start..i].to_string();
+        if matches!(b.get(i), Some(b'.' | b'_')) && digits(i + 1) {
+            let f = i + 1;
+            i = f;
+            while digits(i) {
+                i += 1;
+            }
+            text = format!("{text}.{}", &s[f..i]);
+        }
+        let mut v: f64 = text.parse().unwrap_or(0.0);
+        if b.get(i) == Some(&b'/') && digits(i + 1) {
+            let f = i + 1;
+            i = f;
+            while digits(i) {
+                i += 1;
+            }
+            v /= s[f..i].parse::<f64>().unwrap_or(1.0);
+        }
+        out.push(v);
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -10788,5 +10900,20 @@ mod tests {
         let nested = serde_json::json!({ "queryString": "", "deterministicIds": [], "edgeQuery": { "queryString": "query=qCompressed(1.0,\"&23a$x\",id);" }, "faceQuery": { "queryString": "query=qCompressed(1.0,\"&23a$y\",id);" } });
         assert!(super::empty_live_query(&lost));
         assert!(!super::empty_live_query(&nested));
+    }
+
+    /// Onshape's standard frame profiles map to the built-in library at their configured size (c2-hgr-riser-weldment's
+    /// ANSI Rectangular bar 2" x 0.1875", AISC L8x4x3/4; c2-saw-table-frame-weldment's ANSI tube).
+    #[test]
+    fn standard_frame_profiles_are_the_built_in_library() {
+        let pick = |doc: &str, element: &str, config: Value| library_profile(&json!({ "namespace": format!("d{doc}::v0::e{element}::m0"), "configuration": config }));
+        let size = |v: &str| json!([{ "btType": "BTMParameterEnum-145", "parameterId": "List_x", "value": v }]);
+        assert_eq!(pick("aa06d5468b3bc366947ba7f0", "6b92c44fcf228039bd90042b", size("_2__x_0_1875_")), Some(Ok("frame-library:ANSI/Rectangular bar\tSize=2in x 0.1875in".into())));
+        assert_eq!(pick("222d833563d2b359395e721d", "71bc1272ef1cf54ba5407618", size("L8x4x0_75")), Some(Ok("frame-library:AISC/L-angle\tSize=L8x4x3/4".into())));
+        assert_eq!(pick("222d833563d2b359395e721d", "71bc1272ef1cf54ba5407618", size("Default")), Some(Ok("frame-library:AISC/L-angle\tSize=L2x2x1/8".into())));
+        assert!(pick("afd89bc349544bd249b47b01", "94de058aece357024ba47a5a", size("_2__x_6__x_0_1875_")).is_some_and(|v| v.is_ok_and(|v| v.starts_with("frame-library:ANSI/Rectangular tube\tSize="))));
+        assert!(pick("aa06d5468b3bc366947ba7f0", "e", size("_9__x_9_")).is_some_and(|v| v.is_err()));
+        assert_eq!(pick("0123456789abcdef01234567", "e", size("_2__x_0_1875_")), None);
+        assert_eq!(size_numbers("1/32in (0.03125)"), vec![0.03125, 0.03125]);
     }
 }
