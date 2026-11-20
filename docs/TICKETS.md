@@ -223,6 +223,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Needs live's face count after Rib Round 1 to say which is right; until then compat reports the dock DIFF on every green.
   Same green, same range, also new: cf-surface-pattern Part 1 129/386/259 -> 129/385/258 (live 131/387/258); cli-fillet-segv Parts 4,
   13, 14, 15 34/80/50 -> 33/82/52, volume unchanged (no live record).
+  qa 14:5x (v0.4.62 vs green 428f75ed, vibe2, query_entities): the 4 Rib Round 1 torus faces of 68.37 mm² at y = +-26.12 (two
+  pairs, axes z at 2.42 / 3.98) are 2 torus faces of 136.74 mm² on the same axes; nothing else changes: volume 19945.537281 ->
+  19945.537306 mm³, area +2e-5 mm², centroid identical, every feature's status / message the same in all 7 Part Studios, other parts SAME.
 - [ ] P2 FEEL-CONFIG-BOX-WIDTH (psui; qa 11-20 13:44, walked on green 452420b22 vibex8, live onshape-research/live/psui/cfglabel-1120) Configurations box:
   live's rows run x 42..220 (178 px) and the box is a 45 px scroll pane at its default height; ours run 45..245 (200 px), so a long
   Variable label keeps "A much longe…" where live cuts "A much lo…", and our box shows both rows at once. Labels themselves as live
