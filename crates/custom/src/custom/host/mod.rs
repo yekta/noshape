@@ -221,10 +221,11 @@ pub struct CtxState {
     /// Bodies hidden from the Part Studio (std sheet metal definition
     /// sheets): skipped by `qEverything` & co., found by attribute queries.
     pub hidden: HashSet<BodyId>,
-    /// The sheet metal parts `updateSheetMetalGeometry` built in this feature, with their definition sheets: live makes
-    /// the parts when the feature ends, so inside it `qCreatedBy(id, BODY)` finds the definitions, not these (std's flip
-    /// arrow on that query's first face, live smflip-1118).
-    pub sm_built: HashMap<BodyId, BodyId>,
+    /// The sheet metal parts `updateSheetMetalGeometry` built in a running feature, with their definition sheets and
+    /// that feature's id: live makes the parts when the feature ends, so inside it `qCreatedBy(id, BODY)` finds the
+    /// definitions, not these (std's flip arrow on that query's first face, live smflip-1118). Dropped at its
+    /// `endFeature` / `abortFeature` (a custom feature's sheetMetalStart then finds its part).
+    pub sm_built: HashMap<BodyId, (BodyId, FsId)>,
     /// Holes built by each `opHole` (`qOpHoleFace` / `qOpHoleProfile`).
     pub holes: HashMap<FsId, Vec<hole::HoleRecord>>,
     /// What each operation was made from (`qDependency`: an extruded body's

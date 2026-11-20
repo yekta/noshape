@@ -2780,7 +2780,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
         let Some(pb) = st.ctx.bodies.iter().position(|b| b.id == part_id) else { continue };
         if let Reference::Body(def_body) = &body_ref {
-            st.sm_built.insert(part_id.clone(), def_body.clone());
+            st.sm_built.insert(part_id.clone(), (def_body.clone(), id.clone()));
         }
         let part = st.ctx.bodies[pb].clone();
         let def_ref = |d: &Def| match *d {

@@ -296,7 +296,17 @@ fn end_feature(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     if let Some(k) = st.started.iter().rposition(|s| s.id == id) {
         st.started.truncate(k);
     }
+    forget_sm_built(&mut st, &id);
     Ok(Value::Undefined)
+}
+
+/// Feature `id` ended: the sheet metal parts it built are found by `qCreatedBy` again (its cached answers too).
+fn forget_sm_built(st: &mut super::CtxState, id: &[Arc<str>]) {
+    let n = st.sm_built.len();
+    st.sm_built.retain(|_, (_, by)| !by.starts_with(id));
+    if st.sm_built.len() != n {
+        st.created_cache.lock().clear();
+    }
 }
 
 fn abort_feature(i: &mut Interp, a: Vec<Value>) -> R<Value> {
@@ -311,6 +321,7 @@ fn abort_feature(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         // one id, aborted every time).
         st.used_ids.retain(|u| !u.starts_with(&id));
     }
+    forget_sm_built(&mut st, &id);
     Ok(Value::Undefined)
 }
 

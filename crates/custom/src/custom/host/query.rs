@@ -1874,7 +1874,7 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
             let swapped = |e: &Ent| match e {
                 Ent::Body(b) if sm_feature => {
                     let body = &q.st.ctx.bodies[*b].id;
-                    !q.st.sm_built.contains_key(body) && (!q.st.hidden.contains(body) || q.st.sm_built.values().any(|d| d == body))
+                    !q.st.sm_built.contains_key(body) && (!q.st.hidden.contains(body) || q.st.sm_built.values().any(|(d, _)| d == body))
                 }
                 _ => true,
             };
