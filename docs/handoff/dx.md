@@ -42,17 +42,16 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 - URDF-RIGID-SUBASM-SINGLE-LINK LANDED b7c2c4e8a (ticket [x]); open: live's file shape (REQUESTS dx 05:44). Nightly
   dump-test LANDED 3b9ec80cc; dx-nightly worktree + vibe2 target removed 07:4x.
 - EXCHANGE TOP-3 LANDED 09:29 as 072a6c50 (2f406fa1). Rings "ours.stl" face 23 no triangles: bool's Shell builder, low.
-- DXF SCORING (DECISIONS 11-20, uncommitted parity.rs; LWPOLYLINE read as LINEs): Mac exall-a8 DXF 2/10 (duct,
-  louver); ops e2e 262/262. Rows left: snap-hook live's 4th tangent ring 0.0014 in inside a visible ring, dropped by
-  drop_covered_hidden at the chords' tol (FIXED uncommitted kernel hlr.rs off_circle + test
-  a_tangent_arc_beside_a_visible_arc_stays) + one 0.018 in SPLINE where live has an ARC r 0.049 (3.648, 3.069; probe);
-  bottle-split our arc 41.8-90 deg past live's (HLR extent); extension-spring an extra seam LINE + one edge live splits
-  into spline + line (model topology); hex-bookcase a hole rim quarter on the dowel mesh (coincident, live 0.05 in
-  ELLIPSE, ours hidden); housing-draft live's 4-LINE runs (intersection curves?) + 0.057 in bow (projection);
-  faceblend ELLIPSE vs SPLINE (model); rings-loft model; clamp-guillem Top edges inside another part (known, no rule).
-  Hole rims on a cylinder seen along it are its circle (views.rs model_edge, uncommitted, unit test). Tools:
-  /root/dx-scratch/bin/near.py, dxfgeo.py; files /root/dx-scratch/dxf-a8/.
-- DRAWING SPEED (lead 11-20): P1 ISAAC-DRAWING-VIEW-SPEED fixed uncommitted (shared assembly evaluator: ops
+- DXF SCORING (DECISIONS 11-20) QUEUED bdf50182 + 6047caa6 (with the hole-rim circle, the tangent-beside-a-curve HLR
+  fix, the isaac speed fix, five-point ARC fit). Mac exall-b1: DXF 2/10 (duct, louver); ops e2e 262/262. Rows left:
+  snap-hook 0.107 in of the Iso's r 0.8848 tangent ellipse cut into pieces (ours, cause not probed); bottle-split
+  Front's lip arc: P3 HLR-TORUS-SELF-OCCLUSION (lead 11-20: parked; collect other drawings showing it for one patch); extension-spring an extra seam LINE + an edge live splits
+  into spline + line (model topology); hex-bookcase a 0.05 in rim quarter on the dowel mesh (coincident, our
+  under-the-mesh rule hides it); housing-draft live's 4-LINE runs + 0.057 in bow (projection); faceblend ELLIPSE vs
+  SPLINE (model); rings-loft model; clamp-guillem Top edges inside another part (known). Probe: model_edge eprintln
+  of curve + face surfaces under DXEDGE (not committed; recipe in this line), Mac `export DXEDGE=1; exall.sh`.
+  Tools: /root/dx-scratch/bin/near.py, dxfgeo.py; files /root/dx-scratch/dxf-a9/.
+- DRAWING SPEED (lead 11-20): P1 ISAAC-DRAWING-VIEW-SPEED fixed, queued (bdf50182) (shared assembly evaluator: ops
   doc.rs prime_sources, app-core DocModel::assemblies, assembly_view / drawing_view take it; tell asm on landing):
   isaac Front 37.4 -> 1.60 s (live 10.7), Create 37.5 -> 2.49 (18.2); infento 19.5 -> 4.3. Timing:
   dx_perf::timed_saved_drawing_views (uncommitted) + Mac dx-keep/dvspeed.sh (copy /root/dx-scratch/dvspeed.sh).
