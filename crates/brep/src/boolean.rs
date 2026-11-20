@@ -1994,7 +1994,10 @@ impl Ctx<'_> {
                         }
                     }
                     let t = 0.5 * (lo + hi);
-                    if apart(a.0, t) > margin && apart(t, b.0) > margin && d(t) <= GREY * tol && !grazes.iter().any(|g| t >= g.0 - margin / scale && t <= g.1 + margin / scale) && !edge_on_other(t) {
+                    // (Not within the section's tolerance of its ends: cuts that near are one pave (the Ø25 × 10 knurl's
+                    // end face against a flank's own section, 9.6 um long, through the rim 3.3 um before its end).)
+                    let ends = margin.max(vtol);
+                    if apart(a.0, t) > ends && apart(t, b.0) > ends && d(t) <= GREY * tol && !grazes.iter().any(|g| t >= g.0 - margin / scale && t <= g.1 + margin / scale) && !edge_on_other(t) {
                         return Err(Decline("a section touching a face's boundary"));
                     }
                 }
