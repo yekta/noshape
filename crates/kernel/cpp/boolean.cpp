@@ -1980,6 +1980,18 @@ TopoDS_Shape recut_arc_seams(const TopoDS_Shape& s, HHist& hist)
 // rejected merge (the same one three times running).
 thread_local bool t_usd_order_moot = false;
 
+// Whether the faces of `out` not in `in` (those USD merged) are valid on their own (c2-config-parts-screws' Sweep 1:
+// two pieces of the shank's cylinder between thread turns merged into a face with unorientable wires, the volume kept).
+static bool new_faces_valid(const TopoDS_Shape& in, const TopoDS_Shape& out)
+{
+  ShapeIMap had;
+  TopExp::MapShapes(in, TopAbs_FACE, had);
+  for (TopExp_Explorer x(out, TopAbs_FACE); x.More(); x.Next())
+    if (!had.Contains(x.Current()) && !BRepCheck_Analyzer(x.Current()).IsValid())
+      return false;
+  return true;
+}
+
 TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
 {
   // The volume of `s` only when the check needs it (one integral of every face: 14 s of the knurl's unify):
@@ -2116,7 +2128,7 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.check");
     const std::optional<double> change = usd_volume_change(sf, image, share, u.Shape(), diag, &memo);
-    if (!keeps_volume(change, u.Shape()))
+    if (!keeps_volume(change, u.Shape()) || !new_faces_valid(in, u.Shape()))
     {
       // (The same merge rejected three times running: the faces' order doesn't change it here, so neither will the
       // rest: cf-spur-gear's Boolean 2 tried eight, 86 ms each. A notched cylinder fused with its mirror is kept at
@@ -2189,7 +2201,7 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     std::vector<FaceShare>    share;
     images(cp, HHist(), in, image, share);
     u.Build();
-    if (!keeps_volume(usd_volume_change(sf, image, share, u.Shape(), diag, &memo), u.Shape()))
+    if (!keeps_volume(usd_volume_change(sf, image, share, u.Shape(), diag, &memo), u.Shape()) || !new_faces_valid(in, u.Shape()))
       continue;
     if (hist.IsNull())
       hist = new BRepTools_History();
