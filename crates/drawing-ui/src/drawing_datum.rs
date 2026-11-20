@@ -824,8 +824,10 @@ impl DrawingEditor {
                                             )
                                     })
                                     .child(
+                                        // Live panel-lists s21: the buttons' centres 30 px apart.
                                         h_flex()
                                             .pt(px(2.))
+                                            .gap(px(5.))
                                             .child(toggle(("dt-aflip", k), "Flip", opts.angle_flip, cx, Box::new(move |this, _, cx| {
                                                 if let Some(r) = this.datum_dlg.as_mut().and_then(|d| d.rows.get_mut(k)) {
                                                     let o = r.ann.target.get_or_insert_with(Default::default);

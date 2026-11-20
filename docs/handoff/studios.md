@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 10:49 UTC.
+Updated 2026-11-20 11:06 UTC.
 
 ## In flight
 
@@ -20,37 +20,25 @@ read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edi
 the next run. Run the full ops e2e before any drawing land. vibex8 is qa's quiet speed window 02:00-04:00 (lead 11-20):
 nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdshots-host.sh (PD_HOST=vibe2 PD_DISP=395: first free display, never skasm's :391-399). A few app runs don't take ~/bin/slot (DECISIONS 11-15).
 - Landed 09:57: 782f4c47 as f29e6eb2 (the Windows CI wheel-notch fix and the 18 commits with it).
-- Queued 10:05 as fc8e6c91 (11 commits): a8b7e4c61 / 2d0b3a87e matrix doc (b21 merged; live's visually-hidden
-  labels dropped); 856e293d8 BOM / cut list / custom cell menu = live's bom-table-cell (Size ▸, Resize… | Copy), the
-  MENUDUMP test lists BOM header / row / cell, a revision's row, the sheet tree's reference row; 0cf22ebd0 Datum target
-  X / Y flips = flip-direction icon, Length / Angle dropdown 13.33 px #555, distance text 12 px; bc65e1c09 Origin field
-  stays active once picked (live s5; test); 5b8590995 Targets box ≤400 px with a scrollbar, #1b5faa borders. Mac:
-  drawing-ui 126, clippy clean.
-- Local after fc8e6c91 (to land once it does): 8305af19d coverage MENUS "drawing:Resize..." (856e293d8 renamed the cell
-  menu's item; without it ops coverage::every_menu_item_is_listed fails, so fc8e6c91 may fail on it: fix = this);
-  404ed8a14 DRW-DATUM-TARGET-OP: op `drawing_datum_target` (ops drawing_tools.rs): area / size / area precision,
-  style, origin, Length (x_edge / y_edge, distance_x / _y, flip_x / _y) or Angle (reference_edge, diameter_distance,
-  angle, flip, rotate, instances, radial_lines), precision_1 / _2; e2e
-  drawing_datum_target_takes_area_style_origin_and_distances; shared with the dialog via scene opts.rs
-  `datum_target_at`, `datum_target_distances`, SheetPick `datum_target_custom`, `straight_edge_dir_at`. Mac: ops all
-  (450 + coverage 11) ok, drawing-ui 126, clippy clean; AGENT_API regenerated.
-- Local, uncommitted (10:50): live's panel-lists s21-24 (uip 10:30) + a34-1699 10-15: an empty distance's Precision
-  ▾ opens no list (test an_empty_target_distances_precision_opens_no_list); Angle's Instance count an underlined field
-  with its Opposite direction button (flip-circular-opposite; on with an origin and ≥2 instances; new
-  DatumTargetOpts::instances_reverse, op `opposite_direction`, drawing test); Flip / Rotate icon buttons
-  (flip-direction / flip-circular-opposite), disabled (grey) with no origin. Feature Studio bracket box on the glyph
-  cell (vendor gpui-base inset_frame_corners 0.5 px; qa measured ours 11-12x17 vs live 8x16). TICKETS: FS-WHEEL /
-  BRACKET / OUTDENT / TRIPLE rows closed as qa's verified FEEL-FS-* duplicates. Needs: Mac run dto3 green, AGENT_API
-  scp back (mac:noshape-host/agents/studios/src/docs/AGENT_API.md), full ops e2e (model-data changed), land.
-- revision-table-delete retake (REQUESTS 09:55 item 2): not in at 10:48.
+- fc8e6c91 FAILED 10:52: export_drawing_rows_as_live inherited the previous test's remembered DWG (Linux test order;
+  the binary shares one config dir); the test picks PDF first now.
+- Queued 10:56 as 35451185 (18 commits): the fc8e6c91 batch (matrix doc, BOM / cut list / custom cell menu = live's,
+  Datum target flips / dropdown / Origin stays active / Targets box ≤400 px), coverage MENUS "drawing:Resize...",
+  DRW-DATUM-TARGET-OP (op `drawing_datum_target`; scene opts.rs `datum_target_at` / `datum_target_distances`,
+  SheetPick `datum_target_custom` / `straight_edge_dir_at` shared with the dialog; e2e), live panel-lists s21-24 (an
+  empty distance's ▾ opens no list; Angle's Instance count underlined + Opposite direction button =
+  DatumTargetOpts::instances_reverse / op `opposite_direction`; Flip / Rotate icons, grey with no origin), Feature
+  Studio bracket box on the 8x16 cell (vendor gpui-base inset_frame_corners), FS-* psui rows closed (qa's verified
+  duplicates). Mac: ops 452, drawing-ui 127, feature-studio-ui 28, clippy clean; AGENT_API regenerated.
+- b24 DONE 11:05 (vibex7 build): panel-lists 27/27 (was 25/27), hide-dim 12/12. Local after: Flip / Rotate 5 px apart
+  (live s21: centres 30 px apart).
+- An rb.sh run re-syncs the worktree to the Mac: scp a regenerated docs/AGENT_API.md back in the same command as
+  UPDATE_DOCS (mac:noshape-host/agents/studios/src/docs/AGENT_API.md).
+- revision-table-delete retake (REQUESTS 09:55 item 2): not in at 11:06.
 - Matrix 09:30: 1232 = + 558 shown of 1841, 0 ≠, 9 present-only, all conditional rows that wait on live's takes
   (REQUESTS "studios (2026-11-20 08:08 UTC)", not captured at 09:30): Section Depth / Offset distance, Datum "This
   field cannot be empty" (live's hidden Instance count row), Custom table Cell / Split custom table below, Inspection
   Diameter dimension, View properties Multiple values, Sheet properties A4 Portrait, Styles Show dimension line.
-- b22 DONE 09:40 (vibex6 build): hide-dim 12/12, s5 now as live (Origin active, flips, Length, distance text);
-  panel-lists 25/27: s22-23 our click at (285, 447) opened Diameter distance's ▾ list; live's Targets box is 400 px
-  with a 15 px scrollbar inside (▾ 15 px further left), fixed 5b8590995 (+ #1b5faa borders). Local after 782f4c47 also:
-  5b8590995, and the commits above.
 - b23 DONE 09:52 (vibex7 build): hide-dim 12/12, inspection-table-iso-scrolled 10/10, panel-lists 25/27 (still the
   (285, 447) ▾: ours' Targets box in Angle mode is 370 px, under live's 400, so no scrollbar), revision-table-delete
   7/10 (live's s7-s10 "EDGE Top" is the deleted table's stale paint). Both asked of live: REQUESTS "studios
