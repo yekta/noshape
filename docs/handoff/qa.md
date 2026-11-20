@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-20 05:43)
+# QA handoff (agent qa; current state only, updated 2026-11-20 07:13)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -91,13 +91,12 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    (150-200 vs 46), D1 release (470 vs 10 / 767), A1 per-move draw, A2 preview draws, S1 per-move draw.
 00e. skasm stack on 3fd4db71: 5 verified; FEEL-DIM-TWO-POINTS-ZERO / CHAIN-LASTPOINT / PASTE-PLACE still open. ANALYSIS-READOUT-HIDDEN
    verified 05:4x (2b3887ebe, 7/7); FEEL-DIM-PICK-READOUT (cov2-dim-orient step 8), ROLLBACK-DROP-ROW, SECTION-ARROW-FOOT: psui's next batch, on its word.
-00d. 05:00 cut GO (2a43b78b) -> v0.4.62. OPEN (05:4x runs, vibex7 slot, qa worktree at green 760975a3):
-   - blend 6b6b3b4a car Fillet 1: bin/car-one.sh (parity_models on the 5 c2-surf-intro docs, ~/qa-parity/one) -> feel1120/car-one.log:
-     Fillet 1 ok, 7 faces, Car part, Loft 4 builds -> verify / reopen, tell blend (core if Loft 4 is cd801518's).
-   - dx d9b795e0 (OCCT 0036, /opt/occt libTKHLR 24c350e8 installed 03:45): bin/ex-one.sh cf-snap-hook -> vibex7 ~/qa-parity/ex1/cf-snap-hook/
-     ours-drawing.dxf vs live-drawing.dxf with /root/dx-scratch/bin/dxfdiff.py (dx: 7 ours-only -> 0, ARC 81->75, LINE 352->345).
-   - asm 5bfaa556 landed as 2811098a 05:42: qa-wait-asm-drag fires on its green -> re-walk DRAG-DEAD-ZONE (real 100 px drag, read a part
-     edge not the hover outline), DRAG-START (15 px rule), MATE-PREVIEW-COLOUR, vibex8 one app.
+00d. 05:00 cut GO (2a43b78b) -> v0.4.62. 07:1x: studios 9/10 verified (6c3c0a8fe; WHEEL-ZOOM re-time 02:00), asm DEAD-ZONE verified,
+   MATE-PREVIEW-COLOUR reopened (edges; 7affcee96), DRAG-START re-walk on 48a2b02a6's green (unit qa-wait-asm-drag2). Seat lip (lead 06:xx):
+   Ok in every release 0.4.43-0.4.61 + green; only 11-14/15 greens had it; not a ticket. OPEN, read from suite 1120-0407-81d23c9b:
+   - blend car Fillet 1: vibex7 ~/qa-parity/models.log c2-surf-intro-* (Fillet 1 ok, Loft 4 builds) -> verify / reopen, tell blend.
+   - dx d9b795e0 (0036 lib on vibex7/8 since 03:45): vibex8 ~/qa-parity/exchange/cf-snap-hook/ours-drawing.dxf vs live via
+     /root/dx-scratch/bin/dxfdiff.py; feel1120/snap/before.txt (11-19 build: 85 ours-only) vs after.txt.
 00a. **05:00 cut HELD (lead 04:0x) until a green has core's 2f4f3bc5 (singularities Sketch 2; Mirror 2 is as live, accepted in
    compat/accepted.txt; 2f4f's subject added to cut-must.txt).** Unit qa-prerel-2f4f (bin/prerel-when.sh "<subject>" cut0500): when
    that commit is in the green, bin/prerel-run.sh uploads it to vibe2 and runs userdocs + prerel-edits + prerel-open (pixel diff at 90 s)
