@@ -2371,7 +2371,7 @@ fn face_planes(faces: &[Shape]) -> Vec<Option<(DVec3, DVec3)>> {
 }
 
 /// What each face, edge and vertex of the part comes from (`probes`: its faces' [`face_probes`]).
-fn part_sources(part: &Shape, probes: &[Option<(DVec3, DVec3)>], pieces: &[Piece], topo: &Topo) -> ((Vec<Def>, Vec<Def>, Vec<Def>), Vec<bool>) {
+fn part_sources(part: &Shape, probes: &[Option<(DVec3, DVec3)>], pieces: &[Piece], topo: &Topo) -> (Sources, Vec<bool>) {
     // Each piece's box (a point outside it is not on it: most pieces are
     // skipped without projecting onto them).
     let boxes: Vec<Option<k::BoundingBox>> = pieces.iter().map(|x| x.face.bounding_box(false).ok()).collect();
@@ -3047,13 +3047,16 @@ fn rip_offset(def: &Definition, topo: &Topo, e: usize, f: usize) -> f64 {
     }
 }
 
+/// Each face's, edge's and vertex's definition source.
+type Sources = (Vec<Def>, Vec<Def>, Vec<Def>);
+
 /// One part built from a definition sheet: its solid, face names, what each
 /// face comes from, and its definition faces (walls and rolled bends).
 struct PartOf {
     solid: Shape,
     probes: Vec<Option<(DVec3, DVec3)>>,
     names: Vec<crate::naming::Name>,
-    sources: (Vec<Def>, Vec<Def>, Vec<Def>),
+    sources: Sources,
     /// The faces on a relief's cut.
     relief: Vec<bool>,
     members: Vec<usize>,
