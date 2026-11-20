@@ -5762,7 +5762,7 @@ P2
   Live 2325 C: OK with no message, both parts filleted (part 2 overflows its 5 mm face); ours the same (T1).
 - [x] verified (qa 11-20 02:48, green a06ec927: T1 features_c::a_distance_and_angle_chamfer_leans_past_90_degrees_at_an_acute_edge on main, not ignored) P2 CHAMFER-ANGLE-OVER-90 (blend) Distance and angle refuses 90-179.9° in the kernel (features.cpp:8048).
   Done: 90° and over go to OCCT as two distances (an acute edge's chamfer; one edge, or edges coming to the same).
-- [ ] reopened (qa 11-20 02:48: by its own note only two distances on one edge is done; Distance and angle and several edges still run on with Tangent propagation off) P2 CHAMFER-ASYM-NO-PROPAGATION (blend) Tangent propagation off stops only equal-distance chamfers; two distances /
+- [ ] fixed, for qa to walk (blend 11-20: Distance and angle, and two distances on several edges, stop at the selection with Tangent propagation off); reopened (qa 11-20 02:48: by its own note only two distances on one edge is done; Distance and angle and several edges still run on with Tangent propagation off) P2 CHAMFER-ASYM-NO-PROPAGATION (blend) Tangent propagation off stops only equal-distance chamfers; two distances /
   distance and angle still run on.
   Two distances on one edge done (and the stopped chamfer's setback, d·tan(half) at a non-right edge, fixed);
   Distance and angle and several edges still run on.
