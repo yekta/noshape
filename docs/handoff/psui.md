@@ -56,9 +56,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
    shows their inputs dark.
 4c. live retakes eef639d7 (camera recorded, 11-20): check ours against the changed takes: face-menu-select-create-selection
    (face menu adds "Where used for Part 1…"), ver-compare-hover-part (version row menu without "Releases"),
-   fillet-chip-clear-missing / row 1738 (deleted Extrude 1: the pick reads "Unknown of", menu only "Clear all · Edit
-   healthy moment", step 5 fails in live), dialog-query-rclick-clear-all (new Fillet opens at the account's last-used
-   radius, 2 mm in the take). 12 others unchanged apart from the camera.
+   fillet-chip-clear-missing / row 1738 ("Unknown of": likely the start without q2224/fix.js; live asked 00:3x to re-run
+   with it; ours keeps "Missing Edge"), face menu "Where used" already ours (ctx-menus-1117), dialog-query-rclick-clear-all (new Fillet at the account's last radius: scenario now seeds
+   remembered 2 mm). ver-compare-hover-part (history-ui) flagged to the lead. 12 others unchanged apart from the camera.
 5. Interaction-feel rows that match live with no test (grep "missing" in the Test column; P0 sections first).
    Skipped: the two-block box counts (live's camera: iso + 10 wheel steps about an unknown pointer), the rollback
    bar's hover colour (GPUI group_hover, no test hook), the spinner's 900 ms (`Instant`, not the test clock).

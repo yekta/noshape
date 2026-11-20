@@ -4,6 +4,13 @@
  "area": "psui",
  "source": "coverage 11-06 (lead: menus, batch 6)",
  "start": "block",
+ "remembered": {
+  "fillet": {
+   "length:Millimeter": {
+    "radius": "2 mm"
+   }
+  }
+ },
  "steps": [
   {
    "do": "click",
