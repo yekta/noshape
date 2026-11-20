@@ -1,30 +1,27 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-20 04:05 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-20 09:31 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-20 04:05 UTC)
-- QUEUED b44e293b (23 commits: suite O = J; DXF v2; P0 dim place over a plane `plane_holds_lines`). Being re-checked
-  apart from a red batch. Detail: archive "Moved from the handoff 11-20".
-- Local, to land on top (each its own commit):
-  - dx T2 `std_sheet_metal_matches_onshape` (parts 0, NO_EDGES): `sm_built` (smflip-1118) hid every body a SM
-    feature built, past the feature: now `(definition, feature id)`, forgotten at end/abortFeature with the
-    `created_cache` (status.rs `forget_sm_built`). T2 passes, SM std 12/12.
-  - Dimension tool picks in the selection readout (`readout_ids`; live sketch-dimension-variable step 8 "Length").
-  - S1 partial flange bound: std TANGENTIAL linear manipulator (`tangential`) drawn as a ring with a head each way
-    (manipulators.rs `ring_glyph`, hit along the edge). Pin `a_partial_flanges_bound_is_a_tangential_handle_on_its_edge`.
-  - Feel round 2 (live cov-1120, interaction-feel "feel-cov-1120"): R1 a 2nd click on the last point ends the chain;
-    R6 a paste follows the pointer (`paste_follow`, absorbed into the paste's undo step), a click places it and leaves
-    Transform. 8 ui-parity scenarios sketch-line-* / sketch-dim-two-points-above-left / sketch-undo-one-segment-per-step
-    / sketch-paste-follows-pointer, to run on vibe2 (/root/skasm-scratch/uip5.sh) before landing.
-- qa SNAP-INSERT-FACE (reopened: a plain face snapping to its centroid connector, live's 180° about X): assemblies
-  are asm's: routed via the lead.
+## In flight (11-20 09:31 UTC)
+- Feel stack queued on main (after psui 37741d38): dx T2 `std_sheet_metal_matches_onshape` (`forget_sm_built`); qa round-2
+  feel P0s CHAIN-LASTPOINT, PASTE-PLACE (8 ui-parity scenarios sketch-line-* etc.), FEEL-SM-PARTIAL-FLANGE-MANIP (edge lit
+  whole), FEEL-DIM-TWO-POINTS-ZERO (a point in reach beats the stale hovered line, sketch.rs click path). The readout picks
+  and S1's TANGENTIAL handle are psui's (1c202f031, e0181b9f3). When it lands: tell dx (T2 fix), tell qa (P0s on green),
+  close the tickets.
+- Redo of the 4 reverted renames LANDED b0995d8f (names keep the pick order's, old names alias the new: `Bodies::aliases`,
+  `rename_aliases`, `alias_chain`). Remove worktree skasm-revert and its target.
+- qa SNAP-INSERT-FACE: asm's, routed via the lead.
 
 ## Closed 11-19: big-sketch feel (no row >= 100 ms and >= 2x live; live: open 2.6-25 s, edit 2.7-13 s, press 31-56 ms;
 ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
 Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six on green.
 
 ## Next
+- 850efe Extrude 6 (lead P1 11-20): ours 33/85/50 vs live 28/68/40, open. Not the regions (same area, volume in band).
+  The "JVJ 15 nm" diagnosis was WRONG (11-18 CLI): on current main Sketch 4 solves exact, Extrude 4's tool and JVJ are exact
+  (bool's recording agrees to 6.5e-14 m). Next: rebuild the parity test binary and find where Extrude 5/6 split. Model:
+  vibe2 ~/tmp/skasm/m85 (save/ = translated doc).
 - qa 11-20 (P2, SMM-EXTRUDE-CLOSED-PROFILE leftover): a cannot-unfold model is a WARNING on live's server but drawn
   failed (red, "did not regenerate properly"); ours sets FeatureStatus::Error (regen/mod.rs, sm-rip-1118). Fix: status
   Warning plus a "drawn failed" flag that psui's red sites read (51 sites test Error: keep it narrow).
