@@ -6345,6 +6345,28 @@ fn where_used_for_the_part_has_its_own_group_after_export(cx: &mut TestAppContex
 
 /// Live2 cfg-1118 (qa CFGFEEL-ROW-CLICK-SWITCHES): a plain click on a configuration row doesn't switch to it; only the
 /// row menu's Switch to and the feature list's box do.
+/// Live cfg-1118: Configurations docks at the right, 712 px with its 6 px gutter, and the graphics shrink by it (live's
+/// 1920 px window).
+#[gpui::test]
+fn the_configurations_panel_docks_712_px_and_the_graphics_shrink(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "cfg-panel-width");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_resize(gpui_kit::size(px(1920.), px(1080.)));
+    draw(cx, window);
+    let graphics = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).viewport.read(cx).size().x);
+    let before = graphics(cx);
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.right_panel = Some(crate::part_studio::config_panel::RightPanel::Configurations);
+        cx.notify();
+    }));
+    draw(cx, window);
+    draw(cx, window);
+    let panel = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("right-panel").expect("the panel drawn");
+    let after = graphics(cx);
+    let w = f64::from(f32::from(panel.size.width));
+    assert!((w - 718.0).abs() < 1.0, "the panel 712 px and its gutter: {w}");
+    assert!((before - after - w).abs() < 2.0, "the graphics shrink by the panel: {before} -> {after}, the panel {w}");
+}
+
 #[gpui::test]
 fn a_click_on_a_configuration_row_doesnt_switch_to_it(cx: &mut TestAppContext) {
     let (window, view) = studio_with_variables(cx, "cfg-row-click", &[("width", "30 mm")]);

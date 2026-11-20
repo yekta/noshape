@@ -50,10 +50,15 @@ docs/DECISIONS.md (read first; it wins over anything here).
    a_lines_lit_end_goes_dark_with_one_move_away. Ball test centre now exact (µm-rounded, 1e-12).
    Real-app repro kit: /root/psui-scratch/stale/ (stale-app.sh + scenarios; run on vibex6 with ~/green/noshape):
    on green 2bcd6dd7a (b) in sketch mode did NOT reproduce (one xdotool move clears the end) -> qa to re-run on green.
-4. P2 qa ERROR-CHIP-RED-NO-FIELD: Thicken both-zero "Invalid input selections." reddens the face chip and face
-   (FeatureDialog::entry_failing: any error naming no field reddens entries, from live's Fillet 100 mm); live keeps both
-   dark for this validation error. Needs a signal from the evaluator (an op failure vs a validation error; model-core,
-   core's crate) -> decision / ask core.
+4. P2 ERROR-CHIP-RED-NO-FIELD fixed (lead 11-20 ok'd the flag): FeatureError::invalid_input / FeatureState.invalid_input
+   (model-core; core told), set at Thicken's both-zero; FeatureDialog.invalid_input skips entry_failing and the red
+   inputs. Feedback matrix row "error / inputs refused". Other validation errors can take it the same way when live
+   shows their inputs dark.
+4c. live retakes eef639d7 (camera recorded, 11-20): check ours against the changed takes: face-menu-select-create-selection
+   (face menu adds "Where used for Part 1…"), ver-compare-hover-part (version row menu without "Releases"),
+   fillet-chip-clear-missing / row 1738 (deleted Extrude 1: the pick reads "Unknown of", menu only "Clear all · Edit
+   healthy moment", step 5 fails in live), dialog-query-rclick-clear-all (new Fillet opens at the account's last-used
+   radius, 2 mm in the take). 12 others unchanged apart from the camera.
 5. Interaction-feel rows that match live with no test (grep "missing" in the Test column; P0 sections first).
    Skipped: the two-block box counts (live's camera: iso + 10 wheel steps about an unknown pointer), the rollback
    bar's hover colour (GPUI group_hover, no test hook), the spinner's 900 ms (`Instant`, not the test clock).

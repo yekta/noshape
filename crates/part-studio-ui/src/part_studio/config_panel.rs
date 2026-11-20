@@ -340,6 +340,7 @@ impl PartStudioView {
         // gutter left of the 712 px pane; `#ccc` line over gutter and pane.
         Some(
             crate::ui::right_resizable(v_flex().relative(), 6.)
+                .debug_selector(|| "right-panel".into())
                 .w(px(crate::ui::right_panel_w() + 6.))
                 .max_w(relative(0.5))
                 .h_full()

@@ -1263,10 +1263,10 @@ each display from the right-click to the menu's first frame. Evidence live/feel/
 
 | Finding | Ours | Test |
 |---|---|---|
-| The panel docks at the right, ~700 px, the graphics shrink; the empty state ~346 ms after the click | = | missing (the 712 px panel: no test) |
+| The panel docks at the right, ~700 px, the graphics shrink; the empty state ~346 ms after the click | = | sketch_ui_tests::the_configurations_panel_docks_712_px_and_the_graphics_shrink |
 | The feature list's "Configurations" box with "Configuration [A ▾]" 193 × 26 | = | sketch_ui_tests::opening_the_configuration_select_moves_nothing (the place: missing) |
 | A duplicate row name is accepted, stored as "A0" | = | sketch_ui_tests::a_duplicate_configuration_name_and_a_bad_value_wait_for_their_row |
-| A row's menu: Switch to / Set as default / Duplicate row / Move up / Move down / Delete row | = | missing |
+| A row's menu: Switch to / Set as default / Duplicate row / Move up / Move down / Delete row | = | sketch_ui_tests::a_configuration_rows_menu_offers_what_live_offers |
 | A plain click on a row name doesn't switch | = | sketch_ui_tests::a_click_on_a_configuration_row_doesnt_switch_to_it |
 | A bad configured value stays plain until its row is active; then pink and bold, its feature red, its part gone | = | sketch_ui_tests::a_bad_configured_value_is_pink_only_on_the_active_row, a_duplicate_configuration_name_and_a_bad_value_wait_for_their_row |
 | Switching: no greying; the spinner only past 900 ms | = | missing |
