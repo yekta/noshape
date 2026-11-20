@@ -1285,7 +1285,15 @@ impl PartStudioView {
                     let (o, d) = vp.read(cx).ray(*position);
                     self.sketch.as_ref().and_then(|s| s.plane_point(o, d)).unwrap_or(p)
                 };
-                let hovered = self.hovered_sketch_entity(cx).filter(|e| self.in_sketch_reach(*e, hit, cx)).or_else(|| self.sketch_pick_at(hit, cx));
+                let hovered = self.hovered_sketch_entity(cx).filter(|e| self.in_sketch_reach(*e, hit, cx));
+                // A point in reach beats a curve, as the hover's (a quick click's hover still the line through it from
+                // the last place: qa FEEL-DIM-TWO-POINTS-ZERO, a line's end at the origin took the line, "0 mm").
+                let near = self.sketch_pick_at(hit, cx);
+                let is_point = |e: &noshape_sketch::EntityId| self.sketch_data(cx).is_some_and(|d| d.sketch.point(*e).is_some());
+                let hovered = match (hovered, near) {
+                    (Some(e), Some(q)) if q != e && is_point(&q) && !is_point(&e) => Some(q),
+                    (h, q) => h.or(q),
+                };
                 // Dimensions and constraints to planes, model edges / vertices and
                 // other sketches: a linked external reference entity stands in.
                 let tool_now = self.sketch.as_ref().map(|s| s.tool);

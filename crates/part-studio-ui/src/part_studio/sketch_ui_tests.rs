@@ -1590,6 +1590,51 @@ fn the_dimension_tools_picks_fill_the_readout(cx: &mut TestAppContext) {
     assert_eq!(seen, vec![s(&["Point"]), s(&["Min dist"]), s(&["Min dist"]), Vec::new()], "the readout after the first pick, the second, moving to place it, placed");
 }
 
+/// Live feel round 2 R3 (qa FEEL-DIM-TWO-POINTS-ZERO): a line from the origin to (30, 20); the Dimension tool's quick
+/// clicks on its two ends, the hover still the line from where the pointer was, take the ends, and the dimension placed
+/// above-left reads their horizontal distance (was the line and its own end: "0 mm").
+#[gpui::test]
+fn a_dimension_between_a_lines_ends_clicked_quickly_reads_their_distance(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "dim-two-points", Tool::Line);
+    let at = |cx: &mut TestAppContext, x: f64, y: f64| { let p = on_screen(cx, &view, DVec2::new(x, y)); (p.x, p.y) };
+    let (a, b, place) = (at(cx, 0.0, 0.0), at(cx, 0.03, 0.02), at(cx, 0.005, 0.025));
+    click(cx, window, &view, a);
+    click(cx, window, &view, b);
+    keys(cx, window, &["escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Dimension, w, cx))).unwrap();
+    draw(cx, window);
+    let line = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.sketch_data(cx).unwrap();
+        let e = d.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).unwrap().id;
+        Reference::SketchEntity { sketch: v.sketch.as_ref().unwrap().feature, entity: e.0 }
+    });
+    for p in [a, b] {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                let (vp, at) = (v.viewport.clone(), DVec2::new(p.0, p.1));
+                v.hover = Some(line.clone());
+                v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+                v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: at, modifiers: Modifiers::default() }, w, cx);
+            });
+        })
+        .unwrap();
+        draw(cx, window);
+    }
+    let picks = cx.update(|cx| { let v = view.read(cx); let d = v.sketch_data(cx).unwrap(); v.sketch.as_ref().unwrap().tool_picks().iter().map(|e| d.sketch.kind(*e)).collect::<Vec<_>>() });
+    assert_eq!(picks, [Some(noshape_sketch::EntityKind::Point); 2], "both ends picked, not the line");
+    // (The ends where the clicks' pixels put them, about 30 mm apart across: live's 29.548 mm.)
+    let across = cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        let (a, b) = d.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).and_then(|e| d.sketch.endpoints(e.id)).unwrap();
+        (d.sketch.point(b).unwrap().x - d.sketch.point(a).unwrap().x).abs() * 1e3
+    });
+    click(cx, window, &view, place);
+    let text = cx.update(|cx| view.read(cx).dim_input.as_ref().map(|(_, st, _)| st.read(cx).value().to_string()));
+    let value: f64 = text.as_deref().and_then(|t| t.strip_suffix(" mm")).and_then(|t| t.parse().ok()).unwrap_or(0.0);
+    assert!((value - across).abs() < 1e-3 && (across - 30.0).abs() < 1.0, "the ends' horizontal distance {across} mm: {text:?}");
+}
+
 /// Live2 11-17 sketch-dim-sel: with the Dimension tool a pick previews the dimension at once (the line kept selected);
 /// the placement click creates it and opens its box, the measured value with its unit pre-selected; Esc in the box
 /// keeps the dimension, the tool on; "1abc" Enter keeps the box (invalid), the first Esc restores the measured text
