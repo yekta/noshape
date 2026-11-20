@@ -103,7 +103,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
    (`Window::pointer_out`: no hit test after MouseExited until the next move). run116/117 fixes: section test grabs the head
    (45 px), skip ring focuses the dialog as the array field's click, empty new folder collapsed (live
    featurelist-gaps emptyFolder; model-data); run118 (vibex8). Rollback row tooltip after a drop: REQUESTS row 04:51.
-3g. FEEL-EDGE-VS-FACE-HOLD parked: reach-px-1119 (no hold) vs ours-verify-1120 (hold 8-10); REQUESTS 05:10;
+3g. FEEL-EDGE-VS-FACE-HOLD parked: reach-px-1119 (no hold) vs ours-verify-1120 (hold 8-10); REQUESTS 05:00;
    fix in /root/psui-scratch/edge-hold.patch (PickBuffer::pick_holding, EDGE_HOLD 9 px; feel_tests:137 needs the
    hold rows). FEEL-HASH-LIST-DELAY verified by live (close on rebase).
 3e. qa P0 FEEL-DIM-PICK-READOUT (15e785522, live R3 cov2-dim-orient): the sketch readout reads the Dimension tool's

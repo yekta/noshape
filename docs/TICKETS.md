@@ -120,7 +120,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   distance; live calls the row weak: the end landed at x 29.55). Ours places one whose box reads "0 mm". Escape twice: same as live (the first keeps
   Dimension, the second leaves it). Possibly the same placement code as skasm's unlanded 94f6df34 stack (P0 SKETCH-DIM-PLACE-CLICK-SELECTS):
   recheck after it lands.
-- [ ] P0 FEEL-DIM-PICK-READOUT (psui; qa 11-20 04:15, live R3, cov2-dim-orient steps 8-12 on 9ae062180) in the sketch Dimension tool, live's
+- [ ] (fixed psui 11-20 05:0x, to verify: the readout shows the Dimension tool's picks, `SketchEditor::readout_entities`; test sketch_ui_tests::the_dimension_tools_picks_fill_the_readout) P0 FEEL-DIM-PICK-READOUT (psui; qa 11-20 04:15, live R3, cov2-dim-orient steps 8-12 on 9ae062180) in the sketch Dimension tool, live's
   bottom-right measure readout shows the picks: after the first point, Point with X / Y / Z 0.000 mm; after the second, "Min dist 35.982 mm",
   kept while hovering to place. Ours shows no readout (null) throughout. Check against ANALYSIS-READOUT-HIDDEN's fix (readout hidden only for
   Interference) once it is on green.
@@ -164,11 +164,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   flange edge with a blue arrowhead each way along it, the whole edge orange; ours one white arrow pointing one way (blue while dragged), no
   ring, no second arrowhead, orange only on the edge part left of the flange. Drag values match (Distance 25 -> 36.8 mm over 60 px, field
   updates live, no value box). qa-scratch/feel1120/s1/cmp-manip.png (top live, bottom ours)
-- [ ] P0 FEEL-ROLLBACK-DROP-ROW (psui; qa 11-20 04:32, live behaviours "feel coverage (11-20)" round 2 R8, walked on green 9ae062180 vibex8) rollback bar drag: live lights the row under the drop line light blue (Fillet 1);
+- [ ] (fixed psui 11-20 05:0x, to verify: the row under the drop line lit (R8); the tooltip 3 px under the 7 px bar; none on the dropped bar until the pointer leaves it; list matrix row "rollback bar / its tooltip 3 px under it"; which tooltip live shows after a drop with the pointer on a row: REQUESTS 04:51) P0 FEEL-ROLLBACK-DROP-ROW (psui; qa 11-20 04:32, live behaviours "feel coverage (11-20)" round 2 R8, walked on green 9ae062180 vibex8) rollback bar drag: live lights the row under the drop line light blue (Fillet 1);
   ours doesn't. Pill, drop line + ring, grey old place, list not rolled, release (grey italic rows, first draw 145 ms vs live 192) match.
   Small: the bar's "Rollback bar" tooltip sits ~33 px below the bar (live ~22) and ours shows it again right after release (live's shot none).
   qa-scratch/feel1120/r/r8-drag-live-vs-ours.png (left live), r/r8.png, r/r8-after-live-vs-ours.png
-- [ ] P0 FEEL-SECTION-ARROW-FOOT (psui; qa 11-20 04:32, live behaviours "feel coverage (11-20)" round 2 R9, walked on green 9ae062180 vibex8) Part Studio section view: live's arrow manipulator shaft starts at the origin
+- [ ] (fixed psui 11-20 05:0x, to verify: the shaft starts at the origin ring, no 12% foot; R9 matrix row; the cap colour not looked at) P0 FEEL-SECTION-ARROW-FOOT (psui; qa 11-20 04:32, live behaviours "feel coverage (11-20)" round 2 R9, walked on green 9ae062180 vibex8) Part Studio section view: live's arrow manipulator shaft starts at the origin
   ring; ours leaves a ~20 px gap between the ring and the shaft's foot; the cap reads paler (mean rgb(225,199,164) vs live 231,194,149; cameras
   differ slightly, unsure). Menu item, dialog place / tabs / chip and timings match (dialog 85-250 ms, live 96-180). qa-scratch/feel1120/r/man.png (left live)
 
@@ -864,7 +864,7 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 - Right-click → menu: live 666, ours 148. Feature row hover → part highlight: live 679, ours 349.
 
 ## Interaction feel: live2's "Ours" cells on the P0 rows (live2 12:1x, green 4a69d55b, Xvfb :125, real pointer; evidence live/psui/ours-1118/)
-- [ ] (psui 11-18 22:49, to verify: fea9cbbe widened a held edge's pick band 9 → 11 px, the matrix's hold 9 → 10, so over a face it should hold to ~9) **P1 FEEL-EDGE-VS-FACE-HOLD (psui)** (hover-pick-1120): a part edge over the face behind it lights at 6 px but the face takes
+- [ ] (psui 11-20 05:0x: still open, live ours-verify-1120 on cd82afd4: lit at 6 from the face, the face back at 7; part edges have no hold (DRAWN_PICK) as live reach-px-1119 said; the captures disagree, retake in REQUESTS; a 9 px hold fix ready) (psui 11-18 22:49, to verify: fea9cbbe widened a held edge's pick band 9 → 11 px, the matrix's hold 9 → 10, so over a face it should hold to ~9) **P1 FEEL-EDGE-VS-FACE-HOLD (psui)** (hover-pick-1120): a part edge over the face behind it lights at 6 px but the face takes
   over at 8 px (the edge holds only to 7); live lights at 5-6 and holds to 8-10 px.
 - [x] (verified live2 20:2x on green 548d795fb / main 7302f8bd4, psui 17:09 batch: a press on empty space, first move onto Front: the plane lights, no box; the next move draws it) (psui 12:4x: fixed with a test, land queue; qa re-runs on its green) **P1 FEEL-PLANE-FIRST-MOVE (psui)** (sel-feel): press on empty space, first move onto a default plane: ours draws the crossing
   box on that move and no plane lights; live lights the plane and shows no box until the next move.
@@ -880,7 +880,7 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 - [x] (closed psui 11-18: 45 / 71 ms gaps, under the 11-18 ruling's 100 ms and 2×, DECISIONS 9e5b481d4) **P1 FEEL-SUPPRESS-TIMING (psui)**: Suppress: list row 253 ms, Parts 403 ms; live 208 / 332.
 - [ ] (fixed psui 11-18 22:38, to verify: the tooltip at the chip's right, `ui::with_user_side_tooltip`) **P2 FEEL-CHIP-TOOLTIP-PLACE (psui)**: a selection chip's tooltip shows under the pointer, over the next chip; live puts it to the chip's right.
 - [x] (verified live2 20:2x on green 548d795fb / main 7302f8bd4, psui 17:09 batch: "Delete Edge of Extrude 1") **P2 FEEL-CHIP-X-TOOLTIP (psui)**: the chip's × tooltip reads the chip's name; live "Delete Edge of Extrude 1".
-- [ ] (fixed psui 11-18 22:4x, to verify: the dialog redraws when its list opens; a bare "#" changed no value, so the list waited for the caret's next blink) **P1 FEEL-HASH-LIST-DELAY (psui)**: the "#" variable list opens ~0.7 s after the key; live on the next frame.
+- [x] (verified live 11-20 on green cd82afd4, ours-verify-1120: the # list 72-88 ms after the key, in the same frame as the "#") (fixed psui 11-18 22:4x, to verify: the dialog redraws when its list opens; a bare "#" changed no value, so the list waited for the caret's next blink) **P1 FEEL-HASH-LIST-DELAY (psui)**: the "#" variable list opens ~0.7 s after the key; live on the next frame.
 - [ ] (ON HOLD qa 12:33: live2 right-clicked Extrude 2, the LAST feature; live's menu with Roll to here was on a feature that wasn't last; live2 checks live's menu on a last feature first) **P1 FEEL-ROW-MENU-ROLL-TO-HERE (psui)**: a feature row's menu has no "Roll to here"; live has it.
 - [x] (closed qa 12:33: live2's fresh-config retake: 220 px (x 246-466), as live; the 392 came from /root's shared config) **P1 FEEL-FILLET-DIALOG-WIDTH (psui)**: the Fillet dialog is ~394 px wide; live 220.
 - Equal to live (live2): the two-feature suppress, the rollback release, chip click / Delete, expressions, Tab in the "#" list.
