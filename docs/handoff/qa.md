@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-20 05:16)
+# QA handoff (agent qa; current state only, updated 2026-11-20 05:50)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -89,15 +89,15 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    Sketch rows ran as live's recordings (qa-bisect, uncommitted, suites/1120-feel-cov2; R4 inconclusive per live). Crops /root/qa-scratch/feel1120/.
    Quiet-window re-time (02:00-04:00 11-21, vibex8 was at load 21-36): D3 drawing wheel zoom (ours 208-392 ms, live 8-23), V1 cell edit
    (150-200 vs 46), D1 release (470 vs 10 / 767), A1 per-move draw, A2 preview draws, S1 per-move draw.
-00e. skasm stack on 3fd4db71 (05:2x): SKETCH-DIM-PLACE-CLICK-SELECTS, OFFSET-EDIT-SCALES-SKETCH, SKETCH-SLOT-ON-ARC, SMM-EXTRUDE-CLOSED-PROFILE,
-   SKETCH-DXF-EXPORT-POLYLINES verified; FEEL-DIM-TWO-POINTS-ZERO / CHAIN-LASTPOINT / PASTE-PLACE still open. Waiting: qa-rr-psui-readout (re-runs the 6
-   analysis + edge-menu-curve-analysis + cov2-dim-orient on the first green with psui 41d7c720, out suites/1120-psui-readout; then tick
-   ANALYSIS-READOUT-HIDDEN / FEEL-DIM-PICK-READOUT); psui's next batch (ROLLBACK-DROP-ROW, SECTION-ARROW-FOOT): re-walk on its word.
-00d. 05:00 cut: GO 05:05 on 2a43b78b (prerel cut0500-2a43b78b.txt all 0 px; singularities Sketch 2 ok). Lead's fixes 04:5x verified on
-   2a43b78b: core cd801518 loft, dx 5dd3534a hex Right, dx 68ba3762 torus 253.01 mm2, dx 281554e9 brand (Version props' "Onshape Version"
-   left, studios), studios 7d3a6e28 dialogs (P1 DRW-DIALOG-FIRST-FOCUS, P3 DRW-EXPORT-HIDE-INSPECTION-SIZE), skasm cd4191eb sim removed (code).
-   OPEN: blend 6b6b3b4a car Fillet 1: read suites/1120-0407-81d23c9b's models stage (c2-surf-intro: Fillet 1 ok, 7 faces, Car part; Loft 4
-   must still build: it fails in the saved doc on green) -> verify or reopen, tell blend (and core if Loft 4 is core's loft change).
+00e. skasm stack on 3fd4db71: 5 verified; FEEL-DIM-TWO-POINTS-ZERO / CHAIN-LASTPOINT / PASTE-PLACE still open. ANALYSIS-READOUT-HIDDEN
+   verified 05:4x (2b3887ebe, 7/7); FEEL-DIM-PICK-READOUT (cov2-dim-orient step 8), ROLLBACK-DROP-ROW, SECTION-ARROW-FOOT: psui's next batch, on its word.
+00d. 05:00 cut GO (2a43b78b) -> v0.4.62. OPEN (05:4x runs, vibex7 slot, qa worktree at green 760975a3):
+   - blend 6b6b3b4a car Fillet 1: bin/car-one.sh (parity_models on the 5 c2-surf-intro docs, ~/qa-parity/one) -> feel1120/car-one.log:
+     Fillet 1 ok, 7 faces, Car part, Loft 4 builds -> verify / reopen, tell blend (core if Loft 4 is cd801518's).
+   - dx d9b795e0 (OCCT 0036, /opt/occt libTKHLR 24c350e8 installed 03:45): bin/ex-one.sh cf-snap-hook -> vibex7 ~/qa-parity/ex1/cf-snap-hook/
+     ours-drawing.dxf vs live-drawing.dxf with /root/dx-scratch/bin/dxfdiff.py (dx: 7 ours-only -> 0, ARC 81->75, LINE 352->345).
+   - asm 5bfaa556 landed as 2811098a 05:42: qa-wait-asm-drag fires on its green -> re-walk DRAG-DEAD-ZONE (real 100 px drag, read a part
+     edge not the hover outline), DRAG-START (15 px rule), MATE-PREVIEW-COLOUR, vibex8 one app.
 00a. **05:00 cut HELD (lead 04:0x) until a green has core's 2f4f3bc5 (singularities Sketch 2; Mirror 2 is as live, accepted in
    compat/accepted.txt; 2f4f's subject added to cut-must.txt).** Unit qa-prerel-2f4f (bin/prerel-when.sh "<subject>" cut0500): when
    that commit is in the green, bin/prerel-run.sh uploads it to vibe2 and runs userdocs + prerel-edits + prerel-open (pixel diff at 90 s)
