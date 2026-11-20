@@ -294,7 +294,7 @@ fn apply_corner_breaks(part: &mut Shape, pieces: &mut Vec<Piece>, def: &Definiti
         for f in part.faces().into_iter().filter(|f| is_new(f)) {
             let c = key(&f).map_or(DVec3::ZERO, |k| k.0);
             let v = found.iter().map(|(v, _)| *v).min_by(|a, b| topo.vertices[*a].distance(c).total_cmp(&topo.vertices[*b].distance(c))).unwrap_or(found[0].0);
-            pieces.push(Piece { face: f, from: Def::Vertex(v) });
+            pieces.push(Piece { face: f, from: Def::Vertex(v), relief: true });
         }
         true
     };
@@ -536,6 +536,8 @@ pub(super) fn rename_strings(v: &Value, map: &HashMap<Arc<str>, Arc<str>>) -> Va
 struct Piece {
     face: Shape,
     from: Def,
+    /// A bend or corner relief's cut (live q-sm-creators-1119: its faces are the latest relief rebuild's).
+    relief: bool,
 }
 
 /// One wall's outer loop as straight edges: points and the definition
@@ -1904,7 +1906,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
                     if (c - b.start).dot(b.dir) < b.len * 0.5 { Def::Vertex(v0) } else { Def::Vertex(v1) }
                 }
             };
-            pieces.push(Piece { face: f, from });
+            pieces.push(Piece { face: f, from, relief: false });
         }
         solids.push(bend);
     }
@@ -2015,7 +2017,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
                     let c = inner_point(&face).unwrap_or_default();
                     let near = |e: &usize| k::make_vertex(c).ok().and_then(|v| k::distance(&v, &topo.edges[*e]).ok()).map_or(f64::INFINITY, |d| d.distance);
                     let from = edges.iter().copied().min_by(|a, b| near(a).total_cmp(&near(b))).map_or(Def::Face(fi), Def::Edge);
-                    pieces.push(Piece { face, from });
+                    pieces.push(Piece { face, from, relief: false });
                 }
                 tools.push(tool);
             }
@@ -2033,7 +2035,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             slab = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&slab), &tools, &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal bend relief failed: {e}")))?.shape;
             // The slot's faces come from the bend's end vertex.
             for (tool, v) in &reliefs {
-                pieces.extend(tool.faces().into_iter().map(|face| Piece { face, from: Def::Vertex(*v) }));
+                pieces.extend(tool.faces().into_iter().map(|face| Piece { face, from: Def::Vertex(*v), relief: true }));
             }
         }
         for f in slab.faces() {
@@ -2060,7 +2062,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
                     Def::Edge(l.side[k])
                 }
             };
-            pieces.push(Piece { face: f, from });
+            pieces.push(Piece { face: f, from, relief: false });
         }
         wall_flats.push((fi, flat));
         wall_solid.insert(fi, solids.len());
@@ -2123,7 +2125,7 @@ fn plain_wall(topo: &Topo, fi: usize, front: f64, back: f64, solids: &mut Vec<Sh
             let near = |e: &usize| k::make_vertex(c).ok().and_then(|v| k::distance(&v, &topo.edges[*e]).ok()).map_or(f64::INFINITY, |d| d.distance);
             own.iter().copied().min_by(|a, b| near(a).total_cmp(&near(b))).map_or(Def::Face(fi), Def::Edge)
         };
-        pieces.push(Piece { face: f, from });
+        pieces.push(Piece { face: f, from, relief: false });
     }
     solids.push(slab);
     Ok(())
@@ -2268,7 +2270,7 @@ fn rolled_bend(topo: &Topo, fi: usize, face: &Shape, front: f64, back: f64, soli
             }
             _ => Def::Face(fi),
         };
-        pieces.push(Piece { face: f, from });
+        pieces.push(Piece { face: f, from, relief: false });
     }
     solids.push(res);
     Ok(())
@@ -2369,26 +2371,30 @@ fn face_planes(faces: &[Shape]) -> Vec<Option<(DVec3, DVec3)>> {
 }
 
 /// What each face, edge and vertex of the part comes from (`probes`: its faces' [`face_probes`]).
-fn part_sources(part: &Shape, probes: &[Option<(DVec3, DVec3)>], pieces: &[Piece], topo: &Topo) -> (Vec<Def>, Vec<Def>, Vec<Def>) {
+fn part_sources(part: &Shape, probes: &[Option<(DVec3, DVec3)>], pieces: &[Piece], topo: &Topo) -> ((Vec<Def>, Vec<Def>, Vec<Def>), Vec<bool>) {
     // Each piece's box (a point outside it is not on it: most pieces are
     // skipped without projecting onto them).
     let boxes: Vec<Option<k::BoundingBox>> = pieces.iter().map(|x| x.face.bounding_box(false).ok()).collect();
     let planes = face_planes(&pieces.iter().map(|x| x.face.clone()).collect::<Vec<_>>());
     let in_box = |i: usize, p: DVec3| boxes[i].is_none_or(|b| (b.min - DVec3::splat(1e-6)).cmple(p).all() && p.cmple(b.max + DVec3::splat(1e-6)).all()) && planes[i].is_none_or(|(o, n)| (p - o).dot(n).abs() < 1e-6);
-    let faces: Vec<Def> = probes
+    // Each face's source, and whether it lies on a relief's cut (not on a bend's end: it can share the cut's plane).
+    let (faces, relief): (Vec<Def>, Vec<bool>) = probes
         .iter()
         .map(|probe| {
             // (Cancelled: the rest unmatched, the rebuild stops after.)
             if k::thread_cancelled() {
-                return Def::Face(0);
+                return (Def::Face(0), false);
             }
-            let Some((p, n)) = *probe else { return Def::Face(0) };
+            let Some((p, n)) = *probe else { return (Def::Face(0), false) };
             // A piece through the point that faces the same way (a unified wall's
             // middle can lie on the edge of a side piece).
             let along = |x: &Piece| x.face.normal_at_point(p).map_or(true, |b| n.cross(b).length() < 1e-6);
-            pieces.iter().enumerate().find(|(i, x)| in_box(*i, p) && x.face.contains_point(p, 1e-7).unwrap_or(false) && along(x)).map_or(Def::Face(0), |(_, x)| x.from)
+            let on = |i: usize, x: &Piece| in_box(i, p) && x.face.contains_point(p, 1e-7).unwrap_or(false) && along(x);
+            let Some((_, x)) = pieces.iter().enumerate().find(|(i, x)| on(*i, x)) else { return (Def::Face(0), false) };
+            let on_any = |relief: bool, end: bool| pieces.iter().enumerate().any(|(i, y)| y.relief == relief && (!end || matches!(y.from, Def::Vertex(_))) && on(i, y));
+            (x.from, on_any(true, false) && !on_any(false, true))
         })
-        .collect();
+        .unzip();
     let ef = part.edge_faces().unwrap_or_default();
     let edges: Vec<Def> = part
         .edges()
@@ -2422,7 +2428,7 @@ fn part_sources(part: &Shape, probes: &[Option<(DVec3, DVec3)>], pieces: &[Piece
             from_edges.unwrap_or_else(|| Def::Vertex(topo.nearest_vertex(v.vertex_point().unwrap_or_default())))
         })
         .collect();
-    (faces, edges, vertices)
+    ((faces, edges, vertices), relief)
 }
 
 /// A cancelled regeneration stops the rebuild between its steps (cf-fill-pattern's thousand-hole plate: 1.2 s of
@@ -2522,7 +2528,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 }
                 let n_removes = removes.len();
                 let tools: Vec<Shape> = removes.into_iter().chain(adds).collect();
-                pieces.extend(tools.iter().flat_map(|t| t.faces()).map(|face| Piece { face, from: Def::Face(ft.face) }));
+                pieces.extend(tools.iter().flat_map(|t| t.faces()).map(|face| Piece { face, from: Def::Face(ft.face), relief: false }));
                 if ft.cut {
                     cut_shapes.push((ft.face, tools));
                 } else {
@@ -2553,17 +2559,19 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 .into_iter()
                 .map(|solid| {
                     let probes = face_probes(&solid.faces());
-                    let sources = part_sources(&solid, &probes, &pieces, &topo);
+                    let (sources, relief) = part_sources(&solid, &probes, &pieces, &topo);
                     let mut members: Vec<usize> = sources.0.iter().filter_map(|d| if let Def::Face(f) = d { Some(*f) } else { None }).collect();
                     members.sort_unstable();
                     members.dedup();
-                    PartOf { solid, probes, names: Vec::new(), sources, members }
+                    PartOf { solid, probes, names: Vec::new(), sources, relief, members }
                 })
                 .collect();
             stop_if_cancelled()?;
             parts.sort_by_key(|p| p.members.first().copied().unwrap_or(usize::MAX));
             let mut others = BTreeMap::new();
             let mut taken: std::collections::HashSet<crate::naming::Name> = ev.ctx.bodies.iter().flat_map(|b| b.faces.iter().cloned()).collect();
+            // A relief's cut faces' names before the rebuild, which saved references hold, and the names they get now.
+            let mut relief_aliases = Vec::new();
             for (k, p) in parts.iter_mut().enumerate() {
                 p.names = super::ops::fresh_names(ev, &p.solid);
                 // Fresh faces are named by their order in the solid, so the
@@ -2580,6 +2588,14 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 let fresh_names = p.names.clone();
                 if let Some(Some(b)) = before.get(k) {
                     keep_names(&p.solid, &p.probes, &mut p.names, &b.shape, &b.faces, ev.feature);
+                    // A relief's cut is the rebuild's own, even on the old relief's planes (live q-sm-creators-1119: two
+                    // Bend reliefs, the second creates the cut faces at both ends; Corner 1's rectangle its cut); its
+                    // name before still finds it (qa compat 11-20: rocker-enclosure's and dogbone's sketch planes).
+                    for (fi, n) in p.names.iter_mut().enumerate() {
+                        if p.relief.get(fi) == Some(&true) && *n != fresh_names[fi] {
+                            relief_aliases.push((std::mem::replace(n, fresh_names[fi].clone()), fresh_names[fi].clone()));
+                        }
+                    }
                 }
                 // A face this rebuild exposes for the first time (on no face of the part before) is the one its
                 // definition wall or bend's creator made (live sm-box: Flange 2's relief bares a face of Flange 1's
@@ -2591,7 +2607,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 {
                     let kept: Vec<&Def> = p.sources.0.iter().enumerate().filter(|(fi, _)| p.names.get(*fi) != fresh_names.get(*fi)).map(|(_, d)| d).collect();
                     for (fi, n) in p.names.iter_mut().enumerate() {
-                        let Some(src) = p.sources.0.get(fi).filter(|d| *n == fresh_names[fi] && kept.contains(d)) else { continue };
+                        let Some(src) = p.sources.0.get(fi).filter(|d| *n == fresh_names[fi] && kept.contains(d) && p.relief.get(fi) != Some(&true)) else { continue };
                         let Some(c) = definition_creator(db, src, &order).filter(|c| *c != studio_feature) else { continue };
                         *n = Arc::new(crate::reference::TopoName::face(c, crate::reference::Role::Generated(n.clone())));
                     }
@@ -2604,6 +2620,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     }
                 }
             }
+            ev.ctx.bodies.add_aliases(relief_aliases);
             stop_if_cancelled()?;
             // (The walls a loop of bends can't lay flat; the placement holds flat walls only: with a rolled wall, none.)
             let rolled = topo.faces.iter().any(|f| f.face_plane().ok().flatten().is_none());
@@ -3037,6 +3054,8 @@ struct PartOf {
     probes: Vec<Option<(DVec3, DVec3)>>,
     names: Vec<crate::naming::Name>,
     sources: (Vec<Def>, Vec<Def>, Vec<Def>),
+    /// The faces on a relief's cut.
+    relief: Vec<bool>,
     members: Vec<usize>,
 }
 

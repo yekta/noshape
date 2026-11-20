@@ -154,6 +154,61 @@ fn a_face_a_later_flange_exposes_keeps_its_walls_creator() {
     assert!(creators.iter().all(|c| *c == Some(f1)), "{creators:?} (Flange 1 {f1:?})");
 }
 
+/// The creator of the face through `p` (mm), within 1 µm.
+fn creator_at(r: &RegenResult, p: DVec3) -> Option<FeatureId> {
+    let b = &r.context.bodies[part(r)];
+    let v = noshape_kernel::make_vertex(p * 1e-3).unwrap();
+    let Some(i) = b.shape.faces().iter().position(|f| noshape_kernel::distance(&v, f).is_ok_and(|d| d.distance < 1e-6)) else {
+        let all: Vec<String> = b.shape.faces().iter().zip(&b.faces).map(|(f, n)| format!("{:?} {:.2} {:?}", f.centroid().unwrap_or_default() * 1e3, f.area().unwrap_or(0.0) * 1e6, n.creator())).collect();
+        panic!("no face at {p:?}:\n{}", all.join("\n"));
+    };
+    b.faces[i].creator()
+}
+
+/// Live2 q-sm-creators-1119 B0 / B1: a partial Flange 1 on the plate's front edge (10 mm in from each end) makes its
+/// Obround reliefs' cut faces; then a Rectangle Bend relief at each bend end: the second one creates the cut faces at
+/// BOTH ends (each rebuilds every relief), the walls and bends stay Flange 1's (the bend's end too, on the relief's plane).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn the_latest_bend_relief_creates_every_reliefs_cut_faces() {
+    let mut s = Studio::new();
+    let region = s.rectangle(60.0, 40.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    let r = s.ok();
+    let front = edge_at(&r, DVec3::new(30.0, 0.0, 2.0));
+    let f1 = s.add("sheetMetalFlange", |p| {
+        p.set("edges", ParamValue::Query(vec![front]));
+        p.set("isPartialFlange", ParamValue::Bool(true));
+        p.set("firstBoundType", en("BLIND"));
+        p.set("firstBoundOffset", expr("10 mm"));
+        p.set("hasSecondBound", ParamValue::Bool(true));
+        p.set("secondBoundType", en("BLIND"));
+        p.set("secondBoundOffset", expr("10 mm"));
+    });
+    let r = s.ok();
+    let got = |r: &RegenResult, pts: &[(f64, f64, f64)]| pts.iter().map(|&(x, y, z)| creator_at(r, DVec3::new(x, y, z))).collect::<Vec<_>>();
+    assert_eq!(got(&r, &[(7.875, 2.0, 1.0), (10.0, 3.0, 1.0), (52.125, 2.0, 1.0), (50.0, 3.0, 1.0)]), vec![Some(f1); 4], "the flange's own Obround reliefs");
+    let relief = |s: &mut Studio, x: f64| {
+        let r = s.ok();
+        let end = vertex_at(&r, DVec3::new(x, -2.0, 4.0));
+        s.add("sheetMetalBendRelief", |p| {
+            p.set("bendRelief", ParamValue::Query(vec![end]));
+            p.set("bendReliefStyle", en("RECTANGLE"));
+        })
+    };
+    relief(&mut s, 50.0);
+    let br2 = relief(&mut s, 10.0);
+    let r = s.ok();
+    let cuts = [(7.875, 2.53125, 1.0), (10.0, 3.53125, 1.0), (52.125, 2.53125, 1.0), (50.0, 3.53125, 1.0)];
+    assert_eq!(got(&r, &cuts), vec![Some(br2); 4], "both ends' cut faces (Bend relief 2 {br2:?}, Flange 1 {f1:?})");
+    assert_eq!(got(&r, &[(10.0, -1.0, 14.5), (30.0, -2.0, 14.5), (50.0, 0.0194052, 2.0194052)]), vec![Some(f1); 3], "the wall's end and side, the bend's end");
+}
+
 /// A flange leaves the plate's other top edges their references (std rebuilds
 /// the part: its faces kept their names only by being on the old ones), so in
 /// the Flange dialog's preview the next edge can still be picked (the preview's
