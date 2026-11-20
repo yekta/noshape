@@ -27,6 +27,7 @@ impl DrawingEditor {
         }
         self.projection_parent_lit = false;
         self.tool_points.clear();
+        self.dim_kept_points.clear();
         let sheet = self.drawing_sheet();
         self.tool_start = (sheet.sketch.sketch.entities().map(|e| e.id.0).max().unwrap_or(0), sheet.annotations.iter().map(|a| a.id).max().unwrap_or(0));
         // A constraint key on a selection that completes it: applied at once.
@@ -758,6 +759,9 @@ impl DrawingEditor {
                 // Picked points keep the snap disc, picked edges the selection orange (live2 drw-tools-1119: p2p, dimg).
                 const PICKED: [u8; 4] = [0xcc, 0x92, 0x5c, 255];
                 let lit = LIT_LINE_PX;
+                if picks.is_empty() {
+                    overlay.marks.extend(self.dim_kept_points.iter().filter_map(|a| self.pick_sheet(a)).map(|p| (p, crate::drawing_scene::SnapMark::Disc, 0.0)));
+                }
                 for p in picks {
                     match p {
                         Pick::Point(a) => overlay.marks.extend(self.pick_sheet(a).map(|p| (p, crate::drawing_scene::SnapMark::Disc, 0.0))),
@@ -1191,11 +1195,15 @@ impl DrawingEditor {
                     let placed: Vec<Sel> = anns.iter().map(|a| Sel::Annotation(a.id)).collect();
                     self.edit_sheet(kind.name(), cx, |s| s.annotations.extend(anns));
                     self.selection = placed;
+                    // 2 point linear keeps its points' discs (live drw-dimension-point-to-point-vertical s4; line to line
+                    // and point to line clear theirs).
+                    self.dim_kept_points = if kind == DimTool::Point2 { picks.iter().filter_map(|p| match p { Pick::Point(a) => Some(a.clone()), _ => None }).collect() } else { Vec::new() };
                     self.tool = Tool::Dimension { kind, picks: vec![] };
                 } else {
                     // The next dimension started: the one placed before is let go.
                     if picks.is_empty() {
                         self.selection.retain(|s| !matches!(s, Sel::Annotation(_)));
+                        self.dim_kept_points.clear();
                     }
                     let had = picks.len();
                     match kind {

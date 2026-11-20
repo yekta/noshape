@@ -370,8 +370,16 @@ impl DrawingEditor {
                 }
             }
             Tool::Dimension { picks, .. } => {
+                if picks.is_empty() {
+                    for a in &self.dim_kept_points {
+                        selection.push(("EDGE".into(), self.ui_view_name(a.view)));
+                    }
+                }
                 for p in picks {
                     match p {
+                        // A picked point's disc (and the line from it to the pointer) in the 2 point and point to line
+                        // tools (live drw-dimension-point-to-point-vertical s2-s3, -point-to-line-hole-centre s2).
+                        Pick::Point(PickedPoint { view, .. }) if matches!(self.tool, Tool::Dimension { kind: DimTool::Point2 | DimTool::PointLine, .. }) => selection.push(("EDGE".into(), self.ui_view_name(*view))),
                         Pick::Line { a: PickedPoint { view, .. }, .. } => selection.push(("EDGE".into(), self.ui_view_name(*view))),
                         Pick::Circle { view, .. } | Pick::Arc { view, .. } | Pick::CircleAt { view, .. } => selection.push(("EDGE".into(), self.ui_view_name(*view))),
                         _ => {}

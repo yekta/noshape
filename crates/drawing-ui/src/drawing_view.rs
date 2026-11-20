@@ -522,6 +522,9 @@ pub struct DrawingEditor {
     pub woken_plus: Vec<[f64; 2]>,
     /// Dimension tool: where the picked circle was clicked (sheet mm; its hourglass mark).
     pub dim_circle_spot: Option<[f64; 2]>,
+    /// 2 point linear: the points of the dimension just placed, their discs kept until the next pick or the tool ends
+    /// (live drw-dimension-point-to-point-vertical s4).
+    pub dim_kept_points: Vec<PickedPoint>,
     /// Sketch tools: endpoints hovered so far (SK8: the cursor aligns with
     /// them along red dotted inference lines).
     pub woken_points: Vec<[f64; 2]>,
@@ -835,6 +838,7 @@ impl DrawingEditor {
             custom_tables: Default::default(),
             woken_plus: Vec::new(),
             dim_circle_spot: None,
+            dim_kept_points: Vec::new(),
             woken_points: Vec::new(),
             datum_on: None,
             datum_at: None,

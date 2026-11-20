@@ -2293,6 +2293,12 @@ fn the_dimension_tool_marks_its_picks_as_live_and_keeps_the_placed_one_selected(
     assert_eq!(count(cx), before + 1, "one dimension placed");
     assert_eq!(sel, vec![Sel::Annotation(placed)], "placed: selected");
     assert!(bold(cx, Some(placed)), "placed: bold");
+    // Placed, the tool on: both points keep their discs (live drw-dimension-point-to-point-vertical s4); Esc takes them.
+    let discs = |cx: &mut TestAppContext| cx.update(|cx| [a, b].iter().filter(|p| editor.read(cx).overlay.marks.iter().any(|(m, k, _)| *k == SnapMark::Disc && (m[0] - p[0]).hypot(m[1] - p[1]) < 1e-6)).count());
+    assert_eq!(discs(cx), 2, "placed: both discs kept");
+    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+    draw(cx, window);
+    assert_eq!(discs(cx), 0, "Esc: the discs gone");
     // Select: a press-drag on its text draws it plain, no orange, no tan.
     cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Select, cx)));
     draw(cx, window);
@@ -2368,6 +2374,34 @@ fn a_dimension_pick_marks_every_dimensions_value_and_far_end(cx: &mut TestAppCon
     draw(cx, window);
     click_at(cx, window, &editor, a, Modifiers::default());
     assert!(marks(cx).is_empty(), "none after a vertex pick");
+}
+
+/// Live drw-dimension-point-to-point-vertical s2-s3, -point-to-line-hole-centre s2: a point picked in the 2 point and
+/// the point to line tools lights its view (its disc and the line to the pointer), as an edge pick does.
+#[gpui::test]
+fn a_point_picked_for_a_2_point_or_point_to_line_dimension_lights_its_view(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::DimTool;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-dim-point-lit");
+    real_sheet(cx, window, &editor);
+    let (a, name) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+        let a = g.snaps.iter().map(|s| pl.to_sheet(s.p)).min_by(|p, q| (p[0] + p[1]).total_cmp(&(q[0] + q[1]))).expect("a vertex");
+        (a, e.ui_view_name(pl.id))
+    });
+    let lit = |cx: &mut TestAppContext| {
+        let s = cx.update(|cx| editor.read(cx).ui_state(cx));
+        s["drawing"]["selection"].as_array().is_some_and(|l| l.iter().any(|x| x["kind"] == "EDGE" && x["owner"] == name.as_str()))
+    };
+    for kind in [DimTool::Point2, DimTool::PointLine] {
+        cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Dimension { kind, picks: vec![] }, cx)));
+        draw(cx, window);
+        assert!(!lit(cx), "{kind:?}: nothing lit before a pick");
+        click_at(cx, window, &editor, a, Modifiers::default());
+        assert!(lit(cx), "{kind:?}: the view lit after the point pick");
+    }
 }
 
 /// Live2 drw-tools-1119 (sl.png), recheck-1119: a section's cutting line hovered in Select frames the section view light
