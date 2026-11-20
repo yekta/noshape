@@ -8549,6 +8549,21 @@ pub struct AssemblyResult {
 /// resolve mate connectors." as live's.
 const UNRESOLVED_CONNECTOR: &str = "mc:F0.0";
 
+/// A live mate's connector picks as assembly_mate's a, b (c, d): a Width's first tab connector, its two width
+/// connectors, its second tab connector; a Tangent's two entities (found as connectors under "<its id>/first" and
+/// "/second").
+fn mate_picks(f: &Value, ty: &str) -> Vec<Value> {
+    let queries = |id: &str| f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == id).and_then(|p| p["queries"].as_array()).cloned().unwrap_or_default();
+    match ty {
+        "width" => {
+            let (tabs, widths) = (queries("tabMateConnectorsQuery"), queries("widthMateConnectorsQuery"));
+            [tabs.first(), widths.first(), widths.get(1), tabs.get(1)].into_iter().flatten().cloned().collect()
+        }
+        "tangent" => ["first", "second"].map(|end| json!({ "featureId": format!("{}/{end}", f["featureId"].as_str().unwrap_or_default()) })).to_vec(),
+        _ => queries("mateConnectorsQuery"),
+    }
+}
+
 /// Onshape's mate types in assembly_mate's words.
 fn mate_type(t: &str) -> Option<&'static str> {
     Some(match t {
@@ -9196,6 +9211,16 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     }
                 }
             }
+            // A Tangent mate's two picked entities (live's geometryMate has no connectors): found as a connector's entity,
+            // under "<its feature id>/first" and "/second".
+            if let Some(id) = f["featureId"].as_str().filter(|_| f["featureType"] == "geometryMate") {
+                for (end, param) in [("first", "firstEntityQuery"), ("second", "secondEntityQuery")] {
+                    let pick = f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == param);
+                    let Some(q) = pick.and_then(|p| p["queries"].as_array()).and_then(|q| q.first()) else { continue };
+                    let query = json!({ "queryString": q["entityQuery"], "deterministicIds": q["deterministicIds"], "second": q["secondDeterministicId"] });
+                    connectors.insert((l.element.clone(), format!("{id}/{end}")), (path_of(&q["path"]), String::new(), query));
+                }
+            }
         }
         // Live's frame of each mate's connectors (part coordinates), in the mate's pick order: where a connector is
         // when its query isn't read.
@@ -9760,8 +9785,10 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     let mut mate_names: Vec<(String, String)> = Vec::new();
     let mut sub_mates: Vec<(usize, String, String)> = Vec::new();
     let mut suppressed: Vec<(String, Vec<String>)> = Vec::new();
+    let mut relations: Vec<(usize, &Value)> = Vec::new();
     for &k in &order {
         let l = &levels[k];
+        relations.extend(l.features.iter().filter(|f| f["featureType"] == "mateRelation").map(|f| (k, *f)));
         if k != 0
             && let Err(e) = placer.call("tab_create", json!({ "kind": "assembly", "name": l.tab }))
         {
@@ -9942,13 +9969,21 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             }
         }
         // The mates, between the same connectors.
-        for f in l.features.iter().filter(|f| f["btType"].as_str().is_some_and(|t| t.starts_with("BTMMate-"))) {
+        // (Width and Tangent are features of their own in live: widthMate, geometryMate.)
+        let mate_like = |t: &str| ["BTMMate-", "BTMWidthMate-", "BTMGeometryMate-"].iter().any(|p| t.starts_with(p));
+        for f in l.features.iter().filter(|f| f["btType"].as_str().is_some_and(mate_like)) {
             let name = f["name"].as_str().unwrap_or("").to_string();
             let par = |id: &str| f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == id);
-            let Some(ty) = par("mateType").and_then(|p| p["value"].as_str()).and_then(mate_type) else {
+            let ty = match f["featureType"].as_str() {
+                Some("widthMate") => Some("width"),
+                Some("geometryMate") => Some("tangent"),
+                _ => par("mateType").and_then(|p| p["value"].as_str()).and_then(mate_type),
+            };
+            let Some(ty) = ty else {
                 res.untranslated.push(format!("{name}: mate type {:?} not mapped", par("mateType").map(|p| &p["value"])));
                 continue;
             };
+            let picks = mate_picks(f, ty);
             let mut ends: Vec<Option<Value>> = Vec::new();
             // The ends live can't resolve (its dialog's red "Mate connector of <instance>"): unresolved in ours too, the
             // part left where live leaves it, not found again by live's last point (lead 11-18: asm-pattern-std's
@@ -9957,7 +9992,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             let red: Vec<&str> = live_msg["redFields"].as_array().into_iter().flatten().filter_map(Value::as_str).collect();
             // (Its tooltip's message alone, no end named: both.)
             let all_red = red.is_empty() && live_msg["message"].as_str().is_some_and(|m| m.contains("Mate cannot resolve mate connectors."));
-            for q in par("mateConnectorsQuery").and_then(|p| p["queries"].as_array()).into_iter().flatten() {
+            for q in &picks {
                 let end = (|| {
                     let id = q["featureId"].as_str()?;
                     if let Some(name) = origin_connectors.get(id) {
@@ -10042,15 +10077,19 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     c
                 }));
             }
-            let [Some(a), Some(b)] = ends.as_slice() else {
-                for q in par("mateConnectorsQuery").and_then(|p| p["queries"].as_array()).into_iter().flatten() {
+            let ends: Option<Vec<Value>> = ends.into_iter().collect();
+            let Some(ends) = ends.filter(|e| if ty == "width" { (3..=4).contains(&e.len()) } else { e.len() == 2 }) else {
+                for q in &picks {
                     let key = (l.element.clone(), q["featureId"].as_str().unwrap_or_default().to_string());
                     trace(&format!("{name}: end {} {}: path {:?}, entity {:?}", key.1, q["btType"], connectors.get(&key).map(|c| path_names(&c.0)), entities.get(&key)));
                 }
                 res.untranslated.push(format!("{name}: its connectors not translated"));
                 continue;
             };
-            let mut args = json!({ "tab": l.tab, "type": ty, "a": a, "b": b, "name": name });
+            let mut args = json!({ "tab": l.tab, "type": ty, "a": ends[0], "b": ends[1], "name": name });
+            for (key, end) in ["c", "d"].into_iter().zip(&ends[2..]) {
+                args[key] = end.clone();
+            }
             // As stored: the flip, the secondary axis's quarter turns, the offset; a parameter left out (live's UI
             // fetch) has its default, false and PLUS_X, not the dialog's choice.
             let flip = par("primaryAxisAlignment").and_then(|p| p["value"].as_bool()).unwrap_or(false);
@@ -10213,6 +10252,43 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             trace(&format!("{name}: not placed per occurrence: {e}"));
         }
     }
+    // The relations between the mates (live's mateRelation), once every part is at live's place: a relation holds its
+    // mates' values as they are when it is made.
+    let mut relation_names: Vec<(String, String)> = Vec::new();
+    for (k, f) in relations {
+        let live_name = f["name"].as_str().unwrap_or("");
+        let par = |id: &str| f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == id);
+        let Some(ty) = par("relationType").and_then(|p| p["value"].as_str()).map(str::to_lowercase) else {
+            res.untranslated.push(format!("{live_name}: no relation type"));
+            continue;
+        };
+        // (Its mates by live's names, as ours are named.)
+        let mate_name = |q: &Value| levels[k].features.iter().find(|m| m["featureId"] == q["featureId"]).and_then(|m| m["name"].as_str());
+        let mates: Vec<&str> = par("matesQuery").and_then(|p| p["queries"].as_array()).into_iter().flatten().filter_map(mate_name).collect();
+        // Screw and Rack and pinion: a length per revolution; Gear and Linear: a ratio.
+        let length = matches!(ty.as_str(), "screw" | "rack_and_pinion");
+        let ratio = par(if length { "relationLength" } else { "relationRatio" }).and_then(|p| p["expression"].as_str().map(str::to_string).or_else(|| p["value"].as_f64().map(|v| if length { format!("{v} m") } else { v.to_string() })));
+        let reverse = par("reverseDirection").is_some_and(|p| p["value"] == true);
+        let mut args = json!({ "tab": levels[k].tab, "type": ty, "mates": mates, "reverse": reverse });
+        if let Some(r) = ratio {
+            args["ratio"] = json!(r);
+        }
+        trace(&format!("relation {live_name} {args}"));
+        match placer.call("assembly_relation", args) {
+            Ok(r) => {
+                let ours = r["name"].as_str().unwrap_or("").to_string();
+                if f["suppressed"] == true
+                    && let Err(e) = placer.call("assembly_set_feature_state", json!({ "tab": levels[k].tab, "features": [ours], "suppressed": true }))
+                {
+                    res.untranslated.push(format!("{live_name}: suppressed: {e}"));
+                }
+                if k == 0 {
+                    relation_names.push((f["featureId"].as_str().unwrap_or("").to_string(), ours));
+                }
+            }
+            Err(e) => res.untranslated.push(format!("{live_name}: {e}")),
+        }
+    }
     trace("comparing");
     // Compared with live: each occurrence's place (a top-level instance by its placement, a part inside a
     // subassembly by assembly_list's occurrences; a subassembly inside another is placed by its parts), each mate's
@@ -10327,6 +10403,18 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         } else {
             let ends = mate_ends_off(&mut *placer.ctx, root, name).map(|e| format!("; {e}")).unwrap_or_default();
             res.differences.push(format!("{name}: {}, live {}{ends}", if ok { "OK".to_string() } else { format!("error ({})", m["message"].as_str().unwrap_or("")) }, live_status));
+        }
+    }
+    // The relations, counted with the mates (live's mate features too): their status against live's.
+    for (id, name) in &relation_names {
+        res.mates += 1;
+        let live_status = states[id.as_str()]["featureStatus"].as_str().unwrap_or("OK");
+        let Some(r) = after["relations"].as_array().into_iter().flatten().find(|r| r["name"] == name.as_str()) else { continue };
+        let ok = r["ok"] == true && r["inactive"] != true;
+        if ok == (live_status == "OK") {
+            res.mates_matching += 1;
+        } else {
+            res.differences.push(format!("{name}: {}, live {live_status}", if ok { "OK".to_string() } else { format!("error ({})", r["message"].as_str().unwrap_or("")) }));
         }
     }
     // Inside the subassemblies (not scored, their mates' placements are the occurrences'): ours that fail where
@@ -10655,6 +10743,22 @@ fn size_numbers(s: &str) -> Vec<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Live's Width mate (asm-cov-width's Width 1) gives assembly_mate a tab, the two width connectors, the other tab;
+    /// its Tangent (asm-cov-tangent's geometryMate) the two picked entities under the mate's id.
+    #[test]
+    fn width_and_tangent_mates_pick_as_assembly_mate() {
+        let picks = |ids: &[&str]| serde_json::json!({ "queries": ids.iter().map(|id| serde_json::json!({ "featureId": id })).collect::<Vec<_>>() });
+        let mut tab = picks(&["T1", "T2"]);
+        tab["parameterId"] = json!("tabMateConnectorsQuery");
+        let mut width = picks(&["W1", "W2"]);
+        width["parameterId"] = json!("widthMateConnectorsQuery");
+        let f = json!({ "featureType": "widthMate", "featureId": "Fw", "parameters": [tab, width] });
+        let ids = |v: Vec<Value>| v.iter().map(|q| q["featureId"].as_str().unwrap_or_default().to_string()).collect::<Vec<_>>();
+        assert_eq!(ids(mate_picks(&f, "width")), ["T1", "W1", "W2", "T2"]);
+        let f = json!({ "featureType": "geometryMate", "featureId": "Fg", "parameters": [] });
+        assert_eq!(ids(mate_picks(&f, "tangent")), ["Fg/first", "Fg/second"]);
+    }
 
     /// A Form's tool from Onshape's form library (c2-sheet-metal-forms' Form 1: the Louver at V4) is our built-in form,
     /// its configuration by our input ids; another document's Part Studio isn't one.
