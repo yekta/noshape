@@ -807,6 +807,150 @@ fn nearest_on(template: &Shape, p: DVec3) -> Option<(DVec3, DVec3)> {
     Some((q.point, f.normal_at_point(q.point).ok()?))
 }
 
+/// Planar faces of `shape` replaced by the template one at a time: the prism from each up to the template added or
+/// cut. The history records only where each face went (its pieces on the template); the other faces are found again
+/// by place.
+fn replace_by_prism(shape: &Shape, faces: &[Shape], template: &Shape) -> k::Result<k::OpResult> {
+    let failed = || k::KernelError::OperationFailed(REPLACE_FAILED.into());
+    let mut cur = shape.clone();
+    // Each face's images so far (the walls the prism shortens: their old points may lie in what it filled).
+    let mut images: Vec<Vec<u32>> = (0..shape.count(ShapeType::Face) as u32).map(|i| vec![i]).collect();
+    for face in faces {
+        let c = face.centroid()?;
+        let n = face.normal_at_point(c)?;
+        let (q, _) = nearest_on(template, c).ok_or_else(failed)?;
+        let s = (q - c).dot(n);
+        if s.abs() < 1e-9 {
+            continue;
+        }
+        // Onto a plane: the face moved there, its neighbours cut again where they meet it (a drafted pocket's walls; a
+        // prism square to the face left wedges between them: c2-replace-face-exercise).
+        let now = shape.index_of(face, ShapeType::Face).and_then(|fi| match images[fi][..] { [i] => cur.sub_shape(ShapeType::Face, i as usize).ok(), _ => None });
+        let tweaked = now.clone().zip(onto_plane(face, c, n, template)).and_then(|(f, m)| k::tweak_faces(&cur, &[f], &k::Transform::Matrix(m)).ok()).filter(|r| r.shape.count(ShapeType::Solid) == 1 && r.shape.is_valid());
+        if let Some(r) = tweaked {
+            faces_through(&mut images, &r.history, &cur, &r.shape);
+            cur = r.shape;
+            continue;
+        }
+        let onto = now.as_ref().and_then(|f| onto_cylinder(&cur, f, c, s, template));
+        if let Some([r, u]) = onto {
+            faces_through(&mut images, &r.history, &cur, &r.shape);
+            faces_through(&mut images, &u.history, &r.shape, &u.shape);
+            cur = u.shape;
+            continue;
+        }
+        let prism = k::extrude_up_to(face, if s > 0.0 { n } else { -n }, template, 0.0)?;
+        let op = if s > 0.0 { k::BooleanOp::Fuse } else { k::BooleanOp::Cut };
+        let res = k::boolean(op, std::slice::from_ref(&cur), std::slice::from_ref(&prism.shape), &k::BooleanOptions::default())?;
+        let uni = k::unify_same_domain(&res.shape)?;
+        faces_through(&mut images, &res.history, &cur, &res.shape);
+        faces_through(&mut images, &uni.history, &res.shape, &uni.shape);
+        cur = uni.shape;
+    }
+    if cur.count(ShapeType::Solid) != 1 {
+        return Err(failed());
+    }
+    let size = cur.bounding_box(false)?.diagonal().max(1e-9);
+    let on_template: Vec<u32> = cur
+        .faces()
+        .iter()
+        .enumerate()
+        .filter(|(_, g)| point_on_face(g).and_then(|p| nearest_on(template, p).map(|(q, _)| q.distance(p) < 1e-7 * size)).unwrap_or(false))
+        .map(|(i, _)| i as u32)
+        .collect();
+    let replaced: Vec<usize> = faces.iter().filter_map(|f| shape.index_of(f, ShapeType::Face)).collect();
+    let record = |fi: usize, o: u32| k::HistoryRecord { arg: 0, input_kind: ShapeType::Face, input_index: fi as u32, relation: k::Relation::Modified, output_kind: ShapeType::Face, output_index: o };
+    let records = images
+        .iter()
+        .enumerate()
+        .flat_map(|(fi, imgs)| if replaced.contains(&fi) { on_template.iter().map(|&o| record(fi, o)).collect::<Vec<_>>() } else { imgs.iter().map(|&o| record(fi, o)).collect() })
+        .collect();
+    Ok(k::OpResult { shape: cur, history: k::History { records } })
+}
+
+/// A face of `cur` moved `s` along its normal onto a cylinder template, its walls cut again where they meet it: of the
+/// pocket (boss) it ends, the part on the face's side of the cylinder filled (taken off). The Boolean and the unify
+/// after it; `None` where the template is no one cylinder or a step fails.
+fn onto_cylinder(cur: &Shape, face: &Shape, c: DVec3, s: f64, template: &Shape) -> Option<[k::OpResult; 2]> {
+    let t = if template.shape_type() == ShapeType::Face { template.clone() } else { template.faces().into_iter().next().filter(|_| template.count(ShapeType::Face) == 1)? };
+    let k::Surface::Cylinder { origin, axis, radius, .. } = t.face_surface().ok()? else { return None };
+    let fi = cur.index_of(face, ShapeType::Face)? as u32;
+    let ef = cur.edge_faces().ok()?;
+    let mut walls: BTreeSet<u32> = ef.iter().filter(|fs| fs.contains(&fi)).flatten().copied().collect();
+    walls.insert(fi);
+    // The pocket (boss) as a solid of its own: the face, its walls and a cap across their free edges (Delete face's
+    // filled part came out as the part's voids: c2-replace-face-exercise's tray, recessed under its floor).
+    let free: Vec<Shape> = ef.iter().enumerate().filter(|(_, fs)| fs.iter().filter(|f| walls.contains(f)).count() == 1).map(|(ei, _)| cur.sub_shape(ShapeType::Edge, ei).ok()).collect::<Option<_>>()?;
+    let cap = k::make_face_from_wire(&k::make_wire(&free).ok()?, true).ok()?;
+    let mut pieces: Vec<Shape> = walls.iter().map(|&i| cur.sub_shape(ShapeType::Face, i as usize).ok()).collect::<Option<_>>()?;
+    pieces.push(cap);
+    let mut region = k::sew(&pieces, 1e-6, true).ok()?.shape;
+    if region.shape_type() != ShapeType::Solid || !region.is_valid() {
+        return None;
+    }
+    if region.volume().ok()? < 0.0 {
+        region = region.reversed().ok()?;
+    }
+    let bb = cur.bounding_box(false).ok()?;
+    let size = bb.diagonal().max(1e-9);
+    let axis = axis.normalize();
+    let mid = origin + axis * ((bb.min + bb.max) * 0.5 - origin).dot(axis);
+    let cyl = k::make_cylinder(&k::Plane::from_normal(mid - axis * 4.0 * size, axis), radius, 8.0 * size, std::f64::consts::TAU).ok()?;
+    let opts = k::BooleanOptions::default();
+    let off = c - origin;
+    let side = if (off - axis * off.dot(axis)).length() < radius {
+        cyl
+    } else {
+        let world = k::make_box_corners(bb.min - DVec3::splat(size), bb.max + DVec3::splat(size)).ok()?;
+        k::boolean(k::BooleanOp::Cut, &[world], &[cyl], &opts).ok()?.shape
+    };
+    let piece = k::boolean(k::BooleanOp::Common, &[region], &[side], &opts).ok()?.shape;
+    if piece.count(ShapeType::Solid) == 0 || piece.volume().ok()? <= 0.0 {
+        return None;
+    }
+    let op = if s > 0.0 { k::BooleanOp::Fuse } else { k::BooleanOp::Cut };
+    let r = k::boolean(op, std::slice::from_ref(cur), &[piece], &opts).ok()?;
+    let u = k::unify_same_domain(&r.shape).ok()?;
+    (u.shape.count(ShapeType::Solid) == 1 && u.shape.is_valid()).then_some([r, u])
+}
+
+/// The rigid motion taking a planar face (centroid `c`, normal `n`) onto the template where the template is one plane
+/// over it; `None` otherwise.
+fn onto_plane(face: &Shape, c: DVec3, n: DVec3, template: &Shape) -> Option<DMat4> {
+    let (q, nt) = nearest_on(template, c)?;
+    let m = if nt.dot(n) < 0.0 { -nt } else { nt }.normalize();
+    let size = face.bounding_box(false).ok()?.diagonal().max(1e-9);
+    let [u0, u1, v0, v1] = face.uv_bounds().ok()?;
+    for i in 0..=2 {
+        for j in 0..=2 {
+            let p = face.point_at_uv(u0 + (u1 - u0) * i as f64 / 2.0, v0 + (v1 - v0) * j as f64 / 2.0).ok()?;
+            let (qq, nn) = nearest_on(template, p)?;
+            if ((qq - q).dot(m)).abs() > 1e-7 * size || nn.cross(m).length() > 1e-9 {
+                return None;
+            }
+        }
+    }
+    let r = glam::DQuat::from_rotation_arc(n.normalize(), m);
+    Some(DMat4::from_translation(c + m * (q - c).dot(m)) * DMat4::from_quat(r) * DMat4::from_translation(-c))
+}
+
+/// Each face's images carried through one step `from` → `to`: its Modified / Kept records, else (no record) the same
+/// face in `to`.
+fn faces_through(images: &mut [Vec<u32>], h: &k::History, from: &Shape, to: &Shape) {
+    for imgs in images.iter_mut() {
+        *imgs = imgs
+            .iter()
+            .flat_map(|&c| {
+                let m = h.modified(0, ShapeType::Face, c);
+                if !m.is_empty() || h.is_deleted(0, ShapeType::Face, c) {
+                    return m;
+                }
+                from.sub_shape(ShapeType::Face, c as usize).ok().and_then(|f| to.index_of(&f, ShapeType::Face)).map(|i| i as u32).into_iter().collect()
+            })
+            .collect();
+    }
+}
+
 fn replace_with(ev: &mut EvalCtx, bi: usize, fi_name: &Name, template: &Shape, sense: f64) -> FResult<()> {
     let feature = ev.feature;
     let body = ev.ctx.bodies[bi].clone();
@@ -852,6 +996,12 @@ fn replace_with(ev: &mut EvalCtx, bi: usize, fi_name: &Name, template: &Shape, s
     let s = (q - c).dot(n);
     if s.abs() < 1e-9 {
         return Ok(());
+    }
+    // The fillets round the face rolled again against the template (live: c2-replace-face-exercise's pocket floor,
+    // its r 12.7 mm fillets to the walls and corners rolled at the new floor).
+    let blends = super::detail_a::blends_to_reapply(&body.shape, &body.faces, &[fi], false)?;
+    if !blends.is_empty() {
+        return super::detail_a::reblend(ev, bi, &[fi], &blends, REPLACE_FAILED, |shape, fs| replace_by_prism(shape, fs, template));
     }
     let dir = if s > 0.0 { n } else { -n };
     let prism = k::extrude_up_to(&face, dir, template, 0.0).map_err(kerr("Surface to replace with needs to extend size of faces."))?;

@@ -11,34 +11,40 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   6b384aa69 + AGENT_API 2374eb6fc; P0 COMPAT-FILLET-ORIENT-REFS aa5682636 (d80c2c58e's edge turning out: OCCT's offset
   can't join turned edges; if snap-hook's axis is wanted again, orient at the point of use); screws Sweep 1 0f8993ef8
   (unify keeps a USD merge only if its new faces pass BRepCheck; follow-up: live 8 faces there, we 20). Targets removed.
-- **dx: c2-replace-face-exercise Replace face 1 (core-rf on vibex8, WIP commit 080681865 + uncommitted):** ours 89/192/108,
-  586411.92 mm3; live 85/184/104, 688437.672. The pocket floor's r 12.7 mm fillets roll again (reblend + replace_by_prism,
-  direct.rs); first try errored: the prism's Boolean/unify history wasn't carried, the shortened walls lost their images,
-  1 of the fillet edges found. Now faces_through composes it. .rf4.sh: model test replace_face, kernel delete tests,
-  rf-ops, replace-face -> ~/tmp/core/p2/<doc>-4.log: 60/132/76, 1306377 mm3 (overshoot); .rf5.sh adds NOSHAPE_RFDBG
-  eprintlns in reblend / replace_with (STRIP before land) -> ~/tmp/core/p2/rf5.log. Then suite pair (base: core-rp detached at
-  2432e6f6e, vibex7 .gof.sh base-rf -> ~/tmp/core/g/run-base-rf.log), g13, split commits, land. 34009ac98 = dx's
-  cherry-pick (drop if landed).
+- **LANDING 18:0x core-rf: c2-replace-face-exercise Replace face 1 (dx):** ERROR -> 85/184/112, 688456.9 mm3 (live
+  85/184/104, 688437.672); doc 0 -> 6/8. rounds.rs takes OCCT's free-form corner patches; Replace face rolls its fillets
+  again (reblend + replace_by_prism: onto_plane tweak, onto_cylinder = sewn pocket solid on the face's side of the
+  cylinder template, Fuse/Cut + unify). Suite vibex8 101/174 vs base: only this doc moved. Follow-up: 8 extra vertices /
+  19 mm3 in OCCT's refillet corners (5-edge vertices, asymmetric centroid); Replace face 2 builds (550.5 cm3), unchecked.
 - **dx: c2-impeller-loft Delete face 2 (622 ms vs live 12):** comes AFTER the doc's first difference (Fillet 3, blend):
   our input isn't live's. Face 33 goes onto neighbours; face 39 (x=5 plane with a bore) OCCT spends its bound and
   gives up (face left; live 65 -> 63 faces). Revisit when Fillet 3 matches. Moving by_region before OCCT broke kernel
   tests a_boss_and_a_pocket..., delete_and_offset_faces and didn't apply (face 33 has no closed region): reverted
   (diff /root/core-scratch/defeat-reorder.diff).
-- **Frame 1 (endcap, gusset, saw-table, hgr-riser):** dx's (references/ loader, dx 45ebed800). Not mine.
-- **parting-line Draft 1/2 speed (op_draft_parting_curve, shell.cpp):** ~850 ms under load (live 20): ~600 OCCT
-  Splitter of the slab by the ruled sheet, 120 Rust Boolean (succeeds). Split 3 1.6 s: 12 OCCT Face-Face (shelled
-  B-spline walls x extruded sheet).
+- **parting-line Draft 1/2 speed (PARKED 17:50):** 128 samples (main): Draft 1/2 ~760/800 ms, live 20/18 (vibex7 load ~15).
+  Fewer samples (diff /root/core-scratch/pl-samples.diff): 8 per span -> Split 3 38 edges vs 34 (10/17); 16 per span keeps
+  13/17, Split 3 1.8 s -> 0.7 s, but Draft 2 slower (bool's boolean.rust.sections_ahead 92 -> 646 ms on the 67-pole
+  sheet; told bool 17:50). Real fix is structural (no slab + Splitter by a sampled ruled sheet). Not landing.
 - **P2 SUITE-NEW-INDEX-1120-CORE (TICKETS 7066344c1):** 12 new documents' first differences (Split 2, Sweep 1 invalid,
   Constrained surface, External thread, 3x Frame 1, Rib 2, ribbed enclosure extrude remove, Projected curve 1, Thicken 1,
   Wrap 1). Not started.
 - **dx speed list (below the bar):** loft-paths-guides Loft 3, Mirror 1.
-- **core-bis core-fit1 LANDING 14:5x (c0084be13 fit spline one end, 81aff852f loft to point Coons, c548c432f Normal to
-  profile + pinched thicken, 54f6eaf00 flat fan thickens):** 20-doc A/B vs base: singularities 5 -> 8/15, cf-surface-pattern
-  Pattern 3 one edge/vertex nearer live, rest identical. bool asked: screws Sweep 1 still invalid on main: check it with
-  today's binary (cut's result or ours?).
+- **LANDED 16:01 core-bis as 6d8e63f8** (fit spline one end, loft to point Coons, Normal to profile, pinched thicken,
+  flat fan): singularities 5 -> 8/15. Target removed. screws Sweep 1 valid on main (bool: closed).
+- **blend COMPAT-RUSTZERO-FILLET1:** told blend 6b384aa69 isn't in qa's range (b2b0cf9a 09:16 first bad); of mine
+  in the range only 426922541 (part pattern seed joins in its own merge scope) changes built shapes. Blend 16:3x: none of mine (legacy
+  edge directions, minus 426922541 both still Error); blend bisects from 73470cff. Nothing for me.
+- **live's 4 option models (11-20):** c2-opt-sweep-twist-scale, c2-opt-sweep-lock-direction, c2-opt-hole-standards-ends,
+  c2-opt-pattern-skip-centred; batch 2: c2-opt-extrude-thin, c2-opt-extrude-direction-second, c2-opt-revolve-thin-up-to,
+  c2-opt-revolve-start-bound, c2-opt-loft-continuity; batch 3: c2-opt-draft-pull-refillet,
+  c2-opt-shell-outward-hole-last, c2-opt-mirror-pattern-ops (pattern REMOVE/INTERSECT consumes the seed); batch 4:
+  c2-opt-loft-periodic-trim-thin, c2-opt-intersect-sweep-loft-extrude, c2-opt-revolve-surface-add-mirror-reapply (behaviours "Feature option coverage (11-20)"). bis-ops 16:2x:
+  hole-standards-ends 9/9; pattern-skip-centred 12/13 (Circular pattern 1: our pattern logic is std's, the axis = Extrude
+  4's THROUGH_ALL REMOVE hole cylinder, ours -z live +z: frame_cylinders_toward_sketch / through-all tool's sweep);
+  sweep-twist-scale 4/7 + sweep-lock-direction 3/5: importer missed qSketchRegion(makeId(..)) and qContainsPoint of a
+  sketch's qCreatedBy edges: fixed in core-pl parity.rs (untested).
 - **bool-land7 e3078f89:** if a model result moves after it lands, tell bool.
-- **Singularity loft model / Loft 3 / Fill G0:** open item (live core q-singularity-loft-1119): core-scratch/sing
-  (model.py, loft3.py), fill/ (FILLDBG prints + crash_inputs case in core-oc, strip before any land).
+- **Singularity loft / Loft 3 / Fill G0:** open (live q-singularity-loft-1119); core-scratch/sing, fill/ (FILLDBG in core-oc).
 
 ## Earlier (11-18/19)
 - **LANDED 11-18/19:** Delete face errors when a face stays 67a475987; rib parallel 303e9d916; loft path sections

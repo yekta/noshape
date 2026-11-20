@@ -1202,6 +1202,51 @@ fn replace_face_extends_and_trims() {
     assert!(near(volume(&r, 0), mm(100.0) * mm(50.0) * mm(35.0), 1e-12));
 }
 
+/// The block with a 60 x 30 mm pocket `depth` deep from its top, its floor's edges filleted r 3 mm.
+fn filleted_pocket(depth: f64) -> Studio {
+    let mut s = block();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(20.0, 10.0), (80.0, 10.0), (80.0, 40.0), (20.0, 40.0)], true);
+    let pl = top_plane_at(&mut s, 25.0);
+    let ps = s.sketch(Reference::FeaturePlane(pl), sk);
+    let pr = s.region(ps);
+    s.add("extrude", move |p| {
+        p.set("entities", q(pr));
+        p.set("operationType", en("REMOVE"));
+        p.set("defaultScope", ParamValue::Bool(true));
+        p.set("depth", expr(&format!("{depth} mm")));
+        p.set("oppositeDirection", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let z = mm(25.0 - depth);
+    let edges: Vec<Reference> = [(50.0, 10.0), (50.0, 40.0), (20.0, 25.0), (80.0, 25.0)].iter().map(|&(x, y)| edge_near(&r, 0, DVec3::new(mm(x), mm(y), z))).collect();
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(edges));
+        p.set("radius", expr("3 mm"));
+    });
+    s
+}
+
+/// Replace face rolls the fillets round the replaced face again against the template (live: c2-replace-face-exercise's
+/// pocket floor, its fillets to the walls rolled at the new floor): as the pocket cut to the template.
+#[test]
+fn replace_face_rolls_its_fillets_again() {
+    let reference = filleted_pocket(10.0).ok();
+    let mut s = filleted_pocket(15.0);
+    let pl = top_plane_at(&mut s, 15.0);
+    let r = s.ok();
+    let faces = r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face);
+    let floor = face_at(&r, 0, DVec3::new(mm(50.0), mm(25.0), mm(10.0)));
+    s.add("replaceFace", move |p| {
+        p.set("replaceFaces", q(floor));
+        p.set("templateFace", q(Reference::FeaturePlane(pl)));
+    });
+    let r = s.ok();
+    assert!(near(volume(&r, 0), volume(&reference, 0), 1e-12), "{} vs the pocket cut to it {}", volume(&r, 0), volume(&reference, 0));
+    assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), faces, "the fillets rolled again, none added");
+    assert_eq!(cylinder_radii(&r, 0).iter().filter(|&&x| (x - mm(3.0)).abs() < 1e-9).count(), cylinder_radii(&reference, 0).iter().filter(|&&x| (x - mm(3.0)).abs() < 1e-9).count());
+}
+
 #[test]
 fn move_face_rotate_up_to_translate_and_create() {
     // Rotate the top face about its back edge by 10 degrees (tilts down to the front).
