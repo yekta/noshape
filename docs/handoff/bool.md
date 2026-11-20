@@ -42,8 +42,20 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   the rule's 8 declines fall to other reasons. Dropped: bool-sh3 5b38e5c92.
   afcf858f3 slab union history differing only in vertex records = equivalent (lead 11-19); 0d465cb70 the gate's
   end-to-end Shell check (gate-host.py SHELLS / SHELLS_KNOWN).
-- bool-k25x10 (bool-tube worktree): d2a26a12a alone on main (lead 11-20: land it ahead of sh3); gate on vibex8 once
-  pole2 (1ff271cf, queued 06:04) is in main, then land.
+- P1 isaac Gear Lab 1 (dx 11-20; gl40 = isaac-ball 8f5622, gl13 = 2d7dc1; Mac glm/, cases Mac gl/ = vibex7
+  dx-keep/gl-bool): Mac gl40 2.46 s vs live 1.15 (dx's vibex7 18 s is host load, gl13 257 ms < live 515).
+  Mirror fuse b7fab705 (two 203-face herringbone halves) declined by ours (non-manifold, 620 ms) + OCCT 810 ms.
+  bool-hat WIP fuse_glued (UNCOMMITTED, boolean.cpp): N facing face pairs on the plane matched by outline (core
+  section + 40 tooth ends, those 1e-5 rad off: on-plane by vertices), no(n) NOSHAPE_BOOL_DEBUG, the located refusal
+  only where the face across the plane is on the located face's surface (2a5681394's test). With the old refusal
+  bypassed: glued 77 ms, = OCCT (324 faces / 805 / volume), gl40 1217 ms, feature matches live. Next: probe
+  (.gl3.sh / .glp3.sh on Mac) with the new rule, kernel tests (boolean_groups located mirror test), commit on a
+  branch from main, gate, land. Then teeth fuse 5413ba32 (core + 40 teeth, ours non-manifold 44 ms, OCCT tree 460).
+- shfall swap: rec2 (vibe2 shrec, 107 cases, 32 inputs >= 1e-4) is worse than rec1 (19): swap to rec1 with
+  shswap.sh after the knurl gate (it reads the corpora).
+- bool-k25x10 (bool-tube worktree): d2a26a12a alone on main (lead 11-20: land it ahead of sh3); pole2 landed 06:49
+  (b3706f04; asm asked to re-check Fastened 43); gate running (unit bool-gate-k25x10, out
+  /root/bool-scratch/gate-k25x10.out), land on PASS.
 - bool-sh3 (origin/bool-sh3, tip a0b85fef4 = + d494b222e, a0b85fef4 (standoffs speed, below); 5b38e5c92 the 50 um rule removed; d2a26a12a the Ø25×10 knurl's touch (P2 below);
   1f27fa8ca the unify's segmented volume recheck (free-form fuse, P2 below); 8b6d6faba + Shell's stray-pcurve refit after its unify (2756e521: a 45° cone's merged
   face had an edge pcurve 0.83 mm off, read 77 mm3 heavy in ours and OCCT; now 32108.414, live 32108.426 / 45 faces (q-2756e521),
