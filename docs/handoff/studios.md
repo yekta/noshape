@@ -19,34 +19,26 @@ origin/main` first. Builds / tests on the lowest 1-min load of vibex7 / vibex8 /
 read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edited during a running sync: `touch` edited files before
 the next run. Run the full ops e2e before any drawing land. vibex8 is qa's quiet speed window 02:00-04:00 (lead 11-20):
 nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdshots-host.sh (PD_HOST=vibe2 PD_DISP=395: first free display, never skasm's :391-399). A few app runs don't take ~/bin/slot (DECISIONS 11-15).
-- Landed 06:10: 3a462952 as 8705a6ea. Queued: 5a1b564a (06:07, checking since 06:11; qa's 3 dialog tickets, brand fix,
-  configured studios in Custom table › Add and Insert view, DRW-CHOOSER-SORT, Custom table's second Esc), then
-  019a2040 (06:41, on top): VARIABLE-ROW-LABEL-VALUE, DRW-MULTI-VIEW-MENU, Custom table dialog and chooser as live
-  ct-2-add. Local, not queued: bd7d02573 (handoff), 650735871 (matrix texts, below). Mac: drawing-ui 125, clippy clean.
-- 650735871: panels list their tooltips as `texts` (a key only ours records, so steps don't compare it): the chooser's
-  title / tabs, the table picker, detail / hatch / replicate tools, Export's File name + rules link, Note's Color;
-  Replicate region's rectangle got live's "Rectangle" tooltip. The matrix maps a cell's Note panel to Table, counts
-  menus our runs opened (sheet row Move up / down) and skips live document names. Matrix 06:50 (old runs):
-  1224 = + 496 shown of 1849, 0 ≠, 87 present-only (Create Drawing 46: our old runs lack `texts`; a rerun of the
-  drw-create-drawing* takes with the new build turns them shown).
-- Still present-only, need a take or a look: Section view Depth / Offset distance; Hole callout palette's Tolerance
-  precision / Offset tips; Styles' Center / Show dimension line / Help;
-  Inspection item's Name / Diameter dimension / table note; View properties' Opposite direction / Multiple values;
-  Title block's auto / DejaVu S / Color; MBD status note; Reference manager's Version graph; Drawing properties'
-  Auxiliary; Undo / Redo / Update toolbar tips; menu rows Hide revision callouts, BOM Switch to, cell Size ▸,
-  Switch to reference.
-- b15 (06:43-07:05, vibe2 :402): drw-custom-table-add 11/11, drw-insert-view-top-1to1 9/9; ops e2e 260 ok. Look vs
-  live iv-3: as live but our search box kept its focus ring after a row click (live's focus goes to the row):
-  fixed (a press in the list focuses the editor; test). Fix-forward of b6c84b49 (coverage: the sort rows in MENUS)
-  queued 07:03 as 0c681a1c (22 commits, carries 5a1b564a / 019a2040).
-- qa 11-20 (green 0bc7e772e): 9 of 10 to-verify rows verified (6c3c0a8fe); FEEL-DRW-WHEEL-ZOOM-SLOW stays open (qa
-  re-times it 02:00-04:00).
-- Local, to land after 0c681a1c (full ops e2e first): db2a556d4 chooser focus, faaa2f80d Datum target Precision ▾
-  per distance (DatumTargetOpts::precisions, drawn by sheet.rs `basic`), 074d71889 live's release-history 120 (an
-  assembly's Release… lists its linked parts, no version icon on them; ops release::tab_items), 3639f81f8 matrix doc.
-  Ops gap to ticket: Datum targets (origin, Length / Angle, flips, precision) have no op (drawing_datum makes only
-  the feature symbol).
-- Matrix 07:25 (b16 Create Drawing takes rerun, 100/100 states): 1224 = + 531 shown of 1849, 0 ≠, 52 present-only.
+- Queued: c8ab739d (07:35, #4) carries 5a1b564a / 019a2040 / 0c681a1c (b6c84b49's fix forward: the chooser's sort
+  rows in coverage MENUS), Datum target Precision ▾ per distance (DatumTargetOpts::precisions, drawn by sheet.rs
+  `basic`), live's release-history 120 (an assembly's Release… lists its linked parts, no version icon on them; ops
+  release::tab_items; e2e), matrix doc, ticket DRW-DATUM-TARGET-OP (datum targets have no op). Ops e2e 261, drawing 259.
+- Local, not queued (land with the next batch): c80343986 the chooser's focused search box live's 1 px #3e94ff border, no
+  glow (test); 60f279179 Datum target's emptied Instance count red with "This field cannot be empty", View properties'
+  reverse button tip "Opposite direction" (+ `texts`). Mac: drawing-ui 125, clippy clean.
+- Panels list their tooltips as `texts` (a key only ours records, so steps don't compare it; ours_shown walks it).
+  Matrix 07:25: 1224 = + 531 shown of 1849, 0 ≠, 52 present-only. Most of the 52 have `texts` now but uip-merged
+  holds runs from before: rerun (new build) drw-datum-target-panel-tips drw-section-edit-depth-direction
+  drw-detail-view drw-hatch-region drw-copy-annotation-drag drw-custom-table-insert drw-export-formats
+  drw-detail-id-profile-tips drw-view-properties drw-views-shift-select-properties, copy out/*.json into uip-merged.
+- Present-only needing more than a rerun: Custom table menu (Split custom table below, Cell: the MENUDUMP test has no
+  custom table); Inspection item empty-table notes; Replicate's success toast (toasts aren't walked; our take says
+  "No annotation is available for copy" where live replicates 7/7: look); Title block "auto" / "DejaVu S" (dump
+  artefacts: CSS overflow:auto, a clipped font name); Undo / Redo / Update toolbar tips; menu rows Hide revision
+  callouts, BOM Switch to, cell Size ▸, Switch to reference; MBD status note; Reference manager's Version graph.
+- b17 (vibe2, running 07:38): app build + shots drw-insert-view-top-1to1 (focused search border vs live iv s2: crop
+  live +290+200, ours +855+470) and drw-datum-target-hide-dim (Precision ▾ vs live s5, crop live 330x700+0+80).
+- qa 11-20: 9 of 10 to-verify rows verified (6c3c0a8fe); FEEL-DRW-WHEEL-ZOOM-SLOW stays open (re-timed 02:00-04:00).
 
 ## Next, in order
 1. Lead 11-20: the drawing matrix's items not yet matching, by use (dialogs, menus, placement, rarer panels): check
