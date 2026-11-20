@@ -902,7 +902,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   tooltip on click", live/qa/dialog-tip-1119 B): shows ~40 ms after hover, fades in over ~250 ms, stays during the press (80 and
   600 ms holds), gone the first frame after release, no fade-out. (qa 11-19, green a58eee8c)
 
-- [ ] P1 **COMPARE-COMMON-PARTS-MISSING (studios)**: Versions and history › B1 › Compare (Main vs B1), Part Studio 1 tab (dot ○
+- [ ] (studios 11-20: fixed, to verify: each side regenerates in its own document, with its Variable Studio variables, Derived sources and Feature Studio custom features (walk3/r: Part Studio 1 now 6 parts on both sides, Part Studio 2 its 2); test `a_compared_side_regenerates_with_its_document`) P1 **COMPARE-COMMON-PARTS-MISSING (studios)**: Versions and history › B1 › Compare (Main vs B1), Part Studio 1 tab (dot ○
   unchanged, Features list empty; B1's Part Studio 1 = Main's, 6 parts): the graphics show only 2 of the 6 parts (a ring and the
   cone), tinted blue (base-only) at the Main end and red at the B1 end; the plate and the other 3 rings are not drawn, and zoom to
   fit frames empty space as if they were there. Live (behaviours "Compare mode graphics: the blend slider"): common geometry is
@@ -992,7 +992,6 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   qa 23:13, raised to P1: leaving that pending arc slot (Esc, then other tools) DELETES the arc: the sketch keeps only
   its centre point and a committed "Ø0" dimension with its leader (full shot walk3/dm3.png on the qa host).
 - [x] (qa 23:08: NOT A BUG, closed as = live. dx: ✓ only starts placing, the table follows the pointer until a click places it (behaviours "dx (2131)"); re-walked with a click after ✓: placed and saved ("Part 1 Drawing 1 :: Hole table"). What I read as placed was the preview; its snap is the preview's frame-corner snap) P1 **DRW-HOLE-TABLE-NOT-SAVED (dx)**: a Hole table placed with ✓ is never recorded: no history entry, and it is gone
-- [ ] (studios 11-19: as live, to verify: after ✓ the table follows the pointer and a click (or Esc) places it, live dx 2131 / drw-hole-table (a click on the sheet after ✓; behaviours 1988 "placed on ✓" is the older note); the walk closed the app before that click, so nothing was placed. The Table's leftover alignment line and ✕ after ✓ fixed, test `a_tables_alignment_line_goes_with_its_check_mark`) P1 **DRW-HOLE-TABLE-NOT-SAVED (dx)**: a Hole table placed with ✓ is never recorded: no history entry, and it is gone
   after the app is closed and the document reopened (walk3 Part 1 Drawing 1, green 624c6db77; twice: 22:58 and 23:04:40,
   the second time the app stopped 10 s after ✓). The document's microversions have "Part 1 Drawing 1 :: Note" (22:56) but
   nothing for either table; the view's A1 tag and X/Y origin arrows go too. Steps: Hole table › pick the Top view › Origin

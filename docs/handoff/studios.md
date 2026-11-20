@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-19 23:53 UTC.
+Updated 2026-11-20 00:23 UTC.
 
 ## In flight
 
@@ -18,24 +18,24 @@ tools/tiers/land.sh` (`--no-precheck` only when the code was clippy-checked unch
 origin/main` first. Builds / tests on the lowest 1-min load of vibex7 / vibex8 / vibe2 (`NOSHAPE_RB_HOST=… tools/tiers/rb.sh`;
 read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edited during a running sync: `touch` edited files before
 the next run. Run the full ops e2e before any drawing land. A few app runs don't take ~/bin/slot (DECISIONS 11-15).
-- Queued f450d0dd (23:09; CHECKING since 23:38; carries 9f21ecfb + 22d4ea61): Measure rounds 1-2, the Pro instance
-  menus (Where used… / Revision history…, no Release…), ANSI_A_MM fit precision 4, `data_value`, "Noshape Labs"
-  (run.py `LIVE_BRAND` / `noshape_names` in `normalize_live`), HISTORY-ROW-NAME-OVERLAP (115 px Name column ellipsis).
-- Committed, to land after f450d0dd (lead 11-19): 81d16ffcd (ticket + handoff), 7458597fb (lead's brand ruling:
-  "Noshape (default)" profile / mouse preset, "Noshape default / controlled" legend, "Noshape Material Library",
-  "Noshape Default BOM", "Noshape Default revision table", Noshape default release / obsoletion workflows; 24 catalog
-  rows; 3 scenarios `ours_on`; run.py maps live's wording; ops e2e 449 green, clippy clean).
-- Uncommitted: run.py drops live's company-only "Items (0)" assembly folder (live items-folder-1119; asm-menu-release
-  5/5 offline); ui_script menu rule takes a row with its shortcut ("Coincident (i)"); the Table / Hole table ✓
-  clear the alignment line + ✕ (test a_tables_alignment_line_goes_with_its_check_mark); drawing-matrix.md refreshed
-  (1108/1874 match, 3 ≠ = dump conditions); DRW-HOLE-TABLE-NOT-SAVED annotated (as live 2131: a click after ✓ places).
+- Landed f450d0dd (11-20 by 00:10: Labs brand, HISTORY-ROW-NAME-OVERLAP, Pro menus, Measure 1-2).
+- Landing 11-20 00:24: brand ruling ("Noshape (default)", legend, Material Library, Default BOM / revision table,
+  workflows), COMPARE-COMMON-PARTS-MISSING (compare_graphics::regenerate with the side's variables / Derived / custom
+  features; also the Repair panel), Table / Hole table ✓ clears the alignment line, runner rules (Items (0) folder,
+  a menu row with its shortcut, bare "Onshape" = "Noshape"), Create Drawing source "Noshape", note insert lists
+  (206 px / 26 px rows / 341 px cap; symbols 47 px; OsMenu dropdown cap counts its padding), title field editor
+  alignment, drawing-matrix.md with the new "shown" status (1210 = + 446 shown of 1874).
 
 ## Next, in order
-1. live's retakes asked 11-19 ~22:40: drw-revision-table-delete, drw-inspection-table-iso-scrolled.
-2. Lead 11-19 speed pass done: no gap >=100 ms and >=2x (drawing tab 128 ms vs live 3.2 s; back to PS 230 vs 1578 ms;
-   VS Enter 12 ms vs live rebuild 1747 ms; tab switch 23 ms vs 1.5-2.4 s; big doc 32 vs 25.5 s = 1.26x, core's regen).
-   P1 parity rows for drawings / Feature Studio: none open (audit-drawing-dataexchange D1-D18 closed).
-3. The newest qa suite log once qa runs again; then the feel rows below and the lead's queue (11-17).
+1. Lead 11-20: the drawing matrix's items not yet matching, by use (dialogs, menus, placement, rarer panels): check
+   each against our build (screenshots: /root/studios-scratch/bin/pdshots.sh <tag> <takes> on vibex8 :394 2560x1440,
+   NOSHAPE_UI_SHOTS per step; compare with live/drawing/*.png and dom dumps), fix real differences in batches, report
+   the count per land. Regenerate: `drawing_matrix.py --run <uip dir> --ours-menus <MENUDUMP>` (merged dir
+   /root/studios-scratch/uip-merged). Left at 11-20 00:23: 174 present-only (Create Drawing custom template tab,
+   Move to sheet / Replicate page chrome, small rests). Screens of b2 (14 takes) not yet compared but Create Drawing /
+   note lists / title field.
+2. live's retakes asked 11-19 ~22:40: drw-revision-table-delete, drw-inspection-table-iso-scrolled.
+3. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
 - live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell
