@@ -91,7 +91,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    "qa, 2026-11-20 (live's feel coverage rows …)": 15e785522 sketch skasm 3 / psui 1, e79906b34 studios 8, 51d079b3c asm 3 / skasm 1 / psui 2).
    Sketch rows ran as live's recordings (qa-bisect, uncommitted, suites/1120-feel-cov2; R4 inconclusive per live). Crops /root/qa-scratch/feel1120/.
    Quiet-window re-time (02:00-04:00 11-21, vibex8 was at load 21-36): FAST-OFF-CLEAR (ours 141-260 ms, live 5-7), toolbar tooltip (208-242, live 15-45), D3 drawing wheel zoom (ours 208-392 ms, live 8-23), V1 cell edit
-   (150-200 vs 46), D1 release (470 vs 10 / 767), A1 per-move draw, A2 preview draws, S1 per-move draw.
+   (150-200 vs 46), D1 release (470 vs 10 / 767), A1 per-move draw, A2 preview draws, S1 per-move draw; psui 51c01c9c first hover after a 3.5 s rest on 850efe (feel1120/psui5/abh.sh + hov.py: green vs b2b0cf9a9; 19:2x load 10 393 vs 561 ms, load 12 mixed).
 00e. skasm stack on 3fd4db71: 5 verified; FEEL-DIM-TWO-POINTS-ZERO / CHAIN-LASTPOINT / PASTE-PLACE still open. ANALYSIS-READOUT-HIDDEN
    verified 05:4x (2b3887ebe, 7/7); FEEL-DIM-PICK-READOUT (cov2-dim-orient step 8), ROLLBACK-DROP-ROW, SECTION-ARROW-FOOT: psui's next batch, on its word.
 00d. 05:00 cut GO (2a43b78b) -> v0.4.62 (published, lead 08:1x). 09:2x: studios 9/10, asm DEAD-ZONE verified, MATE-PREVIEW-COLOUR
