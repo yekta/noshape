@@ -64,6 +64,29 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   itself matches (x1.059 per notch about the pointer, exact inverse). D1's release (ours redraws once at ~470 ms, live first draw 10 ms, settled
   767 ms) is no verdict yet: recheck both on a quiet host.
 
+- [ ] P0 FEEL-ASM-DRAG-START (asm; qa 11-20 04:32, live behaviours "feel coverage (11-20)" A1 / A1b, walked on green 9ae062180 vibex8) assembly instance drag start: live takes a press + ONE move of 2-24 px, then release,
+  as a click (Part 2 <1> selected, not moved); stepped 1 px moves start a drag only with a move >= ~0.62 s after the press AND >= 15-17 px from it
+  (17 px / 1.27 s yes; 14 / 1.26, 10 / 1.0, 24 / 0.6, 16 / 0.4 no; 40 px in 0.2 s then still: no). Ours drags on any single move >= 3 px (only 2 px
+  is a click) and on every stepped pair (17/1.27 -> 12 px, 14/1.26 -> 11, 10/1.0 -> 8, 16/0.4 -> 10, 40 in 0.2 s -> 38), never selected after.
+  qa-scratch/feel1120/a1/thr2-vs-thr4.png
+- [ ] P0 FEEL-ASM-DRAG-DEAD-ZONE (asm; qa 11-20 04:32, live behaviours "feel coverage (11-20)" A1 / A1b, walked on green 9ae062180 vibex8) a dragged instance moves the FULL pointer delta from the press in live (150 px =
+  8.84 mm at 0.058965 mm/px; 17 px = 1.002 mm); ours moves 2 px less every time (148 of 150, 3 of 3; single moves d-2). After release
+  / Ctrl+Z match. qa-scratch/feel1120/a1/a1-after-0c.png
+- [ ] P0 FEEL-ASM-MATE-PREVIEW-COLOUR (asm; qa 11-20 04:32, live behaviours "feel coverage (11-20)" A2, walked on green 9ae062180 vibex8) Fastened preview: live's mate face highlight is yellow rgb(229,183,37), Part 1's
+  top edges yellow (221,187,116) and Part 2's coplanar top partly grey; ours orange rgb(229,163,34), Part 1's top edges black, Part 2's top all
+  highlight colour. Jump, ghost outline, picks, chips and Escape match. qa-scratch/feel1120/a2/prev-live-vs-ours.png (top live, bottom ours)
+- [ ] P0 FEEL-SM-PARTIAL-FLANGE-MANIP (skasm; qa 11-20 04:32, live behaviours "feel coverage (11-20)" S1, walked on green 9ae062180 vibex8) Flange edit, Partial flange: live's manipulator is a blue ring (~12 px) on the
+  flange edge with a blue arrowhead each way along it, the whole edge orange; ours one white arrow pointing one way (blue while dragged), no
+  ring, no second arrowhead, orange only on the edge part left of the flange. Drag values match (Distance 25 -> 36.8 mm over 60 px, field
+  updates live, no value box). qa-scratch/feel1120/s1/cmp-manip.png (top live, bottom ours)
+- [ ] P0 FEEL-ROLLBACK-DROP-ROW (psui; qa 11-20 04:32, live behaviours "feel coverage (11-20)" round 2 R8, walked on green 9ae062180 vibex8) rollback bar drag: live lights the row under the drop line light blue (Fillet 1);
+  ours doesn't. Pill, drop line + ring, grey old place, list not rolled, release (grey italic rows, first draw 145 ms vs live 192) match.
+  Small: the bar's "Rollback bar" tooltip sits ~33 px below the bar (live ~22) and ours shows it again right after release (live's shot none).
+  qa-scratch/feel1120/r/r8-drag-live-vs-ours.png (left live), r/r8.png, r/r8-after-live-vs-ours.png
+- [ ] P0 FEEL-SECTION-ARROW-FOOT (psui; qa 11-20 04:32, live behaviours "feel coverage (11-20)" round 2 R9, walked on green 9ae062180 vibex8) Part Studio section view: live's arrow manipulator shaft starts at the origin
+  ring; ours leaves a ~20 px gap between the ring and the shaft's foot; the cap reads paler (mean rgb(225,199,164) vs live 231,194,149; cameras
+  differ slightly, unsure). Menu item, dialog place / tabs / chip and timings match (dialog 85-250 ms, live 96-180). qa-scratch/feel1120/r/man.png (left live)
+
 ## qa, 2026-11-20
 - [ ] P2 **ORACLE-ASM-R3-TOLERANCE (asm)**: the T2 test `model/tests/oracle_asm::assemblies_match_live` fails in every
   nightly T2 since 11-14 (vibex6 ~/lead/t2-*.log; 11-20 on 5b62f6ca8) on R3 only: instance B's transform vs live's differs
