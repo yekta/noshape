@@ -5,7 +5,7 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-20 17:05 UTC)
+## State (2026-11-20 18:50 UTC)
 
 ### P0 closed: isaac drag 7-10 s/frame (v0.4.62 252 ms)
 - `big_assembly_perf::suite_assemblies_speed` on asm-isaac-ball (private copy ~/tmp/asm/speed on vibe2 / vibex7 /
@@ -14,7 +14,8 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
 - Culprit 33c176a43 (bool, bisect); bool's revert 61295b96f: drag 185 ms/frame (worst 233), bool + lead told.
 - isaac "evaluate again" 2.2 s on main vs 62.6 ms at e4bf3ee7a (v0.4.62 2.8 s; not the Ball block): bisecting
   (systemd unit asm-eval-bisect, /root/asm-scratch/eval-bisect.sh, log eval-bisect.log; worktree asm-base, build
-  vibex7 ops-bisect, isaac on vibe2; bad > 500 ms; paths = the engine crates). 16:01: b0995d8fd bad (2616 ms), 11 left.
+  vibex7 ops-bisect, isaac on vibe2; bad > 500 ms; paths = the engine crates). Bad: b0995d8fd 2616, 96aee900a 2781,
+  f7b711726 2491 ms; 18:5x measuring 3d459b517, 2 left (3d459b517, 73470cffb, 83423fa52 skasm revert, c1dbf3f03, bad5d2ecc).
 - Sparse group solve LANDED 15:25 as 011ef691 (isaac on main 14:45: drag 31 ms/frame, worst 44): `jacobian_rows` + `normal_equations` over each row's
   bodies, `BlockCholesky` (6x6 blocks, minimum degree), dragged LM steps take up to 4 second-order corrections
   (`jt_mul`, same factor), the Ball block (443952080) back with f50 out of KNOWN. isaac on the 07:26 base: 957 ->
@@ -28,8 +29,7 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   triad, dragging", live/asm/triad-click-1120): the triad sits at the click point and stays; a centre press + drag moves
   the triad alone (no value box): ours too (qa told). To check against ours: X arrow 30 px = 1.9 mm with a "1.9 mm" box
   during and after; the ring at the Z tip turns 15° about world Y through the triad's centre with a "15 deg" box.
-- dx ca70dbdfd: AssemblyView uses DocModel::assemblies; 10 assembly-ui ui_tests fail on the Mac with or without it
-  (pass on Linux): check whether macOS CI fails them too.
+- Mac 18:1x at f00b10093: assembly-ui lib 113 passed, 0 failed (the 10 Mac-only failures gone). Mac off until 21:35.
 
 ### WIP split: LANDED 16:24 as 78b3cc95
 - d9a0335d4 P0 FEEL-ASM-MATE-PREVIEW-COLOUR (asm_scene `preview_tops` peach edges 0xf7c171 / hidden 0xdcb971; picked
@@ -37,7 +37,7 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   items); 9008a18a5 P2 ASM-FACE-TAB-REFERENCE-FRAME + ASM-PATTERN-ZERO-DISTANCE-MARK; 8000528e0 parity translator
   (Derived chains, composites) + `suite_assembly_open_profile`. Tickets marked. asm-mass / asm-wip-0815: superseded.
 
-### Parity translator: Width / Tangent / relations + Tangent flip (2 commits on asm-split; landing 17:0x)
+### Parity translator: Width / Tangent / relations + Tangent flip: LANDED 17:35 as eb4fadd8
 - cov3 with ops-wtr: width 1/1, screw 2/2 as live; tangent moved both parts (4.7 / 6.3 mm): a Tangent's flip was taken
   inverted by assembly_mate (model flag = its flip alone, as the dialog) and a new one defaulted from the connectors'
   Z axes; fixed (op, list, app default unflipped = live flipAlignment false), e2e a_tangent_mate_lays_a_pin_on_the_face_unless_flipped.
@@ -51,12 +51,15 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   worktree asm-wb, B ops-wtr; vibe2 ~/agents/asm-keep/suite/{rwb,rwtr}.log).
 
 ### Next, in order
-1. The translator commit above, its runs, land. 2. The evaluate-again culprit (bisect) to its owner / fix.
+1. rel-ab A/B (rwb 8/9 at 18:1x: clamp 27/32/14 all, gearbox 23/20/8, infento 162/167 200/203, isaac 118/120 86/129
+   60/62, linear-limits, linear-relations, rack-pinion, robot 139 11 36/42): compare rwtr; ops-wtr predates the Tangent
+   flip fix (scissor's Tangent: rerun on main). 2. The evaluate-again culprit (bisect) to its owner / fix.
 3. Our triad value boxes against live: X arrow 30 px = 1.9 mm with a "1.9 mm" box during and after; the ring at the
    Z tip turns 15° about world Y through the triad's centre with a "15 deg" box.
 4. bool: re-check isaac Fastened 43 on main after pole2 b3706f04 (traced isaac run, tell bool if it still differs).
 5. infento composites / scissor from the -comp runs (vibex7 ~/agents/asm-keep/{infento,scissor}-comp.out).
-6. macOS CI: the 10 assembly-ui ui_tests that fail on the Mac (pass on Linux).
+6. Feel: all asm rows = (18:4x); 61e3da3ef closed the stale drag-start ≠ row. Left ≈: connector dot reach 47.5 vs
+   live ±48 / ±49–50 (captures disagree). studios writes the untested asm rows' tests: coordinate first.
 
 ### Landed today (702c9878: Display states Esc, driver-mate named position, paste; d671313d; 335f8e43; 9f52415c; 123ca4b3 free drag)
 - LOD (91478e2c), Derived mirror of an assembly complete (e87a2b3e, 17c26dc1; left: live's exact node icon, symmetry
