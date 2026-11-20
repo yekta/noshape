@@ -1130,7 +1130,8 @@ impl AssemblyView {
         o.xray_tops = self.placing.iter().flatten().copied().collect();
         // So does the part a mate's preview moves (live feel cov-1120 A2: a Fastened block sunk into the other, its
         // edges a thin amber box through it).
-        o.xray_tops.extend(self.mate_preview_top(cx));
+        o.preview_tops.extend(self.mate_preview_top(cx));
+        o.xray_tops.extend(o.preview_tops.iter().copied());
         o.tangent_edges = self.ui.tangent_edges;
         o.graphics = self.ui.graphics;
         o.software = self.gpu.is_software();

@@ -117,6 +117,7 @@ fn highlight_stroke(base: vec3<f32>, st: u32) -> vec3<f32> {
     if ((st & ACCENT) != 0u) { c = mix(c, g.accent.rgb, 0.55); }
     if ((st & SELECTED) != 0u) { c = g.select.rgb; }
     if ((st & HOVER) != 0u) { c = g.hover.rgb; }
+    if ((st & (PICKED | OUTLINE)) == (PICKED | OUTLINE)) { c = PICKED_OUTLINE; }
     if ((st & QUERY) != 0u) { c = QUERY_COLOR; }
     return c;
 }
@@ -134,6 +135,8 @@ const FACE_SELECTED: vec3<f32> = vec3<f32>(0.887, 0.414, 0.018);
 const BODY_SELECTED: vec3<f32> = vec3<f32>(1.0, 0.536, 0.074);
 // A face a mate dialog picked (state PICKED): live (229,183,37) on the top face where FACE_SELECTED reads (229,163,34).
 const FACE_PICKED: vec3<f32> = vec3<f32>(0.887, 0.534, 0.021);
+// Its boundary (state PICKED | OUTLINE on the edges): live #FFC20E (qa asm-mate-preview-0bc7: (255,194,14)).
+const PICKED_OUTLINE: vec3<f32> = vec3<f32>(1.0, 0.5395, 0.0044);
 const BODY_OUTLINE: vec3<f32> = vec3<f32>(1.0, 0.527, 0.073);
 
 // ---------------------------------------------------------------- background

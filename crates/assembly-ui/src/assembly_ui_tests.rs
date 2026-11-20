@@ -3019,6 +3019,14 @@ fn a_mate_previews_moving_part_shows_its_edges_through_the_others(cx: &mut TestA
         let other = instance(v, "Part 2 <1>", cx);
         assert_eq!(faces(picked, other), 1, "the other part's picked face yellow");
         assert_eq!(faces(selected, moving), 0, "the moving part not filled");
+        // (qa asm-mate-preview-0bc7: the picked face's boundary #FFC20E (PICKED | OUTLINE), none of the moving part's
+        // edges lit; its edges peach in view and through the others.)
+        let (lit, outline) = (noshape_render::state::HOVER | noshape_render::state::SELECTED, noshape_render::state::PICKED | noshape_render::state::OUTLINE);
+        let edges = |top: InstanceId, flag: u32| built.picks.edges_of(top).into_iter().filter(|id| scene.states[*id as usize] & flag != 0).map(|id| (id, scene.states[id as usize])).collect::<Vec<_>>();
+        assert_eq!(edges(moving, lit), vec![], "the moving part's edges unlit");
+        let ring = edges(other, noshape_render::state::OUTLINE);
+        assert!(!ring.is_empty() && ring.iter().all(|(_, s)| s & outline == outline), "the picked cap's circle outlined #FFC20E: {ring:?}");
+        assert_eq!(v.scene_options(cx).preview_tops, std::collections::HashSet::from([moving]));
     });
 }
 
