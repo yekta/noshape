@@ -50,12 +50,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   but brings the whole car, 220/612/408, 2652444.77 mm³; downstream 3D fit spline 1 / 2 "Select at least two vertices…",
   Curve 1 a sheet (live a wire), Ruled surface 1 now "Only sketch and face edges can be used…" (built before). Same in v0.4.61
   and 5b62f6ca (compat SAME). Evidence: qa-scratch/suites/1119-1302-291c74b0/models.log (feature 5 on).
-- [ ] P1 **SINGULARITIES-SKETCH2-UNSOLVED (core)**: corpus c2-surf-workshop-singularities (compat vs v0.4.61). Live: Sketch 2
-  OK (its PIERCE constraint on edge JGJ of Mirror 3's sheet JGD, refs.jsonl), 5 parts at the end. Ours since green 624c6db7
+- [x] (core a2e7c966: Sketch 2 solves again) **P1 SINGULARITIES-SKETCH2-UNSOLVED (core)**: corpus c2-surf-workshop-singularities (compat vs v0.4.61). Live: Sketch 2
+  OK (its PIERCE constraint on edge JGJ of Mirror 3's sheet JGD, refs.jsonl), 3 parts at the end (live.jsonl #14: Base part and
+  Problem loft sheets, Part 1 a 10-face solid of 31 142.6 mm³; v0.4.61's 5 parts were its own, not live's). Ours since green 624c6db7
   (11-19 22:50; e61f91fe 22:14 OK): Sketch 2 "Sketch could not be solved.", Mirror 2 "Boolean resulted in no geometry change",
   2 parts (Part 1, Part 2, Surface 1 gone). Range e61f91fe..624c6db7 has one modelling change before Sketch 2: core 4a52a26bb
   (a mirrored surface joins the surfaces it touches; Mirror 3 one 2-face sheet), so the pierced edge likely no longer
   resolves. Not bisected. Still in 5b62f6ca. Evidence: qa-scratch/compat/38e72d88.txt.
+  core 11-20: the edge kept its place once joined (a2e7c966). Mirror 2's "no geometry change" is right for its input: it
+  mirrors "Loft with bad singularity"'s body, which ours can't build yet, so qa's saved copy points it at Extrude 1's sheet,
+  already mirrored by Mirror 3 into one sheet as live. Ours ends with 2 solids (the 10-face one as live's, 40 169 mm³) until
+  that loft builds: core's own open item (live core q-singularity-loft-1119).
 - [ ] P0 **SKETCH-DIM-PLACE-CLICK-SELECTS (skasm; user case "#variable in a sketch dimension")**: ui-parity
   sketch-dimension-variable (Top sketch, rectangle (60,0)-(90,20), Esc, d, click the line at (75,0), click (75,-8) to place,
   type "#width", Enter). Live (live2's 11-19 retake): the second click places the dimension (selection 0) and its box takes
