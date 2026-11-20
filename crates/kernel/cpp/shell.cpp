@@ -11504,8 +11504,29 @@ OpOut op_draft_parting_curve(const OcShape& solid_in, const OcShapeList& faces_i
           prm->SetValue(k + 1, t);
         }
       };
-      const double ext = closed || c->IsPeriodic() ? 0.0 : 0.1 * (b - a);
-      double       lo = a - ext, hi = b + ext;
+      // Only at an end no other parting edge goes on from: two pieces of one closed curve (a saddle's) run on into each
+      // other and the sewn sheet folds.
+      auto free_end = [&](const TopoDS_Vertex& v) {
+        for (TopExp_Explorer y(f, TopAbs_EDGE); y.More(); y.Next())
+        {
+          if (y.Current().IsSame(e))
+            continue;
+          bool other = false;
+          for (const TopoDS_Shape& pe : edges.items)
+            other |= pe.IsSame(y.Current());
+          if (!other)
+            continue;
+          for (TopExp_Explorer w(y.Current(), TopAbs_VERTEX); w.More(); w.Next())
+            if (w.Current().IsSame(v))
+              return false;
+        }
+        return true;
+      };
+      TopoDS_Vertex vf, vl;
+      TopExp::Vertices(TopoDS::Edge(e.Oriented(TopAbs_FORWARD)), vf, vl);
+      const bool   ring = !vf.IsNull() && vf.IsSame(vl);
+      const double ext  = closed || ring || c->IsPeriodic() ? 0.0 : 0.1 * (b - a);
+      double       lo = vf.IsNull() || free_end(vf) ? a - ext : a, hi = vl.IsNull() || free_end(vl) ? b + ext : b;
       try
       {
         sample(lo, hi);
