@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 06:07 UTC.
+Updated 2026-11-20 06:41 UTC.
 
 ## In flight
 
@@ -19,13 +19,17 @@ origin/main` first. Builds / tests on the lowest 1-min load of vibex7 / vibex8 /
 read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edited during a running sync: `touch` edited files before
 the next run. Run the full ops e2e before any drawing land. vibex8 is qa's quiet speed window 02:00-04:00 (lead 11-20):
 nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdshots-host.sh (PD_HOST=vibe2 PD_DISP=395). A few app runs don't take ~/bin/slot (DECISIONS 11-15).
-- Queued 11-20 06:07: 5a1b564a (27 commits, one result): 3a462952's 9 (b4-b12; DOCS-CRUMB-TOOLTIP's id-keyed
-  tooltip gate in vendor gpui, VER-COMPARE-READOUT, Compare zooms to fit, 8 feel P0s), qa's 3 dialog tickets, the
-  brand fix, configured studios in Custom table › Add and Insert view, DRW-CHOOSER-SORT, Custom table's second Esc.
-  Mac: drawing-ui lib 123, clippy clean, ops e2e 260/260 (before the chooser commits, which touch drawing-ui only).
-  When landed: tell psui the vendor gpui gate change (`Window::tooltip_released_on(id)` /
-  `set_tooltip_released_on(bounds, id)`, test a_clicked_crumb_turned_title_shows_its_tooltip) and the gpui-base
-  editor patches (close_brace_outdent, select_line, wheel step); report to the lead.
+- Landed 06:10: 3a462952 as 8705a6ea (psui told about the vendor gpui tooltip gate + gpui-base editor patches).
+  Queued 06:07 5a1b564a (qa's 3 dialog tickets, brand fix, configured studios in Custom table › Add and Insert view,
+  DRW-CHOOSER-SORT, Custom table's second Esc), then 06:41 019a2040 on top (18 commits): VARIABLE-ROW-LABEL-VALUE
+  (interaction.rs display_name_computed: `shown(id)` first; feature_dialog::shown_length picks the dim by param),
+  DRW-MULTI-VIEW-MENU (drawing_move_sheet multi_view_entries), the Custom table dialog and drawing chooser as live
+  ct-2-add (26 px Add/Insert with a blue foot when open, table-insert icon, 13.33 px lists, corners 26 px / 52 pitch,
+  30 px title + tabs, thin × and chevrons, doc block in 30 px, 30 px search box). Mac: drawing-ui 125, clippy clean.
+  Lead report at 06:08 said "78 present-only": the real count is 114 (correct it in the next report).
+- Not yet shot: 5caea450d (chooser doc block, chevrons). Next: b15 on vibe2 :395 (drw-custom-table-add,
+  drw-insert-view-top-1to1) against live ct-2-add / uip drw-insert-view-top-1to1-3; our search box's 2 px focus ring
+  vs live's 1 px blue border is still open.
 - b12 shots (vibe2 :395) against live: export-pdf-bw dialog within 2 px; ver-compare's fit shows the same 42 mm of
   height as live's (ours has a taller viewport); drw-custom-table-add 10/10 states after the Esc fix (the app needed a
   third Esc: cancel() took insert.chooser but left the studio picker).
