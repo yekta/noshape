@@ -36,6 +36,15 @@ impl DrawingEditor {
             return Vec::new();
         }
         let view = a.kind.view();
+        // A hole callout: every hole it counts, the circles of its size at their centres (live drw-hcallout-fit 12).
+        let holes = match &a.kind {
+            noshape_model::drawing::AnnotationKind::HoleCallout { radius, .. } => Some((*radius, noshape_model::drawing::build::hole_callout_centers(&self.drawing, self.current_sheet(), &self.sources, a))),
+            _ => None,
+        };
+        let counted = |me: &ModelEdge| {
+            let (Some((r, centers)), noshape_model::drawing::views::EdgeGeom::Circle { center, radius, .. }) = (&holes, &me.geom) else { return false };
+            (radius - r).abs() <= r * 1e-3 + 1e-7 && centers.iter().any(|c| (c[0] - center[0]).hypot(c[1] - center[1]) <= r * 1e-3 + 1e-7)
+        };
         b.picks
             .iter()
             .enumerate()
@@ -46,7 +55,7 @@ impl DrawingEditor {
                 }
                 let g = self.geoms.get(v)?;
                 let me = g.model_edges.get(g.edges.get(*edge as usize)?.model? as usize)?;
-                a.refs.iter().any(|r| edge_matches(me, &r.point)).then_some(i as u32)
+                (a.refs.iter().any(|r| edge_matches(me, &r.point)) || counted(me)).then_some(i as u32)
             })
             .collect()
     }
@@ -179,6 +188,41 @@ impl DrawingEditor {
         }
         if !grips.points.is_empty() {
             scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&grips))).per_primitive_color().unpickable().layer(23));
+        }
+    }
+
+    /// A hole table's selected cells (live drw-hole-table-cell-panel 13): their holes' circles and centre marks light
+    /// blue at 3 px, their tags on a light blue box.
+    pub fn push_hole_cell_looks(&self, scene: &mut Scene) {
+        use noshape_model::drawing::font;
+        use noshape_render::MeshData;
+        let Some(b) = &self.built else { return };
+        let (picks, texts) = self.hole_cells_lit();
+        if picks.is_empty() && texts.is_empty() {
+            return;
+        }
+        let up = self.gpu.uploader();
+        let mut lines = LineData::default();
+        for l in b.geometry.lines.iter().filter(|l| picks.contains(&l.pick)) {
+            for w in l.points.windows(2) {
+                lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width: LIT_LINE_PX, style: LineSegment::ON_TOP });
+            }
+        }
+        if !lines.segments.is_empty() {
+            scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
+        }
+        let mut boxes = MeshData::default();
+        for t in texts.iter().filter_map(|i| b.geometry.texts.get(*i)) {
+            let base = boxes.positions.len() as u32;
+            for p in font::text_box(t) {
+                boxes.positions.push([p[0] as f32, p[1] as f32, -0.5]);
+                boxes.normals.push([0.0, 0.0, 1.0]);
+                boxes.pick_ids.push(0);
+            }
+            boxes.indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
+        }
+        if !boxes.indices.is_empty() {
+            scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&boxes))).with_color(crate::theme::lin(0x90cef1)).unlit().unpickable().layer(-4));
         }
     }
 

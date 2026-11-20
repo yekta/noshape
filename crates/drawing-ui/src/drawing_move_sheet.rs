@@ -252,7 +252,7 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    fn dialog_header(title: &'static str, ok_on: bool, ok: impl Fn(&mut Self, &mut Context<Self>) + 'static, cancel: impl Fn(&mut Self, &mut Context<Self>) + 'static, ids: (&'static str, &'static str), cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn dialog_header(title: &'static str, ok_on: bool, ok: impl Fn(&mut Self, &mut Context<Self>) + 'static, cancel: impl Fn(&mut Self, &mut Context<Self>) + 'static, ids: (&'static str, &'static str), cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         h_flex()
             .h(px(28.))
@@ -309,6 +309,7 @@ impl DrawingEditor {
                 .text_color(gpui_kit::rgb(0x333333))
                 .text_size(px(12.))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(Self::dialog_header("Move to sheet", moves, |t, cx| t.accept_move_sheet(cx), |t, cx| {
                     t.move_sheet = None;
@@ -365,6 +366,7 @@ impl DrawingEditor {
                 .text_color(ink)
                 .text_size(px(12.))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(Self::dialog_header("Table properties", true, |t, cx| t.close_table_props(true, cx), |t, cx| t.close_table_props(false, cx), ("tp-ok", "tp-close"), cx))
                 .child(div().pl(px(11.)).pt(px(14.)).h(px(34.)).text_size(px(13.33)).child("Select fixed corner"))

@@ -1274,8 +1274,9 @@ impl DrawingEditor {
                 self.apply_hole_table_dlg(&mut table);
                 self.edit_sheet(name, cx, |s| s.tables.push(table));
                 self.tool = Tool::Select;
-                // Placed, not selected (live: a new BOM table isn't drawn orange, drw-bom-table).
-                self.selection.clear();
+                // A hole table is left selected, its grips shown (live drw-hole-table-properties 5); others placed
+                // unselected (live: a new BOM table isn't drawn orange, drw-bom-table).
+                self.selection = if kind == TableTool::Hole { vec![Sel::Table(id)] } else { Vec::new() };
             }
             Tool::Datum { anchor: None } => {
                 // On a GD&T frame edge or a dimension's lines (the red
@@ -2066,6 +2067,7 @@ impl DrawingEditor {
             .shadow(crate::drawing_chrome::dialog_shadow())
             .text_color(rgb(0x333333))
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .on_mouse_move(cx.listener(Self::pointer_off_sheet))
             .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_click(|_, _, cx| cx.stop_propagation())
             .capture_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {

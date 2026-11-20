@@ -81,32 +81,7 @@ impl DrawingEditor {
             }
             Panel::Datum { .. } | Panel::SurfaceFinish { .. } | Panel::Cell { .. } | Panel::SheetName { .. } | Panel::Rotation { .. } => self.extra_panel_rows(cx)?,
             Panel::BrokenOut { .. } | Panel::CellFormat { .. } | Panel::CellResize { .. } | Panel::DatumTarget { .. } => self.more_panel_rows(cx)?,
-            Panel::ImageProps { rows, tab } => {
-                let tab = *tab;
-                // Its texts for the ui-parity runner (live behaviours: Document, Workspace, Reference with its "In
-                // progress" chip, Sheet).
-                crate::ui_script::note_dialog(|| {
-                    let mut text = vec!["Image properties".to_string()];
-                    for (k, v) in rows {
-                        text.push(k.to_string());
-                        text.extend(v.split("  ").map(str::to_string));
-                    }
-                    serde_json::json!({ "kind": "drawing-panel", "title": "Image properties", "text": text })
-                });
-                let rows = rows
-                    .iter()
-                    .map(|(k, val)| {
-                        let value = div().text_xs().child(val.clone());
-                        // The Reference: a link to the image tab.
-                        let value = match (k, tab) {
-                            (&"Reference", Some(t)) => value.id("dr-image-ref").text_color(pal.accent).cursor_pointer().on_click(move |_, w, cx| crate::actions::request_activate_tab(t, w, cx)).into_any_element(),
-                            _ => value.into_any_element(),
-                        };
-                        h_flex().gap_2().child(div().w(px(90.)).text_xs().text_color(pal.text_muted).child(*k)).child(value).into_any_element()
-                    })
-                    .collect();
-                ("Image properties", rows)
-            }
+            Panel::ImageProps { .. } => return self.render_image_props(cx),
             Panel::TitleBlock { inputs } => (
                 "Title block (fields like {part.name}, {sheet.scale} allowed)",
                 inputs
@@ -150,6 +125,7 @@ impl DrawingEditor {
                 .text_sm()
                 .text_color(pal.text)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(
                     h_flex()
@@ -205,6 +181,7 @@ impl DrawingEditor {
                 .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(gpui_kit::rgb(0x333333))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(
                     h_flex()

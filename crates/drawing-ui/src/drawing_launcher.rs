@@ -117,6 +117,7 @@ impl DrawingEditor {
                 .occlude()
                 .child(crate::assets::icon("dim-palette-launcher", SIZE, cx))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                     this.launcher.hover = None;
                     open(this, window, cx)

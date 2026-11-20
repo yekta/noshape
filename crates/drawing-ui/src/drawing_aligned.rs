@@ -201,8 +201,9 @@ impl DrawingEditor {
         };
         let ink = gpui_kit::rgb(0x333333);
         let caption = gpui_kit::rgb(0x616b73);
-        // A query row: its caption, then "Point ×" once picked; the next one
-        // to pick is active (blue underline), later ones disabled.
+        // A query box (live drw-aligned-section-edit 3 / 10): 194 px, white with a #ddd border, the active one #dbf1fa
+        // with a #1b5faa border; empty 26 px with its caption as grey text, picked 47 px with the caption small over
+        // "Point" and a grey ×.
         let repick = d.repick;
         let query = |id: &'static str, title: &'static str, k: usize, cx: &mut Context<Self>| {
             // Editing: a click re-picks the point (the row turns active).
@@ -217,14 +218,18 @@ impl DrawingEditor {
                         cx.notify();
                     }))
                 })
-                .mt(px(4.))
-                .px(px(4.))
-                .pb(px(3.))
-                .border_b_1()
-                .border_color(if active { pal.accent } else { gpui_kit::rgb(0xdddddd) })
-                .when(!done && !active, |e| e.opacity(0.45))
-                .child(div().text_size(px(11.)).text_color(caption).child(title))
-                .when(done, |e| e.child(h_flex().gap(px(4.)).child(div().px(px(5.)).rounded(px(2.)).bg(gpui_kit::rgb(0xe5ebf0)).text_size(px(12.)).text_color(ink).child("Point ×"))))
+                .w(px(194.))
+                .h(px(if done { 47. } else { 26. }))
+                .px(px(6.))
+                .justify_center()
+                .border_1()
+                .border_color(gpui_kit::rgb(if active { 0x1b5faa } else { 0xdddddd }))
+                .bg(gpui_kit::rgb(if active { 0xdbf1fa } else { 0xffffff }))
+                .when(!done, |e| e.child(div().text_size(px(12.)).text_color(caption).child(title)))
+                .when(done, |e| {
+                    e.child(div().text_size(px(10.)).text_color(caption).child(title))
+                        .child(h_flex().pt(px(2.)).child(div().flex_1().text_size(px(13.33)).text_color(ink).child("Point")).child(div().text_size(px(14.)).text_color(gpui_kit::rgb(0x999999)).child("×")))
+                })
                 .into_any_element()
         };
         let (check_on, flipped) = (d.cut_only, d.flip);
@@ -259,6 +264,7 @@ impl DrawingEditor {
                 .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(pal.text)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(
                     h_flex()
@@ -300,18 +306,20 @@ impl DrawingEditor {
                 .child(
                     v_flex()
                         .p(px(3.))
-                        .child(div().mt(px(1.)).h(px(25.)).flex().items_end().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).child(Input::new(&d.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small()))
+                        .gap(px(6.))
+                        .child(div().mt(px(1.)).mb(px(1.)).h(px(25.)).flex().items_end().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).child(Input::new(&d.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small()))
                         .child(query("da-center", "Center", 0, cx))
                         .child(
                             h_flex()
-                                .child(div().flex_1().child(query("da-viewing", "Viewing plane location", 1, cx)))
+                                .items_start()
+                                .gap(px(3.))
+                                .child(query("da-viewing", "Viewing plane location", 1, cx))
                                 // Flip: the view looks the other way (help
                                 // aligned_section_view).
                                 .child(
                                     div()
                                         .id("da-flip")
-                                        .size(px(24.))
-                                        .mt(px(6.))
+                                        .size(px(26.))
                                         .flex()
                                         .items_center()
                                         .justify_center()

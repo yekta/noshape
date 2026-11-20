@@ -202,7 +202,7 @@
     ]
    },
    "ours_on": {
-    "dropdown": "Fit class"
+    "dropdown": "Fit type"
    }
   },
   {
@@ -219,7 +219,7 @@
     ]
    },
    "ours_on": {
-    "dropdown": "Fit class"
+    "dropdown": "Fit type"
    }
   },
   {

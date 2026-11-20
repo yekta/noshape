@@ -358,7 +358,11 @@ impl DrawingEditor {
                 .child(label)
                 // Live dom/drawing-edit-section: each mode's tooltip.
                 .tooltip(crate::ui::tooltip(["Vertical cut line", "Horizontal cut line", "Angular cut line"][m as usize % 3]))
-                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_section_mode(m, cx)))
+                // The label field gives up its focus (live drw-section-view 2: "A" no longer selected).
+                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                    window.focus(&this.focus, cx);
+                    this.set_section_mode(m, cx)
+                }))
         };
         let label_value = d.label.read(cx).value().to_string();
         crate::ui_script::note_dialog(|| {
@@ -415,6 +419,7 @@ impl DrawingEditor {
                 .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(pal.text)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(
                     h_flex()

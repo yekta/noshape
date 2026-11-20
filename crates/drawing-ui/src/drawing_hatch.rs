@@ -500,11 +500,12 @@ impl DrawingEditor {
                 .border_b_1()
                 .border_color(gpui_kit::rgb(RULE))
                 .dropdown_caret(true)
-                .child(h_flex().gap(px(4.)).when(!none, |h| h.child(crate::ui::glyph(&hatch_pat::icon_name(standard, pattern), 16., ink))).child(div().text_size(px(11.5)).text_color(ink).child(pat)))
+                .child(div().text_size(px(12.)).text_color(ink).child(pat))
                 .os_dropdown_menu("hd-pattern-dd", true, move |mut m, _, _| {
                     // 2 px wider than the field, 30 px rows, 1 px under it, at most 341 px tall, then it scrolls; low in the
                     // window it opens above the field (live2 hatch-list-1118).
-                    m = m.select_list(190.).truncate_labels().row_height(30.).max_height(341., 1.);
+                    // Its names 12 px, 36 px in (live drw-hatch-panel 10: "ANSI31 general (drawing)" whole).
+                    m = m.select_list(190.).truncate_labels().row_height(30.).text_px(12.).text_inset(36.).max_height(341., 1.);
                     // Edit hatch section...: General starts with None (live (4)).
                     if section_mode && standard == 2 {
                         let e = ed.clone();
@@ -521,23 +522,34 @@ impl DrawingEditor {
             crate::ui_script::wrap(field.child(btn).into_any_element(), || "dropdown:Pattern".into())
         };
         // Scale / Angle: editable boxes with a list.
+        // Their lists open under the whole field, as wide, 26 px rows of 12 px text with a ✓ on the current value,
+        // scrolling past 203 px (live drw-hatch-panel 14 / 18).
         let combo = |id: &'static str, name: &'static str, input: &Entity<InputState>, items: Vec<String>| -> AnyElement {
             let current = input.read(cx).value().to_string();
             let (ed, input2) = (ed.clone(), input.clone());
+            let field = std::rc::Rc::new(std::cell::Cell::new(Bounds::<Pixels>::default()));
+            let probe = field.clone();
             h_flex()
                 .w(px(188.))
+                .relative()
                 .border_b_1()
                 .border_color(gpui_kit::rgb(RULE))
+                .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
                 .child(div().flex_1().child(Input::new(input).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall()))
-                .child(crate::ui_script::wrap(Button::new(id).ghost().xsmall().dropdown_caret(true).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
-                    for v in &items {
-                        let (e, st, v) = (ed.clone(), input2.clone(), v.clone());
-                        m = m.item(crate::os_menu::OsMenuItem::new(v.clone()).checked(current == v).on_click(move |_, window, cx| {
-                            st.update(cx, |s, cx| s.set_value(v.clone(), window, cx));
-                            e.update(cx, |t, cx| t.hatch_preview(cx));
-                        }));
-                    }
-                    m
+                .child(crate::ui_script::wrap(Button::new(id).ghost().xsmall().dropdown_caret(true).on_click(move |_, window, cx| {
+                    let (items, current, ed, input2, b) = (items.clone(), current.clone(), ed.clone(), input2.clone(), field.get());
+                    let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+                        m = m.min_width(f32::from(b.size.width) + 2.).row_height(26.).text_px(12.).max_height(203., 1.);
+                        for v in &items {
+                            let (e, st, v) = (ed.clone(), input2.clone(), v.clone());
+                            m = m.item(crate::os_menu::OsMenuItem::new(v.clone()).checked(current == v).on_click(move |_, window, cx| {
+                                st.update(cx, |s, cx| s.set_value(v.clone(), window, cx));
+                                e.update(cx, |t, cx| t.hatch_preview(cx));
+                            }));
+                        }
+                        m
+                    });
+                    crate::os_menu::open_anchored(point(b.origin.x - px(1.), b.origin.y + b.size.height + px(1.)), Anchor::TopLeft, menu, window, cx);
                 }).into_any_element(), move || format!("dropdown:{name}")))
                 .into_any_element()
         };
@@ -638,6 +650,7 @@ impl DrawingEditor {
                 .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(ink)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(
                     h_flex()

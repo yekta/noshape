@@ -550,7 +550,7 @@ impl DrawingEditor {
             .into_any_element()
         };
         let menu = |id: &'static str, label: AnyElement, w: f32, items: Vec<(String, bool, Act)>| combo(id, label, w, 28., items);
-        let menu_tall = |id: &'static str, label: AnyElement, w: f32, items: Vec<(String, bool, Act)>| combo(id, label, w, 54., items);
+        let menu_tall = |id: &'static str, label: AnyElement, w: f32, h: f32, items: Vec<(String, bool, Act)>| combo(id, label, w, h, items);
         let small = |s: String| div().text_size(px(12.)).text_color(ink).child(s).into_any_element();
         // Units (D34): the drawing's entry "… (Drawing)" in the list.
         let mut unit_items: Vec<(String, bool, Act)> = DimUnits::ALL.iter().map(|&u| (u.name().to_string(), units == Some(u), std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.units = Some(u)) as Act)).collect();
@@ -667,6 +667,8 @@ impl DrawingEditor {
             if du.symbol().is_empty() { "(ft-in)".to_string() } else { format!("({})", du.symbol()) }
         };
         // The middle row.
+        // Under Override, the selected value as shown (live drw-hcallout-fit: the Precision combo reads ".197").
+        let mut hole_value = String::new();
         let middle = if hole {
             let n = noshape_model::drawing::build::hole_callout_count(sheet, &self.sources, &d.cur).unwrap_or(1);
             let eff = d.annotation();
@@ -675,6 +677,7 @@ impl DrawingEditor {
             let sel = opts.override_tol.then_some(d.hole_sel);
             let mut preview = Vec::new();
             let lines = noshape_model::drawing::build::hole_callout_preview(&self.drawing, sheet, &self.sources, &core).unwrap_or_default();
+            hole_value = lines.iter().flatten().find(|r| r.1 == Some(d.hole_sel)).map(|r| r.0.clone()).unwrap_or_default();
             // Live's recorder (2026-11-15.1, live drw-hole-callout-palette): the palette's fields, the value as one text
             // and, under Override, the selected value at its precision.
             if crate::ui_script::active() {
@@ -685,7 +688,7 @@ impl DrawingEditor {
                 let primary = noshape_model::drawing::build::hole_callout_preview(&self.drawing, sheet, &self.sources, &single).unwrap_or_default();
                 let value = primary.iter().map(|l| l.iter().map(|r| r.0.as_str()).collect::<String>()).collect::<Vec<_>>().join(" ");
                 let value = value.strip_prefix(&count).map(str::to_string).unwrap_or(value);
-                let picked = lines.iter().flatten().find(|r| r.1 == Some(d.hole_sel)).map(|r| r.0.clone()).unwrap_or_default();
+                let picked = hole_value.clone();
                 let text = |st: &Entity<InputState>| st.read(cx).value().to_string();
                 let mut fields = vec![
                     serde_json::json!({ "label": "Text above", "kind": "input", "value": text(&d.above) }),
@@ -704,6 +707,14 @@ impl DrawingEditor {
                 }
                 crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "palette", "title": "Dimension palette", "fields": fields }));
             }
+            // The count is the Quantity's, not in the callout body (live drw-hcallout-fit 12: "3X" ▾ beside "⌀.197 THRU").
+            let mut lines = lines;
+            let count = format!("{n}{}", self.drawing.props.hole_indicator);
+            if let Some(first) = lines.first_mut().and_then(|l| l.first_mut())
+                && let Some(rest) = first.0.strip_prefix(&count)
+            {
+                first.0 = rest.trim_start().to_string();
+            }
             for (li, runs) in lines.into_iter().enumerate() {
                 let mut line = h_flex();
                 for (ri, (text, k)) in runs.into_iter().enumerate() {
@@ -719,15 +730,17 @@ impl DrawingEditor {
                 preview.push(line);
             }
             let counts: Vec<(String, bool, Act)> = HoleCount::ALL.iter().map(|&c| (c.name().to_string(), opts.count == c, std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.hole.get_or_insert_with(Default::default).count = c) as Act)).collect();
+            // One line of callout: 30 px fields (live drw-hcallout-fit 12), taller for a counterbore's lines.
+            let row_h = if preview.len() <= 1 { 30. } else { 54. };
             h_flex()
                 .gap(px(4.))
-                .h(px(54.))
-                .child(field(&d.prefix, Some(80.), 54.))
+                .h(px(row_h + 2.))
+                .child(field(&d.prefix, Some(80.), row_h))
                 // Live drawing-hole-callout-panel: "Count type: <type>".
-                .child(crate::ui_script::mark(div().id("dp-count-tip"), || "dropdown:Count type".into()).tooltip(crate::ui::tooltip(format!("Count type: {}", opts.count.name()))).child(menu_tall("dp-count", small(format!("{n}{}", self.drawing.props.hole_indicator)), 104., counts)))
-                .child(v_flex().w(px(145.)).h(px(54.)).px(px(10.)).justify_center().rounded(px(2.)).bg(gpui_kit::rgb(0xe8e8e8)).text_size(px(12.)).text_color(gpui_kit::rgb(0x8a8a8a)).children(preview))
-                .child(crate::ui_script::mark(div().id("dp-hunits-tip"), || "dropdown:Units".into()).tooltip(crate::ui::tooltip("Dimension units")).child(menu_tall("dp-units", small(unit_label), 58., unit_items)))
-                .child(field(&d.suffix, Some(80.), 54.))
+                .child(crate::ui_script::mark(div().id("dp-count-tip"), || "dropdown:Count type".into()).tooltip(crate::ui::tooltip(format!("Count type: {}", opts.count.name()))).child(menu_tall("dp-count", small(format!("{n}{}", self.drawing.props.hole_indicator)), 104., row_h, counts)))
+                .child(v_flex().w(px(145.)).h(px(row_h)).px(px(10.)).justify_center().rounded(px(2.)).bg(gpui_kit::rgb(0xe8e8e8)).text_size(px(12.)).text_color(gpui_kit::rgb(0x8a8a8a)).children(preview))
+                .child(crate::ui_script::mark(div().id("dp-hunits-tip"), || "dropdown:Units".into()).tooltip(crate::ui::tooltip("Dimension units")).child(menu_tall("dp-units", small(unit_label), 58., row_h, unit_items)))
+                .child(field(&d.suffix, Some(80.), row_h))
         } else {
             // Live drawing/15 (dom/drawing-dimension-edit-dialog.txt): prefix
             // 80, the value 85 + ▾ 20 (precision), the tolerance icon 45, the
@@ -898,7 +911,7 @@ impl DrawingEditor {
             Tolerance::Fit { hole, shaft } => (hole.clone(), shaft.clone()),
             _ => (String::new(), String::new()),
         };
-        let fit_row = || -> AnyElement {
+        let fit_parts = || -> (Vec<AnyElement>, AnyElement, AnyElement) {
             let type_items: Vec<(String, bool, Act)> = FitType::ALL.iter().map(|&t| (t.name().to_string(), fo.fit_type == t, std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.fit.fit_type = t) as Act)).collect();
             let hole_items: Vec<(String, bool, Act)> = std::iter::once("None")
                 .chain(noshape_model::fits::hole_classes(standard, fo.fit_type.name()))
@@ -946,31 +959,55 @@ impl DrawingEditor {
                     .cursor_pointer()
                     .text_size(px(12.))
                     .text_color(ink)
-                    .child(if hole { "g6" } else { "H7" })
+                    .child(if hole {
+                        v_flex().items_center().line_height(px(9.)).child(div().text_size(px(10.)).underline().child("XX")).child(div().text_size(px(8.)).child("xx")).into_any_element()
+                    } else {
+                        div().child("H7").into_any_element()
+                    })
                     .tooltip(crate::ui::tooltip(tip))
                     .on_click(move |_, _, cx| ed.update(cx, |t, cx| t.edit_palette(flip, cx)))
             };
-            // Each list named and tipped as live's (live2 drw-hcallout-palette-fit-tips).
+            // Each list named and tipped as live's (live2 drw-hcallout-palette-fit-tips: the fit's kind "Fit type").
             let tipped = |id: &'static str, tip: &'static str, el: AnyElement| crate::ui_script::mark(div().id(id), move || format!("dropdown:{tip}")).tooltip(crate::ui::tooltip(tip)).child(el);
-            h_flex()
-                .gap(px(3.))
-                .pt(px(3.))
-                .child(tipped("dp-fit-type-tip", "Fit class", menu("dp-fit-type", small(fo.fit_type.name().into()), 98., type_items)))
-                .child(crate::ui_script::wrap(tipped("dp-fit-hole-tip", "Hole class", menu("dp-fit-hole", small(or_none(&hole_class)), 58., hole_items)).into_any_element(), || "dropdown:Hole fit".into()))
-                .child(menu("dp-fit-shaft", small(or_none(&shaft_class)), 58., shaft_items))
-                .child(tipped("dp-fit-std-tip", "Fit standard", menu("dp-fit-std", small(match fo.iso {
-                    None => format!("{standard} (Drawing)"),
-                    Some(_) => standard.to_string(),
-                }), 110., std_items)))
-                .when(fo.mode != FitMode::Fit, |e| e.child(tipped("dp-fit-prec-tip", "Fit tolerance precision", menu("dp-fit-prec", small(PRECISIONS.iter().find(|x| x.1 == fo.precision).map(|x| x.0).unwrap_or("(Drawing)").to_string()), 80., fprec_items))))
-                .child(vis)
-                .child(tipped("dp-fit-stack-tip", "Fit type", menu("dp-fit-stack", small("H7/g6".into()), 58., stack_items)))
-                .into_any_element()
+            // A hole callout's (live drw-hcallout-fit 26): Fit type, Hole class, Fit standard after the tolerance in one
+            // row, no shaft class; its stacked-visibility toggle and stacking list beside the dual dimension.
+            let (type_w, hole_w, std_w) = if hole { (102., 66., 150.) } else { (98., 58., 110.) };
+            let mut lists: Vec<AnyElement> = vec![
+                tipped("dp-fit-type-tip", "Fit type", menu("dp-fit-type", small(fo.fit_type.name().into()), type_w, type_items)).into_any_element(),
+                crate::ui_script::wrap(tipped("dp-fit-hole-tip", "Hole class", menu("dp-fit-hole", small(or_none(&hole_class)), hole_w, hole_items)).into_any_element(), || "dropdown:Hole fit".into()),
+            ];
+            if !hole {
+                lists.push(menu("dp-fit-shaft", small(or_none(&shaft_class)), 58., shaft_items));
+            }
+            lists.push(tipped("dp-fit-std-tip", "Fit standard", menu("dp-fit-std", small(match fo.iso {
+                None => format!("{standard} (Drawing)"),
+                Some(_) => standard.to_string(),
+            }), std_w, std_items)).into_any_element());
+            if fo.mode != FitMode::Fit {
+                lists.push(tipped("dp-fit-prec-tip", "Fit tolerance precision", menu("dp-fit-prec", small(PRECISIONS.iter().find(|x| x.1 == fo.precision).map(|x| x.0).unwrap_or("(Drawing)").to_string()), 80., fprec_items)).into_any_element());
+            }
+            let stack = menu("dp-fit-stack", if hole { div().into_any_element() } else { small("H7/g6".into()) }, if hole { 20. } else { 58. }, stack_items);
+            (lists, vis.into_any_element(), stack)
+        };
+        // A hole callout's (live drw-hcallout-fit 16 / 20): the Precision combo reads the value as shown, greyed; the
+        // Tolerance list is live's icon, 1.500 between +0.01 and −0.01.
+        let tol_icon = v_flex().items_center().line_height(px(7.)).child(div().text_size(px(6.)).text_color(gpui_kit::rgb(0x1b72c4)).child("+0.01")).child(div().text_size(px(10.)).line_height(px(10.)).text_color(ink).child("1.500")).child(div().text_size(px(6.)).text_color(gpui_kit::rgb(0x1b72c4)).child("−0.01")).into_any_element();
+        let hole_prec = if hole_value.is_empty() { small(prec_label.clone()) } else { div().text_size(px(13.33)).text_color(gpui_kit::rgb(0x999999)).child(hole_value.clone()).into_any_element() };
+        let (fit_lists, fit_vis, fit_stack) = if show_tol && fit { let (l, v, s) = fit_parts(); (l, Some(v), Some(s)) } else { (Vec::new(), None, None) };
+        let (row_fits, fit_row) = if hole {
+            toggles = toggles.children(fit_vis).children(fit_stack);
+            (fit_lists, None)
+        } else {
+            (Vec::new(), (!fit_lists.is_empty()).then(|| h_flex().gap(px(3.)).pt(px(3.)).children(fit_lists).children(fit_vis).children(fit_stack).into_any_element()))
         };
         let tol_row = h_flex()
             .gap(px(4.))
             .pt(px(3.))
-            .when(hole, |e| e.child(crate::ui_script::wrap(menu("dp-hprec", small(prec_label.clone()), 110., prec_items), || "dropdown:Precision".into())).child(crate::ui_script::wrap(menu("dp-htol", small(tol.to_string()), 150., tol_items), || "dropdown:Tolerance".into())))
+            .when(hole, |e| {
+                e.child(crate::ui_script::wrap(menu("dp-hprec", hole_prec, 106., prec_items), || "dropdown:Precision".into()))
+                    .child(crate::ui_script::wrap(div().id("dp-htol-tip").tooltip(crate::ui::tooltip("Tolerance")).child(menu("dp-htol", tol_icon, 44., tol_items)).into_any_element(), || "dropdown:Tolerance".into()))
+                    .children(row_fits)
+            })
             .when(matches!(tol, "Symmetrical" | "Deviation" | "Limits"), |e| e.child(crate::ui_script::wrap(field(&d.tol_a, Some(70.), 26.).into_any_element(), || "field:Tolerance".into())))
             .when(matches!(tol, "Deviation" | "Limits"), |e| e.child(flip("dp-flip-a", true, cx)).child(field(&d.tol_b, Some(70.), 26.)).child(flip("dp-flip-b", false, cx)));
         let touched = d.touched;
@@ -1007,6 +1044,7 @@ impl DrawingEditor {
                     }
                 }))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 // The drag handle.
                 .child(h_flex().h(px(13.)).justify_center().border_b_1().border_color(gpui_kit::rgb(0xeeeeee)).child(div().text_size(px(8.)).text_color(gpui_kit::rgb(0x9a9a9a)).child("▫▫▫")))
@@ -1016,7 +1054,7 @@ impl DrawingEditor {
                 .child(field(&d.below, None, 22.))
                 .child(toggles)
                 .when(show_tol && (hole || tol != "None") && tol != VARIES, |e| e.child(tol_row))
-                .when(show_tol && fit, |e| e.child(fit_row()));
+                .children(fit_row);
         // Live's halo (40 px left, 20 right, 30 above and below): a click there closes a palette not yet clicked into,
         // and is swallowed once it has been (live2 dim-palette-halo: after a Precision pick or a click into Prefix).
         Some(

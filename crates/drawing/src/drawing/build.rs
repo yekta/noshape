@@ -1565,8 +1565,32 @@ pub fn hole_callout_count(sheet: &Sheet, sources: &Sources, a: &Annotation) -> O
     Some(hole_count(ctx, hole, a.hole.as_ref().map(|o| o.count).unwrap_or_default()))
 }
 
+/// The view points of the holes a callout counts (its Count type), its own first: lit with it when selected (live
+/// drw-hcallout-fit 12: a 3X callout's three holes light blue).
+pub fn hole_callout_centers(drawing: &Drawing, sheet: &Sheet, sources: &Sources, a: &Annotation) -> Vec<[f64; 2]> {
+    let centers = || {
+        let view = a.kind.view()?;
+        let (key, _) = views::view_source(sheet, view)?;
+        let ctx = &sources.get(&key)?.context;
+        let (c, radius) = views::resolve_point3(ctx, &a.refs.iter().find(|r| r.slot == 0)?.point)?;
+        let radius = radius?;
+        let hole = ctx.holes.iter().find(|h| h.matches_circle(c, radius, radius * 1e-3 + 1e-7))?;
+        let frame = views::view_frame(drawing, sheet, view)?;
+        let own = frame.project(c);
+        let mut out = vec![own];
+        out.extend(counted_holes(ctx, hole, a.hole.as_ref().map(|o| o.count).unwrap_or_default()).into_iter().map(|h| frame.project(h.start)).filter(|p| (p[0] - own[0]).hypot(p[1] - own[1]) > 1e-7));
+        Some(out)
+    };
+    centers().unwrap_or_default()
+}
+
 /// How many holes a callout counts (its Count type, live drawing/461).
 pub fn hole_count(ctx: &crate::regen::context::Context, hole: &crate::regen::context::HoleRecord, count: super::HoleCount) -> usize {
+    counted_holes(ctx, hole, count).len()
+}
+
+/// The holes a callout's Count type counts.
+fn counted_holes<'a>(ctx: &'a crate::regen::context::Context, hole: &'a crate::regen::context::HoleRecord, count: super::HoleCount) -> Vec<&'a crate::regen::context::HoleRecord> {
     use super::HoleCount as C;
     let mm = |x: Option<f64>| x.map(|d| (d * 1e6).round() as i64);
     let pair = |x: Option<(f64, f64)>| x.map(|(p, q)| ((p * 1e6).round() as i64, (q * 1e6).round() as i64));
@@ -1574,10 +1598,10 @@ pub fn hole_count(ctx: &crate::regen::context::Context, hole: &crate::regen::con
     let same_face = |h: &&crate::regen::context::HoleRecord| h.dir.dot(hole.dir) > 1.0 - 1e-9 && (h.start - hole.start).dot(hole.dir).abs() < 1e-7;
     let holes = ctx.holes.iter().filter(same_size);
     match count {
-        C::None => 1,
-        C::View | C::Part => holes.count(),
-        C::Pattern => holes.filter(|h| h.feature == hole.feature).count(),
-        C::Face | C::FaceExcludingPatterns => holes.filter(|h| h.feature == hole.feature).filter(same_face).count(),
+        C::None => vec![hole],
+        C::View | C::Part => holes.collect(),
+        C::Pattern => holes.filter(|h| h.feature == hole.feature).collect(),
+        C::Face | C::FaceExcludingPatterns => holes.filter(|h| h.feature == hole.feature).filter(same_face).collect(),
     }
 }
 
@@ -3085,58 +3109,61 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             // with its head) leaves the line under the origin 0.7375 in down,
             // the Y arrow the line left of it; "X" / "Y" past the tips. ISO
             // adds a 1/48 in circle and a "0" at each arrow's tail.
-            const IN: f64 = 25.4;
             let ts = &drawing.props.table_styles;
-            let head = ts.hole_indicator_arrow.unwrap_or(0.18 * IN);
-            let at = |p: [f64; 2], d: [f64; 2], k: f64| [p[0] + d[0] * k, p[1] + d[1] * k];
-            // The table's X direction turns the indicator (on the sheet).
-            let (ux, uy) = tables::hole_axes(*x_dir);
-            let on_sheet = |d: [f64; 2]| {
-                let (a, b) = (pl.to_sheet(o), pl.to_sheet([o[0] + d[0] * 1e-3, o[1] + d[1] * 1e-3]));
-                let l = (b[0] - a[0]).hypot(b[1] - a[1]).max(1e-12);
-                [(b[0] - a[0]) / l, (b[1] - a[1]) / l]
-            };
-            let turned = x_dir.is_some();
-            let (ux, uy) = if turned { (on_sheet(ux), on_sheet(uy)) } else { (ux, uy) };
-            let (ex, ey) = ([ux[0] * sx, ux[1] * sx], [uy[0] * sy, uy[1] * sy]);
-            let (back_x, back_y) = ([-ex[0], -ex[1]], [-ey[0], -ey[1]]);
-            let xs = at(os, back_y, 0.7375 * IN);
-            let ys = at(os, back_x, 0.7375 * IN);
-            let (xt, yt) = (at(xs, ex, 0.5 * IN), at(ys, ey, 0.5 * IN));
-            let l0 = g.lines.len();
-            g.lines.push(Polyline2 { points: vec![at(os, back_y, IN / 16.0), at(os, back_y, 0.8 * IN)], style: LineStyle::Thin, closed: false, pick });
-            g.lines.push(Polyline2 { points: vec![xs, at(xt, back_x, head)], style: LineStyle::Thin, closed: false, pick });
-            g.lines.push(Polyline2 { points: vec![at(os, back_x, IN / 16.0), at(os, back_x, 0.8 * IN)], style: LineStyle::Thin, closed: false, pick });
-            g.lines.push(Polyline2 { points: vec![ys, at(yt, back_y, head)], style: LineStyle::Thin, closed: false, pick });
-            // Drawing properties › Tables › Hole tables: Indicator lines' pen
-            // and arrowhead size, Indicator style.
-            g.arrow_as(xt, ex, head, super::sheet::ArrowType::Filled);
-            g.arrow_as(yt, ey, head, super::sheet::ArrowType::Filled);
-            if ts.hole_indicator_iso {
-                for c in [xs, ys] {
-                    g.lines.push(Polyline2 { points: circle_points(c, IN / 48.0, 16), style: LineStyle::Thin, closed: true, pick });
+            // The tag axis only with location data measured from it (live drw-hole-table-cell-panel 11: none without).
+            if *show_location {
+                const IN: f64 = 25.4;
+                let head = ts.hole_indicator_arrow.unwrap_or(0.18 * IN);
+                let at = |p: [f64; 2], d: [f64; 2], k: f64| [p[0] + d[0] * k, p[1] + d[1] * k];
+                // The table's X direction turns the indicator (on the sheet).
+                let (ux, uy) = tables::hole_axes(*x_dir);
+                let on_sheet = |d: [f64; 2]| {
+                    let (a, b) = (pl.to_sheet(o), pl.to_sheet([o[0] + d[0] * 1e-3, o[1] + d[1] * 1e-3]));
+                    let l = (b[0] - a[0]).hypot(b[1] - a[1]).max(1e-12);
+                    [(b[0] - a[0]) / l, (b[1] - a[1]) / l]
+                };
+                let turned = x_dir.is_some();
+                let (ux, uy) = if turned { (on_sheet(ux), on_sheet(uy)) } else { (ux, uy) };
+                let (ex, ey) = ([ux[0] * sx, ux[1] * sx], [uy[0] * sy, uy[1] * sy]);
+                let (back_x, back_y) = ([-ex[0], -ex[1]], [-ey[0], -ey[1]]);
+                let xs = at(os, back_y, 0.7375 * IN);
+                let ys = at(os, back_x, 0.7375 * IN);
+                let (xt, yt) = (at(xs, ex, 0.5 * IN), at(ys, ey, 0.5 * IN));
+                let l0 = g.lines.len();
+                g.lines.push(Polyline2 { points: vec![at(os, back_y, IN / 16.0), at(os, back_y, 0.8 * IN)], style: LineStyle::Thin, closed: false, pick });
+                g.lines.push(Polyline2 { points: vec![xs, at(xt, back_x, head)], style: LineStyle::Thin, closed: false, pick });
+                g.lines.push(Polyline2 { points: vec![at(os, back_x, IN / 16.0), at(os, back_x, 0.8 * IN)], style: LineStyle::Thin, closed: false, pick });
+                g.lines.push(Polyline2 { points: vec![ys, at(yt, back_y, head)], style: LineStyle::Thin, closed: false, pick });
+                // Drawing properties › Tables › Hole tables: Indicator lines' pen
+                // and arrowhead size, Indicator style.
+                g.arrow_as(xt, ex, head, super::sheet::ArrowType::Filled);
+                g.arrow_as(yt, ey, head, super::sheet::ArrowType::Filled);
+                if ts.hole_indicator_iso {
+                    for c in [xs, ys] {
+                        g.lines.push(Polyline2 { points: circle_points(c, IN / 48.0, 16), style: LineStyle::Thin, closed: true, pick });
+                    }
                 }
-            }
-            g.pens.push(super::sheet::PenSpan { centered: false, lines: l0..g.lines.len(), width_mm: ts.hole_indicator_line, dashes: Vec::new() });
-            color_lines_since(&mut g, origin_mark, ts.hole_indicator_color);
-            let h = drawing.props.ann_text_height;
-            // Top-left anchors as live's MTEXT (a letter's width ≈ 0.65 h
-            // when it goes to the left).
-            let w = 0.65 * h;
-            if turned {
-                // Past the tips along the turned axes.
-                for (tip, d, l) in [(xt, ex, "X"), (yt, ey, "Y")] {
-                    g.texts.push(Text2 { pos: at(tip, d, 0.4 * h + w / 2.0), height: h, text: l.into(), angle: 0.0, anchor: Anchor::Center, pick });
+                g.pens.push(super::sheet::PenSpan { centered: false, lines: l0..g.lines.len(), width_mm: ts.hole_indicator_line, dashes: Vec::new() });
+                color_lines_since(&mut g, origin_mark, ts.hole_indicator_color);
+                let h = drawing.props.ann_text_height;
+                // Top-left anchors as live's MTEXT (a letter's width ≈ 0.65 h
+                // when it goes to the left).
+                let w = 0.65 * h;
+                if turned {
+                    // Past the tips along the turned axes.
+                    for (tip, d, l) in [(xt, ex, "X"), (yt, ey, "Y")] {
+                        g.texts.push(Text2 { pos: at(tip, d, 0.4 * h + w / 2.0), height: h, text: l.into(), angle: 0.0, anchor: Anchor::Center, pick });
+                    }
+                } else {
+                    g.texts.push(Text2 { pos: [xt[0] + if sx > 0.0 { 1.8354 } else { -1.8354 - w }, xt[1] + 1.5302], height: h, text: "X".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
+                    g.texts.push(Text2 { pos: [yt[0] - 1.2032, yt[1] + if sy > 0.0 { 4.5782 } else { -1.6 }], height: h, text: "Y".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
                 }
-            } else {
-                g.texts.push(Text2 { pos: [xt[0] + if sx > 0.0 { 1.8354 } else { -1.8354 - w }, xt[1] + 1.5302], height: h, text: "X".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
-                g.texts.push(Text2 { pos: [yt[0] - 1.2032, yt[1] + if sy > 0.0 { 4.5782 } else { -1.6 }], height: h, text: "Y".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
+                if ts.hole_indicator_iso && !turned {
+                    g.texts.push(Text2 { pos: [xs[0] + if sx > 0.0 { -3.8484 } else { 1.6 }, xs[1] + 1.5209], height: h, text: "0".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
+                    g.texts.push(Text2 { pos: [ys[0] - 0.8004, ys[1] + if sy > 0.0 { -1.5271 } else { 4.4 }], height: h, text: "0".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
+                }
+                g.cad_since(origin_mark, CadLayer::OriginIndicators);
             }
-            if ts.hole_indicator_iso && !turned {
-                g.texts.push(Text2 { pos: [xs[0] + if sx > 0.0 { -3.8484 } else { 1.6 }, xs[1] + 1.5209], height: h, text: "0".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
-                g.texts.push(Text2 { pos: [ys[0] - 0.8004, ys[1] + if sy > 0.0 { -1.5271 } else { 4.4 }], height: h, text: "0".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
-            }
-            g.cad_since(origin_mark, CadLayer::OriginIndicators);
             let tag_mark = g.texts.len();
             let tags = &ts.hole_tags;
             // Collapse tags: each hole tagged by its size's letter alone (live2 feel/holetable.json: A, A, A, B, B).

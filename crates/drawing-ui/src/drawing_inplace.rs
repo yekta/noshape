@@ -201,6 +201,7 @@ impl DrawingEditor {
                 .flex_col()
                 // Clicks in the editor stay in it (a click away commits).
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 // The ruler's zero on the text's left edge (the tab stop
                 // selector, 22 px + 3 px gap, to the left of it), and the text
@@ -381,6 +382,7 @@ impl DrawingEditor {
                 .bg(gpui_kit::rgb(0xffffff))
                 .p(px(pad as f32 - 1.0))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 // Live: Tab → the next cell, Shift+Tab → the previous one,
                 // Enter → the cell below, Alt+Enter → a new line in the cell,

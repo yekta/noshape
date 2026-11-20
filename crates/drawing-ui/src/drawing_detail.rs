@@ -386,6 +386,9 @@ impl DrawingEditor {
             // one `#cfdbe5` with a 1 px `#9aa5af` border.
             // Live 604: once the profile exists no shape stays pressed.
             let on = shape == i as u8 && !placed && !self.detail_dlg.as_ref().is_some_and(|d| d.pick_region);
+            // Once the profile exists the shapes are disabled (live drw-detail-view 3: #f6f6f6, the one used #eff3f6
+            // framed #e1e4e7, the icons faded).
+            let off = placed && !editing;
             // (Marked by its tooltip: live's runner aims at it by pixel, ours by name, `ours_on`.)
             let btn = div()
                 .id(SharedString::from(format!("det-shape-{i}")))
@@ -398,9 +401,14 @@ impl DrawingEditor {
                 .border_1()
                 .cursor_pointer()
                 .when(on, |d| d.bg(gpui_kit::rgb(0xcfdbe5)).border_color(gpui_kit::rgb(0x9aa5af)))
-                .when(!on, |d| d.border_color(gpui_kit::transparent_black()).hover(|d| d.bg(gpui_kit::rgb(0xe6ebef))))
-                .child(crate::assets::icon(icon, 20., cx))
+                .when(off, |d| if shape == i as u8 { d.bg(gpui_kit::rgb(0xeff3f6)).border_color(gpui_kit::rgb(0xe1e4e7)) } else { d.bg(gpui_kit::rgb(0xf6f6f6)).border_color(gpui_kit::rgb(0xf7f7f7)) })
+                .when(!on && !off, |d| d.border_color(gpui_kit::transparent_black()).hover(|d| d.bg(gpui_kit::rgb(0xe6ebef))))
+                .child(div().when(off, |d| d.opacity(0.35)).child(crate::assets::icon(icon, 20., cx)))
                 .tooltip(crate::ui::tooltip(*tip));
+            if off {
+                tools = tools.child(btn);
+                continue;
+            }
             tools = tools.child(btn.on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                 if let Some(d) = &mut this.detail_dlg {
                     d.shape = i as u8;
@@ -490,6 +498,7 @@ impl DrawingEditor {
                 .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(pal.text)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(
                     h_flex()
@@ -498,9 +507,9 @@ impl DrawingEditor {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd3d7d9))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Detail view"))
-                        // ✓ (live asbv-5: green rgb(0,149,0)): applies Edit detail;
-                        // pale while creating (the click on the sheet places).
-                        .child(div().id("det-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().bg(gpui_kit::rgb(0x009500)).when(!editing, |d| d.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED))).child(crate::drawing_chrome::ok_check(18.)).when(editing, |d| d.on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_detail_edit(true, cx)))))
+                        // ✓ (live asbv-5: green rgb(0,149,0)) applies Edit detail; none while creating (live drw-detail-view
+                        // 1–3: the click on the sheet places).
+                        .when(editing, |h| h.child(div().id("det-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().bg(gpui_kit::rgb(0x009500)).child(crate::drawing_chrome::ok_check(18.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_detail_edit(true, cx)))))
                         .child(
                             div()
                                 .id("det-cancel")
@@ -567,7 +576,6 @@ impl DrawingEditor {
                 // Live drawing/127: the checkbox rows start 3 px into the last field row.
                 .child(div().mt(px(-3.)).child(check("det-show", "Show detail view profile", show, |d, v| d.show_profile = v, cx)))
                 .child(check("det-clip", "Clip border to geometry", clip, |d, v| d.clip_border = v, cx))
-                .when(shape >= 2, |e| e.child(div().px(px(6.)).py(px(4.)).text_size(px(12.)).text_color(pal.text_muted).child("Click points; double-click to close the profile")))
                 .into_any_element(),
         )
     }

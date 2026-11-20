@@ -5,6 +5,9 @@
 //! borders (all images), Move to sheet ▸ and Delete.
 
 use crate::drawing_view::*;
+use crate::theme::p;
+use gpui_kit::component::{h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_render::{Drawable, ImageData, ImageHandle, Instance};
 use noshape_model::document::TabId;
@@ -199,6 +202,66 @@ impl DrawingEditor {
         ];
         self.panel = Some(Panel::ImageProps { rows, tab: tab.map(|t| t.0) });
         cx.notify();
+    }
+
+    /// Image properties (live drw-image-properties 9): a 295 px ✓ ✕ panel, read only: Document, Workspace, Reference
+    /// (the image's icon and link to its tab, the "In progress" pill below) and Sheet.
+    pub(crate) fn render_image_props(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let Some(Panel::ImageProps { rows, tab }) = &self.panel else { return None };
+        let (rows, tab) = (rows.clone(), *tab);
+        crate::ui_script::note_dialog(|| {
+            let mut text = vec!["Image properties".to_string()];
+            for (k, v) in &rows {
+                text.push(k.to_string());
+                text.extend(v.split("  ").map(str::to_string));
+            }
+            serde_json::json!({ "kind": "drawing-panel", "title": "Image properties", "text": text })
+        });
+        let pal = p();
+        let row = |label: &'static str, body: AnyElement| h_flex().h(px(26.)).pl(px(9.)).pr(px(6.)).child(div().w(px(76.)).flex_none().whitespace_nowrap().text_size(px(11.)).child(label)).child(body).into_any_element();
+        let mut body: Vec<AnyElement> = Vec::new();
+        for (k, v) in rows {
+            if k != "Reference" {
+                body.push(row(k, div().text_size(px(12.)).child(crate::ui::user_text(v)).into_any_element()));
+                continue;
+            }
+            let (name, in_progress) = match v.strip_suffix("  In progress") {
+                Some(n) => (n.to_string(), true),
+                None => (v, false),
+            };
+            let link = div().id("dr-image-ref").text_size(px(12.)).text_color(pal.accent).child(crate::ui::user_text(name)).when_some(tab, |l, t| l.cursor_pointer().on_click(move |_, w, cx| crate::actions::request_activate_tab(t, w, cx)));
+            body.push(row("Reference", h_flex().gap(px(6.)).child(crate::assets::icon("image", 18., cx)).child(link).into_any_element()));
+            if in_progress {
+                body.push(h_flex().pl(px(83.)).pt(px(3.)).pb(px(4.)).child(div().h(px(22.)).px(px(3.)).flex().items_center().rounded(px(2.)).bg(gpui_kit::rgb(0x9ccef0)).text_size(px(12.)).child("In progress")).into_any_element());
+            }
+        }
+        Some(
+            v_flex()
+                .id("dr-panel")
+                .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                    if e.keystroke.key == "escape" {
+                        this.cancel_panel(cx);
+                        window.focus(&this.focus, cx);
+                        cx.stop_propagation();
+                    }
+                }))
+                .absolute()
+                .top(px(DIALOG_TOP))
+                .left(px(self.dialog_left()))
+                .w(px(295.))
+                .pb(px(6.))
+                .bg(pal.dialog_bg)
+                .shadow(crate::drawing_chrome::dialog_shadow())
+                .text_color(gpui_kit::rgb(0x333333))
+                .text_size(px(12.))
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
+                .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .child(Self::dialog_header("Image properties", true, |t, cx| t.cancel_panel(cx), |t, cx| t.cancel_panel(cx), ("dr-panel-check", "dr-panel-x"), cx))
+                .child(div().h(px(4.)))
+                .children(body)
+                .into_any_element(),
+        )
     }
 
     /// Context menu of an image (live 1613 (a), live2 11-15, in order): Image properties..., Show / Hide image

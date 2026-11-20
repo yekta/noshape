@@ -597,7 +597,7 @@ impl DrawingEditor {
         ];
         let sel_w = if editing { 208. } else { 120. };
         // Live b-ok-panel: labels at 9 px, values at 85 (selects 4 px further left), text rows 25 px, select rows 28.
-        let row = |label: &'static str, body: AnyElement| h_flex().h(px(25.)).pl(px(9.)).pr(px(6.)).child(div().w(px(76.)).flex_none().whitespace_nowrap().text_size(px(11.)).child(label)).child(body).into_any_element();
+        let row = |label: &'static str, body: AnyElement| h_flex().h(px(26.)).pl(px(9.)).pr(px(6.)).child(div().w(px(76.)).flex_none().whitespace_nowrap().text_size(px(11.)).child(label)).child(body).into_any_element();
         let srow = |label: &'static str, body: AnyElement| h_flex().h(px(28.)).pl(px(9.)).pr(px(6.)).child(div().w(px(72.)).flex_none().whitespace_nowrap().text_size(px(11.)).child(label)).child(body).into_any_element();
         let corner = d.corner;
         let corner_btn = |k: TableCorner, i: usize, cx: &mut Context<Self>| {
@@ -694,6 +694,7 @@ impl DrawingEditor {
                 .text_color(ink)
                 .text_size(px(12.))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(
                     h_flex()
@@ -712,7 +713,7 @@ impl DrawingEditor {
                 // inserting: Insert + the drawing's suitable sources.
                 // Live 2132: Document:, Workspace:, Reference: "BOM : <assembly>" with its "In progress" badge.
                 .when(editing, |v| {
-                    v.child(row("Document:", div().text_size(px(12.)).child(crate::ui::user_text(doc_name.clone())).into_any_element()))
+                    v.child(div().h(px(4.))).child(row("Document:", div().text_size(px(12.)).child(crate::ui::user_text(doc_name.clone())).into_any_element()))
                         .child(row("Workspace:", div().text_size(px(12.)).child(ws_name.clone()).into_any_element()))
                         // The source's icon and link, its "In progress" pill on the line below.
                         .child(row(
@@ -731,7 +732,7 @@ impl DrawingEditor {
                                 )
                                 .into_any_element(),
                         ))
-                        .child(h_flex().pl(px(83.)).pt(px(3.)).pb(px(4.)).child(div().h(px(22.)).px(px(3.)).flex().items_center().rounded(px(2.)).bg(gpui_kit::rgb(0x9ccef0)).text_size(px(11.)).text_color(gpui_kit::rgb(0x333333)).child("In progress")))
+                        .child(h_flex().pl(px(83.)).pt(px(3.)).pb(px(4.)).child(div().h(px(22.)).px(px(3.)).flex().items_center().rounded(px(2.)).bg(gpui_kit::rgb(0x9ccef0)).text_size(px(12.)).text_color(gpui_kit::rgb(0x333333)).child("In progress")))
                 })
                 .when_some(config_line, |v, text| v.child(row("Configurations", div().text_size(px(12.)).text_color(ink).child(text).into_any_element())))
                 // A cut list: Insert opens Select a composite part (live2 2278).

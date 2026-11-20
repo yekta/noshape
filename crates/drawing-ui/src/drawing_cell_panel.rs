@@ -101,10 +101,12 @@ impl DrawingEditor {
         let first = t.shown_cell_format(r0, c0);
         let all = |p: &dyn Fn(&CellFormat) -> bool| cs.rows().all(|r| cs.cols().all(|c| p(&t.shown_cell_format(r, c))));
         let (bold, italic, underline, strike) = (all(&|f| f.bold), all(&|f| f.italic), all(&|f| f.underline), all(&|f| f.strikethrough));
-        // Live 1143: the panel's left edge by the table's, above it.
-        let tl = self.sheet_to_local([l.min()[0], l.max()[1]]);
-        let bottom = (self.size_px()[1] - tl[1] + 60.0) as f32;
-        let left = (tl[0] - 7.0).max(4.0) as f32;
+        // Live drw-hole-table-cell-panel / -cell-format 13: by the selected cell (a merged one whole), 10 px left of
+        // it, its bottom 59 px above the cell's top.
+        let (a, b) = self.cell_sel_rect()?;
+        let tl = self.sheet_to_local([a[0], b[1]]);
+        let bottom = (self.size_px()[1] - tl[1] + 59.0) as f32;
+        let left = (tl[0] - 10.0).max(4.0) as f32;
         let ed = cx.entity();
 
         let icon_btn = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, enabled: bool, cx: &App| {
@@ -413,6 +415,7 @@ impl DrawingEditor {
                 .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(gpui_kit::rgb(0x333333))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(
                     h_flex()

@@ -2614,3 +2614,33 @@ fn a_click_away_from_a_typed_note_commits_it_and_the_note_tool_goes_on(cx: &mut 
     assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::Select)), "Esc ends the tool");
     assert_eq!(notes(cx), after, "Esc adds nothing");
 }
+
+/// Live drw-hcallout-fit 14: a panel over a view hides it from the pointer: nothing under the panel lights (ours lit
+/// the view through the palette); off the panel the view lights again.
+#[gpui::test]
+fn nothing_lights_under_a_panel(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-under-panel");
+    real_sheet(cx, window, &editor);
+    let pl = cx.update(|cx| editor.read(cx).built.as_ref().and_then(|b| b.placements.first().copied())).expect("a view");
+    let c = [(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0];
+    assert_eq!(view_of(&lit_at(cx, window, &editor, c)), Some(pl.id), "the view lights with no panel");
+    // Move to sheet opens where its menu was: just above and left of the view's centre, so the dialog covers it.
+    cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let l = e.sheet_to_local(c);
+            e.menu_at = [l[0] - 20.0, l[1] - 15.0];
+            e.open_move_sheet(crate::drawing_move_sheet::MoveTarget::View(pl.id), cx);
+        })
+    });
+    draw(cx, window);
+    assert_eq!(lit_at(cx, window, &editor, c), None, "nothing lights under the dialog");
+    cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            e.move_sheet = None;
+            cx.notify();
+        })
+    });
+    draw(cx, window);
+    assert_eq!(view_of(&lit_at(cx, window, &editor, c)), Some(pl.id), "the view lights again once it closes");
+}

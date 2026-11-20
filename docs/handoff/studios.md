@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 01:03 UTC.
+Updated 2026-11-20 02:12 UTC.
 
 ## In flight
 
@@ -33,12 +33,20 @@ the next run. Run the full ops e2e before any drawing land. A few app runs don't
   Also: live's centermark retake (996d6b8a): a Single click on a circle with an automatic mark replaces it and
   stays after Esc; the matrix accepts three click-spot menu rows (surface finish on edge Flip / Add leader, ordinate
   Reset ordinate: live's later takes show ours): 1213 = + 446 shown of 1874, 0 ≠, 174 present-only.
-- b5 (screens of 10 more takes, 11-20 01:20): cut list tables get live's Standard column; no "Click to place the
-  table" bubble after picking a composite; BOM / Cut list table properties 295 px as live (icon + link, pill below,
-  one sheet as text, 208 px selects at 13.33 px, the first focused, corners 72 px apart). Open from b5: Image
-  properties as a docked ✓ ✕ panel (ours a card with Cancel / OK); aligned section's boxed query fields (Center /
-  Viewing / Revolved, active one blue); Detail view without ✓ while creating, profile icons greyed once picked, no
-  hint line; section tabs' tooltips (Horizontal cut line) and label not focused after a tab click.
+- Re-landing 8a7a67f6e (11-20 01:58; 68a4f22e / 988d0416 failed 01:49 on the flaky assembly box test, now T2 on
+  main cf738a75c): b4/b5 above plus cut list Standard column and 295 px BOM / Cut list properties.
+- Local b6/b7 (tested on the Mac, screens on vibex8): Image properties a docked ✓ ✕ panel; aligned section's boxed
+  query fields; Detail view without ✓ while creating, shapes greyed once the profile exists, no hint line; a section
+  tab click unfocuses the label; properties rows 26 px; panels hide the sheet from the pointer (56 panel roots:
+  pointer_off_sheet, feel test nothing_lights_under_a_panel); hole callout palette 30 px fields for one line, no
+  count in the body; a callout lights every hole it counts; hole / cut list body cells left-aligned; no tag axis
+  without location data; a placed hole table stays selected.
+- Local b8 (Mac-tested): a merged cell's rows lit and its outline whole (live drw-hole-table-cell-panel 13); the
+  Cell panel by the selected cell (10 px left, bottom 59 px above; live cell-panel / cell-format 13); a hole table's
+  selected cells light their holes, centre marks and tags blue; "In progress" pills 12 px; hole callout palette's
+  tolerance row as live drw-hcallout-fit 26 (Precision combo reads the value, tolerance icon, Fit type / Hole class /
+  Fit standard in that row, no shaft class; stacked-visibility toggle + stacking list beside the dual; "Fit type"
+  tooltip on the fit's kind, scenarios renamed). Next: shots of b8 on vibex8, then commit + land.
 - psui via lead 11-20: version row menu without "Releases": ours already lists none there (qa's run = live's rows).
 
 ## Next, in order

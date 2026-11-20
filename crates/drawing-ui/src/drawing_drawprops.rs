@@ -1771,6 +1771,7 @@ impl DrawingEditor {
                 .text_color(pal.text)
                 .occlude()
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 // Live: the title centred, 18.67 px / 500 `#1b5faa` on a 25 px line
                 // 5 px down, no close button (the right strip toggles the panel);

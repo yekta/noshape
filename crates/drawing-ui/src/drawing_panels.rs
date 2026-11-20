@@ -89,6 +89,7 @@ impl DrawingEditor {
                 .child(crate::assets::icon(icon, 20., cx))
                 .tooltip(crate::ui::tooltip(tip))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.toggle_right_panel(panel, cx)))
         };
         let rp = self.right_panel;
@@ -516,6 +517,7 @@ impl DrawingEditor {
                 .text_color(pal.text)
                 .occlude()
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 // Live dom/drawing-panel-*.txt, drawing/95: a 37 px header, the
                 // title centred (18.67 px / 500, #1b5faa) over a 2 px #1b5faa

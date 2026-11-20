@@ -701,7 +701,9 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
                     }
                 }
             }
-            TableData { title: None, header: Some(header), rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden: Vec::new(), merges, ..Default::default() }
+            // Body cells left-aligned under centred headers (live drw-hole-table-cell-panel, -collapse-off).
+            let col_align = vec![CellAlign::Left; header.len()];
+            TableData { title: None, header: Some(header), rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden: Vec::new(), merges, col_align, ..Default::default() }
         }
         TableKind::Revision { .. } => revision_data(&table.kind, revisions),
         // Resolved by [`table_data_with`] from the evaluated tables.
@@ -725,7 +727,9 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
             if *bottom_to_top {
                 rows.reverse();
             }
-            TableData { title: None, header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden: Vec::new(), ..Default::default() }
+            // Body cells left-aligned (live drw-cut-list-table-properties: "1", "8020", "112.7 mm" at their cells' left).
+            let col_align = vec![CellAlign::Left; header.as_ref().map_or(0, |h| h.len())];
+            TableData { title: None, header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden: Vec::new(), col_align, ..Default::default() }
         }
     };
     finish(drawing, table, data)

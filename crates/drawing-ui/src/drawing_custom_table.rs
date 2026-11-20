@@ -554,6 +554,7 @@ impl DrawingEditor {
             .text_color(ink)
             .text_size(px(12.))
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .on_mouse_move(cx.listener(Self::pointer_off_sheet))
             .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .child(title);
         if editing {
@@ -684,6 +685,7 @@ impl DrawingEditor {
             .shadow(crate::drawing_chrome::dialog_shadow())
             .text_color(ink)
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .on_mouse_move(cx.listener(Self::pointer_off_sheet))
             .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .child(
                 h_flex()

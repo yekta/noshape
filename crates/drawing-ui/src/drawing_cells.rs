@@ -188,14 +188,23 @@ impl DrawingEditor {
         self.redraw(cx);
     }
 
-    /// The selected cells' outline (sheet mm) for the overlay.
-    pub fn cell_sel_rect(&self) -> Option<([f64; 2], [f64; 2])> {
+    /// The selected cells (rows r0..=r1, columns c0..=c1) grown to the merged cells they touch (live
+    /// drw-hole-table-cell-panel 13: a size's SIZE cell over A1–A3).
+    fn cell_sel_span(&self) -> Option<(CellSel, (usize, usize, usize, usize))> {
         let cs = self.cell_sel?;
         let l = self.built.as_ref()?.table_layout(cs.table)?;
+        let sel = (*cs.rows().start(), *cs.rows().end(), *cs.cols().start(), *cs.cols().end());
+        let touches = |m: &&noshape_model::drawing::CellMerge| m.row <= sel.1 && m.row + m.rows > sel.0 && m.col <= sel.3 && m.col + m.cols > sel.2;
+        Some((cs, l.merges.iter().filter(touches).fold(sel, |(r0, r1, c0, c1), m| (r0.min(m.row), r1.max(m.row + m.rows - 1), c0.min(m.col), c1.max(m.col + m.cols - 1)))))
+    }
+
+    /// The selected cells' outline (sheet mm) for the overlay.
+    pub fn cell_sel_rect(&self) -> Option<([f64; 2], [f64; 2])> {
+        let (cs, (r0, r1, c0, c1)) = self.cell_sel_span()?;
+        let l = self.built.as_ref()?.table_layout(cs.table)?;
         let t0 = l.title as usize;
-        let (r, c) = (cs.rows(), cs.cols());
-        let (x0, x1) = (*l.xs.get(*c.start())?, *l.xs.get(*c.end() + 1)?);
-        let (y0, y1) = (*l.ys.get(t0 + *r.start())?, *l.ys.get(t0 + *r.end() + 1)?);
+        let (x0, x1) = (*l.xs.get(c0)?, *l.xs.get(c1 + 1)?);
+        let (y0, y1) = (*l.ys.get(t0 + r0)?, *l.ys.get(t0 + r1 + 1)?);
         Some(([x0, y1], [x1, y0]))
     }
 
@@ -263,6 +272,39 @@ impl DrawingEditor {
         ts.sort_by(|a, b| b.pos[1].total_cmp(&a.pos[1]).then(a.pos[0].total_cmp(&b.pos[0])));
         ts.dedup_by(|a, b| a.text == b.text && (a.pos[1] - b.pos[1]).abs() < 1e-6);
         ts.iter().map(|t| t.text.as_str()).collect::<Vec<_>>().join(" ")
+    }
+
+    /// A hole table's selected cells: their holes' circles and automatic centre marks (picks) and their tags (text
+    /// indices), lit blue (live drw-hole-table-cell-panel 13: the SIZE cell of A1–A3 lights A1, A2, A3).
+    pub(crate) fn hole_cells_lit(&self) -> (Vec<u32>, Vec<usize>) {
+        use noshape_model::drawing::build::{centermark_key, same_centre};
+        use noshape_model::drawing::views::EdgeGeom;
+        let none = || (Vec::new(), Vec::new());
+        let (Some(b), Some((cs, (r0, r1, _, _)))) = (&self.built, self.cell_sel_span()) else { return none() };
+        let Some(t) = self.current_sheet().table(cs.table) else { return none() };
+        let TableKind::Hole { view, origin, exclude, x_dir, .. } = &t.kind else { return none() };
+        let Some(g) = self.geoms.get(view) else { return none() };
+        let tags: Vec<String> = (r0..=r1).map(|r| self.cell_text(cs.table, r, 0)).collect();
+        let ctx = noshape_model::drawing::views::table_source(self.current_sheet(), t).and_then(|k| self.sources.get(&k)).map(|s| &*s.context);
+        let centres: Vec<[f64; 2]> = noshape_model::drawing::tables::hole_rows(g, ctx, *origin, exclude, *x_dir).into_iter().filter(|h| tags.contains(&h.tag)).map(|h| h.center).collect();
+        if centres.is_empty() {
+            return none();
+        }
+        let at_centre = |c: [f64; 2]| centres.iter().any(|o| (o[0] - c[0]).hypot(o[1] - c[1]) < 1e-7);
+        let picks = b
+            .picks
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| match p {
+                PickTarget::Edge { view: v, edge } if v == view => g.edges.get(*edge as usize).and_then(|e| g.model_edges.get(e.model? as usize)).is_some_and(|me| matches!(me.geom, EdgeGeom::Circle { center, .. } if at_centre(center))),
+                PickTarget::AutoCentermark { view: v, center } if v == view => centres.iter().any(|c| same_centre(centermark_key(*c), *center)),
+                _ => false,
+            })
+            .map(|(i, _)| i as u32)
+            .collect();
+        let tag_pick = b.picks.iter().position(|p| *p == PickTarget::HoleAxis(cs.table)).map(|i| i as u32);
+        let texts = b.geometry.texts.iter().enumerate().filter(|(_, x)| Some(x.pick) == tag_pick && tags.contains(&x.text)).map(|(i, _)| i).collect();
+        (picks, texts)
     }
 
     /// Hovering a BOM or hole table row (help TB15): the picks of the

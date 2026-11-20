@@ -268,6 +268,7 @@ impl DrawingEditor {
                     // Not a click on the sheet: the note stays in edit (qa
                     // DWG-RULER-SELECTOR-CLOSES; live cycles it in place).
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.ruler.kind = this.ruler.kind.next();
                         cx.notify();

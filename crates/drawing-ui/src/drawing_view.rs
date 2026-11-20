@@ -1746,6 +1746,7 @@ impl DrawingEditor {
             // group members (yellow).
             self.push_related_highlights(&mut scene);
             self.push_centermark_looks(&mut scene);
+            self.push_hole_cell_looks(&mut scene);
             self.push_replicate_overlay(&mut scene);
             self.push_label_highlights(&mut scene);
             self.push_datum_selection(&mut scene);
@@ -2010,10 +2011,12 @@ impl DrawingEditor {
                 TableKind::Revision { .. } => None,
             };
             let by_row = !matches!(t.kind, TableKind::General { .. });
+            // A merged cell lights every row it spans (live drw-hole-table-cell-panel 13: a size's SIZE cell, A1–A3).
+            let lit_rows = cell.map(|(cr, cc)| l.merges.iter().find(|m| m.contains(cr, cc)).map_or(cr..=cr, |m| m.row..=m.row + m.rows - 1));
             for r in 0..n {
                 let (lo, hi) = row_box(r);
                 // (`cell_at` counts rows under the title row.)
-                let lit_row = by_row && cell.is_some_and(|(cr, _)| cr + first == r) && Some(r) != header_row;
+                let lit_row = by_row && r >= first && lit_rows.as_ref().is_some_and(|rs| rs.contains(&(r - first))) && Some(r) != header_row;
                 quad(if lit_row { &mut lit } else if Some(r) == header_row { &mut header } else { &mut rows }, lo, hi);
             }
             if let (false, Some((r, c))) = (by_row, cell.map(|(r, c)| (r + first, c)))
@@ -2191,6 +2194,18 @@ impl DrawingEditor {
             self.redraw(cx);
         } else if self.replicate_dlg.is_some() {
             // The Replicate region box follows the pointer.
+            self.redraw(cx);
+        }
+    }
+
+    /// The pointer over a panel: nothing on the sheet under it stays lit (live drw-hcallout-fit 14: the palette over a
+    /// view, no view frame), unless a drag goes on under it.
+    pub(crate) fn pointer_off_sheet(&mut self, _: &MouseMoveEvent, _: &mut Window, cx: &mut Context<Self>) {
+        if !matches!(self.drag, Drag::None) {
+            return;
+        }
+        cx.stop_propagation();
+        if self.hover.take().is_some() {
             self.redraw(cx);
         }
     }

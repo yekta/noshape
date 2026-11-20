@@ -99,6 +99,7 @@ impl DrawingEditor {
                 .top(px(p[1] as f32 - 16.))
                 .occlude()
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
                     if e.keystroke.key == "escape" {
                         this.sketch_dim_edit = None;

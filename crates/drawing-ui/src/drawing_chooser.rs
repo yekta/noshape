@@ -780,6 +780,7 @@ impl DrawingEditor {
                     .left(px(self.dialog_left()))
                     .occlude()
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                     .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .child(panel)
                     .into_any_element(),
@@ -1223,6 +1224,7 @@ impl DrawingEditor {
                 .gap(px(4.))
                 .occlude()
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .children(left)
                 .child(panel)

@@ -813,6 +813,9 @@ fn collapsed_hole_tags_are_the_size_letters() {
     let built = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
     let t = texts(&built);
     assert!(t.iter().any(|x| x == "A") && !t.iter().any(|x| x == "A1" || x == "B2"), "letters alone: {t:?}");
+    // No tag axis without location data (live drw-hole-table-cell-panel 11).
+    let ap = built.picks.iter().position(|p| *p == PickTarget::HoleAxis(1)).map(|i| i as u32);
+    assert!(!built.geometry.lines.iter().any(|l| Some(l.pick) == ap) && !t.iter().any(|x| x == "X" || x == "Y"), "{t:?}");
 }
 
 #[test]
@@ -901,6 +904,10 @@ fn bom_hole_table_and_linked_balloons() {
     let zeros = |b: &build::BuiltSheet| b.geometry.texts.iter().filter(|t| t.pick == ap && t.text == "0").count();
     assert_eq!(zeros(&built), 0);
     drawing.props.table_styles.hole_indicator_iso = true;
+    // (The axis comes with location data, turned off above.)
+    if let TableKind::Hole { show_location, .. } = &mut drawing.sheets[0].tables[0].kind {
+        *show_location = true;
+    }
     let iso = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     assert_eq!(zeros(&iso), 2);
     assert_eq!(axis_lines(&iso).len(), axis_lines(&built).len() + 2);
@@ -3384,6 +3391,11 @@ fn cut_list_table_has_a_standard_column() {
     let t = Table::new(1, TableKind::CutList { view: ViewId(1), bottom_to_top: false, config: None, source: None }, [400.0, 280.0]);
     let d = super::tables::table_data(&drawing, &t, None, None, None, &[], &|s| s.to_string());
     assert_eq!(d.header.unwrap(), ["Item", "Qty", "Standard", "Description", "Length", "Angle 1", "Angle 2"]);
+    assert_eq!(d.col_align, vec![CellAlign::Left; 7], "its cells left-aligned");
+    // A hole table's too, under centred headers (live drw-hole-table-cell-panel).
+    let h = Table::new(2, TableKind::Hole { view: ViewId(1), origin: [0.0; 2], origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, collapse_tags: false, bottom_to_top: false, exclude: Vec::new(), x_dir: None, more: Vec::new() }, [400.0, 280.0]);
+    let d = super::tables::table_data(&drawing, &h, None, None, None, &[], &|s| s.to_string());
+    assert!(!d.col_align.is_empty() && d.col_align.iter().all(|a| *a == CellAlign::Left), "{:?}", d.col_align);
 }
 
 /// A BOM table of an assembly no view shows (Insert ▾ another assembly or

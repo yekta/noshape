@@ -1352,3 +1352,110 @@ fn print_in_a_drawing_opens_its_pdf_without_a_banner(cx: &mut TestAppContext) {
 
 /// Interaction feel (pointer reach, click, drag): its own file.
 mod feel;
+
+/// Live drw-hcallout-fit 12: a hole callout lights every hole it counts (3X: the three like holes light blue), not
+/// only the one it points at.
+#[gpui::test]
+fn a_hole_callout_lights_the_holes_it_counts(cx: &mut TestAppContext) {
+    use noshape_model::drawing::views::EdgeGeom;
+    use noshape_model::drawing::{Annotation, AnnotationKind, AnnotationRef, PointRef};
+    START.set(Some("holes-plate-drawing"));
+    let (window, editor) = drawing(cx, "hcallout-holes");
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            // A face-on bore with others of its radius in the same view.
+            let (view, me, kin) = e.built.as_ref()?.placements.iter().find_map(|pl| {
+                let g = e.geoms.get(&pl.id)?;
+                let bores: Vec<_> = g.model_edges.iter().filter(|m| matches!(m.geom, EdgeGeom::Circle { face_on: true, bore: true, .. })).collect();
+                let me = bores.first()?;
+                let EdgeGeom::Circle { radius: r, .. } = me.geom else { return None };
+                let kin = bores.iter().filter(|m| matches!(m.geom, EdgeGeom::Circle { radius, .. } if (radius - r).abs() < 1e-9)).count();
+                (kin >= 3).then(|| (pl.id, (*me).clone(), kin))
+            })?;
+            let EdgeGeom::Circle { center, radius, .. } = me.geom else { return None };
+            let id = e.current_sheet().next_annotation_id();
+            let a = Annotation { id, kind: AnnotationKind::HoleCallout { view, center, radius, leaders: Vec::new() }, refs: vec![AnnotationRef { slot: 0, point: PointRef::Center { body: me.body, name: (*me.name).clone() } }], ..Default::default() };
+            e.edit_sheet("Hole/thread callout", cx, |s| s.annotations.push(a));
+            Some((id, kin))
+        })
+    });
+    let (id, kin) = id.expect("a view with three like holes face on");
+    draw(cx, window);
+    let lit = cx.update(|cx| editor.read(cx).reference_edge_picks(id).len());
+    assert!(lit >= kin, "the {kin} holes it counts light, not only its own: {lit} edges");
+}
+
+/// Live drw-hole-table-cell-panel 13: a click in a size's merged SIZE cell outlines the whole cell (A1–A3), not the
+/// row under the pointer.
+#[gpui::test]
+fn a_merged_hole_size_cell_is_outlined_whole(cx: &mut TestAppContext) {
+    use noshape_model::drawing::views::EdgeGeom;
+    use noshape_model::drawing::{Table, TableKind};
+    START.set(Some("holes-plate-drawing"));
+    let (window, editor) = drawing(cx, "hole-merged-cell");
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let view = e.built.as_ref()?.placements.iter().find(|pl| {
+                e.geoms.get(&pl.id).is_some_and(|g| g.model_edges.iter().filter(|m| matches!(m.geom, EdgeGeom::Circle { face_on: true, bore: true, .. })).count() >= 3)
+            })?.id;
+            let id = e.current_sheet().next_table_id();
+            let kind = TableKind::Hole { view, origin: [0.0; 2], origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, collapse_tags: false, bottom_to_top: false, exclude: Vec::new(), x_dir: None, more: Vec::new() };
+            e.edit_sheet("Hole table", cx, |s| s.tables.push(Table::new(id, kind, [300.0, 250.0])));
+            Some(id)
+        })
+    });
+    let id = id.expect("a view with holes face on");
+    draw(cx, window);
+    cx.update(|cx| {
+        editor.update(cx, |e, _| {
+            let l = e.built.as_ref().and_then(|b| b.table_layout(id)).cloned().expect("laid out");
+            let m = *l.merges.iter().find(|m| m.rows > 1).expect("a size over two or more rows");
+            e.selection = vec![crate::drawing_view::Sel::Table(id)];
+            e.cell_sel = Some(crate::drawing_cells::CellSel { table: id, a: (m.row + 1, m.col), b: (m.row + 1, m.col) });
+            let t0 = l.title as usize;
+            let whole = ([l.xs[m.col], l.ys[t0 + m.row + m.rows]], [l.xs[m.col + m.cols], l.ys[t0 + m.row]]);
+            assert_eq!(e.cell_sel_rect(), Some(whole), "the merged cell's outline, {m:?}");
+        })
+    });
+}
+
+/// Live drw-hole-table-cell-panel 13: the merged SIZE cell of A1–A3 lights those holes (their circles and centre
+/// marks) and their three tags blue.
+#[gpui::test]
+fn a_hole_size_cell_lights_its_holes_and_tags(cx: &mut TestAppContext) {
+    use noshape_model::drawing::views::EdgeGeom;
+    use noshape_model::drawing::{Table, TableKind};
+    START.set(Some("holes-plate-drawing"));
+    let (window, editor) = drawing(cx, "hole-cell-lit");
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let view = e.built.as_ref()?.placements.iter().find(|pl| {
+                e.geoms.get(&pl.id).is_some_and(|g| g.model_edges.iter().filter(|m| matches!(m.geom, EdgeGeom::Circle { face_on: true, bore: true, .. })).count() >= 3)
+            })?.id;
+            let id = e.current_sheet().next_table_id();
+            let kind = TableKind::Hole { view, origin: [0.0; 2], origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, collapse_tags: false, bottom_to_top: false, exclude: Vec::new(), x_dir: None, more: Vec::new() };
+            e.edit_sheet("Hole table", cx, |s| s.tables.push(Table::new(id, kind, [300.0, 250.0])));
+            Some(id)
+        })
+    });
+    let id = id.expect("a view with holes face on");
+    draw(cx, window);
+    cx.update(|cx| {
+        editor.update(cx, |e, _| {
+            assert_eq!(e.hole_cells_lit(), (Vec::new(), Vec::new()), "nothing selected, nothing lit");
+            let l = e.built.as_ref().and_then(|b| b.table_layout(id)).cloned().expect("laid out");
+            let m = *l.merges.iter().find(|m| m.rows > 1).expect("a size over two or more rows");
+            e.selection = vec![crate::drawing_view::Sel::Table(id)];
+            e.cell_sel = Some(crate::drawing_cells::CellSel { table: id, a: (m.row, m.col), b: (m.row, m.col) });
+            let (picks, texts) = e.hole_cells_lit();
+            assert_eq!(texts.len(), m.rows, "one tag per row of the size");
+            assert!(picks.len() >= m.rows, "each hole's circle (and centre mark): {} picks", picks.len());
+            // One row's cell (TAG) lights its own hole alone.
+            e.cell_sel = Some(crate::drawing_cells::CellSel { table: id, a: (m.row, 0), b: (m.row, 0) });
+            assert_eq!(e.hole_cells_lit().1.len(), 1);
+        })
+    });
+}
