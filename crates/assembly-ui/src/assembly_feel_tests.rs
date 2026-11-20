@@ -245,7 +245,6 @@ fn a_mate_glyph_wins_the_hover_within_its_reach_and_its_click_selects_the_mate(c
 /// live2 asm-feel (5): a box takes whole instances, never faces: left to right (a window) over half a part takes
 /// nothing and around it the instance; right to left (crossing) over half a part takes the whole instance.
 #[gpui::test]
-#[ignore = "T2: flaky under load (the crossing box took nothing: main 01:05, dx's land 01:10, 11-20); asm making it deterministic"]
 fn a_box_takes_whole_instances_as_live(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
     let (window, view) = mated_blocks(cx, "box");
@@ -257,7 +256,11 @@ fn a_box_takes_whole_instances_as_live(cx: &mut TestAppContext) {
         let a = v.assembly(cx).unwrap();
         v.selected.iter().map(|id| a.instances.iter().find(|i| i.id == *id).unwrap().name.clone()).collect::<Vec<_>>()
     });
-    let clear = |cx: &mut TestAppContext| cx.update(|cx| view.update(cx, |v, _| v.clear_selection()));
+    // (As the app clears it: the scene and what a press does follow, with no hover in between.)
+    let clear = |cx: &mut TestAppContext| cx.update(|cx| view.update(cx, |v, cx| {
+        v.clear_selection();
+        v.refresh_scene(false, cx);
+    }));
 
     drag(cx, window, &view, DVec2::new(lo.x - 30.0, above), DVec2::new(mid, below));
     assert!(selected(cx).is_empty(), "a window over half a part takes nothing");

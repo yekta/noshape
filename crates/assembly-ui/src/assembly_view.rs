@@ -1218,6 +1218,9 @@ impl AssemblyView {
 
     /// Push highlight state + overlays to the viewport.
     fn refresh_scene(&mut self, geometry_changed: bool, cx: &mut Context<Self>) {
+        // What a press does follows the selection shown (a cleared selection's next press on empty space boxes, not
+        // only after a hover came: the T1 box test failed under load, 11-20).
+        self.update_capture(cx);
         // Entities of instances no longer selected drop out (a list click or
         // Space replaced the selection).
         let before = self.ui.entity_sel.len();
