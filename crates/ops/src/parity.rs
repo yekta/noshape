@@ -10092,7 +10092,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             }
             // As stored: the flip, the secondary axis's quarter turns, the offset; a parameter left out (live's UI
             // fetch) has its default, false and PLUS_X, not the dialog's choice.
-            let flip = par("primaryAxisAlignment").and_then(|p| p["value"].as_bool()).unwrap_or(false);
+            let flip = par(if ty == "tangent" { "flipAlignment" } else { "primaryAxisAlignment" }).and_then(|p| p["value"].as_bool()).unwrap_or(false);
             args["flip_primary"] = json!(flip);
             let turns = par("secondaryAxisAlignment").and_then(|p| p["value"].as_str()).map_or(Some(0), |v| ["PLUS_X", "PLUS_Y", "MINUS_X", "MINUS_Y"].iter().position(|x| *x == v));
             if let Some(turns) = turns {

@@ -5,7 +5,7 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-20 16:15 UTC)
+## State (2026-11-20 17:05 UTC)
 
 ### P0 closed: isaac drag 7-10 s/frame (v0.4.62 252 ms)
 - `big_assembly_perf::suite_assemblies_speed` on asm-isaac-ball (private copy ~/tmp/asm/speed on vibe2 / vibex7 /
@@ -31,13 +31,16 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
 - dx ca70dbdfd: AssemblyView uses DocModel::assemblies; 10 assembly-ui ui_tests fail on the Mac with or without it
   (pass on Linux): check whether macOS CI fails them too.
 
-### WIP split (branch asm-split on 011ef691; clippy + tests pass vibex8 15:4x): queued b5e676d0 (checking 16:01)
+### WIP split: LANDED 16:24 as 78b3cc95
 - d9a0335d4 P0 FEEL-ASM-MATE-PREVIEW-COLOUR (asm_scene `preview_tops` peach edges 0xf7c171 / hidden 0xdcb971; picked
   boundary PICKED|OUTLINE -> PICKED_OUTLINE #FFC20E); 643e60a35 P2 ASM-INSERT-RELEASED-ITEMS (▲ View released
   items); 9008a18a5 P2 ASM-FACE-TAB-REFERENCE-FRAME + ASM-PATTERN-ZERO-DISTANCE-MARK; 8000528e0 parity translator
   (Derived chains, composites) + `suite_assembly_open_profile`. Tickets marked. asm-mass / asm-wip-0815: superseded.
 
-### Parity translator: Width / Tangent / relations (d81b66a7b on asm-split; clippy + parity 34 pass vibex8 16:0x)
+### Parity translator: Width / Tangent / relations + Tangent flip (2 commits on asm-split; landing 17:0x)
+- cov3 with ops-wtr: width 1/1, screw 2/2 as live; tangent moved both parts (4.7 / 6.3 mm): a Tangent's flip was taken
+  inverted by assembly_mate (model flag = its flip alone, as the dialog) and a new one defaulted from the connectors'
+  Z axes; fixed (op, list, app default unflipped = live flipAlignment false), e2e a_tangent_mate_lays_a_pin_on_the_face_unless_flipped.
 - asm-cov-{width,tangent,screw} on main+sparse (vibe2 ~/agents/asm-keep/cov3/): 2/2 occurrences each, but width and
   tangent 0/0 mates and screw 1/1 (its Screw relation unseen): the translator skipped BTMWidthMate, BTMGeometryMate
   and BTMMateRelation silently (also the 18 relations in other asm-* models). Draft: `mate_picks` (Width a,b,c,d =

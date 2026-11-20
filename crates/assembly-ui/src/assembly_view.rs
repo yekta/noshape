@@ -3051,10 +3051,12 @@ impl AssemblyView {
             if is_new && dialog.read(cx).connectors_complete() {
                 // Default primary-axis alignment (`default_flip_primary`: the
                 // moving instance keeps its orientation, a tie aligns; Onshape's
-                // flip = !flip_primary).
+                // flip = !flip_primary). A Tangent stays unflipped (live's
+                // flipAlignment: on the face's outside, asm-cov-tangent).
                 let units = self.units(cx);
                 let (a, b) = { let d = dialog.read(cx); (d.field(0).cloned(), d.field(1).cloned()) };
                 if let (Some(a), Some(b)) = (a, b)
+                    && dialog.read(cx).mate_type != MateType::Tangent
                     && let Some(agree) = noshape_ops::assembly::default_flip_primary(&self.result, &a, &b, &units)
                 {
                     dialog.update(cx, |d, cx| d.set_flip(agree, cx));

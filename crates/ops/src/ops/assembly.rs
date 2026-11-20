@@ -317,7 +317,7 @@ fn describe(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
             let st = r.mates.iter().find(|s| s.id == m.id);
             let mut v = json!({ "id": format!("mate:{}", m.id.0), "name": m.name, "type": mate_type_id(m.mate_type), "a": format!("inst:{}", m.a.instance.0), "b": format!("inst:{}", m.b.instance.0), "ok": st.map(|s| s.ok), "message": st.and_then(|s| s.message.clone()), "suppressed": m.suppressed, "hidden": m.hidden });
             // The dialog's settings (as assembly_mate takes them).
-            v["flip_primary"] = json!(!m.flip_primary);
+            v["flip_primary"] = json!(m.flip_primary == (m.mate_type == MateType::Tangent));
             if m.reorient_secondary != 0 {
                 v["reorient_secondary"] = json!(m.reorient_secondary);
             }
@@ -877,10 +877,13 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(o) => Mate { mate_type, a: ca.clone(), b: cb.clone(), name: name.clone(), ..o.clone() },
         None => Mate::new(id, name.clone(), mate_type, ca.clone(), cb.clone()),
     };
+    // (The model's flag is true when the Z axes agree: not flipped; a Tangent's is its flip alone, unflipped by
+    // default: live's flipAlignment, the part on the face's outside, asm-cov-tangent.)
+    let tangent = m.mate_type == MateType::Tangent;
     m.flip_primary = match (a.get("flip_primary").and_then(Value::as_bool), &old) {
-        // (The model's flag is true when the Z axes agree: not flipped.)
-        (Some(f), _) => !f,
+        (Some(f), _) => f == tangent,
         (None, Some(o)) => o.flip_primary,
+        (None, None) if tangent => false,
         (None, None) => sa::default_flip_primary(&before, &ca, &cb, &units).unwrap_or(false),
     };
     if let Some(r) = a.opt_u64("reorient_secondary")? {
