@@ -43,8 +43,10 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
   panel-lists 25/27: s22-23 our click at (285, 447) opened Diameter distance's ▾ list; live's Targets box is 400 px
   with a 15 px scrollbar inside (▾ 15 px further left), fixed 5b8590995 (+ #1b5faa borders). Local after 782f4c47 also:
   5b8590995, and the commits above.
-- b23 (09:46, task buue74be9, vibex7 build): hide-dim, panel-lists (expect 27/27), and live's 01:40 retakes
-  drw-revision-table-delete, drw-inspection-table-iso-scrolled (never run on ours yet; "Waiting on others" below).
+- b23 DONE 09:52 (vibex7 build): hide-dim 12/12, inspection-table-iso-scrolled 10/10, panel-lists 25/27 (still the
+  (285, 447) ▾: ours' Targets box in Angle mode is 370 px, under live's 400, so no scrollbar), revision-table-delete
+  7/10 (live's s7-s10 "EDGE Top" is the deleted table's stale paint). Both asked of live: REQUESTS "studios
+  (2026-11-20 09:55 UTC)".
 - qa 11-20: 9 of 10 to-verify rows verified (6c3c0a8fe); FEEL-DRW-WHEEL-ZOOM-SLOW stays open (re-timed 02:00-04:00).
 
 ## Next, in order
@@ -106,7 +108,7 @@ Ids live only in /root/lead-scratch/roster.md (lead 11-19): read it before every
 into notes.
 
 ## Waiting on others
-- live: drw-revision-table-delete and drw-inspection-table-iso-scrolled retakes (REQUESTS 22:13 / 22:35).
+- live: REQUESTS 09:55 (panel-lists s20-24 shots; revision-table-delete ending on a repaint) and 08:08 (9 rows).
 - Left to others under BRAND-IN-UI-TEXT: Category values "Onshape Part"… and "Import to Onshape" (dx), "Onshape
   default tolerances" (psui), "Onshape images" / "Onshape form library" (skasm).
 
