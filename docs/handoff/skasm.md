@@ -18,13 +18,11 @@ ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scrat
 Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six on green.
 
 ## Next
-- 850efe Extrude 6 (lead P1 11-20): ours 33/85/50 vs live 28/68/40, open. Not the regions (same area, volume in band).
-  The "JVJ 15 nm" diagnosis was WRONG (11-18 CLI): on current main Sketch 4 solves exact, Extrude 4's tool and JVJ are exact
-  (bool's recording agrees to 6.5e-14 m). Next: rebuild the parity test binary and find where Extrude 5/6 split. Model:
-  vibe2 ~/tmp/skasm/m85 (save/ = translated doc).
-- qa 11-20 (P2, SMM-EXTRUDE-CLOSED-PROFILE leftover): a cannot-unfold model is a WARNING on live's server but drawn
-  failed (red, "did not regenerate properly"); ours sets FeatureStatus::Error (regen/mod.rs, sm-rip-1118). Fix: status
-  Warning plus a "drawn failed" flag that psui's red sites read (51 sites test Error: keep it narrow).
+- 850efe Extrude 6: bool's (P1 for them, 3b6725b2). Extrude 1-5 match live; Extrude 6's union leaves its r4 tool cylinders and
+  Extrude 2's coaxial r4 ones unmerged (ours 33, OCCT 31 with a bad merge, live 28). Axes exact to 1e-12 mm: not the sketch.
+- qa 11-20 P2 (SMM-EXTRUDE-CLOSED-PROFILE leftover) done, to land after the feel stack: a cannot-unfold model is status
+  Warning (live's server) with `FeatureState::drawn_failed`; the list row, the header's failures count and ui_state read
+  `shown_status()` (Error). Other sites see the Warning (geometry kept).
 - Midpoint alignment landed (303e9d91); live has no circle quadrant inference, nor do we: nothing left there.
 - Handed: surf-intro-simple Loft 1 (core), surf-intro-examples Fill 1 overshoot (lead to route), welding-config
   Extrude 8 (core, fixing), manualblend Sweep 2 area / Move boundary (core).

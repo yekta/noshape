@@ -535,7 +535,7 @@ impl Regenerator {
                 keys.push((f.id, key));
             }
             if i >= upto {
-                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), invalid_input: false, missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() });
+                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), invalid_input: false, drawn_failed: false, missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() });
                 continue;
             }
             if let Some(versions) = self.entries.get_mut(&f.id)
@@ -606,7 +606,7 @@ impl Regenerator {
                 noshape_kernel::kernel_profile_mark("");
             }
             let ft = Instant::now();
-            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), invalid_input: false, missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() };
+            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), invalid_input: false, drawn_failed: false, missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() };
             if let Some(msg) = expr_error.take() {
                 state.status = FeatureStatus::Error;
                 state.message = Some(msg);
@@ -702,8 +702,8 @@ impl Regenerator {
                                     // (Live 11-18 sm-rip-1118: a model that can't be unfolded is a WARNING on the
                                     // server, its geometry kept, but the list shows the feature as failed: red, "did
                                     // not regenerate properly".)
-                                    let unfold = ev.warnings.iter().any(|w| w == features::sheetmetal_ops::CANNOT_UNFOLD);
-                                    state.status = if unfold { FeatureStatus::Error } else { FeatureStatus::Warning };
+                                    state.drawn_failed = ev.warnings.iter().any(|w| w == features::sheetmetal_ops::CANNOT_UNFOLD);
+                                    state.status = FeatureStatus::Warning;
                                     state.message = Some(ev.warnings.join("\n"));
                                 } else if !ev.infos.is_empty() {
                                     state.status = FeatureStatus::Info;

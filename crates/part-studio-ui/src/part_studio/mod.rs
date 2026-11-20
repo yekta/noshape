@@ -4448,7 +4448,7 @@ impl PartStudioView {
         // A new feature whose dialog is open counts at once (live
         // sketch/501: "Features (5)" while Sketch 1 is being made).
         let n_features = listed_feature_count(studio.features.len(), self.edit.as_ref().is_some_and(|e| e.is_new));
-        let failed = |id: noshape_model::FeatureId| self.display.feature_state(id).is_some_and(|s| s.status == FeatureStatus::Error);
+        let failed = |id: noshape_model::FeatureId| self.display.feature_state(id).is_some_and(|s| s.shown_status() == FeatureStatus::Error);
         // The open dialog counts when it can't regenerate (a new feature
         // isn't in the list yet).
         let errors = studio.features.iter().filter(|f| failed(f.id)).count()
@@ -5952,7 +5952,7 @@ impl PartStudioView {
         let f = draft.as_ref().or(configured.as_ref()).unwrap_or(f);
         let name = self.shown_feature_name(f, cx);
         let state = self.display.feature_state(f.id);
-        let status = if editing && self.edit_invalid(cx) { FeatureStatus::Error } else { state.map(|s| s.status).unwrap_or(FeatureStatus::Ok) };
+        let status = if editing && self.edit_invalid(cx) { FeatureStatus::Error } else { state.map(|s| s.shown_status()).unwrap_or(FeatureStatus::Ok) };
         let selected = self.selected_features.contains(&f.id) || self.row_ctx.picked.contains(&f.id);
         // Onshape (§3.4): rolled back = italic #ccc, suppressed = #999 struck
         // through, error = #aa252d; everything else (sketches included) #333.

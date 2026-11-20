@@ -172,7 +172,7 @@ impl PartStudioView {
                         super::ListItem::Feature(_, id) => {
                             let (Some(i), Some(f)) = (index(*id), s.feature(*id)) else { continue };
                             // As the row draws it: the edited feature is red while its dialog holds an invalid value.
-                            let status = if editing == Some(f.id) && self.edit_invalid(cx) { Some(FeatureStatus::Error) } else { self.display.feature_state(f.id).map(|s| s.status) };
+                            let status = if editing == Some(f.id) && self.edit_invalid(cx) { Some(FeatureStatus::Error) } else { self.display.feature_state(f.id).map(|s| s.shown_status()) };
                             let state = if i >= rollback {
                                 "rolled-back"
                             } else if f.suppressed {

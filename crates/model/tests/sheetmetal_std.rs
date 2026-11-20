@@ -1138,7 +1138,7 @@ fn an_extruded_closed_rectangle_is_a_box_that_cannot_unfold() {
         let r = s.ok();
         let last = r.display.features.last().unwrap();
         // (A WARNING on the server that the list draws as failed, as sm-rip-1118.)
-        assert_eq!((last.status, last.message.as_deref()), (FeatureStatus::Error, Some(noshape_model::regen::features::sheetmetal_ops::CANNOT_UNFOLD)), "whole {whole}");
+        assert_eq!((last.status, last.drawn_failed, last.message.as_deref()), (FeatureStatus::Warning, true, Some(noshape_model::regen::features::sheetmetal_ops::CANNOT_UNFOLD)), "whole {whole}");
         let faces = r.context.bodies[part(&r)].shape.faces().len();
         assert!((volume_mm3(&r) - 12843.115).abs() < 1e-3 && faces == 32, "whole {whole}: {} mm³, {} faces", volume_mm3(&r), faces);
     }

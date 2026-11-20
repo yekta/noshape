@@ -494,6 +494,10 @@ pub struct FeatureState {
     /// It failed on inputs refused before any operation ran (no input drawn as failing).
     #[serde(default)]
     pub invalid_input: bool,
+    /// The list draws it failed though its status is a warning (live sm-rip-1118: a sheet metal model that can't be
+    /// unfolded is a WARNING on the server, its geometry kept, but its row is red with the header's failures icon).
+    #[serde(default)]
+    pub drawn_failed: bool,
     /// Selections that no longer resolve (live: the row's tooltip adds
     /// "1 missing selection").
     pub missing: usize,
@@ -606,6 +610,11 @@ pub enum ComputedValue {
 }
 
 impl FeatureState {
+    /// The status the feature list draws.
+    pub fn shown_status(&self) -> FeatureStatus {
+        if self.drawn_failed { FeatureStatus::Error } else { self.status }
+    }
+
     pub fn computed(&self, id: &str) -> Option<&ComputedValue> {
         self.computed.iter().find(|(k, _)| k == id).map(|(_, v)| v)
     }

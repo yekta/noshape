@@ -339,12 +339,15 @@ fn a_corner_rip_made_a_bend_cannot_unfold_as_lives(cx: &mut TestAppContext) {
     let got = cx.update(|cx| {
         let v = view.read(cx);
         let joint = v.studio(cx).and_then(|st| st.features.iter().find(|f| f.type_id == "sheetMetalJoint").map(|f| (f.name.clone(), f.id)));
-        let state = joint.as_ref().and_then(|(_, id)| v.display.feature_state(*id)).map(|st| (st.status, st.message.clone()));
+        let state = joint.as_ref().and_then(|(_, id)| v.display.feature_state(*id)).map(|st| (st.status, st.drawn_failed, st.message.clone()));
         let bends = v.context.as_ref().and_then(|c| c.sheet_metal.get(&part)).map(|d| d.bends.len());
         (joint.map(|j| j.0), state, bends, v.message.clone())
     });
     use noshape_model::display::FeatureStatus;
-    assert_eq!(got, (Some("Modify joint 1".into()), Some((FeatureStatus::Error, Some(msg.into()))), Some(5), Some((FeatureStatus::Warning, msg.into()))), "(the joint, its state (live: a WARNING listed as failed), the part's bends, the yellow toast)");
+    assert_eq!(got, (Some("Modify joint 1".into()), Some((FeatureStatus::Warning, true, Some(msg.into()))), Some(5), Some((FeatureStatus::Warning, msg.into()))), "(the joint, its state (live: a WARNING listed as failed), the part's bends, the yellow toast)");
+    let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+    let row = state["features"]["rows"].as_array().and_then(|r| r.iter().find(|r| r["name"] == "Modify joint 1")).cloned();
+    assert_eq!(row.map(|r| r["state"].clone()), Some(serde_json::json!("error")), "the row drawn failed (live: red name, the header's failures icon)");
     assert_eq!(flat(cx), Some(false), "no flat");
 }
 
