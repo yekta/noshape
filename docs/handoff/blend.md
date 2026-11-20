@@ -1,44 +1,37 @@
 # Blends (agent "blend"): current state
 
-Updated 11-20 10:11 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-20 12:45 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-20 11:15, thread on the Hello account)
+## Now (11-20 12:45, thread on the Hello account)
 
-- Landed 11-20: car Fillet 1, 805e29, suspension canals, mutualtrim (dfc773b80), CHAMFER-ASYM (5a7f9ba8e). Queued 10:55:
-  car end 4a34ff94 (blend-carend 66fbe5e60; rear vertices ±33.941 as live; model 559 ok, suite no diffs, userdocs
-  ALL-SAME). isaac e54410 Chamfer 1 (f8865fb7e) and a2e4a2 Chamfer 2 (bb667320d) landed 11-19: nothing left there.
+- Landed 11-20: car end (f689de1bb), groups speed (214446392: isaac-ball 00f1d4 Fillet 6 5246 -> 968 ms, Fillet 8
+  2382 -> 594), car Fillet 1, 805e29, mutualtrim, CHAMFER-ASYM; e54410 / a2e4a2 chamfers 11-19.
 - Running units (local, `systemctl status blend-*`; results in /root/blend-scratch, *.done markers, logs/):
-  blend-gategroups (vibex8 suite pair -> suite-egroups.cmp, gategroups.done), blend-gatefwork (vibex8 -> ud-fwork.log,
-  suite-efwork.cmp, gatefwork.done), blend-capext (Halter probe -> logs/imp-faces-cap14.out), blend-e54main (e54410 on
-  main, vibex7 -> logs/e54-main.out; confirmation only).
-- 1. Groups speed (worktree blend-speed, 1bf9c67c0): fillet_by_groups rounds groups whose rmax-grown boxes can't meet in
-  one layer, one Common per layer (isaac-ball 00f1d4 Fillet 6 5246 -> 968 ms, Fillet 8 2382 -> 594). T1
-  rounds_meeting_on_several_ribs_are_their_common. Kernel 538 / model 558 ok, userdocs ALL-SAME; waiting on
-  suite-egroups.cmp (vs groups-base be2a573cf). Clean -> `tools/tiers/land.sh` from blend-speed; report ms to the lead.
-- 2. Fillet work bound (worktree blend-fwork, 08749e8bb on 1bf9c67c0; land after groups): build_fillet_bounded =
-  ScopedWork(FILLET_WORK 50000) round every BRepFilletAPI_MakeFillet build (patch 0030's break hook counts each math
-  solve; no clock, DECISIONS 11-15). T1 a_fillet_past_its_work_bound_fails_and_the_next_one_builds. Calibration: kernel +
-  model test fillets 5410 steps at most. f850-work.out: 850efe's Fillet 3 now fails in 4727 ms (as_is 2282 ms and
-  by_groups 2314 ms each stop at 50000 steps; other builds 969-3554 steps; was ~35 s). Gate: clippy clean, kernel 539 /
-  model 558 ok; waiting on ud-fwork.log + suite-efwork.cmp -> land, report the ms to the lead. Base worktree fwork-base.
-- 3. Halter (impeller Fillet 3 near tip; probes only in worktree blend-f850 on vibex8, never commit: ZZ_FACES/ZZE dumps
-  in detail.rs, ZZRUN + ZZCORNER in blend_section.rs, ZZEXT + ZZ_CAPEXT=<mm> (caps each side's extension) in build.cpp
-  extend_face_over, zz_f850 in crash_inputs.rs, ZZ_ASIS/ZZ_PARAMS in features.cpp). bin/imp-faces.sh <wt> <tag>
-  ['ENV=..'] -> logs/imp-faces-<tag>.out.
-  Ours vs live: our tip vertex x 1.502, live 0.097 (same y z); chamfer x round 4.7418 vs 5.7369, chamfer x wall 4.1531 vs
-  4.5437. Live (q-imp-chamfer-surf): the chamfer face is ruled (u deg 1, x 1.5 -> 5) and after Fillet 3 extended
-  linearly in u by 0.4008 of its width (1.403 mm) to x 0.097 = the tip.
-  imp-faces-corner.out (11-20): the old hypothesis is wrong: the corner walls (faces 7 / 17, ruled direction = our v)
-  ARE extended, 1.25 x 5.25 + 2.97 = ~9.5 mm to x -7.6; the tool's run past x 1.5 then lies behind every wall (plane x 5
-  and both extended chamfers) and is dropped as one cell (box x -1.5..5); kept cells start at x 1.501. Probe running:
-  cap at live's 1.403 mm (cap14) to see if the tip follows the extension. Then derive the extension rule (what decides
-  live's 0.4008) and feature 29 (Fillet Stevenrohr zum Halter, "Adjoining edge not filleted.") per q-imp-halter.
-- Cleanup after lands: worktrees cham-base, carend-base, groups-base, fwork-base, blend-f850 (+ host targets
+  blend-gatefwork (vibex8 suite pair; base done, new running -> suite-efwork.cmp, gatefwork.done), blend-gateseg (trim
+  gate: tests -> logs/gseg-tests.out, userdocs ud-seg.log, suite-eseg.cmp, gateseg.done), blend-capprobe (Halter cap
+  1.403 mm -> logs/imp-faces-cap1403.out), blend-budprobe (after it: ZZBUD budget-fire probes -> logs/imp-bud-b1.out).
+- 1. Fillet work bound (worktree blend-fwork, 08749e8bb): build_fillet_bounded = ScopedWork(FILLET_WORK 50000) round
+  every BRepFilletAPI_MakeFillet build (patch 0030's break hook; no clock). 850efe Fillet 3 fails in 4727 ms (was ~35 s).
+  Tests ok, ud-fwork ALL-SAME; suite clean -> g13.sh, land.sh from blend-fwork, report the ms. Base fwork-base.
+- 2. Halter (impeller Fillet 3 near tip). Trim committed: blend-f850 branch blend-seg b6bb39e3b (extend_face_over
+  extends the face's own UV part, not the whole surface; tip x 1.502 -> 0.957, live 0.097). Gate blend-gateseg; land
+  when identical except intended. Probes in worktree blend-cap (branch blend-capx = b6bb39e3b + parked/f850-probes-1120
+  .patch + ZZBUD), never commit. bin/imp-faces.sh <wt> <tag> ['ENV=..'] (IHOST=host). Next: live extends the chamfer
+  linearly 1.403 mm (0.4008 of its width): probe ZZ_CAPEXT=1.403, then derive the rule; then feature 29 (Fillet
+  Stevenrohr zum Halter).
+- 3. SUITE-IMPELLER-FILLET3 (qa P1, mine; core agrees it's a time budget): impeller alone on main, vibex8 under load ->
+  27/48, Fillet 3 39/113/71, 5266 ms; unloaded single runs 29. Clocks on the path: CancelIndicator deadline (boolean.cpp
+  ~255), pool jobs' wall clock in deadline checks (boolean.cpp ~483: cpu0 + wall), run_budgeted CPU budgets. ZZBUD probe
+  shows which fires; replace it by a work bound (DECISIONS: no clocks).
+- 4. qa P2 c2-curve-pattern-composite Fillet 2 28/58/32 vs live 26/52/28.
+- 5. dx speed (impeller): Fillet 3 1839 vs live 107 ms, Ansaugflansch 1654/321 (blend.scaled 532 after as_is 273),
+  Flansch zum Stroemungskanal 1002/67, Fillet 4 361/102; knifehandle Fillet 3 306/12.
+- Cleanup after lands: worktrees cham-base, carend-base, groups-base, fwork-base, blend-f850, blend-cap (+ host targets
   ~/agents/<wt>/target), vibex7 ~/tmp/blend/cli-{blend-speed,groups-base,carend-base,blend-carend,fwork-base,blend-fwork},
   vibex8 ~/tmp/blend/f850, Mac ~/noshape-host/agents/blend10/f850. blend-cham is on branch blend-e54 (= main, unused).
 - Agent ids: only in /root/lead-scratch/roster.md; read it before every message_agent, never copy ids here.
