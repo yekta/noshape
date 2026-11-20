@@ -165,7 +165,7 @@ RT revision table, CW customized release workflow; BUNDLE the client's strings. 
 | Submit when an approver is given, else Obsolete | OBS "Click Submit if an approver's email is supplied, otherwise click Obsolete" | no Approvers/Observers in obsolete mode (RD:2017); only Obsolete (RD:2151-2158) | – | see the live matrix |
 | Name / notes fields and which are required | OBS "Supply the required information" | label = display name "Obsoletion names"/"Obsoletion notes" (RD:1964, RS:79); notes required (RD:1967, 1489) | – | see the live matrix |
 | Obsoleting marks the released version (solid ▲ with dot) | RM | OPS:364-368, HP:1110-1162 | – | = |
-| Obsoleted revisions never offered when inserting into Assembly / Drawing | OBS | drawing insert filters them (crates/drawing-ui/src/drawing_chooser.rs:117-127); assembly Insert has no release filter | drawing_chooser released_items_newest_first_without_obsolete | = (drawing) / ? (assembly) |
+| Obsoleted revisions never offered when inserting into Assembly / Drawing | OBS | drawing insert filters them (crates/drawing-ui/src/drawing_chooser.rs:117-127); assembly Insert has no release filter | drawing_chooser released_items_newest_first_without_obsolete | = (drawing) / ✗ (assembly: live's Insert › Other documents › ▲ "View released items" lists "Part 1 OBS-PN-1 (A)", after obsoleting "No Part Studios found."; version graph unchanged; TICKETS ASM-INSERT-RELEASED-ITEMS; live 11-20 parity-open-1120/ob) |
 | Agent API op to obsolete a revision | AGENTS.md: every app action is an op | ops `release_obsolete` | e2e release_parts_and_revision_history | = (fixed 11-14) |
 
 ## 6. Company settings › Release management
