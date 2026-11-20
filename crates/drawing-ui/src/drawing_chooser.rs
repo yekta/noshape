@@ -1318,7 +1318,7 @@ impl DrawingEditor {
                         (_, true) => "Select a Part Studio",
                         _ => "Select a part or assembly",
                     }))
-                    .child(div().id("dr-chooser-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 12., pal.text_muted)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .child(div().id("dr-chooser-close").debug_selector(|| "dr-chooser-close".into()).relative().top(px(3.)).left(px(-1.)).w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("panel-close", 24., gpui_kit::rgb(0x999999))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.chooser.composite = false;
                         this.close_studio_chooser();
                         this.insert.chooser = None;
