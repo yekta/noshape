@@ -146,6 +146,9 @@ regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete w
 
 ## Next, in order
 0. USER P0 feel: rows of docs/parity/interaction-feel.md in my areas are "=" now; Hover timing is psui's.
+0b. live's camera retakes (025a33f6): sketch-line-from-midpoint, sketch-bezier-polygon, sketch-spline-handle-arm and 7 asm
+   takes now compare the camera; rerun them after the land. asm-menu-instance-properties' Pro menu (Where used…, no
+   Release…) is already asm's on main; "Create task…" is CLOUD_ONLY in run.py.
 1. loft-paths-guides now lists only Sketch 2's take-back and Sketch 4's 3 PROJECTED (Sketch 5's PIERCEs on its
    Intersection's ends are skipped as the tool's own). The other PIERCE take-backs (09:20, sec.log) all sit behind an
    upstream difference: surf-intro tail fins (Intersection face from the unbuilt Derived 1), manualblend Sketch 6 / 7
