@@ -190,6 +190,28 @@ fn rows() -> Vec<Row> {
             // (Live's recorder reads the field itself "ok": fillet-too-big; the entry is what turns red.)
             expect((d["titleState"].as_str(), query["state"].as_str(), entry_red, tip.as_str()), (Some("error"), Some("ok"), true, "Fillet 1 did not regenerate properly: Failed to fillet selections."), "(title, field, its entry red, title's tooltip)")
         } },
+        Row { id: "error / inputs refused", live: "Thicken on a block's top face with Thickness 1 and 2 both 0 (live part-studio 2059, L19): 'Invalid input selections.', the title red, the face's entry dark and the face orange (selected), no field marked (qa ERROR-CHIP-RED-NO-FIELD)", gap: false, check: |cx| {
+            let json = serde_json::json!({ "units": "mm", "features": [
+                { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+                { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } },
+                { "type": "thicken", "name": "Thicken 1", "params": { "entities": ["face through [20, 15, 10]"], "thickness1": "0 mm", "thickness2": "0 mm" } }
+            ] });
+            let (window, view) = start(cx, "fb-thicken-zero", json);
+            let id = feature_id(cx, &view, "Thicken 1");
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            draw(cx, window);
+            let dialog = cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.clone())).ok_or("no dialog")?;
+            let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+            let d = &state["dialog"];
+            let (message, entry_red, picked) = cx.update(|cx| {
+                let dlg = dialog.read(cx);
+                let picked = dlg.feature.params.query("entities");
+                (dlg.status.as_ref().map(|s| s.1.clone()), picked.iter().any(|r| dlg.entry_failing(r)), picked.len())
+            });
+            let marked: Vec<String> = d["fields"].as_array().map(|f| f.iter().filter(|f| f["state"] != "ok").filter_map(|f| f["label"].as_str().map(str::to_string)).collect()).unwrap_or_default();
+            expect((d["titleState"].as_str(), message.as_deref(), picked, entry_red, marked), (Some("error"), Some("Invalid input selections."), 1, false, Vec::<String>::new()), "(title, message, faces picked, an entry red, fields marked)")
+        } },
     ]
 }
 

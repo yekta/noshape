@@ -1554,9 +1554,9 @@ pub fn thicken(ev: &mut EvalCtx) -> FResult<()> {
     if ev.bool("oppositeDirection") && !ev.bool("midplane") {
         std::mem::swap(&mut t1, &mut t2);
     }
-    // Live L19: both thicknesses 0 fail with this text and no field.
+    // Live L19: both thicknesses 0 fail with this text, no field and no input drawn failing.
     if t1 + t2 <= 0.0 {
-        return err("Invalid input selections.");
+        return Err(crate::regen::eval::FeatureError::invalid_input("Invalid input selections."));
     }
     let mut inputs: Vec<ThickenInput> = Vec::new();
     let mut consumed: Vec<BodyId> = Vec::new();

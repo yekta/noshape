@@ -903,6 +903,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   Files: qa-scratch/tickets/sketch-dxf-1119/. (qa 23:58, green f6f8069f)
 
 - [ ] P2 **ERROR-CHIP-RED-NO-FIELD (psui)**: Thicken on a box face, Thickness 1 = 0 and Thickness 2 = 0 (behaviours L19): title red,
+- [x] fixed (psui 11-20: FeatureError / FeatureState `invalid_input` for inputs refused before any operation, set by Thicken's both-zero; the dialog then draws no entry or input failing; feedback matrix row "error / inputs refused") P2 **ERROR-CHIP-RED-NO-FIELD (psui)**: Thicken on a box face, Thickness 1 = 0 and Thickness 2 = 0 (behaviours L19): title red,
   "Thicken 1 did not regenerate properly: Invalid input selections." = live, but ours also draws the "Face of Move face 1" chip in red
   text. Live flags no field for this error: title red only, the chip stays dark (live/part-studio/2059-psbL16-ThickenL19bothzero.png).
   The evaluator's err (solid_a.rs:1559) names no parameter, so the red comes from the dialog. Shots: qa-scratch/tickets/

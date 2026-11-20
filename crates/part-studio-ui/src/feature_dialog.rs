@@ -175,6 +175,8 @@ pub struct FeatureDialog {
     /// Parameters the regeneration error points at (Onshape paints those
     /// fields pink with the message as their tooltip).
     pub faulty: Vec<String>,
+    /// The error refused the inputs before any operation ran: no entry drawn failing (live L19).
+    pub invalid_input: bool,
     labeler: RefLabeler,
     collapsed_groups: std::collections::HashSet<String>,
     /// Where live's layout is in the parameter list, unrounded (see
@@ -454,6 +456,7 @@ impl FeatureDialog {
             typed_pending: false,
             status: None,
             faulty: Vec::new(),
+            invalid_input: false,
             labeler,
             collapsed_groups,
             live_y: Default::default(),
@@ -1566,9 +1569,10 @@ impl FeatureDialog {
     /// saved studio while it is new).
     /// A field entry drawn as an error (live `ns-list-item-error`): its entity is gone, or the feature fails with an
     /// error naming no field, which draws its inputs red (live feel/feedback.json "failedPreview": Fillet 100 mm's
-    /// "Edge of Extrude 1" entry red, the field itself not marked).
+    /// "Edge of Extrude 1" entry red, the field itself not marked); not when the inputs were refused before any
+    /// operation (live L19: Thicken's two zero thicknesses keep the face's entry dark).
     pub(crate) fn entry_failing(&self, r: &Reference) -> bool {
-        let failing = matches!(self.status, Some((FeatureStatus::Error, _))) && self.faulty.is_empty() && self.feature.type_id != "sketch";
+        let failing = matches!(self.status, Some((FeatureStatus::Error, _))) && self.faulty.is_empty() && !self.invalid_input && self.feature.type_id != "sketch";
         failing || self.ref_missing(r)
     }
 
@@ -1617,9 +1621,9 @@ impl FeatureDialog {
         }
     }
 
-    pub fn set_faulty(&mut self, faulty: Vec<String>, cx: &mut Context<Self>) {
-        if self.faulty != faulty {
-            self.faulty = faulty;
+    pub fn set_faulty(&mut self, faulty: Vec<String>, invalid_input: bool, cx: &mut Context<Self>) {
+        if self.faulty != faulty || self.invalid_input != invalid_input {
+            (self.faulty, self.invalid_input) = (faulty, invalid_input);
             cx.notify();
         }
     }

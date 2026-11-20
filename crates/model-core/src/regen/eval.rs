@@ -20,16 +20,24 @@ pub struct FeatureError {
     /// The parameters at fault (Onshape's faulty parameters: their empty
     /// selection fields turn pink and show the message).
     pub faulty: Vec<&'static str>,
+    /// The inputs were refused before any operation ran (Thicken's two zero thicknesses): live reddens no input then,
+    /// as it does the inputs of an operation that failed on them (a Fillet too large).
+    pub invalid_input: bool,
 }
 
 impl FeatureError {
     pub fn new(m: impl Into<String>) -> Self {
-        Self { message: m.into(), warning: false, faulty: Vec::new() }
+        Self { message: m.into(), warning: false, faulty: Vec::new(), invalid_input: false }
     }
 
     /// An error naming the parameters at fault (their fields shown red), as [`err_at`].
     pub fn at(faulty: &[&'static str], m: impl Into<String>) -> Self {
         Self { faulty: faulty.to_vec(), ..Self::new(m) }
+    }
+
+    /// Inputs refused before any operation (see [`FeatureError::invalid_input`]).
+    pub fn invalid_input(m: impl Into<String>) -> Self {
+        Self { invalid_input: true, ..Self::new(m) }
     }
 }
 

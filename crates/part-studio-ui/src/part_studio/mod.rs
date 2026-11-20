@@ -1237,7 +1237,7 @@ impl PartStudioView {
             // configuration only fails once accepted; its dialog stays black
             // with ✓ enabled.
             let st = st.filter(|(_, m)| !m.starts_with("Creating multiple Derived features from the same source"));
-            let faulty = self.display.feature_state(id).map(|s| s.faulty.clone()).unwrap_or_default();
+            let (faulty, invalid_input) = self.display.feature_state(id).map(|s| (s.faulty.clone(), s.invalid_input)).unwrap_or_default();
             // Live (sketch/00-sketch-dialog-empty.png): a sketch without a
             // plane asks for one in a blue bubble over the graphics.
             const NO_PLANE: &str = NO_SKETCH_PLANE_BUBBLE;
@@ -1264,7 +1264,7 @@ impl PartStudioView {
             e.dialog.update(cx, |d, cx| {
                 d.note_regenerated(regen_ok);
                 d.set_status(st, cx);
-                d.set_faulty(faulty, cx);
+                d.set_faulty(faulty, invalid_input, cx);
             });
         } else if let Some(m) = self.ui.dialog_info.take()
             && self.message.as_ref().is_some_and(|(_, x)| *x == m)
@@ -1526,7 +1526,7 @@ impl PartStudioView {
         // drawn red while its dialog is open.
         let failing = self.edit.as_ref().is_some_and(|e| {
             let d = e.dialog.read(cx);
-            matches!(d.status, Some((noshape_model::display::FeatureStatus::Error, _))) && !d.only_missing_input()
+            matches!(d.status, Some((noshape_model::display::FeatureStatus::Error, _))) && !d.only_missing_input() && !d.invalid_input
         });
         // A failed Feature pattern shows the instances it couldn't make, and
         // its inputs keep the usual selection colors (the user's live shot

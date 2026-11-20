@@ -535,7 +535,7 @@ impl Regenerator {
                 keys.push((f.id, key));
             }
             if i >= upto {
-                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() });
+                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), invalid_input: false, missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() });
                 continue;
             }
             if let Some(versions) = self.entries.get_mut(&f.id)
@@ -606,7 +606,7 @@ impl Regenerator {
                 noshape_kernel::kernel_profile_mark("");
             }
             let ft = Instant::now();
-            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() };
+            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), invalid_input: false, missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() };
             if let Some(msg) = expr_error.take() {
                 state.status = FeatureStatus::Error;
                 state.message = Some(msg);
@@ -757,6 +757,7 @@ impl Regenerator {
                                 state.status = if e.warning { FeatureStatus::Warning } else { FeatureStatus::Error };
                                 state.message = Some(e.message);
                                 state.faulty = e.faulty.iter().map(|s| s.to_string()).collect();
+                                state.invalid_input = e.invalid_input;
                                 state.touched = std::mem::take(&mut ev.touched);
                                 state.touched_behind = std::mem::take(&mut ev.touched_behind);
                                 // A failed custom feature's debug() still shows (live).

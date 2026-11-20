@@ -491,6 +491,9 @@ pub struct FeatureState {
     pub time_ms: f32,
     /// Parameters at fault when it failed.
     pub faulty: Vec<String>,
+    /// It failed on inputs refused before any operation ran (no input drawn as failing).
+    #[serde(default)]
+    pub invalid_input: bool,
     /// Selections that no longer resolve (live: the row's tooltip adds
     /// "1 missing selection").
     pub missing: usize,
