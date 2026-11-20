@@ -1245,6 +1245,63 @@ fn variable_studio_rename_reaches_assemblies() {
     assert!(!c.to_string().contains("#w"), "no #w left: {c}");
 }
 
+/// Live dm-1120: a mate offset "#w" is refused until the assembly has a Variable Studio defining w; an inserted
+/// "Dims" with w = 0.5 in reads "12.7 mm" in the assembly's Variable table, and the offset then solves to it.
+#[test]
+fn a_mate_offset_variable_needs_an_inserted_variable_studio() {
+    let mut ctx = Ctx::new();
+    let path = scratch("asm-vs-offset.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [d["regions"][0]["id"]], "depth": "10 mm" } }));
+    let asm = json!("Assembly 1");
+    call(&mut ctx, "assembly_insert", json!({ "tab": asm, "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": asm, "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_set_state", json!({ "tab": asm, "instances": ["Part 1 <1>"], "fixed": true }));
+    let face = |ctx: &mut Ctx, instance: &str, z: f64| call(ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": instance, "kind": "faces", "normal": [0, 0, z] }))["faces"][0].clone();
+    let (top, bottom) = (face(&mut ctx, "Part 1 <1>", 1.0)["id"].clone(), face(&mut ctx, "Part 1 <2>", -1.0)["id"].clone());
+    let mate = json!({ "tab": asm, "type": "fastened", "a": { "instance": "Part 1 <1>", "entity": top }, "b": { "instance": "Part 1 <2>", "entity": bottom }, "offset": { "z": "#w" } });
+    let e = try_call(&mut ctx, "assembly_mate", mate.clone()).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("offset.z"), "{e:?}");
+    assert!(call(&mut ctx, "assembly_list", json!({ "tab": asm }))["mates"].as_array().unwrap().is_empty(), "nothing written");
+    call(&mut ctx, "tab_create", json!({ "kind": "variablestudio", "name": "Dims" }));
+    call(&mut ctx, "variable_create", json!({ "tab": "Dims", "name": "w", "value": "0.5 in" }));
+    call(&mut ctx, "variable_insert_studio", json!({ "tab": asm, "studio": "Dims" }));
+    let l = call(&mut ctx, "variable_list", json!({ "tab": asm }));
+    assert_eq!(l["visible_at_end"]["#w"], "12.7 mm", "{l}");
+    assert_eq!(l["studio_tables"][0]["studio"], "Dims", "{l}");
+    assert_eq!(call(&mut ctx, "assembly_mate", mate)["mate_ok"], true);
+    let gap = num(&face(&mut ctx, "Part 1 <2>", -1.0)["centroid"][2]) - 10.0;
+    assert!((gap.abs() - 12.7).abs() < 1e-6, "the offset solves to 12.7 mm: {gap}");
+    // Live batch 2: w = 1 in regenerates the mate to 25.4 mm.
+    call(&mut ctx, "variable_set", json!({ "tab": "Dims", "variable": "w", "value": "1 in" }));
+    let gap = num(&face(&mut ctx, "Part 1 <2>", -1.0)["centroid"][2]) - 10.0;
+    assert!((gap.abs() - 25.4).abs() < 1e-6, "w = 1 in: 25.4 mm, {gap}");
+}
+
+/// Live dm-1120 batch 2: Change configuration… to one without the instance's part keeps the instance, in error
+/// ("Failed to resolve instance."); back to a configuration with it, the error goes.
+#[test]
+fn an_instance_changed_to_a_configuration_without_its_part_is_in_error() {
+    let mut ctx = Ctx::new();
+    let (_, pin) = two_part_assembly(&mut ctx, "asm-config-no-part.noshape");
+    let ext = "Extrude 2"; // the pin's
+    let c = call(&mut ctx, "config_add_input", json!({ "tab": "Part Studio 1", "kind": "checkbox", "name": "No pin", "default": false }));
+    let cb = c["input"].as_str().unwrap().to_string();
+    call(&mut ctx, "config_configure", json!({ "tab": "Part Studio 1", "feature": ext, "param": "suppressed", "input": cb }));
+    call(&mut ctx, "config_set_value", json!({ "tab": "Part Studio 1", "feature": ext, "param": "suppressed", "configuration": true, "value": true }));
+    let error = |ctx: &mut Ctx| {
+        let l = call(ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+        l["instances"].as_array().unwrap().iter().find(|i| i["id"] == pin.as_str() || i["name"] == pin.as_str()).expect("the instance stays")["error"].clone()
+    };
+    assert_eq!(error(&mut ctx), Value::Null);
+    call(&mut ctx, "assembly_set_configuration", json!({ "tab": "Assembly 1", "instance": pin, "configuration": { cb.clone(): true } }));
+    assert_eq!(error(&mut ctx), "Failed to resolve instance.");
+    call(&mut ctx, "assembly_set_configuration", json!({ "tab": "Assembly 1", "instance": pin, "configuration": { cb: false } }));
+    assert_eq!(error(&mut ctx), Value::Null);
+}
+
 /// Variable Studio tables in a Part Studio's Variable table: create, insert,
 /// reorder (the later table's variable wins), remove, settings.
 #[test]

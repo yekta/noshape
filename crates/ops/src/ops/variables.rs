@@ -118,8 +118,8 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "variable",
             verb: "list",
-            summary: "The variables of a Part Studio or a Variable Studio, with their values",
-            description: "Part Studio: Variable features (#name) in feature order with kind, expression, evaluated value and description, plus the values of every variable visible at the end of the feature list (including Variable Studio and configuration variables) and the inserted Variable Studio tables (`studio_tables`). Variable Studio (`tab` names it): its table rows in order (name, type, expression, value, description).",
+            summary: "The variables of a Part Studio, an Assembly or a Variable Studio, with their values",
+            description: "Part Studio: Variable features (#name) in feature order with kind, expression, evaluated value and description, plus the values of every variable visible at the end of the feature list (including Variable Studio and configuration variables) and the inserted Variable Studio tables (`studio_tables`). Assembly (`tab` names it): its Variable table, the values its expressions see (`visible_at_end`: the inserted Variable Studios', then its configuration variables) and `studio_tables`. Variable Studio (`tab` names it): its table rows in order (name, type, expression, value, description).",
             fields: vec![doc_field(), var_tab(), opt("copy", json!({ "type": "boolean" }), "The table's Copy table (Part Studio: the Variables panel's; Variable Studio: its ⋯ menu's), `copied` being the text it puts on the clipboard (a header row, then name, type, value, description per variable, tab-separated). A row's Copy copies its description (`description` here).")],
             mutates: false,
             destructive: false,
@@ -549,6 +549,9 @@ fn list_value(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
 }
 
 fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if let Some(v) = assembly_list(ctx, a)? {
+        return Ok(v.into());
+    }
     match table(ctx, a)? {
         (od, Table::Studio(tab)) => {
             let mut v = list_value(od, tab)?;
@@ -565,6 +568,23 @@ fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             Ok(v.into())
         }
     }
+}
+
+/// An Assembly's Variable table (live dm-1120: an inserted Dims' `w` = 0.5 in reads "12.7 mm"); None for other tabs.
+fn assembly_list(ctx: &mut Ctx, a: &Args) -> Result<Option<Value>, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let Some(k) = a.opt_str("tab")? else { return Ok(None) };
+    let tab = doc::find_tab(od.doc(), k).map_err(|e| e.with_param("tab"))?;
+    let Some(TabContent::Assembly(asm)) = od.doc().tab(tab).map(|t| &t.content) else { return Ok(None) };
+    let units = od.doc().settings.units;
+    let scope = noshape_model::assembly::eval::assembly_variables(od.doc(), asm);
+    let all: serde_json::Map<String, Value> = scope.iter().map(|(k, q)| (format!("#{k}"), json!(noshape_units::format_quantity_exact(*q, &units)))).collect();
+    let mut v = json!({ "variables": [], "visible_at_end": all });
+    let tables = tables_json(od.doc(), tab)["tables"].clone();
+    if tables.as_array().is_some_and(|t| !t.is_empty()) {
+        v["studio_tables"] = tables;
+    }
+    Ok(Some(v))
 }
 
 fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

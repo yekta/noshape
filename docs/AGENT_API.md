@@ -2098,9 +2098,9 @@ Examples:
 
 #### variable_list
 
-The variables of a Part Studio or a Variable Studio, with their values.
+The variables of a Part Studio, an Assembly or a Variable Studio, with their values.
 
-Part Studio: Variable features (#name) in feature order with kind, expression, evaluated value and description, plus the values of every variable visible at the end of the feature list (including Variable Studio and configuration variables) and the inserted Variable Studio tables (`studio_tables`). Variable Studio (`tab` names it): its table rows in order (name, type, expression, value, description).
+Part Studio: Variable features (#name) in feature order with kind, expression, evaluated value and description, plus the values of every variable visible at the end of the feature list (including Variable Studio and configuration variables) and the inserted Variable Studio tables (`studio_tables`). Assembly (`tab` names it): its Variable table, the values its expressions see (`visible_at_end`: the inserted Variable Studios', then its configuration variables) and `studio_tables`. Variable Studio (`tab` names it): its table rows in order (name, type, expression, value, description).
 
 Examples:
 
@@ -2643,7 +2643,7 @@ Examples:
 
 An assembly's instances, mates and degrees of freedom.
 
-Solves the assembly and lists the instances (id, name, source, placement: translation in workspace units and rotation quaternion xyzw, fixed/hidden/suppressed, remaining DOF), every part occurrence with nested ones (path "Sub <1> > Part 1 <1>", where its Part Studio coordinates are in the assembly), the mates (id, name, type, ok, error message) and the mate relations (id, name, type, mates, ratio, reverse, suppressed, ok / inactive / message).
+Solves the assembly and lists the instances (id, name, source, placement: translation in workspace units and rotation quaternion xyzw, fixed/hidden/suppressed, remaining DOF, `error` when its row is red, e.g. "Failed to resolve instance."), every part occurrence with nested ones (path "Sub <1> > Part 1 <1>", where its Part Studio coordinates are in the assembly), the mates (id, name, type, ok, error message) and the mate relations (id, name, type, mates, ratio, reverse, suppressed, ok / inactive / message).
 
 Examples:
 

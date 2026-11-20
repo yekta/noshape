@@ -51,7 +51,7 @@ pub fn ops() -> Vec<Op> {
             group: "assembly",
             verb: "list",
             summary: "An assembly's instances, mates and degrees of freedom",
-            description: "Solves the assembly and lists the instances (id, name, source, placement: translation in workspace units and rotation quaternion xyzw, fixed/hidden/suppressed, remaining DOF), every part occurrence with nested ones (path \"Sub <1> > Part 1 <1>\", where its Part Studio coordinates are in the assembly), the mates (id, name, type, ok, error message) and the mate relations (id, name, type, mates, ratio, reverse, suppressed, ok / inactive / message).",
+            description: "Solves the assembly and lists the instances (id, name, source, placement: translation in workspace units and rotation quaternion xyzw, fixed/hidden/suppressed, remaining DOF, `error` when its row is red, e.g. \"Failed to resolve instance.\"), every part occurrence with nested ones (path \"Sub <1> > Part 1 <1>\", where its Part Studio coordinates are in the assembly), the mates (id, name, type, ok, error message) and the mate relations (id, name, type, mates, ratio, reverse, suppressed, ok / inactive / message).",
             fields: vec![doc_field(), asm_field()],
             mutates: false,
             destructive: false,
@@ -304,6 +304,10 @@ fn describe(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
                 "dof": r.solved.instance_dof.get(&i.id),
             });
             instance_extras(&mut v, i);
+            // The row's red error (live dm-1120: "Failed to resolve instance." after a configuration without its part).
+            if let Some(e) = r.nodes.iter().find(|n| n.path == [i.id]).and_then(|n| n.error.as_deref()) {
+                v["error"] = json!(e);
+            }
             if a.pinned_references.contains(&i.id) {
                 v["reference_pinned"] = json!(true);
             }
@@ -917,6 +921,15 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
         }
         m.limits = out;
+    }
+    // As the dialog's fields: a name no inserted Variable Studio or configuration defines is refused (live dm-1120).
+    let vars = noshape_model::assembly::eval::assembly_variables(od.doc(), &asm);
+    let offsets = [("offset.x", &m.offset_x), ("offset.y", &m.offset_y), ("offset.z", &m.offset_z), ("offset.rotation", &m.rotation)];
+    let limits = m.limits.iter().flat_map(|(_, l)| [("limits", &l.min), ("limits", &l.max)]);
+    for (key, e) in offsets.into_iter().chain(limits) {
+        if e.as_ref().is_some_and(|e| noshape_units::evaluate(&e.text, &vars).is_err()) {
+            return Err(OpError::param(key, "Enter a valid expression."));
+        }
     }
     m.tangent_propagation = a.bool_or("tangent_propagation", m.tangent_propagation)?;
     if mate_type == MateType::Width {
