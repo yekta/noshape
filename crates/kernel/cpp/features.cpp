@@ -8087,15 +8087,38 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_groups(const TopoDS_Shap
   }
   if (groups.size() < 2)
     return std::nullopt;
+  // Groups whose rounds can't meet (their edges' boxes apart by more than two of the largest radius) rounded together,
+  // in one layer: a Common per layer, not per group (isaac-ball 00f1d4's Fillet 6: 16 slot edges, the 16 Commons
+  // 5.0 s). A layer OCCT can't round as one goes group by group.
+  double rmax = 0;
+  for (double r : rs)
+    rmax = std::max(rmax, r);
+  std::vector<Bnd_Box> boxes(groups.size());
+  for (size_t g = 0; g < groups.size(); ++g)
+  {
+    for (size_t i : groups[g])
+      BRepBndLib::Add(es[i], boxes[g]);
+    boxes[g].Enlarge(rmax + Precision::Confusion());
+  }
+  std::vector<std::vector<size_t>> layers;
+  for (size_t g = 0; g < groups.size(); ++g)
+  {
+    auto apart = [&](const std::vector<size_t>& layer) {
+      return std::all_of(layer.begin(), layer.end(), [&](size_t o) { return boxes[g].IsOut(boxes[o]); });
+    };
+    auto it = std::find_if(layers.begin(), layers.end(), apart);
+    if (it == layers.end())
+      layers.push_back({g});
+    else
+      it->push_back(g);
+  }
   try
   {
     // (The input's volume only once a group's round builds: an integral over the whole part, 2.2 s of
     // c2-impeller-loft's failing Fillet Stevenrohr zum Halter, whose first group fails in 5 ms.)
     std::optional<double> v0;
-    TopoDS_Shape cur = input;
-    HHist        cur_h;
-    for (const std::vector<size_t>& idx : groups)
-    {
+    // The input rounded at the edges `idx`, checked; null where OCCT can't.
+    auto rounded_at = [&](const std::vector<size_t>& idx) -> std::optional<std::pair<TopoDS_Shape, HHist>> {
       BRepFilletAPI_MakeFillet mk(input);
       for (size_t i : idx)
         mk.Add(rs.size() == es.size() ? rs[i] : rs[0], es[i]);
@@ -8113,6 +8136,35 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_groups(const TopoDS_Shap
         v0 = volume_props(input).Mass();
       if (!(volume_props(rounded).Mass() < *v0))
         return std::nullopt;
+      return std::make_pair(rounded, h);
+    };
+    std::vector<std::pair<TopoDS_Shape, HHist>> rounds;
+    for (const std::vector<size_t>& layer : layers)
+    {
+      std::vector<size_t> idx;
+      for (size_t g : layer)
+        idx.insert(idx.end(), groups[g].begin(), groups[g].end());
+      if (layer.size() > 1 && layers.size() > 1)
+        if (auto r = rounded_at(idx))
+        {
+          rounds.push_back(std::move(*r));
+          continue;
+        }
+      for (size_t g : layer)
+      {
+        auto r = rounded_at(groups[g]);
+        if (!r)
+          return std::nullopt;
+        rounds.push_back(std::move(*r));
+      }
+    }
+    if (rounds.size() < 2)
+      return std::nullopt;
+    TopoDS_Shape cur   = rounds[0].first;
+    HHist        cur_h = rounds[0].second;
+    for (size_t k = 1; k < rounds.size(); ++k)
+    {
+      const auto& [rounded, h] = rounds[k];
       BRepAlgoAPI_Common cm; // (not the two-shape constructor: it builds at once)
       ShapeList          args, tools;
       args.Append(cur);

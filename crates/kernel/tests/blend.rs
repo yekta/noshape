@@ -1631,6 +1631,24 @@ fn overlapping_rounds_of_a_narrow_rib_are_their_common() {
     assert!(vol_mm3(&r) < vol_mm3(&one(&es[0])));
 }
 
+/// isaac-ball 00f1d4's Fillet 6: r 4 on both top edges of ribs 8 mm thick, every rib's two rounds meeting at its top:
+/// the rounds that can't meet made together (each rib's left edges, then its right ones), the part their common; each
+/// rib loses (1 - π/4) r² of section per edge, exactly.
+#[test]
+fn rounds_meeting_on_several_ribs_are_their_common() {
+    setup();
+    let ribs: Vec<Shape> = (0..4).map(|k| bx([5.0 + 20.0 * k as f64, 0.0, 2.0], [13.0 + 20.0 * k as f64, 10.0, 7.0])).collect();
+    let part = boolean(BooleanOp::Fuse, &[bx([0.0; 3], [80.0, 10.0, 2.0])], &ribs, &BooleanOptions::default()).unwrap().shape;
+    let es = edges_where(&part, |i| i.start.z > 6.99 * MM && i.end.z > 6.99 * MM && (i.start.y - i.end.y).abs() > 1.0 * MM);
+    assert_eq!(es.len(), 8);
+    let r = fillet_checked(&part, &es, &[4.0 * MM; 8]).unwrap().shape;
+    assert!(r.is_valid() && r.solids().len() == 1);
+    let want = vol_mm3(&part) - 8.0 * (1.0 - std::f64::consts::FRAC_PI_4) * 16.0 * 10.0;
+    assert!((vol_mm3(&r) - want).abs() < 1e-3, "{} vs {want}", vol_mm3(&r));
+    let round: f64 = r.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { .. }))).map(|f| f.area().unwrap() / (MM * MM)).sum();
+    assert!((round - 4.0 * std::f64::consts::PI * 4.0 * 10.0).abs() < 1e-3, "{round} mm² of round");
+}
+
 /// FILLET-MEETING-FILLETS-ONE-FACE (pulley02-maxwell): a revolved groove 6.35 mm high, both bottom corners R3.175: the
 /// two rounds meet on one torus (the floor goes). OCCT's unify can't tell two tori are one (it intersects them): the
 /// unify gives them one surface first, then merges them: one face, as live's (5 faces).
