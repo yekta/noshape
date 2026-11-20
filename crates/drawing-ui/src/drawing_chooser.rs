@@ -345,7 +345,7 @@ impl DrawingEditor {
             .flex()
             .flex_none()
             .items_center()
-            .child(crate::assets::icon(if open { "chevron-down" } else { "chevron-right" }, 14., cx))
+            .child(chooser_chevron(open))
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                 cx.stop_propagation();
                 if let Some(i) = this.chooser.open.iter().position(|t| *t == id) {
@@ -1183,7 +1183,7 @@ impl DrawingEditor {
                     .debug_selector(move || format!("dr-ch-ps-{id}"))
                     .when(!inputs.is_empty(), |d| d.min_h(px(31.)))
                     .map(|d| crate::ui_script::mark(d, || format!("list_row:{studio}")))
-                    .child(crate::assets::icon(if open { "chevron-down" } else { "chevron-right" }, 14., cx))
+                    .child(chooser_chevron(open))
                     .child(div().flex_1().min_w_0().truncate().child(crate::ui::user_text(name)))
                     .when(!inputs.is_empty(), |d| d.child(self.config_buttons(id, cx)))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -1405,14 +1405,14 @@ impl DrawingEditor {
             }
         } else {
             // Live 170: the document, its workspace or chosen version, and
-            // the Create version… / Version graph buttons.
+            // the Create version… / Version graph buttons; the two lines in the buttons' 30 px (ct-2-add).
             let place = self.chooser.version.as_ref().map(|v| v.name.clone()).unwrap_or_else(|| "Main".into());
             let doc = self.doc.clone();
             let header = h_flex()
                 .px(px(6.))
                 .py(px(4.))
                 .gap(px(4.))
-                .child(v_flex().flex_1().min_w_0().child(div().truncate().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).child(crate::ui::user_text(doc_name))).child(h_flex().gap(px(4.)).text_size(px(13.)).text_color(gpui_kit::rgb(0x999999)).child(crate::assets::icon("branch", 12., cx)).child(place)))
+                .child(v_flex().flex_1().min_w_0().child(div().truncate().text_size(px(14.)).line_height(px(18.)).font_weight(FontWeight::SEMIBOLD).child(crate::ui::user_text(doc_name))).child(h_flex().h(px(12.)).gap(px(4.)).text_size(px(13.)).text_color(gpui_kit::rgb(0x999999)).child(crate::assets::icon("branch", 12., cx)).child(place)))
                 // The drawing holds the keyboard under the modal: Esc gives it back to the drawing, not the search box (live
                 // ver-insert-create-version-esc).
                 .child(chooser_square("dr-ch-version", "version", "Create version…", false, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
@@ -1525,6 +1525,12 @@ impl DrawingEditor {
 pub(crate) const NO_SEARCH_MATCH: &str = "No parts or sketches match current search.";
 
 /// The document header's 30 px buttons (Create version…, Version graph).
+/// A studio row's expander (live iv-4, ch-5): a thin dark › or ⌄.
+fn chooser_chevron(open: bool) -> Div {
+    let (name, size) = if open { ("ui-chevron-down", 10.) } else { ("ui-chevron-right", 14.) };
+    div().size(px(14.)).flex_none().flex().items_center().justify_center().child(crate::ui::glyph(name, size, gpui_kit::rgb(0x333333)))
+}
+
 fn chooser_square(id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &App) -> Stateful<Div> {
     div()
         .id(id)
