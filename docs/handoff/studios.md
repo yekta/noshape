@@ -20,26 +20,14 @@ read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edi
 the next run. Run the full ops e2e before any drawing land. vibex8 is qa's quiet speed window 02:00-04:00 (lead 11-20):
 nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdshots-host.sh (PD_HOST=vibe2 PD_DISP=395: first free display, never skasm's :391-399). A few app runs don't take ~/bin/slot (DECISIONS 11-15).
 - Landed 09:57: 782f4c47 as f29e6eb2 (the Windows CI wheel-notch fix and the 18 commits with it).
-- fc8e6c91 FAILED 10:52: export_drawing_rows_as_live inherited the previous test's remembered DWG (Linux test order;
-  the binary shares one config dir); the test picks PDF first now.
-- Queued 10:56 as 35451185 (18 commits): the fc8e6c91 batch (matrix doc, BOM / cut list / custom cell menu = live's,
-  Datum target flips / dropdown / Origin stays active / Targets box ≤400 px), coverage MENUS "drawing:Resize...",
-  DRW-DATUM-TARGET-OP (op `drawing_datum_target`; scene opts.rs `datum_target_at` / `datum_target_distances`,
-  SheetPick `datum_target_custom` / `straight_edge_dir_at` shared with the dialog; e2e), live panel-lists s21-24 (an
-  empty distance's ▾ opens no list; Angle's Instance count underlined + Opposite direction button =
-  DatumTargetOpts::instances_reverse / op `opposite_direction`; Flip / Rotate icons, grey with no origin), Feature
-  Studio bracket box on the 8x16 cell (vendor gpui-base inset_frame_corners), FS-* psui rows closed (qa's verified
-  duplicates). Mac: ops 452, drawing-ui 127, feature-studio-ui 28, clippy clean; AGENT_API regenerated.
-- b24 DONE 11:05 (vibex7 build): panel-lists 27/27 (was 25/27), hide-dim 12/12. Local after: Flip / Rotate 5 px apart
-  (live s21: centres 30 px apart).
-- Local after 35451185: 7ba01b354 Flip / Rotate 5 px apart; aedc1b050 a selected dimension = live dsel3 (black text
-  on an orange box, lines orange, grips; push_annotation_look, test); section End type select marked
-  `dropdown:<shown>` (drw-section-blind-offset 5/11 → 9/11); uncommitted: drawing_ui_state counts a selected
-  dimension's grips in a view box (live drw-styles-radial s3 EDGE Top), checked by b27d (baseline, 21 drw-dimension
-  takes) vs b28. Next: when /root/studios-scratch/b27d.log ends DONE and b28.log has APPDONE, `scp -3
-  vibex7:tmp/studios/noshape vibe2:tmp/studios/noshape`, then `PD_HOST=vibe2 PD_DISP=395 pdshots-host.sh b28d $(cat
-  /root/studios-scratch/dimtakes.txt)`; compare the score lines with b27d's; commit the reader change if nothing drops.
-  Land everything once 35451185 lands (Monitor on land.sh --status); report and end the turn after each land (lead 11:4x).
+- Landed 11:43: 35451185 as 2ce8ad6e (18 commits: the fc8e6c91 batch, drawing_datum_target op, panel-lists s21-24,
+  FS bracket box, coverage Resize...).
+- Queued 11:46 as b5048cc1 (4 commits): Flip / Rotate 30 px apart; a selected dimension = live dsel3 (black text on an
+  orange box, lines and grips orange; push_annotation_look, test); section End type select `dropdown:<shown>`
+  (drw-section-blind-offset 5/11 -> 9/11); handoff. No crates/drawing change.
+- Uncommitted (patch also in /root/studios-scratch/reader-grips.patch): drawing_ui_state counts a selected dimension's
+  grips in a view box (live drw-styles-radial s3 EDGE Top). b27d (baseline, 21 drw-dimension takes) DONE; b28d (with
+  the change) running into /root/studios-scratch/b28d.log. Compare the score lines; commit + land only if nothing drops.
 - Live's 08:08 takes, drafts in /root/live-scratch/st0808 (scenario + out/<take>.json; copied untracked into
   tests/ui-parity/ and live/): styles-radial (live's s11 click opened Inspection table: retake asked), section-blind-
   offset (s8 Esc keeps the panel in live: asked). Others not recorded at 11:40.
