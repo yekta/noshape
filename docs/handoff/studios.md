@@ -15,7 +15,7 @@ Updated 2026-11-20 06:41 UTC.
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2
 tools/tiers/land.sh` (`--no-precheck` only when the code was clippy-checked unchanged); read `git diff --stat
-origin/main` first. Builds / tests on the lowest 1-min load of vibex7 / vibex8 / vibe2 (`NOSHAPE_RB_HOST=… tools/tiers/rb.sh`;
+origin/main` first. App builds for shots on vibex7 / vibex6, never vibe2 (its one slot is the land queue's, lead 11-20 08:50; `scp -3 vibex7:tmp/studios/noshape vibe2:tmp/studios/noshape`, shots on vibe2); crate tests on the Mac or the lowest 1-min load of vibex7 / vibex8 (`NOSHAPE_RB_HOST=… tools/tiers/rb.sh`;
 read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edited during a running sync: `touch` edited files before
 the next run. Run the full ops e2e before any drawing land. vibex8 is qa's quiet speed window 02:00-04:00 (lead 11-20):
 nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdshots-host.sh (PD_HOST=vibe2 PD_DISP=395: first free display, never skasm's :391-399). A few app runs don't take ~/bin/slot (DECISIONS 11-15).
