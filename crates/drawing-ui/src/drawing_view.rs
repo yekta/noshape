@@ -1718,7 +1718,11 @@ impl DrawingEditor {
             let placing = matches!(self.tool, Tool::Dimension { .. });
             // An annotation being dragged is drawn plain black (live2 drw-tools-1119 dt).
             let dragged = self.dragging_annotation_id();
-            for s in self.selection.iter().chain(self.panel_highlight.iter()).chain(self.lit_tool_edge().iter()).filter(|s| !matches!(s, Sel::ViewLabel(_) | Sel::Table(_) | Sel::CutLine(_)) && !(placing && matches!(s, Sel::Annotation(_))) && dragged.is_none_or(|d| **s != Sel::Annotation(d))) {
+            // A selected dimension keeps its text black on an orange box, its lines orange with its grips (live dsel3,
+            // drw-styles-radial s10): drawn by push_annotation_look, not tinted.
+            let cur = &self.drawing.sheets[self.sheet];
+            let dims: Vec<Sel> = self.selection.iter().copied().filter(|s| !placing && matches!(s, Sel::Annotation(id) if dragged != Some(*id) && cur.annotations.iter().any(|a| a.id == *id && a.kind.is_dimension()))).collect();
+            for s in self.selection.iter().chain(self.panel_highlight.iter()).chain(self.lit_tool_edge().iter()).filter(|s| !matches!(s, Sel::ViewLabel(_) | Sel::Table(_) | Sel::CutLine(_)) && !(placing && matches!(s, Sel::Annotation(_))) && dragged.is_none_or(|d| **s != Sel::Annotation(d)) && !dims.contains(s)) {
                 for p in self.picks_of(*s).into_iter().filter(|p| !datums.contains(p)) {
                     scene.add_flag(p, state::SELECTED);
                 }
@@ -1735,7 +1739,7 @@ impl DrawingEditor {
                 match self.sel_of_pick(h) {
                     // Onshape (drawing/14): a hovered annotation turns tan with
                     // a tan label box and its grips, drawn on top below.
-                    Some(s @ Sel::Annotation(_)) if !single => self.push_annotation_hover(&mut scene, b, &self.picks_of(s)),
+                    Some(s @ Sel::Annotation(_)) if !single => self.push_annotation_look(&mut scene, b, &self.picks_of(s), DRAWING_HOVER),
                     // A hovered view keeps its edges and gets the tan frame (push_view_frames).
                     Some(Sel::View(_) | Sel::Edge(..)) if matches!(self.tool, Tool::Select) => {}
                     // Hovered labels and indicators show their dots only.
@@ -1750,6 +1754,10 @@ impl DrawingEditor {
                         }
                     }
                 }
+            }
+            let hovered = self.hover.filter(|_| !self.tool_picks_edges()).and_then(|h| self.sel_of_pick(h));
+            for d in dims.iter().filter(|d| Some(**d) != hovered) {
+                self.push_annotation_look(&mut scene, b, &self.picks_of(*d), DRAWING_SELECTED);
             }
             self.push_view_frames(&mut scene);
             self.push_cut_line_hover(&mut scene);
@@ -2056,12 +2064,13 @@ impl DrawingEditor {
     /// Onshape's hovered-annotation look (live, drawing/14): its lines in
     /// `#ccb292`, a `#ccb292` box behind its text, attachment points as
     /// `#90cef1` dots, dimension-line ends as `#cc925c` dots and flip
-    /// handles as `#cc925c` diamonds.
-    fn push_annotation_hover(&self, scene: &mut Scene, built: &BuiltSheet, picks: &[u32]) {
+    /// handles as `#cc925c` diamonds. A selected dimension's is the same in
+    /// `#cc925c` (live dsel3), its text black.
+    fn push_annotation_look(&self, scene: &mut Scene, built: &BuiltSheet, picks: &[u32], colour: u32) {
         use noshape_model::drawing::font;
         use noshape_model::drawing::sheet::GripKind;
         use noshape_render::{LineData, LineSegment, MeshData, PointData, PointSprite};
-        const TAN: [u8; 4] = [0xcc, 0xb2, 0x92, 255];
+        let ink = [(colour >> 16) as u8, (colour >> 8) as u8, colour as u8, 255];
         const GRIP: [u8; 4] = [0xcc, 0x92, 0x5c, 255];
         const ORIGIN: [u8; 4] = [0x90, 0xce, 0xf1, 255];
         let g = &built.geometry;
@@ -2069,7 +2078,7 @@ impl DrawingEditor {
         for l in g.lines.iter().filter(|l| picks.contains(&l.pick)) {
             let width = drawing_scene::px_width(l.style, self.zoom).max(LIT_LINE_PX);
             for w in l.points.windows(2) {
-                lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.4], b: [w[1][0] as f32, w[1][1] as f32, 0.4], color: TAN, pick_id: 0, width, style: LineSegment::ON_TOP });
+                lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.4], b: [w[1][0] as f32, w[1][1] as f32, 0.4], color: ink, pick_id: 0, width, style: LineSegment::ON_TOP });
             }
         }
         // Label boxes (behind the text, above the paper) and diamond grips.
@@ -2111,7 +2120,7 @@ impl DrawingEditor {
         }
         let up = self.gpu.uploader();
         if !boxes.indices.is_empty() {
-            scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&boxes))).with_color(crate::theme::lin(0xccb292)).unlit().unpickable().layer(-4));
+            scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&boxes))).with_color(crate::theme::lin(colour)).unlit().unpickable().layer(-4));
         }
         if !covers.indices.is_empty() {
             scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&covers))).with_color([1.0, 1.0, 1.0, 1.0]).unlit().unpickable().layer(19));

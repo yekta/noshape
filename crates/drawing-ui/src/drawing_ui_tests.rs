@@ -1881,6 +1881,35 @@ fn a_datum_targets_origin_field_stays_active_once_picked(cx: &mut TestAppContext
     assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::DatumTarget { anchor: Some(_) })), "a click in space starts the next target");
 }
 
+/// Live dsel3 / drw-styles-radial s10: a selected dimension's text stays black on an orange (#cc925c) box, not
+/// tinted with the selection colour.
+#[gpui::test]
+fn a_selected_dimension_keeps_its_text_black_on_an_orange_box(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_render::scene::state;
+    use noshape_scene::drawing_tools::Sel;
+    SUGGESTED.set(true);
+    DIMENSIONED.set(true);
+    let (window, editor) = drawing(cx, "dim-sel-look");
+    DIMENSIONED.set(false);
+    real_sheet(cx, window, &editor);
+    let (states, text_picks, boxed) = cx.update(|cx| {
+        editor.update(cx, |e, _| {
+            let id = e.current_sheet().annotations.iter().find(|a| a.kind.is_dimension()).map(|a| a.id).expect("a dimension");
+            e.selection = vec![Sel::Annotation(id)];
+            e.hover = None;
+            let b = e.built.as_ref().expect("built");
+            let texts: Vec<u32> = b.geometry.texts.iter().filter(|t| b.picks.get(t.pick as usize) == Some(&PickTarget::Annotation(id))).map(|t| t.pick).collect();
+            let scene = e.build_scene();
+            let orange = crate::theme::lin(crate::drawing_view::DRAWING_SELECTED);
+            (scene.states.clone(), texts, scene.instances.iter().any(|i| i.color == orange))
+        })
+    });
+    assert!(!text_picks.is_empty(), "the dimension has text");
+    assert!(text_picks.iter().all(|p| states.get(*p as usize).is_none_or(|s| s & state::SELECTED == 0)), "its text isn't tinted");
+    assert!(boxed, "an orange box behind it");
+}
+
 /// Live drw-datum-target-panel-lists s22-24: in Angle mode with no origin the Diameter distance is empty and its
 /// Precision ▾ opens no list; once the origin fills it, the ▾ lists the precisions.
 #[gpui::test]
