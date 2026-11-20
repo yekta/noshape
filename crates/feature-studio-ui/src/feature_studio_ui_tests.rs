@@ -443,7 +443,7 @@ fn ace_feel_outdent_triple_click_bracket_boxes_and_wheel(cx: &mut TestAppContext
     draw(cx, window);
     let moved = before - cx.update(|cx| view.read(cx).editor.read(cx).scroll_offset().y);
     let want = if cfg!(target_os = "linux") { 72. } else if cfg!(target_os = "windows") { 60. } else { f32::from(moved) };
-    assert_eq!(f32::from(moved), want, "one notch");
+    assert!((f32::from(moved) - want).abs() < 0.5, "one notch: {} px, want {want}", f32::from(moved));
     let _ = std::fs::remove_dir_all(&dir);
 }
 
