@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-20 01:29)
+# QA handoff (agent qa; current state only, updated 2026-11-20 02:02)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -68,7 +68,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    1119-1302 diffed (suites-diff vs 1119-0551; LOADED): only P2 SUITE-INTRO-MUTUALTRIM-DERIVED (core); exchange 117/130. skasm stack queued 01:5x (94f6df34): waiter qa-wait-skasm-dim
    (first skasm commit since 01:53; check the green has 94f6df34's subjects). Recheck: sketch-dimension-variable (uip-rerun +
    by hand), OFFSET-EDIT-SCALES-SKETCH (free circle, O, Enter, 3: no scaling), SMM-EXTRUDE-CLOSED-PROFILE, SKETCH-SLOT-ON-ARC,
-   SKETCH-DXF-EXPORT-POLYLINES (R14, LINE/CIRCLE/ARC/SPLINE on MODELSKETCH_VISIBLE, no construction / points). Compat: P1 SINGULARITIES-SKETCH2-UNSOLVED -> core (20ae6a506; core 4a52a26bb).
+   SKETCH-DXF-EXPORT-POLYLINES (R14, LINE/CIRCLE/ARC/SPLINE on MODELSKETCH_VISIBLE, no construction / points). Night ui suite started 02:00:01 on vibex8 (a06ec927);
+   vibex8 ~/.slot-quiet until 04:00 (timer qa-vibex8-unquiet removes it); core's .dbg.sh + skasm's uip4 build queued there, told.
+   Lead 02:0x: once 69bcf1791 is green (waiter qa-wait-studios-drwdlg) spot 5 drawing dialogs vs live/drawing 1047-lnk-front-props,
+   1037-lnk-move-to-sheet-dialog, 710-hole-table-dialog, 508-datum-target-tab, 1358-dk-export-default (all 1919x1079); dx STEP
+   torus export (qa-wait-dx-torus) and hex-bookcase DXF counts vs live (qa-wait-dx-hexdxf; dx ba3d6cc1 determinism land). Compat: P1 SINGULARITIES-SKETCH2-UNSOLVED -> core (20ae6a506; core 4a52a26bb).
 4. Hover flow (lead 11-17 22:20, every release): uh/uh2.sh <release app> <out> on vibex6 Xvfb, 3 runs, xsheet.py for the sheet;
    USER-HOVER-STAYS-LIT is listed as known in the cut's entry until psui's latest-wins picking fix passes 3 clean runs.
 
