@@ -971,7 +971,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   right: common flange grey, B1's box red. Walk doc walk3/r.noshape (Main after a Restore to V1; B1 from V1).
   Shot: qa-scratch/tickets/compare-ps1-two-parts-1120.png. (qa 00:13, green f6f8069f)
 
-- [ ] P1 **SKETCH-DXF-EXPORT-POLYLINES (skasm)**: a sketch's (or planar face's) Export as DXF/DWG… writes every curve as a
+- [x] verified (qa 11-20 05:16, green 3fd4db71, skasm's stack: live's test sketch exported: AC1014, 4 LINE / 1 CIRCLE / 1 ARC / 1 SPLINE (control points) on MODELSKETCH_VISIBLE, no construction line or point, = live's file (spline poles 6 vs 5 from live's take missing a click); tickets/sk-dxf-3fd4.*) P1 **SKETCH-DXF-EXPORT-POLYLINES (skasm)**: a sketch's (or planar face's) Export as DXF/DWG… writes every curve as a
   tessellated POLYLINE in f32 (crates/ops/src/sketch_export.rs plane_sheet; the app's modal uses the same sketch_sheet / face_sheet).
   A Ø33 circle comes out as one 85-vertex POLYLINE; inserted back (Insert DXF or DWG) it is 84 lines, region 856.84 mm² vs the
   circle's 857.64. Lines round-trip exactly. The flat pattern's export already writes exact ARC / CIRCLE / ELLIPSE / SPLINE
@@ -1013,7 +1013,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   after leaving keeps a stale hover. (a) is separate: it survives several moves after ✓ (seen a 3rd time on Sketch 6).
   (c) Worst case: that lit line end stays drawn after the sketch is CANCELLED (✕, toast "Sketch 9 has been canceled"): an
   orange dot over empty viewport where no entity exists, through moves and the + menu, until a part face is hovered.
-- [ ] P1 **OFFSET-EDIT-SCALES-SKETCH (skasm)**: in a sketch with no dimensions yet, Offset (O) a free circle, Enter, type 3,
+- [x] verified (qa 11-20 05:16, green 3fd4db71, skasm's stack: a free r5 circle's 5 mm copy set to 3: the copy keeps r 10.055, the source grows 5.055 -> 7.055, nothing scaled, as live; tickets/sk-offset-3fd4.png) P1 **OFFSET-EDIT-SCALES-SKETCH (skasm)**: in a sketch with no dimensions yet, Offset (O) a free circle, Enter, type 3,
   Enter: ours treats the offset's distance as the sketch's first dimension and scales the whole sketch by 3/5 about its
   centre (green f3bc85da, walk 22:3x: copy r 56 -> 33 px, source r 40 -> 24 px, any other free geometry shrinks too).
   Live (behaviours psb 10-24 j (c), same flow on a free Ø-r5 circle, 5 -> 3): no scaling; the copy keeps r 10 and the
@@ -1030,7 +1030,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   30 / max 35, then min 0 / max 5 (disjoint ranges): the part never moves in the preview; it turns only on Solve or ✓.
   Live (behaviours "asm (lead 11-18 ~01:15 …) mate limits", r1-r4): a typed limit applies to the preview at once, the part
   turning into the range within ~1 s. Drag clamping at the limit after ✓ is = live. Green 624c6db77, walk 22:4x.
-- [ ] P2 **SMM-EXTRUDE-CLOSED-PROFILE (skasm)**: Sheet metal model › Extrude of a closed 100 × 60 rectangle (Blind 25, 1.6 /
+- [x] verified (qa 11-20 05:16, green 3fd4db71, skasm's stack: the 4 lines or the whole sketch build live's box: 32 faces, 64 edges, 12843.115 mm³, "Sheet metal model cannot be unfolded."; left: ours reports the feature status Error where live's record says WARNING (both draw the name red)) P2 **SMM-EXTRUDE-CLOSED-PROFILE (skasm)**: Sheet metal model › Extrude of a closed 100 × 60 rectangle (Blind 25, 1.6 /
   2.3 mm): ours fails, chip red, no part, "Sheet metal model 1 did not regenerate properly: Failed to extrude selections."
   Live (behaviours "qa (11-19): sheet metal extrude of a closed rectangle", live/qa/smm-closed-1119/) BUILDS it: one part,
   a closed box of 4 walls with bends at all 4 corners (32 faces: 8 cylinder + 24 plane, 64 edges, 12843.115 mm³); the
@@ -1044,7 +1044,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   row's exact cut isn't recorded, ask live if needed). Green 624c6db77, walk 23:02. Branch from V1, edit in B1,
   merge dialog (1 tab changed, Replace with B1), toast "Merged B1 into Main. Revert to before this merge" = live.
   verified bbc7b3861 (qa 00:28 on green eef639d7): the row reads "Part Studio 2 :: E…" and ends at the Name column.
-- [ ] P1 **SKETCH-SLOT-ON-ARC (skasm)**: Slot, click a 3-point arc (r ≈ 22.7 mm, free): the arc lights orange and a "Ø0"
+- [x] verified (qa 11-20 05:16, green 3fd4db71, skasm's stack: the click wraps the arc in a Ø20 slot at once, no Ø0; after Enter or Esc the arc stays with the 4 slot arcs; tickets/sk-slot-3fd4.png) P1 **SKETCH-SLOT-ON-ARC (skasm)**: Slot, click a 3-point arc (r ≈ 22.7 mm, free): the arc lights orange and a "Ø0"
   readout with a long leader to the arc's centre appears, but no slot shape; moving the pointer changes nothing. On a line
   the same tool is = live (Ø20 preview, vertical leader, 4 tangent points). Live (behaviours 164): "click a line/arc → a
   slot preview of default width wraps it immediately". Green 624c6db77, walk 23:10. Arc, spline and circumscribed polygon
