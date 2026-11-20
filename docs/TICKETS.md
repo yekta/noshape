@@ -19,10 +19,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   lies on Top (0.000 deg / 0.000 / 0.000 mm); no Length and no Curvature deviation in either. A vertex or an edge
   midpoint with Top reads Min dist alone (ours the same). Ours (query_measure plane:top + circle): adds Length
   31.416 mm to both, and Curvature deviation 0 % on the lying circle (measure.rs circle-plane branch).
-- [ ] P2 **ASM-PATTERN-ZERO-DISTANCE-MARK (asm)**: workflow-assembly-sweep 21. Live: assembly Linear pattern with
+- [x] P2 **ASM-PATTERN-ZERO-DISTANCE-MARK (asm)**: workflow-assembly-sweep 21. Live: assembly Linear pattern with
   Distance 0 mm: red title rgb(170,37,45) and the Distance field invalid as in a Part Studio (background #f9ebec,
   1 px bottom border #bd3039, class os-invalid); Instance count unchanged. Ours leaves Distance white (TICKETS
   NUMBER-FIELD-ERROR-MARK residual).
+  Done (asm 11-20): Distance / Angle <= 0 marked as a Part Studio's invalid field; test a_zero_pattern_distance_is_marked_invalid.
 - [ ] fixed (studios 11-20: the row evaluates its value in the document units, angles and numbers too), to verify P2 **VARIABLE-ROW-LABEL-VALUE (studios)**: workflow-configurations 1.7. Live: an unnamed Variable's Features
   row reads "#name = <evaluated value>" in document units, 3 decimals with trailing zeros dropped: "#w = 30 mm" for
   #h * 3 (h = 10 mm in a Variable Studio), "#q = 32 mm" for #w + 2 mm, "#t = 3.333 mm" for #h / 3, "#u = 2.5 mm";
@@ -40,11 +41,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   release mark, unchanged (insertable as a version). Ours: assembly Insert has no released-items view (the drawing
   chooser's `released_items` already does this, drawing.md V1).
   Done (asm 11-20): ▲ View released items in Insert › Other documents; test an_other_documents_released_items_leave_out_obsoleted_revisions.
-- [ ] P2 **ASM-FACE-TAB-REFERENCE-FRAME (asm)**: assembly.md LA49. Live: Mass and section properties › Face with
+- [x] P2 **ASM-FACE-TAB-REFERENCE-FRAME (asm)**: assembly.md LA49. Live: Mass and section properties › Face with
   "Mate connector for reference frame" set (a connector on the corner (40,20,10) of a 40x20x10 block, world axes, top
   face picked): Lxx 106666.667, Lxy = Lyx 160000, Lyy 426666.667, Lzz 533333.333 mm⁴ (parallel axis to the
   connector's origin in its axes; product +A·dx·dy), area / perimeter unchanged. Ours computes about the faces'
   centroid whatever the connector (assembly_mass.rs face_section_properties gets no reference).
+  Done (asm 11-20): moments about the connector's origin in its axes; test face_section_properties_like_live (mc1-mc3).
 
 ## live, 2026-11-20 (Onshape 1.222 / 1.223 release audit)
 - [x] P2 **INSERT-OTHER-DOCS-SORT (asm)** (asm 11-20 06:1x: the Sort button and its name order for an opened other document, with Current document's remembered choice; test an_other_documents_studios_sort_by_name_as_the_current_documents): Onshape 1.223 "sorting in the Current document and Other documents tabs of the

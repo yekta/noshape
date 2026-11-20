@@ -2520,7 +2520,7 @@ fn face_section_properties_like_live() {
     let asm = Assembly { instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <2>", f.studios[0], body, DVec3::new(0.0, 0.0, 0.05), false)], ..Default::default() };
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     let top = face_with(&r, "CapEnd");
-    let s = analysis::face_section_properties(&res, &[(vec![InstanceId(1)], top.clone())]).unwrap();
+    let s = analysis::face_section_properties(&res, &[(vec![InstanceId(1)], top.clone())], None).unwrap();
     let mm4 = 1e-12;
     assert!((s.area - 8e-4).abs() < 1e-10 && (s.perimeter - 0.12).abs() < 1e-9, "{s:?}");
     let mut m = [s.moments[0][0] / mm4, s.moments[1][1] / mm4];
@@ -2530,8 +2530,17 @@ fn face_section_properties_like_live() {
     assert!(near(m[0], 26666.667) && near(m[1], 106666.667), "{m:?}");
     assert!(near(s.polar / mm4, 133333.333) && (s.moments[0][1] / mm4).abs() < 1e-2, "{} {}", s.polar / mm4, s.moments[0][1] / mm4);
     assert!((s.centroid - DVec3::new(0.02, 0.01, 0.01)).length() < 1e-9);
+    // About a connector on the corner (40, 20, 10) in world axes (live mc1-mc3): the parallel axis values, the product
+    // +A·dx·dy; area and perimeter unchanged.
+    let corner = super::solver::Frame::new(DVec3::new(0.04, 0.02, 0.01), glam::DQuat::IDENTITY);
+    let c = analysis::face_section_properties(&res, &[(vec![InstanceId(1)], top.clone())], Some(&corner)).unwrap();
+    let got = [c.moments[0][0], c.moments[0][1], c.moments[1][0], c.moments[1][1], c.polar].map(|v| v / mm4);
+    for (g, want) in got.iter().zip([106666.667, 160000.0, 160000.0, 426666.667, 533333.333]) {
+        assert!(near(*g, want), "{got:?}");
+    }
+    assert_eq!((c.area, c.perimeter), (s.area, s.perimeter));
     // The same face of the raised block is parallel but not coplanar: no values.
-    assert!(analysis::face_section_properties(&res, &[(vec![InstanceId(1)], top.clone()), (vec![InstanceId(2)], top)]).is_none());
+    assert!(analysis::face_section_properties(&res, &[(vec![InstanceId(1)], top.clone()), (vec![InstanceId(2)], top)], None).is_none());
 }
 
 #[test]

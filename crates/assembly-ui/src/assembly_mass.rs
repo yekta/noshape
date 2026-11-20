@@ -21,7 +21,7 @@ pub type Overrides = Vec<((InstancePath, BodyId), PartOverrides)>;
 /// Each part occurrence's density (kg/m³; None: no material).
 pub type Densities = std::collections::BTreeMap<(InstancePath, BodyId), Option<f64>>;
 /// Its face section job: (the picked faces, the result's address).
-pub type AsmSectionKey = (Vec<(InstancePath, Reference)>, usize);
+pub type AsmSectionKey = (Vec<(InstancePath, Reference)>, Option<MateConnectorRef>, usize);
 /// Its value: the mass properties and the variance.
 pub type AsmMassValue = (Option<AssemblyMass>, Option<noshape_model::regen::measure::MassProperties>);
 // Shared with the Part Studio's Mass properties (noshape-app-core).
@@ -336,9 +336,9 @@ impl AssemblyView {
         // moments and the polar moment (mm⁴), no Override boxes; blank with a
         // red title while the faces aren't coplanar.
         let section = if faces && !face_picks.is_empty() {
-            let (result, picks) = (self.result.clone(), face_picks.clone());
-            let key = (face_picks.clone(), Arc::as_ptr(&self.result) as usize);
-            crate::bg_job::bg_job(self, |v| &mut v.ui.section_job, key, move || face_section_properties(&result, &picks), cx).flatten()
+            let (result, picks, frame) = (self.result.clone(), face_picks.clone(), reference_frame);
+            let key = (face_picks.clone(), reference.clone(), Arc::as_ptr(&self.result) as usize);
+            crate::bg_job::bg_job(self, |v| &mut v.ui.section_job, key, move || face_section_properties(&result, &picks, frame.as_ref()), cx).flatten()
         } else {
             None
         };

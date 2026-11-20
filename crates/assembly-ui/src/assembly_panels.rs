@@ -1809,6 +1809,14 @@ impl AssemblyView {
                 }))
         };
         let value_row = |label: &'static str, st: &Entity<crate::quantity_field::QuantityInput>| crate::ui_script::mark(os::param_row_plain(label, st.clone()), move || format!("field:{label}"));
+        // A distance or angle of 0 (or less) is marked like a Part Studio's faulty field: pink, a red underline, no
+        // hover (live parity-open-1120 ap1: os-invalid on Distance, the count stays plain).
+        let length_row = |label: &'static str, st: &Entity<crate::quantity_field::QuantityInput>, cx: &App| {
+            let bad = st.read(cx).value().is_some_and(|v| v <= 0.0);
+            let field = div().id(label).size_full().child(st.clone());
+            let field = if bad { crate::quantity_field::invalid_field_tip(field.debug_selector(move || format!("pat-invalid {label}")), true, String::new()) } else { field };
+            crate::ui_script::mark(os::param_row_plain(label, field), move || format!("field:{label}"))
+        };
         // A configured assembly: a field's right-click menu is one row, Configure (live 2209).
         let configurable = |this: &Self, id: &'static str, field: &Entity<crate::quantity_field::QuantityInput>, el: AnyElement, param: &'static str, cx: &mut Context<Self>| -> AnyElement {
             if this.cfg_input(cx).is_none() {
@@ -1860,7 +1868,7 @@ impl AssemblyView {
             let ids: [&'static str; 4] = if n == 1 { ["pat-axis2", "pat-opp2", "pat-eq2", "pat-centered2"] } else { ["pat-axis3", "pat-opp3", "pat-eq3", "pat-centered3"] };
             body.child(div().px(px(3.)).pt(px(5.)).child(axis_box(this, ids[0], axis, "Direction", n, cx)))
                 .child(div().h(px(5.)))
-                .child(if n == 1 { configurable(this, "pat-cfg-distance2", distance, value_row("Distance", distance).into_any_element(), noshape_model::assembly::config::param::DISTANCE_2, cx) } else { value_row("Distance", distance).into_any_element() })
+                .child(if n == 1 { configurable(this, "pat-cfg-distance2", distance, length_row("Distance", distance, cx).into_any_element(), noshape_model::assembly::config::param::DISTANCE_2, cx) } else { length_row("Distance", distance, cx).into_any_element() })
                 .child(h_flex().child(if n == 1 { configurable(this, "pat-cfg-count2", count, value_row("Instance count", count).into_any_element(), noshape_model::assembly::config::param::COUNT_2, cx) } else { value_row("Instance count", count).into_any_element() }).child(toggle(ids[1], icon, opposite, cx, flip)))
                 .child(os::checkbox(ids[2], "Equal spacing", equal).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(p) = &mut this.pattern {
@@ -1910,7 +1918,7 @@ impl AssemblyView {
                     .into_any_element();
                 body = body
                     .child(div().h(px(5.)))
-                    .child(configurable(self, pc, &s.distance, value_row(if circular { "Angle" } else { "Distance" }, &s.distance).into_any_element(), pd, cx))
+                    .child(configurable(self, pc, &s.distance, length_row(if circular { "Angle" } else { "Distance" }, &s.distance, cx).into_any_element(), pd, cx))
                     .child(h_flex().child(configurable(self, "pat-cfg-count", &s.count, count_row, noshape_model::assembly::config::param::COUNT, cx)).child(toggle("pat-opp", flip, opposite, cx, |this| {
                         if let Some(p) = &mut this.pattern {
                             p.note_toggle();

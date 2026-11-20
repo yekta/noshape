@@ -1536,6 +1536,32 @@ fn an_opened_linear_pattern_counts_its_row(cx: &mut TestAppContext) {
     .unwrap();
 }
 
+/// Live parity-open-1120 ap1: a Linear pattern's Distance of 0 is marked invalid as a Part Studio field (pink, red
+/// underline); the count stays plain, and a positive distance clears it.
+#[gpui::test]
+fn a_zero_pattern_distance_is_marked_invalid(cx: &mut TestAppContext) {
+    let path = pattern_document(cx, "pattern-zero-distance");
+    let (window, view) = open_assembly_with_front(cx, &path);
+    let set = |cx: &mut TestAppContext, text: &'static str| {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                let d = v.pattern.as_ref().unwrap().distance.clone();
+                d.update(cx, |f, cx| f.set_text(text, w, cx));
+                cx.notify();
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+    };
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_pattern(super::PatternDialogKind::Linear, w, cx))).unwrap();
+    let marked = |cx: &mut TestAppContext, label: &'static str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(format!("pat-invalid {label}").leak()).is_some();
+    set(cx, "0 mm");
+    assert!(marked(cx, "Distance"), "0 mm marked");
+    assert!(!marked(cx, "Instance count"), "the count stays plain");
+    set(cx, "10 mm");
+    assert!(!marked(cx, "Distance"), "10 mm clears it");
+}
+
 /// Live snapmode-1118 / snap-diag-1118: Esc during a snap-mode drag doesn't cancel it; off every part the connector
 /// stays put and a release there moves nothing (no message); snap mode stays on.
 #[gpui::test]

@@ -1029,14 +1029,15 @@ pub fn inertia_about_frame(inertia_cm: glam::DMat3, mass: f64, center: DVec3, fr
 
 /// Mass and section properties › Face tab (live behaviours "Assembly Mass
 /// and section properties: Face tab"): area, perimeter, and the area
-/// moments about the faces' centroid in the plane's own axes.
+/// moments about the faces' centroid in the plane's own axes, or about a
+/// reference connector's origin in its axes.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FaceSection {
     pub area: f64,
     pub perimeter: f64,
     /// Centroid (world).
     pub centroid: DVec3,
-    /// [[Lxx, Lxy], [Lyx, Lyy]] (m⁴); Lxx = ∫y² dA about the centroid's x axis.
+    /// [[Lxx, Lxy], [Lyx, Lyy]] (m⁴); Lxx = ∫y² dA about the centroid's (or the reference's) x axis, Lxy = ∫xy dA.
     pub moments: [[f64; 2]; 2],
     /// Polar moment Lzz = Lxx + Lyy (m⁴).
     pub polar: f64,
@@ -1045,7 +1046,7 @@ pub struct FaceSection {
 /// The Face tab's values for faces of the assembly (path, face); None when
 /// a face isn't planar or the faces aren't coplanar (live: blank values, a
 /// red title, "Face selections are not coplanar").
-pub fn face_section_properties(result: &AssemblyResult, faces: &[(InstancePath, Reference)]) -> Option<FaceSection> {
+pub fn face_section_properties(result: &AssemblyResult, faces: &[(InstancePath, Reference)], reference: Option<&super::solver::Frame>) -> Option<FaceSection> {
     if faces.is_empty() {
         return None;
     }
@@ -1092,10 +1093,12 @@ pub fn face_section_properties(result: &AssemblyResult, faces: &[(InstancePath, 
         return None;
     }
     let centroid = tris.iter().map(|t| (t[0] + t[1] + t[2]) / 3.0 * tri_area(t)).sum::<DVec3>() / total;
+    // About a reference connector: its origin, in its x and y axes (live mc1-mc3: the parallel axis values).
+    let (at, x, y) = reference.map_or((centroid, x, y), |f| (f.origin, f.x(), f.y()));
     let (mut ixx, mut iyy, mut ixy) = (0.0, 0.0, 0.0);
     for t in &tris {
         let a = tri_area(t);
-        let uv: Vec<(f64, f64)> = t.iter().map(|q| ((*q - centroid).dot(x), (*q - centroid).dot(y))).collect();
+        let uv: Vec<(f64, f64)> = t.iter().map(|q| ((*q - at).dot(x), (*q - at).dot(y))).collect();
         let (u, v) = ([uv[0].0, uv[1].0, uv[2].0], [uv[0].1, uv[1].1, uv[2].1]);
         let sq = |w: [f64; 3]| w[0] * w[0] + w[1] * w[1] + w[2] * w[2] + w[0] * w[1] + w[1] * w[2] + w[2] * w[0];
         ixx += a / 6.0 * sq(v);
