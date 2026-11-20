@@ -117,7 +117,7 @@ RT revision table, CW customized release workflow; BUNDLE the client's strings. 
 | Part Studio row expands to its parts; picks shown at right with red × | image | RD:477-562 | – | = |
 | Add / Cancel with tooltips | BUNDLE "Add selected items to Release" / "Cancel adding items and resume editing Release" | RD:654-660 | – | = |
 | Current document / Other documents (only with "Allow adding items from other documents") | RMS | RD:615-619 | – | = |
-| Linked item shows version icon | (help Release__selecting_parts…, not saved locally) | RD:1837-1845 | – | ? (page not in local set) |
+| Linked item shows version icon | (help Release__selecting_parts…, not saved locally) | RD:1837-1845 | – | ? live 11-20 (parity-open-1120 rl1): in "Create Release candidate" of an assembly holding a part inserted from another document's V1, that linked Part 1 row looks like the local one (thumbnail, part icon, "Part"), no version icon; the help's icon may belong to Add items › Other documents (needs "Allow adding items from other documents", not checked) |
 
 ## 3. Review / approve / reject / drafts
 

@@ -110,5 +110,5 @@ SF2 8000 / 10 faces, SF5 2400 mm² (all edges move), SF6 −514.304543 → ✗ s
 |---|---|---|---|
 | SF2 two adjacent regions | 8000 mm³, **6 faces** | ✅ fixed | skasm 10-31 (CLI) |
 | SF5 Move boundary one edge 10 mm | 1000 mm², x 0…50, 1 face (only that edge moves) | ✅ fixed | skasm 10-31 (CLI) |
-| SF6 Move boundary the B-spline side 25 mm | OK, 1950 mm² = 1200 + 25 × 30, 1 face. The arcs run on along their tangents (z −23.81 at x −25). No more negative area | ✅ fixed (corrupt area gone; live's exact figure not measured) | skasm 10-31 (CLI) |
+| SF6 Move boundary the B-spline side 25 mm | OK, 1950 mm² = 1200 + 25 × 30, 1 face. The arcs run on along their tangents (z −23.81 at x −25). No more negative area | ✅ fixed = live (live 11-20 parity-open-1120, REST: boundary surface 1200 mm², Move boundary 25 mm → 1950.0000717 mm², 1 face) | skasm 10-31 (CLI) |
 | SF1 Fill preview while editing | editing Fill 1 (4 rim edges of the open box) shows the knit result, Parts (1) Part 1, as when creating | ✅ fixed | skasm 10-31 (GUI :103, sf7 doc) |
