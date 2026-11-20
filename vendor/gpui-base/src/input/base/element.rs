@@ -863,7 +863,7 @@ impl<M: InputModeKind> TextElement<M> {
                         continue;
                     };
                     let origin = bounds.origin + point(last_layout.line_number_width, px(0.));
-                    let corners = pad_frame_corners(&corners, px(1.));
+                    let corners = inset_frame_corners(&corners, px(0.5));
                     let points = frame_outline_points(&corners)
                         .into_iter()
                         .map(|point| origin + point)
@@ -2510,26 +2510,16 @@ fn frame_outline_points(corners: &[Corners<Point<Pixels>>]) -> Vec<Point<Pixels>
     points
 }
 
-fn pad_frame_corners(
-    corners: &[Corners<Point<Pixels>>],
-    horizontal_padding: Pixels,
-) -> Vec<Corners<Point<Pixels>>> {
+/// The frame's stroke centred half a pixel inside the range's cells, so its outer edge is the cells' edge (Ace's
+/// bracket marker: the 8 x 16 character cell, live feel cov-1120 F3).
+fn inset_frame_corners(corners: &[Corners<Point<Pixels>>], inset: Pixels) -> Vec<Corners<Point<Pixels>>> {
     corners
         .iter()
-        .map(|corners| Corners {
-            top_left: point(corners.top_left.x - horizontal_padding, corners.top_left.y),
-            top_right: point(
-                corners.top_right.x + horizontal_padding,
-                corners.top_right.y,
-            ),
-            bottom_left: point(
-                corners.bottom_left.x - horizontal_padding,
-                corners.bottom_left.y,
-            ),
-            bottom_right: point(
-                corners.bottom_right.x + horizontal_padding,
-                corners.bottom_right.y,
-            ),
+        .map(|c| Corners {
+            top_left: point(c.top_left.x + inset, c.top_left.y + inset),
+            top_right: point(c.top_right.x - inset, c.top_right.y + inset),
+            bottom_left: point(c.bottom_left.x + inset, c.bottom_left.y - inset),
+            bottom_right: point(c.bottom_right.x - inset, c.bottom_right.y - inset),
         })
         .collect()
 }
@@ -4316,21 +4306,21 @@ mod tests {
     }
 
     #[test]
-    fn frame_outline_keeps_horizontal_space_between_the_stroke_and_text() {
+    fn frame_outline_sits_on_the_cells_edge() {
         let corners = [Corners {
             top_left: point(px(2.), px(0.)),
-            top_right: point(px(20.), px(0.)),
-            bottom_left: point(px(2.), px(10.)),
-            bottom_right: point(px(20.), px(10.)),
+            top_right: point(px(10.), px(0.)),
+            bottom_left: point(px(2.), px(16.)),
+            bottom_right: point(px(10.), px(16.)),
         }];
 
         assert_eq!(
-            pad_frame_corners(&corners, px(1.)),
+            inset_frame_corners(&corners, px(0.5)),
             vec![Corners {
-                top_left: point(px(1.), px(0.)),
-                top_right: point(px(21.), px(0.)),
-                bottom_left: point(px(1.), px(10.)),
-                bottom_right: point(px(21.), px(10.)),
+                top_left: point(px(2.5), px(0.5)),
+                top_right: point(px(9.5), px(0.5)),
+                bottom_left: point(px(2.5), px(15.5)),
+                bottom_right: point(px(9.5), px(15.5)),
             }]
         );
 
