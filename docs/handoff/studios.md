@@ -33,7 +33,7 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
 - Matrix 08:30 (b18-b20 merged): 1227 = + 551 shown of 1842, 0 ≠, 22 present-only (doc not regenerated yet). Our
   replicate gap was a stale run: b19 replicates 1/1 with live's toast. Datum target distance fields checked vs live s5
   (centred, ▾ joined; then the 8 x 4 black caret, 312017e9c).
-- b21 (running, task bolwdmchk, 08:52): app build on vibex7 → scp -3 to vibe2 → shots drw-create-drawing-custom-lists
+- b21 DONE 09:03 (4/4 takes full: 48, 7, 7, 12 states): app build on vibex7 → scp -3 to vibe2 → shots drw-create-drawing-custom-lists
   drw-create-drawing-custom-template drw-properties-views drw-datum-target-hide-dim (log
   /root/studios-scratch/b21.log: APPDONE, COPIED, scores, SHOTSDONE). Then: cp pd/b21/out/*.json into uip-merged,
   regenerate the matrix, splice docs/parity/drawing-matrix.md (from "| surface | items | = matching" on, prose counts),
