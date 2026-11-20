@@ -261,7 +261,9 @@ pub enum Drag {
     Zoom { anchor: [f64; 2], last_px: [f64; 2] },
     /// `fresh`: the press selected the view (it wasn't before): released, nothing stays selected (live2 drw-view-drag-undo).
     MoveViews { start: [f64; 2], view: ViewId, fresh: bool },
-    MoveAnnotation { start: [f64; 2], orig: Annotation },
+    /// `fresh`: a dimension the press selected (it wasn't before): released, it isn't selected (live feel coverage
+    /// 11-20 D2: tan hover with grips while the pointer is on it, black away).
+    MoveAnnotation { start: [f64; 2], orig: Annotation, fresh: bool },
     /// A jog snap point of a linear dimension (extension line `k`; `far`:
     /// the diagonal's end).
     Jog { orig: Annotation, k: usize, far: bool },

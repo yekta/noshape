@@ -82,7 +82,7 @@ impl DrawingEditor {
         let orig = a.clone();
         self.edit_sheet("Copy view label", cx, |s| s.annotations.push(a));
         self.selection = vec![Sel::Annotation(id)];
-        Some(Drag::MoveAnnotation { start, orig })
+        Some(Drag::MoveAnnotation { start, orig, fresh: false })
     }
 
     /// A drag on a label moves it (the view stays).

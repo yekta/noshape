@@ -1519,3 +1519,85 @@ fn a_hole_size_cell_lights_its_holes_and_tags(cx: &mut TestAppContext) {
         })
     });
 }
+
+/// Live behaviours "feel coverage (11-20)" D2: a dimension dragged by its text from unselected ends unselected (tan
+/// hover with grips while the pointer is on it), its move one edit; a selected one stays selected.
+#[gpui::test]
+fn a_dimension_dragged_from_unselected_ends_unselected(cx: &mut TestAppContext) {
+    use gpui_kit::{MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent};
+    use noshape_scene::drawing_tools::Sel;
+    SUGGESTED.set(true);
+    DIMENSIONED.set(true);
+    let (window, editor) = drawing(cx, "dim-drag-unselected");
+    DIMENSIONED.set(false);
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().find(|a| a.kind.is_dimension()).map(|a| a.id)).expect("a dimension");
+    let text_at = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let (b, picks) = (e.built.clone().unwrap(), e.picks_of(Sel::Annotation(id)));
+            let t = b.geometry.texts.iter().find(|t| picks.contains(&t.pick)).expect("the dimension's text").pos;
+            let l = e.sheet_to_local(t);
+            e.bounds.origin + Point::new(px(l[0] as f32), px(l[1] as f32))
+        })
+    };
+    let drag = |cx: &mut TestAppContext, dy: f32| {
+        let at = text_at(cx);
+        let to = at + Point::new(px(0.), px(dy));
+        cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+            e.on_mouse_move(&MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }, w, cx);
+            e.on_mouse_down(&MouseDownEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1, first_mouse: false }, w, cx);
+            for k in 1..=4 {
+                let p = at + Point::new(px(0.), px(dy * k as f32 / 4.));
+                e.on_mouse_move(&MouseMoveEvent { position: p, pressed_button: Some(MouseButton::Left), modifiers: Modifiers::default() }, w, cx);
+            }
+            e.on_mouse_up(&MouseUpEvent { button: MouseButton::Left, position: to, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+    };
+    let place = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().find(|a| a.id == id).map(|a| format!("{:?}", a.kind))).unwrap();
+    let before = place(cx);
+    drag(cx, -30.);
+    assert_ne!(place(cx), before, "moved");
+    assert!(cx.update(|cx| editor.read(cx).selection.is_empty()), "not selected after the drag");
+    cx.update(|cx| editor.update(cx, |e, _| e.selection = vec![Sel::Annotation(id)]));
+    drag(cx, 20.);
+    assert_eq!(cx.update(|cx| editor.read(cx).selection.clone()), vec![Sel::Annotation(id)], "a selected one stays selected");
+}
+
+/// Live drawing/262 (dom drawing-custom-table-select-part-studio): Custom table › Add opens "Select a Part Studio",
+/// the Insert view chooser's look (Current document | Other documents, the document, Part Studios only, no kinds,
+/// filters or Import), 40 px right of the dialog; a pick is the table's Part Studio and closes it; Esc closes it too.
+#[gpui::test]
+fn custom_table_add_picks_a_part_studio_in_the_chooser(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::{TableTool, Tool};
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "ct-studio-chooser");
+    real_sheet(cx, window, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Table { kind: TableTool::Custom, view: None, origin: None }, cx)));
+    draw(cx, window);
+    press(cx, window, "ct-add");
+    let state = |cx: &mut TestAppContext| cx.update(|cx| {
+        let e = editor.read(cx);
+        (e.chooser.studio, e.insert.chooser, e.custom_tables.dlg.as_ref().map(|d| (d.studio, d.version.clone(), d.picker.is_some())))
+    });
+    let (studio_mode, open, _) = state(cx);
+    assert!(studio_mode && open == Some(0), "the chooser in its studio mode");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    for gone in ["dr-ch-ps", "dr-ch-import"] {
+        assert!(vcx.debug_bounds(gone).is_none(), "no {gone}");
+    }
+    let (dlg, chooser) = (vcx.debug_bounds("dr-custom-dlg").expect("the dialog"), vcx.debug_bounds("dr-chooser").expect("the chooser"));
+    assert!((chooser.left() - (dlg.right() + px(40.))).abs() < px(1.), "40 px right of the dialog: {dlg:?} {chooser:?}");
+    let studio = cx.update(|cx| editor.read(cx).doc.read(cx).session.doc.ordered_tabs().into_iter().find(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_))).map(|t| t.id)).unwrap();
+    press(cx, window, &format!("dr-ch-ps-{studio}"));
+    let (studio_mode, open, dlg) = state(cx);
+    assert!(!studio_mode && open.is_none(), "a pick closes it");
+    assert_eq!(dlg, Some((Some(studio), None, false)), "the table's Part Studio, this workspace's");
+    press(cx, window, "ct-add");
+    cx.update_window(window, |_, w, cx| w.dispatch_action(Box::new(gpui_kit::component::input::Escape), cx)).unwrap();
+    draw(cx, window);
+    let (studio_mode, open, dlg) = state(cx);
+    assert!(!studio_mode && open.is_none() && dlg.as_ref().is_some_and(|d| !d.2), "Esc closes it, the dialog stays: {dlg:?}");
+}

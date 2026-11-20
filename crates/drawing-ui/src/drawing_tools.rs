@@ -1551,8 +1551,8 @@ impl DrawingEditor {
                 self.leader_node_move(&drag, cx);
             }
             // A datum from the model moves along its face normal only.
-            Drag::MoveAnnotation { start, orig } if orig.model.is_some() => self.drag_model_datum(&orig, start, cx),
-            Drag::MoveAnnotation { start, orig } => {
+            Drag::MoveAnnotation { start, orig, .. } if orig.model.is_some() => self.drag_model_datum(&orig, start, cx),
+            Drag::MoveAnnotation { start, orig, .. } => {
                 self.infer_lines.clear();
                 if !e.modifiers.shift {
                     // Inference on the dragged annotation's own position.
@@ -1898,10 +1898,14 @@ impl DrawingEditor {
                     self.redraw(cx);
                 }
             }
-            Drag::MoveAnnotation { orig, .. } => {
+            Drag::MoveAnnotation { orig, fresh, .. } => {
                 if let Some(mut p) = self.preview.take() {
                     self.group_callout_on_drop(&orig, &mut p);
                     self.commit("Move annotation", p, cx);
+                    if fresh {
+                        self.selection.clear();
+                        self.redraw(cx);
+                    }
                 }
             }
             Drag::Jog { .. } | Drag::Reattach { .. } | Drag::CentermarkArm { .. } | Drag::AutoCentermarkArm { .. } | Drag::CenterlineEnd { .. } => {
@@ -2197,7 +2201,7 @@ impl DrawingEditor {
             return Drag::CenterlineEnd { orig, k };
         }
         if let Some(orig) = self.centerline_middle_at(start) {
-            return Drag::MoveAnnotation { start, orig };
+            return Drag::MoveAnnotation { start, orig, fresh: false };
         }
         // A hole's circle lights its centre mark but a press on it drags the view (live2 drw-centermark t5).
         if matches!(self.tool, Tool::Select)
@@ -2220,7 +2224,7 @@ impl DrawingEditor {
             // (Live: a view moves by its edges too; the views aligned with it follow: `dragged_view_positions`.)
             Sel::View(id) | Sel::Edge(id, _) => Drag::MoveViews { start, view: id, fresh },
             Sel::Annotation(aid) => match self.built.as_ref().and_then(|b| b.resolved.annotations.iter().find(|a| a.id == aid).cloned()) {
-                Some(a) if !matches!(a.kind, AnnotationKind::Centermark { .. } | AnnotationKind::Centerline { .. }) => Drag::MoveAnnotation { start, orig: a },
+                Some(a) if !matches!(a.kind, AnnotationKind::Centermark { .. } | AnnotationKind::Centerline { .. }) => Drag::MoveAnnotation { start, fresh: fresh && a.kind.is_dimension(), orig: a },
                 _ => Drag::None,
             },
             // Drag a sketch entity (its points move, the sketch solves); on a

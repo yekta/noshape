@@ -3323,7 +3323,8 @@ impl SheetGeometry {
         let outside = (s_along.abs() > half_line && self.text_along.is_some()) || iso_out;
         let squeezed = iso_squeezed || (inline && !self.flip_arrows && !outside && gap.is_some_and(|g| 2.0 * g + 2.0 * a_len > dl));
         // ANSI: a value moved against an extension line (within its gap and an arrow of it) sends both arrows outside,
-        // pointing in (live2 place-1118: flipped 13–19 px inside an end, not 53–59).
+        // pointing in with their tails, no line between the extension lines (live2 place-1118: flipped 13–19 px inside
+        // an end, not 53–59; feel coverage 11-20 D2).
         let crowded = inline && !self.style.iso && !squeezed && !outside && self.text_along.is_some() && gap.is_some_and(|g| half_line - s_along.abs() < g + a_len);
         if outside {
             // From the extension line on the value's side to its gap.
@@ -3353,7 +3354,7 @@ impl SheetGeometry {
             }
             out
         };
-        if squeezed {
+        if squeezed || crowded {
             if iso_squeezed {
                 self.lines.push(Polyline2 { points: vec![dp, dq], style: LineStyle::Thin, closed: false, pick });
             }
@@ -3363,7 +3364,7 @@ impl SheetGeometry {
             }
             self.arrow(dp, d, 3.0);
             self.arrow(dq, [-d[0], -d[1]], 3.0);
-        } else if self.flip_arrows || crowded {
+        } else if self.flip_arrows {
             // Flipped: arrows outside pointing in, the line runs past them.
             let ext = self.style.dim_arrow + 3.0;
             for seg in broken([[dp[0] - du[0] * ext, dp[1] - du[1] * ext], [dq[0] + du[0] * ext, dq[1] + du[1] * ext]]) {
@@ -3963,6 +3964,24 @@ pub fn note_leader_paths(bbox: [f64; 4], leaders: &[super::Leader], targets: &[[
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// ANSI, the value dragged against the right extension line (feel coverage 11-20 D2): the arrows go outside with
+    /// their tails, nothing between the extension lines but the value.
+    #[test]
+    fn a_value_against_an_extension_line_sends_the_arrows_out_with_no_line_inside() {
+        let mut g = SheetGeometry::new(420.0, 297.0);
+        g.style.iso = false;
+        g.text_along = Some(26.0);
+        g.linear_dimension_text([50.0, 100.0], [110.0, 100.0], -20.0, DimOrientation::Horizontal, &DimText::plain("60"), 1);
+        let a = g.style.dim_arrow;
+        let t = g.texts.iter().find(|t| t.text == "60").unwrap();
+        assert!((t.pos[0] - 106.0).abs() < 1e-9, "where it was dragged: {:?}", t.pos);
+        let y = t.pos[1];
+        let pieces: Vec<[f64; 2]> = g.lines.iter().filter(|l| l.points.len() == 2 && l.points.iter().all(|p| (p[1] - y).abs() < 1e-9)).map(|l| [l.points[0][0].min(l.points[1][0]), l.points[0][0].max(l.points[1][0])]).collect();
+        assert!(pieces.iter().all(|p| p[1] <= 50.0 + 1e-9 || p[0] >= 110.0 - 1e-9), "no line inside: {pieces:?}");
+        assert!(pieces.iter().any(|p| (p[0] - (50.0 - 2.0 * a)).abs() < 1e-9 && (p[1] - (50.0 - a)).abs() < 1e-9), "left tail: {pieces:?}");
+        assert!(pieces.iter().any(|p| (p[0] - (110.0 + a)).abs() < 1e-9 && (p[1] - (110.0 + 2.0 * a)).abs() < 1e-9), "right tail: {pieces:?}");
+    }
 
     /// Live2 drawprops-1119: a dot arrowhead is as wide as an arrow is long, centred on the tip; text turned along a
     /// leader or an arc reads left to right.

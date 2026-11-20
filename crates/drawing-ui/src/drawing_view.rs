@@ -383,6 +383,9 @@ pub struct DrawingEditor {
     /// The display cache (drawing_open.rs).
     pub(crate) cached_open: crate::drawing_open::CachedOpen,
     image: Option<Arc<RenderImage>>,
+    /// The camera (centre, zoom, canvas size) the shown image was rendered for, and each submitted frame's by its seq.
+    image_cam: Option<FrameCam>,
+    frame_cams: std::collections::VecDeque<(u64, FrameCam)>,
     _frames: Task<()>,
 
     // Interaction.
@@ -775,6 +778,8 @@ impl DrawingEditor {
             open_stage: 0,
             cached_open: Default::default(),
             image: None,
+            image_cam: None,
+            frame_cams: Default::default(),
             _frames: frames,
             tool: Tool::Select,
             canvas_hovered: false,
@@ -2137,6 +2142,10 @@ impl DrawingEditor {
         if !armed.is_empty() {
             self.frame_milestones.push_back((self.seq, armed));
         }
+        self.frame_cams.push_back((self.seq, FrameCam { center: self.center, zoom: self.zoom, size: self.size_px() }));
+        while self.frame_cams.len() > 8 {
+            self.frame_cams.pop_front();
+        }
         self.gpu.submit(RenderJob {
             target: self.target_id,
             scene: Arc::new(self.build_scene()),
@@ -2167,6 +2176,10 @@ impl DrawingEditor {
                 if let Some(old) = self.image.replace(image) {
                     let _ = window.drop_image(old);
                 }
+                while self.frame_cams.front().is_some_and(|(s, _)| *s < seq) {
+                    self.frame_cams.pop_front();
+                }
+                self.image_cam = self.frame_cams.front().filter(|(s, _)| *s == seq).map(|(_, c)| *c);
             }
             Err(e) => log::error!("drawing render failed: {e}"),
         }
@@ -2408,7 +2421,15 @@ impl DrawingEditor {
                 .absolute()
                 .size_full(),
             )
-            .children(image.map(|img| gpui_kit::img(img).absolute().top_0().left_0().size_full()))
+            // Until the frame for a new zoom or pan comes back, the last one scaled and moved to it (a wheel notch
+            // shows at once, feel coverage 11-20 D3).
+            .children(image.map(|img| {
+                let el = gpui_kit::img(img).absolute();
+                match self.image_cam.and_then(|c| c.placed(self.center, self.zoom, self.size_px())) {
+                    Some([x, y, w, h]) => el.left(px(x as f32)).top(px(y as f32)).w(px(w as f32)).h(px(h as f32)),
+                    None => el.top_0().left_0().size_full(),
+                }
+            }))
             .child(self.sheets_toggle(0., cx))
             .children(sheet_chips)
             .child(status)
@@ -2557,4 +2578,47 @@ pub(crate) struct CutLineLooks {
     pub lit: Vec<u32>,
     pub grips: Vec<([f64; 2], [u8; 4])>,
     pub ink: noshape_render::MeshData,
+}
+
+/// The camera a frame was rendered for.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct FrameCam {
+    center: [f64; 2],
+    zoom: f64,
+    size: [f64; 2],
+}
+
+impl FrameCam {
+    /// Where this frame's image goes (left, top, width, height in canvas px) to show the sheet at camera `center` /
+    /// `zoom`; None when it already does, or the canvas was resized.
+    fn placed(&self, center: [f64; 2], zoom: f64, size: [f64; 2]) -> Option<[f64; 4]> {
+        if self.size != size || (self.center == center && self.zoom == zoom) || self.zoom <= 0.0 {
+            return None;
+        }
+        let k = zoom / self.zoom;
+        let left = size[0] / 2.0 * (1.0 - k) + (self.center[0] - center[0]) * zoom;
+        let top = size[1] / 2.0 * (1.0 - k) + (center[1] - self.center[1]) * zoom;
+        Some([left, top, size[0] * k, size[1] * k])
+    }
+}
+
+#[cfg(test)]
+mod frame_cam_tests {
+    use super::FrameCam;
+
+    /// The last frame, moved to a new camera, puts every sheet point where the new camera draws it.
+    #[test]
+    fn a_frame_moved_to_a_new_camera_keeps_the_sheet_under_the_pointer() {
+        let old = FrameCam { center: [100.0, 80.0], zoom: 2.0, size: [800.0, 600.0] };
+        let local = |c: [f64; 2], z: f64, p: [f64; 2]| [(p[0] - c[0]) * z + 400.0, (c[1] - p[1]) * z + 300.0];
+        let (center, zoom) = ([112.0, 70.0], 2.12);
+        let [left, top, w, h] = old.placed(center, zoom, [800.0, 600.0]).expect("moved");
+        for p in [[100.0, 80.0], [0.0, 0.0], [250.0, 190.0]] {
+            let (was, now) = (local(old.center, old.zoom, p), local(center, zoom, p));
+            let shown = [left + was[0] * w / 800.0, top + was[1] * h / 600.0];
+            assert!((shown[0] - now[0]).abs() < 1e-9 && (shown[1] - now[1]).abs() < 1e-9, "{p:?}: {shown:?} vs {now:?}");
+        }
+        assert_eq!(old.placed(old.center, old.zoom, old.size), None, "its own camera");
+        assert_eq!(old.placed(center, zoom, [900.0, 600.0]), None, "a resized canvas");
+    }
 }
