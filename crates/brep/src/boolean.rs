@@ -2469,8 +2469,9 @@ impl Ctx<'_> {
 
     /// Edge `e` of an analytic face, free-form face `f` lying on that face's surface: its stretches over `f`, each from
     /// where it comes onto `f` to where it crosses `f`'s edge there, each projected onto `f` (c2-config-parts-standoffs:
-    /// the bore cylinder's seam and end circles across the thread's root strip, at each of its turns).
-    fn edge_over_free_face(&mut self, e: usize, f: usize) -> R<()> {
+    /// the bore cylinder's seam and end circles across the thread's root strip, at each of its turns). With `bsplines`
+    /// a B-spline edge too (of another free-form face on `f`'s surface).
+    fn edge_over_free_face(&mut self, e: usize, f: usize, bsplines: bool) -> R<()> {
         if self.in_face_done.contains(&(e, f)) {
             return Ok(());
         }
@@ -2482,11 +2483,18 @@ impl Ctx<'_> {
                 (Path::Line { p: a, d: (b - a) / l }, 0.0, l)
             }
             Geo::Arc { k, a0, sweep } => (Path::Circle(k), a0, a0 + sweep),
+            // (A free-form face's edge over another free-form face of its surface: c2-impeller-loft's wall's bottom
+            // edge across a seat's extruded face reaching 1 mm past the wall.)
+            Geo::Nurbs { id, t0, t1 } if bsplines => (Path::Nurbs { id, c: self.ncurves[id as usize].c.clone() }, t0, t1),
             _ => return Ok(()),
         };
         let at = |t: f64| match &path {
             Path::Line { p, d } => (*p + *d * t, *d),
             Path::Circle(k) => (k.at(t), (k.y * t.cos() - k.x * t.sin()) * k.r),
+            Path::Nurbs { c, .. } => {
+                let d = c.derivs(t);
+                (d[0], d[1])
+            }
             _ => unreachable!(),
         };
         let whole = (t0, End::Vertex(s.v[0]), t1, End::Vertex(s.v[1]));
@@ -3070,6 +3078,10 @@ impl Ctx<'_> {
                     && gf.ns.as_deref().is_some_and(|ns| !matches!(ns, FreeSurface::Torus { .. } | FreeSurface::Sphere { .. }))
                     && free::off_patches(gf.patches.get_or_init(|| free::cached_grouped(gf)), p, tol);
                 if off || free::whole_surface_distance_first(gf, p) > tol {
+                    // (Past its patch along its surface: not where they overlap.)
+                    if free::past_patch_along(gf, p, tol) {
+                        continue;
+                    }
                     return self.lies_on(fs, ft) || self.lies_on(ft, fs);
                 }
                 n += 1;
@@ -3103,11 +3115,19 @@ impl Ctx<'_> {
             // (A free-form face on an analytic one's surface: the analytic face's edges lie on it where they cross it,
             // its seam too (a thread's root strip on the bore's cylinder, split at the seam each turn as OCCT's
             // same-domain faces are).)
+            // (Two free-form faces, neither within the other: each one's edges over the other.)
+            let both_free = matches!(self.faces[fs].s, Surf::Nurbs { .. }) && matches!(self.faces[ft].s, Surf::Nurbs { .. }) && !self.lies_on(fs, ft) && !self.lies_on(ft, fs);
             for (f, g) in [(fs, ft), (ft, fs)] {
-                if matches!(self.faces[f].s, Surf::Nurbs { .. }) && !matches!(self.faces[g].s, Surf::Nurbs { .. }) {
+                if matches!(self.faces[f].s, Surf::Nurbs { .. }) && (both_free || !matches!(self.faces[g].s, Surf::Nurbs { .. })) {
                     let edges: Vec<usize> = self.faces[g].edges.iter().map(|x| x.0).collect();
                     for e in edges {
-                        self.edge_over_free_face(e, f)?;
+                        // (One free-form face's edge the other can't take, nothing added: left as it was, as before
+                        // the two were imprinted (a Shell's slabs of one fillet's B-spline copies, shfall a7ab967d).)
+                        let (points, pending) = (self.pool.p.len(), self.pending.len());
+                        match self.edge_over_free_face(e, f, both_free) {
+                            Err(_) if both_free && self.pool.p.len() == points && self.pending.len() == pending => {}
+                            r => r?,
+                        }
                     }
                 }
             }
@@ -3186,7 +3206,7 @@ impl Ctx<'_> {
                 }
                 let (hints, points, pending) = (self.crossing_hints.len(), self.pool.p.len(), self.pending.len());
                 self.crossing_hints.extend([c.curve.at(c.t0), c.curve.at(c.t1)]);
-                match self.edge_over_free_face(e, f) {
+                match self.edge_over_free_face(e, f, false) {
                     Ok(()) => keep[i] = false,
                     Err(_) if self.pool.p.len() == points && self.pending.len() == pending => self.crossing_hints.truncate(hints),
                     Err(x) => return Err(x),

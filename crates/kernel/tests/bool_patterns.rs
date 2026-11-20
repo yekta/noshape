@@ -3376,3 +3376,12 @@ fn a_threads_helical_land_stays_in_strips_on_unify() {
     let v = s.volume().unwrap();
     assert!(s.is_valid() && (v - c.summary.volume).abs() <= 1e-9 * c.summary.volume, "volume {v}");
 }
+
+/// c2-impeller-loft's Extrude "Bohrungssitz Ansaugflansch" (recorded): 9 seats fused onto the impeller's 58-face part,
+/// each seat's extruded face (z -5..0 mm) on the part's free-form wall's surface (z -4..0) and a millimetre past its
+/// patch. The wall's bottom edge is imprinted on the seat's face and the coincident pieces then agree: taken by
+/// noshape's Boolean, as OCCT's (97 faces; it declined "a piece's point on another solid's face", OCCT 1.8 s).
+#[test]
+fn impeller_seats_on_its_free_form_wall_fuse_as_occt() {
+    valid_as_occt("23c0c38476a63ecf", 1e-7);
+}

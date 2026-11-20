@@ -840,6 +840,26 @@ pub(super) fn whole_surface_distance(g: &GFace, p: DVec3) -> f64 {
     }
 }
 
+/// Whether `p` lies past free-form face `g`'s parameter box along its surface: its nearest point on the face's patch
+/// on the box's edge, `p` within `tol` of the surface's tangent plane there (a part's NURBS wall 4 mm high against a
+/// seat's extruded face 5 mm high on it, c2-impeller-loft's Bohrungssitz Ansaugflansch: its last millimetre past the
+/// wall's patch, not off its surface).
+pub(super) fn past_patch_along(g: &GFace, p: DVec3, tol: f64) -> bool {
+    let (Surf::Nurbs { .. }, Some(ns)) = (&g.s, g.ns.as_deref()) else { return false };
+    if matches!(ns, FreeSurface::Torus { .. } | FreeSurface::Sphere { .. }) {
+        return false;
+    }
+    let uv = g.uv_first(p);
+    let [u0, u1, v0, v1] = g.uvbox;
+    let e = 1e-9 * ((u1 - u0).abs() + (v1 - v0).abs());
+    if uv.x > u0 + e && uv.x < u1 - e && uv.y > v0 + e && uv.y < v1 - e {
+        return false;
+    }
+    let d = ns.derivs(uv.x, uv.y);
+    let n = d[1].cross(d[2]).normalize_or_zero();
+    n != DVec3::ZERO && (p - d[0]).dot(n).abs() <= tol
+}
+
 /// Whether `p` lies farther than `d` from every one of a free-form face's patches' boxes (which hold its surface over
 /// the face's parameter box): off that surface there, found without projecting `p` on it (none for a face without
 /// patches).
