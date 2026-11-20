@@ -2713,9 +2713,12 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             }
             ev.ctx.bodies.add_aliases(relief_aliases);
             stop_if_cancelled()?;
-            // (The walls a loop of bends can't lay flat; the placement holds flat walls only: with a rolled wall, none.)
-            let rolled = topo.faces.iter().any(|f| f.face_plane().ok().flatten().is_none());
-            let clashes = if rolled { Vec::new() } else { unfold(def, def.k_factor, &topo).map(|u| u.clashes).unwrap_or_default() };
+            // The walls a loop of bends can't lay flat (placed across bends from each flat wall; live c2-sm-hem-flange's
+            // Hem 1, its rolled walls crossed, keeps the box's warning). A curved face the placing doesn't cross
+            // leaves the walls beside it placed by other paths: no loop is told then (cf-sheet-metal-model-plus).
+            let rolled = rolled_walls(def, &topo);
+            let uncrossed = (0..topo.faces.len()).any(|fi| !matches!(topo.faces[fi].face_plane(), Ok(Some(_))) && !def.rolled.contains_key(&fi) && !rolled.iter().any(|r| r.0 == fi));
+            let clashes = if uncrossed { Vec::new() } else { unfold(def, def.k_factor, &topo).map(|u| u.clashes).unwrap_or_default() };
             for (k, p) in parts.into_iter().enumerate() {
                 let walls: Vec<(usize, Shape)> = wall_flats.iter().filter(|w| p.members.contains(&w.0)).cloned().collect();
                 let own: Vec<Strip> = strips.iter().filter(|s| p.members.contains(&s.wall_a)).cloned().collect();

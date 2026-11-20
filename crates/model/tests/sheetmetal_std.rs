@@ -1193,6 +1193,36 @@ fn an_extruded_closed_rectangle_is_a_box_that_cannot_unfold() {
     }
 }
 
+/// A Hem on a box that cannot unfold keeps the warning (live c2-sm-hem-flange's Hem 1, behaviours "skasm 15:34
+/// (11-20)": WARNING SHEET_METAL_COULD_NOT_UNFOLD; ours said the flat's collision, an INFO).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_hem_on_a_box_that_cannot_unfold_keeps_the_warning() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = [(0.0, 0.0), (100.0, 0.0), (100.0, 60.0), (0.0, 60.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+    let lines: Vec<_> = (0..4).map(|k| sk.add_line_between(p[k], p[(k + 1) % 4]).unwrap()).collect();
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    s.ok();
+    s.add("sheetMetalStart", |pv| {
+        pv.set("process", en("EXTRUDE"));
+        pv.set("sketchCurves", ParamValue::Query(lines.iter().map(|e| Reference::SketchEntity { sketch, entity: e.0 }).collect()));
+        pv.set("depth", expr("25 mm"));
+    });
+    let r = s.ok();
+    let edge = edge_at(&r, DVec3::new(50.0, 0.0, 25.0));
+    s.add("sheetMetalHem", |p| {
+        p.set("edges", ParamValue::Query(vec![edge]));
+        p.set("hemType", en("STRAIGHT"));
+    });
+    let r = s.ok();
+    let last = r.display.features.last().unwrap();
+    assert_eq!((last.status, last.message.as_deref()), (FeatureStatus::Warning, Some(noshape_model::regen::features::sheetmetal_ops::CANNOT_UNFOLD)));
+}
+
 /// Sheet metal model › Extrude of a line, a tangent arc and a line: the arc is a rolled wall (no bend), developed in
 /// the flat between the two walls at the rolled k-factor, not left out with the walls on each other (live
 /// c2-sm-tablet-stand's Sheet metal model 1: OK; ours said "Collision in sheet metal flat pattern.").
