@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 02:12 UTC.
+Updated 2026-11-20 02:16 UTC.
 
 ## In flight
 
@@ -17,7 +17,8 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE
 tools/tiers/land.sh` (`--no-precheck` only when the code was clippy-checked unchanged); read `git diff --stat
 origin/main` first. Builds / tests on the lowest 1-min load of vibex7 / vibex8 / vibe2 (`NOSHAPE_RB_HOST=… tools/tiers/rb.sh`;
 read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edited during a running sync: `touch` edited files before
-the next run. Run the full ops e2e before any drawing land. A few app runs don't take ~/bin/slot (DECISIONS 11-15).
+the next run. Run the full ops e2e before any drawing land. vibex8 is qa's quiet speed window 02:00-04:00 (lead 11-20):
+nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdshots-host.sh (PD_HOST=vibe2 PD_DISP=395). A few app runs don't take ~/bin/slot (DECISIONS 11-15).
 - Landed f450d0dd (11-20 by 00:10: Labs brand, HISTORY-ROW-NAME-OVERLAP, Pro menus, Measure 1-2).
 - Queued 68a4f22e (11-20 00:31; carries 988d0416 and the lead's 81d16ffcd / 7458597fb rebased): brand ruling,
   COMPARE-COMMON-PARTS-MISSING, table alignment line, runner rules, note lists, title field alignment, matrix doc
@@ -33,7 +34,7 @@ the next run. Run the full ops e2e before any drawing land. A few app runs don't
   Also: live's centermark retake (996d6b8a): a Single click on a circle with an automatic mark replaces it and
   stays after Esc; the matrix accepts three click-spot menu rows (surface finish on edge Flip / Add leader, ordinate
   Reset ordinate: live's later takes show ours): 1213 = + 446 shown of 1874, 0 ≠, 174 present-only.
-- Re-landing 8a7a67f6e (11-20 01:58; 68a4f22e / 988d0416 failed 01:49 on the flaky assembly box test, now T2 on
+- Queued 8a7a67f6e (11-20 02:15; 68a4f22e / 988d0416 failed 01:49 on the flaky assembly box test, now T2 on
   main cf738a75c): b4/b5 above plus cut list Standard column and 295 px BOM / Cut list properties.
 - Local b6/b7 (tested on the Mac, screens on vibex8): Image properties a docked ✓ ✕ panel; aligned section's boxed
   query fields; Detail view without ✓ while creating, shapes greyed once the profile exists, no hint line; a section
@@ -46,7 +47,8 @@ the next run. Run the full ops e2e before any drawing land. A few app runs don't
   selected cells light their holes, centre marks and tags blue; "In progress" pills 12 px; hole callout palette's
   tolerance row as live drw-hcallout-fit 26 (Precision combo reads the value, tolerance icon, Fit type / Hole class /
   Fit standard in that row, no shaft class; stacked-visibility toggle + stacking list beside the dual; "Fit type"
-  tooltip on the fit's kind, scenarios renamed). Next: shots of b8 on vibex8, then commit + land.
+  tooltip on the fit's kind, scenarios renamed). Committed 3c74d2225 (b6-b8; hole table shots match live); palette /
+  hatch / BOM / inspection / revision shots on vibe2 (tag b9), then land.
 - psui via lead 11-20: version row menu without "Releases": ours already lists none there (qa's run = live's rows).
 
 ## Next, in order
