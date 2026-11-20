@@ -158,7 +158,12 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   parked-own-foot.diff, torus-cylinder-wip.diff, offset-cache.diff, parked-cones-apart.diff.
 
 ## Next (after the order above)
-- Speed (lead 11-19): pulleys Circular pattern 1 152 ms vs live 23 (doc 238 vs 102), time in the Boolean.
+- Pulleys (lead 11-19, 152 ms vs live 23): not a gap (11-20 05:00). Mac Circular pattern 1 45-55 ms, document 75-90 ms
+  vs live 102; vibex8's 152 was host load.
+- P1 SPEED-STANDOFFS: its Booleans all ours on land7. Mac document (ops xshell3::xpul, XPUL_DOC) 455 ms vs live ~200.
+  The unify's volume checks were ~40% (usd_kept_volume: faces_volume_precise, volume0): both on all threads in the
+  faces' order (bool-hat WIP, for bool-sh3): 350 ms. Next: brep uv_of's fold retry (16 Newton per point off the
+  thread root strip, from stretches_over's 257 samples per edge, ~11%), then waiting on occt_ahead.
 - qa's backlog (TICKETS a3ff6d481): standoffs Revolve 2 / Boolean 1 / 2 (OCCT 450-980 ms, ours "a piece's point on
   another solid's face"), wire-clip / gamma Boolean 1 (87-tool fuse, "cylinders nearly coincident", OCCT 2-2.9 s) and
   Boolean 2. Cases Mac bool-keep/rec-<doc>.
