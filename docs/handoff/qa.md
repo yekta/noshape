@@ -107,7 +107,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
      x86 speed only from the window) -> nightly/pm-1121. vibex8's feel re-time goes after it.
    - Compat: FILLET-ORIENT, GYRO verified; P0 RUSTZERO-FILLET1 -> blend (read new DIFF docs per green). psui a21e verified; P2 CONFIG-BOX-WIDTH.
      17:00 cut: GO 15:4x on 18809b4c (prerel/cut17-18809b4c.txt: hats SAME, dock = accepted B Govde; known: rust-zero F1, crash957 Ch3 P1
-     bool). Hat open px (163-448): b76561076 variable row text + 24 plane-plane edges B-spline -> line; bisect unit qa-hatedge-bisect.
+     bool). Hat open px (163-448): b76561076 variable row text + 24 plane-plane edges B-spline -> line; bisect 19:49: blend b749ad59e (fillet edges between analytic faces rebuilt exact), intended.
    - Seat lip: a47534be5 (Ok in 0.4.43-0.4.61 + green; vibex7 ~/agents/qa-keep/seatlip-hat8-1120.txt).
 00a. **05:00 cut HELD (lead 04:0x) until a green has core's 2f4f3bc5 (singularities Sketch 2; Mirror 2 is as live, accepted in
    compat/accepted.txt; 2f4f's subject added to cut-must.txt).** Unit qa-prerel-2f4f (bin/prerel-when.sh "<subject>" cut0500): when
