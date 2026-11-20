@@ -4232,6 +4232,22 @@ neither build. knifehandle Fillet 2 shows a kernel message in place of Onshape's
     to confirm with a run started 2 s after opening.
   - core 03:25: REGEN-SPEED's perf.yml run 40796942944 (main 34cbea98) has the Extrude 1 edit commit at 34 / 38 / 60 ms (macOS / Linux / Windows, budget 200). psui / qa: please confirm "commit shown in" on a current perf run and close.
   qa 17:28 (green e20a0d67, local Xvfb + llvmpipe, a sanity check, not the runners' measure): live-30, 5 Extrude 1 depth edits (bin/editloop3.sh) all commit, preview regen 102–153 ms, full regen ≤ 30 ms, app alive; no step over the 200 ms budget in the logs.
+- [ ] P2 T2-NIGHTLY-22-FAILURES (lead routes; qa 11-20 02:44) **the watcher's nightly T2 (vibex6 ~/lead/t2-*.log) fails
+  18–22 tests every night since 11-17** (11-20 on 5b62f6ca8: 7 kernel, 9 model, 6 ops; new since 11-19: knurl_b94_at_30_tpi_on_a_10_mm_rod,
+  dx_perf::dump_corpus_drawing_views). By cause:
+  - no corpus on vibex6 (8, lead: copy the corpora or skip when absent): blend_replay::occt_blend_corpus_time (~/agents/blend-corpus),
+    shell::shell_corpus_time, bool_replay::bool_corpus_replay (0 cases), dx_perf::dump_corpus_drawing_views (NOSHAPE_VIEWS_DUMP unset),
+    planar_face_mesh::corpus_* ×3, regen_profile::bench_profdocs.
+  - bool: overlapping_free_form_parts_merge_like_onshape 45 faces vs 15 (21.7 s); a_25_by_10_knurl_at_30_tpi "noshape's Boolean declined:
+    a section touching a face's boundary"; a_25_by_25_knurl and a_gears_tooth_gaps_cut_as_fast_as_occts compare volume with OCCT's last
+    digits (1e-10 relative: the test breaks TESTS.md's tolerance rule).
+  - core: pattern_perf::part_pattern_regenerates "Part ×200" 2 parts vs 1; kernel_robustness::patterns_match_onshape (M1 "Failed to create
+    pattern" vs live's "Could not create all instances…"); std_oracle::chamfer_ / boolean_regenerates_as_std "native differs from std";
+    features_c::parting_line_draft_on_curves_as_live (A2 6616.061 vs live 6616.046 mm³).
+  - dx / featurescript: custom_features::std_sheet_metal_matches_onshape (sm1 0 parts, sm2 SHEET_METAL_FLANGE_NO_EDGES);
+    knurl_b94_at_30_tpi_on_a_10_mm_rod "needed more than 15035 MB of memory".
+  - asm: oracle_asm::asm_fuzz_live_matches 75 of 80; assemblies_match_live is P2 ORACLE-ASM-R3-TOLERANCE.
+  - regen_profile::bench_edit_latency_reuse (no message beyond its timings; big-plate depth edit 327 ms).
 - [x] verified (qa 11-20 02:36, main 5b62f6ca8 / green a06ec927: nightly T2 on 5b62f6ca8: CP1 matches live (the test still fails on R3 by ~2e-6 mm: P2 ORACLE-ASM-R3-TOLERANCE)) 3f5f69ed (core: extruded cylinders framed as live, z toward the sketch; CP1 matches, out of KNOWN; R3/C1 now flip the pin as live, the solver's −157.5° turn is skasm's) P0 `model/tests/oracle_asm::assemblies_match_live` CP1 regressed by 339de774 (cylinder frame); fs suspects the
   cylinder axis should point toward the sketch (also CP1, R3, C1). Red at the halt.
 - [x] verified (qa 11-20 02:36, main 5b62f6ca8 / green a06ec927: qa_regressions::shell_that_breaks_the_part_fails test(s) on main, not ignored (run by the watcher each commit)) cc6c4b54 (core: live's rule, a blind hole's bottom within 2t of the floor fails the shell before OCCT runs; back in T1) P0 `model/tests/qa_regressions::shell_that_breaks_the_part_fails` red on macOS arm64 in every CI run of 10-26 (T2
