@@ -1075,6 +1075,7 @@ impl DrawingEditor {
             .child(
                 div()
                     .id("vp-rot-reverse")
+                    .tooltip(crate::ui::tooltip("Opposite direction"))
                     .size(px(26.))
                     .flex()
                     .items_center()
@@ -1252,7 +1253,8 @@ impl DrawingEditor {
                 if parent_cut_row {
                     t.text("Apply parent view section cut");
                 }
-                crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "View properties" }), t.0)
+                // The reverse button's tip as `texts` (the drawing matrix; live dom drawing-view-properties-multi).
+                crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "View properties", "texts": ["Opposite direction"] }), t.0)
             });
         }
         // Several views (live drw-views-shift-select-properties): the rows they share, each list's options.
@@ -1269,7 +1271,9 @@ impl DrawingEditor {
                 if !is_asm {
                     t.text("Cut list table reference").options([cut_text]);
                 }
-                crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "View properties" }), t.0)
+                let mixed = multi.as_ref().is_some_and(|m| m.tangent.is_none() || m.best_quality.is_none() || m.scale_text.is_empty());
+                let texts: &[&str] = if mixed { &["Opposite direction", "Multiple values"] } else { &["Opposite direction"] };
+                crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "View properties", "texts": texts }), t.0)
             });
         }
         rows.push(check("vp-sketch-app", "Show sketch appearances", props.sketch_appearances, |p, on| p.sketch_appearances = on, cx));

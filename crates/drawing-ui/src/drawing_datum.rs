@@ -461,7 +461,9 @@ impl DrawingEditor {
         let d = self.datum_dlg.as_ref()?;
         // The X / Y flips' tip as `texts` (the drawing matrix; live drawing-datum-target-after).
         let flips = d.rows.iter().any(|r| !r.ann.target.as_ref().is_some_and(|t| t.angular));
-        crate::ui_script::note_dialog(|| crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Datum", "texts": if flips { vec!["Opposite direction"] } else { vec![] } }), datum_dlg_texts(d)));
+        let empty = d.label_text.is_empty() || d.rows.iter().any(|r| r.ann.target.as_ref().is_some_and(|t| t.angular) && r.count.read(cx).value().trim().is_empty());
+        let texts: Vec<&str> = [(flips, "Opposite direction"), (empty, "This field cannot be empty")].into_iter().filter_map(|(on, t)| on.then_some(t)).collect();
+        crate::ui_script::note_dialog(|| crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Datum", "texts": texts }), datum_dlg_texts(d)));
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);
         let ed = cx.entity();
@@ -774,7 +776,21 @@ impl DrawingEditor {
                                         cx.notify();
                                     })))
                                     .child(input_row("Angle:", &r.y).mt(px(2.)).child(self.target_precision(k, 1, opts.precisions[1], cx)))
-                                    .child(input_row("Instance count:", &r.count).mt(px(2.)))
+                                    // Live (dom drawing-datum-target-after): an emptied count is invalid (red), "This field cannot be empty".
+                                    .child({
+                                        let empty = r.count.read(cx).value().trim().is_empty();
+                                        h_flex().mt(px(2.)).h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Instance count:")).child(
+                                            div()
+                                                .id(("dt-count", k))
+                                                .flex_1()
+                                                .border_1()
+                                                .border_color(gpui_kit::rgb(if empty { 0xd9534f } else { 0xcccccc }))
+                                                .rounded(px(2.))
+                                                .px(px(4.))
+                                                .when(empty, |e| e.tooltip(crate::ui::tooltip("This field cannot be empty")))
+                                                .child(Input::new(&r.count).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall()),
+                                        )
+                                    })
                                     .child(
                                         h_flex()
                                             .pt(px(2.))
