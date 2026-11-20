@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 04:50 UTC.
+Updated 2026-11-20 05:21 UTC.
 
 ## In flight
 
@@ -22,7 +22,9 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
 - Branch (11-20 04:50, rebased on origin/main): the 9 commits b4-b10 (drawing panels as live's screens, Inspection item,
   DOCS-CRUMB-TOOLTIP's id-keyed tooltip gate in vendor gpui, VER-COMPARE-READOUT) + b12: custom table picker in Select
   a Part Studio (05466abc0 line), FS editor feel, VS old-value chip, drawing feel, 8 feel TICKETS rows "to verify".
-  Gates before land: b11 shots (vibe2 :395: inspection-item, create-drawing-custom-template, ver-compare-hover-part),
+  b11 shots: inspection-item 7 = live; ver-compare 5 state = live (no readout), and Compare now zooms to fit the
+  parts as live's step 3 (fit_compare; test compare_zooms_to_fit_the_parts). Mac: drawing-ui lib 119, clippy clean,
+  ops e2e 260/260. Was gated on: b11 shots (vibe2 :395: inspection-item, create-drawing-custom-template, ver-compare-hover-part),
   Mac round 2 (drawing-ui lib + clippy), full ops e2e. Then land, tell psui the vendor gpui gate change
   (`Window::tooltip_released_on(id)` / `set_tooltip_released_on(bounds, id)`, test
   a_clicked_crumb_turned_title_shows_its_tooltip) and the gpui-base editor patches (close_brace_outdent, select_line,
