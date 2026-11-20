@@ -1315,7 +1315,7 @@ pub struct Window {
     /// NOSHAPE PATCH (agent psui): see `pointer_rests`.
     pointer_rests: bool,
     /// NOSHAPE PATCH (agent psui): see `tooltip_released_on`.
-    tooltip_released_on: Option<Bounds<Pixels>>,
+    tooltip_released_on: Option<(Bounds<Pixels>, ElementId)>,
     modifiers: Modifiers,
     capslock: Capslock,
     scale_factor: f32,
@@ -3540,15 +3540,17 @@ impl Window {
         self.pointer_rests
     }
 
-    /// NOSHAPE PATCH (agent psui): the bounds of the element a press with a tooltip was released on, until the pointer
-    /// leaves them: no tooltip shows there meanwhile, even from an element drawn anew in its place (live: a toolbar
-    /// button's tooltip is gone at the release and stays gone while the pointer stays on it).
-    pub(crate) fn tooltip_released_on(&self) -> Option<Bounds<Pixels>> {
-        self.tooltip_released_on
+    /// NOSHAPE PATCH (agent psui, studios): a press with a tooltip was released on the element with id `id`, the
+    /// pointer still within its bounds: that element shows no tooltip meanwhile, even drawn anew (live: a toolbar
+    /// button's tooltip is gone at the release and stays gone while the pointer stays on it). Another element drawn
+    /// in its place shows its own (live docs-folder-crumb: the crumb clicked turns into the place's title, whose
+    /// tooltip shows under the resting pointer).
+    pub(crate) fn tooltip_released_on(&self, id: &ElementId) -> bool {
+        self.tooltip_released_on.as_ref().is_some_and(|(_, released)| released == id)
     }
 
-    pub(crate) fn set_tooltip_released_on(&mut self, bounds: Bounds<Pixels>) {
-        self.tooltip_released_on = Some(bounds);
+    pub(crate) fn set_tooltip_released_on(&mut self, bounds: Bounds<Pixels>, id: ElementId) {
+        self.tooltip_released_on = Some((bounds, id));
     }
 
     pub(crate) fn last_input_was_touch(&self) -> bool {
@@ -5919,7 +5921,7 @@ impl Window {
                 self.mouse_position = mouse_move.position;
                 self.modifiers = mouse_move.modifiers;
                 self.pointer_rests = mouse_move.pressed_button.is_none();
-                if self.tooltip_released_on.is_some_and(|b| !b.contains(&mouse_move.position)) {
+                if self.tooltip_released_on.as_ref().is_some_and(|(b, _)| !b.contains(&mouse_move.position)) {
                     self.tooltip_released_on = None;
                 }
                 PlatformInput::MouseMove(mouse_move)

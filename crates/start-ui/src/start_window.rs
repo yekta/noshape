@@ -3326,6 +3326,7 @@ impl StartView {
                 // The top level's title is another element than the crumb a click turns into it (live: its tooltip shows).
                 div()
                     .id(if in_folder { "crumb-root" } else { "place-title" })
+                    .debug_selector(|| "place-root".into())
                     .map(|d| {
                         let r = root.to_string();
                         crate::ui_script::mark(d, move || format!("crumb:{r}"))
@@ -5717,6 +5718,83 @@ mod tests {
         let (left2, right2, name2) = (at(&mut vcx, "doc-head-pinned-left"), at(&mut vcx, "doc-head-pinned-right"), at(&mut vcx, "doc-head-name"));
         assert!(near(name2.left(), name.left() - px(150.)), "Name scrolled: {name:?} -> {name2:?}");
         assert!(near(left2.left(), table.left()) && near(right2.right(), table.right()), "the pinned columns held: {left2:?} {right2:?} in {table:?}");
+    }
+
+    /// qa DOCS-CRUMB-TOOLTIP (live docs-folder-crumb 2): inside a folder, a click on the "Owned by me" crumb turns it
+    /// into the place's title, whose tooltip shows under the resting pointer (the gate after a release holds back the
+    /// clicked element's own tooltip, not another one drawn in its place).
+    #[gpui::test]
+    fn a_clicked_crumb_turned_title_shows_its_tooltip(cx: &mut gpui::TestAppContext) {
+        use super::{Source, StartView, ViewMode};
+        use gpui_kit::{AppContext as _, Bounds, MouseButton, MouseDownEvent, MouseUpEvent, Point, VisualTestContext, WindowBounds, WindowOptions, px, size};
+        cx.update(gpui_kit::init);
+        crate::start_hooks::register(crate::start_hooks::Hooks {
+            open_document_window: |_, _, _, _| Ok(()),
+            open_document_at: |_, _, _, _| Ok(()),
+            open_document_history: |_, _, _| Ok(()),
+            build_label: String::new,
+            import_dialog: |_, _, _, _| {},
+            help_items: |m| m,
+        });
+        let mut view = None;
+        let (window, _) = cx
+            .update(|cx| {
+                crate::os_menu::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(Bounds { origin: Point::default(), size: size(px(1100.), px(700.)) })), ..Default::default() }, cx, |window, cx| {
+                    let v = cx.new(|cx| StartView::new(window, cx));
+                    view = Some(v.clone());
+                    v
+                })
+            })
+            .unwrap();
+        let view = view.unwrap();
+        // A folder added from outside the documents folder: Owned by me › uip Folder.
+        let base = std::env::temp_dir().join(format!("noshape-start-crumb-{}", std::process::id()));
+        let folder = base.join("uip Folder");
+        std::fs::create_dir_all(&folder).unwrap();
+        cx.update(|cx| {
+            view.update(cx, |v, cx| {
+                v.outside = vec![super::canon(&base)];
+                (v.source, v.view, v.loaded, v.docs) = (Source::Folder(folder.clone()), ViewMode::List, true, Vec::new());
+                v.refresh_body(cx);
+            })
+        });
+        let mut vcx = VisualTestContext::from_window(window, cx);
+        let draw = |vcx: &mut VisualTestContext| {
+            vcx.update_window(window, |_, w, cx| {
+                w.refresh();
+                w.draw(cx).clear(cx)
+            })
+            .unwrap();
+            vcx.run_until_parked();
+        };
+        let wait = |vcx: &mut VisualTestContext, ms: u64| {
+            for _ in 0..ms / 50 {
+                vcx.executor().advance_clock(std::time::Duration::from_millis(50));
+                draw(vcx);
+            }
+        };
+        let shown = |vcx: &mut VisualTestContext| {
+            crate::ui_script::clear_tooltip();
+            draw(vcx);
+            crate::ui_script::shown_tooltip()
+        };
+        draw(&mut vcx);
+        let crumb = vcx.debug_bounds("place-root").expect("the Owned by me crumb");
+        assert!(cx.update(|cx| matches!(view.read(cx).source, Source::Folder(_))), "inside uip Folder");
+        vcx.simulate_mouse_move(crumb.center(), None, Modifiers::none());
+        wait(&mut vcx, 1000);
+        assert_eq!(shown(&mut vcx).as_deref(), Some("Owned by me"), "the crumb's own tooltip");
+        let none = Modifiers::none();
+        vcx.simulate_event(MouseDownEvent { button: MouseButton::Left, position: crumb.center(), modifiers: none, click_count: 1, first_mouse: false });
+        vcx.simulate_event(MouseUpEvent { button: MouseButton::Left, position: crumb.center(), modifiers: none, click_count: 1 });
+        draw(&mut vcx);
+        assert!(cx.update(|cx| matches!(view.read(cx).source, Source::All)), "the click went to Owned by me");
+        // The pointer stays where it was released (a motion event there: the window's gate still holds).
+        vcx.simulate_mouse_move(crumb.center(), None, Modifiers::none());
+        wait(&mut vcx, 1500);
+        let shown_after = shown(&mut vcx);
+        std::fs::remove_dir_all(&base).ok();
+        assert_eq!(shown_after.as_deref(), Some("Owned by me"), "the title drawn in its place shows its tooltip");
     }
 
     /// Live2 doc-feel-1119 L41: the ⋮ menus of Name (sorted descending), Modified (unsorted), Owned by (not sortable).

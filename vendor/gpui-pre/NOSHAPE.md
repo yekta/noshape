@@ -13,8 +13,11 @@ a compile error:
   window.rs). Pinned by the chrome feel row "tooltip / fades out".
 - **A pressed element keeps its tooltip until the release** (`TooltipPressGate`, elements/div.rs): the press keeps
   it, the release (or a drag's start) clears it at once, and it stays away until the pointer leaves the element, even
-  from an element drawn anew in its place (`Window::tooltip_released_on`; a toolbar button re-keyed by the dialog it
-  opened) (live2 dialog-tip-1119). Pinned by the chrome feel row "tooltip / kept while pressed, gone at the release".
+  when that element is drawn anew (`Window::tooltip_released_on`, keyed by the element's id: a toolbar button re-keyed
+  by the dialog it opened) (live2 dialog-tip-1119); another element drawn in its place shows its own (live
+  docs-folder-crumb: the crumb clicked turns into the place's title, its tooltip under the resting pointer). Pinned by
+  the chrome feel row "tooltip / kept while pressed, gone at the release" and start-ui's
+  `a_clicked_crumb_turned_title_shows_its_tooltip`.
 - **X11 press times** (vendor/gpui-pre-linux: `last_press`, gpui_linux.rs; set in linux/x11/client.rs's button
   press): each press's number and the time since the one before by the X server's event times. The feature list's
   double-click (part_studio `ROW_DOUBLE_CLICK`, via app-core `viewport::platform_last_press`) uses it, because a

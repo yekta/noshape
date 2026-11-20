@@ -3274,8 +3274,10 @@ impl Interactivity {
                 });
                 let painted_at = element_state.tooltip_painted_at.get_or_insert_with(Default::default).replace(Some(hitbox.bounds));
                 let moved = painted_at.is_none_or(|b| b != hitbox.bounds && !b.contains(&window.mouse_position()));
-                // A press released on it blocks one drawn anew in its place too (a re-keyed toolbar button).
-                if moved && window.pointer_rests() && check_is_hovered(window) && tooltip_pressed.may_show(true) && window.tooltip_released_on() != Some(hitbox.bounds) {
+                // A press released on it blocks it drawn anew too (a toolbar button re-keyed by the dialog it opened),
+                // by its id: another element drawn in its place shows its own.
+                let released = self.element_id.as_ref().is_some_and(|id| window.tooltip_released_on(id));
+                if moved && window.pointer_rests() && check_is_hovered(window) && tooltip_pressed.may_show(true) && !released {
                     handle_tooltip_mouse_move(
                         &active_tooltip,
                         &build_tooltip,
@@ -3296,7 +3298,7 @@ impl Interactivity {
                     check_is_hovered,
                     check_is_hovered_during_prepaint,
                     long_press_tooltip_active,
-                    (tooltip_pressed, is_inside, hitbox.bounds),
+                    (tooltip_pressed, is_inside, hitbox.bounds, self.element_id.clone()),
                     self.tooltip_show_delay,
                     window,
                 );
@@ -3854,7 +3856,7 @@ pub(crate) fn register_tooltip_mouse_handlers(
     check_is_hovered: Rc<dyn Fn(&Window) -> bool>,
     check_is_hovered_during_prepaint: Rc<dyn Fn(&Window) -> bool>,
     long_press_tooltip_active: Rc<Cell<bool>>,
-    (pressed, is_inside, bounds): (TooltipPressGate, Rc<dyn Fn(&Window) -> bool>, Bounds<Pixels>),
+    (pressed, is_inside, bounds, element_id): (TooltipPressGate, Rc<dyn Fn(&Window) -> bool>, Bounds<Pixels>, Option<ElementId>),
     show_delay: Option<Duration>,
     window: &mut Window,
 ) {
@@ -3868,13 +3870,13 @@ pub(crate) fn register_tooltip_mouse_handlers(
         let build_tooltip = build_tooltip.clone();
         let check_is_hovered = check_is_hovered.clone();
         let check_is_hovered_during_prepaint = check_is_hovered_during_prepaint.clone();
-        let (pressed, is_inside) = (pressed.clone(), is_inside.clone());
+        let (pressed, is_inside, element_id) = (pressed.clone(), is_inside.clone(), element_id.clone());
         move |e: &MouseMoveEvent, phase, window, cx| {
             if e.pressed_button.is_some() && pressed.release() {
                 clear_active_tooltip(&active_tooltip, window);
                 return;
             }
-            if !pressed.may_show(is_inside(window)) || window.tooltip_released_on() == Some(bounds) {
+            if !pressed.may_show(is_inside(window)) || element_id.as_ref().is_some_and(|id| window.tooltip_released_on(id)) {
                 return;
             }
             handle_tooltip_mouse_move(
@@ -3906,7 +3908,9 @@ pub(crate) fn register_tooltip_mouse_handlers(
         let active_tooltip = active_tooltip.clone();
         move |_: &MouseUpEvent, _phase, window: &mut Window, _cx| {
             if pressed.release() {
-                window.set_tooltip_released_on(bounds);
+                if let Some(id) = element_id.clone() {
+                    window.set_tooltip_released_on(bounds, id);
+                }
                 clear_active_tooltip(&active_tooltip, window);
             }
         }
