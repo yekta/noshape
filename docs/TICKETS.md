@@ -1252,6 +1252,12 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
   build at load 24, re-check on a release build in the quiet window. Not run: Sketch 3's region (our two-blocks start has no
   Sketch 3), the view cube click.
 
+## Release blockers for the 2026-11-20 05:00 release (qa 05:05: GO on green 2a43b78b vs v0.4.61)
+- Held 04:0x for core's singularities Sketch 2 fix (2f4f3bc5, landed 04:19 as a2e7c966). On 2a43b78b: userdocs (hats, dock) ALL-SAME, edits
+  ALL-SAME, app open pixel-identical at 90 s (4 of 4); singularities Sketch 2 solves; Mirror 2 "no geometry change" accepted (lead: live ends
+  with 3 parts, 0.4.61's 5 were wrong). Open, not blocking: blend's car Fillet 1 (6b6b3b4a) unproven in the saved suite doc (Loft 4 now fails
+  there): the fresh model suite (1120-0407) decides.
+
 ## Release blockers for the 2026-11-19 17:00 release (qa 16:47: GO on green eb3b06a8 vs v0.4.60)
 User documents and qa's authored documents are the same as in v0.4.60. The ticket fuzz documents differ only by changes the lead
 accepted (cli-shell-hang-pre, cli-draft-hang, cli-suppress-segv). Corpus statuses only got better (Error -> Ok; c2-config-parts-nuts'
