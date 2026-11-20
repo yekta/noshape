@@ -1077,10 +1077,10 @@ impl AssemblyView {
                             .flex()
                             .items_center()
                             .rounded(px(5.25))
-                            .bg(rgb(0x1651b0))
+                            // Disabled: a pale blue, the text still white (live drawing/294).
+                            .bg(if enabled { rgb(0x1651b0) } else { gpui_kit::rgb(0xa2b9df) })
                             .text_size(px(14.))
                             .text_color(gpui_kit::rgb_static(0xffffff))
-                            .when(!enabled, |d| d.opacity(0.4))
                             .when(enabled, |d| d.cursor_pointer())
                             .child(if tab == 0 { "Update all" } else { "Update selected" })
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {

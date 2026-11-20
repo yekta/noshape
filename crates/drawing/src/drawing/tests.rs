@@ -3377,6 +3377,15 @@ fn cut_list_table_reads_its_own_configuration() {
     assert!(keys.contains(&key) && keys.contains(&view_key), "{keys:?}");
 }
 
+/// A cut list table's columns as live's (drw-cut-list-table-properties: the profile's Standard in its own column).
+#[test]
+fn cut_list_table_has_a_standard_column() {
+    let drawing = Drawing::default();
+    let t = Table::new(1, TableKind::CutList { view: ViewId(1), bottom_to_top: false, config: None, source: None }, [400.0, 280.0]);
+    let d = super::tables::table_data(&drawing, &t, None, None, None, &[], &|s| s.to_string());
+    assert_eq!(d.header.unwrap(), ["Item", "Qty", "Standard", "Description", "Length", "Angle 1", "Angle 2"]);
+}
+
 /// A BOM table of an assembly no view shows (Insert ▾ another assembly or
 /// Other documents…; drawing.md TB14): the table reads that source, pinned
 /// to the other document's version.

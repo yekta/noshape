@@ -707,9 +707,9 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
         // Resolved by [`table_data_with`] from the evaluated tables.
         TableKind::Custom { .. } => TableData::default(),
         TableKind::CutList { bottom_to_top, source: picked, .. } => {
-            // Onshape's cut list table (help cutlist-table-indrawing): Item,
-            // Qty, Description, Length ("675.444 mm"), Angle 1 / 2 ("45 deg").
-            let header = Some(["Item", "Qty", "Description", "Length", "Angle 1", "Angle 2"].map(String::from).to_vec());
+            // Onshape's cut list table (live drw-cut-list-table-properties): Item, Qty, Standard, Description, Length
+            // ("112.7 mm"), Angle 1 / 2 ("45 deg").
+            let header = Some(["Item", "Qty", "Standard", "Description", "Length", "Angle 1", "Angle 2"].map(String::from).to_vec());
             let f = DimFormat::default();
             let u = length_units(drawing, &f);
             let len = |m: Option<f64>| m.map(|m| format!("{} {}", format_number(m / u.meters(), None, 3), u.symbol())).unwrap_or_default();
@@ -720,7 +720,7 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
             };
             let mut rows: Vec<Vec<String>> = rows
                 .into_iter()
-                .map(|r| vec![r.item.to_string(), r.qty.to_string(), if r.standard.is_empty() { r.description } else { format!("{} {}", r.standard, r.description) }, len(r.length), ang(r.angle1), ang(r.angle2)])
+                .map(|r| vec![r.item.to_string(), r.qty.to_string(), r.standard, r.description, len(r.length), ang(r.angle1), ang(r.angle2)])
                 .collect();
             if *bottom_to_top {
                 rows.reverse();

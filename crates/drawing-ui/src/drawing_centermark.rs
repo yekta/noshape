@@ -27,14 +27,11 @@ pub struct CentermarkDlg {
     pub picks: Vec<CmCircle>,
     /// Single: the centermark each pick placed at once (live2 2442), by pick.
     pub placed: Vec<u64>,
-    /// Of those, the ones on a circle with an automatic centermark: Esc drops them, ✓ keeps them (live
-    /// dx/q-centermark).
-    pub over_auto: Vec<u64>,
 }
 
 impl Default for CentermarkDlg {
     fn default() -> Self {
-        Self { mode: 0, reference_center: true, bolt_circle: true, radial_lines: false, pattern: true, connecting: true, picks: Vec::new(), placed: Vec::new(), over_auto: Vec::new() }
+        Self { mode: 0, reference_center: true, bolt_circle: true, radial_lines: false, pattern: true, connecting: true, picks: Vec::new(), placed: Vec::new() }
     }
 }
 
@@ -80,13 +77,10 @@ impl DrawingEditor {
                     s.annotations.push(noshape_scene::drawing_tools::centermark(id, &mark, pos));
                     placed = Some(id);
                 });
-                // (A circle with an automatic centermark: the new mark lasts only with ✓.)
-                let auto = self.built.as_ref().is_some_and(|b| b.picks.iter().any(|t| matches!(t, noshape_model::drawing::build::PickTarget::AutoCentermark { view: v, center: c } if *v == view && *c == noshape_model::drawing::build::centermark_key(center))));
+                // On a circle with an automatic centermark it replaces it and stays with Esc (live drw-centermark
+                // retake 996d6b8a).
                 if let Some(d) = &mut self.centermark_dlg {
                     d.placed.extend(placed);
-                    if auto {
-                        d.over_auto.extend(placed);
-                    }
                 }
             }
         }
@@ -106,21 +100,6 @@ impl DrawingEditor {
     pub fn close_centermark_on_escape(&mut self, cx: &mut Context<Self>) -> bool {
         if !self.centermark_dlg.as_ref().is_some_and(|d| !d.picks.is_empty()) {
             return false;
-        }
-        // Single marks over automatic ones go with Esc (live dx/q-centermark: only the automatic mark is left).
-        let dropped = self.centermark_dlg.as_mut().map(|d| std::mem::take(&mut d.over_auto)).unwrap_or_default();
-        if !dropped.is_empty() {
-            if let Some(d) = &mut self.centermark_dlg {
-                let keep: Vec<(CmCircle, u64)> = d.picks.iter().cloned().zip(d.placed.iter().copied()).filter(|(_, id)| !dropped.contains(id)).collect();
-                (d.picks, d.placed) = keep.into_iter().unzip();
-            }
-            self.edit_sheet("Centermark", cx, |s| s.annotations.retain(|a| !dropped.contains(&a.id)));
-            if self.centermark_dlg.as_ref().is_some_and(|d| d.picks.is_empty()) {
-                self.tool = Tool::Select;
-                self.centermark_dlg = None;
-                cx.notify();
-                return true;
-            }
         }
         self.accept_centermark(cx);
         self.tool = Tool::Select;

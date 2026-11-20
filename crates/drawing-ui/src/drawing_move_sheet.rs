@@ -252,7 +252,7 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    fn dialog_header(title: &'static str, ok: impl Fn(&mut Self, &mut Context<Self>) + 'static, cancel: impl Fn(&mut Self, &mut Context<Self>) + 'static, ids: (&'static str, &'static str), cx: &mut Context<Self>) -> AnyElement {
+    fn dialog_header(title: &'static str, ok_on: bool, ok: impl Fn(&mut Self, &mut Context<Self>) + 'static, cancel: impl Fn(&mut Self, &mut Context<Self>) + 'static, ids: (&'static str, &'static str), cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         h_flex()
             .h(px(28.))
@@ -260,7 +260,7 @@ impl DrawingEditor {
             .border_b_1()
             .border_color(gpui_kit::rgb(0xd3d7d9))
             .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(title))
-            .child(div().id(ids.0).w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().child(crate::drawing_chrome::ok_check(18.)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| ok(this, cx))))
+            .child(div().id(ids.0).w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(if ok_on { pal.accept } else { gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED) }).child(crate::drawing_chrome::ok_check(18.)).when(ok_on, |e| e.cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| ok(this, cx)))))
             .child(div().id(ids.1).w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| cancel(this, cx))))
             .into_any_element()
     }
@@ -273,7 +273,9 @@ impl DrawingEditor {
         let cur = names.get(d.sheet).cloned().unwrap_or_default();
         let at = d.at;
         let (shown, value) = (cur.clone(), cur.clone());
-        let sheet = Button::new("ms-sheet").label(cur).ghost().xsmall().w(px(130.)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu("ms-sheet-dd", true, move |mut m, _, _| {
+        let moves = d.sheet != self.sheet;
+        // Live 284: 120 px, the value at 13.33 px; ✓ pale until another sheet is picked.
+        let sheet = Button::new("ms-sheet").accessibility_label(cur.clone()).child(div().min_w_0().overflow_hidden().whitespace_nowrap().text_size(px(13.33)).child(cur)).ghost().xsmall().w(px(120.)).h(px(25.)).text_color(gpui_kit::rgb(0x555555)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu("ms-sheet-dd", true, move |mut m, _, _| {
             for (i, n) in names.iter().enumerate() {
                 let e = ed.clone();
                 m = m.item(crate::os_menu::OsMenuItem::new(n.clone()).on_click(move |_, _, cx| {
@@ -301,19 +303,18 @@ impl DrawingEditor {
                 .absolute()
                 .left(px(at[0] as f32))
                 .top(px(at[1] as f32))
-                .w(px(220.))
-                .pb(px(6.))
+                .w(px(223.))
                 .bg(pal.dialog_bg)
                 .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(gpui_kit::rgb(0x333333))
                 .text_size(px(12.))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .child(Self::dialog_header("Move to sheet", |t, cx| t.accept_move_sheet(cx), |t, cx| {
+                .child(Self::dialog_header("Move to sheet", moves, |t, cx| t.accept_move_sheet(cx), |t, cx| {
                     t.move_sheet = None;
                     cx.notify();
                 }, ("ms-ok", "ms-close"), cx))
-                .child(h_flex().h(px(30.)).px(px(10.)).gap(px(8.)).child(div().w(px(50.)).child("Sheet")).child(sheet))
+                .child(h_flex().h(px(27.)).pl(px(10.)).pr(px(4.)).justify_between().child(div().pt(px(6.)).child("Sheet")).child(sheet))
                 .into_any_element(),
         )
     }
@@ -365,7 +366,7 @@ impl DrawingEditor {
                 .text_size(px(12.))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .child(Self::dialog_header("Table properties", |t, cx| t.close_table_props(true, cx), |t, cx| t.close_table_props(false, cx), ("tp-ok", "tp-close"), cx))
+                .child(Self::dialog_header("Table properties", true, |t, cx| t.close_table_props(true, cx), |t, cx| t.close_table_props(false, cx), ("tp-ok", "tp-close"), cx))
                 .child(div().pl(px(11.)).pt(px(14.)).h(px(34.)).text_size(px(13.33)).child("Select fixed corner"))
                 .child(h_flex().pl(px(16.)).pt(px(6.)).gap(px(24.)).children(corners))
                 .into_any_element(),

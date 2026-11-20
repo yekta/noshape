@@ -439,7 +439,8 @@ impl DrawingEditor {
             div()
                 .id(("dt-tab", t as usize))
                 .map(|d| crate::ui_script::mark(d, || format!("tab:{name}")))
-                .flex_1()
+                // Live 508: each tab its text plus an even share of the rest (Datum 112 px, Datum target 150).
+                .flex_grow(1.)
                 .h(px(28.))
                 .flex()
                 .items_center()
@@ -462,7 +463,7 @@ impl DrawingEditor {
         type OnToggle = Box<dyn Fn(&mut DrawingEditor, &mut Window, &mut Context<DrawingEditor>)>;
         let icon_menu = |id: &'static str, glyph: String, items: Vec<(String, String, bool, Act)>| -> AnyElement {
             let ed = ed.clone();
-            Button::new(id).ghost().w(px(50.)).h(px(30.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).dropdown_caret(true).child(div().text_size(px(16.)).child(glyph)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+            Button::new(id).ghost().small().w(px(50.)).h(px(30.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).dropdown_caret(true).child(div().text_size(px(16.)).child(glyph)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
                 for (g, l, on, f) in &items {
                     let (e, f) = (ed.clone(), f.clone());
                     m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).glyph(g).checked(*on).on_click(move |_, _, cx| e.update(cx, |t, cx| t.edit_datum(|d| f(d), cx))));

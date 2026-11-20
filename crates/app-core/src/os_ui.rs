@@ -214,7 +214,7 @@ fn modal_with(dialog: Dialog, title: impl Into<SharedString>, width: f32, dark: 
                 .border_b_1()
                 .border_color(rgb(MODAL_DIVIDER))
                 // Live (document/80, drawing/90, document/23): 18 px `#666`, regular.
-                .child(div().text_size(px(18.)).when(dark, |d| d.text_color(rgb(0x333333)).font_weight(FontWeight::MEDIUM)).when(!dark, |d| d.text_color(pal.text_muted)).whitespace_nowrap().child(title))
+                .child(div().text_size(px(18.)).when(dark, |d| d.text_color(rgb(0x333333)).font_weight(FontWeight::MEDIUM)).when(!dark, |d| d.text_color(pal.text_muted).font_weight(FontWeight::NORMAL)).whitespace_nowrap().child(title))
                 .child(div().flex_1())
                 .when(help, |d| d.child(div().flex_none().mr(px(5.)).child(crate::ui::glyph("help-dot", 16., crate::theme::help_dot(0x888888)))))
                 .child(div().flex_none().child(DialogClose::new().child(

@@ -150,9 +150,6 @@ impl Focusable for CreateDrawingDialog {
 
 
 impl CreateDrawingDialog {
-    /// `metric`: the document works in millimeters (the Custom template's
-    /// units; the list preselects ANSI_A_INCH, Onshape's first row). `default_name`: the name
-    /// Onshape suggests ("Part 1 Drawing 1", or "Drawing 1" without a source).
     /// The other documents' DWTs (found in the background), after this
     /// document's; the owner of this document's rows too.
     pub fn add_dwts(&mut self, more: Vec<DwtTab>, own_owner: Option<String>, cx: &mut Context<Self>) {
@@ -165,7 +162,8 @@ impl CreateDrawingDialog {
         cx.notify();
     }
 
-    pub fn new(req: CreateRequest, default_name: String, metric: bool, dwts: Vec<DwtTab>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    /// `default_name`: the name Onshape suggests ("Part 1 Drawing 1", or "Drawing 1" without a source).
+    pub fn new(req: CreateRequest, default_name: String, dwts: Vec<DwtTab>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let name = cx.new(|cx| InputState::new(window, cx).default_value(default_name));
         let rows = template_rows();
         // Live 1706: Recently opened with the last used template on top and
@@ -187,7 +185,7 @@ impl CreateDrawingDialog {
             standard: "All",
             selected,
             custom: false,
-            ct: CustomTemplate::new(metric),
+            ct: CustomTemplate::new(),
             // Onshape preselects "No views" (the first view follows the cursor), then the last choice.
             suggested: remembered_suggested(&crate::paths::config_dir()),
             focus: cx.focus_handle(),

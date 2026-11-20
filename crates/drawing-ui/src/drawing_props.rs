@@ -835,7 +835,8 @@ impl DrawingEditor {
         let select = |id: &'static str, current: String, items: Vec<(String, bool, PropsAct)>, enabled: bool| {
             let view = view.clone();
             let shown = current.clone();
-            let b = Button::new(id).label(current).ghost().xsmall().w_full().h(px(25.)).rounded(px(0.)).border_b_1().border_color(line).text_color(field_ink).text_size(px(13.33)).dropdown_caret(true);
+            // The value at 13.33 px, clipped without an ellipsis (live 1448: "Best performan"); a label would take the button's 11 px.
+            let b = Button::new(id).accessibility_label(current.clone()).child(div().min_w_0().overflow_hidden().whitespace_nowrap().text_size(px(13.33)).child(current)).ghost().xsmall().w_full().h(px(25.)).rounded(px(0.)).border_b_1().border_color(line).text_color(field_ink).dropdown_caret(true);
             if !enabled {
                 return div().opacity(0.5).child(b).into_any_element();
             }
@@ -856,7 +857,7 @@ impl DrawingEditor {
             .map(|b| crate::ui_script::mark(b, move || format!("dropdown:{shown}")))
             .into_any_element()
         };
-        let field = |input: &Entity<InputState>| div().h(px(25.)).border_b_1().border_color(line).text_color(field_ink).child(Input::new(input).appearance(false).xsmall().text_size(px(13.33))).into_any_element();
+        let field = |input: &Entity<InputState>| h_flex().h(px(25.)).border_b_1().border_color(line).text_color(field_ink).child(div().flex_1().child(Input::new(input).appearance(false).xsmall().text_size(px(13.33)))).into_any_element();
         // Multi-line (Enter starts a new line): a view label's Prefix / Suffix.
         let area_field = |input: &Entity<TextareaState>| div().min_h(px(25.)).border_b_1().border_color(line).text_color(field_ink).child(Textarea::new(input).appearance(false).xsmall().text_size(px(13.33))).into_any_element();
         // Reference block.

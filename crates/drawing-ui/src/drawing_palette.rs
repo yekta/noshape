@@ -830,7 +830,9 @@ impl DrawingEditor {
             // Parentheses).
             let blue = gpui_kit::rgb(0x1b72c4);
             let oval = div().px(px(3.)).rounded_full().border_1().border_color(blue).text_size(px(11.)).text_color(ink).child("XX").into_any_element();
-            toggles = toggles.child(icon_toggle("dp-insp", oval, "Inspection dimension", fmt.inspection_frame, |d| d.cur.format.inspection_frame = !d.cur.format.inspection_frame, cx)).child(crate::ui_script::mark(div().id("dp-dual-tip"), || "dropdown:Dual dimension".into()).tooltip(crate::ui::tooltip("Dual dimension")).child(menu("dp-dual", small("[XX] x.xx".into()), 80., dual_items))).child(
+            // Live 460: the dimension palette's stacked [XX] over x.xx, 45 px.
+            let dual = v_flex().items_center().line_height(px(11.)).child(div().text_size(px(12.)).text_color(blue).child("[XX]")).child(div().text_size(px(8.)).text_color(ink).child("x.xx")).into_any_element();
+            toggles = toggles.child(icon_toggle("dp-insp", oval, "Inspection dimension", fmt.inspection_frame, |d| d.cur.format.inspection_frame = !d.cur.format.inspection_frame, cx)).child(crate::ui_script::mark(div().id("dp-dual-tip"), || "dropdown:Dual dimension".into()).tooltip(crate::ui::tooltip("Dual dimension")).child(pbutton("dp-dual", dual, 45., dual_items, false))).child(
                 div().pl(px(8.)).child(crate::drawing_chrome::DrCheckbox::new("dp-override").label("Override precision/tolerance").checked(opts.override_tol).tooltip("Click to override the precision and tolerance from the hole feature").on_click(cx.listener(|this, v: &bool, _, cx| {
                     let v = *v;
                     this.edit_palette(|d| d.cur.hole.get_or_insert_with(Default::default).override_tol = v, cx)

@@ -119,6 +119,12 @@ ACCEPTED = {
     "All views in a hole table must be of a common singular part": "live 1744: other parts' views aren't pickable, no error",
     "All instances in all views": "live 1735: no Apply to with a single-part section",
 }
+# Menu rows that depend on the spot clicked: live's later takes show ours (entity, row as listed).
+ACCEPTED_MENU = {
+    ("surface-finish-on-edge", "Add leader"): "live2 drw-surface-finish-flip: Flip, no Add leader, on an edge without a leader",
+    ("surface-finish-on-edge", "Flip (ours only)"): "live2 drw-surface-finish-flip: Flip on an edge without a leader",
+    ("ordinate", "Reset ordinate (ours only)"): "live2 drw-ordinate-value-rclick: on a value's text",
+}
 # Texts in the dumps that are user content, the recording's document, units or the dump format, not UI.
 NOISE = re.compile(r"^(Part \d|Part Studio \d|Sheet\d|Drawing \d|Assembly \d|Front|Top|Right|Left|Back|Bottom|Isometric|"
                    r"Hole \d|Extrude \d|Sketch \d|Hatch \d|[A-Z]\d?|[A-Z]-[A-Z]|DETAIL [A-Z]|SECTION [A-Z]-[A-Z]|"
@@ -437,13 +443,17 @@ def main():
             k = key(it)
             if mine is not None:
                 st = "=" if k in mine_keys else ("≠" if in_sources(src, it) else "missing")
-                rows.append((f"Menu: {entity}", it, st, "our menu"))
+                if st != "=" and (entity, it) in ACCEPTED_MENU:
+                    st = "accepted"
+                rows.append((f"Menu: {entity}", it, st, ACCEPTED_MENU.get((entity, it), "our menu")))
             else:
                 rows.append((f"Menu: {entity}", it, status(menu_seen.get(k), menu_row_in_sources(src, it)), ""))
         # A row of ours live's menu doesn't have.
         for r in mine or []:
             if r != "——" and key(r.removesuffix(" ▸")) not in {key(x) for x in items}:
-                rows.append((f"Menu: {entity}", f"{r} (ours only)", "≠", "our menu"))
+                name = f"{r} (ours only)"
+                note = ACCEPTED_MENU.get((entity, name))
+                rows.append((f"Menu: {entity}", name, "accepted" if note else "≠", note or "our menu"))
     elsewhere = {}
     for sf, it, st, _ in rows:
         if st in ("=", "≠") and (sf.startswith(("Toolbar", "Menu:"))):
@@ -478,7 +488,7 @@ def main():
             rows.append((surface, t, "shown" if st == "present" and norm(t) in mine else st, "dump"))
 
     # Cloud-only rows (out of scope) and dump texts live itself no longer shows (docs/parity/audit-drawing-dataexchange.md).
-    rows = [(sf, it, "n/a" if it in CLOUD else ("accepted" if it in ACCEPTED and st != "=" else st), ACCEPTED.get(it, note) if st != "=" else note)
+    rows = [(sf, it, "n/a" if it in CLOUD else ("accepted" if it in ACCEPTED and st != "=" else st), ACCEPTED.get(it, note) if st not in ("=", "accepted") else note)
             for sf, it, st, note in rows]
     kinds = ["=", "shown", "≠", "present", "missing", "accepted", "n/a"]
     counts = defaultdict(lambda: defaultdict(int))

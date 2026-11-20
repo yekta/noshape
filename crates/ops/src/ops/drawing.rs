@@ -785,7 +785,6 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             None
         }
     };
-    let metric = !matches!(od.doc().settings.units.length, noshape_units::LengthUnit::Inch | noshape_units::LengthUnit::Foot | noshape_units::LengthUnit::Yard);
     let rows = dr::template_rows();
     let template = match (a.opt_str("template")?, a.object("custom_template")?) {
         (Some(_), Some(_)) => return Err(OpError::param("custom_template", "give `template` or `custom_template`, not both")),
@@ -794,7 +793,7 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let found = rows.iter().find(file).or_else(|| rows.iter().find(|r| r.template.name.eq_ignore_ascii_case(t)));
             found.map(|r| r.template).ok_or_else(|| OpError::param("template", &format!("no template `{t}`; the templates: {}", rows.iter().map(|r| r.file).collect::<Vec<_>>().join(", "))))?
         }
-        (None, Some(c)) => custom_template(c, metric).map_err(|e| e.under("custom_template"))?,
+        (None, Some(c)) => custom_template(c).map_err(|e| e.under("custom_template"))?,
         // Live drawing/01, qa5 D1: the dialog preselects ANSI_A_INCH.dwt whatever the units.
         (None, None) => rows.iter().find(|r| r.file == "ANSI_A_INCH.dwt").map(|r| r.template).expect("standard template"),
     };
@@ -828,11 +827,11 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     Ok(reply(od, tab, 0, false)?.into())
 }
 
-const CUSTOM_TEMPLATE_DOC: &str = "The Custom template tab instead of `template`: {\"standard\": \"ANSI\" | \"ISO\" | \"JIS\" (default ISO in metric workspaces, else ANSI), \"language\": English (default), French, German, Spanish, Italian, Japanese, Korean, ChineseSimplified, ChineseTraditional or the list's own name, \"size\": ANSI A (default), A Portrait, B, C, D; ISO / JIS A4 (default), A4 Portrait, A3, A2, A1, A0, \"units\": Millimeters, Centimeter, Meter, Inches, Feet and inches, Foot, Yard, \"decimal_separator\": \"period\" | \"comma\", \"projection\": \"third_angle\" | \"first_angle\", \"border\": bool (default true), \"horizontal_zones\" / \"vertical_zones\": 0–20 even (default per size), \"start_zones\": \"bottom_right\" (default) | \"top_left\", \"title_block\": bool (default true)}. Choosing a standard sets the units, separator and projection like the dialog (ANSI: Inches, period, third angle; ISO: Millimeters, comma, first angle; JIS: Millimeters, comma, third angle).";
+const CUSTOM_TEMPLATE_DOC: &str = "The Custom template tab instead of `template`: {\"standard\": \"ANSI\" | \"ISO\" | \"JIS\" (default ANSI, as the dialog in any units), \"language\": English (default), French, German, Spanish, Italian, Japanese, Korean, ChineseSimplified, ChineseTraditional or the list's own name, \"size\": ANSI A (default), A Portrait, B, C, D; ISO / JIS A4 (default), A4 Portrait, A3, A2, A1, A0, \"units\": Millimeters, Centimeter, Meter, Inches, Feet and inches, Foot, Yard, \"decimal_separator\": \"period\" | \"comma\", \"projection\": \"third_angle\" | \"first_angle\", \"border\": bool (default true), \"horizontal_zones\" / \"vertical_zones\": 0–20 even (default per size), \"start_zones\": \"bottom_right\" (default) | \"top_left\", \"title_block\": bool (default true)}. Choosing a standard sets the units, separator and projection like the dialog (ANSI: Inches, period, third angle; ISO: Millimeters, comma, first angle; JIS: Millimeters, comma, third angle).";
 
 /// Create Drawing › Custom template from its JSON options (the dialog's
 /// choices applied in its order: standard first, then the rest).
-fn custom_template(c: &serde_json::Map<String, Value>, metric: bool) -> Result<noshape_model::drawing::templates::DrawingTemplate, OpError> {
+fn custom_template(c: &serde_json::Map<String, Value>) -> Result<noshape_model::drawing::templates::DrawingTemplate, OpError> {
     use noshape_model::drawing::tb_lang::TitleLanguage;
     let text = |k: &str| -> Result<Option<&str>, OpError> {
         match c.get(k) {
@@ -846,7 +845,7 @@ fn custom_template(c: &serde_json::Map<String, Value>, metric: bool) -> Result<n
             Some(v) => v.as_bool().map(Some).ok_or_else(|| OpError::param(k, "true or false")),
         }
     };
-    let mut ct = dr::CustomTemplate::new(metric);
+    let mut ct = dr::CustomTemplate::new();
     if let Some(st) = text("standard")? {
         let st = ["ANSI", "ISO", "JIS"].into_iter().find(|x| x.eq_ignore_ascii_case(st)).ok_or_else(|| OpError::param("standard", "ANSI, ISO or JIS"))?;
         ct.set_standard(st);

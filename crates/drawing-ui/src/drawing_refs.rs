@@ -458,10 +458,10 @@ impl DrawingEditor {
                             .flex()
                             .items_center()
                             .rounded(px(5.25))
-                            .bg(blue)
+                            // Disabled: a pale blue, the text still white (live drawing/294).
+                            .bg(if enabled { blue } else { gpui_kit::rgb(0xa2b9df) })
                             .text_size(px(14.))
                             .text_color(gpui_kit::rgb_static(0xffffff))
-                            .when(!enabled, |d| d.opacity(0.4))
                             .when(enabled, |d| d.cursor_pointer())
                             .child(if tab == 0 { "Update all" } else { "Update selected" })
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -471,6 +471,8 @@ impl DrawingEditor {
                             })),
                     ),
                 )
+                // Live drawing/294: a strip with the help "?" under the button.
+                .child(h_flex().h(px(22.)).justify_end().pr(px(4.)).border_t_1().border_color(gpui_kit::rgb(0xeaeaea)).bg(gpui_kit::rgb(0xffffff)).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x888888))))
                 .into_any_element(),
         )
     }

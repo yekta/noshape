@@ -276,8 +276,8 @@ impl DrawingEditor {
         if let Some(d) = &mut self.table_dlg {
             d.cut_source = Some(noshape_model::drawing::CompositeSource { tab: id, version, part, label });
         }
+        // No bubble: the table follows the pointer (live drw-cut-list-table-properties 5).
         self.close_composite_chooser();
-        self.status = Some("Click to place the table".into());
         window.focus(&self.focus, cx);
         self.ensure_sources(false, cx);
         self.update_preview(cx);

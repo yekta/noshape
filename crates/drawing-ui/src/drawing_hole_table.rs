@@ -305,7 +305,7 @@ impl DrawingEditor {
             let ed = ed.clone();
             // (The ui-parity runner's `{"dropdown": "<shown>"}`.)
             let mark = format!("dropdown:{label}");
-            let button = Button::new(id).label(label).ghost().xsmall().w(px(w)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+            let button = Button::new(id).accessibility_label(label.clone()).child(div().min_w_0().overflow_hidden().whitespace_nowrap().text_size(px(13.33)).child(label)).ghost().xsmall().w(px(w)).h(px(25.)).text_color(gpui_kit::rgb(0x555555)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
                 for (l, on, f) in &items {
                     let (e, f) = (ed.clone(), f.clone());
                     m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| {
@@ -322,7 +322,8 @@ impl DrawingEditor {
             crate::ui_script::mark(div().child(button), move || mark)
         };
         // "Location precision" on one line (it wrapped at 70 px, walk 10-28).
-        let row = |label: &'static str, body: AnyElement| h_flex().h(px(28.)).px(px(8.)).child(div().w(px(98.)).flex_none().text_size(px(11.)).child(label)).child(body).into_any_element();
+        // Live drw-hole-table-properties: the label at 8 px, its field from 47 (Order) or right-aligned (precision, 85 px).
+        let row = |label: &'static str, body: AnyElement| h_flex().h(px(28.)).pl(px(8.)).pr(px(5.)).justify_between().child(div().flex_none().text_size(px(12.)).child(label)).child(body).into_any_element();
         let precisions: Vec<(String, bool, Set)> = PRECISIONS.iter().map(|&(l, p)| (l.to_string(), d.precision == p, std::rc::Rc::new(move |d: &mut HoleTableDlg| d.precision = p) as Set)).collect();
         let precision_label = PRECISIONS.iter().find(|(_, p)| *p == d.precision).map(|(l, _)| l.to_string()).unwrap_or_default();
         // Sheet ▾ (live drawing-hole-table-dialog): a placed table moves to
@@ -330,11 +331,18 @@ impl DrawingEditor {
         let sheet_select = {
             let names: Vec<String> = self.drawing.sheets.iter().map(|s| s.name.clone()).collect();
             let (cur, table, ed) = (self.sheet, d.table, ed.clone());
+            let name = names.get(cur).cloned().unwrap_or_default();
+            if names.len() < 2 {
+                // Live: one sheet is its name, no list.
+                div().w(px(148.)).pl(px(2.)).text_size(px(12.)).child(name).into_any_element()
+            } else {
             Button::new("hole-table-sheet")
-                .label(names.get(cur).cloned().unwrap_or_default())
+                .accessibility_label(name.clone())
+                .child(div().min_w_0().overflow_hidden().whitespace_nowrap().text_size(px(13.33)).child(name))
                 .ghost()
                 .xsmall()
-                .w(px(112.))
+                .w(px(148.))
+                .h(px(25.))
                 .dropdown_caret(true)
                 .border_b_1()
                 .border_color(gpui_kit::rgb(0xdddddd))
@@ -354,6 +362,7 @@ impl DrawingEditor {
                     m
                 })
                 .into_any_element()
+            }
         };
         let orders: Vec<(String, bool, Set)> = vec![
             ("Top to bottom".into(), !d.bottom_to_top, std::rc::Rc::new(|d: &mut HoleTableDlg| d.bottom_to_top = false) as Set),
@@ -363,16 +372,19 @@ impl DrawingEditor {
         let corner_btn = |k: TableCorner, i: usize, cx: &mut Context<Self>| {
             let on = corner == k;
             let (top, left) = (matches!(k, TableCorner::TopLeft | TableCorner::TopRight), matches!(k, TableCorner::TopLeft | TableCorner::BottomLeft));
+            // Live drw-hole-table-properties, as Table properties' (live 550): 26 px, `#d3d7d9`; the pressed one
+            // `#e6e6e6`, `#ccc` with a 2 px blue bottom rule.
             div()
                 .id(("hole-table-corner", i))
-                .size(px(24.))
+                .size(px(26.))
+                .p(px(2.))
                 .relative()
                 .cursor_pointer()
                 .border_1()
-                .border_color(gpui_kit::rgb(0x909090))
-                .when(on, |e| e.border_b_2().border_color(pal.accent))
+                .border_color(gpui_kit::rgb(0xd3d7d9))
+                .when(on, |e| e.bg(gpui_kit::rgb(0xe6e6e6)).border_color(gpui_kit::rgb(0xcccccc)).child(div().absolute().left(px(-1.)).right(px(-1.)).bottom(px(-1.)).h(px(2.)).bg(pal.accent)))
                 .child(crate::ui::glyph("table", 20., ink))
-                .child(div().absolute().size(px(4.)).rounded_full().bg(ink).when(top, |e| e.top(px(1.))).when(!top, |e| e.bottom(px(1.))).when(left, |e| e.left(px(1.))).when(!left, |e| e.right(px(1.))))
+                .child(div().absolute().size(px(4.)).rounded_full().bg(ink).when(top, |e| e.top(px(2.))).when(!top, |e| e.bottom(px(2.))).when(left, |e| e.left(px(2.))).when(!left, |e| e.right(px(2.))))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(d) = &mut this.hole_dlg {
                         d.corner = k;
@@ -382,10 +394,7 @@ impl DrawingEditor {
         };
         let corners: Vec<AnyElement> = CORNERS.iter().enumerate().map(|(i, k)| corner_btn(*k, i, cx).into_any_element()).collect();
         let show = d.show_location;
-        // The view field: "Top" once picked (live "Top ×"), then the origin.
-        let field = |text: String, active: bool| {
-            div().mx(px(8.)).my(px(2.)).px(px(6.)).h(px(24.)).flex().items_center().text_size(px(12.)).when(active, |d| d.bg(gpui_kit::rgb(0xdbf1fa))).child(text).into_any_element()
-        };
+        let views_box = self.hole_views_box(view_name.clone(), more, first_origin, editing.is_some(), cx);
         crate::ui_script::note_dialog(|| {
             // Every text shown, in reading order (README "### Drawings"; live 2131): the selects' options, a picked
             // view's and origin's chips with their ×.
@@ -433,8 +442,8 @@ impl DrawingEditor {
                 .absolute()
                 .top(px(DIALOG_TOP))
                 .left(px(self.dialog_left()))
-                .w(px(230.))
-                .pb(px(6.))
+                .w(px(200.))
+                .pb(px(8.))
                 .bg(pal.dialog_bg)
                 .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(ink)
@@ -490,7 +499,7 @@ impl DrawingEditor {
                         cx.notify();
                     }))),
                 )
-                .when(show, |v| v.child(row("Location precision", select("hole-table-precision", precision_label, 112., precisions).into_any_element())))
+                .when(show, |v| v.child(row("Location precision", select("hole-table-precision", precision_label, 85., precisions).into_any_element())))
                 .when(!show, |v| {
                     v.child(h_flex().px(px(8.)).h(px(26.)).gap(px(6.)).child(crate::drawing_chrome::DrCheckbox::new("hole-table-collapse").label("Collapse tags").checked(d.collapse_tags).on_click(cx.listener(|this, on: &bool, _, cx| {
                         if let Some(d) = &mut this.hole_dlg {
@@ -499,133 +508,173 @@ impl DrawingEditor {
                         cx.notify();
                     }))))
                 })
-                // Live drawing-hole-table-dialog: the Views field's tooltip.
-                // A click on it with a view picked takes another view of the
-                // same part (live request 1744).
-                .child(
-                    div()
-                        .id("hole-table-views")
-                        .tooltip(crate::ui::tooltip("Select views of a common singular part"))
-                        .child(field(view_name.clone().unwrap_or_else(|| "Views".into()), view.is_none() || d.adding_view))
-                        .when(view.is_some() && editing.is_none(), |e| {
-                            e.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                if let Some(d) = &mut this.hole_dlg {
-                                    d.adding_view = !d.adding_view;
-                                }
-                                cx.notify();
-                            }))
-                        }),
-                )
-                .when(view.is_some() && editing.is_none() && show, |v| v.child(field(if first_origin { "Origin: Point".into() } else { "Origin: a vertex or circle center".into() }, !first_origin)))
-                // Live 1985 / 1682: X direction and Y direction, each a
-                // straight edge of the view; setting one hides the other (the
-                // other axis is square to it); a click on a set one clears it.
-                .when(view.is_some() && editing.is_none() && show, |v| {
-                    let axis = |id: &'static str, label: &'static str, y: bool, cx: &mut Context<Self>| {
-                        let on = if y { d.y_picking } else { d.x_picking };
-                        let set = d.x_dir.is_some() && d.y_set == y;
+                .child(views_box)
+                .child(row("Sheet", sheet_select))
+                .child(row("Order", select("hole-table-order", if d.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, 148., orders).into_any_element()))
+                .child(div().px(px(9.)).pt(px(6.)).text_size(px(12.)).child("Select fixed corner"))
+                .child(h_flex().pl(px(12.)).pt(px(6.)).gap(px(24.)).children(corners))
+                .into_any_element(),
+        )
+    }
+
+    /// The Views group (live drw-hole-table-properties 1–9): "Views" alone, blue, until a view is picked; then a
+    /// blue-framed box with its caption and "⌄ Top ×" over the view's Origin, X / Y direction, Holes to exclude and the
+    /// X / Y flips (inserting), or "› Top ×" alone on blue (editing).
+    fn hole_views_box(&self, view_name: Option<String>, more: Vec<(ViewId, String, bool)>, first_origin: bool, editing: bool, cx: &mut Context<Self>) -> AnyElement {
+        let Some(d) = self.hole_dlg.as_ref() else { return div().into_any_element() };
+        let pal = p();
+        let (ink, muted, faint, line, blue_bg) = (gpui_kit::rgb(0x333333), gpui_kit::rgb(0x555555), gpui_kit::rgb(0xaaaaaa), gpui_kit::rgb(0xd3d7d9), gpui_kit::rgb(0xdbf1fa));
+        let tip = "Select views of a common singular part";
+        let Some(name) = view_name else {
+            return div().id("hole-table-views").tooltip(crate::ui::tooltip(tip)).mx(px(4.)).my(px(2.)).px(px(8.)).h(px(26.)).flex().items_center().border_1().border_color(pal.accent).bg(blue_bg).text_size(px(13.)).text_color(muted).child("Views").into_any_element();
+        };
+        let show = d.show_location;
+        let busy = d.picking || d.x_picking || d.y_picking || d.adding_view;
+        // A field inside the box: 25 px, `#d3d7d9`, blue while it takes the next pick.
+        let field = |id: SharedString, caption: Option<&'static str>, text: String, active: bool, filled: bool| {
+            div()
+                .id(id)
+                .ml(px(20.))
+                .mr(px(6.))
+                .mb(px(4.))
+                .px(px(6.))
+                .min_h(px(25.))
+                .flex()
+                .flex_col()
+                .justify_center()
+                .border_1()
+                .border_color(if active { pal.accent } else { line })
+                .when(active, |e| e.bg(blue_bg))
+                .cursor_pointer()
+                .when_some(caption, |e, c| e.child(div().pt(px(2.)).text_size(px(11.)).text_color(muted).child(c)))
+                .child(h_flex().justify_between().text_size(px(13.)).text_color(if filled { ink } else { muted }).child(text).when(filled && caption.is_some(), |e| e.child(div().text_color(faint).child("×"))))
+        };
+        let chevron = crate::ui::glyph(if editing { "chevron-right" } else { "chevron-down" }, 14., ink);
+        let view_row = h_flex()
+            .id("hole-table-views")
+            .tooltip(crate::ui::tooltip(tip))
+            .h(px(26.))
+            .px(px(4.))
+            .gap(px(2.))
+            .child(chevron)
+            .child(div().flex_1().text_size(px(13.33)).text_color(ink).child(name))
+            .child(div().id("hole-table-view-x").px(px(4.)).text_color(faint).child("×").when(!editing, |e| {
+                e.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    cx.stop_propagation();
+                    if let Tool::Table { view, origin, .. } = &mut this.tool {
+                        (*view, *origin) = (None, None);
+                    }
+                    if let Some(d) = &mut this.hole_dlg {
+                        d.more.clear();
+                    }
+                    this.update_preview(cx);
+                    cx.notify();
+                }))
+            }))
+            // A click on it with a view picked takes another view of the same part (live request 1744).
+            .when(!editing, |e| {
+                e.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    if let Some(d) = &mut this.hole_dlg {
+                        d.adding_view = !d.adding_view;
+                    }
+                    cx.notify();
+                }))
+            });
+        let mut group = v_flex()
+            .mx(px(4.))
+            .my(px(2.))
+            .pb(px(4.))
+            .border_1()
+            .border_color(pal.accent)
+            .when(editing || d.adding_view, |e| e.bg(blue_bg))
+            .child(div().px(px(8.)).pt(px(4.)).text_size(px(11.)).text_color(muted).child("Views"))
+            .child(view_row);
+        if !editing {
+            if show {
+                let origin = if first_origin {
+                    field("hole-table-origin".into(), Some("Origin"), "Point".into(), !busy, true)
+                } else {
+                    field("hole-table-origin".into(), None, "Origin".into(), !busy, false)
+                };
+                group = group.child(origin);
+                // Live 1985 / 1682: X direction and Y direction, each a straight edge of the view; setting one hides
+                // the other (the other axis is square to it); a click on a set one clears it.
+                for (id, label, y) in [("hole-table-x-dir", "X direction", false), ("hole-table-y-dir", "Y direction", true)] {
+                    let set = d.x_dir.is_some() && d.y_set == y;
+                    if d.x_dir.is_some() && !set {
+                        continue;
+                    }
+                    let on = if y { d.y_picking } else { d.x_picking };
+                    let f = if set { field(id.into(), Some(label), "Edge".into(), on, true) } else { field(id.into(), None, label.into(), on, false) };
+                    group = group.child(f.on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        if let Some(d) = &mut this.hole_dlg {
+                            if set {
+                                (d.x_dir, d.y_set) = (None, false);
+                            } else if y {
+                                (d.y_picking, d.x_picking) = (!d.y_picking, false);
+                            } else {
+                                (d.x_picking, d.y_picking) = (!d.x_picking, false);
+                            }
+                            d.picking = false;
+                        }
+                        this.update_preview(cx);
+                        cx.notify();
+                    })));
+                }
+            }
+            let n = d.exclude.len();
+            let text = if n == 0 { "Holes to exclude".to_string() } else { format!("Holes to exclude: {n}") };
+            group = group.child(field("hole-table-exclude".into(), None, text, d.picking, n > 0).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                if let Some(d) = &mut this.hole_dlg {
+                    d.picking = !d.picking;
+                }
+                cx.notify();
+            })));
+            if show {
+                // Live 1609: the X / Y flips, each a 24 px icon under its letter.
+                let flip = |id: &'static str, cap: &'static str, on: bool, f: fn(&mut HoleTableDlg), cx: &mut Context<Self>| {
+                    v_flex().items_center().child(div().text_size(px(11.)).child(cap)).child(
                         div()
                             .id(id)
-                            .mx(px(8.))
-                            .my(px(2.))
-                            .px(px(6.))
-                            .h(px(24.))
+                            .size(px(24.))
                             .flex()
                             .items_center()
-                            .text_size(px(12.))
+                            .justify_center()
                             .border_1()
-                            .border_color(if on { pal.accent } else { gpui_kit::rgb(0xd3d7d9) })
-                            .when(on, |d| d.bg(gpui_kit::rgb(0xdbf1fa)))
+                            .border_color(line)
+                            .when(on, |e| e.bg(gpui_kit::rgb(0xcfdbe5)))
                             .cursor_pointer()
-                            .child(if set { format!("{label}: Edge ×") } else { label.to_string() })
-                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                if let Some(d) = &mut this.hole_dlg {
-                                    if set {
-                                        (d.x_dir, d.y_set) = (None, false);
-                                    } else if y {
-                                        (d.y_picking, d.x_picking) = (!d.y_picking, false);
-                                    } else {
-                                        (d.x_picking, d.y_picking) = (!d.x_picking, false);
-                                    }
-                                    d.picking = false;
-                                }
-                                this.update_preview(cx);
-                                cx.notify();
-                            }))
-                            .into_any_element()
-                    };
-                    let v = if d.x_dir.is_some() && d.y_set { v } else { v.child(axis("hole-table-x-dir", "X direction", false, cx)) };
-                    if d.x_dir.is_some() && !d.y_set { v } else { v.child(axis("hole-table-y-dir", "Y direction", true, cx)) }
-                })
-                // Live 1609: the X / Y flip icons and Holes to exclude.
-                .when(view.is_some() && editing.is_none() && show, |v| {
-                    let flip = |id: &'static str, label: &'static str, on: bool, f: fn(&mut HoleTableDlg), cx: &mut Context<Self>| {
-                        div()
-                            .id(id)
-                            .px(px(6.))
-                            .h(px(22.))
-                            .flex()
-                            .items_center()
-                            .border_1()
-                            .border_color(gpui_kit::rgb(0xd3d7d9))
-                            .when(on, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
-                            .cursor_pointer()
-                            .child(label)
+                            .child(crate::assets::icon("flip-direction", 18., cx))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 if let Some(d) = &mut this.hole_dlg {
                                     f(d);
                                 }
                                 cx.notify();
-                            }))
-                    };
-                    v.child(h_flex().px(px(8.)).h(px(28.)).gap(px(6.)).child(flip("hole-table-flip-x", "Flip X", d.flip_x, |d| d.flip_x = !d.flip_x, cx)).child(flip("hole-table-flip-y", "Flip Y", d.flip_y, |d| d.flip_y = !d.flip_y, cx)))
-                })
-                .when(view.is_some() && editing.is_none(), |v| {
-                    let n = d.exclude.len();
-                    let on = d.picking;
-                    v.child(
-                        div()
-                            .id("hole-table-exclude")
-                            .mx(px(8.))
-                            .my(px(2.))
-                            .px(px(6.))
-                            .h(px(24.))
-                            .flex()
-                            .items_center()
-                            .text_size(px(12.))
-                            .border_1()
-                            .border_color(if on { pal.accent } else { gpui_kit::rgb(0xd3d7d9) })
-                            .when(on, |d| d.bg(gpui_kit::rgb(0xdbf1fa)))
-                            .cursor_pointer()
-                            .child(if n == 0 { "Holes to exclude".to_string() } else { format!("Holes to exclude: {n}") })
-                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                if let Some(d) = &mut this.hole_dlg {
-                                    d.picking = !d.picking;
-                                }
-                                cx.notify();
                             })),
                     )
-                })
-                // The further views: their name (× drops it) and Origin.
-                .children(more.into_iter().enumerate().map(|(i, (_, name, set))| {
-                    v_flex()
-                        .child(
-                            h_flex()
-                                .child(div().flex_1().child(field(name, false)))
-                                .child(div().id(SharedString::from(format!("hole-table-more-x-{i}"))).px(px(8.)).cursor_pointer().child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                    if let Some(d) = &mut this.hole_dlg {
-                                        d.more.remove(i);
-                                    }
-                                    cx.notify();
-                                }))),
-                        )
-                        .child(field(if set { "Origin: Point".into() } else { "Origin: a vertex or circle center".into() }, !set))
-                }))
-                .child(row("Sheet", sheet_select))
-                .child(row("Order", select("hole-table-order", if d.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, 112., orders).into_any_element()))
-                .child(div().px(px(8.)).pt(px(4.)).text_size(px(11.)).child("Select fixed corner"))
-                .child(h_flex().px(px(8.)).pt(px(4.)).gap(px(26.)).children(corners))
-                .into_any_element(),
-        )
+                };
+                group = group.child(h_flex().pl(px(22.)).gap(px(4.)).child(flip("hole-table-flip-x", "X", d.flip_x, |d| d.flip_x = !d.flip_x, cx)).child(flip("hole-table-flip-y", "Y", d.flip_y, |d| d.flip_y = !d.flip_y, cx)));
+            }
+        }
+        // The further views: their name (× drops it) and Origin.
+        for (i, (_, name, set)) in more.into_iter().enumerate() {
+            group = group
+                .child(
+                    h_flex()
+                        .h(px(26.))
+                        .px(px(4.))
+                        .gap(px(2.))
+                        .child(crate::ui::glyph("chevron-down", 14., ink))
+                        .child(div().flex_1().text_size(px(13.33)).text_color(ink).child(name))
+                        .child(div().id(SharedString::from(format!("hole-table-more-x-{i}"))).px(px(4.)).text_color(faint).cursor_pointer().child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            if let Some(d) = &mut this.hole_dlg {
+                                d.more.remove(i);
+                            }
+                            cx.notify();
+                        }))),
+                )
+                .when(show, |g| g.child(if set { field(SharedString::from(format!("hole-table-more-origin-{i}")), Some("Origin"), "Point".into(), false, true) } else { field(SharedString::from(format!("hole-table-more-origin-{i}")), None, "Origin".into(), true, false) }));
+        }
+        group.into_any_element()
     }
 }

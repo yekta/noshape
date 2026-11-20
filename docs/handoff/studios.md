@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 00:23 UTC.
+Updated 2026-11-20 01:03 UTC.
 
 ## In flight
 
@@ -19,12 +19,27 @@ origin/main` first. Builds / tests on the lowest 1-min load of vibex7 / vibex8 /
 read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edited during a running sync: `touch` edited files before
 the next run. Run the full ops e2e before any drawing land. A few app runs don't take ~/bin/slot (DECISIONS 11-15).
 - Landed f450d0dd (11-20 by 00:10: Labs brand, HISTORY-ROW-NAME-OVERLAP, Pro menus, Measure 1-2).
-- Landing 11-20 00:24: brand ruling ("Noshape (default)", legend, Material Library, Default BOM / revision table,
-  workflows), COMPARE-COMMON-PARTS-MISSING (compare_graphics::regenerate with the side's variables / Derived / custom
-  features; also the Repair panel), Table / Hole table ✓ clears the alignment line, runner rules (Items (0) folder,
-  a menu row with its shortcut, bare "Onshape" = "Noshape"), Create Drawing source "Noshape", note insert lists
-  (206 px / 26 px rows / 341 px cap; symbols 47 px; OsMenu dropdown cap counts its padding), title field editor
-  alignment, drawing-matrix.md with the new "shown" status (1210 = + 446 shown of 1874).
+- Queued 68a4f22e (11-20 00:31; carries 988d0416 and the lead's 81d16ffcd / 7458597fb rebased): brand ruling,
+  COMPARE-COMMON-PARTS-MISSING, table alignment line, runner rules, note lists, title field alignment, matrix doc
+  (1210 = + 446 shown of 1874), Preferences "Noshape".
+- Local, b4 batch (screens of 13 rarer dialogs vs live): View properties' selects at 13.33 px and Name centred;
+  Move to sheet 223 px, ✓ pale until another sheet, Sheet list 120 px; Export Drawing title regular weight (all
+  modals' #666 titles), tighter field spacing; Datum target carets not squashed (.small()), tabs sized to text;
+  hole callout's Dual dimension the stacked [XX]/x.xx icon; Hole table panel rebuilt as live (200 px, Views group
+  with ⌄ Top ×, nested Origin / X / Y / Holes to exclude / X Y flip icons, one sheet as text, corners as Table
+  properties'); Reference manager's disabled button white text (asm too) + "?" strip; Custom template starts on ANSI
+  in any units (app and the drawing_create op). Matched as is: Styles, MBD status, Replicate annotations (nothing
+  opens with nothing selected for replication, as live), title-block double-click (alignment fix queued).
+  Also: live's centermark retake (996d6b8a): a Single click on a circle with an automatic mark replaces it and
+  stays after Esc; the matrix accepts three click-spot menu rows (surface finish on edge Flip / Add leader, ordinate
+  Reset ordinate: live's later takes show ours): 1213 = + 446 shown of 1874, 0 ≠, 174 present-only.
+- b5 (screens of 10 more takes, 11-20 01:20): cut list tables get live's Standard column; no "Click to place the
+  table" bubble after picking a composite; BOM / Cut list table properties 295 px as live (icon + link, pill below,
+  one sheet as text, 208 px selects at 13.33 px, the first focused, corners 72 px apart). Open from b5: Image
+  properties as a docked ✓ ✕ panel (ours a card with Cancel / OK); aligned section's boxed query fields (Center /
+  Viewing / Revolved, active one blue); Detail view without ✓ while creating, profile icons greyed once picked, no
+  hint line; section tabs' tooltips (Horizontal cut line) and label not focused after a tab click.
+- psui via lead 11-20: version row menu without "Releases": ours already lists none there (qa's run = live's rows).
 
 ## Next, in order
 1. Lead 11-20: the drawing matrix's items not yet matching, by use (dialogs, menus, placement, rarer panels): check
@@ -32,8 +47,8 @@ the next run. Run the full ops e2e before any drawing land. A few app runs don't
    NOSHAPE_UI_SHOTS per step; compare with live/drawing/*.png and dom dumps), fix real differences in batches, report
    the count per land. Regenerate: `drawing_matrix.py --run <uip dir> --ours-menus <MENUDUMP>` (merged dir
    /root/studios-scratch/uip-merged). Left at 11-20 00:23: 174 present-only (Create Drawing custom template tab,
-   Move to sheet / Replicate page chrome, small rests). Screens of b2 (14 takes) not yet compared but Create Drawing /
-   note lists / title field.
+   Move to sheet / Replicate page chrome, small rests). b4 compared (above); next: rescreenshot b4 with the new
+   build, then the remaining panels (inspection / revision tables, BOM properties, section / detail view panels).
 2. live's retakes asked 11-19 ~22:40: drw-revision-table-delete, drw-inspection-table-iso-scrolled.
 3. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.
 

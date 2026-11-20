@@ -418,11 +418,17 @@ pub struct CustomTemplate {
     pub title_block: bool,
 }
 
+impl Default for CustomTemplate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CustomTemplate {
-    pub fn new(metric: bool) -> Self {
-        let mut t = Self { standard: "ANSI", language: 2, size: 0, units: DimUnits::Inch, comma: false, first_angle: false, border: true, zones: [2, 2], top_left: false, title_block: true };
-        t.set_standard(if metric { "ISO" } else { "ANSI" });
-        t
+    /// ANSI whatever the document's units (live drawing/800 and drw-create-drawing-custom-template, both from
+    /// millimetre documents).
+    pub fn new() -> Self {
+        Self { standard: "ANSI", language: 2, size: 0, units: DimUnits::Inch, comma: false, first_angle: false, border: true, zones: [2, 2], top_left: false, title_block: true }
     }
 
     /// Choosing a standard resets the size (A / A4) and its zones, the

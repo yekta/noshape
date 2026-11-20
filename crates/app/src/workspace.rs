@@ -3192,7 +3192,6 @@ impl Workspace {
         let doc = &self.doc.read(cx).session.doc;
         // Onshape: "<part> Drawing 1" for a part or assembly, else "Drawing 1".
         let default_name = doc.next_tab_name(&req.name.as_ref().map(|n| format!("{n} Drawing")).unwrap_or_else(|| "Drawing".into()));
-        let metric = !matches!(doc.settings.units.length, noshape_units::LengthUnit::Inch | noshape_units::LengthUnit::Foot | noshape_units::LengthUnit::Yard);
         // The document's DWT tabs: Create drawing › Created by me (live request 1627).
         let document = self.doc.read(cx).name();
         let dwts = doc
@@ -3204,7 +3203,7 @@ impl Workspace {
             })
             .collect();
         let external = req.external.clone();
-        let dialog = cx.new(|cx| CreateDrawingDialog::new(req, default_name, metric, dwts, window, cx));
+        let dialog = cx.new(|cx| CreateDrawingDialog::new(req, default_name, dwts, window, cx));
         // The other documents' DWTs (live 1627: "Created by me" lists the
         // DWTs exported from every document), read in the background.
         let here = self.doc.read(cx).session.path.clone();

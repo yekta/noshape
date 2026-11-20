@@ -539,7 +539,10 @@ impl DrawingEditor {
             // takes its own width.
             let as_select = id != "table-dlg-template";
             let shown = label.clone();
-            Button::new(id).label(label).ghost().xsmall().w(px(w)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), as_select, move |mut m, _, _| {
+            // Properties open with their first select focused (live b-ok-panel, drw-cut-list-table-properties 10: a blue line).
+            let focused = editing && id == if bom { "table-dlg-template" } else { "table-dlg-order" };
+            let value = div().min_w_0().overflow_hidden().whitespace_nowrap().text_size(px(13.33)).child(label.clone());
+            Button::new(id).accessibility_label(label).child(value).ghost().small().w(px(w)).h(px(25.)).dropdown_caret(true).text_color(gpui_kit::rgb(0x333333)).rounded(px(0.)).map(|b| if focused { b.border_b_2().border_color(pal.accent) } else { b.border_b_1().border_color(gpui_kit::rgb(0xdddddd)) }).os_dropdown_menu(SharedString::from(format!("{id}-dd")), as_select, move |mut m, _, _| {
                 for (l, on, f) in &items {
                     let (e, f) = (ed.clone(), f.clone());
                     m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| {
@@ -592,7 +595,10 @@ impl DrawingEditor {
             ("Top to bottom".into(), !d.bottom_to_top, std::rc::Rc::new(|d: &mut TableDlg| d.bottom_to_top = false) as Set),
             ("Bottom to top".into(), d.bottom_to_top, std::rc::Rc::new(|d: &mut TableDlg| d.bottom_to_top = true) as Set),
         ];
-        let row = |label: &'static str, body: AnyElement| h_flex().h(px(28.)).px(px(8.)).child(div().min_w(px(70.)).pr(px(6.)).flex_none().whitespace_nowrap().text_size(px(11.)).child(label)).child(body).into_any_element();
+        let sel_w = if editing { 208. } else { 120. };
+        // Live b-ok-panel: labels at 9 px, values at 85 (selects 4 px further left), text rows 25 px, select rows 28.
+        let row = |label: &'static str, body: AnyElement| h_flex().h(px(25.)).pl(px(9.)).pr(px(6.)).child(div().w(px(76.)).flex_none().whitespace_nowrap().text_size(px(11.)).child(label)).child(body).into_any_element();
+        let srow = |label: &'static str, body: AnyElement| h_flex().h(px(28.)).pl(px(9.)).pr(px(6.)).child(div().w(px(72.)).flex_none().whitespace_nowrap().text_size(px(11.)).child(label)).child(body).into_any_element();
         let corner = d.corner;
         let corner_btn = |k: TableCorner, i: usize, cx: &mut Context<Self>| {
             let on = corner == k;
@@ -680,7 +686,8 @@ impl DrawingEditor {
                 .absolute()
                 .top(px(DIALOG_TOP))
                 .left(px(self.dialog_left()))
-                .w(px(210.))
+                // Live: 295 px with the table's properties, 210 inserting.
+                .w(px(if editing { 295. } else { 210. }))
                 .pb(px(6.))
                 .bg(pal.dialog_bg)
                 .shadow(crate::drawing_chrome::dialog_shadow())
@@ -707,10 +714,12 @@ impl DrawingEditor {
                 .when(editing, |v| {
                     v.child(row("Document:", div().text_size(px(12.)).child(crate::ui::user_text(doc_name.clone())).into_any_element()))
                         .child(row("Workspace:", div().text_size(px(12.)).child(ws_name.clone()).into_any_element()))
+                        // The source's icon and link, its "In progress" pill on the line below.
                         .child(row(
                             ref_label,
                             h_flex()
                                 .gap(px(6.))
+                                .child(crate::assets::icon(if bom { "tab-assembly" } else { "composite-part" }, 18., cx))
                                 .child(
                                     div()
                                         .id("table-dlg-ref")
@@ -720,9 +729,9 @@ impl DrawingEditor {
                                         .child(ref_text.clone())
                                         .when_some(source_tab, |l, tab| l.on_click(move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx))),
                                 )
-                                .child(div().px(px(4.)).rounded(px(3.)).bg(gpui_kit::rgb(0x9ccef0)).text_size(px(11.)).text_color(gpui_kit::rgb(0x333333)).child("In progress"))
                                 .into_any_element(),
                         ))
+                        .child(h_flex().pl(px(83.)).pt(px(3.)).pb(px(4.)).child(div().h(px(22.)).px(px(3.)).flex().items_center().rounded(px(2.)).bg(gpui_kit::rgb(0x9ccef0)).text_size(px(11.)).text_color(gpui_kit::rgb(0x333333)).child("In progress")))
                 })
                 .when_some(config_line, |v, text| v.child(row("Configurations", div().text_size(px(12.)).text_color(ink).child(text).into_any_element())))
                 // A cut list: Insert opens Select a composite part (live2 2278).
@@ -743,7 +752,6 @@ impl DrawingEditor {
                                 .cursor_pointer()
                                 .text_size(px(13.))
                                 .hover(|d| d.bg(pal.row_hover))
-                                .when(self.chooser.composite && self.insert.chooser.is_some(), |d| d.bg(gpui_kit::rgb(0xeaeaea)))
                                 .child(crate::assets::icon("insert", 14., cx))
                                 .child("Insert")
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_composite_chooser(cx))),
@@ -794,7 +802,12 @@ impl DrawingEditor {
                     let names: Vec<String> = self.drawing.sheets.iter().map(|s| s.name.clone()).collect();
                     let cur = self.sheet;
                     let ed = ed.clone();
-                    let sheet = Button::new("table-dlg-sheet").label(names.get(cur).cloned().unwrap_or_default()).ghost().xsmall().w(px(120.)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu("table-dlg-sheet-dd", true, move |mut m, _, _| {
+                    let name = names.get(cur).cloned().unwrap_or_default();
+                    // One sheet: its name as text (live b-ok-panel "Sheet1").
+                    if names.len() == 1 {
+                        return v.child(row("Sheet", div().text_size(px(12.)).child(name).into_any_element()));
+                    }
+                    let sheet = Button::new("table-dlg-sheet").accessibility_label(name.clone()).child(div().text_size(px(13.33)).child(name)).ghost().small().w(px(208.)).h(px(25.)).text_color(gpui_kit::rgb(0x333333)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu("table-dlg-sheet-dd", true, move |mut m, _, _| {
                         for (i, n) in names.iter().enumerate() {
                             let e = ed.clone();
                             m = m.item(crate::os_menu::OsMenuItem::new(n.clone()).checked(i == cur).on_click(move |_, _, cx| {
@@ -810,10 +823,11 @@ impl DrawingEditor {
                     });
                     v.child(row("Sheet", sheet.into_any_element()))
                 })
-                .when(bom, |v| v.child(row("Template", select("table-dlg-template", if d.default_template { "Noshape Default BOM".into() } else { "Follow assembly".into() }, 120., templates).into_any_element())).child(row("BOM type", select("table-dlg-type", type_label.clone(), 120., types).into_any_element())))
-                .child(row("Order", select("table-dlg-order", if d.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, 120., orders).into_any_element()))
-                .child(div().px(px(8.)).pt(px(4.)).text_size(px(11.)).child("Select fixed corner"))
-                .child(h_flex().px(px(8.)).pt(px(4.)).gap(px(26.)).children(corners))
+                .when(bom, |v| v.child(srow("Template", select("table-dlg-template", if d.default_template { "Noshape Default BOM".into() } else { "Follow assembly".into() }, sel_w, templates).into_any_element())).child(srow("BOM type", select("table-dlg-type", type_label.clone(), sel_w, types).into_any_element())))
+                .child(srow("Order", select("table-dlg-order", if d.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, sel_w, orders).into_any_element()))
+                .child(div().pl(px(10.)).pt(px(if editing { 10. } else { 4. })).text_size(px(11.)).child("Select fixed corner"))
+                // Live: properties' corners 72 px apart from 28 px in (b-ok-panel); inserting 52 apart.
+                .child(h_flex().pl(px(if editing { 28. } else { 16. })).pt(px(4.)).gap(px(if editing { 48. } else { 28. })).children(corners))
                 .into_any_element(),
         )
     }

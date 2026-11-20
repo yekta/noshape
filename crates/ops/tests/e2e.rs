@@ -4973,7 +4973,11 @@ fn create_drawing_dialog_options() {
     assert_eq!(d["drawing"], "Part Studio 1 Drawing 1", "{d}");
     assert!((num(&d["size_mm"][0]) - 279.4).abs() < 0.01 && (num(&d["size_mm"][1]) - 215.9).abs() < 0.01, "ANSI A: {d}");
     assert!(d["views"].as_array().unwrap().is_empty(), "No views: {d}");
-    // Custom template: ISO A4 Portrait.
+    // Custom template: ANSI A in a millimetre document too (live drawing/800, drw-create-drawing-custom-template).
+    call(&mut ctx, "document_set_units", json!({ "length_unit": "mm" }));
+    let a = call(&mut ctx, "drawing_create", json!({ "custom_template": {} }));
+    assert!((num(&a["size_mm"][0]) - 279.4).abs() < 0.01 && (num(&a["size_mm"][1]) - 215.9).abs() < 0.01, "ANSI A: {a}");
+    // ISO A4 Portrait.
     let c = call(&mut ctx, "drawing_create", json!({ "custom_template": { "standard": "ISO", "size": "A4 Portrait", "projection": "third_angle", "title_block": false, "language": "German" } }));
     assert!((num(&c["size_mm"][0]) - 210.0).abs() < 0.01 && (num(&c["size_mm"][1]) - 297.0).abs() < 0.01, "{c}");
     let e = try_call(&mut ctx, "drawing_create", json!({ "custom_template": { "standard": "ISO", "size": "B" } })).unwrap_err();

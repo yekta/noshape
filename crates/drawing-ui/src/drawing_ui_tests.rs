@@ -1273,10 +1273,10 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
     assert_eq!(flat(&rows), ["Paste", "Copy", "Paste as table", "Add leader", "Move to ▸", "——", "Clear selection", "Zoom to fit", "Delete"]);
 }
 
-/// Live (dx/q-centermark): a Single centermark clicked on a hole that has an automatic mark lasts only with ✓; Esc
-/// drops it, the automatic mark staying.
+/// Live drw-centermark (retake 996d6b8a): a Single centermark clicked on a hole that has an automatic mark replaces it
+/// and stays after Esc.
 #[gpui::test]
-fn a_single_centermark_over_an_automatic_one_goes_with_escape(cx: &mut TestAppContext) {
+fn a_single_centermark_over_an_automatic_one_stays_after_escape(cx: &mut TestAppContext) {
     use noshape_model::drawing::views::EdgeGeom;
     use noshape_scene::drawing_tools::Tool;
     SUGGESTED.set(true);
@@ -1297,6 +1297,15 @@ fn a_single_centermark_over_an_automatic_one_goes_with_escape(cx: &mut TestAppCo
     });
     let rim = rim.expect("a hole seen face on");
     let before = marks(cx);
+    // The automatic marks' lines (a replaced one's lines pick as the Single mark).
+    let autos = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let b = editor.read(cx).built.clone().expect("built");
+            b.geometry.lines.iter().filter(|l| matches!(b.picks.get(l.pick as usize), Some(noshape_model::drawing::build::PickTarget::AutoCentermark { .. }))).count()
+        })
+    };
+    let auto_before = autos(cx);
+    assert!(auto_before > 0, "the hole has an automatic mark");
     cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Centermark, cx)));
     draw(cx, window);
     cx.update_window(window, |_, w, cx| {
@@ -1311,7 +1320,10 @@ fn a_single_centermark_over_an_automatic_one_goes_with_escape(cx: &mut TestAppCo
     assert_eq!(marks(cx), before + 1, "the Single mark is drawn at once");
     cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
     draw(cx, window);
-    assert_eq!(marks(cx), before, "Esc drops it over the automatic mark");
+    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+    draw(cx, window);
+    assert_eq!(marks(cx), before + 1, "Esc keeps it");
+    assert!(autos(cx) < auto_before, "in place of the automatic mark");
 }
 
 /// Live2 manual-4: ☰ › Print… in a drawing opens the drawing's PDF (live, pop-ups allowed: "<drawing>.pdf" in a new

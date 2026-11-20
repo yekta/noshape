@@ -47,7 +47,7 @@ impl DrawingEditor {
             let select = |id: &'static str, label: &'static str, opts: Vec<String>, cur: usize, set: fn(&mut ExportSettings, usize)| {
                 shown.borrow_mut().push(serde_json::json!({ "label": label, "kind": "select", "value": opts.get(cur).cloned().unwrap_or_default() }));
                 let st = st.clone();
-                div().pt(px(8.)).child(crate::os_ui::field_label(label)).child(div().pt(px(6.)).child(crate::os_ui::select_field(id, opts, cur, move |i, w, _| {
+                div().pt(px(5.)).child(crate::os_ui::field_label(label)).child(div().pt(px(4.)).child(crate::os_ui::select_field(id, opts, cur, move |i, w, _| {
                     set(&mut st.borrow_mut(), i);
                     w.refresh();
                 })))
@@ -62,7 +62,8 @@ impl DrawingEditor {
             };
             let strs = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
             let range_empty = matches!(f, DrawingFormat::Dwg | DrawingFormat::Dxf) && s.sheets == 2 && custom.read(cx).value().trim().is_empty();
-            let mut body = crate::os_ui::modal_body()
+            // Live drawing/40: 25 px from a field to the next label, 16 from a label to its field.
+            let mut body = crate::os_ui::modal_body().pt(px(0.)).gap(px(4.))
                 // Live drawing/40: "View export rules" next to the label.
                 .child(gpui_kit::component::h_flex().gap(px(4.)).items_end().child(crate::os_ui::field_label("File name")).child(crate::drawing_hooks::export_rules_link("ex-rules")))
                 .child(Input::new(&file).h(px(34.)).text_size(px(14.)))
