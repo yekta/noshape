@@ -1435,6 +1435,30 @@ fn a_hole_on_an_in_feature_mate_connector() {
     assert!(g.get("sub_features").is_none(), "{g}");
 }
 
+/// A sketch on a mate connector made in its Sketch plane field (c2-hgr-riser-weldment's Bottom): the connector is the
+/// sketch's own, the sketch lies on it, and no Mate connector feature is added.
+#[test]
+fn a_sketch_on_an_in_feature_mate_connector() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "sketch-in-feature-mc.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[-20, -15], [20, 15]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+    let top = call(&mut ctx, "query_entities", json!({ "kind": "faces", "normal": [0, 0, 1], "limit": 1 }))["faces"][0]["id"].as_str().unwrap().to_string();
+    let mc = json!({ "mate_connector": { "originQuery": [top], "entityInferenceType": "CENTROID" } });
+    let s2 = call(&mut ctx, "sketch_create", json!({ "plane": mc, "name": "Bottom" }));
+    assert_eq!(s2["feature_status"]["status"], "Ok", "{s2}");
+    let o = &s2["frame"]["origin"];
+    assert!(num(&o[0]).abs() < 1e-6 && num(&o[1]).abs() < 1e-6 && (num(&o[2]) - 10.0).abs() < 1e-6, "{s2}");
+    let names: Vec<String> = call(&mut ctx, "feature_list", json!({}))["features"].as_array().unwrap().iter().map(|f| f["name"].as_str().unwrap().to_string()).collect();
+    assert!(!names.iter().any(|n| n.starts_with("Mate connector")), "{names:?}");
+    let g = call(&mut ctx, "feature_get", json!({ "feature": s2["sketch"] }));
+    let subs = g["sub_features"].as_array().unwrap_or_else(|| panic!("{g}"));
+    assert_eq!((subs.len(), subs[0]["type"].as_str()), (1, Some("mateConnector")), "{g}");
+    let e = try_call(&mut ctx, "sketch_create", json!({ "plane": { "mate_connector": 3 } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("plane"), "{e:?}");
+}
+
 /// An in-feature construction point (Onshape's "Edge point" sub-feature, live 2422: c2-hex-bookcase-derived's
 /// "cross-section" Plane through a point a quarter along an edge): `{"point": {cPoint parameters}}` in a selection
 /// makes it inside the feature, the plane goes through it, and no point stays in the Part Studio.

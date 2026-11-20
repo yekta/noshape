@@ -77,7 +77,7 @@ pub fn ops() -> Vec<Op> {
             verb: "create",
             summary: "Create a sketch on a plane or planar face",
             description: "Inserts a Sketch feature (\"Insert feature : Sketch 1\") at the rollback bar. Returns its id and plane frame: sketch coordinates (x, y) map to world = origin + x*xdir + y*ydir. On `plane:top` x = world X, y = world Y; on `plane:front` x = X, y = Z; on `plane:right` x = Y, y = Z.",
-            fields: vec![doc_field(), tab_field(), req("plane", json!({ "type": ["string", "object"] }), "Plane: `plane:top`, `plane:front`, `plane:right`, a Plane feature (`fplane:…`), a planar face id or a mate connector; or `{\"query\": {query_entities arguments}}` matching one planar face (e.g. the top face: {\"query\": {\"kind\": \"faces\", \"normal\": [0, 0, 1], \"near\": [0, 0, 1000], \"limit\": 1}})."), opt("name", s(), "Name (default \"Sketch N\")."), opt("disable_imprinting", json!({ "type": "boolean" }), "The dialog's Disable imprinting (default off).")],
+            fields: vec![doc_field(), tab_field(), req("plane", json!({ "type": ["string", "object"] }), "Plane: `plane:top`, `plane:front`, `plane:right`, a Plane feature (`fplane:…`), a planar face id, a mate connector or `{\"mate_connector\": {its parameters}}` (one made in the field, feature_schema mateConnector); or `{\"query\": {query_entities arguments}}` matching one planar face (e.g. the top face: {\"query\": {\"kind\": \"faces\", \"normal\": [0, 0, 1], \"near\": [0, 0, 1000], \"limit\": 1}})."), opt("name", s(), "Name (default \"Sketch N\")."), opt("disable_imprinting", json!({ "type": "boolean" }), "The dialog's Disable imprinting (default off).")],
             mutates: true,
             destructive: false,
             run: create,
@@ -675,9 +675,18 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     let (od, tab) = studio_target(ctx, a)?;
     let units = od.doc().settings.units;
-    let plane = refs::parse(&plane).map_err(|e| e.with_param("plane"))?;
     let ps = doc::studio(od.doc(), tab)?;
     let mut f = ps.new_feature("sketch", &units).expect("sketch type");
+    // A mate connector made in the Sketch plane field (Onshape's in-feature one): the sketch's sub-feature.
+    if plane.get("mate_connector").is_some() {
+        let mut params = serde_json::Map::from_iter([("plane".to_string(), plane)]);
+        super::feature::in_feature_connectors(&mut f, &mut params, &units, od.doc()).map_err(|mut e| {
+            e.param = e.param.map(|p| p.trim_start_matches("params.").to_string());
+            e
+        })?;
+        plane = params.remove("plane").expect("kept");
+    }
+    let plane = refs::parse(&plane).map_err(|e| e.with_param("plane"))?;
     f.params.set("sketchPlane", ParamValue::Query(vec![plane]));
     if let Some(n) = a.opt_str("name")? {
         // The default name given is no custom one (a paste names the copy as a new sketch).

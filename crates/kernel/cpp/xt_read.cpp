@@ -1788,6 +1788,55 @@ struct Builder
     return {};
   }
 
+  // Whether a rolling-ball blend face's normal is against our tube's natural one, from a tangent neighbour across
+  // one of its edges (a face on another kind of surface): their outward normals agree there. The range's sign
+  // doesn't tell it (c2-replace-face-exercise's convex rim rounds have a positive range, g25's a negative one); a
+  // wrong side is the rest of a closed tube (12454 mm² for a 474 mm² round).
+  std::optional<bool> blend_flipped_by_neighbour(const XNode& face, const occ::handle<Geom_Surface>& s)
+  {
+    for (long long l = face.ptr("loop"); l; l = r.at_index(l).ptr("next"))
+    {
+      const long long first = r.at_index(l).ptr("fin");
+      long long       fi    = first;
+      for (int guard = 0; fi && guard < 100000; ++guard)
+      {
+        const XNode&    fin   = r.at_index(fi);
+        const long long other = fin.ptr("other");
+        fi                    = fin.ptr("forward");
+        if (fi == first)
+          fi = 0;
+        if (!other || !fin.ptr("edge") || !r.at_index(other).ptr("loop"))
+          continue;
+        const XNode&    nf  = r.at_index(r.at_index(r.at_index(other).ptr("loop")).ptr("face"));
+        const long long nsi = nf.ptr("surface");
+        if (!nsi || r.at_index(nsi).type == 56)
+          continue;
+        double                        f, e;
+        const occ::handle<Geom_Curve> c = BRep_Tool::Curve(edge(fin.ptr("edge")), f, e);
+        if (c.IsNull())
+          continue;
+        const gp_Pnt                    p  = c->Value((f + e) / 2);
+        const occ::handle<Geom_Surface> ns = surface(nsi);
+        gp_Pnt2d                        a, b;
+        if (!project(p, s, a) || !project(p, ns, b))
+          continue;
+        gp_Pnt q;
+        gp_Vec du, dv, nu, nv;
+        s->D1(a.X(), a.Y(), q, du, dv);
+        ns->D1(b.X(), b.Y(), q, nu, nv);
+        gp_Vec n0 = du.Crossed(dv), n1 = nu.Crossed(nv);
+        if (n0.Magnitude() <= 0 || n1.Magnitude() <= 0)
+          continue;
+        if (((nf.chr("sense") == '-') != (r.at_index(nsi).chr("sense") == '-')) != natural_flipped(nsi))
+          n1.Reverse();
+        const double d = n0.Normalized().Dot(n1.Normalized());
+        if (std::abs(d) > 0.9)
+          return d < 0;
+      }
+    }
+    return std::nullopt;
+  }
+
   // Outward normal of a rolling-ball blend face at p: away from the ball's
   // centre on a convex blend (negative range), towards it on a concave one.
   bool blend_flipped(long long si, const occ::handle<Geom_Surface>& s, const TopoDS_Face& F)
@@ -1858,7 +1907,10 @@ struct Builder
     // XT face normal = natural normal, reversed when exactly one sense is '-'.
     bool flip;
     if (r.at_index(si).type == 56)
-      flip = blend_flipped(si, s, F) != (n.chr("sense") == '-');
+    {
+      const std::optional<bool> by = blend_flipped_by_neighbour(n, s);
+      flip = by ? *by : blend_flipped(si, s, F) != (n.chr("sense") == '-');
+    }
     else
       flip = ((n.chr("sense") == '-') != (r.at_index(si).chr("sense") == '-')) != natural_flipped(si);
     if (flip)

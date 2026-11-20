@@ -706,7 +706,7 @@ fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 /// It starts as Onshape's: no owner part, Move ticked (live 1851). `{"point": {cPoint parameters}}` makes an
 /// in-feature construction point the same way (Onshape's "Edge point" / "Mesh point" sub-features, live 2422) and
 /// names its vertex.
-fn in_feature_connectors(feature: &mut noshape_model::partstudio::Feature, params: &mut serde_json::Map<String, Value>, units: &noshape_units::UnitPrefs, doc: &noshape_model::Document) -> Result<(), OpError> {
+pub(super) fn in_feature_connectors(feature: &mut noshape_model::partstudio::Feature, params: &mut serde_json::Map<String, Value>, units: &noshape_units::UnitPrefs, doc: &noshape_model::Document) -> Result<(), OpError> {
     type Make<'a> = dyn FnMut(&str, &serde_json::Map<String, Value>, &str) -> Result<String, OpError> + 'a;
     fn walk(v: &mut Value, path: &str, make: &mut Make) -> Result<(), OpError> {
         match v {

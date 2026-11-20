@@ -5269,6 +5269,9 @@ impl<'a> Translator<'a> {
             },
             None => plane,
         };
+        // A mate connector made in the Sketch plane field (c2-hgr-riser-weldment's Bottom).
+        let mut plane = plane;
+        self.place_sub_features(&mut plane);
         let mut args = json!({ "plane": plane });
         if let Some(n) = f["name"].as_str().filter(|n| !n.starts_with('#')) {
             args["name"] = json!(n);
