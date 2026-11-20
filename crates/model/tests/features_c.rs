@@ -5213,6 +5213,9 @@ fn a_cars_top_edges_round_along_their_tangent_chain_as_live() {
     assert!(shape.is_valid() && shape.solids().len() == 1);
     let shown = shape.shown_topology().unwrap();
     assert_eq!((shape.faces().len(), shown.edge_count(), shown.vertices.iter().filter(|v| **v).count()), (7, 14, 9));
+    // The round's ends on the rear face: its ball rolls on the sides carried on tangentially past it (live x ±33.941).
+    let rear: Vec<f64> = shape.vertices().iter().map(|v| v.vertex_point().unwrap() * 1e3).filter(|p| (p.y - 254.0).abs() < 1e-3 && p.z > 25.0).map(|p| p.x).collect();
+    assert!(rear.len() == 2 && rear.iter().all(|x| (x.abs() - 33.941).abs() < 0.002), "{rear:?} (live ±33.941)");
     let area: f64 = shape.faces().iter().map(|f| f.area().unwrap() * 1e6).sum();
     assert!((area - 81479.51).abs() < 1.0, "{area} mm² (live 81479.51)");
     // (The loft under it is already 2.1 mm² of area off live's Loft 4: its volume within 0.03 %.)

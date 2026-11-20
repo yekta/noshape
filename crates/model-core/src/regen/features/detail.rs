@@ -617,7 +617,24 @@ fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
         // first (c2-hunting-knife's Fillet 2: the scaled retry 105 of OCCT's 118 ms, building a bad solid again).
         let lines_overflow = !width && ev.bool("allowEdgeOverflow") && all_lines(&shapes);
         // (A round OCCT leaves in several faces is built as rolling balls below: OCCT's as built, not finished.)
-        let occt = || if width { k::fillet_checked(&body.shape, &shapes, &radii) } else { k::with_blend_split_raw(|| k::fillet_checked(&body.shape, &shapes, &radii)) };
+        // (On the supports carried on past the chain's free ends where they are B-splines, OCCT's on the body as it is
+        // where that fails.)
+        let extended = if width { None } else { extended_supports(&body.shape, &edges, radius) };
+        let on = |shape: &k::Shape| {
+            let shapes: Vec<k::Shape> = edges.iter().filter_map(|e| shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
+            if width { k::fillet_checked(shape, &shapes, &radii) } else { k::with_blend_split_raw(|| k::fillet_checked(shape, &shapes, &radii)) }
+        };
+        let on_extended = std::cell::Cell::new(false);
+        let occt = || match extended.as_ref().map(on) {
+            Some(Ok(r)) => {
+                on_extended.set(true);
+                Ok(r)
+            }
+            _ => {
+                on_extended.set(false);
+                on(&body.shape)
+            }
+        };
         // (A round OCCT may leave in several faces: its rolling balls' tools made meanwhile on another thread, kept only
         // if it does; c2-hunting-knife's Fillet 5 waited 5 ms on OCCT's try first.)
         let ahead = !width && !lines_overflow && edges.len() > 1;
@@ -680,7 +697,14 @@ fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
                     }
                     // OCCT's then, finished: built again only where it came back as built (a fallback's or a finished
                     // result is already the blend's: pipeflange-steven's Fillet 2 was built twice, 133 -> 510 ms).
-                    if k::blend_raw_returned() { k::fillet_checked(&body.shape, &shapes, &radii).map_err(fillet_failed)? } else { res }
+                    if !k::blend_raw_returned() {
+                        res
+                    } else if let Some(x) = extended.as_ref().filter(|_| on_extended.get()) {
+                        let es: Vec<k::Shape> = edges.iter().filter_map(|e| x.sub_shape(ShapeType::Edge, *e).ok()).collect();
+                        k::fillet_checked(x, &es, &radii).map_err(fillet_failed)?
+                    } else {
+                        k::fillet_checked(&body.shape, &shapes, &radii).map_err(fillet_failed)?
+                    }
                 }
             }
         } else {
@@ -725,6 +749,48 @@ fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
         return err("Failed to fillet selections.");
     }
     Ok(())
+}
+
+/// `shape` with the B-spline faces a round's chain ends on rebuilt on their surfaces carried on tangentially (G1) past
+/// the chain's free ends: live's ball rolls on so extended supports where the chain meets an end face, OCCT's on its
+/// own extrapolation (a car's top round at its rear face: x ±33.941 as live, was ±33.142). None where none is a B-spline.
+fn extended_supports(shape: &Shape, edges: &[usize], r: f64) -> Option<Shape> {
+    let ef = shape.edge_faces().ok()?;
+    let faces = shape.faces();
+    let ends: Vec<(usize, k::Shape, DVec3, DVec3)> = edges
+        .iter()
+        .filter_map(|&e| {
+            let s = shape.sub_shape(ShapeType::Edge, e).ok()?;
+            let i = s.edge_info().ok()?;
+            let (a, b) = (s.point_at(i.first_param).ok()?, s.point_at(i.last_param).ok()?);
+            Some((e, s, a, b))
+        })
+        .collect();
+    let shared = |p: DVec3, own: usize| ends.iter().any(|(e, _, a, b)| *e != own && ((*a - p).length() < 1e-7 || (*b - p).length() < 1e-7));
+    let mut beyond: BTreeMap<u32, Vec<DVec3>> = BTreeMap::new();
+    for (e, s, a, b) in &ends {
+        let i = s.edge_info().ok()?;
+        for (p, t, sign) in [(*a, i.first_param, -1.0), (*b, i.last_param, 1.0)] {
+            if (*a - *b).length() < 1e-9 || shared(p, *e) {
+                continue;
+            }
+            let out = s.tangent_at(t).ok()?.normalize_or_zero() * sign;
+            for &f in ef.get(*e)? {
+                if matches!(faces.get(f as usize)?.face_surface().ok()?, k::Surface::BSpline { .. }) {
+                    beyond.entry(f).or_default().push(p + out * r);
+                }
+            }
+        }
+    }
+    let mut out: Option<Shape> = None;
+    for (f, points) in beyond {
+        let at = out.as_ref().unwrap_or(shape);
+        let Ok(ext) = k::extend_face_over(&at.faces()[f as usize], &points, r) else { continue };
+        if let Ok(x) = k::reface_on(at, f as usize, &ext) {
+            out = Some(x);
+        }
+    }
+    out
 }
 
 /// Whether OCCT's fillet left some edge's round in more than one face.
