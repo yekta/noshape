@@ -749,6 +749,9 @@ pub struct SketchEditor {
     pub pattern_center: DVec2,
     /// Transform: the triad was dragged away from the selection's center.
     xf_center_pinned: bool,
+    /// A paste follows the pointer (live feel round 2 R6): where the pointer last moved the copy to; the next click
+    /// places it and leaves the tool.
+    pub paste_follow: Option<DVec2>,
     pub xf_offset: DVec2,
     pub xf_angle: f64,
     pub xf_scale: f64,
@@ -822,6 +825,8 @@ pub struct SketchEditor {
     pub woken_point: Option<(noshape_model::reference::Reference, DVec2)>,
     /// Press position of a drawing tool (press-drag-release placement).
     press: Option<DVec2>,
+    /// A press on the Line chain's last point: released there it ends the chain, dragged it keeps the rubber band.
+    chain_end_press: Option<DVec2>,
     /// Line tool temporarily drawing a tangent arc (Shift+A or hovering
     /// back over the chain end); reverts to lines after one arc.
     pub tangent_mode: bool,
@@ -1512,6 +1517,7 @@ impl SketchEditor {
             circular_angle: -TAU,
             pattern_center: DVec2::ZERO,
             xf_center_pinned: false,
+            paste_follow: None,
             xf_offset: DVec2::ZERO,
             xf_angle: 0.0,
             xf_scale: 1.0,
@@ -1545,6 +1551,7 @@ impl SketchEditor {
             woken_edge: None,
             woken_point: None,
             press: None,
+            chain_end_press: None,
             tangent_mode: false,
             left_chain_end: false,
             alt_held: false,
@@ -1605,6 +1612,7 @@ impl SketchEditor {
         self.editing_text = None;
         self.text_expression = false;
         self.xf_center_pinned = false;
+        self.paste_follow = None;
         self.pending_text = None;
         self.text_clicks.clear();
         self.slot_session = None;
@@ -1625,6 +1633,7 @@ impl SketchEditor {
         self.woken_edge = None;
         self.woken_point = None;
         self.press = None;
+        self.chain_end_press = None;
         self.tangent_mode = false;
         // Live shows no hint for a sketch tool (behaviours "qa (2026-10-28,
         // P3) sketch tool hints: none in live"; SKETCH-HINT-OVERLAP: ours drew
@@ -2062,6 +2071,9 @@ impl SketchEditor {
     }
 
     pub fn pointer_move(&mut self, data: &mut SketchData, p: DVec2, shift: bool, alt: bool) -> EditOutcome {
+        if let Some(at) = self.paste_follow.filter(|_| self.tool == Tool::Transform) {
+            return self.move_paste(data, p - at, p);
+        }
         // Polygon side count from the pointer's distance to the centre (live,
         // behaviours "skasm (2026-10-27) sketch polygon side count"): one
         // side more per 10 px beyond the 2nd click, one less per 10 px in.
@@ -2539,6 +2551,12 @@ impl SketchEditor {
         }
         self.cursor = Some(p);
         self.pointer_rests = false;
+        // A following paste is placed where it is, and the tool ends (live feel round 2 R6: tool off, nothing selected).
+        if self.paste_follow.is_some() && self.tool == Tool::Transform {
+            self.selection.clear();
+            self.set_tool(Tool::Select);
+            return EditOutcome::redraw();
+        }
         // A dimension being placed takes the press (live: ui-parity
         // sketch-dimension-edit, its value over the line's Horizontal glyph),
         // and so does a drawing tool (live ui-parity revolve-dialog-axis: a
@@ -2613,6 +2631,7 @@ impl SketchEditor {
                     && self.chain_end.and_then(|e| data.sketch.point(e)).is_some_and(|e| (e - pos).length() < 1e-9);
                 if on_chain_end && !double_click {
                     self.press = None;
+                    self.chain_end_press = Some(p);
                     return EditOutcome::redraw();
                 }
                 // Continuing to sketch leaves the last geometry undimensioned.
@@ -4850,6 +4869,15 @@ impl SketchEditor {
             self.press = None;
             return self.commit_corner(data);
         }
+        // Live (feel round 2 R1): a click on the chain's last point ends the chain, the tool stays.
+        if let Some(start) = self.chain_end_press.take()
+            && self.tool == Tool::Line
+            && (p - start).length() <= self.world_per_px * 4.0
+        {
+            self.clicks.clear();
+            self.chain_end = None;
+            return EditOutcome::redraw();
+        }
         // Press-drag-release with a drawing tool: the release is the next click.
         if self.tool.draws()
             && self.drag.is_none()
@@ -5875,8 +5903,26 @@ impl SketchEditor {
         self.selection = pasted;
         // The Transform triad on the copy (qa: it stayed on the original).
         self.follow_transform_selection(&data.sketch);
+        self.paste_follow = self.cursor.filter(|_| !b.is_empty());
         self.message = None;
         true
+    }
+
+    /// Moves a following paste by `d`, the pointer now at `p`.
+    fn move_paste(&mut self, data: &mut SketchData, d: DVec2, p: DVec2) -> EditOutcome {
+        self.cursor = Some(p);
+        if d.length() < 1e-12 {
+            return EditOutcome::none();
+        }
+        let ids: Vec<EntityId> = self.selection.iter().copied().filter(|e| data.sketch.entity(*e).is_some()).collect();
+        if ids.is_empty() || data.sketch.transform(&ids, Transform::Translate(d)).is_err() {
+            self.paste_follow = None;
+            return EditOutcome::none();
+        }
+        data.sketch.solve();
+        self.paste_follow = Some(p);
+        self.follow_transform_selection(&data.sketch);
+        EditOutcome::changed()
     }
 
     /// Paste sketch entities (copied with [`Sketch::extract`]) moved by
@@ -9336,6 +9382,21 @@ mod tests {
         assert_eq!(count(&d, EntityKind::Line), 2, "completed segments remain");
     }
 
+    /// Live (feel round 2 R1, cov2-lastpoint): a second click on the chain's last point ends the chain, no
+    /// zero-length line; the tool stays and the next click starts a new line.
+    #[test]
+    fn a_second_click_on_the_last_point_ends_the_chain() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        click(&mut ed, &mut d, v(0.03, 0.0));
+        click(&mut ed, &mut d, v(0.03, 0.0));
+        assert!(ed.chain_end.is_none() && ed.clicks.is_empty() && ed.tool == Tool::Line);
+        click(&mut ed, &mut d, v(0.05, 0.03));
+        assert_eq!(count(&d, EntityKind::Line), 1, "the next click only starts a line");
+        click(&mut ed, &mut d, v(0.06, 0.01));
+        assert_eq!(count(&d, EntityKind::Line), 2);
+    }
+
     #[test]
     fn enter_mid_chain_places_the_boxed_length_as_a_driving_dimension() {
         let (mut ed, mut d) = editor(Tool::Line);
@@ -12203,6 +12264,25 @@ mod tests {
         assert!(ed.dim_edit.is_none());
     }
 
+    /// qa FEEL-DIM-TWO-POINTS-ZERO (live feel round 2 R3): the two ends of a line drawn from the origin, the dimension
+    /// placed above-left: the value box reads the ends' distance (horizontal there), never 0.
+    #[test]
+    fn a_dimension_between_a_lines_ends_from_the_origin_reads_their_distance() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        click(&mut ed, &mut d, v(0.03, 0.02));
+        assert!(ed.cancel());
+        ed.set_tool(Tool::Dimension);
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        click(&mut ed, &mut d, v(0.03, 0.02));
+        let picks: Vec<_> = ed.picks.iter().map(|x| (d.sketch.kind(x.0), d.sketch.point(x.0))).collect();
+        assert!(picks.iter().all(|(k, _)| *k == Some(EntityKind::Point)), "{picks:?}");
+        ed.pointer_move(&mut d, v(0.005, 0.025), false, false);
+        click(&mut ed, &mut d, v(0.005, 0.025));
+        let text = ed.dim_edit.as_ref().map(|e| e.text.clone());
+        assert_eq!(text.as_deref(), Some("30 mm"), "{picks:?}");
+    }
+
     #[test]
     fn dimension_click_sequence_opens_the_value_box() {
         let (mut ed, mut d) = editor(Tool::Dimension);
@@ -12917,6 +12997,28 @@ mod tests {
         assert!((b.center() - v(0.1, 0.05)).length() < 1e-9, "bbox centre on the pointer: {:?}", b.center());
         assert_eq!((ed.selection.len(), ed.tool, d.sketch.constraints().count()), (4, Tool::Transform, 2 * before), "(selected, tool, constraints doubled)");
         assert!((ed.pattern_center - v(0.08, 0.035)).length() < 1e-9, "the triad on the copy's lowest-left corner: {}", ed.pattern_center);
+    }
+
+    /// Live (feel round 2 R6, cov2-copypaste): the pasted copy follows the pointer, its triad with it; a click
+    /// places it where it is and leaves the tool with nothing selected.
+    #[test]
+    fn a_paste_follows_the_pointer_until_a_click() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let l = d.sketch.add_line(v(0.0, 0.0), v(0.03, 0.0));
+        ed.selection = vec![l];
+        let clip = ed.copy_selection(&d).unwrap();
+        ed.pointer_move(&mut d, v(0.015, 0.0), false, false);
+        assert!(ed.paste_clipboard(&mut d, &clip));
+        let copy = ed.selection[0];
+        let mid = |d: &SketchData| d.sketch.curve(copy).map(|c| (c.start_point() + c.end_point()) * 0.5).unwrap();
+        assert!(ed.pointer_move(&mut d, v(0.04, 0.03), false, false).changed);
+        assert!((mid(&d) - v(0.04, 0.03)).length() < 1e-9, "the copy follows: {}", mid(&d));
+        assert!((ed.pattern_center - v(0.025, 0.03)).length() < 1e-9, "and its triad: {}", ed.pattern_center);
+        click(&mut ed, &mut d, v(0.04, 0.03));
+        assert_eq!((ed.tool, ed.selection.len(), count(&d, EntityKind::Line)), (Tool::Select, 0, 2));
+        assert!((mid(&d) - v(0.04, 0.03)).length() < 1e-9);
+        assert!(!ed.pointer_move(&mut d, v(0.06, 0.01), false, false).changed, "placed: it stays");
+        assert!((d.sketch.curve(l).unwrap().start_point() - v(0.0, 0.0)).length() < 1e-12, "the original never moves");
     }
 
     /// qa4 round 5 v3 s6 with live's answers: Normal takes either pick

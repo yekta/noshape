@@ -1,0 +1,71 @@
+{
+ "name": "sketch-line-press-drag-one-segment",
+ "about": "R2: a press-drag in Line makes one segment (COINCIDENT + HORIZONTAL) and no chain",
+ "area": "skasm",
+ "source": "live feel coverage round 2 (11-20), behaviours \"feel coverage round 2\"",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "drag",
+   "from": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   },
+   "to": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     30,
+     20
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     20
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     40,
+     30
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

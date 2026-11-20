@@ -1223,6 +1223,13 @@ impl PartStudioView {
                         self.linger_glyphs(old, cx);
                     }
                     self.update_use_preview();
+                    // A paste following the pointer stays the paste's one undo step.
+                    if out.changed
+                        && self.sketch.as_ref().is_some_and(|s| s.paste_follow.is_some())
+                        && let Some(e) = &mut self.edit
+                    {
+                        e.history.absorb = true;
+                    }
                     self.apply_outcome(out, window, cx);
                 }
                 if was_shift != shift {

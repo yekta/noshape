@@ -1,0 +1,99 @@
+{
+ "name": "sketch-paste-follows-pointer",
+ "about": "R6: Ctrl+V starts Transform with the copy added and selected; it follows the pointer, a click places it and leaves the tool",
+ "area": "skasm",
+ "source": "live feel coverage round 2 (11-20), behaviours \"feel coverage round 2\"",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     15,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+c"
+  },
+  {
+   "do": "key",
+   "key": "mod+v"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     20,
+     30
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     40,
+     30
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     40,
+     30
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

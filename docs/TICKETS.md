@@ -901,6 +901,8 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 - [x] (verified live2 20:2x on green 548d795fb / main 7302f8bd4, psui 17:09 batch: 3 frames over 150-230 ms, 3 runs (live 3 over ~240)) **P1 NAMED-VIEW-RESTORE-ANIM (psui)**: a named view restores in one step at 0.24-0.40 s; live animates, 3 frames over ~240 ms.
 - [x] (psui 11-20 02:43: fixed 11-19, never ticked: tan #E9C497 while the plane is just picked in the open dialog (live2 cap-plane-1119); test sketch_ui_tests::a_section_cap_is_tan_only_while_its_plane_is_just_picked) **P2 SECTION-PREVIEW-COLOUR (psui)**: our section view's preview cap is #E3C9A7; live's #EBBD8A / #E9C497.
 - [ ] (skasm 13:05: fixed in 6389133a, queued; live2 re-measures on its green, then close) **P1 SEARCH-TOOLS-TOOLBAR-HIGHLIGHT (skasm)**: with "Highlight tool" on in Search tools, no toolbar button lights; live lights the
+- [ ] **P2 SECTION-PREVIEW-COLOUR (psui)**: our section view's preview cap is #E3C9A7; live's #EBBD8A / #E9C497.
+- [x] (verified live 04:4x on green cd82afd4, live/ours-verify-1120: the matched button #fcda7f with a #fab601 ring) **P1 SEARCH-TOOLS-TOOLBAR-HIGHLIGHT (skasm)**: with "Highlight tool" on in Search tools, no toolbar button lights; live lights the
   match #FCDA7F.
 - Equal to live (live2): view-tools 992, field-keys 1309-1312.
 

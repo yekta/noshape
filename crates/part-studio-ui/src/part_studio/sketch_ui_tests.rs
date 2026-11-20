@@ -2276,6 +2276,11 @@ fn dimension_box_escape_as_live(cx: &mut TestAppContext) {
     click(cx, window, &view, (570., 330.));
     keys(cx, window, &["escape"]);
     assert!(cx.update(|cx| view.read(cx).dim_input.is_none()), "an untouched box closes at once");
+    // Live (feel round 2 R10): the box's Esc keeps the Dimension tool, the next one leaves it.
+    let tool = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch.as_ref().map(|s| s.tool));
+    assert_eq!(tool(cx), Some(Tool::Dimension));
+    keys(cx, window, &["escape"]);
+    assert_eq!(tool(cx), Some(Tool::Select));
     let measured = dimensions(cx, &view);
     assert_eq!(measured.len(), 1, "the dimension stays");
     let cid = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.constraints().find(|c| c.value().is_some()).unwrap().id);
