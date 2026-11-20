@@ -1,6 +1,6 @@
 {
  "scenario": "drw-revision-table-delete",
- "recorded": "2026-11-20T00:34:15.136Z",
+ "recorded": "2026-11-20T12:08:53.443Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -12,11 +12,11 @@
   "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a0a89137353b1fa3bb81a421",
-  "workspace": "10055ef3071ac518dc085aca",
-  "element": "9fc01ed2ab34d8bb6b665074",
+  "document": "ab6c185b296632505a4d9cbd",
+  "workspace": "9fb85795122c25e952dd60ae",
+  "element": "b0a40c398f3c57f28e0e3b7b",
   "start": "block-drawing",
-  "startElement": "9fc01ed2ab34d8bb6b665074",
+  "startElement": "b0a40c398f3c57f28e0e3b7b",
   "runner": "live2 nstate-co3.json"
  },
  "start": {
@@ -312,7 +312,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 206365
+   "t": 205021
   },
   {
    "step": 2,
@@ -478,7 +478,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 233383
+   "t": 231255
   },
   {
    "step": 3,
@@ -619,7 +619,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 261627
+   "t": 258719
   },
   {
    "step": 4,
@@ -752,7 +752,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 287763
+   "t": 284335
   },
   {
    "step": 5,
@@ -892,7 +892,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 315452
+   "t": 311292
   },
   {
    "step": 6,
@@ -1087,7 +1087,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 341655
+   "t": 338204
   },
   {
    "step": 7,
@@ -1230,7 +1230,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 369502
+   "t": 365694
   },
   {
    "step": 8,
@@ -1368,10 +1368,284 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 398051
+   "t": 394557
   },
   {
    "step": 9,
+   "do": {
+    "do": "click",
+    "on": {
+     "sheet_point": [
+      140,
+      40
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    980,
+    870
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 422243
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 449432
+  },
+  {
+   "step": 11,
    "do": {
     "do": "hover",
     "on": {
@@ -1465,12 +1739,7 @@
       }
      ],
      "annotations": [],
-     "selection": [
-      {
-       "kind": "EDGE",
-       "owner": "Top"
-      }
-     ],
+     "selection": [],
      "viewport": {
       "sheet_px": [
        378,
@@ -1514,10 +1783,10 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 425734
+   "t": 478649
   },
   {
-   "step": 10,
+   "step": 12,
    "do": {
     "do": "wait",
     "until": "ms",
@@ -1603,12 +1872,7 @@
       }
      ],
      "annotations": [],
-     "selection": [
-      {
-       "kind": "EDGE",
-       "owner": "Top"
-      }
-     ],
+     "selection": [],
      "viewport": {
       "sheet_px": [
        378,
@@ -1652,7 +1916,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 452711
+   "t": 504418
   }
  ]
 }

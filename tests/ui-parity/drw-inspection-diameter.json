@@ -1,0 +1,97 @@
+{
+  "name": "drw-inspection-diameter",
+  "about": "hole-plate-drawing: a diameter dimension (0.394) of the hole in Top, Inspection item on it, then the Inspection table panel (its row type); Escape",
+  "area": "drawing",
+  "source": "studios REQUESTS 11-20 08:08 (drawing matrix rows only a new take can show); scenario written and recorded by live 11-20",
+  "start": "hole-plate-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Dimension",
+        "menu": "Diameter dimension (shift+d)"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Top",
+          "at": [
+            3.5355,
+            3.5355,
+            20
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            12,
+            14,
+            20
+          ]
+        }
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "tool": "Inspection item"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "annotation": "0.394"
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Inspection table"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    }
+  ]
+}

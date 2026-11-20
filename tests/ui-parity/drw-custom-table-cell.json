@@ -1,0 +1,136 @@
+{
+  "name": "drw-custom-table-cell",
+  "about": "A Part faces custom table placed; a double-click on one of its cells (the Cell panel); a right-click on that cell while it is edited (its menu); Escape twice; a right-click on the table (its menu: live has no Split custom table below there); Escape",
+  "area": "drawing",
+  "source": "studios REQUESTS 11-20 08:08 (drawing matrix rows only a new take can show); scenario written and recorded by live 11-20",
+  "start": "block-drawing-table",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Custom table"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Insert"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Select a custom table"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "list_row": "Part faces"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Done"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          150,
+          150
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "dblclick",
+      "on": {
+        "sheet_point": [
+          140,
+          146
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          140,
+          146
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 600
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          140,
+          146
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    }
+  ]
+}

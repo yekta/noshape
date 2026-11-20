@@ -1,6 +1,6 @@
 {
   "name": "drw-revision-table-delete",
-  "about": "A revision table's menu › Delete",
+  "about": "A revision table's menu › Delete; then a click on empty sheet (a repaint) before the hover",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",
   "source": "coverage (lead 11-07: the revision table's rows; live's Free account has no Revision table tool, asked whether another can record); live2 11-14: steps follow live (a data-row cell at sheet (70, 130))",
@@ -59,6 +59,20 @@
       "do": "wait",
       "until": "ms",
       "ms": 3000
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          140,
+          40
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 500
     },
     {
       "do": "hover",

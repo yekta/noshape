@@ -1,0 +1,63 @@
+{
+  "name": "drw-section-blind-offset",
+  "about": "Section view: Section depth ticked (End type Up to entity), Offset ticked (the Offset distance field), then End type → Blind (the Depth field; live drops Offset for Blind); Escape",
+  "area": "drawing",
+  "source": "studios REQUESTS 11-20 08:08 (drawing matrix rows only a new take can show); scenario written and recorded by live 11-20",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Section view"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "checkbox": "Section depth"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "checkbox": "Offset"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Up to entity",
+        "pick": "Blind"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    }
+  ]
+}

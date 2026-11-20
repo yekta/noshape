@@ -1,0 +1,58 @@
+{
+  "name": "drw-sheet-properties-iso",
+  "about": "block-drawing-iso (ISO A4 portrait): the sheet's right-click menu › Sheet properties..., its Size list opened (A4 Portrait); Escape twice; live's Size options (read from the select in the take): A4, A4 Portrait, A3, A2, A1, A0, Custom",
+  "area": "drawing",
+  "source": "studios REQUESTS 11-20 08:08 (drawing matrix rows only a new take can show); scenario written and recorded by live 11-20",
+  "start": "block-drawing-iso",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          30,
+          280
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Sheet properties..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "A4 Portrait"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 600
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    }
+  ]
+}

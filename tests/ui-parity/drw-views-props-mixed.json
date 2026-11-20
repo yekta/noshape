@@ -1,0 +1,92 @@
+{
+  "name": "drw-views-props-mixed",
+  "about": "Front set to Best quality in View properties (OK); then Front and Right selected (click, Shift+click) and View properties... opened: the render mode shows the mixed value; Escape",
+  "area": "drawing",
+  "source": "studios REQUESTS 11-20 08:08 (drawing matrix rows only a new take can show); scenario written and recorded by live 11-20",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "View properties..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 2000
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Best performance",
+        "pick": "Best quality"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "ok"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "click",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view": "Right"
+      },
+      "mods": "shift"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "View properties..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 2000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    }
+  ]
+}
