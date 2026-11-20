@@ -15,10 +15,10 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::{WindowExt as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::cad_export::{CAD_VERSIONS, DEFAULT_DWG, DEFAULT_DXF, to_dwg_file, to_dxf_file};
+use noshape_model::drawing::cad_export::{CAD_VERSIONS, DEFAULT_DWG, DEFAULT_DXF};
 use noshape_model::reference::{FeatureId, Reference};
 use noshape_model::BodyId;
-use noshape_model::sheetmetal::flat_dxf::{FlatExport, flats_dwg, flats_dxf};
+use noshape_model::sheetmetal::flat_dxf::{FlatExport, curves_dwg, curves_dxf, flats_dwg, flats_dxf};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -205,13 +205,15 @@ impl PartStudioView {
     fn run_cad_export(&mut self, s: Settings, name: String, source: CadSource, window: &mut Window, cx: &mut Context<Self>) {
         let units = if s.workspace_units { self.workspace_insunits(cx) } else { UNITS[s.units.min(5)].1 };
         let version = CAD_VERSIONS[s.version.min(CAD_VERSIONS.len() - 1)].1;
-        let sheet = match &source {
+        let curves = match &source {
             CadSource::Flat(body) => return self.run_flat_export(s, name, body.clone(), window, cx),
-            CadSource::Sketch(id) => self.context.as_ref().and_then(|ctx| self.display.sketches.iter().find(|sk| sk.feature == *id).map(|sk| noshape_ops::sketch_export::sketch_sheet(ctx, sk))),
-            CadSource::Face(r) => self.context.as_ref().and_then(|ctx| noshape_ops::sketch_export::face_sheet(ctx, r)),
+            CadSource::Sketch(id) => self.context.as_ref().map(|ctx| noshape_ops::sketch_export::sketch_curves(ctx, *id)),
+            CadSource::Face(r) => self.context.as_ref().and_then(|ctx| noshape_ops::sketch_export::face_curves(ctx, r)),
         };
-        let Some(g) = sheet else { return self.flash_info("Export failed: nothing to export".into(), cx) };
-        match if s.dwg { to_dwg_file(&g, units, version) } else { to_dxf_file(&g, units, version) } {
+        let Some(curves) = curves.filter(|c| !c.is_empty()) else { return self.flash_info("Export failed: nothing to export".into(), cx) };
+        // As live's sketch export (qa rt-1119): the flat export's tables, the curves exact on MODELSKETCH_VISIBLE.
+        let o = FlatExport { insunits: units, version, ..FlatExport::default() };
+        match if s.dwg { curves_dwg(&curves, &o) } else { curves_dxf(&curves, &o) } {
             Ok(bytes) => self.save_cad_export(bytes, if name.is_empty() { "Export".into() } else { name }, s, window, cx),
             Err(e) => self.flash_info(format!("Export failed: {e}"), cx),
         }

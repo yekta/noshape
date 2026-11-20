@@ -238,7 +238,7 @@ pub fn ops() -> Vec<Op> {
             group: "sketch",
             verb: "export",
             summary: "Export a sketch or a planar face as DXF (Export as DXF/DWG…)",
-            description: "The context menus' Export as DXF/DWG… of a sketch (its curves; construction curves as hidden lines; external references left out) or of a planar face (its boundary), in the plane's coordinates, millimeters, at the dialog's default version (Release 14): lines, circles, arcs and ellipses exactly as LINE / CIRCLE / ARC / ELLIPSE, splines as SPLINEs. `format` svg writes the same geometry as SVG.",
+            description: "The context menus' Export as DXF/DWG… of a sketch (its curves) or of a planar face (its boundary), in the plane's coordinates, millimeters, at the dialog's default version (Release 14), as live's: every curve exactly (LINE / CIRCLE / ARC / ELLIPSE / SPLINE by its control points) on layer MODELSKETCH_VISIBLE; construction curves, points and external references left out. `format` svg writes the same geometry as SVG.",
             fields: vec![doc_field(), tab_field(), opt("sketch", s(), "Sketch feature id or name."), opt("face", s(), "Instead: a planar face id (`face:…`)."), req("file", s(), "Output path."), opt("format", json!({ "type": "string", "enum": ["dxf", "svg"], "default": "dxf" }), "File format.")],
             mutates: false,
             destructive: false,
@@ -1307,33 +1307,42 @@ fn paste(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn export_sketch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use crate::sketch_export as x;
     let (od, tab) = studio_target(ctx, a)?;
     let r = od.regenerate(tab, None)?;
-    let g = match (a.opt_str("sketch")?, a.opt_str("face")?) {
-        (Some(_), _) => {
-            let ps = doc::studio(od.doc(), tab)?;
-            let id = feature_arg(ps, a, "sketch")?;
-            let sk = r.display.sketches.iter().find(|s| s.feature == id).ok_or_else(|| OpError::param("sketch", "the sketch isn't shown (suppressed or after the rollback bar)"))?;
-            crate::sketch_export::sketch_sheet(&r.context, sk)
-        }
-        (None, Some(fid)) => {
-            let face = refs::parse_str(fid).ok_or_else(|| OpError::param("face", "a face id"))?;
-            crate::sketch_export::face_sheet(&r.context, &face).ok_or_else(|| OpError::param("face", "not a planar face of this Part Studio"))?
-        }
-        (None, None) => return Err(OpError::param("sketch", "a sketch or a face")),
-    };
     let svg = match a.opt_str("format")?.unwrap_or("dxf") {
         "dxf" => false,
         "svg" => true,
         _ => return Err(OpError::param("format", "dxf or svg")),
     };
-    // (As the app's Export as DXF/DWG… modal by default: its DXF version, millimeters.)
-    let data = if svg {
-        noshape_model::drawing::export::to_svg(&g).into_bytes()
-    } else {
-        noshape_model::drawing::cad_export::to_dxf_file(&g, 4, noshape_model::drawing::cad_export::CAD_VERSIONS[noshape_model::drawing::cad_export::DEFAULT_DXF].1).map_err(|e| OpError::new("export", e))?
+    // DXF: the exact curves at the dialog's defaults (Release 14, millimeters); SVG: sheet geometry.
+    let (data, curves) = match (a.opt_str("sketch")?, a.opt_str("face")?) {
+        (Some(_), _) => {
+            let ps = doc::studio(od.doc(), tab)?;
+            let id = feature_arg(ps, a, "sketch")?;
+            let sk = r.display.sketches.iter().find(|s| s.feature == id).ok_or_else(|| OpError::param("sketch", "the sketch isn't shown (suppressed or after the rollback bar)"))?;
+            if svg {
+                let g = x::sketch_sheet(&r.context, sk);
+                (noshape_model::drawing::export::to_svg(&g).into_bytes(), g.lines.len())
+            } else {
+                let c = x::sketch_curves(&r.context, id);
+                (x::dxf(&c)?, c.len())
+            }
+        }
+        (None, Some(fid)) => {
+            let face = refs::parse_str(fid).ok_or_else(|| OpError::param("face", "a face id"))?;
+            let bad = || OpError::param("face", "not a planar face of this Part Studio");
+            if svg {
+                let g = x::face_sheet(&r.context, &face).ok_or_else(bad)?;
+                (noshape_model::drawing::export::to_svg(&g).into_bytes(), g.lines.len())
+            } else {
+                let c = x::face_curves(&r.context, &face).ok_or_else(bad)?;
+                (x::dxf(&c)?, c.len())
+            }
+        }
+        (None, None) => return Err(OpError::param("sketch", "a sketch or a face")),
     };
     let path = std::path::Path::new(a.str("file")?);
     std::fs::write(path, &data).map_err(|e| OpError::new("io", format!("{}: {e}", path.display())).with_param("file"))?;
-    Ok(json!({ "file": path.display().to_string(), "bytes": data.len(), "curves": g.lines.len() }).into())
+    Ok(json!({ "file": path.display().to_string(), "bytes": data.len(), "curves": curves }).into())
 }

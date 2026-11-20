@@ -1711,7 +1711,7 @@ Examples:
 
 Export a sketch or a planar face as DXF (Export as DXF/DWG…).
 
-The context menus' Export as DXF/DWG… of a sketch (its curves; construction curves as hidden lines; external references left out) or of a planar face (its boundary), in the plane's coordinates, millimeters, at the dialog's default version (Release 14): lines, circles, arcs and ellipses exactly as LINE / CIRCLE / ARC / ELLIPSE, splines as SPLINEs. `format` svg writes the same geometry as SVG.
+The context menus' Export as DXF/DWG… of a sketch (its curves) or of a planar face (its boundary), in the plane's coordinates, millimeters, at the dialog's default version (Release 14), as live's: every curve exactly (LINE / CIRCLE / ARC / ELLIPSE / SPLINE by its control points) on layer MODELSKETCH_VISIBLE; construction curves, points and external references left out. `format` svg writes the same geometry as SVG.
 
 Examples:
 

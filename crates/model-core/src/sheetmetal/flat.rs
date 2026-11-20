@@ -128,33 +128,35 @@ pub fn flat_sketch_curves(ctx: &Context, studio: &crate::partstudio::PartStudio,
         let Some(r) = ctx.sketch(sd.feature).filter(|_| on_this) else { continue };
         // Sketch coordinates -> the flat's: a rigid map of the plane (the sketch lies on the flat in its view place).
         let m = |p: DVec2| flat.frame.to_local(back.transform_point3(r.frame.to_world(p)));
-        let (ex, ey) = (m(DVec2::X) - m(DVec2::ZERO), m(DVec2::Y) - m(DVec2::ZERO));
-        let lin = |v: DVec2| ex * v.x + ey * v.y;
-        let flips = ex.perp_dot(ey) < 0.0;
-        let ang = |a: f64| lin(DVec2::from_angle(a)).to_angle();
-        for e in r.sketch.entities().filter(|e| !e.construction && !e.external) {
-            let Some(c) = r.sketch.curve(e.id) else { continue };
-            out.push(match c {
-                noshape_sketch::Curve2::Line { a, b } => FlatCurve::Line { a: m(a), b: m(b) },
-                noshape_sketch::Curve2::Circle { center, radius } => FlatCurve::Circle { center: m(center), radius },
-                noshape_sketch::Curve2::Arc { center, radius, start_angle, end_angle } => {
-                    let (s, t) = (ang(start_angle), ang(end_angle));
-                    FlatCurve::Arc { center: m(center), radius, start: if flips { t } else { s }, end: if flips { s } else { t } }
-                }
-                noshape_sketch::Curve2::Ellipse { center, major, minor } => FlatCurve::Ellipse { center: m(center), major: lin(major), ratio: minor / major.length().max(1e-300), start: 0.0, end: std::f64::consts::TAU },
-                noshape_sketch::Curve2::EllipticalArc { center, major, minor, start_param, end_param } => {
-                    let (s, t) = if flips { (-end_param, -start_param) } else { (start_param, end_param) };
-                    FlatCurve::Ellipse { center: m(center), major: lin(major), ratio: minor / major.length().max(1e-300), start: s, end: t }
-                }
-                noshape_sketch::Curve2::Nurbs(n) => {
-                    let (k0, k1) = (n.knots.first().copied().unwrap_or(0.0), n.knots.last().copied().unwrap_or(1.0));
-                    let span = (k1 - k0).max(1e-300);
-                    FlatCurve::Spline { degree: n.degree as u32, knots: n.knots.iter().map(|k| (k - k0) / span).collect(), poles: n.ctrl.iter().map(|p| m(*p)).collect(), weights: n.weights.clone().unwrap_or_default() }
-                }
-            });
-        }
+        out.extend(r.sketch.entities().filter(|e| !e.construction && !e.external).filter_map(|e| Some(sketch_flat_curve(&r.sketch.curve(e.id)?, m))));
     }
     out
+}
+
+/// A sketch curve as a [`FlatCurve`] through `m`, a rigid map of its plane (a mirror reverses the arcs).
+pub fn sketch_flat_curve(c: &noshape_sketch::Curve2, m: impl Fn(DVec2) -> DVec2) -> FlatCurve {
+    let (ex, ey) = (m(DVec2::X) - m(DVec2::ZERO), m(DVec2::Y) - m(DVec2::ZERO));
+    let lin = |v: DVec2| ex * v.x + ey * v.y;
+    let flips = ex.perp_dot(ey) < 0.0;
+    let ang = |a: f64| lin(DVec2::from_angle(a)).to_angle();
+    match c {
+        noshape_sketch::Curve2::Line { a, b } => FlatCurve::Line { a: m(*a), b: m(*b) },
+        noshape_sketch::Curve2::Circle { center, radius } => FlatCurve::Circle { center: m(*center), radius: *radius },
+        noshape_sketch::Curve2::Arc { center, radius, start_angle, end_angle } => {
+            let (s, t) = (ang(*start_angle), ang(*end_angle));
+            FlatCurve::Arc { center: m(*center), radius: *radius, start: if flips { t } else { s }, end: if flips { s } else { t } }
+        }
+        noshape_sketch::Curve2::Ellipse { center, major, minor } => FlatCurve::Ellipse { center: m(*center), major: lin(*major), ratio: minor / major.length().max(1e-300), start: 0.0, end: std::f64::consts::TAU },
+        noshape_sketch::Curve2::EllipticalArc { center, major, minor, start_param, end_param } => {
+            let (s, t) = if flips { (-end_param, -start_param) } else { (*start_param, *end_param) };
+            FlatCurve::Ellipse { center: m(*center), major: lin(*major), ratio: minor / major.length().max(1e-300), start: s, end: t }
+        }
+        noshape_sketch::Curve2::Nurbs(n) => {
+            let (k0, k1) = (n.knots.first().copied().unwrap_or(0.0), n.knots.last().copied().unwrap_or(1.0));
+            let span = (k1 - k0).max(1e-300);
+            FlatCurve::Spline { degree: n.degree as u32, knots: n.knots.iter().map(|k| (k - k0) / span).collect(), poles: n.ctrl.iter().map(|p| m(*p)).collect(), weights: n.weights.clone().unwrap_or_default() }
+        }
+    }
 }
 
 /// The unfolded part: outline loops and bend lines in the flat plane.

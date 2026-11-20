@@ -143,29 +143,7 @@ pub fn flat_document(flat: &FlatPattern, o: &FlatExport) -> Result<CadDocument, 
 /// Flats (the export's Scope: a part, its model's parts, the Part Studio's)
 /// as one CAD document, each where it lies.
 pub fn flats_document(flats: &[FlatPattern], o: &FlatExport) -> Result<CadDocument, String> {
-    let mut doc = CadDocument::with_version(o.version);
-    doc.header.insertion_units = o.insunits as i16;
-    for (name, description, pattern) in LINE_TYPES {
-        let mut lt = LineType::new(name);
-        lt.description = description.to_string();
-        for &p in pattern {
-            lt.add_element(if p > 0.0 { LineTypeElement::dash(p) } else { LineTypeElement::space(-p) });
-        }
-        lt.pattern_length = pattern.iter().map(|p| p.abs()).sum();
-        let _ = doc.line_types.add(lt);
-    }
-    for (name, line_type, on, frozen) in LAYERS {
-        let mut layer = Layer::new(name);
-        layer.color = Color::from_index(7);
-        layer.line_type = line_type.to_string();
-        if !on {
-            layer.turn_off();
-        }
-        if frozen {
-            layer.freeze();
-        }
-        let _ = doc.layers.add(layer);
-    }
+    let mut doc = tables(o);
     let k = units_per_meter(o.insunits);
     let p3 = |p: glam::DVec2| Vector3::new(p.x * k, p.y * k, 0.0);
     let add = |doc: &mut CadDocument, a: glam::DVec2, b: glam::DVec2, layer: &str| -> Result<(), String> {
@@ -173,39 +151,10 @@ pub fn flats_document(flats: &[FlatPattern], o: &FlatExport) -> Result<CadDocume
         e.common_mut().layer = layer.into();
         doc.add_entity(e).map(|_| ()).map_err(|e| e.to_string())
     };
-    let put = |doc: &mut CadDocument, mut e: EntityType, layer: &str| -> Result<(), String> {
-        e.common_mut().layer = layer.into();
-        doc.add_entity(e).map(|_| ()).map_err(|e| e.to_string())
-    };
     for flat in flats {
         let curves = flat.outline.iter().map(|c| (c, CUT)).chain(flat.sketches.iter().filter(|_| o.sketches).map(|c| (c, SKETCH)));
         for (c, layer) in curves {
-            match c {
-                FlatCurve::Line { a, b } => add(&mut doc, *a, *b, layer)?,
-                FlatCurve::Circle { center, radius } => put(&mut doc, EntityType::Circle(Circle::from_center_radius(p3(*center), radius * k)), layer)?,
-                FlatCurve::Arc { center, radius, start, end } => {
-                    let mut e = Arc::new();
-                    (e.center, e.radius, e.start_angle, e.end_angle) = (p3(*center), radius * k, start.rem_euclid(std::f64::consts::TAU), end.rem_euclid(std::f64::consts::TAU));
-                    put(&mut doc, EntityType::Arc(e), layer)?;
-                }
-                FlatCurve::Ellipse { center, major, ratio, start, end } => {
-                    let mut e = Ellipse::from_center_axes(p3(*center), Vector3::new(major.x * k, major.y * k, 0.0), *ratio);
-                    (e.start_parameter, e.end_parameter) = (*start, *end);
-                    put(&mut doc, EntityType::Ellipse(e), layer)?;
-                }
-                // Live's: planar (flags 8), tolerances 1e-10 / 1e-8, knots 0...1.
-                FlatCurve::Spline { degree, knots, poles, weights } => {
-                    let mut e = Spline::new();
-                    e.degree = *degree as i32;
-                    (e.flags.planar, e.flags.rational) = (true, !weights.is_empty());
-                    e.knots = knots.clone();
-                    e.control_points = poles.iter().map(|p| p3(*p)).collect();
-                    e.weights = weights.clone();
-                    e.normal = Vector3::new(0.0, 0.0, 1.0);
-                    (e.knot_tolerance, e.control_tolerance) = (1e-10, 1e-8);
-                    put(&mut doc, EntityType::Spline(e), layer)?;
-                }
-            }
+            put_curve(&mut doc, c, layer, k)?;
         }
         for l in flat.loops.iter().filter(|_| flat.outline.is_empty()) {
             for (i, a) in l.iter().enumerate() {
@@ -263,6 +212,88 @@ pub fn flats_document(flats: &[FlatPattern], o: &FlatExport) -> Result<CadDocume
         }
     }
     Ok(doc)
+}
+
+/// A document with live's line types and layers (its flat and sketch exports share them), no entities.
+fn tables(o: &FlatExport) -> CadDocument {
+    let mut doc = CadDocument::with_version(o.version);
+    doc.header.insertion_units = o.insunits as i16;
+    for (name, description, pattern) in LINE_TYPES {
+        let mut lt = LineType::new(name);
+        lt.description = description.to_string();
+        for &p in pattern {
+            lt.add_element(if p > 0.0 { LineTypeElement::dash(p) } else { LineTypeElement::space(-p) });
+        }
+        lt.pattern_length = pattern.iter().map(|p| p.abs()).sum();
+        let _ = doc.line_types.add(lt);
+    }
+    for (name, line_type, on, frozen) in LAYERS {
+        let mut layer = Layer::new(name);
+        layer.color = Color::from_index(7);
+        layer.line_type = line_type.to_string();
+        if !on {
+            layer.turn_off();
+        }
+        if frozen {
+            layer.freeze();
+        }
+        let _ = doc.layers.add(layer);
+    }
+    doc
+}
+
+/// One exact curve on `layer` (`k`: file units per meter).
+fn put_curve(doc: &mut CadDocument, c: &FlatCurve, layer: &str, k: f64) -> Result<(), String> {
+    let p3 = |p: glam::DVec2| Vector3::new(p.x * k, p.y * k, 0.0);
+    let mut e = match c {
+        FlatCurve::Line { a, b } => EntityType::Line(Line::from_points(p3(*a), p3(*b))),
+        FlatCurve::Circle { center, radius } => EntityType::Circle(Circle::from_center_radius(p3(*center), radius * k)),
+        FlatCurve::Arc { center, radius, start, end } => {
+            let mut e = Arc::new();
+            (e.center, e.radius, e.start_angle, e.end_angle) = (p3(*center), radius * k, start.rem_euclid(std::f64::consts::TAU), end.rem_euclid(std::f64::consts::TAU));
+            EntityType::Arc(e)
+        }
+        FlatCurve::Ellipse { center, major, ratio, start, end } => {
+            let mut e = Ellipse::from_center_axes(p3(*center), Vector3::new(major.x * k, major.y * k, 0.0), *ratio);
+            (e.start_parameter, e.end_parameter) = (*start, *end);
+            EntityType::Ellipse(e)
+        }
+        // Live's: planar (flags 8), tolerances 1e-10 / 1e-8, knots 0...1.
+        FlatCurve::Spline { degree, knots, poles, weights } => {
+            let mut e = Spline::new();
+            e.degree = *degree as i32;
+            (e.flags.planar, e.flags.rational) = (true, !weights.is_empty());
+            e.knots = knots.clone();
+            e.control_points = poles.iter().map(|p| p3(*p)).collect();
+            e.weights = weights.clone();
+            e.normal = Vector3::new(0.0, 0.0, 1.0);
+            (e.knot_tolerance, e.control_tolerance) = (1e-10, 1e-8);
+            EntityType::Spline(e)
+        }
+    };
+    e.common_mut().layer = layer.into();
+    doc.add_entity(e).map(|_| ()).map_err(|e| e.to_string())
+}
+
+/// A sketch's or a planar face's Export as DXF/DWG…: its curves exactly, all on MODELSKETCH_VISIBLE, with the flat's
+/// tables (live qa rt-1119 live-sketch1-default.dxf: R14, LINE / CIRCLE / ARC / SPLINE, no construction or points).
+pub fn curves_document(curves: &[FlatCurve], o: &FlatExport) -> Result<CadDocument, String> {
+    let mut doc = tables(o);
+    let k = units_per_meter(o.insunits);
+    for c in curves {
+        put_curve(&mut doc, c, SKETCH, k)?;
+    }
+    Ok(doc)
+}
+
+/// [`curves_document`] as a DXF file.
+pub fn curves_dxf(curves: &[FlatCurve], o: &FlatExport) -> Result<Vec<u8>, String> {
+    DxfWriter::new(&curves_document(curves, o)?).write_to_vec().map_err(|e| e.to_string())
+}
+
+/// [`curves_document`] as a DWG file.
+pub fn curves_dwg(curves: &[FlatCurve], o: &FlatExport) -> Result<Vec<u8>, String> {
+    DwgWriter::write_to_vec(&curves_document(curves, o)?).map_err(|e| e.to_string())
 }
 
 /// The flat as a DXF file.

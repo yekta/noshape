@@ -4868,30 +4868,37 @@ fn sketch_paste_export_and_imprinting() {
     // Its plane is Front: the frame's normal is ±y.
     let n = &p["frame"]["normal"];
     assert!((num(&n[1]).abs() - 1.0).abs() < 1e-9, "{p}");
+    // A construction line: left out of the DXF, as live's (qa rt-1119).
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "line", "points": [[-30, -10], [30, 10]] }));
+    let line = d["created"].as_array().unwrap().iter().find(|e| e["type"] == "line").unwrap()["id"].clone();
+    call(&mut ctx, "sketch_set_construction", json!({ "sketch": "Sketch 1", "entities": [line] }));
     let dxf = scratch("sketch1.dxf");
     let r = call(&mut ctx, "sketch_export", json!({ "sketch": "Sketch 1", "file": dxf.to_str().unwrap() }));
-    assert!(num(&r["curves"]) >= 5.0, "rectangle + circle: {r}");
-    // Exact curves, not tessellated polylines (qa SKETCH-DXF-EXPORT-POLYLINES): the Ø10 circle a CIRCLE of radius 5.
-    let entities = |path: &std::path::Path| -> Vec<(String, Option<f64>)> {
+    assert_eq!(num(&r["curves"]), 5.0, "rectangle + circle: {r}");
+    // Live's sketch DXF (qa SKETCH-DXF-EXPORT-POLYLINES, live/qa/rt-1119/live-sketch1-default.dxf): Release 14, each
+    // curve exact on MODELSKETCH_VISIBLE: the Ø10 circle a CIRCLE of radius 5.
+    let entities = |path: &std::path::Path| -> Vec<(String, String, Option<f64>)> {
         let text = std::fs::read_to_string(path).unwrap();
+        assert!(text.contains("AC1014"), "Release 14");
         let lines: Vec<&str> = text.lines().map(str::trim).collect();
         let pairs: Vec<(&str, &str)> = lines.chunks(2).filter(|c| c.len() == 2).map(|c| (c[0], c[1])).collect();
         let start = pairs.iter().position(|p| *p == ("2", "ENTITIES")).unwrap();
-        let mut out: Vec<(String, Option<f64>)> = Vec::new();
+        let mut out: Vec<(String, String, Option<f64>)> = Vec::new();
         for (c, v) in &pairs[start + 1..] {
-            match *c {
-                "0" if *v == "ENDSEC" => break,
-                "0" => out.push((v.to_string(), None)),
-                "40" => if let Some(e) = out.last_mut() { e.1 = v.parse().ok() },
+            match (*c, out.last_mut()) {
+                ("0", _) if *v == "ENDSEC" => break,
+                ("0", _) => out.push((v.to_string(), String::new(), None)),
+                ("8", Some(e)) => e.1 = v.to_string(),
+                ("40", Some(e)) => e.2 = v.parse().ok(),
                 _ => {}
             }
         }
         out
     };
     let kinds = entities(&dxf);
-    assert!(kinds.iter().all(|(k, _)| k == "LINE" || k == "CIRCLE"), "{kinds:?}");
-    assert_eq!(kinds.iter().filter(|(k, r)| k == "CIRCLE" && r.is_some_and(|r| (r - 5.0).abs() < 1e-9)).count(), 1, "{kinds:?}");
-    assert_eq!(kinds.iter().filter(|(k, _)| k == "LINE").count(), 4, "{kinds:?}");
+    assert!(kinds.iter().all(|(k, l, _)| (k == "LINE" || k == "CIRCLE") && l == "MODELSKETCH_VISIBLE"), "{kinds:?}");
+    assert_eq!(kinds.iter().filter(|(k, _, r)| k == "CIRCLE" && r.is_some_and(|r| (r - 5.0).abs() < 1e-9)).count(), 1, "{kinds:?}");
+    assert_eq!(kinds.iter().filter(|(k, _, _)| k == "LINE").count(), 4, "no construction line: {kinds:?}");
     let svg = scratch("sketch1.svg");
     call(&mut ctx, "sketch_export", json!({ "sketch": "Sketch 1", "file": svg.to_str().unwrap(), "format": "svg" }));
     assert!(std::fs::read_to_string(&svg).unwrap().contains("<svg"));
@@ -4902,8 +4909,8 @@ fn sketch_paste_export_and_imprinting() {
     let r = call(&mut ctx, "sketch_export", json!({ "face": top, "file": fd.to_str().unwrap() }));
     assert!(num(&r["curves"]) >= 5.0, "outline + hole: {r}");
     let kinds = entities(&fd);
-    assert!(kinds.iter().any(|(k, r)| (k == "CIRCLE" || k == "ARC") && r.is_some_and(|r| (r - 5.0).abs() < 1e-9)), "{kinds:?}");
-    assert!(kinds.iter().all(|(k, _)| k == "LINE" || k == "CIRCLE" || k == "ARC"), "{kinds:?}");
+    assert!(kinds.iter().any(|(k, _, r)| (k == "CIRCLE" || k == "ARC") && r.is_some_and(|r| (r - 5.0).abs() < 1e-9)), "{kinds:?}");
+    assert!(kinds.iter().all(|(k, _, _)| k == "LINE" || k == "CIRCLE" || k == "ARC"), "{kinds:?}");
     // Disable imprinting on a new sketch.
     let s = call(&mut ctx, "sketch_create", json!({ "plane": "plane:right", "disable_imprinting": true }));
     let f = call(&mut ctx, "feature_get", json!({ "feature": s["sketch"] }));

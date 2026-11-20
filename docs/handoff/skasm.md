@@ -1,9 +1,9 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-19 22:45 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-20 00:50 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight 23:18: one land after suite O (vibex6 under nice 19, lead one-off; /root/skasm-scratch/suiteo.out, log ~/agents/skasm-keep/suite-O-*.log on vibex6; J is on vibex7)
+## In flight 00:30: landing the stack (suite O = J on every document: 95/126, 1354/1585; log ~/agents/skasm-keep/suite-O-1120-0010.log on vibex6)
 Compare per document with suite J (vibex7 ~/tmp/skasm/suite-J-1119-1831.log.s.c: `sed` the "name: N/M features match"
 lines to "name N/M", LC_ALL=C sort, join, awk $2!=$3). None worse -> land.sh. The stack:
 - Extrude part order (3ff5480f): a New extrude's regions of one sketch go in drawing order (the lowest entity id of each
@@ -35,10 +35,11 @@ lines to "name N/M", LC_ALL=C sort, join, awk $2!=$3). None worse -> land.sh. Th
   Left: sketch points passed through ops into sketchCurves say "Cannot compute tangent line." (the app's filter blocks them).
 - Slot on an arc (44c3ffed, qa P1 SKETCH-SLOT-ON-ARC): slot_chains took the arc's offset sides as caps (they share its
   centre) -> Equal to the Ø cap -> "Ø0" and Esc committed the wreck. Sketch + scene tests; slot tool only (no suite doc).
-- Sketch / face DXF (8dec7bd6, qa P1 SKETCH-DXF-EXPORT-POLYLINES): sketch_export samples the sketch's f64 curves / the
-  face's B-rep edges with conic_lines + freeform_lines, so the writer puts CIRCLE / ARC / ELLIPSE / SPLINE; the op now
-  writes via cad_export::to_dxf_file at DEFAULT_DXF (R14), as the dialog. Live's sketch-DXF capture is requested (qa
-  REQUESTS 11-19 23:57): check layers and spline form against it.
+- Sketch / face DXF (qa P1 SKETCH-DXF-EXPORT-POLYLINES; live rt-1119 live-sketch1-default.dxf): as live's: R14, the
+  flat export's tables (flat_dxf `tables`), each curve exact through flat_dxf `put_curve` (LINE / CIRCLE / ARC / ELLIPSE
+  / SPLINE by control points) on MODELSKETCH_VISIBLE (`curves_document` / `curves_dxf` / `curves_dwg`); no construction
+  curves, points or external refs (sketch_export `sketch_curves`; a face: `outline_curves`, else sampled lines). SVG
+  keeps the sheet path. ops e2e sketch_paste_export pins layer, kinds, radius, AC1014, construction left out.
 - Simulation connection removed (77fa48ed, lead; DECISIONS 11-16): mate dialog field + flyout row + model-data/ops
   fields, run.py drops the two labels, scenario asm-slider-simulation-connection deleted. ops e2e assembly 14, coverage,
   assembly-ui 97, clippy clean (vibex8).
