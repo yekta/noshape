@@ -231,7 +231,7 @@ impl DrawingEditor {
     /// A revision table's selected cell (live2 drw-revision-*): Size ▸, Resize…, Copy.
     pub fn revision_cell_entries(&self, t: &noshape_model::drawing::Table, cs: crate::drawing_cells::CellSel) -> Vec<MenuEntry> {
         let id = t.id;
-        let mut out = self.size_entries(t, cs, "Resize...");
+        let mut out = self.size_entries(t, cs);
         out.push(MenuEntry::item("Copy", move |t, _, cx| {
             t.selection = vec![Sel::Table(id)];
             t.copy_entities(cx);
@@ -239,15 +239,6 @@ impl DrawingEditor {
         out
     }
 
-    /// A hole table's selected cell (live2 drw-hole-table-cell-rmb): Size ▸, Resize… | Copy.
-    pub fn hole_cell_entries(&self, t: &noshape_model::drawing::Table, cs: crate::drawing_cells::CellSel) -> Vec<MenuEntry> {
-        let mut out = self.size_entries(t, cs, "Resize...");
-        out.push(MenuEntry::Separator);
-        out.push(MenuEntry::item("Copy", |ed, _, cx| {
-            ed.copy_cells(cx);
-        }));
-        out
-    }
 
     /// Double-click on a revision table: edit the title (`row` = `usize::MAX`),
     /// a column header (row 0) or a revision's description (its row).

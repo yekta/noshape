@@ -343,7 +343,7 @@ impl DrawingEditor {
             MenuEntry::Submenu("Duplicate".into(), vec![edit("Columns", Box::new(move |t| t.duplicate_cols(c0, c1))), edit("Rows", Box::new(move |t| t.duplicate_rows(r0, r1)))]),
             MenuEntry::Separator,
         ];
-        let mut size = self.size_entries(t, cs, "Resize...");
+        let mut size = self.size_entries(t, cs);
         let resize = size.pop();
         out.extend(size);
         out.push(MenuEntry::Separator);
@@ -397,15 +397,20 @@ impl DrawingEditor {
         out
     }
 
-    /// Right-click with cells of a BOM, cut list or custom table selected
-    /// (help BOM-table-context-menu-01): Size ▸ Columns Equally / Rows
-    /// Equally (of the selected columns / rows), Resize.
+    /// Right-click with cells of a BOM, cut list, custom or hole table selected (live dom/context-menus-drawing:
+    /// bom-table-cell; live2 drw-hole-table-cell-rmb): Size ▸ Columns Equally / Rows Equally (of the selected
+    /// columns / rows), Resize… | Copy.
     pub fn cell_size_entries(&self, t: &noshape_model::drawing::Table, cs: crate::drawing_cells::CellSel) -> Vec<MenuEntry> {
-        self.size_entries(t, cs, "Resize")
+        let mut out = self.size_entries(t, cs);
+        out.push(MenuEntry::Separator);
+        out.push(MenuEntry::item("Copy", |ed, _, cx| {
+            ed.copy_cells(cx);
+        }));
+        out
     }
 
-    /// Size ▸ and the resize item (`resize`: its label).
-    pub(crate) fn size_entries(&self, t: &noshape_model::drawing::Table, cs: crate::drawing_cells::CellSel, resize: &'static str) -> Vec<MenuEntry> {
+    /// Size ▸ and Resize….
+    pub(crate) fn size_entries(&self, t: &noshape_model::drawing::Table, cs: crate::drawing_cells::CellSel) -> Vec<MenuEntry> {
         let id = t.id;
         let Some(l) = self.built.as_ref().and_then(|b| b.table_layout(id)).cloned() else { return Vec::new() };
         let widths: Vec<f64> = l.xs.windows(2).map(|w| w[1] - w[0]).collect();
@@ -438,7 +443,7 @@ impl DrawingEditor {
         let (w, h) = (widths.get(col).copied().unwrap_or(20.0), heights.get(cs.a.0).copied().unwrap_or(t.row_height));
         vec![
             MenuEntry::Submenu("Size".into(), size),
-            MenuEntry::item(resize, move |t, win, cx| {
+            MenuEntry::item("Resize...", move |t, win, cx| {
                 let width = t.input(&noshape_model::drawing::format::format_number(w, None, 2), win, cx);
                 let height = t.input(&noshape_model::drawing::format::format_number(h, None, 2), win, cx);
                 t.panel = Some(Panel::CellResize { table: id, col, width, height });

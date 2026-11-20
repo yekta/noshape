@@ -1233,6 +1233,51 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
         }));
         dump_full.insert(name.into(), json!(full(&rows)));
     }
+    // A BOM table of the first view: its header's and row's menu (the whole table's), and a selected cell's.
+    let bom = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let view = e.built.as_ref()?.placements.first()?.id;
+            let id = e.current_sheet().next_table_id();
+            let kind = noshape_model::drawing::TableKind::Bom { view, structured: false, top_level: false, bottom_to_top: false, overrides: Vec::new(), default_template: false, source: None };
+            e.edit_sheet("BOM table", cx, |s| s.tables.push(noshape_model::drawing::Table::new(id, kind, [300.0, 120.0])));
+            Some(id)
+        })
+    });
+    draw(cx, window);
+    if let Some(id) = bom {
+        let (whole, cell) = cx.update(|cx| editor.update(cx, |e, cx| {
+            e.selection = vec![crate::drawing_view::Sel::Table(id)];
+            let whole = e.table_entries(id, cx);
+            e.cell_sel = Some(crate::drawing_cells::CellSel { table: id, a: (1, 0), b: (1, 0) });
+            let cell = e.table_entries(id, cx);
+            e.cell_sel = None;
+            e.selection.clear();
+            (whole, cell)
+        }));
+        dump_full.insert("bom-table-header".into(), json!(full(&whole)));
+        dump_full.insert("bom-table-row".into(), json!(full(&whole)));
+        assert_eq!(full(&cell), ["Size ▸ Columns Equally | Rows Equally", "Resize...", "——", "Copy"], "live's bom-table-cell");
+        dump_full.insert("bom-table-cell".into(), json!(full(&cell)));
+    }
+    // A revision's row of the revision table (row 1: the drawing's first revision).
+    let revision_row = cx.update(|cx| {
+        let e = editor.read(cx);
+        let id = e.current_sheet().tables.iter().find(|t| matches!(t.kind, noshape_model::drawing::TableKind::Revision { .. }))?.id;
+        Some(full(&e.revision_table_entries(id, Some((1, 0)))))
+    });
+    if let Some(rows) = revision_row {
+        dump_full.insert("revision-table-row".into(), json!(rows));
+    }
+    // The sheet tree's reference row of the first view's source.
+    let reference = cx.update(|cx| {
+        let e = editor.read(cx);
+        let sheet = e.current_sheet();
+        let (key, _) = noshape_model::drawing::views::view_source(sheet, sheet.views.first()?.id)?;
+        Some(full(&e.reference_menu(key.tab, None, None, cx)))
+    });
+    if let Some(rows) = reference {
+        dump_full.insert("sheet-tree-part".into(), json!(rows));
+    }
     let image_rows = cx.update(|cx| {
         let e = editor.read(cx);
         e.current_sheet().images.first().map(|i| full(&e.image_entries(i.id, cx)).into_iter().filter(|r| r != "Paste").collect::<Vec<_>>())
