@@ -9,19 +9,15 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
-## Now (12:0x 11-20): SUITE SPEED (lead 11-20 ~11:45)
-Task: docs whose full regeneration is >= 2x live's AND >= 100 ms slower; profile the top 10 to the slowest feature + op;
-fix mine (FS interpreter, translator, regen plumbing), route the rest with ms (Boolean -> bool, fillet -> blend,
-sweep/loft/pattern -> core, sheet metal -> skasm); report the table to the lead.
-- qa's 10:28 run (/root/qa-scratch/suites/1120-1028-4e51cce3-models/models-report.json) is a DEBUG build at load 12-18:
-  28 flagged (impeller 40.6 s / 2.8, parting-line 6.0 / 0.74, config-screws 5.0 / 0.27, rings 5.9 / 1.6, loft-paths
-  2.6 / 0.43, cpcurves, knifehandle, standoffs, part-draft, hunting-knife, surf-intro x4 "Derived 1" ~0.8 s ...).
-- RUNNING: release parity_models on the Mac (rb.sh slot; Mac ~/noshape-host/dx-keep/pmrun.sh <tag> [only], copy
-  /root/dx-scratch/pmrun.sh): tag r1 -> Mac dx-keep/pm-r1/report.json + pm-r1.log; local log /root/dx-scratch/pm-r1.log.
-  Next: filter report (regen_ms ours = sum of features, live = full_regen_ms) as above; per doc
-  NOSHAPE_PARITY_ONLY=<doc> (each feature vs live) + NOSHAPE_KERNEL_PROFILE=1 / NOSHAPE_FS_PROFILE=fn.
-- Lands: bdf50182 LANDED 5b23eb0e (speed fix + DXF); 6047caa6 checking; c09079ab queued (P3 ticket, 5-point fit,
-  handoff). This handoff edit is committed locally, not landed.
+## Now (12:3x 11-20): SUITE SPEED done, reported (lead 11-20 ~11:45)
+Mac release parity_models r1 (Mac dx-keep/pm-r1/report.json, local /root/dx-scratch/pm-r1-report.json): only 2 of
+158 docs >= 2x live AND >= 100 ms slower (qa's 28 were a debug build): c2-impeller-loft 10629 / 2773 ms,
+c2-config-parts-screws 1126 / 266. Profiles (pmprof.sh <tag> <doc>; pm-pf1/pf2.log): nothing mine (FS, translator,
+plumbing all small). Routed with ms: bool (screws Sweep 1 940 ms rust boolean sections_ahead; impeller Extrude
+Bohrungssitz 666), blend (impeller Fillet 3 1839 / Ansaugflansch 1654 / Flansch 1002 / Fillet 4 361; knifehandle
+Fillet 3 306), core (Delete face 2 622 op_defeature; parting-line Drafts 224/219), skasm (rocker Mirror 3 160).
+Open: an x86 (vibex8) release run would show gaps the fast Mac hides; offered to the lead.
+- Lands: 6047caa6 LANDED 535d63f6; c09079ab queued; handoff commits local.
 
 ## Earlier (00:10 11-20)
 - Fan-blade HLR sampling: TICKETS P3. surf-intro: see the 03:0x bullet below (archive has the 00:10 rerun).
