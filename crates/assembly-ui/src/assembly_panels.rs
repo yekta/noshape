@@ -4835,7 +4835,7 @@ impl AssemblyView {
         cx.notify();
     }
 
-    fn pick_other_document(&mut self, path: std::path::PathBuf, cx: &mut Context<Self>) {
+    pub(super) fn pick_other_document(&mut self, path: std::path::PathBuf, cx: &mut Context<Self>) {
         match OtherDoc::open(&path) {
             Ok(d) => self.ui.insert_other_doc = Some(d),
             Err(e) => self.message = Some((true, format!("Could not open {}: {e:#}", path.display()))),
@@ -4890,8 +4890,9 @@ impl AssemblyView {
         } else {
             "Search assemblies"
         };
-        // The current document's list: its Sort button right of the box (28 px, no tooltip; live2 asm-dialogs-1119).
-        let sort = (self.ui.insert_source == 0 && !self.picking_replacement()).then(|| {
+        // The current document's list and an opened other document's: the Sort button right of the box (28 px, no
+        // tooltip; live2 asm-dialogs-1119, Onshape 1.223 rn-1222-1223 ins-other).
+        let sort = (matches!(self.ui.insert_source, 0 | 1) && !self.picking_replacement()).then(|| {
             let open = self.ui.insert_sort_menu == Some(2);
             let probe = self.ui.insert_sort_anchor[2].clone();
             div()
@@ -5156,7 +5157,8 @@ impl AssemblyView {
                 );
             }
             let query = self.ui.insert_query.trim().to_lowercase();
-            let tabs: Vec<(String, String, bool)> = d.tabs.iter().filter(|t| t.2 == (tab == 1) && (query.is_empty() || t.1.to_lowercase().contains(&query))).cloned().collect();
+            let desc = self.ui.insert_memory.as_ref().is_some_and(|m| m.current_desc);
+            let tabs = sort_by_name(d.tabs.iter().filter(|t| t.2 == (tab == 1) && (query.is_empty() || t.1.to_lowercase().contains(&query))).cloned().collect(), |t| &t.1, desc);
             if tabs.is_empty() {
                 col = col.child(div().pl(px(10.)).h(px(28.)).flex().items_center().text_size(px(12.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(if tab == 0 { "No Part Studios available." } else { "No Assemblies available." }));
             }
@@ -5168,8 +5170,10 @@ impl AssemblyView {
                 }
             }
             let item_row = |id: SharedString, indent: f32, expander: Option<AnyElement>, icon: &'static str, thumb: Option<Arc<RenderImage>>, name: String, cx: &App| {
+                let selector = format!("ins-other-row {name}");
                 h_flex()
                     .id(id)
+                    .debug_selector(move || selector)
                     .flex_none()
                     .h(px(40.))
                     .pl(px(4. + indent))

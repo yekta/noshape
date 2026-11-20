@@ -32,7 +32,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   centroid whatever the connector (assembly_mass.rs face_section_properties gets no reference).
 
 ## live, 2026-11-20 (Onshape 1.222 / 1.223 release audit)
-- [ ] P2 **INSERT-OTHER-DOCS-SORT (asm)**: Onshape 1.223 "sorting in the Current document and Other documents tabs of the
+- [x] P2 **INSERT-OTHER-DOCS-SORT (asm)** (asm 11-20 06:1x: the Sort button and its name order for an opened other document, with Current document's remembered choice; test an_other_documents_studios_sort_by_name_as_the_current_documents): Onshape 1.223 "sorting in the Current document and Other documents tabs of the
   insert dialog". Live 05:42: Insert › Other documents › a document's Part Studios / Assemblies list has the same sort button
   beside its search box as Current document (Name: A → Z / Z → A). Ours shows Sort only for the current document
   (assembly_panels.rs, insert_source == 0). Live 05:52: the button is in an opened document's lists only (Name: A → Z / Z → A);

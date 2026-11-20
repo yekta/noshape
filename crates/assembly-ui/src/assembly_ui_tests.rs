@@ -2151,7 +2151,7 @@ fn other_documents_sort_by_their_menu_and_remember_it(cx: &mut TestAppContext) {
     assert_eq!(dirs[0].file_name().unwrap(), "Alpha");
     assert_eq!(FolderSort::ALL.map(|s| s.label()), ["Name: A → Z", "Name: Z → A", "Last modified"]);
 
-    let (window, view) = pattern_assembly(cx, "insert-sort");
+    let (window, view) = pattern_assembly(cx, "insert-docs-sort");
     cx.update_window(window, |_, w, cx| {
         view.update(cx, |v, cx| {
             v.toggle_insert(w, cx);
@@ -2452,6 +2452,43 @@ fn the_insert_dialogs_studios_sort_by_name_and_keep_the_sort(cx: &mut TestAppCon
         draw(cx, window);
     }
     assert_eq!(first(cx), "Part Studio 1", "Z → A kept on reopening");
+}
+
+/// Onshape 1.223 (live rn-1222-1223 ins-other): Insert › Other documents › an opened document's Part Studios list has
+/// the same Sort button beside its search box as Current document, A → Z by default, Z → A from its menu.
+#[gpui::test]
+fn an_other_documents_studios_sort_by_name_as_the_current_documents(cx: &mut TestAppContext) {
+    let src = two_parts_document(cx, "ins-other-sort-src", |ctx| {
+        let dup = call(ctx, "tab_duplicate", json!({ "tab": "Part Studio 1" }))["tab"]["name"].as_str().unwrap().to_string();
+        call(ctx, "tab_rename", json!({ "tab": dup, "name": "Alpha studio" }));
+        call(ctx, "history_create_version", json!({ "name": "V1" }));
+    });
+    let path = two_parts_document(cx, "ins-other-sort", |_| {});
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.ui.insert_memory = Some(noshape_ops::prefs::InsertMemory::default());
+            v.toggle_insert(w, cx);
+            v.ui.insert_source = 1;
+            v.pick_other_document(src.clone(), cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    let first = |cx: &mut TestAppContext| {
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        let y = |vcx: &mut gpui_kit::VisualTestContext, n: &str| vcx.debug_bounds(format!("ins-other-row {n}").leak()).unwrap_or_else(|| panic!("{n} listed")).origin.y;
+        if y(&mut vcx, "Alpha studio") < y(&mut vcx, "Part Studio 1") { "Alpha studio" } else { "Part Studio 1" }
+    };
+    assert!(gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("ins-cur-sort").is_some(), "the Sort button beside the search box");
+    assert_eq!(first(cx), "Alpha studio", "A → Z by default");
+    // (Z → A as the menu's pick sets it, without writing the remembered file other tests read.)
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.ui.insert_memory.as_mut().unwrap().current_desc = true;
+        cx.notify();
+    }));
+    draw(cx, window);
+    assert_eq!(first(cx), "Part Studio 1", "Z → A");
 }
 
 /// Live2 asm-dialogs-1119 grp / gok: Group on a fixed part and a part Revolute-mated to it shows the mate's error as the
