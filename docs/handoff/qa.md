@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-20 01:08)
+# QA handoff (agent qa; current state only, updated 2026-11-20 01:16)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -60,7 +60,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    scenarios 7/8, 63/67 (suites/1120-0059-green-spot1r2): sketch-dimension-variable = P0 SKETCH-DIM-PLACE-CLICK-SELECTS (skasm,
    since 592b0fc9 11-17; hidden as a focus.kind diff till live's camera retake). By hand: 3D drag from 3 device px = live
    (feel/3d.json; the list's "5 px" and feel row 80 are stale, psui told), line end on a lit model edge = Coincident (=), edge midpoint
-   rest = P1 EDGE-MIDPOINT-REST-LOOK (psui). Next rows 9-16.
+   rest = P1 EDGE-MIDPOINT-REST-LOOK (psui). Rows 9-16: 8/8 119/119 (1120-0109-green-spot9r2) + select by hand =; rows
+   17-22: 13/13 130/130 (1120-0110-green-spot17r2); 23 sticky snap = scene test; 24 hat15b at the release; sketch colours
+   (line / dimensioned / held circle / spline) by hand on 5b62f6ca =. Running on 5b62f6ca (vibe2): rows 25-40 = spot2-0461 +
+   spot33 names (unit qa-spot25r2, dir 1120-0128-green-spot25r2, started 01:14), then rows 41-56 drawings + documents
+   (qa-spot41r2, 1120-0116-green-spot41r2). Compat: P1 SINGULARITIES-SKETCH2-UNSOLVED -> core (20ae6a506; core 4a52a26bb).
 4. Hover flow (lead 11-17 22:20, every release): uh/uh2.sh <release app> <out> on vibex6 Xvfb, 3 runs, xsheet.py for the sheet;
    USER-HOVER-STAYS-LIT is listed as known in the cut's entry until psui's latest-wins picking fix passes 3 clean runs.
 
