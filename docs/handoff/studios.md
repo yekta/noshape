@@ -77,13 +77,16 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
    /root/studios-scratch/uip-merged). Left at 11-20 00:23: 174 present-only (Create Drawing custom template tab,
    Move to sheet / Replicate page chrome, small rests). b4 compared (above); next: rescreenshot b4 with the new
    build, then the remaining panels (inspection / revision tables, BOM properties, section / detail view panels).
-2. live's retakes landed (e4ff71a8e, 11-20): drw-inspection-table-iso-scrolled now ISO A4 (live-1120-inspection-s2:
-   Front's edge selected tan after step 2, 40 preview at the pointer): run ours after the rebase and compare.
-   drw-revision-table-delete: live's stale box after Delete is a glitch, not copied.
-3. Custom table › Add's "Select a Part Studio" is a bare list in ours; live (dom drawing-custom-table-select-part-studio)
-   is a document-version picker: Current document | Other documents tabs, the document name with Create version /
-   Version graph, then its Part Studios (the Insert view chooser's look, drawing_chooser.rs). Other documents only if
-   a custom table can use another document's studio (check the op first).
+2. Local, b12 (11-20 04:45, not yet landed): qa's 8 P0 feel tickets (behaviours "feel coverage (11-20)"): FS "}"
+   outdents to its "{" line (gpui-base `close_brace_outdent`), triple-click takes the line's newline (gpui-base
+   `select_line`, code editors), Ace's bracket boxes (feature_studio `update_bracket_box`, fs_lines `bracket_pair`),
+   a wheel notch 72 px on Linux / 60 Windows (gpui-base `on_scroll_wheel`); VS old-value chip (variable_studio);
+   a crowded dimension draws no line inside (sheet.rs, as squeezed); a dimension dragged from unselected ends
+   unselected (`Drag::MoveAnnotation.fresh`); drawing wheel / pan: the last frame moved to the new camera until its
+   frame comes back (drawing_view `FrameCam`; qa rechecks D3 timing quiet). Custom table › Add: the Insert view
+   chooser in a studio mode ("Select a Part Studio", Part Studios only, 40 px right of the dialog), Other documents
+   real (`drawing_custom_table` `document` / `version`; the kind's `version` an ExternalRef key).
+3. Custom table picker leftovers: configured studios' chevron + configuration pair (live 279) not drawn.
 4. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
