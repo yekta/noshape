@@ -1803,6 +1803,27 @@ impl PartStudioView {
                     inst.compare = noshape_render::scene::compare::POST;
                 }
             }
+            // Live flange-handle-1120 (qa psui5): a picked edge stays bright orange where the preview's new walls cover
+            // it: the model's edge lines holding one drawn again, only their lit lines, over the mix.
+            let lit = |id: usize| scene.states.get(id).is_some_and(|s| s & (noshape_render::state::SELECTED | noshape_render::state::QUERY) != 0);
+            if (1..scene.states.len()).any(lit) {
+                let mut bases: Vec<u32> = scene.instances[..built.static_instances].iter().filter(|i| i.pickable).map(|i| i.pick_base).collect();
+                bases.sort_unstable();
+                let again: Vec<noshape_render::Instance> = scene.instances[..built.static_instances]
+                    .iter()
+                    .filter(|i| i.pickable && !i.pick_only && !i.back_silhouette && matches!(i.drawable, noshape_render::Drawable::Lines(_)))
+                    .filter(|i| {
+                        let next = bases.iter().copied().find(|&b| b > i.pick_base).map_or(scene.states.len(), |b| b as usize + 1);
+                        (i.pick_base as usize + 1..next.min(scene.states.len())).any(lit)
+                    })
+                    .map(|i| {
+                        let mut i = i.clone().unpickable().selected_only();
+                        i.compare = noshape_render::scene::compare::POST;
+                        i
+                    })
+                    .collect();
+                scene.instances.extend(again);
+            }
             scene.instances.extend(base.scene.instances[..base.static_instances].iter().cloned().map(|mut i| {
                 i.pickable = false;
                 // Past any highlight state.
@@ -5891,6 +5912,8 @@ impl PartStudioView {
             .items_center()
             // Live (dom/cursors.txt): the default arrow, also while dragging.
             .when(!self.ui.rollback_tip_off, |d| d.tip("Rollback bar", crate::ui::TipSide::Below))
+            // Its name for the parity suite while the tip is off too (uip rollback-bar-drag: the second drag found no bar).
+            .when(self.ui.rollback_tip_off, |d| crate::ui_script::mark(d, || "button:Rollback bar".into()))
             .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
                 if !*hovered && this.ui.rollback_tip_off {
                     this.ui.rollback_tip_off = false;
@@ -6640,7 +6663,15 @@ impl PartStudioView {
             m = m.item(suppress);
             // Live feature-menu-configure-suppression: Dynamic suppression, then Configure suppression.
             m = dynamic(m, window, cx);
-            if let Some(input) = first_config_input.clone() {
+            let suppression_configured = view.read(cx).studio(cx).is_some_and(|s| s.configuration.configured.iter().any(|c| c.feature == id && c.param == noshape_model::configuration::SUPPRESSED_PARAM));
+            if suppression_configured {
+                // Live rollto-menus (11-20): a feature whose suppression is configured offers Unconfigure suppression instead.
+                m = m.item(item("Unconfigure suppression", Box::new(move |this, _, cx| {
+                    this.edit_config(noshape_ops::config::UNCONFIGURE_PARAMETER, cx, |ps| {
+                        noshape_ops::config::unconfigure_parameter(ps, id, noshape_model::configuration::SUPPRESSED_PARAM);
+                    });
+                })));
+            } else if let Some(input) = first_config_input.clone() {
                 // Configure suppression adds the feature to the configuration table.
                 let name = feature_name.clone();
                 m = m.item(item("Configure suppression", Box::new(move |this, _, cx| {

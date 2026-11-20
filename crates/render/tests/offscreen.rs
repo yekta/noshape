@@ -2295,6 +2295,59 @@ fn preview_highlights_stay_whole_over_the_mix() {
     assert!(plain.0 < 160, "an untagged line under the new body shows at the mix: {plain:?}");
 }
 
+/// A selected-only line instance in a preview's top layer (the picked edges, compare::POST) draws its selected
+/// line whole over the new body and nothing of the others (live flange-handle-1120: the picked edge bright orange
+/// through the flange's wall).
+#[test]
+fn a_previews_picked_edge_stays_whole_over_the_mix() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (w, h) = (400u32, 300u32);
+    let floor = Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.03, -0.03, -0.002], [0.03, 0.03, 0.0], 0)))).with_color([0.6, 0.6, 0.6, 1.0]).compare_layer(compare::BASE);
+    let floor_too = floor.clone().compare_layer(compare::TARGET);
+    let boss = Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.01, -0.01, 0.0], [0.01, 0.01, 0.01], 0)))).with_color([0.2, 0.35, 0.5, 1.0]).compare_layer(compare::TARGET);
+    // Two edges under the new body: the first picked.
+    let mut line = LineData::default();
+    line.push_polyline(&[[-0.008, 0.0, 0.0], [0.008, 0.0, 0.0]], [20, 20, 24, 255], 1, 1.25, 0);
+    line.push_polyline(&[[-0.008, -0.005, 0.0], [0.008, -0.005, 0.0]], [20, 20, 24, 255], 2, 1.25, 0);
+    let edges = Instance::new(Drawable::Lines(r.upload_lines(&line))).with_color([0.0, 0.0, 0.0, 1.0]);
+    let again = edges.clone().unpickable().selected_only().compare_layer(compare::POST);
+    let mut cam = Camera::default();
+    cam.set_view(StandardView::Top);
+    cam.fit_box(glam::DVec3::new(-0.03, -0.03, 0.0), glam::DVec3::new(0.03, 0.03, 0.01), w as f64 / h as f64);
+    let style = Style::default();
+    let mut render = |with_again: bool| {
+        let mut instances = vec![floor.clone(), floor_too.clone(), boss.clone(), edges.clone()];
+        instances.extend(with_again.then(|| again.clone()));
+        let mut scene = Scene { instances, preview_mix: Some(0.7), ..Default::default() };
+        scene.states = vec![0; 3];
+        scene.states[1] = state::SELECTED;
+        r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &style, pick: false }).unwrap().bgra
+    };
+    let (f, plain) = (render(true), render(false));
+    let rgb = |x: u32, y: u32| {
+        let o = ((y * w + x) * 4) as usize;
+        [f[o + 2], f[o + 1], f[o]]
+    };
+    // Live's selection amber (Style::select_color, #FFA90A): the band's opaque rim.
+    let near = |p: [u8; 3]| (p[0] as i32 - 255).abs() <= 12 && (p[1] as i32 - 169).abs() <= 12 && (p[2] as i32 - 10).abs() <= 12;
+    let (cx, cy) = (w / 2, h / 2);
+    let band: Vec<[u8; 3]> = (cy - 4..cy + 5).map(|y| rgb(cx, y)).collect();
+    assert!(band.iter().any(|&p| near(p)), "the picked edge lost its colour under the new body: {band:?}");
+    // The other edge isn't drawn again: away from the picked one the frame is as without the copy.
+    let changed = (0..h).filter(|y| y.abs_diff(cy) > 4).filter(|&y| (0..w).any(|x| {
+        let o = ((y * w + x) * 4) as usize;
+        f[o..o + 3] != plain[o..o + 3]
+    })).count();
+    assert_eq!(changed, 0, "rows changed away from the picked edge (the edge not picked drawn again)");
+}
+
 /// Label quads and shadows are drawn like GPUI draws a div with
 /// `.rounded(4).border_1().shadow_xs()` (overlay.wgsl `fs_quad` /
 /// `fs_shadow`): solid background inside, the full border color on the

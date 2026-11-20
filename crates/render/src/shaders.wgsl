@@ -997,6 +997,12 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     let half_vp = g.viewport.xy * 0.5;
     let pick = global_pick(l.pick);
     let st = (state_of(pick) | state_add) & state_mask;
+    // params.x bit 2 (Instance::selected_only): only its selected or query-lit lines.
+    if ((inst.params.x & 4u) != 0u && (st & (SELECTED | QUERY)) == 0u) {
+        var gone: LineOut;
+        gone.pos = vec4(0.0, 0.0, -2.0, 1.0);
+        return gone;
+    }
     var width = l.width * inst.extra.x + g.viewport.w;
     // Live (selection/03, 06b, 07b): highlighted edges and face outlines
     // put ~3.5–4.5 px of colour down (4 px here at the default width).

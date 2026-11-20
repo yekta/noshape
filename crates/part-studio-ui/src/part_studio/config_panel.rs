@@ -2683,7 +2683,7 @@ impl PartStudioView {
             .child(div().debug_selector(|| "cfgbox-title".into()).text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Configurations"))
             .child(div().debug_selector(|| "cfgbox-split".into()).child(split));
         // Live cfglabel-1120: the inputs are a pane under the title, rows 2 px in and 5 px short of the pane's right
-        // edge, Chrome's scrollbar there once they overflow (rows x 42..220 in a 200 px panel at x 40).
+        // edge, Chrome's scrollbar there once they overflow (rows x 42..220, the panel at x 40..245).
         let overflow = self.ui.cfg_box_overflow.get();
         let bar_w = gpui_kit::component::menu::NATIVE_SCROLLBAR_WIDTH;
         let mut col = v_flex().pl(px(2.)).pr(px(5. + if overflow { bar_w } else { 0. }));
@@ -2821,6 +2821,9 @@ impl PartStudioView {
                 .debug_selector(|| "cfg-box".into())
                 .relative()
                 .flex_none()
+                // Live cfglabel-1120 (qa psui5): title and rows end 5 px further in than the panel's other boxes (the
+                // split button 10 px from the border, rows to x 220 in a 205 px panel); the line runs full width.
+                .pr(px(5.))
                 .border_b_1()
                 .border_color(pal.border)
                 .child(title)

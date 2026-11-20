@@ -5046,9 +5046,14 @@ impl PartStudioView {
         cx.notify();
     }
 
-    fn paste_sketch_entities(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// `follow`: Ctrl+V's copy follows the pointer until a click (live R6); the menu's stays where it lands, with the
+    /// Transform tool on it (live uip sketch-entity-copy-paste: a click on it keeps the tool and the pick).
+    fn paste_sketch_entities(&mut self, follow: bool, window: &mut Window, cx: &mut Context<Self>) {
         let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) else { return };
         if self.with_sketch(cx, |ed, data| ed.paste_clipboard(data, &text)) == Some(true) {
+            if !follow && let Some(ed) = self.sketch.as_mut() {
+                ed.paste_follow = None;
+            }
             self.regen_sync(window, cx);
         }
         cx.notify();
@@ -5316,7 +5321,7 @@ impl PartStudioView {
             if let Some(r) = plane_ref.clone().filter(|_| n == 0 && !tool_active) {
                 let (rh, ro, rs, rz, rn, rf) = (r.clone(), r.clone(), r.clone(), r.clone(), r.clone(), r);
                 if has_clip {
-                    m = m.item(item("Paste sketch entities", Box::new(|this, w, cx| this.paste_sketch_entities(w, cx))));
+                    m = m.item(item("Paste sketch entities", Box::new(|this, w, cx| this.paste_sketch_entities(false, w, cx))));
                 }
                 m = m
                     .item(item(&format!("Hide {plane_name}"), Box::new(move |this, _, cx| {
@@ -5369,7 +5374,7 @@ impl PartStudioView {
             }
             if only_endpoints {
                 if has_clip {
-                    m = m.item(item("Paste sketch entities", Box::new(|this, w, cx| this.paste_sketch_entities(w, cx))));
+                    m = m.item(item("Paste sketch entities", Box::new(|this, w, cx| this.paste_sketch_entities(false, w, cx))));
                 }
             } else if n > 0 {
                 m = m.item(item("Copy sketch entities", Box::new(move |this, _, cx| {
@@ -5385,7 +5390,7 @@ impl PartStudioView {
                     }
                 })));
                 if has_clip {
-                    m = m.item(item("Paste sketch entities", Box::new(|this, w, cx| this.paste_sketch_entities(w, cx))));
+                    m = m.item(item("Paste sketch entities", Box::new(|this, w, cx| this.paste_sketch_entities(false, w, cx))));
                 }
                 if !tool_active {
                     m = m.item(item("Transform sketch entities", Box::new(|this, _, cx| this.set_tool(Tool::Transform, cx))));
@@ -5405,7 +5410,7 @@ impl PartStudioView {
                 })));
             }
             if has_clip && n == 0 {
-                m = m.item(item("Paste sketch entities", Box::new(|this, w, cx| this.paste_sketch_entities(w, cx))));
+                m = m.item(item("Paste sketch entities", Box::new(|this, w, cx| this.paste_sketch_entities(false, w, cx))));
             }
             // Live (behaviours "qa4 round 5 s5 driven dims", a selected line,
             // SK-LINE-MENU): Construction | Extrude…, Revolve… | Hide other
@@ -5693,7 +5698,7 @@ impl PartStudioView {
                 cx.stop_propagation();
             }))
             .capture_action(cx.listener(|this, _: &Paste, window, cx| {
-                this.paste_sketch_entities(window, cx);
+                this.paste_sketch_entities(true, window, cx);
                 cx.stop_propagation();
             }))
             .on_action(cx.listener(|this, _: &SketchLine, _, cx| this.set_tool(Tool::Line, cx)))

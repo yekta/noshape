@@ -4366,7 +4366,9 @@ pub fn shown_length(f: &Feature, id: &str, units: &UnitPrefs, vars: &std::collec
         _ => noshape_units::Dim::LENGTH,
     };
     let q = noshape_units::evaluate_as(&e.text, dim, units, vars).ok()?;
-    Some(noshape_units::format_quantity(q, units))
+    let shown = noshape_units::format_quantity(q, units);
+    // A name reads degrees as "deg" (live variable-type-angle: "#wall_thickness = 0 deg").
+    Some(if dim == noshape_units::Dim::ANGLE { dialog_angle_text(&shown) } else { shown })
 }
 
 /// Feature schemas are static (registry), so array item specs live forever.
@@ -4991,5 +4993,19 @@ mod angle_text_tests {
         assert_eq!(dialog_angle_text("2.5 °"), "2.5 deg");
         assert_eq!(dialog_angle_text("5 deg"), "5 deg");
         assert_eq!(dialog_angle_text("#a + 1°"), "#a + 1°");
+    }
+
+    /// Live variable-type-angle: a Variable switched to Angle is named "#wall_thickness = 0 deg" (was "0°").
+    #[::core::prelude::v1::test]
+    fn an_angle_variables_name_reads_deg() {
+        use super::{Feature, FeatureId, ParamValue, ParamValues};
+        let mut params = ParamValues::default();
+        params.set("name", ParamValue::Text("wall_thickness".into()));
+        params.set("variableType", ParamValue::Enum("ANGLE".into()));
+        params.set("angleValue", ParamValue::Expr(noshape_units::ExprValue::new("30 deg")));
+        let f = Feature { id: FeatureId(1), type_id: "assignVariable".into(), name: "Variable 1".into(), suppressed: false, params, folder: None, custom_name: false, hidden: false, suppression_expr: None, sub_features: Vec::new() };
+        let units = super::UnitPrefs::default();
+        let name = noshape_model::interaction::display_name_computed(&f, &|k| super::shown_length(&f, k, &units, &Default::default()));
+        assert_eq!(name, "#wall_thickness = 30 deg");
     }
 }

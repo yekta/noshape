@@ -1612,6 +1612,14 @@ fn a_linear_patterns_instance_previews_once_its_direction_is_picked(cx: &mut Tes
     // instance shows see-through.
     let mix = cx.update(|cx| view.read(cx).viewport.read(cx).scene().preview_mix);
     assert_eq!(mix, Some(crate::feature_dialog::PREVIEW_REST), "the preview blended at rest over the scene before it");
+    // Live flange-handle-1120 (qa psui5): the picked edge drawn again, whole, over the mix (its edge lines, only their
+    // lit ones), so the new body doesn't dim it.
+    let again = cx.update(|cx| {
+        let v = view.read(cx);
+        let scene = v.viewport.read(cx).scene();
+        scene.instances.iter().filter(|i| i.selected_only && i.compare == noshape_render::scene::compare::POST && matches!(i.drawable, noshape_render::Drawable::Lines(_))).count()
+    });
+    assert!(again >= 1, "the part's edge lines drawn again over the preview for the picked edge");
 }
 
 /// Live2 pattern-hole-1118 (P0): the Hole's style tabs: Counterbore adds its diameter and depth rows (10 mm, 5 mm),

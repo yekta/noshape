@@ -289,8 +289,8 @@ pub struct Instance {
     /// white by this much in sRGB, as a see-through layer over a white page
     /// looks, while still hiding what is behind (0: off).
     pub ghost: f32,
-    /// Draws only its selected faces (state SELECTED): the selection drawn
-    /// again over what is see-through (see [`Instance::selected_only`]).
+    /// Draws only its selected faces (state SELECTED), or of lines its
+    /// selected and query-lit ones (see [`Instance::selected_only`]).
     pub selected_only: bool,
     /// A decal on a selected face: the image mixed 0.4 toward the selection
     /// amber (see [`Instance::decal_selected`]).
@@ -624,7 +624,8 @@ impl Instance {
     /// Draw only the selected faces: with an alpha and over_transparent, the
     /// selection shows through the datum planes in front of it as live's
     /// (selection/04: a selected face under a plane (229,170,56), the plane
-    /// alone would give (224,174,73)).
+    /// alone would give (224,174,73)). Lines: only the selected or query-lit
+    /// ones (a preview's picked edges drawn whole over its mix).
     pub fn selected_only(mut self) -> Self {
         self.selected_only = true;
         self

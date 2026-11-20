@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-20 18:56 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-20 19:00 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -59,7 +59,36 @@ docs/DECISIONS.md (read first; it wins over anything here).
    Tools vibex6 ~/agents/psui-keep: ab9/10/11.sh, hf3t.sh, hfeel-t.py, hovtrace.py, hovtrace2.py (+ DIAG lines from
    the trace patch /root/psui-scratch/diag2.py: NOSHAPE_NOTIFY_TRACE, never land); docs in ~/tmp/psui (850efe
    bb49db4ceba0762c, de4eff 874aef1a8b008b1b, impeller 844c39ce20497196, block cc4a172465de10c6).
-4. Flange handle vs live flange-handle-1120: the orange inside the heads is the selected edge seen through the hollow
+4. NOW (lead 18:5x): every Part Studio uip scenario that still differs (feature dialogs, feature list, sketch chrome,
+   view cube, filters), most-used first; report the count before / after. Sources: qa 14:47 run on 0a0b9a49
+   (/root/qa-scratch/suites/1120-1447-0a0b9a49/uip.log; it has a5505f50's select regression, none of the fixes) and
+   the night runs (1120-0407-81d23c9b, 1120-night-ui-a06ec927). The 33 Part Studio names: /root/psui-scratch/ps-names.txt;
+   rerun on main via uip-some.sh on vibex8 -> ~/tmp/psui/ps1 (log /root/psui-scratch/ps1.log) = the "before":
+   4/33 differ on eb8aae4fb (rollback-bar-drag, sketch-dimension-variable, sketch-entity-copy-paste,
+   variable-type-angle); the 14:47 run's other 12 + 5 not run all match now. "After": rerun once this batch lands.
+   - P0 (lead 20:0x): macOS CI failed a_cleared_hover_shows_the_frame_drawn_before_without_drawing (reused 0
+     frames): T2'd from worktree /root/projects/noshape-wt/psui-p0 (branch agent/psui-p0), QUEUED 81b0fa91 20:11.
+     Diagnose on the Mac after 21:35 (frame_key / in_flight / readback); remove psui-p0 once landed.
+   - variable-type-angle: title "0°" vs live "0 deg": fixed (uncommitted) in feature_dialog `shown_length`
+     (dialog_angle_text), test angle_text_tests::an_angle_variables_name_reads_deg (run163).
+   - sketch-dimension-variable: live's take is broken (no dimension placed; "#width" typed into shortcuts): retake
+     asked of live in REQUESTS 19:00.
+   - FEEL-ROW-MENU-ROLL-TO-HERE: live answered 19:0x (live/dm/rollto-menus.json): Roll to here on every row but the
+     last, after Show dependencies… = ours already (roll_items). New from it: "Unconfigure suppression" for a feature
+     whose suppression is configured: added (uncommitted) in the row menu + coverage.rs line + list matrix row
+     "menu / configured suppression" (run163). Open: "Section view…" on Extrude 1's row but not Extrude 2's: asked of
+     live in REQUESTS 19:11.
+   - Sheet metal titleState errors (bend-alignment-hold-line, hem-in-place-closed, bend/jog-new-edit-reedit,
+     bend-angle-align-to-geometry) are skasm's features.
+   - rollback-bar-drag: after a drop the bar's tip is off (FEEL-ROLLBACK-DROP-ROW), and with it its driver name
+     "button:Rollback bar": now marked while the tip is off too (uncommitted, mod.rs render_rollback_bar).
+   - sketch-entity-copy-paste: a menu paste no longer follows the pointer (Ctrl+V still does, R6); Transform keeps a
+     picked entity clicked again (inferred from this take only). Test sketch_mode a_menu_paste_stays_... (run163).
+   - qa 19:2x: FEEL-CONFIG-BOX-WIDTH reopened (5 px): cfg-box pr(5) (title split 10 px from the border, rows to 220);
+     test the_configurations_box_stays_one_input_tall_with_two. FEEL-FLANGE-EDGE-BEHIND-WALL: a preview's picked edge
+     lines drawn again (selected_only line instances, compare::POST; line shader bit 2); tests offscreen
+     a_previews_picked_edge_stays_whole_over_the_mix + the linear-pattern preview test (run163).
+4b. Flange handle vs live flange-handle-1120: the orange inside the heads is the selected edge seen through the hollow
    heads: nothing more to draw.
 5. Cleanup done 18:56 (vibex6 A/B binaries and hf/, vibex8 target/release).
    Not to build: 3D Sketch, Fault analysis.

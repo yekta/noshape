@@ -465,6 +465,22 @@ fn rows() -> Vec<Row> {
             l.right_click(cx, "feature:Extrude 1");
             expect(l.menu(cx), names(&["Rename", "Edit…", "Edit Sketch 1…", "Show dimensions", "Add selection to folder…", "Suppress", "Dynamic suppression", "Zoom to selection", "Clear selection", "Show dependencies…", "Roll to here", "Add appearance to feature…", "Delete"]), "rows")
         } },
+        Row { id: "menu / configured suppression", live: "a feature whose suppression is configured: Unconfigure suppression where Configure suppression was (live rollto-menus 11-20)", gap: false, check: |l, cx| {
+            l.view.update(cx, |v, cx| {
+                let fid = v.studio(cx).and_then(|s| s.features.iter().find(|f| f.name == "Extrude 1").map(|f| f.id)).expect("Extrude 1");
+                v.edit_config("configure", cx, |ps| {
+                    let input = noshape_ops::config::add_input(ps, "Checkbox");
+                    noshape_ops::config::configure_parameter(ps, fid, noshape_model::configuration::SUPPRESSED_PARAM, &input);
+                });
+            });
+            l.right_click(cx, "feature:Extrude 1");
+            let rows = l.menu(cx);
+            expect((rows.iter().any(|r| r == "Unconfigure suppression"), rows.iter().any(|r| r == "Configure suppression")), (true, false), &format!("rows {rows:?}"))?;
+            l.keys(cx, "escape");
+            l.right_click(cx, "feature:Extrude 2");
+            let rows = l.menu(cx);
+            expect((rows.iter().any(|r| r == "Unconfigure suppression"), rows.iter().any(|r| r == "Configure suppression")), (false, true), &format!("Extrude 2's rows {rows:?}"))
+        } },
         Row { id: "menu / a feature and a part, on the part", live: "the one-part menu without Copy Part 2", gap: false, check: |l, cx| {
             l.click(cx, "feature:Extrude 1", NONE);
             l.click(cx, "part:Part 2", NONE);

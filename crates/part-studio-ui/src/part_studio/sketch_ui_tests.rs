@@ -7145,15 +7145,17 @@ fn the_configurations_box_stays_one_input_tall_with_two(cx: &mut TestAppContext)
     })));
     let two = box_h(cx);
     assert!((one - two).abs() < px(0.5), "one input {one:?}, two {two:?}");
-    // Live cfglabel-1120: a 45 px pane under the title; its rows 2 px in and 20 px short of its right edge (Chrome's
-    // scrollbar and 5 px), the List's row 178 px in a 200 px panel.
+    // Live cfglabel-1120: a 45 px pane under the title; its rows 2 px in and 25 px short of the box's right edge
+    // (Chrome's scrollbar, 5 px each side of it; qa psui5: rows 42..220, the border at 245), the split button 10 px.
     draw(cx, window);
     let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
     let pane = vcx.debug_bounds("cfg-box").expect("the box drawn");
     let label = vcx.debug_bounds(Box::leak(format!("cfgbox-label-{list}").into_boxed_str())).expect("the List's label");
     let field = vcx.debug_bounds(Box::leak(format!("cfgbox-field-{list}").into_boxed_str())).expect("the List's field");
     assert!((label.left() - pane.left() - px(2.)).abs() < px(0.5), "rows 2 px in: {:?} in {:?}", label, pane);
-    assert!((pane.right() - field.right() - px(20.)).abs() < px(0.5), "rows 20 px short (the scrollbar): {:?} in {:?}", field, pane);
+    assert!((pane.right() - field.right() - px(25.)).abs() < px(0.5), "rows 25 px short (the scrollbar): {:?} in {:?}", field, pane);
+    let split = vcx.debug_bounds("cfgbox-split").expect("the split button");
+    assert!((pane.right() - split.right() - px(10.)).abs() < px(0.5), "the split button 10 px from the border: {:?} in {:?}", split, pane);
     assert!(cx.update(|cx| view.read(cx).ui.cfg_box_overflow.get()), "the second input scrolls");
 }
 

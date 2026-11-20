@@ -2864,6 +2864,9 @@ impl SketchEditor {
             Tool::LinearPattern | Tool::CircularPattern | Tool::Transform => {
                 match hovered {
                     Some(e) if data.text_of_entity(e).is_some() && !is_point(&data.sketch, e) => self.toggle_text_selection(data, e),
+                    // Transform keeps a picked entity clicked again (live uip sketch-entity-copy-paste: a click on the
+                    // pasted line leaves it selected, the tool on).
+                    Some(e) if self.tool == Tool::Transform && self.selection.contains(&e) => {}
                     Some(e) => {
                         if let Some(pos) = self.selection.iter().position(|x| *x == e) {
                             self.selection.remove(pos);
@@ -13049,6 +13052,26 @@ mod tests {
         assert!((mid(&d) - v(0.04, 0.03)).length() < 1e-9);
         assert!(!ed.pointer_move(&mut d, v(0.06, 0.01), false, false).changed, "placed: it stays");
         assert!((d.sketch.curve(l).unwrap().start_point() - v(0.0, 0.0)).length() < 1e-12, "the original never moves");
+    }
+
+    /// Live uip sketch-entity-copy-paste: a copy pasted from the menu stays where it lands; a click on it keeps it
+    /// selected and the Transform tool on.
+    #[test]
+    fn a_menu_paste_stays_and_a_click_on_it_keeps_the_tool() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let l = d.sketch.add_line(v(0.0, 0.0), v(0.03, 0.0));
+        ed.selection = vec![l];
+        let clip = ed.copy_selection(&d).unwrap();
+        ed.pointer_move(&mut d, v(0.015, 0.02), false, false);
+        assert!(ed.paste_clipboard(&mut d, &clip));
+        ed.paste_follow = None;
+        let copy = ed.selection[0];
+        let mid = |d: &SketchData| d.sketch.curve(copy).map(|c| (c.start_point() + c.end_point()) * 0.5).unwrap();
+        assert!(!ed.pointer_move(&mut d, v(0.04, 0.03), false, false).changed, "it doesn't follow");
+        ed.pointer_move(&mut d, v(0.015, 0.02), false, false);
+        click(&mut ed, &mut d, v(0.015, 0.02));
+        assert_eq!((ed.tool, ed.selection.clone(), count(&d, EntityKind::Line)), (Tool::Transform, vec![copy], 2));
+        assert!((mid(&d) - v(0.015, 0.02)).length() < 1e-9, "where it landed: {}", mid(&d));
     }
 
     /// qa4 round 5 v3 s6 with live's answers: Normal takes either pick

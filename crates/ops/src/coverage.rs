@@ -518,6 +518,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Configure", Op("config_configure")),
     ("partStudio:Configure appearance", Op("part_configured_properties")),
     ("partStudio:Configure suppression", Op("config_configure")),
+    ("partStudio:Unconfigure suppression", Op("config_configure")),
     ("partStudio:Confirm spline", Op("sketch_draw")),
     ("partStudio:Convert to checkbox", Op("feature_edit")),
     ("partStudio:Convert to expression", Op("feature_edit")),
