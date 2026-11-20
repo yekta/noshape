@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 05:21 UTC.
+Updated 2026-11-20 05:17 UTC.
 
 ## In flight
 
@@ -49,13 +49,13 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
    frame comes back (drawing_view `FrameCam`; qa rechecks D3 timing quiet). Custom table › Add: the Insert view
    chooser in a studio mode ("Select a Part Studio", Part Studios only, 40 px right of the dialog), Other documents
    real (`drawing_custom_table` `document` / `version`; the kind's `version` an ExternalRef key).
-3. Custom table picker leftovers (live answered 11-20 05:04, behaviours "studios (11-20): configured studio rows in
-   drawing choosers", live/drawing/cfg-choosers-1120/): a configured studio's row has a › chevron (expands one row
-   per configuration input inline: label left, full-width select; a non-default value relabels it "Size: (Default:
-   Small)"), and right an insert icon (tooltip "Set to last viewed configuration") + ▾ (Set to last viewed | Reset to
-   default); a name click closes the chooser and adds the studio. Needs the custom table kind's configuration
-   (TableKind::Custom has none), its evaluation, the op's `configuration`. Insert view's tab not captured.
-   The scenario drw-custom-table-add is recorded (tests/ui-parity/live/, 10/10).
+3. Local (11-20 05:17, after 3a462952): qa's DRW-DIALOG-FIRST-FOCUS (first_field / first_due / first_lit in
+   drawing_view; View properties' orientation and Move to sheet's Sheet), DRW-EXPORT-HIDE-INSPECTION-SIZE (labels
+   75 px, native 13 px box), BRAND-IN-UI-TEXT's Version / Workspace Category; Custom table › Add's configured studios
+   (chooser config_expander / config_buttons / config_rows, ChooserState::studio_config, TableKind::Custom `config`,
+   op `configuration`, drawing_hooks::last_viewed_config); `configuration: null` now reaches the ops (Args::get drops
+   nulls: read a.value). Insert view's Part Studios tab for configured studios: not captured by live yet.
+   Next: our run of drw-custom-table-add (live recorded 10/10) to compare, then the matrix.
 4. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
