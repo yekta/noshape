@@ -256,6 +256,69 @@ pub fn wall_loops(w: &Shape, t_out: f64, t_in: f64) -> FResult<(Shape, Shape)> {
     Ok((outer, inner))
 }
 
+/// [`wall_loops`] of a polygon lofted between planar sides (`sides`): each edge offset in its plane so that the wall's
+/// face lies `t_out` / `t_in` off its side along the side's normal, as live's thin loft (c2-opt-loft-periodic-trim-thin's
+/// Loft 2, 30 to 20 mm squares 40 mm apart, 2 mm out: an outer square of 34.031 mm, not 34). None when an edge isn't a
+/// line on one planar side.
+pub fn normal_wall_loops(w: &Shape, sides: &Shape, t_out: f64, t_in: f64) -> Option<(Shape, Shape)> {
+    let n0 = wire_frame(w).ok()?.normal;
+    let mut segs: Vec<(DVec3, DVec3)> = w
+        .edges()
+        .iter()
+        .map(|e| e.edge_info().ok().filter(|i| matches!(i.curve, k::Curve::Line { .. })).map(|i| (i.start, i.end)))
+        .collect::<Option<_>>()?;
+    // The corners in order, counter-clockwise about the plane's normal.
+    let (a, b) = segs.pop()?;
+    let mut poly = vec![a, b];
+    while !segs.is_empty() {
+        let last = *poly.last()?;
+        let i = segs.iter().position(|(p, q)| p.distance(last) < 1e-9 || q.distance(last) < 1e-9)?;
+        let (p, q) = segs.swap_remove(i);
+        poly.push(if p.distance(last) < 1e-9 { q } else { p });
+    }
+    if poly.len() < 4 || poly[0].distance(*poly.last()?) > 1e-9 {
+        return None;
+    }
+    poly.pop();
+    let n = poly.len();
+    if (0..n).map(|i| poly[i].cross(poly[(i + 1) % n]).dot(n0)).sum::<f64>() < 0.0 {
+        poly.reverse();
+    }
+    let planes: Vec<k::Plane> = sides.faces().iter().filter_map(|f| f.face_plane().ok().flatten()).collect();
+    // Per edge: its direction, outward in the plane, and the in-plane offset of a unit offset of its side.
+    let edges: Vec<(DVec3, DVec3, DVec3, f64)> = (0..n)
+        .map(|i| {
+            let (a, b) = (poly[i], poly[(i + 1) % n]);
+            let dir = (b - a).normalize();
+            let out = dir.cross(n0);
+            let mut on = planes.iter().filter(|q| q.normal.dot(n0).abs() < 1.0 - 1e-9 && [a, b].iter().all(|p| (*p - q.origin).dot(q.normal).abs() < 1e-8));
+            let q = on.next()?;
+            if on.any(|o| o.normal.cross(q.normal).length() > 1e-9) {
+                return None;
+            }
+            let nf = q.normal * q.normal.dot(out).signum();
+            let m = (nf - n0 * nf.dot(n0)).length();
+            (m > 1e-9).then_some((a, dir, out, 1.0 / m))
+        })
+        .collect::<Option<_>>()?;
+    let ring = |t: f64| -> Option<Shape> {
+        if t == 0.0 {
+            return Some(w.clone());
+        }
+        let line = |i: usize| (edges[i].0 + edges[i].2 * (t * edges[i].3), edges[i].1);
+        let corners: Vec<DVec3> = (0..n)
+            .map(|i| {
+                let ((ap, dp), (ac, dc)) = (line((i + n - 1) % n), line(i));
+                let den = dc.cross(dp).dot(n0);
+                (den.abs() > 1e-12).then(|| ac - dc * ((ac - ap).cross(dp).dot(n0) / den))
+            })
+            .collect::<Option<_>>()?;
+        let lines: Vec<Shape> = (0..n).map(|i| k::make_line(corners[i], corners[(i + 1) % n])).collect::<Result<_, _>>().ok()?;
+        k::make_wire(&lines).ok()
+    };
+    Some((ring(t_out)?, ring(-t_in)?))
+}
+
 /// Thin wall around a closed loop.
 fn closed_wall(frame: &PlaneFrame, w: &Shape, sources: &[SourcedEdge], t_out: f64, t_in: f64, key: Source) -> FResult<Profile> {
     let (mut outer, mut inner) = wall_loops(w, t_out, t_in)?;

@@ -1221,6 +1221,30 @@ fn projected_curves_both_modes() {
     assert!(near(l1, (0.04f64.powi(2) + 0.02f64.powi(2)).sqrt(), 1e-6), "two-sketch length {l1}");
 }
 
+/// Projected curve, two sketches (c2-projected-curve-enclose): an ellipse on Top (50 × 30 mm radii, major along y)
+/// and an arc on Right ending at y ±50 on Top: live's curve is two edges of 135.5088 mm, split only where it meets the
+/// arc's prism's ends (OCCT's section came in four pieces).
+#[test]
+fn a_two_sketch_projection_is_one_edge_between_the_profiles_ends() {
+    let mut s = Studio::new();
+    let mut a = noshape_sketch::Sketch::new();
+    let arc = a.add_arc_angles(DVec2::new(0.0, -0.051177438302144385), 0.07154809704785862, 0.7970349983821571, 2.344557655207636);
+    let sa = s.sketch(Reference::Plane(DatumPlane::Right), a);
+    let mut b = noshape_sketch::Sketch::new();
+    let ell = b.add_ellipse(DVec2::ZERO, DVec2::new(0.0, 0.05), 0.03);
+    let sb = s.sketch(Reference::Plane(DatumPlane::Top), b);
+    s.add("projectCurves", move |p| {
+        p.set("curveProjectionType", ParamValue::Enum("TWO_SKETCHES".into()));
+        p.set("sketchEdges1", ParamValue::Query(vec![Reference::SketchEntity { sketch: sa, entity: arc.0 }]));
+        p.set("sketchEdges2", ParamValue::Query(vec![Reference::SketchEntity { sketch: sb, entity: ell.0 }]));
+    });
+    let r = s.ok();
+    let curve = r.context.bodies.iter().find(|b| b.kind == BodyKind::Wire).expect("the curve");
+    let lengths: Vec<f64> = curve.shape.edges().iter().map(|e| e.length().unwrap() * 1e3).collect();
+    assert_eq!(lengths.len(), 2, "{lengths:?}");
+    assert!(lengths.iter().all(|l| (l - 135.5088).abs() < 1e-3), "{lengths:?}");
+}
+
 #[test]
 fn boundary_routing_edit_isoparametric() {
     let mut s = block();
@@ -1566,6 +1590,37 @@ fn offset_curve_move_boundary_mutual_trim() {
     assert_eq!(r.context.bodies.len(), 3);
     let areas: Vec<f64> = (0..3).map(|i| surface_area(&r, i)).collect();
     assert_eq!(areas.iter().filter(|a| near(**a, 0.03 * 0.03, 1e-8)).count(), 2, "first set trimmed to 30 x 30 mm each: {areas:?}");
+}
+
+/// Split part by the part's own planar face, Use trimmed off (c2-body-draft-naming's Split 2 at a box's top under a
+/// boss): the cut and the face it came from are one face, as live's (the box 6/12/8, not the boss's footprint apart).
+#[test]
+fn a_split_by_its_own_top_face_leaves_the_box_whole() {
+    let block = noshape_kernel::make_box_corners(DVec3::new(0.0, 0.0, 0.0), DVec3::new(0.04, 0.03, 0.01)).unwrap();
+    let boss = noshape_kernel::make_box_corners(DVec3::new(0.015, 0.01, 0.01), DVec3::new(0.025, 0.02, 0.02)).unwrap();
+    let fused = noshape_kernel::boolean(noshape_kernel::BooleanOp::Fuse, &[block], &[boss], &Default::default()).unwrap();
+    let part = noshape_kernel::unify_same_domain(&fused.shape).unwrap().shape;
+    let brep = String::from_utf8(part.to_brep_bytes().unwrap()).unwrap();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let top = |f: &noshape_kernel::Shape| f.face_plane().ok().flatten().is_some_and(|pl| pl.normal.z > 0.5 && (pl.origin.z - 0.01).abs() < 1e-9);
+    let fi = b.shape.faces().iter().position(top).expect("the box's top");
+    let (id, face) = (b.id.clone(), Reference::Face((*b.faces[fi]).clone()));
+    s.add("splitPart", move |p| {
+        p.set("targets", ParamValue::Query(vec![Reference::Body(id)]));
+        p.set("tool", ParamValue::Query(vec![face]));
+        p.set("keepTools", ParamValue::Bool(true));
+        p.set("useTrimmed", ParamValue::Bool(false));
+    });
+    let r = s.ok();
+    let mut parts: Vec<(usize, usize, f64)> = r.context.bodies.iter().map(|b| (b.shape.faces().len(), b.shape.edges().len(), b.shape.volume().unwrap() * 1e9)).collect();
+    parts.sort_by(|a, b| a.2.total_cmp(&b.2));
+    assert_eq!(parts.len(), 2, "{parts:?}");
+    assert_eq!((parts[0].0, parts[0].1), (6, 12), "the boss: {parts:?}");
+    assert_eq!((parts[1].0, parts[1].1), (6, 12), "the box: {parts:?}");
+    assert!((parts[0].2 - 1000.0).abs() < 1e-3 && (parts[1].2 - 12000.0).abs() < 1e-3, "{parts:?}");
 }
 
 /// Mesh parts in booleans and splits (live G35/G35-retry): a split by a plane

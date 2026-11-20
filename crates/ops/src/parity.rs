@@ -1289,6 +1289,7 @@ impl<'a> Translator<'a> {
                 None => param("standardTappedOrClearance").is_some_and(|p| p["value"]["standard"] == "ANSI"),
             }
         };
+        let legacy_version = ty == "hole" && f["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"] == "holeVersion" && p["value"] == "LEGACY");
         let legacy_table = (ty == "hole" && !is_v2).then(|| {
             let value = |id: &str| f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == id).and_then(|p| p["value"].as_str());
             match (legacy_inch, value("style").is_none_or(|s| s == "SIMPLE")) {
@@ -1324,7 +1325,9 @@ impl<'a> Translator<'a> {
             };
             // A legacy parameter beside its newer version (Hole `style` /
             // `styleV2`): the newer one counts.
-            if ty == "hole" && (given.contains(&format!("{id}V2").as_str()) || given.contains(&format!("{id}V3").as_str())) {
+            // (A LEGACY hole runs on the unsuffixed ones: `upgrade` maps them.)
+            let legacy_value = legacy_version && LEGACY_HOLE_VALUES.contains(&id);
+            if ty == "hole" && !legacy_value && (given.contains(&format!("{id}V2").as_str()) || given.contains(&format!("{id}V3").as_str())) {
                 continue;
             }
             if !known.iter().any(|n| n == id) && ty == "hole" {
@@ -1340,7 +1343,7 @@ impl<'a> Translator<'a> {
                     continue;
                 }
                 let stem = id.trim_end_matches("V2");
-                if given.contains(&format!("{stem}V3").as_str()) || given.contains(&format!("{stem}V2").as_str()) && known.iter().any(|n| *n == format!("{stem}V2")) {
+                if !legacy_value && (given.contains(&format!("{stem}V3").as_str()) || given.contains(&format!("{stem}V2").as_str()) && known.iter().any(|n| *n == format!("{stem}V2"))) {
                     continue;
                 }
             }
@@ -2394,7 +2397,7 @@ impl<'a> Translator<'a> {
                     let own_sub = |q: &Value| q["featureId"].as_str().is_some_and(|f| self.sub_points.contains_key(f) || self.sub_params.contains_key(f));
                     // (Nor one whose text names a sketch entity of ours: that entity (c2-surf-intro-simple's Revolve 1, Sketch 1's
                     // ellipse; by live's id it went to a region).)
-                    let named = |q: &Value| q["queryString"].as_str().is_some_and(|t| self.sketch_entity_from_query(t).is_some());
+                    let named = |q: &Value| q["queryString"].as_str().is_some_and(|t| self.sketch_entities_from_query(t).is_some());
                     let keep: Vec<bool> = queries.iter().map(|q| own_sub(q) || named(q)).collect();
                     for (n, q) in queries.iter_mut().enumerate().filter(|(n, q)| q["deterministicIds"].as_array().is_none_or(|a| a.is_empty()) && !keep[*n]) {
                         let mut own: Vec<String> = mine.iter().filter(|(_, m)| *m == Some(n)).map(|(id, _)| id.clone()).collect();
@@ -2709,8 +2712,8 @@ impl<'a> Translator<'a> {
         // Revolve 1 axis: the Axis sketch's line, not a construction point of the profile's sketch on it); a Mate
         // connector feature's connector too, not the vertex at its origin (c2-config-parts-linear-rail's Linear pattern
         // 1 along Mate connector 1).
-        if let Some(e) = q["queryString"].as_str().and_then(|t| self.sketch_entity_from_query(t).or_else(|| self.mate_connector_from_query(t))) {
-            return Ok(vec![e]);
+        if let Some(es) = q["queryString"].as_str().and_then(|t| self.sketch_entities_from_query(t).or_else(|| self.mate_connector_from_query(t).map(|e| vec![e]))) {
+            return Ok(es);
         }
         self.query_with(k, q, true)
     }
@@ -2838,9 +2841,16 @@ impl<'a> Translator<'a> {
         }
         // A Plane feature's plane (`dummyQuery(id+"F….planeOp", …)`, or packed: `DUMMY` of "F….planeOp"): ours, before any
         // line's geometry (live's refs read it as the plane body's face: c2-loft-guide-curves-wave-washer's Sketch 2 on
-        // Plane 1).
+        // Plane 1); not an edge or vertex a Split's plane imprinted (c2-opt-draft-pull-refillet's Draft 3 parting edges).
         let plane_op = text.split("id+\"").nth(1).and_then(|r| r.split(".planeOp\"").next()).filter(|f| !f.contains('"')).map(str::to_string);
-        if let Some(fid) = plane_op.or_else(|| packed_strings_of(text).iter().find_map(|s| s.strip_suffix(".planeOp").map(str::to_string)))
+        let packed_plane = || {
+            let strings = packed_strings_of(text);
+            if strings.iter().any(|s| s == "EDGE" || s == "VERTEX") {
+                return None;
+            }
+            strings.iter().find_map(|s| s.strip_suffix(".planeOp").map(str::to_string))
+        };
+        if let Some(fid) = plane_op.or_else(packed_plane)
             && let Some(ours) = self.feature_ids.get(&fid)
         {
             return Ok(vec![format!("fplane:{ours}")]);
@@ -2986,8 +2996,8 @@ impl<'a> Translator<'a> {
         if let Some(r) = self.region_from_query(text)? {
             return Ok(vec![r]);
         }
-        if let Some(e) = self.sketch_entity_from_query(text) {
-            return Ok(vec![e]);
+        if let Some(es) = self.sketch_entities_from_query(text) {
+            return Ok(es);
         }
         if let Some(r) = self.extrude_name_from_query(text) {
             return r.map(|e| vec![e]);
@@ -3030,6 +3040,21 @@ impl<'a> Translator<'a> {
                 return Ok(vec![format!("fplane:{ours}")]);
             }
         }
+        // qUnion([qContainsPoint(…), …]): each (c2-opt-sweep-lock-direction's Sweep 2 path, two sketch lines).
+        if let Some(items) = text.split_once("qUnion([").and_then(|(_, r)| top_level_items(r))
+            && items.len() > 1
+            && items.iter().all(|i| i.starts_with("qContainsPoint("))
+        {
+            let mut out: Vec<String> = Vec::new();
+            for i in items {
+                for e in self.query_with(k, &json!({ "queryString": format!("query={i};") }), use_ids)? {
+                    if !out.contains(&e) {
+                        out.push(e);
+                    }
+                }
+            }
+            return Ok(out);
+        }
         // qContainsPoint(…EntityType.EDGE / FACE / VERTEX…, vector(x, y, z) * unit),
         // or of qSketchRegion(makeId("F…")): the sketch's region holding the point.
         if let Some(rest) = text.split("qContainsPoint(").nth(1)
@@ -3048,7 +3073,10 @@ impl<'a> Translator<'a> {
             }
             let kind = ["EDGE", "FACE", "VERTEX"].into_iter().find(|k| rest.contains(&format!("EntityType.{k}"))).unwrap_or("EDGE");
             if c.len() == 3 {
-                let r = LiveRef { kind: kind.into(), point: Some([c[0] * scale, c[1] * scale, c[2] * scale]), ..Default::default() };
+                // Of a sketch's edges (qCreatedBy(makeId("F…"), EntityType.EDGE)): that sketch's curve there (c2-opt-sweep-twist-scale's
+                // paths, sketch lines on no part).
+                let sketch = rest.split("qCreatedBy(makeId(\"").nth(1).and_then(|r| r.split('"').next()).is_some_and(|f| self.sketch_entities.keys().any(|(s, _)| s == f));
+                let r = LiveRef { kind: kind.into(), point: Some([c[0] * scale, c[1] * scale, c[2] * scale]), sketch, ..Default::default() };
                 let key = (k, format!("point:{text}"));
                 self.refs.insert(key.clone(), r);
                 return self.by_geometry(k, &key.1).map(|e| vec![e]);
@@ -3090,9 +3118,12 @@ impl<'a> Translator<'a> {
         // sketch's own curves decide: a piece of a ring that the face's edge
         // split off is no inner loop (live motor-mount-jack's Extrude 3), a
         // piece of an inner region is.
-        // (Written `id + "F…"` or `id+"F…"`.)
+        // (Written `id + "F…"`, `id+"F…"` or `makeId("F…")`.)
         fn region_of(t: &str) -> Option<(&str, &str)> {
-            t.split("qSketchRegion(").skip(1).find_map(|r| r.trim_start().strip_prefix("id")?.trim_start().strip_prefix('+')?.trim_start().strip_prefix('"')?.split_once('"'))
+            t.split("qSketchRegion(").skip(1).find_map(|r| {
+                let r = r.trim_start();
+                r.strip_prefix("makeId(\"").or_else(|| r.strip_prefix("id")?.trim_start().strip_prefix('+')?.trim_start().strip_prefix('"'))?.split_once('"')
+            })
         }
         if let Some((sk, rest)) = region_of(text) {
             let ours = self.feature_ids.get(sk).cloned().ok_or_else(|| format!("sketch {sk} was not built"))?;
@@ -3100,7 +3131,7 @@ impl<'a> Translator<'a> {
             // (Not the face's imprinted pieces: sketch faces, not regions.)
             let regions: Vec<&Value> = g["regions"].as_array().into_iter().flatten().filter(|r| r["imprinted"] != true).collect();
             let curves = |r: &Value| -> Vec<String> { r["boundary"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(str::to_string)).collect() };
-            let outer_only = rest.trim_start_matches([',', ' ']).starts_with("true");
+            let outer_only = rest.trim_start_matches([')', ',', ' ']).starts_with("true");
             let outer = |r: &Value| -> Vec<String> { r["outer"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(str::to_string)).collect() };
             let own = |c: &String| c.rsplit(':').next().and_then(|n| n.parse::<u32>().ok()).is_some_and(|n| !noshape_model::regen::features::sketch::is_imprint_entity(n));
             let in_hole_of = |r: &Value, o: &Value, mine: &[String]| {
@@ -3820,8 +3851,8 @@ impl<'a> Translator<'a> {
 
     /// A sketch curve or point named by its Onshape id (packed
     /// `SKETCH_ENTITY` query of a sketch's own wire, not of a feature made
-    /// from it).
-    fn sketch_entity_from_query(&self, text: &str) -> Option<String> {
+    /// from it); each of a `UNION` of one sketch's entities (c2-opt-sweep-lock-direction's Sweep 1 path, two lines).
+    fn sketch_entities_from_query(&self, text: &str) -> Option<Vec<String>> {
         let packed = text.split("qCompressed(1.0,\"").nth(1)?.split('"').next()?;
         let tree = noshape_model::custom::host::packed::unpack(packed).ok()?;
         let mut strings = Vec::new();
@@ -3833,11 +3864,18 @@ impl<'a> Translator<'a> {
             return None;
         }
         let mut ops = strings.iter().filter(|s| s.contains(".op") || s.ends_with("Op"));
-        let sk = ops.next()?.strip_suffix(".wireOp")?.to_string();
-        if ops.next().is_some() || (imprint && strings.iter().any(|s| s.ends_with(".imprint") && *s != format!("{sk}.imprint"))) {
+        let first = ops.next()?;
+        let sk = first.strip_suffix(".wireOp")?.to_string();
+        if ops.any(|o| o != first) || (imprint && strings.iter().any(|s| s.ends_with(".imprint") && *s != format!("{sk}.imprint"))) {
             return None;
         }
-        strings.iter().find_map(|e| self.sketch_entities.get(&(sk.clone(), e.clone())).cloned())
+        let of = |e: &String| self.sketch_entities.get(&(sk.clone(), e.clone())).cloned();
+        let mut named: Vec<String> = strings.windows(2).filter(|w| w[0] == "sketchEntityId").filter_map(|w| of(&w[1])).collect();
+        named.dedup();
+        if named.is_empty() {
+            named.extend(strings.iter().find_map(of));
+        }
+        (!named.is_empty()).then_some(named)
     }
 
     /// A face, edge or part an Extrude made, by Onshape's name for it
@@ -3947,11 +3985,21 @@ impl<'a> Translator<'a> {
                         return Some(Ok(face));
                     }
                 }
-                let seed = match self.extrude_name_from_tree(seed)? {
-                    Ok(s) => s,
-                    Err(e) => return Some(Err(format!("COPY: {e}"))),
+                let seed = match self.extrude_name_from_tree(seed) {
+                    Some(Ok(s)) => s,
+                    Some(Err(e)) => return Some(Err(format!("COPY: {e}"))),
+                    None => {
+                        if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+                            eprintln!("TRACE COPY {pattern} instance {index}: its seed not named");
+                        }
+                        return None;
+                    }
                 };
-                return Some(self.pattern_copy(&pattern, index, &seed).or_else(|e| self.mirror_copy(&pattern, &seed).map_err(|_| e)));
+                let copy = self.pattern_copy(&pattern, index, &seed).or_else(|e| self.mirror_copy(&pattern, &seed).map_err(|_| e));
+                if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() && copy.is_err() {
+                    eprintln!("TRACE COPY {pattern} instance {index} of {seed}: {copy:?}");
+                }
+                return Some(copy);
             }
         }
         fn find<'p>(p: &'p Packed, names: &[&str]) -> Option<&'p Vec<(Packed, Packed)>> {
@@ -7923,6 +7971,9 @@ const INTERNAL: [&str; 3] = ["asVersion", "defaultsChanged", "computeTransformsW
 /// Older features' parameters as today's std (and ours) has them, as
 /// Onshape upgrades them: Revolve's `revolveType`, Extrude's `SYMMETRIC`
 /// end, a pre-V2 Hole's, a Variable's `value`.
+/// A LEGACY Hole's values that `upgrade` maps onto the V3 ones.
+const LEGACY_HOLE_VALUES: [&str; 10] = ["endStyle", "holeDiameter", "cBoreDiameter", "cBoreDepth", "cSinkDiameter", "cSinkAngle", "tapDrillDiameter", "holeDepth", "tappedDepth", "style"];
+
 fn upgrade(ty: &str, params: &mut Map<String, Value>, unknown: &mut Vec<String>) {
     let mut done = |id: &str, params: &mut Map<String, Value>| {
         unknown.retain(|u| u != id);
@@ -7948,8 +7999,15 @@ fn upgrade(ty: &str, params: &mut Map<String, Value>, unknown: &mut Vec<String>)
         }
         // Holes before V2 (2019): unsuffixed names, the start as a flag.
         "hole" => {
+            // A legacy hole (holeVersion LEGACY) runs on its unsuffixed values; the V3 ones are defaults.
+            let legacy = params.get("holeVersion").is_some_and(|v| v == "LEGACY");
+            if legacy && params.get("endStyle").is_some_and(|v| v == "BLIND_IN_LAST") {
+                done("endStyle", params);
+                params.insert("endStyleV2".into(), json!("BLIND"));
+                params.insert("blindInLast".into(), json!(true));
+            }
             for (old, new) in [("endStyle", "endStyleV2"), ("holeDiameter", "holeDiameterV3"), ("cBoreDiameter", "cBoreDiameterV3"), ("cBoreDepth", "cBoreDepthV3"), ("cSinkDiameter", "cSinkDiameterV3"), ("cSinkAngle", "cSinkAngleV3"), ("tapDrillDiameter", "tapDrillDiameterV3"), ("holeDepth", "holeDepthV3"), ("tappedDepth", "tappedDepthV3")] {
-                if !params.contains_key(new)
+                if (legacy || !params.contains_key(new))
                     && let Some(v) = done(old, params)
                 {
                     params.insert(new.into(), v);
@@ -7957,7 +8015,7 @@ fn upgrade(ty: &str, params: &mut Map<String, Value>, unknown: &mut Vec<String>)
             }
             // (The legacy `style` goes either way: our dialog has only styleV2.)
             if let Some(v) = done("style", params)
-                && !params.contains_key("styleV2")
+                && (legacy || !params.contains_key("styleV2"))
             {
                 params.insert("styleV2".into(), v);
             }

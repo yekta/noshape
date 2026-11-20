@@ -919,6 +919,7 @@ fn blend(i: &mut Interp, a: &[Value], chamfer: bool) -> R<Value> {
     // Tangent (apex) measurement, the sides flipped edge by edge.
     let apex = chamfer && def_enum(&def, "chamferMethod").is_some_and(|m| &*m == "APEX_RANGE");
     let override_refs = if chamfer { evaluate_refs(i, &cx, def.get("directionOverrides"))? } else { Vec::new() };
+    let left_rule = i.module_version().is_some_and(|v| v < 1646);
     run_op(i, &cx, &id, if chamfer { "CHAMFER_FAILED" } else { "FILLET_FAILED" }, |ev| {
         let overrides = ev.resolve_edges(&override_refs);
         let groups = by_body(ev.resolve_edges(&refs));
@@ -945,7 +946,11 @@ fn blend(i: &mut Interp, a: &[Value], chamfer: bool) -> R<Value> {
                     r
                 };
                 let first = (0..edges.len()).min_by_key(|&i| rank(edges[i])).unwrap_or(0);
-                reference = distance_faces(&body.shape, &edges, first, def_bool(&def, "oppositeDirection", false), &flipped).map_err(|e| fe(e.to_string()))?;
+                let opposite = def_bool(&def, "oppositeDirection", false);
+                reference = match distance_faces(&body.shape, &edges, first, opposite, &flipped, left_rule).map_err(|e| fe(e.to_string()))? {
+                    Some(faces) => faces,
+                    None => crate::regen::features::detail::distance_one_faces(ev, &body, &edges, &flipped.iter().copied().collect(), opposite)?,
+                };
             }
             // Onshape's sides where OCCT reads them otherwise (a face curved across the edge): two distances.
             use crate::regen::features::blend_section::ChamferSides;
@@ -999,11 +1004,21 @@ fn blend(i: &mut Interp, a: &[Value], chamfer: bool) -> R<Value> {
 /// share a face the side the first edge (`edges[first]`) takes (a disc's two rims: both on the cylinder or both on the
 /// caps); Opposite
 /// direction the other face, and so a direction override for its chain. Empty where an edge doesn't have two faces (OCCT's choice then).
-fn distance_faces(shape: &Shape, edges: &[usize], first: usize, opposite: bool, flipped: &HashSet<usize>) -> Result<Vec<Shape>, k::KernelError> {
+/// The left face only before FS 1646 (`left_rule`); None where that's the Chamfer feature's choice.
+fn distance_faces(shape: &Shape, edges: &[usize], first: usize, opposite: bool, flipped: &HashSet<usize>, left_rule: bool) -> Result<Option<Vec<Shape>>, k::KernelError> {
     let ef = shape.edge_faces()?;
     let faces = shape.faces();
-    let Some(pairs) = edges.iter().map(|&e| ef.get(e).and_then(|f| <[u32; 2]>::try_from(f.as_slice()).ok())).collect::<Option<Vec<_>>>() else { return Ok(Vec::new()) };
+    let Some(pairs) = edges.iter().map(|&e| ef.get(e).and_then(|f| <[u32; 2]>::try_from(f.as_slice()).ok())).collect::<Option<Vec<_>>>() else { return Ok(Some(Vec::new())) };
     let shared: Vec<u32> = pairs[0].iter().copied().filter(|f| pairs.iter().all(|p| p.contains(f))).collect();
+    let shared = match shared.as_slice() {
+        [f] if edges.len() > 1 => Some(*f),
+        _ => None,
+    };
+    // From V1646_VERSION_BUMP_FOR_CHAMFER_FIX the Chamfer feature's sides, not the left face (std's thread chamfer on
+    // an extruded rod's far rim: the width on the shaft, live c2-cov-external-thread; FS 336 fCylinder's: the cap).
+    if shared.is_none() && !left_rule {
+        return Ok(None);
+    }
     let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
     // A direction override flips its chain (the edges joined to it through shared vertices), as the Chamfer feature's.
     let ends: Vec<[DVec3; 2]> = edges.iter().map(|&e| shape.sub_shape(ShapeType::Edge, e).and_then(|s| s.edge_info()).map(|i| [i.start, i.end])).collect::<Result<_, _>>()?;
@@ -1034,28 +1049,28 @@ fn distance_faces(shape: &Shape, edges: &[usize], first: usize, opposite: bool, 
         }))
     };
     // Edges sharing a face all take the side the first one takes (both rims of a disc: live 3120).
-    let first_on_shared = match shared.as_slice() {
-        [f] if edges.len() > 1 => match left_of(edges[first], &pairs[first])? {
-            Some(l) => Some(l == *f),
-            None => return Ok(Vec::new()),
+    let first_on_shared = match shared {
+        Some(f) => match left_of(edges[first], &pairs[first])? {
+            Some(l) => l == f,
+            None => return Ok(Some(Vec::new())),
         },
-        _ => None,
+        None => false,
     };
     let other = |pair: &[u32; 2], f: u32| if f == pair[0] { pair[1] } else { pair[0] };
     let mut out = Vec::with_capacity(edges.len());
     for ((&e, pair), flip) in edges.iter().zip(&pairs).zip(flip) {
-        let pick = match (shared.as_slice(), first_on_shared) {
-            ([f], Some(true)) => *f,
-            ([f], Some(false)) => other(pair, *f),
-            _ => match left_of(e, pair)? {
+        let pick = match shared {
+            Some(f) if first_on_shared => f,
+            Some(f) => other(pair, f),
+            None => match left_of(e, pair)? {
                 Some(f) => f,
-                None => return Ok(Vec::new()),
+                None => return Ok(Some(Vec::new())),
             },
         };
         let face = if opposite != flip { other(pair, pick) } else { pick };
         out.push(faces[face as usize].clone());
     }
-    Ok(out)
+    Ok(Some(out))
 }
 
 fn op_chamfer(i: &mut Interp, a: Vec<Value>) -> R<Value> {

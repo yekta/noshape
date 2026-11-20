@@ -756,6 +756,12 @@ pub fn straighten_edges(shape: &Shape, tol: f64) -> Result<Shape> {
     Shape::from_res(ffi::straighten_edges(shape.raw(), tol))
 }
 
+/// Chained edges (in order, each sharing a vertex with the next) as one edge: their curves concatenated into one
+/// B-spline (an intersection curve OCCT's section returned in pieces).
+pub fn concat_edges(edges: &[Shape]) -> Result<Shape> {
+    Shape::from_res(ffi::concat_edges(&crate::shape::vec_to_list(edges)))
+}
+
 /// Edges where two planes, or a plane and a B-spline extrusion, meet rebuilt exact (OCCT's approximated intersections lie
 /// up to 3e-5 m off their faces; an exported file's reader refits them, PS-INEXACT-INTERSECTION-EDGES), their vertices
 /// moved onto the exact ends; the shape unchanged when nothing is rebuilt or the result doesn't check valid.

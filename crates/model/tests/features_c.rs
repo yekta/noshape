@@ -1730,6 +1730,33 @@ fn thicken_as_live() {
     assert_eq!(r.context.bodies[1].shape.count(noshape_kernel::ShapeType::Face), 8);
 }
 
+/// A cylinder's side thickened 6 mm out (c2-surfaces-lofts-projected's Thicken 1 of cylinder strips): the offset's
+/// edges are circles and lines, as live's, not OCCT's B-spline approximations.
+#[test]
+fn a_thickened_cylinder_has_circle_and_line_edges() {
+    let mut s = Studio::new();
+    let sid = circle_sketch(&mut s, 20.0);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("25 mm"));
+    });
+    let r = s.ok();
+    let side = cylinder_face(&r, 0);
+    s.add("thicken", move |p| {
+        p.set("entities", ParamValue::Query(vec![side]));
+        p.set("thickness1", expr("6 mm"));
+        p.set("operationType", ParamValue::Enum("NEW".into()));
+    });
+    let r = s.ok();
+    let ring = &r.context.bodies[1].shape;
+    let kinds: Vec<noshape_kernel::Curve> = ring.edges().iter().map(|e| e.edge_info().unwrap().curve).collect();
+    assert!(kinds.iter().all(|c| matches!(c, noshape_kernel::Curve::Line { .. } | noshape_kernel::Curve::Circle { .. })), "{kinds:?}");
+    let v = ring.volume().unwrap() * 1e9;
+    let exact = std::f64::consts::PI * (26.0f64.powi(2) - 20.0f64.powi(2)) * 25.0;
+    assert!((v - exact).abs() < 1e-6 * exact, "{v} mm³, {exact}");
+}
+
 /// Live L7: Flip alignment against a plane facing the same way as the
 /// replaced face fails ("Could not replace faces as requested.").
 #[test]
@@ -5468,5 +5495,45 @@ fn a_surfaces_round_between_its_trimmed_halves_stays_a_surface_as_live() {
     // (The curvature round's section is ours, not Parasolid's: within 0.5 %.)
     for (a, live) in areas.iter().zip([302.42, 1663.35, 7349.65]) {
         assert!((a - live).abs() < live * 5e-3, "{areas:?} mm² (live 302.42, 1663.35, 7349.65)");
+    }
+}
+
+/// Live c2-cov-external-thread: a thread's chamfer and undercut are std's. A Ø6.35 × 30 mm rod, ANSI 1/4-20 Blind
+/// 12 mm with a 0.5 mm × 30° chamfer at its top: 5 faces / 4 edges, 946.1501 mm³; a Ø8 × 25 mm rod, ISO M8 Up to
+/// next with a 6.5 × 3 mm undercut: 5 faces / 4 edges, 1205.3898 mm³.
+#[test]
+fn an_external_threads_chamfer_and_undercut_cut_the_rod() {
+    // (rod radius mm, height, standard, thread parameters, live mm³)
+    type Case<'a> = (f64, &'a str, [&'a str; 2], &'a [(&'a str, ParamValue)], f64);
+    let cases: [Case; 2] = [
+        (3.175, "30 mm", ["ANSI", "1/4"], &[("depthType", en("Blind")), ("threadDepth", expr("12 mm")), ("addChamfer", ParamValue::Bool(true)), ("chamferWidth", expr("0.5 mm")), ("chamferAngle", expr("30 deg"))], 946.1501126534241),
+        (4.0, "25 mm", ["ISO", "M8"], &[("depthType", en("UpToNext")), ("addUndercut", ParamValue::Bool(true)), ("undercutDiameter", expr("6.5 mm")), ("undercutLength", expr("3 mm"))], 1205.389831274235),
+    ];
+    for (r, h, standard, set, live) in cases {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        sk.add_circle(DVec2::ZERO, mm(r));
+        let sketch = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let region = s.region(sketch);
+        s.add("extrude", |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr(h));
+        });
+        let res = s.regen();
+        let top = mm(h.trim_end_matches(" mm").parse().unwrap());
+        let edge = edge_near(&res, 0, DVec3::new(mm(r), 0.0, top));
+        s.add("externalThread", |p| {
+            p.set("entities", q(edge));
+            p.set("branchOfStandard", ParamValue::Lookup(standard.iter().map(|x| x.to_string()).collect()));
+            for (k, v) in set {
+                p.set(k, v.clone());
+            }
+        });
+        let (status, message) = s.last_status();
+        assert_ne!(status, FeatureStatus::Error, "{standard:?}: {message}");
+        let res = s.regen();
+        let b = &res.context.bodies[0];
+        assert_eq!((b.shape.faces().len(), b.shape.shown_topology().unwrap().edge_count()), (5, 4), "{standard:?}");
+        assert!(near(volume(&res, 0) * 1e9, live, 1e-3), "{standard:?}: {} mm³, live {live}", volume(&res, 0) * 1e9);
     }
 }

@@ -4613,3 +4613,28 @@ skasm meanwhile; I'll list what I change here before landing.
 - **LANDED 11-18/19:** Delete face errors when a face stays 67a475987; rib parallel 303e9d916; loft path sections
   c0b6e2d4a; loft one-connection equal arcs 7a8ca3b2 (asm-suspension Loft 1, blend told); error wording (Up to next,
   revolve, coplanar loft) c3e949a8; Delete face onto its neighbour (impeller face 24, ~0.2 s) edf20895.
+
+## 11-19 (moved 11-20)
+- **qa compat alerts ANSWERED 11:30:** both are selections saved on geometry that was wrong and is live's now. cpcurves:
+  3D fit spline 1 failed in v0.4.60 (f4443780a, live OK); its Thicken 1 "Ok" was a 103.67 mm3 part off the failed chain
+  (live: 3 parts). mutualtrim Fillet 1: bisected d8ead241b ok / 444ae7b1a lost (Sweep 1 was cut at z=0; stored name
+  Boundary(trimmed face, 0) of an unshared 58.43 mm edge; now one 156.02 mm shared edge, Edge{faces}, as live). qa asked
+  to re-save both. Tools: vibex7 ~/tmp/core/perfeat2.py, edgeids2.py (decodes entity ids); core-scratch/bis.sh <commit>.
+- **blend COMPAT-RUSTZERO-FILLET1:** told blend 6b384aa69 isn't in qa's range (b2b0cf9a 09:16 first bad); of mine
+  in the range only 426922541 (part pattern seed joins in its own merge scope) changes built shapes. Blend 16:3x: none of mine (legacy
+  edge directions, minus 426922541 both still Error); blend bisects from 73470cff. Nothing for me.
+
+## Moved 11-20 22:25
+- **LANDED 11-19:** pattern P1 6a8e411d (qa verified session-1118 = live); surface stack fc162641 -> ec1882ba (7
+  commits: Up to next to surfaces, Boundary Coons/ruled + exact sketch splines, Split sheet pieces + surface Extrude
+  Add, surface Sweep path cut at its profile's plane, sketch region direction, loft section race, thin Sweep wall side;
+  private docs ALL-SAME); integer field "Enter a valid expression." 139b5ea2 -> 24792169.
+- **welding Extrude 8 body order:** moved to skasm (lead 19:35).
+- **Lead 11-19:** rocker-enclosure-sm Extrude 2 (split face) is skasm's now; answer skasm on my notes if asked.
+- **asm 11-19 (low):** c2-surf-intro-* Derived 1: after asm's translator commits (post 6bca92a2) the source studio translates;
+  live's Loft 4 (SURFACE, surfaceOperationType ADD) closes the 4-face "Car" sheet into a 5-face SOLID (Fillet 1 -> 7);
+  ours stays a 4-face surface. derived/b7635b82…/live.jsonl 11-16; repro vibex8 NOSHAPE_PARITY_ONLY=c2-surf-intro-offset.
+- **cpcurves Split 3 LANDED 575aba2a4:** a closed profile's surface sweep faces out of its tube (live q-sweep-normals-1119:
+  manualblend's tube against its sketch's normal, cpcurves' along it: both outward); cpcurves' 1227.58 mm3 part and Split
+  5's Info gone, Delete face 2 = live; left: edge counts from Sweep 5's split circle (known). 30-doc subset clean
+  (core-scratch gls3.log). T1 features_c::a_surface_swept_from_a_circle_faces_out_of_its_tube.

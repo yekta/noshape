@@ -569,6 +569,29 @@ fn thin_loft_of_squares_walls_them_as_live() {
     }
 }
 
+/// Live c2-opt-loft-periodic-trim-thin's Loft 2: a thin loft from a 30 × 30 square to a 20 × 20 one 40 mm up, 2 mm
+/// outward with Trim ends, walls each side 2 mm off along its normal: 8712.2577 mm³, 10 faces, 24 line edges (the
+/// squares offset 2 mm in their planes had 8640 mm³ and curved corner edges).
+#[test]
+fn thin_loft_of_a_tapered_square_offsets_its_sides_as_live() {
+    let item = |s: FeatureId| {
+        let mut v = ParamValues::default();
+        v.set("wireProfileEntities", q(vec![Reference::Sketch(s)]));
+        v
+    };
+    let mut t = T::new();
+    let a = t.sketch(Reference::Plane(DatumPlane::Top), rect(-0.015, -0.015, 0.015, 0.015));
+    let p40 = t.top_plane("40 mm");
+    let b2 = t.sketch(Reference::FeaturePlane(p40), rect(-0.01, -0.01, 0.01, 0.01));
+    t.add("loft", &[("bodyType", en("THIN")), ("wireProfilesArray", ParamValue::Array(vec![item(a), item(b2)])), ("thickness1", e("2 mm")), ("trimEnds", b(true))]);
+    let res = t.ok();
+    let body = res.context.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+    let v = total_volume(&res.context) * 1e9;
+    let lines = body.shape.edges().iter().filter(|e| matches!(e.edge_info().map(|i| i.curve), Ok(noshape_kernel::Curve::Line { .. }))).count();
+    assert!((v - 8712.257748298569).abs() < 1e-3, "{v} mm³");
+    assert_eq!((body.shape.faces().len(), body.shape.edges().len(), lines), (10, 24, 24));
+}
+
 /// Live (behaviours "skasm (2026-10-31, P2 feature-sweep Loft 8)" (a)): a thin loft from a 20 x 20 square to a
 /// Ø16 circle 20 mm up, 1 mm outward with Trim ends: the lofted surface offset along its normals, mitred where its
 /// faces crease, cut by the profiles' planes: 1370.1046656 mm³ (evVolume HIGH), 10 faces, z 0 … 20, x and y to
@@ -860,11 +883,11 @@ fn revolve_up_to_vertex_face_and_next() {
     t.set(rv, "endBoundEntityVertex", q(vec![Reference::SketchEntity { sketch: ps, entity: p.0 }]));
     let res = t.ok();
     assert!(near(total_volume(&res.context), quarter, 1e-6), "{}", total_volume(&res.context));
-    // With a 30 degree offset.
+    // With a 30 degree offset: past the vertex (live c2-opt-revolve-thin-up-to: up to Right + 10 deg, 100 deg).
     t.set(rv, "endBoundHasOffset", b(true));
     t.set(rv, "endBoundOffset", e("30 deg"));
     let res = t.ok();
-    assert!(near(total_volume(&res.context), quarter * 60.0 / 90.0, 1e-6), "{}", total_volume(&res.context));
+    assert!(near(total_volume(&res.context), quarter * 120.0 / 90.0, 1e-6), "{}", total_volume(&res.context));
 
     // Up to the Right plane (first hit at 90 degrees).
     let mut t = T::new();
@@ -892,6 +915,19 @@ fn revolve_up_to_vertex_face_and_next() {
     // 45 .. ~(180 - asin(1/r)) degrees.
     let full = PI * (0.02f64.powi(2) - 0.01f64.powi(2)) * 0.01;
     assert!(v > full * (170.0 - 45.0) / 360.0 && v < full * (180.0 - 45.0) / 360.0, "{v} vs {full}");
+
+    // A start up to the Right plane with a 15 degree offset, the end blind at 45: met turning the revolve's own way
+    // (90 degrees), the revolve runs from 105 round to 405 (live c2-opt-revolve-start-bound Revolve 2: 300 degrees).
+    let mut t = T::new();
+    let rv = setup(&mut t);
+    t.set(rv, "angle", e("45 deg"));
+    t.set(rv, "hasStartBound", b(true));
+    t.set(rv, "startBound", en("UP_TO_SURFACE"));
+    t.set(rv, "startBoundEntityFace", q(vec![Reference::Plane(DatumPlane::Right)]));
+    t.set(rv, "startBoundHasOffset", b(true));
+    t.set(rv, "startBoundOffset", e("15 deg"));
+    let res = t.ok();
+    assert!(near(total_volume(&res.context), quarter * 4.0 * 300.0 / 360.0, 1e-5), "{}", total_volume(&res.context));
 }
 
 // ------------------------------------------------------------------ query variables

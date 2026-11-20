@@ -1036,6 +1036,18 @@ impl<'a> EvalCtx<'a> {
         self.apply_operation_from(tools, None, op, scope, kind)
     }
 
+    /// New parts, one per tool, kept apart where they touch or overlap (a Thicken of two surfaces).
+    pub fn add_new_apart(&mut self, tools: Vec<NamedShape>, kind: BodyKind) -> FResult<()> {
+        if kind == BodyKind::Solid && tools.len() <= 8 && self.probe_touched && !self.scratch {
+            let t = self.scope_of(&tools, false);
+            self.touched = t.iter().map(|&i| self.ctx.bodies[i].id.clone()).collect();
+        }
+        for (i, t) in tools.into_iter().enumerate() {
+            self.add_new_bodies(t, kind, i as u32)?;
+        }
+        Ok(())
+    }
+
     /// [`Self::apply_operation`] with each tool's sketch (an Extrude's regions): New parts from different sketches stay
     /// apart where they only touch, as live keeps asm-welding-config's disc in its ring's hole a part of its own (std's
     /// opExtrude sweeps each sketch's faces, which share no edges across sketches); tools of one sketch that touch are

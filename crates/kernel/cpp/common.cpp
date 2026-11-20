@@ -1314,7 +1314,9 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
     for (int i = 1; i <= vm.Extent(); ++i)
     {
       const uint32_t e0 = ve.first[(size_t)i - 1], e1 = ve.first[(size_t)i];
-      bool           shown = e0 == e1, anyEdge = false;
+      // (A vertex on no edge: a free point's, shown; one a Boolean left inside a face where two faces touch at a point
+      // isn't, Parasolid has none: c2-replace-face-exercise's Replace face 1, 2 per refilleted corner.)
+      bool           shown = e0 == e1 && vf.first[(size_t)i - 1] == vf.first[(size_t)i], anyEdge = false;
       if (joint[(size_t)i])
       {
         out.push_back(0);

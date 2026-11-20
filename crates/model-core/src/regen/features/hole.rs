@@ -174,7 +174,7 @@ fn hole_dims(ev: &EvalCtx) -> FResult<HoleDims> {
     };
     let len = |id: &str| ev.eval_num_in(vals, id, crate::params::NumKind::Length);
     let diameter = len("holeDiameterV3")?;
-    let tap_drill = if vals.bool("showTappedDepth") { Some(len("tapDrillDiameterV3")?) } else { None };
+    let tap_drill = if vals.bool("showTappedDepth") || vals.bool("blindInLast") { Some(len("tapDrillDiameterV3")?) } else { None };
     let mut cbore = if style == "C_BORE" { Some((len("cBoreDiameterV3")?, len("cBoreDepthV3")?)) } else { None };
     let csink = if style == "C_SINK" { Some((len("cSinkDiameterV3")?, ev.eval_num_in(vals, "cSinkAngleV3", crate::params::NumKind::Angle)?)) } else { None };
     // (Out of the parameter's bounds, as std's precondition says it.)
@@ -200,7 +200,7 @@ fn hole_dims(ev: &EvalCtx) -> FResult<HoleDims> {
     if csink.is_some_and(|(sd, _)| sd <= diameter) {
         return crate::regen::eval::err_at(&["holeDiameterV3", "cSinkDiameterV3"], "The countersink diameter must be larger than the hole diameter.");
     }
-    Ok(HoleDims { diameter, tap_drill, clearance: vals.bool("hasClearance"), cbore, csink })
+    Ok(HoleDims { diameter, tap_drill, clearance: vals.bool("hasClearance") || vals.bool("blindInLast"), cbore, csink })
 }
 
 /// Hole cross-section as (radius, depth) points, depth into the material
@@ -557,6 +557,12 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         }
         let r_main = dims.diameter * 0.5;
         let (h, tip) = match end.as_str() {
+            // Legacy Blind in last (hole.fs LAST_TARGET_START): the Depth from where the last part starts, the tip the
+            // tap drill's (c2-opt-shell-outward-hole-last's Hole 1: Ø6 through the top plate, Ø4 6 mm into the bottom one).
+            "BLIND" if ev.bool("blindInLast") => {
+                let last = hit_bodies.iter().map(|x| x.1).fold(0.0, f64::max);
+                (last + ev.length("holeDepthV3")?, tip_len(tip_angle, dims.tap_drill.unwrap_or(dims.diameter) * 0.5))
+            }
             "BLIND" => (ev.length("holeDepthV3")?, tip_len(tip_angle, r_main)),
             "THROUGH" => (hit_bodies.iter().map(|x| x.2).fold(0.0, f64::max) + r_main.max(1e-4), 0.0),
             "UP_TO_NEXT" => {
@@ -945,6 +951,11 @@ pub fn external_thread(ev: &mut EvalCtx) -> FResult<()> {
                 ev.infos.push("Exact match for thread size not found.".into());
             }
         }
+    }
+    // A chamfer or an undercut: std's (opChamfer at the selected end, the shaft split and its far piece offset in;
+    // c2-cov-external-thread: live 5 faces with a 0.5 mm chamfer, 5 with a 6.5 x 3 mm undercut).
+    if (ev.bool("addChamfer") || ev.bool("addUndercut")) && crate::regen::custom_features::host().is_some() {
+        return crate::regen::custom_features::evaluate_std(ev, "externalThread.fs", "externalThread");
     }
     if ev.is("depthType", "Blind") && !ev.bool("addUndercut") && ev.bool("splitFace") {
         let depth = ev.length("threadDepth")?;

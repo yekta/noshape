@@ -295,6 +295,24 @@ fn touches_freeform(shape: &Shape, faces: &[usize]) -> bool {
     near.iter().any(|&f| all.get(f).is_some_and(|x| !matches!(x.face_surface(), Ok(k::Surface::Plane(_) | k::Surface::Cylinder { .. } | k::Surface::Cone { .. } | k::Surface::Sphere { .. } | k::Surface::Torus { .. }))))
 }
 
+/// A moved face beside an unmoved one on its own surface (std's thread undercut: the 3 mm end of a split shaft):
+/// OCCT's offset moves both, live steps between them.
+fn beside_its_own_surface(shape: &Shape, faces: &[usize]) -> bool {
+    let all = shape.faces();
+    let Ok(ef) = shape.edge_faces() else { return false };
+    let same = |a: usize, b: usize| match (all.get(a).map(|f| f.face_surface()), all.get(b).map(|f| f.face_surface())) {
+        (Some(Ok(k::Surface::Cylinder { origin: o1, axis: a1, radius: r1, .. })), Some(Ok(k::Surface::Cylinder { origin: o2, axis: a2, radius: r2, .. }))) => {
+            let a1 = a1.normalize();
+            (r1 - r2).abs() < 1e-9 && a1.cross(a2.normalize()).length() < 1e-9 && (o2 - o1).reject_from_normalized(a1).length() < 1e-9
+        }
+        _ => false,
+    };
+    ef.iter().any(|fs| match fs.as_slice() {
+        &[a, b] => faces.contains(&(a as usize)) != faces.contains(&(b as usize)) && same(a as usize, b as usize),
+        _ => false,
+    })
+}
+
 pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
     let ty = ev.enum_("moveFaceType").to_string();
     // moveFace.fs: the faces are checked before the direction or axis.
@@ -427,7 +445,7 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
         // Else, faces on or beside the moved ones that aren't planes, cylinders, cones, spheres or tori (a flange's walls
         // extruded from a loft's): OCCT's offset worked on them for ~0.6 s and left an invalid solid the booleans
         // then made (c2-impeller-loft's Flansch verbreitern): the booleans first, OCCT's offset if they fail.
-        if translate_dir.is_none() && touches_freeform(&body.shape, &faces) && offset_by_booleans(ev, bi, &faces, dist).is_ok() {
+        if translate_dir.is_none() && (touches_freeform(&body.shape, &faces) || beside_its_own_surface(&body.shape, &faces)) && offset_by_booleans(ev, bi, &faces, dist).is_ok() {
             continue;
         }
         let res = match translate_dir {

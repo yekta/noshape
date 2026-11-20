@@ -451,11 +451,63 @@ pub fn project_curves(ev: &mut EvalCtx) -> FResult<()> {
         prisms.push(Shape::compound(&faces));
     }
     let sec = k::section(&prisms[0], &prisms[1])?;
-    let wires = chain_wires(&sec.shape.edges())?;
+    // Parasolid's intersection is one curve between the prisms' ends: OCCT's section comes in pieces (c2-projected-curve-enclose:
+    // 4 edges, live 2, split where the curve meets the arc's prism's end lines).
+    let mut ends: Vec<(DVec3, DVec3)> = Vec::new();
+    for (frame, edges) in &sets {
+        for e in edges {
+            if let Ok((a, b)) = e.endpoints()
+                && a.distance(b) > 1e-9
+            {
+                ends.push((a, frame.normal));
+                ends.push((b, frame.normal));
+            }
+        }
+    }
+    let at_end = |p: DVec3| ends.iter().any(|(q, n)| (p - *q).reject_from_normalized(*n).length() < 1e-7);
+    let joined = join_runs(sec.shape.edges(), at_end)?;
+    let wires = chain_wires(&joined)?;
     if wires.is_empty() {
         return err("Error regenerating.");
     }
     add_wire_bodies(ev, wires)
+}
+
+/// Chained edges joined into one edge between their stops (a vertex `stop` keeps, or one that isn't between two edges);
+/// a closed run without stops one closed edge.
+fn join_runs(edges: Vec<Shape>, stop: impl Fn(DVec3) -> bool) -> FResult<Vec<Shape>> {
+    let ends: Vec<(DVec3, DVec3)> = edges.iter().map(|e| e.endpoints()).collect::<Result<_, _>>()?;
+    let near = |a: DVec3, b: DVec3| a.distance(b) < 1e-7;
+    let degree = |p: DVec3| ends.iter().map(|(a, b)| usize::from(near(*a, p)) + usize::from(near(*b, p))).sum::<usize>();
+    let stops = |p: DVec3| stop(p) || degree(p) != 2;
+    let mut used = vec![false; edges.len()];
+    let mut out = Vec::new();
+    let walk = |from: usize, start: DVec3, used: &mut [bool]| -> FResult<Shape> {
+        used[from] = true;
+        let mut run = vec![edges[from].clone()];
+        let other = |i: usize, p: DVec3| if near(ends[i].0, p) { ends[i].1 } else { ends[i].0 };
+        let mut cur = other(from, start);
+        while !stops(cur) && !near(cur, start) {
+            let Some(j) = (0..edges.len()).find(|&j| !used[j] && (near(ends[j].0, cur) || near(ends[j].1, cur))) else { break };
+            used[j] = true;
+            run.push(edges[j].clone());
+            cur = other(j, cur);
+        }
+        Ok(if run.len() == 1 { run.remove(0) } else { k::concat_edges(&run)? })
+    };
+    for i in 0..edges.len() {
+        for p in [ends[i].0, ends[i].1] {
+            if !used[i] && stops(p) {
+                out.push(walk(i, p, &mut used)?);
+            }
+        }
+    }
+    for i in 0..edges.len() {
+        if !used[i] {
+            out.push(walk(i, ends[i].0, &mut used)?);
+        }
+    }
+    Ok(out)
 }
 
 // ------------------------------------------------------------------ bridging curve

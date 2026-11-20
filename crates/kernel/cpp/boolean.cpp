@@ -11390,16 +11390,42 @@ bool edge_on_curve(const TopoDS_Edge& e, occ::handle<Geom_Curve> g, const ShapeL
   B.Add(ne, vertex(v1).Oriented(TopAbs_REVERSED));
   B.Range(ne, a, b);
   ShapeFix_Edge fix;
+  ShapeIMap     done;
   for (const TopoDS_Shape& f : faces)
   {
     const TopoDS_Face& F = TopoDS::Face(f);
-    fix.FixAddPCurve(ne, F, false, tol);
+    const int seen = done.Extent();
+    if (done.Add(F) <= seen)
+      continue;
+    // (A seam gets both its pcurves: a thickened cylinder's offset side, c2-surfaces-lofts-projected's Thicken 1.)
+    fix.FixAddPCurve(ne, F, BRep_Tool::IsClosed(e, F), tol);
     // (On a periodic surface the new pcurve in the old one's period, else the face's wire breaks there.)
     double                    of = 0, ol = 0, nf = 0, nl = 0;
     occ::handle<Geom2d_Curve> oc = BRep_Tool::CurveOnSurface(e, F, of, ol), nc = BRep_Tool::CurveOnSurface(ne, F, nf, nl);
-    if (oc.IsNull() || nc.IsNull() || BRep_Tool::IsClosed(e, F))
+    if (oc.IsNull() || nc.IsNull())
       continue;
     const BRepAdaptor_Surface S(F, false);
+    // A seam's two pcurves each in its old one's period (else the face's wire doesn't close).
+    auto period_shift = [&](const occ::handle<Geom2d_Curve>& o, double o0, const occ::handle<Geom2d_Curve>& n, double n0) {
+      const gp_Vec2d off(o->Value(o0).XY() - n->Value(n0).XY());
+      return gp_Vec2d(S.IsUPeriodic() ? std::round(off.X() / S.UPeriod()) * S.UPeriod() : 0.0, S.IsVPeriodic() ? std::round(off.Y() / S.VPeriod()) * S.VPeriod() : 0.0);
+    };
+    if (BRep_Tool::IsClosed(e, F))
+    {
+      double                    of2 = 0, ol2 = 0, nf2 = 0, nl2 = 0;
+      const TopoDS_Edge         er = TopoDS::Edge(e.Reversed()), nr = TopoDS::Edge(ne.Reversed());
+      occ::handle<Geom2d_Curve> oc2 = BRep_Tool::CurveOnSurface(er, F, of2, ol2), nc2 = BRep_Tool::CurveOnSurface(nr, F, nf2, nl2);
+      if (oc2.IsNull() || nc2.IsNull() || !BRep_Tool::IsClosed(ne, F))
+        continue;
+      // (Matched by where they lie, the old forward one perhaps the new reversed one.)
+      const bool swap = oc->Value(of).Distance(nc2->Value(nf2)) + oc2->Value(of2).Distance(nc->Value(nf)) < oc->Value(of).Distance(nc->Value(nf)) + oc2->Value(of2).Distance(nc2->Value(nf2)) - 1e-9;
+      const occ::handle<Geom2d_Curve> a1 = swap ? nc2 : nc, a2 = swap ? nc : nc2;
+      const double                    s1 = swap ? nf2 : nf, s2 = swap ? nf : nf2;
+      const occ::handle<Geom2d_Curve> m1 = occ::down_cast<Geom2d_Curve>(a1->Translated(period_shift(oc, of, a1, s1)));
+      const occ::handle<Geom2d_Curve> m2 = occ::down_cast<Geom2d_Curve>(a2->Translated(period_shift(oc2, of2, a2, s2)));
+      B.UpdateEdge(ne, m1, m2, F, BRep_Tool::Tolerance(ne));
+      continue;
+    }
     const gp_Vec2d            off(oc->Value(of).XY() - nc->Value(nf).XY());
     const double              du  = S.IsUPeriodic() ? std::round(off.X() / S.UPeriod()) * S.UPeriod() : 0.0;
     const double              dv  = S.IsVPeriodic() ? std::round(off.Y() / S.VPeriod()) * S.VPeriod() : 0.0;
@@ -13267,6 +13293,27 @@ TopoDS_Shape without_tangent_slivers(const TopoDS_Shape& r, const TopoDS_Shape& 
   return out;
 }
 } // namespace
+
+std::unique_ptr<OcShape> concat_edges(const OcShapeList& edges)
+{
+  BRep_Builder b;
+  TopoDS_Wire  w;
+  b.MakeWire(w);
+  int n = 0;
+  for (const TopoDS_Shape& e : edges.items)
+  {
+    b.Add(w, as_edge(e, "edge"));
+    ++n;
+  }
+  if (n == 0)
+    fail_invalid("concat_edges: no edges");
+  if (n == 1)
+    return wrap(edges.items.front());
+  const TopoDS_Edge one = BRepAlgo::ConcatenateWireC0(w);
+  if (one.IsNull())
+    fail_op("concat_edges: the edges don't chain");
+  return wrap(one);
+}
 
 std::unique_ptr<OcShape> project_along(const OcShape& curves, const OcShape& target, P3 dir)
 {

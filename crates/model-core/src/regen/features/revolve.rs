@@ -102,6 +102,18 @@ fn surface(ev: &mut EvalCtx) -> FResult<()> {
             tools.push(partial(ev, &p, origin, axis)?);
         }
     }
+    // Add sews each to the sheets it meets (live c2-opt-revolve-surface-add-mirror-reapply's Revolve 2: one sheet).
+    // Nothing to join: live's INFO BOOLEAN_UNION_NO_OP (its Revolve 3), a sheet of its own.
+    if ev.is("surfaceOperationType", "ADD") {
+        let (before, n) = (ev.ctx.bodies.len(), tools.len());
+        for t in tools {
+            super::bshared::surface_result(ev, t)?;
+        }
+        if ev.ctx.bodies.len() == before + n {
+            ev.infos.push(crate::regen::eval::NO_GEOMETRY_CHANGE.into());
+        }
+        return Ok(());
+    }
     ev.apply_operation(tools, "NEW", None, BodyKind::Surface)
 }
 
@@ -163,10 +175,13 @@ fn side_end(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3, first: bool) 
         // flip only applies to the up-to types (live oracle_p1 R4/R4b).
         return Ok(Side::Angle(if first { ev.angle("angle")? } else { ev.angle("angleBack")?.rem_euclid(TAU) }));
     }
-    // Positive offsets stop short of the bounding entity.
+    // An offset turns the bound on the revolve's own way: the end past the entity, the start (whose `axis` here is
+    // the revolve's reversed) short of it (live c2-opt-revolve-thin-up-to: end up to Right + 10 deg, 100 deg;
+    // c2-opt-revolve-start-bound: start up to Right + 15 deg, from 105 deg).
     let off = if ev.bool(has_off) {
         let o = ev.angle(off_id)?;
-        if ev.bool(off_flip) { -o } else { o }
+        let o = if ev.bool(off_flip) { -o } else { o };
+        if first { -o } else { o }
     } else {
         0.0
     };
@@ -230,8 +245,9 @@ fn big_face(ev: &EvalCtx, pl: &k::Plane) -> FResult<Shape> {
 }
 
 /// Named revolve of one side up to its end, around `axis` (already
-/// oriented). `cap_end` names the far cap.
-fn revolve_side(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3, side: Side, cap_end: bool) -> FResult<NamedShape> {
+/// oriented). `cap_end` names the far cap. `past` (an up-to start bound): the turn after the first hit instead, from it
+/// round to the profile (live c2-opt-revolve-start-bound: start up to Right + 15 deg, end 45: 300 deg).
+fn revolve_side(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3, side: Side, cap_end: bool, past: bool) -> FResult<NamedShape> {
     let far_role = |p: &Profile| if cap_end { Role::CapEnd(Some(p.key.clone())) } else { Role::CapStart(Some(p.key.clone())) };
     match side {
         Side::Angle(a) => {
@@ -241,7 +257,10 @@ fn revolve_side(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3, side: Sid
         }
         Side::Tool(tool) => {
             // Almost a full turn, split by the bounding entity.
-            let res = k::revolve(&p.shape, origin, axis, TAU * (1.0 - 1e-4)).map_err(|_| fe("Could not create revolve with provided bounds. Check input."))?;
+            // (Past the hit: the sliver left out at the start, so the last piece ends on the profile, where the other side
+            // starts.)
+            let res = if past { k::revolve_between(&p.shape, origin, axis, TAU * 1e-4, TAU) } else { k::revolve(&p.shape, origin, axis, TAU * (1.0 - 1e-4)) };
+            let res = res.map_err(|_| fe("Could not create revolve with provided bounds. Check input."))?;
             let names = names_for(&res.shape, side_names(ev, p, &res, &far_role(p)));
             let split = k::split(std::slice::from_ref(&res.shape), std::slice::from_ref(&tool), &k::BooleanOptions::default()).map_err(|_| fe("Could not create revolve with provided bounds. Check input."))?;
             // Faces coming from the tool are the new end cap.
@@ -256,15 +275,19 @@ fn revolve_side(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3, side: Sid
             // The piece containing the start of the sweep.
             let start = profile_point(p)?;
             let probe = k::Transform::Rotate { origin, axis, angle: 1e-3 }.matrix().transform_point3(start);
-            let piece = split
-                .shape
-                .solids()
-                .into_iter()
-                .find(|s| matches!(s.classify_point(probe, 1e-9), Ok(k::PointClass::Inside)))
+            let solids = split.shape.solids();
+            let first = solids
+                .iter()
+                .position(|s| matches!(s.classify_point(probe, 1e-9), Ok(k::PointClass::Inside)))
                 .ok_or_else(|| fe("Could not create revolve with provided bounds. Check input."))?;
-            if piece.volume().unwrap_or(0.0) >= res.shape.volume().unwrap_or(0.0) * (1.0 - 1e-6) {
+            if solids[first].volume().unwrap_or(0.0) >= res.shape.volume().unwrap_or(0.0) * (1.0 - 1e-6) {
                 return err("Could not create revolve with provided bounds. Check input.");
             }
+            let piece = if past {
+                Shape::compound(&solids.iter().enumerate().filter(|(i, _)| *i != first).map(|(_, s)| s.clone()).collect::<Vec<_>>())
+            } else {
+                solids[first].clone()
+            };
             let faces = piece
                 .faces()
                 .iter()
@@ -319,12 +342,12 @@ fn partial(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3) -> FResult<Nam
             let res = k::revolve_between(&p.shape, origin, axis, if start < a { start } else { start - TAU }, a).map_err(revolve_failed)?;
             Ok(NamedShape::new(res.shape.clone(), sweep_names(ev, p, &res, true, true)))
         }
-        (first, None) => revolve_side(ev, p, origin, axis, first, true),
+        (first, None) => revolve_side(ev, p, origin, axis, first, true, false),
         // Up to an entity from a blind start angle: the profile turned to
         // the start first.
         (first, Some(Side::Angle(start))) if ev.is("startBound", "BLIND") => {
             if start.abs() < 1e-12 {
-                return revolve_side(ev, p, origin, axis, first, true);
+                return revolve_side(ev, p, origin, axis, first, true, false);
             }
             let turned = Profile {
                 shape: p.shape.transformed(&k::Transform::Rotate { origin, axis, angle: start })?,
@@ -333,11 +356,14 @@ fn partial(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3) -> FResult<Nam
                 key: p.key.clone(),
                 from_face: p.from_face,
             };
-            revolve_side(ev, &turned, origin, axis, first, true)
+            revolve_side(ev, &turned, origin, axis, first, true, false)
         }
         (first, Some(second)) => {
-            let a = revolve_side(ev, p, origin, axis, first, true)?;
-            let b = revolve_side(ev, p, origin, -axis, second, false)?;
+            let a = revolve_side(ev, p, origin, axis, first, true, false)?;
+            // An up-to start is met turning the revolve's own way (opRevolve's start sense: its flag against the
+            // end's); turned the other way with Start opposite direction.
+            let own_way = matches!(second, Side::Tool(_)) && ev.bool("startOppositeDirection") == ev.bool("oppositeDirection");
+            let b = if own_way { revolve_side(ev, p, origin, axis, second, false, true)? } else { revolve_side(ev, p, origin, -axis, second, false, false)? };
             let fused = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&a.shape), std::slice::from_ref(&b.shape), &k::BooleanOptions::default())?;
             let names = ev.name_result(&[&a.names, &b.names], &fused.history, &fused.shape, &BTreeMap::new(), None);
             let unified = k::unify_same_domain(&fused.shape)?;

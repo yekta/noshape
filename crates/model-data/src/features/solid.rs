@@ -357,6 +357,8 @@ pub fn hole() -> FeatureType {
         hidden(ParamSpec::text("asVersion", "Version", "")),
         hidden(ParamSpec::enum_("threadStandard", "Thread standard", &[("UNSET", "Unset"), ("ANSI", "ANSI"), ("ISO", "ISO")])),
         hidden(ParamSpec::bool("hasClearance", "Has clearance", false)),
+        // A legacy hole's Blind in last: through every part but the last, then the tap drill Depth into the last.
+        hidden(ParamSpec::bool("blindInLast", "Blind in last", false)),
         hidden(ParamSpec::bool("showTappedDepth", "Tapped details", false)),
         hidden(ParamSpec::num("majorDiameter", "Tap major diameter", NumSpec::positive_length(5.0, 0.25))),
         hidden(ParamSpec::bool("isMultiple", "Multiple", false)),

@@ -238,6 +238,10 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
     // A whole cylinder's pieces: the faces left on one surface are one face, as Parasolid's (c2-rib-wrap's disc: its
     // lobe and the cut are one cylinder, 3 faces).
     let whole_cylinder = !ev.bool("useTrimmed") && matches!(tool_ref, Reference::Face(_)) && matches!(tool.shape.face_surface(), Ok(k::Surface::Cylinder { .. }));
+    // A face's plane through its own part: the cut and the face it came from one face, as Parasolid's (c2-body-draft-naming's
+    // Split 2 at Extrude 1's cap: live's box 6/12/8). Only faces on the plane merge (the boss's Split 1 imprint stays).
+    let face_plane = tool.plane.filter(|_| matches!(tool_ref, Reference::Face(_)));
+    let on_plane = |f: &Shape, pl: &k::Plane| f.face_plane().ok().flatten().is_some_and(|q| q.normal.cross(pl.normal).length() < 1e-9 && (q.origin - pl.origin).dot(pl.normal).abs() < 1e-7);
     let both = ev.bool("keepBothSides");
     let front = ev.bool("keepFront");
     let mut changed = false;
@@ -255,6 +259,18 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
             .into_iter()
             .filter(|p| !p.shape.is_null())
             .map(|p| {
+                if let Some(pl) = &face_plane {
+                    let off = |s: &Shape| s.faces().iter().filter(|f| !on_plane(f, pl)).count();
+                    if p.shape.faces().iter().filter(|f| on_plane(f, pl)).count() < 2 {
+                        return Ok(p);
+                    }
+                    let un = k::unify_same_domain(&p.shape)?;
+                    if un.shape.count(ShapeType::Face) >= p.shape.count(ShapeType::Face) || off(&un.shape) != off(&p.shape) {
+                        return Ok(p);
+                    }
+                    let names = ev.name_result(&[&p.names], &un.history, &un.shape, &BTreeMap::new(), None);
+                    return Ok(NamedShape { names: names_for(&un.shape, names), shape: un.shape });
+                }
                 if !whole_cylinder {
                     return Ok(p);
                 }

@@ -751,7 +751,14 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
             res
         };
         let names = sweep_names(ev, p, &res, true, true);
-        tools.push(NamedShape::new(res.shape, names));
+        // Twisted or scaled, OCCT's sweep leaves the profile's straight edges at its ends B-splines: lines, as live's
+        // (c2-opt-sweep-twist-scale's Sweep 1: 8 lines, 4 helices).
+        let shape = if opts.twist != 0.0 || opts.scale_end != 1.0 {
+            k::straighten_edges(&res.shape, 1e-6).ok().filter(|s| s.count(ShapeType::Face) == res.shape.count(ShapeType::Face) && s.is_valid()).unwrap_or(res.shape)
+        } else {
+            res.shape
+        };
+        tools.push(NamedShape::new(shape, names));
     }
     let op = ev.enum_("operationType").to_string();
     let scope = super::extrude::scope(ev);
@@ -1062,6 +1069,15 @@ fn loft_sections(ev: &EvalCtx, items: &[ParamValues], query_id: &str, wire: bool
                 let f = ev.face_shape(bi, fi)?;
                 if let Some(w) = f.wires().first() {
                     wires.push(w.clone());
+                }
+            }
+            // A sketch region too (live c2-opt-loft-periodic-trim-thin's thin Loft 2).
+            let regions: Vec<Reference> = refs.iter().filter(|r| matches!(r, Reference::SketchRegion { .. })).cloned().collect();
+            if !regions.is_empty() {
+                for p in ev.profiles(&regions)? {
+                    if let Some(w) = p.shape.wires().first() {
+                        wires.push(w.clone());
+                    }
                 }
             }
             if wires.len() != 1 {
@@ -1445,18 +1461,27 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
                 return ev.apply_operation(tools, &op, scope, BodyKind::Solid);
             }
             let (mut outer, mut inner) = (Vec::new(), Vec::new());
-            for s in &shapes {
-                let (o, i) = super::thin::wall_loops(s, t1, t2).map_err(|_| failed())?;
-                outer.push(o);
-                inner.push(i);
+            // (Between two polygons on planar sides, each side's wall offset along its normal, ruled: live's lines.)
+            let normal = if shapes.len() == 2 { shapes.iter().map(|s| super::thin::normal_wall_loops(s, &res.shape, t1, t2)).collect::<Option<Vec<_>>>() } else { None };
+            let ruled = normal.is_some();
+            if let Some(loops) = normal {
+                (outer, inner) = loops.into_iter().unzip();
+            } else {
+                for s in &shapes {
+                    let (o, i) = super::thin::wall_loops(s, t1, t2).map_err(|_| failed())?;
+                    outer.push(o);
+                    inner.push(i);
+                }
             }
-            let solid_opts = k::LoftOptions { solid: true, ..opts.clone() };
+            let solid_opts = k::LoftOptions { solid: true, ruled: ruled || opts.ruled, ..opts.clone() };
             let o = k::loft(&outer, &solid_opts).map_err(|_| failed())?.shape;
             let i = k::loft(&inner, &solid_opts).map_err(|_| failed())?.shape;
             let wall = k::boolean(k::BooleanOp::Cut, &[o], &[i], &k::BooleanOptions::default()).map_err(|_| failed())?.shape;
             if wall.count(ShapeType::Solid) == 0 {
                 return Err(failed());
             }
+            // (The ruled loft's straight edges are B-splines: lines, as live's.)
+            let wall = if ruled { k::straighten_edges(&wall, 1e-9).ok().filter(|s| s.count(ShapeType::Face) == wall.count(ShapeType::Face) && s.is_valid()).unwrap_or(wall) } else { wall };
             let names = super::helpers_a::name_new(ev, &wall);
             let tools = vec![NamedShape::new(wall, names)];
             let op = ev.enum_("operationType").to_string();
@@ -1601,6 +1626,7 @@ pub fn thicken(ev: &mut EvalCtx) -> FResult<()> {
     let mut picked: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
     // Corner fills of each body's picked faces (by body).
     let mut fills: Vec<(usize, Shape)> = Vec::new();
+    let regions = refs.iter().any(|r| matches!(r, Reference::SketchRegion { .. }));
     for r in refs {
         match r {
             Reference::SketchRegion { .. } => {
@@ -1712,6 +1738,11 @@ pub fn thicken(ev: &mut EvalCtx) -> FResult<()> {
         consumed.sort();
         consumed.dedup();
         remove_bodies(ev, &consumed);
+    }
+    // Each surface's or part's slab a part of its own, overlapping too (c2-surfaces-lofts-projected Thicken 1: two
+    // parts); a sketch's regions as an Extrude's.
+    if op == "NEW" && !regions {
+        return ev.add_new_apart(tools, BodyKind::Solid);
     }
     let scope = ids_to_indices(ev, &scope);
     ev.apply_operation(tools, &op, scope, BodyKind::Solid)
@@ -2041,10 +2072,17 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
             };
             ev.replace_body(bi, shape, names);
         } else {
-            // (The ribs alone: each was cut against the part already.)
-            let shape = if ribs.len() == 1 { ribs.remove(0) } else { k::boolean(k::BooleanOp::Fuse, &ribs[..1], &ribs[1..], &k::BooleanOptions::default())?.shape };
-            let names = name_new(ev, &shape);
-            new_ribs.push(NamedShape::new(shape, names));
+            // The ribs alone, each its own part where they touch too (rib.fs: one body per profile, no Boolean;
+            // c2-genesis-trunk-hanger's Rib 2: five 6-face boxes). Each was cut against the part already; the cut's seams
+            // on its faces go (ours were 12/26/16).
+            for shape in ribs {
+                let shape = match k::unify_same_domain(&shape) {
+                    Ok(un) if crate::regen::eval::unify_merged(&shape, &un.shape) => un.shape,
+                    _ => shape,
+                };
+                let names = name_new(ev, &shape);
+                new_ribs.push(NamedShape::new(shape, names));
+            }
         }
     }
     if made == 0 {

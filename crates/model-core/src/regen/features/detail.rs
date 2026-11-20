@@ -1496,7 +1496,7 @@ fn rim_flipped(shape: &k::Shape, edges: &[usize], i: usize, overrides: &BTreeSet
 /// Onshape's entity order; along a chain of connected edges the chain's first
 /// edge decides and the others keep to the same side of it; a direction
 /// override flips its whole chain, Opposite direction every edge.
-fn distance_one_faces(ev: &EvalCtx, body: &crate::regen::context::Body, edges: &[usize], overrides: &BTreeSet<usize>, opposite: bool) -> FResult<Vec<k::Shape>> {
+pub fn distance_one_faces(ev: &EvalCtx, body: &crate::regen::context::Body, edges: &[usize], overrides: &BTreeSet<usize>, opposite: bool) -> FResult<Vec<k::Shape>> {
     let adjacency = body.shape.edge_faces()?;
     let faces: Vec<[usize; 2]> = edges
         .iter()

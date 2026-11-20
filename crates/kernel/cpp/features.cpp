@@ -132,6 +132,7 @@
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepTools_Modification.hxx>
 #include <BRepTools_Modifier.hxx>
+#include <Geom_OffsetSurface.hxx>
 #include <GeomAPI_IntSS.hxx>
 #include <GeomAPI_ExtremaCurveCurve.hxx>
 #include <BRepAdaptor_Curve.hxx>
@@ -5311,6 +5312,104 @@ static bool has_sharp_inner_edge(const TopoDS_Shape& sheet)
   return false;
 }
 
+namespace {
+static double accurate(const TopoDS_Shape& part);
+static void   analytic_blend_edges(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h, double tol, bool any_surface = false);
+static void   analytic_blend_faces(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h);
+} // namespace
+
+namespace {
+// Offset surfaces that are planes or cylinders as those (OCCT's simple offset leaves Geom_OffsetSurface; Parasolid's
+// offset of a plane or cylinder is one), parameters kept: each face's pcurves stay.
+class OffsetsToElementary : public BRepTools_Modification
+{
+public:
+  NCollection_DataMap<TopoDS_Shape, occ::handle<Geom_Surface>, TopTools_ShapeMapHasher> made;
+
+  void prepare(const TopoDS_Shape& shape)
+  {
+    for (TopExp_Explorer x(shape, TopAbs_FACE); x.More(); x.Next())
+    {
+      const TopoDS_Face&                    f   = TopoDS::Face(x.Current());
+      TopLoc_Location                       l;
+      const occ::handle<Geom_OffsetSurface> off = occ::down_cast<Geom_OffsetSurface>(BRep_Tool::Surface(f, l));
+      if (off.IsNull() || made.IsBound(f.Oriented(TopAbs_FORWARD)))
+        continue;
+      const occ::handle<Geom_Surface> eq = off->Surface();
+      if (eq.IsNull() || !(eq->IsKind(STANDARD_TYPE(Geom_Plane)) || eq->IsKind(STANDARD_TYPE(Geom_CylindricalSurface))))
+        continue;
+      // (The same parameters: the pcurves carried over.)
+      double u0, u1, v0, v1;
+      BRepTools::UVBounds(f, u0, u1, v0, v1);
+      bool same = true;
+      for (const double a : {0.0, 0.5, 1.0})
+        for (const double b : {0.0, 0.5, 1.0})
+        {
+          const double u = u0 + (u1 - u0) * a, v = v0 + (v1 - v0) * b;
+          same = same && eq->Value(u, v).Distance(off->Value(u, v)) < 1e-9;
+        }
+      if (same)
+        made.Bind(f.Oriented(TopAbs_FORWARD), eq);
+    }
+  }
+
+  bool NewSurface(const TopoDS_Face& F, occ::handle<Geom_Surface>& S, TopLoc_Location& L, double& Tol, bool& RevWires, bool& RevFace) override
+  {
+    const TopoDS_Shape k = F.Oriented(TopAbs_FORWARD);
+    if (!made.IsBound(k))
+      return false;
+    TopLoc_Location l;
+    (void)BRep_Tool::Surface(F, l);
+    S        = made(k);
+    L        = l;
+    Tol      = BRep_Tool::Tolerance(F);
+    RevWires = false;
+    RevFace  = false;
+    return true;
+  }
+  bool NewCurve(const TopoDS_Edge&, occ::handle<Geom_Curve>&, TopLoc_Location&, double&) override { return false; }
+  bool NewPoint(const TopoDS_Vertex&, gp_Pnt&, double&) override { return false; }
+  bool NewCurve2d(const TopoDS_Edge& E, const TopoDS_Face& F, const TopoDS_Edge&, const TopoDS_Face&, occ::handle<Geom2d_Curve>& C, double& Tol) override
+  {
+    if (!made.IsBound(F.Oriented(TopAbs_FORWARD)))
+      return false;
+    double f = 0, l = 0;
+    C = BRep_Tool::CurveOnSurface(E, F, f, l);
+    if (C.IsNull())
+      return false;
+    Tol = BRep_Tool::Tolerance(E);
+    return true;
+  }
+  bool NewParameter(const TopoDS_Vertex&, const TopoDS_Edge&, double&, double&) override { return false; }
+  GeomAbs_Shape Continuity(const TopoDS_Edge& E, const TopoDS_Face& F1, const TopoDS_Face& F2, const TopoDS_Edge&, const TopoDS_Face&, const TopoDS_Face&) override
+  {
+    return BRep_Tool::Continuity(E, F1, F2);
+  }
+};
+
+// `r`'s offset planes and cylinders made those, recorded in `h`; unchanged where that isn't valid.
+static void elementary_offsets(TopoDS_Shape& r, HHist& h)
+{
+  occ::handle<OffsetsToElementary> m = new OffsetsToElementary();
+  m->prepare(r);
+  if (m->made.IsEmpty())
+    return;
+  BRepTools_Modifier mod(r, m);
+  if (!mod.IsDone() || !BRepCheck_Analyzer(mod.ModifiedShape(r)).IsValid())
+    return;
+  const TopoDS_Shape out = mod.ModifiedShape(r);
+  occ::handle<BRepTools_History> mh = new BRepTools_History();
+  for (const TopAbs_ShapeEnum t : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+    for (TopExp_Explorer x(r, t); x.More(); x.Next())
+      if (!mod.ModifiedShape(x.Current()).IsSame(x.Current()))
+        mh->AddModified(x.Current(), mod.ModifiedShape(x.Current()));
+  if (h.IsNull())
+    h = new BRepTools_History();
+  h->Merge(mh);
+  r = out;
+}
+} // namespace
+
 OpOut op_thicken(const OcShape& s, double t1, double t2)
 {
   for (TopExp_Explorer x(s.shape, TopAbs_FACE); x.More(); x.Next())
@@ -5427,7 +5526,37 @@ OpOut op_thicken(const OcShape& s, double t1, double t2)
   // volume) depending on the face orientation and the offset sign: orient
   // every solid outward. Only orientations change, so sub-shape identities
   // (and therefore the history) stay valid.
-  return make_result(args, orient_solids_outward(mk.Shape()), hist.get());
+  TopoDS_Shape r = orient_solids_outward(mk.Shape());
+  // (Its offset edges approximated: lines and circles where they are, as live's (c2-surfaces-lofts-projected's
+  // Thicken 1 of two cylinder strips); kept only if the solid stays as it was, outward and its volume. Only for a
+  // sheet of planes and cylinders: on free-form ones the checks' accurate volumes are slow (thin_sweep_as_live).)
+  bool elementary = true;
+  for (TopExp_Explorer x(s.shape, TopAbs_FACE); x.More() && elementary; x.Next())
+  {
+    const GeomAbs_SurfaceType t = BRepAdaptor_Surface(TopoDS::Face(x.Current()), false).GetType();
+    elementary = t == GeomAbs_Plane || t == GeomAbs_Cylinder;
+  }
+  TopoDS_Shape exact = r;
+  HHist        exact_hist;
+  if (elementary)
+  {
+    elementary_offsets(exact, exact_hist);
+    analytic_blend_faces(base, exact, exact_hist);
+    analytic_blend_edges(base, exact, exact_hist, accurate(base), true);
+  }
+  if (!exact_hist.IsNull())
+  {
+    exact = orient_solids_outward(exact);
+    GProp_GProps a, b;
+    BRepGProp::VolumeProperties(r, a, 1e-9);
+    BRepGProp::VolumeProperties(exact, b, 1e-9);
+    if (BRepCheck_Analyzer(exact).IsValid() && a.Mass() > 0 && std::abs(a.Mass() - b.Mass()) <= 1e-5 * a.Mass())
+    {
+      merge_into(hist, exact_hist);
+      r = exact;
+    }
+  }
+  return make_result(args, r, hist.get());
 }
 
 OpOut op_shell(const OcShape& solid_in, const OcShapeList& faces_in, double thickness, uint8_t join)
@@ -6544,7 +6673,7 @@ static double tighten_new_tolerances(const TopoDS_Shape& input, const TopoDS_Sha
 // circles within `tol`: rebuilt exact, as Parasolid's (asm-suspension's Joint 805e29 Fillet 1: r 40 between parallel
 // cylinders, live's lines along them and circles on the end planes). Kept only when the solid stays valid and its volume
 // the same.
-static void analytic_blend_edges(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h, double tol)
+static void analytic_blend_edges(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h, double tol, bool any_surface)
 {
   ShapeIMap old;
   TopExp::MapShapes(input, TopAbs_EDGE, old);
@@ -6558,13 +6687,16 @@ static void analytic_blend_edges(const TopoDS_Shape& input, TopoDS_Shape& r, HHi
     if (old.Contains(e) || BRep_Tool::Degenerated(e) || ef(i).Extent() != 2)
       continue;
     const GeomAbs_CurveType type = BRepAdaptor_Curve(e).GetType();
-    if (type != GeomAbs_BSplineCurve && type != GeomAbs_BezierCurve)
+    // (Thicken's offset edges may be offset curves: fitted first.)
+    const bool fit = any_surface && (type == GeomAbs_OffsetCurve || type == GeomAbs_OtherCurve);
+    if (type != GeomAbs_BSplineCurve && type != GeomAbs_BezierCurve && !fit)
       continue;
+    // (Thicken's offset faces may be offset or extrusion surfaces: `any_surface`.)
     bool elementary = true;
     for (const TopoDS_Shape& f : ef(i))
     {
       const GeomAbs_SurfaceType t = BRepAdaptor_Surface(TopoDS::Face(f), false).GetType();
-      elementary = elementary && (t == GeomAbs_Plane || t == GeomAbs_Cylinder || t == GeomAbs_Cone || t == GeomAbs_Sphere || t == GeomAbs_Torus);
+      elementary = elementary && (any_surface || t == GeomAbs_Plane || t == GeomAbs_Cylinder || t == GeomAbs_Cone || t == GeomAbs_Sphere || t == GeomAbs_Torus);
     }
     if (!elementary)
       continue;
@@ -6575,12 +6707,20 @@ static void analytic_blend_edges(const TopoDS_Shape& input, TopoDS_Shape& r, HHi
       continue;
     if (!loc.IsIdentity())
       c = occ::down_cast<Geom_Curve>(c->Transformed(loc.Transformation()));
+    if (fit)
+    {
+      GeomConvert_ApproxCurve approx(new Geom_TrimmedCurve(c, f, l), 0.1 * tol, GeomAbs_C2, 50, 9);
+      if (!approx.HasResult())
+        continue;
+      c = approx.Curve();
+      f = c->FirstParameter();
+      l = c->LastParameter();
+    }
     GeomConvert_CurveToAnaCurve conv(c);
     occ::handle<Geom_Curve>     ana;
     double                      nf = 0, nl = 0;
-    if (!conv.ConvertToAnalytical(tol, ana, f, l, nf, nl) || ana.IsNull() || conv.Gap() > tol)
-      continue;
-    if (!ana->IsKind(STANDARD_TYPE(Geom_Line)) && !ana->IsKind(STANDARD_TYPE(Geom_Circle)))
+    const bool                  ok = conv.ConvertToAnalytical(tol, ana, f, l, nf, nl) && !ana.IsNull() && conv.Gap() <= tol;
+    if (!ok || (!ana->IsKind(STANDARD_TYPE(Geom_Line)) && !ana->IsKind(STANDARD_TYPE(Geom_Circle))))
       continue;
     any = edge_on_curve(e, ana, ef(i), rs, tol) || any;
   }
@@ -6590,9 +6730,18 @@ static void analytic_blend_edges(const TopoDS_Shape& input, TopoDS_Shape& r, HHi
   if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
     return;
   GProp_GProps a, b;
-  BRepGProp::VolumeProperties(r, a);
-  BRepGProp::VolumeProperties(out, b);
-  if (std::abs(a.Mass() - b.Mass()) > 1e-8 * std::abs(a.Mass()))
+  // (Thicken's offsets were approximations within ~5e-6 of the volume: the exact curves' differs that much.)
+  if (any_surface)
+  {
+    BRepGProp::VolumeProperties(r, a, 1e-9);
+    BRepGProp::VolumeProperties(out, b, 1e-9);
+  }
+  else
+  {
+    BRepGProp::VolumeProperties(r, a);
+    BRepGProp::VolumeProperties(out, b);
+  }
+  if (std::abs(a.Mass() - b.Mass()) > (any_surface ? 1e-5 : 1e-8) * std::abs(a.Mass()))
     return;
   if (h.IsNull())
     h = new BRepTools_History();

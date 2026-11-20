@@ -2417,6 +2417,30 @@ fn rib_of_an_l_normal_to_its_plane_as_live() {
     assert!((thick[0].0 - 3552.0).abs() < 1e-6, "{thick:?}");
 }
 
+/// Unmerged ribs are a part each where they cross too (rib.fs: one body per profile, no Boolean; live
+/// c2-genesis-trunk-hanger's Rib 2, five 6-face boxes): the + across the open box's pocket, Merge ribs off: the box and
+/// two 6-face ribs, 576 and 256 mm³.
+#[test]
+fn crossing_ribs_unmerged_are_a_part_each() {
+    let mut t = T::new();
+    let (_, x) = t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let top = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+    let ps = t.sketch(Reference::FeaturePlane(top), rect(0.002, 0.002, 0.038, 0.018));
+    let r = t.regions(ps)[0].clone();
+    let cut = t.extrude(r, "8 mm", "REMOVE");
+    t.set(cut, "oppositeDirection", b(true));
+    let mut sk = noshape_sketch::Sketch::new();
+    let a = sk.add_line(DVec2::new(0.002, 0.01), DVec2::new(0.038, 0.01));
+    let c = sk.add_line(DVec2::new(0.02, 0.002), DVec2::new(0.02, 0.018));
+    let s = t.sketch(Reference::FeaturePlane(top), sk);
+    let profiles = q(vec![Reference::SketchEntity { sketch: s, entity: a.0 }, Reference::SketchEntity { sketch: s, entity: c.0 }]);
+    t.add("rib", &[("profiles", profiles), ("parts", q(vec![Reference::Body(BodyId { feature: x, index: 0 })])), ("thickness", e("2 mm")), ("ribExtrusionDirection", en("NORMAL_TO_SKETCH_PLANE")), ("oppositeDirection", b(true)), ("mergeRibs", b(false))]);
+    let res = t.ok();
+    let mut ribs: Vec<(i64, usize)> = res.context.bodies.iter().skip(1).map(|b| ((b.shape.volume().unwrap() * 1e9).round() as i64, b.shape.faces().len())).collect();
+    ribs.sort();
+    assert_eq!((res.context.bodies.len(), ribs), (3, vec![(256, 6), (576, 6)]));
+}
+
 /// Crossing ribs as rib.fs builds them: each against the part as it was, all merged at once (one Boolean): two ribs
 /// across the open box's pocket in a +, 2 mm, down to its floor: 576 + 256 - 32 mm³ more.
 #[test]
