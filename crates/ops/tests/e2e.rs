@@ -4435,16 +4435,8 @@ fn drawing_hatch_regions() {
     assert_eq!(e.param.as_deref(), Some("pattern"), "{e:?}");
 }
 
-#[test]
-fn drawing_custom_table_from_a_feature_studio() {
-    let mut ctx = Ctx::new();
-    // Another document with a block at V1 (Select a Part Studio › Other documents).
-    block_with_hole(&mut ctx, "drawing_custom_table_lib");
-    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
-    let lib = format!("{}.noshape", scratch("drawing_custom_table_lib").display());
-    block_with_hole(&mut ctx, "drawing_custom_table.noshape");
-    call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
-    let src = r#"FeatureScript 3095;
+/// A Feature Studio table listing each part with its face count.
+const PART_FACES_FS: &str = r#"FeatureScript 3095;
 import(path : "onshape/std/geometry.fs", version : "3095.0");
 annotation { "Table Type Name" : "Part faces" }
 export const partFaces = defineTable(function(context is Context, definition is map) returns Table
@@ -4459,7 +4451,45 @@ export const partFaces = defineTable(function(context is Context, definition is 
         return table("Faces", columns, rows);
     });
 "#;
-    call(&mut ctx, "featurestudio_edit", json!({ "source": src }));
+
+/// Split custom table below on a Part faces table of two parts (live drw-custom-table-split): the first keeps the
+/// header and Part 1, the second the header and Part 2, 3 mm under it with the same left edge.
+#[test]
+fn drawing_custom_table_splits_below() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_custom_table_split.noshape");
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top", "name": "Part 2" }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[60, -10], [80, 10]] }));
+    let r = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [r], "depth": "10 mm", "operationType": "NEW" } }));
+    call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+    call(&mut ctx, "featurestudio_edit", json!({ "source": PART_FACES_FS }));
+    call(&mut ctx, "featurestudio_commit", json!({}));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let id = call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "table": "Part faces", "position": [400, 280] }))["table"].clone();
+    let r = call(&mut ctx, "drawing_table_edit", json!({ "drawing": tab, "table": id, "action": "split", "row": 1 }));
+    let second = r["table"].clone();
+    let ts = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["tables"].as_array().unwrap().clone();
+    let (a, b) = (ts.iter().find(|t| t["id"] == id).unwrap(), ts.iter().find(|t| t["id"] == second).unwrap());
+    assert_eq!((a["header"].clone(), b["header"].clone()), (json!(["Part", "Faces"]), json!(["Part", "Faces"])), "{a} {b}");
+    assert_eq!((a["rows"].as_array().unwrap().len(), b["rows"].as_array().unwrap().len()), (1, 1), "{a} {b}");
+    assert_ne!(a["rows"][0][0], b["rows"][0][0], "Part 1 above, Part 2 below: {a} {b}");
+    let gap = num(&a["bounds"]["min"][1]) - num(&b["bounds"]["max"][1]);
+    assert!((gap - 3.0).abs() < 0.01, "3 mm under it: gap {gap}: {a} {b}");
+    assert!((num(&a["bounds"]["min"][0]) - num(&b["bounds"]["min"][0])).abs() < 0.01, "left edges aligned: {a} {b}");
+}
+
+#[test]
+fn drawing_custom_table_from_a_feature_studio() {
+    let mut ctx = Ctx::new();
+    // Another document with a block at V1 (Select a Part Studio › Other documents).
+    block_with_hole(&mut ctx, "drawing_custom_table_lib");
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    let lib = format!("{}.noshape", scratch("drawing_custom_table_lib").display());
+    block_with_hole(&mut ctx, "drawing_custom_table.noshape");
+    call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+    call(&mut ctx, "featurestudio_edit", json!({ "source": PART_FACES_FS }));
     call(&mut ctx, "featurestudio_commit", json!({}));
     let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();

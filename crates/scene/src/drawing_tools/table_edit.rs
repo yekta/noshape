@@ -202,7 +202,9 @@ pub fn split_table(s: &mut Sheet, id: u64, l: &TableLayout, split: usize) -> Opt
     second.rows = Some([split, b]);
     let head = l.title as usize + 1;
     let cut = l.ys.get(head + split.saturating_sub(a)).copied();
-    if let (TableKind::Hole { bottom_to_top: false, .. } | TableKind::Bom { bottom_to_top: false, .. }, Some(cut), Some(&top), Some(&bottom), Some(&head_y)) = (&second.kind, cut, l.ys.first(), l.ys.last(), l.ys.get(head)) {
+    // A top-down BOM, Hole or custom table's part goes 3 mm under it, left edges aligned (live2 tables-1118, live
+    // drw-custom-table-split); the others beside it.
+    if let (TableKind::Hole { bottom_to_top: false, .. } | TableKind::Bom { bottom_to_top: false, .. } | TableKind::Custom { bottom_to_top: false, .. }, Some(cut), Some(&top), Some(&bottom), Some(&head_y)) = (&second.kind, cut, l.ys.first(), l.ys.last(), l.ys.get(head)) {
         let new_top = cut - 3.0;
         second.position[1] = match second.corner {
             TableCorner::TopLeft | TableCorner::TopRight => new_top,

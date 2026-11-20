@@ -187,7 +187,8 @@ impl DrawingEditor {
         let lab = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(label));
         let x = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false));
         let y = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false));
-        let count = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value("1"));
+        // An emptied count reads a grey 1 and is one instance, no error (live drw-datum-empty-field s22-23).
+        let count = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("1").default_value("1"));
         let k = self.datum_dlg.as_ref().map(|d| d.rows.len()).unwrap_or(0);
         let mut subs = Vec::new();
         for st in [&lab, &x, &y, &count] {
@@ -220,7 +221,8 @@ impl DrawingEditor {
         let (dx, dy) = (dist(&row.x), dist(&row.y));
         // Angle: Diameter distance, Angle (deg), Instance count.
         let angle = row.y.read(cx).value().trim().trim_end_matches("deg").trim_end_matches('°').trim().parse::<f64>().ok();
-        if let Ok(n) = row.count.read(cx).value().trim().parse::<u32>() {
+        let count = row.count.read(cx).value().trim().to_string();
+        if let Ok(n) = if count.is_empty() { Ok(1) } else { count.parse::<u32>() } {
             row.ann.target.get_or_insert_with(Default::default).instances = n.clamp(1, 64);
         }
         let opts = row.ann.target.as_deref().cloned().unwrap_or_default();
@@ -447,7 +449,7 @@ impl DrawingEditor {
     pub fn render_datum_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let d = self.datum_dlg.as_ref()?;
         // The X / Y flips' and the instances' tip as `texts` (the drawing matrix; live drawing-datum-target-after).
-        let empty = d.label_text.is_empty() || d.rows.iter().any(|r| r.ann.target.as_ref().is_some_and(|t| t.angular) && r.count.read(cx).value().trim().is_empty());
+        let empty = d.label_text.is_empty();
         let texts: Vec<&str> = [(!d.rows.is_empty(), "Opposite direction"), (!d.rows.is_empty(), "Precision"), (empty, "This field cannot be empty")].into_iter().filter_map(|(on, t)| on.then_some(t)).collect();
         crate::ui_script::note_dialog(|| crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Datum", "texts": texts }), datum_dlg_texts(d)));
         let pal = p();
@@ -495,17 +497,18 @@ impl DrawingEditor {
         };
         let mut body = v_flex();
         if tab == 0 {
-            // Live (dom drawing-datum*): an emptied label is an error, "This
-            // field cannot be empty".
+            // Live drw-datum-empty-field s7-8: an emptied label is pink over a red underline; the error is the header's
+            // tooltip, the field has none.
             let empty = d.label_text.is_empty();
             body = body.child(
                 h_flex().h(px(30.)).px(px(8.)).gap(px(6.)).child(div().text_size(px(12.)).child("Label")).child(
                     div()
                         .id("dt-label")
+                        .debug_selector(|| "dt-label".into())
                         .flex_1()
                         .border_b_1()
-                        .border_color(if empty { gpui_kit::rgb(0xd9534f) } else { blue })
-                        .when(empty, |e| e.tooltip(crate::ui::tooltip("This field cannot be empty")))
+                        .border_color(blue)
+                        .when(empty, |e| e.border_b_2().border_color(gpui_kit::rgb(crate::drawing_scene::DANGLING_RGB)).bg(gpui_kit::rgba(crate::drawing_wt::INVALID_BG)))
                         .child(Input::new(&d.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall()),
                 ),
             );
@@ -778,11 +781,10 @@ impl DrawingEditor {
                                         cx.notify();
                                     })))
                                     .child(h_flex().mt(px(2.)).h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Angle:")).child(self.target_distance(&r.y, k, 1, opts.precisions[1], cx)))
-                                    // Live (dom drawing-datum-target-after): an emptied count is invalid (red), "This field cannot be
-                                    // empty"; an underlined field and its Opposite direction button (FlipInstancesDirection), on with
-                                    // an origin and two or more instances (a34-1699 10 / 14).
+                                    // An underlined field (emptied: a grey 1, no error; its DOM's "This field cannot be empty" is never
+                                    // shown, live drw-datum-empty-field s22-23) and its Opposite direction button
+                                    // (FlipInstancesDirection), on with an origin and two or more instances (a34-1699 10 / 14).
                                     .child({
-                                        let empty = r.count.read(cx).value().trim().is_empty();
                                         let rev_on = has_origin && opts.instances > 1;
                                         h_flex()
                                             .mt(px(2.))
@@ -792,11 +794,11 @@ impl DrawingEditor {
                                             .child(
                                                 div()
                                                     .id(("dt-count", k))
+                                                    .debug_selector(move || format!("dt-count-{k}"))
                                                     .flex_1()
                                                     .border_b_1()
-                                                    .border_color(gpui_kit::rgb(if empty { 0xd9534f } else { 0xcccccc }))
+                                                    .border_color(gpui_kit::rgb(0xcccccc))
                                                     .px(px(4.))
-                                                    .when(empty, |e| e.tooltip(crate::ui::tooltip("This field cannot be empty")))
                                                     .child(Input::new(&r.count).text_size(px(13.33)).text_color(gpui_kit::rgb(if has_origin { 0x555555 } else { 0xaaaaaa })).appearance(false).xsmall().disabled(!has_origin)),
                                             )
                                             .child(
@@ -887,10 +889,11 @@ impl DrawingEditor {
             );
         }
         let can_accept = tab == 1 && !d.rows.is_empty();
-        let invalid_title = (tab == 1)
-            .then(|| d.rows.iter().find(|r| r.label.read(cx).value().trim().is_empty()))
-            .flatten()
-            .and_then(|r| if let AnnotationKind::DatumTarget { label, .. } = &r.ann.kind { Some(format!("{label}: This field cannot be empty")) } else { None });
+        let invalid_title = if tab == 0 {
+            d.label_text.is_empty().then(|| "This field cannot be empty".to_string())
+        } else {
+            d.rows.iter().find(|r| r.label.read(cx).value().trim().is_empty()).and_then(|r| if let AnnotationKind::DatumTarget { label, .. } = &r.ann.kind { Some(format!("{label}: This field cannot be empty")) } else { None })
+        };
         Some(
             v_flex()
                 .id("dr-datum-dlg")
@@ -916,9 +919,10 @@ impl DrawingEditor {
                     h_flex()
                         .h(px(30.))
                         .pl(px(11.))
-                        // A target with an emptied Label: the title says which (live2 explore: "A1: This field cannot be
-                        // empty" on the header).
-                        .child(div().id("dt-title").flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).when_some(invalid_title, |e, t| e.tooltip(crate::ui::tooltip(t))).child("Datum"))
+                        // An emptied Label: the title red, its tooltip the error, a target's naming it (live
+                        // drw-datum-empty-field s7-8: "This field cannot be empty"; live2 explore: "A1: This field cannot be
+                        // empty").
+                        .child(div().id("dt-title").debug_selector(|| "dt-title".into()).flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).when_some(invalid_title, |e, t| e.text_color(gpui_kit::rgb(crate::drawing_scene::DANGLING_RGB)).tooltip(crate::ui::tooltip(t))).child("Datum"))
                         .child(div().id("dt-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(if can_accept { pal.accept } else { gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED) }).cursor_pointer().child(crate::drawing_chrome::ok_check(18.)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             if can_accept {
                                 this.close_datum_dlg(true, cx)

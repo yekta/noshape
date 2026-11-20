@@ -1910,6 +1910,76 @@ fn a_selected_dimension_keeps_its_text_black_on_an_orange_box(cx: &mut TestAppCo
     assert!(boxed, "an orange box behind it");
 }
 
+/// Live drw-datum-empty-field s7-8: Backspace on the Datum tab's Label leaves the field without a tooltip and puts
+/// "This field cannot be empty" on the header; s22-23: an emptied Instance count is one instance, no error anywhere.
+#[gpui::test]
+fn an_emptied_datum_label_errs_on_the_header_and_an_emptied_count_is_one(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_scene::drawing_tools::Tool;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "dt-empty");
+    real_sheet(cx, window, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Datum { anchor: None }, cx)));
+    draw(cx, window);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("backspace");
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| editor.read(cx).datum_dlg.as_ref().map(|d| d.label_text.clone())).as_deref(), Some(""), "the label emptied");
+    let tip_over = |cx: &mut TestAppContext, id: &'static str| {
+        crate::ui_script::clear_tooltip();
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        let b = vcx.debug_bounds(id).unwrap_or_else(|| panic!("no {id}"));
+        vcx.simulate_mouse_move(gpui_kit::point(b.left() + px(20.), b.center().y), None, Modifiers::default());
+        for _ in 0..4 {
+            vcx.executor().advance_clock(std::time::Duration::from_millis(300));
+            draw(cx, window);
+        }
+        crate::ui_script::shown_tooltip()
+    };
+    assert_eq!(tip_over(cx, "dt-label"), None, "the field: no tooltip");
+    assert_eq!(tip_over(cx, "dt-title").as_deref(), Some("This field cannot be empty"), "the header's");
+    // Datum target › Angle: Instance count emptied (the tab as its click sets it).
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        e.set_tool(Tool::DatumTarget { anchor: None }, cx);
+        if let Some(d) = &mut e.datum_dlg {
+            d.tab = 1;
+        }
+    }));
+    draw(cx, window);
+    let (a, b) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let bt = e.built.as_ref().expect("built");
+        let l = bt.geometry.lines.iter().find(|l| l.points.len() >= 2 && matches!(bt.picks.get(l.pick as usize), Some(PickTarget::Edge { .. }))).expect("a view edge");
+        (l.points[0], l.points[l.points.len() - 1])
+    });
+    let click = |cx: &mut TestAppContext, at: [f64; 2]| {
+        cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+            e.cursor = at;
+            e.extra_tool_click(w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+    };
+    click(cx, a);
+    click(cx, [a[0] + 15.0, a[1] + 15.0]);
+    cx.update(|cx| editor.update(cx, |e, _| {
+        if let Some(r) = e.datum_dlg.as_mut().and_then(|d| d.rows.first_mut()) {
+            r.ann.target.get_or_insert_with(Default::default).angular = true;
+        }
+    }));
+    draw(cx, window);
+    // The origin enables the count.
+    click(cx, b);
+    press(cx, window, "dt-count-0");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("end backspace");
+    draw(cx, window);
+    let count = cx.update(|cx| editor.read(cx).datum_dlg.as_ref().and_then(|d| d.rows.first()).map(|r| r.count.read(cx).value().to_string()));
+    assert_eq!(count.as_deref(), Some(""), "the count emptied");
+    let instances = cx.update(|cx| editor.read(cx).datum_dlg.as_ref().and_then(|d| d.rows.first()).and_then(|r| r.ann.target.as_ref().map(|t| t.instances)));
+    assert_eq!(instances, Some(1), "an emptied count is one instance");
+    assert_eq!(tip_over(cx, "dt-count-0"), None, "the count: no tooltip");
+    assert_eq!(tip_over(cx, "dt-title"), None, "the header: no error");
+}
+
 /// Live drw-datum-target-panel-lists s22-24: in Angle mode with no origin the Diameter distance is empty and its
 /// Precision ▾ opens no list; once the origin fills it, the ▾ lists the precisions.
 #[gpui::test]
