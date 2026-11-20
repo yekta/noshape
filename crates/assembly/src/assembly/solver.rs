@@ -2290,26 +2290,6 @@ fn least_change(problem: &Problem, poses: &mut [Frame], free: &[usize], scale: f
             break;
         }
     }
-    // A body whose mates leave it free to turn about its anchor (a Ball): its start turn exactly, the anchor where the
-    // rounds put it, when the mates hold as well (live fuzz f5: the rounds' finite differences left the pin ~2e-6 rad
-    // off its turn, live keeps it).
-    for (k, &bi) in free.iter().enumerate() {
-        let (s, c) = (problem.bodies[bi].pose, trial[bi]);
-        if s.rotation == c.rotation {
-            continue;
-        }
-        let a = anchors[k];
-        let kept = Frame { rotation: s.rotation, origin: c.transform_point(a) - s.rotation * a };
-        let mut turned = trial.clone();
-        turned[bi] = kept;
-        problem.driven.place(problem.mates, &mut turned, None);
-        let mut rt = Vec::new();
-        residuals(problem, &turned, &mut rt);
-        if cost(&rt) <= cost(&r).max(1e-12) {
-            trial = turned;
-            r = rt;
-        }
-    }
     if cost(&r) <= before {
         poses.copy_from_slice(&trial);
     }
