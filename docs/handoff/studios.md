@@ -23,19 +23,20 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
   rows in coverage MENUS), Datum target Precision ▾ per distance (DatumTargetOpts::precisions, drawn by sheet.rs
   `basic`), live's release-history 120 (an assembly's Release… lists its linked parts, no version icon on them; ops
   release::tab_items; e2e), matrix doc, ticket DRW-DATUM-TARGET-OP (datum targets have no op). Ops e2e 261, drawing 259.
-- Local, not queued (land with the next batch): c80343986 the chooser's focused search box live's 1 px #3e94ff border, no
-  glow (test); 60f279179 Datum target's emptied Instance count red with "This field cannot be empty", View properties'
-  reverse button tip "Opposite direction" (+ `texts`). Mac: drawing-ui 125, clippy clean.
-- Panels list their tooltips as `texts` (a key only ours records, so steps don't compare it; ours_shown walks it).
-  Matrix 07:25: 1224 = + 531 shown of 1849, 0 ≠, 52 present-only. Most of the 52 have `texts` now but uip-merged
-  holds runs from before: rerun (new build) drw-datum-target-panel-tips drw-section-edit-depth-direction
-  drw-detail-view drw-hatch-region drw-copy-annotation-drag drw-custom-table-insert drw-export-formats
-  drw-detail-id-profile-tips drw-view-properties drw-views-shift-select-properties, copy out/*.json into uip-merged.
-- Present-only needing more than a rerun: Custom table menu (Split custom table below, Cell: the MENUDUMP test has no
-  custom table); Inspection item empty-table notes; Replicate's success toast (toasts aren't walked; our take says
-  "No annotation is available for copy" where live replicates 7/7: look); Title block "auto" / "DejaVu S" (dump
-  artefacts: CSS overflow:auto, a clipped font name); Undo / Redo / Update toolbar tips; menu rows Hide revision
-  callouts, BOM Switch to, cell Size ▸, Switch to reference; MBD status note; Reference manager's Version graph.
+- Local, not queued (land with the next batch, after c8ab739d): c80343986 chooser search box border; 60f279179 Datum
+  target's emptied Instance count red + "This field cannot be empty", View properties' reverse tip; 600063d0b Datum
+  target distance fields as live (25 px, centred, ▾ joined); 7649da91f / b12ac2198 / a715b5219 more `texts` (Version
+  graph, hole Tolerance, Precision, Create Drawing's Language / Size options + Owner, the Auxiliary prefix); matrix
+  script: hovered toolbar tips, HTML comments / "none" dumps skipped, wrapped long texts, never-shown hole palette
+  Tolerance precision / Offset and Move to sheet's Clear. Mac: drawing-ui 125, clippy clean.
+- Matrix 08:05 (b18 merged): 1227 = + 543 shown of 1845, 0 ≠, 33 present-only. b19 (vibe2, 07:58): rebuild + rerun
+  drw-custom-table-add drw-view-replicate-region-place drw-datum-target-hide-dim drw-datum-target-panel-tips
+  drw-ref-selective-update-pin drw-hcallout-override; then rerun drw-create-drawing-custom-lists /
+  -custom-template (Create Drawing rows), copy out/*.json into uip-merged, regenerate the doc.
+- Our replicate take: live replicates 1/1 into Top (toast "Successfully replicated 1/1 annotations"); our old run
+  (11-19 23:47) replicated nothing: check b19's run. Our toasts may not reach the recorder's `message`.
+- Rows needing a live take: REQUESTS "studios (2026-11-20 08:08 UTC)" (styles on a radial dim, section Blind +
+  Offset, mixed views' Multiple values, a diameter inspection item, a custom table's cell / menu).
 - b17 (vibe2, running 07:38): app build + shots drw-insert-view-top-1to1 (focused search border vs live iv s2: crop
   live +290+200, ours +855+470) and drw-datum-target-hide-dim (Precision ▾ vs live s5, crop live 330x700+0+80).
 - qa 11-20: 9 of 10 to-verify rows verified (6c3c0a8fe); FEEL-DRW-WHEEL-ZOOM-SLOW stays open (re-timed 02:00-04:00).
