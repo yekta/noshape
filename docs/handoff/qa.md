@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-20 04:08)
+# QA handoff (agent qa; current state only, updated 2026-11-20 04:30)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -83,6 +83,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    USER-HOVER-STAYS-LIT is listed as known in the cut's entry until psui's latest-wins picking fix passes 3 clean runs.
 
 ## Next (in this order)
+00b. **Live's 21 feel rows (11-20, lead 04:1x)**: walk each on the newest green, every difference a P0 feel ticket to its owner. Sketch
+   R1-R10: live's recordings as ui-parity scenarios (qa-bisect, uncommitted; out suites/1120-feel-cov2): 4 tickets (15e785522; skasm 3, psui 1).
+   F/V/D (studios): 8 tickets (e79906b34); crops /root/qa-scratch/feel1120/. Quiet-window recheck (02:00-04:00 11-21): D3 wheel zoom, V1 cell
+   edit, D1 release timings. A1/A1b/A2 (asm), S1 (skasm), R7-R9 (psui): fork walking on vibex8 :782 -> feel1120/asm-sm-psui.md.
 00a. **05:00 cut HELD (lead 04:0x) until a green has core's 2f4f3bc5 (singularities Sketch 2; Mirror 2 is as live, accepted in
    compat/accepted.txt; 2f4f's subject added to cut-must.txt).** Unit qa-prerel-2f4f (bin/prerel-when.sh "<subject>" cut0500): when
    that commit is in the green, bin/prerel-run.sh uploads it to vibe2 and runs userdocs + prerel-edits + prerel-open (pixel diff at 90 s)
