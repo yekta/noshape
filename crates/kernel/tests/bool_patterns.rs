@@ -3372,3 +3372,24 @@ fn plates_sharing_an_edge_fuse_as_they_were() {
     let changed: Vec<_> = r.history.records.iter().filter(|h| h.relation != k::Relation::Kept).collect();
     assert!(changed.is_empty(), "{changed:?}");
 }
+
+/// c2-fan-blade-sweep (recorded before Boolean 2): a threaded rod whose cylinder is left as 9 strips between the
+/// thread's helical cuts. They stay apart on unify: one face of them would go round 7.7 times, and the next cut on it
+/// (Boolean 2's) came out OCCT's and invalid.
+#[test]
+fn a_threads_helical_land_stays_in_strips_on_unify() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "935abddf483b208a").expect("the recorded cut");
+    let u = k::unify_same_domain(&c.objects[0]).expect("unified").shape;
+    assert_eq!(u.count(k::ShapeType::Face), 25);
+    for f in u.faces() {
+        let b = f.uv_bounds().unwrap();
+        assert!(!format!("{:?}", f.face_surface().unwrap()).starts_with("Cylinder") || b[1] - b[0] <= 2.0 * std::f64::consts::PI + 1e-6, "a face of {} turns", (b[1] - b[0]) / std::f64::consts::TAU);
+    }
+    let r = k::boolean(c.op, std::slice::from_ref(&u), &c.tools, &c.opts).expect("cut");
+    let s = &r.shape;
+    assert_eq!((s.count(k::ShapeType::Face), s.count(k::ShapeType::Edge), s.count(k::ShapeType::Vertex)), (c.summary.faces, c.summary.edges, c.summary.vertices));
+    let v = s.volume().unwrap();
+    assert!(s.is_valid() && (v - c.summary.volume).abs() <= 1e-9 * c.summary.volume, "volume {v}");
+}

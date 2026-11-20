@@ -3913,6 +3913,12 @@ static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hi
       auto replace_by = [&](const TopoDS_Face& F) {
         if (!BRepCheck_Analyzer(F).IsValid())
           return false;
+        // (Not round more than once: c2-fan-blade-sweep's thread land, 9 strips one face of 7.7 turns, valid alone but
+        // its next cut OCCT's and invalid.)
+        double u0f, u1f, v0f, v1f;
+        BRepTools::UVBounds(F, u0f, u1f, v0f, v1f);
+        if (u1f - u0f > 2 * M_PI + 1e-6)
+          return false;
         occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
         if (!swap_from.IsNull())
           rs->Replace(swap_from, swap_to);
