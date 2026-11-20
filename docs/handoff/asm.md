@@ -5,17 +5,17 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-20 14:46 UTC)
+## State (2026-11-20 15:50 UTC)
 
 ### P0 closed: isaac drag 7-10 s/frame (v0.4.62 252 ms)
 - `big_assembly_perf::suite_assemblies_speed` on asm-isaac-ball (private copy ~/tmp/asm/speed on vibe2 / vibex7 /
   vibex8; script ~/agents/asm-keep/isaac-speed.sh <binary> <out>, through ~/bin/slot; it now asserts a drag frame
   <= 300 ms). Drag frames don't re-evaluate Part Studios (assembly_perf.rs drag_in: `prepared.solve_drag` only).
 - Culprit 33c176a43 (bool, bisect); bool's revert 61295b96f: drag 185 ms/frame (worst 233), bool + lead told.
-- isaac "evaluate again" 1.9-2.2 s on main vs 47 ms at 07:26 (v0.4.62 2.8 s): not the Ball block (2217 ms with it
-  back); candidates landed since: skasm's revert 83423fa52 and the naming commits; next: bisect e4bf3ee7a..main with
-  isaac-speed.sh. Speed item.
-- Sparse group solve (asm-sparse, landing with this handoff; isaac on main 14:45: drag 31 ms/frame, worst 44): `jacobian_rows` + `normal_equations` over each row's
+- isaac "evaluate again" 2.2 s on main vs 62.6 ms at e4bf3ee7a (v0.4.62 2.8 s; not the Ball block): bisecting
+  (systemd unit asm-eval-bisect, /root/asm-scratch/eval-bisect.sh, log eval-bisect.log; worktree asm-base, build
+  vibex7 ops-bisect, isaac on vibe2; bad > 500 ms; paths = the engine crates). 15:28: 23 left at b0995d8fd.
+- Sparse group solve LANDED 15:25 as 011ef691 (isaac on main 14:45: drag 31 ms/frame, worst 44): `jacobian_rows` + `normal_equations` over each row's
   bodies, `BlockCholesky` (6x6 blocks, minimum degree), dragged LM steps take up to 4 second-order corrections
   (`jt_mul`, same factor), the Ball block (443952080) back with f50 out of KNOWN. isaac on the 07:26 base: 957 ->
   239 ms/frame; T1 the_block_solver_matches_the_dense_one, the_normal_equations_match_the_dense_ones; T2
@@ -31,49 +31,27 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
 - dx ca70dbdfd: AssemblyView uses DocModel::assemblies; 10 assembly-ui ui_tests fail on the Mac with or without it
   (pass on Linux): check whether macOS CI fails them too.
 
-### Local WIP commits (asm-mass, also branch asm-wip-0815; never land as is: reset --soft and split)
-- 065d1ac91: the two P2s below, parity files, preview colours, sparse solve, handoff. 27a1fc28d: released items.
-- P0 FEEL-ASM-MATE-PREVIEW-COLOUR: asm_scene `preview_tops` (edges 0xf7c171, hidden 0xdcb971), picked boundary
-  PICKED|OUTLINE -> shaders.wgsl PICKED_OUTLINE #FFC20E (wgsl_portable passes). Test: Part 2 is the cylinder, its cap
-  has one circle edge (the "4 edges" assertion was wrong; fixed in 27a1fc28d; passes, vibex7 09:2x).
-- P2 ASM-INSERT-RELEASED-ITEMS (27a1fc28d + 3ad749246 header debug selectors; test passes, vibex7 09:3x): OtherDoc `released` (drawing_chooser::released_items)
-  and `released_view`; ▲ `ins-other-released` before Create version; rows "name [PN] (rev)" + ▲, inserted at the
-  release's version; "No Part Studios found." / "No Assemblies found."; Version graph closes it. Test
-  `an_other_documents_released_items_leave_out_obsoleted_revisions`.
+### WIP split (branch asm-split on 011ef691; clippy + tests pass vibex8 15:4x): landing
+- d9a0335d4 P0 FEEL-ASM-MATE-PREVIEW-COLOUR (asm_scene `preview_tops` peach edges 0xf7c171 / hidden 0xdcb971; picked
+  boundary PICKED|OUTLINE -> PICKED_OUTLINE #FFC20E); 643e60a35 P2 ASM-INSERT-RELEASED-ITEMS (▲ View released
+  items); 9008a18a5 P2 ASM-FACE-TAB-REFERENCE-FRAME + ASM-PATTERN-ZERO-DISTANCE-MARK; 8000528e0 parity translator
+  (Derived chains, composites) + `suite_assembly_open_profile`. Tickets marked. asm-mass / asm-wip-0815: superseded.
 
-### Queued / local
-- Landing: the sparse group solve (branch asm-sparse). Local asm-mass (WIP, 07:26 base; its 2941d56bf holds
-  the sparse solve too: drop solver.rs / oracle_asm.rs / the speed assert from it when splitting).
-- In WIP commit 065d1ac91, tests pass (vibex8 06:5x-07:2x):
-  - ASM-FACE-TAB-REFERENCE-FRAME (P2): `face_section_properties(.., reference: Option<&Frame>)` (moments about the
-    connector's origin in its x / y axes); assembly_mass.rs passes the reference frame, key has the reference;
-    tests.rs `face_section_properties_like_live` checks live mc1-mc3 (106666.667 / 160000 / 426666.667 / 533333.333).
-  - ASM-PATTERN-ZERO-DISTANCE-MARK (P2): assembly_panels.rs `length_row` marks Distance / Angle <= 0 with
-    `invalid_field_tip` (no hover; `pat-invalid <label>`); test `a_zero_pattern_distance_is_marked_invalid`.
-  - Mark both tickets [x] in TICKETS when committing.
-  - parity (commit with the -comp runs): ops tests/parity.rs composites; parity.rs nested Derived sources as Arc;
-    big_assembly_perf.rs `suite_assembly_open_profile`. Runs: vibex7 ~/agents/asm-keep/{infento,scissor}-comp.out
-    (infento done 2317 s: 0/1, occurrences 162/167, mates 200/203, BOM 64/64; scissor running).
+### Parity translator: Width / Tangent / relations (next commit; draft /root/asm-scratch/par/parity.rs)
+- asm-cov-{width,tangent,screw} on main+sparse (vibe2 ~/agents/asm-keep/cov3/): 2/2 occurrences each, but width and
+  tangent 0/0 mates and screw 1/1 (its Screw relation unseen): the translator skipped BTMWidthMate, BTMGeometryMate
+  and BTMMateRelation silently (also the 18 relations in other asm-* models). Draft: `mate_picks` (Width a,b,c,d =
+  tab 1, width 1, width 2, tab 2; Tangent's entities as connectors "<id>/first|second"), relations made after every
+  part is at live's place (assembly_relation; length for Screw / Rack and pinion), counted with the mates; T1
+  width_and_tangent_mates_pick_as_assembly_mate. Then rerun cov3.sh and the whole asm suite (scores may move).
 
 ### Next, in order
-0. Live coverage batch 1 (behaviours "Assembly coverage (11-20)", live/asmcov/coverage-1120.txt): run the parity
-   pairs on the 3 new models asm-cov-width (channel +85 mm onto the tab), asm-cov-tangent (pin on a plate),
-   asm-cov-screw (Cylindrical + Screw 2 mm/rev). A mate without its default parameters shows "(Hidden)" in live and
-   voids relations on it.
-1. (done: Ball fix redo + timing test.) 2. P0 FEEL-ASM-MATE-PREVIEW-COLOUR (uncommitted: asm_scene
-   `preview_tops` edges 0xf7c171 / hidden 0xdcb971; picked boundary PICKED|OUTLINE -> shaders.wgsl PICKED_OUTLINE
-   #FFC20E; test a_mate_previews_moving_part_shows_its_edges_through_the_others asserts no lit moving-part edge, for
-   the extra 4 px line; testing on vibex7) reopened by qa (green
-   0bc7e772e, crop /root/qa-scratch/tickets/asm-mate-preview-0bc7.png): Part 1 top outline ours (255,198,133) vs live
-   (255,194,14); Part 2 top edges ours black vs live ~(247,193,113); Part 2 hidden edges ours (255,192,76) vs live
-   (220,185,113); ours has an extra ~4 px (255,169,10) line on Part 2's back vertical edge. 3. Land the two P2s.
+1. The translator commit above, its runs, land. 2. The evaluate-again culprit (bisect) to its owner / fix.
+3. Our triad value boxes against live: X arrow 30 px = 1.9 mm with a "1.9 mm" box during and after; the ring at the
+   Z tip turns 15° about world Y through the triad's centre with a "15 deg" box.
 4. bool: re-check isaac Fastened 43 on main after pole2 b3706f04 (traced isaac run, tell bool if it still differs).
-5. P2 ASM-INSERT-RELEASED-ITEMS (live 07:3x, 1192a2f67): Insert › Other documents › a document's ▲ "View released
-   items" lists released parts ("Part 1 OBS-PN-1 (A)"), drops obsoleted revisions ("No Part Studios found."); reuse
-   the drawing chooser's released_items. Evidence live/parity-open-1120/ob/.
-6. infento composites / scissor from the -comp runs.
-- blend asked how the open profile instances 850efe: answered (instance config, assembly_evaluator().studio).
-- qa verified FEEL-ASM-DRAG-DEAD-ZONE; re-walks drag start 2 px on its green.
+5. infento composites / scissor from the -comp runs (vibex7 ~/agents/asm-keep/{infento,scissor}-comp.out).
+6. macOS CI: the 10 assembly-ui ui_tests that fail on the Mac (pass on Linux).
 
 ### Landed today (702c9878: Display states Esc, driver-mate named position, paste; d671313d; 335f8e43; 9f52415c; 123ca4b3 free drag)
 - LOD (91478e2c), Derived mirror of an assembly complete (e87a2b3e, 17c26dc1; left: live's exact node icon, symmetry
