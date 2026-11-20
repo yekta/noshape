@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 10:17 UTC.
+Updated 2026-11-20 10:49 UTC.
 
 ## In flight
 
@@ -34,6 +34,15 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
   drawing_datum_target_takes_area_style_origin_and_distances; shared with the dialog via scene opts.rs
   `datum_target_at`, `datum_target_distances`, SheetPick `datum_target_custom`, `straight_edge_dir_at`. Mac: ops all
   (450 + coverage 11) ok, drawing-ui 126, clippy clean; AGENT_API regenerated.
+- Local, uncommitted (10:50): live's panel-lists s21-24 (uip 10:30) + a34-1699 10-15: an empty distance's Precision
+  ▾ opens no list (test an_empty_target_distances_precision_opens_no_list); Angle's Instance count an underlined field
+  with its Opposite direction button (flip-circular-opposite; on with an origin and ≥2 instances; new
+  DatumTargetOpts::instances_reverse, op `opposite_direction`, drawing test); Flip / Rotate icon buttons
+  (flip-direction / flip-circular-opposite), disabled (grey) with no origin. Feature Studio bracket box on the glyph
+  cell (vendor gpui-base inset_frame_corners 0.5 px; qa measured ours 11-12x17 vs live 8x16). TICKETS: FS-WHEEL /
+  BRACKET / OUTDENT / TRIPLE rows closed as qa's verified FEEL-FS-* duplicates. Needs: Mac run dto3 green, AGENT_API
+  scp back (mac:noshape-host/agents/studios/src/docs/AGENT_API.md), full ops e2e (model-data changed), land.
+- revision-table-delete retake (REQUESTS 09:55 item 2): not in at 10:48.
 - Matrix 09:30: 1232 = + 558 shown of 1841, 0 ≠, 9 present-only, all conditional rows that wait on live's takes
   (REQUESTS "studios (2026-11-20 08:08 UTC)", not captured at 09:30): Section Depth / Offset distance, Datum "This
   field cannot be empty" (live's hidden Instance count row), Custom table Cell / Split custom table below, Inspection
