@@ -99,8 +99,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    vibex7: saved suite doc -> drawing placed as live -> DXF 2018 -> dxfdiff). Seat lip: Ok in every release (not a ticket). OPEN:
    - blend car Fillet 1: bin/car-one.sh queued on vibex7's slot (09:16 third) at green bad5d2ecc (has 6b6b3b4a + dx's translator 8ba897c06;
      the night suite 81d23c9b lacked 8ba897c06: Derived 1 220 faces vs live 7, inconclusive) -> feel1120/car-one.log.
-   - blend CHAMFER-ASYM-NO-PROPAGATION (5a7f9ba8e): unit qa-wait-chamfer-asym; walk on live's G7 block (40x20x10, 4 vertical R3; 1 mm
-     equal chamfer of the front straight edge 7904.485): distance 1 + 45 deg = 7904.485, front + back 7886.227, two distances stop at the edge.
+   - P0s sent 09:59 (TICKETS 95fa940e1): COMPAT-GYRO-REVOLVE -> bool (be2a573c..f943df0b), COMPAT-FILLET-ORIENT-REFS -> core (d80c2c58e).
+   - Live index landed 9b382ec56 + bc95b3943 (145 listed; vibex7 ~/parity/models has 155 with features.json). Suite 1120-0407 is the old
+     126 (models 96/126, 1358/1585; rest stage still on vibex8). The next qa-suites run is the first on it: re-baseline SCORE (coverage
+     note), owners for new failures, its models time (126 docs took 1 h 51 debug) -> split proposal if > 2 h.
    - asm DRAG-START: unit qa-wait-asm-drag2 (48a2b02a6: 2 px / 50 ms). Parity index row: unit qa-index-daily.
    - psui 37741d38 (unit qa-wait-psui-37741): DIM-PICK-READOUT (cov2-dim-orient step 8), ROLLBACK-DROP-ROW, SECTION-ARROW-FOOT,
      EDGE-MIDPOINT-REST-LOOK, HOVER-LEAVES-WINDOW, FAST-OFF-CLEAR, MEASURE-CIRCLE-DEFAULT-PLANE (rows say what to check).
