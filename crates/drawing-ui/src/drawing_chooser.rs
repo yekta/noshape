@@ -89,6 +89,9 @@ pub struct ChooserState {
     pub other_doc: Option<OtherDoc>,
     /// The Cut list table's "Select a composite part" (live2 2278): composite parts only, a pick is the table's.
     pub composite: bool,
+    /// Custom table › Add's "Select a Part Studio" (live custom-tables 262, 279): Part Studios only, a pick is the
+    /// custom table's.
+    pub studio: bool,
     /// Current document › Version graph: the list shown, and the version
     /// chosen (new views are pinned to it).
     pub graph: bool,
@@ -219,7 +222,7 @@ impl DrawingEditor {
     pub fn sync_chooser(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         match (self.insert.chooser.is_some(), self.chooser.search.is_some()) {
             (true, false) => {
-                let placeholder = if self.chooser.composite { "Search composite parts" } else { "Search parts or sketches" };
+                let placeholder = self.chooser_placeholder();
                 self.chooser.search = Some(cx.new(|cx| InputState::new(window, cx).placeholder(placeholder)));
                 self.chooser.url = Some(cx.new(|cx| InputState::new(window, cx).placeholder("Search or paste URL")));
                 // Live 2063: the search box takes the focus as the chooser opens.
@@ -243,6 +246,9 @@ impl DrawingEditor {
         if self.chooser.composite {
             return F_COMPOSITES;
         }
+        if self.chooser.studio {
+            return F_STUDIOS;
+        }
         self.chooser.filter.unwrap_or(F_PARTS)
     }
 
@@ -264,6 +270,49 @@ impl DrawingEditor {
         if std::mem::take(&mut self.chooser.composite) {
             self.insert.chooser = None;
         }
+    }
+
+    fn chooser_placeholder(&self) -> &'static str {
+        match (self.chooser.composite, self.chooser.studio) {
+            (true, _) => "Search composite parts",
+            (_, true) => "Search Part Studios",
+            _ => "Search parts or sketches",
+        }
+    }
+
+    /// The Custom table dialog's Add: Select a Part Studio.
+    pub fn open_studio_chooser(&mut self, cx: &mut Context<Self>) {
+        if self.insert.chooser.is_some() && !self.chooser.studio {
+            self.insert.chooser = None;
+            self.chooser.search = None;
+        }
+        self.chooser.composite = false;
+        self.chooser.studio = true;
+        self.chooser.other = false;
+        self.insert.chooser = Some(0);
+        self.ensure_sources(false, cx);
+        cx.notify();
+    }
+
+    pub fn close_studio_chooser(&mut self) {
+        if std::mem::take(&mut self.chooser.studio) {
+            self.insert.chooser = None;
+        }
+        if let Some(d) = self.custom_tables.dlg.as_mut().filter(|d| d.picker == Some(crate::drawing_custom_table::Picker::Studio)) {
+            d.picker = None;
+        }
+    }
+
+    /// A Part Studio picked for the custom table: this document's (at the Version graph's version), or the opened
+    /// other document's at its version.
+    fn pick_custom_studio(&mut self, id: TabId, name: String, window: &mut Window, cx: &mut Context<Self>) {
+        let version = match self.chooser.other_doc.clone().filter(|_| self.chooser.other) {
+            Some(d) => d.key(id).map(|k| k.0),
+            None => self.chooser.version.as_ref().map(|v| v.id.clone()),
+        };
+        self.close_studio_chooser();
+        window.focus(&self.focus, cx);
+        self.pick_studio(id, version, name, cx);
     }
 
     /// A composite part picked: the cut list table's, placed by the next click.
@@ -869,6 +918,29 @@ impl DrawingEditor {
                 any = true;
                 read_rows.push(row_read(&name, false));
                 let pic = pic_of(id, ThumbOf::Part(None));
+                if self.chooser.studio {
+                    // Live 279: 40 px rows, a 70 × 40 picture, the name light.
+                    let shown = name.clone();
+                    list = list.child(
+                        h_flex()
+                            .id(SharedString::from(format!("dr-ch-ps-{id}")))
+                            .debug_selector(move || format!("dr-ch-ps-{id}"))
+                            .map(|d| crate::ui_script::mark(d, move || format!("list_row:{shown}")))
+                            .h(px(40.))
+                            .pl(px(2.))
+                            .pr(px(6.))
+                            .gap(px(6.))
+                            .cursor_pointer()
+                            .hover(|d| d.bg(pal.row_hover))
+                            .text_size(px(13.33))
+                            .font_weight(FontWeight::LIGHT)
+                            .child(thumb_sized(pic, 70., 40.))
+                            .child(div().truncate().child(crate::ui::user_text(name.clone())))
+                            .tooltip(crate::ui::tooltip(name.clone()))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.pick_custom_studio(id, name.clone(), window, cx))),
+                    );
+                    continue;
+                }
                 list = list.child(row_base(SharedString::from(format!("dr-ch-ps-{id}")), 20.).min_h(px(38.)).child(thumb(pic)).child(div().truncate().child(crate::ui::user_text(name))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_tree(id, None, cx))));
                 continue;
             }
@@ -1005,12 +1077,14 @@ impl DrawingEditor {
         }
         let panel = v_flex()
             .id("dr-chooser")
+            .debug_selector(|| "dr-chooser".into())
             // The chooser in use again: the keyboard is its (Create version… sets it off after this).
             .on_mouse_down(MouseButton::Left, cx.listener(|this, _: &MouseDownEvent, _, _| this.chooser.keyboard_left = false))
             // Replace...'s chooser: Esc closes it, even from its search box (live2 drw-sheet-ref-replace).
             .capture_action(cx.listener(|this, _: &gpui_kit::component::input::Escape, window, cx| {
-                if this.chooser.composite {
+                if this.chooser.composite || this.chooser.studio {
                     this.close_composite_chooser();
+                    this.close_studio_chooser();
                     window.focus(&this.focus, cx);
                     cx.stop_propagation();
                     cx.notify();
@@ -1035,9 +1109,14 @@ impl DrawingEditor {
                     .pl(px(4.))
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xd3d7d9))
-                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(if self.chooser.composite { "Select a composite part" } else { "Select a part or assembly" }))
+                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(match (self.chooser.composite, self.chooser.studio) {
+                        (true, _) => "Select a composite part",
+                        (_, true) => "Select a Part Studio",
+                        _ => "Select a part or assembly",
+                    }))
                     .child(div().id("dr-chooser-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 12., pal.text_muted)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.chooser.composite = false;
+                        this.close_studio_chooser();
                         this.insert.chooser = None;
                         cx.notify();
                     }))),
@@ -1057,7 +1136,7 @@ impl DrawingEditor {
         let sub_tabs = h_flex()
             .border_b_1()
             .border_color(gpui_kit::rgb(0xeeeeee))
-            .child(tab_btn("dr-ch-ps", "Part Studios", tab == 0).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+            .child(tab_btn("dr-ch-ps", "Part Studios", tab == 0).debug_selector(|| "dr-ch-ps".into()).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.insert.chooser = Some(0);
                 cx.notify();
             })))
@@ -1069,6 +1148,7 @@ impl DrawingEditor {
         let import_row = |cx: &App| {
             h_flex()
                 .id("dr-ch-import")
+                .debug_selector(|| "dr-ch-import".into())
                 .h(px(24.))
                 .px(px(6.))
                 .gap(px(6.))
@@ -1081,7 +1161,8 @@ impl DrawingEditor {
                 .child("Import...")
                 .on_click(|_, window, cx| crate::drawing_hooks::import(window, cx))
         };
-        let composite = self.chooser.composite;
+        // (Select a composite part / Select a Part Studio: no kinds, filters or Import.)
+        let composite = self.chooser.composite || self.chooser.studio;
         let panel = if self.chooser.other {
             match other_doc {
                 // An opened document: its header, Part Studios | Assemblies,
@@ -1186,7 +1267,7 @@ impl DrawingEditor {
         let panel_read = crate::ui_script::open_dialog();
         let by_create = self.chooser.by_create;
         let other = self.chooser.other;
-        let placeholder = if composite { "Search composite parts" } else { "Search parts or sketches" };
+        let placeholder = self.chooser_placeholder();
         let search_text = self.chooser.search.as_ref().map(|s| s.read(cx).value().to_string()).unwrap_or_default();
         crate::ui_script::note_dialog(|| {
             if !by_create && let Some(p) = panel_read.clone() {
@@ -1209,8 +1290,10 @@ impl DrawingEditor {
                 "panel": panel_read,
             })
         });
+        // (Select a Part Studio: 40 px right of the 210 px Custom table dialog, live dom 262.)
         let offset = match (&left, composite) {
             (Some(_), _) => 0.,
+            (None, true) if self.chooser.studio => 250.,
             (None, true) => 214.,
             (None, false) => 251.,
         };
@@ -1256,7 +1339,11 @@ fn chooser_square(id: &'static str, icon: &'static str, tip: &'static str, on: b
 
 /// A row picture (Onshape: about 56 × 32 px), blank until rendered.
 fn thumb(img: Option<Arc<RenderImage>>) -> AnyElement {
-    let base = div().w(px(56.)).h(px(32.)).flex_none();
+    thumb_sized(img, 56., 32.)
+}
+
+fn thumb_sized(img: Option<Arc<RenderImage>>, w: f32, h: f32) -> AnyElement {
+    let base = div().w(px(w)).h(px(h)).flex_none();
     match img {
         Some(i) => base.child(gpui_kit::img(i).size_full()).into_any_element(),
         None => base.into_any_element(),

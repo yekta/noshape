@@ -4652,7 +4652,7 @@ Examples:
 
 Insert a custom table, or edit a custom table's properties (edits the document (one undoable history entry)).
 
-The Custom table dialog: custom table `table` (its name or display name) defined by a Feature Studio of this document, computed on Part Studio `studio` (default: the Part Studio of `view`, else the first one shown in the drawing), placed with its `corner` at `position` (sheet mm). With `id`: Custom table properties of that table (Part Studio, table, order, corner; unset fields kept). One edit ("Custom table" / "Custom table properties"). Its rows are in drawing_get's tables.
+The Custom table dialog: custom table `table` (its name or display name) defined by a Feature Studio of this document, computed on Part Studio `studio` (default: the Part Studio of `view`, else the first one shown in the drawing; with `document`, that document's Part Studio at its `version`: Select a Part Studio › Other documents), placed with its `corner` at `position` (sheet mm). With `id`: Custom table properties of that table (Part Studio, table, order, corner; unset fields kept). One edit ("Custom table" / "Custom table properties"). Its rows are in drawing_get's tables.
 
 Examples:
 
@@ -4667,7 +4667,9 @@ Examples:
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `table` | string |  | Custom table name or display name. |
 | `feature_studio` | string |  | Feature Studio tab (name or id) defining it, when several define the name. |
-| `studio` | string |  | Part Studio tab (name or id). |
+| `studio` | string |  | Part Studio tab (name or id; with `document`, its name there). |
+| `document` | string |  | Select a Part Studio › Other documents: another document's file (path) whose Part Studio `studio` to use. |
+| `version` | string |  | With `document`: its named version ("V1"). |
 | `view` | integer |  | A view whose Part Studio to use. |
 | `position` | array of number |  | Where the fixed corner goes (sheet mm; inserting). |
 | `corner` | one of `top_left`, `top_right`, `bottom_left`, `bottom_right` |  | Fixed corner. |

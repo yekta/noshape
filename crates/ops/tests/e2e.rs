@@ -4228,6 +4228,10 @@ fn drawing_hatch_regions() {
 #[test]
 fn drawing_custom_table_from_a_feature_studio() {
     let mut ctx = Ctx::new();
+    // Another document with a block at V1 (Select a Part Studio › Other documents).
+    block_with_hole(&mut ctx, "drawing_custom_table_lib");
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    let lib = format!("{}.noshape", scratch("drawing_custom_table_lib").display());
     block_with_hole(&mut ctx, "drawing_custom_table.noshape");
     call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
     let src = r#"FeatureScript 3095;
@@ -4272,6 +4276,17 @@ export const partFaces = defineTable(function(context is Context, definition is 
     assert_eq!((f["linked"].clone(), f["target"]["kind"].clone()), (json!(false), json!("Feature Studio")), "{f}");
     let s = call(&mut ctx, "drawing_switch_to_reference", json!({ "drawing": tab, "table": id }));
     assert_eq!(s["target"]["name"], "Part Studio 1", "{s}");
+    // Another document's Part Studio at its V1.
+    let e = try_call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "table": "Part faces", "studio": "Part Studio 1", "document": lib, "position": [300, 280] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("version"), "{e:?}");
+    let e = try_call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "table": "Part faces", "studio": "nope", "document": lib, "version": "V1", "position": [300, 280] })).unwrap_err();
+    assert!(e.param.as_deref() == Some("studio") && e.message.contains("Part Studio 1"), "{e:?}");
+    let r = call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "table": "Part faces", "studio": "Part Studio 1", "document": lib, "version": "V1", "position": [300, 280] }));
+    let other = r["table"].as_u64().unwrap();
+    let t = r["tables"].as_array().unwrap().iter().find(|t| t["id"] == other).unwrap().clone();
+    assert!(t["rows"][0][1].as_str().unwrap().parse::<u32>().unwrap() >= 7, "{t}");
+    let e = try_call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "id": other, "version": "V1" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("version"), "{e:?}");
 }
 
 #[test]

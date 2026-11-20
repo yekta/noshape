@@ -27,7 +27,7 @@ const CORNERS: [TableCorner; 4] = [TableCorner::TopLeft, TableCorner::TopRight, 
 /// The picker open over the dialog.
 #[derive(Clone, PartialEq)]
 pub enum Picker {
-    /// "Select a Part Studio".
+    /// "Select a Part Studio" (the Insert view chooser in its studio mode).
     Studio,
     /// "Select a custom table": the table chosen in its dropdown so far.
     Table { pending: Option<TableRef>, list_open: bool },
@@ -39,6 +39,11 @@ pub struct CustomDlg {
     pub table: Option<u64>,
     original: Option<(TableKind, TableCorner)>,
     pub studio: Option<TabId>,
+    /// The Part Studio's version: this document's (its id), another document's ([`crate::derived::ExternalRef`]
+    /// key), None: this workspace.
+    pub version: Option<String>,
+    /// Another document's Part Studio: its name there.
+    pub external: Option<String>,
     pub chosen: Option<TableRef>,
     pub bottom_to_top: bool,
     pub corner: TableCorner,
@@ -71,7 +76,7 @@ fn table_ref(kind: &TableKind, doc: &noshape_model::Document) -> Option<TableRef
 }
 
 impl DrawingEditor {
-    /// Part Studios of the document (the "Select a Part Studio" list).
+    /// Part Studios of the document.
     fn part_studios(&self, cx: &App) -> Vec<(TabId, String)> {
         self.doc.read(cx).session.doc.ordered_tabs().into_iter().filter(|t| matches!(t.content, TabContent::PartStudio(_))).map(|t| (t.id, t.name.clone())).collect()
     }
@@ -81,7 +86,7 @@ impl DrawingEditor {
     /// the chosen one.
     fn drawing_studios(&self, chosen: Option<TabId>, cx: &App) -> Vec<(TabId, String)> {
         let keys = noshape_model::drawing::views::referenced_sources(&self.drawing);
-        self.part_studios(cx).into_iter().filter(|(t, _)| keys.iter().any(|k| k.tab == *t) || Some(*t) == chosen).collect()
+        self.part_studios(cx).into_iter().filter(|(t, _)| keys.iter().any(|k| k.tab == *t && !k.version.as_deref().is_some_and(|v| crate::derived::ExternalRef::parse(v).is_some())) || Some(*t) == chosen).collect()
     }
 
     /// Create / drop the dialog with the Custom table tool (from render).
@@ -96,9 +101,10 @@ impl DrawingEditor {
             };
             let studios = self.drawing_studios(None, cx);
             let studio = from_view.filter(|t| studios.iter().any(|s| s.0 == *t)).or_else(|| studios.first().map(|s| s.0));
-            self.custom_tables.dlg = Some(CustomDlg { table: None, original: None, studio, chosen: None, bottom_to_top: false, corner: TableCorner::TopRight, picker: None });
+            self.custom_tables.dlg = Some(CustomDlg { table: None, original: None, studio, version: None, external: None, chosen: None, bottom_to_top: false, corner: TableCorner::TopRight, picker: None });
         } else if !active && inserting {
             self.custom_tables.dlg = None;
+            self.close_studio_chooser();
         }
     }
 
@@ -106,24 +112,25 @@ impl DrawingEditor {
     /// fixed corner).
     pub fn open_custom_props(&mut self, id: u64, cx: &mut Context<Self>) {
         let Some(t) = self.current_sheet().table(id).cloned() else { return };
-        let TableKind::Custom { studio, bottom_to_top, .. } = &t.kind else { return };
+        let TableKind::Custom { studio, version, bottom_to_top, .. } = &t.kind else { return };
         let chosen = table_ref(&t.kind, &self.doc.read(cx).session.doc);
+        let external = version.as_deref().and_then(crate::derived::ExternalRef::parse).and_then(|e| crate::derived::external_snapshot(&e.path, e.microversion).ok()).and_then(|d| d.tab(*studio).map(|t| t.name.clone()));
         self.tool = Tool::Select;
-        self.custom_tables.dlg = Some(CustomDlg { table: Some(id), original: Some((t.kind.clone(), t.corner)), studio: Some(*studio), chosen, bottom_to_top: *bottom_to_top, corner: t.corner, picker: None });
+        self.custom_tables.dlg = Some(CustomDlg { table: Some(id), original: Some((t.kind.clone(), t.corner)), studio: Some(*studio), version: version.clone(), external, chosen, bottom_to_top: *bottom_to_top, corner: t.corner, picker: None });
         cx.notify();
     }
 
-    /// The dialog's table kind (keeping the pinned Part Studio version).
-    fn custom_kind(d: &CustomDlg, old: Option<&TableKind>) -> Option<TableKind> {
+    /// The dialog's table kind.
+    fn custom_kind(d: &CustomDlg) -> Option<TableKind> {
         let (studio, t) = (d.studio?, d.chosen.as_ref()?);
-        Some(noshape_scene::drawing_tools::custom_table_kind(studio, t.fs, t.name.clone(), t.version.clone(), d.bottom_to_top, old))
+        Some(noshape_scene::drawing_tools::custom_table_kind(studio, d.version.clone(), t.fs, t.name.clone(), t.version.clone(), d.bottom_to_top))
     }
 
     /// Editing a table: apply the dialog live.
     fn apply_custom_dlg(&mut self, cx: &mut Context<Self>) {
         if let Some(d) = &self.custom_tables.dlg
             && let Some(id) = d.table
-            && let Some(kind) = Self::custom_kind(d, d.original.as_ref().map(|o| &o.0))
+            && let Some(kind) = Self::custom_kind(d)
         {
             let corner = d.corner;
             self.edit_table(id, "Custom table properties", cx, |t| {
@@ -136,6 +143,7 @@ impl DrawingEditor {
 
     fn close_custom_dlg(&mut self, accept: bool, cx: &mut Context<Self>) {
         let Some(d) = self.custom_tables.dlg.take() else { return };
+        self.close_studio_chooser();
         match (d.table, d.original) {
             (Some(id), Some((kind, corner))) if !accept => self.edit_table(id, "Custom table properties", cx, |t| {
                 t.kind = kind;
@@ -154,7 +162,7 @@ impl DrawingEditor {
         if d.table.is_some() || d.picker.is_some() {
             return d.picker.is_some();
         }
-        let Some(kind) = Self::custom_kind(d, None) else { return true };
+        let Some(kind) = Self::custom_kind(d) else { return true };
         let corner = d.corner;
         let c = self.cursor;
         let id = self.current_sheet().next_table_id();
@@ -378,11 +386,16 @@ impl DrawingEditor {
         self.open_cell_format_panel(t.id, r, c, window, cx);
     }
 
-    fn pick_studio(&mut self, tab: TabId, cx: &mut Context<Self>) {
+    /// A Part Studio chosen: from the chooser (`version` as [`CustomDlg::version`]) or the dialog's dropdown.
+    pub(crate) fn pick_studio(&mut self, tab: TabId, version: Option<String>, name: String, cx: &mut Context<Self>) {
+        let external = version.as_deref().and_then(crate::derived::ExternalRef::parse).map(|_| name);
         if let Some(d) = &mut self.custom_tables.dlg {
             d.studio = Some(tab);
+            d.version = version;
+            d.external = external;
             d.picker = None;
         }
+        self.ensure_sources(false, cx);
         self.apply_custom_dlg(cx);
     }
 
@@ -405,8 +418,8 @@ impl DrawingEditor {
             let doc = self.doc.read(cx);
             (ct::workspace_tables(&doc.session.doc), doc.name().to_string(), doc.session.store.branch(doc.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()))
         };
-        let studios = self.drawing_studios(d.studio, cx);
-        let studio_name = d.studio.and_then(|s| studios.iter().find(|x| x.0 == s)).map(|s| s.1.clone());
+        let studios = self.drawing_studios(d.studio.filter(|_| d.external.is_none()), cx);
+        let studio_name = d.external.clone().or_else(|| d.studio.and_then(|s| studios.iter().find(|x| x.0 == s)).map(|s| s.1.clone()));
         let row = |label: &'static str, body: AnyElement| h_flex().min_h(px(28.)).px(px(8.)).child(div().w(px(90.)).flex_none().text_size(px(12.)).child(label)).child(div().flex_1().min_w_0().child(body)).into_any_element();
         // A select: label ▾ with a natural-width list (live custom-tables-02).
         type Set = std::rc::Rc<dyn Fn(&mut DrawingEditor, &mut Context<DrawingEditor>)>;
@@ -467,6 +480,7 @@ impl DrawingEditor {
         let action = |id: &'static str, icon: &'static str, label: &'static str, enabled: bool, full: bool, cx: &mut Context<Self>| {
             h_flex()
                 .id(id)
+                .debug_selector(move || id.into())
                 .map(|d| crate::ui_script::mark(d, || format!("button:{label}")))
                 .h(px(28.))
                 .when(full, |b| b.flex_1())
@@ -486,17 +500,27 @@ impl DrawingEditor {
                         if let Some(d) = &mut this.custom_tables.dlg {
                             d.picker = Some(if id == "ct-add" { Picker::Studio } else { Picker::Table { pending: d.chosen.clone(), list_open: false } });
                         }
+                        if id == "ct-add" {
+                            this.open_studio_chooser(cx);
+                        } else {
+                            this.close_studio_chooser();
+                        }
                         cx.notify();
                     }))
                 })
         };
-        let studio_items: Vec<(String, bool, Set)> = studios
+        // This document's studios in the drawing, and another document's chosen one.
+        let mut studio_items: Vec<(String, bool, Set)> = studios
             .iter()
             .map(|(t, n)| {
-                let t = *t;
-                (n.clone(), Some(t) == d.studio, std::rc::Rc::new(move |e: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| e.pick_studio(t, cx)) as Set)
+                let (t, n2) = (*t, n.clone());
+                (n.clone(), Some(t) == d.studio && d.external.is_none(), std::rc::Rc::new(move |e: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| e.pick_studio(t, None, n2.clone(), cx)) as Set)
             })
             .collect();
+        if let (Some(t), Some(n)) = (d.studio, d.external.clone()) {
+            let (v, n2) = (d.version.clone(), n.clone());
+            studio_items.push((n, true, std::rc::Rc::new(move |e: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| e.pick_studio(t, v.clone(), n2.clone(), cx)) as Set));
+        }
         let table_items: Vec<(String, bool, Set)> = mine
             .iter()
             .chain(ws.iter())
@@ -544,6 +568,7 @@ impl DrawingEditor {
             .child(close("ct-close", cx));
         let mut dlg = v_flex()
             .id("dr-custom-dlg")
+            .debug_selector(|| "dr-custom-dlg".into())
             .absolute()
             .top(px(DIALOG_TOP))
             .left(px(self.dialog_left()))
@@ -590,7 +615,7 @@ impl DrawingEditor {
             .child(div().px(px(8.)).pt(px(4.)).text_size(px(11.)).child("Select fixed corner"))
             .child(h_flex().px(px(8.)).pt(px(4.)).gap(px(26.)).children(corners));
         // The pickers sit beside the dialog.
-        let picker = d.picker.clone().map(|pk| self.render_custom_picker(pk, &mine, &ws, cx));
+        let picker = d.picker.clone().filter(|pk| *pk != Picker::Studio).map(|pk| self.render_custom_picker(pk, &mine, &ws, cx));
         Some(div().absolute().top_0().left_0().child(dlg).children(picker).into_any_element())
     }
 
@@ -603,22 +628,8 @@ impl DrawingEditor {
         let title = if pk == Picker::Studio { "Select a Part Studio" } else { "Select a custom table" };
         let mut body = v_flex().p(px(6.)).gap(px(6.));
         match pk {
-            Picker::Studio => {
-                for (i, (tab, name)) in self.part_studios(cx).into_iter().enumerate() {
-                    body = body.child(
-                        h_flex()
-                            .id(("ct-pick-studio", i))
-                            .h(px(32.))
-                            .px(px(6.))
-                            .gap(px(6.))
-                            .cursor_pointer()
-                            .hover(|r| r.bg(gpui_kit::rgb(0xdef1fb)))
-                            .child(crate::assets::icon("part-studio", 20., cx))
-                            .child(div().text_size(px(14.)).child(crate::ui::user_text(name)))
-                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_studio(tab, cx))),
-                    );
-                }
-            }
+            // (The chooser draws it.)
+            Picker::Studio => {}
             Picker::Table { pending, list_open } => {
                 let label = pending.as_ref().map(|t| t.display.clone()).unwrap_or_else(|| "Select a custom table".into());
                 body = body.child(

@@ -888,15 +888,10 @@ pub fn apply_hatches(sketch: &mut noshape_model::drawing::sheet_sketch::SheetSke
     sketch.hatches.extend(regions);
 }
 
-/// The Custom table dialog's table kind: Part Studio `studio`, custom table
-/// `name` of Feature Studio `fs` (at `fs_version`, another document's
-/// version, or this workspace); editing keeps the pinned Part Studio
-/// version of `old`.
-pub fn custom_table_kind(studio: noshape_model::document::TabId, fs: noshape_model::document::TabId, name: String, fs_version: Option<String>, bottom_to_top: bool, old: Option<&TableKind>) -> TableKind {
-    let version = match old {
-        Some(TableKind::Custom { version, .. }) => version.clone(),
-        _ => None,
-    };
+/// The Custom table dialog's table kind: Part Studio `studio` at `version` (this document's version id, another
+/// document's version key, None: the workspace), custom table `name` of Feature Studio `fs` (at `fs_version`, another
+/// document's version, or this workspace).
+pub fn custom_table_kind(studio: noshape_model::document::TabId, version: Option<String>, fs: noshape_model::document::TabId, name: String, fs_version: Option<String>, bottom_to_top: bool) -> TableKind {
     TableKind::Custom { studio, version, fs, name, fs_version, bottom_to_top }
 }
 

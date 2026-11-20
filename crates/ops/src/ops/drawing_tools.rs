@@ -373,13 +373,15 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "custom_table",
             summary: "Insert a custom table, or edit a custom table's properties",
-            description: "The Custom table dialog: custom table `table` (its name or display name) defined by a Feature Studio of this document, computed on Part Studio `studio` (default: the Part Studio of `view`, else the first one shown in the drawing), placed with its `corner` at `position` (sheet mm). With `id`: Custom table properties of that table (Part Studio, table, order, corner; unset fields kept). One edit (\"Custom table\" / \"Custom table properties\"). Its rows are in drawing_get's tables.",
+            description: "The Custom table dialog: custom table `table` (its name or display name) defined by a Feature Studio of this document, computed on Part Studio `studio` (default: the Part Studio of `view`, else the first one shown in the drawing; with `document`, that document's Part Studio at its `version`: Select a Part Studio › Other documents), placed with its `corner` at `position` (sheet mm). With `id`: Custom table properties of that table (Part Studio, table, order, corner; unset fields kept). One edit (\"Custom table\" / \"Custom table properties\"). Its rows are in drawing_get's tables.",
             fields: with(
                 common(),
                 vec![
                     opt("table", json!({ "type": "string" }), "Custom table name or display name."),
                     opt("feature_studio", json!({ "type": "string" }), "Feature Studio tab (name or id) defining it, when several define the name."),
-                    opt("studio", json!({ "type": "string" }), "Part Studio tab (name or id)."),
+                    opt("studio", json!({ "type": "string" }), "Part Studio tab (name or id; with `document`, its name there)."),
+                    opt("document", json!({ "type": "string" }), "Select a Part Studio › Other documents: another document's file (path) whose Part Studio `studio` to use."),
+                    opt("version", json!({ "type": "string" }), "With `document`: its named version (\"V1\")."),
                     opt("view", json!({ "type": "integer" }), "A view whose Part Studio to use."),
                     opt("position", point(), "Where the fixed corner goes (sheet mm; inserting)."),
                     opt("corner", json!({ "type": "string", "enum": ["top_left", "top_right", "bottom_left", "bottom_right"], "default": "top_right" }), "Fixed corner."),
@@ -2251,9 +2253,27 @@ fn custom_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some((TableKind::Custom { studio, fs, name, fs_version, bottom_to_top, .. }, _)) => (Some(*studio), Some(*fs), Some(name.clone()), fs_version.clone(), *bottom_to_top),
         _ => (None, None, None, None, false),
     };
-    // The Part Studio: given, the view's, the edited table's, else the first in the drawing.
+    if a.get("version").is_some() && a.get("document").is_none() {
+        return Err(OpError::param("version", "`version` goes with `document` (another document's version)"));
+    }
+    // The Part Studio: another document's, given, the view's, the edited table's, else the first in the drawing.
+    let mut version = old.as_ref().and_then(|o| match &o.0 {
+        TableKind::Custom { version, .. } => version.clone(),
+        _ => None,
+    });
     let studio = match (a.opt_str("studio")?, a.opt_u64("view")?) {
+        (_, _) if a.get("document").is_some() => {
+            let document = a.str("document")?;
+            let v = a.opt_str("version")?.ok_or_else(|| OpError::param("version", "the version of `document` to use (e.g. \"V1\")"))?;
+            let (path, v, snapshot) = crate::derived::named_version(document, v)?;
+            let name = a.opt_str("studio")?.ok_or_else(|| OpError::param("studio", "the Part Studio of `document` to use"))?;
+            let studios: Vec<&noshape_model::document::Tab> = snapshot.ordered_tabs().into_iter().filter(|t| matches!(t.content, TabContent::PartStudio(_))).collect();
+            let tab = studios.iter().find(|t| t.name == name || t.id.to_string() == name).ok_or_else(|| OpError::param("studio", &format!("no Part Studio `{name}` in {} {}; there: {}", path.display(), v.label, studios.iter().map(|t| t.name.as_str()).collect::<Vec<_>>().join(", "))))?;
+            version = Some(crate::derived::ExternalRef { path: path.clone(), microversion: v.microversion, tab: tab.id.to_string() }.key());
+            tab.id
+        }
         (Some(s), _) => {
+            version = None;
             let id = crate::doc::find_tab(doc, s).map_err(|e| OpError::param("studio", &e.message))?;
             if !matches!(doc.tab(id).map(|t| &t.content), Some(TabContent::PartStudio(_))) {
                 return Err(OpError::param("studio", "not a Part Studio"));
@@ -2262,6 +2282,8 @@ fn custom_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         (None, Some(_)) => {
             let v = view_arg(&t, a, "view")?;
+            let key = noshape_model::drawing::views::view_source(&t.d.sheets[t.sheet], v).map(|(k, _)| k);
+            version = key.as_ref().and_then(|k| k.version.clone());
             views_source_tab(&t, v).ok_or_else(|| OpError::param("view", "the view doesn't show a Part Studio"))?
         }
         (None, None) => match old_studio {
@@ -2291,7 +2313,7 @@ fn custom_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     };
     let bottom_to_top = a.bool_or("bottom_to_top", old_btt)?;
     let corner = enum_arg(a, "corner", &CORNERS, old.as_ref().map_or(TableCorner::TopRight, |o| o.1))?;
-    let kind = dt::custom_table_kind(studio, fs, name, fs_version, bottom_to_top, old.as_ref().map(|o| &o.0));
+    let kind = dt::custom_table_kind(studio, version, fs, name, fs_version, bottom_to_top);
     let sheet = t.sheet;
     let (id, description) = match edit {
         Some(id) => {
