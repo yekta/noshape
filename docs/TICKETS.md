@@ -23,6 +23,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   runs of the unfixed binary on vibe2 (lavapipe) all exited 0. Reopen if it comes back on CI.
 
 ## qa, 2026-11-20
+- [ ] P2 **SUITE-INTRO-MUTUALTRIM-DERIVED (core)**: model suite, c2-surf-intro-mutualtrim (5/17). Live: Derived 1 brings in
+  "Car" 7/14/9 faces/edges/vertices, 1289903.86 mm³. Ours (run 1119-1302-291c74b0; 05:51 a67911be had it NOT BUILT): builds
+  but brings the whole car, 220/612/408, 2652444.77 mm³; downstream 3D fit spline 1 / 2 "Select at least two vertices…",
+  Curve 1 a sheet (live a wire), Ruled surface 1 now "Only sketch and face edges can be used…" (built before). Same in v0.4.61
+  and 5b62f6ca (compat SAME). Evidence: qa-scratch/suites/1119-1302-291c74b0/models.log (feature 5 on).
 - [ ] P1 **SINGULARITIES-SKETCH2-UNSOLVED (core)**: corpus c2-surf-workshop-singularities (compat vs v0.4.61). Live: Sketch 2
   OK (its PIERCE constraint on edge JGJ of Mirror 3's sheet JGD, refs.jsonl), 5 parts at the end. Ours since green 624c6db7
   (11-19 22:50; e61f91fe 22:14 OK): Sketch 2 "Sketch could not be solved.", Mirror 2 "Boolean resulted in no geometry change",
