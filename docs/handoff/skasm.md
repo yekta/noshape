@@ -1,14 +1,20 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-20 09:31 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-20 11:37 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-20 09:31 UTC)
-- Feel stack LANDED 4e51cce3 (dx T2 `forget_sm_built`; CHAIN-LASTPOINT, PASTE-PLACE, FEEL-SM-PARTIAL-FLANGE-MANIP,
-  FEEL-DIM-TWO-POINTS-ZERO): tickets marked fixed to verify, feel R3 row =; dx and qa told.
-- Redo of the 4 reverted renames LANDED b0995d8f (names keep the pick order's, old names alias the new: `Bodies::aliases`,
-  `rename_aliases`, `alias_chain`). Worktrees skasm-revert / skasm-bisect and their vibe2 targets removed.
-- qa SNAP-INSERT-FACE: asm's, routed via the lead.
+## In flight (11-20 11:37 UTC)
+- 5 new SM suite models (lead 11-20), before -> after: forms 2 -> 10/21, hem-flange 2 -> 3/8, jog-panel 0 -> 3/12,
+  modify-joint 4/11, loft-basic 3/4. Landing: translator (Form's form-library studio -> `library:<form>` + config; SM wall
+  CAP_FACE of `wallThicken` = start: off the line's sheet; sketch on its own in-feature MC -> plane on live's frame, P2
+  SKETCH-ON-IN-FEATURE-MC; CORRESPONDING_IN_FLAT sketch plane -> our flat face), harness (live's in-context "Reference N"
+  wires no parts), sheetmetal.rs (a bend end square to one wall: no ruled end; 24 SM docs A/B, no change elsewhere).
+- Next differences: forms Sketch 3 frame (P2 ticket), Form 5/7 (circle-emboss / circle-knockout tools); hem Hem 1 (INFO
+  "Collision in sheet metal flat pattern." vs WARNING); jog Jog 1: 7 B-spline edges (bend-end arcs, the two bends' seam)
+  where live has circles / lines; joint: our flat lies elsewhere (Sketch 1 on flat: frame (0, -113.5) vs live (120.02, 0)),
+  Extrude 2 "No faces meet flattened sheet metal bodies"; loft: corner faces (live 8 B-spline, ours 2).
+- Feel stack 4e51cce3 verified by qa (green f380b6928); P2 drawn_failed LANDED 8fd60c7a.
+- cf-sheet-metal-model-plus P1 line (SUITE-REGRESSIONS-1108) closed: 318 ms vs live 917.
 
 ## Closed 11-19: big-sketch feel (no row >= 100 ms and >= 2x live; live: open 2.6-25 s, edit 2.7-13 s, press 31-56 ms;
 ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
@@ -17,9 +23,6 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
 ## Next
 - 850efe Extrude 6: bool's (P1 for them, 3b6725b2). Extrude 1-5 match live; Extrude 6's union leaves its r4 tool cylinders and
   Extrude 2's coaxial r4 ones unmerged (ours 33, OCCT 31 with a bad merge, live 28). Axes exact to 1e-12 mm: not the sketch.
-- qa 11-20 P2 (SMM-EXTRUDE-CLOSED-PROFILE leftover) done, to land after the feel stack: a cannot-unfold model is status
-  Warning (live's server) with `FeatureState::drawn_failed`; the list row, the header's failures count and ui_state read
-  `shown_status()` (Error). Other sites see the Warning (geometry kept).
 - Midpoint alignment landed (303e9d91); live has no circle quadrant inference, nor do we: nothing left there.
 - Handed: surf-intro-simple Loft 1 (core), surf-intro-examples Fill 1 overshoot (lead to route), welding-config
   Extrude 8 (core, fixing), manualblend Sweep 2 area / Move boundary (core).
@@ -30,6 +33,9 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
   (c2-surf-intro-*/derived/<id>/, live.jsonl by rollback): rerun wave-washer and the surf-intro docs.
 
 ## Next, in order
+00. lead 11-20: 5 new SM suite models (forms, hem, jog, joint, SM loft): first difference each, before/after counts.
+00b. qa P2 SUITE-INTRO-TAILFIN-INTERSECTED: "Profile for tail fin" 1 INTERSECTED not found (surf-intro boundary/fill/
+   mutualtrim/ruled): Surface 2 area, Curve 1 start, Boundary surface 1 fails; qa-scratch/feel1120/car-one.log.
 0. USER P0 feel: rows of docs/parity/interaction-feel.md in my areas are "=" now; Hover timing is psui's.
 0b. live's camera retakes (025a33f6): sketch-line-from-midpoint, sketch-bezier-polygon, sketch-spline-handle-arm and 7 asm
    takes now compare the camera; rerun them after the land. asm-menu-instance-properties' Pro menu (Where used…, no

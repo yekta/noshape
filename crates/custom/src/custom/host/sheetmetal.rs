@@ -1709,6 +1709,12 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
                     continue;
                 }
                 let (Some(da), Some(db)) = (free_end(fa, e, v, b.dir), free_end(fb, e, v, b.dir)) else { continue };
+                // A wall ending square to the bend ends it there, the other wall notched past it (c2-sm-hem-flange's
+                // Sheet metal model 1: the side walls' tops square to the corner bends, the end walls slanted on above
+                // them; live's bend ends flat at the side wall's top, a 0.988 mm² step face in the end wall).
+                if da.dot(b.dir).abs() <= 1e-6 || db.dot(b.dir).abs() <= 1e-6 {
+                    continue;
+                }
                 // Free sides both square to the bend at different places share no plane (two flanges' corner, the
                 // plate pulled back by the second's bend, live sm-box: the bend ends with the nearer wall, the
                 // other wall runs on past it).

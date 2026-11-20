@@ -5,6 +5,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## skasm, 2026-11-20
+- [ ] P2 SKETCH-ON-IN-FEATURE-MC (skasm): live's sketch can sit on its own in-feature mate connector (c2-sheet-metal-forms'
+  Sketch 3: `sketchPlane` qCreatedBy(id + its mateConnector sub-feature), a connector at a wall face's centroid); ours has no
+  in-feature connector in a sketch (sketch_create's `plane` takes no `{"mate_connector": …}`). The parity translator puts it
+  on a plane at live's frame meanwhile. Check live's sketch dialog (the plane field's connector button) before adding it.
+
 ## live, 2026-11-20 (docs/parity open rows, P1 areas; evidence live/parity-open-1120/findings.md)
 - [ ] fixed (studios 11-20: op drawing_datum_target, every Datum target tab option; e2e), to verify P2 **DRW-DATUM-TARGET-OP (studios)**: the Datum dialog's Datum target tab has no operation: `drawing_datum` makes only the feature symbol, so an agent can't place a target with its area, style, origin, Length / Angle positions, X / Y flips, per-distance Precision or instances (AGENTS: everything the app does is an op). Found 11-20 adding the distances' Precision ▾.
 - [ ] P2 **MEASURE-CIRCLE-DEFAULT-PLANE (psui)**: interaction.md 4.4. Live: a circle with the Top plane reads Min dist ·
@@ -2458,7 +2464,8 @@ neither build. knifehandle Fillet 2 shows a kernel message in place of Onshape's
   - core: cf-part-draft 1.4 → 19.8 s, Part Draft 3 15.3 s: it builds now (8/13 → 13/13: core's direct drafted prism cba0a00bb /
     ae5154213, and the corpus' high-accuracy gear volume, a correction); bool's 5a964e078 (the halves' union 3.1 → 0.13 s) is
     after this green: check the next run.
-  - skasm / core: cf-sheet-metal-model-plus 2.0 → 3.1 s (14/14 both; Extrude 4 1.3 s, Flange 1 0.65 s).
+  - [x] skasm / core: cf-sheet-metal-model-plus 2.0 → 3.1 s (14/14 both; Extrude 4 1.3 s, Flange 1 0.65 s). Gone (skasm 11-20
+    10:30, vibe2: 14/14, features 318 ms against live's 917; Extrude 4 4 ms, Flange 1 26 ms).
   - blend / core: cf-snap-hook 6.5 → 11.2 s with 11/18 → 14/18 (Snap Hook 1 / 2 3.4 / 4.0 s): more of it builds; Fillet 6 is fixed
     after this green (4b3e0611f).
   - Not regressions: c2-hunting-knife's 7 "now ERROR" features are past its unchanged first difference (Bridging curve 1, 10/52

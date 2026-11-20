@@ -2585,6 +2585,8 @@ impl<'a> Translator<'a> {
             // A Frame's profile sketch in another Part Studio of the document: ours `<tab id>#<sketch>.4294967295`
             // (psui's Select sketch › Current document), that studio built first.
             "BTMParameterReferencePartStudio" if p["parameterId"] == "profileSketch" => Some(json!(self.studio_sketch(p)?)),
+            // A Form's tool from Onshape's form library: ours the built-in form of that Part Studio, in its configuration.
+            "BTMParameterReferencePartStudio" if p["parameterId"] == "formPartStudio" => Some(json!(library_form(p)?)),
             _ => return Err(format!("parameter type {ty} not translated")),
         })
     }
@@ -3981,6 +3983,19 @@ impl<'a> Translator<'a> {
         if let Some(v) = get("operationId") {
             packed_strings(v, &mut own);
         }
+        // A sheet metal wall's face (`CAP_FACE` of `….wallThicken`, of the sheet a model's extrude swept from a sketch
+        // line): c2-sheet-metal-forms' Forms placed on a wall's face by a mate connector.
+        if name == "CAP_FACE"
+            && own.iter().any(|o| o.contains("wallThicken"))
+            && let Some(model) = strings.iter().find_map(|s| s.strip_suffix(".opExtrude")).and_then(|o| o.split('.').next()).map(str::to_string)
+            && let Some(sk) = strings.iter().find_map(|s| s.strip_suffix(".wireOp")).map(str::to_string)
+        {
+            let line = strings.windows(2).filter(|w| w[0] == "sketchEntityId").find_map(|w| self.curve_of(&sk, &w[1]));
+            return Some(match line {
+                Some(line) => self.wall_face(&model, &sk, &line, is_start),
+                None => Err(format!("CAP_FACE of {model}'s wall: its sketch {sk}'s curve was not translated")),
+            });
+        }
         let own = own.first().and_then(|o| o.split('.').next()).map(|f| format!("{f}."));
         let swept = |s: &String| s.strip_suffix(".opExtrude").map(|o| (o.to_string(), false)).or_else(|| s.strip_suffix(".opRevolve").map(|o| (o.to_string(), true)));
         let (op, revolve) = own.as_ref().and_then(|f| strings.iter().filter(|s| s.starts_with(f.as_str())).find_map(swept)).or_else(|| strings.iter().find_map(swept))?;
@@ -4511,6 +4526,59 @@ impl<'a> Translator<'a> {
         circles.iter().all(|(_, d)| (0..3).all(|i| (d[i] - c[i]).abs() < 1e-9)).then(|| first.clone())
     }
 
+    /// A face of sheet metal model `model`'s wall swept from sketch `sk`'s line `line`: its start cap the face the
+    /// thickness put off the line's sheet, its end cap the one on it (live c2-sheet-metal-forms: Form 1's targets
+    /// JIi (start) at x = 3 and JIm at x = 0 of the wall on x = 0; Form 3's location on the floor's z = 3 face, its
+    /// target there).
+    fn wall_face(&mut self, model: &str, sk: &str, line: &[[f64; 2]], is_start: bool) -> Result<String, String> {
+        let ours = self.feature_ids.get(model).cloned().ok_or_else(|| format!("CAP_FACE: sheet metal model {model} was not built"))?;
+        let [o, x, y] = match self.frames.get(sk) {
+            Some(f) => *f,
+            None => {
+                let our_sketch = self.feature_ids.get(sk).cloned().ok_or_else(|| format!("CAP_FACE: sketch {sk} was not built"))?;
+                let g = self.call("sketch_get", json!({ "sketch": our_sketch }))?;
+                let f = |k: &str| f3(&g["frame"][k]).ok_or("sketch frame");
+                [f("origin")?.map(|c| c * per_unit(&g["units"])), f("x")?, f("y")?]
+            }
+        };
+        let (Some(a), Some(b)) = (line.first(), line.last()) else { return Err("CAP_FACE: no line".into()) };
+        let dot = |a: [f64; 3], b: [f64; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        let cross = |a: [f64; 3], b: [f64; 3]| [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+        let world = |p: [f64; 2]| [o[0] + p[0] * x[0] + p[1] * y[0], o[1] + p[0] * x[1] + p[1] * y[1], o[2] + p[0] * x[2] + p[1] * y[2]];
+        let (wa, wb) = (world(*a), world(*b));
+        let len = ((wb[0] - wa[0]).powi(2) + (wb[1] - wa[1]).powi(2) + (wb[2] - wa[2]).powi(2)).sqrt();
+        if len < 1e-12 {
+            return Err("CAP_FACE: a zero length line".into());
+        }
+        let t = [(wb[0] - wa[0]) / len, (wb[1] - wa[1]) / len, (wb[2] - wa[2]) / len];
+        let n = cross(x, y);
+        let made = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 1000 }))?;
+        let parts: HashSet<String> = made["faces"].as_array().into_iter().flatten().filter_map(|f| f["part"].as_str().map(str::to_string)).collect();
+        let s = cross(t, n);
+        let all = self.call("query_entities", json!({ "kind": "faces", "surface": "plane", "limit": 100000 }))?;
+        let k = per_unit(&all["units"]);
+        let mut best: Option<(f64, String)> = None;
+        for f in all["faces"].as_array().into_iter().flatten().filter(|f| f["part"].as_str().is_some_and(|p| parts.contains(p))) {
+            let (Some(m), Some(c), Some(id)) = (f3(&f["normal"]), f3(&f["centroid"]), f["id"].as_str()) else { continue };
+            if dot(m, s).abs() < 1.0 - 1e-6 {
+                continue;
+            }
+            let w = [c[0] * k - wa[0], c[1] * k - wa[1], c[2] * k - wa[2]];
+            // Beside the line (along it within its ends); the end cap on its sheet, the start cap the nearest off it
+            // facing away.
+            let along = dot(w, t);
+            if along < -1e-6 || along > len + 1e-6 {
+                continue;
+            }
+            let off = dot(w, m);
+            let fits = if is_start { off > 1e-7 } else { off.abs() <= 1e-7 };
+            if fits && best.as_ref().is_none_or(|b| off < b.0) {
+                best = Some((off, id.to_string()));
+            }
+        }
+        best.map(|b| b.1).ok_or_else(|| format!("CAP_FACE: no face of {model}'s wall along its line"))
+    }
+
     fn extrude_entity(&mut self, name: &str, is_start: bool, crossing: Option<usize>, op: &str, sk: &str, curves: &[Vec<[f64; 2]>]) -> Result<String, String> {
         // A feature's own operation inside it (`F….*.extrude`, a sheet metal model's sheet): that feature's.
         let ours = self.feature_ids.get(op).or_else(|| op.split_once(".*.").and_then(|(f, _)| self.feature_ids.get(f))).cloned().ok_or_else(|| format!("{name}: extrude {op} was not built"))?;
@@ -4937,10 +5005,15 @@ impl<'a> Translator<'a> {
 
     /// The face of a sheet metal flat (sheetmetal_table's `flat_faces`) on live's plane, the nearest to live's area.
     fn flat_face_on_plane(&mut self, r: &LiveRef) -> Option<String> {
+        self.flat_face_on_plane_of(r, &[])
+    }
+
+    /// [`Self::flat_face_on_plane`] of these sheet metal models of ours only (none: any).
+    fn flat_face_on_plane_of(&mut self, r: &LiveRef, only: &[String]) -> Option<String> {
         let (o, n) = (r.point?, r.normal?);
         let models = self.call("sheetmetal_table", json!({})).ok()?;
         let mut best: Option<(f64, String)> = None;
-        for m in models["models"].as_array().cloned().unwrap_or_default() {
+        for m in models["models"].as_array().cloned().unwrap_or_default().into_iter().filter(|m| only.is_empty() || m["model"].as_str().is_some_and(|id| only.iter().any(|o| o == id))) {
             let Ok(t) = self.call("sheetmetal_table", json!({ "model": m["model"] })) else { continue };
             let k = per_unit(&t["units"]);
             let num = |v: &Value| v.as_str().and_then(|x| x.parse::<f64>().ok()).or_else(|| v.as_f64());
@@ -5155,13 +5228,41 @@ impl<'a> Translator<'a> {
         let plane_q = f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "sketchPlane").ok_or("no sketchPlane")?;
         // A plane named by id alone (a Plane feature's, older documents):
         // ours that lies where live's sketch frame does.
-        let plane = match self.param(k, plane_q) {
-            Ok(v) => v.and_then(|v| v.as_array().and_then(|a| a.first()).cloned()).ok_or("no sketch plane")?,
-            Err(e) => self.plane_at_frame(&oid).map(Value::from).ok_or(e)?,
+        // A face of a sheet metal flat (`CORRESPONDING_IN_FLAT`; live's fetch has no geometry for its id): ours on live's
+        // frame, of the model the query names (c2-sm-modify-joint's Sketch 1 on Sheet metal model 2's flat).
+        let texts: Vec<&str> = plane_q["queries"].as_array().into_iter().flatten().filter_map(|q| q["queryString"].as_str()).collect();
+        let in_flat = texts.iter().any(|t| packed_strings_of(t).iter().any(|s| s == "CORRESPONDING_IN_FLAT"));
+        let flat = match self.frames.get(&oid).copied().filter(|_| in_flat) {
+            Some([o, x, y]) => {
+                let models: Vec<String> = texts.iter().flat_map(|t| packed_strings_of(t)).filter_map(|s| s.split('.').next().and_then(|f| self.feature_ids.get(f)).cloned()).collect();
+                let n = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+                let at = LiveRef { point: Some(o), normal: Some(n), ..Default::default() };
+                let face = self.flat_face_on_plane_of(&at, &models).or_else(|| self.flat_face_on_plane(&at));
+                if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+                    eprintln!("TRACE in-flat plane of {oid}: models {models:?}, face {face:?}");
+                }
+                face
+            }
+            None => None,
+        };
+        let from_flat = flat.is_some();
+        let plane = match (flat, self.param(k, plane_q)) {
+            (Some(face), _) => Value::from(face),
+            (None, Ok(v)) => v.and_then(|v| v.as_array().and_then(|a| a.first()).cloned()).ok_or("no sketch plane")?,
+            (None, Err(e)) => self.plane_at_frame(&oid).map(Value::from).ok_or(e)?,
+        };
+        // Its own in-feature mate connector (ours has none in a sketch): a plane on live's frame (c2-sheet-metal-forms'
+        // Sketch 3 on a connector at a wall face's centroid).
+        let plane = match plane.as_str().filter(|p| p.starts_with(SUB_FEATURE)) {
+            Some(_) => {
+                problems.push("its plane, an in-feature mate connector, taken as a plane on live's frame".into());
+                self.plane_at_frame(&oid).map(Value::from).ok_or("its plane: an in-feature mate connector, and no plane of ours on live's frame")?
+            }
+            None => plane,
         };
         // A face off live's sketch frame (an id whose newest earlier line named another entity: asm-bjr-config 5d8bc1's
         // Sketch 40 on RfCS, Hole 2's bore at live's line 95 and Extrude 16's end cap at the sketch): ours on the frame.
-        let plane = match plane.as_str().filter(|p| p.starts_with("face:")).map(str::to_string) {
+        let plane = match plane.as_str().filter(|p| p.starts_with("face:") && !from_flat).map(str::to_string) {
             Some(face) => match self.faces_on_frame(&oid, 200) {
                 Some(on) if !on.is_empty() && !on.contains(&face) => Value::from(on[0].clone()),
                 _ => plane,
@@ -10341,9 +10442,54 @@ fn empty_live_query(q: &Value) -> bool {
         && q.as_object().is_none_or(|o| o.values().all(|v| v.get("queryString").and_then(Value::as_str).is_none_or(str::is_empty)))
 }
 
+/// Onshape's form library (a43c5db8…, V4) Part Studios by element id: our built-in forms (`sheetmetal::forms`).
+const LIBRARY_FORMS: [(&str, &str); 9] = [
+    ("41e13d2a99122294d2417048", "circle-knockout"),
+    ("431e8a75d66b1b17edcf7666", "louver"),
+    ("00925aea75b1496ed7a3d6b7", "circle-extrusion"),
+    ("ea1d9c0a43f388e3e6e01371", "slot-extrusion"),
+    ("7a308096d2a1b95ec14962e8", "countersink"),
+    ("abe424640db861f548110425", "circle-emboss"),
+    ("4ab7c4e8b67cc5660738f66b", "slot-emboss"),
+    ("0b93a6689c5c22c2c828d8c1", "bridge-lance"),
+    ("4f9c5f6132a87e55eb8c29bb", "lance"),
+];
+
+/// A Form's `formPartStudio` of the form library as ours: `library:<form>`, a tab, then its configuration
+/// (`input=value;…`, live's list inputs by our names; std's Form sets the thickness from the sheet).
+fn library_form(p: &Value) -> Result<String, String> {
+    let ns = p["namespace"].as_str().unwrap_or("");
+    let element = ns.split("::").find_map(|x| x.strip_prefix('e')).ok_or_else(|| format!("form Part Studio `{ns}`: no element"))?;
+    let form = LIBRARY_FORMS.iter().find(|(e, _)| *e == element).map(|(_, f)| *f).ok_or_else(|| format!("form Part Studio {element} is not one of Onshape's form library"))?;
+    let mut cfg = Vec::new();
+    for c in p["configuration"].as_array().into_iter().flatten() {
+        let Some(id) = c["parameterId"].as_str() else { continue };
+        let input = match id {
+            "List_WrgkY2rdTeUGo2" => "Radius control",
+            "List_rZVuoqSoy79i0I" | "List_OrKvSo3y1S6Ua4" => "Length to",
+            "List_g6XZAvs1qlzUG1" => "Profile",
+            other => other,
+        };
+        let value = c["expression"].as_str().or(c["value"].as_str()).map(str::to_string).or_else(|| c["value"].as_bool().map(|b| b.to_string())).ok_or_else(|| format!("form configuration {id}: no value"))?;
+        cfg.push(format!("{input}={value}"));
+    }
+    Ok(format!("{}{form}\t{}", noshape_model::sheetmetal::forms::PREFIX, cfg.join(";")))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A Form's tool from Onshape's form library (c2-sheet-metal-forms' Form 1: the Louver at V4) is our built-in form,
+    /// its configuration by our input ids; another document's Part Studio isn't one.
+    #[test]
+    fn a_form_library_part_studio_is_our_built_in_form() {
+        let p = serde_json::json!({ "parameterId": "formPartStudio", "namespace": "da43c5db857134eb8f4474bd7::vfb920c2aa30f9e85a9bb8de5::e431e8a75d66b1b17edcf7666::mdb29c4586fd049dca95be4f6",
+            "configuration": [{ "parameterId": "height", "expression": "8 mm" }, { "parameterId": "List_WrgkY2rdTeUGo2", "value": "Thickness" }] });
+        assert_eq!(super::library_form(&p).unwrap(), "library:louver\theight=8 mm;Radius control=Thickness");
+        let other = serde_json::json!({ "parameterId": "formPartStudio", "namespace": "d0::v0::e0123456789abcdef01234567::m0" });
+        assert!(super::library_form(&other).is_err());
+    }
 
     /// A studio configured only by suppressions (asm-bjr-config 5d8bc1: holes and Kerf Compensation by Manufacture) gets
     /// its checkbox from them.

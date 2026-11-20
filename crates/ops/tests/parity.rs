@@ -423,6 +423,9 @@ fn live_import_refits_hold_the_studs_counts() {
 /// row (massproperties ignores the rollback, live 11-17): its volume counts only on the last row (asm-robotic-arm 21ab69).
 fn live_parts_of_row(line: &Value, last: Option<u64>) -> Vec<PartState> {
     let mut parts = live_parts(line);
+    // An in-context entity's body ("Reference 1", a wire of the assembly's), listed by live's fetch: no part (ours are
+    // stand-ins deleted after the last feature; c2-sm-jog-panel).
+    parts.retain(|p| !(matches!(p.body_type.as_str(), "wire" | "sheet" | "point") && p.name.strip_prefix("Reference ").is_some_and(|n| n.parse::<u32>().is_ok())));
     let method = line["method"].as_str().unwrap_or("");
     if method.contains("massproperties") && method.contains("rollbackBarIndex") && line["index"].as_u64() != last {
         for p in &mut parts {
@@ -439,6 +442,13 @@ fn a_rollback_capture_compares_its_final_volume_on_the_last_row_only() {
     assert_eq!(live_parts_of_row(&row(9), Some(9))[0].volume, Some(2.116e-5));
     let other = json!({ "index": 4, "parts": [{ "name": "Pulley", "bodyType": "SOLID", "faces": 483, "volume": 2.116e-5 }] });
     assert_eq!(live_parts_of_row(&other, Some(9))[0].volume, Some(2.116e-5));
+}
+
+#[test]
+fn an_in_context_reference_live_lists_is_no_part() {
+    let row = json!({ "index": 1, "parts": [{ "name": "Reference 1", "bodyType": "wire", "faces": 0, "edges": 1 }, { "name": "Panel", "bodyType": "solid", "faces": 6 }, { "name": "Reference wire", "bodyType": "wire", "faces": 0 }] });
+    let names: Vec<String> = live_parts_of_row(&row, None).into_iter().map(|p| p.name).collect();
+    assert_eq!(names, ["Panel", "Reference wire"]);
 }
 
 /// Rebuilds `features` and compares with `live` (live.jsonl lines) after each feature.
