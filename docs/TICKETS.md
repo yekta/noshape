@@ -211,6 +211,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   B Govde 85/206/126 faces/edges/vertices in 0.4.61 and up to 86d1cbc4 -> 83/200/122 on 452420b2, volume 19945.54 mm³ both. The only
   geometry commit in the range is bool 61295b96f (USD's merge of coaxial pieces back), the change 33c176a43 noted with no live capture.
   Needs live's face count after Rib Round 1 to say which is right; until then compat reports the dock DIFF on every green.
+  Same green, same range, also new: cf-surface-pattern Part 1 129/386/259 -> 129/385/258 (live 131/387/258); cli-fillet-segv Parts 4,
+  13, 14, 15 34/80/50 -> 33/82/52, volume unchanged (no live record).
 - [ ] P2 FEEL-CONFIG-BOX-WIDTH (psui; qa 11-20 13:44, walked on green 452420b22 vibex8, live onshape-research/live/psui/cfglabel-1120) Configurations box:
   live's rows run x 42..220 (178 px) and the box is a 45 px scroll pane at its default height; ours run 45..245 (200 px), so a long
   Variable label keeps "A much longe…" where live cuts "A much lo…", and our box shows both rows at once. Labels themselves as live
