@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-20 02:02)
+# QA handoff (agent qa; current state only, updated 2026-11-20 02:25)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -72,7 +72,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    vibex8 ~/.slot-quiet until 04:00 (timer qa-vibex8-unquiet removes it); core's .dbg.sh + skasm's uip4 build queued there, told.
    Lead 02:0x: once 69bcf1791 is green (waiter qa-wait-studios-drwdlg) spot 5 drawing dialogs vs live/drawing 1047-lnk-front-props,
    1037-lnk-move-to-sheet-dialog, 710-hole-table-dialog, 508-datum-target-tab, 1358-dk-export-default (all 1919x1079); dx STEP
-   torus export (qa-wait-dx-torus) and hex-bookcase DXF counts vs live (qa-wait-dx-hexdxf; dx ba3d6cc1 determinism land). Compat: P1 SINGULARITIES-SKETCH2-UNSOLVED -> core (20ae6a506; core 4a52a26bb).
+   torus export (qa-wait-dx-torus) and hex-bookcase DXF counts vs live (qa-wait-dx-hexdxf; dx ba3d6cc1 determinism land). Pre-release 05:00 (lead 02:0x): GO 02:25 on a06ec927, vibe2
+   ~/tmp/qa/prerel (700; bin/prerel-edits.py, prerel-open.sh, prerel-appedit.sh; out qa-scratch/prerel): userdocs ALL-SAME,
+   edits SAME (hats 2 vars, dock 4), app open + hat15 edit pixel-identical to 0.4.61. A newer cut green: qa-cut-0415. Compat: P1 SINGULARITIES-SKETCH2-UNSOLVED -> core (20ae6a506; core 4a52a26bb).
 4. Hover flow (lead 11-17 22:20, every release): uh/uh2.sh <release app> <out> on vibex6 Xvfb, 3 runs, xsheet.py for the sheet;
    USER-HOVER-STAYS-LIT is listed as known in the cut's entry until psui's latest-wins picking fix passes 3 clean runs.
 
