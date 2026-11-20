@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-20 01:05)
+# QA handoff (agent qa; current state only, updated 2026-11-20 01:08)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -56,8 +56,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    on the released app (vibex6, slot), then the compat baseline moved. Then bin/rel-compat.sh <prev> <v> (released CLI vs
    the previous release) -> compat/rel-<v>.txt; any user-document worse = P0 to the lead at once.
 3. The app spot-check rows (archive "Release checks: the app spot-check list"): user cases + 8 interaction-feel rows in
-   rotation. Round 2 (lead 11-20 01:00): rows 1-8 on green eef639d7: scenarios suites/1120-0059-green-spot1r2 (plane rclick,
-   variable autocomplete in dimension / Extrude depth, line-from-midpoint) running on vibe2; by hand: 3D drag from 3 device px = live
+   rotation. Round 2 (lead 11-20 01:00): rows 1-8 on green eef639d7:
+   scenarios 7/8, 63/67 (suites/1120-0059-green-spot1r2): sketch-dimension-variable = P0 SKETCH-DIM-PLACE-CLICK-SELECTS (skasm,
+   since 592b0fc9 11-17; hidden as a focus.kind diff till live's camera retake). By hand: 3D drag from 3 device px = live
    (feel/3d.json; the list's "5 px" and feel row 80 are stale, psui told), line end on a lit model edge = Coincident (=), edge midpoint
    rest = P1 EDGE-MIDPOINT-REST-LOOK (psui). Next rows 9-16.
 4. Hover flow (lead 11-17 22:20, every release): uh/uh2.sh <release app> <out> on vibex6 Xvfb, 3 runs, xsheet.py for the sheet;
@@ -98,7 +99,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    = live 10/10 (psui told); STALE-SKETCH-HOVER re-walk when ffd85455 (= 00389dbd) is in a green (qa-wait-psui-stale).
    **Full interaction suite 02:00 (lead 11-20 01:00): timer qa-night-ui 01:40 -> bin/ui-night.sh: newest green to vibex8
    ~/qa-speed/bin/noshape-night, worktree qa-night (not qa-suite: the 13:02 run's exchange step builds from agents/qa-suite/src),
-   slot ticket ~01:45, shards (3, :471) start at 02:00; score + worse/better vs 1119-1302 -> qa-alerts. The 4-h loop stops after
+   slot ticket ~01:45, shards (3, :471) start at 02:00 (lead 01:1x: vibex8 is ours, blend moved to vibex7; if bool run1.sh still holds it, start when free, the alert line says started HH:MM late + the 02:00 slot owner); score + worse/better vs 1119-1302 -> qa-alerts. The 4-h loop stops after
    the 13:02 run (suites/stop touched 01:05); restart it (rm stop; systemd-run qa-suites) after the night run.** uip-rerun.sh fixed
    01:05: an empty shard ran ALL scenarios (psui-vk's shard 1, killed) and its Xvfb kept uip.lock (now 7>&-).
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
