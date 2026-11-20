@@ -396,12 +396,7 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
             continue;
         }
         n += 1;
-        // Declines fail at once (no OCCT run). (A Shell's slab Boolean, as quick_boolean runs ours.)
-        let slab = c.path.starts_with("direct");
-        if slab {
-            // SAFETY: read by this thread's Booleans; the replay runs on one thread.
-            unsafe { std::env::set_var("NOSHAPE_BOOL_SLAB", "1") };
-        }
+        // Declines fail at once (no OCCT run).
         set_rust_boolean_only(true);
         let t = Instant::now();
         let r = boolean(c.op, &c.objects, &c.tools, &c.opts);
@@ -409,10 +404,6 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         let path = last_boolean_path();
         let why = last_rust_decline();
         set_rust_boolean_only(false);
-        if slab {
-            // SAFETY: as above.
-            unsafe { std::env::remove_var("NOSHAPE_BOOL_SLAB") };
-        }
         if let Ok(names) = std::env::var("NOSHAPE_BREP_SHOW_OCCT")
             && names.split(',').any(|x| x == name)
         {
@@ -661,20 +652,11 @@ fn brep_corpus_share() {
             if c.path == "failed" {
                 continue;
             }
-            let slab = c.path.starts_with("direct");
-            if slab {
-                // SAFETY: read by this thread's Booleans; the share runs on one thread.
-                unsafe { std::env::set_var("NOSHAPE_BOOL_SLAB", "1") };
-            }
             set_rust_boolean_only(true);
             let ours = boolean(c.op, &c.objects, &c.tools, &c.opts);
             let taken = ours.is_ok() && last_boolean_path() == "rust";
             let why = last_rust_decline();
             set_rust_boolean_only(false);
-            if slab {
-                // SAFETY: as above.
-                unsafe { std::env::remove_var("NOSHAPE_BOOL_SLAB") };
-            }
             // (OCCT the way the app ran it: op_boolean's, or OCCT's one Boolean of them all.)
             let direct = c.path.starts_with("direct");
             if direct {

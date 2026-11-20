@@ -6979,26 +6979,10 @@ static bool edges_apart(const OcShape& a, const OcShape& b)
   return true;
 }
 
-// A Shell's slab Boolean (quick_boolean's; the replay's of one, NOSHAPE_BOOL_SLAB) with an input of OCCT's nominal
-// tolerance, 1e-4: OCCT's (its tolerant interferences there are its own: on the Shell corpus ours kept a slab's end
-// vertex OCCT drops, unified otherwise; elsewhere such inputs come out as OCCT's, so only here).
-static thread_local bool t_slab = false;
-static bool slab_too_tolerant(const std::vector<TopoDS_Shape>& args)
-{
-  if (!t_slab && std::getenv("NOSHAPE_BOOL_SLAB") == nullptr)
-    return false;
-  for (const TopoDS_Shape& x : args)
-    if (BRep_Tool::MaxTolerance(x, TopAbs_EDGE) >= 5e-5)
-      return true;
-  return false;
-}
-
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
                   double fuzzy, bool touching_only, bool scaled_inputs)
 {
-  if (slab_too_tolerant(args))
-    return decline("a Shell slab of 50 um tolerance or more");
   // A stale regeneration's Boolean stops (as OCCT's does through its progress indicator).
   const std::atomic<bool>* cancel = thread_cancel_flag();
   auto stop = [&] {
@@ -7686,17 +7670,7 @@ bool quick_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, bo
     std::vector<const OcShape*>           srcs;
     std::vector<std::unique_ptr<OcShape>> own;
     const KernelTimer                     timer("boolean.rust.direct");
-    t_slab = true;
-    try
-    {
-      done = rust_boolean(op, all, srcs, own, out, hist);
-    }
-    catch (...)
-    {
-      t_slab = false;
-      throw;
-    }
-    t_slab = false;
+    done = rust_boolean(op, all, srcs, own, out, hist);
     if (done)
       path = "direct_rust";
     else if (std::getenv("NOSHAPE_SHELL_DEBUG"))
