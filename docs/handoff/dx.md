@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-20 05:1x UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-20 06:2x UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -38,9 +38,13 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
   Derived 1, rebuild 300-490 ms (live 359-1202). Next stop in 4: Tail fin extrude UP_TO_VERTEX 3483.23 vs 3567.19 mm²:
   the car's rear vertices (y 254, z 30.343) at x +-33.142, live +-33.941 (Fillet 1's end): sent to blend 03:0x.
   offset doc: Offset surfaces 1 9588.57 vs 9591.44 (likely the same). CLI queries: Mac dx-keep/siq.sh, si-q/.
-- P1 (lead 05:3x): isaac-ball 8f5622 Gear Lab 1 (custom, 40T helical) 14.1 s, live's studio 1.15 s (2d7dc1's 13T 1.5 s).
-  vibex7 ~/agents/dx-keep/gl/{gl40,gl13} + gl.sh (parity_models, NOSHAPE_FS_PROFILE). Then P2 URDF-RIGID-SUBASM-SINGLE-
-  LINK (live REQUESTS 05:44 for the file's shape; settings key mergeFastenedComponents).
+- P1 Gear Lab DONE on my side (06:2x): 8f5622 18.1 s (live 1153 ms); interpreter ~60 ms, the rest 2 OCCT fuses:
+  body ∪ its herringbone mirror 14.4 s (occt), core ∪ 40 teeth 3.3 s (occt_tree). Sent to bool 06:21 with the
+  recorded cases vibex7 ~/agents/dx-keep/gl-bool (.brep/.txt). gl13 2d7dc1: 0.8 + 0.9 s, live 515 ms. Repro: vibex7
+  ~/agents/dx-keep/gl.sh <tag> [gl40|gl13] (parity_models + NOSHAPE_FS_PROFILE; NOSHAPE_RECORD_BOOLEANS for cases).
+- URDF-RIGID-SUBASM-SINGLE-LINK QUEUED 752aa551 (06:0x, with 898a054b5 screws = LANDED 615fe712): ExportSettings
+  urdf_single_link, AssemblyExport.rigid + placed_links, op opt rigid_subassemblies_single_link, dialog row; e2e
+  urdf_export_takes_a_rigid_subassembly_as_one_link. Open: live's file shape (REQUESTS dx 05:44).
 - Next: the rest of "Next, in order".
 - The Mac's dx-main release target links a PRIVATE TKHLR (OCCT_ROOT=~/noshape-host/dx-keep/hlr/root, counters only
   with DXHLR=1); rebuild with the normal OCCT_ROOT for timings.
