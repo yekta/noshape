@@ -2404,7 +2404,7 @@ neither build. knifehandle Fillet 2 shows a kernel message in place of Onshape's
     → blend 11-13: fixed; cf-snap-hook 18/18 on main (Mac and vibe suites 11-13).
   - (skasm 11-19: done; corner-break 1.6–1.8 s on quiet vibex6 11-18, live 1.97 s) skasm: c2-sm-corner-break 4.0 → 5.5 s (×1.4); the range has skasm's sheet metal (56603985 c2-sm-louver's flanges).
   - core / bool: cf-fix-pcb 0.9 → 1.5 s (×1.7).
-  - dx: drw-hide-inspection-items now differs, alone too on green 8f6f6fd2: step 7 `.drawing.annotations[1].text` live null /
+  - (dx 11-20: done; drw-hide-inspection-items matches, 10 states, qa's 1120-night-ui a06ec927) dx: drw-hide-inspection-items now differs, alone too on green 8f6f6fd2: step 7 `.drawing.annotations[1].text` live null /
     ours "1"; 9765bd7a0 made the record list a bubble by its number. drw-detail-view, drw-note-bring-to-front, drw-table,
     drw-table-cells-resize also differed in the run but match alone (load, UIP-DRW-START-FLAKY).
   - From SUITE-REGRESSIONS-1107, now fixed in this run: learning-center-michael 7/7 again (2.4 s), cf-t-slot-joint 18/18.
