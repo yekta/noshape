@@ -19,14 +19,16 @@ Statuses:
   **n/a** cloud-only (Add comment).
 
 **Result.** Nothing of live's is missing from ours: every toolbar tool and ▾ row, every right-click row (a submenu's
-rows included) and every panel text is in ours. 1224 of 1855 live items (66%) match (11-17: 1046 of 1875); 475 more are
+rows included) and every panel text is in ours. 1224 of 1849 live items (66%) match (11-17: 1046 of 1875); 531 more are
 **shown**: live's DOM dump has them in a panel and our build showed them in that same panel (its fields, an open list
 or menu, the tooltip; the run's own states, panel titles mapped in `OURS_TITLES`), with no take comparing the two
 states. A panel dump's toolbar button or right-click row takes that item's status. Our menus (MENUDUMP) list every
 entity's, the view, image and table cells' included, a submenu with its rows ("Insert ▸ Column Left | …"); rows that
-name a tab or document compare by their words before the name ("Switch to …"). 114 are present in our sources only (no
-state of ours shows them yet): Create Drawing (46, screenshots checked separately; its modal reports only its name
-field), Replicate's region page, and small rests. live2's 11-17 review dropped what full-page dumps carry
+name a tab or document compare by their words before the name ("Switch to …"). 52 are present in our sources only (no
+state of ours shows them yet; 11-20: 114): conditional fields no take opens (Section view's Depth, View properties'
+Multiple values, Styles' select options), live documents' option lists and small rests. Panels list their tooltips
+as `texts` (a key only ours records, so steps don't compare it), and our runs' right-click menus count as ours.
+live2's 11-17 review dropped what full-page dumps carry
 besides their surface (`PAGE_CHROME`, document names, a menu clicked earlier, display:none rows; View properties'
 multi-select dump read visible-only; other panels hidden in a page dump).
 
@@ -40,8 +42,8 @@ drw-table-cells-resize recording (the text dump's All | Horizontal | Vertical wa
 |---|---|---|---|---|---|---|---|---|
 | Toolbar | 54 | 51 | 0 | 0 | 3 | 0 | 0 | 0 |
 | Right-click menus | 403 | 363 | 0 | 0 | 5 | 0 | 4 | 31 |
-| Panels and dialogs | 1398 | 810 | 475 | 0 | 106 | 0 | 1 | 6 |
-| All | 1855 | 1224 | 475 | 0 | 114 | 0 | 5 | 37 |
+| Panels and dialogs | 1392 | 810 | 531 | 0 | 44 | 0 | 1 | 6 |
+| All | 1849 | 1224 | 531 | 0 | 52 | 0 | 5 | 37 |
 
 ### Toolbar and its ▾ rows
 
@@ -519,7 +521,7 @@ drw-table-cells-resize recording (the text dump's All | Horizontal | Vertical wa
 | Section view | 24 | 14 | 8 | 0 | 2 | 0 | 0 |  | Depth; Offset distance |
 | Aligned section view | 6 | 6 | 0 | 0 | 0 | 0 | 0 |  |  |
 | Broken-out section | 11 | 11 | 0 | 0 | 0 | 0 | 0 |  |  |
-| Detail view | 24 | 19 | 2 | 0 | 3 | 0 | 0 |  | Circle; Rectangle; Polygon |
+| Detail view | 24 | 19 | 4 | 0 | 1 | 0 | 0 |  | Polygon |
 | Break view | 9 | 9 | 0 | 0 | 0 | 0 | 0 |  |  |
 | Crop view | 7 | 7 | 0 | 0 | 0 | 0 | 0 |  |  |
 | Dimension | 11 | 11 | 0 | 0 | 0 | 0 | 0 |  |  |
@@ -532,28 +534,28 @@ drw-table-cells-resize recording (the text dump's All | Horizontal | Vertical wa
 | Edge condition symbol | 5 | 5 | 0 | 0 | 0 | 0 | 0 |  |  |
 | Note | 106 | 53 | 51 | 0 | 1 | 0 | 0 |  | Color |
 | Callout | 20 | 20 | 0 | 0 | 0 | 0 | 0 |  |  |
-| Table | 74 | 34 | 32 | 0 | 8 | 0 | 0 |  | Noto Sans ( Note ); Color; List; Insert symbol; Insert drawing property; Insert sheet reference property; Text format; Date time format |
+| Table | 74 | 34 | 39 | 0 | 1 | 0 | 0 |  | Color |
 | BOM table | 21 | 21 | 0 | 0 | 0 | 0 | 0 |  |  |
 | Revision table | 6 | 6 | 0 | 0 | 0 | 0 | 0 |  |  |
 | Cut list table | 14 | 14 | 0 | 0 | 0 | 0 | 0 |  |  |
 | Hole table | 75 | 28 | 45 | 0 | 0 | 0 | 1 | All views in a hole table must be of a common singular part (accepted: live 1744: other parts' views aren't pickable, no error) |  |
-| Custom table | 37 | 27 | 0 | 0 | 9 | 0 | 0 |  | Cell; noshape mm test; FS sizes; Custom table properties…; Split custom table below; Select a Part Studio; Current document; Other documents; Select a custom table |
+| Custom table | 35 | 27 | 1 | 0 | 6 | 0 | 0 |  | Cell; Split custom table below; Select a Part Studio; Current document; Other documents; Select a custom table |
 | Centermark | 6 | 6 | 0 | 0 | 0 | 0 | 0 |  |  |
 | Hatch region | 78 | 72 | 5 | 0 | 1 | 0 | 0 |  | Polygon |
 | Insert DXF or DWG | 2 | 2 | 0 | 0 | 0 | 0 | 0 |  |  |
 | Insert image | 11 | 11 | 0 | 0 | 0 | 0 | 0 |  |  |
 | Format painter | 5 | 5 | 0 | 0 | 0 | 0 | 0 |  |  |
-| Inspection item | 45 | 42 | 0 | 0 | 3 | 0 | 0 |  | Name; Diameter dimension; An inspection table reveals all the datums and datum targets |
+| Inspection item | 45 | 42 | 1 | 0 | 2 | 0 | 0 |  | Diameter dimension; An inspection table reveals all the datums and datum targets |
 | Adjust linestyle | 16 | 9 | 6 | 0 | 1 | 0 | 0 |  | none |
-| Move to sheet / Replicate | 46 | 21 | 17 | 0 | 7 | 0 | 0 |  | Clear; Rectangle; No closed profile selected; Insert custom table of asb drawing src …; Suppress alignment with parent; Successfully replicated 7/7 annotations; Close |
-| View properties | 45 | 41 | 1 | 0 | 3 | 0 | 0 |  | Opposite direction; Multiple values; noshape mm test |
-| Sheets panel | 65 | 63 | 0 | 0 | 2 | 0 | 0 |  | Move up; Move down |
+| Move to sheet / Replicate | 45 | 21 | 19 | 0 | 4 | 0 | 0 |  | Clear; No closed profile selected; Successfully replicated 7/7 annotations; Close |
+| View properties | 44 | 41 | 1 | 0 | 2 | 0 | 0 |  | Opposite direction; Multiple values |
+| Sheets panel | 65 | 63 | 2 | 0 | 0 | 0 | 0 |  |  |
 | Sheet properties | 16 | 12 | 3 | 0 | 1 | 0 | 0 |  | A4 Portrait |
 | Drawing properties | 184 | 83 | 100 | 0 | 1 | 0 | 0 |  | Auxiliary |
-| Styles panel | 44 | 1 | 40 | 0 | 3 | 0 | 0 |  | Center; Show dimension line; Help |
+| Styles panel | 44 | 1 | 42 | 0 | 1 | 0 | 0 |  | Show dimension line |
 | MBD status | 6 | 0 | 5 | 0 | 1 | 0 | 0 |  | An MBD status table reveals all the MBD requirements within |
-| Reference manager | 9 | 2 | 5 | 0 | 2 | 0 | 0 |  | noshape mm test; Version graph |
+| Reference manager | 8 | 2 | 5 | 0 | 1 | 0 | 0 |  | Version graph |
 | Title block | 70 | 13 | 53 | 0 | 3 | 0 | 0 |  | auto; DejaVu S; Color |
-| Create Drawing | 59 | 1 | 12 | 0 | 46 | 0 | 0 |  | Create Drawing:; Existing templates; Custom template; Onshape; Owned by me; Recently opened; Created by me; Shared with me; Public; All … +36 |
+| Create Drawing | 59 | 1 | 51 | 0 | 7 | 0 | 0 |  | Owner; Français; Deutsch; Español; Italiano; A4 Portrait; New drawing name |
 | Export Drawing | 35 | 13 | 20 | 0 | 2 | 0 | 0 |  | File name; View export rules |
-| Change to version | 7 | 0 | 6 | 0 | 1 | 0 | 0 |  | noshape mm test |
+| Change to version | 6 | 0 | 6 | 0 | 0 | 0 | 0 |  |  |
