@@ -5427,7 +5427,7 @@ were checked in code by asm; "(verify)" ones need a live check first.
 - [ ] (asm 11-07: confirmed; part and subassembly Mass overrides now count (`analysis::part_densities`, T1 assembly_mass_properties_combine_parts_where_they_sit); left: configured materials (need the library's density), and whether Onshape leaves BOM-excluded parts out: P2 now) P0 ASM-MASS-OVERRIDES (asm) assembly mass properties use material density only: a part's
   mass override counts as "no material", a subassembly's override and configured materials are ignored, parts excluded
   from BOMs are counted.
-- [x] (asm 11-07: Mate::new and the op default X; saved mates keep theirs) P1 ASM-MATE-OFFSET-ROTATE-AXIS (asm) a new mate's offset "Rotate about" defaults to Z on every type but
+- [x] verified (qa 11-20 03:1x on green a06ec927, walk3 Assembly 1: a new Revolute, ☑ Offset shows "Rotate about X", 0 mm, 0 deg) (asm 11-07: Mate::new and the op default X; saved mates keep theirs) P1 ASM-MATE-OFFSET-ROTATE-AXIS (asm) a new mate's offset "Rotate about" defaults to Z on every type but
   Fastened (`Mate::new`); live's Revolute dialog shows "Rotate about X" (behaviours 1256, 19950). Change the default
   for new mates and the op (saved documents keep what they stored).
 - [ ] P1 ASM-FLEX-SUB-RIGID (asm) a subassembly with relations, patterns, tangent mates or a flexible subassembly is
