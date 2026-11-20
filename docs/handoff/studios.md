@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 11:06 UTC.
+Updated 2026-11-20 11:41 UTC.
 
 ## In flight
 
@@ -32,6 +32,17 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
   duplicates). Mac: ops 452, drawing-ui 127, feature-studio-ui 28, clippy clean; AGENT_API regenerated.
 - b24 DONE 11:05 (vibex7 build): panel-lists 27/27 (was 25/27), hide-dim 12/12. Local after: Flip / Rotate 5 px apart
   (live s21: centres 30 px apart).
+- Local after 35451185: 7ba01b354 Flip / Rotate 5 px apart; aedc1b050 a selected dimension = live dsel3 (black text
+  on an orange box, lines orange, grips; push_annotation_look, test); section End type select marked
+  `dropdown:<shown>` (drw-section-blind-offset 5/11 → 9/11); uncommitted: drawing_ui_state counts a selected
+  dimension's grips in a view box (live drw-styles-radial s3 EDGE Top), checked by b27d (baseline, 21 drw-dimension
+  takes) vs b28. Next: when /root/studios-scratch/b27d.log ends DONE and b28.log has APPDONE, `scp -3
+  vibex7:tmp/studios/noshape vibe2:tmp/studios/noshape`, then `PD_HOST=vibe2 PD_DISP=395 pdshots-host.sh b28d $(cat
+  /root/studios-scratch/dimtakes.txt)`; compare the score lines with b27d's; commit the reader change if nothing drops.
+  Land everything once 35451185 lands (Monitor on land.sh --status); report and end the turn after each land (lead 11:4x).
+- Live's 08:08 takes, drafts in /root/live-scratch/st0808 (scenario + out/<take>.json; copied untracked into
+  tests/ui-parity/ and live/): styles-radial (live's s11 click opened Inspection table: retake asked), section-blind-
+  offset (s8 Esc keeps the panel in live: asked). Others not recorded at 11:40.
 - An rb.sh run re-syncs the worktree to the Mac: scp a regenerated docs/AGENT_API.md back in the same command as
   UPDATE_DOCS (mac:noshape-host/agents/studios/src/docs/AGENT_API.md).
 - revision-table-delete retake (REQUESTS 09:55 item 2): not in at 11:06.
