@@ -64,12 +64,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   itself matches (x1.059 per notch about the pointer, exact inverse). D1's release (ours redraws once at ~470 ms, live first draw 10 ms, settled
   767 ms) is no verdict yet: recheck both on a quiet host.
 
-- [ ] P0 FEEL-ASM-DRAG-START (asm; qa 11-20 04:32, live behaviours "feel coverage (11-20)" A1 / A1b, walked on green 9ae062180 vibex8) assembly instance drag start: live takes a press + ONE move of 2-24 px, then release,
+- [ ] P0 FEEL-ASM-DRAG-START (lead 11-20 04:5x via asm: the target is 15 px, no 0.6 s wait (live's ~0.6 s is server latency); asm 5bfaa556 in the queue; asm; qa 11-20 04:32, live behaviours "feel coverage (11-20)" A1 / A1b, walked on green 9ae062180 vibex8) assembly instance drag start: live takes a press + ONE move of 2-24 px, then release,
   as a click (Part 2 <1> selected, not moved); stepped 1 px moves start a drag only with a move >= ~0.62 s after the press AND >= 15-17 px from it
   (17 px / 1.27 s yes; 14 / 1.26, 10 / 1.0, 24 / 0.6, 16 / 0.4 no; 40 px in 0.2 s then still: no). Ours drags on any single move >= 3 px (only 2 px
   is a click) and on every stepped pair (17/1.27 -> 12 px, 14/1.26 -> 11, 10/1.0 -> 8, 16/0.4 -> 10, 40 in 0.2 s -> 38), never selected after.
   qa-scratch/feel1120/a1/thr2-vs-thr4.png
-- [ ] P0 FEEL-ASM-DRAG-DEAD-ZONE (asm; qa 11-20 04:32, live behaviours "feel coverage (11-20)" A1 / A1b, walked on green 9ae062180 vibex8) a dragged instance moves the FULL pointer delta from the press in live (150 px =
+- [ ] P0 FEEL-ASM-DRAG-DEAD-ZONE (asm 04:5x: a real-pointer 100 px drag moves 100 px in its test; the 2 px may be the hover outline: re-walk on a part edge once 5bfaa556 is green; asm; qa 11-20 04:32, live behaviours "feel coverage (11-20)" A1 / A1b, walked on green 9ae062180 vibex8) a dragged instance moves the FULL pointer delta from the press in live (150 px =
   8.84 mm at 0.058965 mm/px; 17 px = 1.002 mm); ours moves 2 px less every time (148 of 150, 3 of 3; single moves d-2). After release
   / Ctrl+Z match. qa-scratch/feel1120/a1/a1-after-0c.png
 - [ ] P0 FEEL-ASM-MATE-PREVIEW-COLOUR (asm; qa 11-20 04:32, live behaviours "feel coverage (11-20)" A2, walked on green 9ae062180 vibex8) Fastened preview: live's mate face highlight is yellow rgb(229,183,37), Part 1's
