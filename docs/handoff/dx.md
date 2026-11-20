@@ -41,18 +41,12 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
   ~/agents/dx-keep/gl.sh <tag> [gl40|gl13] (parity_models + NOSHAPE_FS_PROFILE; NOSHAPE_RECORD_BOOLEANS for cases).
 - URDF-RIGID-SUBASM-SINGLE-LINK LANDED b7c2c4e8a (ticket [x]); open: live's file shape (REQUESTS dx 05:44). Nightly
   dump-test LANDED 3b9ec80cc; dx-nightly worktree + vibe2 target removed 07:4x.
-- EXCHANGE TOP-3 (lead 06:3x), uncommitted in dx-land: baseline b0 (Mac, old binary, 22 docs; screws not in the set):
-  imports 119/130, live imports ours 46/48, self 153/154, DXF 1/10, times 174/174; 39 failing rows (/root/dx-scratch/
-  b0-fails.txt): rings-loft 8, faceblend 6, housing-draft 6. Fixes: (1) parity.rs OBJ/3MF held to live's OWN OBJ/3MF
-  mesh (file_mesh), not its STL; (2) export.rs IGES/ACIS leave a mesh part out beside B-rep parts (as live's hex
-  files) + e2e iges_and_acis_leave_a_mesh_part_out_beside_brep_parts + read-back kept parts; (3) "ours.stl as live
-  will read it" passes on DECISIONS 11-16 deviation (stl_within_deviation), as the live-imports row. NOT a mesher
-  change (lead 07:3x: rows pass on deviation, never count): our B-spline STL is ~2.5-3x fewer triangles than live's
-  (hoses 76922/222374, faceblend 3662/9204) but within 0.003 mm mean. Rest: DXF + rings STEP area = model causes
-  (parked). a3: all fixed but DXF, rings STEP (parked), rings "ours.stl" and sm-louver OBJ/3MF louvers mispaired ->
-  (4) ops/src/parity.rs differences(): ours within live's volume band ties (both boxed), box pairs; a4: sm-louver
-  clean. Rings "ours.stl": Shell 1 offset faces mesh with folds/open edges in plain BRepMesh too (part valid) -> sent
-  to bool 08:1x (Mac dx-keep/rings-fold/, /root/dx-scratch/rings-fold-probe.patch). Then e2e, commit, land, full run.
+- EXCHANGE TOP-3 (lead 06:3x) QUEUED 2f406fa1: before (b0) imports 119/130, live 46/48, self 153/154, DXF 1/10, times
+  174/174, 39 failing rows; after (Mac exall-a5.log) imports 127/130, rest same, 16 rows (rings-loft 8->3, faceblend
+  6->1, housing 6->1; the 1s are DXF). Fixes: OBJ/3MF held to live's own OBJ/3MF; IGES/ACIS drop a mesh part beside
+  B-rep parts (export.rs, e2e); STL rows on DECISIONS 11-16 deviation; differences() ties within live's volume band
+  (louvers). Left: DXF + rings STEP area (model, parked); rings "ours.stl" Shell 1 offset faces fold in BRepMesh too
+  (sent to bool; Mac dx-keep/rings-fold/, /root/dx-scratch/rings-fold-probe.patch); duct STL (parked); hose x_t (core).
 - Next: the rest of "Next, in order".
 - The Mac's dx-main release target links a PRIVATE TKHLR (OCCT_ROOT=~/noshape-host/dx-keep/hlr/root, counters only
   with DXHLR=1); rebuild with the normal OCCT_ROOT for timings.
