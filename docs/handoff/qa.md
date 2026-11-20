@@ -90,7 +90,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 00b. **Live's 21 feel rows (11-20, lead 04:1x) DONE 04:3x** on green 9ae062180: 18 P0 feel tickets, all routed (rows FEEL-* in TICKETS
    "qa, 2026-11-20 (live's feel coverage rows …)": 15e785522 sketch skasm 3 / psui 1, e79906b34 studios 8, 51d079b3c asm 3 / skasm 1 / psui 2).
    Sketch rows ran as live's recordings (qa-bisect, uncommitted, suites/1120-feel-cov2; R4 inconclusive per live). Crops /root/qa-scratch/feel1120/.
-   Quiet-window re-time (02:00-04:00 11-21, vibex8 was at load 21-36): D3 drawing wheel zoom (ours 208-392 ms, live 8-23), V1 cell edit
+   Quiet-window re-time (02:00-04:00 11-21, vibex8 was at load 21-36): FAST-OFF-CLEAR (ours 141-260 ms, live 5-7), toolbar tooltip (208-242, live 15-45), D3 drawing wheel zoom (ours 208-392 ms, live 8-23), V1 cell edit
    (150-200 vs 46), D1 release (470 vs 10 / 767), A1 per-move draw, A2 preview draws, S1 per-move draw.
 00e. skasm stack on 3fd4db71: 5 verified; FEEL-DIM-TWO-POINTS-ZERO / CHAIN-LASTPOINT / PASTE-PLACE still open. ANALYSIS-READOUT-HIDDEN
    verified 05:4x (2b3887ebe, 7/7); FEEL-DIM-PICK-READOUT (cov2-dim-orient step 8), ROLLBACK-DROP-ROW, SECTION-ARROW-FOOT: psui's next batch, on its word.
@@ -99,7 +99,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    vibex7: saved suite doc -> drawing placed as live -> DXF 2018 -> dxfdiff). Seat lip: Ok in every release (not a ticket). OPEN:
    - car Fillet 1 verified b05f1c014 (Derived 1 matches in 5 surf-intro docs); next diff P2 SUITE-INTRO-TAILFIN-INTERSECTED -> skasm.
    - asm DRAG-START verified 83a8003d9; CHAMFER-ASYM closed afc395406. skasm 4e51cce3 (4 feel P0s): unit qa-wait-skasm-4e51.
-     psui 37741d38 batch: fork walking on vibex8 :782 -> feel1120/psui3.md.
+     psui 37741d38: 7f6c5e1ae (5 verified; ROLLBACK-DROP-ROW lit row + SECTION-ARROW-FOOT length reopened; DIM-PICK values on skasm's green).
    - P0s sent 09:59 (TICKETS 95fa940e1): COMPAT-GYRO-REVOLVE -> bool (be2a573c..f943df0b), COMPAT-FILLET-ORIENT-REFS -> core (d80c2c58e).
    - Live index landed 9b382ec56 + bc95b3943 (145 listed; vibex7 ~/parity/models has 155 with features.json). Suite 1120-0407 is the old
      126 (models 96/126, 1358/1585; rest stage still on vibex8). The next qa-suites run is the first on it: re-baseline SCORE (coverage
