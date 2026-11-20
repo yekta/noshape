@@ -4362,7 +4362,7 @@ neither build. knifehandle Fillet 2 shows a kernel message in place of Onshape's
 - [x] (asm 164a763c1: the Reference designator input listed as a field (label none, its value) and the modal text; asm-menu-instance-properties 4/4) P2 ASM-INSTANCE-PROPS-FIELD (asm; qa 11-20 02:55) asm-menu-instance-properties step 2: live's retake 025a33f60 records the
   Instance properties modal's Reference designator input (fields 1, text "Part 2 <1> Reference designator"); ours dumps fields [] while its
   focus is that input (same dump as in 1119-1302, so the gap is in our state dump or the field is missing). Re-run alone: the same.
-- [ ] P2 DOCS-CRUMB-TOOLTIP (studios; qa 11-20 02:56, night ui run on a06ec927, re-run alone 2/2) docs-folder-crumb step 2: after a click
+- [ ] fixed (studios 11-20: not b54408712 but be41a8c2b's tooltip gate, which blocked any element drawn in the released one's bounds; now keyed to the released element's id: the title the crumb turns into shows its tooltip; start-ui test a_clicked_crumb_turned_title_shows_its_tooltip, chrome row unchanged), to verify P2 DOCS-CRUMB-TOOLTIP (studios; qa 11-20 02:56, night ui run on a06ec927, re-run alone 2/2) docs-folder-crumb step 2: after a click
   on the breadcrumb's "Owned by me" (from inside uip Folder) live shows its tooltip "Owned by me" under the resting pointer, ours none. Matched in
   1119-1302 (291c74b0); start-ui changes between: studios' b54408712 (Documents table pinned columns).
 - [ ] P2 VER-COMPARE-READOUT (studios; qa 11-20 03:59, night ui run on a06ec927, re-run alone the same) ver-compare-hover-part step 5: in
