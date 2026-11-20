@@ -235,18 +235,29 @@ pub fn name_edges(face_names: &[Name], edge_faces: &[Vec<u32>], edge_key: &dyn F
         base.push((fs, e));
     }
     let mut groups: BTreeMap<Vec<Name>, Vec<usize>> = BTreeMap::new();
+    // An edge a face shares with a pattern copy joined onto it keeps its place among the face's boundary edges, so
+    // the others keep their names (a surface mirrored with Add is one sheet since 4a52a26bb; saved references kept).
+    let mut copy_joints: BTreeMap<Name, Vec<usize>> = BTreeMap::new();
     for (fs, e) in &base {
         groups.entry(fs.clone()).or_default().push(*e);
+        if let [a, b] = fs.as_slice() && copy_joint(a, b) {
+            copy_joints.entry(a.clone()).or_default().push(*e);
+            copy_joints.entry(b.clone()).or_default().push(*e);
+        }
     }
     let mut out: Vec<Option<Name>> = vec![None; edge_faces.len()];
-    for (fs, mut edges) in groups {
-        if edges.len() > 1 {
-            edges.sort_by_cached_key(|e| {
+    for (fs, edges) in groups {
+        let mut slots: Vec<(usize, bool)> = edges.iter().map(|&e| (e, true)).collect();
+        if let [f] = fs.as_slice() && let Some(joints) = copy_joints.get(f) {
+            slots.extend(joints.iter().map(|&e| (e, false)));
+        }
+        if slots.len() > 1 {
+            slots.sort_by_cached_key(|(e, _)| {
                 let k = edge_key(*e);
                 (k.map(|x| (x * 1e9).round() as i64), *e)
             });
         }
-        for (ord, e) in edges.into_iter().enumerate() {
+        for (ord, (e, _)) in slots.into_iter().enumerate().filter(|(_, (_, own))| *own) {
             let ord = ord as u16;
             let name = match fs.len() {
                 0 => TopoName::Boundary { face: Arc::new(TopoName::face(FeatureId(0), Role::New(e as u32))), ordinal: ord },
@@ -263,6 +274,18 @@ pub fn name_edges(face_names: &[Name], edge_faces: &[Vec<u32>], edge_key: &dyn F
         }
     }
     out.into_iter().map(|n| n.expect("all edges named")).collect()
+}
+
+/// Whether an edge between faces `a` and `b` joins a pattern copy to a face of another feature.
+fn copy_joint(a: &TopoName, b: &TopoName) -> bool {
+    fn origin(n: &TopoName) -> Option<(FeatureId, bool)> {
+        match n {
+            TopoName::Face { feature, role } => Some((*feature, matches!(role, Role::Copy { .. }))),
+            TopoName::Split { parent, .. } => origin(parent),
+            _ => None,
+        }
+    }
+    matches!((origin(a), origin(b)), (Some((fa, ca)), Some((fb, cb))) if fa != fb && (ca || cb))
 }
 
 /// Name vertices from their adjacent faces.
@@ -351,5 +374,18 @@ mod tests {
         assert_eq!(*names[1], TopoName::edge(a.clone(), b.clone(), 0));
         assert_eq!(*names[0], TopoName::edge(a.clone(), b.clone(), 1));
         assert_eq!(*names[2], TopoName::Boundary { face: a, ordinal: 0 });
+    }
+
+    #[test]
+    fn a_boundary_edge_shared_with_a_joined_copy_keeps_the_others_names() {
+        let a = face(1, Role::CapStart(None));
+        let c = face(2, Role::Copy { instance: 1, of: a.clone() });
+        let keys = [[0.0; 4], [1.0, 0.0, 0.0, 0.0], [2.0, 0.0, 0.0, 0.0], [3.0, 0.0, 0.0, 0.0], [-1.0, 0.0, 0.0, 0.0]];
+        let apart = name_edges(std::slice::from_ref(&a), &[vec![0], vec![0], vec![0], vec![0]], &|i| keys[i], &[]);
+        let joined = name_edges(&[a.clone(), c.clone()], &[vec![0, 1], vec![0], vec![0], vec![0], vec![1]], &|i| keys[i], &[]);
+        assert_eq!(joined[0], Arc::new(TopoName::edge(a.clone(), c.clone(), 0)));
+        assert_eq!(joined[1..4], apart[1..4]);
+        assert_eq!(*joined[4], TopoName::Boundary { face: c, ordinal: 0 });
+        assert_eq!(*joined[3], TopoName::Boundary { face: a, ordinal: 3 });
     }
 }
