@@ -124,6 +124,19 @@ pub fn project_hlr(shape: &Shape, view_dir: DVec3, up: DVec3, exact: bool) -> Re
 
 // ------------------------------------------------------------ post-processing
 
+/// How far `p` lies off the circle through `a`, `b`, `c` (off their line when they are in line).
+fn off_circle(a: DVec2, b: DVec2, c: DVec2, p: DVec2) -> f64 {
+    let d = 2.0 * cross2(b - a, c - a);
+    let span = (b - a).length().max((c - a).length());
+    if d.abs() <= 1e-12 * span * span {
+        let g = if a.distance_squared(b) > 0.0 { b - a } else { c - a };
+        return (cross2(g, p - a) / g.length().max(1e-300)).abs();
+    }
+    let (ba, ca) = (b - a, c - a);
+    let centre = a + DVec2::new(ca.y * ba.length_squared() - ba.y * ca.length_squared(), ba.x * ca.length_squared() - ca.x * ba.length_squared()) / d;
+    (p.distance(centre) - a.distance(centre)).abs()
+}
+
 fn cross2(a: DVec2, b: DVec2) -> f64 {
     a.x * b.y - a.y * b.x
 }
@@ -155,12 +168,15 @@ impl SegGrid {
 pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64, line_tol: f64) -> Vec<ProjectedEdge> {
     // Visible segments, whether each is a whole straight edge, and whether it is a tangent edge (those cover only hidden
     // tangent edges: c2-sm-louver's bends seen edge-on, a hidden tangent line behind a visible one, live none).
-    let mut vis: Vec<(DVec2, DVec2, bool, bool)> = Vec::new();
+    // (With a third point of its polyline, when it has one: the circle through the three is its curve there.)
+    let mut vis: Vec<(DVec2, DVec2, bool, bool, Option<DVec2>)> = Vec::new();
     for e in &edges {
         if e.visibility == Visibility::Visible && matches!(e.class, EdgeClass::Sharp | EdgeClass::Outline | EdgeClass::Smooth) {
-            for w in e.polyline.windows(2) {
-                if w[0].distance_squared(w[1]) > 0.0 {
-                    vis.push((w[0], w[1], e.polyline.len() == 2, e.class == EdgeClass::Smooth));
+            let p = &e.polyline;
+            for i in 0..p.len().saturating_sub(1) {
+                if p[i].distance_squared(p[i + 1]) > 0.0 {
+                    let third = p.get(i + 2).or(i.checked_sub(1).and_then(|j| p.get(j))).copied();
+                    vis.push((p[i], p[i + 1], p.len() == 2, e.class == EdgeClass::Smooth, third));
                 }
             }
         }
@@ -170,13 +186,13 @@ pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64, line_tol:
         return edges;
     }
     let (mut lo, mut hi) = (DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY));
-    for (a, b, _, _) in &vis {
+    for (a, b, ..) in &vis {
         lo = lo.min(a.min(*b));
         hi = hi.max(a.max(*b));
     }
     let extent = (hi - lo).max_element().max(tol);
     let mut grid = SegGrid { cell: (extent / 128.0).max(tol * 4.0), origin: lo, map: Default::default() };
-    for (i, (a, b, _, _)) in vis.iter().enumerate() {
+    for (i, (a, b, ..)) in vis.iter().enumerate() {
         for k in grid.cells(*a, *b, tol).collect::<Vec<_>>() {
             grid.map.entry(k).or_default().push(i as u32);
         }
@@ -208,8 +224,13 @@ pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64, line_tol:
             cand.dedup();
             let mut covered: Vec<(f64, f64)> = Vec::new();
             for &ci in &cand {
-                let (c, f, line, smooth) = vis[ci as usize];
+                let (c, f, line, smooth, third) = vis[ci as usize];
                 if smooth && !hidden_tangent {
+                    continue;
+                }
+                // A visible tangent edge beside a curve, within the chords' tolerance but off the curve, stays
+                // (cf-snap-hook's Top: a fillet's rim 0.0014 in inside a visible ring, live draws both).
+                if e.visibility == Visibility::Visible && !straight && third.is_some_and(|n| off_circle(c, f, n, a).min(off_circle(c, f, n, b)) > tol * 0.25) {
                     continue;
                 }
                 let near = if straight && line { line_tol } else { tol };
@@ -538,6 +559,24 @@ mod tests {
         assert!(r.iter().any(|e| e.class == EdgeClass::Smooth), "{r:?}");
         let r = drop_covered_hidden(vec![pe(true, &[[0.0, 0.0], [10.0, 0.0]], Some(1)), tangent(1e-9)], 0.5, 1e-6);
         assert!(!r.iter().any(|e| e.class == EdgeClass::Smooth), "{r:?}");
+    }
+
+    /// A tangent arc 0.0014 off a visible arc, inside the chords' cover tolerance (0.0017), is drawn (cf-snap-hook's
+    /// Top: live draws the fillet's rim beside the ring); the same arc sampled at other points isn't.
+    #[test]
+    fn a_tangent_arc_beside_a_visible_arc_stays() {
+        let arc = |r: f64, n: usize, visible: bool, smooth: bool, id: u32| {
+            let pts: Vec<[f64; 2]> = (0..=n).map(|i| 0.2 + 1.0 * i as f64 / n as f64).map(|t| [r * t.cos(), r * t.sin()]).collect();
+            let mut e = pe(visible, &pts, Some(id));
+            if smooth {
+                e.class = EdgeClass::Smooth;
+            }
+            e
+        };
+        let r = drop_covered_hidden(vec![arc(0.9603, 64, true, false, 1), arc(0.9589, 90, true, true, 2)], 0.0017, 1e-9);
+        assert!(r.iter().any(|e| e.source_edge == Some(2)), "{r:?}");
+        let r = drop_covered_hidden(vec![arc(0.9603, 64, true, false, 1), arc(0.9603, 90, true, true, 2)], 0.0017, 1e-9);
+        assert!(!r.iter().any(|e| e.source_edge == Some(2)), "{r:?}");
     }
 
     /// A hidden tangent edge on a visible tangent edge isn't drawn (c2-sm-louver's bends seen edge-on: live's
