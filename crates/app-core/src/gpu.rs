@@ -209,6 +209,11 @@ impl Gpu {
         self.worker().submit(job);
     }
 
+    /// `job`'s frame is shown from the viewport's copy of one drawn before: picks answer for it from now on.
+    pub fn adopt(&self, job: RenderJob) {
+        self.worker().adopt(job);
+    }
+
     /// Read a rectangle (device pixels) of the target's pick buffer for its
     /// newest frame; the answer arrives on the target's pick channel.
     pub fn pick(&self, target: u64, token: u64, rect: PickRect) {
@@ -309,6 +314,7 @@ fn route_frames(r2: Arc<Mutex<Routes>>) -> impl Fn(Completed) + Send + 'static {
         };
         let ms = started.map(|t| t.elapsed().as_secs_f32() * 1000.0).unwrap_or(0.0);
         noshape_render::perf::record_ms("g.submit_to_frame", ms);
+        frame_log("frame_rendered");
         let viewport = r2.lock().viewport_senders.get(&target).cloned();
         if let Some(tx) = viewport {
             let result = result.map_err(|e| e.to_string()).and_then(|mut frame| {
@@ -472,7 +478,9 @@ impl gpui_kit::Global for GpuGlobal {}
 /// thread's CPU time since the previous phase ended, at most the phase's wall time): CPU time is what a frame costs
 /// whatever else the machine runs (a loaded box's wall clock varied ±15 ms).
 /// `NOSHAPE_FRAME_LOG=<file>`: one line per window input and per presented frame, `<unix µs> <event>` (an input's kind or
-/// `present`), to time input -> frame without a screen recording (qa's latency runs). Written by its own thread.
+/// `present`; each draw phase's end, `gpui.<phase>`; `frame_rendered` on the render thread; the viewport's `render`, `pick_asked` / `pick_answered`,
+/// `frame_submitted` / `frame_back`, `frame_reused`), to time
+/// input -> frame without a screen recording (qa's latency runs). Written by its own thread.
 fn start_frame_log() {
     let Ok(path) = std::env::var("NOSHAPE_FRAME_LOG") else { return };
     let file = match std::fs::File::create(&path) {
@@ -519,6 +527,7 @@ pub fn frame_log(event: &'static str) {
 
 fn draw_stat(phase: &'static str, wall: std::time::Duration) {
     noshape_render::perf::record(phase, wall);
+    frame_log(phase);
     thread_local!(static LAST: std::cell::Cell<Option<std::time::Duration>> = const { std::cell::Cell::new(None) });
     let Some(cpu) = noshape_render::perf::thread_cpu_time() else { return };
     let Some(prev) = LAST.with(|l| l.replace(Some(cpu))) else { return };

@@ -3240,6 +3240,12 @@ impl PartStudioView {
         .detach();
     }
 
+    /// A feature row's hover fill beyond gpui's own hover: under its open context menu, and under a dragged rollback
+    /// bar (live cov-1120 R8: gpui's hover sleeps during a drag).
+    fn row_hover_filled(&self, id: noshape_model::reference::FeatureId, cx: &App) -> bool {
+        self.ui.list_menu == Some(id) || (cx.has_active_drag() && self.ui.rollback_drop_row == Some(id))
+    }
+
     fn set_rollback(&mut self, index: Option<usize>, cx: &mut Context<Self>) {
         self.ui.rollback_folder_top = None;
         self.doc.update(cx, |doc, cx| {
@@ -6071,7 +6077,7 @@ impl PartStudioView {
             .pl(px(4.))
             .mr(px(5.))
             .pr(px(11.))
-            .when(self.ui.list_menu == Some(id) && !(selected || editing), |d| d.bg(pal.row_hover))
+            .when(self.row_hover_filled(id, cx) && !(selected || editing), |d| d.bg(pal.row_hover))
             .group("feature-row")
             .relative()
             // Rollback drop line (live part-studio/30): a small hollow blue

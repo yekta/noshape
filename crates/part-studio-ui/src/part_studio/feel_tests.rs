@@ -929,6 +929,63 @@ fn a_fast_move_off_a_lit_face_clears_it_on_that_move(cx: &mut TestAppContext) {
     assert_eq!(after.0, None, "the face dark on the move off, before any pause or frame (settled: {})", after.1);
 }
 
+/// A fast move's hover waits 5 × the average pick (live's `averagePickDuration`): the pick's own time, not a pick's
+/// wait behind a frame the render thread draws first (a heavy model's software frame held the wait at its 250 ms cap).
+#[gpui::test]
+fn a_pick_held_up_behind_a_frame_leaves_the_hover_wait(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view, _, _) = block_part(cx, "hover-wait-own-pick");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let pointer = Pointer::new(cx, window, &view);
+    let size = cx.update(|cx| view.read(cx).viewport.read(cx).size());
+    let at = DVec2::new(size.x * 0.2, size.y * 0.2);
+    pointer.move_to(cx, &view, at);
+    let avg = |cx: &mut TestAppContext| cx.update(|cx| pointer.vp.read(cx).average_pick_ms());
+    // Frames and picks delivered as they finish, none asked: the next frame is drawn at once, a pick asked alone.
+    let drain = |cx: &mut TestAppContext| {
+        let t = std::time::Instant::now();
+        while cx.update(|cx| pointer.vp.read(cx).frame_in_flight() || pointer.vp.read(cx).pick_pending()) && t.elapsed() < std::time::Duration::from_secs(15) {
+            cx.update(|cx| view.read(cx).gpu.deliver_frames());
+            draw(cx, window);
+        }
+    };
+    drain(cx);
+    // A slow move away (past the pixels picked round the pointer): its pick, asked with no frame in flight, is timed.
+    cx.executor().advance_clock(std::time::Duration::from_secs(5));
+    let win = pointer.window_point(cx, DVec2::new(size.x * 0.6, size.y * 0.6));
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(win, None, Modifiers::default());
+    drain(cx);
+    assert!(avg(cx) >= 0.0, "a pick asked alone timed");
+    cx.executor().advance_clock(std::time::Duration::from_secs(5));
+    let win = pointer.window_point(cx, at);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(win, None, Modifiers::default());
+    drain(cx);
+    let before = avg(cx);
+    // A frame on its way (the camera turned; headless frames wait for `deliver_frames`), then a slow 3 px move (5 s after
+    // the last) whose pick waits for that frame 10 s.
+    cx.executor().advance_clock(std::time::Duration::from_secs(5));
+    cx.update(|cx| {
+        pointer.vp.update(cx, |v, cx| {
+            v.camera.orbit(DVec2::new(20.0, 0.0), size.y);
+            v.request_frame(cx);
+        })
+    });
+    draw(cx, window);
+    assert!(cx.update(|cx| pointer.vp.read(cx).frame_in_flight()), "the turned view's frame on its way");
+    let win = pointer.window_point(cx, at + DVec2::new(3.0, 0.0));
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(win, None, Modifiers::default());
+    assert!(cx.update(|cx| pointer.vp.read(cx).pick_pending()), "the move's pick asked behind the frame");
+    cx.executor().advance_clock(std::time::Duration::from_secs(10));
+    pointer.frames(cx, &view);
+    let t = std::time::Instant::now();
+    while cx.update(|cx| pointer.vp.read(cx).pick_pending()) && t.elapsed() < std::time::Duration::from_secs(15) {
+        pointer.frames(cx, &view);
+    }
+    // One 10 s pick in the average would put it past 2 s (0.8 old + 0.2 new).
+    assert!(avg(cx) < before + 1000.0, "the 10 s behind the frame isn't the pick's: average {before} -> {} ms", avg(cx));
+}
+
 /// Live 3d.json (interaction-feel "Click", "Ctrl+click"): in 3D with no tool a click adds what is lit, a click on a
 /// selected face removes it, a click on empty space clears, Shift+click there keeps the selection, and Ctrl+click
 /// opens the menu of what is under the pointer without selecting it; through the real pointer.

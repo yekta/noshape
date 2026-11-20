@@ -478,6 +478,18 @@ impl PickRect {
     }
 }
 
+/// On a software adapter, the part of the pick buffer a pick pass draws: the queries' rectangles `need` (x0, y0, x1, y1
+/// device px) and [`PICK_AREA_MARGIN`] round them, so the next moves' picks find it drawn (a whole pass there is a
+/// full frame of fill: 50-120 ms on llvmpipe, and 5 x the average pick is how long a fast move waits to light). None:
+/// the whole buffer.
+fn pick_area(need: Option<[u32; 4]>, width: u32, height: u32, software: bool) -> Option<[u32; 4]> {
+    let [x0, y0, x1, y1] = need.filter(|_| software && !perf_overrides().skip_pick_area)?;
+    let m = PICK_AREA_MARGIN;
+    Some([x0.saturating_sub(m), y0.saturating_sub(m), (x1 + m).min(width), (y1 + m).min(height)])
+}
+
+const PICK_AREA_MARGIN: u32 = 96;
+
 /// Everything needed to render one frame of a target.
 #[derive(Clone)]
 pub struct FrameRequest {
@@ -522,6 +534,64 @@ impl Textures {
     }
 }
 
+/// A pick buffer drawn for an earlier frame, kept for when a frame shows that again (a hover lit and cleared: on a
+/// software adapter a pick pass of a heavy Part Studio is 100-300 ms, and 5 x the average pick is how long a fast move
+/// waits to light).
+struct KeptPick {
+    state: FrameState,
+    pick: wgpu::Texture,
+    view: wgpu::TextureView,
+    area: Option<[u32; 4]>,
+}
+
+/// How many [`KeptPick`]s a target keeps (a few MB each).
+const KEPT_PICKS: usize = 2;
+
+impl FrameState {
+    /// Whether `other` draws the same frame (and pick buffer) as this.
+    fn same_frame(&self, other: &FrameState) -> bool {
+        self.camera == other.camera
+            && self.device_pixel_ratio == other.device_pixel_ratio
+            && self.style == other.style
+            && self.scene.same_as(&other.scene)
+            && self.scene.signature() == other.scene.signature()
+    }
+}
+
+impl TargetState {
+    /// The frame shown is `next` now. When its pick buffer needs drawing again (`invalidate`), the one drawn is kept for
+    /// the frame it was drawn for, and one kept for a frame like `next` is used again.
+    fn follow_pick(&mut self, device: &wgpu::Device, next: FrameState, invalidate: bool) {
+        let last = self.last.replace(next);
+        if !invalidate {
+            return;
+        }
+        let drawn = last.filter(|_| self.pick_valid).map(|state| (state, self.pick_area));
+        self.pick_valid = false;
+        self.pick_area = None;
+        let Some(tex) = self.tex.as_mut() else { return };
+        let next = self.last.as_ref().expect("just set");
+        let back = self.picks_kept.iter().position(|k| k.state.same_frame(next) && !perf_overrides().skip_kept_pick).map(|i| self.picks_kept.remove(i));
+        if let Some(k) = &back {
+            (self.pick_valid, self.pick_area) = (true, k.area);
+        }
+        let (pick, view) = match (back, &drawn) {
+            (Some(k), _) => (k.pick, k.view),
+            (None, None) => return,
+            (None, Some(_)) if self.picks_kept.len() >= KEPT_PICKS => {
+                let k = self.picks_kept.remove(0);
+                (k.pick, k.view)
+            }
+            (None, Some(_)) => pick_texture(device, tex.width, tex.height),
+        };
+        let pick = std::mem::replace(&mut tex.pick, pick);
+        let view = std::mem::replace(&mut tex.pick_view, view);
+        if let Some((state, area)) = drawn {
+            self.picks_kept.push(KeptPick { state, pick, view, area });
+        }
+    }
+}
+
 #[derive(Clone)]
 struct FrameState {
     scene: Arc<Scene>,
@@ -557,6 +627,10 @@ struct TargetState {
     last: Option<FrameState>,
     /// The pick texture matches `last`.
     pick_valid: bool,
+    /// Where it does (x0, y0, x1, y1 device px), when its pass was cut to the queries ([`pick_area`]); else all of it.
+    pick_area: Option<[u32; 4]>,
+    /// Pick buffers drawn for earlier frames of this size, oldest first ([`TargetState::follow_pick`]).
+    picks_kept: Vec<KeptPick>,
     in_flight: usize,
     stamp: u64,
 }
@@ -1494,6 +1568,10 @@ struct PerfOverrides {
     skip_ao: bool,
     /// `backcull`: closed solids' back faces rasterized too ([`Instance::closed`] ignored).
     skip_back_cull: bool,
+    /// `pickarea`: software pick passes draw the whole buffer.
+    skip_pick_area: bool,
+    /// `keptpick`: no pick buffer kept to answer for a frame shown again.
+    skip_kept_pick: bool,
 }
 
 /// `NOSHAPE_PERF_SKIP=instancing`: no instanced calls, and the scene builder
@@ -1518,6 +1596,8 @@ fn perf_overrides() -> &'static PerfOverrides {
             skip_silhouettes: skip.split([',', '+']).any(|t| t == "silhouettes"),
             skip_ao: skip.split([',', '+']).any(|t| t == "ao"),
             skip_back_cull: skip.split([',', '+']).any(|t| t == "backcull"),
+            skip_pick_area: skip.split([',', '+']).any(|t| t == "pickarea"),
+            skip_kept_pick: skip.split([',', '+']).any(|t| t == "keptpick"),
         }
     })
 }
@@ -2319,6 +2399,8 @@ pub struct Renderer {
     ready: Vec<Completed>,
     pick_pool: Vec<wgpu::Buffer>,
     stamp: u64,
+    /// Pick passes drawn so far ([`Renderer::pick_passes`]).
+    pick_passes: u64,
     frames_in_flight: usize,
     /// `NOSHAPE_PERF` on a device with timestamp queries: GPU time per frame.
     timer: Option<GpuTimer>,
@@ -2749,6 +2831,7 @@ impl Renderer {
             ready: Vec::new(),
             pick_pool: Vec::new(),
             stamp: 0,
+            pick_passes: 0,
             frames_in_flight,
             timer,
             wait_slice: std::time::Duration::from_secs(10),
@@ -3093,6 +3176,7 @@ impl Renderer {
             ts.tex = Some(create_textures(device, width, height, msaa));
             ts.spare.clear();
             ts.pick_valid = false;
+            ts.picks_kept.clear();
         }
         ts.ring.retain(|t| t.width == width && t.height == height);
         ts
@@ -3109,6 +3193,17 @@ impl Renderer {
         let ts = self.targets.entry(target).or_default();
         ts.camera_geometry = geometry;
         ts.camera_geometry_built = None;
+    }
+
+    /// A frame the caller shows from its own copy of one drawn before (the same inputs): picks answer for it from now
+    /// on, as if it had been drawn.
+    pub fn adopt_frame(&mut self, target: u64, req: FrameRequest) {
+        if self.targets.get(&target).is_none_or(|t| t.last.is_none()) {
+            return;
+        }
+        let req = self.with_camera_geometry(target, req);
+        let ts = self.targets.get_mut(&target).expect("target");
+        ts.follow_pick(&self.device, FrameState { scene: req.scene, camera: req.camera, device_pixel_ratio: req.device_pixel_ratio, style: req.style }, req.invalidate_pick);
     }
 
     /// `req` with the target's camera geometry for its view added to the scene.
@@ -3305,9 +3400,6 @@ impl Renderer {
         let timer_slot = timer.as_ref().and_then(|t| t.free_slot());
         let pipelines = pipelines.as_ref().expect("pipelines");
         let ts = targets.get_mut(&target).expect("target");
-        if req.invalidate_pick {
-            ts.pick_valid = false;
-        }
         let tex = ts.tex.as_ref().expect("textures");
         // Texture targets render into a free texture of their ring (the
         // readback path into the target's own color texture).
@@ -3649,7 +3741,7 @@ impl Renderer {
         };
         pending.push_back(PendingRead { target, kind, buffer: readback, submission, state, submitted_ns, done_ns });
         ts.in_flight += 1;
-        ts.last = Some(FrameState { scene: req.scene, camera: req.camera, device_pixel_ratio: dpr, style: req.style });
+        ts.follow_pick(device, FrameState { scene: req.scene, camera: req.camera, device_pixel_ratio: dpr, style: req.style }, req.invalidate_pick);
         self.lists = lists;
         if let Some((over, ..)) = compare_frame {
             self.lists_over = over;
@@ -3659,6 +3751,11 @@ impl Renderer {
         }
         drop(t_encode);
         Ok(())
+    }
+
+    /// Pick passes drawn so far (each pick buffer drawn, in whole or round its queries).
+    pub fn pick_passes(&self) -> u64 {
+        self.pick_passes
     }
 
     /// Read rectangles of `target`'s pick buffer for its newest frame. The
@@ -3680,8 +3777,14 @@ impl Renderer {
             (tex.width, tex.height, tex.msaa)
         };
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("pick") });
-        if !self.targets[&target].pick_valid {
-            self.ensure_pipelines(msaa);
+        let need = queries.iter().filter(|(_, r)| r.depth_samples == 0).map(|(_, r)| r.clip(width, height)).filter(|r| r.2 > 0 && r.3 > 0).fold(None, |u: Option<[u32; 4]>, (x, y, w, h)| {
+            let r = [x, y, x + w, y + h];
+            Some(u.map_or(r, |u| [u[0].min(r[0]), u[1].min(r[1]), u[2].max(r[2]), u[3].max(r[3])]))
+        });
+        let ts = &self.targets[&target];
+        let covered = ts.pick_valid && ts.pick_area.zip(need).is_none_or(|(a, n)| a[0] <= n[0] && a[1] <= n[1] && a[2] >= n[2] && a[3] >= n[3]);
+        if !covered {
+            let area = pick_area(need, width, height, last.style.software);
             self.upload_states(&last.scene.states);
             self.upload_instances(&last.scene);
             if self.bind_color.is_none() {
@@ -3724,12 +3827,18 @@ impl Renderer {
                     occlusion_query_set: None,
                     multiview_mask: None,
                 });
+                if let Some([x0, y0, x1, y1]) = area {
+                    pass.set_scissor_rect(x0, y0, x1 - x0, y1 - y0);
+                }
                 pass.set_bind_group(0, self.bind_pick.as_ref().expect("bind groups"), &[]);
                 pass.set_bind_group(3, &self.compare_none, &[]);
                 draw_lists(&mut pass, &lists, &last.scene.instances, self.pipelines.as_ref().expect("pipelines"), &bind_inst, DrawMode { pick: true, caps, ..Default::default() });
             }
             self.lists = lists;
-            self.targets.get_mut(&target).expect("target").pick_valid = true;
+            self.pick_passes += 1;
+            let ts = self.targets.get_mut(&target).expect("target");
+            ts.pick_valid = true;
+            ts.pick_area = area;
         }
         // Visible-depth sampling queries render their own tiny pass.
         let samples: Vec<(u64, SampleRead, Vec<wgpu::Texture>)> = queries
@@ -4095,6 +4204,21 @@ fn create_present_texture(d: &wgpu::Device, width: u32, height: u32) -> PresentT
     PresentTexture { texture, view, target_view, width, height }
 }
 
+fn pick_texture(d: &wgpu::Device, width: u32, height: u32) -> (wgpu::Texture, wgpu::TextureView) {
+    let pick = d.create_texture(&wgpu::TextureDescriptor {
+        label: Some("pick"),
+        size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: PICK_FORMAT,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    });
+    let view = pick.create_view(&Default::default());
+    (pick, view)
+}
+
 fn create_textures(d: &wgpu::Device, width: u32, height: u32, msaa: u32) -> Textures {
     let size = wgpu::Extent3d { width, height, depth_or_array_layers: 1 };
     let tex = |label, format, samples, usage| {
@@ -4128,8 +4252,7 @@ fn create_textures(d: &wgpu::Device, width: u32, height: u32, msaa: u32) -> Text
     let depth_tex = tex("depth", depth_format(), msaa, att | wgpu::TextureUsages::TEXTURE_BINDING);
     let depth = depth_tex.create_view(&Default::default());
     let depth_sample = depth_tex.create_view(&wgpu::TextureViewDescriptor { aspect: wgpu::TextureAspect::DepthOnly, ..Default::default() });
-    let pick = tex("pick", PICK_FORMAT, 1, att | wgpu::TextureUsages::COPY_SRC);
-    let pick_view = pick.create_view(&Default::default());
+    let (pick, pick_view) = pick_texture(d, width, height);
     let pick_depth = tex("pick-depth", PICK_DEPTH_FORMAT, 1, att).create_view(&Default::default());
     let padded_row = (width * 4).div_ceil(256) * 256;
     Textures { width, height, msaa, color_msaa, resolve, resolve_view, resolve_unorm, depth, depth_sample, pick, pick_view, pick_depth, padded_row }

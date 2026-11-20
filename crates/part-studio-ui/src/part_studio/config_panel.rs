@@ -2674,15 +2674,19 @@ impl PartStudioView {
                         crate::os_menu::open(e.position(), menu, window, cx);
                     }),
             );
-        let mut col = v_flex()
+        let title = h_flex()
             .flex_none()
             .px(px(5.))
             .pt(px(6.))
-            // Live (183): 19 px under the last input to the line.
-            .pb(px(18.))
-            .border_b_1()
-            .border_color(pal.border)
-            .child(h_flex().h(px(30.)).justify_between().child(div().debug_selector(|| "cfgbox-title".into()).text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Configurations")).child(div().debug_selector(|| "cfgbox-split".into()).child(split)));
+            .h(px(36.))
+            .justify_between()
+            .child(div().debug_selector(|| "cfgbox-title".into()).text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Configurations"))
+            .child(div().debug_selector(|| "cfgbox-split".into()).child(split));
+        // Live cfglabel-1120: the inputs are a pane under the title, rows 2 px in and 5 px short of the pane's right
+        // edge, Chrome's scrollbar there once they overflow (rows x 42..220 in a 200 px panel at x 40).
+        let overflow = self.ui.cfg_box_overflow.get();
+        let bar_w = gpui_kit::component::menu::NATIVE_SCROLLBAR_WIDTH;
+        let mut col = v_flex().pl(px(2.)).pr(px(5. + if overflow { bar_w } else { 0. }));
         // Visibility conditions: hidden inputs and options don't show.
         let (shown, effective) = cfg.visibility(&self.config_values);
         for (input, vis) in cfg.inputs.iter().zip(&shown) {
@@ -2738,12 +2742,23 @@ impl PartStudioView {
                     None => div().text_size(px(14.)).text_color(pal.text).child(current).into_any_element(),
                 },
             };
+            // Live cfglabel-1120: no label column: the label is its text + 5 px each side, cut with an ellipsis (no
+            // wrap, no tooltip) when the field needs the room; the field takes the rest, a Variable's at least 100 px.
+            let field_min = if matches!(input.kind, ConfigInputKind::Variable { .. }) { 100. } else { 0. };
             col = col.child(
                 h_flex()
                     .min_h(px(26.))
-                    .gap(px(4.))
-                    .child(div().w(px(80.)).flex_none().pl(px(4.)).text_size(px(12.)).text_color(pal.text_muted).truncate().child(crate::ui::user_text(input.name.clone())))
-                    .child(div().flex_1().min_w_0().child(control))
+                    .child(
+                        div()
+                            .debug_selector(|| format!("cfgbox-label-{}", input.id))
+                            .min_w_0()
+                            .px(px(5.))
+                            .text_size(px(12.))
+                            .text_color(pal.text_muted)
+                            .truncate()
+                            .child(crate::ui::user_text(input.name.clone())),
+                    )
+                    .child(div().debug_selector(|| format!("cfgbox-field-{}", input.id)).flex_1().min_w(px(field_min)).child(control))
                     // Live part-studio/535: the excluded icon follows the value.
                     .when(input.excluded, |d| {
                         d.child(
@@ -2763,16 +2778,53 @@ impl PartStudioView {
         // List "Size", the Size row cut off).
         let visible = shown.iter().filter(|v| v.visible).count();
         let height = self.ui.cfg_box_h.or_else(|| (visible > 1).then_some(CFG_BOX_ONE_INPUT_H));
+        // Live (183): 19 px under the last input to the line; a row, so a pane it fits doesn't scroll for it.
+        col = col.child(div().flex_none().h(px(18.)));
+        let (scroll, flag, entity) = (self.ui.cfg_box_scroll.clone(), self.ui.cfg_box_overflow.clone(), cx.entity_id());
+        let pane = match height {
+            Some(h) => div()
+                .relative()
+                .h(px((h - CFG_BOX_TITLE_H - 1.).max(0.)))
+                .child(col.id("cfg-box-inputs").size_full().overflow_y_scroll().track_scroll(&self.ui.cfg_box_scroll))
+                .when(overflow, |d| d.child(gpui_kit::component::menu::native_scrollbar(&self.ui.cfg_box_scroll, cx)))
+                .on_drag_move(cx.listener(|this, e: &DragMoveEvent<gpui_kit::component::menu::NativeThumbDrag>, window, cx| {
+                    gpui_kit::component::menu::native_scrollbar_drag(&this.ui.cfg_box_scroll, e.event.position.y);
+                    window.refresh();
+                    cx.notify();
+                }))
+                .child(
+                    // Known once laid out: drawn again with (or without) the scrollbar.
+                    canvas(
+                        move |_, _, cx| {
+                            let o = scroll.max_offset().y > px(0.5);
+                            if o != flag.get() {
+                                flag.set(o);
+                                cx.notify(entity);
+                            }
+                        },
+                        |_, _, _, _| {},
+                    )
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .size_full(),
+                )
+                .into_any_element(),
+            None => {
+                self.ui.cfg_box_overflow.set(false);
+                col.into_any_element()
+            }
+        };
         Some(
-            div()
+            v_flex()
                 .id("cfg-box")
                 .debug_selector(|| "cfg-box".into())
                 .relative()
                 .flex_none()
-                .child(match height {
-                    Some(h) => col.id("cfg-box-inputs").h(px(h)).overflow_y_scroll().into_any_element(),
-                    None => col.into_any_element(),
-                })
+                .border_b_1()
+                .border_color(pal.border)
+                .child(title)
+                .child(pane)
                 .child(
                     div()
                         .id("cfg-box-splitter")
@@ -3464,7 +3516,9 @@ fn config_value_refused(input: &ConfigInput, text: &str, units: &noshape_units::
 }
 
 /// The Configurations box's height with one input: the title row, the input's row and the space under it (live 183).
-const CFG_BOX_ONE_INPUT_H: f32 = 6. + 30. + 26. + 18. + 1.;
+/// The Configurations block's title row; its height with one input (live 45 px of pane under the title).
+const CFG_BOX_TITLE_H: f32 = 6. + 30.;
+const CFG_BOX_ONE_INPUT_H: f32 = CFG_BOX_TITLE_H + 26. + 18. + 1.;
 
 /// Dragging the splitter under the feature list's Configurations block.
 #[derive(Clone)]

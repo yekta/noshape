@@ -482,6 +482,9 @@ pub struct UiState {
     pub panels: crate::ui::PanelOffsets,
     /// The Configurations block's height after its splitter was dragged.
     pub cfg_box_h: Option<f32>,
+    /// The Configurations block's inputs pane: its scroll and whether its inputs overflow it (its scrollbar shows).
+    pub cfg_box_scroll: ScrollHandle,
+    pub cfg_box_overflow: std::rc::Rc<std::cell::Cell<bool>>,
     /// The Create selection dialog.
     pub create_selection: Option<super::create_selection::CreateSelection>,
     /// Where the last context menu opened (window coordinates).
@@ -969,6 +972,8 @@ impl UiState {
             where_used: None,
             panels: Default::default(),
             cfg_box_h: None,
+            cfg_box_scroll: ScrollHandle::new(),
+            cfg_box_overflow: Default::default(),
             menu_pos: Point::default(),
             regen_paused: None,
             force_regen: false,
