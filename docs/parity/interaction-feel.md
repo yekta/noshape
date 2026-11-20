@@ -1631,6 +1631,16 @@ These are what the user sees; reach-1118 (16:29) read the viewer's own pick and 
 | Assembly hover timing ("start two-blocks asm", the pointer jumped onto Part 1's top face, 10 rounds) | the first draw 93–261 ms after the pointer stops (median 255), a second at ~515 ms more; the Part Studio the same (99–263, median 260) | the Part Studio's: the assembly's hover is the shared Viewport's (`prehighlight_delay`, app-core `prehighlight_waits_for_a_pause_as_live`; by the code) | = [asm] |
 | Drawing: a click beside a view selects it (Top view of "start two-blocks", 1:2, left edge, 2 rounds) | selected out to 13 px, not at 14; hover lights at 13, not 14, with no hold (1 px steps, 450 ms, full-page shots, 2 rounds; row "View edge / inside hover reach" has 14–16) | = (fixed 11-19: a reach of 3.45 sheet mm, 13.6 px at the fit's ~3.93 px/mm: lit and taken at 13, not 14; GPUI feel `a_view_lights_and_is_taken_within_its_reach_in_sheet_mm`) | = [studios] |
 
+### feel-cov-1120 (assembly drag and mate preview, live 11-20 02:50–03:10) [asm]
+
+Lane 1 "start two-blocks asm" copy, iso at 0.058965 mm/px; behaviours "feel coverage (11-20)", live/feel/cov-1120/.
+
+| Action | Live | Ours | Status |
+|---|---|---|---|
+| A1b A press on a free instance, then a move | a click up to 14 px (selected, not moved); 17 px drags; the drag starts only from a move ≥ ~0.62 s after the press (40 px in 0.2 s, then still: a click) | 15 px and 50 ms (`a_free_instance_drags_from_15_px_and_takes_the_whole_move`) | = [asm]: the ~0.6 s is live's drag-start round trip, not copied |
+| A1 A 150 px drag of a free instance | the full pointer delta in the screen plane (-7.66, -4.422, 0) mm from the press, no dead zone; drawn 7–29 ms after each move; after the release not selected, the hover outline only | the same (`a_free_instances_drag_keeps_the_default_cursor_and_follows_the_pointer`, the 17 px test above) | = [asm] |
+| A2 A new Fastened's second connector | the moving part jumps connector to connector, its hidden edges a thin amber box through the other part; the stored transform unchanged until ✓ | the same: the previewed part drawn x-ray as Insert's (`a_mate_previews_moving_part_shows_its_edges_through_the_others`); stored unchanged till ✓ (`a_new_mates_preview_moves_the_first_pick_alone_…`) | = [asm] (live's draws at 155 / 651 / 1319 ms are its round trips) |
+
 ### sketch-tools-1119 (P0 sketch tools: Line, Rectangle, Circle, Tangent arc, Dimension, Trim; live 11-19 03:58–04:32) [skasm, psui]
 
 Only what the rows above don't already cover (inference reach, snap priority, glyph place, value boxes, Esc / Enter / Space mid-chain, the Trim

@@ -815,6 +815,14 @@ impl AssemblyView {
         }
     }
 
+    /// The instance the mate dialog's preview moves, once both its ends are picked.
+    fn mate_preview_top(&self, cx: &App) -> Option<InstanceId> {
+        let d = self.mate.as_ref()?.dialog.read(cx);
+        let (Some(a), Some(b)) = (&d.a, &d.b) else { return None };
+        let m = Mate::new(MateId(0), String::new(), d.mate_type(), a.clone(), b.clone());
+        Some(noshape_ops::assembly::mate_preview_moving(self.assembly(cx)?, &m))
+    }
+
     fn assembly<'a>(&self, cx: &'a App) -> Option<&'a Assembly> {
         match &self.doc.read(cx).session.doc.tab(self.tab)?.content {
             TabContent::Assembly(a) => Some(&**a),
@@ -1124,6 +1132,9 @@ impl AssemblyView {
         o.hidden_edges_visible = self.ui.hidden_edges_visible;
         // Live (mates.json insert_dialog): the instance on the pointer shows its hidden edges through other parts.
         o.xray_tops = self.placing.iter().flatten().copied().collect();
+        // So does the part a mate's preview moves (live feel cov-1120 A2: a Fastened block sunk into the other, its
+        // edges a thin amber box through it).
+        o.xray_tops.extend(self.mate_preview_top(cx));
         o.tangent_edges = self.ui.tangent_edges;
         o.graphics = self.ui.graphics;
         o.software = self.gpu.is_software();
@@ -1256,12 +1267,8 @@ impl AssemblyView {
             h.selected_entities.push((path, c.reference.clone()));
         }
         // Mate preview: the instance that moves is drawn amber (live qa5 2.1).
-        if let Some(s) = self.mate.as_ref().filter(|_| chip_mc.is_none()) {
-            let d = s.dialog.read(cx);
-            if let (Some(a), Some(b), Some(asm)) = (&d.a, &d.b, self.assembly(cx)) {
-                let m = Mate::new(MateId(0), String::new(), d.mate_type(), a.clone(), b.clone());
-                h.selected_tops.push(noshape_ops::assembly::mate_preview_moving(asm, &m));
-            }
+        if let Some(top) = self.mate_preview_top(cx).filter(|_| chip_mc.is_none()) {
+            h.selected_tops.push(top);
         }
         let size = self.triad_size();
         let units = self.units(cx);
@@ -3512,7 +3519,10 @@ impl AssemblyView {
                     return;
                 }
                 let Some(d) = &self.drag else { return };
-                if !d.started && position.distance(d.press) > 2.0 && d.pressed_at.elapsed() > std::time::Duration::from_millis(50) {
+                // An instance moves once the pointer is 15 px from the press (live feel cov-1120 A1b: 14 px a click, 17 px
+                // a drag taking the whole delta); a handle at 2 px.
+                let start_px = if d.handle.is_none() && !d.explode { 15.0 } else { 2.0 };
+                if !d.started && position.distance(d.press) > start_px && d.pressed_at.elapsed() > std::time::Duration::from_millis(50) {
                     let (top, explode) = (d.top, d.explode);
                     self.drag.as_mut().unwrap().started = true;
                     // A fixed instance does not move (live 562: no-drop cursor and

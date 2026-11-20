@@ -2065,6 +2065,55 @@ fn a_free_instances_drag_keeps_the_default_cursor_and_follows_the_pointer(cx: &m
     });
 }
 
+/// Live feel cov-1120 A1 / A1b: a press on a free instance moved 14 px is a click (selected, not moved); moved 17 px it
+/// drags, taking the whole move from the press, and after the release nothing is selected.
+#[gpui::test]
+fn a_free_instance_drags_from_15_px_and_takes_the_whole_move(cx: &mut TestAppContext) {
+    use crate::viewport::ViewportEvent;
+    use gpui_kit::Modifiers;
+    let (window, view) = pattern_assembly(cx, "drag-start");
+    draw(cx, window);
+    let centre = |v: &AssemblyView, cx: &gpui_kit::App| {
+        let (lo, hi) = v.result.instance_bounds(instance(v, "Part 1 <1>", cx)).unwrap();
+        v.viewport.read(cx).project((lo + hi) * 0.5).unwrap()
+    };
+    let press_move_release = |cx: &mut TestAppContext, by: f64| {
+        let to = cx
+            .update_window(window, |_, w, cx| {
+                view.update(cx, |v, cx| {
+                    let at = centre(v, cx);
+                    let vp = v.viewport.clone();
+                    v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+                    std::thread::sleep(std::time::Duration::from_millis(60));
+                    let to = at + glam::DVec2::new(by, 0.0);
+                    v.on_viewport_event(&vp, &ViewportEvent::ToolDrag { position: to }, w, cx);
+                    v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: to, modifiers: Modifiers::default() }, w, cx);
+                    to
+                })
+            })
+            .unwrap();
+        cx.executor().advance_clock(std::time::Duration::from_millis(100));
+        cx.run_until_parked();
+        to
+    };
+    let before = cx.update(|cx| view.read(cx).result.solved.placement(instance(view.read(cx), "Part 1 <1>", cx)));
+    press_move_release(cx, 14.0);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let id = instance(v, "Part 1 <1>", cx);
+        assert_eq!(v.result.solved.placement(id), before, "14 px: not moved");
+        assert!(v.selected.contains(&id), "14 px: a click, selected");
+    });
+    cx.update(|cx| view.update(cx, |v, _| v.clear_selection()));
+    let to = press_move_release(cx, 17.0);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let now = centre(v, cx);
+        assert!(now.distance(to) < 1.0, "17 px: the part's centre with the pointer, the whole move: {now:?}, pointer {to:?}");
+        assert!(v.selected.is_empty(), "nothing selected after the drag");
+    });
+}
+
 /// Live insert-sort-1118: Insert › Other documents lists Documents newest first by default; a Sort menu pick re-sorts
 /// them (names case-insensitive, Modified by by author) and is remembered across a restart; Esc closes the menu, not the
 /// dialog.
@@ -2837,6 +2886,35 @@ fn a_drag_with_nothing_fixed_carries_the_mated_group(cx: &mut TestAppContext) {
         let turn = glam::DQuat::from_array(after[i].rotation).angle_between(glam::DQuat::from_array(before[i].rotation));
         assert!(turn < 1e-6, "{} not turned: {turn}", names[i]);
     }
+}
+
+/// Live feel cov-1120 A2: a new Fastened's previewed part shows its hidden edges through the other part (sunk into it,
+/// a thin amber box), as an instance on the pointer from Insert does; nothing before the second pick.
+#[gpui::test]
+fn a_mate_previews_moving_part_shows_its_edges_through_the_others(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "preview-xray", |ctx| {
+        call(ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>", "Part 2 <1>"], "fixed": false }));
+    });
+    let (window, view) = open_assembly(cx, &path);
+    let xray = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).scene_options(cx).xray_tops);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Fastened, w, cx);
+            let a = face_connector(v, "Part 1 <1>", true, cx);
+            v.deliver_connector(a, w, cx);
+        });
+    })
+    .unwrap();
+    assert!(xray(cx).is_empty(), "one end picked: nothing moves yet");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let b = face_connector(v, "Part 2 <1>", false, cx);
+            v.deliver_connector(b, w, cx);
+        });
+    })
+    .unwrap();
+    let moving = cx.update(|cx| instance(view.read(cx), "Part 1 <1>", cx));
+    assert_eq!(xray(cx), std::collections::HashSet::from([moving]), "the first pick moves and shows its hidden edges");
 }
 
 /// Live new-mate-preview-1119 (asm REQUESTS 22:49, qa's ASM-NEW-MATE-PREVIEW-GROUP): in a new Revolute's preview the
