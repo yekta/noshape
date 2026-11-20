@@ -1,0 +1,77 @@
+{
+ "name": "drw-dimension-3-point-angular-isometric",
+ "about": "3 point angular dimension in the Isometric view: the top face's near corner (-20,-20,20) as the vertex, then the corners along x and y, placed inside the top face: the angle on the sheet (projected) or the true 90\u00b0",
+ "area": "dx",
+ "source": "coverage (lead 11-20: drawing types with 0-1 uses)",
+ "start": "hole-plate-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension",
+    "menu": "3 point angular dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Isometric",
+     "at": [
+      -20,
+      -20,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Isometric",
+     "at": [
+      20,
+      -20,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Isometric",
+     "at": [
+      -20,
+      20,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Isometric",
+     "at": [
+      -12,
+      -12,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

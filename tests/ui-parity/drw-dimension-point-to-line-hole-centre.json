@@ -1,0 +1,64 @@
+{
+ "name": "drw-dimension-point-to-line-hole-centre",
+ "about": "Point to line dimension from the hole's centre to the plate's left edge in Top, placed below the view (20 mm, 0.787)",
+ "area": "dx",
+ "source": "coverage (lead 11-20: drawing types with 0-1 uses)",
+ "start": "hole-plate-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension",
+    "menu": "Point to line dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Top",
+     "at": [
+      0,
+      0,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Top",
+     "at": [
+      -20,
+      0,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Top",
+     "at": [
+      -10,
+      -30,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

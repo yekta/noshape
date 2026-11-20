@@ -1,0 +1,64 @@
+{
+ "name": "drw-dimension-angular-outside-corner",
+ "about": "Line to line angular dimension between Top's bottom and left edges, placed outside the corner (below-left): which angle live shows (90\u00b0 or 270\u00b0) and where the arc and extension lines go",
+ "area": "dx",
+ "source": "coverage (lead 11-20: drawing types with 0-1 uses)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension",
+    "menu": "Line to line angular dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Top",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Top",
+     "at": [
+      0,
+      15,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Top",
+     "at": [
+      -8,
+      -8,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

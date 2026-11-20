@@ -1,0 +1,64 @@
+{
+ "name": "drw-dimension-point-to-point-vertical",
+ "about": "2 point linear dimension between Front's opposite corners (0,0,0) and (40,0,10), placed right of the view: the placement picks the vertical 10 mm (0.394) over the horizontal / aligned",
+ "area": "dx",
+ "source": "coverage (lead 11-20: drawing types with 0-1 uses)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension",
+    "menu": "2 point linear dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      0,
+      0,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      40,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      52,
+      0,
+      5
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
