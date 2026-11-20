@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-20 14:50 UTC (lead order 13:1x: screws fix (landed), dx items, then parting-line Drafts speed; NO MAC until the lead says (user: left alone till 18:05)). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-20 19:02 UTC (lead order 13:1x: screws fix (landed), dx items, then parting-line Drafts speed; NO MAC until the lead says (user: left alone till 18:05)). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
@@ -11,7 +11,7 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   6b384aa69 + AGENT_API 2374eb6fc; P0 COMPAT-FILLET-ORIENT-REFS aa5682636 (d80c2c58e's edge turning out: OCCT's offset
   can't join turned edges; if snap-hook's axis is wanted again, orient at the point of use); screws Sweep 1 0f8993ef8
   (unify keeps a USD merge only if its new faces pass BRepCheck; follow-up: live 8 faces there, we 20). Targets removed.
-- **LANDING 18:0x core-rf: c2-replace-face-exercise Replace face 1 (dx):** ERROR -> 85/184/112, 688456.9 mm3 (live
+- **LANDED 18:41 771be348 (core-rf, target moved to vibex8 core-rp): c2-replace-face-exercise Replace face 1 (dx):** ERROR -> 85/184/112, 688456.9 mm3 (live
   85/184/104, 688437.672); doc 0 -> 6/8. rounds.rs takes OCCT's free-form corner patches; Replace face rolls its fillets
   again (reblend + replace_by_prism: onto_plane tweak, onto_cylinder = sewn pocket solid on the face's side of the
   cylinder template, Fuse/Cut + unify). Suite vibex8 101/174 vs base: only this doc moved. Follow-up: 8 extra vertices /
@@ -27,7 +27,10 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   sheet; told bool 17:50). Real fix is structural (no slab + Splitter by a sampled ruled sheet). Not landing.
 - **P2 SUITE-NEW-INDEX-1120-CORE (TICKETS 7066344c1):** 12 new documents' first differences (Split 2, Sweep 1 invalid,
   Constrained surface, External thread, 3x Frame 1, Rib 2, ribbed enclosure extrude remove, Projected curve 1, Thicken 1,
-  Wrap 1). Not started.
+  Wrap 1). 19:0x in core-rp: Thicken NEW keeps each surface's slab its own part (add_new_apart; live 2 overlapping
+  parts); Constrained surface: 1 of 961 points (Linear pattern 1 copy of Sketch 2's rL3agFJlOTPG1.MirrorCS.end,
+  instance 2) unmapped -> TRACE COPY added; Projected curve 1 TWO_SKETCHES: 4 edges vs live 2 (guess: closed ellipse
+  prism's seam splits the section; join across seams); frames = dx (7aac1279c fixed the path query).
 - **dx speed list (below the bar):** loft-paths-guides Loft 3, Mirror 1.
 - **LANDED 16:01 core-bis as 6d8e63f8** (fit spline one end, loft to point Coons, Normal to profile, pinched thicken,
   flat fan): singularities 5 -> 8/15. Target removed. screws Sweep 1 valid on main (bool: closed).
@@ -43,13 +46,14 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   4's THROUGH_ALL REMOVE hole cylinder, ours -z live +z: frame_cylinders_toward_sketch / through-all tool's sweep);
   sweep-twist-scale 4/7 + sweep-lock-direction 3/5: importer missed qSketchRegion(makeId(..)) and qContainsPoint of a
   sketch's qCreatedBy edges: fixed in core-pl parity.rs (untested).
+- **live data-management batch 1 (19:00):** cov-dm-config (5 configurations, configured suppression) and cov-dm-vs
+  (VS -> VS -> Part Studio, inch units, w change). Importer already reads configured suppression + VS references;
+  suite checks one configuration. Asked live 18:57 (REQUESTS) for c2-dm-config / c2-dm-vs dirs + configurations.json
+  rows; then parity_models evaluates each row (config_activate, parts / bbox / volume).
 - **bool-land7 e3078f89:** if a model result moves after it lands, tell bool.
 - **Singularity loft / Loft 3 / Fill G0:** open (live q-singularity-loft-1119); core-scratch/sing, fill/ (FILLDBG in core-oc).
 
 ## Earlier (11-18/19)
-- **LANDED 11-18/19:** Delete face errors when a face stays 67a475987; rib parallel 303e9d916; loft path sections
-  c0b6e2d4a; loft one-connection equal arcs 7a8ca3b2 (asm-suspension Loft 1, blend told); error wording (Up to next,
-  revolve, coplanar loft) c3e949a8; Delete face onto its neighbour (impeller face 24, ~0.2 s) edf20895.
 - **LANDED 11-19:** pattern P1 6a8e411d (qa verified session-1118 = live); surface stack fc162641 -> ec1882ba (7
   commits: Up to next to surfaces, Boundary Coons/ruled + exact sketch splines, Split sheet pieces + surface Extrude
   Add, surface Sweep path cut at its profile's plane, sketch region direction, loft section race, thin Sweep wall side;

@@ -4608,3 +4608,8 @@ skasm meanwhile; I'll list what I change here before landing.
   faces (else the tool as is), so ours removes 54.7 mm³ less (56/139/84 vs live 56/143/88). OCCT's offset_faces on them,
   limit lifted: fails every time after 33-62 s (4 tools). Needs a free-form face offset (Geom_OffsetSurface faces
   trimmed against their neighbours' offsets) in the kernel: a sizeable item, not started.
+
+## Moved 11-20 19:02
+- **LANDED 11-18/19:** Delete face errors when a face stays 67a475987; rib parallel 303e9d916; loft path sections
+  c0b6e2d4a; loft one-connection equal arcs 7a8ca3b2 (asm-suspension Loft 1, blend told); error wording (Up to next,
+  revolve, coplanar loft) c3e949a8; Delete face onto its neighbour (impeller face 24, ~0.2 s) edf20895.
