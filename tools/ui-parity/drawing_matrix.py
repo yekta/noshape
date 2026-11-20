@@ -497,6 +497,12 @@ def main():
         mine = set().union(*(v for k, v in shown.items() if any(k == ti or k.startswith(ti) for ti in titles + OURS_TITLES.get(surface, []))))
         # A right-click menu live's panel dump caught open: our menus' rows (the MENUDUMP of our build).
         mine |= {norm(r.removesuffix(" ▸")) for rows_ in ours_menus.values() for r in rows_}
+        # A submenu's rows too ("Tangent edges ▸ Hidden | Solid | Phantom"), its name without the badge.
+        for rows_ in ours_menus.values():
+            for r in rows_:
+                name, arrow, subs = r.replace("\tbeta", "").partition(" ▸ ")
+                if arrow:
+                    mine |= {norm(name)} | {norm(x) for x in subs.split(" | ") if x.strip()}
         for t in texts:
             if t in recorded:
                 continue

@@ -215,6 +215,12 @@ pub fn open_add_material_library(on_add: impl Fn(Option<AddedLibrary>, &mut Wind
     (hooks().open_add_material_library)(Box::new(on_add), window, cx)
 }
 
+#[cfg(test)]
+thread_local! {
+    /// Tests: Versions and history › Compare on (its blend) for the Part Studios of this thread.
+    pub static TEST_COMPARE: std::cell::Cell<Option<f32>> = const { std::cell::Cell::new(None) };
+}
+
 /// Inert hooks for UI tests on GPUI's test platform (docs/TESTS.md "UI keystroke tests"): nothing above the Part
 /// Studio exists there.
 #[cfg(test)]
@@ -239,7 +245,7 @@ pub fn register_for_tests() {
         readonly_variable_table: |_, _, _, _, _, _| None,
         variable_panel_footer: |_, _, _| div().into_any_element(),
         variable_type_cell: |_, _, _, _| div(),
-        compare_blend: |_, _| None,
+        compare_blend: |_, _| TEST_COMPARE.with(|c| c.get()),
         compare_documents: |_, _| None,
         compare_panel: |_, _, _| None,
         compare_slider: |_, _| None,

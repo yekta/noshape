@@ -184,6 +184,13 @@ fn rows() -> Vec<Row> {
         Row { id: "one vertex", live: &["Point:", "svg-icon-XYZ-Icons-AlongX: 40.000 mm", "svg-icon-XYZ-Icons-AlongY: 0.000 mm", "svg-icon-XYZ-Icons-AlongZ: 0.000 mm"], gap: false, check: |b, cx| b.readout(cx, &[V40], &[]) },
         Row { id: "one straight edge", live: &["Length: 40.000 mm"], gap: false, check: |b, cx| b.readout(cx, &[FRONT_EDGE], &[]) },
         Row { id: "one circular edge", live: &["Diameter: 8.000 mm"], gap: false, check: |b, cx| b.readout(cx, &[HOLE_TOP], &[]) },
+        // qa VER-COMPARE-READOUT (live ver-compare-hover-part 5, retake 24af0f0f2): Compare shows no readout.
+        Row { id: "one circular edge in Versions and history › Compare", live: &[], gap: false, check: |b, cx| {
+            crate::part_studio_hooks::TEST_COMPARE.with(|c| c.set(Some(0.5)));
+            let got = b.readout(cx, &[HOLE_TOP], &[]);
+            crate::part_studio_hooks::TEST_COMPARE.with(|c| c.set(None));
+            got
+        } },
         Row { id: "one face (the front: less the chamfer's and the fillet's corners)", live: &["Area: 398.642 mm2"], gap: false, check: |b, cx| b.readout(cx, &[FRONT], &[]) },
         Row { id: "two vertices", live: &["Min dist: 20.000 mm"], gap: false, check: |b, cx| b.readout(cx, &[V40, V60], &[]) },
         Row { id: "a vertex and a circle", live: &["Min dist: 39.990 mm", "Max dist: 47.778 mm", "Center dist: 43.875 mm"], gap: false, check: |b, cx| b.readout(cx, &[V60, HOLE_TOP], &[]) },

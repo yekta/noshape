@@ -1474,6 +1474,11 @@ impl PartStudioView {
         if self.edit.is_some() || self.context.is_none() {
             return Vec::new();
         }
+        // Versions and history › Compare: a selection gets no readout (live ver-compare-hover-part 5, retake 24af0f0f2).
+        if !self.show_mass && crate::part_studio_hooks::compare_blend(&self.doc, cx).is_some() {
+            self.ui.measure_readout.clear();
+            return Vec::new();
+        }
         let ctx = self.context.clone().unwrap();
         let mut rows: Vec<(String, String)> = Vec::new();
         // The Measure panel's rows: (label, value, X/Y/Z sub-row axis).
