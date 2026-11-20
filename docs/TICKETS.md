@@ -5,6 +5,22 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## live, 2026-11-20 (docs/parity open rows, P1 areas; evidence live/parity-open-1120/findings.md)
+- [ ] P2 **MEASURE-CIRCLE-DEFAULT-PLANE (psui)**: interaction.md 4.4. Live: a circle with the Top plane reads Min dist ·
+  Center dist when apart (circle at z 10: 10.000 / 10.000 mm), and Face tangent angle · Center dist · Min dist when it
+  lies on Top (0.000 deg / 0.000 / 0.000 mm); no Length and no Curvature deviation in either. A vertex or an edge
+  midpoint with Top reads Min dist alone (ours the same). Ours (query_measure plane:top + circle): adds Length
+  31.416 mm to both, and Curvature deviation 0 % on the lying circle (measure.rs circle-plane branch).
+- [ ] P2 **ASM-PATTERN-ZERO-DISTANCE-MARK (asm)**: workflow-assembly-sweep 21. Live: assembly Linear pattern with
+  Distance 0 mm: red title rgb(170,37,45) and the Distance field invalid as in a Part Studio (background #f9ebec,
+  1 px bottom border #bd3039, class os-invalid); Instance count unchanged. Ours leaves Distance white (TICKETS
+  NUMBER-FIELD-ERROR-MARK residual).
+- [ ] P2 **ASM-FACE-TAB-REFERENCE-FRAME (asm)**: assembly.md LA49. Live: Mass and section properties › Face with
+  "Mate connector for reference frame" set (a connector on the corner (40,20,10) of a 40x20x10 block, world axes, top
+  face picked): Lxx 106666.667, Lxy = Lyx 160000, Lyy 426666.667, Lzz 533333.333 mm⁴ (parallel axis to the
+  connector's origin in its axes; product +A·dx·dy), area / perimeter unchanged. Ours computes about the faces'
+  centroid whatever the connector (assembly_mass.rs face_section_properties gets no reference).
+
 ## live, 2026-11-20 (Onshape 1.222 / 1.223 release audit)
 - [ ] P2 **INSERT-OTHER-DOCS-SORT (asm)**: Onshape 1.223 "sorting in the Current document and Other documents tabs of the
   insert dialog". Live 05:42: Insert › Other documents › a document's Part Studios / Assemblies list has the same sort button

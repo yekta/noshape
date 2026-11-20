@@ -96,7 +96,7 @@ it, so re-take positions after every selection.
 | 5.8 | Right-click a feature parameter (Variable Value) | "Configure …" | ✅ re-checked 10-23: Depth › right-click › "Configure" (was ✗ F20 (only Cut/Copy/Paste/Select All)) | 0.4.10+ / fa61ba6f 10-27 |
 | 5.9 | + Configure features | Yellow banner "Select … to configure [Done]" | ✅ (v0.4.6 gate): yellow "Select sketches or features to configure [Done]" (was ✗ F21 (no banner seen)) | 0.4.10+ / fa61ba6f 10-27 |
 | 5.10 | Strip tooltip after the panel opens | Hides | ✅ re-checked 10-23: no tooltip left over the panel (was ✗ F22 (stays over the panel)) | 0.4.10+ / fa61ba6f 10-27 |
-| 5.11 | ☰ › Workspace units… while a sketch is open; Length → Inch, ✓ | Units change; the sketch stays open; geometry unchanged | ✅ re-checked 10-23: the Workspace units dialog accepts the open sketch first (Sketch 3 kept), geometry unchanged; live order not captured (was ✗ F23, F24) | 0.4.10+ / fa61ba6f 10-27 (dialog + sketch accepted first; unit change itself not re-run) |
+| 5.11 | ☰ › Workspace units… while a sketch is open; Length → Inch, ✓ | Units change; the sketch stays open; geometry unchanged | ✅ re-checked 10-23: the Workspace units dialog accepts the open sketch first (Sketch 3 kept), geometry unchanged; live order captured (live 11-20 parity-open-1120: opening Workspace units… accepts the open sketch, which stays closed; ✓ changes the unit, geometry unchanged = ours; was ✗ F23, F24) | 0.4.10+ / fa61ba6f 10-27 (dialog + sketch accepted first; unit change itself not re-run) |
 
 ## 6. Assembly and drawing (live: "Assembly", "Drawing")
 
@@ -275,7 +275,7 @@ and closes again with ✕/Esc/Cancel. Expected results follow live (behaviours.m
 | F20 | ✅ fixed | Depth › right-click › Configure adds "Extrude 1 / Depth" column, field framed dashed amber |
 | F21 | ✅ fixed | banner "Select sketches or features to configure [Done]", toolbar greyed |
 | F22 | ✅ fixed | no stranded strip tooltip |
-| F23 | ✅ fixed (verify) | Workspace units no longer cancels the sketch: it **accepts** it first (live behaviour not captured) |
+| F23 | ✅ fixed (verify) | Workspace units no longer cancels the sketch: it **accepts** it first (live the same, live 11-20 parity-open-1120) |
 | F24 | ✅ fixed | follows from F23 (no sketch dialog under it) |
 | F25 | ✅ fixed | first instance placed at the assembly origin |
 | F26 | ✅ later (row 7.2: flat products Part 1…n, AP242 header); 10-21: ✗ still failing | two parts → PRODUCT('Part 1'), ('Part 2') and root ('SOLID'); header still "Open CASCADE Model" |
@@ -303,7 +303,7 @@ New in this run:
 | | 3.5 chamfer 5 mm next to fillets (F8) | ✅ later (row 3.5); 10-21: ✗ kern |
 | | 3.6 shell 2.5 / 1 mm (F9) | ◐ later (row 3.6, kern); 10-21: ✗ kern |
 | | 3.12 Feature pattern of the Hole **after a Part pattern** (direction = Part 1's bottom edge, 10 mm × 2) | ✅ later (10-22 run: real holes, Parts (3); row 3.12 verified 8bb8a6d1); 10-21: ✗ **new path of F12**: no extra holes, Part 1's filleted top corner turns into twisted facets and a sliver **Part 4** is split off |
-| | 3.16 Boolean union | ? (the mirrored part didn't touch Part 3 in this layout; committed without error, parts unchanged) |
+| | 3.16 Boolean union | ✅ as live (the mirrored part didn't touch Part 3 in this layout; committed without error, parts unchanged). Live (live 11-20 parity-open-1120): a union of parts apart is INFO "Boolean resulted in no geometry change…", parts unchanged; ours basic.rs the same |
 | 4 Edit / history | 4.1 Extrude 1 30 → 25 mm | ✅ later (row 4.1 verified 1c853f78 10-27); 10-21: ✗ **Part 1 disappears with no error** (Parts 3) while Linear pattern 2 (the Feature pattern above) is active — data loss |
 | | 4.2–4.8 | ✅ (suppressing Linear pattern 2 brings Part 1 back; reorder, undo/redo, rollback arrows, Delete key, menu Delete + undo). Note: plain clicks in the list add to the selection, so Delete removed the two selected rows (verify against live's list selection) |
 | 5 Variables … units | 5.1–5.11 | ✅ (5.5 centre of mass blank = F18, live request open; 5.11 mm → inch changes only the Hole row's text) |
@@ -332,7 +332,7 @@ direction = Part 1's bottom-right edge, 10 mm × 2 → sliver Part 4 + facets; t
 | | 3.6 shell 2.5 mm, top face removed (F9) | ◐ later (row 3.6, kern); 10-22: ✗ kern (red) |
 | | 3.10 count field | ✅ later (F30 fixed, re-run line 366); 10-22: ✗ **F30** (Enter kept the dialog open; see below) |
 | | 3.12 Feature pattern of Hole 1 after the Part pattern, Part 1's bottom-right edge, 10 mm × 2 (F12 path) | ✅ real holes, Parts (3), no sliver or facets |
-| | 3.16 Boolean union of the disjoint Part 3 + mirrored Part 4 | ? (no error, parts unchanged; same as last run) |
+| | 3.16 Boolean union of the disjoint Part 3 + mirrored Part 4 | ✅ as live (no error, parts unchanged; live live 11-20 parity-open-1120: INFO "Boolean resulted in no geometry change…", parts unchanged) |
 | 4 Edit / history | 4.1 Extrude 1 → 25 mm with the Feature pattern active (F12) | ✅ rolled back while editing; Part 1 kept |
 | | 4.2, 4.4–4.8 | ✅ |
 | | 4.3 drag Fillet 1 down onto the Sketch 2 row | ✅ later (F33 fixed, re-run line 370; re-checked line 474); 10-22: ✗ **F33**: the drop line is drawn above Sketch 2, but the feature lands **below** Sketch 2 (dragging up lands where the line is) |
@@ -415,7 +415,7 @@ Models: /root/qa4-scratch/mk-models.py CLI DIR (lpwall.noshape, failext.noshape)
 |---|---|
 | Sections 1–4 | ✅ (2.17 scripted miss as before; by hand OK) |
 | Section 5 | ✅ #w = 20 drives Extrude 1; area 688.210 mm² / "Parallel dist 0.000 mm"; mass props Part 1 17073.686 mm³ (centre of mass still blank, F18); config row "Long". **Now fixed:** 5.2 Plane ▾ list scrolls to Composite part / Tag (F17); 5.9 yellow "Select sketches or features to configure [Done]" banner (F21). |
-| Section 6 | ✅ Insert (configuration picker shown), filter "3", Fastened 1 solves, Drawing ANSI_A_MM, 3 views, dimension "32.81". ? both inserted instances show the fixed icon and Fastened 1 is drawn grey (live not checked). |
+| Section 6 | ✅ Insert (configuration picker shown), filter "3", Fastened 1 solves, Drawing ANSI_A_MM, 3 views, dimension "32.81". Live (live 11-20 parity-open-1120): both UI-inserted instances are free (triad icon, no fixed icon; REST fixed=false), also after Fastened 1, which is drawn grey (hidden mate); ours inserts free (fixed=false, dof 6) = live. |
 | Section 7 | ✅ STEP: 4 MANIFOLD_SOLID_BREP, products Part 1–4; quit / Recently opened (thumbnail) / reopen: all tabs, features, Configurations panel back. |
 | Section 8 (73 items, menurun.sh, fresh demo app each) | ✅ all ALIVE, every screenshot shows its dialog / action |
 | (a) lp wall over | ✅ red row + title, tooltip exact, ✓ green, seed wall and Right plane red; Reapply on: black title, two walls, **20042 mm³** |

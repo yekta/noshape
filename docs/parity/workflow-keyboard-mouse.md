@@ -40,7 +40,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified / live data mi
 | ↑ ↓ on the rollback bar | move it | ✅ (core 4.5) | ✅ | 77870dd4 10-28 |
 | Shift+1…7 | Front, Back, Left, Right, Top, Bottom, Isometric | all correct | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | ← → ↑ ↓ | rotate 15°: from Front, Left brings Right in, Up brings Bottom in | same direction and step | ✅ | 0.4.10+ / dd1b5037 10-27 |
-| Shift+arrows / Ctrl+arrows / Ctrl+Shift+arrows | coarse / precision rotate / pan | Shift+← from Front → Right (90°), Ctrl+← a small step | ✅ / ? (angles) | da18f886 10-28 (from Isometric: ← a small turn, Shift+← a large one (Right / Back faces), Ctrl+← barely moves; Ctrl+Shift+arrows pan (wf-block)) |
+| Shift+arrows / Ctrl+arrows / Ctrl+Shift+arrows | coarse / precision rotate / pan | Shift+← from Front → Right (90°), Ctrl+← a small step | ✅ / angles answered: arrows 15°, Ctrl 5°, Shift 90°; Ctrl+Shift+arrows pan 150 px (behaviours W@ constants, live 11-20 parity-open-1120 triage) | da18f886 10-28 (from Isometric: ← a small turn, Shift+← a large one (Right / Back faces), Ctrl+← barely moves; Ctrl+Shift+arrows pan (wf-block)) |
 | Shift+P | hide all construction | origin, planes, sketches hidden (an undo step; not a toggle, live 1863) | ✅ (psui 11-03) | 0.4.10+ / dd1b5037 10-27 |
 | y / Shift+Y | hide / show selected parts | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 (y hides; Shift+Y shows only with the pointer over the hidden part = live behaviours psui 2.16/2.17) |
 | p | hide/show planes: the default planes' own visibility, all hidden when any is shown, else all shown (live request 1673) | the same (was a global draw flag) | ✅ | psui 10-31 (:102 cm3; T1 p_hides_the_default_planes_then_shows_them) |
