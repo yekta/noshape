@@ -236,7 +236,7 @@ impl Sketch {
 
     /// Adds an entity with validated references.
     pub fn add_entity(&mut self, geometry: Geometry, construction: bool, external: bool) -> Result<EntityId> {
-        let probe = Entity { id: EntityId(u32::MAX), geometry, construction, external, reference_only: false, handle_of: None, held_direction: None };
+        let probe = Entity { id: EntityId(u32::MAX), geometry, construction, external, reference_only: false, handle_of: None, held_direction: None, clockwise: false };
         for r in probe.point_refs() {
             if self.kind(r) != Some(EntityKind::Point) {
                 return Err(SketchError::InvalidGeometry(format!("{r} is not a point")));
@@ -318,7 +318,7 @@ impl Sketch {
                 continue;
             }
             let id = self.alloc_entity();
-            self.entities.insert(id, Entity { id, geometry: Geometry::Line { start: at, end: tip }, construction: true, external: false, reference_only: false, handle_of: Some(curve), held_direction: None });
+            self.entities.insert(id, Entity { id, geometry: Geometry::Line { start: at, end: tip }, construction: true, external: false, reference_only: false, handle_of: Some(curve), held_direction: None, clockwise: false });
         }
         self.touch();
     }
@@ -365,7 +365,7 @@ impl Sketch {
         if id.0 < self.next_entity || self.entities.contains_key(&id) {
             return Err(SketchError::InvalidGeometry(format!("entity id {id} is already allocated")));
         }
-        let probe = Entity { id, geometry, construction, external, reference_only: false, handle_of: None, held_direction: None };
+        let probe = Entity { id, geometry, construction, external, reference_only: false, handle_of: None, held_direction: None, clockwise: false };
         for r in probe.point_refs() {
             if self.kind(r) != Some(EntityKind::Point) {
                 return Err(SketchError::InvalidGeometry(format!("{r} is not a point")));
@@ -428,7 +428,7 @@ impl Sketch {
         // (A pasted spline brings its own handle arms; the copied ones' constraints go to those.)
         for e in other.entities.values().filter(|e| e.kind() != EntityKind::Point && e.handle_of.is_none()) {
             let mut g = e.geometry.clone();
-            let mut probe = Entity { id: e.id, geometry: g.clone(), construction: e.construction, external: false, reference_only: false, handle_of: None, held_direction: None };
+            let mut probe = Entity { id: e.id, geometry: g.clone(), construction: e.construction, external: false, reference_only: false, handle_of: None, held_direction: None, clockwise: false };
             for p in e.point_refs() {
                 if let Some(n) = map.get(&p) {
                     probe.replace_point(p, *n);
@@ -438,6 +438,7 @@ impl Sketch {
             if let Ok(id) = self.add_entity(g, e.construction, false) {
                 if let Some(n) = self.entities.get_mut(&id) {
                     n.held_direction = e.held_direction;
+                    n.clockwise = e.clockwise;
                 }
                 map.insert(e.id, id);
                 created.push(id);
@@ -665,6 +666,14 @@ impl Sketch {
     }
 
     /// Marks an entity (and its defining points) as construction geometry.
+    /// Stores a circle or arc clockwise or not (see [`Entity::clockwise`]); other entities stay as they are.
+    pub fn set_clockwise(&mut self, id: EntityId, clockwise: bool) {
+        if let Some(e) = self.entities.get_mut(&id).filter(|e| matches!(e.geometry, Geometry::Circle { .. } | Geometry::Arc { .. })) && e.clockwise != clockwise {
+            e.clockwise = clockwise;
+            self.touch();
+        }
+    }
+
     pub fn set_construction(&mut self, id: EntityId, construction: bool) -> Result<()> {
         let e = self.entities.get_mut(&id).ok_or(SketchError::UnknownEntity(id))?;
         e.construction = construction;

@@ -742,6 +742,9 @@ impl Sketch {
                 },
             };
             let nid = self.add_entity(g, e.construction, false)?;
+            // A reflected circle or arc turns the other way.
+            let turned = reverse_arcs && matches!(e.geometry, Geometry::Circle { .. } | Geometry::Arc { .. });
+            self.set_clockwise(nid, e.clockwise != turned);
             res.created.push(nid);
             emap.push((id, nid));
         }

@@ -250,7 +250,9 @@ impl Sketch {
         if ccw { self.add_arc(center, start, end) } else {
             let r = (start - center).length();
             let e = center + (end - center).normalize_or(DVec2::X) * r;
-            self.add_arc(center, e, start)
+            let arc = self.add_arc(center, e, start);
+            self.set_clockwise(arc, true);
+            arc
         }
     }
 

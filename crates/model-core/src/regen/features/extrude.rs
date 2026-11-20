@@ -571,8 +571,12 @@ fn drawn_edge_directions(ev: &EvalCtx, t: NamedShape) -> FResult<NamedShape> {
                 let d = b - a;
                 (info.end - info.start).dot(s.frame.x * d.x + s.frame.y * d.y) < 0.0
             }
-            // (Sketch arcs and circles run counter-clockwise about the sketch's normal.)
-            (noshape_sketch::Curve2::Arc { .. } | noshape_sketch::Curve2::Circle { .. }, k::Curve::Circle { axis, .. }) => axis.dot(s.frame.x.cross(s.frame.y)) < 0.0,
+            // (Sketch arcs and circles run counter-clockwise about the sketch's normal, those stored clockwise clockwise:
+            // live core q-arc-sense-1120.)
+            (noshape_sketch::Curve2::Arc { .. } | noshape_sketch::Curve2::Circle { .. }, k::Curve::Circle { axis, .. }) => {
+                let clockwise = s.sketch.entity(noshape_sketch::EntityId(entity)).is_some_and(|e| e.clockwise);
+                (axis.dot(s.frame.x.cross(s.frame.y)) < 0.0) != clockwise
+            }
             _ => false,
         };
         if against {

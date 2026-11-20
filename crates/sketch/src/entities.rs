@@ -98,6 +98,11 @@ pub struct Entity {
     /// point-on-line and the other direction constraints use while its length is below [`HELD_LENGTH`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub held_direction: Option<DVec2>,
+    /// A circle or arc stored clockwise, as Onshape stores a mirror copy and a centre-point arc swept clockwise (live
+    /// core q-arc-sense-1120): its model edges run clockwise, from its end point to its start point. Its geometry stays
+    /// counter-clockwise.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub clockwise: bool,
 }
 
 /// A held-direction line shorter than this (m) has no direction of its own: it keeps [`Entity::held_direction`].

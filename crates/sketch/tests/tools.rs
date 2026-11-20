@@ -264,6 +264,27 @@ fn mirror_with_symmetric_constraints() {
         }
         _ => panic!(),
     }
+    // Live stores a mirror copy of a circle or an arc clockwise (core q-arc-sense-1120), and a copy of that back.
+    let mc = res.created.iter().copied().find(|e| sk.kind(*e) == Some(EntityKind::Circle)).unwrap();
+    assert!(sk.entity(ma).unwrap().clockwise && sk.entity(mc).unwrap().clockwise && !sk.entity(a).unwrap().clockwise);
+    let axis2 = sk.add_line(v(10.0, -5.0), v(10.0, 5.0));
+    let back = sk.mirror(&[ma], axis2).unwrap();
+    let again = back.created.iter().copied().find(|e| sk.kind(*e) == Some(EntityKind::Arc)).unwrap();
+    assert!(!sk.entity(again).unwrap().clockwise);
+}
+
+/// Live's centre-point arc swept clockwise is stored clockwise (core q-arc-sense-1120: its edges run start to end
+/// clockwise); swept counter-clockwise, or a three-point arc whatever the click order, not.
+#[test]
+fn a_centre_point_arc_swept_clockwise_is_stored_clockwise() {
+    let mut sk = Sketch::new();
+    let cw = sk.center_point_arc(v(0.0, 0.0), v(0.0, 1.0), v(1.0, 0.0), false);
+    let ccw = sk.center_point_arc(v(5.0, 0.0), v(6.0, 0.0), v(5.0, 1.0), true);
+    let three = sk.three_point_arc(v(0.0, -10.0), v(2.0, -11.0), v(0.0, -12.0)).unwrap();
+    assert!(sk.entity(cw).unwrap().clockwise);
+    assert!(!sk.entity(ccw).unwrap().clockwise && !sk.entity(three).unwrap().clockwise);
+    let json = serde_json::to_string(sk.entity(ccw).unwrap()).unwrap();
+    assert!(!json.contains("clockwise"), "{json}");
 }
 
 /// Live's sketch Mirror (live/feel/mirror.json): one mirror constraint per copy (a line's, an arc's, a circle's,

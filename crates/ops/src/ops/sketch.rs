@@ -99,7 +99,7 @@ pub fn ops() -> Vec<Op> {
                 req("sketch", s(), "Sketch feature id or name."),
                 opt("tool", json!({ "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }), "Drawing tool (required without `shapes`)."),
                 opt("points", json!({ "type": "array", "items": click_point.clone() }), "The clicks, in order: [[x, y], ...] in sketch coordinates, or [[x, y, z], ...] model positions (required without `shapes`)."),
-                opt("shapes", json!({ "type": "array", "items": { "type": "object", "properties": { "tool": { "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }, "points": { "type": "array", "items": click_point.clone() }, "sides": { "type": "integer", "minimum": 3, "maximum": 1000 }, "rho": { "type": "number" }, "construction": { "type": "boolean" }, "tangent_arc_switch": { "type": "array", "items": { "type": "integer" } }, "apart": { "type": "array", "items": { "type": "integer" } }, "start_derivative": click_point.clone(), "end_derivative": click_point.clone(), "degree": { "type": "integer", "minimum": 1 }, "knots": { "type": "array", "items": { "type": "number" } }, "weights": { "type": "array", "items": { "type": "number" } }, "direction": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 } }, "required": ["tool", "points"] } }), "Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes. A line's `direction` [x, y] with its two clicks at one point: a line a sketch fillet consumed, which keeps that direction."),
+                opt("shapes", json!({ "type": "array", "items": { "type": "object", "properties": { "tool": { "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }, "points": { "type": "array", "items": click_point.clone() }, "sides": { "type": "integer", "minimum": 3, "maximum": 1000 }, "rho": { "type": "number" }, "construction": { "type": "boolean" }, "tangent_arc_switch": { "type": "array", "items": { "type": "integer" } }, "apart": { "type": "array", "items": { "type": "integer" } }, "start_derivative": click_point.clone(), "end_derivative": click_point.clone(), "degree": { "type": "integer", "minimum": 1 }, "knots": { "type": "array", "items": { "type": "number" } }, "weights": { "type": "array", "items": { "type": "number" } }, "direction": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 }, "clockwise": { "type": "boolean" } }, "required": ["tool", "points"] } }), "Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes. A line's `direction` [x, y] with its two clicks at one point: a line a sketch fillet consumed, which keeps that direction. `clockwise`: its circles and arcs stored clockwise, as Onshape stores a mirror copy (their edges run clockwise; the geometry is the same)."),
                 opt("construction", json!({ "type": "boolean" }), "Make the new geometry construction geometry."),
                 opt("sides", json!({ "type": "integer", "minimum": 3, "maximum": 1000 }), "Polygon sides."),
                 opt("rho", json!({ "type": "number" }), "A conic's ρ (0 < ρ < 1; default 0.5), as typed in its box while drawing: its Rho dimension."),
@@ -741,7 +741,15 @@ fn draw(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                         _ => Err(OpError::param(&format!("{p}direction"), "two numbers [x, y]")),
                     })
                     .transpose()?;
+                let clockwise = obj.get("clockwise").map(|v| v.as_bool().ok_or_else(|| OpError::param(&format!("{p}clockwise"), "true or false"))).transpose()?.unwrap_or(false);
+                let last = t.data.sketch.entities().map(|e| e.id).max();
                 draw_shape(&mut t, &units, &p, tool, points, (sides, rho), construction, (&switches, &apart), ends, knots, direction)?;
+                if clockwise {
+                    let made: Vec<_> = t.data.sketch.entities().map(|e| e.id).filter(|id| Some(*id) > last).collect();
+                    for id in made {
+                        t.data.sketch.set_clockwise(id, true);
+                    }
+                }
             }
         }
         None => {

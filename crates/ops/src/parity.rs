@@ -5284,8 +5284,8 @@ impl<'a> Translator<'a> {
                     let (cx, cy, r, xd, yd) = (num("xCenter"), num("yCenter"), num("radius"), num("xDir"), num("yDir"));
                     self.circles.insert((oid.clone(), eid.clone()), ([cx, cy], r));
                     let full = e["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketchCurve-")) || e["startParam"].is_null();
-                    if full {
-                        Some(json!({ "tool": "circle", "points": [at(cx, cy), at(cx + r * xd, cy + r * yd)], "construction": construction }))
+                    let mut shape = if full {
+                        json!({ "tool": "circle", "points": [at(cx, cy), at(cx + r * xd, cy + r * yd)], "construction": construction })
                     } else {
                         // Arc parameters are angles from xDir, clockwise when flagged.
                         let sense = if g["clockwise"].as_bool() == Some(true) { -1.0 } else { 1.0 };
@@ -5295,8 +5295,13 @@ impl<'a> Translator<'a> {
                             at(cx + r * (c * xd - s * yd), cy + r * (c * yd + s * xd))
                         };
                         let (t0, t1) = arc_span(e).unwrap_or((0.0, 0.0));
-                        Some(json!({ "tool": "three_point_arc", "points": [pt(t0), pt(t1), pt((t0 + t1) / 2.0)], "construction": construction }))
+                        json!({ "tool": "three_point_arc", "points": [pt(t0), pt(t1), pt((t0 + t1) / 2.0)], "construction": construction })
+                    };
+                    // Stored clockwise (a mirror copy, a centre-point arc swept clockwise): its edges run so.
+                    if g["clockwise"].as_bool() == Some(true) {
+                        shape["clockwise"] = json!(true);
                     }
+                    Some(shape)
                 }
                 "BTCurveGeometryEllipse" => {
                     let (cx, cy, a, b, xd, yd) = (num("xCenter"), num("yCenter"), g["majorRadius"].as_f64().or(g["radius"].as_f64()).unwrap_or(0.0), num("minorRadius"), num("xDir"), num("yDir"));

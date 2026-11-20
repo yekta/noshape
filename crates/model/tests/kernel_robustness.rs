@@ -4108,6 +4108,29 @@ fn extruded_edges_run_as_their_sketch_lines_are_drawn() {
     }
 }
 
+/// An arc stored clockwise (a mirror copy, a centre-point arc swept clockwise) has its extruded edges run clockwise,
+/// from its end point to its start point (live core q-arc-sense-1120; cf-snap-hook's mirrored arc JHp); others
+/// counter-clockwise. A half disc of R 20 on Top: the arc's cap edges run +x or -x.
+#[test]
+fn an_arc_stored_clockwise_is_extruded_clockwise() {
+    for clockwise in [false, true] {
+        let mut t = T::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let arc = sk.add_arc(DVec2::ZERO, DVec2::new(0.02, 0.0), DVec2::new(-0.02, 0.0));
+        sk.set_clockwise(arc, clockwise);
+        let (a, b) = sk.endpoints(arc).unwrap();
+        sk.add_line_between(b, a).unwrap();
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let r = t.regen();
+        let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+        let x = t.add("extrude", &[("entities", q(regions)), ("depth", e("5 mm")), ("operationType", en("NEW"))]);
+        let r = t.ok(x);
+        let dxs: Vec<f64> = r.context.bodies[0].shape.edges().iter().filter_map(|e| e.edge_info().ok()).filter(|i| matches!(i.curve, noshape_kernel::Curve::Circle { .. })).map(|i| i.end.x - i.start.x).collect();
+        assert_eq!(dxs.len(), 2);
+        assert!(dxs.iter().all(|&dx| if clockwise { dx > 0.0 } else { dx < 0.0 }), "clockwise {clockwise}: {dxs:?}");
+    }
+}
+
 /// PATTERN-INSTANCE-REFS (live cf-linear-pattern-with-seed-location: a Feature pattern of an Extrude and the Draft of
 /// its sides, Reapply on): each instance's Draft drafts that instance's boss, as std runs an instance's features under
 /// its id. A 60 × 20 × 10 block, a 10 × 10 × 10 boss added on top, its sides drafted 10° about the block's top, the two
