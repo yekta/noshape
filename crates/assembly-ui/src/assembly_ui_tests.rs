@@ -3161,3 +3161,151 @@ fn a_new_mates_preview_moves_the_first_pick_alone_and_its_group_after_the_check(
         assert!(qa.angle_between(qb) < 1e-6 && (ta - tb).length() < 1e-6, "the Fastened pair kept together after ✓");
     }
 }
+
+/// [`pattern_assembly`] in an app window (its menus open as the app's).
+fn list_assembly(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<AssemblyView>) {
+    let path = pattern_document(cx, name);
+    open_assembly_with_front(cx, &path)
+}
+
+/// An instance row's middle in the window (right of its name, left of its icons).
+fn row_at(cx: &mut TestAppContext, window: AnyWindowHandle, name: &str) -> Point<gpui_kit::Pixels> {
+    let b = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(Box::leak(format!("inst-row {name}").into_boxed_str())).unwrap_or_else(|| panic!("{name}'s row not drawn"));
+    gpui_kit::point(b.left() + px(150.), b.center().y)
+}
+
+fn row_click(cx: &mut TestAppContext, window: AnyWindowHandle, name: &str, m: gpui_kit::Modifiers) {
+    let at = row_at(cx, window, name);
+    cx.executor().advance_clock(std::time::Duration::from_millis(600));
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at, m);
+    draw(cx, window);
+}
+
+fn selected_names(cx: &mut TestAppContext, view: &Entity<AssemblyView>) -> Vec<String> {
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let a = v.assembly(cx).unwrap();
+        v.selected.iter().filter_map(|id| a.instance(*id).map(|i| i.name.clone())).collect()
+    })
+}
+
+/// Live2 fields.json: a hovered instance row lights its instance in the graphics at once (live's ~0.85 s is its
+/// software-GL host, live2 18:20 (6)), and the light goes when the pointer leaves the row.
+#[gpui::test]
+fn a_hovered_instance_row_lights_its_instance_at_once(cx: &mut TestAppContext) {
+    let (window, view) = list_assembly(cx, "row-hover");
+    draw(cx, window);
+    let block = cx.update(|cx| instance(view.read(cx), "Part 1 <1>", cx));
+    let at = row_at(cx, window, "Part 1 <1>");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(at, None, gpui_kit::Modifiers::none());
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| view.read(cx).ui.list_hover), Some(block), "lit in the first frame");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(gpui_kit::point(px(700.), px(400.)), None, gpui_kit::Modifiers::none());
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| view.read(cx).ui.list_hover), None, "off the row: unlit");
+}
+
+/// Live2 18:20 and behaviours "skb (10-24)" (3): Ctrl+click on a row opens its menu, the selection as it was; a
+/// right-click on an unselected row adds it to the selection (behaviours "audit 1943" (2)).
+#[gpui::test]
+fn ctrl_click_opens_a_rows_menu_and_a_right_click_adds_its_row(cx: &mut TestAppContext) {
+    let (window, view) = list_assembly(cx, "row-ctrl");
+    draw(cx, window);
+    row_click(cx, window, "Part 1 <1>", gpui_kit::Modifiers::none());
+    assert_eq!(selected_names(cx, &view), ["Part 1 <1>"]);
+    row_click(cx, window, "Part 2 <1>", gpui_kit::Modifiers::control());
+    assert!(cx.read(crate::os_menu::is_open), "Ctrl+click: the menu");
+    assert_eq!(selected_names(cx, &view), ["Part 1 <1>"], "the selection as it was");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    draw(cx, window);
+    let at = row_at(cx, window, "Part 2 <1>");
+    let mut v = gpui_kit::VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_down(at, gpui_kit::MouseButton::Right, gpui_kit::Modifiers::none());
+    v.simulate_mouse_up(at, gpui_kit::MouseButton::Right, gpui_kit::Modifiers::none());
+    draw(cx, window);
+    assert_eq!(selected_names(cx, &view), ["Part 1 <1>", "Part 2 <1>"], "the right-clicked row joins");
+    assert!(cx.read(crate::os_menu::is_open), "its menu");
+}
+
+/// Live2 fields.json: Shift+click adds the rows from the last clicked one; after a click that took a row off, the range
+/// starts at the top row.
+#[gpui::test]
+fn shift_click_adds_the_rows_from_the_last_clicked_one(cx: &mut TestAppContext) {
+    let (window, view) = list_assembly(cx, "row-shift");
+    draw(cx, window);
+    row_click(cx, window, "Part 2 <1>", gpui_kit::Modifiers::none());
+    row_click(cx, window, "Part 1 <1>", gpui_kit::Modifiers::shift());
+    let mut got = selected_names(cx, &view);
+    got.sort();
+    assert_eq!(got, ["Part 1 <1>", "Part 2 <1>"], "the range");
+    // Both off again by plain clicks (the last one took its row off: no anchor), then Shift+click Part 2 takes the top
+    // row to it.
+    row_click(cx, window, "Part 1 <1>", gpui_kit::Modifiers::none());
+    assert_eq!(selected_names(cx, &view), ["Part 2 <1>"], "Part 1 toggled off");
+    row_click(cx, window, "Part 2 <1>", gpui_kit::Modifiers::none());
+    assert!(selected_names(cx, &view).is_empty());
+    row_click(cx, window, "Part 2 <1>", gpui_kit::Modifiers::shift());
+    let mut got = selected_names(cx, &view);
+    got.sort();
+    assert_eq!(got, ["Part 1 <1>", "Part 2 <1>"], "from the top row");
+}
+
+/// Live2 fields.json doubleClickInstance: a double-click on an instance's row opens its Part Studio with the part
+/// selected, the assembly displayed round it (no context made).
+#[gpui::test]
+fn a_double_click_on_an_instance_row_shows_its_part_studio_with_the_assembly(cx: &mut TestAppContext) {
+    let (window, view) = list_assembly(cx, "row-dblclick");
+    draw(cx, window);
+    let seen: std::rc::Rc<std::cell::RefCell<Vec<(bool, bool, String)>>> = Default::default();
+    let s2 = seen.clone();
+    let _sub = cx.update(|cx| {
+        cx.subscribe(&view, move |_, e: &super::AssemblyViewEvent, _| {
+            if let super::AssemblyViewEvent::EditInContext(_, c) = e {
+                s2.borrow_mut().push((c.part.is_some(), c.context.is_some(), c.assembly_name.clone()));
+            }
+        })
+    });
+    let at = row_at(cx, window, "Part 1 <1>");
+    let mut v = gpui_kit::VisualTestContext::from_window(window, cx);
+    for n in [1, 2] {
+        v.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: gpui_kit::Modifiers::none(), click_count: n, first_mouse: false });
+        v.simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: gpui_kit::Modifiers::none(), click_count: n });
+    }
+    draw(cx, window);
+    let seen = seen.borrow().clone();
+    assert_eq!(seen.len(), 1, "one Part Studio shown: {seen:?}");
+    assert!(seen[0].0 && !seen[0].1 && seen[0].2 == "Assembly 1", "the part, the assembly displayed, no context: {seen:?}");
+    assert_eq!(selected_names(cx, &view), ["Part 1 <1>"]);
+}
+
+/// Live asm-feel3-1118: a row dragged over another shows the blue line above or below it (the row's middle decides);
+/// the drop reorders the instances in one undo step.
+#[gpui::test]
+fn a_dragged_instance_row_drops_between_rows_in_one_undo_step(cx: &mut TestAppContext) {
+    let (window, view) = list_assembly(cx, "row-drag");
+    draw(cx, window);
+    let order = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).assembly(cx).unwrap().instances.iter().map(|i| i.name.clone()).filter(|n| n.starts_with("Part")).collect::<Vec<_>>());
+    let before = order(cx);
+    assert_eq!(before[..2], ["Part 1 <1>", "Part 2 <1>"]);
+    let (from, onto) = (row_at(cx, window, "Part 2 <1>"), row_at(cx, window, "Part 1 <1>"));
+    let block = cx.update(|cx| instance(view.read(cx), "Part 1 <1>", cx));
+    let to = onto - gpui_kit::point(px(0.), px(5.));
+    let mut v = gpui_kit::VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(from, None, gpui_kit::Modifiers::none());
+    v.simulate_mouse_down(from, gpui_kit::MouseButton::Left, gpui_kit::Modifiers::none());
+    for k in 1..=4 {
+        let t = k as f32 / 4.;
+        let p = gpui_kit::point(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t);
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(p, Some(gpui_kit::MouseButton::Left), gpui_kit::Modifiers::none());
+        draw(cx, window);
+    }
+    assert!(cx.update(|cx| cx.has_active_drag()), "dragging");
+    assert_eq!(cx.update(|cx| view.read(cx).ui.list_drop), Some((block, false)), "the line above Part 1 (its upper half)");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(to, gpui_kit::MouseButton::Left, gpui_kit::Modifiers::none());
+    draw(cx, window);
+    assert_eq!(order(cx)[..2], ["Part 2 <1>", "Part 1 <1>"], "dropped above Part 1");
+    let doc = cx.update(|cx| view.read(cx).doc.clone());
+    cx.update(|cx| doc.update(cx, |d, cx| d.undo(cx)));
+    draw(cx, window);
+    assert_eq!(order(cx), before, "one undo puts it back");
+}

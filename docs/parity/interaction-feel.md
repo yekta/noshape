@@ -120,11 +120,11 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (D1–D6, F3, F4
 | Priority: annotation vs view | an extension line's foot on a view edge lights the dimension and a click selects it (3 of 3, live2 drw-feel-q (b)); a centerline over a view edge lights both and a click takes the view (D2); on the centerline 3 px inside the view, hover and click take the centerline (followUp (2)) | annotation first (−2.5 px bias); a centerline lit where it runs on a view edge gives way to the edge, which stands for the view (`centerline_on_edge`) | GPUI feel `a_centerline_on_a_view_edge_gives_way_to_the_view` | = |
 | Snap reach (Dimension tool, Note leader) | 7 px, not 9, for vertices; a circle centre 9 px, not 11, on the diagonal and from inside the hole (live2 batch 1, 11-18 16:15; 11-13 had 7 / 9); 5 px along an edge; constant in px (D3) | 8 px (`SNAP_REACH_PX`), a centre 10 px (`CENTER_SNAP_REACH_PX`; was 8) | GPUI `a_views_vertex_snaps_within_8_px_on_screen` (7 snaps, 9 doesn't), feel `the_dimension_tool_snaps_to_a_circle_centre_within_9_px` | = (centre fixed 11-18) |
 | Snap marker, dimension tools | a filled 10 px disc rgb(216,165,102) for every kind, none in Select, none for a midpoint (D3) | the same (`SnapMark::Disc`), also the Dimension tool's sticky centre dots (bm 4062) | GPUI feel `the_dimension_tool_snaps_to_a_vertex_within_its_reach_and_select_marks_none` | = |
-| Snap marker, Note tool | a hollow square ~15 px rgb(255,130,63) round the vertex (bm 26796, C11 (a)) | the same (`SnapMark::Box`) | – | = |
-| Midpoints / quadrants | only after Shift+Q (D22) | the same | – | = |
-| Two points in reach | the nearer, one marker (bm 4092) | the nearer (`snap_at_with`) | – | = |
+| Snap marker, Note tool | a hollow square ~15 px rgb(255,130,63) round the vertex (bm 26796, C11 (a)) | the same (`SnapMark::Box`) | GPUI `feel::the_note_tool_frames_a_vertex_in_a_15_px_square` | = |
+| Midpoints / quadrants | only after Shift+Q (D22) | the same | GPUI `feel::midpoints_snap_only_after_shift_q` | = |
+| Two points in reach | the nearer, one marker (bm 4092) | the nearer (`snap_at_with`) | GPUI `feel::of_two_points_in_reach_the_nearer_snaps_under_one_marker` | = |
 | Placement inference (note / dimension text) | 7 px, not 9; pink dotted line, red ✕ (D4) | 8 px (`INFER_REACH_PX`), the same line and ✕ | GPUI feel `placing_a_note_lines_up_with_another_within_8_px` | = |
-| Box select look | left → right: light-blue fill, solid 1 px blue; right → left: pale-yellow fill, dashed yellow-orange (F3) | the same (`box_overlay`) | – | = |
+| Box select look | left → right: light-blue fill, solid 1 px blue; right → left: pale-yellow fill, dashed yellow-orange (F3) | the same (`box_overlay`) | GPUI `feel::a_box_dragged_right_is_the_window_box_and_left_the_crossing_box` | = |
 | Box select, annotations | a note half inside: right → left only; fully inside: both (F3) | the same (`select_in_box`) | GPUI `a_box_right_to_left_takes_what_it_crosses` | = |
 | Box select, views | left → right: a view only with a whole model edge of it inside (part of an edge, or a box past its corner: nothing); right → left: when the box meets its frame (~7 px out); a dimension left → right with its whole text, an arrowhead or an attachment point inside (an extension line's foot alone: nothing), right → left when touched; a press within a view's reach drags it (live2 box-select-rule 11-16) | the same (`select_in_box`, `BOX_VIEW_FRAME_PX` 7) | GPUI `a_box_takes_a_view_by_a_whole_edge_or_by_crossing_its_frame`, `a_box_takes_a_dimension_by_its_text_an_arrowhead_or_an_attachment_point` | = |
 | Box select with modifiers | none adds; Shift: nothing changes (F3) | adds; Shift does nothing | the same test | = |
@@ -147,22 +147,22 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (D1–D6, F3, F4
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
 | Documents list: click / Ctrl / Shift | click one row; Ctrl toggles; Shift **adds** anchor..row; the anchor is the last plain or Ctrl click (feel/documents.json `multiSelect`, three sequences) | the same (`click_rows`) | `rows_select_alone_with_ctrl_toggles_and_with_shift_ranges_from_the_anchor` (live2's sequences) | = |
-| Ctrl+A / Esc / click on empty list | all rows (the panel shows no details) / keeps / clears | the same (`select_all_rows`, `doc-list` click) | – | = |
-| Right panel for N | "⌄ N selections", the rows with ✕, Trash, Deselect all, "⌄ Labels" (docs-f1-shift-range) | the same (`render_selection_panel`) | – | = |
-| Menu for N | Details, Labels…, Move selected (N) to…, Send to trash | the same (`selection_menu`) | – | = |
+| Ctrl+A / Esc / click on empty list | all rows (the panel shows no details) / keeps / clears | the same (`select_all_rows`, `doc-list` click) | GPUI `feel_tests::ctrl_a_takes_every_row_esc_keeps_them_and_a_click_on_the_empty_list_clears` | = |
+| Right panel for N | "⌄ N selections", the rows with ✕, Trash, Deselect all, "⌄ Labels" (docs-f1-shift-range) | the same (`render_selection_panel`) | GPUI `feel_tests::several_selected_rows_get_their_own_menu_and_panel` | = |
+| Menu for N | Details, Labels…, Move selected (N) to…, Send to trash | the same (`selection_menu`) | GPUI `feel_tests::several_selected_rows_get_their_own_menu_and_panel` | = |
 | Move to… for N | the folder tree, "N items will be moved." + Show details, New folder / Move here / Cancel (docs-move-dialog) | the same browser (Home, Back, the place, New folder, Sort), the count bar and details; Move here off where the rows already are; a new folder's Enter makes and opens it | app check 11-13 (3 moved into a new folder) | = |
-| Send to trash for N | "N selections will be sent to the trash."; toast "N items have been sent … Restore" | the same, Restore brings all back | – | = |
-| Row drag start | 5 px (4 is a click) | 4 px threshold (`DOCS_DRAG_PX`, gpui `drag_threshold`) | – | = |
-| Drag ghost | light-blue pill rgb(178,221,246), 48 px, 10 px left / 8 px above the pointer, ✥ over a target, ⊘ elsewhere, bold name or "N items"; source rows faded | the same (`DocsDrag`) | – | = |
+| Send to trash for N | "N selections will be sent to the trash."; toast "N items have been sent … Restore" | the same, Restore brings all back | `feel_tests::send_to_trash_words_count_the_rows` | = |
+| Row drag start | 5 px (4 is a click) | 4 px threshold (`DOCS_DRAG_PX`, gpui `drag_threshold`) | GPUI `feel_tests::a_row_drags_from_5_px_under_a_pill_up_and_left_of_the_pointer` | = |
+| Drag ghost | light-blue pill rgb(178,221,246), 48 px, 10 px left / 8 px above the pointer, ✥ over a target, ⊘ elsewhere, bold name or "N items"; source rows faded | the same (`DocsDrag`) | GPUI `feel_tests::a_row_drags_from_5_px_under_a_pill_up_and_left_of_the_pointer` | = |
 | Drop targets | folder tiles (2 px rgb(22,81,176) border, rgb(232,238,247) fill; toast "Selected items moved."), left panel Trash (Send to trash dialog); not: document rows, "Owned by me" crumb or nav; no dwell-open | the same; folder rows too (list view) | `rows_dropped_on_a_folder_move_into_it`; app check 11-13 (4 moved) | = |
-| Row hover / selected | #def1fb / #b2ddf6 (bm 20) | the same | – | = |
-| Tab drag: ghost, gap | 100 px ghost, a tab-wide gap, no line (bm 6562) | the same | – | = |
-| Tab drag start | 6 px (5 is a click), the tab lifts and leaves a grey slot (feel/documents.json `tabBar.dragStartPx`) | 6 px (`TAB_DRAG_PX`, gpui `drag_threshold`) | – | = |
+| Row hover / selected | #def1fb / #b2ddf6 (bm 20) | the same | `feel_tests::rows_light_and_select_in_lives_blues` | = |
+| Tab drag: ghost, gap | 100 px ghost, a tab-wide gap, no line (bm 6562) | the same | GPUI `a_tab_drags_from_6_px_leaving_a_gap_its_width_and_a_100_px_ghost` | = |
+| Tab drag start | 6 px (5 is a click), the tab lifts and leaves a grey slot (feel/documents.json `tabBar.dragStartPx`) | 6 px (`TAB_DRAG_PX`, gpui `drag_threshold`) | GPUI `a_tab_drags_from_6_px_leaving_a_gap_its_width_and_a_100_px_ghost` | = |
 | Tab dropped on a folder | where it's released decides, not a dwell: the folder tab's middle 20–80 % puts it in (lit), near its ends it reorders (live2 11-13) | the same (`drops_into_folder`, `TabGap.into`) | `a_tab_goes_into_a_folder_released_over_its_middle` | = |
 | Tab bar auto-scroll while dragging | from 45 px of an end (not 60), faster nearer it: 13–24 / 51–59 / 66–75 / 94–119 / 108–119 px/s at 45 / 30 / 20 / 10 / 3 px; the tab lands where the pointer is in the scrolled bar (`tabBar.autoScroll`, `dropWhileAutoScrolled`) | the two ends' mean, interpolated (`TAB_AUTOSCROLL`), whatever the frame rate; the pointer's place re-sent each tick so the gap follows the tabs scrolling under it | `a_tab_dragged_to_an_end_of_the_strip_scrolls_it`; app check 11-13 07:02 (held 10 px from the end 2 s: ~250 px, landed under the pointer) | = |
 | Tab manager drag and drop | 6 px start; the pressed row selected; a dark-blue pill (white bold name or "N items") below-right of the pointer; between rows a ~2 px dark-blue line with a ring at its left end; a folder row's thirds: above / into (light-blue fill, 1 px dark-blue frame, » at its left) / below; out of a folder to the root; no dwell opens a folder; Esc cancels (`tabManager`) | the same (`TmDrag`, `tm_zone`, `tm_drop_line`; folder rows now laid out as tab rows, 54 px, "Folder" under the name); not undoable (tab operations) | `a_folder_row_takes_drops_in_its_middle_third`, `rows_dropped_beside_a_folder_land_before_or_after_it`, `rows_dropped_on_a_folder_go_into_it`, `rows_dropped_on_a_tab_row_land_before_or_after_it`; app check 11-13 07:02 (ghost, line, Esc) | = |
-| Click on a document's name / double-click on a tab | a single click on the name opens the document; a double-click on a tab does nothing (live2 11-13) | the same (`doc-name` click; the tab bar ignores a second click) | – | = |
-| Ctrl / Shift + click a tab | opens it in a new window (rq 2403) | the same | – | = |
+| Click on a document's name / double-click on a tab | a single click on the name opens the document; a double-click on a tab does nothing (live2 11-13) | the same (`doc-name` click; the tab bar ignores a second click) | GPUI `feel_tests::a_click_on_a_documents_name_opens_it`, `a_double_click_on_a_tab_only_activates_it` | = |
+| Ctrl / Shift + click a tab | opens it in a new window (rq 2403) | the same | GPUI `ctrl_or_shift_click_on_a_tab_opens_it_in_a_new_window` | = |
 
 ## Variable Studio, Versions panel, Feature Studio editor (studios, from 2026-11-13)
 
@@ -230,7 +230,7 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Selecting an instance | orange outline through other parts (in explode edit mode too, live2 11-14), a triad (3 arrows, 3 rings, centre) | the same (render `Instance::outline_through`: the silhouette's outline outside its own image, no depth test) | render `an_outline_through_shows_past_the_part_in_front` | = (fixed) |
 | Arrow drag | moves live, no value box; on release the Explode step dialog; only that arrow stays | the same | – | = |
 | Ring drag | a Rotation step, 5° steps, Specify axis | the same (`ring_snap`, 17:18; was 1°) | `explode_drag_values_round` | = |
-| ✓ / Esc on the step | keeps / removes the step | the same | – | = |
+| ✓ / Esc on the step | keeps / removes the step | the same | GPUI `esc_on_a_new_explode_step_removes_it_and_ends_the_editing` | = |
 | Done | back to mated positions, toolbar back | the same | – | = |
 | Row click | selects (blue), tooltip with its name, no explode | the same (17:18: the tooltip) | – | = |
 | Row menus | collapsed: Activate, Rename, Reset starting position, Duplicate, Delete; active: Collapse, Rename, Show / Hide all explode lines, Delete | the same | ui-parity asm-explode-row-menu, -row-menu-editing | = |
@@ -248,21 +248,24 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Hovered row | light blue, an eye at the right end | the same | – | = |
 | Row tooltip | every instance row's name area tips its name, cut off or not; an icon column its icon's own tip ("Part is fixed", a lock's named position) or none (live2 asm-feel2 (a) 11-17, which retracts 11-14's "a row whose name fits has none": probed over the icon columns) | the same, at 80 ms (`ROW_TIP_DELAY`); the next row's at once | every_instance_row_tooltips_its_name | = |
 | 3D highlight on hover | ~0.85 s after the pointer arrives on live2's software-GL host; its graphics hover takes ~0.73 s too (live2 18:20 (6)): the host, not a delay of Onshape's | at once | – | = |
+| Hovered row | light blue, an eye at the right end | the same | GPUI `a_hovered_instance_row_lights_its_instance_at_once` | = |
+| Row tooltip | only for a cut-off name (a row whose name fits has none; the fix icon's "Part is fixed"), live2 11-14 | the same (the name measured against its room), at 80 ms (`ROW_TIP_DELAY`) | – | = (fixed) |
+| 3D highlight on hover | ~0.85 s after the pointer arrives on live2's software-GL host; its graphics hover takes ~0.73 s too (live2 18:20 (6)): the host, not a delay of Onshape's | at once | GPUI `a_hovered_instance_row_lights_its_instance_at_once` | = |
 | Plain click | toggles the row | the same (`list_click`) | ui-parity asm-select-mate-row | = |
-| Ctrl+click | opens the context menu (live2 18:20; behaviours "skb (10-24)" (3)) | the same | – | = |
-| Shift+click | the range from the last clicked row, added; after a deselecting click from the top row | the same (17:18: the top row) | – | = |
+| Ctrl+click | opens the context menu (live2 18:20; behaviours "skb (10-24)" (3)) | the same | GPUI `ctrl_click_opens_a_rows_menu_and_a_right_click_adds_its_row` | = |
+| Shift+click | the range from the last clicked row, added; after a deselecting click from the top row | the same (17:18: the top row) | GPUI `shift_click_adds_the_rows_from_the_last_clicked_one` | = |
 | Esc / empty graphics | Esc keeps the selection; an empty graphics click clears | the same | – | = |
-| Double-click an instance | its Part Studio, the part selected, "<assembly> displayed" bar | the same (17:18, `show_in_context`) | – | = |
+| Double-click an instance | its Part Studio, the part selected, "<assembly> displayed" bar | the same (17:18, `show_in_context`) | GPUI `a_double_click_on_an_instance_row_shows_its_part_studio_with_the_assembly` | = |
 | Rename | none for instances; Instance properties… (Reference designator) | the same | ui-parity asm-menu-instance-properties | = |
 | One instance's menu | Properties… … Delete | the same | `the_instance_and_top_row_menus_are_lives` | = |
 | Two instances' menu | … Dynamic suppression ▸, Check interference… \| Show / Hide mates, Replace instances…, … Clear selection, Delete | the same (17:18) | `two_selected_instances_have_lives_list_menu` | = |
 | Mate menu / folder menu | Rename … Delete; Rename … Unpack folder | the same | ui-parity asm-menu-* | = |
 | Mixed selection menu | instances, the Origin and a mate: Hide … Clear selection (no Suppress, Fix, Copy, Export…, Delete) | the same | `instances_with_a_mate_selected_have_lives_reduced_menu` | = |
-| Right-click an unselected row | acts on both rows (live2 18:20; behaviours "audit 1943" (2)) | joins the selection | – | = |
+| Right-click an unselected row | acts on both rows (live2 18:20; behaviours "audit 1943" (2)) | joins the selection | GPUI `ctrl_click_opens_a_rows_menu_and_a_right_click_adds_its_row` | = |
 | Add selection to folder… | a floating "Folder name" panel; the folder row only after Enter (live2 18:20) | the same | ui-parity asm-menu-add-selection-to-folder | = |
 | Folders | collapsed; double-click does nothing; one Ctrl+Z | the same | ui-parity asm-menu-unpack-folder | = |
-| Row drag look | a blue pill with the name; a blue line with a ring at its left end | the same (17:30, `InstanceDrag`, `list_drop_line`, as the Tab manager's) | – | = |
-| Row drop | reorders, one undo step | the same ("Reorder instances") | – | = |
+| Row drag look | a blue pill with the name; a blue line with a ring at its left end | the same (17:30, `InstanceDrag`, `list_drop_line`, as the Tab manager's) | GPUI `a_dragged_instance_row_drops_between_rows_in_one_undo_step` | = |
+| Row drop | reorders, one undo step | the same ("Reorder instances") | GPUI `a_dragged_instance_row_drops_between_rows_in_one_undo_step` | = |
 | Hidden mate | grey name and icon | the same | `hidden_mate_rows_are_grey` | = |
 | Suppressed mate | grey italic struck through; "Fastened 1 (Suppressed)" | the same (17:18: the tooltip) | – | = |
 | Failed mate's colour | rgb(170,37,45); hidden, rgb(196,139,148) (live2 errors-1118 tips) | the same (17:18; was #bd3039; hidden faded red since 11-18, was the strong red) | `hidden_mate_rows_are_grey`, `a_hidden_mate_in_error_is_faded_red` | = |
@@ -284,7 +287,7 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Implicit, over a face | the centroid wherever the pointer is; corner dots larger than midpoint dots | the same (17:18; Shift still picks among the points) | `a_faces_connector_is_its_centroid_wherever_the_pointer_is` | = |
 | Implicit, over an edge | the midpoint, Z along the edge | the same (17:18) | – | = |
 | Vertex / edge over the face | takes over within 6 px, not at 8 | the pick square (psui's 3D matrix: 15 / 15) | psui `the_3d_pick_matrix_matches_live` | = |
-| Free drag | moves in the screen plane by the full pointer delta | the same | – | = |
+| Free drag | moves in the screen plane by the full pointer delta | the same | GPUI `a_free_instances_drag_keeps_the_default_cursor_and_follows_the_pointer`, `a_dragged_free_instance_takes_the_whole_move_from_the_press` | = |
 | Drag start | > 2 px and > 50 ms | the same (asm ccbc333f) | asm's tests | = |
 | Drag feel on a software-GL host (live2 drag-1118, lead (c)) | two-blocks: first moved frame 1.7–2.0 s after the press, then a frame per input step (~0.3 s), the last 0.8–1.5 s after the last move, release settled 0.9–1.2 s; RB 18 (1177 occurrences): the drag is lost, the press answered 12.7 s later as a click (selection) | qa 21:5x, green 7302f8bd on vibex8 Xvfb (software GL, load 8-13), live2's method with ImageMagick grabs every ~0.15 s (no ffmpeg there; qa-scratch/af/dragq.py): two-blocks (free block, 3 runs): first moved frame 0.81-1.02 s, a frame every 0.32-0.45 s, the last 0.44-1.07 s after the last move, settled at the release; asm-xdev-subs (asm's RB 18-class save, 1 run): the press lights the part at 0.58 s, no frame during the drag, the part's move drawn 13.3 s after the press (3.9 s after the release), redraws at 21.9 / 29.9 s (live loses the drag; ours applies it late: the HEAVY-ASM-SOFTWARE-FRAME P0) | – | = (two-blocks); RB 18: ours applies the drag, live doesn't |
 | Triad drag steps (live2 triad-step-1118; client constants 11-18) | an arrow: 10^(round(log10(the length of 100 px at the handle)) − 2), always rounded; a ring: 5° while 5° spans ≥ 50 px of arc, else 1° / 0.1°, snapping within 0.4·(1 + level/3) of a step; an explode arrow ~0.1 mm a step at a close zoom (120 px → 8.1 mm) | the same: arrow `arrow_snap_step_for`; ring `ring_snap` (the coarsest of 5° / 1° / 0.1° whose arc at the pointer's radius is ≤ 50 px, the bundle's getSnapAngle, behaviours 10-27 (1)); explode 0.1 mm (`explode_drag_round`) | assembly_view `arrow_drags_snap_to_a_step_that_follows_the_zoom`, `ring_drags_snap_to_a_step_that_follows_the_pointer_radius`, `explode_drag_values_round` | = (checked 11-18) |

@@ -1002,7 +1002,7 @@ impl StartView {
             list.push(spacer(skipped));
         }
         let rows = v_flex().mt(px(6.)).border_1().border_color(rgb(0xcccccc)).children(list);
-        let button = |id: &'static str| h_flex().id(id).h(px(32.)).px(px(10.)).gap(px(6.)).rounded(px(3.)).border_1().border_color(rgb(0xaaaaaa)).bg(rgb(0xffffff)).cursor_pointer().text_size(px(14.)).text_color(pal.text).map(move |d| crate::ui_script::mark(d, move || format!("button:{}", if id == "sel-trash" { "Trash" } else { "Deselect all" })));
+        let button = |id: &'static str| h_flex().id(id).debug_selector(move || id.into()).h(px(32.)).px(px(10.)).gap(px(6.)).rounded(px(3.)).border_1().border_color(rgb(0xaaaaaa)).bg(rgb(0xffffff)).cursor_pointer().text_size(px(14.)).text_color(pal.text).map(move |d| crate::ui_script::mark(d, move || format!("button:{}", if id == "sel-trash" { "Trash" } else { "Deselect all" })));
         let (v1, v2) = (view.clone(), view.clone());
         let docs: Vec<PathBuf> = items.iter().filter(|i| !i.2).map(|i| i.0.clone()).collect();
         v_flex()
@@ -1600,10 +1600,7 @@ impl StartView {
         }
         let view = cx.entity();
         let shown = Rc::new(std::cell::Cell::new(false));
-        let count = match items.len() {
-            1 => "1 selection will be sent to the trash.".to_string(),
-            n => format!("{n} selections will be sent to the trash."),
-        };
+        let count = trash_question(items.len());
         window.open_dialog(cx, move |dialog, _, cx| {
             let pal = p();
             let (view, items, count) = (view.clone(), items.clone(), count.clone());
@@ -1659,7 +1656,7 @@ impl StartView {
         match sent.as_slice() {
             [] => {}
             [(name, id)] => Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(name.clone()), text: " has been sent to the trash and will be automatically deleted after 30 days.".into(), restore: vec![id.clone()], brief: true }),
-            many => Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: None, text: format!("{} items have been sent to the trash and will be automatically deleted after 30 days.", many.len()), restore: many.iter().map(|(_, id)| id.clone()).collect(), brief: true }),
+            many => Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: None, text: trashed_toast(many.len()), restore: many.iter().map(|(_, id)| id.clone()).collect(), brief: true }),
         }
         self.force_rescan(cx);
     }
@@ -4344,6 +4341,7 @@ impl StartView {
                 h_flex()
                     // A row is its document (a row that slides up under the pointer is another one: its tooltip shows).
                     .id(SharedString::from(format!("row-{}", d.path.display())))
+                    .debug_selector(|| format!("doc-row:{}", d.name))
                     .group(PIN_ROW)
                     .relative()
                     .map(|r| crate::ui_script::mark(r, || format!("doc_row:{}", d.name)))
@@ -4781,6 +4779,19 @@ impl DocsDrag {
     }
 }
 
+/// Send to trash's question for `n` rows (live2 feel/documents.json `trashForN`).
+fn trash_question(n: usize) -> String {
+    match n {
+        1 => "1 selection will be sent to the trash.".to_string(),
+        n => format!("{n} selections will be sent to the trash."),
+    }
+}
+
+/// The toast after `n` rows went to the trash.
+fn trashed_toast(n: usize) -> String {
+    format!("{n} items have been sent to the trash and will be automatically deleted after 30 days.")
+}
+
 /// How far a row moves before it drags (live: 4 px or less is a click, 5 a drag).
 const DOCS_DRAG_PX: f32 = 4.;
 
@@ -4800,6 +4811,7 @@ impl Render for DocsDrag {
         };
         div().pl(self.offset.x - px(10.)).pt(self.offset.y - px(8.)).child(
             h_flex()
+                .debug_selector(|| "docs-drag-ghost".into())
                 .h(px(48.))
                 .px(px(18.))
                 .gap(px(10.))
@@ -5654,6 +5666,10 @@ fn pinned_order(columns: &[(Col, bool)], pins: &[(Col, Pin)]) -> Vec<Col> {
 }
 
 #[cfg(test)]
+#[path = "start_feel_tests.rs"]
+mod feel_tests;
+
+#[cfg(test)]
 mod tests {
     use super::{Col, Pin, SelectAllRows, SelectNext, SelectPrev, ToggleRow, bold_match, default_columns, header_menu_items, pinned_order, click_rows, history_change_matches, import_failed, key_bindings, lib, move_rows, rows_to_move, toggles};
     use gpui_kit::Modifiers;
@@ -5666,14 +5682,7 @@ mod tests {
         use super::{DocEntry, Source, StartView, ViewMode};
         use gpui_kit::{AppContext as _, Bounds, Pixels, Point, ScrollDelta, ScrollWheelEvent, VisualTestContext, WindowBounds, WindowOptions, point, px, size};
         cx.update(gpui_kit::init);
-        crate::start_hooks::register(crate::start_hooks::Hooks {
-            open_document_window: |_, _, _, _| Ok(()),
-            open_document_at: |_, _, _, _| Ok(()),
-            open_document_history: |_, _, _| Ok(()),
-            build_label: String::new,
-            import_dialog: |_, _, _, _| {},
-            help_items: |m| m,
-        });
+        super::feel_tests::register_test_hooks();
         let dir = std::env::temp_dir().join(format!("noshape-start-pins-{}", std::process::id()));
         let docs: Vec<DocEntry> = (0..5)
             .map(|i| DocEntry { path: dir.join(format!("Doc {i}.noshape")), name: format!("Doc {i}"), modified: 1_760_000_000_000 + i * 60_000, modified_by: "me".into(), owner: "me".into(), description: "d".into(), workspace: "Main".into(), thumbnail: None, recent_rank: None, broken: false, trashed: false })
@@ -5728,14 +5737,7 @@ mod tests {
         use super::{Source, StartView, ViewMode};
         use gpui_kit::{AppContext as _, Bounds, MouseButton, MouseDownEvent, MouseUpEvent, Point, VisualTestContext, WindowBounds, WindowOptions, px, size};
         cx.update(gpui_kit::init);
-        crate::start_hooks::register(crate::start_hooks::Hooks {
-            open_document_window: |_, _, _, _| Ok(()),
-            open_document_at: |_, _, _, _| Ok(()),
-            open_document_history: |_, _, _| Ok(()),
-            build_label: String::new,
-            import_dialog: |_, _, _, _| {},
-            help_items: |m| m,
-        });
+        super::feel_tests::register_test_hooks();
         let mut view = None;
         let (window, _) = cx
             .update(|cx| {

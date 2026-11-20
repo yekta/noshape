@@ -1684,7 +1684,7 @@ impl Workspace {
         let gap = self.tab_gap.as_ref().map(|g| (g.dragged, g.before));
         // The gap is the dragged tab's own width (live tabs size to their name).
         let gap_w = self.tab_gap.as_ref().map(|g| g.width).filter(|w| *w > px(0.)).unwrap_or(px(200.));
-        let placeholder = || div().flex_none().w(gap_w).h(px(27.));
+        let placeholder = || div().flex_none().w(gap_w).h(px(27.)).debug_selector(|| "tab-gap".into());
         let mut strip = h_flex()
             .id("tab-strip")
             .flex_1()
@@ -2080,6 +2080,7 @@ impl Workspace {
         // truncated) under the pointer, along the bar (it starts at x 0).
         let ghost = self.tab_gap.as_ref().map(|g| {
             h_flex()
+                .debug_selector(|| "tab-ghost".into())
                 .absolute()
                 .top_0()
                 .left(g.x - g.grab.min(px(90.)))
@@ -3408,6 +3409,14 @@ impl Workspace {
 
 /// Onshape inserts a new tab right after the active one (behaviours.md, tab bar).
 pub(crate) use noshape_ops::docedit::place_after;
+
+#[cfg(test)]
+impl Workspace {
+    /// The tab a drag on the bar is moving, and the tab being renamed.
+    pub(crate) fn tab_drag_and_rename(&self) -> (Option<TabId>, Option<TabId>) {
+        (self.tab_gap.as_ref().map(|g| g.dragged), self.renaming_tab.as_ref().map(|r| r.0))
+    }
+}
 
 /// A tab or folder dragged on the tab bar (also its drag preview).
 #[derive(Clone)]

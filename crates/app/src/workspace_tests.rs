@@ -365,3 +365,64 @@ fn create_drawing_with_no_views_fits_the_first_views_scale(cx: &mut TestAppConte
     let want = noshape_model::drawing::create::first_part_view_scale(SheetSize::A3, [20.0, 5.0]);
     assert_eq!(scale, Some(want), "the first view's scale fitted, not the sheet's 1:1");
 }
+
+fn tab_bounds(cx: &mut TestAppContext, w: AnyWindowHandle, t: TabId) -> Bounds<gpui_kit::Pixels> {
+    VisualTestContext::from_window(w, cx).debug_bounds(Box::leak(format!("doc-tab-{t}").into_boxed_str())).unwrap_or_else(|| panic!("tab {t} not drawn"))
+}
+
+/// Live2 feel/documents.json `tabBar.dragStartPx` and bm 6562: a tab pressed and moved 5 px is still a click; from
+/// 6 px it drags, leaving a gap its own width in the strip and a 100 px ghost under the pointer.
+#[gpui::test]
+fn a_tab_drags_from_6_px_leaving_a_gap_its_width_and_a_100_px_ghost(cx: &mut TestAppContext) {
+    let (w, ws, [_, a, ..]) = workspace(cx, "tab-drag");
+    let tab = tab_bounds(cx, w, a);
+    let at = tab.center();
+    let none = Modifiers::none();
+    let mut vcx = VisualTestContext::from_window(w, cx);
+    vcx.simulate_mouse_move(at, None, none);
+    vcx.simulate_mouse_down(at, MouseButton::Left, none);
+    vcx.simulate_mouse_move(at + gpui_kit::point(px(5.), px(0.)), Some(MouseButton::Left), none);
+    draw(cx, w);
+    assert!(!cx.update(|cx| cx.has_active_drag()), "5 px: still a click");
+    let mut vcx = VisualTestContext::from_window(w, cx);
+    vcx.simulate_mouse_move(at + gpui_kit::point(px(6.), px(0.)), Some(MouseButton::Left), none);
+    draw(cx, w);
+    assert!(cx.update(|cx| cx.has_active_drag()), "6 px: a drag");
+    assert_eq!(ws.read_with(cx, |ws, _| ws.tab_drag_and_rename().0), Some(a), "the strip shows A's gap");
+    let mut vcx = VisualTestContext::from_window(w, cx);
+    let (gap, ghost) = (vcx.debug_bounds("tab-gap").expect("the gap"), vcx.debug_bounds("tab-ghost").expect("the ghost"));
+    assert!((f32::from(gap.size.width) - f32::from(tab.size.width)).abs() < 0.5, "the gap is the tab's width: {gap:?} {tab:?}");
+    assert_eq!(ghost.size.width, px(100.), "a 100 px ghost");
+    assert!(ghost.left() <= at.x + px(6.) && at.x + px(6.) <= ghost.right(), "under the pointer: {ghost:?}");
+    vcx.simulate_mouse_up(at + gpui_kit::point(px(6.), px(0.)), MouseButton::Left, none);
+    draw(cx, w);
+}
+
+/// Live2 11-13 and 2279 (b): a double-click on a tab activates it and does nothing more (no rename: Rename is in its
+/// menu).
+#[gpui::test]
+fn a_double_click_on_a_tab_only_activates_it(cx: &mut TestAppContext) {
+    let (w, ws, [_, a, ..]) = workspace(cx, "tab-dblclick");
+    let at = tab_bounds(cx, w, a).center();
+    let mut vcx = VisualTestContext::from_window(w, cx);
+    vcx.simulate_event(gpui_kit::MouseDownEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::none(), click_count: 1, first_mouse: false });
+    vcx.simulate_event(gpui_kit::MouseUpEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::none(), click_count: 1 });
+    vcx.simulate_event(gpui_kit::MouseDownEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::none(), click_count: 2, first_mouse: false });
+    vcx.simulate_event(gpui_kit::MouseUpEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::none(), click_count: 2 });
+    draw(cx, w);
+    assert_eq!(ws.read_with(cx, |ws, _| (ws.active, ws.tab_drag_and_rename().1)), (Some(a), None), "A active, not renaming");
+}
+
+/// Live rq 2403: Ctrl+click or Shift+click on a tab opens it in a new window; this window keeps its tab.
+#[gpui::test]
+fn ctrl_or_shift_click_on_a_tab_opens_it_in_a_new_window(cx: &mut TestAppContext) {
+    let (w, ws, [_, a, _, c]) = workspace(cx, "tab-new-window");
+    let at = tab_bounds(cx, w, a).center();
+    for (n, m) in [(2, Modifiers::secondary_key()), (3, Modifiers::shift())] {
+        let mut vcx = VisualTestContext::from_window(w, cx);
+        vcx.simulate_click(at, m);
+        draw(cx, w);
+        assert_eq!(cx.update(|cx| cx.windows().len()), n, "{m:?}: a new window");
+        assert_eq!(ws.read_with(cx, |ws, _| ws.active), Some(c), "{m:?}: this window stays on C");
+    }
+}

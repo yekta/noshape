@@ -164,11 +164,15 @@ impl DrawingEditor {
     /// The box of a box select being dragged: Onshape's window box left to right (#1651B0 at 20 %, its border at
     /// 60 %), its crossing box right to left (#FFC20E, dashed 9 on 8 off).
     pub fn render_select_box(&self) -> Option<AnyElement> {
-        use crate::viewport::{BoxStyle, box_overlay};
         let Drag::SelectBox { start } = self.drag else { return None };
         let (a, b) = (self.sheet_to_local(start), self.sheet_to_local(self.cursor));
-        let style = if self.cursor[0] < start[0] { BoxStyle::Crossing } else { BoxStyle::Window };
-        Some(box_overlay(glam::DVec2::from(a), glam::DVec2::from(b), style).into_any_element())
+        Some(crate::viewport::box_overlay(glam::DVec2::from(a), glam::DVec2::from(b), self.select_box_style()?).into_any_element())
+    }
+
+    /// The look of the box select being dragged: the window box left to right, the crossing box right to left.
+    pub fn select_box_style(&self) -> Option<crate::viewport::BoxStyle> {
+        let Drag::SelectBox { start } = self.drag else { return None };
+        Some(if self.cursor[0] < start[0] { crate::viewport::BoxStyle::Crossing } else { crate::viewport::BoxStyle::Window })
     }
 
     /// End of a cell drag-selection: the cells the rubber band `a`–`b`

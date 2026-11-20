@@ -21,14 +21,7 @@ fn draw(cx: &mut TestAppContext, window: AnyWindowHandle) {
 
 fn page(cx: &mut TestAppContext) -> (AnyWindowHandle, Entity<StartView>) {
     cx.update(gpui_kit::init);
-    crate::start_hooks::register(crate::start_hooks::Hooks {
-        open_document_window: |_, _, _, _| Ok(()),
-        open_document_at: |_, _, _, _| Ok(()),
-        open_document_history: |_, _, _| Ok(()),
-        build_label: String::new,
-        import_dialog: |_, _, _, _| {},
-        help_items: |m| m,
-    });
+    super::feel_tests::register_test_hooks();
     cx.update(|cx| gpui_kit::component::Theme::global_mut(cx).font_family = "Roboto".into());
     let root = crate::file_dialogs::documents_dir();
     let folders: Vec<PathBuf> = (0..50).map(|i| root.join(format!("Project {i:02}"))).collect();

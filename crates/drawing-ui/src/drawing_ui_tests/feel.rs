@@ -2712,3 +2712,123 @@ fn view_dialogs_open_with_their_first_select_focused(cx: &mut TestAppContext) {
     draw(cx, window);
     assert_eq!(state(cx), (true, true, false), "Move to sheet's Sheet focused");
 }
+
+/// Live C11 (a), bm 26796: the Note tool frames a view's vertex under the pointer in the hollow orange square, about
+/// 15 px, where the Dimension tool puts its disc.
+#[gpui::test]
+fn the_note_tool_frames_a_vertex_in_a_15_px_square(cx: &mut TestAppContext) {
+    use crate::drawing_scene::SnapMark;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-note-square");
+    real_sheet(cx, window, &editor);
+    let corner = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+        g.snaps.iter().map(|s| pl.to_sheet(s.p)).min_by(|a, b| (a[0] + a[1]).total_cmp(&(b[0] + b[1]))).expect("a vertex")
+    });
+    let mark = |cx: &mut TestAppContext, tool: Tool| {
+        cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(tool, cx)));
+        draw(cx, window);
+        let mm = cx.update(|cx| editor.read(cx).tol_mm(4.0)) * std::f64::consts::FRAC_1_SQRT_2;
+        lit_at(cx, window, &editor, [corner[0] - mm, corner[1] - mm]);
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            e.overlay.marks.iter().find(|(p, _, _)| (p[0] - corner[0]).hypot(p[1] - corner[1]) < 1e-9).map(|m| (m.1, m.2 / e.tol_mm(1.0)))
+        })
+    };
+    let (kind, size_px) = mark(cx, Tool::Note).expect("the Note tool marks the vertex");
+    assert_eq!(kind, SnapMark::Box);
+    assert!((size_px - 15.0).abs() < 1e-6, "about 15 px: {size_px}");
+    let dim = Tool::Dimension { kind: noshape_scene::drawing_tools::DimTool::Linear, picks: vec![] };
+    assert_eq!(mark(cx, dim).map(|m| m.0), Some(SnapMark::Disc), "the Dimension tool's disc");
+}
+
+/// Help D22: the Dimension tool snaps to an edge's midpoint only after Shift+Q (its status says so); a new tool starts
+/// without them.
+#[gpui::test]
+fn midpoints_snap_only_after_shift_q(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::DimTool;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-shift-q");
+    real_sheet(cx, window, &editor);
+    let (a, b, _) = horizontal_edge(cx, &editor);
+    let mid = [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0];
+    let dim = || Tool::Dimension { kind: DimTool::Linear, picks: vec![] };
+    let on_mid = |cx: &mut TestAppContext| {
+        lit_at(cx, window, &editor, mid);
+        cx.update(|cx| editor.read(cx).hover_snap).is_some_and(|s| (s[0] - mid[0]).hypot(s[1] - mid[1]) < 1e-6)
+    };
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(dim(), cx)));
+    draw(cx, window);
+    assert!(!on_mid(cx), "no midpoint before Shift+Q");
+    cx.update_window(window, |_, w, cx| w.focus(&editor.focus_handle(cx), cx)).unwrap();
+    VisualTestContext::from_window(window, cx).simulate_keystrokes("shift-q");
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| editor.read(cx).status.clone()).as_deref(), Some("Midpoints and quad points on"));
+    assert!(on_mid(cx), "Shift+Q: the midpoint snaps");
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Select, cx)));
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(dim(), cx)));
+    draw(cx, window);
+    assert!(!on_mid(cx), "the next Dimension command starts without them");
+}
+
+/// bm 4092: with two snap points in reach the nearer one snaps, under one marker.
+#[gpui::test]
+fn of_two_points_in_reach_the_nearer_snaps_under_one_marker(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::DimTool;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-nearer");
+    real_sheet(cx, window, &editor);
+    let (a, b, _) = horizontal_edge(cx, &editor);
+    // Zoomed out until the edge is 12 px long: both its ends within the 8 px reach of a point between them.
+    cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let px_per_mm = 1.0 / e.tol_mm(1.0);
+            e.zoom *= 12.0 / ((b[0] - a[0]) * px_per_mm);
+            e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx);
+        })
+    });
+    draw(cx, window);
+    let len_px = cx.update(|cx| (b[0] - a[0]) / editor.read(cx).tol_mm(1.0));
+    assert!((len_px - 12.0).abs() < 0.1, "the edge is {len_px} px");
+    for (from_a_px, want) in [(4.0, a), (8.0, b)] {
+        let mm = cx.update(|cx| editor.read(cx).tol_mm(from_a_px));
+        lit_at(cx, window, &editor, [a[0] + mm, a[1]]);
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let s = e.hover_snap.expect("a snap");
+            assert!((s[0] - want[0]).hypot(s[1] - want[1]) < 1e-6, "{from_a_px} px from one end: {s:?}, not {want:?}");
+            assert_eq!(e.overlay.marks.len(), 1, "one marker: {:?}", e.overlay.marks);
+        });
+    }
+}
+
+/// Live2 feel/drawing.json F3: a box dragged left to right is the window box (blue, solid), right to left the
+/// crossing box (yellow, dashed).
+#[gpui::test]
+fn a_box_dragged_right_is_the_window_box_and_left_the_crossing_box(cx: &mut TestAppContext) {
+    use crate::viewport::BoxStyle;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-box-look");
+    real_sheet(cx, window, &editor);
+    // An empty spot of the sheet: inside its frame, left of every view.
+    let start = cx.update(|cx| {
+        let e = editor.read(cx);
+        let [x0, y0, _, _] = e.current_sheet().size.frame_rect();
+        [x0 + 30.0, y0 + 20.0]
+    });
+    for (dx, want) in [(25.0, BoxStyle::Window), (-25.0, BoxStyle::Crossing)] {
+        let from = at_window(cx, &editor, start);
+        let mut v = VisualTestContext::from_window(window, cx);
+        v.simulate_mouse_move(from, None, Modifiers::default());
+        v.simulate_mouse_down(from, MouseButton::Left, Modifiers::default());
+        let mm = cx.update(|cx| editor.read(cx).tol_mm(dx));
+        let to = at_window(cx, &editor, [start[0] + mm, start[1] + mm.abs()]);
+        VisualTestContext::from_window(window, cx).simulate_mouse_move(to, Some(MouseButton::Left), Modifiers::default());
+        draw(cx, window);
+        assert_eq!(cx.update(|cx| editor.read(cx).select_box_style()), Some(want), "dragged {dx} px");
+        VisualTestContext::from_window(window, cx).simulate_mouse_up(to, MouseButton::Left, Modifiers::default());
+        draw(cx, window);
+    }
+}
