@@ -42,18 +42,20 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   the rule's 8 declines fall to other reasons. Dropped: bool-sh3 5b38e5c92.
   afcf858f3 slab union history differing only in vertex records = equivalent (lead 11-19); 0d465cb70 the gate's
   end-to-end Shell check (gate-host.py SHELLS / SHELLS_KNOWN).
-- P1 isaac Gear Lab 1 (dx 11-20; gl40 = isaac-ball 8f5622, gl13 = 2d7dc1; Mac glm/, cases Mac gl/ = vibex7
-  dx-keep/gl-bool): branch bool-gl 3d8d16e5e (worktree bool-gl, from main, pushed): fuse_glued takes N facing
-  face pairs on one plane matched by outline (core section + 40 tooth ends, 1e-5 rad off: on-plane by vertices);
-  the located refusal only where the face across the plane lies on the located face's free-form surface
-  (elementary surfaces, the tips' cylinder, glued). Mirror fuse b7fab705: glued 78 ms = OCCT (324/805/volume),
-  was 1.98 s; Mac gl40 930 ms vs live 1153, feature matches; kernel 537/537 + new bridge test. Gate after the
-  knurl gate, then land. Teeth fuse 5413ba32 (OCCT tree ~475 ms): no longer a gap (whole feature < live).
-- shfall swap: rec2 (vibe2 shrec, 107 cases, 32 inputs >= 1e-4) is worse than rec1 (19): swap to rec1 with
-  shswap.sh after the knurl gate (it reads the corpora).
-- bool-k25x10 (bool-tube worktree): d2a26a12a alone on main (lead 11-20: land it ahead of sh3); pole2 landed 06:49
-  (b3706f04; asm asked to re-check Fastened 43); gate running (unit bool-gate-k25x10, out
-  /root/bool-scratch/gate-k25x10.out), land on PASS.
+- Gate 98ef1c012 (unit bool-gate-98ef1c012-x8, out /root/bool-hat-scratch/chain-98ef1c012.out, from 09:17):
+  branch bool-gl (worktree bool-gl, pushed) = 3d8d16e5e Gear Lab glue (isaac-ball 8f5622 gl40 930 ms vs live 1153;
+  fuse_glued: N facing face pairs on one plane by outline; located refusal only on free-form surfaces) +
+  98ef1c012 screws thread (c2-config-parts-screws Sweep 1 cut b95e3b88: refined_section's projections by next_uv,
+  Newton clamped to non-periodic bounds; 48 ms vs 1.1 s Mac, OCCT 324; T2 test a_screws_thread_cut_as_fast_as_occts;
+  worktree bool-thread has it alone). Land on PASS (knurls: kn-k25.sh pattern on vibex7).
+- shfall swapped to rec1 on all hosts 09:16 (98 cases; 11-02 set = shfall-1102, report-only).
+- isaac 850efe JVJ 15 nm (skasm P1, lead 09:00): Extrude 4 cut = 7c230926d5dd84eb (Mac bool-keep/m85r, model
+  m85m): all 42 plane/plane lines exact (<1e-12) ours and OCCT, with unify; asked skasm what they measured against.
+- rings-loft STL (dx, low): Shell 1's face 23 (offset -1 mm of a B-spline) gets no triangulation: its wire crosses
+  itself in UV around a 1.1e-4 degenerate edge; all 79 open edges border it. Shell builder fix, not the mesher.
+- bool-k25x10 (d2a26a12a = 2f452d3b3): gate PASS except knurls not run (CHECK; /root/bool-tube-scratch/gate-2f452d3b3.log);
+  knurls ours-only on vibex7 (/root/bool-scratch/kn-k25.sh -> kn-k25.out); land on equal lines (bool-tube is detached by
+  the 98ef gate: land from a fresh worktree of branch bool-k25x10).
 - bool-sh3 (rebased on main 3ac2565d6 in worktree bool-sh3r, branch bool-sh3r, tip c26a788e0, not pushed; origin/bool-sh3, tip a0b85fef4 = + d494b222e, a0b85fef4 (standoffs speed, below); 5b38e5c92 the 50 um rule removed; d2a26a12a the Ø25×10 knurl's touch (P2 below);
   1f27fa8ca the unify's segmented volume recheck (free-form fuse, P2 below); 8b6d6faba + Shell's stray-pcurve refit after its unify (2756e521: a 45° cone's merged
   face had an edge pcurve 0.83 mm off, read 77 mm3 heavy in ours and OCCT; now 32108.414, live 32108.426 / 45 faces (q-2756e521),
