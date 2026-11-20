@@ -430,3 +430,27 @@ fn a_face_click_leaves_forms_locations_empty(cx: &mut TestAppContext) {
     });
     assert_eq!(state, (Some("locations".to_string()), Vec::new()), "(the active field, Location(s)) after a face click");
 }
+
+/// Live feel S1 (qa FEEL-SM-PARTIAL-FLANGE-MANIP): editing a partial flange, its picked edge is lit whole, as it was
+/// before the flange (ours lit only the piece the flange leaves).
+#[gpui::test]
+fn a_partial_flanges_edge_is_lit_whole_while_edited(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [60, 40]] }] },
+        { "type": "sheetMetalStart", "name": "Sheet metal model 1", "params": { "process": "THICKEN", "regions": ["Sketch 1 region 0"], "thickness": "2 mm", "radius": "2 mm" } },
+        { "type": "sheetMetalFlange", "name": "Flange 1", "params": { "edges": ["edge through [30, 0, 2]"], "isPartialFlange": true, "firstBoundOffset": "25 mm" } },
+    ] });
+    let (window, view) = part_studio_from(cx, "sm-partial-edge", Some(start));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let flange = cx.update(|cx| view.read(cx).studio(cx).and_then(|st| st.features.iter().find(|f| f.name == "Flange 1").map(|f| f.id))).expect("Flange 1");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(flange, w, cx))).unwrap();
+    wait_until(cx, window, |cx| {
+        let v = view.read(cx);
+        !v.ui_busy() && v.ui.preview_before.is_some() && v.display.feature_state(flange).is_some_and(|s| s.status == noshape_model::display::FeatureStatus::Ok)
+    });
+    let edges = cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.read(cx).feature.params.query("edges").to_vec())).unwrap_or_default();
+    assert_eq!(edges.len(), 1, "the flange's edge: {edges:?}");
+    let changed = cx.update(|cx| view.read(cx).changed_picks(&edges));
+    assert_eq!(changed, edges, "the shortened edge drawn as before the flange");
+}

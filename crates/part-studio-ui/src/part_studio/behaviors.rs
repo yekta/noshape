@@ -3664,8 +3664,8 @@ impl PartStudioView {
     /// selection color where they were (live dialogs/fillet-02…04: the
     /// sharp edges orange over the rounded preview). Taken from the model
     /// before the feature; faces by their boundary edges.
-    /// A dialog's picked faces the feature changes (a Shell's removed face,
-    /// whose name the rim keeps; a Draft's faces): live highlights a pick
+    /// A dialog's picked faces and edges the feature changes (a Shell's removed face,
+    /// whose name the rim keeps; a Draft's faces; a partial flange's edge): live highlights a pick
     /// as it was before the feature (Shell: the removed face's outline, the
     /// rim unlit; behaviours "psui (11-01) preview audit"), so these go to
     /// [`Self::consumed_picks_overlay`] instead of the result's face.
@@ -3688,11 +3688,26 @@ impl PartStudioView {
                 Some((area, lo, hi))
             })
         };
+        // An edge's length and box: a picked edge the preview shortened (a partial flange's) is drawn whole, as it was
+        // (live feel S1, qa FEEL-SM-PARTIAL-FLANGE-MANIP).
+        let edge_shape = |d: &noshape_model::display::StudioDisplay, r: &Reference| -> Option<(f32, glam::Vec3, glam::Vec3)> {
+            let pieces: Vec<&Vec<[f32; 3]>> = d.bodies.iter().filter(|b| !b.hidden).flat_map(|b| b.edge_refs.iter().zip(&b.mesh.edges).filter(|(e, _)| *e == r).map(|(_, pl)| pl)).collect();
+            let pts = || pieces.iter().flat_map(|pl| pl.iter().map(|p| glam::Vec3::from(*p)));
+            let len = pieces.iter().map(|pl| pl.windows(2).map(|w| (glam::Vec3::from(w[1]) - glam::Vec3::from(w[0])).length()).sum::<f32>()).sum();
+            let lo = pts().reduce(|a, b| a.min(b))?;
+            Some((len, lo, pts().fold(lo, |a, b| a.max(b))))
+        };
         selection
             .iter()
-            .filter(|r| matches!(r, Reference::Face(_)))
-            .filter(|r| match (face_shape(before, r), face_shape(&self.display, r)) {
-                (Some((a, a0, a1)), Some((b, b0, b1))) => (a - b).abs() > 1e-4 * a.max(b) || (a0 - b0).length() > 1e-6 || (a1 - b1).length() > 1e-6,
+            .filter(|r| match r {
+                Reference::Face(_) => match (face_shape(before, r), face_shape(&self.display, r)) {
+                    (Some((a, a0, a1)), Some((b, b0, b1))) => (a - b).abs() > 1e-4 * a.max(b) || (a0 - b0).length() > 1e-6 || (a1 - b1).length() > 1e-6,
+                    _ => false,
+                },
+                Reference::Edge(_) => match (edge_shape(before, r), edge_shape(&self.display, r)) {
+                    (Some((a, a0, a1)), Some((b, b0, b1))) => (a - b).abs() > 1e-4 * a.max(b) || (a0 - b0).length() > 1e-6 || (a1 - b1).length() > 1e-6,
+                    _ => false,
+                },
                 _ => false,
             })
             .cloned()
