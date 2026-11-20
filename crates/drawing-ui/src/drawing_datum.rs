@@ -431,12 +431,34 @@ impl DrawingEditor {
 
     /// A target distance's Precision ▾ beside its field (live drawing-datum-target-after; i: X / Diameter
     /// distance, Y / Angle).
+    /// Live (dom drawing-datum-target-after, uip drw-datum-target-hide-dim s5): a Distance field 25 px high, its value
+    /// centred, the Precision ▾ joined to its right edge.
+    fn target_distance(&self, st: &Entity<InputState>, row: usize, i: usize, cur: Option<u8>, cx: &mut Context<Self>) -> AnyElement {
+        h_flex()
+            .flex_1()
+            .h(px(25.))
+            .child(
+                div()
+                    .flex_1()
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .border_1()
+                    .border_color(gpui_kit::rgb(0xcccccc))
+                    .rounded_l(px(2.))
+                    .px(px(4.))
+                    .child(Input::new(st).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall().text_center()),
+            )
+            .child(self.target_precision(row, i, cur, cx))
+            .into_any_element()
+    }
+
     fn target_precision(&self, row: usize, i: usize, cur: Option<u8>, cx: &mut Context<Self>) -> AnyElement {
         let ed = cx.entity();
         div()
             .id(SharedString::from(format!("dt-prec-tip-{row}-{i}")))
             .tooltip(crate::ui::tooltip("Precision"))
-            .child(Button::new(SharedString::from(format!("dt-prec-{row}-{i}"))).ghost().w(px(20.)).h(px(24.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).dropdown_caret(true).os_dropdown_menu(SharedString::from(format!("dt-prec-dd-{row}-{i}")), true, move |mut m, _, _| {
+            .child(Button::new(SharedString::from(format!("dt-prec-{row}-{i}"))).ghost().w(px(20.)).h(px(25.)).border_1().border_l_0().border_color(gpui_kit::rgb(0xcccccc)).rounded_r(px(2.)).rounded_l(px(0.)).bg(gpui_kit::rgb(0xffffff)).text_color(gpui_kit::rgb(0x333333)).dropdown_caret(true).os_dropdown_menu(SharedString::from(format!("dt-prec-dd-{row}-{i}")), true, move |mut m, _, _| {
                 for &(l, p) in &PRECISIONS {
                     let e = ed.clone();
                     m = m.item(crate::os_menu::OsMenuItem::new(l).checked(cur == p).on_click(move |_, _, cx| {
@@ -733,7 +755,7 @@ impl DrawingEditor {
                                         cx.notify();
                                     })))
                                 })
-                                .child(h_flex().mt(px(2.)).h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(&r.x).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())).child(self.target_precision(k, 0, opts.precisions[0], cx)))
+                                .child(h_flex().mt(px(2.)).h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(self.target_distance(&r.x, k, 0, opts.precisions[0], cx)))
                                 .child(h_flex().pt(px(2.)).pb(px(1.)).gap(px(4.)).child(crate::ui::caret(true)).child(div().text_size(px(12.)).child("Y position")))
                                 // Setting one direction hides the other (live 1699, as
                                 // the hole table's).
@@ -746,12 +768,11 @@ impl DrawingEditor {
                                         cx.notify();
                                     })))
                                 })
-                                .child(h_flex().mt(px(2.)).h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(&r.y).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())).child(self.target_precision(k, 1, opts.precisions[1], cx)))
+                                .child(h_flex().mt(px(2.)).h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(self.target_distance(&r.y, k, 1, opts.precisions[1], cx)))
                                 .child(h_flex().pt(px(2.)).child(flip(("dt-flipx", k), "X", opts.flip_x, true, cx)).child(flip(("dt-flipy", k), "Y", opts.flip_y, false, cx)))
                             })
                             .when(opts.angular, |e| {
                                 let invalid = opts.origin.is_some() && !matches!(opts.origin_ref, Some(noshape_model::drawing::PointRef::Center { .. }));
-                                let input_row = |label: &'static str, st: &Entity<InputState>| h_flex().h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child(label)).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(st).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall()));
                                 // Live (px-datum-dt-angle): a caption over a 20 px icon button, as the X / Y flips.
                                 let toggle = |id: (&'static str, usize), label: &'static str, on: bool, cx: &mut Context<Self>, f: OnToggle| {
                                     let tip = if label == "Flip" { "Flip measurement from reference line" } else { "Rotate angle measurement" };
@@ -760,7 +781,7 @@ impl DrawingEditor {
                                     )
                                 };
                                 e.when(invalid, |e| e.child(div().text_size(px(11.)).text_color(gpui_kit::rgb(0xd0021b)).child("Invalid origin selected. Angle datum target origin must be an arc or circle center.")))
-                                    .child(input_row("Diameter distance:", &r.x).mt(px(5.)).child(self.target_precision(k, 0, opts.precisions[0], cx)))
+                                    .child(h_flex().mt(px(5.)).h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Diameter distance:")).child(self.target_distance(&r.x, k, 0, opts.precisions[0], cx)))
                                     .child(h_flex().mt(px(2.)).h(px(26.)).child(crate::drawing_chrome::DrCheckbox::new(("dt-radial", k)).label("Radial lines").checked(opts.radial_lines).on_click(cx.listener(move |this, v: &bool, _, cx| {
                                         let v = *v;
                                         if let Some(r) = this.datum_dlg.as_mut().and_then(|d| d.rows.get_mut(k)) {
@@ -775,7 +796,7 @@ impl DrawingEditor {
                                         }
                                         cx.notify();
                                     })))
-                                    .child(input_row("Angle:", &r.y).mt(px(2.)).child(self.target_precision(k, 1, opts.precisions[1], cx)))
+                                    .child(h_flex().mt(px(2.)).h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Angle:")).child(self.target_distance(&r.y, k, 1, opts.precisions[1], cx)))
                                     // Live (dom drawing-datum-target-after): an emptied count is invalid (red), "This field cannot be empty".
                                     .child({
                                         let empty = r.count.read(cx).value().trim().is_empty();

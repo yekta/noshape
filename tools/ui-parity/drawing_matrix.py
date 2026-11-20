@@ -256,6 +256,8 @@ NEVER_SHOWN_IN = {
 def texts_of(path, visible_only=False):
     """Every visible text, option, tooltip and placeholder of a dump (dx's audit reader)."""
     raw = open(path, errors="ignore").read()
+    # An HTML comment is no text a user sees (live's reference manager dump: "<!-- Version graph-->").
+    raw = re.sub(r"<!--.*?-->", "", raw, flags=re.S)
     if visible_only and path.endswith(".html"):
         raw = strip_hidden(raw)
     out = []
