@@ -2066,7 +2066,10 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
   // A change OCCT's integrals put just past the bound, within 1e-8 of the box's volume: the segmented integrals of
   // the faces it changed decide (about the box's middle). OCCT's are loose on cylinder pieces our Boolean bounds by
   // B-spline edges (MIRROR-HANG-402's fuse: 9.7e-13 m³ on 1e-9 of 2.4e-4, the merge to live's 15 faces refused; the
-  // segmented integrals 2.1e-13, and all three agree on the merged solid).
+  // segmented integrals 2.1e-13, and all three agree on the merged solid). Only where the two agree on the solid
+  // itself to 1e-8 of it (MIRROR-HANG-402's 3.3e-9): else they can't tell a change of 1e-9 (an impeller tube's
+  // chamfered end, gaps between its faces, 1.6e-2: a merge live doesn't make; a knurl's two grooves, 5.3e-8).
+  std::optional<bool> integrals_agree;
   auto precise_keeps_volume = [&](const std::optional<double>& change, const std::pair<std::vector<TopoDS_Shape>, std::vector<TopoDS_Shape>>& changed) {
     if (!change || std::abs(*change) > 1e-8 * most || changed.first.empty())
       return false;
@@ -2074,7 +2077,9 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     box.Get(x0, y0, z0, x1, y1, z1);
     const gp_XYZ o(0.5 * (x0 + x1), 0.5 * (y0 + y1), 0.5 * (z0 + z1));
     const KernelTimer timer("usd.precise");
-    return std::abs(faces_volume_precise(changed.second, o) - faces_volume_precise(changed.first, o)) <= 1e-9 * std::abs(volume0());
+    if (!integrals_agree)
+      integrals_agree = std::abs(faces_volume_precise(sf, o) - volume0()) <= 1e-8 * std::abs(volume0());
+    return *integrals_agree && std::abs(faces_volume_precise(changed.second, o) - faces_volume_precise(changed.first, o)) <= 1e-9 * std::abs(volume0());
   };
   // USD's result depends on the order of the faces too (a notched cylinder
   // fused with its mirror, qa OCCT-MIRROR-OVERCOUNT: one order of the same
