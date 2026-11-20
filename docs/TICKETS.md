@@ -87,6 +87,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   runs of the unfixed binary on vibe2 (lavapipe) all exited 0. Reopen if it comes back on CI.
 
 ## qa, 2026-11-20 (live's feel coverage rows, walked on green 9ae062180)
+- [x] verified (qa 11-20 09:1x, compat on green 83423fa5 vs 0.4.61: learning-center-michael SAME, cf-sheet-metal-overcut-dogbone SAME, c2-sm-louver SAME; c2-sm-rocker-enclosure-sm only Extrude 3 Error -> Ok, as live (live.jsonl Extrude 3 OK, 2 parts), accepted in compat/accepted.txt) (skasm 08:28: reverted de9d6a523, c6915f34c, e951ecc72, 203afb794 as 83423fa5; the redo keeps the 4 docs as 0.4.61) P0 SAVED-DOC-REFS-LOST (skasm; qa compat ALERT 11-20 05:51, green ef199f32, since 2a43b78b, routed by the lead) saved
+  corpus documents lost their references: learning-center-michael Sketch 2, rocker-enclosure-sm Sketch 5 / 6 and overcut-dogbone Sketch 3
+  "Select a sketch plane." (Ok in 0.4.61), then their Extrudes / Fillets / Fold SM 1 "Select …" or "Cannot resolve entities."; c2-sm-louver
+  Sketch 6 "Some external references are missing.". Not in a release (v0.4.62 was cut from 2a43b78b).
 - [ ] P0 FEEL-CHAIN-LASTPOINT-END (skasm; qa 11-20 04:15, live behaviours "feel coverage round 2" R1, recording cov2-chain-lastpoint run on
   green 9ae062180, vibe2) Line tool: (0,0), (30,0), then a second click on (30,0). Live: that click ends the chain (no zero-length line), so the next
   click at (50,30) only starts a new line: still 1 line, constraints COINCIDENT + HORIZONTAL. Ours: also no zero-length line, but the chain goes
