@@ -64,7 +64,7 @@ All fixed since (psui 11-01: the rows above carry the current status and evidenc
 | D12 | DXF export explodes circles/arcs, hatches, dimensions, tables into lines/polylines; layer names differ from Onshape's | §4.4 | asb / drw2 |
 | D10 | PDF: iso view comes out shaded; detail view border/clip lost | §4.2 | asb |
 | D2 | Insert view picker: no filter icons (Parts/Sketches/Flat patterns), no thumbnails, no flat-pattern entries | §1.4 | asb |
-| D6 | (unverified; may match live) Dimension: a click near an edge's midpoint picks the midpoint, not the edge | §2.2 | asb |
+| D6 | Dimension: a click near an edge's midpoint picks the EDGE (live 10-21, behaviours "asb (b)": no midpoint marker even at 0 px); ours offers drawing midpoints only with Shift+Q on (drawing_tools.rs:688) -> same (live 11-20 parity-open-1120 triage, code reading) | §2.2 | asb |
 | D5 | Drawing shortcuts (d) dead after closing a view dialog with Esc until the sheet is clicked | §2.1 | asb / ui2 |
 | D7 | GTol: focused Tolerance field drops keys typed on open; ✓ stays dimmed with content | §2.6 | asb |
 | D3 | Undoing views shows a spurious "Out of date" notice | §1.6 | asb |

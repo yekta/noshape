@@ -50,7 +50,7 @@ were open; all three are closed (band rule 10-24, fixes 10-28 … 11-01).
 | onshape-cone.sat | 376.991118430775 | 376.991118 | ✅ |
 | g26-revolved-spline.x_t | **1726.09834614350** | 1726.080764 (sat 1726.080718) | ✗ **IM2** (−0.018) |
 | pvz-shapes.pvz | Part Studio "**pvz-shapes parts**" + Assembly "**RootAssembly**" + BOM tab; parts **Cylinder 9407.778, Torus 1770.239, Cone 1569.177** (that order) + "Composite parts (1)" | one tab "pvz-shapes", Part 1 1569.18 (Cone), Part 2 1770.24 (Torus), Part 3 9407.78 (Cylinder) + "Composite part 1" (Surface) | ✗ IM1 (names, order, tab name, no RootAssembly/BOM) |
-| Import dialog options by type | STEP/x_t: appearances, material density, Y up, composite, join; SAT: no density; PVZ: no density, no join | UI dialog not re-checked this pass | ? |
+| Import dialog options by type | STEP/x_t: appearances, material density, Y up, composite, join; SAT: no density; PVZ: no density, no join | UI dialog not re-checked this pass | density answered: live shows "Import material density" only for its listed types (x_t, x_b, sldprt, zip, catpart, prt…; never STEP / SAT / PVZ / meshes; behaviours IMP-DENS), ours the same rule (import_files `density`); IGES adds "IGES postprocessing" (behaviours 2511). PVZ join not captured (live 11-20 parity-open-1120 triage) |
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
 

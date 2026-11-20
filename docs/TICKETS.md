@@ -19,6 +19,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   row reads "#name = <evaluated value>" in document units, 3 decimals with trailing zeros dropped: "#w = 30 mm" for
   #h * 3 (h = 10 mm in a Variable Studio), "#q = 32 mm" for #w + 2 mm, "#t = 3.333 mm" for #h / 3, "#u = 2.5 mm";
   tooltip "#w = 30 mm [Variable]". Ours shows the typed expression, "#w = #h * 3" (model-core interaction.rs:557).
+- [ ] P2 **DRW-MULTI-VIEW-MENU (studios)**: drawing.md V39. Live, two views selected (a Front and its projected
+  view): Show/hide ▸ · Tangent edges ▸ · Adjust linestyle... · View properties... · Move to sheet... · Copy · Paste as
+  table · Clear selection · Zoom to fit · Delete; Show/hide ▸ = Show hidden lines · Show shaded view · Hide threads ·
+  Show faulty parts · Show center of mass. Ours (drawing_move_sheet.rs multi menu): no Tangent edges, an extra
+  Align views ▸, and Show/hide lists hidden lines / shaded / threads / auto centermarks (no faulty parts, no centre
+  of mass).
 - [ ] P2 **ASM-FACE-TAB-REFERENCE-FRAME (asm)**: assembly.md LA49. Live: Mass and section properties › Face with
   "Mate connector for reference frame" set (a connector on the corner (40,20,10) of a 40x20x10 block, world axes, top
   face picked): Lxx 106666.667, Lxy = Lyx 160000, Lyy 426666.667, Lzz 533333.333 mm⁴ (parallel axis to the
