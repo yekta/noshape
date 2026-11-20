@@ -38,6 +38,9 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
   Derived 1, rebuild 300-490 ms (live 359-1202). Next stop in 4: Tail fin extrude UP_TO_VERTEX 3483.23 vs 3567.19 mm²:
   the car's rear vertices (y 254, z 30.343) at x +-33.142, live +-33.941 (Fillet 1's end): sent to blend 03:0x.
   offset doc: Offset surfaces 1 9588.57 vs 9591.44 (likely the same). CLI queries: Mac dx-keep/siq.sh, si-q/.
+- P1 (lead 05:3x): isaac-ball 8f5622 Gear Lab 1 (custom, 40T helical) 14.1 s, live's studio 1.15 s (2d7dc1's 13T 1.5 s).
+  vibex7 ~/agents/dx-keep/gl/{gl40,gl13} + gl.sh (parity_models, NOSHAPE_FS_PROFILE). Then P2 URDF-RIGID-SUBASM-SINGLE-
+  LINK (live REQUESTS 05:44 for the file's shape; settings key mergeFastenedComponents).
 - Next: the rest of "Next, in order".
 - The Mac's dx-main release target links a PRIVATE TKHLR (OCCT_ROOT=~/noshape-host/dx-keep/hlr/root, counters only
   with DXHLR=1); rebuild with the normal OCCT_ROOT for timings.
@@ -68,8 +71,8 @@ Open, ranked:
    their cuts with the cylinders 56 ELLIPSEs), ours are offsets written as approximations (deg 15x13, 7189 poles), the
    cuts B-splines (/root/dx-scratch/bin/step_edgefaces.py, step_bsurf.py). Reported to the lead for bool/core.
    housing-draft ARC 0/3, ELLIPSE 10/15, SPLINE 15/7; sm-louver ARC 101/68, ELLIPSE 50/86, SPLINE 31/0.
-- c2-config-parts-screws: hang fixed (b777cbd1), still in tests/parity-models/unscored.json: Sweep 1's 14.8 GB
-  Boolean is bool's P0 (lead 11-16). Score it once fixed: capped check (16 GB) vibex7 ~/agents/dx-keep/screws.sh 05:1x. Remove vibe5 ~/agents/dx/target-g13 when no longer needed.
+- c2-config-parts-screws: scored again (05:5x; vibex7 screws.sh: 362 MB peak, 2959 ms, live 266): 27/63, Sweep 1 "not
+  a valid solid" (OCCT check) in 2409 ms (live 42): core / bool, via the lead.
 
 ## Other in flight
 - config-parts: see "config-parts at live's 18:0x retake" below (the 11-17 vibe5 runs: archive).
