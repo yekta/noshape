@@ -8272,9 +8272,8 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_groups(const TopoDS_Shap
   }
   try
   {
-    // (The input's volume only once a group's round builds: an integral over the whole part, 2.2 s of
-    // c2-impeller-loft's failing Fillet Stevenrohr zum Halter, whose first group fails in 5 ms.)
-    std::optional<double> v0;
+    ShapeIMap input_faces;
+    TopExp::MapShapes(input, TopAbs_FACE, input_faces);
     // The input rounded at the edges `idx`, checked; null where OCCT can't.
     auto rounded_at = [&](const std::vector<size_t>& idx) -> std::optional<std::pair<TopoDS_Shape, HHist>> {
       BRepFilletAPI_MakeFillet mk(input);
@@ -8291,9 +8290,29 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_groups(const TopoDS_Shap
         h = compose(input, h, corners);
       if (!valid_shape(rounded))
         return std::nullopt;
-      if (!v0)
-        v0 = volume_props(input).Mass();
-      if (!(volume_props(rounded).Mass() < *v0))
+      // Material off: by the faces the round changed alone (the whole part's volume, before and after, was 8.5 s of
+      // c2-impeller-loft's Fillet Flansch zum Stroemungskanal, its next group then failing in 0.2 s).
+      ShapeIMap rounded_faces;
+      TopExp::MapShapes(rounded, TopAbs_FACE, rounded_faces);
+      std::vector<TopoDS_Shape> changed;
+      Bnd_Box                   box;
+      for (TopExp_Explorer x(rounded, TopAbs_FACE); x.More(); x.Next())
+        if (!input_faces.Contains(x.Current()))
+        {
+          changed.push_back(x.Current());
+          BRepBndLib::Add(x.Current(), box);
+        }
+      for (TopExp_Explorer x(input, TopAbs_FACE); x.More(); x.Next())
+        if (!rounded_faces.Contains(x.Current()))
+        {
+          changed.push_back(x.Current().Reversed());
+          BRepBndLib::Add(x.Current(), box);
+        }
+      if (changed.empty())
+        return std::nullopt;
+      double a0, b0, c0, a1, b1, c1;
+      box.Get(a0, b0, c0, a1, b1, c1);
+      if (!(faces_volume_precise(changed, gp_XYZ((a0 + a1) / 2, (b0 + b1) / 2, (c0 + c1) / 2)) < 0))
         return std::nullopt;
       return std::make_pair(rounded, h);
     };
