@@ -751,7 +751,8 @@ pub fn frame_trim(ev: &mut EvalCtx) -> FResult<()> {
         if ev.bool("useToolExtents") {
             ev.warnings.push("Trim to face boundaries is not applied; the face's plane is used".into());
         }
-        let removed = if ev.bool("flipTrim") { -p.normal } else { p.normal };
+        // std faceTrim: opSplitPart keeps the front (the tool's normal side; Flip: the back).
+        let removed = if ev.bool("flipTrim") { p.normal } else { -p.normal };
         let big = ev.model_extent();
         for bi in targets {
             let body = ev.ctx.bodies[bi].clone();

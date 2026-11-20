@@ -524,7 +524,11 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
                     println!("CHECK {name} feature {k}: {}", checks.join("; "));
                 }
                 let reached: Vec<&str> = reached.iter().map(String::as_str).collect();
-                let (live, parts) = drop_live_import_failures(name, &reached, carry_volume_bands(&mut banded, live_parts_of_row(line, live_last)), parts);
+                let live_row = live_parts_of_row(line, live_last);
+                // Live's Part Studio rows list bodies, never a composite part (c2-hgr-riser-weldment's Cut list 1 makes
+                // live's "Composite part 1", behaviours.md Cut list): ours aren't compared against a row without one.
+                let parts = if live_row.iter().any(|p| p.body_type == "composite") { parts } else { parts.into_iter().filter(|p| p.body_type != "composite").collect() };
+                let (live, parts) = drop_live_import_failures(name, &reached, carry_volume_bands(&mut banded, live_row), parts);
                 diff.extend(differences(&allow_live_readings(name, &reached, live), &parts))
             }
             Err(e) => diff.push(format!("parts: {e}")),

@@ -9,27 +9,40 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
-## Now (19:4x 11-20): FRAMES LAND + CHAMFER RULE + EXCHANGE OPTIONS
-- LANDED: 7aac1279 (frame profiles), 53ec91f0 (2 point dimension discs), eca5b13e / ee6357d0 (URDF as live's file).
-- QUEUED (dx-land, one commit): frames grid / start x / mirror; End cap trims its member by the thickness (std
-  endcap.fs: endcap 2/4 -> 4/4, gusset 4/4); hgr Front's in-feature connector on live's sketch frame (13 -> 15/52;
-  next: feature 15 "Side", x (0,1,0) normal (-1,0,0): connector_at_frame only takes x = +X); drawing coverage b2-b3
-  (small edges light their view only past 60 px; foreshorten drops its pick on a click on nothing; centerline first
-  pick lights its view, with a disc; arc length text without the arc symbol; chamfer note centred at the click).
-- HELD: the chamfer rule (/root/dx-scratch/chamfer-rule.patch: round_overrun counts an edge across only when it spans
-  the whole selected edge; saw-table Chamfer 1, 7.874 mm through a 3.175 mm angle leg; test
-  a_chamfer_through_an_angle_leg_builds). It changes fillets too: fx8 (saw-table + hgr) and a parity_models run
-  before landing.
-- EXCHANGE OPTIONS (dx-exch in the dx-urdf worktree, uncommitted): exchange_round_trip reads live-opt-self.json,
-  live-opt-drawing.json, live-opt-hidden.json (live 11-20 "Exchange option coverage", batches 1-4). Individual files
-  always zipped, entries "<tab> - <part>.<ext>" (ExportSettings.name). exo-b (vibex8 ~/agents/dx-keep/exo.sh b):
-  option imports 34/50, option exports read back 40/62. Gaps: duct STL 2 parts (live 9), glTF / GLB 2 (live 4),
-  Parasolid 28 duct 0 parts, compat IGES read as sheets (live sews solids) and ours not written in compatibility mode,
-  flattened assembly names without _1 _2, DXF explode notes keeps MTEXT (live LWPOLYLINE), splines as polylines keeps
-  SPLINE (live POLYLINE), explode all: ANNOTATION_TEXT layer missing.
-- Open: hgr Front's origin is a CENTROID packed as a VERTEX derivedFromEdges (no translator resolver yet: the frame
-  workaround above); 2 point centerline s4 (after Esc live reads EDGE from the hovered centerline); arc length text
-  position (ours 50.1, 96.5 vs live 52.7, 94.1).
+## Now (22:3x 11-20): HGR (dx-land, landing) / EXCHANGE FIXES (dx-urdf)
+- LANDED: 00bc521e (22c7b5d4: frames grid / start x / mirror, End cap trims, hgr Front 13 -> 15/52, drawing b2-b3).
+- dx-land, queued (land.sh 22:3x), 3 commits: chamfer rule (saw-table 27/27; pm-chm vs pm-x1 per document: only
+  c2-sm-louver 36 -> 35, Sketch 9 frame origin x -676.03 vs live -708.49, no fillet/chamfer before it: not the chamfer
+  rule, from main or 22c7b5d4's frames: look at it); Measured variable Extend entities + any-frame in-feature connector
+  (hgr 15 -> 29/52); Frame trim FACE keeps std's KEEP_FRONT + the parity suite skips our composites when live's row
+  lists none (live's Part Studio rows are bodies; Cut list makes "Composite part 1") (hgr 29 -> 35/52).
+- hgr next difference: feature 35 Hole on "Inside Post": ours ERROR "None of the holes intersected a part." (18/48/32
+  vs live 20/52/32 after). Probe: /root/dx-scratch/bin/hgrparts.sh (vibex7 via rb.sh, dx-land; parts after features).
+- skasm's "riser 45 off" = their older pre-00bc521e A/B (7/52), not a drop (skasm 22:0x): closed.
+- dx-urdf (dx-exch), uncommitted, checks: clippy clean (fixed as_chunks), kernel export::iges 6 ok, ops lib import:: 3
+  ok, ops lib export:: 14 ok (all before the DXF spline / glyph change). Contents: glTF/GLB nodes as parts; flattened assembly STEP names _1 _2;
+  IGES compat write (trimmed, type 144) + sewn_closed read; individual-file zips "<tab> - <part>"; suite batches 1-4;
+  TICKETS EXCH-STL-MULTIPART-SHELLS (duct STL ambiguous, ours kept). NEW since: DXF "splines as polylines"
+  (SheetGeometry.splines_as_polylines set in ops drawing_export; 3D POLYLINE, vertex each 3.5 deg of turn, on the
+  edge's layer; live puts them on layer 0 = a shortcoming, say so in the report; 2 points -> LWPOLYLINE); exploded
+  text as glyph contours (font.rs glyph_rings / text_contours_font; SheetGeometry.glyph_lines -> closed LWPOLYLINE;
+  exploded_layers keep ANNOTATION_TEXT for duct's empty view labels); off-sheet filter remaps the sorted line lists.
+  Tests: cad_export free_form_model_edges_are_splines (extended), export exploded_glyphs_are_closed_lwpolylines. NOT
+  yet built: run drawing lib tests + full ops e2e (drawing change) + exo c on vibex8 (~/agents/dx-keep/exo.sh c).
+  TEMP: crates/ops/src/import.rs read_inputs has an eprintln!("DXTMP ...") at the foreign-read Err: REMOVE before commit.
+- Duct Parasolid v28 (live-opt-v28.x_t, schema SCH_2800000_28002 -> code 28000, no embedded schema) "failed to
+  translate"; 38.1 file reads 4 parts. Probe: vibex8 ~/agents/dx-keep/v28.sh via rb.sh (dx-urdf), log
+  /root/dx-scratch/v28b.log (waiting on a release noshape-cli build): read the DXTMP line, fix in kernel/cpp/xt_read.cpp
+  (version_types 28000 layouts). 21:2x: no DXTMP line printed, so the failure is at another failed_to_translate site in
+  read_inputs (lines ~699-741: x_t goes through a parts / zip path): add the print there.
+- textOption: REQUESTS asks live whether "true" = notes or all (live exploded all incl. title block); suite maps true
+  -> explode_notes until then.
+- skasm's "riser 45 off" = c2-hgr-riser-weldment from skasm's older pre-00bc521e A/B (7/52), not a drop (skasm 22:0x);
+  hgr stays mine.
+- d. (22:0x) Frame trim FACE keeps std's KEEP_FRONT (the tool's normal side; was the back): frames.rs frame_trim, test
+  frame_trim_groups_and_face expects the 50 mm front piece. Check hgr past feature 29 with it
+  (/root/dx-scratch/bin/hgrparts.sh on vibex7 lists our parts after named features).
+- Next: hgr feature after 20; then report to lead (<=5 lines) when the next land queues.
 
 ## In flight: data exchange (lead 08:0x)
 Task: 10 corpus docs x every format + a drawing vs live's exports; re-import live's STEP / x_t; times vs live's.

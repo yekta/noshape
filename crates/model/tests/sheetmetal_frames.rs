@@ -993,7 +993,7 @@ fn frame_trim_groups_and_face() {
     let area = mm(40.0).powi(2) - mm(34.0).powi(2);
     assert!(near(volume(&r, 0), area * mm(200.0), 1e-12));
     assert!(near(volume(&r, 1), area * mm(80.0), 1e-12), "trimmed {}", volume(&r, 1));
-    // Face trim with the Right plane (x = 0 plane keeps x < 0 side by default).
+    // Face trim with a plane at x = 150 mm keeps its front (x > 150 mm) unless flipped, as std's opSplitPart KEEP_FRONT.
     let id0 = r.context.bodies[0].id.clone();
     s.add("cPlane", |p| {
         p.set("entities", ParamValue::Query(vec![Reference::Plane(DatumPlane::Right)]));
@@ -1007,7 +1007,7 @@ fn frame_trim_groups_and_face() {
         p.set("tool", ParamValue::Query(vec![plane_ref]));
     });
     let r = s.ok();
-    assert!(near(volume(&r, 0), area * mm(150.0), 1e-12), "face trimmed {}", volume(&r, 0));
+    assert!(near(volume(&r, 0), area * mm(50.0), 1e-12), "face trimmed {}", volume(&r, 0));
 }
 
 #[test]
