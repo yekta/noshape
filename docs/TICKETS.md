@@ -75,6 +75,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   `on_scroll_wheel`), macOS the OS's pixels.
 - [ ] **P2 FS-BRACKET-BOXES [studios]**: with the caret just before or after a bracket, live boxes it and its partner,
   1 px solid rgb(192,192,192), 8 × 16, no fill; none at Home (F3, fs-bracket-after.png). Ours draws none.
+- [ ] **P2 FS-CLOSE-BRACE-OUTDENT [studios]**: a "}" typed on an indented blank line outdents it to its matching "{"
+  line's indent in live (12 spaces -> "    }"; F2, fs-keys.json). Ours leaves it where it is (vendor/gpui-base only
+  re-indents on Enter). Test: extend feature_studio_ui_tests::typing_pairs_nothing_and_enter_after_a_brace_indents_without_closing_it.
+- [ ] **P2 FS-TRIPLE-CLICK-NEWLINE [studios]**: a triple-click selects the line with its newline in live (to the next
+  line's column 0; F3, fs-mouse.json). Ours stops before the newline. Test: a_double_click_takes_the_word_and_a_triple_click_the_line.
 - [ ] **P1 ASM-DRAG-START-15PX [asm]**: an instance drag in live starts only once the pointer is 15–17 px from the press
   (14 px over 1.26 s never moves it; a press with one 2–8 px move is a click), then takes the full delta from the press
   (A1 / A1b, asm-thr*.json). Ours starts at 2.5 px past 50 ms (the Part Studio's press thresholds). Live's extra wait

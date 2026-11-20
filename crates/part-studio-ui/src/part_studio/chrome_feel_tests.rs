@@ -14,7 +14,7 @@ struct Tips;
 
 impl Render for Tips {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let button = |id: &'static str, x: f32| div().id(id).absolute().left(px(x)).top(px(20.)).w(px(100.)).h(px(30.)).tooltip(crate::ui::tooltip(id));
+        let button = |id: &'static str, x: f32| div().id(id).absolute().left(px(x)).top(px(20.)).w(px(100.)).h(px(30.)).tooltip(crate::ui::tooltip(id)).tooltip_show_delay(crate::ui::TOOLBAR_TIP_DELAY);
         div().size_full().relative().child(button("First", 20.)).child(button("Second", 120.))
     }
 }
@@ -107,14 +107,10 @@ fn dropped(x: f32, y: f32) -> (f32, f32) {
 
 fn rows() -> Vec<Row> {
     vec![
-        Row { id: "tooltip / shows after 400 ms", live: "Bootstrap delay show 400 ms (fully shown 470-545 ms with the fade)", gap: false, check: |c, cx| {
+        Row { id: "tooltip / a toolbar tool's shows at once", live: "15-45 ms after the pointer arrives (drift-1120; 400 ms on 11-13)", gap: false, check: |c, cx| {
             c.hover_first(cx);
-            let early = c.wait(cx, 350);
-            let late = c.wait(cx, 80);
-            if early.is_some() || late.as_deref() != Some("First") {
-                return Err(format!("at 350 ms {early:?}, at 430 ms {late:?}"));
-            }
-            Ok(())
+            let shown = c.wait(cx, 40);
+            expect(shown.as_deref(), Some("First"), "40 ms after arriving")
         } },
         Row { id: "tooltip / warm switch to the next button", live: "while one shows, the next button's appears at once (~60 ms), no 400 ms wait", gap: false, check: |c, cx| {
             c.hover_first(cx);
@@ -127,18 +123,15 @@ fn rows() -> Vec<Row> {
             }
             Ok(())
         } },
-        Row { id: "tooltip / cold again after a pause", live: "gone ~200 ms after the pointer left; then the 400 ms wait again", gap: false, check: |c, cx| {
+        Row { id: "tooltip / cold again after a pause", live: "gone ~200 ms after the pointer left; back on a tool, shown at once again (30 ms, drift-1120; 400 ms on 11-13)", gap: false, check: |c, cx| {
             c.hover_first(cx);
             let _ = c.wait(cx, 450);
             c.move_to(cx, 300., 200.);
             let _ = c.wait(cx, 400);
             crate::ui_script::clear_tooltip();
             c.move_to(cx, 160., 35.);
-            let early = c.wait(cx, 100);
-            if early.is_some() {
-                return Err(format!("100 ms after coming back: {early:?}"));
-            }
-            Ok(())
+            let back = c.wait(cx, 40);
+            expect(back.as_deref(), Some("Second"), "40 ms after coming back")
         } },
         Row { id: "tooltip / fades out", live: "Bootstrap's 0.15 s fade after the pointer leaves (the node gone 165-200 ms after; chrome-gaps 11-16)", gap: false, check: |c, cx| {
             c.hover_first(cx);
@@ -169,7 +162,7 @@ fn rows() -> Vec<Row> {
             }
             expect(gone, vec![true, true], "gone after a click, after the wheel")
         } },
-        Row { id: "tooltip / fades in", live: "~150 ms (fully shown 470-545 ms after the pointer arrives: the 400 ms delay and the fade)", gap: false, check: |_, _| {
+        Row { id: "tooltip / fades in", live: "~150 ms (Bootstrap's fade; on screen 110 ms after the pointer arrives, drift-1120)", gap: false, check: |_, _| {
             near(crate::ui::TOOLTIP_FADE_IN.as_millis() as f32, 150., "ms")
         } },
         Row { id: "tooltip / a drag's start closes it", live: "closes on drag start", gap: false, check: |c, cx| {
@@ -205,8 +198,9 @@ fn rows() -> Vec<Row> {
             behaviors::reset_feature_dialog_pos();
             expect(((moved.0 - before.0).round(), (moved.1 - before.1).round(), other == moved), (120., 37., true), "moved by, the other tab's dialog at the same place")
         } },
-        Row { id: "tooltip / longer help after 2 s", live: "data-expand-delay 2000 ms after it shows (measured 2.25-2.5 s from arrival)", gap: false, check: |_, _| {
-            near(crate::ui::TOOLTIP_EXPAND_DELAY.as_millis() as f32, 2000., "ms")
+        Row { id: "tooltip / longer help after 1.8 s", live: "the description 1.77-1.90 s after the pointer arrives (drift-1120; 2.25-2.5 s on 11-13)", gap: false, check: |_, _| {
+            let at = (crate::ui::TOOLBAR_TIP_DELAY + crate::ui::TOOLTIP_EXPAND_DELAY).as_millis() as f32;
+            if (1770. ..=1900.).contains(&at) { Ok(()) } else { Err(format!("ours {at} ms after arriving, live 1770-1900")) }
         } },
         Row { id: "tooltip / under its tool, centred; 400 px expanded; stays while hovered", live: "Extrude's 3 px under the button, centred on it; expanded 400 px wide, centred, same top, clamped at the page edge only if needed; still shown after 12 s (live2 tooltips-1118)", gap: false, check: |c, cx| {
             let (window, _view) = part_studio_from(cx, "chrome-tool-tips", None);

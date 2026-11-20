@@ -106,7 +106,7 @@ fn wrap_manipulators(ev: &mut EvalCtx, dst: &Developable, dst_ref: f64, (anchor,
     let across = along.perp();
     let (fu, fv, fs) = (anchor + across * u, anchor + along * v, anchor + across * u + along * v);
     let axis = ax_z.normalize_or_zero();
-    ev.manipulators.push(("vShiftManipulator".into(), M::Linear { base: at(fu), direction: dir(fu, along), offset: v, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: Some("vShift".into()) }));
+    ev.manipulators.push(("vShiftManipulator".into(), M::Linear { base: at(fu), direction: dir(fu, along), offset: v, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, tangential: false, primary: Some("vShift".into()) }));
     let rot = at(fv);
     let foot = ax_o + axis * (rot - ax_o).dot(axis);
     let radius = (rot - foot).length();

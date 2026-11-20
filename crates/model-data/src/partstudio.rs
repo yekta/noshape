@@ -870,10 +870,10 @@ impl PartStudio {
         });
         // A folder made from features of one folder nests inside it.
         let parent = self.new_folder_parent(ids);
-        // Live (part-studio/587–590): a new folder is collapsed; an empty one
-        // sits at the rollback bar.
+        // Live (part-studio/587–590, feel/featurelist-gaps emptyFolder): a new folder is collapsed, an empty one too;
+        // an empty one sits at the rollback bar.
         let after = if ids.is_empty() { self.rollback_index().checked_sub(1).and_then(|i| self.features.get(i)).map(|f| f.id) } else { None };
-        self.folders.push(Folder { id, name, collapsed: !ids.is_empty(), parent, after });
+        self.folders.push(Folder { id, name, collapsed: true, parent, after });
         // Live (ui 10-25 b (1)): the folder takes every feature from the
         // first to the last selected one, in place (the ones in between
         // too); folders inside that run move in whole.

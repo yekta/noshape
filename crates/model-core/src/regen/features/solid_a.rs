@@ -1323,7 +1323,7 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
             for (j, q) in c.query("connectionEdgeQueries").iter().enumerate() {
                 if let Some((base, direction)) = connection_edge(ev, q).and_then(|e| edge_at(&e, ts.get(j).copied().unwrap_or(0.5))) {
                     use crate::display::FeatureManipulator as M;
-                    ev.manipulators.push((format!("{ci},{j}"), M::Linear { base, direction, offset: 0.0, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: None }));
+                    ev.manipulators.push((format!("{ci},{j}"), M::Linear { base, direction, offset: 0.0, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, tangential: false, primary: None }));
                 }
             }
         }

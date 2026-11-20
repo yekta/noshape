@@ -913,6 +913,7 @@ fn partial_flange_bound_handles_as_std() {
     xs.sort_by(f64::total_cmp);
     assert!(near(xs[0], 10.0, 1e-9) && near(xs[1], 50.0, 1e-9) && [start.0, end.0].iter().all(|p| near(p.y, mm(40.0), 1e-9)), "tips {start:?} {end:?}");
     assert_eq!((start.1.as_deref(), end.1.as_deref()), (Some("firstBoundOffset"), Some("secondBoundOffset")));
+    assert!(m.iter().all(|(_, x)| matches!(x, M::Linear { tangential: true, .. })), "std's TANGENTIAL style: {m:?}");
     let (key, first) = m.iter().find(|(k, _)| k.contains("start")).cloned().unwrap();
     let mut moved = first.clone();
     if let M::Linear { offset, .. } = &mut moved {

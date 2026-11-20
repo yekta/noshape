@@ -535,7 +535,18 @@ pub struct FeatureState {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum FeatureManipulator {
     /// `linearManipulator`: dragged along `direction` from `base`.
-    Linear { base: DVec3, direction: DVec3, offset: f64, min: f64, max: f64, secondary: bool, primary: Option<String> },
+    /// `tangential`: std's TANGENTIAL style, a point on an edge (a ring with an arrowhead each way).
+    Linear {
+        base: DVec3,
+        direction: DVec3,
+        offset: f64,
+        min: f64,
+        max: f64,
+        secondary: bool,
+        #[serde(default)]
+        tangential: bool,
+        primary: Option<String>,
+    },
     /// `angularManipulator`: turned about the axis from `rotation_origin`.
     Angular { axis_origin: DVec3, axis_direction: DVec3, rotation_origin: DVec3, angle: f64, min: f64, max: f64, secondary: bool, primary: Option<String> },
     /// `flipManipulator`: an arrow along `direction` (flipped: the other

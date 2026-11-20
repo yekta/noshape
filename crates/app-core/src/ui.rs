@@ -503,8 +503,11 @@ pub struct PlacedTooltip {
 /// lit (live recheck 11-18).
 /// A menu row's side tooltip unfolds sooner (live fs-ps-ws-feature-tooltip: unfolded within a 1.5 s hover).
 const SIDE_TIP_EXPAND_DELAY: std::time::Duration = std::time::Duration::from_millis(1500);
-/// A toolbar tooltip's longer help unfolds this long after it shows (live: `data-expand-delay` 2000 ms, feel/chrome.json).
-pub const TOOLTIP_EXPAND_DELAY: std::time::Duration = std::time::Duration::from_millis(2000);
+/// A toolbar tooltip's longer help unfolds this long after it shows (live drift-1120: 1.77-1.90 s after the pointer
+/// arrives; 11-13's 2000 ms after showing was the old 400 ms tooltip delay).
+pub const TOOLTIP_EXPAND_DELAY: std::time::Duration = std::time::Duration::from_millis(1800);
+/// A toolbar tooltip shows as the pointer arrives, cold or warm (live drift-1120: 15-45 ms, was 400 ms on 11-13).
+pub const TOOLBAR_TIP_DELAY: std::time::Duration = std::time::Duration::from_millis(20);
 pub const ROW_TIP_DELAY: std::time::Duration = std::time::Duration::from_millis(80);
 const ROW_TIP_FADE: (std::time::Duration, f32) = (std::time::Duration::from_millis(110), 0.2);
 /// Tooltips fade in (live feel/chrome.json "tooltips": fully shown 470-545 ms after the pointer arrives, the 400 ms
@@ -574,7 +577,8 @@ impl Render for PlacedTooltip {
             (TipSide::Right, _) => point(a.right() + px(3.), mid_y),
             (TipSide::Left, Some(w)) => point(clamp_x(a.left() - px(2.) - w, w), mid_y),
             (TipSide::Above, Some(w)) => point(clamp_x(a.center().x - w * 0.5, w), a.top() - px(4.) - h),
-            (TipSide::Below, Some(w)) => point(clamp_x(a.center().x - w * 0.5, w), a.bottom() + px(8.)),
+            // (Live cov-1120 R8: 3 px under the rollback bar's 7 px line, centred in its 26 px row.)
+            (TipSide::Below, Some(w)) => point(clamp_x(a.center().x - w * 0.5, w), a.center().y + px(6.5)),
             (_, None) => point(px(0.), mid_y),
         };
         let hidden = self.side != TipSide::Right && w.is_none();
@@ -848,11 +852,11 @@ pub fn with_tool_tooltip(id: impl Into<ElementId>, title: impl Into<SharedString
     let name = title.split(" (").next().unwrap_or_default().to_string();
     match crate::tool_text::sketch_description(&name) {
         Some(d) => with_rich_tooltip(id, title, d, el),
-        None => with_tooltip(id, title, el),
+        None => div().id(id).flex_none().tooltip(tooltip(title)).tooltip_show_delay(TOOLBAR_TIP_DELAY).child(el).into_any_element(),
     }
 }
 
-/// Wrap a toolbar tool so it shows the title now and the description after 2 s.
+/// Wrap a toolbar tool so it shows the title at once and the description after 1.8 s.
 pub fn with_rich_tooltip(id: impl Into<ElementId>, title: impl Into<SharedString>, description: impl Into<SharedString>, el: impl IntoElement) -> AnyElement {
     let anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
     let a2 = anchor.clone();
@@ -867,6 +871,7 @@ pub fn with_rich_tooltip(id: impl Into<ElementId>, title: impl Into<SharedString
         .flex_none()
         .relative()
         .tooltip(rich_tooltip(title, description, anchor))
+        .tooltip_show_delay(TOOLBAR_TIP_DELAY)
         .child(el)
         .child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
         .into_any_element()

@@ -215,6 +215,8 @@ fn click_at(cx: &mut TestAppContext, window: AnyWindowHandle, at: Point<gpui_kit
 #[gpui::test]
 fn a_double_clicked_value_edits_all_selected_esc_reverts_a_click_away_commits(cx: &mut TestAppContext) {
     let (window, view) = studio(cx, "value-dblclick");
+    // (An active window: a click away blurs the editor, which commits it.)
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
     keys(cx, window, &["h", "enter"]);
     let cell = |cx: &mut TestAppContext, i: usize| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(["vs-val-0", "vs-val-1"][i]).expect("the value cell").center();
     let state = |cx: &mut TestAppContext| {
@@ -232,16 +234,19 @@ fn a_double_clicked_value_edits_all_selected_esc_reverts_a_click_away_commits(cx
     keys(cx, window, &["escape"]);
     let (editing, selected, input) = state(cx);
     assert_eq!((editing, selected, input.map(|i| i.0)), (None, Some("e0".into()), Some("10 mm".into())), "(editing, selected, text) after Esc");
-    click_at(cx, window, w, 1);
-    click_at(cx, window, w, 2);
+    // (h's edit, the row below: the unit list opened under it covers no cell above.)
+    let text = |cx: &mut TestAppContext, i: usize| cx.update(|cx| view.read(cx).studio(cx).and_then(|s| s.variables.get(i).map(|v| v.expr.text.clone())));
+    let h_was = text(cx, 1).expect("h's value");
+    let h = cell(cx, 1);
+    click_at(cx, window, h, 1);
+    click_at(cx, window, h, 2);
     keys(cx, window, &["end", " ", "+", " ", "1", " ", "m", "m"]);
-    let h = cell(cx, 1);
-    click_at(cx, window, h, 1);
-    let w_value = cx.update(|cx| view.read(cx).studio(cx).and_then(|s| s.variables.first().map(|v| v.expr.text.clone())));
-    assert_eq!((w_value.as_deref(), state(cx).0), (Some("10 mm + 1 mm"), None), "(w, editing) after a click on h's value");
+    let w = cell(cx, 0);
+    click_at(cx, window, w, 1);
+    assert_eq!((text(cx, 1), state(cx).0), (Some(format!("{h_was} + 1 mm")), None), "(h, editing) after a click on w's value");
     cx.executor().advance_clock(std::time::Duration::from_millis(900));
-    let h = cell(cx, 1);
-    click_at(cx, window, h, 1);
+    let w = cell(cx, 0);
+    click_at(cx, window, w, 1);
     assert_eq!(state(cx).0, None, "a second single click on the selected cell edits it");
 }
 
@@ -261,6 +266,9 @@ fn the_value_cells_hash_list_holds_the_variables_above_only(cx: &mut TestAppCont
                     crate::var_complete::Entry::Variable(n) => Some(n.clone()),
                     _ => None,
                 }).collect();
+                // (Live's take, "#a" over "#b", doesn't tell the table's order from the alphabet's.)
+                let mut vars = vars;
+                vars.sort();
                 (vars, c.new_variable.clone())
             })
         });
@@ -268,5 +276,5 @@ fn the_value_cells_hash_list_holds_the_variables_above_only(cx: &mut TestAppCont
         got
     };
     assert_eq!(list(cx, "e1"), Some((vec!["w".to_string()], None)), "h's row: (variables, New variable…)");
-    assert_eq!(list(cx, "e2"), Some((vec!["w".to_string(), "h".to_string()], None)), "d's row: (variables, New variable…)");
+    assert_eq!(list(cx, "e2"), Some((vec!["h".to_string(), "w".to_string()], None)), "d's row: (variables, New variable…)");
 }

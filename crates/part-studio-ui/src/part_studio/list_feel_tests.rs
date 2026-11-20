@@ -443,9 +443,9 @@ fn rows() -> Vec<Row> {
             let counts = l.menu(cx).iter().any(|s| s == "Add appearance to 3 features…");
             expect((counts, l.selected(cx)), (true, names(&["Extrude 1", "Extrude 2"])), "counts 3, selected")
         } },
-        Row { id: "menu / one sketch", live: "Rename | Edit… | Copy sketch | Show dimensions | Add selection to folder… | Show | Create Drawing of Sketch 1… | Export as DXF/DWG… | Section view… | Suppress | Dynamic suppression | Zoom to selection | View normal to | Show dependencies… | Roll to here | Edit sketch appearance… | Delete (live keys-1118; Add comment: cloud)", gap: false, check: |l, cx| {
+        Row { id: "menu / one sketch", live: "Rename | Edit… | Copy sketch | Show dimensions | Add selection to folder… | Show | Show all sketches | Create Drawing of Sketch 1… | Export as DXF/DWG… | Section view… | Suppress | Dynamic suppression | Zoom to selection | View normal to | Show dependencies… | Roll to here | Edit sketch appearance… | Delete (live keys-1118, one sketch in its document; with another sketch there Show all sketches too: live 1714; Add comment: cloud)", gap: false, check: |l, cx| {
             l.right_click(cx, "feature:Sketch 1");
-            expect(l.menu(cx), names(&["Rename", "Edit…", "Copy sketch", "Show dimensions", "Add selection to folder…", "Show", "Create Drawing of Sketch 1…", "Export as DXF/DWG…", "Section view…", "Suppress", "Dynamic suppression", "Zoom to selection", "View normal to", "Show dependencies…", "Roll to here", "Edit sketch appearance…", "Delete"]), "rows")
+            expect(l.menu(cx), names(&["Rename", "Edit…", "Copy sketch", "Show dimensions", "Add selection to folder…", "Show", "Show all sketches", "Create Drawing of Sketch 1…", "Export as DXF/DWG…", "Section view…", "Suppress", "Dynamic suppression", "Zoom to selection", "View normal to", "Show dependencies…", "Roll to here", "Edit sketch appearance…", "Delete"]), "rows")
         } },
         Row { id: "menu / two sketches", live: "Add selection to folder… | Show | Show all sketches | Section view… | Suppress | Dynamic suppression | Clear selection | Edit appearance of 2 sketches… | Delete", gap: false, check: |l, cx| {
             l.click(cx, "feature:Sketch 1", NONE);
@@ -502,6 +502,17 @@ fn rows() -> Vec<Row> {
         Row { id: "menu / the Top plane row", live: "Rename | New sketch… | Offset plane… | Size to Part Studio | Hide | Hide other planes | Hide all planes | Section view… | Zoom to selection | View normal to | Show dependencies… (Add comment: cloud; live ctx-menus-1117 row-top-plane)", gap: false, check: |l, cx| {
             l.right_click(cx, "feature:Top");
             expect(l.menu(cx), names(&["Rename", "New sketch…", "Offset plane…", "Size to Part Studio", "Hide", "Hide other planes", "Hide all planes", "Section view…", "Zoom to selection", "View normal to", "Show dependencies…"]), "rows")
+        } },
+        Row { id: "menu / the Top row's Section view… opens on Top", live: "a floating 'Section view' dialog, Exclude / Include, 'Section plane 1 (Top)' already in Section planes, Items to exclude empty; the arrow's shaft starts at its ring on the origin (live cov-1120 R9, sv1-open.png)", gap: false, check: |l, cx| {
+            l.right_click(cx, "feature:Top");
+            let at = l.bounds(cx, "menu:Section view…").ok_or("no Section view… row")?.center();
+            l.press(cx, at, MouseButton::Left, NONE, 1);
+            let got = cx.update(|cx| {
+                let v = l.view.read(cx);
+                (v.ui.section_dialog.as_ref().map(|d| d.items.len()), v.section_chips(), v.section_arrow().is_some_and(|a| a.length.abs() < 1e-5))
+            });
+            l.keys(cx, "escape");
+            expect(got, (Some(0), vec![(1, "Top".to_string())], true), "(the dialog's items to exclude, its planes (number, name), the arrow's shaft from its base ring: qa FEEL-SECTION-ARROW-FOOT)")
         } },
         Row { id: "menu / the Origin row", live: "Rename | Hide | Show dependencies… (live ctx-menus-1117 row-origin)", gap: false, check: |l, cx| {
             l.right_click(cx, "feature:Origin");
@@ -786,13 +797,30 @@ fn rows() -> Vec<Row> {
             }
             expect(got, vec![false, true, false, true], "dragging at 5 / 6 px down, 5.7 / 7.1 px diagonally")
         } },
-        Row { id: "rollback bar / while held nothing moves or greys", live: "the 'Rollback bar' chip follows the pointer, the insertion line shows the slot; the bar stays at its old place, nothing greys (live2 featurelist-feel 1)", gap: false, check: |l, cx| {
+        Row { id: "rollback bar / while held nothing moves or greys", live: "the 'Rollback bar' chip follows the pointer, the insertion line shows the slot, the row under it lit (live cov-1120 R8); the bar stays at its old place, nothing greys (live2 featurelist-feel 1)", gap: false, check: |l, cx| {
             let (from, to) = (l.at(cx, "rollback"), l.at_y(cx, "feature:Extrude 1", 6.));
             l.drag(cx, from, to, false);
-            let held = (l.dragging(cx), cx.update(|cx| l.view.read(cx).ui.feature_drop.get().is_some()), l.rolled_to(cx), cx.update(|cx| l.view.read(cx).display.bodies.len()));
+            let held = (l.dragging(cx), cx.update(|cx| l.view.read(cx).ui.feature_drop.get().is_some()), l.rolled_to(cx), cx.update(|cx| l.view.read(cx).display.bodies.len()), l.lit_row(cx));
             l.keys(cx, "escape");
             l.release(cx, to);
-            expect(held, (true, true, Some("Extrude 3".to_string()), 3), "(dragging, a slot shown, rolled to, parts)")
+            expect(held, (true, true, Some("Extrude 3".to_string()), 3, Some("Extrude 1".to_string())), "(dragging, a slot shown, rolled to, parts, the row lit under it)")
+        } },
+        Row { id: "rollback bar / its tooltip 3 px under it, none on it after a drop", live: "'Rollback bar' 3 px under the 7 px bar (its centre ~20 px above the tip's); after a drag the dropped bar shows no tooltip (live cov-1120 R8, qa FEEL-ROLLBACK-DROP-ROW)", gap: false, check: |l, cx| {
+            l.hover(cx, "rollback", 600);
+            let shown = crate::ui_script::shown_tooltip();
+            let bar = l.bounds(cx, "rollback").ok_or("no bar")?.center().y;
+            let tip = l.bounds(cx, "placed-tooltip").ok_or("no tooltip")?.origin.y;
+            let gap = (f32::from(tip - bar) - 6.5).abs() < 1.;
+            let h = f32::from(l.bounds(cx, "feature:Extrude 1").ok_or("no row")?.size.height);
+            let (from, to) = (l.at(cx, "rollback"), l.at_y(cx, "feature:Extrude 1", h - 6.));
+            l.drag(cx, from, to, true);
+            crate::ui_script::clear_tooltip();
+            l.wait(cx, 800);
+            let after = crate::ui_script::shown_tooltip();
+            let h = f32::from(l.bounds(cx, "feature:Extrude 3").ok_or("no row")?.size.height);
+            let (from, to) = (l.at(cx, "rollback"), l.at_y(cx, "feature:Extrude 3", h - 6.));
+            l.drag(cx, from, to, true);
+            expect((shown.as_deref(), gap, after.as_deref() == Some("Rollback bar")), (Some("Rollback bar"), true, false), "(tooltip on hover, 6.5 px under the bar's centre, the bar's tooltip back after a drop)")
         } },
         Row { id: "rollback bar / on release the rows below grey and the Parts list follows", live: "the bar above Extrude 1: Parts (1) -> Parts (0) here (every part's extrude rolled back); back at the end all three again", gap: false, check: |l, cx| {
             let h = f32::from(l.bounds(cx, "feature:Sketch 1").ok_or("no row")?.size.height);

@@ -513,7 +513,8 @@ fn add_manipulators(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let mut out = Vec::new();
     for (k, m) in map.iter() {
         let (Some(key), Some(kind)) = (k.as_str(), member(m.get("manipulatorType"))) else { continue };
-        let secondary = member(m.get("style")).as_deref() == Some("SECONDARY");
+        let style = member(m.get("style"));
+        let (secondary, tangential) = (style.as_deref() == Some("SECONDARY"), style.as_deref() == Some("TANGENTIAL"));
         let primary = m.get("primaryParameterId").as_str().map(|s| s.to_string());
         let manip = match kind.as_str() {
             "LINEAR_1D" => (|| {
@@ -524,6 +525,7 @@ fn add_manipulators(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     min: length_of(m.get("minValue")).unwrap_or(-500.0),
                     max: length_of(m.get("maxValue")).unwrap_or(500.0),
                     secondary,
+                    tangential,
                     primary: primary.clone(),
                 })
             })(),
@@ -562,20 +564,20 @@ fn add_manipulators(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 pub fn manipulator_value(m: &crate::display::FeatureManipulator) -> Option<Value> {
     use crate::display::FeatureManipulator as M;
     let ty = |member: &str| super::std_enum("manipulatortype.gen.fs", "ManipulatorType", member);
-    let style = |secondary: bool| super::std_enum("manipulatorstyleenum.gen.fs", "ManipulatorStyleEnum", if secondary { "SECONDARY" } else { "DEFAULT" });
+    let style = |secondary: bool, tangential: bool| super::std_enum("manipulatorstyleenum.gen.fs", "ManipulatorStyleEnum", if tangential { "TANGENTIAL" } else if secondary { "SECONDARY" } else { "DEFAULT" });
     let mut out = Map::new();
     let mut put = |k: &str, v: Value| {
         out.insert(Value::str(k), v);
     };
     match m {
-        M::Linear { base, direction, offset, min, max, secondary, primary } => {
+        M::Linear { base, direction, offset, min, max, secondary, tangential, primary } => {
             put("manipulatorType", ty("LINEAR_1D")?);
             put("base", point_value(*base));
             put("direction", dir_value(*direction));
             put("offset", length_value(*offset));
             put("minValue", length_value(*min));
             put("maxValue", length_value(*max));
-            put("style", style(*secondary)?);
+            put("style", style(*secondary, *tangential)?);
             if let Some(p) = primary {
                 put("primaryParameterId", Value::str(p.as_str()));
             }
@@ -588,7 +590,7 @@ pub fn manipulator_value(m: &crate::display::FeatureManipulator) -> Option<Value
             put("angle", angle_value(*angle));
             put("minValue", angle_value(*min));
             put("maxValue", angle_value(*max));
-            put("style", style(*secondary)?);
+            put("style", style(*secondary, false)?);
             if let Some(p) = primary {
                 put("primaryParameterId", Value::str(p.as_str()));
             }
@@ -601,7 +603,7 @@ pub fn manipulator_value(m: &crate::display::FeatureManipulator) -> Option<Value
             if let Some(d) = other_direction {
                 put("otherDirection", dir_value(*d));
             }
-            put("style", style(*secondary)?);
+            put("style", style(*secondary, false)?);
         }
         M::Triad { base, offset } => {
             put("manipulatorType", ty("LINEAR_3D")?);

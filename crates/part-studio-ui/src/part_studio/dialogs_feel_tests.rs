@@ -1480,10 +1480,19 @@ fn a_skip_ring_lights_and_a_click_skips_its_instance_then_keeps_it(cx: &mut Test
         v.zoom_fit(cx);
     }))
     .unwrap();
-    // (Drawn first: the dialog opens on its first query, Entities.) "Instances to skip" clicked: its field takes the rings.
+    // (Settled first: the dialog opens on its first query, Entities.) "Instances to skip" clicked: its field takes the rings.
+    draw(cx, window);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
     draw(cx, window);
     let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the pattern's dialog").dialog.clone());
-    cx.update(|cx| dialog.update(cx, |d, _| d.user_focus_query("skippedInstances")));
+    // As the field's click: it becomes active and the keyboard leaves Entities' Tab stop for the dialog.
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| {
+        d.user_focus_query("skippedInstances");
+        w.focus(&gpui::Focusable::focus_handle(d, cx), cx);
+        cx.notify();
+    }))
+    .unwrap();
+    draw(cx, window);
     wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).toggle_points(cx).is_some_and(|p| p.len() == 3));
     draw(cx, window);
     let shown = cx.update(|cx| {

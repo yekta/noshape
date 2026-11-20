@@ -41,7 +41,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
 2. URGENT, NEXT TO LAND: qa P1 ANALYSIS-READOUT-HIDDEN (62ef70f3b hid the bottom-right readout under every analysis
    tool; live only under Interference: `interference_open()` in menus.rs, used by selection_readout and ui_script's
    measure; test measure_feel_tests::only_interference_detection_hides_the_summary; 6 analysis-* scenarios). Tick it in
-   TICKETS after the rebase (it is on main only) and tell qa on green. run108 (vibe2, 03:08) runs it with the rest.
+   TICKETS after the rebase (it is on main only) and tell qa on green. QUEUED alone as 9e20287b (worktree
+   psui-readout, --no-precheck, 03:26). qa 04:0x: also edge-menu-curve-analysis step 2 (Length 40.000 mm kept under
+   Curve/surface; qa ran a build without 9e20287b): test ::an_edges_curve_analysis_from_its_menu_keeps_its_length in
+   the batch (run114, vibex8).
 3. NEXT TO LAND (after 7c2d7313): qa P1 EDGE-MIDPOINT-REST-LOOK (TICKETS 5296e9f9c; behaviors `midpoint_rest_edge`:
    rested on the edge, the edge stays lit and the midpoint is a 6 px #ffd3a0 fill in a 7 px dark ring; test
    a_rested_edge_midpoint_keeps_the_edge_lit_with_a_filled_ring; tell qa on green, they re-walk it). Feel-row tests:
@@ -80,10 +83,33 @@ docs/DECISIONS.md (read first; it wins over anything here).
    tests FS typing_pairs_nothing_and_enter_after_a_brace_indents_without_closing_it, VS
    a_double_clicked_value_edits_all_selected_esc_reverts_a_click_away_commits / the_value_cells_hash_list_holds_the_variables_above_only,
    model sheetmetal_frames::partial_flange_bound_handles_as_std. S1 fixed: the Flange evaluator adds std's partial bound
-   handles (`partial_flange_manipulators`, model-core sheetmetal_flange.rs, skasm's file: tell skasm on landing). NEXT
-   (psui): S1's look, std's TANGENTIAL style (a ~12 px blue ring with an arrowhead each way; partial Fillet too): needs a
-   style on `FeatureManipulator::Linear` (13 constructors, custom host status.rs reads "style"). Tickets filed:
+   handles (`partial_flange_manipulators`, model-core sheetmetal_flange.rs, skasm's file: tell skasm on landing). S1's look
+   (uncommitted after a269779ee, run111): std's TANGENTIAL style as `FeatureManipulator::Linear { tangential }` (custom
+   host status.rs reads / writes it), drawn by `tangent_point_polylines` (partial Fillet too). Tickets filed:
    FS-WHEEL-72PX, FS-BRACKET-BOXES [studios], ASM-DRAG-START-15PX [asm]: tell them on landing.
+3c. live round 2 (R7–R9, behaviours "feel coverage round 2 (11-20)"): R7 row 1025's live time now 106–151 ms; R8 the row
+   under a dragged rollback bar lights (list_hover set from the drag's move; list matrix "rollback bar / while held");
+   R9 list matrix "menu / the Top row's Section view… opens on Top" (`section_chips` pub(super)). Run in run114
+   (vibex8; vibe2 at load 30 left run112 in the slot queue 22 min).
+   Tickets for studios also FS-CLOSE-BRACE-OUTDENT, FS-TRIPLE-CLICK-NEWLINE (run110 found them).
+3d. live drift-1120 (behaviours "feel drift retake (11-20)"): toolbar tooltips at 20 ms cold or warm
+   (`ui::TOOLBAR_TIP_DELAY` in with_rich_tooltip / with_tool_tooltip; other tooltips keep theirs), longer help 1800 ms
+   after showing; chrome matrix rows; hover row = (feel_tests::a_fast_move_off_a_lit_face_clears_it_on_that_move).
+3f. qa P0 FEEL-ROLLBACK-DROP-ROW (lit row = R8; tooltip 3 px under the bar, none on the dropped bar:
+   `ui.rollback_tip_off`) and FEEL-SECTION-ARROW-FOOT (`SECTION_ARROW_FOOT`), 51d079b3c: tick + tell qa on green.
+   The 5 'unrelated' run114 failures were my own 1492bd286 / a269779ee tests: fixed (toast names "Configuration",
+   one-sketch menu has Show all sketches with Sketch 2 there, skip field focused after the dialog settles, config place
+   check dropped: live's x 42 includes a left rail we may lack — open) and HOVER-LEAVES-WINDOW in gpui-pre
+   (`Window::pointer_out`: no hit test after MouseExited until the next move). run116/117 fixes: section test grabs the head
+   (45 px), skip ring focuses the dialog as the array field's click, empty new folder collapsed (live
+   featurelist-gaps emptyFolder; model-data); run118 (vibex8). Rollback row tooltip after a drop: REQUESTS row 04:51.
+3g. FEEL-EDGE-VS-FACE-HOLD parked: reach-px-1119 (no hold) vs ours-verify-1120 (hold 8-10); REQUESTS 05:10;
+   fix in /root/psui-scratch/edge-hold.patch (PickBuffer::pick_holding, EDGE_HOLD 9 px; feel_tests:137 needs the
+   hold rows). FEEL-HASH-LIST-DELAY verified by live (close on rebase).
+3e. qa P0 FEEL-DIM-PICK-READOUT (15e785522, live R3 cov2-dim-orient): the sketch readout reads the Dimension tool's
+   picks (`SketchEditor::readout_entities`); sketch_ui_tests::the_dimension_tools_picks_fill_the_readout. Tick it and
+   tell qa on green. run114 (vibex8) also showed 5 part-studio tests failing that this batch doesn't touch (config
+   toast "Configuration", config select place, one-sketch menu rows, skip ring, leave-window): run115 re-runs them alone.
 4. fillet-chip-clear-missing / fillet-edit-cancel-keeps retaken by live (e4ff71a8): both match on green 08525ecd
    (20/20 states, vibex6 02:4x). Waiting on others: ver-compare-hover-part (history-ui) with the lead.
 5. Interaction-feel rows that match live with no test (grep "missing" in the Test column; P0 sections first).

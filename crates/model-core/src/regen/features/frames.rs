@@ -904,14 +904,14 @@ pub fn gusset(ev: &mut EvalCtx) -> FResult<()> {
             use crate::display::FeatureManipulator as M;
             let flip = ev.bool("shouldFlipOffset");
             let mid = e * (th * 0.5);
-            ev.manipulators.push(("Offset manipulator".into(), M::Linear { base: m + e * (s0 + th * 0.5), direction: -e, offset: if flip { off.abs() } else { -off.abs() }, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: Some("offset".into()) }));
+            ev.manipulators.push(("Offset manipulator".into(), M::Linear { base: m + e * (s0 + th * 0.5), direction: -e, offset: if flip { off.abs() } else { -off.abs() }, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, tangential: false, primary: Some("offset".into()) }));
             let (from, dir) = if ev.is("gussetType", "RECTANGLE") {
                 let c = if ev.bool("chamfer") { ev.length("chamferSize").unwrap_or(0.0) } else { 0.0 };
                 (base[0] + d1 * (len - c) * 0.5, d2)
             } else {
                 (base[0], d1)
             };
-            ev.manipulators.push(("Length manipulator".into(), M::Linear { base: from + mid, direction: dir, offset: len, min: 0.0, max: f64::INFINITY, secondary: false, primary: Some("length".into()) }));
+            ev.manipulators.push(("Length manipulator".into(), M::Linear { base: from + mid, direction: dir, offset: len, min: 0.0, max: f64::INFINITY, secondary: false, tangential: false, primary: Some("length".into()) }));
         }
         let wire = k::make_polyline(&base, true)?;
         let fshape = k::make_face_from_wire(&wire, true)?;
@@ -1019,7 +1019,7 @@ pub fn end_cap(ev: &mut EvalCtx) -> FResult<()> {
         // side), the side's offset (positive: inward), or an internal cap's inset.
         if count == 0 {
             use crate::display::FeatureManipulator as M;
-            let lin = |base: DVec3, direction: DVec3, offset: f64, min: f64, primary: &str| M::Linear { base, direction, offset, min, max: f64::INFINITY, secondary: false, primary: Some(primary.into()) };
+            let lin = |base: DVec3, direction: DVec3, offset: f64, min: f64, primary: &str| M::Linear { base, direction, offset, min, max: f64::INFINITY, secondary: false, tangential: false, primary: Some(primary.into()) };
             let origin = frame_plane.origin;
             if ptype == "INTERNAL" {
                 ev.manipulators.push(("Inset manipulator".into(), lin(origin, -n, -start_shift.dot(n), 0.0, "internalShiftDistance")));

@@ -4087,7 +4087,8 @@ impl SketchEditor {
     /// Returns (label, value); `None` for an empty or mixed selection.
     /// The icon live puts before a lone circle's or arc's readout (its tool's: psui/sketch-readouts).
     pub fn selection_readout_icon(&self, data: &SketchData) -> Option<&'static str> {
-        let [e] = self.selection.as_slice() else { return None };
+        let picks = self.readout_entities();
+        let [e] = picks.as_slice() else { return None };
         match data.sketch.curve(*e)? {
             Curve2::Circle { .. } => Some("circle"),
             Curve2::Arc { .. } => Some("center-point-arc"),
@@ -4095,12 +4096,18 @@ impl SketchEditor {
         }
     }
 
+    /// What the readout measures: the Dimension tool's picks while it has any (live cov2-dim-orient: "Point" after the
+    /// first, "Min dist" after the second, kept while the dimension is placed), else the selection.
+    pub fn readout_entities(&self) -> Vec<EntityId> {
+        if self.tool == Tool::Dimension && !self.picks.is_empty() { self.tool_picks() } else { self.selection.clone() }
+    }
+
     pub fn selection_readout(&self, data: &SketchData, units: &UnitPrefs) -> Vec<(String, String)> {
         let sk = &data.sketch;
         // Live's readouts keep their precision ("30.000 mm", sketch-mirror-model-edge).
         let len = |v: f64| format!("{} {}", noshape_units::to_fixed(v / units.si_factor(Dim::LENGTH), units.length_precision), units.length.symbol());
         let one = |label: &str, text: String| vec![(label.to_string(), text)];
-        let sel: Vec<EntityId> = self.selection.iter().copied().filter(|e| sk.entity(*e).is_some()).collect();
+        let sel: Vec<EntityId> = self.readout_entities().into_iter().filter(|e| sk.entity(*e).is_some()).collect();
         match sel.as_slice() {
             [e] => {
                 if let Some(p) = sk.point(*e) {

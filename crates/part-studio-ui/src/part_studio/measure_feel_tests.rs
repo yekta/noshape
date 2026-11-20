@@ -623,6 +623,20 @@ fn only_interference_detection_hides_the_summary(cx: &mut TestAppContext) {
     }
 }
 
+/// qa ANALYSIS-READOUT-HIDDEN, live edge-menu-curve-analysis step 2: an edge's Curve/surface analysis from its context
+/// menu keeps the edge selected and its "Length" readout under the panel.
+#[gpui::test]
+fn an_edges_curve_analysis_from_its_menu_keeps_its_length(cx: &mut TestAppContext) {
+    use crate::part_studio::analysis_tools::ToolKind;
+    let b = Bench::open(cx, "summary-curve-menu", 1.0);
+    let edge = b.readout(cx, &[FRONT_EDGE], &[]).unwrap();
+    cx.update_window(b.window, |_, w, cx| b.view.update(cx, |v, cx| { v.ui.analysis_menu_target = true; v.toggle_analysis_tool(ToolKind::CurveSurface, w, cx) })).unwrap();
+    wait_until(cx, b.window, |cx| !b.view.read(cx).ui_busy());
+    draw(cx, b.window);
+    let open = cx.update(|cx| { let v = b.view.read(cx); (v.ui.analysis_tool.is_some(), v.selection.len(), v.ui.measure_readout.len()) });
+    assert!(edge.first().is_some_and(|l| l.starts_with("Length")) && open == (true, 1, edge.len()), "the edge's readout {edge:?}; with Curve/surface open (open, selected, readout rows): {open:?}");
+}
+
 /// live2 mass-override-1119: on one part with a material the Center of mass and inertia Override boxes enable (a part
 /// without one keeps them greyed); ticked, the values they had become editable. A centre's X typed moves the inertia
 /// to the new centre (parallel axis); Lxy typed leaves Lyx as it was; ✓ stores both on the part, no feature added.

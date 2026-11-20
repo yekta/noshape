@@ -451,7 +451,7 @@ fn partial_flange_manipulators(ev: &mut EvalCtx, ef: &EdgeFrame) {
         }
         let Ok(offset) = ev.length(dist) else { return };
         let (base, direction) = if from_start { (start, ef.d) } else { (end, -ef.d) };
-        ev.manipulators.push((key.into(), M::Linear { base, direction, offset, min: 0.0, max: f64::INFINITY, secondary: false, primary: Some(dist.into()) }));
+        ev.manipulators.push((key.into(), M::Linear { base, direction, offset, min: 0.0, max: f64::INFINITY, secondary: false, tangential: true, primary: Some(dist.into()) }));
     };
     bound("Partial flange on start edge manipulator", "firstBoundType", "firstBoundOffset", !flip);
     if second {

@@ -353,16 +353,15 @@ impl PartStudioView {
             Some((q, _, _)) if active => *q,
             _ => at - pl.normal * pl.normal.dot(at - on_plane),
         };
-        Some(super::manipulators::Arrow { base, dir: pl.normal, length: section_handle(lo, hi), param: SECTION_PARAM, flip: None, secondary: false, triangle: false, scale: 1.0 })
+        Some(super::manipulators::Arrow { base, dir: pl.normal, length: SECTION_ARROW_FOOT, param: SECTION_PARAM, flip: None, secondary: false, triangle: false, tangential: false, scale: 1.0 })
     }
 
     /// A drag of the section arrow: its handle end is now at `length`
     /// along the normal from the current plane position.
     pub(super) fn drag_section_arrow(&mut self, length: f64, window: &mut Window, cx: &mut Context<Self>) {
-        let Some((lo, hi)) = self.fit_bounds() else { return };
         let Some(i) = self.ui.section_dialog.as_ref().map(|d| d.active) else { return };
         if let Some(pl) = self.ui.section.get_mut(i) {
-            pl.offset += length - section_handle(lo, hi);
+            pl.offset += length - SECTION_ARROW_FOOT;
             // Live: the plane moves in 0.1 mm (0.01 in) steps from the drag
             // start ("2.6 mm", "-8.5 mm").
             if let Some(s0) = self.ui.section_drag0 {
@@ -421,7 +420,7 @@ impl PartStudioView {
     /// The planes' chips: number and name. Live (skb 10-24 assembly section, qa4-r5-s9-5): a chip is named by its
     /// plane's nearest standard direction, whatever was picked (a face, a connector: "Section plane 1 (Top)"); a
     /// turned plane has no name; Flip plane names the other side (live: "Section plane 2 (Back)").
-    fn section_chips(&self) -> Vec<(usize, String)> {
+    pub(super) fn section_chips(&self) -> Vec<(usize, String)> {
         self.ui.section.iter().map(|pl| (pl.number, if pl.label.starts_with("Section plane") { String::new() } else if pl.flipped { opposite_name(direction_name(pl.normal)).to_string() } else { direction_name(pl.normal).to_string() })).collect()
     }
 
@@ -708,10 +707,9 @@ fn plane(label: &str, origin: DVec3, normal: DVec3) -> SectionPlane {
     SectionPlane { label: label.to_string(), origin, normal, offset: 0.0, flipped: false, base: None, number: 1 }
 }
 
-/// Length of the section arrow's handle: a fraction of the model size.
-fn section_handle(lo: DVec3, hi: DVec3) -> f64 {
-    ((hi - lo).length() * 0.12).max(1e-3)
-}
+/// Where the section arrow's shaft starts along the normal: at its base ring (live cov-1120 R9, qa
+/// FEEL-SECTION-ARROW-FOOT; a fraction of the model size left a ~20 px gap).
+const SECTION_ARROW_FOOT: f64 = 1e-6;
 
 #[cfg(test)]
 mod tests {

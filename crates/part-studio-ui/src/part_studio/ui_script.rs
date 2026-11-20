@@ -311,7 +311,7 @@ impl PartStudioView {
             return Some(json!({ "readout": readout, "panel": null }));
         }
         let (label, text) = all.into_iter().next()?;
-        let readout = match (label.as_str(), ed.selection.as_slice()) {
+        let readout = match (label.as_str(), ed.readout_entities().as_slice()) {
             ("Point", [e]) => {
                 let w = ed.frame.to_world(data.sketch.point(*e)?);
                 let axis = |name: &str, x: f64| {

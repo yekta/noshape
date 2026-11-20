@@ -5883,8 +5883,12 @@ impl PartStudioView {
             .flex_none()
             .items_center()
             // Live (dom/cursors.txt): the default arrow, also while dragging.
-            .tip("Rollback bar", crate::ui::TipSide::Below)
+            .when(!self.ui.rollback_tip_off, |d| d.tip("Rollback bar", crate::ui::TipSide::Below))
             .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                if !*hovered && this.ui.rollback_tip_off {
+                    this.ui.rollback_tip_off = false;
+                    cx.notify();
+                }
                 let now = if *hovered { Some(index) } else { this.ui.rollback_hovered.filter(|&i| i != index) };
                 if this.ui.rollback_hovered != now {
                     this.ui.rollback_hovered = now;
@@ -6321,13 +6325,18 @@ impl PartStudioView {
                 window.focus(&this.ui.list_focus, cx);
             }))
             // Live (feel/featurelist.json): the bar drops before a row from its top half, after it from its bottom half.
+            // The row under it lights as hovered, its geometry too (live cov-1120 R8, m1-bar-drag.png; gpui's hover
+            // sleeps during a drag).
             .on_drag_move(cx.listener(move |this, e: &DragMoveEvent<RollbackDrag>, _, cx| {
                 if !e.bounds.contains(&e.event.position) {
                     return;
                 }
                 let slot = Some((i, e.event.position.y >= e.bounds.center().y));
-                if this.ui.feature_drop.get() != slot {
+                // (No "Rollback bar" tooltip on the dropped bar until the pointer leaves it: qa FEEL-ROLLBACK-DROP-ROW.)
+                this.ui.rollback_tip_off = true;
+                if this.ui.feature_drop.get() != slot || this.ui.list_hover != Some(id) {
                     this.ui.feature_drop.set(slot);
+                    this.ui.list_hover = Some(id);
                     cx.notify();
                 }
             }))

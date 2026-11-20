@@ -316,6 +316,8 @@ pub struct UiState {
     pub rollback_keyboard: Option<Vec<noshape_model::reference::FeatureId>>,
     /// The rollback bar under the pointer, by its place in the list (a bar moved by the keyboard isn't lit).
     pub rollback_hovered: Option<usize>,
+    /// The rollback bar was just dragged: no tooltip on it until the pointer leaves it (live cov-1120 R8).
+    pub rollback_tip_off: bool,
     /// The edited sketch's splines were given handle arms on entry: regenerate once the display is applied.
     pub regen_for_arms: bool,
     /// The last toast that hides by itself (`flash_for`): Esc drops it.
@@ -879,6 +881,7 @@ impl UiState {
             list_autoscrolling: false,
             rollback_keyboard: None,
             rollback_hovered: None,
+            rollback_tip_off: false,
             regen_for_arms: false,
             flashed: None,
             dependencies: None,

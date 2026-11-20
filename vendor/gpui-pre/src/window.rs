@@ -1314,6 +1314,9 @@ pub struct Window {
     mouse_hit_test: HitTest,
     /// NOSHAPE PATCH (agent psui): see `pointer_rests`.
     pointer_rests: bool,
+    /// NOSHAPE PATCH (agent psui): the pointer left the window (MouseExited) and hasn't moved in again: nothing is
+    /// hovered, even when a later frame hit-tests the last position it had inside (qa HOVER-LEAVES-WINDOW).
+    pointer_out: bool,
     /// NOSHAPE PATCH (agent psui): see `tooltip_released_on`.
     tooltip_released_on: Option<(Bounds<Pixels>, ElementId)>,
     modifiers: Modifiers,
@@ -2233,6 +2236,7 @@ impl Window {
             mouse_position,
             mouse_hit_test: HitTest::default(),
             pointer_rests: false,
+            pointer_out: false,
             tooltip_released_on: None,
             modifiers,
             capslock,
@@ -3891,7 +3895,7 @@ impl Window {
             tooltip_element = self.prepaint_tooltip(cx);
         }
 
-        self.mouse_hit_test = self.next_frame.hit_test(self.mouse_position);
+        self.mouse_hit_test = if self.pointer_out { HitTest::default() } else { self.next_frame.hit_test(self.mouse_position) };
 
         // Now actually paint the elements.
         #[cfg(feature = "profiler")]
@@ -5919,6 +5923,7 @@ impl Window {
             // API for the mouse position can only occur on the main thread.
             PlatformInput::MouseMove(mouse_move) => {
                 self.mouse_position = mouse_move.position;
+                self.pointer_out = false;
                 self.modifiers = mouse_move.modifiers;
                 self.pointer_rests = mouse_move.pressed_button.is_none();
                 if self.tooltip_released_on.as_ref().is_some_and(|(b, _)| !b.contains(&mouse_move.position)) {
@@ -5928,6 +5933,7 @@ impl Window {
             }
             PlatformInput::MouseDown(mouse_down) => {
                 self.mouse_position = mouse_down.position;
+                self.pointer_out = false;
                 self.modifiers = mouse_down.modifiers;
                 self.pointer_rests = false;
                 PlatformInput::MouseDown(mouse_down)
@@ -5943,6 +5949,7 @@ impl Window {
             }
             PlatformInput::MouseExited(mouse_exited) => {
                 self.modifiers = mouse_exited.modifiers;
+                self.pointer_out = true;
                 self.pointer_rests = false;
                 PlatformInput::MouseExited(mouse_exited)
             }
@@ -6256,7 +6263,7 @@ impl Window {
     }
 
     fn dispatch_mouse_event(&mut self, event: &dyn Any, cx: &mut App) {
-        let hit_test = self.rendered_frame.hit_test(self.mouse_position());
+        let hit_test = if self.pointer_out { HitTest::default() } else { self.rendered_frame.hit_test(self.mouse_position()) };
         if hit_test != self.mouse_hit_test {
             self.mouse_hit_test = hit_test;
             self.reset_cursor_style(cx);

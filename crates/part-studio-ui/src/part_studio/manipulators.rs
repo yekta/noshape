@@ -26,6 +26,9 @@ pub(super) struct Arrow {
     pub secondary: bool,
     /// Only a ~16 px hollow triangle at the handle's point, no shaft (live manip-1118b: Fillet's).
     pub triangle: bool,
+    /// std's TANGENTIAL style: a point on an edge, a ring with a hollow arrowhead each way along it (live feel cov-1120
+    /// S1, a partial flange's bound).
+    pub tangential: bool,
     /// The arrow's length per unit of the parameter (a fillet's offset to its round: 1 / cos(φ/2) - 1).
     pub scale: f64,
 }
@@ -207,7 +210,7 @@ impl PartStudioView {
         // flipManipulator: at the profile, across the turn (the arc's start direction).
         let flip = |flip: &'static str, opposite: bool, secondary: bool| {
             let dir = arc.axis.cross(arc.radial).normalize_or_zero();
-            Handle::Arrow(Arrow { base: arc.point(0.0), dir: if opposite { -dir } else { dir }, length: 0.0, param: "", flip: Some(flip), secondary, triangle: false, scale: 1.0 })
+            Handle::Arrow(Arrow { base: arc.point(0.0), dir: if opposite { -dir } else { dir }, length: 0.0, param: "", flip: Some(flip), secondary, triangle: false, tangential: false, scale: 1.0 })
         };
         let first = if p.is("endBound", "BLIND") { Handle::Arc(arc) } else { flip("oppositeDirection", false, false) };
         let second = if p.bool("symmetric") || !p.bool("hasStartBound") {
@@ -318,7 +321,7 @@ impl PartStudioView {
         }
         .try_normalize()?;
         let dir = if opposite { -dir } else { dir };
-        Manip::of([Handle::Arrow(Arrow { base: c, dir, length: value("distance", Dim::LENGTH)?, param: "distance", flip: Some("oppositeDirection"), secondary: false, triangle: false, scale: 1.0 })])
+        Manip::of([Handle::Arrow(Arrow { base: c, dir, length: value("distance", Dim::LENGTH)?, param: "distance", flip: Some("oppositeDirection"), secondary: false, triangle: false, tangential: false, scale: 1.0 })])
     }
 
     /// World axis (point, unit direction) of a sketch line or straight/circular edge.
@@ -377,7 +380,7 @@ impl PartStudioView {
             dir = -dir;
         }
         let symmetric = d.feature.params.bool("symmetric");
-        Some(Arrow { base, dir, length: if symmetric { depth * 0.5 } else { depth }, param: if blind { "depth" } else { "" }, flip: Some("oppositeDirection"), secondary: false, triangle: false, scale: 1.0 })
+        Some(Arrow { base, dir, length: if symmetric { depth * 0.5 } else { depth }, param: if blind { "depth" } else { "" }, flip: Some("oppositeDirection"), secondary: false, triangle: false, tangential: false, scale: 1.0 })
     }
 
     /// Extrude's second end (std addExtrudeManipulator, live psb 10-24 ex2):
@@ -394,11 +397,11 @@ impl PartStudioView {
         let dir = if p.bool("secondDirectionOppositeDirection") != p.bool("oppositeDirection") { -first.dir } else { first.dir };
         // Other end types: std's SECONDARY flip arrow at the profile.
         if !p.is("secondDirectionBound", "BLIND") {
-            return Some(Arrow { base: first.base, dir, length: 0.0, param: "", flip: Some("secondDirectionOppositeDirection"), secondary: true, triangle: false, scale: 1.0 });
+            return Some(Arrow { base: first.base, dir, length: 0.0, param: "", flip: Some("secondDirectionOppositeDirection"), secondary: true, triangle: false, tangential: false, scale: 1.0 });
         }
         let units = self.doc.read(cx).session.doc.settings.units;
         let depth = p.expr("secondDirectionDepth").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok().map(|q| q.value)))?;
-        Some(Arrow { base: first.base, dir, length: depth, param: "secondDirectionDepth", flip: Some("secondDirectionOppositeDirection"), secondary: true, triangle: false, scale: 1.0 })
+        Some(Arrow { base: first.base, dir, length: depth, param: "secondDirectionDepth", flip: Some("secondDirectionOppositeDirection"), secondary: true, triangle: false, tangential: false, scale: 1.0 })
     }
 
     /// A blended Extrude preview's end cap (live 10-27, psui-prv-05a/b): the
@@ -464,7 +467,7 @@ impl PartStudioView {
                 // A plane, or a circular / elliptical edge (offset from its plane).
                 let f = p.query("entities").iter().find_map(|r| noshape_model::regen::features::cplane::circular_edge_frame(ctx, r).or_else(|| self.frame_of_ref(r)))?;
                 let dir = if p.bool("oppositeDirection") { -f.normal } else { f.normal };
-                Some(Arrow { base: f.origin, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection"), secondary: false, triangle: false, scale: 1.0 })
+                Some(Arrow { base: f.origin, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection"), secondary: false, triangle: false, tangential: false, scale: 1.0 })
             }
             // moveFace.fs: Offset drives offsetDistance along the first
             // face's normal, Translate drives translationDistance along the
@@ -473,11 +476,11 @@ impl PartStudioView {
                 let (base, n) = p.query("moveFaces").iter().find_map(|r| self.face_anchor(ctx, r))?;
                 let sign = if p.bool("oppositeDirection") { -1.0 } else { 1.0 };
                 if p.is("moveFaceType", "OFFSET") {
-                    return Some(Arrow { base, dir: n * sign, length: value("offsetDistance")?, param: "offsetDistance", flip: Some("oppositeDirection"), secondary: false, triangle: false, scale: 1.0 });
+                    return Some(Arrow { base, dir: n * sign, length: value("offsetDistance")?, param: "offsetDistance", flip: Some("oppositeDirection"), secondary: false, triangle: false, tangential: false, scale: 1.0 });
                 }
                 let r = p.query("direction").first()?;
                 let dir = self.axis_of(r).map(|(_, d)| d).or_else(|| self.frame_of_ref(r).map(|f| f.normal))?;
-                Some(Arrow { base, dir: dir * sign, length: value("translationDistance")?, param: "translationDistance", flip: Some("oppositeDirection"), secondary: false, triangle: false, scale: 1.0 })
+                Some(Arrow { base, dir: dir * sign, length: value("translationDistance")?, param: "translationDistance", flip: Some("oppositeDirection"), secondary: false, triangle: false, tangential: false, scale: 1.0 })
             }
             // offsetSurface.fs: on the last face (a sketch region: its
             // plane), along its normal, the offset signed by the flip.
@@ -491,20 +494,20 @@ impl PartStudioView {
                     r => self.face_anchor(ctx, r),
                 })?;
                 let dir = if p.bool("oppositeDirection") { -n } else { n };
-                Some(Arrow { base, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection"), secondary: false, triangle: false, scale: 1.0 })
+                Some(Arrow { base, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection"), secondary: false, triangle: false, tangential: false, scale: 1.0 })
             }
             // replaceFace.fs: on the face to replace with, along its normal
             // (Flip alignment turns it twice there: not at all).
             "replaceFace" => {
                 let (base, n) = p.query("templateFace").iter().find_map(|r| self.face_anchor(ctx, r).or_else(|| self.frame_of_ref(r).map(|f| (f.origin, f.normal))))?;
                 let dir = if p.bool("oppositeDirection") { -n } else { n };
-                Some(Arrow { base, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection"), secondary: false, triangle: false, scale: 1.0 })
+                Some(Arrow { base, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection"), secondary: false, triangle: false, tangential: false, scale: 1.0 })
             }
             // extend.fs (Move boundary, Blind): on the last edge, out of its face.
             "extendSurface" if p.is("endCondition", "BLIND") => {
                 let (base, out) = p.query("entities").iter().rev().find_map(|r| noshape_model::select::edge_extend(ctx, r))?;
                 let dir = if p.bool("oppositeDirection") { -out } else { out };
-                Some(Arrow { base, dir, length: value("extendDistance")?, param: "extendDistance", flip: Some("oppositeDirection"), secondary: false, triangle: false, scale: 1.0 })
+                Some(Arrow { base, dir, length: value("extendDistance")?, param: "extendDistance", flip: Some("oppositeDirection"), secondary: false, triangle: false, tangential: false, scale: 1.0 })
             }
             // projectCurves.fs addDropCurveManipulator (Curve to face,
             // Direction): a flip arrow at the direction's plane (or axis)
@@ -512,7 +515,7 @@ impl PartStudioView {
             "projectCurves" if !p.is("curveProjectionType", "TWO_SKETCHES") && p.is("projectionType", "DIRECTION") => {
                 let r = p.query("directionQuery").first()?;
                 let (base, n) = self.frame_of_ref(r).map(|f| (f.origin, f.normal)).or_else(|| self.axis_of(r))?;
-                Some(Arrow { base, dir: if p.bool("oppositeDirection") { -n } else { n }, length: 0.0, param: "", flip: Some("oppositeDirection"), secondary: false, triangle: false, scale: 1.0 })
+                Some(Arrow { base, dir: if p.bool("oppositeDirection") { -n } else { n }, length: 0.0, param: "", flip: Some("oppositeDirection"), secondary: false, triangle: false, tangential: false, scale: 1.0 })
             }
             // frameTrim.fs addKeepSideManipulator (Face): a flip arrow on the
             // tool where it is nearest the parts to trim, along its normal
@@ -536,7 +539,7 @@ impl PartStudioView {
                     let face = tool.faces().into_iter().find(|f| noshape_kernel::make_vertex(d.point_a).ok().and_then(|v| noshape_kernel::distance(f, &v).ok()).is_some_and(|x| x.distance < 1e-7))?;
                     (d.point_a, face.normal_at_point(d.point_a).ok()?)
                 };
-                Some(Arrow { base, dir: if flipped { -n } else { n }, length: 0.0, param: "", flip: Some("flipTrim"), secondary: false, triangle: false, scale: 1.0 })
+                Some(Arrow { base, dir: if flipped { -n } else { n }, length: 0.0, param: "", flip: Some("flipTrim"), secondary: false, triangle: false, tangential: false, scale: 1.0 })
             }
             // bodyDraft.fs createManipulators: a flip arrow along the pull
             // direction, at the first drafted entity's point nearest the
@@ -568,13 +571,13 @@ impl PartStudioView {
                         r => self.frame_of_ref(r)?.origin,
                     }
                 };
-                Some(Arrow { base, dir: if p.bool("flipPullDirection") { -dir } else { dir }, length: 0.0, param: "", flip: Some("flipPullDirection"), secondary: false, triangle: false, scale: 1.0 })
+                Some(Arrow { base, dir: if p.bool("flipPullDirection") { -dir } else { dir }, length: 0.0, param: "", flip: Some("flipPullDirection"), secondary: false, triangle: false, tangential: false, scale: 1.0 })
             }
             // moveCurveBoundary.fs (Extend, Blind, with a help point): from
             // the first curve's end that grows, along its tangent.
             "trimCurve" => {
                 let (base, dir) = noshape_model::interaction::move_curve_boundary_anchor(ctx, p, &units)?;
-                Some(Arrow { base, dir, length: value("extensionDistance")?, param: "extensionDistance", flip: None, secondary: false, triangle: false, scale: 1.0 })
+                Some(Arrow { base, dir, length: value("extensionDistance")?, param: "extensionDistance", flip: None, secondary: false, triangle: false, tangential: false, scale: 1.0 })
             }
             // splitpart.fs addKeepSideManipulator (Part, not Keep both
             // sides): a flip arrow on the tool where it is nearest the parts
@@ -586,7 +589,7 @@ impl PartStudioView {
                 let (lo, hi) = self.parts_box("targets", cx)?;
                 let c = (lo + hi) * 0.5;
                 let base = c - n * n.dot(c - o);
-                Some(Arrow { base, dir: if p.bool("keepFront") { n } else { -n }, length: 0.0, param: "", flip: Some("keepFront"), secondary: false, triangle: false, scale: 1.0 })
+                Some(Arrow { base, dir: if p.bool("keepFront") { n } else { -n }, length: 0.0, param: "", flip: Some("keepFront"), secondary: false, triangle: false, tangential: false, scale: 1.0 })
             }
             // std edgeBlendCommon.fs addFilletControlManipulator: on the last picked edge (live behaviours "Fillet",
             // qa5 P1-3), its tip where the round crosses the faces' bisector, driving the radius (a conic or curvature
@@ -599,7 +602,7 @@ impl PartStudioView {
                     _ if circular => ("radius", ratio),
                     _ => ("nonCircularRadius", ratio),
                 };
-                Some(Arrow { base, dir, length: value(param)? * scale, param, flip: None, secondary: false, triangle: true, scale })
+                Some(Arrow { base, dir, length: value(param)? * scale, param, flip: None, secondary: false, triangle: true, tangential: false, scale })
             }
             _ => None,
         }
@@ -609,7 +612,8 @@ impl PartStudioView {
     pub(super) fn sync_manipulator(&mut self, cx: &mut Context<Self>) {
         let arrow = |a: &Arrow| {
             let tip = a.base + a.dir * a.length;
-            (tip, tip + a.dir * a.length.signum() * 1e-3, if a.triangle { TRIANGLE_PX * 0.5 } else { ARROW_SHAFT_PX + ARROW_HEAD_PX })
+            let reach = if a.tangential { TANGENT_HEAD_FROM_PX + TANGENT_HEAD_PX } else if a.triangle { TRIANGLE_PX * 0.5 } else { ARROW_SHAFT_PX + ARROW_HEAD_PX };
+            (tip, tip + a.dir * a.length.signum() * 1e-3, reach)
         };
         // The handle end of the arc (last few degrees) is grabbable.
         // The arc's last stretch, then the stem and head past its end (screen-sized).
@@ -1156,10 +1160,10 @@ impl PartStudioView {
 fn std_handle(m: &noshape_model::display::FeatureManipulator, i: usize) -> Option<Handle> {
     use noshape_model::display::FeatureManipulator as M;
     Some(match m {
-        M::Linear { base, direction, offset, secondary, .. } => Handle::StdArrow(Arrow { base: *base, dir: *direction, length: *offset, param: "", flip: None, secondary: *secondary, triangle: false, scale: 1.0 }, i),
+        M::Linear { base, direction, offset, secondary, tangential, .. } => Handle::StdArrow(Arrow { base: *base, dir: *direction, length: *offset, param: "", flip: None, secondary: *secondary, triangle: false, tangential: *tangential, scale: 1.0 }, i),
         M::Flip { base, direction, flipped, other_direction, secondary } => {
             let dir = if *flipped { other_direction.unwrap_or(-*direction) } else { *direction };
-            Handle::StdArrow(Arrow { base: *base, dir, length: 0.0, param: "", flip: None, secondary: *secondary, triangle: false, scale: 1.0 }, i)
+            Handle::StdArrow(Arrow { base: *base, dir, length: 0.0, param: "", flip: None, secondary: *secondary, triangle: false, tangential: false, scale: 1.0 }, i)
         }
         M::Angular { axis_origin, axis_direction, rotation_origin, angle, min, max, secondary, .. } => {
             let rel = *rotation_origin - *axis_origin;
@@ -1296,6 +1300,27 @@ fn head_polylines(base: DVec3, dir: DVec3, side: DVec3, len: f64, width: f64, se
     }
 }
 
+/// std's TANGENTIAL point (live feel cov-1120 s1-zoom: a partial flange's bound): a ~13 px ring facing the view at the
+/// point and a hollow ~12 px arrowhead each way along the edge, from 12 px out.
+fn tangent_point_polylines(at: DVec3, dir: DVec3, side: DVec3, view_dir: DVec3, wpp: f64) -> Vec<Vec<DVec3>> {
+    let up = view_dir.cross(side).normalize_or(dir);
+    let r = TANGENT_RING_PX * 0.5 * wpp;
+    let ring = (0..=24).map(|k| {
+        let t = std::f64::consts::TAU * k as f64 / 24.0;
+        at + (side * t.cos() + up * t.sin()) * r
+    });
+    let mut out = vec![ring.collect()];
+    for d in [dir, -dir] {
+        out.extend(head_polylines(at + d * (TANGENT_HEAD_FROM_PX * wpp), d, side, TANGENT_HEAD_PX * wpp, TANGENT_HEAD_PX * wpp, false));
+    }
+    out
+}
+
+/// A TANGENTIAL point's ring, its arrowheads' length (and width) and where they start, in px (live s1-zoom).
+const TANGENT_RING_PX: f64 = 13.;
+const TANGENT_HEAD_PX: f64 = 12.;
+const TANGENT_HEAD_FROM_PX: f64 = 12.;
+
 /// An angle handle (Revolve, Move face, Draft; live psb 10-24 rev-1, rev-10
 /// and live 11-01 Draft): thin radial lines from the axis to the start and
 /// to the swept end, the arc between them, then past the end a straight stem
@@ -1346,7 +1371,9 @@ fn arrow_glyph(a: &Arrow, hover: bool, dragging: bool, view: &noshape_render::ca
     // Live ex2 (3x): a second end's stem is half as long, then two chevrons. Fillet's: the triangle alone, centred on
     // its point.
     let base = if a.triangle { tip - dir * (TRIANGLE_PX * 0.5 * wpp) } else { tip + dir * ARROW_SHAFT_PX * if a.secondary { 0.5 } else { 1.0 } * wpp };
-    let heads = if a.triangle {
+    let heads = if a.tangential {
+        tangent_point_polylines(tip, dir, side, view.direction(), wpp)
+    } else if a.triangle {
         head_polylines(base, dir, side, TRIANGLE_PX * wpp, TRIANGLE_PX * ARROW_HEAD_W_PX / ARROW_HEAD_PX * wpp, false)
     } else {
         head_polylines(base, dir, side, ARROW_HEAD_PX * wpp, ARROW_HEAD_W_PX * wpp, a.secondary)
@@ -1355,7 +1382,7 @@ fn arrow_glyph(a: &Arrow, hover: bool, dragging: bool, view: &noshape_render::ca
     let mut back = LineData::default();
     let mut front = LineData::default();
     for (data, color, width) in [(&mut back, outline, outline_px), (&mut front, core, core_px)] {
-        if !a.triangle {
+        if !a.triangle && !a.tangential {
             data.push_polyline(&[f(tip), f(base)], color, 0, width, LineSegment::ON_TOP);
         }
         for p in &heads {
@@ -1379,7 +1406,24 @@ fn dragged_angle_text(rad: f64, units: &noshape_units::UnitPrefs) -> String {
 
 #[cfg(test)]
 mod snap_tests {
-    use super::{dragged_angle_text, handle_style, linear_step, snap_degrees};
+    use super::{dragged_angle_text, handle_style, linear_step, snap_degrees, tangent_point_polylines};
+
+    /// Live feel cov-1120 s1-zoom: std's TANGENTIAL point is a ~13 px ring facing the view and a hollow 12 px arrowhead
+    /// each way along the edge, from 12 px out to 24 px.
+    #[test]
+    fn a_tangential_point_is_a_ring_with_an_arrowhead_each_way() {
+        use glam::DVec3;
+        let (at, wpp) = (DVec3::new(1.0, 2.0, 3.0), 0.5);
+        let lines = tangent_point_polylines(at, DVec3::X, DVec3::Y, DVec3::Z, wpp);
+        assert_eq!(lines.len(), 3, "a ring and two heads");
+        let px = |p: &DVec3| (*p - at).length() / wpp;
+        assert!(lines[0].iter().all(|p| (px(p) - 6.5).abs() < 1e-9 && (p.z - at.z).abs() < 1e-12), "the ring: 13 px across, facing the view");
+        for (head, sign) in lines[1..].iter().zip([1.0, -1.0]) {
+            let along: Vec<f64> = head.iter().map(|p| (p.x - at.x) / wpp * sign).collect();
+            let (lo, hi) = along.iter().fold((f64::MAX, f64::MIN), |(a, b), &x| (a.min(x), b.max(x)));
+            assert!((lo - 12.0).abs() < 1e-9 && (hi - 24.0).abs() < 1e-9, "a head from 12 to 24 px out: {along:?}");
+        }
+    }
 
     /// Live feel/dialogs.json: a dragged angle is written at the workspace's angle precision (3 by default), zeros
     /// dropped.

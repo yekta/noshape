@@ -860,7 +860,7 @@ pub fn helix_manipulators(ctx: &crate::regen::context::Context, params: &ParamVa
         return Vec::new();
     }
     let Ok(height) = ev.length("height") else { return Vec::new() };
-    vec![("heightManipulator".to_string(), M::Linear { base: start, direction: axis, offset: if opposite { -height } else { height }, min: -500.0, max: 500.0, secondary: false, primary: Some("height".into()) })]
+    vec![("heightManipulator".to_string(), M::Linear { base: start, direction: axis, offset: if opposite { -height } else { height }, min: -500.0, max: 500.0, secondary: false, tangential: false, primary: Some("height".into()) })]
 }
 
 /// Move curve boundary's distance arrow (moveCurveBoundary.fs: Extend, Blind, with a help point): the first
@@ -987,7 +987,7 @@ pub fn partial_fillet_manipulators(ctx: &crate::regen::context::Context, params:
         let offset = total * param;
         out.push((
             format!("partialPointOnEdgeManipulator.{index}"),
-            crate::display::FeatureManipulator::Linear { base: point + direction * offset, direction: -direction, offset, min: 0.0, max: total, secondary: false, primary: Some(primary.to_string()) },
+            crate::display::FeatureManipulator::Linear { base: point + direction * offset, direction: -direction, offset, min: 0.0, max: total, secondary: false, tangential: true, primary: Some(primary.to_string()) },
         ));
     }
     out

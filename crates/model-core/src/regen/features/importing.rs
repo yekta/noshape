@@ -452,7 +452,7 @@ fn apply_look(ev: &mut EvalCtx, bi: usize, look: &Look, appearances: bool) {
 fn decal_manipulators(ev: &mut EvalCtx, record: &crate::regen::context::DecalRecord, (w, h): (f64, f64), (u, v): (f64, f64), angle: f64, with_origin: bool) {
     use crate::display::FeatureManipulator as M;
     use crate::regen::context::DecalMapping;
-    let lin = |base: DVec3, direction: DVec3, offset: f64, primary: Option<&str>| M::Linear { base, direction, offset, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: primary.map(str::to_string) };
+    let lin = |base: DVec3, direction: DVec3, offset: f64, primary: Option<&str>| M::Linear { base, direction, offset, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, tangential: false, primary: primary.map(str::to_string) };
     // A point of the image (0..1 each way) on the decal's surface: the inverse of its UV transform.
     let world_at = |uv: [f64; 2]| -> DVec3 {
         let (l, t) = (&record.uv_linear, &record.uv_translation);

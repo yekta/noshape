@@ -897,3 +897,34 @@ fn a_lit_face_goes_dark_when_the_pointer_leaves_the_window(cx: &mut TestAppConte
     leave(cx);
     assert_eq!(lit(cx), None, "out of the window with a pick on its way: nothing lit");
 }
+
+/// Live drift-1120: a fast move off a lit face clears it on that move (redrawn 5–7 ms after it), not after the pause
+/// the next pick waits for.
+#[gpui::test]
+fn a_fast_move_off_a_lit_face_clears_it_on_that_move(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view, top, _) = block_part(cx, "hover-fast-off");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let centre = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let i = b.face_refs.iter().position(|r| *r == top).expect("the top face");
+        let (first, count) = b.mesh.face_ranges[i];
+        let idx = &b.mesh.indices[first as usize..(first + count) as usize];
+        let c = idx.iter().map(|&k| { let q = b.mesh.positions[k as usize]; glam::DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64) }).sum::<glam::DVec3>() / idx.len() as f64;
+        v.viewport.read(cx).project(c).expect("the top face on screen")
+    });
+    let pointer = Pointer::new(cx, window, &view);
+    pointer.move_to(cx, &view, centre);
+    assert_eq!(cx.update(|cx| view.read(cx).hover.clone()), Some(top.clone()), "the top face lit under the pointer");
+    // A 1 px move on the face, then at once 200 px up off the part: one fast move.
+    let move_to = |cx: &mut TestAppContext, at: DVec2| {
+        let win = pointer.window_point(cx, at);
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(win, None, Modifiers::default());
+    };
+    move_to(cx, centre + DVec2::new(1.0, 0.0));
+    move_to(cx, DVec2::new(centre.x, (centre.y - 200.0).max(4.0)));
+    let after = cx.update(|cx| (view.read(cx).hover.clone(), view.read(cx).viewport.read(cx).hover_settled()));
+    assert_eq!(after.0, None, "the face dark on the move off, before any pause or frame (settled: {})", after.1);
+}

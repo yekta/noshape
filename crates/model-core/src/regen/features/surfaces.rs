@@ -958,7 +958,7 @@ pub fn ruled_surface(ev: &mut EvalCtx) -> FResult<()> {
                 let t = e.tangent_at(if i == 0 { info.first_param } else { info.last_param })?.normalize_or(DVec3::X);
                 let (ruled, base) = dir_at(pts[i], t)?;
                 use crate::display::FeatureManipulator as M;
-                ev.manipulators.push(("depthManipulator.T.-1".into(), M::Linear { base: pts[i], direction: ruled, offset: dist, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: Some("distance".into()) }));
+                ev.manipulators.push(("depthManipulator.T.-1".into(), M::Linear { base: pts[i], direction: ruled, offset: dist, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, tangential: false, primary: Some("distance".into()) }));
                 if ty != "ALIGNED_WITH_VECTOR" {
                     let tau = std::f64::consts::TAU;
                     // std keeps the sign: the angle modulo a turn, less a turn when negative.

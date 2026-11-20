@@ -353,7 +353,7 @@ pub fn fit_spline(ev: &mut EvalCtx) -> FResult<()> {
             for (key, end, at, back, primary) in [("startManipulator", s, pts[0], false, "startMagnitude"), ("endManipulator", e, pts[pts.len() - 1], true, "endMagnitude")] {
                 let Some((d, m, _)) = end else { continue };
                 let direction = if back { -d } else { d };
-                ev.manipulators.push((key.into(), crate::display::FeatureManipulator::Linear { base: at, direction, offset: m * span / 3.0, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: Some(primary.into()) }));
+                ev.manipulators.push((key.into(), crate::display::FeatureManipulator::Linear { base: at, direction, offset: m * span / 3.0, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, tangential: false, primary: Some(primary.into()) }));
             }
             if s.is_some() || e.is_some() {
                 let mut t = vec![DVec3::ZERO; pts.len()];
@@ -1191,7 +1191,7 @@ fn trim_offset(ev: &mut EvalCtx, wire: &Shape, edges: &[Shape]) -> FResult<Shape
     let (p0, t0) = chain_point_at_length(edges, s0.min(total))?;
     let (p1, t1) = chain_point_at_length(edges, (total - s1).max(0.0))?;
     use crate::display::FeatureManipulator as M;
-    let arrow = |base: DVec3, direction: DVec3, primary: &str| M::Linear { base, direction, offset: 0.0, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: Some(primary.into()) };
+    let arrow = |base: DVec3, direction: DVec3, primary: &str| M::Linear { base, direction, offset: 0.0, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, tangential: false, primary: Some(primary.into()) };
     ev.manipulators.push(("startTrimManipulator".into(), arrow(p0 + t0 * (s0 - total).max(0.0), t0, "startTrim")));
     if !ev.bool("equalTrim") {
         ev.manipulators.push(("endTrimManipulator".into(), arrow(p1 + t1 * (total - s1).min(0.0), t1, "endTrim")));

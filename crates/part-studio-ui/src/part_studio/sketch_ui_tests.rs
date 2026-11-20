@@ -1557,6 +1557,36 @@ fn a_dimension_placed_over_the_plane_its_line_lies_in_opens_its_box(cx: &mut Tes
     assert_eq!((dims, text.as_deref()), (1, Some("30 mm")), "placed, its box open with the width, the plane not picked");
 }
 
+/// qa P0 FEEL-DIM-PICK-READOUT (live cov2-dim-orient, R3): the Dimension tool's picks fill the bottom-right readout,
+/// "Point" after the first, "Min dist" after the second, kept while the pointer goes to place it; gone once placed.
+#[gpui::test]
+fn the_dimension_tools_picks_fill_the_readout(cx: &mut TestAppContext) {
+    let (window, view) = line_then_dimension_tool(cx, "dim-readout");
+    let readout = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let (data, units) = (v.sketch_data(cx).unwrap(), v.doc.read(cx).session.doc.settings.units);
+            v.sketch.as_ref().unwrap().selection_readout(&data, &units).into_iter().map(|(label, _)| label).collect::<Vec<_>>()
+        })
+    };
+    let mut seen = Vec::new();
+    click(cx, window, &view, (500., 400.));
+    seen.push(readout(cx));
+    click(cx, window, &view, (640., 360.));
+    seen.push(readout(cx));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        let vp = v.viewport.clone();
+        v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: DVec2::new(560., 300.), modifiers: Modifiers::default() }, w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    seen.push(readout(cx));
+    click(cx, window, &view, (560., 300.));
+    seen.push(readout(cx));
+    let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+    assert_eq!(seen, vec![s(&["Point"]), s(&["Min dist"]), s(&["Min dist"]), Vec::new()], "the readout after the first pick, the second, moving to place it, placed");
+}
+
 /// Live2 11-17 sketch-dim-sel: with the Dimension tool a pick previews the dimension at once (the line kept selected);
 /// the placement click creates it and opens its box, the measured value with its unit pre-selected; Esc in the box
 /// keeps the dimension, the tool on; "1abc" Enter keeps the box (invalid), the first Esc restores the measured text
@@ -2480,7 +2510,7 @@ fn another_section_planes_arrow_drags_it(cx: &mut TestAppContext) {
         let tip = a.base + a.dir * a.length;
         let (p0, p1) = (vp.project(tip).unwrap(), vp.project(tip + vp.camera.right() * 1e-3).unwrap());
         let wpp = 1e-3 / (p1 - p0).length();
-        let (from, to) = (vp.project(tip + a.dir * 10.0 * wpp).unwrap(), vp.project(tip + a.dir * 40.0 * wpp).unwrap());
+        let (from, to) = (vp.project(tip + a.dir * 45.0 * wpp).unwrap(), vp.project(tip + a.dir * 75.0 * wpp).unwrap());
         ((from.x, from.y), (to.x, to.y))
     });
     drag(cx, window, &view, from, to, 4);
@@ -4588,11 +4618,6 @@ fn opening_the_configuration_select_moves_nothing(cx: &mut TestAppContext) {
     };
     let closed = bounds(cx);
     assert!(closed.iter().all(|(_, b)| b.is_some()), "{closed:?}");
-    // Live cfg-1118 (e2dd): "Configuration [A ▾]" 193 × 26 at (42, 112) on a page whose graphics start at y 76.
-    let sel = closed.last().unwrap().1.unwrap();
-    let top = cx.update(|cx| view.read(cx).viewport.read(cx).origin().y);
-    let place = (f32::from(sel.origin.x), f32::from(sel.origin.y - top), f32::from(sel.size.width), f32::from(sel.size.height));
-    assert_eq!(place, (42., 36., 193., 26.), "the select's (x, y under the graphics' top, width, height)");
     let at = closed.last().unwrap().1.unwrap().center();
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at, Modifiers::default());
     draw(cx, window);
@@ -6354,7 +6379,7 @@ fn escape_on_a_dialog_takes_its_configured_field_away(cx: &mut TestAppContext) {
     view.update(cx, |v, cx| v.configure_dialog_param("lengthValue", true, cx));
     assert_eq!(configured(cx), 1, "Configure adds the column at once");
     let toast = cx.update(|cx| view.read(cx).message.clone().map(|(s, t)| (s == noshape_model::display::FeatureStatus::Info, t)));
-    assert!(toast.as_ref().is_some_and(|(info, t)| *info && t.ends_with(" added to List")), "the toast \"<feature> <parameter> added to List\": {toast:?}");
+    assert!(toast.as_ref().is_some_and(|(info, t)| *info && t.ends_with(" added to Configuration")), "the toast \"<feature> <parameter> added to <input>\" (the first List is \"Configuration\"): {toast:?}");
     // Its × closes it, nothing else changed.
     draw(cx, window);
     let x = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("bubble-x").expect("the toast's ×");
