@@ -1,39 +1,40 @@
 # Blends (agent "blend"): current state
 
-Updated 11-20 12:45 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-20 16:05 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-20 12:45, thread on the Hello account)
+## Now (11-20 16:05, thread on the Hello account)
 
-- Landed 11-20: car end (f689de1bb), groups speed (214446392: isaac-ball 00f1d4 Fillet 6 5246 -> 968 ms, Fillet 8
-  2382 -> 594), car Fillet 1, 805e29, mutualtrim, CHAMFER-ASYM; e54410 / a2e4a2 chamfers 11-19.
-- Running units (local, `systemctl status blend-*`; results in /root/blend-scratch, *.done markers, logs/):
-  blend-gatefwork (vibex8 suite pair; base done, new running -> suite-efwork.cmp, gatefwork.done), blend-gateseg (trim
-  gate: tests -> logs/gseg-tests.out, userdocs ud-seg.log, suite-eseg.cmp, gateseg.done), blend-capprobe (Halter cap
-  1.403 mm -> logs/imp-faces-cap1403.out), blend-budprobe (after it: ZZBUD budget-fire probes -> logs/imp-bud-b1.out).
-- 1. Fillet work bound (worktree blend-fwork, 08749e8bb): build_fillet_bounded = ScopedWork(FILLET_WORK 50000) round
-  every BRepFilletAPI_MakeFillet build (patch 0030's break hook; no clock). 850efe Fillet 3 fails in 4727 ms (was ~35 s).
-  Tests ok, ud-fwork ALL-SAME; suite clean -> g13.sh, land.sh from blend-fwork, report the ms. Base fwork-base.
-- 2. Halter (impeller Fillet 3 near tip). Trim committed: blend-f850 branch blend-seg b6bb39e3b (extend_face_over
-  extends the face's own UV part, not the whole surface; tip x 1.502 -> 0.957, live 0.097). Gate blend-gateseg; land
-  when identical except intended. Probes in worktree blend-cap (branch blend-capx = b6bb39e3b + parked/f850-probes-1120
-  .patch + ZZBUD), never commit. bin/imp-faces.sh <wt> <tag> ['ENV=..'] (IHOST=host). Next: live extends the chamfer
-  linearly 1.403 mm (0.4008 of its width): probe ZZ_CAPEXT=1.403, then derive the rule; then feature 29 (Fillet
-  Stevenrohr zum Halter).
-- 3. SUITE-IMPELLER-FILLET3 (qa P1, mine; core agrees it's a time budget): impeller alone on main, vibex8 under load ->
-  27/48, Fillet 3 39/113/71, 5266 ms; unloaded single runs 29. Clocks on the path: CancelIndicator deadline (boolean.cpp
-  ~255), pool jobs' wall clock in deadline checks (boolean.cpp ~483: cpu0 + wall), run_budgeted CPU budgets. ZZBUD probe
-  shows which fires; replace it by a work bound (DECISIONS: no clocks).
-- 4. qa P2 c2-curve-pattern-composite Fillet 2 28/58/32 vs live 26/52/28.
-- 5. dx speed (impeller): Fillet 3 1839 vs live 107 ms, Ansaugflansch 1654/321 (blend.scaled 532 after as_is 273),
-  Flansch zum Stroemungskanal 1002/67, Fillet 4 361/102; knifehandle Fillet 3 306/12.
-- Cleanup after lands: worktrees cham-base, carend-base, groups-base, fwork-base, blend-f850, blend-cap (+ host targets
-  ~/agents/<wt>/target), vibex7 ~/tmp/blend/cli-{blend-speed,groups-base,carend-base,blend-carend,fwork-base,blend-fwork},
-  vibex8 ~/tmp/blend/f850, Mac ~/noshape-host/agents/blend10/f850. blend-cham is on branch blend-e54 (= main, unused).
+- Landed 11-20: work bound e5b2ec359 (OCCT fillet builds stop past 50000 break-hook steps), groups speed 214446392,
+  car end f689de1bb, car Fillet 1, 805e29, mutualtrim, CHAMFER-ASYM.
+- Mac off limits until the lead says it's back (user, until ~18:05). Build on vibex7/vibex8/vibe2.
+- 0. P0 COMPAT-RUSTZERO-FILLET1 (ticket rust-zero-solid-f197, vibex7 ~/qa/tickets): Fillet 1 Error "Failed to fillet
+  selections." since b2b0cf9a (last good 73470cff); ships 17:00 listed as known (lead). Deterministic: release main
+  fails too. Fillet 1's op_fillet input differs from the old build (an extra cylinder face + seam p-curve). Still Error
+  with single reverts of 0f8993ef8, 61295b96f, 6b384aa69, aa5682636. Engine commits in range: dfc773b80, 6910009d2
+  (mine), f7b711726, 3d459b517, b12434a76, 426922541 (core; only 426922541 can change a built shape: part pattern
+  seed merge scope; the doc has Mirror 1 before Fillet 1). Running: blend-rzled (main + ZZ_LED forcing
+  legacy_edge_directions, core's idea, worktree blend-cham, vibe2 -> logs/rz-led.out), blend-rz2 (b2b0cf9a minus
+  426922541, worktree blend-rz2, vibex7 -> logs/rz-rz2no4269.out). bin/rz-build.sh <wt> <tag> <host> builds + tests;
+  vibex7 ~/tmp/blend/rz/st.py prints the statuses. Then fix forward (core owns it if it's his).
+- 1. Halter: trim b6bb39e3b (worktree blend-f850, branch blend-seg). Tests ok, userdocs ALL-SAME; suite pair
+  (blend-gateseg, vibex8 slot) pending -> suite-eseg.cmp. Land if only intended diffs. The 1.403 mm cap alone made
+  it worse (tip piece dropped): derive live's extension rule, then feature 29.
+- 2. P1 SUITE-IMPELLER-FILLET3 (load-dependent 27/29): blend-capprobes (vibex8 slot) runs blend-cap's ops binary
+  with ZZ_BUD -> logs/imp-bud-b2.out (which deadline fires), then c2-curve-pattern-composite faces -> logs/cpc-c2.out
+  (P2: Fillet 2 28/58/32 vs live 26/52/28). Replace the firing clock with a work bound.
+- 3. Impeller speed (vibex7, loaded, main 452420b22, NOSHAPE_KERNEL_PROFILE, logs/prof-p1.txt): Fillet 3 8.2 s =
+  op_boolean x3 3.9 s (Edge-Face x742 2.2 s), min_distance x133 1.7 s, bounding_box x195 0.9 s, op_split x10 0.8 s;
+  Ansaugflansch 6.7 s = op_fillet x2 5.5 s (as_is fails 1.2 s, then scaled 2.3 s); Flansch zum Stroemungskanal 13.7 s
+  = op_fillet x8 12.8 s (blend.fallback.by_groups 9.1 s). Next: why by_groups runs in Flansch, why as_is fails.
+- 4. New option-coverage model from live: c2-opt-fillet-partial-asym-smooth (tests/parity-models/index.json,
+  /root/parity/models; behaviours "## Feature option coverage (11-20)").
+- Cleanup: worktrees cham-base, carend-base, groups-base, fwork-base, blend-fwork, blend-cap, blend-rz2 (+ host
+  targets ~/agents/<wt>/target), vibex7 ~/tmp/blend/green-dbg (1 GB) and cli-*, ~/tmp/blend/rz/d-*.
 - Agent ids: only in /root/lead-scratch/roster.md; read it before every message_agent, never copy ids here.
 
 ## In flight (older)
