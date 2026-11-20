@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-20 09:57 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-20 11:14 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -35,31 +35,35 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (09:57 UTC 11-20; this thread moves to a fresh one at 10:00, Motile's weekly limit)
+## Now (11:14 UTC 11-20, fresh thread since 10:00)
 
-1. LANDED 09:29 as 37741d38: the whole 11-20 batch (EDGE-MIDPOINT-REST-LOOK, FEEL-DIM-PICK-READOUT,
-   FEEL-ROLLBACK-DROP-ROW, FEEL-SECTION-ARROW-FOOT, HOVER-LEAVES-WINDOW, FEEL-FAST-OFF-CLEAR, PARTS-LIST-PROPERTIES,
-   TABLES-STICKY-HEADER-HSCROLL, MEASURE-CIRCLE-DEFAULT-PLANE; the four never-ticked TRANSFORM-GHOST-LOOK /
-   SECTION-PREVIEW-COLOUR / HOLE-CALLOUT-PLACE / FLFEEL-BAR-MENU ticked "to verify"). qa, studios, asm, skasm told
-   09:3x. Nothing queued. (620709c4 had failed 07:55 on two tests: the 3D click rows now `pointer.settle` after
-   each click for its GPU pick; the FS triple-click test expects live's newline after studios' vendor change.)
-2. IN FLIGHT, uncommitted in the worktree (a backup in stash "psui-feeltests-1000": drop it, found by tag, once
-   committed; if the worktree lacks them, apply it by SHA from `git stash list --format='%H %gs'`): tests for the last untested Part Studio feel rows (interaction-feel 574 / 575 / 577):
-   - part-studio-ui sketch_glyph_feel_tests::a_lines_glyph_row_is_20_px_boxes_22_px_apart_20_5_px_off_its_middle
-     (Show constraints on, rectangle; reads `glyph-{cid}-{eid}` debug bounds). run136 failed only because one rectangle
-     line has no glyphs; fixed (skips empty rows, needs a row of 2+); run138 reruns it (log psui-scratch/run138.log).
-   - scene sketch_mode tests a_dimension_arrowhead_is_16_by_7_px (`arrow`), geometry_being_drawn_is_lives_preview_blue
-     (overlay of Line / Circle / CornerRect, rgb(68,156,205) 2 px) + clippy on scene and part-studio-ui: run137.
-   Both runs started before the stash: if their logs are empty or stale, rerun after applying the stash (touch the two
-   files). When green: commit, fill the Test cells of rows 574 / 575 / 577, land.
-   Rows 578-580 (planes/axes colours, mate connector size, in-context colours) stay "–": constants calibrated on live's
-   screenshots; a test would only restate them.
-3. Untested "=" rows elsewhere in interaction-feel (56) are asm's (mates, instance list, asm views, 3D in an assembly)
-   and studios' (documents page, drawings) sections: not psui's. No psui row is ≠ (1313 units is the lead's decision).
-4. Waiting on live: the Configurations box's label column (ours 80 px fixed, config_panel.rs `div().w(px(80.))`; live
-   ~32 px for "Size"): REQUESTS 06:40. No change until live answers. Also the diagonal submenu timing (REQUESTS 16:37).
-5. Cleanup: vibex8 ~/agents/psui/target is 21 GB (over the 20 GB rule): clear target/debug once no run uses it. vibe2's
-   psui target cleared 07:5x; branch psui-backup-1119 deleted (all landed). Not to build: 3D Sketch, Fault analysis.
+1. IN FLIGHT, a local commit "psui: wip" (rebased on main 10:3x; amend it into the real subject before land.sh):
+   - Feel-row tests for interaction-feel 574 / 575 / 577: sketch_glyph_feel_tests::a_lines_glyph_row_is_20_px_boxes_22_px_
+     apart_20_5_px_off_its_middle; scene sketch_mode a_dimension_arrowhead_is_16_by_7_px, geometry_being_drawn_is_lives_
+     preview_blue (run139: the scene two pass). Fill those rows' Test cells when green.
+   - qa reopen R8 FEEL-ROLLBACK-DROP-ROW (`row_hover_filled`, mod.rs); R9 FEEL-SECTION-ARROW-FOOT (`SECTION_STEM_PX`,
+     test the_section_arrow_reaches_about_100_px_from_its_plane); Configurations box labels (live cfglabel-1120, test
+     the_configurations_box_labels_take_their_texts_width); FEEL-SM-PARTIAL-FLANGE-MANIP handle (TANGENT_* consts in
+     manipulators.rs: ring 19, heads 24-41 px, live's blue in every state; at-rest asked of live2, REQUESTS 10:40).
+   - TICKETS: SETLIB ticked; R8 / R9 / partial-flange "fixed, to verify"; HEAVY-ASM-SOFTWARE-FRAME closed (lead).
+   - Uncommitted on top: the frame cache (item 2).
+   Check: run141 (vibex7) then run142.sh (clippy render + app-core + part-studio-ui; app-core viewport; sketch_hover_feel
+   + the tests above). Green: amend, land.sh, tell qa (R8 / R9 / handle), drop stash "psui-feeltests-1000" (by tag).
+2. P0 heavy Part Studio feel (lead 10:3x). Tools: /root/psui-scratch/hf.sh (vibex6 ~/agents/psui-keep/hf2.sh <doc>
+   <tab hex> <out> [perf] [NOSHAPE_PERF_SKIP]) + hfeel.py (screen-timed hover / clear / click / Shift+E, 5 takes); docs
+   + green 9381b4adc binary in vibex6 ~/tmp/psui (isaac "Studio 850efe" bb49db4ceba0762c, "Studio de4eff"
+   874aef1a8b008b1b; impeller 844c39ce20497196; block.noshape cc4a172465de10c6). Medians (ms) hover / clear / select /
+   dialog: block 480 / 228 / 128 / 93; 850efe 404 / 157 / 495 / 68; de4eff 412 / 123 / 333 / 104; impeller 568 / 290 /
+   199 / 137. Live drift-1120 (software GL): hover 113-259, clear 5-7. Not model size: one llvmpipe frame is 90-120 ms
+   (r.gpu ~56 even for a block; no single pass dominates: NOSHAPE_PERF_SKIP "ao" only drops AO from the timer, not the
+   pass) + GPUI's present ~30. Fix in progress (uncommitted): viewport.rs `frame_cache` (3 read-back full frames keyed
+   by `frame_key` + `Scene::same_as`); a frame equal to one kept is shown at once and the render thread only told
+   (`Gpu::adopt` -> `Renderer::adopt_frame`: picks answer for its scene). Test sketch_hover_feel_tests::a_cleared_hover_
+   shows_the_frame_drawn_before_without_drawing. Then: hf2.sh A/B on the block + the 3 docs; hover itself (first light)
+   stays one frame + the prehighlight wait.
+3. Untested "=" rows elsewhere (56) are asm's and studios'. Rows 578-580 stay "–" (calibrated constants).
+4. Cleanup: vibex8 ~/agents/psui/target 21 GB: clear target/debug once run140 is done. Not to build: 3D Sketch, Fault
+   analysis.
 
 ## Agents
 

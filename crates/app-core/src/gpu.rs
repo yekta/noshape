@@ -209,6 +209,11 @@ impl Gpu {
         self.worker().submit(job);
     }
 
+    /// `job`'s frame is shown from the viewport's copy of one drawn before: picks answer for it from now on.
+    pub fn adopt(&self, job: RenderJob) {
+        self.worker().adopt(job);
+    }
+
     /// Read a rectangle (device pixels) of the target's pick buffer for its
     /// newest frame; the answer arrives on the target's pick channel.
     pub fn pick(&self, target: u64, token: u64, rect: PickRect) {

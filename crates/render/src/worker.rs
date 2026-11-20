@@ -90,8 +90,23 @@ pub struct RenderJob {
     pub seq: u64,
 }
 
+impl RenderJob {
+    fn request(self) -> FrameRequest {
+        FrameRequest {
+            scene: self.scene,
+            camera: self.camera,
+            width: self.width,
+            height: self.height,
+            device_pixel_ratio: self.device_pixel_ratio,
+            style: self.style,
+            invalidate_pick: self.pick,
+        }
+    }
+}
+
 enum Msg {
     Render(Box<RenderJob>),
+    Adopt(Box<RenderJob>),
     Pick { target: u64, token: u64, rect: PickRect },
     SetPresent(u64, Present),
     SetOverlay(u64, Option<Arc<crate::overlay::Overlay>>),
@@ -155,6 +170,7 @@ impl RenderWorker {
                             jobs.push(job);
                         }
                     }
+                    Msg::Adopt(job) => renderer.adopt_frame(job.target, job.request()),
                     Msg::Pick { target, token, rect } => picks.push((target, token, rect)),
                     Msg::SetPresent(target, present) => renderer.set_present(target, present),
                     Msg::SetOverlay(target, overlay) => renderer.set_overlay(target, overlay),
@@ -207,15 +223,7 @@ impl RenderWorker {
                         if renderer.can_submit(jobs[i].target) {
                             let job = jobs.swap_remove(i);
                             let (target, seq) = (job.target, job.seq);
-                            let req = FrameRequest {
-                                scene: job.scene,
-                                camera: job.camera,
-                                width: job.width,
-                                height: job.height,
-                                device_pixel_ratio: job.device_pixel_ratio,
-                                style: job.style,
-                                invalidate_pick: job.pick,
-                            };
+                            let req = job.request();
                             perf::frame_milestone(seq, "taken by the render thread");
                             if let Err(e) = renderer.submit_frame(target, seq, req) {
                                 on_done(Completed::Frame { target, seq, result: Err(e) });
@@ -275,6 +283,11 @@ impl RenderWorker {
 
     pub fn submit(&self, job: RenderJob) {
         let _ = self.tx.send(Msg::Render(Box::new(job)));
+    }
+
+    /// The caller shows `job`'s frame from its own copy of one drawn before: picks answer for it from now on.
+    pub fn adopt(&self, job: RenderJob) {
+        let _ = self.tx.send(Msg::Adopt(Box::new(job)));
     }
 
     /// Read a rectangle (device pixels) of `target`'s pick buffer for its
