@@ -1629,5 +1629,32 @@
   "url": "https://cad.onshape.com/documents/3c47bd5fbd9ad2cbb4e1d14d/w/728fd46698d94e0bad243937/e/44643d5e8ab40d0f0359389c",
   "title": "opt-mirror-pattern-ops",
   "original": "https://cad.onshape.com/documents/7784095af76cf11affb1afd7/w/652f716ff0846c0bc127cdf8/e/258caeb805fbd189fc51d1ab"
+ },
+ {
+  "name": "c2-opt-loft-periodic-trim-thin",
+  "document": "1e508ec75dd15bbc40aeb2f7",
+  "workspace": "10d45d94cc5739040d2812a7",
+  "element": "590cebd79b19a78aa1f1e208",
+  "url": "https://cad.onshape.com/documents/1e508ec75dd15bbc40aeb2f7/w/10d45d94cc5739040d2812a7/e/590cebd79b19a78aa1f1e208",
+  "title": "opt-loft-periodic-trim-thin",
+  "original": "https://cad.onshape.com/documents/5840dde20fc2744e6bc1a686/w/33562e4ad586fc11dbe19aa4/e/19e7619e07cebffd8c793cd7"
+ },
+ {
+  "name": "c2-opt-intersect-sweep-loft-extrude",
+  "document": "e8964f9dc297143051365e80",
+  "workspace": "9f9daf6ae55de624cdae5de4",
+  "element": "237f3401e97c2e614e46adca",
+  "url": "https://cad.onshape.com/documents/e8964f9dc297143051365e80/w/9f9daf6ae55de624cdae5de4/e/237f3401e97c2e614e46adca",
+  "title": "opt-intersect-sweep-loft-extrude",
+  "original": "https://cad.onshape.com/documents/5c004b7d701cdae492acedbb/w/0ff93cf2a0869c4a1b1e1373/e/36bba95ff361652b424f576d"
+ },
+ {
+  "name": "c2-opt-revolve-surface-add-mirror-reapply",
+  "document": "622bc2049d57b85f6ed1729d",
+  "workspace": "87a25c917a25200f227cc8d0",
+  "element": "c009f014caa82561afcdd270",
+  "url": "https://cad.onshape.com/documents/622bc2049d57b85f6ed1729d/w/87a25c917a25200f227cc8d0/e/c009f014caa82561afcdd270",
+  "title": "opt-revolve-surface-add-mirror-reapply",
+  "original": "https://cad.onshape.com/documents/18be675fb57477de8fbb9ee0/w/e2fd9b9d31a8bbe1ebc9bc8f/e/503568a0bb1cb174b6c55b37"
  }
 ]
