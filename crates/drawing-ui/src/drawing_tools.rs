@@ -802,9 +802,11 @@ impl DrawingEditor {
                     }
                 }
             }
+            // The first point's disc and the line from it to the pointer (live drw-centerline-2-point-cylinder-axis s1).
             Tool::Centerline { first: Some(a) } => {
                 if let Some(sa) = self.pick_sheet(a) {
                     overlay.lines.push((vec![sa, self.hover_snap.unwrap_or(c)], true));
+                    overlay.marks.push((sa, crate::drawing_scene::SnapMark::Disc, 0.0));
                 }
             }
             Tool::CircleCenterline { three, points } if !points.is_empty() => {

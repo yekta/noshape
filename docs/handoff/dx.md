@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-20 14:3x UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-20 16:3x UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -9,35 +9,27 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
-## Now (14:3x 11-20): FRAME PROFILES (lead "build it") + URDF REWRITE (lead "go on")
-- FRAMES (dx-land, uncommitted on top of 45ebed800 + ce6f7a10): live 13:50 (behaviours "Standard frame profile
-  studios", parity/models/<m>/derived/<element>/options.tsv) says option ids don't tell the size, display names do.
-  Done: tests/parity.rs passes options.tsv as features `profileOptions`; library_profile maps id -> display name;
-  frame_library: AISC L-angles = live studio's 127 sizes/names/order (L2x2x0.125 …) with kdes, drawn as live (root
-  fillet kdes-t, toe arcs 0.9t, end flats 0.1t, d along y; 317.649 mm2 as live), old fraction names still read;
-  ANSI Rectangular tube has Rounded (r = max(w,h)/20, (max-t)/20). parity.rs qCreatedBy(F…, EDGE) handler (endcap
-  Frame 1 paths). Test run fr3 (vibex7). Next: fxf rerun (vibex7 ~/agents/dx-keep/fx2x.sh), commit, land, report.
-  fx3 (vibex7, before these) = baseline.
-- URDF (worktree /root/projects/noshape-wt/dx-urdf, branch dx-urdf, uncommitted): crates/ops/src/urdf.rs (live's
-  file shape: links/joints sorted, connector links, inertia, launch, visual per part, zip launch/meshes/urdf) +
-  live 13:37 joint types: Slider prismatic ±10000, Cylindrical / Pin slot / Planar / Ball chains through empty links,
-  limits (revolute/prismatic, effort 1 velocity 1), names numbered _1, links named in instance order; nothing fixed ->
-  root = heaviest fastened/rigid cluster, tie the later (INFERRED from live's 4 captures, not stated by live).
-  eval.rs: Prepared.flex_mates, pub mate_limits. Test run urdf2 (vibex8). Next: AGENT_API regen, full ops e2e,
-  commit, land, TICKETS URDF-LIVE-FILE-SHAPE [x] (open: Parallel/Tangent/Width not joints, root rule inferred).
-- LANDING ae0fa4d8 (QUEUED 14:21; = 3b980fee + AGENT_API regen + frames 4506c2b68). 3b980fee FAILED 13:34
-  (AGENT_API stale). Uncommitted in dx-land: parity.rs sketch plane SUB_FEATURE branch (hgr Bottom: an earlier
-  branch erred before 3b980fee's code ran; fx3's "not built" was also a stale binary: pmx.sh now logs builds to
-  pm-<tag>.build.log). fx4 (vibex7 ~/agents/dx-keep/fx4.sh, tag fxg) checks it.
-- DRAWING COVERAGE (live 14:28, area dx): drw-dimension-{point-to-point-vertical 0.394, point-to-line-hole-centre
-  0.787, line-to-line-vertical 0.394, angular-outside-corner 270.0 deg, 3-point-angular-isometric 60.0 deg} (live's
-  commit 8a145f224, queued). Ours run on vibex8: ~/agents/dx-keep/uip5.sh <names> (green app + uip/ archive).
-- bool 14:12: screws Sweep 1 cut 48 ms (0a0b9a49; whole feature ~85 ms Mac scale vs live 42), Sweep 1 still "not a
-  valid solid" (core's sweep); impeller Extrude Bohrungssitz Ansaugflansch: OCCT Boolean (Edge-Face x813), bool's.
-- x86 suite speed: lead "not real" (host load); qa runs the release suite in tonight's 02:00-04:00 vibex8 window;
-  Mac numbers stand (pm-r1-report.json in /root/dx-scratch).
-- MAC OFF until the lead says it is back (lead 13:5x: user wants it alone until 18:05 UTC, tunnel shut): no
-  NOSHAPE_RB_HOST=mac, no ssh/scp, no Mac scripts. Build on vibex7/vibex8.
+## Now (19:4x 11-20): FRAMES LAND + CHAMFER RULE + EXCHANGE OPTIONS
+- LANDED: 7aac1279 (frame profiles), 53ec91f0 (2 point dimension discs), eca5b13e / ee6357d0 (URDF as live's file).
+- QUEUED (dx-land, one commit): frames grid / start x / mirror; End cap trims its member by the thickness (std
+  endcap.fs: endcap 2/4 -> 4/4, gusset 4/4); hgr Front's in-feature connector on live's sketch frame (13 -> 15/52;
+  next: feature 15 "Side", x (0,1,0) normal (-1,0,0): connector_at_frame only takes x = +X); drawing coverage b2-b3
+  (small edges light their view only past 60 px; foreshorten drops its pick on a click on nothing; centerline first
+  pick lights its view, with a disc; arc length text without the arc symbol; chamfer note centred at the click).
+- HELD: the chamfer rule (/root/dx-scratch/chamfer-rule.patch: round_overrun counts an edge across only when it spans
+  the whole selected edge; saw-table Chamfer 1, 7.874 mm through a 3.175 mm angle leg; test
+  a_chamfer_through_an_angle_leg_builds). It changes fillets too: fx8 (saw-table + hgr) and a parity_models run
+  before landing.
+- EXCHANGE OPTIONS (dx-exch in the dx-urdf worktree, uncommitted): exchange_round_trip reads live-opt-self.json,
+  live-opt-drawing.json, live-opt-hidden.json (live 11-20 "Exchange option coverage", batches 1-4). Individual files
+  always zipped, entries "<tab> - <part>.<ext>" (ExportSettings.name). exo-b (vibex8 ~/agents/dx-keep/exo.sh b):
+  option imports 34/50, option exports read back 40/62. Gaps: duct STL 2 parts (live 9), glTF / GLB 2 (live 4),
+  Parasolid 28 duct 0 parts, compat IGES read as sheets (live sews solids) and ours not written in compatibility mode,
+  flattened assembly names without _1 _2, DXF explode notes keeps MTEXT (live LWPOLYLINE), splines as polylines keeps
+  SPLINE (live POLYLINE), explode all: ANNOTATION_TEXT layer missing.
+- Open: hgr Front's origin is a CENTROID packed as a VERTEX derivedFromEdges (no translator resolver yet: the frame
+  workaround above); 2 point centerline s4 (after Esc live reads EDGE from the hovered centerline); arc length text
+  position (ours 50.1, 96.5 vs live 52.7, 94.1).
 
 ## In flight: data exchange (lead 08:0x)
 Task: 10 corpus docs x every format + a drawing vs live's exports; re-import live's STEP / x_t; times vs live's.

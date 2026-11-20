@@ -5296,7 +5296,19 @@ impl<'a> Translator<'a> {
                     problems.push("its plane, an in-feature mate connector, taken as a plane on live's frame".into());
                     Value::from(p)
                 }
-                None if self.sub_params.contains_key(&sub) => plane,
+                // On live's frame (c2-hgr-riser-weldment's Front: a face's centroid packed as a vertex derived from
+                // the frame's edges, moved by -#AngleThick); else as translated.
+                None if self.sub_params.contains_key(&sub) => {
+                    let at = self.frames.get(&oid).and_then(|[o, x, y]| {
+                        let z = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+                        connector_at_frame(&json!({ "origin_mm": o.map(|c| c * 1000.0), "x": x, "z": z }))
+                    });
+                    if let Some(at) = at {
+                        problems.push("its plane, an in-feature mate connector, taken at live's frame".into());
+                        self.sub_params.insert(sub, at);
+                    }
+                    plane
+                }
                 None => return Err("its plane: an in-feature mate connector, and no plane of ours on live's frame".into()),
             },
             None => plane,

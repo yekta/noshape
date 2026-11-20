@@ -29,11 +29,11 @@ impl FrameProfile {
         k::make_face_2d(&k::Plane::xy(), &self.outer, &self.holes)
     }
 
-    /// Alignment point `index` of the 9-point bounding box grid (0..8,
-    /// row-major from the bottom left; 4 = center).
+    /// Alignment point `index` of the 9-point bounding box grid, std's layout (frameUtils getAlignmentPointOffsetData):
+    /// 8 7 6 / 5 4 3 / 2 1 0, 0 the bottom right, 4 the centre.
     pub fn alignment_point(&self, index: i64) -> DVec2 {
         let i = index.clamp(0, 8) as usize;
-        let (col, row) = (i % 3, i / 3);
+        let (col, row) = (2 - i % 3, i / 3);
         let lerp = |a: f64, b: f64, t: usize| a + (b - a) * t as f64 * 0.5;
         DVec2::new(lerp(self.min.x, self.max.x, col), lerp(self.min.y, self.max.y, row))
     }
@@ -233,6 +233,8 @@ mod tests {
         assert!(library().len() > 30);
         let c = p.alignment_point(4);
         assert!(c.length() < 1e-12);
-        assert!((p.alignment_point(0) - p.min).length() < 1e-12);
+        assert!((p.alignment_point(2) - p.min).length() < 1e-12);
+        assert!((p.alignment_point(0) - DVec2::new(p.max.x, p.min.y)).length() < 1e-12);
+        assert!((p.alignment_point(6) - p.max).length() < 1e-12);
     }
 }

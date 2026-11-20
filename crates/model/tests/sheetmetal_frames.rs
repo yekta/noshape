@@ -867,10 +867,15 @@ fn end_cap_manipulators_as_std() {
         p.set("thickness", expr("5 mm"));
     });
     let r = s.ok();
+    // std: without Opposite direction the member's end moves in by the thickness and the cap fills it (live
+    // c2-cov-frame-endcap: the member ends at 494, its 6 mm cap at 494..500).
+    let xs = |i: usize| r.context.bodies[i].shape.bounding_box(true).map(|b| (b.min.x, b.max.x)).expect("a box");
+    assert!(near(xs(0).0, mm(5.0), 1e-7) && near(xs(0).1, mm(200.0), 1e-7), "member {:?}", xs(0));
+    assert!(near(xs(1).0, 0.0, 1e-7) && near(xs(1).1, mm(5.0), 1e-7), "cap {:?}", xs(1));
     let m = &r.display.feature_state(cap).expect("state").manipulators;
     let Some((key, thick @ M::Linear { base, direction, offset, .. })) = m.iter().find(|(k, _)| k == "Thickness manipulator") else { panic!("{m:?}") };
     let tip = *base + *direction * *offset;
-    assert!(near(tip.x, mm(-5.0), 1e-9), "the tip on the cap's far face: {m:?}");
+    assert!(near(tip.x, mm(5.0), 1e-9), "the tip on the member's new end (std): {m:?}");
     assert!(m.iter().any(|(k, x)| k == "Offset manipulator" && matches!(x, M::Linear { offset, .. } if offset.abs() < 1e-12)), "{m:?}");
     let mut moved = thick.clone();
     if let M::Linear { offset, .. } = &mut moved {

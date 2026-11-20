@@ -208,7 +208,11 @@ impl SheetPick<'_> {
                     .or_else(|| self.line_pick().filter(|l| matches!(l, Pick::Line { a, .. } if a.view == view)))
                     .or_else(|| self.raw_line_pick().filter(|l| matches!(l, Pick::Line { a, .. } if a.view == view)))
                     .or_else(|| self.placement(view).filter(|pl| pl.contains(self.cursor, 2.0)).map(|pl| Pick::Point(PickedPoint { view, p: pl.to_view(self.cursor), r: None })));
-                picks.extend(e);
+                // A click on nothing drops the first pick (live drw-dimension-foreshorten-silhouette-only s2).
+                match e {
+                    Some(e) => picks.push(e),
+                    None => picks.clear(),
+                }
             }
             _ => {}
         }

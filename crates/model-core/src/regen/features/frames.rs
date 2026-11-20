@@ -500,14 +500,15 @@ pub fn frame(ev: &mut EvalCtx) -> FResult<()> {
         let n = path.segs.len();
         // Profile frames at segment starts / ends (x axis; y = t × x).
         let t0 = path.segs[0].t0;
-        let up = reference.unwrap_or(if t0.z.abs() < 0.999 { DVec3::Z } else { DVec3::Y });
-        let mut y = up - t0 * up.dot(t0);
-        if y.length() < 1e-9 {
-            y = t0.any_orthonormal_vector();
-        }
-        let y = y.normalize();
-        let x0 = y.cross(t0).normalize();
-        let mut x = DQuat::from_axis_angle(t0, angle) * x0;
+        // std's getPlaneAtLineStart: x = Z × t for a path with no z component, else Y × t; with a reference, its part
+        // across the path.
+        let x0 = match reference {
+            Some(r) => t0.cross(r).cross(t0),
+            None => (if t0.z.abs() > 1e-13 { DVec3::Y } else { DVec3::Z }).cross(t0),
+        };
+        let x0 = if x0.length() < 1e-9 { t0.any_orthonormal_vector() } else { x0.normalize() };
+        // A mirrored profile turns the other way (std's getMirrorAndAngleTransform).
+        let mut x = DQuat::from_axis_angle(t0, if ev.bool("mirrorProfile") { -angle } else { angle }) * x0;
         if pi == 0 {
             frame_manipulators(ev, &profile, &path.segs[0], (x0, x), angle);
         }
@@ -1011,10 +1012,20 @@ pub fn end_cap(ev: &mut EvalCtx) -> FResult<()> {
                     let w = k::offset_wire_2d(&fc, d, k::JoinType::Intersection, false)?;
                     fc = k::make_face_from_wire(&w, true)?;
                 }
-                let dir = if ev.bool("thicknessDirection") { -n } else { n };
-                (fc, DVec3::ZERO, dir)
+                // std: unless Opposite direction, the member's end moves in by the thickness and the cap fills it.
+                if ev.bool("thicknessDirection") { (fc, DVec3::ZERO, n) } else { (fc, -n * t, n) }
             }
         };
+        if ptype != "INTERNAL" && !ev.bool("thicknessDirection") {
+            let fb = f.bounding_box(false)?;
+            let r = (fb.max - fb.min).length() + 1e-4;
+            let (ex, ey) = (frame_plane.unit_x(), frame_plane.unit_y());
+            let bx = oriented_box(frame_plane.origin - n * t, ex, ey, [-r, r], [-r, r], [0.0, t + r])?;
+            let tool = tool_named(bx, |i| face(feature, Role::New(i)));
+            let (sh, nm) = bool_named(ev, k::BooleanOp::Cut, &super::sheetmetal_util::body_named(&body), &[tool])?;
+            let piece = largest_piece(&sh, &nm).ok_or_else(|| fe("The frame segment is shorter than the end cap"))?;
+            set_body(ev, bi, piece);
+        }
         // std's manipulators, on the first face: the thickness from the end face (positive: Opposite direction's
         // side), the side's offset (positive: inward), or an internal cap's inset.
         if count == 0 {
@@ -1025,10 +1036,10 @@ pub fn end_cap(ev: &mut EvalCtx) -> FResult<()> {
                 ev.manipulators.push(("Inset manipulator".into(), lin(origin, -n, -start_shift.dot(n), 0.0, "internalShiftDistance")));
             } else {
                 let flip = ev.bool("thicknessDirection");
-                ev.manipulators.push(("Thickness manipulator".into(), lin(origin, -n, if flip { t } else { -t }, f64::NEG_INFINITY, "thickness")));
+                ev.manipulators.push(("Thickness manipulator".into(), lin(origin, n, if flip { t } else { -t }, f64::NEG_INFINITY, "thickness")));
                 if let Some((q, out)) = side {
                     let off = ev.length("offsetDistance").unwrap_or(0.0);
-                    ev.manipulators.push(("Offset manipulator".into(), lin(q + dir * t * 0.5, -out, if ev.bool("offsetDirection") { off } else { -off }, f64::NEG_INFINITY, "offsetDistance")));
+                    ev.manipulators.push(("Offset manipulator".into(), lin(q + start_shift + dir * t * 0.5, -out, if ev.bool("offsetDirection") { off } else { -off }, f64::NEG_INFINITY, "offsetDistance")));
                 }
             }
         }

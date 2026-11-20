@@ -5133,6 +5133,11 @@ fn chamfer_note_has_a_short_landing_and_no_underline() {
     // Horizontal pieces of the leader: only the landing, shorter than the text.
     let horiz: Vec<f64> = g.lines.iter().flat_map(|l| l.points.windows(2).filter(|p| (p[0][1] - p[1][1]).abs() < 1e-9).map(|p| (p[1][0] - p[0][0]).abs()).collect::<Vec<_>>()).collect();
     assert!(!horiz.is_empty() && horiz.iter().all(|h| *h < w * 0.6), "landing {horiz:?} vs text {w}");
+    // The text centred where it was placed (live drw-dimension-chamfer-placed), the landing left of it.
+    let bx = font::text_box(&t);
+    let cx = bx.iter().map(|p| p[0]).sum::<f64>() / bx.len() as f64;
+    assert!((cx - 60.0).abs() < 0.5, "text centre {cx}");
+    assert!(g.lines.iter().flat_map(|l| l.points.iter()).all(|p| p[0] < 60.0 - w / 2.0), "the leader left of the text");
 }
 
 /// Align centermark on an automatic centermark (live ~1490, qa

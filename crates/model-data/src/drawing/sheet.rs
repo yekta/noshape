@@ -2295,12 +2295,15 @@ impl SheetGeometry {
                     // Live (drawing/255z; qa DWG-CHAMFER-NOTE-LANDING): no
                     // underline: the leader ends in a short horizontal landing
                     // at the text's mid-height, the text beside it.
+                    // The text centred where it was placed (live drw-dimension-chamfer-placed: placed at sheet
+                    // x 110.7, read there).
                     let e = a.position;
                     let side = if e[0] < m[0] { -1.0 } else { 1.0 };
-                    let k = [e[0] - side * self.style.dim_arrow.max(2.0), e[1]];
-                    self.lines.push(Polyline2 { points: vec![m, k, e], style: LineStyle::Thin, closed: false, pick });
+                    let end = [e[0] - side * (self.dim_label_width(&t, dh) / 2.0 + 1.0), e[1]];
+                    let k = [end[0] - side * self.style.dim_arrow.max(2.0), e[1]];
+                    self.lines.push(Polyline2 { points: vec![m, k, end], style: LineStyle::Thin, closed: false, pick });
                     self.arrow(m, [m[0] - k[0], m[1] - k[1]], 3.0);
-                    self.dim_label([e[0] + side, e[1]], 0.0, if side < 0.0 { 1.0 } else { 0.0 }, true, &t, dh, pick);
+                    self.dim_label(e, 0.0, 0.5, true, &t, dh, pick);
                 }
                 AnnotationKind::ArcLengthDimension { view, center, radius, a: pa, b: pb, mid, offset } => {
                     let c = env.to_sheet(*view, *center);

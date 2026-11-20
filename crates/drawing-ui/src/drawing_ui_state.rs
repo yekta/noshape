@@ -112,6 +112,31 @@ impl DrawingEditor {
         Ok(w)
     }
 
+    /// A picked edge's orange on screen in pixels (its length at the sheet's zoom, highlighted lines 2 px wide).
+    fn pick_lit_px(&self, pick: &Pick) -> f64 {
+        let view = match pick {
+            Pick::Point(PickedPoint { view, .. }) | Pick::Line { a: PickedPoint { view, .. }, .. } => *view,
+            Pick::Circle { view, .. } | Pick::Arc { view, .. } | Pick::CircleAt { view, .. } => *view,
+        };
+        let Some(pl) = self.placement(view) else { return 0.0 };
+        let len = match pick {
+            Pick::Point(_) => 0.0,
+            Pick::Line { a, b } => {
+                let (p, q) = (pl.to_sheet(a.p), pl.to_sheet(b.p));
+                (p[0] - q[0]).hypot(p[1] - q[1])
+            }
+            Pick::Circle { radius, .. } | Pick::CircleAt { radius, .. } => pl.len_to_sheet(std::f64::consts::TAU * radius),
+            Pick::Arc { center, radius, a, b, mid, .. } => {
+                let at = |p: [f64; 2]| (p[1] - center[1]).atan2(p[0] - center[0]);
+                let from_a = |p: [f64; 2]| (at(p) - at(a.p)).rem_euclid(std::f64::consts::TAU);
+                let to_b = from_a(b.p);
+                let span = if from_a(*mid) <= to_b { to_b } else { std::f64::consts::TAU - to_b };
+                pl.len_to_sheet(radius * span)
+            }
+        };
+        len * self.zoom * 2.0
+    }
+
     /// A view's name as its properties show it: its orientation (a projected view's: what it looks along), a
     /// section's "Section" (live 2063), a detail's "Detail".
     pub fn ui_view_name(&self, id: ViewId) -> String {
@@ -381,12 +406,17 @@ impl DrawingEditor {
                         // A picked point's disc (and the line from it to the pointer) in the 2 point and point to line
                         // tools (live drw-dimension-point-to-point-vertical s2-s3, -point-to-line-hole-centre s2).
                         Pick::Point(PickedPoint { view, .. }) if matches!(self.tool, Tool::Dimension { kind: DimTool::Point2 | DimTool::PointLine, .. }) => selection.push(("EDGE".into(), self.ui_view_name(*view))),
-                        Pick::Line { a: PickedPoint { view, .. }, .. } => selection.push(("EDGE".into(), self.ui_view_name(*view))),
-                        Pick::Circle { view, .. } | Pick::Arc { view, .. } | Pick::CircleAt { view, .. } => selection.push(("EDGE".into(), self.ui_view_name(*view))),
+                        // A picked edge's orange, read past 60 px as any lit edge (live: Front's R4 fillet arc and
+                        // 4 mm chamfer edge at 1:1 read nothing, drw-dimension-arc-length-fillet s1, -chamfer-placed s1).
+                        Pick::Line { a: PickedPoint { view, .. }, .. } | Pick::Circle { view, .. } | Pick::Arc { view, .. } | Pick::CircleAt { view, .. } if self.pick_lit_px(p) > 60.0 => selection.push(("EDGE".into(), self.ui_view_name(*view))),
                         _ => {}
                     }
                 }
             }
+            // A centerline's picked points (a 2 point centerline's disc, a circle centerline's centre with its hole):
+            // live drw-centerline-2-point-cylinder-axis s1, drw-centerline-circle-2-point-small-hole-centres s1.
+            Tool::Centerline { first: Some(PickedPoint { view, .. }) } => selection.push(("EDGE".into(), self.ui_view_name(*view))),
+            Tool::CircleCenterline { points, .. } if !points.is_empty() => selection.push(("EDGE".into(), self.ui_view_name(points[0].view))),
             // A datum target's anchor picked on a view: its edge lit until the target is placed (live2
             // drw-datum-target-hide-dim 11-15, step 3). Recorders before 2026-11-15.1 didn't read it ("EDGE+": marked
             // `new` for the runner).
@@ -838,9 +868,11 @@ fn sheet_sketch_items(sk: &noshape_model::drawing::sheet_sketch::SheetSketch, op
     out
 }
 
+/// (An arc length's ⌒ isn't in it: live drw-dimension-arc-length-fillet "0.247"; a chamfer's callout is read as drawn,
+/// ".157 X 45.0°": drw-dimension-chamfer-placed.)
 fn dimension_value(shown: &str) -> String {
-    let v = shown.trim_start_matches(['Ø', '⌀', 'R', 'S']);
-    if v.starts_with('.') { format!("0{v}") } else { v.to_string() }
+    let v = shown.trim_start_matches(['Ø', '⌀', 'R', 'S', '⌒']);
+    if v.starts_with('.') && !v.contains(' ') { format!("0{v}") } else { v.to_string() }
 }
 
 /// A plain dimension value as live's recorder reads it from the drawing data: a period, and every digit of the
