@@ -1,28 +1,38 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-19 23:20 UTC (fresh thread 21:10 after the 17:30 usage stall). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-20 04:30 UTC (fresh thread 21:10 after the 17:30 usage stall). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
-## In flight (11-19 night)
-- **LANDED 11-19 evening:** surface Mirror / pattern with Add joins the copy into the surfaces it touches 4a52a26bb
-  (singularities 2 -> 5/15); pipe Loft through > 2 open profiles f67a191fe + checklist 123ca4b30; closed-profile surface
-  sweep faces out of its tube 575aba2a4 (Split 3).
-- **P0 qa compat 22:50 (singularities Sketch 2 error, Mirror 2 Info) ANSWERED 23:15: mine (4a52a26bb), only on qa's
-  saved copy.** Laminar edges are named Boundary{face, ordinal among the face's laminar edges}; the join shares Extrude 1
-  surface's x=0 edge, so the saved PIERCE ordinal 1 (y=0 edge) now resolves to the y=56 edge. Mirror 2's saved
-  selection is Extrude 1's body (live: Problem loft). Fresh translation solves (5/15). decision asked: keep + qa re-saves,
-  or revert; naming laminar edges stably would be a bigger change (not started).
-- **Singularities "Loft with bad singularity" (surface loft along 2 guides to a point; ours refuses point profiles in
-  solid_a.rs ~L1240):** live q-singularity-loft-1119 decoded in core-scratch/sing/ (lib.py, model.py): Default = Coons
-  sum, smoothstep W(u)=3u^2-2u^3 across guides, linear in v (exact); start Normal to profile adds phi(v)[d(u)+m(u)X],
-  phi=v(1-v)(1-v/2), magnitude Hermite between guide derivatives 60.05/126.71 with end slopes 10.0259/7.5413 (max 0.001
-  mm; area 3532.215 vs live 3532.206). Next: variant (a) as-is (guides' conditions, 3425.038), then kernel
-  loft_guided_open point case + lift the refusal; then Loft 3 (3480.951, 12x16 deg 5).
-- **Fill G0 (intro-examples Fill 1, all four edges G0): ours 65652.67 mm2 vs live 23827.44.** fair_g1_fill takes it (null
-  supports). Dump vibex8 ~/tmp/core/fd/fill-0.brep (core-oc: features.cpp dumps the edges; crash_inputs replays "fill":
-  uncommitted); replay .fr.sh -> core-scratch/fr.out. Live: 14x18 cubic, box within the edges'.
+## In flight (11-20 night)
+- **LANDED 11-20:** singularities Sketch 2 P0 2f4f3bc5 -> a2e7c966 (04:19); TICKETS row fixed 2a43b78ba (live ends with 3
+  parts, not 5; Mirror 2's "no change" is right for qa's saved input: it mirrors the singularity loft's body, which ours
+  can't build, so the copy points it at Extrude 1's sheet). Verify on the first green with a2e7c966 (watcher ->
+  userdocs.py v0.4.61 vs green on vibex7 ~/tmp/core/qs copy; m2.py prints parts per feature). Ring core-rp landed.
+- **T2-NIGHTLY-22-FAILURES (lead P2), branch core-t2 in core-lam:** b5f4857cf chamfer whole rim fails once strips
+  overlap (live q-chamfer-top-face-1120) + std_oracle Boolean nothing-selected + planar corpus / profdocs skips +
+  regen_profile scratch per bench; d5ab386c1 pattern seed in its own merge scope joins (Part x200 one part) + face
+  pattern round-tangent copy fails (kern M1). All pass on vibex8 (core-icd base), model full 558/0, clippy clean.
+  Parity suite: core-lam .ss.sh on vibex7 -> ~/tmp/core/g/run-t2.log, compare run-filbase.log; then land.
+- **parting_line_draft_on_curves_as_live case B (saddle):** cause 48beead66 (an open parting edge runs on 10% past its
+  ends): the saddle curve's pieces ran into each other. Fix in core-icd shell.cpp (uncommitted): run on only at ends no
+  other parting edge shares. Test + g++-13 on vibex7 -> core-scratch/t2d.out; then move to core-t2.
+- **Snap-hook mirrored hooks (dx; live core q-snaphook-shell-edges-1120):** core-fil 8fbd2f175 (branch; worktree
+  detached at e26a927c2 for the base suite: re-checkout after): single fillet face's new edges clockwise about its
+  outward normal (orient_round_edges over bodies holding its blend faces only, so reuse holds); reverse_edge_curves keeps
+  continuity. Suite run-fil.log 95/126 docs, 1357/1585 features; base run-filbase.log running on vibex7 (slot): explain
+  the one doc lost vs ring5, then land. Left: chained Fillet 3 edges (rule unknown), JSd.
+- **Arc sense, core-arc b0c0b00c9 (not landed):** sketch Entity.clockwise (live core q-arc-sense-1120). Snap-hook
+  re-import via PARITY_SAVE queued on vibex7 -> core-scratch/arc-sh.out, dircmp.py on ~/tmp/core/sh2/ours.json.
+- **manualblend Intersection curve 1, core-icd bde5bbcbd (on 8ea35ce62 = the fillet commit):** curves run
+  n(group1) x n(group2) as live's ic1-normals.json; reverse_edge_curves also turns a wire's free edges. Land after
+  core-fil.
+- **core-bis core-fit1 (fit spline 8dec3093f + loft_to_point 189a47069, not landed):** AlongDirection arm fix
+  uncommitted with LTPDBG prints (solid_a.rs); debug run on vibex8 -> dbg.out. Then strip prints, .par.sh, land.
+- **bool-land7 e3078f89:** if a model result moves after it lands, tell bool.
+- **Singularity loft model / Loft 3 / Fill G0:** open item (live core q-singularity-loft-1119): core-scratch/sing
+  (model.py, loft3.py), fill/ (FILLDBG prints + crash_inputs case in core-oc, strip before any land).
 
 ## Earlier (11-18/19)
 - **LANDED 11-18/19:** Delete face errors when a face stays 67a475987; rib parallel 303e9d916; loft path sections
@@ -64,8 +74,7 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   ~/tmp/core/g/run-ring5.log, base (core-cache detached at 2f9ab4c4c) run-base5.log; local log
   /root/core-scratch/ring5-suite.out. Compare SAME-PER-DOC + validity, then g++-13 build, then land if the lead OKs.
   Probes: vibex8 ~/tmp/core/{ringl,ringsurf,pcv,chk,spar} (src core-scratch/brepq/).
-- **asm isaac (23:00):** Chamfer 2's state line gone, but Ball 7 / Fastened 33 cannot resolve and Fastened 7/8/9/57/79/88 +
-  Ball 1 still fail: asm sends Chamfer 2's volume line from a traced current-main run (wait for it, then take it).
+- **asm isaac a2e4a2 Chamfer 2: CLOSED 11-19 (asm: Part 1 39921.44 mm3 fits live on main; the rest is asm's connectors).**
   PROBE lines `// PROBE` in features.cpp (nl false / ok valid, ring wires, ringloft dump) to strip before landing.
   Tools: vibex8 ~/tmp/core/ringl <wires.brep> ring-live-surf.txt (src core-scratch/brepq/ringl.cpp), .r5.sh. Bar 0.1 mm
   (0.17 would need the lead: decision).
