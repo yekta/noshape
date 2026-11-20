@@ -61,6 +61,7 @@ const OUTLINE: u32 = 128u;
 const TINT: u32 = 512u;
 const NO_PICK: u32 = 1024u;
 const BAND: u32 = 2048u;
+const PICKED: u32 = 4096u;
 // Entity of a hovered dialog selection row (Onshape, live: #f2ff80).
 const QUERY_COLOR: vec3<f32> = vec3<f32>(0.888, 1.0, 0.216);
 
@@ -131,6 +132,8 @@ const FACE_SELECTED: vec3<f32> = vec3<f32>(0.887, 0.414, 0.018);
 // picked in the parts list reads (243,183,72) on its top face where no
 // plane lies over it (selection/09).
 const BODY_SELECTED: vec3<f32> = vec3<f32>(1.0, 0.536, 0.074);
+// A face a mate dialog picked (state PICKED): live (229,183,37) on the top face where FACE_SELECTED reads (229,163,34).
+const FACE_PICKED: vec3<f32> = vec3<f32>(0.887, 0.534, 0.021);
 const BODY_OUTLINE: vec3<f32> = vec3<f32>(1.0, 0.527, 0.073);
 
 // ---------------------------------------------------------------- background
@@ -392,7 +395,7 @@ fn mesh_shade(i: MeshOut, front: bool, st: u32) -> vec4<f32> {
     } else if (!unlit) {
         // (A hovered selection row's: its yellow-green over the selection, `highlight`.)
         if ((st & SELECTED) != 0u && (st & (ERROR | QUERY)) == 0u) {
-            let sel = select(FACE_SELECTED, BODY_SELECTED, (st & BODY) != 0u);
+            let sel = select(select(FACE_SELECTED, FACE_PICKED, (st & PICKED) != 0u), BODY_SELECTED, (st & BODY) != 0u);
             // A whole part keeps more of its shading (live "psui (10-27, interaction 5.x)": top (243,183,72), front (192,144,57), right (224,169,66)).
             let body = (st & BODY) != 0u;
             c = mix(sel * select(0.97, 1.0, body), shade(i.world, i.normal, front, sel), select(0.45, 0.6, body));

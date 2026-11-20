@@ -1266,10 +1266,6 @@ impl AssemblyView {
             path.push(c.instance);
             h.selected_entities.push((path, c.reference.clone()));
         }
-        // Mate preview: the instance that moves is drawn amber (live qa5 2.1).
-        if let Some(top) = self.mate_preview_top(cx).filter(|_| chip_mc.is_none()) {
-            h.selected_tops.push(top);
-        }
         let size = self.triad_size();
         let units = self.units(cx);
         // (Picking a mate connector shows its own hover look, below.) An instance on the pointer from Insert lights
@@ -1309,9 +1305,11 @@ impl AssemblyView {
         // Mate highlight: a selected mate shows only its mated faces /
         // edges amber (live 305, qa5 MT7); a hovered row its instances.
         // Both show the connector triads.
-        // The mate dialog's mate, once both connectors are in, looks selected
-        // (live 2220: its mated faces amber, the lettered triad, its glyph).
+        // The mate dialog's mate, once both connectors are in: the lettered triad, its glyph, the face that stays filled
+        // the picks' yellow and the moving part unfilled, its edges through the other (live feel cov-1120 A2; a selected
+        // mate's faces amber, live 2220).
         let dialog_mate = self.mate.as_ref().and_then(|s| s.dialog.read(cx).to_mate(cx));
+        let moving = dialog_mate.as_ref().and(self.mate_preview_top(cx));
         let shown_mate = dialog_mate.as_ref().map(|m| m.id).or(self.selected_mate);
         let selected_mate = dialog_mate.or_else(|| self.selected_mate.and_then(|id| self.assembly(cx).and_then(|a| a.mate(id).cloned())));
         if let Some(m) = &selected_mate {
@@ -1324,7 +1322,11 @@ impl AssemblyView {
                 if let Some(e) = entity {
                     let mut path = vec![c.instance];
                     path.extend(c.path.iter().copied());
-                    h.selected_entities.push((path, e));
+                    match moving {
+                        Some(top) if path[0] == top => {}
+                        Some(_) => h.picked_entities.push((path, e)),
+                        None => h.selected_entities.push((path, e)),
+                    }
                 }
             }
         }
@@ -1503,7 +1505,7 @@ impl AssemblyView {
                     if !c.is_origin() {
                         h.hover_tops.push(c.instance);
                     }
-                    h.selected_entities.extend(entity_of(c));
+                    h.picked_entities.extend(entity_of(c));
                 }
                 cs => chosen.extend(cs.iter().map(|c| (*c).clone())),
             }

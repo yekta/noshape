@@ -2915,6 +2915,18 @@ fn a_mate_previews_moving_part_shows_its_edges_through_the_others(cx: &mut TestA
     .unwrap();
     let moving = cx.update(|cx| instance(view.read(cx), "Part 1 <1>", cx));
     assert_eq!(xray(cx), std::collections::HashSet::from([moving]), "the first pick moves and shows its hidden edges");
+    // (A2 FEEL-ASM-MATE-PREVIEW-COLOUR: the face that stays filled the picks' yellow, the moving part not amber.)
+    cx.executor().advance_clock(std::time::Duration::from_millis(100));
+    cx.run_until_parked();
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let (scene, built) = (v.viewport.read(cx).scene(), v.built.as_ref().unwrap());
+        let (picked, selected) = (noshape_render::state::SELECTED | noshape_render::state::PICKED, noshape_render::state::SELECTED);
+        let faces = |flag: u32, top: InstanceId| (1..scene.states.len() as u32).filter(|id| scene.states[*id as usize] & flag == flag && built.picks.faces_of(top).contains(id)).count();
+        let other = instance(v, "Part 2 <1>", cx);
+        assert_eq!(faces(picked, other), 1, "the other part's picked face yellow");
+        assert_eq!(faces(selected, moving), 0, "the moving part not filled");
+    });
 }
 
 /// Live new-mate-preview-1119 (asm REQUESTS 22:49, qa's ASM-NEW-MATE-PREVIEW-GROUP): in a new Revolute's preview the

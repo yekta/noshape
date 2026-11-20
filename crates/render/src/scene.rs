@@ -698,6 +698,9 @@ pub mod state {
     /// With OUTLINE on a whole selected part's faces (Part Studio): outlined by the 2 device px screen-space band
     /// (`Scene::body_outline`, hover_outline.rs) instead of the pushed-out back faces (live2 hl-pixels-1118).
     pub const BAND: u32 = 2048;
+    /// With SELECTED on faces: an entity a mate dialog picked, live's yellow (229,183,37 on a lit top face) rather than a
+    /// selected face's amber (live feel cov-1120 A2).
+    pub const PICKED: u32 = 4096;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

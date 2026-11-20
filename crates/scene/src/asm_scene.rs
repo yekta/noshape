@@ -514,6 +514,9 @@ pub struct Highlights {
     pub hover_outline: Option<(InstancePath, Reference)>,
     /// A dialog's hovered selection row's entities: yellow-green (`state::QUERY`).
     pub query_entities: Vec<(InstancePath, Reference)>,
+    /// Entities a mate dialog picked: filled yellow (`state::PICKED`), their boundary in the hover colour (live feel
+    /// cov-1120 A2: (229,183,37) inside (221,187,116), where a selected face is amber inside 3 px #ffa90a).
+    pub picked_entities: Vec<(InstancePath, Reference)>,
     /// The hovered part's occurrence: its silhouette in the hover colour, no tint (live2 asm-feel (3b): only that
     /// part, inside a subassembly too).
     pub hover_part: Option<InstancePath>,
@@ -1024,6 +1027,12 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     for (p, r) in &h.query_entities {
         for &id in built.picks.ids_for(p, r) {
             scene.add_flag(id, state::QUERY);
+        }
+    }
+    for (p, r) in &h.picked_entities {
+        mark(p, r, state::SELECTED | state::PICKED, &mut scene);
+        for id in built.picks.boundary_ids(p, r) {
+            scene.add_flag(id, state::HOVER | state::OUTLINE);
         }
     }
     // A solid 2 device px line, not the band of an edge hovered itself (live2 asm-dialogs-1119 hz: outlined once).

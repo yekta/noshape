@@ -273,6 +273,28 @@ fn a_box_takes_whole_instances_as_live(cx: &mut TestAppContext) {
     assert!(!faces, "no face or mate taken by a box");
 }
 
+/// Live feel cov-1120 A1 (qa FEEL-ASM-DRAG-DEAD-ZONE): a free instance pressed and dragged through the pointer's real
+/// moves follows the whole move from the press, no dead zone (ours lost 2 px: 148 of 150).
+#[gpui::test]
+fn a_dragged_free_instance_takes_the_whole_move_from_the_press(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "drag-delta", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+        call(ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>", "Part 2 <1>"], "fixed": false }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    let centre = |cx: &mut TestAppContext| {
+        let (lo, hi) = screen_box(cx, &view, "Part 2 <1>");
+        (lo + hi) * 0.5
+    };
+    let from = centre(cx);
+    drag(cx, window, &view, from, from + DVec2::new(100.0, 0.0));
+    wait_until(cx, window, &view, |v, _| v.drag.is_none());
+    let moved = centre(cx) - from;
+    assert!((moved - DVec2::new(100.0, 0.0)).length() < 0.5, "a 100 px drag moves the part 100 px: {moved:?}");
+}
+
 /// live2 asm-feel (3b): in a subassembly, hovering one part outlines only that part (the pre-selection is its face with
 /// a two-level path) and a click selects that part's face inside the sub, the collapsed sub's row grey (related).
 #[gpui::test]
@@ -579,8 +601,9 @@ fn a_mate_dialogs_dots_are_white_and_the_first_pick_outlines_its_instance(cx: &m
     cx.update(|cx| {
         let v = view.read(cx);
         let (scene, built) = (v.viewport.read(cx).scene(), v.built.as_ref().unwrap());
-        let selected = (1..scene.states.len() as u32).filter(|id| scene.states[*id as usize] & noshape_render::state::SELECTED != 0 && built.picks.get(*id).is_some_and(|t| t.kind == crate::scene_builder::PickKind::Face)).count();
-        assert_eq!(selected, 1, "the picked face selected");
+        let picked = noshape_render::state::SELECTED | noshape_render::state::PICKED;
+        let selected = (1..scene.states.len() as u32).filter(|id| scene.states[*id as usize] & picked == picked && built.picks.get(*id).is_some_and(|t| t.kind == crate::scene_builder::PickKind::Face)).count();
+        assert_eq!(selected, 1, "the picked face filled the picks' yellow (live feel cov-1120 A2), not a selection's amber");
     });
 }
 
