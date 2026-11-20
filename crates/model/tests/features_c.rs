@@ -4465,6 +4465,35 @@ fn two_distance_chamfers_on_several_edges_stop_at_the_selection() {
     assert!(ins.len() == 2 && ins.iter().all(|d| (d - 1.0).abs() < 1e-6 || (d - 2.0).abs() < 1e-6), "{ins:?} mm in");
 }
 
+/// A fillet's edges that don't meet run on at the chain's ends alone, not at the gap between them (only a chamfer
+/// stopped at its selection does that): rust-zero-solid-f197's Fillet 1, R25 on a shelled box's top edge and a far
+/// corner's, failed since 6910009d2; 0.4.61 built it (22 faces, 16122.149 mm³).
+#[test]
+fn fillet_edges_apart_run_on_only_at_the_chains_ends() {
+    let brep = include_str!("data/rustzero-fillet1-input.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let at = |i: &noshape_kernel::EdgeInfo, p: [f64; 3], q: [f64; 3]| {
+        let (p, q) = (DVec3::from(p) * mm(1.0), DVec3::from(q) * mm(1.0));
+        ((i.start - p).length() < 1e-7 && (i.end - q).length() < 1e-7) || ((i.start - q).length() < 1e-7 && (i.end - p).length() < 1e-7)
+    };
+    let picked: Vec<Reference> = b.shape.edges().iter().enumerate().filter(|(_, e)| e.edge_info().is_ok_and(|i| at(&i, [59.0, 39.0, -1.0], [1.0, 39.0, -1.0]) || at(&i, [59.0, 1.0, -1.0], [59.0, 1.0, -20.0]))).map(|(k, _)| Reference::Edge((*b.edges[k]).clone())).collect();
+    assert_eq!(picked.len(), 2);
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(picked));
+        p.set("radius", expr("25 mm"));
+        p.set("tangentPropagation", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    assert!(shape.is_valid() && shape.solids().len() == 1);
+    assert_eq!(shape.faces().len(), 22);
+    let v = volume(&r, 0) * 1e9;
+    assert!((v - 16122.149).abs() < 0.05, "{v} mm³ (0.4.61: 16122.149)");
+}
+
 /// Distance and angle past 90° at an acute edge (std allows 0.1-179.9°; OCCT stops below 90°): a 60° wedge, 2 mm at
 /// 100° to the reference face takes the triangle with sides 2 and 2 sin 100° / sin 20° along the faces.
 #[test]

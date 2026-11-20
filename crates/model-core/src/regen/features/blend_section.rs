@@ -1075,8 +1075,9 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     let total: f64 = chain.iter().map(|c| c.length).sum();
     // An edge's ends free in the chain: the chain's own ends, or where the next selected edge doesn't start (a stadium's
     // two straight edges, each run out at both ends).
-    let free_start = |ci: usize| ci == 0 || (chain[ci - 1].end - chain[ci].start).length() > 1e-9;
-    let free_end = |ci: usize| ci + 1 == chain.len() || (chain[ci].end - chain[ci + 1].start).length() > 1e-9;
+    // (A chamfer's only: a fillet's chain runs on at its own ends alone, rust-zero-solid-f197's Fillet 1.)
+    let free_start = |ci: usize| ci == 0 || (spec.reference.is_some() && (chain[ci - 1].end - chain[ci].start).length() > 1e-9);
+    let free_end = |ci: usize| ci + 1 == chain.len() || (spec.reference.is_some() && (chain[ci].end - chain[ci + 1].start).length() > 1e-9);
     // Distance along the chain of a bound.
     let along = |bd: Bound| bound_along(&chain, total, bd);
     let (lo, hi) = match spec.partial {
