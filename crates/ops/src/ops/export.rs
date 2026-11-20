@@ -41,7 +41,7 @@ pub fn ops() -> Vec<Op> {
             opt("group_composites", json!({ "type": "boolean" }), "PVZ: Group composite parts into a single part file."),
             opt("compress", json!({ "type": "boolean" }), "glTF / GLB: Compress."),
             opt("geometry_format", json!({ "type": "string", "enum": crate::export::URDF_GEOMETRY.iter().map(|f| f.label()).collect::<Vec<_>>() }), "URDF: Geometry format (default STL)."),
-            opt("rigid_subassemblies_single_link", json!({ "type": "boolean" }), "URDF of an Assembly: Export rigid subassemblies as a single link (each rigid subassembly instance's parts one link, one mesh)."),
+            opt("rigid_subassemblies_single_link", json!({ "type": "boolean" }), "URDF of an Assembly: Export rigid subassemblies as a single link (a rigid subassembly's or fastened parts one link with a visual per part, the mate connectors folded into their parts)."),
         ],
         mutates: true,
         destructive: false,
@@ -230,7 +230,10 @@ fn assembly(ctx: &mut Ctx, a: &Args, format: PartFormat, s: ExportSettings) -> R
     };
     let result = super::assembly::solve_assembly(od, tab, &asm, &Default::default());
     let root = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default();
-    let export = crate::export::AssemblyExport::of(&root, &result, ids.as_deref(), s.hidden);
+    let mut export = crate::export::AssemblyExport::of(&root, &result, ids.as_deref(), s.hidden);
+    if format == PartFormat::Urdf {
+        export = export.with_kinematics(od.doc(), &asm, &result);
+    }
     let n = export.instances.len();
     write_out(od, tab, a, format, n, |file| crate::export::write_assembly_export(&s, file, &export))
 }

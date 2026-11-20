@@ -334,6 +334,9 @@ pub struct Prepared {
     memo: Arc<std::sync::Mutex<solver::MateMemo>>,
     /// Pattern followers' (synthetic) mate ids -> their pattern.
     follower_pattern: HashMap<MateId, MateId>,
+    /// The flexible subassemblies' own mates in this solve: (the subassembly's path from here, the mate, its id in
+    /// [`Solved::mate_frames`]).
+    pub flex_mates: Vec<(Vec<InstanceId>, super::Mate, MateId)>,
 }
 
 #[derive(Clone, Debug)]
@@ -1643,8 +1646,8 @@ fn limits_crossed(m: &super::Mate, units: &UnitPrefs) -> bool {
     })
 }
 
-/// Limits, offsets, rotation offset and alignment of a mate on its solver mate.
-fn fill_solver_mate(m: &super::Mate, sm: &mut SolverMate, units: &UnitPrefs) {
+/// A mate's limits that apply to its type: (solver free value index (`limit_index`), min, max), SI.
+pub fn mate_limits(m: &super::Mate, units: &UnitPrefs) -> Vec<(usize, Option<f64>, Option<f64>)> {
     let mut limits = Vec::new();
     for (key, l) in &m.limits {
         let Some(ix) = limit_index(key) else { continue };
@@ -1658,6 +1661,12 @@ fn fill_solver_mate(m: &super::Mate, sm: &mut SolverMate, units: &UnitPrefs) {
             limits.push((ix, lo, hi));
         }
     }
+    limits
+}
+
+/// Limits, offsets, rotation offset and alignment of a mate on its solver mate.
+fn fill_solver_mate(m: &super::Mate, sm: &mut SolverMate, units: &UnitPrefs) {
+    let limits = mate_limits(m, units);
     let (ox, oy, oz, orot) = offset_axes(m.mate_type);
     sm.offset = DVec3::new(
         if ox { eval_len(&m.offset_x, units) } else { 0.0 },
@@ -3373,6 +3382,7 @@ impl AssemblyEvaluator {
                     fill_solver_mate(m, &mut sm, &units);
                     synth_of.insert(m.id, MateId(synth));
                     prepared.mates.push((MateId(synth), m.mate_type, sm));
+                    prepared.flex_mates.push((prefix.clone(), m.clone(), MateId(synth)));
                     synth += 1;
                     continue;
                 }
@@ -3392,6 +3402,7 @@ impl AssemblyEvaluator {
                 fill_solver_mate(m, &mut sm, &units);
                 synth_of.insert(m.id, MateId(synth));
                 prepared.mates.push((MateId(synth), m.mate_type, sm));
+                prepared.flex_mates.push((prefix.clone(), m.clone(), MateId(synth)));
                 synth += 1;
             }
             // Its linear and circular patterns: each copy follows its seed (live flexsub-1120: the Arm and its copy turn

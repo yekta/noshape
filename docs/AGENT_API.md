@@ -7507,7 +7507,7 @@ Examples:
 | `group_composites` | boolean |  | PVZ: Group composite parts into a single part file. |
 | `compress` | boolean |  | glTF / GLB: Compress. |
 | `geometry_format` | one of `STL`, `GLTF`, `GLB`, `OBJ` |  | URDF: Geometry format (default STL). |
-| `rigid_subassemblies_single_link` | boolean |  | URDF of an Assembly: Export rigid subassemblies as a single link (each rigid subassembly instance's parts one link, one mesh). |
+| `rigid_subassemblies_single_link` | boolean |  | URDF of an Assembly: Export rigid subassemblies as a single link (a rigid subassembly's or fastened parts one link with a visual per part, the mate connectors folded into their parts). |
 
 ### import
 

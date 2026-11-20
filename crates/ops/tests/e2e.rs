@@ -5185,29 +5185,49 @@ fn drawing_raster_export_matches_live() {
     }
 }
 
-/// URDF of an Assembly with "Export rigid subassemblies as a single link" (live 1.223): a locked subassembly's two
-/// instances are one link, one mesh, named after it; off, a link each.
+/// URDF of an Assembly as live's (urdf-single-link-1120): a link per part, the fixed one hung on an empty `root`, a
+/// joint per mate (Fastened `fixed`, Revolute `continuous`), the mate connector a link of its own; with "Export rigid
+/// subassemblies as a single link" the fastened pair is `root` with a visual each and the connector folds into it.
 #[test]
-fn urdf_export_takes_a_rigid_subassembly_as_one_link() {
+fn urdf_export_joints_from_mates_and_one_link_for_fastened_parts() {
     let mut ctx = Ctx::new();
     block_with_hole(&mut ctx, "urdf-link.noshape");
     let ids: Vec<String> = (0..3).map(|_| call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1" }))["instance"].as_str().unwrap().to_string()).collect();
-    let m = call(&mut ctx, "assembly_move_to_subassembly", json!({ "instances": [ids[0], ids[1]] }));
-    let sub = m["new_instance"]["id"].as_str().unwrap().to_string();
-    call(&mut ctx, "assembly_lock", json!({ "tab": "Assembly 1", "instance": sub, "lock": "current" }));
-    // The .urdf's links (base_link aside) and mesh files; the zip is stored, its .urdf readable in place.
-    let urdf = |ctx: &mut Ctx, on: bool| -> (Vec<String>, usize) {
+    call(&mut ctx, "assembly_set_state", json!({ "instances": [ids[0]], "fixed": true }));
+    let face = |ctx: &mut Ctx, i: &str, z: f64| {
+        let faces = call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces" }));
+        faces["faces"].as_array().unwrap().iter().find(|f| f["surface"] == "plane" && num(&f["normal"][2]) * z > 0.99).unwrap()["id"].as_str().unwrap().to_string()
+    };
+    let cyl = |ctx: &mut Ctx, i: &str| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "surface": "cylinder" }))["faces"][0]["id"].as_str().unwrap().to_string();
+    let top = face(&mut ctx, &ids[0], 1.0);
+    call(&mut ctx, "assembly_mate_connector", json!({ "on": { "instance": ids[0], "entity": top } }));
+    let bottom = face(&mut ctx, &ids[1], -1.0);
+    let m = call(&mut ctx, "assembly_mate", json!({ "type": "fastened", "a": { "connector": "Mate connector 1" }, "b": { "instance": ids[1], "entity": bottom } }));
+    assert_eq!(m["mate_ok"], true, "{m}");
+    let (h0, h2) = (cyl(&mut ctx, &ids[0]), cyl(&mut ctx, &ids[2]));
+    let m = call(&mut ctx, "assembly_mate", json!({ "type": "revolute", "a": { "instance": ids[0], "entity": h0 }, "b": { "instance": ids[2], "entity": h2 } }));
+    assert_eq!(m["mate_ok"], true, "{m}");
+    // The zip's entries, and the .urdf's links (with their visuals) and joints (type, parent, child).
+    let urdf = |ctx: &mut Ctx, on: bool| {
         let f = scratch(&format!("urdf-link-{on}.zip"));
         let r = call(ctx, "export_parts", json!({ "tab": "Assembly 1", "format": "URDF", "file": f.to_str().unwrap(), "rigid_subassemblies_single_link": on }));
         let text = String::from_utf8_lossy(&std::fs::read(r["file"].as_str().unwrap()).unwrap()).to_string();
-        let links = text.match_indices("<link name=\"").map(|(i, _)| text[i + 12..].split('"').next().unwrap().to_string()).filter(|n| n != "base_link").collect();
-        (links, text.matches("<visual>").count())
+        let attr = |s: &str, k: &str| s.split(&format!("{k}=\"")).nth(1).map(|x| x.split('"').next().unwrap().to_string()).unwrap_or_default();
+        let name = |s: &str| s[1..].split('"').next().unwrap().to_string();
+        let links: Vec<(String, usize)> = text.split("<link name=").skip(1).map(|l| (name(l), l.split("</link>").next().unwrap().matches("<visual>").count())).collect();
+        let joints: Vec<String> = text.split("<joint name=").skip(1).map(|j| format!("{} {} {} > {}", name(j), attr(j, "type"), attr(j, "parent link"), attr(j, "child link"))).collect();
+        let entries: Vec<&str> = ["assembly_1/urdf/assembly_1.urdf", "assembly_1/launch/assembly_1.launch", "assembly_1/meshes/Part_1.stl"].into_iter().filter(|e| text.contains(e)).collect();
+        (links, joints, entries.len())
     };
-    let (off, meshes) = urdf(&mut ctx, false);
-    assert_eq!((off.len(), meshes), (3, 3), "{off:?}");
-    let (on, meshes) = urdf(&mut ctx, true);
-    assert_eq!((on.len(), meshes), (2, 2), "{on:?}");
-    assert!(on.iter().any(|l| l.starts_with("Assembly_2")), "the subassembly's link (Assembly 2 <1>): {on:?}");
+    let (links, joints, entries) = urdf(&mut ctx, false);
+    assert_eq!(entries, 3, "the urdf, launch and the part's mesh");
+    let l: Vec<(&str, usize)> = links.iter().map(|(n, v)| (n.as_str(), *v)).collect();
+    assert_eq!(l, [("mate_connector_1", 0), ("part_1", 1), ("part_1_1", 1), ("part_1_2", 1), ("root", 0)], "{links:?}");
+    assert_eq!(joints, ["fastened_1 fixed part_1 > part_1_1", "hanging_node_to_root_joint fixed root > part_1", "mate_connector_1 fixed part_1 > mate_connector_1", "revolute_1 continuous part_1 > part_1_2"]);
+    let (links, joints, _) = urdf(&mut ctx, true);
+    let l: Vec<(&str, usize)> = links.iter().map(|(n, v)| (n.as_str(), *v)).collect();
+    assert_eq!(l, [("part_1", 1), ("root", 2)], "{links:?}");
+    assert_eq!(joints, ["revolute_1 continuous root > part_1"]);
 }
 
 /// The instance and mate menus: copy and paste, folders, subassemblies,

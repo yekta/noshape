@@ -471,6 +471,24 @@ pub fn version_parts(doc: noshape_model::Document, tab: noshape_model::document:
     Ok(parts)
 }
 
+/// Each part through the format's writer into its own file: (`<name>.<ext>`, bytes), names' spaces `_`.
+fn part_files(s: &ExportSettings, ext: &str, parts: &[(String, k::Shape, [f32; 4])]) -> anyhow::Result<Vec<(String, Vec<u8>)>> {
+    let tmp = |i: usize| std::env::temp_dir().join(format!("noshape-export-{}-{i}.{ext}", std::process::id()));
+    let mut used = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for (i, p) in parts.iter().enumerate() {
+        let mut name = sanitize(&p.0).replace(' ', "_");
+        while !used.insert(name.clone()) {
+            name.push('_');
+        }
+        let t = tmp(i);
+        let one = ExportSettings { pmi: vec![s.pmi.get(i).cloned().flatten()], ..s.clone() };
+        write_parts(&one, &t, std::slice::from_ref(p))?;
+        out.extend(with_mesh_file(&t, &format!("{name}.{ext}"))?);
+    }
+    Ok(out)
+}
+
 pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(String, k::Shape, [f32; 4])>) -> anyhow::Result<std::path::PathBuf> {
     anyhow::ensure!(!parts.is_empty(), "Selected tab contains no supported geometry for export.");
     if s.format == PartFormat::InspectionList {
@@ -496,23 +514,7 @@ pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(Stri
     } else {
         parts
     };
-    let tmp = |i: usize, ext: &str| std::env::temp_dir().join(format!("noshape-export-{}-{i}.{ext}", std::process::id()));
-    // Each part through the format's writer into a temporary file.
-    let files_of = |s: &ExportSettings, ext: &str| -> anyhow::Result<Vec<(String, Vec<u8>)>> {
-        let mut used = std::collections::HashSet::new();
-        let mut out = Vec::new();
-        for (i, p) in parts.iter().enumerate() {
-            let mut name = sanitize(&p.0).replace(' ', "_");
-            while !used.insert(name.clone()) {
-                name.push('_');
-            }
-            let t = tmp(i, ext);
-            let one = ExportSettings { pmi: vec![s.pmi.get(i).cloned().flatten()], ..s.clone() };
-            write_parts(&one, &t, std::slice::from_ref(p))?;
-            out.extend(with_mesh_file(&t, &format!("{name}.{ext}"))?);
-        }
-        Ok(out)
-    };
+    let files_of = |s: &ExportSettings, ext: &str| part_files(s, ext, &parts);
     if s.format == PartFormat::Urdf {
         let geo = URDF_GEOMETRY[s.urdf_geometry.min(URDF_GEOMETRY.len() - 1)];
         let ms = ExportSettings { format: geo, y_up: false, individual: false, ..s.clone() };
@@ -637,6 +639,10 @@ pub struct AssemblyExport {
     pub instances: Vec<(usize, String, glam::DMat4)>,
     /// Each instance's rigid subassembly (the outermost one it moves with, as one body): (its path, its name).
     pub rigid: Vec<Option<(Vec<noshape_model::assembly::InstanceId>, String)>>,
+    /// Each instance's occurrence path.
+    pub paths: Vec<Vec<noshape_model::assembly::InstanceId>>,
+    /// The mates and connectors a URDF's joints come from ([`Self::with_kinematics`]).
+    pub kinematics: Option<crate::urdf::Kinematics>,
 }
 
 impl AssemblyExport {
@@ -651,7 +657,7 @@ impl AssemblyExport {
     /// subassembly: its path from the top-level instance).
     pub fn of_occurrences(root: &str, result: &noshape_model::assembly::eval::AssemblyResult, paths: Option<&[Vec<noshape_model::assembly::InstanceId>]>, include_hidden: bool) -> Self {
         let mut keys: Vec<(noshape_model::document::TabId, noshape_model::BodyId, noshape_model::configuration::ConfigValues)> = Vec::new();
-        let mut out = AssemblyExport { root: root.to_string(), parts: Vec::new(), instances: Vec::new(), rigid: Vec::new() };
+        let mut out = AssemblyExport { root: root.to_string(), parts: Vec::new(), instances: Vec::new(), rigid: Vec::new(), paths: Vec::new(), kinematics: None };
         for o in result.occurrences.iter().filter(|o| (include_hidden || !o.hidden) && paths.is_none_or(|ps| ps.iter().any(|p| o.path.starts_with(p)))) {
             let key = (o.studio, o.body.clone(), o.config.clone());
             let part = match keys.iter().position(|k| *k == key) {
@@ -666,33 +672,60 @@ impl AssemblyExport {
             };
             out.instances.push((part, o.instance_name.clone(), o.transform));
             out.rigid.push(rigid_subassembly(&result.nodes, o));
+            out.paths.push(o.path.clone());
         }
         out
     }
 
-    /// [`Self::placed`], the parts of each rigid subassembly as one (named after its instance; the first part's
-    /// colour): URDF's "Export rigid subassemblies as a single link".
-    pub fn placed_links(&self) -> anyhow::Result<Vec<(String, k::Shape, [f32; 4])>> {
-        let placed = self.placed()?;
-        let mut out: Vec<(String, k::Shape, [f32; 4])> = Vec::new();
-        let mut groups: Vec<(&[noshape_model::assembly::InstanceId], usize, Vec<k::Shape>)> = Vec::new();
-        for (p, r) in placed.into_iter().zip(&self.rigid) {
-            let Some((path, name)) = r else {
-                out.push(p);
-                continue;
+    /// With what a URDF's links and joints need: each instance's density and whether it is fixed, the explicit mate
+    /// connectors, the mates (a flexible subassembly's own too) at their solved frames.
+    pub fn with_kinematics(mut self, doc: &noshape_model::document::Document, asm: &noshape_model::assembly::Assembly, result: &noshape_model::assembly::eval::AssemblyResult) -> Self {
+        use noshape_model::assembly::eval::{frame_matrix, mate_limits};
+        use noshape_model::assembly::{InstanceId, MateConnectorRef};
+        let index = |path: &[InstanceId]| self.paths.iter().position(|p| p.as_slice() == path);
+        let occurrence = |path: &[InstanceId]| result.occurrences.iter().find(|o| o.path.as_slice() == path);
+        let mut kin = crate::urdf::Kinematics::default();
+        for path in &self.paths {
+            let props = occurrence(path).and_then(|o| match &doc.tab(o.studio)?.content {
+                noshape_model::TabContent::PartStudio(ps) => ps.part_properties.get(&o.body).map(|p| (p.density, p.mass_override)),
+                _ => None,
+            });
+            kin.density.push(props.unwrap_or_default());
+            let top_fixed = asm.instance(path[0]).is_some_and(|i| i.fixed);
+            let moves_in_sub = occurrence(path).and_then(|o| o.flex.as_ref()).is_some_and(|(key, _)| result.prepared.is_flexible_child(key));
+            kin.fixed.push((top_fixed && !moves_in_sub) || asm.occurrence(path).fixed);
+        }
+        // A side's instance: the part its connector or entity is on (`prefix`: the subassembly's path from here).
+        let side_of = |prefix: &[InstanceId], c: &MateConnectorRef, connectors: &[noshape_model::assembly::AsmMateConnector]| -> Option<Option<usize>> {
+            let on = match c.connector {
+                Some(id) => &connectors.iter().find(|x| x.id == id)?.on,
+                None => c,
             };
-            match groups.iter_mut().find(|g| g.0 == path.as_slice()) {
-                Some(g) => g.2.push(p.1),
-                None => {
-                    groups.push((path, out.len(), vec![p.1.clone()]));
-                    out.push((name.clone(), p.1, p.2));
-                }
+            if on.instance == InstanceId::ORIGIN {
+                return prefix.is_empty().then_some(None);
             }
+            let mut path = prefix.to_vec();
+            path.push(on.instance);
+            path.extend(on.path.iter().copied());
+            // A connector on a subassembly's instance: its first part.
+            Some(Some(index(&path).or_else(|| self.paths.iter().position(|p| p.starts_with(&path)))?))
+        };
+        for c in asm.connectors.iter().filter(|c| !c.suppressed) {
+            let (Some(Some(i)), Some(f)) = (side_of(&[], &c.on, &[]), result.connector_frame(c.id)) else { continue };
+            kin.connectors.push((c.name.clone(), i, frame_matrix(&f)));
         }
-        for (_, at, shapes) in groups.into_iter().filter(|g| g.2.len() > 1) {
-            out[at].1 = k::Shape::compound(&shapes);
+        for st in result.mates.iter().filter(|m| m.ok && !m.inactive) {
+            let (Some(m), Some(fa), Some(fb)) = (asm.mate(st.id), st.frame_a, st.frame_b) else { continue };
+            let (Some(a), Some(b)) = (side_of(&[], &m.a, &asm.connectors), side_of(&[], &m.b, &asm.connectors)) else { continue };
+            kin.mates.push(crate::urdf::JointMate { name: m.name.clone(), kind: m.mate_type, a, b, frame_a: frame_matrix(&fa), frame_b: frame_matrix(&fb), limits: mate_limits(m, &doc.settings.units) });
         }
-        Ok(out)
+        for (prefix, m, id) in &result.prepared.flex_mates {
+            let Some((fa, fb)) = result.solved.mate_frames.get(id) else { continue };
+            let (Some(Some(a)), Some(Some(b))) = (side_of(prefix, &m.a, &[]), side_of(prefix, &m.b, &[])) else { continue };
+            kin.mates.push(crate::urdf::JointMate { name: m.name.clone(), kind: m.mate_type, a: Some(a), b: Some(b), frame_a: frame_matrix(fa), frame_b: frame_matrix(fb), limits: mate_limits(m, &doc.settings.units) });
+        }
+        self.kinematics = Some(kin);
+        self
     }
 
     /// Each instance as a placed part, named after it (formats without
@@ -739,8 +772,8 @@ pub fn write_assembly_export(s: &ExportSettings, path: &std::path::Path, a: &Ass
         k::write_iges_assembly(path, &parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect::<Vec<_>>(), &instances, k::LengthUnit::Meter)?;
         return Ok(path.to_path_buf());
     }
-    if s.format == PartFormat::Urdf && s.urdf_single_link {
-        return write_export(s, path, a.placed_links()?);
+    if s.format == PartFormat::Urdf {
+        return write_urdf_assembly(s, path, a);
     }
     if s.format != PartFormat::Step || s.individual {
         return write_export(s, path, a.placed()?);
@@ -748,6 +781,33 @@ pub fn write_assembly_export(s: &ExportSettings, path: &std::path::Path, a: &Ass
     let shapes: Vec<k::ExportShape> = a.parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect();
     k::write_step_assembly(path, &a.root, &shapes, &instances, k::LengthUnit::Meter, &step_options(s))?;
     Ok(path.to_path_buf())
+}
+
+/// An Assembly's URDF as live's zip: `<robot>/urdf/<robot>.urdf`, `<robot>/launch/<robot>.launch` and a mesh per part
+/// in its Part Studio's coordinates, `<robot>/meshes/<Part_name>.stl` ([`crate::urdf`]).
+fn write_urdf_assembly(s: &ExportSettings, path: &std::path::Path, a: &AssemblyExport) -> anyhow::Result<std::path::PathBuf> {
+    let geo = URDF_GEOMETRY[s.urdf_geometry.min(URDF_GEOMETRY.len() - 1)];
+    let ms = ExportSettings { format: geo, y_up: false, individual: false, pmi: Vec::new(), ..s.clone() };
+    let meshes = part_files(&ms, geo.ext(), &a.parts)?;
+    let masses: Vec<crate::urdf::PartMass> = a.parts.iter().map(|p| k::mass_properties(&p.1).map_or((0.0, glam::DVec3::ZERO, glam::DMat3::ZERO), |m| (m.mass, m.center, m.inertia))).collect();
+    let names: Vec<String> = a.parts.iter().map(|p| p.0.clone()).collect();
+    let instances: Vec<(usize, glam::DMat4)> = a.instances.iter().map(|(p, _, t)| (*p, *t)).collect();
+    let rigid: Vec<Option<Vec<noshape_model::assembly::InstanceId>>> = a.rigid.iter().map(|r| r.as_ref().map(|r| r.0.clone())).collect();
+    let kin = a.kinematics.clone().unwrap_or_else(|| crate::urdf::Kinematics { density: vec![(None, None); instances.len()], ..Default::default() });
+    let (links, joints) = crate::urdf::tree(&names, &instances, &rigid, &kin, &masses, s.urdf_single_link);
+    let robot = crate::urdf::link_name(&a.root);
+    let srgb = |v: f32| crate::appearance::lin_to_srgb(v) as f64 / 255.0;
+    let files: Vec<(String, [f64; 3])> = meshes.iter().zip(&a.parts).map(|((f, _), p)| (f.clone(), [srgb(p.2[0]), srgb(p.2[1]), srgb(p.2[2])])).collect();
+    let urdf = crate::urdf::urdf_text(&robot, &links, &joints, &files);
+    let launch = crate::urdf::launch_text(&robot);
+    let (un, ln) = (format!("{robot}/urdf/{robot}.urdf"), format!("{robot}/launch/{robot}.launch"));
+    let mesh_names: Vec<String> = meshes.iter().map(|(f, _)| format!("{robot}/meshes/{f}")).collect();
+    let mut entries: Vec<(&str, &[u8])> = vec![(ln.as_str(), launch.as_bytes())];
+    entries.extend(mesh_names.iter().zip(&meshes).map(|(n, (_, b))| (n.as_str(), b.as_slice())));
+    entries.push((un.as_str(), urdf.as_bytes()));
+    let out = path.with_extension("zip");
+    std::fs::write(&out, stored_zip(&entries))?;
+    Ok(out)
 }
 
 /// Formats whose writers take B-rep faces only: a mesh part (an imported STL) goes as its triangles' planar faces

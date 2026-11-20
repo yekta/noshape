@@ -6119,7 +6119,13 @@ impl AssemblyView {
     pub(crate) fn run_asm_export(&mut self, s: noshape_ops::export::ExportSettings, name: String, ids: Option<Vec<Vec<InstanceId>>>, download: Option<std::path::PathBuf>, cx: &mut Context<Self>) {
         self.message = Some((false, format!("{name} is being prepared for export. You will receive a notification with its status.")));
         cx.notify();
-        let asm = self.export_assembly(ids.as_deref(), s.hidden, cx);
+        let mut asm = self.export_assembly(ids.as_deref(), s.hidden, cx);
+        if s.format == noshape_ops::export::PartFormat::Urdf {
+            let doc = &self.doc.read(cx).session.doc;
+            if let Some(noshape_model::TabContent::Assembly(data)) = doc.tab(self.tab).map(|t| &t.content) {
+                asm = asm.with_kinematics(doc, data, &self.result);
+            }
+        }
         let file = format!("{name}.{}", s.file_ext(true));
         crate::export_store::export_in_background(self.doc.clone(), self.tab, crate::export_store::ExportJob { name, file, options: s.options, download }, move |p| noshape_ops::export::write_assembly_export(&s, p, &asm), cx);
     }
