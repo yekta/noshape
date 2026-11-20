@@ -5,6 +5,7 @@
 #include <optional>
 #include <gp_Cylinder.hxx>
 #include <gp_Lin.hxx>
+#include <GeomLib_IsPlanarSurface.hxx>
 #include <NCollection_Array2.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
@@ -5270,10 +5271,11 @@ static bool pinched_free_form(const TopoDS_Face& f)
   const GeomAbs_SurfaceType t = BRepAdaptor_Surface(f, false).GetType();
   if (t != GeomAbs_BSplineSurface && t != GeomAbs_BezierSurface && t != GeomAbs_OtherSurface)
     return false;
-  for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
-    if (BRep_Tool::Degenerated(TopoDS::Edge(x.Current())))
-      return true;
-  return false;
+  bool pinched = false;
+  for (TopExp_Explorer x(f, TopAbs_EDGE); x.More() && !pinched; x.Next())
+    pinched = BRep_Tool::Degenerated(TopoDS::Edge(x.Current()));
+  // (A flat fan to a point thickens: its normal is one everywhere.)
+  return pinched && !GeomLib_IsPlanarSurface(BRep_Tool::Surface(f), 1e-7).IsPlanar();
 }
 
 // A sheet with an inner edge where its two faces meet at an angle, not smoothly.

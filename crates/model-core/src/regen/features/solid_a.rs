@@ -1663,7 +1663,11 @@ pub fn thicken(ev: &mut EvalCtx) -> FResult<()> {
     let mut tools: Vec<NamedShape> = Vec::new();
     let mut grouped: BTreeMap<usize, usize> = BTreeMap::new();
     for inp in &inputs {
-        let res = k::thicken(&inp.shape, t1, t2).map_err(kerr("Failed to thicken all selections."))?;
+        // Live's words alone (c2-surf-workshop-singularities' "Thicken failure"); the kernel's reason only in the log.
+        let res = k::thicken(&inp.shape, t1, t2).map_err(|e| {
+            log::debug!("Failed to thicken all selections. ({e})");
+            crate::regen::eval::FeatureError::new("Failed to thicken all selections.")
+        })?;
         if res.shape.count(ShapeType::Solid) == 0 {
             return err("Failed to thicken all selections.");
         }

@@ -654,8 +654,6 @@ fn delete_and_offset_faces() {
     assert!(matches!(replace_face(&b, &[], &b), Err(KernelError::Unsupported(_))));
 }
 
-/// Two chamfers on opposite edges of a block, deleted at once: OCCT removes each on its own (two features apart, each
-/// under its work bound), the block whole again.
 /// A free-form face pinched to a point where its normal has no one direction (a ruled loft from a bent profile to a
 /// point: the rulings leave the point at different angles): Thicken fails, as Parasolid's (c2-surf-workshop-
 /// singularities' Thicken failure), where OCCT's offset crashed. A plane fan to a point thickens.
@@ -674,6 +672,8 @@ fn thicken_fails_a_face_pinched_where_its_normal_has_no_one_direction() {
     assert!(thicken(&f, 1.0, 0.0).is_ok());
 }
 
+/// Two chamfers on opposite edges of a block, deleted at once: OCCT removes each on its own (two features apart, each
+/// under its work bound), the block whole again.
 #[test]
 fn chamfers_apart_deleted_at_once_each_go() {
     let b = box10();
