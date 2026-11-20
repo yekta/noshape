@@ -133,12 +133,14 @@ fn matched(def: &Value, i: &mut Interp, cx: &FsContext) -> R<(Vec<(ProfilePoint,
     Ok((p1.into_iter().zip(best).collect(), c1))
 }
 
-/// Profiles with different corner counts (live "fs (10-23 10:30)": a rectangle
-/// to a triangle gives a trapezoid and five triangles): the second turned the
-/// first's way round and started at the corner nearest the first's start,
-/// then both walked together, each step advancing the profile whose next
-/// corner makes the shorter diagonal, or both along parallel edges (a planar
-/// quad). Rows may repeat a point (triangles).
+/// Profiles with different corner counts: the second turned the first's way
+/// round and started at the corner nearest the first's start, then both walked
+/// together, each step advancing one profile (a triangle) or both along parallel
+/// edges (a planar quad), the walk folding the sheet least: the smallest sum of
+/// angles between neighbouring facets (live "fs (10-23 10:30)": a rectangle to a
+/// triangle gives a trapezoid and five triangles; c2-sm-loft-basic: a line to an
+/// arc gives the line's triangle, then a fan from its far end). Rows may repeat a
+/// point (triangles).
 fn walk(p1: &[ProfilePoint], p2: &[ProfilePoint], closed: bool) -> Vec<(ProfilePoint, ProfilePoint)> {
     let newell = |p: &[ProfilePoint]| (0..p.len()).fold(DVec3::ZERO, |acc, i| acc + p[i].pos.cross(p[(i + 1) % p.len()].pos));
     let mut q: Vec<ProfilePoint> = p2.to_vec();
@@ -152,28 +154,112 @@ fn walk(p1: &[ProfilePoint], p2: &[ProfilePoint], closed: bool) -> Vec<(ProfileP
         q.reverse();
     }
     let (n1, n2) = if closed { (p1.len(), q.len()) } else { (p1.len() - 1, q.len() - 1) };
-    let at = |p: &[ProfilePoint], k: usize| p[k % p.len()].pos;
+    let moves = least_folding(n1, n2, closed, |k| p1[k % p1.len()].pos, |k| q[k % q.len()].pos);
     let (mut a, mut b) = (0usize, 0usize);
     let mut rows = vec![(p1[0].clone(), q[0].clone())];
-    while a < n1 || b < n2 {
-        let parallel = a < n1 && b < n2 && {
-            let (e1, e2) = (at(p1, a + 1) - at(p1, a), at(&q, b + 1) - at(&q, b));
-            e1.cross(e2).length() <= 1e-9 * e1.length() * e2.length() && e1.dot(e2) > 0.0
-        };
-        if parallel {
-            a += 1;
-            b += 1;
-        } else if b == n2 || (a < n1 && (at(p1, a + 1) - at(&q, b)).length() <= (at(p1, a) - at(&q, b + 1)).length()) {
-            a += 1;
-        } else {
-            b += 1;
-        }
+    for m in moves {
+        a += usize::from(m != Step::Second);
+        b += usize::from(m != Step::First);
         if closed && a == n1 && b == n2 {
             break;
         }
         rows.push((p1[a % p1.len()].clone(), q[b % q.len()].clone()));
     }
     rows
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Step {
+    First,
+    Second,
+    Both,
+}
+
+/// The steps from (0, 0) to (n1, n2) whose facets fold least (the sum of the angles
+/// between neighbouring facets, the closing pair too when closed); a tiny cost per
+/// facet prefers a planar quad over its two triangles.
+fn least_folding(n1: usize, n2: usize, closed: bool, p: impl Fn(usize) -> DVec3, q: impl Fn(usize) -> DVec3) -> Vec<Step> {
+    const STEPS: [Step; 3] = [Step::Both, Step::First, Step::Second];
+    const FACET: f64 = 1e-9;
+    let allowed = |a: usize, b: usize, s: Step| match s {
+        Step::First => a < n1,
+        Step::Second => b < n2,
+        Step::Both => {
+            a < n1 && b < n2 && {
+                let (e1, e2) = (p(a + 1) - p(a), q(b + 1) - q(b));
+                e1.cross(e2).length() <= 1e-9 * e1.length() * e2.length() && e1.dot(e2) > 0.0
+            }
+        }
+    };
+    // The facet a step from (a, b) makes, oriented as the strip (p(a), p(a + 1), q(b + 1), q(b)).
+    let normal = |a: usize, b: usize, s: Step| {
+        let o = p(a);
+        match s {
+            Step::First => (p(a + 1) - o).cross(q(b) - o),
+            Step::Second => (q(b + 1) - o).cross(q(b) - o),
+            Step::Both => (p(a + 1) - o).cross(q(b + 1) - o),
+        }
+        .normalize_or_zero()
+    };
+    let fold = |x: DVec3, y: DVec3| if x == DVec3::ZERO || y == DVec3::ZERO { 0.0 } else { x.dot(y).clamp(-1.0, 1.0).acos() };
+    let back = |a: usize, b: usize, s: Step| (a - usize::from(s != Step::Second), b - usize::from(s != Step::First));
+    let idx = |a: usize, b: usize, s: Step| ((a * (n2 + 1) + b) * 3) + s as usize;
+    let mut best: Option<(f64, Vec<Step>)> = None;
+    for first in STEPS {
+        if !allowed(0, 0, first) {
+            continue;
+        }
+        // cost[(a, b, s)]: the least fold of a walk reaching (a, b) by step s; from: the step before it.
+        let mut cost = vec![f64::INFINITY; (n1 + 1) * (n2 + 1) * 3];
+        let mut from: Vec<Option<Step>> = vec![None; cost.len()];
+        let (a0, b0) = (usize::from(first != Step::Second), usize::from(first != Step::First));
+        cost[idx(a0, b0, first)] = FACET;
+        for a in 0..=n1 {
+            for b in 0..=n2 {
+                for s in STEPS {
+                    let c = cost[idx(a, b, s)];
+                    if !c.is_finite() {
+                        continue;
+                    }
+                    let (pa, pb) = back(a, b, s);
+                    let n = normal(pa, pb, s);
+                    for t in STEPS {
+                        if !allowed(a, b, t) {
+                            continue;
+                        }
+                        let (na, nb) = (a + usize::from(t != Step::Second), b + usize::from(t != Step::First));
+                        let v = c + fold(n, normal(a, b, t)) + FACET;
+                        if v < cost[idx(na, nb, t)] - 1e-12 {
+                            cost[idx(na, nb, t)] = v;
+                            from[idx(na, nb, t)] = Some(s);
+                        }
+                    }
+                }
+            }
+        }
+        for s in STEPS {
+            let mut c = cost[idx(n1, n2, s)];
+            if !c.is_finite() {
+                continue;
+            }
+            if closed {
+                let (pa, pb) = back(n1, n2, s);
+                c += fold(normal(pa, pb, s), normal(0, 0, first));
+            }
+            if best.as_ref().is_some_and(|(b, _)| c >= *b - 1e-12) {
+                continue;
+            }
+            let (mut steps, mut at, mut step) = (Vec::new(), (n1, n2), Some(s));
+            while let Some(st) = step {
+                steps.push(st);
+                step = from[idx(at.0, at.1, st)];
+                at = back(at.0, at.1, st);
+            }
+            steps.reverse();
+            best = Some((c, steps));
+        }
+    }
+    best.map(|b| b.1).unwrap_or_default()
 }
 
 fn ev_tessellated_loft_matches(i: &mut Interp, a: Vec<Value>) -> R<Value> {

@@ -612,6 +612,56 @@ fn sheet_metal_loft_rectangle_to_triangle() {
     assert!((fp.area() * 1e6 - sheet).abs() < sheet * 3e-3, "flat area {} mm² vs {sheet}", fp.area() * 1e6);
 }
 
+#[test]
+fn sheet_metal_loft_line_to_arc_folds_least() {
+    // Live c2-sm-loft-basic: a line on Right to a 4-facet arc 8 in away. The walk folding least: the line's triangle
+    // flat on Top, then the arc's facets fanned from the line's far end (live walls' normals and areas below); each
+    // bend's end on the arc's plane a ruled face. (Live's apex, where the four bends meet, has three more ruled
+    // ends: not yet ours.)
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let a = sk.add_line(DVec2::ZERO, DVec2::new(mm(203.2), 0.0)).0;
+    let s1 = s.sketch(Reference::Plane(DatumPlane::Right), sk);
+    let pl = s.add("cPlane", |p| {
+        p.set("entities", q(Reference::Plane(DatumPlane::Right)));
+        p.set("offset", expr("8 in"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    let b = sk.add_arc_angles(DVec2::new(-0.020060199085093725, 0.2999814751065999), 0.30065145433618845, -1.5040242790506346, -0.8268284448875443).0;
+    let s2 = s.sketch(Reference::FeaturePlane(pl), sk);
+    s.add("sheetMetalLoft", move |p| {
+        p.set("profile1", entities(s1, &[a]));
+        p.set("profile2", entities(s2, &[b]));
+        p.set("chordalTolerance", expr("0.05 in"));
+        p.set("minimalClearance", expr("0.001 in"));
+        p.set("defaultCornerStyle", en("RECTANGLE"));
+        p.set("defaultCornerReliefScale", expr("1.2"));
+        p.set("defaultBendReliefStyle", en("OBROUND"));
+        p.set("defaultBendReliefDepthScale", expr("2"));
+        p.set("defaultBendReliefScale", expr("1.0625"));
+        p.set("defaultRoundReliefDiameter", expr("0.25 in"));
+        p.set("defaultSquareReliefWidth", expr("0.25 in"));
+        p.set("kFactorRolled", expr("0.5"));
+        set_model(p, "0.0625 in", "0.09 in");
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 1);
+    let faces = r.context.bodies[0].shape.faces();
+    let planes: Vec<(DVec3, f64)> = faces.iter().filter_map(|f| match f.face_surface().unwrap() {
+        noshape_kernel::Surface::Plane(pl) => Some((pl.normal, f.area().unwrap() * 1e6)),
+        _ => None,
+    }).collect();
+    let walls = [(DVec3::Z, 20_574.64), (DVec3::new(0.149156, 0.149156, -0.977499), 5_095.26), (DVec3::new(0.263448, 0.304114, -0.915484), 5_249.6), (DVec3::new(0.326459, 0.444857, -0.833982), 5_378.61), (DVec3::new(0.343403, 0.575326, -0.742344), 5_459.84)];
+    for (n, area) in walls {
+        let n = n.normalize();
+        let sides = planes.iter().filter(|(m, x)| m.dot(n).abs() > 1.0 - 1e-5 && (x - area).abs() < area * 2e-3).count();
+        assert_eq!(sides, 2, "live's wall {n:?} {area} mm² on both sides: {planes:?}");
+    }
+    assert_eq!(cylinder_radii(&r, 0).len(), 8, "four bends");
+    let ruled = faces.iter().filter(|f| !matches!(f.face_surface().unwrap(), noshape_kernel::Surface::Plane(_) | noshape_kernel::Surface::Cylinder { .. }));
+    assert_eq!(ruled.filter(|f| f.centroid().unwrap().x > mm(202.0)).count(), 4, "a ruled end per bend on the arc's plane");
+}
+
 /// Cylinder of radius 20 mm around Z, 60 mm long centered at z = 0, and a
 /// 10 x 20 mm rectangle sketched on the tangent plane x = 20 mm.
 fn cylinder_and_tool() -> (Studio, Reference) {

@@ -1,14 +1,18 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-20 14:33 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-20 16:45 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-20 14:33 UTC)
+## In flight (11-20 16:45 UTC)
+- Landing now: sheet metal loft profiles with different corner counts walk the least total fold (host/loft.rs
+  least_folding; was the shorter diagonal): c2-sm-loft-basic gets live's walls (line triangle + fan from its far end),
+  rect-tri unchanged; test sheet_metal_loft_line_to_arc_folds_least. Left in loft-basic: the apex where 4 bends meet
+  (live 3 more ruled bend ends, ours planar: 38 vs 40 faces, +4.2 mm3).
+- Hem 1 (c2-sm-hem-flange) INFO vs live WARNING: asked live for the messages (REQUESTS 15:34); std hole.fs makes the
+  flat collision INFO from V2743 and this doc is 3044, so live's warning may be another message.
+- LANDED 6d80df66: Unfold unrolls only its bend, Refold puts back the held side (unfold-refold 6/6, 212/295).
 - LANDED eca6e645: Thicken / Convert flat lies by the largest wall (`Definition::extracted`); Sized relief ends
   depth + R tan(a/2) in (live 8.3 mm). 201 -> 209/295.
-- Landing now: Unfold unrolls only its bend (sector and tangent-plane faces kept within the bend's extent, so a box's
-  side bends ending on the same plane stay); an Unfold holding the child's side (`SheetMetalData::held_child`) is put
-  back by Refold (F = fold_inverse). c2-cov-sm-unfold-refold 3 -> 6/6, 24 SM docs 209 -> 212/295, no doc worse.
 - Rejected: extract surface's faces in body order (hem-flange SM model 2 7 -> 4/8, frames BUTT/BUTT2 swap);
   patch ~/agents/skasm-keep/extract-order.patch (local).
 - modify-joint Sketch 1 frame origin ours 50.33 vs live 120.02 (x): the flat's plane origin convention, open.
@@ -16,8 +20,7 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   and we build the lower triangle as its own wall, so the bottom-front bend starts at x 3.45 with a slanted end
   (diagonal crosses z 2.3 at x 5.75). Fix: build coplanar rip pieces as one wall (needs topology reindexing:
   def_topo, pieces). A coplanar-rip filter in corner_rip / edge_rip lookups had no effect.
-- Next differences: forms Sketch 3 frame (P2 ticket), Form 5/7; hem Hem 1 INFO vs live WARNING; jog Jog 3 ERROR vs live
-  INFO; loft: live 24 plane + 8 B-spline faces, ours 30 + 2.
+- Next differences: forms Sketch 3 frame (P2 ticket), Form 5/7; jog Jog 3 ERROR vs live INFO; loft apex (above).
 - Tools: /root/skasm-scratch/pm.sh (ONLY=, SAVE=, build + run), pmrun.sh (TRACE run of the kept binary), smlist.txt
   (24 SM docs), CLI batch on saved docs: ~/tmp/skasm/saved (copy .noshape + -wal), hemq*.sh / jq.sh / jogq.sh.
 - Feel stack 4e51cce3 verified by qa (green f380b6928); P2 drawn_failed LANDED 8fd60c7a.
