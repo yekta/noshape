@@ -59,7 +59,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    rotation. Round 2 (lead 11-20 01:00): rows 1-8 on green eef639d7:
    scenarios 7/8, 63/67 (suites/1120-0059-green-spot1r2): sketch-dimension-variable = P0 SKETCH-DIM-PLACE-CLICK-SELECTS (skasm,
    since 592b0fc9 11-17; hidden as a focus.kind diff till live's camera retake). By hand: 3D drag from 3 device px = live
-   (feel/3d.json; the list's "5 px" and feel row 80 are stale, psui told), line end on a lit model edge = Coincident (=), edge midpoint
+   (feel/3d.json; the list's 3D "5 px" fixed to 3 px; feel row 80 (sketch drag 5 px) stands), line end on a lit model edge = Coincident (=), edge midpoint
    rest = P1 EDGE-MIDPOINT-REST-LOOK (psui). Rows 9-16: 8/8 119/119 (1120-0109-green-spot9r2) + select by hand =; rows
    17-22: 13/13 130/130 (1120-0110-green-spot17r2); 23 sticky snap = scene test; 24 hat15b at the release; sketch colours
    (line / dimensioned / held circle / spline) by hand on 5b62f6ca =. Running on 5b62f6ca (vibe2): rows 25-40 = spot2-0461 +

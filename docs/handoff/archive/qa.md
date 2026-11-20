@@ -66,7 +66,7 @@ app differs from its live column there. The user's cases first (hat15 mode-700 c
   dimension lists both variables, values grey on the right, first row lit; ↓ Enter inserts, the box stays open, Enter commits;
   "fcb" in Extrude's Depth, Tab inserts (a6a18313); a line's end over a lit model edge lands on it, Coincident to the edge
   (d90b4f6f8).
-- **3D:** an edge's midpoint target after a short rest (9 px square); a press moves 5 px before it drags.
+- **3D:** an edge's midpoint target after a short rest (9 px square); a left press in empty space box-drags from 3 px after 50 ms (live feel/3d.json; sketch entities drag from 5 px, feel row 80).
 - **Sketch, line tool:** an end snaps onto a line at 7 px, not 8; onto a point at 8, a circle's centre gives Coincident (not
   Concentric); onto a midpoint ±6 px along it; horizontal 7 px / vertical 6 px off the start; alignment with another point
   only after a 100 ms rest on it (the origin always); perpendicular only when the line starts on a line, never parallel; the
