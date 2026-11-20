@@ -576,8 +576,9 @@ impl DrawingEditor {
                             let up_to = d.up_to;
                             // Live request 1737: an End type select [Up to entity | Blind].
                             let ed = cx.entity();
+                            let shown = if up_to { "Up to entity" } else { "Blind" };
                             e.child(
-                                div().px(px(6.)).py(px(2.)).child(
+                                crate::ui_script::mark(div().px(px(6.)).py(px(2.)), move || format!("dropdown:{shown}")).child(
                                     Button::new("ds-end-type")
                                         .ghost()
                                         .w_full()
