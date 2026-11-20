@@ -107,7 +107,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    - qa-nightpm-1121 (bin/nightpm.sh): 00:30 release build on vibex8 (qa-night worktree), the model suite alone at 02:00 (lead 13:4x:
      x86 speed only from the window) -> nightly/pm-1121. vibex8's feel re-time goes after it.
    - Compat: FILLET-ORIENT verified 86d1cbc4; P0 COMPAT-RUSTZERO-FILLET1 -> blend (missed since 10:13: read new compat DIFF docs per green,
-     not just the alert tail). Gyro: bool 1b68aa85 queued, unit qa-wait-compat-gyro-revolve. psui a21e5b8f on green aa568263 (12:42): walk.
+     not just the alert tail). Gyro: bool 1b68aa85 queued, unit qa-wait-compat-gyro-revolve. psui a21e5b8f verified 698df935f (3 rows + cfg labels); P2 FEEL-CONFIG-BOX-WIDTH to psui.
    - Seat lip: a47534be5 (Ok in 0.4.43-0.4.61 + green; vibex7 ~/agents/qa-keep/seatlip-hat8-1120.txt).
 00a. **05:00 cut HELD (lead 04:0x) until a green has core's 2f4f3bc5 (singularities Sketch 2; Mirror 2 is as live, accepted in
    compat/accepted.txt; 2f4f's subject added to cut-must.txt).** Unit qa-prerel-2f4f (bin/prerel-when.sh "<subject>" cut0500): when
