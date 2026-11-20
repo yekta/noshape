@@ -865,7 +865,9 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   A Ø33 circle comes out as one 85-vertex POLYLINE; inserted back (Insert DXF or DWG) it is 84 lines, region 856.84 mm² vs the
   circle's 857.64. Lines round-trip exactly. The flat pattern's export already writes exact ARC / CIRCLE / ELLIPSE / SPLINE
   entities (1021a0c19; = live's a-defaults.dxf), so a laser-cut part exported from a sketch is worse than from a flat. Live's
-  sketch DXF capture requested (REQUESTS "qa (2026-11-19 23:57 UTC)"); expect exact entities as in the flat export.
+  Live (00:1x, live/qa/rt-1119/live-sketch1-default.dxf, behaviours "qa (11-19): exports imported into live; sketch DXF"):
+  AC1014, only LINE / CIRCLE / ARC / SPLINE (5 control points, no fit points) on layer MODELSKETCH_VISIBLE; construction curves
+  and sketch points are NOT written (their layers exist in the table). Ours: layer "VISIBLE", construction as hidden lines.
   Files: qa-scratch/tickets/sketch-dxf-1119/. (qa 23:58, green f6f8069f)
 
 - [ ] P2 **ERROR-CHIP-RED-NO-FIELD (psui)**: Thicken on a box face, Thickness 1 = 0 and Thickness 2 = 0 (behaviours L19): title red,
