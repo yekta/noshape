@@ -40,6 +40,30 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   kept while hovering to place. Ours shows no readout (null) throughout. Check against ANALYSIS-READOUT-HIDDEN's fix (readout hidden only for
   Interference) once it is on green.
 
+- [ ] P0 FEEL-FS-CLOSE-BRACE-OUTDENT (studios; qa 11-20 04:30, live behaviours "feel coverage (11-20)" F2, walked on green 9ae062180 vibex8) Feature Studio: "}" typed on an indented blank line outdents
+  to its matching "{" line's indent in live (12 sp -> "    }"); ours leaves it at col 13 (nested f/g/h blocks, Line 4 Column 14), the next "}" too.
+  Enter after "{" (+4 sp, no "}" added) and after a statement match. qa-scratch/feel1120/f2-outdent-clean.png
+- [ ] P0 FEEL-FS-TRIPLE-CLICK-LINE (studios; qa 11-20 04:30, live behaviours "feel coverage (11-20)" F3) Feature Studio: a triple-click selects the line with its newline in live (caret to the next line,
+  col 0); ours selects to the line's end only (caret stays, Line 2 Column 9). Double-click word, Shift+click, drag match. qa-scratch/feel1120/f3-mouse.png
+- [ ] P0 FEEL-FS-BRACKET-MATCH (studios; qa 11-20 04:30, live behaviours "feel coverage (11-20)" F3) Feature Studio: with the caret right after or before ")", live boxes both brackets (1 px solid
+  rgb(192,192,192), 8x16, no fill; none at Home); ours draws no box at either (1.2 s wait). Live: live/feel/cov-1120/fs-bracket-after.png; ours qa-scratch/feel1120/f3-bracket2.png
+- [ ] P0 FEEL-FS-WHEEL-STEP (studios; qa 11-20 04:30, live behaviours "feel coverage (11-20)" F3) Feature Studio: one wheel notch scrolls 72 px in live (4.5 lines of 16 px: first line 0 -> 4 -> 9 -> 13);
+  ours 48 px (3 lines: 1 -> 4 -> 7 -> 10). qa-scratch/feel1120/f3-wheel.png
+- [ ] P0 FEEL-VS-OLD-VALUE-CHIP (studios; qa 11-20 04:30, live behaviours "feel coverage (11-20)" V2) Variable Studio: while a value cell is edited, live shows a grey chip with its old value ("30 mm")
+  at the cell's top right, over the row above; ours none. The "#" list itself matches (154 px, 31 px rows, only variables above, filter, Enter).
+  V1's mouse edit matches; its timing (live input 46 ms after the dblclick, ours ~150-200 ms at load 35) is to recheck on a quiet host.
+  Live: live/feel/cov-1120/vs2-hash.png; ours qa-scratch/feel1120/v2-chip-height.png
+- [ ] P0 FEEL-DRW-DIM-FLIPPED-LINE (studios; qa 11-20 04:30, live behaviours "feel coverage (11-20)" D2) drawing: dragging a dimension's text near an extension line flips the arrows outside; live then
+  draws no dimension line between the extension lines (only the text); ours still draws it from the left extension line to the text and on
+  to the right one. qa-scratch/feel1120/d2-mid-live-vs-ours.png (top live, bottom ours)
+- [ ] P0 FEEL-DRW-DIM-DRAG-SELECTS (studios; qa 11-20 04:30, live behaviours "feel coverage (11-20)" D2) drawing: after a dimension text drag, live leaves it unselected (tan hover with grips while the
+  pointer stays, black away); ours leaves it selected (orange away) with a "±0.1" tolerance chip above it from the release on. Text follow,
+  line height, run-out and no highlight during the drag match. qa-scratch/feel1120/d2-drag.png (panels 4-5) vs live/feel/cov-1120/d2-after*.png
+- [ ] P0 FEEL-DRW-WHEEL-ZOOM-SLOW (studios; qa 11-20 04:30, live behaviours "feel coverage (11-20)" D3; timing under load, recheck quiet) drawing wheel zoom: live's first draw 8-23 ms after the wheel
+  event; ours 208-392 ms (6 notches, median ~250) at vibex8 load 21-28, 2-4x the Feature Studio wheel (54-158 ms) in the same window. The zoom
+  itself matches (x1.059 per notch about the pointer, exact inverse). D1's release (ours redraws once at ~470 ms, live first draw 10 ms, settled
+  767 ms) is no verdict yet: recheck both on a quiet host.
+
 ## qa, 2026-11-20
 - [ ] P2 **ORACLE-ASM-R3-TOLERANCE (asm)**: the T2 test `model/tests/oracle_asm::assemblies_match_live` fails in every
   nightly T2 since 11-14 (vibex6 ~/lead/t2-*.log; 11-20 on 5b62f6ca8) on R3 only: instance B's transform vs live's differs
