@@ -105,9 +105,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
      (models-report + 0407's other areas). qa-suites.sh / suites-models.sh now default QA_SPEED_PROFILE=release (dx/lead 12:0x).
    - qa-nightpm-1121 (bin/nightpm.sh): 00:30 release build on vibex8 (qa-night worktree), the model suite alone at 02:00 (lead 13:4x:
      x86 speed only from the window) -> nightly/pm-1121. vibex8's feel re-time goes after it.
-   - Compat: FILLET-ORIENT verified 86d1cbc4; P0 COMPAT-RUSTZERO-FILLET1 -> blend (missed since 10:13: read new compat DIFF docs per green,
-     not just the alert tail). Gyro: bool 1b68aa85 queued, unit qa-wait-compat-gyro-revolve. psui a21e5b8f verified 698df935f (3 rows + cfg labels); P2 FEEL-CONFIG-BOX-WIDTH to psui.
-     17:00 cut: candidate = first green with psui aba58c71 (qa-wait-cut17), then bin/prerel-run.sh <label> (base v0.4.62); GO by 16:15.
+   - Compat: FILLET-ORIENT, GYRO verified; P0 RUSTZERO-FILLET1 -> blend (read new DIFF docs per green). psui a21e verified; P2 CONFIG-BOX-WIDTH.
+     17:00 cut: GO 15:4x on 18809b4c (prerel/cut17-18809b4c.txt: hats SAME, dock = accepted B Govde; known: rust-zero F1, crash957 Ch3 P1
+     bool). Hat open px (163-448): b76561076 variable row text + 24 plane-plane edges B-spline -> line; bisect unit qa-hatedge-bisect.
    - Seat lip: a47534be5 (Ok in 0.4.43-0.4.61 + green; vibex7 ~/agents/qa-keep/seatlip-hat8-1120.txt).
 00a. **05:00 cut HELD (lead 04:0x) until a green has core's 2f4f3bc5 (singularities Sketch 2; Mirror 2 is as live, accepted in
    compat/accepted.txt; 2f4f's subject added to cut-must.txt).** Unit qa-prerel-2f4f (bin/prerel-when.sh "<subject>" cut0500): when
