@@ -1,0 +1,719 @@
+{
+ "scenario": "drw-centerline-edge-to-edge-cylinder",
+ "recorded": "2026-11-20T15:30:35.660Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 303901ce5388bd1d8370",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "7a10ea3609dd8e72c5c58a57",
+  "start": "cylinder-drawing",
+  "startElement": "0f461c828d5a510eba8b4214",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "other",
+   "tag": "iframe"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": {
+   "tab": "Part 1 Drawing 1",
+   "sheet": "Sheet1",
+   "sheets": [
+    "Sheet1"
+   ],
+   "tool": null,
+   "views": [
+    {
+     "name": "Front",
+     "kind": "base",
+     "position": [
+      81,
+      81
+     ],
+     "parent": null,
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Isometric",
+     "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Right",
+     "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Top",
+     "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    }
+   ],
+   "annotations": [],
+   "selection": [],
+   "viewport": {
+    "sheet_px": [
+     432,
+     110,
+     1526,
+     955
+    ],
+    "sheet_mm": [
+     279.4,
+     215.9
+    ],
+    "mmPerPixel": 0.25539
+   }
+  }
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Edge to edge centerline"
+    }
+   },
+   "ok": true,
+   "at": [
+    1066,
+    59
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Edge to edge centerline",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
+    }
+   },
+   "t": 226509
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "view_edge": {
+      "view": "Front",
+      "at": [
+       -10,
+       0,
+       20
+      ]
+     }
+    }
+   },
+   "ok": true,
+   "at": [
+    710,
+    638
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Edge to edge centerline",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [
+      {
+       "kind": "centerline",
+       "text": null,
+       "position": null
+      }
+     ],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
+    }
+   },
+   "t": 258184
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "view_edge": {
+      "view": "Front",
+      "at": [
+       10,
+       0,
+       20
+      ]
+     }
+    }
+   },
+   "ok": true,
+   "at": [
+    788,
+    638
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Edge to edge centerline",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [
+      {
+       "kind": "centerline",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "centerline",
+       "text": null,
+       "position": null
+      }
+     ],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
+    }
+   },
+   "t": 285056
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Edge to edge centerline",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [
+      {
+       "kind": "centerline",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "centerline",
+       "text": null,
+       "position": null
+      }
+     ],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
+    }
+   },
+   "t": 311397
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     1022,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [
+      {
+       "kind": "centerline",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "centerline",
+       "text": null,
+       "position": null
+      }
+     ],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
+    }
+   },
+   "t": 338462
+  }
+ ]
+}

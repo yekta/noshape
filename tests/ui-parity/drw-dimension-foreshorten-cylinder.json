@@ -1,0 +1,101 @@
+{
+ "name": "drw-dimension-foreshorten-cylinder",
+ "about": "Foreshorten dimension (shift+h) on the Ø20 cylinder in Front: first an Edge to edge centerline on its two silhouette edges (the axis), then the tool: the centerline, the right silhouette edge, a click right of the view: live's half-diameter dimension (0.394 = 10 mm), its text and the foreshortened leader",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "coverage (lead 11-20: drawing types with 0-1 uses)",
+ "start": "cylinder-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Edge to edge centerline"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      -10,
+      0,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      10,
+      0,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension",
+    "menu": "Foreshorten dimension (shift+h)"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      0,
+      0,
+      30
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      10,
+      0,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      24,
+      0,
+      30
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

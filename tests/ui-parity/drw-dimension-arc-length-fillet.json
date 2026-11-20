@@ -1,0 +1,52 @@
+{
+ "name": "drw-dimension-arc-length-fillet",
+ "about": "Arc length dimension on Front's R4 fillet arc (a quarter circle, 6.283 mm), placed up-left of it: the value and the arc symbol over the text",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "coverage (lead 11-20: drawing types with 0-1 uses)",
+ "start": "chamfer-fillet-block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension",
+    "menu": "Arc length dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      1.1716,
+      0,
+      8.8284
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      -8,
+      0,
+      18
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,51 @@
+{
+ "name": "drw-centerline-2-point-cylinder-axis",
+ "about": "2 point centerline on the Ø20 cylinder's axis in Front: the midpoints of its bottom and top lines (0, 0) and (0, 40): the line's length and how far it overruns the part",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "coverage (lead 11-20: drawing types with 0-1 uses)",
+ "start": "cylinder-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "2 point centerline"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      0,
+      0,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      0,
+      0,
+      40
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

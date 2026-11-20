@@ -1,0 +1,51 @@
+{
+ "name": "drw-virtual-sharp-chamfer-corner",
+ "about": "Virtual sharp of Front's top edge and the right edge, which the 4 mm chamfer keeps apart: the mark at their intersection (40, 10)",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "coverage (lead 11-20: drawing types with 0-1 uses)",
+ "start": "chamfer-fillet-block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Virtual sharp"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      40,
+      0,
+      3
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

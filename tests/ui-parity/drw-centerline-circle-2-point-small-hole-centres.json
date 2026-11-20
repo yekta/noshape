@@ -1,0 +1,51 @@
+{
+ "name": "drw-centerline-circle-2-point-small-hole-centres",
+ "about": "2 point circle centerline picking the Ø5 hole centres (10, 10) then (50, 10) in Top: live takes the first pick as the centre and the second as a point on the circle (a circle centred (10, 10), r 40, running off the view), not the ends of a diameter",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "coverage (lead 11-20: drawing types with 0-1 uses)",
+ "start": "holes-plate-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "2 point circle centerline"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Top",
+     "at": [
+      10,
+      10,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Top",
+     "at": [
+      50,
+      10,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

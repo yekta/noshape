@@ -1,0 +1,51 @@
+{
+ "name": "drw-centerline-edge-to-edge-cylinder",
+ "about": "Edge to edge centerline between the Ø20 cylinder's two silhouette edges in Front (x -10 and 10): the axis line live draws, its ends and overrun",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "coverage (lead 11-20: drawing types with 0-1 uses)",
+ "start": "cylinder-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Edge to edge centerline"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      -10,
+      0,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      10,
+      0,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

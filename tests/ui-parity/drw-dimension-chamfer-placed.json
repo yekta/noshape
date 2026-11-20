@@ -1,0 +1,65 @@
+{
+ "name": "drw-dimension-chamfer-placed",
+ "about": "Chamfer dimension on Front's 4 mm chamfer: the chamfer line, then the top edge, placed up-right of the corner: the text live writes (size x angle) and where its leader goes",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "coverage (lead 11-20: drawing types with 0-1 uses)",
+ "start": "chamfer-fillet-block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension",
+    "menu": "Chamfer dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      38,
+      0,
+      8
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      50,
+      0,
+      18
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

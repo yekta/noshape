@@ -1,0 +1,38 @@
+{
+ "name": "drw-centermark-cylinder-top",
+ "about": "Centermark tool on the Ø20 cylinder's circle in Top, which already has the centermark live adds on drawing creation: the circle hovers tan and no second mark is added",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "coverage (lead 11-20: drawing types with 0-1 uses)",
+ "start": "cylinder-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Centermark"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Top",
+     "at": [
+      7.0711,
+      7.0711,
+      40
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

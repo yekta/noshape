@@ -1,0 +1,65 @@
+{
+ "name": "drw-max-min-fillet-arc",
+ "about": "Maximum or minimum dimension between Front's R4 fillet arc and the right edge below the chamfer, placed below the view: whether live gives the minimum (36 mm, 1.417) or the maximum (40 mm, 1.575)",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "coverage (lead 11-20: drawing types with 0-1 uses)",
+ "start": "chamfer-fillet-block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension",
+    "menu": "Maximum or minimum dimension (ctrl+m)"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      1.1716,
+      0,
+      8.8284
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      40,
+      0,
+      3
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      -10
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
