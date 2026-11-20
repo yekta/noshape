@@ -65,7 +65,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    (line / dimensioned / held circle / spline) by hand on 5b62f6ca =. On 5b62f6ca (vibe2): rows 25-40 (spot2-0461 + spot33
    names) 15/15 260/260 (1120-0128-green-spot25r2); rows 41-56 drawings + documents 16/16 67/67 (1120-0116-green-spot41r2).
    Round 2 done 01:20; only failure the P0 sketch-dimension-variable (skasm). STALE-SKETCH-HOVER verified a933e1b7 01:28. Suite
-   1119-1302 diffed (suites-diff vs 1119-0551; LOADED): only P2 SUITE-INTRO-MUTUALTRIM-DERIVED (core); exchange 117/130. Compat: P1 SINGULARITIES-SKETCH2-UNSOLVED -> core (20ae6a506; core 4a52a26bb).
+   1119-1302 diffed (suites-diff vs 1119-0551; LOADED): only P2 SUITE-INTRO-MUTUALTRIM-DERIVED (core); exchange 117/130. skasm stack queued 01:5x (94f6df34): waiter qa-wait-skasm-dim
+   (first skasm commit since 01:53; check the green has 94f6df34's subjects). Recheck: sketch-dimension-variable (uip-rerun +
+   by hand), OFFSET-EDIT-SCALES-SKETCH (free circle, O, Enter, 3: no scaling), SMM-EXTRUDE-CLOSED-PROFILE, SKETCH-SLOT-ON-ARC,
+   SKETCH-DXF-EXPORT-POLYLINES (R14, LINE/CIRCLE/ARC/SPLINE on MODELSKETCH_VISIBLE, no construction / points). Compat: P1 SINGULARITIES-SKETCH2-UNSOLVED -> core (20ae6a506; core 4a52a26bb).
 4. Hover flow (lead 11-17 22:20, every release): uh/uh2.sh <release app> <out> on vibex6 Xvfb, 3 runs, xsheet.py for the sheet;
    USER-HOVER-STAYS-LIT is listed as known in the cut's entry until psui's latest-wins picking fix passes 3 clean runs.
 
