@@ -110,6 +110,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
    `table_section`, sticky header from `ct.panel_scroll` + `grid_tops`, `h_scrollbar(16, 18)` pinned; the grid is
    flex_none so wide custom tables scroll sideways at all). run128 green. On green: tell qa (DIM readout, rollback
    drop row, section arrow foot, midpoint rest, leave-window, fast-off clear) and studios/asm/skasm as listed below.
+3h. 428c82765 (after 620709c4 lands): MEASURE-CIRCLE-DEFAULT-PLANE (live parity-open-1120 ms3: circle + Top = Min dist ·
+   Center dist; on Top Face tangent angle · Center dist · Min dist) in the default-plane filter; tick the ticket then.
+   Config box label column: ours 80 px fixed, live ~32 for "Size": REQUESTS 06:40 (no change until live answers).
 3e. qa P0 FEEL-DIM-PICK-READOUT (15e785522, live R3 cov2-dim-orient): the sketch readout reads the Dimension tool's
    picks (`SketchEditor::readout_entities`); sketch_ui_tests::the_dimension_tools_picks_fill_the_readout. Tick it and
    tell qa on green. run114 (vibex8) also showed 5 part-studio tests failing that this batch doesn't touch (config

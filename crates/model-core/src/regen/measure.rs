@@ -162,9 +162,13 @@ pub fn measure(ctx: &Context, refs: &[Reference]) -> Vec<(String, Measurement)> 
     let area: f64 = faces.iter().filter_map(|s| s.area().ok()).sum();
     let length: f64 = edges.iter().filter_map(|s| s.length().ok()).sum();
     let crossing_planes = refs.iter().all(is_plane) && !rows.iter().any(|(l, _)| l == "Parallel dist");
+    // Live (parity-open-1120 ms3): a circle with a default plane reads Min dist and Center dist (on the plane, Face
+    // tangent angle first): no Length, no Curvature deviation.
+    let circles = !edges.is_empty() && faces.is_empty() && edges.iter().all(|e| matches!(e.edge_curve(), Ok(k::Curve::Circle { .. })));
     rows.into_iter()
         .filter_map(|(l, m)| match l.as_str() {
             "Max dist" | "Position" | "Center position" => None,
+            "Length" | "Curvature deviation" if circles => None,
             "Area" => (!faces.is_empty()).then_some((l, Measurement::Area(area))),
             "Length" => (!edges.is_empty()).then_some((l, Measurement::Length(length))),
             "Min dist" if crossing_planes => None,
@@ -1149,9 +1153,17 @@ mod tests {
         let circle = k::make_circle(DVec3::new(0.0, 0.0, 0.003), DVec3::Z, 0.002).unwrap();
         let ctx = Context { bodies: vec![body(1, circle.clone())].into(), ..Default::default() };
         let c = Reference::Edge((*ctx.bodies[0].edges[0]).clone());
-        let rows = measure(&ctx, &[c, top]);
+        let rows = measure(&ctx, &[c, top.clone()]);
         let d = min_dist(&rows).expect("circle + Top: a Min dist");
         assert!((d - 0.003).abs() < 1e-9, "{d}");
+        // Live parity-open-1120 ms3: apart, Min dist · Center dist; lying on Top, Face tangent angle · Center dist ·
+        // Min dist; never Length or Curvature deviation.
+        let labels = |rows: &[(String, Measurement)]| rows.iter().map(|(l, _)| l.clone()).collect::<Vec<_>>();
+        assert_eq!(labels(&rows), ["Min dist", "Center dist"]);
+        let lying = k::make_circle(DVec3::ZERO, DVec3::Z, 0.005).unwrap();
+        let ctx = Context { bodies: vec![body(1, lying)].into(), ..Default::default() };
+        let c = Reference::Edge((*ctx.bodies[0].edges[0]).clone());
+        assert_eq!(labels(&measure(&ctx, &[c, top])), ["Face tangent angle", "Center dist", "Min dist"]);
     }
 
     /// Live "psb measure" (5a): a vertical edge 10 mm below a perpendicular face it doesn't meet reads "Perp line and
