@@ -9,10 +9,25 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P2 **INSERT-OTHER-DOCS-SORT (asm)**: Onshape 1.223 "sorting in the Current document and Other documents tabs of the
   insert dialog". Live 05:42: Insert › Other documents › a document's Part Studios / Assemblies list has the same sort button
   beside its search box as Current document (Name: A → Z / Z → A). Ours shows Sort only for the current document
-  (assembly_panels.rs, insert_source == 0). Evidence: onshape-research/live/releases/rn-1222-1223/ins-other.png, rn1-rn3.json.
+  (assembly_panels.rs, insert_source == 0). Live 05:52: the button is in an opened document's lists only (Name: A → Z / Z → A);
+  the Recently opened / Created by me / … source lists have none. Evidence: onshape-research/live/releases/rn-1222-1223/ins-other.png,
+  so1.json, rn1-rn3.json.
 - [ ] P2 **DRW-CHOOSER-SORT (studios)**: the drawing Insert view chooser "Select a part or assembly" has a sort button right
   of "Search parts or sketches" (live drawing/cfg-choosers-1120/iv-2-insert.png; the custom table's "Select a Part Studio"
   also has one). Ours (drawing_chooser.rs) has none. Options not opened in the drawing; the assembly's are Name: A → Z / Z → A.
+- [ ] P2 **PARTS-LIST-PROPERTIES (psui)**: Onshape 1.222 "Display parts list properties". Live 05:52: right-clicking the Part
+  Studio's "Parts (n)" header gives one item, "Show parts list properties" (then "Hide parts list properties"). With it on, each
+  part row shows chips after its name: the part number (bg rgb(215,215,215), radius 3 px, 13.33 px text) and the state
+  ("In progress", bg rgb(238,238,238)); a workspace revision "A" shows no chip. Name and chips truncate with an ellipsis on a
+  hovered row. Account Preferences can turn it on by default (forum 1.222 post; not taken). Ours: no such menu item.
+  Evidence: releases/rn-1222-1223/pl-on.png, pl-on-crop.png, pl1.json, pl2.json.
+- [ ] P2 **TABLES-STICKY-HEADER-HSCROLL (psui)**: Onshape 1.223 "sticky headers in more tables". Live 05:52, Part Studio
+  tables panel (Cut list): scrolling the panel, the table's header row (.os-thead, 34 px, bg rgb(234,234,234), z 10) stops
+  at the panel's top (translateY follows the scroll) while the rows pass under it. The table's title row ("Cut list") is not
+  sticky. When the panel scrolls vertically and the table is wider than the panel, a horizontal scrollbar is pinned to the
+  panel's bottom (16 px, the table's visible width; 18 px while the pointer is over it) whenever the table's own bottom is
+  out of view (osc-sticky-scroll-component). Ours (config_panel.rs): the header scrolls away; the sideways scrollbar is
+  only at the table's bottom. Evidence: releases/rn-1222-1223/st2.json, st7.json, sticky-h-*.png, sticky-800.png.
 - [ ] P2 **URDF-RIGID-SUBASM-SINGLE-LINK (dx)**: Onshape 1.223 "merging subassemblies into a single body in URDF export".
   Live 05:42, assembly Export › URDF: Geometry format, STL Format, Resolution, Options, ☐ "Export rigid subassemblies as a
   single link", ☐ Include hidden instances in export. Ours' URDF export has no such option. Evidence:
