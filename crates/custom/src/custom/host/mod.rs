@@ -916,6 +916,7 @@ pub fn rename_created(ctx: &mut Context, marker: FeatureId, bits: u32, feature: 
         }
         *b = Arc::new(nb);
     }
+    ctx.bodies.rename_aliases(|n| mentions(n, marker).then(|| wrap_name(n, marker, feature)));
 }
 
 // ---------------------------------------------------------------- natives

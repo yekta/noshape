@@ -513,6 +513,29 @@ impl<'a> QueryCx<'a> {
         }
     }
 
+    /// The faces, edges or vertices named `n`, else under a name it led to (a face renamed since saved documents named
+    /// it: [`crate::regen::context::Bodies::alias_chain`]).
+    fn named(&self, n: &TopoName, kind: NameKind) -> Vec<Ent> {
+        let found = self.named_exactly(n, kind);
+        if !found.is_empty() {
+            return found;
+        }
+        self.st.ctx.bodies.alias_chain(n).iter().map(|m| self.named_exactly(m, kind)).find(|f| !f.is_empty()).unwrap_or_default()
+    }
+
+    /// Only the bodies that may hold it ([`NameIndex`]): a lookup asks every body otherwise, each without the name
+    /// scanning all its entities for split relatives (thousands of bodies after a pattern).
+    fn named_exactly(&self, n: &TopoName, kind: NameKind) -> Vec<Ent> {
+        let ctx = &self.st.ctx;
+        let want = Wanted::of(n, kind);
+        let bodies = ctx.bodies.iter().enumerate().filter(|(b, _)| self.name_index(*b).may_hold(&want));
+        match kind {
+            NameKind::Face => bodies.flat_map(|(b, body)| body.find_faces(n).into_iter().map(move |f| Ent::Face(b, f))).collect(),
+            NameKind::Edge => bodies.flat_map(|(b, body)| body.find_edges(n).into_iter().map(move |f| Ent::Edge(b, f))).collect(),
+            NameKind::Vertex => bodies.flat_map(|(b, body)| body.find_vertices(n).into_iter().map(move |f| Ent::Vertex(b, f))).collect(),
+        }
+    }
+
     /// Entities a persistent reference resolves to now.
     pub fn from_ref(&self, r: &Reference) -> Vec<Ent> {
         let ctx = &self.st.ctx;
@@ -531,18 +554,9 @@ impl<'a> QueryCx<'a> {
             }
             // Only the bodies that may hold it ([`NameIndex`]): a lookup asks every body otherwise, each without the
             // name scanning all its entities for split relatives (thousands of bodies after a pattern).
-            Reference::Face(n) => {
-                let want = Wanted::of(n, NameKind::Face);
-                ctx.bodies.iter().enumerate().filter(|(b, _)| self.name_index(*b).may_hold(&want)).flat_map(|(b, body)| body.find_faces(n).into_iter().map(move |f| Ent::Face(b, f))).collect()
-            }
-            Reference::Edge(n) => {
-                let want = Wanted::of(n, NameKind::Edge);
-                ctx.bodies.iter().enumerate().filter(|(b, _)| self.name_index(*b).may_hold(&want)).flat_map(|(b, body)| body.find_edges(n).into_iter().map(move |f| Ent::Edge(b, f))).collect()
-            }
-            Reference::Vertex(n) => {
-                let want = Wanted::of(n, NameKind::Vertex);
-                ctx.bodies.iter().enumerate().filter(|(b, _)| self.name_index(*b).may_hold(&want)).flat_map(|(b, body)| body.find_vertices(n).into_iter().map(move |f| Ent::Vertex(b, f))).collect()
-            }
+            Reference::Face(n) => self.named(n, NameKind::Face),
+            Reference::Edge(n) => self.named(n, NameKind::Edge),
+            Reference::Vertex(n) => self.named(n, NameKind::Vertex),
             Reference::Origin => vec![Ent::Origin],
             Reference::Plane(p) => vec![Ent::Datum(*p)],
             // A whole sketch: its bodies (of all its pieces).

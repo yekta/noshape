@@ -525,10 +525,39 @@ impl Bodies {
         }
         chain.iter().map(|m| self.find_named(kind, m)).find(|f| !f.is_empty()).unwrap_or_default()
     }
+    /// The names `n` leads to through the other names faces go by, nearest first (empty: none).
+    pub fn alias_chain(&self, n: &TopoName) -> Vec<TopoName> {
+        let mut chain: Vec<TopoName> = Vec::new();
+        if self.aliases.is_empty() {
+            return chain;
+        }
+        let mut cur = n.clone();
+        for _ in 0..8 {
+            let Some(next) = cur.renamed(&|x| self.aliases.iter().find(|(a, _)| **a == *x).map(|(_, to)| to.clone())) else { break };
+            chain.push(next.clone());
+            cur = next;
+        }
+        chain
+    }
     /// Records `pairs` (another name, the face's name) for [`Bodies::find_untracked`].
     pub fn add_aliases(&mut self, pairs: impl IntoIterator<Item = (Name, Name)>) {
         // (The first wins at lookup: no check for repeats, which would scan the list each time.)
         Arc::make_mut(&mut self.aliases).extend(pairs.into_iter().filter(|(from, to)| from != to));
+    }
+    /// Renames the other names faces go by and the names they lead to (`f`: a new name, or none to keep it; a
+    /// FeatureScript operation's names, made under its marker feature).
+    pub fn rename_aliases(&mut self, f: impl Fn(&Name) -> Option<Name>) {
+        if !self.aliases.iter().any(|(a, b)| f(a).is_some() || f(b).is_some()) {
+            return;
+        }
+        for (a, b) in Arc::make_mut(&mut self.aliases).iter_mut() {
+            if let Some(x) = f(a) {
+                *a = x;
+            }
+            if let Some(y) = f(b) {
+                *b = y;
+            }
+        }
     }
     /// Puts `v` in place of the bodies, as a new list would (no reads noted from here on), keeping the other names
     /// faces go by.

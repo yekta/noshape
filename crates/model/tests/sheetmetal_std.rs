@@ -200,7 +200,12 @@ fn a_corner_reliefs_cut_faces_are_the_corner_features() {
     assert_eq!((sh.faces().len(), sh.edges().len(), sh.vertices().len()), (28, 62, 36), "live's faces, edges, vertices");
 }
 
-/// The creator of the face through `p` (mm), within 1 µm.
+/// The index of the part's face through `p` (mm), within 1 µm.
+fn face_index_at(r: &RegenResult, p: DVec3) -> usize {
+    let b = &r.context.bodies[part(r)];
+    let v = noshape_kernel::make_vertex(p * 1e-3).unwrap();
+    b.shape.faces().iter().position(|f| noshape_kernel::distance(&v, f).is_ok_and(|d| d.distance < 1e-6)).unwrap_or_else(|| panic!("no face at {p:?}"))
+}
 fn creator_at(r: &RegenResult, p: DVec3) -> Option<FeatureId> {
     let b = &r.context.bodies[part(r)];
     let v = noshape_kernel::make_vertex(p * 1e-3).unwrap();
@@ -248,10 +253,16 @@ fn the_latest_bend_relief_creates_every_reliefs_cut_faces() {
         })
     };
     relief(&mut s, 50.0);
+    let cuts = [(7.875, 2.53125, 1.0), (10.0, 3.53125, 1.0), (52.125, 2.53125, 1.0), (50.0, 3.53125, 1.0)];
+    let r = s.ok();
+    let before: Vec<_> = cuts[2..].iter().map(|&(x, y, z)| { let b = &r.context.bodies[part(&r)]; b.faces[face_index_at(&r, DVec3::new(x, y, z))].clone() }).collect();
     let br2 = relief(&mut s, 10.0);
     let r = s.ok();
-    let cuts = [(7.875, 2.53125, 1.0), (10.0, 3.53125, 1.0), (52.125, 2.53125, 1.0), (50.0, 3.53125, 1.0)];
     assert_eq!(got(&r, &cuts), vec![Some(br2); 4], "both ends' cut faces (Bend relief 2 {br2:?}, Flange 1 {f1:?})");
+    // Bend relief 1's cut faces' names still find them (saved documents' sketch planes: qa compat 11-20, rocker-enclosure, dogbone).
+    let found: Vec<Vec<(usize, usize)>> = before.iter().map(|n| r.context.bodies.find_untracked(noshape_model::regen::context::LookupKind::Face, n)).collect();
+    let want: Vec<Vec<(usize, usize)>> = cuts[2..].iter().map(|&(x, y, z)| vec![(part(&r), face_index_at(&r, DVec3::new(x, y, z)))]).collect();
+    assert_eq!(found, want, "Bend relief 1's cut faces by their names before Bend relief 2");
     assert_eq!(got(&r, &[(10.0, -1.0, 14.5), (30.0, -2.0, 14.5), (50.0, 0.0194052, 2.0194052)]), vec![Some(f1); 3], "the wall's end and side, the bend's end");
 }
 

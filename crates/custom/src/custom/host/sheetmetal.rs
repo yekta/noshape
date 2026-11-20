@@ -2631,10 +2631,18 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     // (A bend's end a corner relief moved: beside its bend's faces, live A-rect: Flange 1's.)
                     let beside = |d: &Def| kept.contains(&d) || matches!(d, Def::Vertex(v) if kept.iter().any(|k| matches!(k, Def::Edge(e) if def.bends.contains_key(e) && topo.edge_ends.get(*e).is_some_and(|(a, b)| a.distance(topo.vertices[*v]) < TOL || b.distance(topo.vertices[*v]) < TOL))));
                     for (fi, n) in p.names.iter_mut().enumerate() {
-                        let Some(src) = p.sources.0.get(fi).filter(|d| *n == fresh_names[fi] && beside(d) && p.relief.get(fi) != Some(&true)) else { continue };
+                        let Some(src) = p.sources.0.get(fi).filter(|d| *n == fresh_names[fi] && beside(d)) else { continue };
                         let Some(c) = definition_creator(db, src, &order).filter(|c| *c != studio_feature) else { continue };
                         let named = Arc::new(crate::reference::TopoName::face(c, crate::reference::Role::Generated(n.clone())));
-                        // (A moved bend end's name before still finds it: qa compat 11-20, c2-sm-louver's Sketch 6.)
+                        // (The names these faces had before still find them, qa compat 11-20: a relief's cut face, the
+                        // creator's before, rocker-enclosure's and dogbone's sketch planes; a moved bend end, the rebuild's
+                        // before, c2-sm-louver's Sketch 6.)
+                        if p.relief.get(fi) == Some(&true) {
+                            if kept.contains(&src) {
+                                relief_aliases.push((named, n.clone()));
+                            }
+                            continue;
+                        }
                         if !kept.contains(&src) {
                             relief_aliases.push((n.clone(), named.clone()));
                         }
