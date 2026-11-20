@@ -458,7 +458,7 @@ impl DrawingEditor {
         div()
             .id(SharedString::from(format!("dt-prec-tip-{row}-{i}")))
             .tooltip(crate::ui::tooltip("Precision"))
-            .child(Button::new(SharedString::from(format!("dt-prec-{row}-{i}"))).ghost().w(px(20.)).h(px(25.)).border_1().border_l_0().border_color(gpui_kit::rgb(0xcccccc)).rounded_r(px(2.)).rounded_l(px(0.)).bg(gpui_kit::rgb(0xffffff)).text_color(gpui_kit::rgb(0x333333)).dropdown_caret(true).os_dropdown_menu(SharedString::from(format!("dt-prec-dd-{row}-{i}")), true, move |mut m, _, _| {
+            .child(Button::new(SharedString::from(format!("dt-prec-{row}-{i}"))).ghost().w(px(20.)).h(px(25.)).border_1().border_l_0().border_color(gpui_kit::rgb(0xcccccc)).rounded_r(px(2.)).rounded_l(px(0.)).bg(gpui_kit::rgb(0xffffff)).p_0().child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., gpui_kit::rgb(0x000000))).os_dropdown_menu(SharedString::from(format!("dt-prec-dd-{row}-{i}")), true, move |mut m, _, _| {
                 for &(l, p) in &PRECISIONS {
                     let e = ed.clone();
                     m = m.item(crate::os_menu::OsMenuItem::new(l).checked(cur == p).on_click(move |_, _, cx| {
