@@ -39,9 +39,12 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
   (REQUESTS "studios (2026-11-20 08:08 UTC)", not captured at 09:30): Section Depth / Offset distance, Datum "This
   field cannot be empty" (live's hidden Instance count row), Custom table Cell / Split custom table below, Inspection
   Diameter dimension, View properties Multiple values, Sheet properties A4 Portrait, Styles Show dimension line.
-- b22 (09:35, task b5danw6oa): `/root/studios-scratch/bin/b-app-shots.sh vibex6 b22 drw-datum-target-hide-dim
-  drw-datum-target-panel-lists` (build on the host, scp -3 to vibe2, shots; log b22.log). Check s4-s5 vs live (Origin
-  active, flips, Length) with crops live 330x700+0+80, ours +560+350.
+- b22 DONE 09:40 (vibex6 build): hide-dim 12/12, s5 now as live (Origin active, flips, Length, distance text);
+  panel-lists 25/27: s22-23 our click at (285, 447) opened Diameter distance's ▾ list; live's Targets box is 400 px
+  with a 15 px scrollbar inside (▾ 15 px further left), fixed 5b8590995 (+ #1b5faa borders). Local after 782f4c47 also:
+  5b8590995, and the commits above.
+- b23 (09:46, task buue74be9, vibex7 build): hide-dim, panel-lists (expect 27/27), and live's 01:40 retakes
+  drw-revision-table-delete, drw-inspection-table-iso-scrolled (never run on ours yet; "Waiting on others" below).
 - qa 11-20: 9 of 10 to-verify rows verified (6c3c0a8fe); FEEL-DRW-WHEEL-ZOOM-SLOW stays open (re-timed 02:00-04:00).
 
 ## Next, in order
