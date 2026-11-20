@@ -104,8 +104,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
      Release run (unit qa-models-rel, qa-speed worktree, vibex7) -> suites/1120-1206-f689de1b-models-rel: the index row comes from it
      (models-report + 0407's other areas). qa-suites.sh / suites-models.sh now default QA_SPEED_PROFILE=release (dx/lead 12:0x).
    - qa-nightpm-1121 (bin/nightpm.sh): 00:30 release build on vibex8 (qa-night worktree), the model suite alone at 02:00 (lead 13:4x:
-     x86 speed only from the window) -> nightly/pm-1121. vibex8's feel re-time goes after it.
-   - Compat: FILLET-ORIENT, GYRO verified; P0 RUSTZERO-FILLET1 -> blend (read new DIFF docs per green). psui a21e verified; P2 CONFIG-BOX-WIDTH.
+     x86 speed only from the window), then bin/speedref.py (live "Speed reference (11-20)" PS 1-5: open / edit / undo / rollbacks, green CLI)
+     -> nightly/pm-1121 (speedref.txt). vibex8 feel re-time after. Compat: RUSTZERO verified 19fa1ed6; CRASH957 (bool 43c2644a) waiter armed.
      17:00 cut: GO 15:4x on 18809b4c (prerel/cut17-18809b4c.txt: hats SAME, dock = accepted B Govde; known: rust-zero F1, crash957 Ch3 P1
      bool). Hat open px (163-448): b76561076 variable row text + 24 plane-plane edges B-spline -> line; bisect 19:49: blend b749ad59e (fillet edges between analytic faces rebuilt exact), intended.
    - Seat lip: a47534be5 (Ok in 0.4.43-0.4.61 + green; vibex7 ~/agents/qa-keep/seatlip-hat8-1120.txt).
