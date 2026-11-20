@@ -360,6 +360,8 @@ LIVE_BRAND = [
     ("Onshape (Standard)", "Noshape (Standard)"),
     ("Onshape Material Library", "Noshape Material Library"),
     ("Onshape Default BOM", "Noshape Default BOM"),
+    ("Onshape Version", "Noshape Version"),
+    ("Onshape Workspace", "Noshape Workspace"),
     ("Onshape Default revision table", "Noshape Default revision table"),
     ("Onshape default", "Noshape default"),
     ("Onshape controlled", "Noshape controlled"),

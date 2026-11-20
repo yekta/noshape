@@ -4,7 +4,7 @@
 //! the version ⧫ / workspace ⚲ row, which expands to the document's tabs
 //! at that point (thumbnail, name, italic type). The right side holds the
 //! selected item's name over a `#ccc` rule, Name \*, Description and the
-//! greyed Category ("Onshape Version" / "Onshape Workspace"); the footer
+//! greyed Category (live's "Onshape Version" / "Onshape Workspace" in our name); the footer
 //! has form undo / redo and Apply, Save (disabled until edited), Close.
 
 use crate::doc_model::{DocEvent, DocModel};
@@ -356,8 +356,8 @@ impl Render for ItemProperties {
         let pal = p();
         let dirty = self.dirty(cx);
         let (icon, kind, category) = match self.item {
-            Item::Version(_) => ("legend-version", "Version", "Onshape Version"),
-            Item::Workspace(_) => ("legend-workspace", "Workspace", "Onshape Workspace"),
+            Item::Version(_) => ("legend-version", "Version", "Noshape Version"),
+            Item::Workspace(_) => ("legend-workspace", "Workspace", "Noshape Workspace"),
         };
         let group = |l: Div, f: AnyElement| v_flex().w_full().child(l).child(div().p(px(1.)).child(f));
         let toggle: Listener = {
