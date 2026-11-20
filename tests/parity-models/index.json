@@ -126,6 +126,87 @@
   "original": "https://cad.onshape.com/documents/807372671dcb7461773b9ccc/w/e2fec4602934dcf339a31cdd/e/97702a2d2ddffdc68b79bf94"
  },
  {
+  "name": "c2-cov-copy-part",
+  "document": "83f44b121be46a22ee14764b",
+  "workspace": "347830f13acf34db07bf3c66",
+  "element": "d035befb068c444314e6297a",
+  "url": "https://cad.onshape.com/documents/83f44b121be46a22ee14764b/w/347830f13acf34db07bf3c66/e/d035befb068c444314e6297a",
+  "title": "cov-copy-part",
+  "original": "https://cad.onshape.com/documents/83f44b121be46a22ee14764b/w/347830f13acf34db07bf3c66/e/d035befb068c444314e6297a"
+ },
+ {
+  "name": "c2-cov-derived-mirror",
+  "document": "42a706f298f36e047910ca21",
+  "workspace": "3cceb8d55346f6a692c70523",
+  "element": "99f050b0b6899a0d5ffa611c",
+  "url": "https://cad.onshape.com/documents/42a706f298f36e047910ca21/w/3cceb8d55346f6a692c70523/e/99f050b0b6899a0d5ffa611c",
+  "title": "cov-derived-mirror",
+  "original": "https://cad.onshape.com/documents/42a706f298f36e047910ca21/w/3cceb8d55346f6a692c70523/e/99f050b0b6899a0d5ffa611c"
+ },
+ {
+  "name": "c2-cov-external-thread",
+  "document": "499ad9e1009524567d8a1999",
+  "workspace": "baf71a8d791b440edb3865f3",
+  "element": "596e9efefbc8966107be9ac9",
+  "url": "https://cad.onshape.com/documents/499ad9e1009524567d8a1999/w/baf71a8d791b440edb3865f3/e/596e9efefbc8966107be9ac9",
+  "title": "cov-external-thread",
+  "original": "https://cad.onshape.com/documents/499ad9e1009524567d8a1999/w/baf71a8d791b440edb3865f3/e/596e9efefbc8966107be9ac9"
+ },
+ {
+  "name": "c2-cov-frame-endcap",
+  "document": "768c1f37bf98e9c12e5ce940",
+  "workspace": "07f2437d4427b37c6aed3cd0",
+  "element": "71799e625177af93c329f2a5",
+  "url": "https://cad.onshape.com/documents/768c1f37bf98e9c12e5ce940/w/07f2437d4427b37c6aed3cd0/e/71799e625177af93c329f2a5",
+  "title": "cov-frame-endcap",
+  "original": "https://cad.onshape.com/documents/768c1f37bf98e9c12e5ce940/w/07f2437d4427b37c6aed3cd0/e/71799e625177af93c329f2a5"
+ },
+ {
+  "name": "c2-cov-frame-gusset",
+  "document": "cc7e223db660e9b6fccb0abf",
+  "workspace": "2326126bceb6edbd911a1395",
+  "element": "172235a39f55b9629edcee87",
+  "url": "https://cad.onshape.com/documents/cc7e223db660e9b6fccb0abf/w/2326126bceb6edbd911a1395/e/172235a39f55b9629edcee87",
+  "title": "cov-frame-gusset",
+  "original": "https://cad.onshape.com/documents/cc7e223db660e9b6fccb0abf/w/2326126bceb6edbd911a1395/e/172235a39f55b9629edcee87"
+ },
+ {
+  "name": "c2-cov-sm-bend-relief",
+  "document": "5a5e2015996a43ecf6e79224",
+  "workspace": "2489cb10e959c382eb255f91",
+  "element": "04bec353460b7de4cbb33140",
+  "url": "https://cad.onshape.com/documents/5a5e2015996a43ecf6e79224/w/2489cb10e959c382eb255f91/e/04bec353460b7de4cbb33140",
+  "title": "cov-sm-bend-relief",
+  "original": "https://cad.onshape.com/documents/5a5e2015996a43ecf6e79224/w/2489cb10e959c382eb255f91/e/04bec353460b7de4cbb33140"
+ },
+ {
+  "name": "c2-cov-sm-corner",
+  "document": "95c87a520e8573bb19efa00d",
+  "workspace": "7016b3cc3f67d4f2ed20f620",
+  "element": "e87fb35d2eafa3c67b5715bb",
+  "url": "https://cad.onshape.com/documents/95c87a520e8573bb19efa00d/w/7016b3cc3f67d4f2ed20f620/e/e87fb35d2eafa3c67b5715bb",
+  "title": "cov-sm-corner",
+  "original": "https://cad.onshape.com/documents/95c87a520e8573bb19efa00d/w/7016b3cc3f67d4f2ed20f620/e/e87fb35d2eafa3c67b5715bb"
+ },
+ {
+  "name": "c2-cov-sm-rip",
+  "document": "a5fc2c76c9ffc26c807fb06b",
+  "workspace": "0f70fb10adaf2e4437c18dcc",
+  "element": "3b435dc07385046972e338bf",
+  "url": "https://cad.onshape.com/documents/a5fc2c76c9ffc26c807fb06b/w/0f70fb10adaf2e4437c18dcc/e/3b435dc07385046972e338bf",
+  "title": "cov-sm-rip",
+  "original": "https://cad.onshape.com/documents/a5fc2c76c9ffc26c807fb06b/w/0f70fb10adaf2e4437c18dcc/e/3b435dc07385046972e338bf"
+ },
+ {
+  "name": "c2-cov-sm-unfold-refold",
+  "document": "d4d8d3d98c6974e3bd1dedc2",
+  "workspace": "0e5c1964f991cfd156786d8a",
+  "element": "5246da32402d496dfde6e465",
+  "url": "https://cad.onshape.com/documents/d4d8d3d98c6974e3bd1dedc2/w/0e5c1964f991cfd156786d8a/e/5246da32402d496dfde6e465",
+  "title": "cov-sm-unfold-refold",
+  "original": "https://cad.onshape.com/documents/d4d8d3d98c6974e3bd1dedc2/w/0e5c1964f991cfd156786d8a/e/5246da32402d496dfde6e465"
+ },
+ {
   "name": "c2-curve-pattern-composite",
   "document": "145d75bd04e01d77c895b12d",
   "workspace": "442aba5af93107dd5b09b21d",
