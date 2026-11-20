@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-20 00:30)
+# QA handoff (agent qa; current state only, updated 2026-11-20 01:05)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -56,8 +56,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    on the released app (vibex6, slot), then the compat baseline moved. Then bin/rel-compat.sh <prev> <v> (released CLI vs
    the previous release) -> compat/rel-<v>.txt; any user-document worse = P0 to the lead at once.
 3. The app spot-check rows (archive "Release checks: the app spot-check list"): user cases + 8 interaction-feel rows in
-   rotation (list done; next round from rows 1-8. Documents page + tabs = on f6f8069f 23:51 (spot49 8/8 21/21); 41-48 (sketch colours, drawings) = on green f6f8069f 23:50, suites/1119-2348-green-
-   spot41 8/8 46/46 drw-dimension/note/projected/view-drag; free sketch line + ends blue by hand; 33-40 on 615bed1f 23:17).
+   rotation. Round 2 (lead 11-20 01:00): rows 1-8 on green eef639d7: scenarios suites/1120-0059-green-spot1r2 (plane rclick,
+   variable autocomplete in dimension / Extrude depth, line-from-midpoint) running on vibe2; by hand: 3D drag from 3 device px = live
+   (feel/3d.json; the list's "5 px" and feel row 80 are stale, psui told), line end on a lit model edge = Coincident (=), edge midpoint
+   rest = P1 EDGE-MIDPOINT-REST-LOOK (psui). Next rows 9-16.
 4. Hover flow (lead 11-17 22:20, every release): uh/uh2.sh <release app> <out> on vibex6 Xvfb, 3 runs, xsheet.py for the sheet;
    USER-HOVER-STAYS-LIT is listed as known in the cut's entry until psui's latest-wins picking fix passes 3 clean runs.
 
@@ -78,39 +80,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    mark the TICKETS rows. Suite 1119-1302-291c74b0: ui 2120/2172, models done, assemblies / exchange in vibex8's slot: suites-diff.py
    vs the last full run when done. psui's 7 rows (019698386) verified 22:33 on green 615bed1f: 7/7, 43/43 (TICKETS marked).
    sketch-vertical-key: psui 22:16 on live2's camera retake = a real gap (end ~9 px off plumb, past 7.5 px; ours VERTICAL), psui fixes scene.
-   P1 walk 21:36 on a58eee8c (sketch -> extrude -> fillet -> pattern -> edit -> undo -> suppress): all build; P2 PATTERN-CHECK-STAYS-
-   ENABLED (psui) + live request (REQUESTS qa 11-19 21:36: ✓ after emptying, tooltip on click); reopen, rollback drag, reorder OK. Walk 21:4x: Shell, Boolean union,
-   Mirror (auto Add + merge scope), face area readout, Esc keeps selection (live), view cube Top, face menu, Section view: all OK.
-   Mirror's self-switch to Add confirmed by live's take (mirror-part-right-plane step 4 passes, tabs compared). 21:52: live's capture
-   closed PATTERN-CHECK-STAYS-ENABLED (live keeps ✓ enabled) and gave P1 TOOLBAR-TOOLTIP-AFTER-CLICK (psui told). Hole try on
-   qa-scratch/walk2/h.noshape: my point landed just off the block's top face (Merge scope empty = live's 8559 off-part case; not a bug).
-   Walk 21:55: Hole (point inside the face) = live: Merge scope "Part 1" auto, callout preview; mass properties (bottom-right icon
-   "Display mass and section properties"): volume / area, red chip, blank CoM / inertia without material = live (the one-time toast
-   3.6 s after the first open not caught: shots too early; parity interaction.md 5.2 says =); face + hole rim measure readout plausible.
-   P2 assemblies 21:58 (walk2 Assembly 1): Insert dialog, 2 instances, fit, free drag, Fastened between hole faces (HUD, Solve),
-   BOM panel = live (Item | Quantity | Part number | Description, "1 | 2"). Lead 22:5x: drop "☐ Simulation connection" from the
-   mate dialog (left-out feature; lead tells skasm): verify it's gone on the green after skasm lands.
-   Drawings 22:00: Create Drawing dialog = live (No views default, ANSI_A_INCH), Suggested views (Top/Front/Right/iso, hole centre
-   mark), tab after the active tab, tab menu Export… -> PDF 1.5 one page = the sheet. STEP round trip 22:04 OK (export AP242 8 faces,
-   + › Import… back: Import 1, Part 1); P2 BRAND-IN-UI-TEXT filed ("Import to Onshape" title). 22:05: compat ALERTs vs 0.4.61 (3 Fillet messages, blend
-   74ebd649c wording) accepted in compat/accepted.txt. Drawing dimension 22:05 OK (edge lit, bold
-   preview, placed 4.337 in = the part's 110.2 mm). Spot rows 25-32 22:15 all =: 7/7 scenarios 164/164 on the 0.4.61 app
-   (suites/1119-2210-v0461-spot2) + by hand (snap squares 17 px on end / midpoint, target line lit mid-draw = live's 'coincident on a
-   line', free end blue, 5 px drag threshold, line hover lit at 6 px not 9, two lines: every constraint enabled). Row 73 (perp x lit
-   edge) only via its unit tests. P1 walk 22:12 on green f3bc85da (walk3/r.noshape): Chamfer (Enter applies, 2nd Enter commits = live),
-   first dimension scales the whole sketch about its bbox centre (= live 34917), Revolve (region field stays active: multi-pick =
-   live FD7), Circular pattern 4x round a chamfer edge: all OK. P0 STALE-SKETCH-HOVER (psui) filed (22:2x narrowed: one-event lag;
-   after-✓ outline; a cancelled sketch's lit point stays). Walk 22:2x: Trim, Plane (offset 25), Loft (2 sketches), Sweep (auto Add
-   on Part 1), Offset (5 mm box, arrow) OK; P1 OFFSET-EDIT-SCALES-SKETCH (skasm, told). Variable Studio (tab after active, Length 0 mm,
-   #len autocomplete, VS edit rebuilds the Part Studio) and configurations (Configure Part Studio list, field right-click Configure,
-   toast, Long 4 mm chamfer) = live. Walk 22:3x-22:43 (green 624c6db77): Insert with Configuration ▾, Revolute (HUD, Solve), limit
-   rows, drag clamp, Part 2 Fix, drawing Update (ctrl+q) redraws views keeping the dimension, Sheet properties Size B = live; filed
-   P1 ASM-DRAG-UNFIXED-GROUP + P1 ASM-LIMIT-TYPED-NO-PREVIEW (asm, told). Sheet metal 22:4x (Part Studio 2): Sheet metal model
-   Extrude of an open L, Flange 25 mm, table (Bend A/B 2.3 mm 90° Up K 0.45) + flat view = live; closed rectangle fails 'Failed to
-   extrude selections.': live builds it (warning, no flat) -> P2 SMM-EXTRUDE-CLOSED-PROFILE (skasm). asm's b146b56f (both P1s): verify by hand on its green.
-   Walk 22:5x: Slider (slides on axis), Planar (moves in plane), Exploded view (step dialog, Done -> assembled) = live; BOM Part number
-   edit (Enter moves down, written to Part 1's Properties) = live (Tab keeps the cell: live's BOM Tab not recorded); drawing Note, Hole
-   table (Origin gate, A1 tag, Ø.250 ↧.472, corner placement) = live. BRAND-IN-UI-TEXT += Properties categories "Onshape Part" (dx told).
+   Walks 21:36-22:5x (part modelling, mass, assemblies, drawings, sheet metal, Variable Studio, BOM, hole table): details
+   in archive "## 11-20 moved" (01:05); their tickets are in TICKETS.
    23:0x: Feature Studio custom feature (QA Box: template, commit, tool search, Size field, builds), version V1, branch B1, edit,
    merge (dialog, toast, graph) = live; P2 HISTORY-ROW-NAME-OVERLAP (studios, told). Hole table: ✓ only starts placing, a click
    places it (= live; ticket closed). Drawing hover = rows 130. To verify on their greens: dx BRAND-IN-UI-TEXT, skasm Simulation
@@ -124,7 +95,12 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    flat DXF/DWG = live (live/qa/rt-1119 answers); P1 SKETCH-DXF-EXPORT-POLYLINES (skasm). Restore to Main, switch, Compare bar /
    dots / slider = live; P1 COMPARE-COMMON-PARTS-MISSING (studios). Config List + configured #n through a feature pattern +
    suppression = live (S 2 holes, L 5 holes 11371.681). TOOLBAR-TOOLTIP-AFTER-CLICK verified; psui sketch-vertical-key rerun
-   (qa-psui-vk, vibe2 slot queue) pending; STALE-SKETCH-HOVER re-walk when 00389dbd lands. Full suite: 02:00-04:00 only (lead).
+   = live 10/10 (psui told); STALE-SKETCH-HOVER re-walk when ffd85455 (= 00389dbd) is in a green (qa-wait-psui-stale).
+   **Full interaction suite 02:00 (lead 11-20 01:00): timer qa-night-ui 01:40 -> bin/ui-night.sh: newest green to vibex8
+   ~/qa-speed/bin/noshape-night, worktree qa-night (not qa-suite: the 13:02 run's exchange step builds from agents/qa-suite/src),
+   slot ticket ~01:45, shards (3, :471) start at 02:00; score + worse/better vs 1119-1302 -> qa-alerts. The 4-h loop stops after
+   the 13:02 run (suites/stop touched 01:05); restart it (rm stop; systemd-run qa-suites) after the night run.** uip-rerun.sh fixed
+   01:05: an empty shard ran ALL scenarios (psui-vk's shard 1, killed) and its Xvfb kept uip.lock (now 7>&-).
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
