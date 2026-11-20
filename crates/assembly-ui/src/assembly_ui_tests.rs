@@ -1525,7 +1525,8 @@ fn activating_an_exploded_view_jumps_to_it_and_to_fit(cx: &mut TestAppContext) {
 /// its step moves the pin; the banner's Done puts the parts back where the mates have them and ends the editing.
 #[gpui::test]
 fn an_exploded_views_done_puts_the_parts_back(cx: &mut TestAppContext) {
-    let (window, view) = pattern_assembly(cx, "explode-done");
+    let path = pattern_document(cx, "explode-done");
+    let (window, view) = open_assembly_with_front(cx, &path);
     let (pin, before) = cx.update(|cx| {
         let v = view.read(cx);
         let pin = instance(v, "Part 2 <1>", cx);
@@ -1535,6 +1536,8 @@ fn an_exploded_views_done_puts_the_parts_back(cx: &mut TestAppContext) {
         v.add_exploded_view(cx);
         let step: noshape_model::assembly::ExplodeStep = serde_json::from_value(json!({ "instances": [pin], "translation": [0.0, 0.0, 0.5], "rotation_axis": null, "rotation_angle": 0.0 })).unwrap();
         v.push_explode_step(step, cx);
+        // As the triad's drag does after its step.
+        v.reapply_display(cx);
     }));
     draw(cx, window);
     cx.update(|cx| {
@@ -1558,7 +1561,8 @@ fn an_exploded_views_done_puts_the_parts_back(cx: &mut TestAppContext) {
 /// nothing; activated, a hovered step row lights its instances.
 #[gpui::test]
 fn an_exploded_views_row_click_only_selects_and_a_hovered_step_lights_its_parts(cx: &mut TestAppContext) {
-    let (window, view) = pattern_assembly(cx, "explode-row");
+    let path = pattern_document(cx, "explode-row");
+    let (window, view) = open_assembly_with_front(cx, &path);
     let pin = cx.update(|cx| instance(view.read(cx), "Part 2 <1>", cx));
     cx.update(|cx| view.update(cx, |v, cx| {
         let step: noshape_model::assembly::ExplodeStep = serde_json::from_value(json!({ "instances": [pin], "translation": [0.0, 0.0, 0.5], "rotation_axis": null, "rotation_angle": 0.0 })).unwrap();

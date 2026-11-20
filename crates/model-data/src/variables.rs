@@ -595,7 +595,9 @@ pub fn studio_variables(doc: &crate::Document, studio: TabId) -> BTreeMap<String
 fn studio_variables_at(doc: &crate::Document, studio: TabId, config: Option<&crate::configuration::ConfigValues>, visiting: &mut Vec<TabId>) -> BTreeMap<String, Quantity> {
     let Some(vs) = studio_of(doc, studio) else { return BTreeMap::new() };
     // A reference's configuration, else the one the studio shows.
-    let vs = vs.configured(config.unwrap_or(&vs.configuration.active));
+    let values = config.unwrap_or(&vs.configuration.active);
+    let mut scope = vs.configuration.inputs_only().variable_values(values, &doc.settings.units);
+    let vs = vs.configured(values);
     if visiting.contains(&studio) {
         return BTreeMap::new();
     }
@@ -604,7 +606,8 @@ fn studio_variables_at(doc: &crate::Document, studio: TabId, config: Option<&cra
     for r in &vs.inserted {
         out.extend(ref_variables(doc, r, visiting));
     }
-    let own = resolved(&vs, doc).evaluate_in(&out, &doc.settings.units);
+    scope.extend(out.clone());
+    let own = resolved(&vs, doc).evaluate_in(&scope, &doc.settings.units);
     out.extend(own.values);
     visiting.pop();
     out
@@ -633,8 +636,9 @@ pub fn studio_evaluation(doc: &crate::Document, studio: TabId) -> noshape_units:
 
 /// [`studio_evaluation`] with the studio's table as `vs` (a row about to be added, checked first).
 pub fn studio_evaluation_as(doc: &crate::Document, studio: TabId, vs: &VariableStudio) -> noshape_units::TableEvaluation {
+    // Its own configuration variables (#t) are in scope, under the inserted tables'.
+    let mut outer = vs.configuration.inputs_only().variable_values(&vs.configuration.active, &doc.settings.units);
     let vs = vs.configured(&vs.configuration.active);
-    let mut outer = BTreeMap::new();
     let mut visiting = vec![studio];
     for r in &vs.inserted {
         outer.extend(ref_variables(doc, r, &mut visiting));
