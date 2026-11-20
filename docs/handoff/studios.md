@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 06:41 UTC.
+Updated 2026-11-20 10:09 UTC.
 
 ## In flight
 
@@ -19,22 +19,19 @@ origin/main` first. App builds for shots on vibex7 / vibex6, never vibe2 (its on
 read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edited during a running sync: `touch` edited files before
 the next run. Run the full ops e2e before any drawing land. vibex8 is qa's quiet speed window 02:00-04:00 (lead 11-20):
 nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdshots-host.sh (PD_HOST=vibe2 PD_DISP=395: first free display, never skasm's :391-399). A few app runs don't take ~/bin/slot (DECISIONS 11-15).
-- Landed 08:58: c8ab739d as 82a4a909, carrying 5a1b564a / 019a2040 / 0c681a1c (b6c84b49's fix forward: the chooser's sort
-  rows in coverage MENUS), Datum target Precision ▾ per distance (DatumTargetOpts::precisions, drawn by sheet.rs
-  `basic`), live's release-history 120 (an assembly's Release… lists its linked parts, no version icon on them; ops
-  release::tab_items; e2e), matrix doc, ticket DRW-DATUM-TARGET-OP (datum targets have no op). Ops e2e 261, drawing 259.
-- Queued 09:01 as 782f4c47 (18 commits, with the P0 fix 43656cbca: the Feature Studio wheel-notch test within 0.5 px, Windows CI red from c249e0ed9): c80343986 chooser search box border; 60f279179 Datum
-  target's emptied Instance count red + "This field cannot be empty", View properties' reverse tip; 600063d0b Datum
-  target distance fields as live (25 px, centred, ▾ joined); 7649da91f / b12ac2198 / a715b5219 more `texts` (Version
-  graph, hole Tolerance, Precision, Create Drawing's Language / Size options + Owner, the Auxiliary prefix); 312017e9c
-  black caret; matrix
-  script: hovered toolbar tips, HTML comments / "none" dumps skipped, wrapped long texts, never-shown hole palette
-  Tolerance precision / Offset and Move to sheet's Clear. Mac: drawing-ui 125, clippy clean.
-- Local after 782f4c47 (to land once it does): a8b7e4c61 / 2d0b3a87e matrix doc (b21 merged; live's visually-hidden
-  labels dropped); 856e293d8 BOM / cut list / custom cell menu = live's bom-table-cell (Size ▸, Resize… | Copy) and the
+- Landed 09:57: 782f4c47 as f29e6eb2 (the Windows CI wheel-notch fix and the 18 commits with it).
+- Queued 10:05 as fc8e6c91 (11 commits): a8b7e4c61 / 2d0b3a87e matrix doc (b21 merged; live's visually-hidden
+  labels dropped); 856e293d8 BOM / cut list / custom cell menu = live's bom-table-cell (Size ▸, Resize… | Copy), the
   MENUDUMP test lists BOM header / row / cell, a revision's row, the sheet tree's reference row; 0cf22ebd0 Datum target
   X / Y flips = flip-direction icon, Length / Angle dropdown 13.33 px #555, distance text 12 px; bc65e1c09 Origin field
-  stays active once picked (live s5; test). Mac: drawing-ui 126, clippy clean. No crates/drawing change (no ops e2e).
+  stays active once picked (live s5; test); 5b8590995 Targets box ≤400 px with a scrollbar, #1b5faa borders. Mac:
+  drawing-ui 126, clippy clean.
+- Local, uncommitted (10:08): DRW-DATUM-TARGET-OP. Op `drawing_datum_target` (ops drawing_tools.rs): area / size /
+  area precision, style, origin, Length (x_edge / y_edge, distance_x / _y, flip_x / _y) or Angle (reference_edge,
+  diameter_distance, angle, flip, rotate, instances, radial_lines), precision_1 / _2; e2e
+  drawing_datum_target_takes_area_style_origin_and_distances. Shared with the dialog via scene opts.rs
+  `datum_target_at`, `datum_target_distances`, SheetPick `datum_target_custom`, `straight_edge_dir_at` (drawing-ui's
+  copies removed). Needs: Mac ops tests + clippy, then the full ops e2e (scene changed), land.
 - Matrix 09:30: 1232 = + 558 shown of 1841, 0 ≠, 9 present-only, all conditional rows that wait on live's takes
   (REQUESTS "studios (2026-11-20 08:08 UTC)", not captured at 09:30): Section Depth / Offset distance, Datum "This
   field cannot be empty" (live's hidden Instance count row), Custom table Cell / Split custom table below, Inspection

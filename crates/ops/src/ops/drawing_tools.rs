@@ -10,7 +10,7 @@ use crate::drawing::{self as dr, SheetModel};
 use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, OpenDoc, doc, refs};
-use noshape_model::drawing::{AnnotationKind, SheetLayer, TableKind, BreakStyle, CalloutBorder, CalloutStyle, Crop, Drawing, GdtLeader, InspectionShape, TableCorner, ViewId, ViewKind};
+use noshape_model::drawing::{AnnotationKind, DatumTargetArea, SheetLayer, TargetStyle, TableKind, BreakStyle, CalloutBorder, CalloutStyle, Crop, Drawing, GdtLeader, InspectionShape, TableCorner, ViewId, ViewKind};
 use noshape_scene::drawing_tools::{self as dt, AuxOpts, DetailOpts, Pick, PickedPoint, SectionOpts, TableTool, Tool, ToolValues, ViewOptions};
 use serde_json::{Value, json};
 
@@ -638,6 +638,46 @@ pub fn ops() -> Vec<Op> {
             mutates: true,
             destructive: false,
             run: datum,
+        },
+        Op {
+            group: "drawing",
+            verb: "datum_target",
+            summary: "Datum target: area, style, origin and its distances",
+            description: "The Datum dialog's Datum target tab, ✓ once per call (\"Datum target\"): the target at `anchor` (sheet mm; on a view's geometry it follows the view, in space a sheet point), its callout at `position` (at least 4 mm away), labelled the next set's first (A1, then B1…) unless `label`. `origin` (a point of the target's view) positions it: Length by `distance_x` along the X direction (the view's, or `x_edge`'s / a quarter turn clockwise from `y_edge`'s straight edge) and `distance_y` across it, `flip_x` / `flip_y` putting each on the other side; Angle by `diameter_distance` round the origin and `angle` (deg) from the reference (the view's X, or `reference_edge`), `flip` / `rotate` measuring the other way round or from the reference's other end, with `instances` targets spaced round the origin and `radial_lines`. Distances not given keep the target where it is (the flips from its side). A Custom area outlines the closed region round the target and has no origin. A new target shows no dimensions until drawing_annotation_edit show_dimensions.",
+            fields: with(
+                common(),
+                vec![
+                    req("anchor", point(), "The target point (sheet mm)."),
+                    req("position", point(), "Where the callout goes (sheet mm)."),
+                    opt("label", json!({ "type": "string" }), "Label (default: the next set's, A1, B1…)."),
+                    opt("area", json!({ "type": "string", "enum": TARGET_AREAS, "default": "point" }), "Target area."),
+                    opt("diameter", json!({ "type": ["string", "number"] }), "Circle's area size (\"25 mm\"; a bare number is in workspace units; default 25 mm)."),
+                    opt("width", json!({ "type": ["string", "number"] }), "Rectangle's area width (default: no area size)."),
+                    opt("height", json!({ "type": ["string", "number"] }), "Rectangle's area height (default: the width)."),
+                    opt("area_precision", json!({ "type": ["integer", "string"] }), "Area size decimals 0–6, or \"drawing\"."),
+                    opt("style", json!({ "type": "string", "enum": TARGET_STYLES.iter().map(|s| s.0).collect::<Vec<_>>(), "default": "inside" }), "Callout style."),
+                    opt("origin", point(), "The point the distances measure from (sheet mm; in the target's view)."),
+                    opt("positioning", json!({ "type": "string", "enum": ["length", "angle"], "default": "length" }), "Length or Angle."),
+                    opt("x_edge", point(), "Length: a straight edge setting the X direction (sheet mm)."),
+                    opt("y_edge", point(), "Length: a straight edge setting the Y direction (sheet mm)."),
+                    opt("distance_x", json!({ "type": ["string", "number"] }), "Length: X distance."),
+                    opt("distance_y", json!({ "type": ["string", "number"] }), "Length: Y distance."),
+                    opt("flip_x", json!({ "type": "boolean" }), "Length: the X distance to the other side."),
+                    opt("flip_y", json!({ "type": "boolean" }), "Length: the Y distance to the other side."),
+                    opt("reference_edge", point(), "Angle: the Reference line, a straight edge (sheet mm)."),
+                    opt("diameter_distance", json!({ "type": ["string", "number"] }), "Angle: Diameter distance."),
+                    opt("angle", json!({ "type": "number" }), "Angle: degrees from the reference."),
+                    opt("flip", json!({ "type": "boolean" }), "Angle: measured the other way round."),
+                    opt("rotate", json!({ "type": "boolean", "default": false }), "Angle: measured from the reference's other end."),
+                    opt("instances", json!({ "type": "integer", "minimum": 1, "maximum": 64, "default": 1 }), "Angle: Instance count."),
+                    opt("radial_lines", json!({ "type": "boolean", "default": false }), "Angle: Radial lines."),
+                    opt("precision_1", json!({ "type": ["integer", "string"] }), "X / Diameter distance decimals 0–6, or \"drawing\"."),
+                    opt("precision_2", json!({ "type": ["integer", "string"] }), "Y distance / Angle decimals 0–6, or \"drawing\"."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: datum_target,
         },
         Op {
             group: "drawing",
@@ -1585,6 +1625,130 @@ fn datum(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (id, sheet) = (ann.id, t.sheet);
     t.d.sheets[sheet].annotations.push(ann);
     done(od, t, "Datum", "annotation", id)
+}
+
+/// The Datum target tab's Target area list.
+const TARGET_AREAS: [&str; 5] = ["point", "dot", "circle", "rectangle", "custom"];
+
+/// Its Style list.
+const TARGET_STYLES: [(&str, TargetStyle); 6] = [
+    ("inside", TargetStyle::Inside),
+    ("outside", TargetStyle::Outside),
+    ("moveable_horizontal", TargetStyle::MoveableHorizontal),
+    ("moveable_horizontal_outside", TargetStyle::MoveableHorizontalOutside),
+    ("moveable_rotational", TargetStyle::MoveableRotational),
+    ("moveable_rotational_outside", TargetStyle::MoveableRotationalOutside),
+];
+
+/// Decimals 0–6 or "drawing" (None).
+fn decimals_arg(a: &Args, name: &str) -> Result<Option<u8>, OpError> {
+    match a.get(name) {
+        None => Ok(None),
+        Some(Value::String(s)) if s == "drawing" => Ok(None),
+        Some(v) => v.as_u64().filter(|d| *d <= 6).map(|d| Some(d as u8)).ok_or_else(|| OpError::param(name, "0 to 6, or \"drawing\"")),
+    }
+}
+
+fn datum_target(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let units = od.session.doc.settings.units;
+    let length = |name: &str| a.get(name).map(|v| super::sketch::length_value(v, &units).map_err(|e| OpError::param(name, &e.message))).transpose();
+    let mut t = target(od, a)?;
+    let c = pt_arg(a, "anchor")?;
+    let pk = t.m.pick(&Tool::DatumTarget { anchor: None }, &[], c);
+    let pp = pk.any_point(c).unwrap_or(PickedPoint { view: noshape_model::drawing::SHEET_VIEW, p: [c[0] / 1000.0, c[1] / 1000.0], r: None });
+    let tool = Tool::DatumTarget { anchor: Some(pp) };
+    let pk = t.m.pick(&tool, &[], pt_arg(a, "position")?);
+    let mut ann = pk.pending_annotation(&ToolValues::default()).ok_or_else(|| OpError::param("position", "at least 4 mm from the target"))?;
+    let AnnotationKind::DatumTarget { view, label, area, .. } = &mut ann.kind else { unreachable!("a datum target") };
+    let view = *view;
+    if let Some(l) = a.opt_str("label")?.map(str::trim).filter(|l| !l.is_empty()) {
+        *label = l.to_string();
+    }
+    let size = |name: &str| length(name).and_then(|v| v.map_or(Ok(None), |x| if x > 0.0 { Ok(Some(x)) } else { Err(OpError::param(name, "must be greater than 0")) }));
+    *area = match enum_arg(a, "area", &TARGET_AREAS.map(|n| (n, n)), "point")? {
+        "dot" => DatumTargetArea::Dot,
+        "circle" => DatumTargetArea::Circle { diameter: size("diameter")?.unwrap_or(0.025) },
+        "rectangle" => {
+            let w = size("width")?;
+            let h = size("height")?.or(w);
+            DatumTargetArea::Rectangle { width: w.unwrap_or(0.01), height: h.unwrap_or(0.01) }
+        }
+        "custom" => DatumTargetArea::Custom,
+        _ => DatumTargetArea::Point,
+    };
+    let custom = matches!(area, DatumTargetArea::Custom);
+    ann.format.precision = decimals_arg(a, "area_precision")?;
+    let style = enum_arg(a, "style", &TARGET_STYLES, TargetStyle::Inside)?;
+    let o = ann.target.get_or_insert_with(Default::default);
+    o.style = style;
+    o.angular = enum_arg(a, "positioning", &[("length", false), ("angle", true)], false)?;
+    o.precisions = [decimals_arg(a, "precision_1")?, decimals_arg(a, "precision_2")?];
+    o.angle_rotate = a.bool_or("rotate", false)?;
+    o.radial_lines = a.bool_or("radial_lines", false)?;
+    o.instances = a.opt_u64("instances")?.unwrap_or(1).clamp(1, 64) as u32;
+    let edge = |name: &str| -> Result<Option<[f64; 2]>, OpError> {
+        let Some(v) = a.get(name) else { return Ok(None) };
+        let p = point_value(v, name)?;
+        pk.straight_edge_dir_at(view, p).map(Some).ok_or_else(|| OpError::param(name, "not on a straight edge of the target's view"))
+    };
+    if let Some(d) = edge("x_edge")? {
+        o.x_dir = Some(d);
+    }
+    if let Some(d) = edge("y_edge")? {
+        o.x_dir = Some([d[1], -d[0]]);
+    }
+    o.ref_dir = edge("reference_edge")?;
+    if custom {
+        if a.get("origin").is_some() {
+            return Err(OpError::param("origin", "a Custom target area has no origin"));
+        }
+        if !pk.datum_target_custom(&mut ann) {
+            return Err(OpError::param("anchor", "not inside a closed region of a view"));
+        }
+    } else if let Some(v) = a.get("origin") {
+        let p = point_value(v, "origin")?;
+        let op = pk.any_point(p).filter(|op| op.view == view).ok_or_else(|| OpError::param("origin", "Select the origin in the target's view"))?;
+        let o = ann.target.get_or_insert_with(Default::default);
+        o.origin = Some(op.p);
+        o.origin_ref = op.r.clone();
+        if let Some(r) = op.r {
+            ann.refs.push(noshape_model::drawing::AnnotationRef { slot: 1, point: r });
+        }
+        let AnnotationKind::DatumTarget { anchor, .. } = &mut ann.kind else { unreachable!("a datum target") };
+        let Some(o) = ann.target.as_deref_mut() else { unreachable!("set above") };
+        dt::datum_target_distances(o, *anchor);
+        let (d1, d2) = if o.angular {
+            o.angle_flip = opt_bool(a, "flip")?.unwrap_or(o.angle_flip);
+            (length("diameter_distance")?, a.opt_f64("angle")?)
+        } else {
+            o.flip_x = opt_bool(a, "flip_x")?.unwrap_or(o.flip_x);
+            o.flip_y = opt_bool(a, "flip_y")?.unwrap_or(o.flip_y);
+            (length("distance_x")?, length("distance_y")?)
+        };
+        if o.angular && d1.is_some() != d2.is_some() {
+            return Err(OpError::param(if d1.is_none() { "diameter_distance" } else { "angle" }, "Angle positioning needs both diameter_distance and angle"));
+        }
+        if let Some(moved) = dt::datum_target_at(o, *anchor, d1, d2)
+            && (moved[0] - anchor[0]).abs().max((moved[1] - anchor[1]).abs()) > 1e-12
+        {
+            *anchor = moved;
+            ann.refs.retain(|r| r.slot != 0);
+        }
+    }
+    if a.get("origin").is_none()
+        && let Some(n) = ["distance_x", "distance_y", "diameter_distance", "angle", "flip_x", "flip_y", "flip"].into_iter().find(|n| a.get(n).is_some())
+    {
+        return Err(OpError::param(n, "needs origin"));
+    }
+    // Inside with nothing else set keeps no options, as the dialog's.
+    if ann.target.as_deref().is_some_and(|o| *o == noshape_model::drawing::DatumTargetOpts::default()) {
+        ann.target = None;
+    }
+    let (id, sheet) = (t.d.sheets[t.sheet].next_annotation_id(), t.sheet);
+    ann.id = id;
+    t.d.sheets[sheet].annotations.push(ann);
+    done(od, t, "Datum target", "annotation", id)
 }
 
 fn centermark(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

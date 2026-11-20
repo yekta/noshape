@@ -175,19 +175,8 @@ impl DrawingEditor {
         a.target = (style != TargetStyle::Inside).then(|| Box::new(DatumTargetOpts { style, ..Default::default() }));
         // Custom (live 1699 (e)): the closed region of the view around the
         // pick; the leader ends on its edge.
-        if custom
-            && let AnnotationKind::DatumTarget { view, anchor, .. } = &mut a.kind
-            && let Some(pl) = self.placement(*view)
-            && let Some((outer, _)) = self.pk().view_region_at(*view, pl.to_sheet(*anchor))
-            && outer.len() > 2
-        {
-            let n = outer.len();
-            let p = *anchor;
-            if let Some(q) = (0..n).map(|i| foot(p, outer[i], outer[(i + 1) % n])).min_by(|x, y| dist2(*x, p).total_cmp(&dist2(*y, p))) {
-                *anchor = q;
-            }
-            a.refs.retain(|r| r.slot != 0);
-            a.target.get_or_insert_with(Default::default).region = outer;
+        if custom {
+            self.pk().datum_target_custom(&mut a);
         }
         // The size's precision (Area size ▾).
         a.format.precision = self.datum_dlg.as_ref().and_then(|d| d.size_precision);
@@ -240,35 +229,13 @@ impl DrawingEditor {
             if !label.is_empty() {
                 *l = label;
             }
-            if let (Some(o), true) = (opts.origin, opts.angular) {
-                // On the circle of that diameter round the origin, at that
-                // angle from the reference (live 1699).
-                if let (Some(dd), Some(t)) = (dx, angle) {
-                    let t = t.to_radians();
-                    let t = if opts.angle_rotate { std::f64::consts::PI - t } else { t };
-                    let t = if opts.angle_flip { -t } else { t };
-                    let r = opts.reference();
-                    let (sn, cs) = t.sin_cos();
-                    let moved = [o[0] + dd / 2.0 * (r[0] * cs - r[1] * sn), o[1] + dd / 2.0 * (r[0] * sn + r[1] * cs)];
-                    if (moved[0] - anchor[0]).abs() > 1e-12 || (moved[1] - anchor[1]).abs() > 1e-12 {
-                        *anchor = moved;
-                        row.ann.refs.retain(|r| r.slot != 0);
-                    }
-                }
-            } else if let Some(o) = opts.origin {
-                // Along the X direction and across it, each flipped to the
-                // other side of the origin by its button (live 1699).
-                let (u, n) = opts.axes();
-                let sx = if opts.flip_x { -1.0 } else { 1.0 };
-                let sy = if opts.flip_y { -1.0 } else { 1.0 };
-                let rel = [anchor[0] - o[0], anchor[1] - o[1]];
-                let (x, y) = (dx.map(|v| sx * v).unwrap_or(rel[0] * u[0] + rel[1] * u[1]), dy.map(|v| sy * v).unwrap_or(rel[0] * n[0] + rel[1] * n[1]));
-                let moved = [o[0] + u[0] * x + n[0] * y, o[1] + u[1] * x + n[1] * y];
-                if (moved[0] - anchor[0]).abs() > 1e-12 || (moved[1] - anchor[1]).abs() > 1e-12 {
-                    *anchor = moved;
-                    // Placed by its distances now, not on the picked point.
-                    row.ann.refs.retain(|r| r.slot != 0);
-                }
+            let (a, b) = if opts.angular { (dx, angle) } else { (dx, dy) };
+            if let Some(moved) = noshape_scene::drawing_tools::datum_target_at(&opts, *anchor, a, b)
+                && ((moved[0] - anchor[0]).abs() > 1e-12 || (moved[1] - anchor[1]).abs() > 1e-12)
+            {
+                *anchor = moved;
+                // Placed by its distances now, not on the picked point.
+                row.ann.refs.retain(|r| r.slot != 0);
             }
         }
         self.datum_preview(cx);
@@ -315,23 +282,10 @@ impl DrawingEditor {
         let AnnotationKind::DatumTarget { anchor, .. } = &row.ann.kind else { return };
         let anchor = *anchor;
         let opts = row.ann.target.get_or_insert_with(Default::default);
-        let Some(o) = opts.origin else { return };
-        let rel = [anchor[0] - o[0], anchor[1] - o[1]];
+        let angular = opts.angular;
+        let Some((a, b)) = noshape_scene::drawing_tools::datum_target_distances(opts, anchor) else { return };
         let fmt = |v: f64| format!("{} {}", noshape_model::drawing::format::format_number(v / u.meters(), Some(if mm { 2 } else { 3 }), 3), u.symbol());
-        let (x, y) = if opts.angular {
-            // Angle: the diameter through the target and its angle from the
-            // reference (live 1699: 50.00 mm, 36.9 deg); below the
-            // reference it is measured the other way round (Flip).
-            let r = opts.reference();
-            opts.angle_flip = r[0] * rel[1] - r[1] * rel[0] < -1e-12;
-            (fmt(2.0 * rel[0].hypot(rel[1])), format!("{:.1} deg", opts.measured_angle(anchor, o).to_degrees()))
-        } else {
-            let (ux, uy) = opts.axes();
-            let (a, b) = (rel[0] * ux[0] + rel[1] * ux[1], rel[0] * uy[0] + rel[1] * uy[1]);
-            opts.flip_x = a < -1e-12;
-            opts.flip_y = b < -1e-12;
-            (fmt(a.abs()), fmt(b.abs()))
-        };
+        let (x, y) = if angular { (fmt(a), format!("{b:.1} deg")) } else { (fmt(a), fmt(b)) };
         let (xs, ys) = (row.x.clone(), row.y.clone());
         xs.update(cx, |s, cx| s.set_value(x, window, cx));
         ys.update(cx, |s, cx| s.set_value(y, window, cx));
@@ -928,17 +882,6 @@ impl DrawingEditor {
 }
 
 /// The point of segment `a`-`b` nearest `p`.
-fn foot(p: [f64; 2], a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
-    let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
-    let l2 = dx * dx + dy * dy;
-    let t = if l2 > 0.0 { (((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2).clamp(0.0, 1.0) } else { 0.0 };
-    [a[0] + dx * t, a[1] + dy * t]
-}
-
-fn dist2(a: [f64; 2], b: [f64; 2]) -> f64 {
-    (a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2)
-}
-
 /// A selected datum's fill (live drawing/1073: rgb 204,146,92).
 const DATUM_SEL: [u8; 4] = [0xcc, 0x92, 0x5c, 255];
 /// Its attached edge and anchor dot (live drawing/1073: rgb 144,206,241).

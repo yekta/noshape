@@ -3966,6 +3966,50 @@ fn drawing_callouts_ordinates_and_datums() {
 }
 
 #[test]
+fn drawing_datum_target_takes_area_style_origin_and_distances() {
+    // The Datum dialog's Datum target tab (live 1699, help datum; DRW-DATUM-TARGET-OP).
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_target.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let (top, circle) = g["views"].as_array().unwrap().iter().find_map(|v| v["edges"].as_array().and_then(|es| es.iter().find(|e| e["type"] == "circle").map(|c| (v.clone(), c.clone())))).unwrap();
+    let other = g["views"].as_array().unwrap().iter().find(|v| v["id"] != top["id"]).unwrap()["edges"].as_array().unwrap().iter().find(|e| e["type"] == "line").unwrap().clone();
+    let lines: Vec<Value> = top["edges"].as_array().unwrap().iter().filter(|e| e["type"] == "line" && (num(&e["a"][1]) - num(&e["b"][1])).abs() < 1e-6).cloned().collect();
+    let p = |e: &Value, k: &str| [num(&e[k][0]), num(&e[k][1])];
+    let at = [num(&lines[1]["a"][0]) * 0.75 + num(&lines[1]["b"][0]) * 0.25, num(&lines[1]["a"][1])];
+    let callout = [at[0] + 15.0, at[1] + 15.0];
+    let text = |ctx: &mut Ctx, id: u64| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["annotations"].as_array().unwrap().iter().find(|a| a["id"] == id).map(|a| (a["kind"].as_str().unwrap_or("").to_string(), a["text"].as_str().unwrap_or("").to_string())).unwrap();
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+
+    // Length: 20 mm along the view's X from the corner, 10 mm across.
+    let t = call(&mut ctx, "drawing_datum_target", json!({ "drawing": tab, "anchor": at, "position": callout, "area": "circle", "diameter": "5 mm", "style": "outside", "origin": p(&lines[0], "a"), "distance_x": "20 mm", "distance_y": "10 mm" }));
+    assert!(last(&mut ctx).ends_with(":: Datum target"));
+    let id = t["annotation"].as_u64().unwrap();
+    let (kind, shown) = text(&mut ctx, id);
+    assert_eq!(kind, "DatumTarget");
+    assert!(shown.contains("A1"), "{shown}");
+    // No dimensions until Show dimensions (A35); then its X / Y distances.
+    assert!(!shown.contains("20"), "{shown}");
+    call(&mut ctx, "drawing_annotation_edit", json!({ "drawing": tab, "annotation": id, "action": "show_dimensions" }));
+    let (_, shown) = text(&mut ctx, id);
+    assert!(shown.contains("20") && shown.contains("10"), "{shown}");
+
+    // Angle: four targets round the hole's centre, the next set's (B1…B4).
+    let c = [num(&circle["center"][0]), num(&circle["center"][1])];
+    let t = call(&mut ctx, "drawing_datum_target", json!({ "drawing": tab, "anchor": at, "position": callout, "origin": c, "positioning": "angle", "diameter_distance": "30 mm", "angle": 45, "instances": 4 }));
+    let (_, shown) = text(&mut ctx, t["annotation"].as_u64().unwrap());
+    assert!(shown.contains("B1") && shown.contains("B4"), "{shown}");
+
+    let err = |ctx: &mut Ctx, args: Value| try_call(ctx, "drawing_datum_target", args).unwrap_err().param;
+    assert_eq!(err(&mut ctx, json!({ "drawing": tab, "anchor": at, "position": callout, "distance_x": "5 mm" })).as_deref(), Some("distance_x"));
+    assert_eq!(err(&mut ctx, json!({ "drawing": tab, "anchor": at, "position": callout, "origin": p(&other, "a") })).as_deref(), Some("origin"));
+    assert_eq!(err(&mut ctx, json!({ "drawing": tab, "anchor": at, "position": callout, "origin": c, "positioning": "angle", "diameter_distance": "30 mm" })).as_deref(), Some("angle"));
+    assert_eq!(err(&mut ctx, json!({ "drawing": tab, "anchor": at, "position": [at[0] + 1.0, at[1]] })).as_deref(), Some("position"));
+    assert_eq!(err(&mut ctx, json!({ "drawing": tab, "anchor": [5, 5], "position": [25, 25], "area": "custom" })).as_deref(), Some("anchor"));
+}
+
+#[test]
 fn sketch_fillet_radius_default_is_r5_then_sticky() {
     // Live: R5 on a fresh page, then the last radius used in that tab.
     let mut ctx = Ctx::new();

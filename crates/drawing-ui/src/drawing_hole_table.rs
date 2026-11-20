@@ -224,18 +224,7 @@ impl DrawingEditor {
     /// (pointing right, or up when vertical), by geometry (with the table
     /// and datum tools the hover is the view, not its edge).
     pub fn straight_edge_dir_near(&self, v: noshape_model::drawing::ViewId) -> Option<[f64; 2]> {
-        let tol = self.tol_mm(noshape_scene::drawing_tools::PICKBOX_PX);
-        let g = self.geoms.get(&v)?;
-        let pl = self.placement(v)?;
-        let c = self.cursor;
-        let near = |e: &noshape_model::drawing::views::ViewEdge| e.points.windows(2).any(|w| noshape_scene::drawing_tools::seg_dist(c, pl.to_sheet(w[0]), pl.to_sheet(w[1])) < tol);
-        let me = g.edges.iter().filter(|e| e.visible && near(e)).find_map(|e| g.model_edges.get(e.model? as usize))?;
-        let noshape_model::drawing::views::EdgeGeom::Line { a, b } = me.geom else { return None };
-        let l = (b[0] - a[0]).hypot(b[1] - a[1]);
-        (l > 1e-9).then(|| {
-            let u = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
-            if u[0] < -1e-9 || (u[0].abs() <= 1e-9 && u[1] < 0.0) { [-u[0], -u[1]] } else { u }
-        })
+        self.pk().straight_edge_dir_at(v, self.cursor)
     }
 
     pub fn hole_x_dir_click(&mut self, cx: &mut Context<Self>) -> bool {

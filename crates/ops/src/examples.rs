@@ -359,6 +359,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("drawing_callout", &[r##"{"drawing": "Part 1 Drawing 1", "anchor": [200, 160], "position": [230, 185], "text": "1"}"##]),
     ("drawing_ordinate", &[r##"{"drawing": "Part 1 Drawing 1", "origin": [180, 140], "side": [180, 130], "points": [[205.5, 160], [220, 140]]}"##, r##"{"drawing": "Part 1 Drawing 1", "group": 9, "points": [[230, 140]]}"##]),
     ("drawing_datum", &[r##"{"drawing": "Part 1 Drawing 1", "anchor": [200, 140], "position": [200, 125], "label": "A"}"##]),
+    ("drawing_datum_target", &[r##"{"drawing": "Part 1 Drawing 1", "anchor": [150, 120], "position": [165, 135], "area": "circle", "diameter": "5 mm", "origin": [120, 100], "distance_x": "20 mm", "distance_y": "10 mm"}"##, r##"{"drawing": "Part 1 Drawing 1", "anchor": [150, 120], "position": [165, 135], "origin": [130, 120], "positioning": "angle", "diameter_distance": "40 mm", "angle": 30, "instances": 4}"##]),
     ("drawing_centermark", &[r##"{"drawing": "Part 1 Drawing 1", "holes": [[205.5, 160]]}"##]),
     ("drawing_centermark_resize", &[r##"{"drawing": "Part 1 Drawing 1", "center": [200.5, 160], "reach": 12}"##]),
     ("drawing_note", &[r##"{"drawing": "Part 1 Drawing 1", "text": "BREAK ALL SHARP EDGES", "position": [30, 40]}"##]),

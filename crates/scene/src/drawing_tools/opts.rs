@@ -465,6 +465,86 @@ pub fn jogged_line(a: [f64; 2], b: [f64; 2], jogs: &[[f64; 2]]) -> Vec<[f64; 2]>
     out
 }
 
+/// Datum target dialog (live 1699): where a target goes from its origin's
+/// distances. Length: `a` along the X direction and `b` across it, each to
+/// the other side when flipped (None: kept as it is); Angle: on the circle
+/// of diameter `a` round the origin, `b` degrees from the reference. None:
+/// no origin, or Angle without both.
+pub fn datum_target_at(o: &DatumTargetOpts, anchor: [f64; 2], a: Option<f64>, b: Option<f64>) -> Option<[f64; 2]> {
+    let origin = o.origin?;
+    if o.angular {
+        let t = b?.to_radians();
+        let t = if o.angle_rotate { std::f64::consts::PI - t } else { t };
+        let t = if o.angle_flip { -t } else { t };
+        let (r, (sn, cs)) = (o.reference(), t.sin_cos());
+        return Some(add2(origin, mul([r[0] * cs - r[1] * sn, r[0] * sn + r[1] * cs], a? / 2.0)));
+    }
+    let (u, n) = o.axes();
+    let rel = sub(anchor, origin);
+    let x = a.map_or(dot(rel, u), |v| if o.flip_x { -v } else { v });
+    let y = b.map_or(dot(rel, n), |v| if o.flip_y { -v } else { v });
+    Some(add2(origin, add2(mul(u, x), mul(n, y))))
+}
+
+/// The distances a target at `anchor` shows from its origin, and the flips
+/// for the side it is on. Length: along and across X; Angle: the diameter
+/// through it and the degrees from the reference (live 1699: 50.00 mm,
+/// 36.9 deg; below the reference measured the other way round, Flip).
+pub fn datum_target_distances(o: &mut DatumTargetOpts, anchor: [f64; 2]) -> Option<(f64, f64)> {
+    let origin = o.origin?;
+    let rel = sub(anchor, origin);
+    if o.angular {
+        let r = o.reference();
+        o.angle_flip = r[0] * rel[1] - r[1] * rel[0] < -1e-12;
+        return Some((2.0 * len(rel), o.measured_angle(anchor, origin).to_degrees()));
+    }
+    let (u, n) = o.axes();
+    let (x, y) = (dot(rel, u), dot(rel, n));
+    o.flip_x = x < -1e-12;
+    o.flip_y = y < -1e-12;
+    Some((x.abs(), y.abs()))
+}
+
+impl SheetPick<'_> {
+    /// Datum target area Custom (live 1699 (e)): the closed region of the
+    /// target's view round its point, outlined; the target moves onto the
+    /// region's nearest edge and no longer follows a model point. False:
+    /// no closed region there.
+    pub fn datum_target_custom(&self, a: &mut Annotation) -> bool {
+        let AnnotationKind::DatumTarget { view, anchor, .. } = &mut a.kind else { return false };
+        let Some(pl) = self.placement(*view) else { return false };
+        let Some((outer, _)) = self.view_region_at(*view, pl.to_sheet(*anchor)).filter(|(o, _)| o.len() > 2) else { return false };
+        let (p, n) = (*anchor, outer.len());
+        let foot = |a: [f64; 2], b: [f64; 2]| {
+            let d = sub(b, a);
+            let l2 = dot(d, d);
+            add2(a, mul(d, if l2 > 0.0 { (dot(sub(p, a), d) / l2).clamp(0.0, 1.0) } else { 0.0 }))
+        };
+        if let Some(q) = (0..n).map(|i| foot(outer[i], outer[(i + 1) % n])).min_by(|x, y| len(sub(*x, p)).total_cmp(&len(sub(*y, p)))) {
+            *anchor = q;
+        }
+        a.refs.retain(|r| r.slot != 0);
+        a.target.get_or_insert_with(Default::default).region = outer;
+        true
+    }
+
+    /// The direction of view `v`'s straight model edge within the pick box
+    /// of sheet point `c` (pointing right, or up when vertical), by geometry.
+    pub fn straight_edge_dir_at(&self, v: ViewId, c: [f64; 2]) -> Option<[f64; 2]> {
+        let tol = self.tol_mm(super::PICKBOX_PX);
+        let g = self.geoms.get(&v)?;
+        let pl = self.placement(v)?;
+        let near = |e: &views::ViewEdge| e.points.windows(2).any(|w| super::seg_dist(c, pl.to_sheet(w[0]), pl.to_sheet(w[1])) < tol);
+        let me = g.edges.iter().filter(|e| e.visible && near(e)).find_map(|e| g.model_edges.get(e.model? as usize))?;
+        let views::EdgeGeom::Line { a, b } = me.geom else { return None };
+        let l = len(sub(b, a));
+        (l > 1e-9).then(|| {
+            let u = mul(sub(b, a), 1.0 / l);
+            if u[0] < -1e-9 || (u[0].abs() <= 1e-9 && u[1] < 0.0) { [-u[0], -u[1]] } else { u }
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::jogged_line;
