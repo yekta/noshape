@@ -204,7 +204,9 @@ pub fn fit_curve(points: &[[f64; 2]], closed: bool, tol: f64) -> Option<FitCurve
     pts.dedup_by(|a, b| (a[0] - b[0]).hypot(a[1] - b[1]) < 1e-12);
     let first_last = pts.len() > 2 && (pts[0][0] - pts[pts.len() - 1][0]).hypot(pts[0][1] - pts[pts.len() - 1][1]) < tol;
     let closed = closed || first_last;
-    if pts.len() < 6 {
+    // (Five points for a circle, two more than it needs: cf-snap-hook's 20 deg outline of a fillet, live's ARC; six for
+    // an ellipse, whose five unknowns any five points fit.)
+    if pts.len() < 5 {
         return None;
     }
     // A closed outline of under 12 corners is a polygon, not a curve's tessellation (30 deg or more a side): a
@@ -239,6 +241,9 @@ pub fn fit_curve(points: &[[f64; 2]], closed: bool, tol: f64) -> Option<FitCurve
                 return Some(FitCurve::Arc { center, radius: r, start: wrap(start), end: wrap(end) });
             }
         }
+    }
+    if pts.len() < 6 {
+        return None;
     }
     // Ellipse: x² + B xy + C y² + D x + E y + F = 0.
     let rows: Vec<Vec<f64>> = q.iter().map(|p| vec![p[0] * p[1], p[1] * p[1], p[0], p[1], 1.0]).collect();
@@ -357,6 +362,14 @@ mod tests {
         assert!(matches!(on_conic(&speck, false, conic, 1e-4), Some(FitCurve::Arc { .. })), "{:?}", on_conic(&speck, false, conic, 1e-4));
         let round: Vec<[f64; 2]> = (0..=64).map(|i| at(1.0 + TAU * i as f64 / 64.0)).collect();
         assert!(matches!(on_conic(&round, false, conic, 1e-4), Some(FitCurve::Circle { .. })));
+    }
+
+    /// Five points on a circle are its arc (cf-snap-hook's short fillet outline, live's ARC); five on an ellipse are not.
+    #[test]
+    fn five_points_on_a_circle_are_its_arc() {
+        let on = |rx: f64, ry: f64| -> Vec<[f64; 2]> { (0..5).map(|i| 4.35 + 1.2 * i as f64 / 4.0).map(|t| [rx * t.cos(), ry * t.sin()]).collect() };
+        assert!(matches!(fit_curve(&on(1.25, 1.25), false, 1e-4), Some(FitCurve::Arc { .. })), "{:?}", fit_curve(&on(1.25, 1.25), false, 1e-4));
+        assert_eq!(fit_curve(&on(1.25, 0.8), false, 1e-4), None);
     }
 
     /// A callout's hexagon and octagon borders stay polylines; its 40-point circle is a CIRCLE.
