@@ -72,11 +72,56 @@ fn eval_inner(ev: &mut EvalCtx) -> FResult<()> {
     let op = ev.enum_("operationType").to_string();
     let scope = scope(ev);
     let sketches: Vec<Option<FeatureId>> = profiles.iter().map(|p| if let Source::Region { sketch, .. } = &p.key { Some(*sketch) } else { None }).collect();
+    let first_new = ev.ctx.bodies.len();
     let r = ev.apply_operation_from(tools, (!thin).then_some(&sketches[..]), &op, scope, BodyKind::Solid);
+    if r.is_ok() && !thin && op == "NEW" {
+        number_in_drawing_order(ev, first_new);
+    }
     if crate::regen::display::perf_enabled() {
         log::info!(target: "perf", "extrude: {} profiles {:.1} ms, tools {:.1} ms, operation {:.1} ms", profiles.len(), t_profiles.as_secs_f64() * 1e3, (t_tools - t_profiles).as_secs_f64() * 1e3, (t0.elapsed() - t_tools).as_secs_f64() * 1e3);
     }
     r
+}
+
+/// A New extrude's parts of one sketch's regions are listed and numbered in the sketch's drawing order, whatever the
+/// pick order (live q-extrude-part-order-1119: two circles, three, two rectangles, both pick orders); a part placed by
+/// its region's outer loop's first drawn entity (welding 9c7704 Extrude 8: the disc inside the ring, its circle drawn
+/// first, is Part 5). Only names, colours and list places move: ids and face names stay the pick order's, which saved
+/// documents hold.
+fn number_in_drawing_order(ev: &mut EvalCtx, first_new: usize) {
+    use crate::reference::{Role, TopoName};
+    let Some(new) = ev.ctx.bodies.untracked().get(first_new..).filter(|b| b.len() > 1) else { return };
+    let drawn = |b: &crate::regen::context::Body| -> Option<(FeatureId, u32)> {
+        let regions = b.faces.iter().filter_map(|n| match &**n {
+            TopoName::Face { feature, role: Role::CapStart(Some(Source::Region { sketch, key })) } if *feature == ev.feature => Some((*sketch, key)),
+            _ => None,
+        });
+        let mut sketch = None;
+        let mut first = None::<u32>;
+        for (sk, key) in regions {
+            if sketch.is_some_and(|s| s != sk) {
+                return None;
+            }
+            sketch = Some(sk);
+            let at = ev.resolve_region(sk, key).and_then(|(_, region)| region.outer.sources.iter().map(|s| s.entity.0).min())?;
+            first = Some(first.map_or(at, |f| f.min(at)));
+        }
+        Some((sketch?, first?))
+    };
+    let Some(keys) = new.iter().map(|b| drawn(b)).collect::<Option<Vec<_>>>() else { return };
+    if keys.iter().any(|k| k.0 != keys[0].0) {
+        return;
+    }
+    let mut order: Vec<usize> = (0..new.len()).collect();
+    order.sort_by_key(|&i| keys[i].1);
+    if order.iter().enumerate().all(|(k, &i)| k == i) {
+        return;
+    }
+    let labels: Vec<(String, usize)> = new.iter().map(|b| (b.name.clone(), b.color)).collect();
+    let moved: Vec<_> = order.iter().zip(labels).map(|(&i, (name, color))| std::sync::Arc::new(new[i].renamed(name).recoloured(color))).collect();
+    for (k, b) in moved.into_iter().enumerate() {
+        ev.ctx.bodies.replace_untracked(first_new + k, b);
+    }
 }
 
 pub fn scope(ev: &EvalCtx) -> Option<Vec<usize>> {
