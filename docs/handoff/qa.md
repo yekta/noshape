@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-20 04:30)
+# QA handoff (agent qa; current state only, updated 2026-11-20 04:32)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -83,10 +83,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    USER-HOVER-STAYS-LIT is listed as known in the cut's entry until psui's latest-wins picking fix passes 3 clean runs.
 
 ## Next (in this order)
-00b. **Live's 21 feel rows (11-20, lead 04:1x)**: walk each on the newest green, every difference a P0 feel ticket to its owner. Sketch
-   R1-R10: live's recordings as ui-parity scenarios (qa-bisect, uncommitted; out suites/1120-feel-cov2): 4 tickets (15e785522; skasm 3, psui 1).
-   F/V/D (studios): 8 tickets (e79906b34); crops /root/qa-scratch/feel1120/. Quiet-window recheck (02:00-04:00 11-21): D3 wheel zoom, V1 cell
-   edit, D1 release timings. A1/A1b/A2 (asm), S1 (skasm), R7-R9 (psui): fork walking on vibex8 :782 -> feel1120/asm-sm-psui.md.
+00b. **Live's 21 feel rows (11-20, lead 04:1x) DONE 04:3x** on green 9ae062180: 18 P0 feel tickets, all routed (rows FEEL-* in TICKETS
+   "qa, 2026-11-20 (live's feel coverage rows …)": 15e785522 sketch skasm 3 / psui 1, e79906b34 studios 8, 51d079b3c asm 3 / skasm 1 / psui 2).
+   Sketch rows ran as live's recordings (qa-bisect, uncommitted, suites/1120-feel-cov2; R4 inconclusive per live). Crops /root/qa-scratch/feel1120/.
+   Quiet-window re-time (02:00-04:00 11-21, vibex8 was at load 21-36): D3 drawing wheel zoom (ours 208-392 ms, live 8-23), V1 cell edit
+   (150-200 vs 46), D1 release (470 vs 10 / 767), A1 per-move draw, A2 preview draws, S1 per-move draw.
 00a. **05:00 cut HELD (lead 04:0x) until a green has core's 2f4f3bc5 (singularities Sketch 2; Mirror 2 is as live, accepted in
    compat/accepted.txt; 2f4f's subject added to cut-must.txt).** Unit qa-prerel-2f4f (bin/prerel-when.sh "<subject>" cut0500): when
    that commit is in the green, bin/prerel-run.sh uploads it to vibe2 and runs userdocs + prerel-edits + prerel-open (pixel diff at 90 s)
