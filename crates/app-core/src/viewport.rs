@@ -171,8 +171,6 @@ fn edge_reach_px(scale: f32) -> i32 {
 /// accounts, live "nav2 pre-highlight"): `PREHIGHLIGHT_SPEED_THRESHOLD`
 /// (device px/ms), `PAUSED_MOUSE_PREHIGHLIGHT_TIMEOUT_MULTIPLIER`, `_MAX_MS`.
 const PREHIGHLIGHT_SPEED_THRESHOLD: f64 = 0.15;
-/// How many read-back frames [`Viewport::frame_cache`] keeps (a few MB each).
-const FRAME_CACHE_LEN: usize = 3;
 const PAUSED_PREHIGHLIGHT_MULTIPLIER: f64 = 5.0;
 const PAUSED_PREHIGHLIGHT_MAX_MS: f64 = 250.0;
 
@@ -266,18 +264,6 @@ pub struct Viewport {
     scene_bounds: Option<(glam::Vec3, glam::Vec3)>,
     pub style: Style,
     image: Option<Arc<RenderImage>>,
-    /// Frames come back read back ([`FrameImage::Image`], software adapters).
-    reads_back: bool,
-    /// Read-back full frames kept to show again: a hover cleared back to a frame drawn before draws nothing (live's
-    /// software GL clears in 5-7 ms, drift-1120). Each with its [`Viewport::frame_key`] and the scene it drew;
-    /// newest last.
-    frame_cache: VecDeque<(u64, Arc<Scene>, Arc<RenderImage>)>,
-    /// Frames submitted with a key, for the cache when they come back (seq, key, scene).
-    frame_keys: VecDeque<(u64, u64, Arc<Scene>)>,
-    /// Images no longer shown nor kept, dropped from GPUI's atlas at the next present or render.
-    images_to_drop: Vec<Arc<RenderImage>>,
-    /// Bumped when the render thread's own inputs for this target change (overlay, camera geometry, text shading).
-    target_inputs_epoch: u64,
     /// Frames left on the GPU ([`FrameImage::Texture`]): the id GPUI looks
     /// the shown frame's texture up by, the texture shown, and replaced ones
     /// with the GPU frame count when they were replaced (GPUI may still be
@@ -535,8 +521,6 @@ pub struct Viewport {
     _theme: Subscription,
     /// Frames presented so far.
     frames_presented: u64,
-    /// Of them, shown again from [`Viewport::frame_cache`].
-    frames_reused: u64,
     /// Tests: every presented image, in order ([`Viewport::record_frames`]).
     frame_log: Option<Vec<Arc<RenderImage>>>,
     /// Tests: each scene the viewport was given, as what its frames draw ([`Viewport::record_scenes`]).
@@ -690,11 +674,6 @@ impl Viewport {
             scene_bounds: None,
             style: Style::default(),
             image: None,
-            reads_back: false,
-            frame_cache: VecDeque::new(),
-            frame_keys: VecDeque::new(),
-            images_to_drop: Vec::new(),
-            target_inputs_epoch: 0,
             texture_id: ExternalTextureId::new(),
             shown_texture: None,
             retired_textures: Vec::new(),
@@ -815,7 +794,6 @@ impl Viewport {
                 cx.notify();
             }),
             frames_presented: 0,
-            frames_reused: 0,
             frame_log: None,
             scene_log: None,
             frames_failed: 0,
@@ -856,7 +834,6 @@ impl Viewport {
         }
         if geometry_changed {
             self.hover_id_stale = true;
-            self.clear_frame_cache();
         }
         if geometry_changed || filter_changed {
             self.pick_dirty = true;
@@ -1081,33 +1058,6 @@ impl Viewport {
         let mut h = std::collections::hash_map::DefaultHasher::new();
         (self.scene.signature(), format!("{:?}", self.camera), self.interactive()).hash(&mut h);
         h.finish()
-    }
-
-    /// What a full frame of `w` × `h` px drawn now with `style` shows, but for which uploads its scene draws (a kept
-    /// frame matches when its scene is also [`Scene::same_as`] this one).
-    fn frame_key(&self, w: u32, h: u32, style: &Style) -> u64 {
-        use std::hash::{Hash, Hasher};
-        let mut h_ = std::collections::hash_map::DefaultHasher::new();
-        (self.scene.signature(), format!("{:?}{style:?}", self.camera), w, h, self.scale.to_bits(), self.target_inputs_epoch).hash(&mut h_);
-        h_.finish()
-    }
-
-    /// Show `image`, the one it replaces dropped from GPUI's atlas unless kept to show again.
-    fn show_image(&mut self, image: Arc<RenderImage>) {
-        if let Some(old) = self.image.replace(image)
-            && !self.frame_cache.iter().any(|c| Arc::ptr_eq(&c.2, &old))
-        {
-            self.images_to_drop.push(old);
-        }
-    }
-
-    /// Forget the frames kept to show again (the geometry changed).
-    fn clear_frame_cache(&mut self) {
-        for (_, _, image) in std::mem::take(&mut self.frame_cache) {
-            if !self.image.as_ref().is_some_and(|i| Arc::ptr_eq(i, &image)) {
-                self.images_to_drop.push(image);
-            }
-        }
     }
 
     /// Tests: keep every presented image from now on (frame by frame checks), or stop.
@@ -1592,8 +1542,6 @@ impl Viewport {
             self.pick_cache = None;
             self.schedule_hover_refresh(cx);
         }
-        let key = (self.reads_back && !interactive && !force_next).then(|| self.frame_key(w, h, &style));
-        let cached = key.filter(|_| self.in_flight.is_empty()).and_then(|k| self.frame_cache.iter().position(|c| c.0 == k && c.1.same_as(&self.scene)));
         self.seq += 1;
         // Milestones armed since the last frame ride with this one to its present.
         if noshape_render::perf::enabled() {
@@ -1608,7 +1556,9 @@ impl Viewport {
         {
             b.click_submit_ms.push(t.elapsed().as_secs_f32() * 1000.0);
         }
-        let job = RenderJob {
+        self.in_flight.push_back((self.seq, now, interactive, clock));
+        noshape_render::perf::frame_milestone(self.seq, "submitted");
+        self.gpu.submit(RenderJob {
             target: self.target_id,
             scene: self.scene.clone(),
             camera: self.camera,
@@ -1618,30 +1568,7 @@ impl Viewport {
             style,
             pick,
             seq: self.seq,
-        };
-        if let Some(i) = cached {
-            // Drawn before: shown again at once, the render thread told what is shown (its picks).
-            let entry = self.frame_cache.remove(i).expect("cached frame");
-            self.frame_cache.push_back(entry.clone());
-            self.gpu.adopt(job);
-            if let Some(log) = &mut self.frame_log {
-                log.push(entry.2.clone());
-            }
-            self.last_presented = self.seq;
-            self.show_image(entry.2);
-            self.frames_presented += 1;
-            self.frames_reused += 1;
-            noshape_render::perf::record_ms("v.reused_frame_count", 1.0);
-            self.dirty = false;
-            cx.notify();
-            return;
-        }
-        if let Some(k) = key {
-            self.frame_keys.push_back((self.seq, k, self.scene.clone()));
-        }
-        self.in_flight.push_back((self.seq, now, interactive, clock));
-        noshape_render::perf::frame_milestone(self.seq, "submitted");
-        self.gpu.submit(job);
+        });
         self.dirty = force_next;
     }
 
@@ -1711,14 +1638,6 @@ impl Viewport {
 
     fn present(&mut self, seq: u64, result: Result<(Frame, FrameImage), String>, window: &mut Window, cx: &mut Context<Self>) {
         noshape_render::perf::frame_milestone(seq, "back on the UI thread");
-        self.present_image(seq, result, window, cx);
-        self.frame_keys.retain(|k| k.0 > seq);
-        for image in self.images_to_drop.drain(..) {
-            let _ = window.drop_image(image);
-        }
-    }
-
-    fn present_image(&mut self, seq: u64, result: Result<(Frame, FrameImage), String>, window: &mut Window, cx: &mut Context<Self>) {
         // Frames up to `seq` are done (older ones may have been coalesced away).
         while self.in_flight.front().is_some_and(|(s, _, _, _)| *s <= seq) {
             let (s, t, interactive, clock) = self.in_flight.pop_front().expect("front");
@@ -1769,16 +1688,9 @@ impl Viewport {
                         if let Some(log) = &mut self.frame_log {
                             log.push(image.clone());
                         }
-                        self.reads_back = true;
-                        if let Some((_, key, scene)) = self.frame_keys.iter().find(|k| k.0 == seq).cloned() {
-                            self.frame_cache.push_back((key, scene, image.clone()));
-                            if self.frame_cache.len() > FRAME_CACHE_LEN
-                                && let Some((_, _, old)) = self.frame_cache.pop_front()
-                            {
-                                self.images_to_drop.push(old);
-                            }
+                        if let Some(old) = self.image.replace(image) {
+                            let _ = window.drop_image(old);
                         }
-                        self.show_image(image);
                     }
                     FrameImage::Texture(texture) => self.show_texture(texture),
                 }
@@ -1859,18 +1771,12 @@ impl Viewport {
         }
         self.camera_geometry = geometry.clone();
         self.gpu.set_camera_geometry(self.target_id, geometry);
-        self.target_inputs_epoch += 1;
         self.request_redraw(cx);
     }
 
     /// Frames asked for so far (tests: a redraw that changes nothing in the 3D view asks for none).
     pub fn frames_requested(&self) -> u64 {
         self.frames_requested
-    }
-
-    /// Frames shown again from the ones kept, without drawing.
-    pub fn frames_reused(&self) -> u64 {
-        self.frames_reused
     }
 
     /// Frames presented and frames failed so far (smoke test).
@@ -1920,7 +1826,6 @@ impl Viewport {
         let overlay = Arc::new(overlay);
         self.overlay_sent = Some(overlay.clone());
         self.gpu.set_overlay(self.target_id, Some(overlay));
-        self.target_inputs_epoch += 1;
         self.request_redraw(cx);
     }
 
@@ -1966,7 +1871,6 @@ impl Viewport {
         #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         if let Some((gamma_ratios, contrast)) = gpui_wgpu::text_shading() {
             self.gpu.set_text_shading(noshape_render::overlay::TextShading { correct: true, grayscale_enhanced_contrast: contrast, gamma_ratios, clip_path_pixels: true });
-            self.target_inputs_epoch += 1;
             log::debug!(target: "overlay", "text shading: gamma {gamma_ratios:?}, contrast {contrast}");
         }
         self.sync_overlay(cx);
@@ -3252,9 +3156,6 @@ impl Drop for Viewport {
 
 impl Render for Viewport {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        for image in self.images_to_drop.drain(..) {
-            let _ = window.drop_image(image);
-        }
         if let Some(b) = &mut self.bench
             && b.started.is_some()
         {

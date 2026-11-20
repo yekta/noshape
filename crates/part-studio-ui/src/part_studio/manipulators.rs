@@ -38,9 +38,6 @@ pub(super) struct Arrow {
 /// px, head radius 10 px (dialogs/extrude-03, 05 seen foreshortened at 0.816: 24 + 24.5 px).
 pub(super) const ARROW_SHAFT_PX: f64 = 30.;
 pub(super) const ARROW_HEAD_PX: f64 = 30.;
-/// The Section view's arrow, constant in px (live manip 10-28, side-on): its shaft from the base ring's edge to the
-/// head's base 66 px from the plane (Extrude's 27).
-pub(super) const SECTION_STEM_PX: (f64, f64) = (super::section_manip::BASE_PX, 66.);
 /// Fillet's handle: a hollow triangle this long (live manip-1118b, mn-fillet-z: ~16 px).
 const TRIANGLE_PX: f64 = 16.;
 const ARROW_HEAD_W_PX: f64 = 20.;
@@ -1256,16 +1253,16 @@ impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
         match self.manip {
             // The hovered or dragged handle drawn last: Revolve's start angle arc runs over the first's.
             Manip::Handles(hs) => self.lit_last(&hs, |h, hover, drag| match h {
-                Handle::Arrow(a) | Handle::StdArrow(a, _) => arrow_glyph(a, None, hover, drag, view, up),
+                Handle::Arrow(a) | Handle::StdArrow(a, _) => arrow_glyph(a, hover, drag, view, up),
                 Handle::Arc(h) | Handle::StdArc(h, _) => arc_glyph(h, hover, drag, view, up),
             }),
             Manip::Triad(t) => super::triad::triad_glyph(&t, self.triad_hover, self.triad_dragging, self.triad_turn, view, up),
             Manip::Section(s) => {
                 use super::section_manip::SectionHandle;
-                let mut out = arrow_glyph(&s.arrow, Some(SECTION_STEM_PX), self.section_hover == Some(SectionHandle::Arrow), self.section_dragging == Some(SectionHandle::Arrow), view, up);
+                let mut out = arrow_glyph(&s.arrow, self.section_hover == Some(SectionHandle::Arrow), self.section_dragging == Some(SectionHandle::Arrow), view, up);
                 out.extend(super::section_manip::section_glyph(&s, self.section_hover, self.section_dragging, self.section_face.as_ref(), view, up));
                 for (o, hover) in &self.section_others {
-                    out.extend(arrow_glyph(&o.arrow, Some(SECTION_STEM_PX), *hover == Some(SectionHandle::Arrow), false, view, up));
+                    out.extend(arrow_glyph(&o.arrow, *hover == Some(SectionHandle::Arrow), false, view, up));
                     out.extend(super::section_manip::section_glyph(o, *hover, None, None, view, up));
                 }
                 out
@@ -1303,8 +1300,8 @@ fn head_polylines(base: DVec3, dir: DVec3, side: DVec3, len: f64, width: f64, se
     }
 }
 
-/// std's TANGENTIAL point (live feel cov-1120 s2-*: a partial flange's bound): a ring facing the view at the point, a
-/// line from it to a hollow arrowhead each way along the edge.
+/// std's TANGENTIAL point (live feel cov-1120 s1-zoom: a partial flange's bound): a ~13 px ring facing the view at the
+/// point and a hollow ~12 px arrowhead each way along the edge, from 12 px out.
 fn tangent_point_polylines(at: DVec3, dir: DVec3, side: DVec3, view_dir: DVec3, wpp: f64) -> Vec<Vec<DVec3>> {
     let up = view_dir.cross(side).normalize_or(dir);
     let r = TANGENT_RING_PX * 0.5 * wpp;
@@ -1314,21 +1311,15 @@ fn tangent_point_polylines(at: DVec3, dir: DVec3, side: DVec3, view_dir: DVec3, 
     });
     let mut out = vec![ring.collect()];
     for d in [dir, -dir] {
-        let head = at + d * (TANGENT_HEAD_FROM_PX * wpp);
-        out.push(vec![at + d * r, head]);
-        out.extend(head_polylines(head, d, side, TANGENT_HEAD_PX * wpp, TANGENT_HEAD_W_PX * wpp, false));
+        out.extend(head_polylines(at + d * (TANGENT_HEAD_FROM_PX * wpp), d, side, TANGENT_HEAD_PX * wpp, TANGENT_HEAD_PX * wpp, false));
     }
     out
 }
 
-/// A TANGENTIAL point's ring across, its arrowheads' length and width and where they start, in px (live s2-hover: ring
-/// Ø 19, tip to tip ~83).
-const TANGENT_RING_PX: f64 = 19.;
-const TANGENT_HEAD_PX: f64 = 17.;
-const TANGENT_HEAD_W_PX: f64 = 15.;
-const TANGENT_HEAD_FROM_PX: f64 = 24.;
-/// Its stroke in every state (live s2-hover / mid / after alike): a light-blue core in a dark-blue outline.
-const TANGENT_STYLE: ([u8; 4], [u8; 4], f32, f32) = ([52, 98, 153, 255], [155, 180, 220, 255], 4.5, 2.0);
+/// A TANGENTIAL point's ring, its arrowheads' length (and width) and where they start, in px (live s1-zoom).
+const TANGENT_RING_PX: f64 = 13.;
+const TANGENT_HEAD_PX: f64 = 12.;
+const TANGENT_HEAD_FROM_PX: f64 = 12.;
 
 /// An angle handle (Revolve, Move face, Draft; live psb 10-24 rev-1, rev-10
 /// and live 11-01 Draft): thin radial lines from the axis to the start and
@@ -1367,7 +1358,7 @@ fn arc_glyph(h: &ArcHandle, hover: bool, dragging: bool, view: &noshape_render::
     ]
 }
 
-fn arrow_glyph(a: &Arrow, stem: Option<(f64, f64)>, hover: bool, dragging: bool, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
+fn arrow_glyph(a: &Arrow, hover: bool, dragging: bool, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
     let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
     // Live (part-studio/230, dialogs/extrude-05): a screen-sized arrow at
     // the end of the length: a 1.5 px white shaft and a hollow triangular
@@ -1379,8 +1370,7 @@ fn arrow_glyph(a: &Arrow, stem: Option<(f64, f64)>, hover: bool, dragging: bool,
     let side = dir.cross(view.direction()).try_normalize().unwrap_or_else(|| dir.any_orthonormal_vector());
     // Live ex2 (3x): a second end's stem is half as long, then two chevrons. Fillet's: the triangle alone, centred on
     // its point.
-    let (stem_from, stem_to) = stem.unwrap_or((0.0, ARROW_SHAFT_PX * if a.secondary { 0.5 } else { 1.0 }));
-    let base = if a.triangle { tip - dir * (TRIANGLE_PX * 0.5 * wpp) } else { tip + dir * stem_to * wpp };
+    let base = if a.triangle { tip - dir * (TRIANGLE_PX * 0.5 * wpp) } else { tip + dir * ARROW_SHAFT_PX * if a.secondary { 0.5 } else { 1.0 } * wpp };
     let heads = if a.tangential {
         tangent_point_polylines(tip, dir, side, view.direction(), wpp)
     } else if a.triangle {
@@ -1388,12 +1378,12 @@ fn arrow_glyph(a: &Arrow, stem: Option<(f64, f64)>, hover: bool, dragging: bool,
     } else {
         head_polylines(base, dir, side, ARROW_HEAD_PX * wpp, ARROW_HEAD_W_PX * wpp, a.secondary)
     };
-    let (outline, core, outline_px, core_px) = if a.tangential { TANGENT_STYLE } else { handle_style(hover, dragging) };
+    let (outline, core, outline_px, core_px) = handle_style(hover, dragging);
     let mut back = LineData::default();
     let mut front = LineData::default();
     for (data, color, width) in [(&mut back, outline, outline_px), (&mut front, core, core_px)] {
         if !a.triangle && !a.tangential {
-            data.push_polyline(&[f(tip + dir * stem_from * wpp), f(base)], color, 0, width, LineSegment::ON_TOP);
+            data.push_polyline(&[f(tip), f(base)], color, 0, width, LineSegment::ON_TOP);
         }
         for p in &heads {
             data.push_polyline(&p.iter().map(|v| f(*v)).collect::<Vec<_>>(), color, 0, width, LineSegment::ON_TOP);
@@ -1418,24 +1408,20 @@ fn dragged_angle_text(rad: f64, units: &noshape_units::UnitPrefs) -> String {
 mod snap_tests {
     use super::{dragged_angle_text, handle_style, linear_step, snap_degrees, tangent_point_polylines};
 
-    /// Live feel cov-1120 s2-hover (qa FEEL-SM-PARTIAL-FLANGE-MANIP): std's TANGENTIAL point is a 19 px ring facing the
-    /// view, a line from it to a hollow arrowhead each way along the edge, 24 to 41 px out (~83 px tip to tip).
+    /// Live feel cov-1120 s1-zoom: std's TANGENTIAL point is a ~13 px ring facing the view and a hollow 12 px arrowhead
+    /// each way along the edge, from 12 px out to 24 px.
     #[test]
     fn a_tangential_point_is_a_ring_with_an_arrowhead_each_way() {
         use glam::DVec3;
         let (at, wpp) = (DVec3::new(1.0, 2.0, 3.0), 0.5);
         let lines = tangent_point_polylines(at, DVec3::X, DVec3::Y, DVec3::Z, wpp);
-        assert_eq!(lines.len(), 5, "a ring, then a line and a head each way");
+        assert_eq!(lines.len(), 3, "a ring and two heads");
         let px = |p: &DVec3| (*p - at).length() / wpp;
-        assert!(lines[0].iter().all(|p| (px(p) - 9.5).abs() < 1e-9 && (p.z - at.z).abs() < 1e-12), "the ring: 19 px across, facing the view");
-        for (pair, sign) in lines[1..].chunks(2).zip([1.0, -1.0]) {
-            let span = |l: &Vec<DVec3>| {
-                let along: Vec<f64> = l.iter().map(|p| (p.x - at.x) / wpp * sign).collect();
-                along.iter().fold((f64::MAX, f64::MIN), |(a, b), &x| (a.min(x), b.max(x)))
-            };
-            let ((l0, l1), (h0, h1)) = (span(&pair[0]), span(&pair[1]));
-            assert!((l0 - 9.5).abs() < 1e-9 && (l1 - 24.0).abs() < 1e-9, "the line from the ring to the head: {l0}..{l1}");
-            assert!((h0 - 24.0).abs() < 1e-9 && (h1 - 41.0).abs() < 1e-9, "the head from 24 to 41 px out: {h0}..{h1}");
+        assert!(lines[0].iter().all(|p| (px(p) - 6.5).abs() < 1e-9 && (p.z - at.z).abs() < 1e-12), "the ring: 13 px across, facing the view");
+        for (head, sign) in lines[1..].iter().zip([1.0, -1.0]) {
+            let along: Vec<f64> = head.iter().map(|p| (p.x - at.x) / wpp * sign).collect();
+            let (lo, hi) = along.iter().fold((f64::MAX, f64::MIN), |(a, b), &x| (a.min(x), b.max(x)));
+            assert!((lo - 12.0).abs() < 1e-9 && (hi - 24.0).abs() < 1e-9, "a head from 12 to 24 px out: {along:?}");
         }
     }
 

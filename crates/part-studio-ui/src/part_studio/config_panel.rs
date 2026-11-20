@@ -2738,23 +2738,12 @@ impl PartStudioView {
                     None => div().text_size(px(14.)).text_color(pal.text).child(current).into_any_element(),
                 },
             };
-            // Live cfglabel-1120: no label column: the label is its text + 5 px each side, cut with an ellipsis (no
-            // wrap, no tooltip) when the field needs the room; the field takes the rest, a Variable's at least 100 px.
-            let field_min = if matches!(input.kind, ConfigInputKind::Variable { .. }) { 100. } else { 0. };
             col = col.child(
                 h_flex()
                     .min_h(px(26.))
-                    .child(
-                        div()
-                            .debug_selector(|| format!("cfgbox-label-{}", input.id))
-                            .min_w_0()
-                            .px(px(5.))
-                            .text_size(px(12.))
-                            .text_color(pal.text_muted)
-                            .truncate()
-                            .child(crate::ui::user_text(input.name.clone())),
-                    )
-                    .child(div().debug_selector(|| format!("cfgbox-field-{}", input.id)).flex_1().min_w(px(field_min)).child(control))
+                    .gap(px(4.))
+                    .child(div().w(px(80.)).flex_none().pl(px(4.)).text_size(px(12.)).text_color(pal.text_muted).truncate().child(crate::ui::user_text(input.name.clone())))
+                    .child(div().flex_1().min_w_0().child(control))
                     // Live part-studio/535: the excluded icon follows the value.
                     .when(input.excluded, |d| {
                         d.child(

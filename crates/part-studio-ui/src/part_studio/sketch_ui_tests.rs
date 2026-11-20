@@ -2623,37 +2623,6 @@ fn section_rotate_handles_and_their_dead_centre(cx: &mut TestAppContext) {
     });
 }
 
-/// qa FEEL-SECTION-ARROW-FOOT (live manip 10-28, side-on): the Section view's arrow is longer than Extrude's: its
-/// shaft runs from the base ring to the head's base 66 px from the plane, the apex ~98 px out, the rings past it.
-#[gpui::test]
-fn the_section_arrow_reaches_about_100_px_from_its_plane(cx: &mut TestAppContext) {
-    use super::super::section_manip::SectionHandle;
-    let (window, view) = sketch_with(cx, "section-arrow-len", Tool::CornerRect);
-    click(cx, window, &view, (500., 300.));
-    click(cx, window, &view, (650., 400.));
-    cx.update_window(window, |_, w, cx| {
-        view.update(cx, |v, cx| {
-            v.finish_sketch(w, cx);
-            v.section_through(Reference::Plane(DatumPlane::Top), w, cx);
-        })
-    })
-    .unwrap();
-    draw(cx, window);
-    view.update(cx, |v, cx| {
-        let s = v.section_manip().expect("the section manipulator");
-        let vp = v.viewport.read(cx);
-        let tip = s.arrow.base + s.arrow.dir * s.arrow.length;
-        let (p0, p1) = (vp.project(tip).unwrap(), vp.project(tip + vp.camera.right() * 1e-3).unwrap());
-        let wpp = 1e-3 / (p1 - p0).length();
-        let at = |px: f64| vp.project(tip + s.arrow.dir * px * wpp).unwrap();
-        for px in [30.0, 60.0, 90.0] {
-            assert_eq!(v.section_handle_at(&s, at(px), cx), Some(SectionHandle::Arrow), "{px} px up the arrow");
-        }
-        let rings = (s.ring_center(wpp) - tip).length() / wpp;
-        assert!((100.0..=112.0).contains(&rings), "the rings' centre {rings:.1} px from the plane (live ~109)");
-    });
-}
-
 /// MC-SELECT-NO-READOUT: a mate connector selected alone reads "Point:" at its
 /// origin (live "psui (2026-10-27, P2) interaction 3.4"); with something else
 /// selected too the readout measures the selection as before.
@@ -7137,35 +7106,6 @@ fn the_configurations_box_stays_one_input_tall_with_two(cx: &mut TestAppContext)
     })));
     let two = box_h(cx);
     assert!((one - two).abs() < px(0.5), "one input {one:?}, two {two:?}");
-}
-
-/// Live cfglabel-1120: the Configurations box has no label column: a label is its text + 5 px each side, the field takes
-/// the rest of the row; a Variable's field keeps 100 px, its long label cut to what is left.
-#[gpui::test]
-fn the_configurations_box_labels_take_their_texts_width(cx: &mut TestAppContext) {
-    let (window, view) = studio_with_variables(cx, "cfg-labels", &[("width", "30 mm")]);
-    let (size, long) = cx.update(|cx| {
-        view.update(cx, |v, cx| {
-            let (mut size, mut long) = (String::new(), String::new());
-            v.edit_config("Configure", cx, |ps| {
-                size = noshape_ops::config::add_input(ps, "List");
-                noshape_ops::config::rename_input(ps, &size, "Size".into());
-                long = noshape_ops::config::add_variable_input(ps, "A much longer input name", "LENGTH", "25 mm", None);
-            });
-            v.ui.cfg_box_h = Some(200.);
-            (size, long)
-        })
-    });
-    draw(cx, window);
-    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
-    let mut b = |k: &str| vcx.debug_bounds(Box::leak(k.to_string().into_boxed_str())).unwrap_or_else(|| panic!("{k} drawn"));
-    let (sl, sf) = (b(&format!("cfgbox-label-{size}")), b(&format!("cfgbox-field-{size}")));
-    let (ll, lf) = (b(&format!("cfgbox-label-{long}")), b(&format!("cfgbox-field-{long}")));
-    let w = |r: Bounds<gpui_kit::Pixels>| f32::from(r.size.width);
-    assert!((20.0..50.0).contains(&w(sl)), "Size's label {:.1} px: its text + 10 (live 31.9), no 80 px column", w(sl));
-    assert!((sf.left() - sl.right()).abs() < px(0.5), "Size's field starts at its label's end");
-    assert!((w(lf) - 100.).abs() < 0.5, "the Variable's field keeps 100 px: {:.1}", w(lf));
-    assert!((lf.left() - ll.right()).abs() < px(0.5) && (w(ll) + w(lf) - (w(sl) + w(sf))).abs() < 0.5, "the long label takes the rest of the row");
 }
 
 /// Live's sketch keys (interaction-feel shortcuts-sk-1118): Ctrl+M does nothing; ` with nothing under the pointer

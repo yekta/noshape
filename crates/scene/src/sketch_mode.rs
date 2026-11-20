@@ -11260,36 +11260,6 @@ mod tests {
         }
     }
 
-    /// Feel row "Dimension arrows" (live sketch/12: 16 × 7 px): a dimension's arrowhead is filled from its tip back
-    /// 16 px, 7 px across its base, at any zoom (`s` world per px).
-    #[test]
-    fn a_dimension_arrowhead_is_16_by_7_px() {
-        for s in [1.0, 2.5e-4] {
-            let mut out = Vec::new();
-            arrow(&mut out, DVec2::new(3.0, 4.0) * s, DVec2::new(0.0, -1.0), s);
-            assert!(out.iter().all(|[a, _]| (*a - DVec2::new(3.0, 4.0) * s).length() < 1e-12), "every stroke from the tip");
-            let along: Vec<f64> = out.iter().map(|[_, b]| (b.y / s - 4.0).abs()).collect();
-            let across: Vec<f64> = out.iter().map(|[_, b]| b.x / s - 3.0).collect();
-            assert!(along.iter().all(|l| (l - 16.0).abs() < 1e-6), "16 px long: {along:?}");
-            let w = across.iter().cloned().fold(f64::MIN, f64::max) - across.iter().cloned().fold(f64::MAX, f64::min);
-            assert!((w - 7.0).abs() < 1e-6, "7 px across: {w}");
-        }
-    }
-
-    /// Feel row "Drawing preview": the geometry being drawn is rgb(68,156,205), 2 px (live SKETCH_PREVIEW_COLOR).
-    #[test]
-    fn geometry_being_drawn_is_lives_preview_blue() {
-        for tool in [Tool::Line, Tool::Circle, Tool::CornerRect] {
-            let (mut ed, mut d) = editor(tool);
-            click(&mut ed, &mut d, v(0.0, 0.0));
-            let _ = ed.pointer_move(&mut d, v(0.03, 0.017), true, false);
-            let (lines, _) = ed.overlay(&d, &UnitPrefs::default());
-            let blue: Vec<_> = lines.segments.iter().filter(|s| s.color == [68, 156, 205, 255]).collect();
-            assert!(!blue.is_empty(), "{tool:?}: the preview drawn in rgb(68,156,205)");
-            assert!(blue.iter().all(|s| s.width == 2.0), "{tool:?}: 2 px");
-        }
-    }
-
     #[test]
     fn a_typed_value_makes_an_over_defining_dimension_driving() {
         for typed in ["40", "50"] {

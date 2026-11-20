@@ -817,14 +817,10 @@ fn rows() -> Vec<Row> {
         Row { id: "rollback bar / while held nothing moves or greys", live: "the 'Rollback bar' chip follows the pointer, the insertion line shows the slot, the row under it lit (live cov-1120 R8); the bar stays at its old place, nothing greys (live2 featurelist-feel 1)", gap: false, check: |l, cx| {
             let (from, to) = (l.at(cx, "rollback"), l.at_y(cx, "feature:Extrude 1", 6.));
             l.drag(cx, from, to, false);
-            let filled = cx.update(|cx| {
-                let v = l.view.read(cx);
-                v.studio(cx).and_then(|s| s.features.iter().filter(|f| v.row_hover_filled(f.id, cx)).map(|f| f.name.clone()).next())
-            });
-            let held = (l.dragging(cx), cx.update(|cx| l.view.read(cx).ui.feature_drop.get().is_some()), l.rolled_to(cx), cx.update(|cx| l.view.read(cx).display.bodies.len()), l.lit_row(cx), filled);
+            let held = (l.dragging(cx), cx.update(|cx| l.view.read(cx).ui.feature_drop.get().is_some()), l.rolled_to(cx), cx.update(|cx| l.view.read(cx).display.bodies.len()), l.lit_row(cx));
             l.keys(cx, "escape");
             l.release(cx, to);
-            expect(held, (true, true, Some("Extrude 3".to_string()), 3, Some("Extrude 1".to_string()), Some("Extrude 1".to_string())), "(dragging, a slot shown, rolled to, parts, the row's geometry lit under it, its fill: qa FEEL-ROLLBACK-DROP-ROW)")
+            expect(held, (true, true, Some("Extrude 3".to_string()), 3, Some("Extrude 1".to_string())), "(dragging, a slot shown, rolled to, parts, the row lit under it)")
         } },
         Row { id: "rollback bar / its tooltip 3 px under it, none on it after a drop", live: "'Rollback bar' 3 px under the 7 px bar (its centre ~20 px above the tip's); after a drop on a row no tooltip in 2.2 s, nor after a 1 px move, the row's hover band kept (live cov-1120 R8, rollback-drop-tip-1120; qa FEEL-ROLLBACK-DROP-ROW)", gap: false, check: |l, cx| {
             l.hover(cx, "rollback", 600);

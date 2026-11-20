@@ -308,46 +308,6 @@ fn the_first_pick_at_rest_lights_what_is_under_the_pointer(cx: &mut TestAppConte
     assert_eq!(hovered(cx, &view), want, "the first answer at rest lights the plane under the pointer");
 }
 
-/// Heavy Part Studio feel (live drift-1120: on software GL a move off clears in 5-7 ms): with frames read back, a
-/// hover cleared back to a frame drawn before shows that frame again without drawing, pixel for pixel, and picks answer
-/// for it (back on the line, the line lights again).
-#[gpui::test]
-fn a_cleared_hover_shows_the_frame_drawn_before_without_drawing(cx: &mut TestAppContext) {
-    let Some(_gpu) = gpu_pointer() else { return };
-    RENDERING.set(true);
-    let (window, view) = sketch_with(cx, "sketch-hover-reuse", Tool::CornerRect);
-    click(cx, window, &view, (500., 300.));
-    click(cx, window, &view, (650., 400.));
-    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
-    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
-    let (_, a, b) = lines_on_screen(cx, &view)[0];
-    let on = (a + b) * 0.5;
-    let pointer = Pointer::new(cx, window, &view);
-    let off = [(-300.0, -200.0), (300.0, -200.0), (-300.0, 200.0), (300.0, 200.0), (0.0, -250.0)]
-        .iter()
-        .map(|(x, y)| on + DVec2::new(*x, *y))
-        .find(|s| {
-            pointer.move_to(cx, &view, *s);
-            hovered(cx, &view).is_none()
-        })
-        .expect("a spot where nothing lights");
-    let vp = cx.update(|cx| view.read(cx).viewport.clone());
-    let (before, _) = settled_frame(cx, window, &view);
-    let reused = cx.update(|cx| vp.read(cx).frames_reused());
-    pointer.move_to(cx, &view, on);
-    assert!(matches!(hovered(cx, &view), Some(Reference::SketchEntity { .. })), "the line lit");
-    let (lit, _) = settled_frame(cx, window, &view);
-    assert!(lit != before, "the lit line drawn");
-    pointer.move_to(cx, &view, off);
-    assert_eq!(hovered(cx, &view), None, "nothing lit off the line");
-    let (after, _) = settled_frame(cx, window, &view);
-    let reused = cx.update(|cx| vp.read(cx).frames_reused()) - reused;
-    assert!(reused > 0, "the cleared frame shown again (none reused)");
-    assert!(after == before, "the frame shown again is the one drawn before the hover");
-    pointer.move_to(cx, &view, on);
-    assert!(matches!(hovered(cx, &view), Some(Reference::SketchEntity { .. })), "back on the line, it lights again");
-}
-
 /// qa USER-HOVER-STAYS-LIT (v0.4.57, the user's flow): from each line of the rectangle the pointer sweeps off in 12
 /// quick steps (16 ms apart) to a spot well outside it, crossing the rectangle on the way, and rests; nothing of the
 /// sketch stays lit (the region the sweep crossed included), and back on the line the line lights again.

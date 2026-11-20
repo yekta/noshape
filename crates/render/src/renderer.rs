@@ -478,18 +478,6 @@ impl PickRect {
     }
 }
 
-/// On a software adapter, the part of the pick buffer a pick pass draws: the queries' rectangles `need` (x0, y0, x1, y1
-/// device px) and [`PICK_AREA_MARGIN`] round them, so the next moves' picks find it drawn (a whole pass there is a
-/// full frame of fill: 50-120 ms on llvmpipe, and 5 x the average pick is how long a fast move waits to light). None:
-/// the whole buffer.
-fn pick_area(need: Option<[u32; 4]>, width: u32, height: u32, software: bool) -> Option<[u32; 4]> {
-    let [x0, y0, x1, y1] = need.filter(|_| software)?;
-    let m = PICK_AREA_MARGIN;
-    Some([x0.saturating_sub(m), y0.saturating_sub(m), (x1 + m).min(width), (y1 + m).min(height)])
-}
-
-const PICK_AREA_MARGIN: u32 = 96;
-
 /// Everything needed to render one frame of a target.
 #[derive(Clone)]
 pub struct FrameRequest {
@@ -569,8 +557,6 @@ struct TargetState {
     last: Option<FrameState>,
     /// The pick texture matches `last`.
     pick_valid: bool,
-    /// Where it does (x0, y0, x1, y1 device px), when its pass was cut to the queries ([`pick_area`]); else all of it.
-    pick_area: Option<[u32; 4]>,
     in_flight: usize,
     stamp: u64,
 }
@@ -3125,20 +3111,6 @@ impl Renderer {
         ts.camera_geometry_built = None;
     }
 
-    /// A frame the caller shows from its own copy of one drawn before (the same inputs): picks answer for it from now
-    /// on, as if it had been drawn.
-    pub fn adopt_frame(&mut self, target: u64, req: FrameRequest) {
-        if self.targets.get(&target).is_none_or(|t| t.last.is_none()) {
-            return;
-        }
-        let req = self.with_camera_geometry(target, req);
-        let ts = self.targets.get_mut(&target).expect("target");
-        if req.invalidate_pick {
-            ts.pick_valid = false;
-        }
-        ts.last = Some(FrameState { scene: req.scene, camera: req.camera, device_pixel_ratio: req.device_pixel_ratio, style: req.style });
-    }
-
     /// `req` with the target's camera geometry for its view added to the scene.
     fn with_camera_geometry(&mut self, target: u64, mut req: FrameRequest) -> FrameRequest {
         let uploader = self.uploader();
@@ -3708,14 +3680,8 @@ impl Renderer {
             (tex.width, tex.height, tex.msaa)
         };
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("pick") });
-        let need = queries.iter().filter(|(_, r)| r.depth_samples == 0).map(|(_, r)| r.clip(width, height)).filter(|r| r.2 > 0 && r.3 > 0).fold(None, |u: Option<[u32; 4]>, (x, y, w, h)| {
-            let r = [x, y, x + w, y + h];
-            Some(u.map_or(r, |u| [u[0].min(r[0]), u[1].min(r[1]), u[2].max(r[2]), u[3].max(r[3])]))
-        });
-        let ts = &self.targets[&target];
-        let covered = ts.pick_valid && ts.pick_area.zip(need).is_none_or(|(a, n)| a[0] <= n[0] && a[1] <= n[1] && a[2] >= n[2] && a[3] >= n[3]);
-        if !covered {
-            let area = pick_area(need, width, height, last.style.software);
+        if !self.targets[&target].pick_valid {
+            self.ensure_pipelines(msaa);
             self.upload_states(&last.scene.states);
             self.upload_instances(&last.scene);
             if self.bind_color.is_none() {
@@ -3758,17 +3724,12 @@ impl Renderer {
                     occlusion_query_set: None,
                     multiview_mask: None,
                 });
-                if let Some([x0, y0, x1, y1]) = area {
-                    pass.set_scissor_rect(x0, y0, x1 - x0, y1 - y0);
-                }
                 pass.set_bind_group(0, self.bind_pick.as_ref().expect("bind groups"), &[]);
                 pass.set_bind_group(3, &self.compare_none, &[]);
                 draw_lists(&mut pass, &lists, &last.scene.instances, self.pipelines.as_ref().expect("pipelines"), &bind_inst, DrawMode { pick: true, caps, ..Default::default() });
             }
             self.lists = lists;
-            let ts = self.targets.get_mut(&target).expect("target");
-            ts.pick_valid = true;
-            ts.pick_area = area;
+            self.targets.get_mut(&target).expect("target").pick_valid = true;
         }
         // Visible-depth sampling queries render their own tiny pass.
         let samples: Vec<(u64, SampleRead, Vec<wgpu::Texture>)> = queries

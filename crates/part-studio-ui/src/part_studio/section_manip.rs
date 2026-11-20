@@ -28,9 +28,9 @@ const RING_AXIS_PX: f64 = 22.0;
 /// The pointer this close to the rings' centre (px) is on no handle.
 const RING_DEAD_PX: f64 = 3.0;
 /// The base circle's radius (px).
-pub(super) const BASE_PX: f64 = 8.0;
+const BASE_PX: f64 = 8.0;
 /// Arrow glyph length (px), as `manipulators.rs` draws it.
-const ARROW_PX: f64 = super::manipulators::SECTION_STEM_PX.1 + super::manipulators::ARROW_HEAD_PX;
+const ARROW_PX: f64 = super::manipulators::ARROW_SHAFT_PX + super::manipulators::ARROW_HEAD_PX;
 /// A dragged base snaps onto a vertex within this many px (live ≈22).
 const VERTEX_SNAP_PX: f64 = 22.0;
 /// Over a face, onto one of its edges within this many px (live ≈30–35).

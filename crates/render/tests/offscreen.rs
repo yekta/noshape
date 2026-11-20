@@ -89,46 +89,6 @@ fn pipelined_frames_and_lazy_pick_regions() {
     assert!(corner.1.ids.iter().all(|&id| id == 0));
 }
 
-/// On a software adapter a pick pass draws only round its queries (a whole pass is a full frame of fill there): a pick
-/// first answered in a corner leaves the centre undrawn, and a pick at the centre then draws it and hits the box.
-#[test]
-fn a_software_pick_pass_draws_round_its_queries_and_again_elsewhere() {
-    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
-    let mut r = match Renderer::new() {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("skipping: {e}");
-            return;
-        }
-    };
-    let mesh = r.upload_mesh(&primitives::box_mesh([-0.01, -0.01, -0.01], [0.01, 0.01, 0.01], 1));
-    let mut scene = Scene::default();
-    scene.instances.push(Instance::new(Drawable::Mesh(mesh)));
-    let mut cam = Camera::default();
-    cam.fit_sphere(glam::DVec3::ZERO, 0.0175, 4.0 / 3.0);
-    let style = Style { software: true, ..Style::default() };
-    r.submit_frame(7, 1, FrameRequest { scene: std::sync::Arc::new(scene), camera: cam, width: 400, height: 300, device_pixel_ratio: 1.0, style, invalidate_pick: true }).unwrap();
-    let pick = |r: &mut Renderer, token: u64, x: i32, y: i32| {
-        r.submit_picks(7, &[(token, PickRect::around(x, y, 5))]);
-        let mut got = None;
-        while r.has_pending() {
-            r.wait_oldest();
-            for c in r.collect() {
-                if let Completed::Pick { result, .. } = c {
-                    got = Some(result.unwrap());
-                }
-            }
-        }
-        got.expect("the pick answered")
-    };
-    let corner = pick(&mut r, 1, 10, 10);
-    assert!(corner.pick(10, 10, 5, |_| 0).is_none(), "background in the corner");
-    let centre = pick(&mut r, 2, 200, 150);
-    assert!(centre.pick(200, 150, 5, |_| 0).is_some(), "the centre drawn on its own pick and hitting the box");
-    let near = pick(&mut r, 3, 205, 152);
-    assert!(near.pick(205, 152, 5, |_| 0).is_some(), "a pick near the last one answered from its pass");
-}
-
 #[test]
 fn visible_depth_samples_land_on_the_geometry() {
     let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
