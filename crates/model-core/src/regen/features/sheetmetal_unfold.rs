@@ -336,6 +336,13 @@ fn faces_on_plane(shape: &Shape, p: DVec3, n: DVec3) -> Vec<Shape> {
     shape.faces().into_iter().filter(|f| plane_of(f).is_some_and(|(c, nn)| nn.cross(n).length() < 1e-7 && (c - p).dot(n).abs() < 1e-7)).collect()
 }
 
+/// A bend's section faces on its tangent plane: those within its extent along the axis (a box's side bends end on the
+/// same plane: live c2-cov-sm-unfold-refold's Unfold 1 leaves them be).
+fn bend_section(shape: &Shape, b: &Bend, p: DVec3, n: DVec3) -> Vec<Shape> {
+    let within = |f: &Shape| plane_of(f).is_some_and(|(c, _)| (b.s0 - 1e-6..=b.s1 + 1e-6).contains(&(c - b.origin).dot(b.axis)));
+    faces_on_plane(shape, p, n).into_iter().filter(within).collect()
+}
+
 fn transform_named(ev: &EvalCtx, s: &NamedShape, m: &DMat4) -> FResult<NamedShape> {
     let mv = k::transform(&s.shape, &k::Transform::Matrix(*m), true)?;
     let names = ev.name_result(&[&s.names], &mv.history, &mv.shape, &BTreeMap::new(), None);
@@ -452,7 +459,9 @@ pub fn unfold(ev: &mut EvalCtx) -> FResult<()> {
         // Bend sector: between the two tangent planes through the axis, within R + T.
         let dir_b = DMat4::from_axis_angle(b.axis, b.angle).transform_vector3(-b.dir_a);
         let reach = b.radius + t;
-        let s = (b.s0 - t, b.s1 + t);
+        // Along the axis only the bend's own extent (past it, a box's corner: live c2-cov-sm-unfold-refold's Unfold 1
+        // keeps the side walls whole).
+        let s = (b.s0 - 1e-6, b.s1 + 1e-6);
         let half = |n_out: DVec3| -> FResult<Shape> {
             // Half space {(p - o)·n_out <= 0} bounded to the bend's neighbourhood.
             let ey = b.axis.cross(n_out).normalize();
@@ -470,7 +479,7 @@ pub fn unfold(ev: &mut EvalCtx) -> FResult<()> {
         // Flat transform of the far side and the developed strip.
         let fold_inv = b.fold_inverse(t);
         let (m, strip_dir, plane_n) = if child_near { (fold_inv.inverse(), -dir_b, dir_b) } else { (fold_inv, -b.dir_a, b.dir_a) };
-        let ends = faces_on_plane(&near.shape, b.origin, plane_n);
+        let ends = bend_section(&near.shape, &b, b.origin, plane_n);
         if ends.is_empty() {
             return err("The bend's end section could not be found");
         }
@@ -492,6 +501,7 @@ pub fn unfold(ev: &mut EvalCtx) -> FResult<()> {
         move_data(&mut data, &far_walls, i, &m);
         if child_near {
             data.bends[i].transform(&m);
+            data.held_child.push(i);
         }
         let nb = ev.ctx.bodies[bi].clone();
         let strip: Vec<Name> = (0..(ends.len() as u16 * 16)).map(|f| side_name(feature, &key, 720 + f)).collect();
@@ -562,10 +572,10 @@ pub fn refold(ev: &mut EvalCtx) -> FResult<()> {
         let ba = b.allowance(t);
         // Strip region in the parent's flat extension (both sheet faces + margin).
         let p0 = b.tangent_point(t, 0.0);
-        let strip = oriented_box(p0, -b.dir_a, b.axis, [0.0, ba], [b.s0 - t, b.s1 + t], [-2.0 * t, 2.0 * t])?;
+        let strip = oriented_box(p0, -b.dir_a, b.axis, [0.0, ba], [b.s0 - 1e-6, b.s1 + 1e-6], [-2.0 * t, 2.0 * t])?;
         let (near, far) = split_by(ev, bi, &data, strip, &far_walls, &key, 740)?;
         let m = b.fold_inverse(t).inverse();
-        let ends = faces_on_plane(&near.shape, p0, b.dir_a);
+        let ends = bend_section(&near.shape, &b, p0, b.dir_a);
         if ends.is_empty() {
             return err("The unfolded strip's start section could not be found");
         }
@@ -593,6 +603,17 @@ pub fn refold(ev: &mut EvalCtx) -> FResult<()> {
         }
         ev.replace_body(bi, shape, names);
         move_data(&mut data, &far_walls, i, &m);
+        // Unfolded holding the child's side: the whole part goes back by the turn that unfolded the parent's (live
+        // c2-cov-sm-unfold-refold's Refold 1: the bottom Unfold 1 held stays).
+        if data.held_child.contains(&i) {
+            let back = b.fold_inverse(t);
+            let body = ev.ctx.bodies[bi].clone();
+            let moved = transform_named(ev, &body_named(&body), &back)?;
+            ev.replace_body(bi, moved.shape, moved.names.faces);
+            let all: Vec<usize> = (0..data.walls.len()).collect();
+            move_data(&mut data, &all, usize::MAX, &back);
+            data.held_child.retain(|&x| x != i);
+        }
         let nb = ev.ctx.bodies[bi].clone();
         let bm = &mut data.bends[i];
         bm.flat = false;

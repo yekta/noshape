@@ -373,6 +373,9 @@ pub struct SheetMetalData {
     /// be unfolded.").
     #[serde(default)]
     pub cannot_unfold: bool,
+    /// Bends an Unfold unrolled holding their child's side (the parent's side moved): Refold puts that side back.
+    #[serde(default)]
+    pub held_child: Vec<usize>,
 }
 
 /// A sheet metal model's joints over all its parts: the Sheet metal table
@@ -464,6 +467,7 @@ impl SheetMetalData {
             label_owners: Vec::new(),
             def_owners: Vec::new(),
             cannot_unfold: false,
+            held_child: Vec::new(),
         }
     }
 

@@ -1,20 +1,21 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-20 13:30 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-20 14:33 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-20 13:30 UTC)
-- Landing now: Thicken / Convert flat lies by the model's largest wall (live 2468 follow-up; Extrude keeps its first
-  segment), `Definition::extracted` = a wall created by `extractSurface`; a Sized bend relief (rectangle and obround)
-  ends depth + R tan(a/2) in (live 12:48: 8.3 mm); test a_sized_relief_runs_its_depth_past_the_bend_as_live.
-  24 SM docs 201 -> 209/295 (bend-relief 5/5, modify-joint 10/11), no doc worse; T2 + clippy green.
-- Rejected: extract surface's faces in body order (fits modify-joint, but hem-flange SM model 2 thickens to the wrong
-  side 7 -> 4/8 and frames' convert BUTT/BUTT2 swap); patch ~/agents/skasm-keep/extract-order.patch (local).
+## In flight (11-20 14:33 UTC)
+- LANDED eca6e645: Thicken / Convert flat lies by the largest wall (`Definition::extracted`); Sized relief ends
+  depth + R tan(a/2) in (live 8.3 mm). 201 -> 209/295.
+- Landing now: Unfold unrolls only its bend (sector and tangent-plane faces kept within the bend's extent, so a box's
+  side bends ending on the same plane stay); an Unfold holding the child's side (`SheetMetalData::held_child`) is put
+  back by Refold (F = fold_inverse). c2-cov-sm-unfold-refold 3 -> 6/6, 24 SM docs 209 -> 212/295, no doc worse.
+- Rejected: extract surface's faces in body order (hem-flange SM model 2 7 -> 4/8, frames BUTT/BUTT2 swap);
+  patch ~/agents/skasm-keep/extract-order.patch (local).
 - modify-joint Sketch 1 frame origin ours 50.33 vs live 120.02 (x): the flat's plane origin convention, open.
-- Rip 1 (c2-cov-sm-rip): live no-op (behaviours "skasm 12:58 (11-20)"); ours 48/106/60, -16 mm3: std Rip runs
-  (std_route), our coplanar rip has offset 0 and isn't a relief's free side: cause not found yet, trace next.
-- Unfold 1 (c2-cov-sm-unfold-refold, CONVERT): live unrolls bend KSCB only, hold KMaB, box (0,-36.944,0)-(100,60,40),
-  27666.721, topology 46/100; ours (native sheetmetal_unfold.rs) 56/128/74, 27740.64.
+- Rip 1 (c2-cov-sm-rip), PARKED (Rip is hidden in the UI): live no-op. The std rip splits the front wall diagonally
+  and we build the lower triangle as its own wall, so the bottom-front bend starts at x 3.45 with a slanted end
+  (diagonal crosses z 2.3 at x 5.75). Fix: build coplanar rip pieces as one wall (needs topology reindexing:
+  def_topo, pieces). A coplanar-rip filter in corner_rip / edge_rip lookups had no effect.
 - Next differences: forms Sketch 3 frame (P2 ticket), Form 5/7; hem Hem 1 INFO vs live WARNING; jog Jog 3 ERROR vs live
   INFO; loft: live 24 plane + 8 B-spline faces, ours 30 + 2.
 - Tools: /root/skasm-scratch/pm.sh (ONLY=, SAVE=, build + run), pmrun.sh (TRACE run of the kept binary), smlist.txt
