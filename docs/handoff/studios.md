@@ -49,8 +49,13 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
    frame comes back (drawing_view `FrameCam`; qa rechecks D3 timing quiet). Custom table › Add: the Insert view
    chooser in a studio mode ("Select a Part Studio", Part Studios only, 40 px right of the dialog), Other documents
    real (`drawing_custom_table` `document` / `version`; the kind's `version` an ExternalRef key).
-3. Custom table picker leftovers: configured studios' chevron + configuration pair (live 279) not drawn; nor in
-   Insert view. Waits on live's capture (REQUESTS 11-20 04:47); the custom table kind has no configuration yet.
+3. Custom table picker leftovers (live answered 11-20 05:04, behaviours "studios (11-20): configured studio rows in
+   drawing choosers", live/drawing/cfg-choosers-1120/): a configured studio's row has a › chevron (expands one row
+   per configuration input inline: label left, full-width select; a non-default value relabels it "Size: (Default:
+   Small)"), and right an insert icon (tooltip "Set to last viewed configuration") + ▾ (Set to last viewed | Reset to
+   default); a name click closes the chooser and adds the studio. Needs the custom table kind's configuration
+   (TableKind::Custom has none), its evaluation, the op's `configuration`. Insert view's tab not captured.
+   The scenario drw-custom-table-add is recorded (tests/ui-parity/live/, 10/10).
 4. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
