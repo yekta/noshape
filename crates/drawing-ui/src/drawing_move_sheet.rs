@@ -41,6 +41,7 @@ const CORNERS: [TableCorner; 4] = [TableCorner::TopLeft, TableCorner::TopRight, 
 impl DrawingEditor {
     pub fn open_move_sheet(&mut self, target: MoveTarget, cx: &mut Context<Self>) {
         self.move_sheet = Some(MoveSheetDlg { target, at: self.menu_at, sheet: self.sheet });
+        self.first_due = true;
         cx.notify();
     }
 
@@ -275,7 +276,8 @@ impl DrawingEditor {
         let (shown, value) = (cur.clone(), cur.clone());
         let moves = d.sheet != self.sheet;
         // Live 284: 120 px, the value at 13.33 px; ✓ pale until another sheet is picked.
-        let sheet = Button::new("ms-sheet").accessibility_label(cur.clone()).child(div().min_w_0().overflow_hidden().whitespace_nowrap().text_size(px(13.33)).child(cur)).ghost().xsmall().w(px(120.)).h(px(25.)).text_color(gpui_kit::rgb(0x555555)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu("ms-sheet-dd", true, move |mut m, _, _| {
+        let sheet = Button::new("ms-sheet").accessibility_label(cur.clone()).child(div().min_w_0().overflow_hidden().whitespace_nowrap().text_size(px(13.33)).child(cur)).ghost().xsmall().w(px(120.)).h(px(25.)).text_color(gpui_kit::rgb(0x555555)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.));
+        let sheet = self.first_lit_underline(sheet).os_dropdown_menu("ms-sheet-dd", true, move |mut m, _, _| {
             for (i, n) in names.iter().enumerate() {
                 let e = ed.clone();
                 m = m.item(crate::os_menu::OsMenuItem::new(n.clone()).on_click(move |_, _, cx| {
@@ -289,7 +291,7 @@ impl DrawingEditor {
             }
             m
         });
-        let sheet = crate::ui_script::mark(sheet, move || format!("dropdown:{shown}"));
+        let sheet = div().track_focus(&self.first_field).child(crate::ui_script::mark(sheet, move || format!("dropdown:{shown}")));
         // Live2 drw-view-move-to-sheet (11-16): its title, "Sheet" and the list's options; the list as a field.
         let all: Vec<String> = self.drawing.sheets.iter().map(|s| s.name.clone()).collect();
         crate::ui_script::note_dialog(|| {

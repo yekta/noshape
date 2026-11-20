@@ -74,6 +74,9 @@ pub fn paste_entry(_cx: &App) -> Option<MenuEntry> {
 /// A View properties dropdown choice.
 type PropsAct = std::rc::Rc<dyn Fn(&mut ViewProps)>;
 
+/// A focused select's underline (live drawing/1047: 2 px rgb(27, 95, 170)).
+pub(crate) const FIRST_FIELD_LIT: u32 = 0x1b5faa;
+
 /// View properties dialog state.
 pub struct ViewProps {
     pub view: ViewId,
@@ -629,7 +632,16 @@ impl DrawingEditor {
             tangent_pick: false,
             simp_pick: false,
         });
+        self.first_due = true;
         cx.notify();
+    }
+
+    /// A dialog's first select with live's focused underline while `first_field` has the focus.
+    pub(crate) fn first_lit_underline(&self, b: Button) -> Button {
+        if !self.first_lit {
+            return b;
+        }
+        b.border_b_2().border_color(gpui_kit::rgb(FIRST_FIELD_LIT))
     }
 
     /// View properties of several selected views (live drw2 10-21 j): the
@@ -832,11 +844,14 @@ impl DrawingEditor {
         let value = |s: String| div().pl(px(5.)).pt(px(6.)).text_size(px(12.)).text_color(ink).child(s).into_any_element();
         let view = cx.entity();
         // Onshape's select: white, 120 x 25, a #ddd bottom line, ▾ at the right.
+        // The first select, View orientation, focused when the dialog opens (live drawing/1047).
+        let lit = self.first_lit;
         let select = |id: &'static str, current: String, items: Vec<(String, bool, PropsAct)>, enabled: bool| {
             let view = view.clone();
             let shown = current.clone();
             // The value at 13.33 px, clipped without an ellipsis (live 1448: "Best performan"); a label would take the button's 11 px.
             let b = Button::new(id).accessibility_label(current.clone()).child(div().min_w_0().overflow_hidden().whitespace_nowrap().text_size(px(13.33)).child(current)).ghost().xsmall().w_full().h(px(25.)).rounded(px(0.)).border_b_1().border_color(line).text_color(field_ink).dropdown_caret(true);
+            let b = if lit && id == "vp-orient" { b.border_b_2().border_color(gpui_kit::rgb(FIRST_FIELD_LIT)) } else { b };
             if !enabled {
                 return div().opacity(0.5).child(b).into_any_element();
             }
@@ -921,7 +936,8 @@ impl DrawingEditor {
                 }
             }
             let label = cur_named.unwrap_or_else(|| orientation_name(cur).into());
-            rows.push(row("View orientation", select("vp-orient", label, items, true)));
+            let orient = select("vp-orient", label, items, true);
+            rows.push(row("View orientation", div().track_focus(&self.first_field).child(orient).into_any_element()));
         } else if multi.is_none() {
             rows.push(row("View orientation", value(default_view_name(&self.drawing, sheet, &v))));
         }

@@ -2644,3 +2644,37 @@ fn nothing_lights_under_a_panel(cx: &mut TestAppContext) {
     draw(cx, window);
     assert_eq!(view_of(&lit_at(cx, window, &editor, c)), Some(pl.id), "the view lights again once it closes");
 }
+
+/// qa DRW-DIALOG-FIRST-FOCUS (live drawing/1047, 1037): View properties opens with View orientation focused and Move
+/// to sheet with Sheet focused (a 2 px blue underline); closing one gives the sheet its focus back.
+#[gpui::test]
+fn view_dialogs_open_with_their_first_select_focused(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-first-focus");
+    real_sheet(cx, window, &editor);
+    let view = cx.update(|cx| editor.read(cx).current_sheet().views.first().map(|v| v.id)).expect("a view");
+    let state = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| {
+            let e = editor.read(cx);
+            (e.first_lit, e.first_field.is_focused(w), e.focus.is_focused(w))
+        })
+        .unwrap()
+    };
+    draw(cx, window);
+    assert_eq!(state(cx), (false, false, true), "the sheet has the focus");
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_view_props(view, w, cx))).unwrap();
+    draw(cx, window);
+    draw(cx, window);
+    assert_eq!(state(cx), (true, true, false), "View orientation focused");
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        e.view_props = None;
+        cx.notify();
+    }));
+    draw(cx, window);
+    draw(cx, window);
+    assert_eq!(state(cx), (false, false, true), "closed: the sheet's focus again");
+    cx.update(|cx| editor.update(cx, |e, cx| e.open_move_sheet(crate::drawing_move_sheet::MoveTarget::View(view), cx)));
+    draw(cx, window);
+    draw(cx, window);
+    assert_eq!(state(cx), (true, true, false), "Move to sheet's Sheet focused");
+}

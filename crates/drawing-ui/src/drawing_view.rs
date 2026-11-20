@@ -305,6 +305,11 @@ pub struct DrawingEditor {
     pub gpu: Gpu,
     target_id: u64,
     pub focus: FocusHandle,
+    /// A dialog's first field (View properties' View orientation, Move to sheet's Sheet): focused when it opens (live
+    /// drawing/1047, 1037: its 2 px blue underline); `first_due` focuses it at the next frame, `first_lit` is its state.
+    pub(crate) first_field: FocusHandle,
+    pub(crate) first_due: bool,
+    pub(crate) first_lit: bool,
     /// Cached parts of the editor (toolbar, panel layer): see `crate::cached_slice`.
     slices: Option<DrSlices>,
 
@@ -729,6 +734,9 @@ impl DrawingEditor {
             gpu,
             target_id,
             focus: cx.focus_handle(),
+            first_field: cx.focus_handle(),
+            first_due: false,
+            first_lit: false,
             slices: None,
             drawing,
             preview: None,
@@ -2311,9 +2319,13 @@ impl DrawingEditor {
     fn render_light(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         // A closed view dialog took the focus with it (its fields): the sheet
         // takes it back, so shortcuts work at once (qa5 D5; live keeps them).
-        if window.focused(cx).is_none() {
+        if window.focused(cx).is_none() || (self.first_field.is_focused(window) && self.view_props.is_none() && self.move_sheet.is_none()) {
             window.focus(&self.focus, cx);
         }
+        if std::mem::take(&mut self.first_due) {
+            window.focus(&self.first_field, cx);
+        }
+        self.first_lit = self.first_field.is_focused(window);
         self.sync_section_dlg(window, cx);
         self.sync_aligned_dlg(window, cx);
         self.sync_target_dims_preview(cx);
