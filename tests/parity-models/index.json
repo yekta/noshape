@@ -1548,5 +1548,50 @@
   "url": "https://cad.onshape.com/documents/97090bf9080a13b17cc75501/w/97b83e8ff9bc5822900e0aac/e/c139e4962dd74b52522eace6",
   "title": "opt-pattern-skip-centred",
   "original": "https://cad.onshape.com/documents/b148971c702e8aad5f3fd601/w/e4ae2511a34654d8164c5367/e/01878fb75eccd0c7d6ff8570"
+ },
+ {
+  "name": "c2-opt-extrude-thin",
+  "document": "dafb50fc8e661190d6438af2",
+  "workspace": "7eac8a2f26d728049effff56",
+  "element": "9f1797e6789fa9ba92ca3c8a",
+  "url": "https://cad.onshape.com/documents/dafb50fc8e661190d6438af2/w/7eac8a2f26d728049effff56/e/9f1797e6789fa9ba92ca3c8a",
+  "title": "opt-extrude-thin",
+  "original": "https://cad.onshape.com/documents/46006f163d1f1fff0922f3be/w/1ab8d999c322ec99c17374fd/e/21ead2e6d12885ab06a90a7b"
+ },
+ {
+  "name": "c2-opt-extrude-direction-second",
+  "document": "89e6852b3ebb0dfab10e6b0a",
+  "workspace": "16bfd88cbdc2b754eeb86cbd",
+  "element": "721b0de0fe86bcdc12b2d9a6",
+  "url": "https://cad.onshape.com/documents/89e6852b3ebb0dfab10e6b0a/w/16bfd88cbdc2b754eeb86cbd/e/721b0de0fe86bcdc12b2d9a6",
+  "title": "opt-extrude-direction-second",
+  "original": "https://cad.onshape.com/documents/d023e0b4557595322507842d/w/a1933c442f2e39d542bedb52/e/009425f21f827eedb8b48b7f"
+ },
+ {
+  "name": "c2-opt-revolve-thin-up-to",
+  "document": "7c6e2d765a5d5db989038e5b",
+  "workspace": "914bf4c57fb67281ea2e79f3",
+  "element": "d9026134249258a40f42c55b",
+  "url": "https://cad.onshape.com/documents/7c6e2d765a5d5db989038e5b/w/914bf4c57fb67281ea2e79f3/e/d9026134249258a40f42c55b",
+  "title": "opt-revolve-thin-up-to",
+  "original": "https://cad.onshape.com/documents/d5edca2f2a42d243ffcd1e0d/w/0349749b60ff3cab97a1c407/e/0d8743959afb2811424ec478"
+ },
+ {
+  "name": "c2-opt-revolve-start-bound",
+  "document": "7ebd0308c214a52c6cce641c",
+  "workspace": "ab48fc0fa75f2a322df2eb94",
+  "element": "3a92e5dab8e014701f652013",
+  "url": "https://cad.onshape.com/documents/7ebd0308c214a52c6cce641c/w/ab48fc0fa75f2a322df2eb94/e/3a92e5dab8e014701f652013",
+  "title": "opt-revolve-start-bound",
+  "original": "https://cad.onshape.com/documents/86fe2661e42c5f94cd1b8df7/w/e27bd38fbefec4d9e646cfdb/e/cdeb501ed800fb7ed5800291"
+ },
+ {
+  "name": "c2-opt-loft-continuity",
+  "document": "54420c486787ae9653517e04",
+  "workspace": "7c07769accb656deca0feb49",
+  "element": "472f8b1b55a64f3343b3aca1",
+  "url": "https://cad.onshape.com/documents/54420c486787ae9653517e04/w/7c07769accb656deca0feb49/e/472f8b1b55a64f3343b3aca1",
+  "title": "opt-loft-continuity",
+  "original": "https://cad.onshape.com/documents/5032e4caa0f08ff226f250da/w/3e4c2097b9d9662c4b2f6e00/e/d7fc2ada4758443686e686d1"
  }
 ]
