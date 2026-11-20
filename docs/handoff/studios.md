@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 11:41 UTC.
+Updated 2026-11-20 16:55 UTC.
 
 ## In flight
 
@@ -19,31 +19,26 @@ origin/main` first. App builds for shots on vibex7 / vibex6, never vibe2 (its on
 read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edited during a running sync: `touch` edited files before
 the next run. Run the full ops e2e before any drawing land. vibex8 is qa's quiet speed window 02:00-04:00 (lead 11-20):
 nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdshots-host.sh (PD_HOST=vibe2 PD_DISP=395: first free display, never skasm's :391-399). A few app runs don't take ~/bin/slot (DECISIONS 11-15).
-- Landed 09:57: 782f4c47 as f29e6eb2 (the Windows CI wheel-notch fix and the 18 commits with it).
-- Landed 11:43: 35451185 as 2ce8ad6e (18 commits: the fc8e6c91 batch, drawing_datum_target op, panel-lists s21-24,
-  FS bracket box, coverage Resize...).
-- No Mac until 13:44 UTC (user needs it; lead 12:3x): rb.sh / land.sh with NOSHAPE_RB_HOST=vibex7 or vibex8 till then.
-- Landed 12:25: b5048cc1 as 16e0a7e3 (Flip / Rotate 30 px apart; a selected dimension = live dsel3; section End
-  type `dropdown:<shown>`).
-- Uncommitted, checked by b30 (/root/studios-scratch/b30.log; baseline b27d, 21 drw-dimension takes all full):
-  drawing_ui_state counts a selected dimension's grips, and a hovered selected one in full for recorders >= 11-15
-  (`EDGE+`; the 11-06 drw-dimension-radius s3 read nothing); drawing_view keeps a hovered selected dimension orange;
-  drawing_tools made_by_tool selects a Diameter after Escape (live drw-styles-radial s7). b29 (without Diameter):
-  dimension takes unchanged, styles-radial 7 -> 10/18. Commit + land if b30 drops nothing.
-- Live's final 08:08 takes + the revision-table-delete retake: queue commit 5c17506c1 (live, not landed at 12:50).
-  Untracked copies of its six new takes are in tests/ui-parity (+ live/); revision-table-delete's in
-  /root/studios-scratch/rtd. DELETE the untracked copies before land.sh once 5c17506c lands (else the rebase stops on
-  untracked files). Shots: b30 (25 takes), then b30b (inspection-diameter, sheet-properties-iso, revision-table-delete).
-- Live's 08:08 takes, drafts in /root/live-scratch/st0808 (scenario + out/<take>.json; copied untracked into
-  tests/ui-parity/ and live/): styles-radial (live's s11 click opened Inspection table: retake asked), section-blind-
-  offset (s8 Esc keeps the panel in live: asked). Others not recorded at 11:40.
-- An rb.sh run re-syncs the worktree to the Mac: scp a regenerated docs/AGENT_API.md back in the same command as
-  UPDATE_DOCS (mac:noshape-host/agents/studios/src/docs/AGENT_API.md).
-- revision-table-delete retake (REQUESTS 09:55 item 2): not in at 11:06.
-- Matrix 09:30: 1232 = + 558 shown of 1841, 0 ≠, 9 present-only, all conditional rows that wait on live's takes
-  (REQUESTS "studios (2026-11-20 08:08 UTC)", not captured at 09:30): Section Depth / Offset distance, Datum "This
-  field cannot be empty" (live's hidden Instance count row), Custom table Cell / Split custom table below, Inspection
-  Diameter dimension, View properties Multiple values, Sheet properties A4 Portrait, Styles Show dimension line.
+- No Mac until the lead says it is back (user, not before 18:05 UTC): rb.sh / land.sh with NOSHAPE_RB_HOST=vibex7 or
+  vibex8; app builds on vibex6 when vibex7's slots are full (b35 waited 50 min there 15:37-16:27).
+- Landed 12:25: b5048cc1 as 16e0a7e3. Queued 16:5x: 491f2b01 (3 commits: tables / dimensions / panels as live's 11-20
+  takes; run.py panel fields for old recorders; Edge to edge centerline on a silhouette).
+- Checks for 491f2b01: b34 (78 takes, /root/studios-scratch/b34.scores) 74 full; b35 (43 table takes) 42 full. Not
+  full, not emulated: drw-inspection-diameter 13/15 (s13-14 live's repaint lag), drw-revision-table-delete 7/10 (live's
+  stale paint of the deleted table), drw-styles-radial 14/18 (after Styles docks, live's reader stretches sheet_px:
+  1879 px wide, 0.193 mm/px vs 0.255, so it reads the wrong boxes). x35/x36/x37 on vibex8: drawing 260, drawing-ui
+  128, full ops e2e 263, coverage 11, clippy clean.
+- Reader marks (drawing_ui_state): `+` new (>= live2 11-15.1), `-` old, `*` since 11-18.1 (a table just placed; any
+  selected table's grips), `^` since 11-08.1 (a hovered selected dimension's text). Recorders without "live2" read no
+  drawing-panel fields (run.py panel_fields_unread).
+- Matrix 09:30: 9 present-only rows. Live's 11-20 takes cover 7, all full in b34 except Inspection Diameter (13/15,
+  live's lag) and Styles (reader artefact): Section Depth / Offset, Custom table Cell, View properties Multiple
+  values, Sheet properties A4 Portrait. Still open: Datum "This field cannot be empty", Split custom table below.
+  Regenerate the matrix after the land (drawing_matrix.py --run /root/studios-scratch/uip-merged ...).
+- Live's drawing coverage batches 1-3 (behaviours "## Drawing coverage (11-20)", shots live/drwcov/shots-b2b3/): queued
+  by live, not on main at 16:50. Done ahead: Edge to edge on a silhouette. Already as live: 2 point circle centerline
+  (centre, then a point). To check when the takes land: Centermark on a circle with its auto centermark adds nothing;
+  the 5 dimension takes (chamfer, arc length, max/min, virtual sharp, foreshorten) and batch 1's five.
 - b23 DONE 09:52 (vibex7 build): hide-dim 12/12, inspection-table-iso-scrolled 10/10, panel-lists 25/27 (still the
   (285, 447) ▾: ours' Targets box in Angle mode is 370 px, under live's 400, so no scrollbar), revision-table-delete
   7/10 (live's s7-s10 "EDGE Top" is the deleted table's stale paint). Both asked of live: REQUESTS "studios
