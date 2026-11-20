@@ -1225,21 +1225,27 @@ std::unique_ptr<OcShape> reverse_edge_curves(const OcShape& in, const OcShapeLis
   const TopoDS_Shape& s = in.shape;
   ShapeAncMap         ef;
   TopExp::MapShapesAndAncestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+  ShapeIMap all;
+  TopExp::MapShapes(s, TopAbs_EDGE, all);
+  const ShapeList none;
   occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
   BRep_Builder                   B;
   std::vector<TopoDS_Edge>       turned;
+  std::vector<bool>              faced;
   for (const TopoDS_Shape& x : edges.items)
   {
     const TopoDS_Edge e = TopoDS::Edge(x.Oriented(TopAbs_FORWARD));
-    if (!ef.Contains(e) || BRep_Tool::Degenerated(e))
+    if (!all.Contains(e) || BRep_Tool::Degenerated(e))
       continue;
+    // A wire's free edge has no faces: only its curve turns.
+    const ShapeList& faces = ef.Contains(e) ? ef.FindFromKey(e) : none;
     double                        f, l;
     TopLoc_Location               cl;
     const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, cl, f, l);
     if (c.IsNull())
       continue;
     bool seam = false;
-    for (ShapeList::Iterator fi(ef.FindFromKey(e)); fi.More(); fi.Next())
+    for (ShapeList::Iterator fi(faces); fi.More(); fi.Next())
       seam = seam || BRep_Tool::IsClosed(e, TopoDS::Face(fi.Value()));
     if (seam)
       continue;
@@ -1256,7 +1262,7 @@ std::unique_ptr<OcShape> reverse_edge_curves(const OcShape& in, const OcShapeLis
     B.Add(ne, v0.Oriented(TopAbs_REVERSED));
     B.Range(ne, rf, rl);
     bool same_range = true;
-    for (ShapeList::Iterator fi(ef.FindFromKey(e)); fi.More(); fi.Next())
+    for (ShapeList::Iterator fi(faces); fi.More(); fi.Next())
     {
       const TopoDS_Face&              F = TopoDS::Face(fi.Value());
       double                          pf, pl;
@@ -1283,10 +1289,10 @@ std::unique_ptr<OcShape> reverse_edge_curves(const OcShape& in, const OcShapeLis
     }
     // Its regularity between its two faces kept (a fillet's tangent edge: OCCT's draft intersects a G1 pair's new
     // surfaces as B-splines without it, cf-snap-hook's Draft 1).
-    if (const ShapeList& fl = ef.FindFromKey(e); fl.Extent() == 2)
+    if (faces.Extent() == 2)
     {
-      const TopoDS_Face& F1 = TopoDS::Face(fl.First());
-      const TopoDS_Face& F2 = TopoDS::Face(fl.Last());
+      const TopoDS_Face& F1 = TopoDS::Face(faces.First());
+      const TopoDS_Face& F2 = TopoDS::Face(faces.Last());
       if (BRep_Tool::HasContinuity(e, F1, F2))
         B.Continuity(ne, F1, F2, BRep_Tool::Continuity(e, F1, F2));
     }
@@ -1299,6 +1305,7 @@ std::unique_ptr<OcShape> reverse_edge_curves(const OcShape& in, const OcShapeLis
     }
     rs->Replace(e, ne.Reversed());
     turned.push_back(ne);
+    faced.push_back(faces.Extent() > 0);
   }
   if (turned.empty())
     return wrap(s);
@@ -1310,8 +1317,11 @@ std::unique_ptr<OcShape> reverse_edge_curves(const OcShape& in, const OcShapeLis
   ShapeAncMap oef;
   TopExp::MapShapesAndAncestors(out, TopAbs_EDGE, TopAbs_FACE, oef);
   ShapeIMap checked;
-  for (const TopoDS_Edge& ne : turned)
+  for (size_t t = 0; t < turned.size(); ++t)
   {
+    const TopoDS_Edge& ne = turned[t];
+    if (!faced[t])
+      continue;
     if (!oef.Contains(ne))
       return wrap(s);
     for (ShapeList::Iterator fi(oef.FindFromKey(ne)); fi.More(); fi.Next())

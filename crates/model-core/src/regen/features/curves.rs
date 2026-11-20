@@ -657,7 +657,29 @@ pub fn intersection_curve(ev: &mut EvalCtx) -> FResult<()> {
         return err("Selections must be unique.");
     }
     let sec = k::section(&Shape::compound(&g1), &Shape::compound(&g2))?;
-    let wires = chain_wires(&sec.shape.edges())?;
+    // Each curve runs along n1 x n2, the first group's face normal crossed with the second's (live core
+    // q-manualblend-ic1: both of Intersection curve 1's edges).
+    let near = |fs: &[Shape], p: DVec3| {
+        let v = k::make_vertex(p).ok()?;
+        fs.iter().filter_map(|f| k::distance(&v, f).ok().map(|d| (d.distance, f))).min_by(|a, b| a.0.total_cmp(&b.0)).map(|(_, f)| f.clone())
+    };
+    let along = |e: &Shape| -> FResult<f64> {
+        let info = e.edge_info()?;
+        let t = (info.first_param + info.last_param) * 0.5;
+        let (p, tan) = (e.point_at(t)?, e.tangent_at(t)?);
+        Ok(match (near(&g1, p), near(&g2, p)) {
+            (Some(a), Some(b)) => a.normal_at_point(p)?.cross(b.normal_at_point(p)?).dot(tan),
+            _ => 0.0,
+        })
+    };
+    let mut flip = Vec::new();
+    for e in sec.shape.edges() {
+        if along(&e)? < 0.0 {
+            flip.push(e);
+        }
+    }
+    let shape = if flip.is_empty() { sec.shape } else { k::reverse_edge_curves(&sec.shape, &flip)? };
+    let wires = chain_wires(&shape.edges())?;
     if wires.is_empty() {
         return err("No intersections found with current selections.");
     }

@@ -865,6 +865,35 @@ fn curves_from_sketch_and_edges() {
     assert!(near(len, 0.03, 1e-7), "trimmed length {len}");
 }
 
+/// An intersection curve runs along n1 x n2 (live core q-manualblend-ic1): the block's section by a plane above its
+/// base turns one way with the block first and the other way with the plane first.
+#[test]
+fn an_intersection_curve_runs_along_the_first_groups_normal_cross_the_seconds() {
+    for body_first in [true, false] {
+        let mut s = block();
+        s.add("cPlane", |p| {
+            p.set("entities", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+            p.set("offset", expr("10 mm"));
+        });
+        let plane = Reference::FeaturePlane(s.ps.features.last().unwrap().id);
+        let body = Reference::Body(BodyId { feature: s.ps.features[1].id, index: 0 });
+        let (g1, g2) = if body_first { (body, plane) } else { (plane, body) };
+        s.add("intersectionCurve", move |p| {
+            p.set("group1", ParamValue::Query(vec![g1]));
+            p.set("group2", ParamValue::Query(vec![g2]));
+        });
+        let r = s.ok();
+        let w = r.context.bodies.iter().position(|b| b.kind == BodyKind::Wire).unwrap();
+        let ends: Vec<_> = r.context.bodies[w].shape.edges().iter().map(|e| e.endpoints().unwrap()).collect();
+        let twice_area: f64 = ends.iter().map(|(a, c)| a.x * c.y - c.x * a.y).sum();
+        let (lo, hi) = ends.iter().fold((f64::MAX, f64::MIN), |(lo, hi), (a, _)| (lo.min(a.x), hi.max(a.x)));
+        let (ylo, yhi) = ends.iter().fold((f64::MAX, f64::MIN), |(lo, hi), (a, _)| (lo.min(a.y), hi.max(a.y)));
+        // Body first: a side's outward normal x +Z, clockwise seen from above; plane first: anticlockwise.
+        let want = if body_first { -2.0 } else { 2.0 } * (hi - lo) * (yhi - ylo);
+        assert!(near(twice_area, want, 1e-9), "body first {body_first}: {twice_area} {ends:?}");
+    }
+}
+
 #[test]
 fn intersection_and_ruled_surface_on_block() {
     let mut s = block();
