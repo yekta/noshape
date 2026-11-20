@@ -877,7 +877,8 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   thicken-zero-chip-red-1119.png (ours), thicken-zero-chip-live-2059.png. (qa 23:29, green cb6c12e2)
 
 - [ ] P2 **BRAND-IN-UI-TEXT (dx; prefs line: studios)**: + › Import… › a STEP file: the options modal is titled "Import to Onshape"
-- [ ] (studios 11-19: the prefs line fixed, to verify: Preferences › Noshape Labs, its consent modal, toasts, help section and Feature Studio Co-complete say Noshape, the 8 catalogs' rows renamed, the runner reads live's "Onshape Labs" phrases as ours; Environment profile / mouse preset "Onshape (default)", "Onshape default" key legend, "Onshape Material Library" and "Onshape Default BOM" left for the lead's call) P2 **BRAND-IN-UI-TEXT (dx; prefs line: studios)**: + › Import… › a STEP file: the options modal is titled "Import to Onshape"
+  (studios 11-19: the prefs line fixed, verified 036a1e61 (qa 00:29 on green eef639d7): Preferences › Noshape Labs, its consent modal, toasts, help section and Feature Studio Co-complete say Noshape, the 8 catalogs' rows renamed, the runner reads live's "Onshape Labs" phrases as ours; Environment profile / mouse preset "Onshape (default)", "Onshape default" key legend, "Onshape Material Library" and "Onshape Default BOM" left for the lead's call) P2 **BRAND-IN-UI-TEXT (dx; prefs line: studios)**: + › Import… › a STEP file: the options modal is titled "Import to Onshape"
+  qa 00:29: two lowercase "noshape" left in the My account / Preferences window: its header wordmark reads "noshape" (preferences_window.rs:198; the documents page and document window read "Noshape") and Updates says "it is installed when you restart noshape." (prefs_general.rs:613). Both should read Noshape.
   (crates/app/src/import_dialog.rs:230); Preferences asks "Enable access to Onshape Labs features?" (prefs_general.rs:476). The app
   is Noshape in all user-facing text (no Onshape brand marks): "Import to Noshape" etc., layout as live. Walk 22:04, green a58eee8c;
   the STEP round trip itself is fine (8 faces out, Import 1 + Part 1 back, "CAD Imports" folder, info toast).
@@ -921,11 +922,12 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   a closed box of 4 walls with bends at all 4 corners (32 faces: 8 cylinder + 24 plane, 64 edges, 12843.115 mm³); the
   feature ends in a warning, name red, tooltip "Sheet metal model 1 did not regenerate properly: Sheet metal model cannot
   be unfolded." and no flat pattern. Green 624c6db77, walk 22:45. The open L and a Flange on it are = live.
-- [ ] P2 **HISTORY-ROW-NAME-OVERLAP (studios)**: Versions and history, after a branch edit merged into Main: the change row
+- [x] P2 **HISTORY-ROW-NAME-OVERLAP (studios)**: Versions and history, after a branch edit merged into Main: the change row
   "Part Studio 2 :: Edit : QA Box 1" is wider than the Name column and is drawn over the Modified column's "root"
   ("Edi‹root›QA Box 1"); nothing clips it. It should end at the column (live ellipsises long names in its lists; this
   row's exact cut isn't recorded, ask live if needed). Green 624c6db77, walk 23:02. Branch from V1, edit in B1,
   merge dialog (1 tab changed, Replace with B1), toast "Merged B1 into Main. Revert to before this merge" = live.
+  verified bbc7b3861 (qa 00:28 on green eef639d7): the row reads "Part Studio 2 :: E…" and ends at the Name column.
 - [ ] P1 **SKETCH-SLOT-ON-ARC (skasm)**: Slot, click a 3-point arc (r ≈ 22.7 mm, free): the arc lights orange and a "Ø0"
   readout with a long leader to the arc's centre appears, but no slot shape; moving the pointer changes nothing. On a line
   the same tool is = live (Ø20 preview, vertical leader, 4 tangent points). Live (behaviours 164): "click a line/arc → a
