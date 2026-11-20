@@ -4871,7 +4871,27 @@ fn sketch_paste_export_and_imprinting() {
     let dxf = scratch("sketch1.dxf");
     let r = call(&mut ctx, "sketch_export", json!({ "sketch": "Sketch 1", "file": dxf.to_str().unwrap() }));
     assert!(num(&r["curves"]) >= 5.0, "rectangle + circle: {r}");
-    assert!(std::fs::read_to_string(&dxf).unwrap().contains("LINE"));
+    // Exact curves, not tessellated polylines (qa SKETCH-DXF-EXPORT-POLYLINES): the Ø10 circle a CIRCLE of radius 5.
+    let entities = |path: &std::path::Path| -> Vec<(String, Option<f64>)> {
+        let text = std::fs::read_to_string(path).unwrap();
+        let lines: Vec<&str> = text.lines().map(str::trim).collect();
+        let pairs: Vec<(&str, &str)> = lines.chunks(2).filter(|c| c.len() == 2).map(|c| (c[0], c[1])).collect();
+        let start = pairs.iter().position(|p| *p == ("2", "ENTITIES")).unwrap();
+        let mut out: Vec<(String, Option<f64>)> = Vec::new();
+        for (c, v) in &pairs[start + 1..] {
+            match *c {
+                "0" if *v == "ENDSEC" => break,
+                "0" => out.push((v.to_string(), None)),
+                "40" => if let Some(e) = out.last_mut() { e.1 = v.parse().ok() },
+                _ => {}
+            }
+        }
+        out
+    };
+    let kinds = entities(&dxf);
+    assert!(kinds.iter().all(|(k, _)| k == "LINE" || k == "CIRCLE"), "{kinds:?}");
+    assert_eq!(kinds.iter().filter(|(k, r)| k == "CIRCLE" && r.is_some_and(|r| (r - 5.0).abs() < 1e-9)).count(), 1, "{kinds:?}");
+    assert_eq!(kinds.iter().filter(|(k, _)| k == "LINE").count(), 4, "{kinds:?}");
     let svg = scratch("sketch1.svg");
     call(&mut ctx, "sketch_export", json!({ "sketch": "Sketch 1", "file": svg.to_str().unwrap(), "format": "svg" }));
     assert!(std::fs::read_to_string(&svg).unwrap().contains("<svg"));
@@ -4881,6 +4901,9 @@ fn sketch_paste_export_and_imprinting() {
     let fd = scratch("face.dxf");
     let r = call(&mut ctx, "sketch_export", json!({ "face": top, "file": fd.to_str().unwrap() }));
     assert!(num(&r["curves"]) >= 5.0, "outline + hole: {r}");
+    let kinds = entities(&fd);
+    assert!(kinds.iter().any(|(k, r)| (k == "CIRCLE" || k == "ARC") && r.is_some_and(|r| (r - 5.0).abs() < 1e-9)), "{kinds:?}");
+    assert!(kinds.iter().all(|(k, _)| k == "LINE" || k == "CIRCLE" || k == "ARC"), "{kinds:?}");
     // Disable imprinting on a new sketch.
     let s = call(&mut ctx, "sketch_create", json!({ "plane": "plane:right", "disable_imprinting": true }));
     let f = call(&mut ctx, "feature_get", json!({ "feature": s["sketch"] }));

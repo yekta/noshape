@@ -207,8 +207,8 @@ impl PartStudioView {
         let version = CAD_VERSIONS[s.version.min(CAD_VERSIONS.len() - 1)].1;
         let sheet = match &source {
             CadSource::Flat(body) => return self.run_flat_export(s, name, body.clone(), window, cx),
-            CadSource::Sketch(id) => self.display.sketches.iter().find(|sk| sk.feature == *id).map(noshape_ops::sketch_export::sketch_sheet),
-            CadSource::Face(r) => self.context.as_ref().and_then(|ctx| noshape_ops::sketch_export::face_sheet(ctx, &self.display, r)),
+            CadSource::Sketch(id) => self.context.as_ref().and_then(|ctx| self.display.sketches.iter().find(|sk| sk.feature == *id).map(|sk| noshape_ops::sketch_export::sketch_sheet(ctx, sk))),
+            CadSource::Face(r) => self.context.as_ref().and_then(|ctx| noshape_ops::sketch_export::face_sheet(ctx, r)),
         };
         let Some(g) = sheet else { return self.flash_info("Export failed: nothing to export".into(), cx) };
         match if s.dwg { to_dwg_file(&g, units, version) } else { to_dxf_file(&g, units, version) } {
