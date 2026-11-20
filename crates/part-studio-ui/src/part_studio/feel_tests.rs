@@ -964,7 +964,8 @@ fn clicks_in_3d_add_remove_clear_and_ctrl_opens_the_menu(cx: &mut TestAppContext
     let press = |cx: &mut TestAppContext, at: DVec2, modifiers: Modifiers| {
         pointer.move_to(cx, &view, at);
         gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(pointer.window_point(cx, at), modifiers);
-        draw(cx, window);
+        // A click the pick cache doesn't cover waits for the GPU's pick.
+        pointer.settle(cx, &view);
         cx.update(|cx| view.read(cx).selection.clone())
     };
     let shift = Modifiers { shift: true, ..Default::default() };

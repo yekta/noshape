@@ -557,8 +557,8 @@ fn a_double_click_takes_the_word_and_a_triple_click_the_line(cx: &mut TestAppCon
     };
     click(cx, 1);
     assert_eq!(click(cx, 2), word..word + 4, "a double-click: \"true\"");
-    // (Live's triple-click takes the line's newline too: ticket FS-TRIPLE-CLICK-NEWLINE.)
+    // Live's triple-click takes the line's newline too (FS-TRIPLE-CLICK-NEWLINE).
     let line = start.len() + 1;
-    assert_eq!(click(cx, 3), line..line + 9, "a triple-click: \"x = true;\"");
+    assert_eq!(click(cx, 3), line..line + 10, "a triple-click: \"x = true;\\n\"");
     let _ = std::fs::remove_dir_all(&dir);
 }
