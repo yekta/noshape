@@ -1812,6 +1812,14 @@ fn drawing_lists_silhouettes() {
     // The Diameter tool on one silhouette: the same (help D15).
     let one = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "kind": "diameter", "picks": [mids[0]], "place": [place[0], place[1] + 10.0] }));
     assert_eq!(one["text"], "Ø20", "{one}");
+    // Edge to edge centerline on one silhouette: the cylinder's axis at once, midway between the two (live
+    // drw-centerline-edge-to-edge-cylinder).
+    let ax = call(&mut ctx, "drawing_centerline", json!({ "drawing": tab, "kind": "edge_to_edge", "picks": [mids[0]] }));
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let b = g["annotations"].as_array().unwrap().iter().find(|a| a["id"] == ax["annotation"]).unwrap()["bounds"].clone();
+    let centre = [(num(&b["min"][0]) + num(&b["max"][0])) / 2.0, (num(&b["min"][1]) + num(&b["max"][1])) / 2.0];
+    let axis = [(mids[0][0] + mids[1][0]) / 2.0, (mids[0][1] + mids[1][1]) / 2.0];
+    assert!((centre[0] - axis[0]).abs() < 1e-6 || (centre[1] - axis[1]).abs() < 1e-6, "{b} {axis:?}");
 }
 
 /// A new drawing knows the document state its views come from, so a model

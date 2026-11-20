@@ -1236,8 +1236,20 @@ impl DrawingEditor {
                     self.status = Some("Select a straight edge".into());
                     return;
                 };
+                // A cylinder's silhouette (a drawn line with no model edge) gives its axis at once, each pick another
+                // (live drw-centerline-edge-to-edge-cylinder: annotations 1, then 2); a plate's edges take two picks.
+                if self.hovered_edge().is_none()
+                    && let Some([Pick::Line { a: a1, b: b1 }, Pick::Line { a: a2, b: b2 }]) = self.pk().silhouette_pair().as_deref()
+                {
+                    let (p, q) = dt::edge_pair_centerline(a1.p, b1.p, a2.p, b2.p);
+                    let id = self.current_sheet().next_annotation_id();
+                    self.edit_sheet("Edge to edge centerline", cx, |s| s.annotations.push(dt::edge_centerline(id, a.view, p, q, c)));
+                    self.selection = vec![Sel::Annotation(id)];
+                    self.tool = Tool::EdgeCenterline { first: None };
+                    return;
+                }
                 match first {
-                    // Two edges always (live: "Place a centerline by selecting two edges"; a cylinder's silhouette too).
+                    // Else two edges (live: "Place a centerline by selecting two edges").
                     None => self.tool = Tool::EdgeCenterline { first: Some((a, b)) },
                     Some((a1, b1)) => {
                         if a.view != a1.view {
