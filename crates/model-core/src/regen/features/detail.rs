@@ -488,6 +488,8 @@ fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
         return crate::regen::eval::err_at(&["entities"], "Select edges or faces to fillet.");
     }
     let touched: Vec<usize> = groups.keys().copied().collect();
+    // (A surface's round leaves a surface: c2-surf-workshop-mutualtrim's Fillet 1.)
+    let sheets: Vec<usize> = touched.iter().copied().filter(|&bi| ev.ctx.bodies.get(bi).is_some_and(|b| b.shape.count(ShapeType::Solid) == 0)).collect();
     for (bi, edges) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let propagate = ev.bool("tangentPropagation");
@@ -719,7 +721,7 @@ fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
         log::debug!("fillet: kernel {:?}, naming {:?}, body {:?} (history records {})", t1 - t0, t2 - t1, t2.elapsed(), res.history.records.len());
     }
     // Never an empty body: a round far larger than its part can take every face, which live fails.
-    if touched.iter().any(|&bi| ev.ctx.bodies.get(bi).is_some_and(|b| b.shape.count(ShapeType::Solid) == 0 || b.shape.count(ShapeType::Face) == 0)) {
+    if touched.iter().any(|&bi| ev.ctx.bodies.get(bi).is_some_and(|b| (b.shape.count(ShapeType::Solid) == 0 && !sheets.contains(&bi)) || b.shape.count(ShapeType::Face) == 0)) {
         return err("Failed to fillet selections.");
     }
     Ok(())

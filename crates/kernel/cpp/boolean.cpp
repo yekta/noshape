@@ -10188,7 +10188,34 @@ OpOut op_split_on(const OcShape& shape, const OcShapeList& edges, double tol)
       fail_op("an edge on none of the faces");
     const TopoDS_Face               face = TopoDS::Face(faces(on));
     double                          reached = 0;
-    const occ::handle<Geom2d_Curve> c2 = GeomProjLib::Curve2d(c3, f, l, BRep_Tool::Surface(face), reached);
+    occ::handle<Geom2d_Curve> c2 = GeomProjLib::Curve2d(c3, f, l, BRep_Tool::Surface(face), reached);
+    // (Else its points' feet, each from the last, interpolated at its own parameters: a loft's touch curve on the
+    // sheet c2-surf-workshop-mutualtrim's Fillet 1 rounds, where the projection failed.)
+    if (c2.IsNull())
+    {
+      ShapeAnalysis_Surface sas(BRep_Tool::Surface(face));
+      constexpr int         N = 32;
+      occ::handle<NCollection_HArray1<gp_Pnt2d>> uv = new NCollection_HArray1<gp_Pnt2d>(1, N + 1);
+      occ::handle<NCollection_HArray1<double>>   ts = new NCollection_HArray1<double>(1, N + 1);
+      gp_Pnt2d                                   last;
+      bool                                       on = true;
+      for (int k = 0; k <= N && on; ++k)
+      {
+        const double t = f + (l - f) * k / N;
+        last           = k == 0 ? sas.ValueOfUV(c3->Value(t), 1e-9) : sas.NextValueOfUV(last, c3->Value(t), 1e-9);
+        on             = sas.Gap() <= tol;
+        reached        = std::max(reached, sas.Gap());
+        uv->SetValue(k + 1, last);
+        ts->SetValue(k + 1, t);
+      }
+      if (on)
+      {
+        Geom2dAPI_Interpolate ip(uv, ts, false, 1e-9);
+        ip.Perform();
+        if (ip.IsDone())
+          c2 = occ::handle<Geom2d_Curve>(ip.Curve());
+      }
+    }
     if (c2.IsNull())
       fail_op("an edge with no curve on its face");
     // A vertex at `p`: the one already there (two lofts' touch curves meeting mid-face chain into one cut).
@@ -10256,6 +10283,38 @@ OpOut op_split_on(const OcShape& shape, const OcShapeList& edges, double tol)
   sp.Build();
   if (!sp.IsDone())
     fail_op("split along edges failed");
+  // (A closed edge round a face it wraps, a sheet's touch loop: split as a hole, a face of no area. The general fuse
+  // instead, the edges its tools: c2-surf-workshop-mutualtrim's Fillet 1.)
+  auto no_area = [](const TopoDS_Shape& s) {
+    for (TopExp_Explorer x(s, TopAbs_FACE); x.More(); x.Next())
+    {
+      GProp_GProps p;
+      BRepGProp::SurfaceProperties(x.Current(), p);
+      Bnd_Box box;
+      BRepBndLib::Add(x.Current(), box);
+      if (box.IsVoid() || std::abs(p.Mass()) <= 1e-6 * box.SquareExtent())
+        return true;
+    }
+    return false;
+  };
+  if (no_area(sp.Shape()))
+  {
+    BRepAlgoAPI_Splitter gf;
+    ShapeList            args, tools;
+    args.Append(shape.shape);
+    for (const TopoDS_Shape& x : edges.items)
+      tools.Append(x);
+    gf.SetArguments(args);
+    gf.SetTools(tools);
+    gf.SetFuzzyValue(tol);
+    gf.SetNonDestructive(true);
+    gf.Build();
+    if (gf.IsDone() && !gf.HasErrors() && !no_area(gf.Shape()))
+    {
+      HHist hist = new BRepTools_History(args, gf);
+      return make_result({shape.shape}, gf.Shape(), hist.get());
+    }
+  }
   HHist hist = new BRepTools_History(to_list({shape.shape}), sp);
   return make_result({shape.shape}, sp.Shape(), hist.get());
 }

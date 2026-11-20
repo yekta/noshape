@@ -5277,3 +5277,38 @@ fn rounds_running_into_a_tube_close_on_canals_as_live() {
     let v = volume(&r, 0) * 1e9;
     assert!((v - 1763356.88).abs() < 12.0, "{v} mm³ (live 1763356.88)");
 }
+
+/// c2-surf-workshop-mutualtrim's Fillet 1: the edge where its two mutually trimmed surfaces meet, a curvature round
+/// (3 mm, 0.4), stays one surface. Live: 3/6/4, faces 302.42, 1663.35, 7349.65 mm² (ours was "Failed to fillet
+/// selections.": its touch curves split the sheet into faces of no area).
+#[test]
+fn a_surfaces_round_between_its_trimmed_halves_stays_a_surface_as_live() {
+    let brep = include_str!("data/mutualtrim-fillet1-input.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    assert_eq!((b.shape.solids().len(), b.shape.faces().len()), (0, 2));
+    let lens: Vec<f64> = b.shape.edges().iter().map(|e| e.edge_info().map(|i| i.length * 1e3).unwrap_or(0.0)).collect();
+    let k = lens.iter().position(|l| (l - 156.023).abs() < 0.01).expect("the trimmed halves' common edge");
+    let picked = vec![Reference::Edge((*b.edges[k]).clone())];
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(picked));
+        p.set("radius", expr("1 mm"));
+        p.set("nonCircularRadius", expr("3 mm"));
+        p.set("crossSection", en("CURVATURE"));
+        p.set("magnitude", expr("0.4"));
+        p.set("tangentPropagation", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    assert!(shape.is_valid() && shape.solids().is_empty() && shape.shells().len() == 1);
+    let shown = shape.shown_topology().unwrap();
+    assert_eq!((shape.faces().len(), shown.edge_count(), shown.vertices.iter().filter(|v| **v).count()), (3, 6, 4));
+    let mut areas: Vec<f64> = shape.faces().iter().map(|f| f.area().unwrap() * 1e6).collect();
+    areas.sort_by(f64::total_cmp);
+    // (The curvature round's section is ours, not Parasolid's: within 0.5 %.)
+    for (a, live) in areas.iter().zip([302.42, 1663.35, 7349.65]) {
+        assert!((a - live).abs() < live * 5e-3, "{areas:?} mm² (live 302.42, 1663.35, 7349.65)");
+    }
+}

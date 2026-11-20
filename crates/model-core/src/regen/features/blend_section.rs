@@ -665,6 +665,64 @@ fn trimmed_run_on(shape: &Shape, supports: [usize; 2], (tool, names): (Shape, Ve
     Ok((kept, refaced))
 }
 
+/// A surface's round: its faces less what each tool covers, with the tools' faces off the sheet between them sewn in
+/// (a Boolean can't add a solid tool to a sheet: c2-surf-workshop-mutualtrim's Fillet 1, the round of the edge where
+/// its two trimmed surfaces meet, live's 3/6/4 sheet).
+fn sheet_blend(ev: &EvalCtx, sheet: &NamedShape, tools: Vec<NamedShape>, rounded: &[Shape], scale: f64) -> FResult<NamedShape> {
+    let near = scale * 1e-4;
+    let on_sheet = |p: DVec3| k::make_vertex(p).is_ok_and(|v| k::distance(&v, &sheet.shape).is_ok_and(|d| d.distance <= near));
+    // The tools' faces that don't lie on the sheet (the rounds), and their edges that do (the touch curves).
+    let mut rounds: Vec<(Shape, Name)> = Vec::new();
+    let mut touches: Vec<Shape> = Vec::new();
+    for t in &tools {
+        for (f, n) in t.shape.faces().into_iter().zip(&t.names.faces) {
+            let Ok([u0, u1, v0, v1]) = f.uv_bounds() else { continue };
+            let inside = [(0.5, 0.5), (0.25, 0.5), (0.75, 0.5), (0.5, 0.25), (0.5, 0.75)].iter().filter_map(|(a, b)| f.point_at_uv(u0 + (u1 - u0) * a, v0 + (v1 - v0) * b).ok());
+            if inside.clone().all(on_sheet) {
+                continue;
+            }
+            for e in f.edges() {
+                let Ok(i) = e.edge_info() else { continue };
+                if [0.25, 0.5, 0.75].iter().filter_map(|x| e.point_at(i.first_param + (i.last_param - i.first_param) * x).ok()).all(on_sheet) && !touches.iter().any(|t| t.is_same(&e)) {
+                    touches.push(e);
+                }
+            }
+            rounds.push((f, n.clone()));
+        }
+    }
+    if rounds.is_empty() || touches.is_empty() {
+        return Err(fail("a sheet's round with no face off the sheet"));
+    }
+    // The sheet split along the touch curves; its pieces along the rounded edges (between them and the curves) dropped.
+    // (Within twice the touch curves' distance from it: a loft's edge only approximates its curve on the face.)
+    let split = k::split_on(&sheet.shape, &touches, 2.0 * near)?;
+    let split_names = ev.name_result(&[&sheet.names], &split.history, &split.shape, &BTreeMap::new(), None);
+    let mut parts = Vec::new();
+    let mut part_names = Vec::new();
+    for (f, n) in split.shape.faces().into_iter().zip(split_names) {
+        let along = |e: &Shape| e.edge_info().is_ok_and(|i| e.point_at(0.5 * (i.first_param + i.last_param)).is_ok_and(|q| k::make_vertex(q).is_ok_and(|v| rounded.iter().any(|r| k::distance(&v, r).is_ok_and(|d| d.distance <= near)))));
+        if f.edges().iter().any(along) {
+            continue;
+        }
+        part_names.push(crate::regen::eval::names_for(&f, vec![n]));
+        parts.push(f);
+    }
+    for (f, n) in rounds {
+        part_names.push(crate::regen::eval::names_for(&f, vec![n]));
+        parts.push(f);
+    }
+    // (At the tools' sides' distance from the sheet: a loft only approximates the faces it lies on.)
+    let sewn = k::sew(&parts, 2.0 * near, false)?;
+    if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+        eprintln!("section blend: sheet: {} touch curves, split faces {}, kept {}, sewn valid {} shells {} faces {}", touches.len(), split.shape.faces().len(), parts.len(), sewn.shape.is_valid(), sewn.shape.count(ShapeType::Shell), sewn.shape.faces().len());
+    }
+    if sewn.shape.count(ShapeType::Shell) != 1 || !sewn.shape.is_valid() {
+        return Err(fail("a sheet's round that didn't sew into one surface"));
+    }
+    let names = ev.name_result(&part_names.iter().collect::<Vec<_>>(), &sewn.history, &sewn.shape, &BTreeMap::new(), None);
+    Ok(NamedShape::new(sewn.shape, names))
+}
+
 /// A convex round's tool with its run-on pieces past its edge's free ends (each with the edge's end and the way out).
 struct RunOnTool {
     tool: Shape,
@@ -1639,12 +1697,16 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     for (i, on) in &refaced {
         named.shape = k::reface_on(&named.shape, *i, on)?;
     }
-    for (op, tools) in [(k::BooleanOp::Cut, cuts), (k::BooleanOp::Fuse, adds)] {
-        if tools.is_empty() {
-            continue;
+    if named.shape.count(ShapeType::Solid) == 0 {
+        named = sheet_blend(ev, &named, cuts.into_iter().chain(adds).collect(), &chain.iter().map(|c| c.shape.clone()).collect::<Vec<_>>(), scale)?;
+    } else {
+        for (op, tools) in [(k::BooleanOp::Cut, cuts), (k::BooleanOp::Fuse, adds)] {
+            if tools.is_empty() {
+                continue;
+            }
+            let (s, n) = bool_named(ev, op, &named, &tools)?;
+            named = NamedShape::new(s, n);
         }
-        let (s, n) = bool_named(ev, op, &named, &tools)?;
-        named = NamedShape::new(s, n);
     }
     // (Marked after the Booleans, which drop marks.)
     if !kept_along.is_empty() {
@@ -1688,7 +1750,9 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
             shape = collapsed.shape;
         }
     }
-    if !shape.is_valid() || shape.count(ShapeType::Solid) != 1 {
+    // (A surface's round: one surface again.)
+    let sheet = body.shape.count(ShapeType::Solid) == 0;
+    if !shape.is_valid() || (sheet && shape.count(ShapeType::Shell) != 1) || (!sheet && shape.count(ShapeType::Solid) != 1) {
         return Err(fail("the result is not one valid solid"));
     }
     ev.replace_body(bi, shape, names);
