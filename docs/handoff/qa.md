@@ -97,13 +97,13 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 00d. 05:00 cut GO (2a43b78b) -> v0.4.62 (published, lead 08:1x). 09:2x: studios 9/10, asm DEAD-ZONE verified, MATE-PREVIEW-COLOUR
    reopened; SAVED-DOC-REFS-LOST (skasm revert 83423fa5) verified 5ca8588b0; dx 0036 snap-hook DXF verified b2b0cf9a9 (bin/snapdxf.py on
    vibex7: saved suite doc -> drawing placed as live -> DXF 2018 -> dxfdiff). Seat lip: Ok in every release (not a ticket). OPEN:
-   - blend car Fillet 1: bin/car-one.sh queued on vibex7's slot (09:16 third) at green bad5d2ecc (has 6b6b3b4a + dx's translator 8ba897c06;
-     the night suite 81d23c9b lacked 8ba897c06: Derived 1 220 faces vs live 7, inconclusive) -> feel1120/car-one.log.
+   - car Fillet 1 verified b05f1c014 (Derived 1 matches in 5 surf-intro docs); next diff P2 SUITE-INTRO-TAILFIN-INTERSECTED -> skasm.
+   - asm DRAG-START verified 83a8003d9; CHAMFER-ASYM closed afc395406. skasm 4e51cce3 (4 feel P0s): unit qa-wait-skasm-4e51.
+     psui 37741d38 batch: fork walking on vibex8 :782 -> feel1120/psui3.md.
    - P0s sent 09:59 (TICKETS 95fa940e1): COMPAT-GYRO-REVOLVE -> bool (be2a573c..f943df0b), COMPAT-FILLET-ORIENT-REFS -> core (d80c2c58e).
    - Live index landed 9b382ec56 + bc95b3943 (145 listed; vibex7 ~/parity/models has 155 with features.json). Suite 1120-0407 is the old
      126 (models 96/126, 1358/1585; rest stage still on vibex8). The next qa-suites run is the first on it: re-baseline SCORE (coverage
      note), owners for new failures, its models time (126 docs took 1 h 51 debug) -> split proposal if > 2 h.
-   - asm DRAG-START: unit qa-wait-asm-drag2 (48a2b02a6: 2 px / 50 ms). Parity index row: unit qa-index-daily.
    - psui 37741d38 (unit qa-wait-psui-37741): DIM-PICK-READOUT (cov2-dim-orient step 8), ROLLBACK-DROP-ROW, SECTION-ARROW-FOOT,
      EDGE-MIDPOINT-REST-LOOK, HOVER-LEAVES-WINDOW, FAST-OFF-CLEAR, MEASURE-CIRCLE-DEFAULT-PLANE (rows say what to check).
    - Seat lip: a47534be5 (Ok in 0.4.43-0.4.61 + green; vibex7 ~/agents/qa-keep/seatlip-hat8-1120.txt).
