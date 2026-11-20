@@ -1780,8 +1780,12 @@ fn insert_view_lists_a_configured_studios_inputs_above_its_parts(cx: &mut TestAp
     // A press in the list takes the focus from the search box (live drw-insert-view-top-1to1 s2).
     let search = cx.update(|cx| editor.read(cx).chooser.search.clone()).expect("the search box");
     cx.update_window(window, |_, w, cx| { let f = gpui_kit::Focusable::focus_handle(search.read(cx), cx); w.focus(&f, cx) }).unwrap();
+    draw(cx, window);
+    assert!(cx.update(|cx| editor.read(cx).chooser.search_focused), "focused: live's blue border");
     press(cx, window, &row);
     assert!(!cx.update_window(window, |_, w, cx| gpui_kit::Focusable::focus_handle(search.read(cx), cx).is_focused(w)).unwrap(), "the search box left");
+    draw(cx, window);
+    assert!(!cx.update(|cx| editor.read(cx).chooser.search_focused), "its border grey again");
     let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
     let l = vcx.debug_bounds(Box::leak(list.clone().into_boxed_str())).expect("its Size list once open");
     assert!(cx.update(|cx| editor.read(cx).insert.chooser.is_some()), "the name only opens it");

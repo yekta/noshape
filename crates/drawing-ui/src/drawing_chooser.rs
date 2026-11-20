@@ -97,6 +97,8 @@ pub struct ChooserState {
     pub studio_config: HashMap<TabId, ConfigValues>,
     /// The sort button's Name: Z → A (live DRW-CHOOSER-SORT; A → Z the default).
     pub desc: bool,
+    /// The search box has the focus (live: a 1 px #3e94ff border, no glow).
+    pub search_focused: bool,
     /// Current document › Version graph: the list shown, and the version
     /// chosen (new views are pinned to it).
     pub graph: bool,
@@ -225,6 +227,7 @@ impl OtherDoc {
 impl DrawingEditor {
     /// Create the search field with the chooser (called from render).
     pub fn sync_chooser(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.chooser.search_focused = self.chooser.search.as_ref().is_some_and(|s| s.read(cx).focus_handle(cx).is_focused(window));
         match (self.insert.chooser.is_some(), self.chooser.search.is_some()) {
             (true, false) => {
                 let placeholder = self.chooser_placeholder();
@@ -322,7 +325,7 @@ impl DrawingEditor {
             .pr(px(2.))
             .pt(px(6.))
             .gap(px(5.))
-            .child(div().flex_1().min_w_0().child(Input::new(search).small().h(px(30.)).text_size(px(13.33))))
+            .child(div().flex_1().min_w_0().child(Input::new(search).small().h(px(30.)).text_size(px(13.33)).focus_bordered(false).when(self.chooser.search_focused, |i| i.border_color(gpui_kit::rgb(0x3e94ff)))))
             .child(
                 div().debug_selector(|| "dr-ch-sort".into()).on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation()).child(
                     Button::new("dr-ch-sort").ghost().w(px(30.)).h(px(28.)).child(crate::assets::icon("tm-sort", 20., cx)).os_dropdown_menu("dr-ch-sort-dd", true, move |menu, _, _| {
