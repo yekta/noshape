@@ -18,21 +18,25 @@ op_boolean 666 ms; screws Sweep 1's sections_ahead 907 ms) and 850efe. End a tur
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
 ## In flight
-- Gear Lab + screws (worktree bool-gl, 3d8d16e5e + 98ef1c012) QUEUED 13:12 as 2c7debe4 (gate PASS; knurls ours-only 0
-  diff lines in all 5). On land: tell lead, dx (screws Sweep 1 3992 -> 357 ms on loaded vibex8; ~950 -> ~85 ms Mac
-  scale, live 42: under the 100 ms rule) and core. Sweep 1 is still "not a valid solid" on main and branch: core's
-  sweep (their helix repro), check with core.
+- COMPAT-CRASH957-CHAMFER3 (qa P1, 16:00): 347654fdf's glued fuse took crash957's Mirror 1 fuse (the part and its
+  mirror image, glued on 2 pairs of faces on z 0) and left the pocket walls' arcs on the plane doubled (20/60/32 vs
+  OCCT's 20/59/32), so Chamfer 3 lost its edges. Fix 42aea9f11 (worktree/branch bool-c957): fuse_glued's side() refuses
+  an edge on the plane that isn't a glued face's; T1 mirrored_halves_touching_along_arcs_off_the_glued_faces_fuse_as_occt
+  (tests/data/booleans/839309b67d2ac658); bool_patterns:: 155 pass. Gate on vibex8 since 16:21 (unit bool-gate-c957,
+  out /root/bool-hat-scratch/chain-bool-c957.out). PASS -> land, tell qa + lead.
 - 850efe Extrude 6 (worktree bool-m85, branch bool-m85, 68e96d2fc on main 698df935f): merge_cylinder_groups_with takes
-  pieces on trimmed cylinders, tries the next same-angle ruling pair when the seam crosses a slot side, maps the
-  pieces' own p-curves (GeomProjLib's were 11 um off), sets a chain's direction from its first non-degenerate edge, and
-  checks the merged face's volume with `both` (before + reversed F) within a slack from the p-curves' measured
-  deviation. 28 faces = live (was 33, OCCT 31); T1 slotted_coaxial_cylinder_bands_unify_as_live (tests/data/unify/
-  coaxial-cylinders-slotted). grooves_crossing_37_um_above_the_end now measures the single cuts unmerged (their merged
-  cylinder 1.4e-4 mm3 off by p-curve nm). Full gate on vibex7 since 13:45 (unit bool-gate-m85, out
+  pieces on trimmed cylinders, moves a seam crossing a slot side to the next clean ruling pair, maps the pieces' own
+  p-curves, checks the merged face's volume within the p-curves' measured deviation. 28 faces = live (was 33, OCCT 31);
+  T1 slotted_coaxial_cylinder_bands_unify_as_live. Full gate on vibex7 (unit bool-gate-m85, built 15:30, out
   /root/bool-hat-scratch/chain-bool-m85.out). PASS -> land, tell skasm (root of the 30 s Fillet 3) and lead.
-- impeller-loft Extrude Bohrungssitz Ansaugflansch (dx): ours declines (boolean.rust 150 ms), OCCT's Boolean takes it:
-  Edge-Face x813 797 ms, boolean.build 633, Face-Face x150 387, unify.bands 212 (vibex8 loaded, ~4.5x the Mac).
-  Recording its Booleans (vibex8 ~/tmp/bool/imprec, task via slot) to find the case and why ours declines.
+- impeller-loft Extrude Bohrungssitz Ansaugflansch (dx; worktree bool-imp, uncommitted, DEBUG under NOSHAPE_DBG_ON +
+  test zz_probe_case to strip): case vibex8 ~/tmp/bool/impslow/23c0c38476a63ecf (fuse, 58-face part + 9 seats, OCCT
+  1773 ms). Declined "a piece's point on another solid's face": face 79 (seat's extrusion, z -5..0) runs on face 26
+  (part's NURBS wall, z -4..0), its samples past 26's patch 1 mm off. free::past_patch_along (free.rs) skips those in
+  same_surface; now declines "coincident pieces differ": 26's bottom edge (z -4) isn't imprinted on 79 (79 one piece
+  z -5..0, 26's piece z -4..0). Next: imprint coincident free-form faces' edges as for planes. FULL path = OCCT's.
+- screws Sweep 1: speed landed 0a0b9a49; "not a valid solid" was my 13:06 A/B parity (maybe before core's 0f8993ef8);
+  core finds main valid. Closed unless core says otherwise.
 - AppleWatchDock B Govde 85 -> 83 faces after the revert (qa P1 COMPAT-DOCK-BGOVDE-MERGE): settle by live's count
   after Rib Round 1.
 - Declined by the 50 um rule (4b1784e6c), TO WIN BACK with a narrower signal: gate corpora 0670c350, 280af0bc,
