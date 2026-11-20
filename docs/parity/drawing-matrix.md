@@ -19,12 +19,12 @@ Statuses:
   **n/a** cloud-only (Add comment).
 
 **Result.** Nothing of live's is missing from ours: every toolbar tool and ▾ row, every right-click row (a submenu's
-rows included) and every panel text is in ours. 1232 of 1842 live items (67%) match (11-17: 1046 of 1875); 558 more are
+rows included) and every panel text is in ours. 1232 of 1841 live items (67%) match (11-17: 1046 of 1875); 558 more are
 **shown**: live's DOM dump has them in a panel and our build showed them in that same panel (its fields, an open list
 or menu, the tooltip; the run's own states, panel titles mapped in `OURS_TITLES`), with no take comparing the two
 states. A panel dump's toolbar button or right-click row takes that item's status. Our menus (MENUDUMP) list every
 entity's, the view, image and table cells' included, a submenu with its rows ("Insert ▸ Column Left | …"); rows that
-name a tab or document compare by their words before the name ("Switch to …"). 10 are present in our sources only (no
+name a tab or document compare by their words before the name ("Switch to …"). 9 are present in our sources only (no
 state of ours shows them yet; 11-20 morning: 114): conditional fields no take opens (Section view's Depth, View properties'
 Multiple values, Styles' select options), live documents' option lists and small rests. Panels list their tooltips
 as `texts` (a key only ours records, so steps don't compare it), and our runs' right-click menus count as ours.
@@ -42,8 +42,8 @@ drw-table-cells-resize recording (the text dump's All | Horizontal | Vertical wa
 |---|---|---|---|---|---|---|---|---|
 | Toolbar | 54 | 54 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Right-click menus | 403 | 368 | 0 | 0 | 0 | 0 | 4 | 31 |
-| Panels and dialogs | 1385 | 810 | 558 | 0 | 10 | 0 | 1 | 6 |
-| All | 1842 | 1232 | 558 | 0 | 10 | 0 | 5 | 37 |
+| Panels and dialogs | 1384 | 810 | 558 | 0 | 9 | 0 | 1 | 6 |
+| All | 1841 | 1232 | 558 | 0 | 9 | 0 | 5 | 37 |
 
 ### Toolbar and its ▾ rows
 
@@ -556,6 +556,6 @@ drw-table-cells-resize recording (the text dump's All | Horizontal | Vertical wa
 | MBD status | 6 | 0 | 6 | 0 | 0 | 0 | 0 |  |  |
 | Reference manager | 8 | 2 | 6 | 0 | 0 | 0 | 0 |  |  |
 | Title block | 68 | 13 | 54 | 0 | 0 | 0 | 0 |  |  |
-| Create Drawing | 59 | 1 | 57 | 0 | 1 | 0 | 0 |  | New drawing name |
+| Create Drawing | 58 | 1 | 57 | 0 | 0 | 0 | 0 |  |  |
 | Export Drawing | 35 | 13 | 22 | 0 | 0 | 0 | 0 |  |  |
 | Change to version | 6 | 0 | 6 | 0 | 0 | 0 | 0 |  |  |

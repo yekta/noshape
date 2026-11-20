@@ -268,8 +268,8 @@ def texts_of(path, visible_only=False):
         return []
     # An HTML comment is no text a user sees (live's reference manager dump: "<!-- Version graph-->").
     raw = re.sub(r"<!--.*?-->", "", raw, flags=re.S)
-    # Screen-reader-only text is not drawn (live drawing-replicate-toast.html: the ×'s "Close").
-    raw = re.sub(r"<span[^>]*\bsr-only\b[^>]*>[^<]*</span>", "", raw)
+    # Screen-reader-only text is not drawn (live drawing-replicate-toast.html: the ×'s "Close"; drawing-custom-template-tab.html: the name field's "New drawing name" label).
+    raw = re.sub(r"<(span|label)[^>]*\b(sr-only|visually-hidden)\b[^>]*>[^<]*</\1>", "", raw)
     if visible_only and path.endswith(".html"):
         raw = strip_hidden(raw)
     out = []
