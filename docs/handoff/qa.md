@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-20 09:16)
+# QA handoff (agent qa; current state only, updated 2026-11-20 09:32)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -102,6 +102,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    - blend CHAMFER-ASYM-NO-PROPAGATION (5a7f9ba8e): unit qa-wait-chamfer-asym; walk on live's G7 block (40x20x10, 4 vertical R3; 1 mm
      equal chamfer of the front straight edge 7904.485): distance 1 + 45 deg = 7904.485, front + back 7886.227, two distances stop at the edge.
    - asm DRAG-START: unit qa-wait-asm-drag2 (48a2b02a6: 2 px / 50 ms). Parity index row: unit qa-index-daily.
+   - psui 37741d38 (unit qa-wait-psui-37741): DIM-PICK-READOUT (cov2-dim-orient step 8), ROLLBACK-DROP-ROW, SECTION-ARROW-FOOT,
+     EDGE-MIDPOINT-REST-LOOK, HOVER-LEAVES-WINDOW, FAST-OFF-CLEAR, MEASURE-CIRCLE-DEFAULT-PLANE (rows say what to check).
+   - Seat lip: a47534be5 (Ok in 0.4.43-0.4.61 + green; vibex7 ~/agents/qa-keep/seatlip-hat8-1120.txt).
 00a. **05:00 cut HELD (lead 04:0x) until a green has core's 2f4f3bc5 (singularities Sketch 2; Mirror 2 is as live, accepted in
    compat/accepted.txt; 2f4f's subject added to cut-must.txt).** Unit qa-prerel-2f4f (bin/prerel-when.sh "<subject>" cut0500): when
    that commit is in the green, bin/prerel-run.sh uploads it to vibe2 and runs userdocs + prerel-edits + prerel-open (pixel diff at 90 s)
