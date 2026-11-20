@@ -3193,7 +3193,7 @@ fn selected_names(cx: &mut TestAppContext, view: &Entity<AssemblyView>) -> Vec<S
 /// software-GL host, live2 18:20 (6)), and the light goes when the pointer leaves the row.
 #[gpui::test]
 fn a_hovered_instance_row_lights_its_instance_at_once(cx: &mut TestAppContext) {
-    let (window, view) = list_assembly(cx, "row-hover");
+    let (window, view) = list_assembly(cx, "row-hover-lit");
     draw(cx, window);
     let block = cx.update(|cx| instance(view.read(cx), "Part 1 <1>", cx));
     let at = row_at(cx, window, "Part 1 <1>");
