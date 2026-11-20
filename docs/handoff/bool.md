@@ -42,7 +42,7 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   the rule's 8 declines fall to other reasons. Dropped: bool-sh3 5b38e5c92.
   afcf858f3 slab union history differing only in vertex records = equivalent (lead 11-19); 0d465cb70 the gate's
   end-to-end Shell check (gate-host.py SHELLS / SHELLS_KNOWN).
-- bool-sh3 (origin/bool-sh3, tip 5b38e5c92 = + the 50 um rule removed; d2a26a12a the Ø25×10 knurl's touch (P2 below);
+- bool-sh3 (origin/bool-sh3, tip a0b85fef4 = + d494b222e, a0b85fef4 (standoffs speed, below); 5b38e5c92 the 50 um rule removed; d2a26a12a the Ø25×10 knurl's touch (P2 below);
   1f27fa8ca the unify's segmented volume recheck (free-form fuse, P2 below); 8b6d6faba + Shell's stray-pcurve refit after its unify (2756e521: a 45° cone's merged
   face had an edge pcurve 0.83 mm off, read 77 mm3 heavy in ours and OCCT; now 32108.414, live 32108.426 / 45 faces (q-2756e521),
   live 104 edges / 57 vertices vs ours (= OCCT) 115 / 69: seams (Parasolid has none) and one B-spline edge between
@@ -162,7 +162,8 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   vs live 102; vibex8's 152 was host load.
 - P1 SPEED-STANDOFFS: its Booleans all ours on land7. Mac document (ops xshell3::xpul, XPUL_DOC) 455 ms vs live ~200.
   The unify's volume checks were ~40% (usd_kept_volume: faces_volume_precise, volume0): both on all threads in the
-  faces' order (bool-hat WIP, for bool-sh3): 350 ms. Next: brep uv_of's fold retry (16 Newton per point off the
+  faces' order (bool-sh3 d494b222e): ~345 ms. bool-sh3 a0b85fef4: 1f27fa8ca's segmented-integral
+  rescue only where those and OCCT's agree on the solid to 1e-8 (it broke kernel tube-chamfer 34 / knurl grooves 9). Next: brep uv_of's fold retry (16 Newton per point off the
   thread root strip, from stretches_over's 257 samples per edge, ~11%), then waiting on occt_ahead.
 - qa's backlog (TICKETS a3ff6d481): standoffs Revolve 2 / Boolean 1 / 2 (OCCT 450-980 ms, ours "a piece's point on
   another solid's face"), wire-clip / gamma Boolean 1 (87-tool fuse, "cylinders nearly coincident", OCCT 2-2.9 s) and
