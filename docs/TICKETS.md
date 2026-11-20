@@ -14,7 +14,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   bottom edges, a Ø6 circle at (4, 4) on Top extruded 25 mm Remove (the same circle at (20, 20) cuts 311 mm³). In
   isaac studio 00f1d4 its Extrude 38 ("Selected tools and targets do not intersect"; live removes 303.7 mm³), so the
   hole edge Fastened 43 mates to is missing (isaac 98/129 mates).
-- [x] (asm d671313d) **P1 ASM-UI-SIGSEGV-AT-EXIT [asm]** (lead 17:2x, main CI 44554083714 on eb3b06a88, Linux, first seen):
+- [x] verified (qa 11-20: main CI 44647614148 on 5b62f6ca8, Linux: assembly-ui's 105 tests, then its doc-tests, no SIGSEGV) (asm d671313d) **P1 ASM-UI-SIGSEGV-AT-EXIT [asm]** (lead 17:2x, main CI 44554083714 on eb3b06a88, Linux, first seen):
   `-p noshape-assembly-ui --lib` passed all 97, then the test process died with SIGSEGV at exit. Cause read from the code:
   each headless `Gpu` spawns a detached "noshape-render" thread that compiles its pipelines (lavapipe / LLVM) before it
   reads its channel, and the GPU feel tests make two per test, so the last tests' threads could still be compiling while
@@ -642,7 +642,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   and the next deadline check wrote into whatever the stack held there: a lock's state among them. Open until CI
   shows the custom-feature tests clean on macOS for a few runs. 18:20: CI 41471129554 (5df5c21b) and 41485509681
   (1bd31f72), both after the fix, all green on macOS arm64.
-- [x] P0 SHELL-VOIDS-WINDOWS (core, CI a8c535aa / 67e44bb7): `shell::a_void_waits_for_live` failed on Windows only.
+- [x] closed (qa 11-20: superseded: core 9a8e25390 refuses a Shell of a solid with a void as live, the gate and its test are gone; Windows CI green on 5b62f6ca8) P0 SHELL-VOIDS-WINDOWS (core, CI a8c535aa / 67e44bb7): `shell::a_void_waits_for_live` failed on Windows only.
   Cause: the test switched the void gate on with `std::env::set_var`, which on Windows changes the process
   environment but not the MSVC CRT's copy that the kernel's C++ `getenv` reads (taken at start-up); Linux / macOS
   share one. The gate is now a switch (`noshape_kernel::set_shell_voids`, thread-local, NOSHAPE_SHELL_VOIDS read
@@ -935,7 +935,6 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   free source grows to r 7 (the solver moves the source). The first-dimension scaling (behaviours 34917) is live's for the
   Dimension tool / typed box. Offset's default 5 mm box, arrow and pointer-independent preview are = live.
 - [x] verified d67512a3 (qa 23:42 on green 2574b5b5: Part 2 unfixed, a 75 px drag on Part 1 moves the plate, its Fastened twin and the Revolute disk together, angle unchanged; the unmated cone stays) (asm 11-19 22:5x: the free-instance drag path was taken by a mated group's 6 DOF (eedeede50); now only an instance no mate, pattern or group holds; test `a_drag_with_nothing_fixed_carries_the_mated_group`; the creation preview's split: ASM-NEW-MATE-PREVIEW-GROUP) P1 **ASM-DRAG-UNFIXED-GROUP (asm)**: an assembly with nothing fixed (walk3 Assembly 1: Part 1 <1> + <2> Fastened, Part 1
-- [x] (asm 11-19 22:48: the free-instance drag path was taken by a mated group's 6 DOF (eedeede50); now only an instance no mate, pattern or group holds; test `a_drag_with_nothing_fixed_carries_the_mated_group`; the creation preview's split: ASM-NEW-MATE-PREVIEW-GROUP) P1 **ASM-DRAG-UNFIXED-GROUP (asm)**: an assembly with nothing fixed (walk3 Assembly 1: Part 1 <1> + <2> Fastened, Part 1
   Revolute to Part 2 <1>; green 624c6db77, :110, real pointer 3 px / 40 ms): pressing on Part 1 and dragging 75 px moves
   nothing (outline lit, no motion during or after). With Part 2 › Fix the same drag turns Part 1 about the Revolute axis (=).
   Live (behaviours 42244, 42565): with nothing fixed a drag moves the grabbed part's whole mated group as one rigid set
@@ -943,7 +942,6 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   moved Part 1 <1> onto the ring while its Fastened twin <2> stayed put (after ✓ the pair is together again); live's edit
   preview moves the whole connected group (behaviours 1214), so the creation preview likely should too.
 - [x] verified d67512a3 (qa 23:42 on green 2574b5b5: Edit Revolute 1, limits 90 / 95 typed: the preview turns the part into the range within 1.2 s) (asm 11-19 22:5x: an edited mate's held free values are brought into its typed limits; test `a_typed_limit_turns_the_edited_mates_preview_into_range`) P1 **ASM-LIMIT-TYPED-NO-PREVIEW (asm)**: Edit Revolute 1 › ☑ Limits (rows "No minimum" / "No maximum" = live), type min
-- [x] (asm 11-19 22:48: an edited mate's held free values are brought into its typed limits; test `a_typed_limit_turns_the_edited_mates_preview_into_range`) P1 **ASM-LIMIT-TYPED-NO-PREVIEW (asm)**: Edit Revolute 1 › ☑ Limits (rows "No minimum" / "No maximum" = live), type min
   30 / max 35, then min 0 / max 5 (disjoint ranges): the part never moves in the preview; it turns only on Solve or ✓.
   Live (behaviours "asm (lead 11-18 ~01:15 …) mate limits", r1-r4): a typed limit applies to the preview at once, the part
   turning into the range within ~1 s. Drag clamping at the limit after ✓ is = live. Green 624c6db77, walk 22:4x.
@@ -977,7 +975,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   Table's ✓ its placement guide (pink dashed line at the ✓ button's x, red × at the sheet top) stayed drawn with the pointer
   elsewhere, until the next pointer action.
 - [ ] P1 **ASM-NEW-MATE-PREVIEW-GROUP (asm)**: a new mate's preview moves only the moving part, not the group mated to it
-- [x] (asm 11-19 23:42: the preview was = live (live new-mate-preview-1119: the first pick moves ALONE, its Fastened twin left until ✓; Part 2 first: Part 2 moves, the pair stays); after ✓ ours moved Part 2 as well (the full solve spread the split pair), now the moving part's mated group follows it and the other side stays as live; test `a_new_mates_preview_moves_the_first_pick_alone_and_its_group_after_the_check`, fails without the fix) P1 **ASM-NEW-MATE-PREVIEW-GROUP (asm)**: a new mate's preview moves only the moving part, not the group mated to it
+- [x] verified 5a8338b6e (qa 02:4x on green a06ec927, walk3 Assembly 1, real pointer: Part 2 <1> fixed, new Revolute Part 1 <1> -> Part 2 <1>: the preview moves the first pick alone, its Fastened twin stays; after ✓ the twin and Part 6 (Planar to Part 1 <1>) follow, Part 2 stays) (asm 11-19 23:42: the preview was = live (live new-mate-preview-1119: the first pick moves ALONE, its Fastened twin left until ✓; Part 2 first: Part 2 moves, the pair stays); after ✓ ours moved Part 2 as well (the full solve spread the split pair), now the moving part's mated group follows it and the other side stays as live; test `a_new_mates_preview_moves_the_first_pick_alone_and_its_group_after_the_check`, fails without the fix) P1 **ASM-NEW-MATE-PREVIEW-GROUP (asm)**: a new mate's preview moves only the moving part, not the group mated to it
   (qa walk 11-19: Revolute 1's preview took Part 1 <1> onto the ring, its Fastened twin <2> stayed; together again after ✓);
   live's preview moves the whole connected group (behaviours 1214).
 
