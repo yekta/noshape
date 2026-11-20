@@ -183,6 +183,32 @@ pub fn matching_bracket(text: &str, at: usize) -> Option<usize> {
     partner(k).map(|j| brackets[j].0 + 1)
 }
 
+/// Ace's highlighted bracket pair with the caret at `at`: the bracket right before the caret (else right after it)
+/// and its partner, as byte offsets. Brackets in strings and comments don't count.
+pub fn bracket_pair(text: &str, at: usize) -> Option<(usize, usize)> {
+    let brackets = code_brackets(text);
+    let k = brackets.iter().position(|(p, _)| *p + 1 == at).or_else(|| brackets.iter().position(|(p, _)| *p == at))?;
+    let (pos, c) = brackets[k];
+    let (open, close) = match c {
+        b'(' | b')' => (b'(', b')'),
+        b'[' | b']' => (b'[', b']'),
+        _ => (b'{', b'}'),
+    };
+    let mut depth = 0i32;
+    let partner = if c == open {
+        brackets[k..].iter().find(|&&(_, d)| {
+            depth += if d == open { 1 } else if d == close { -1 } else { 0 };
+            depth == 0
+        })
+    } else {
+        brackets[..=k].iter().rev().find(|&&(_, d)| {
+            depth += if d == close { 1 } else if d == open { -1 } else { 0 };
+            depth == 0
+        })
+    }?;
+    Some((pos, partner.0))
+}
+
 /// The next (`back`: previous) case-insensitive occurrence of `query` from `at`, wrapping round the text (Ace's
 /// findnext / findprevious).
 pub fn find_from(text: &str, query: &str, at: usize, back: bool) -> Option<Range<usize>> {

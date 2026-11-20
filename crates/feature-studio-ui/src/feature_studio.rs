@@ -631,6 +631,8 @@ pub struct FeatureStudioView {
     co_complete: bool,
     /// The pointer is over the profile's total badge (its sentence and heading show).
     badge_hover: bool,
+    /// Ace's bracket boxes (live FEEL-FS-BRACKET-MATCH): the collection and the caret / text length it was made for.
+    bracket_box: Option<(gpui_kit::component::input::RangeDecorationCollection, (usize, usize))>,
     _subs: Vec<Subscription>,
 }
 
@@ -753,12 +755,13 @@ impl FeatureStudioView {
                 this.save(cx);
             }
         }));
+        subs.push(cx.observe(&editor, |this: &mut Self, _, cx| this.update_bracket_box(cx)));
         subs.push(cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
             DocEvent::TabChanged(t) if *t == this.tab => this.sync_from_doc(window, cx),
             DocEvent::Reloaded | DocEvent::TabsChanged => this.sync_from_doc(window, cx),
             _ => {}
         }));
-        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), shown: Vec::new(), save_task: None, check_task: None, quiet: false, error_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, pointer: None, ctrl_link: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, badge_hover: false, _subs: subs };
+        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), shown: Vec::new(), save_task: None, check_task: None, quiet: false, error_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, pointer: None, ctrl_link: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, badge_hover: false, bracket_box: None, _subs: subs };
         this.recompile(source, cx);
         // std's names, read for the completion list off the UI thread before the first key needs them.
         cx.background_spawn(async {
@@ -839,6 +842,35 @@ impl FeatureStudioView {
             let b = text[sel.start..].find(|c: char| !is_w(c)).map_or(text.len(), |i| sel.start + i);
             e.set_selected_range(a..b, cx);
         });
+    }
+
+    /// Ace's bracket highlight: with the caret beside a bracket (the one before it first), both it and its partner
+    /// framed 1 px rgb(192, 192, 192) (live FEEL-FS-BRACKET-MATCH); none with a selection.
+    fn update_bracket_box(&mut self, cx: &mut Context<Self>) {
+        let (sel, len) = {
+            let e = self.editor.read(cx);
+            (e.selected_range(), e.text().len())
+        };
+        let stamp = (if sel.is_empty() { sel.end } else { usize::MAX }, len);
+        if self.bracket_box.as_ref().is_some_and(|(_, s)| *s == stamp) {
+            return;
+        }
+        let pair = sel.is_empty().then(|| crate::fs_lines::bracket_pair(&self.editor.read(cx).value(), sel.end)).flatten();
+        let boxes: Vec<gpui_kit::component::input::RangeDecoration> = pair
+            .into_iter()
+            .flat_map(|(a, b)| [a, b])
+            .map(|at| gpui_kit::component::input::RangeDecoration::new(at..at + 1).with_style(gpui_kit::component::input::RangeDecorationStyle::Frame).with_color(gpui_kit::rgb(0xc0c0c0).into()))
+            .collect();
+        match &mut self.bracket_box {
+            Some((c, s)) => {
+                *s = stamp;
+                c.clone().set(boxes, cx);
+            }
+            None => {
+                let c = self.editor.update(cx, |e, cx| e.create_range_decorations_collection(boxes, cx));
+                self.bracket_box = Some((c, stamp));
+            }
+        }
     }
 
     /// Ctrl+\\: the caret to the bracket matching the one beside it.

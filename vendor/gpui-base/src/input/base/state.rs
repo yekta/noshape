@@ -7,7 +7,7 @@ use gpui::{
     Action, App, AppContext, Bounds, ClipboardItem, Context, Edges, Entity, EntityInputHandler,
     EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, KeyBinding,
     MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement as _, Pixels, Point,
-    Render, ScrollHandle, ScrollWheelEvent, SharedString, Styled as _, Subscription,
+    Render, ScrollDelta, ScrollHandle, ScrollWheelEvent, SharedString, Styled as _, Subscription,
     UTF16Selection, WeakFocusHandle, Window, actions, div, point, prelude::FluentBuilder as _, px,
 };
 use ropey::{Rope, RopeSlice};
@@ -1982,6 +1982,38 @@ impl<M: InputModeKind> InputBaseState<M> {
             == 1
     }
 
+    /// NOSHAPE PATCH: Ace's auto-outdent (live Feature Studio FEEL-FS-CLOSE-BRACE-OUTDENT): a "}" typed in a code
+    /// editor on a line holding only indentation takes its matching "{" line's indent. The edit replacing the line's
+    /// indentation and the brace, or None to insert as typed.
+    fn close_brace_outdent(&self, range: &Range<usize>, new_text: &str) -> Option<(Range<usize>, String)> {
+        if new_text != "}" || !range.is_empty() || range.start != self.cursor() || !self.is_code_editor() || self.ime_marked_range.is_some() || self.silent_replace_text || !self.selections.is_single() {
+            return None;
+        }
+        let row = self.text.offset_to_point(range.start).row;
+        let line_start = self.text.line_start_offset(row);
+        let before: String = self.text.slice(line_start..range.start).chars().collect();
+        if before.is_empty() || !before.chars().all(|c| c == ' ' || c == '\t') {
+            return None;
+        }
+        let head: String = self.text.slice(0..line_start).chars().collect();
+        let mut depth = 0usize;
+        let open = head.char_indices().rev().find_map(|(i, c)| match c {
+            '}' => {
+                depth += 1;
+                None
+            }
+            '{' if depth == 0 => Some(i),
+            '{' => {
+                depth -= 1;
+                None
+            }
+            _ => None,
+        })?;
+        let open_start = self.text.line_start_offset(self.text.offset_to_point(open).row);
+        let indent: String = self.text.slice(open_start..).chars().take_while(|c| *c == ' ' || *c == '\t').collect();
+        (indent != before).then(|| (line_start..range.start, format!("{indent}}}")))
+    }
+
     /// Cursor target when a typed closer should skip over an existing one.
     ///
     /// Returns `Some(offset)` when `new_text` is a single closer from the
@@ -2741,7 +2773,13 @@ impl<M: InputModeKind> InputBaseState<M> {
             .as_ref()
             .map(|layout| layout.line_height)
             .unwrap_or(window.line_height());
-        let delta = event.delta.pixel_delta(line_height);
+        // NOSHAPE PATCH: a code editor's wheel notch is Ace's: 0.6 × Chrome's deltaY (120 px a notch on Linux: 72 px,
+        // live FEEL-FS-WHEEL-STEP; 100 on Windows); macOS and touchpads keep the platform's pixels.
+        let per_tick = if cfg!(target_os = "linux") { Some(120.) } else if cfg!(target_os = "windows") { Some(100.) } else { None };
+        let delta = match (event.wheel_ticks, per_tick, event.delta) {
+            (Some(t), Some(per), ScrollDelta::Lines(_)) if self.is_code_editor() => point(px(t.x * per * 0.6), px(t.y * per * 0.6)),
+            _ => event.delta.pixel_delta(line_height),
+        };
 
         let old_offset = self.scroll_handle.offset();
         self.update_scroll_offset(Some(old_offset + delta), cx);
@@ -4436,6 +4474,8 @@ impl<M: InputModeKind> EntityInputHandler for InputBaseState<M> {
                         vec![selection_before],
                         self.selections.iter().copied().collect(),
                     );
+                } else if let Some(outdent) = self.close_brace_outdent(&range, new_text) {
+                    self.replace_text_in_ranges(&[outdent], window, cx);
                 } else {
                     self.replace_text_in_ranges(
                         &[(range.clone(), new_text.to_string())],

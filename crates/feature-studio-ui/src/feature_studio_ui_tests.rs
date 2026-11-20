@@ -361,3 +361,88 @@ fn ctrl_over_a_defined_identifier_shows_a_link_that_goes_to_it(cx: &mut TestAppC
     assert_eq!((caret.line, caret.character), (5, 9), "at `doubled` in its declaration");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Live behaviours "feel coverage (11-20)" F2 / F3 (Ace): a "}" typed on an indented blank line outdents to its "{"
+/// line's indent; a triple-click selects the line with its newline (the caret at the next line's start); the caret
+/// beside a bracket boxes it and its partner (1 px rgb(192, 192, 192)), none away from brackets; a wheel notch scrolls
+/// 72 px (Linux: Chrome's 120 px deltaY × Ace's 0.6).
+#[gpui::test]
+fn ace_feel_outdent_triple_click_bracket_boxes_and_wheel(cx: &mut TestAppContext) {
+    use gpui_kit::{Modifiers, MouseButton, MouseDownEvent, MouseUpEvent, ScrollDelta, ScrollWheelEvent, VisualTestContext, point};
+    cx.update(gpui_kit::init);
+    let dir = std::env::temp_dir().join(format!("noshape-ui-fs-ace-feel-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("ui.noshape");
+    let _ = std::fs::remove_file(&path);
+    let head = "function f()\n{\n    if (true)\n    {\n        x = g(1);\n        ";
+    let source = format!("{head}\n{}", "// filler\n".repeat(120));
+    {
+        use serde_json::json;
+        let mut ctx = noshape_ops::Ctx::new();
+        let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+        call(&mut ctx, "featurestudio_edit", json!({ "tab": "Feature Studio 1", "source": source }));
+    }
+    let session = crate::session::Session::open(&path).unwrap();
+    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::FeatureStudio(_))).unwrap().id;
+    let (window, view) = cx.update(|cx| {
+        let doc = cx.new(|_| DocModel::new(session));
+        let bounds = Bounds { origin: Point::default(), size: size(px(1600.), px(900.)) };
+        let mut view = None;
+        let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+            let v = cx.new(|cx| FeatureStudioView::new(doc, tab, window, cx));
+            view = Some(v.clone());
+            cx.new(|_| Workspace(v))
+        })
+        .unwrap();
+        (w, view.unwrap())
+    });
+    draw(cx, window);
+    let value = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).editor.read(cx).value().to_string());
+    let select = |cx: &mut TestAppContext, at: usize| cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.editor.update(cx, |e, cx| {
+        e.focus(w, cx);
+        e.set_selected_range(at..at, cx);
+    }))).unwrap();
+    let boxes = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).bracket_box.as_ref().map(|(c, _)| c.get_ranges(cx)).unwrap_or_default());
+    // The "}" on the 8-space blank line goes to the inner "{" line's 4 spaces.
+    select(cx, head.len());
+    VisualTestContext::from_window(window, cx).simulate_input("}");
+    draw(cx, window);
+    assert!(value(cx).starts_with("function f()\n{\n    if (true)\n    {\n        x = g(1);\n    }\n"), "{:?}", &value(cx)[..80]);
+    // The caret after it: both braces boxed (the "}" and the inner "{").
+    let text = value(cx);
+    let (inner_open, close) = (text.find("    {").unwrap() + 4, text.find("    }\n").unwrap() + 4);
+    draw(cx, window);
+    assert_eq!(boxes(cx), vec![close..close + 1, inner_open..inner_open + 1]);
+    // Right after ")" and right before "(": the parentheses; on plain text: none.
+    let open = text.find("g(1)").unwrap() + 1;
+    select(cx, open + 3);
+    draw(cx, window);
+    assert_eq!(boxes(cx), vec![open + 2..open + 3, open..open + 1]);
+    select(cx, open);
+    draw(cx, window);
+    assert_eq!(boxes(cx), vec![open..open + 1, open + 2..open + 3]);
+    select(cx, 3);
+    draw(cx, window);
+    assert!(boxes(cx).is_empty(), "no bracket beside the caret");
+    // Triple-click on line 3: that line and its newline, the caret on line 4.
+    let line3 = text.find("    if").unwrap();
+    let at = cx.update(|cx| view.read(cx).editor.read(cx).range_to_bounds(&(line3 + 4..line3 + 6))).expect("laid out").center();
+    let mut vcx = VisualTestContext::from_window(window, cx);
+    for n in 1..=3 {
+        vcx.simulate_event(MouseDownEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: n, first_mouse: false });
+        vcx.simulate_event(MouseUpEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: n });
+    }
+    draw(cx, window);
+    let line4 = text[line3..].find('\n').unwrap() + line3 + 1;
+    assert_eq!(cx.update(|cx| view.read(cx).editor.read(cx).selected_range()), line3..line4);
+    // One wheel notch down.
+    let before = cx.update(|cx| view.read(cx).editor.read(cx).scroll_offset().y);
+    VisualTestContext::from_window(window, cx).simulate_event(ScrollWheelEvent { position: at, delta: ScrollDelta::Lines(point(0., -3.)), wheel_ticks: Some(point(0., -1.)), ..Default::default() });
+    draw(cx, window);
+    let moved = before - cx.update(|cx| view.read(cx).editor.read(cx).scroll_offset().y);
+    let want = if cfg!(target_os = "linux") { 72. } else if cfg!(target_os = "windows") { 60. } else { f32::from(moved) };
+    assert_eq!(f32::from(moved), want, "one notch");
+    let _ = std::fs::remove_dir_all(&dir);
+}

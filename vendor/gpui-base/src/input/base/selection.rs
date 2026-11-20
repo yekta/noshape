@@ -46,7 +46,12 @@ impl<M: InputModeKind> InputBaseState<M> {
     ///
     /// The offset is the UTF-8 offset.
     pub(super) fn select_line(&mut self, offset: usize, _: &mut Window, cx: &mut Context<Self>) {
-        let range = TextSelector::line_range(&self.text, offset);
+        let mut range = TextSelector::line_range(&self.text, offset);
+        // NOSHAPE PATCH: a code editor's line takes its newline, the caret on the next line's start (Ace, live
+        // Feature Studio FEEL-FS-TRIPLE-CLICK-LINE).
+        if self.is_code_editor() && range.end < self.text.len() {
+            range.end = self.text.line_start_offset(self.text.offset_to_point(range.end).row + 1);
+        }
         self.undo_manager.break_transaction_coalescing();
         self.selections.remove_all_but_active();
         self.set_selection(range.start, range.end);
