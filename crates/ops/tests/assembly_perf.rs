@@ -138,8 +138,12 @@ pub(crate) fn fold_solved(ctx: &mut Ctx, path: &str) {
 }
 
 pub(crate) fn evaluated(ctx: &mut Ctx, path: &str) -> AssemblyResult {
+    evaluated_in(ctx, path, "Assembly 1")
+}
+
+pub(crate) fn evaluated_in(ctx: &mut Ctx, path: &str, tab: &str) -> AssemblyResult {
     let od = ctx.doc(Some(path)).unwrap();
-    let tab = noshape_ops::doc::find_tab(od.doc(), "Assembly 1").unwrap();
+    let tab = noshape_ops::doc::find_tab(od.doc(), tab).unwrap();
     let Some(TabContent::Assembly(asm)) = od.doc().tab(tab).map(|t| t.content.clone()) else { panic!() };
     od.evaluate_assembly(&asm, &SolveOptions::default())
 }
@@ -148,7 +152,11 @@ pub(crate) fn evaluated(ctx: &mut Ctx, path: &str) -> AssemblyResult {
 /// step), each a solve as the app runs it (from the last step's poses, no
 /// DOF), then the placements applied and the scene rebuilt (the frame).
 pub(crate) fn drag(ctx: &mut Ctx, path: &str, inst: InstanceId, dir: DVec3, steps: usize) -> (Stats, Option<Stats>) {
-    let mut res = evaluated(ctx, path);
+    drag_in(ctx, path, "Assembly 1", inst, dir, steps)
+}
+
+pub(crate) fn drag_in(ctx: &mut Ctx, path: &str, tab: &str, inst: InstanceId, dir: DVec3, steps: usize) -> (Stats, Option<Stats>) {
+    let mut res = evaluated_in(ctx, path, tab);
     let mut cache = AsmGpuCache::default();
     let mut built = scene(ctx, &res, &mut cache).map(|s| s.1);
     let local = DVec3::new(0.0, 0.0, 0.01);

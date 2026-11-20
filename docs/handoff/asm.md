@@ -5,7 +5,7 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-19 23:42 UTC)
+## State (2026-11-20 01:06 UTC)
 
 ### Landed today (702c9878: Display states Esc, driver-mate named position, paste; d671313d; 335f8e43; 9f52415c; 123ca4b3 free drag)
 - LOD (91478e2c), Derived mirror of an assembly complete (e87a2b3e, 17c26dc1; left: live's exact node icon, symmetry
@@ -32,17 +32,28 @@ TICKETS ASM-UI-SIGSEGV-AT-EXIT [x].
   didn't move; now `Prepared::moves_alone` (no mate, pattern or group). Test fails without the fix.
 - ASM-LIMIT-TYPED-NO-PREVIEW: an edited mate's held values go through `eval::held_in_limits`. Test fails without it.
 - ASM-NEW-MATE-PREVIEW-GROUP: preview = live (first pick alone); after ✓ ours moved the other part too, now the moving
-  part's group follows it (`Prepared::mated_group`, accept_mate). Test fails without it. Queued 23:42.
+  part's group follows it (`Prepared::mated_group`, accept_mate). Test fails without it. Landed 00:50 as 5a8338b6.
+
+### live retakes 11-19 (eef639d7)
+- The instance list row menu of an in-document part: "Where used…" after Export… (live asm-menu-add-selection-to-folder
+  / unpack-folder): already landed by studios (9edd47f83). Create task… / Add comment: cloud.
 
 ### Lead rows 11-19 (after infento / scissor)
-1. isaac: Chamfer 2 is fixed (current tree, traced: a2e4a2 Part 1 39921.440468 mm³, "volume fits"; core told).
-   The block (Fastened 7/8/9/57/79/88, Ball 1/7, Fastened 33) still fails in h1119: connectors 50–114 mm off live's
-   in plane (mine, the translator). Traced rerun on vibe2 with a 7200 s timeout (`one-save.sh ops-along
-   asm-isaac-ball ~/agents/asm-keep/isaac-main.out 7200`; 3000 s ran out in the studios), document kept in
-   ~/tmp/asm/save.
-2. Speed: `big_assembly_perf::suite_assemblies_speed` (NOSHAPE_PERF_DOCS=<saved suite docs>) in tagged stash
-   asm-suite-speed-1119 (c2bc6c6e, applied in the worktree), waiting for the saved isaac document. Live's numbers (behaviours 21425 asm200, 30512 A200): drag
-   0.4–1 update/s, insert 4.96 s, add mate 1.94 s, open 11.8 s.
+1. isaac on the current tree (traced vibe2 ~/agents/asm-keep/isaac-main.out, 7200 s): Chamfer 2 fits live's volume and
+   the whole block (Fastened 7/8/9/33/57/79/88, Ball 1/7) matches (h1119's failures were its older binary); core
+   told. Now 118/120 occurrences, 126/129 mates, 60/62 BOM rows. Leftovers by owner:
+   - mine: 7072ea (and its copies 00f1d4 / d78cbf / de4eff) Extrude 38 REMOVE "do not intersect": its scope is
+     body:F48f36a73feb.0, check it is live's part (trace isaac-main.out "Studio 7072ea: feature 71"); Revolute 6's
+     end on that studio's part follows. Sketch 39's LENGTH "Value must be positive". 40 instances "freed at live's
+     place, our mates move it" 0.05–0.25 mm (<88> 32 mm, <47> 3.9 mm, <85> 3.0 mm): P2, after the studios.
+   - bool: a04711 Extrude 4 / 27 and 850efe Extrude 8 "non-manifold body"; a04711's cascade (Sketch 5 plane, Loft 1,
+     Extrude 6/13/46) and Revolute 11 / Ball 13 (on a04711's Part 2) follow it.
+   - blend: GearLab 1e81ca / 90f78b #desc fillet → Extrude 1-3 → the 2 Spiral Bevel gears (2 occurrences, 2 BOM rows);
+     fillets / chamfers in 00f1d4, 884765, a2e4a2 (Chamfer 4), b29603, c3fdd4, de4eff, e4a405, fa73e1.
+2. Speed (`big_assembly_perf::suite_assemblies_speed`, NOSHAPE_PERF_DOCS=<saved docs>, release binary vibe2
+   ~/agents/asm-keep/bin/ops-speed; top assembly = the one no other inserts). xdev-subs (vibe2 load 23/16, 11-20
+   00:41): open 257 ms load + 89 ms evaluation + 8 ms scene (live 11.8 s), insert 1.3 ms (live 4.96 s); its top has no
+   mates. Mate solve / drag: isaac's saved document when the trace run ends. Live: behaviours 21425 (asm200), 30512.
 3. Then the suite's next differences (xdev-subs 266/266 7/7 74/74 = live; infento timed out at 3600 s in h1119,
    rerun with ≥7200 s; scissor running in h1119 on vibex7). Infento (06:37 base): 5 Wheel 7inch instances whose
    subassembly is DeletedElement in live; missing parts (pulleys R8DD/RsDD, Seatboard <2>, Wheellock rings);

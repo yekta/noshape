@@ -11,10 +11,11 @@
 //! own; standard content bolts Fastened on stack pins; a linear pattern of
 //! the first subassembly. Numbers go to docs/handoff/skasm.md with live's.
 
-use super::assembly_perf::{Stats, assembly, call, drag, evaluate, evaluated, face, fold_solved, mate, ms, pin_at, scene, stats};
+use super::assembly_perf::{Stats, assembly, call, drag, drag_in, evaluate, evaluated, evaluated_in, face, fold_solved, mate, ms, pin_at, scene, stats};
 use glam::DVec3;
 use noshape_model::assembly::standard::{StandardSpec, default_component};
 use noshape_model::assembly::{Assembly, Instance, InstanceId, InstanceSource, MateType, Placement};
+use noshape_model::assembly::eval::SolveOptions;
 use noshape_model::document::TabContent;
 use noshape_ops::Ctx;
 use noshape_scene::asm_scene::AsmGpuCache;
@@ -287,4 +288,68 @@ fn big_assembly_1000_regenerate_profile() {
     fold_solved(&mut b.ctx, &b.path);
     let times: Vec<Duration> = (0..12).map(|i| regenerate(&mut b.ctx, &b.path, if i % 2 == 0 { "12 mm" } else { "10 mm" })).collect();
     println!("a1000 regenerate: median {:.1} ms", ms(stats(times).median));
+}
+
+/// The parity suite's own assemblies against live (lead 11-19, PLAN 2.7): open, a mate added, a drag and an insert
+/// on rebuilt documents (`NOSHAPE_PARITY_SAVE` keeps them), `NOSHAPE_PERF_DOCS=<a.noshape>,<b.noshape>`.
+#[test]
+#[ignore]
+fn suite_assemblies_speed() {
+    let Ok(docs) = std::env::var("NOSHAPE_PERF_DOCS") else { return };
+    for path in docs.split(',').filter(|p| !p.is_empty()) {
+        noshape_model::assembly::solver::clear_dof_cache();
+        let mut ctx = Ctx::new();
+        let t = Instant::now();
+        call(&mut ctx, "document_open", json!({ "path": path }));
+        let load = t.elapsed();
+        // The top assembly: the one no other assembly of the document inserts.
+        let (tab, asm) = {
+            let doc = ctx.doc(Some(path)).unwrap().doc();
+            let asms: Vec<(_, String, Assembly)> = doc.tabs.iter().filter_map(|t| if let TabContent::Assembly(a) = &t.content { Some((t.id, t.name.clone(), (**a).clone())) } else { None }).collect();
+            let inserted: Vec<_> = asms.iter().flat_map(|(_, _, a)| a.instances.iter().filter_map(|i| if let InstanceSource::Assembly { assembly, .. } = &i.source { Some(*assembly) } else { None })).collect();
+            let (_, name, a) = asms.iter().filter(|(id, _, _)| !inserted.contains(id)).max_by_key(|(_, _, a)| a.instances.len()).cloned().expect("an assembly");
+            (name, a)
+        };
+        let t = Instant::now();
+        let res = evaluated_in(&mut ctx, path, &tab);
+        let first = t.elapsed();
+        let scene_t = scene(&mut ctx, &res, &mut AsmGpuCache::default()).map(|s| s.0);
+        println!(
+            "{path} ({tab}): {} instances, {} occurrences, {} mates; open: load {:.1} ms, first evaluation {:.1} ms, scene {}",
+            asm.instances.len(),
+            res.solved.placements.len(),
+            asm.mates.len(),
+            ms(load),
+            ms(first),
+            scene_t.map(|d| format!("{:.1} ms", ms(d))).unwrap_or("(no GPU)".into())
+        );
+        let solve = |ctx: &mut Ctx, a: &Assembly| {
+            let t = Instant::now();
+            let _ = ctx.doc(Some(path)).unwrap().evaluate_assembly(a, &SolveOptions::default());
+            t.elapsed()
+        };
+        println!("  evaluate again: {:.1} ms (median of 5)", ms(stats((0..5).map(|_| solve(&mut ctx, &asm)).collect()).median));
+        // A mate added: a copy of the first one, solved.
+        if let Some(seed) = asm.mates.first() {
+            let mut with = asm.clone();
+            let (a, b) = (seed.a.instance, seed.b.instance);
+            mate(&mut with, seed, seed.mate_type, a, b);
+            println!("  add a mate (solve): {:.1} ms (median of 5)", ms(stats((0..5).map(|_| solve(&mut ctx, &with)).collect()).median));
+        }
+        // A drag of the first free top-level instance a mate holds.
+        if let Some(inst) = asm.instances.iter().find(|i| !i.fixed && asm.mates.iter().any(|m| m.a.instance == i.id || m.b.instance == i.id)).map(|i| i.id) {
+            let (s, frame) = drag_in(&mut ctx, path, &tab, inst, DVec3::new(0.5, 0.3, 0.0), 40);
+            println!(
+                "  drag: solve median {:.2} ms (worst {:.2}){}",
+                ms(s.median),
+                ms(s.worst),
+                frame.map(|f| format!(", frame {:.2} ms (worst {:.2} ms)", ms(f.median), ms(f.worst))).unwrap_or_default()
+            );
+        }
+        // An insert: a copy of the first instance, away from the rest.
+        let mut with = asm.clone();
+        let seed = asm.instances[0].clone();
+        pin_at(&mut with, &seed, DVec3::new(-2000.0, 0.0, 0.0), false);
+        println!("  insert an instance: {:.1} ms (median of 3)", ms(stats((0..3).map(|_| solve(&mut ctx, &with)).collect()).median));
+    }
 }
