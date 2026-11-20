@@ -1044,7 +1044,7 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   row's exact cut isn't recorded, ask live if needed). Green 624c6db77, walk 23:02. Branch from V1, edit in B1,
   merge dialog (1 tab changed, Replace with B1), toast "Merged B1 into Main. Revert to before this merge" = live.
   verified bbc7b3861 (qa 00:28 on green eef639d7): the row reads "Part Studio 2 :: E…" and ends at the Name column.
-- [x] verified (qa 11-20 05:16, green 3fd4db71, skasm's stack: the click wraps the arc in a Ø20 slot at once, no Ø0; after Enter or Esc the arc stays with the 4 slot arcs; tickets/sk-slot-3fd4.png) P1 **SKETCH-SLOT-ON-ARC (skasm)**: Slot, click a 3-point arc (r ≈ 22.7 mm, free): the arc lights orange and a "Ø0"
+- [x] verified (qa 11-20 05:16, green 3fd4db71, skasm's stack: the click wraps the arc in a Ø20 slot at once, no Ø0; after Enter or Esc the arc stays with the 4 slot arcs; tickets/sk-slot-on-arc-3fd4.png) P1 **SKETCH-SLOT-ON-ARC (skasm)**: Slot, click a 3-point arc (r ≈ 22.7 mm, free): the arc lights orange and a "Ø0"
   readout with a long leader to the arc's centre appears, but no slot shape; moving the pointer changes nothing. On a line
   the same tool is = live (Ø20 preview, vertical leader, 4 tangent points). Live (behaviours 164): "click a line/arc → a
   slot preview of default width wraps it immediately". Green 624c6db77, walk 23:10. Arc, spline and circumscribed polygon
