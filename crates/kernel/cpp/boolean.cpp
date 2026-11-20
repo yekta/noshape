@@ -7411,10 +7411,10 @@ static bool cut_through_holes(const TopoDS_Shape& target, const std::vector<Topo
 }
 
 
-// Two solids meeting on one planar face each, the two faces' outlines the same edge for edge and each solid on its own
-// side of their plane (a part split on a plane, its halves drafted about it and fused again: cf-part-draft's Part
-// Draft 3, two 153-face halves on z 0, 1.9 s of OCCT's). The fuse is the two shells sewn along that outline, without
-// the two faces. False when it doesn't apply; the caller fuses as usual.
+// Two solids meeting on planar faces of one plane, in pairs whose outlines are the same edge for edge, each solid on
+// its own side of the plane (a part split on a plane, its halves drafted about it and fused again: cf-part-draft's
+// Part Draft 3, two 153-face halves on z 0, 1.9 s of OCCT's). The fuse is the two shells sewn along those outlines,
+// without those faces. False when it doesn't apply; the caller fuses as usual.
 static bool fuse_glued(const TopoDS_Shape& target, const TopoDS_Shape& tool, TopoDS_Shape& out, HHist& hist)
 {
   auto only = [](const TopoDS_Shape& s, TopAbs_ShapeEnum k, TopoDS_Shape& one) {
@@ -7464,66 +7464,148 @@ static bool fuse_glued(const TopoDS_Shape& target, const TopoDS_Shape& tool, Top
   for (const TopoDS_Shape* sh : {&sa, &sb})
     for (TopExp_Explorer x(*sh, TopAbs_EDGE); x.More(); x.Next())
       tol = std::max(tol, BRep_Tool::Tolerance(TopoDS::Edge(x.Current())));
-  // The one pair facing each other on one plane; no other planar face of either on it.
-  const Flat* pa = nullptr;
-  const Flat* pb = nullptr;
+  // The faces facing each other on one plane, in pairs with the same outline; no other planar face of either on it
+  // (a herringbone gear's halves: the core's section and each tooth's end, asm-isaac-ball's Gear Lab).
+  const Flat* p0 = nullptr;
   for (const Flat& x : fa)
     for (const Flat& y : fb)
-      if (x.n.Dot(y.n) < -1 + 1e-12 && x.pln.Distance(y.pln.Location()) <= tol)
-      {
-        if (pa != nullptr)
-          return false;
-        pa = &x;
-        pb = &y;
-      }
-  if (pa == nullptr)
+      if (p0 == nullptr && x.n.Dot(y.n) < -1 + 1e-12 && x.pln.Distance(y.pln.Location()) <= tol)
+        p0 = &x;
+  if (p0 == nullptr)
     return false;
-  // (One the other's mirror image, either placed by a location: not glued, as before the mirrored planes were seen
-  // (the glued result keeps the location, and the unify then leaves the two halves of a curved side apart).)
-  if (pa->pln.Position().Direct() != pb->pln.Position().Direct())
-    for (const TopoDS_Shape* sh : {&sa, &sb})
-      for (TopExp_Explorer x(*sh, TopAbs_FACE); x.More(); x.Next())
-        if (!x.Current().Location().IsIdentity())
-          return false;
-  const gp_Pln& pl  = pa->pln;
-  auto          on = [&](const std::vector<Flat>& v, const Flat* keep) {
-    return std::any_of(v.begin(), v.end(), [&](const Flat& x) { return &x != keep && x.pln.Axis().Direction().IsParallel(pl.Axis().Direction(), 1e-12) && pl.Distance(x.pln.Location()) <= tol; });
+  const gp_Pln pl = p0->pln;
+  const gp_Dir n  = p0->n;
+  // (By its vertices: a herringbone's tooth end lies on it to 1.3e-8 m, its own plane 1e-5 rad off.)
+  auto on = [&](const Flat& x) {
+    if (!x.pln.Axis().Direction().IsParallel(pl.Axis().Direction(), 1e-3))
+      return false;
+    for (TopExp_Explorer v(x.face, TopAbs_VERTEX); v.More(); v.Next())
+      if (pl.Distance(BRep_Tool::Pnt(TopoDS::Vertex(v.Current()))) > 2 * tol)
+        return false;
+    return true;
   };
-  if (on(fa, pa) || on(fb, pb))
+  std::vector<const Flat*> ona, onb;
+  for (const Flat& x : fa)
+    if (on(x))
+      ona.push_back(&x);
+  for (const Flat& x : fb)
+    if (on(x))
+      onb.push_back(&x);
+  if (ona.size() != onb.size() || std::any_of(ona.begin(), ona.end(), [&](const Flat* x) { return x->n.Dot(n) < 0; })
+      || std::any_of(onb.begin(), onb.end(), [&](const Flat* x) { return x->n.Dot(n) > 0; }))
     return false;
   // The same outline: each of b's edges one of a's, by its ends and its middle.
-  ShapeIMap ea, eb;
-  TopExp::MapShapes(pa->face, TopAbs_EDGE, ea);
-  TopExp::MapShapes(pb->face, TopAbs_EDGE, eb);
-  if (ea.Extent() != eb.Extent() || ea.Extent() == 0)
-    return false;
   auto mid = [](const TopoDS_Edge& e) {
     BRepAdaptor_Curve c(e);
     return c.Value(0.5 * (c.FirstParameter() + c.LastParameter()));
   };
-  std::vector<char> used((size_t)ea.Extent() + 1);
-  for (int j = 1; j <= eb.Extent(); ++j)
-  {
-    const TopoDS_Edge& e  = TopoDS::Edge(eb(j));
-    const gp_Pnt       b0 = BRep_Tool::Pnt(TopExp::FirstVertex(e)), b1 = BRep_Tool::Pnt(TopExp::LastVertex(e)), bm = mid(e);
-    bool               found = false;
-    for (int i = 1; i <= ea.Extent() && !found; ++i)
-    {
-      if (used[(size_t)i])
-        continue;
-      const TopoDS_Edge& d  = TopoDS::Edge(ea(i));
-      const double       t  = 2 * tol;
-      const gp_Pnt       a0 = BRep_Tool::Pnt(TopExp::FirstVertex(d)), a1 = BRep_Tool::Pnt(TopExp::LastVertex(d));
-      if (((a0.Distance(b0) <= t && a1.Distance(b1) <= t) || (a0.Distance(b1) <= t && a1.Distance(b0) <= t)) && mid(d).Distance(bm) <= t)
-        found = used[(size_t)i] = 1;
-    }
-    if (!found)
+  auto same_outline = [&](const TopoDS_Face& fa_, const TopoDS_Face& fb_) {
+    ShapeIMap ea, eb;
+    TopExp::MapShapes(fa_, TopAbs_EDGE, ea);
+    TopExp::MapShapes(fb_, TopAbs_EDGE, eb);
+    if (ea.Extent() != eb.Extent() || ea.Extent() == 0)
       return false;
+    std::vector<char> used((size_t)ea.Extent() + 1);
+    for (int j = 1; j <= eb.Extent(); ++j)
+    {
+      const TopoDS_Edge& e  = TopoDS::Edge(eb(j));
+      const gp_Pnt       b0 = BRep_Tool::Pnt(TopExp::FirstVertex(e)), b1 = BRep_Tool::Pnt(TopExp::LastVertex(e)), bm = mid(e);
+      bool               found = false;
+      for (int i = 1; i <= ea.Extent() && !found; ++i)
+      {
+        if (used[(size_t)i])
+          continue;
+        const TopoDS_Edge& d  = TopoDS::Edge(ea(i));
+        const double       t  = 2 * tol;
+        const gp_Pnt       a0 = BRep_Tool::Pnt(TopExp::FirstVertex(d)), a1 = BRep_Tool::Pnt(TopExp::LastVertex(d));
+        if (((a0.Distance(b0) <= t && a1.Distance(b1) <= t) || (a0.Distance(b1) <= t && a1.Distance(b0) <= t)) && mid(d).Distance(bm) <= t)
+          found = used[(size_t)i] = 1;
+      }
+      if (!found)
+        return false;
+    }
+    return true;
+  };
+  // (Each of a's paired with the first of b's left whose box is its own and whose outline is the same.)
+  std::vector<std::pair<const Flat*, const Flat*>> pairs;
+  std::vector<char>                                taken(onb.size());
+  for (const Flat* x : ona)
+  {
+    Bnd_Box bx;
+    BRepBndLib::Add(x->face, bx, false);
+    bx.Enlarge(2 * tol);
+    const Flat* match = nullptr;
+    for (size_t j = 0; j < onb.size() && match == nullptr; ++j)
+    {
+      if (taken[j])
+        continue;
+      Bnd_Box by;
+      BRepBndLib::Add(onb[j]->face, by, false);
+      if (bx.IsOut(by) || !same_outline(x->face, onb[j]->face))
+        continue;
+      taken[j] = 1;
+      match    = onb[j];
+    }
+    if (match == nullptr)
+      return false;
+    pairs.emplace_back(x, match);
   }
-  // Each on its own side: its box in the plane's frame, and its vertices on the plane the face's.
+  ShapeIMap glued_faces;
+  for (const auto& [x, y] : pairs)
+  {
+    glued_faces.Add(x->face);
+    glued_faces.Add(y->face);
+  }
+  // (A face at the plane placed by a location and the face across the plane on its free-form surface: not glued (the
+  // glued result keeps the location, and the unify then leaves the two halves of a curved side apart: a located side
+  // and its mirror image). Across a herringbone's plane its flanks are other surfaces, its tips one cylinder: glued.)
+  {
+    ShapeAncMap efa, efb;
+    TopExp::MapShapesAndUniqueAncestors(sa, TopAbs_EDGE, TopAbs_FACE, efa);
+    TopExp::MapShapesAndUniqueAncestors(sb, TopAbs_EDGE, TopAbs_FACE, efb);
+    // Each outline edge's middle and the face at it other than the glued ones.
+    auto beside = [&](const ShapeAncMap& ef) {
+      std::vector<std::pair<gp_Pnt, TopoDS_Face>> v;
+      for (int i = 1; i <= ef.Extent(); ++i)
+      {
+        const ShapeList& fs = ef(i);
+        if (std::none_of(fs.begin(), fs.end(), [&](const TopoDS_Shape& f) { return glued_faces.Contains(f); }))
+          continue;
+        for (const TopoDS_Shape& f : fs)
+          if (!glued_faces.Contains(f))
+            v.emplace_back(mid(TopoDS::Edge(ef.FindKey(i))), TopoDS::Face(f));
+      }
+      return v;
+    };
+    const auto ba = beside(efa), bb = beside(efb);
+    auto on_surface_of = [&](const TopoDS_Face& f, const TopoDS_Face& g) {
+      TopLoc_Location            l;
+      const Handle(Geom_Surface) su = BRep_Tool::Surface(f, l);
+      if (su.IsNull())
+        return false;
+      const Handle(Geom_RectangularTrimmedSurface) tr = Handle(Geom_RectangularTrimmedSurface)::DownCast(su);
+      if ((tr.IsNull() ? su : tr->BasisSurface())->IsKind(STANDARD_TYPE(Geom_ElementarySurface)))
+        return false;
+      const Handle(Geom_Surface) at = l.IsIdentity() ? su : Handle(Geom_Surface)::DownCast(su->Transformed(l.Transformation()));
+      for (TopExp_Explorer v(g, TopAbs_VERTEX); v.More(); v.Next())
+      {
+        const gp_Pnt q = BRep_Tool::Pnt(TopoDS::Vertex(v.Current()));
+        if (pl.Distance(q) <= 10 * tol)
+          continue;
+        GeomAPI_ProjectPointOnSurf pr(q, at);
+        return pr.NbPoints() > 0 && pr.LowerDistance() <= 10 * tol;
+      }
+      return false;
+    };
+    for (const auto& [m, f] : ba)
+      for (const auto& [n, g] : bb)
+        if (m.Distance(n) <= 2 * tol && (!f.Location().IsIdentity() || !g.Location().IsIdentity()) && on_surface_of(f, g))
+          return false;
+  }
+  // Each on its own side: its box in the plane's frame, and its vertices on the plane the glued faces'.
   gp_Trsf to_plane;
-  to_plane.SetTransformation(gp_Ax3(pl.Location(), pa->n));
-  auto side = [&](const TopoDS_Shape& s, const TopoDS_Face& f, bool below) {
+  to_plane.SetTransformation(gp_Ax3(pl.Location(), n));
+  auto side = [&](const TopoDS_Shape& s, bool below) {
     Bnd_Box box;
     BRepBndLib::Add(s.Moved(TopLoc_Location(to_plane)), box, false);
     double x0, y0, z0, x1, y1, z1;
@@ -7531,24 +7613,25 @@ static bool fuse_glued(const TopoDS_Shape& target, const TopoDS_Shape& tool, Top
     if (below ? z1 > 10 * tol + box.GetGap() : z0 < -10 * tol - box.GetGap())
       return false;
     ShapeIMap fv;
-    TopExp::MapShapes(f, TopAbs_VERTEX, fv);
+    for (int i = 1; i <= glued_faces.Extent(); ++i)
+      TopExp::MapShapes(glued_faces(i), TopAbs_VERTEX, fv);
     for (TopExp_Explorer x(s, TopAbs_VERTEX); x.More(); x.Next())
       if (!fv.Contains(x.Current()) && pl.Distance(BRep_Tool::Pnt(TopoDS::Vertex(x.Current()))) <= 2 * tol)
         return false;
     return true;
   };
-  if (!side(sa, pa->face, true) || !side(sb, pb->face, false))
+  if (!side(sa, true) || !side(sb, false))
     return false;
-  // Sewn: each shell without its face, joined along the outline.
+  // Sewn: each shell without its glued faces, joined along their outlines.
   BRep_Builder b;
   TopoDS_Shell s1, s2;
   b.MakeShell(s1);
   b.MakeShell(s2);
   for (TopoDS_Iterator x(sha); x.More(); x.Next())
-    if (!x.Value().IsSame(pa->face))
+    if (!glued_faces.Contains(x.Value()))
       b.Add(s1, x.Value());
   for (TopoDS_Iterator x(shb); x.More(); x.Next())
-    if (!x.Value().IsSame(pb->face))
+    if (!glued_faces.Contains(x.Value()))
       b.Add(s2, x.Value());
   BRepBuilderAPI_Sewing sew(2 * tol, true, false, false, false);
   sew.Add(s1);
@@ -7573,8 +7656,8 @@ static bool fuse_glued(const TopoDS_Shape& target, const TopoDS_Shape& tool, Top
   hist->Remove(sa);
   hist->Remove(sb);
   ShapeIMap touch;
-  for (const TopoDS_Face* f : {&pa->face, &pb->face})
-    TopExp::MapShapes(*f, TopAbs_VERTEX, touch);
+  for (int i = 1; i <= glued_faces.Extent(); ++i)
+    TopExp::MapShapes(glued_faces(i), TopAbs_VERTEX, touch);
   for (const TopoDS_Shape* sh : {&sa, &sb})
   {
     ShapeAncMap ve, ef;
@@ -7598,7 +7681,7 @@ static bool fuse_glued(const TopoDS_Shape& target, const TopoDS_Shape& tool, Top
       {
         const TopoDS_Shape& x = m(i);
         const TopoDS_Shape  y = sew.IsModifiedSubShape(x) ? sew.ModifiedSubShape(x) : x;
-        if (x.IsSame(pa->face) || x.IsSame(pb->face))
+        if (glued_faces.Contains(x))
           hist->Remove(x);
         else if (!y.IsSame(x) || touch.Contains(x))
           hist->AddModified(x, y);

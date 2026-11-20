@@ -1911,6 +1911,30 @@ fn a_cylinder_and_its_mirror_image_fuse_glued() {
     assert!((v / (2.0 * std::f64::consts::PI * r * r * h) - 1.0).abs() < 1e-9, "{v}");
 }
 
+/// A bridge and its mirror image across the plane its two feet stand on: two pairs of faces on the plane, each pair
+/// one outline (asm-isaac-ball's Gear Lab: a herringbone's core section and each tooth's end, 14 s of OCCT's): glued,
+/// OCCT's counts and twice the volume.
+#[test]
+fn a_bridge_and_its_mirror_image_fuse_glued_on_both_feet() {
+    let p = |x: f64, y: f64| glam::DVec2::new(x, y) * 1e-3;
+    let pts = [p(0.0, 0.0), p(10.0, 0.0), p(10.0, 5.0), p(20.0, 5.0), p(20.0, 0.0), p(30.0, 0.0), p(30.0, 10.0), p(0.0, 10.0)];
+    let segs: Vec<k::Segment2d> = (0..pts.len()).map(|i| k::Segment2d::Line { a: pts[i], b: pts[(i + 1) % pts.len()] }).collect();
+    let face = k::make_face_2d(&k::Plane::xy(), &segs, &[]).unwrap();
+    let up = k::extrude(&face, DVec3::new(0.0, 0.0, 8e-3)).unwrap().shape;
+    let down = up.transformed(&k::Transform::Mirror(k::Plane::new(DVec3::ZERO, DVec3::Y, DVec3::X))).unwrap();
+    k::set_rust_boolean(Some(false));
+    let f = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&up), &[down], &k::BooleanOptions::default());
+    let path = k::last_boolean_path();
+    k::set_rust_boolean(None);
+    let f = f.unwrap();
+    assert_eq!(path, "glued");
+    assert!(f.shape.is_valid());
+    // Each half's 8 sides and 2 caps, its two feet gone.
+    assert_eq!((f.shape.count(k::ShapeType::Solid), f.shape.count(k::ShapeType::Face)), (1, 16));
+    let v = f.shape.volume().unwrap();
+    assert!((v / (2.0 * up.volume().unwrap()) - 1.0).abs() < 1e-9, "{v}");
+}
+
 /// c2-valve-config's Extrude 2 (recorded): a valve body cut by a handle whose end plane crosses the seat cone's axis
 /// past its apex, and whose face's section with the body's chamfer cone (OCCT's, of 0.206 mm) ends 0.2065 mm off where
 /// it leaves the cone's rim: no section on the other nappe, the section's end the rim's vertex (OCCT's bound pave);
