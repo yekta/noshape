@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-20 05:50)
+# QA handoff (agent qa; current state only, updated 2026-11-20 05:43)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
