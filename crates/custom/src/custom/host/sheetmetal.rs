@@ -2131,8 +2131,54 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             _ => k::unify_same_domain(&fuse(&group)?).map_err(|e| fe(format!("Sheet metal part failed: {e}")))?.shape,
         });
     }
-    let fused = fuse(&parts)?;
+    let fused = exact_bend_edges(fuse(&parts)?, &strips, front + back);
     Ok(Built { part: fused, pieces, topo, wall_flats, strips })
+}
+
+/// The part's B-spline edges that are a bend's arcs rebuilt as circles, and straight ones as lines: two bends meeting
+/// with no wall between (a Jog's), one's inner cylinder against the other's outer, fuse into approximated edges
+/// (c2-sm-jog-panel's Jog 1: live's 8 circles and 28 lines, ours were 4 circles, 25 lines, 7 B-splines).
+fn exact_bend_edges(part: Shape, strips: &[Strip], thickness: f64) -> Shape {
+    let (mut points, mut conics, mut straight) = (Vec::new(), Vec::new(), false);
+    for e in part.edges() {
+        let Ok(info) = e.edge_info() else { continue };
+        if !matches!(info.curve, k::Curve::BSpline { .. } | k::Curve::Bezier { .. }) || info.closed {
+            continue;
+        }
+        let Ok(mid) = e.point_at(0.5 * (info.first_param + info.last_param)) else { continue };
+        let chord = info.end - info.start;
+        if chord.length() > TOL && (mid - info.start).cross(chord.normalize()).length() < 1e-7 {
+            straight = true;
+            continue;
+        }
+        for st in strips {
+            let axis = st.axis.normalize_or_zero();
+            let at = |p: DVec3| {
+                let r = p - st.origin;
+                let along = r.dot(axis);
+                (along, (r - axis * along).length())
+            };
+            let ((am, rm), (a0, r0), (a1, r1)) = (at(mid), at(info.start), at(info.end));
+            if (am - a0).abs() > 1e-7 || (am - a1).abs() > 1e-7 || (rm - r0).abs() > 1e-7 || (rm - r1).abs() > 1e-7 || rm > st.radius + thickness + 1e-6 {
+                continue;
+            }
+            let r = [st.radius, st.radius + thickness].into_iter().find(|r| (rm - r).abs() < 1e-6).unwrap_or(rm);
+            let centre = st.origin + axis * am;
+            points.push(mid);
+            conics.push(k::Conic { centre, normal: axis, major_dir: (mid - centre).normalize_or_zero(), major: r, minor: r });
+            break;
+        }
+    }
+    let mut part = part;
+    if !conics.is_empty()
+        && let Ok(r) = k::canonical_edges(&part, &points, &conics, 1e-6)
+    {
+        part = r.shape;
+    }
+    if straight && let Ok(s) = k::straighten_edges(&part, 1e-7) {
+        part = s;
+    }
+    part
 }
 
 /// A wall without joints built as its definition face is (curved sides

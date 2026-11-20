@@ -1853,6 +1853,42 @@ fn a_jog_offset_too_small_for_its_angle_shows_the_angle_it_sets() {
     assert!(matches!(state.computed("bendAngleReadOnly"), Some(noshape_model::display::ComputedValue::Text(t)) if t == "80.406°"), "{:?}", state.computed);
 }
 
+/// A Jog whose offset is one thickness (Nominal, radius = thickness): its two bends meet with no wall between, one's
+/// inner cylinder on the other's outer, and every edge stays a line or a circle (live c2-sm-jog-panel's Jog 1: 8
+/// circles and 28 lines; ours had 7 B-splines).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_jog_whose_bends_meet_keeps_exact_edges() {
+    let mut s = plate("2 mm");
+    let mut sk = noshape_sketch::Sketch::new();
+    let (a, b) = (sk.add_point(glam::DVec2::new(mm(30.0), 0.0)), sk.add_point(glam::DVec2::new(mm(30.0), mm(40.0))));
+    let line = sk.add_line_between(a, b).unwrap().0;
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let top = face_at(&r, DVec3::new(30.0, 20.0, 2.0));
+    s.add("sheetMetalJog", move |p| {
+        p.set("bendReference", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: line }]));
+        p.set("face", ParamValue::Query(vec![top]));
+        p.set("bendOffsetAnchor", en("NOMINAL"));
+        p.set("bendOffset", expr("2 mm"));
+    });
+    let index = s.ps.features.len() - 1;
+    let new = s.ps.features[index].params.clone();
+    let changed = noshape_model::custom::std_feature::editing_logic(&s.ps, index, &ConfigValues::default(), &s.units, &RegenOptions::default(), &ParamValues::default(), &new, &["bendOffsetAnchor".to_string(), "bendOffset".to_string()], true).expect("editing logic");
+    let mut values = new;
+    for (k, v) in changed.0 {
+        values.set(&k, v);
+    }
+    s.ps.features[index].params = values;
+    let r = s.ok();
+    let curves: Vec<_> = r.context.bodies[part(&r)].shape.edges().iter().filter_map(|e| e.edge_info().ok()).map(|i| i.curve).collect();
+    let other = curves.iter().filter(|c| !matches!(c, noshape_kernel::Curve::Line { .. } | noshape_kernel::Curve::Circle { .. })).count();
+    assert!(other == 0 && curves.len() > 20, "{other} of {} edges neither lines nor circles: {:?}", curves.len(), r.display.features.last().map(|f| (&f.status, &f.message)));
+}
+
 /// Live ("qa5 sm tools"): a Tab (60,10)–(75,30) beside the plate merges into
 /// the plate (5400 mm³, 10 faces); without a flange to merge it fails "Select
 /// a sheet metal wall to join the tab to." and adds nothing.

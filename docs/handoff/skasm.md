@@ -1,18 +1,26 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-20 11:37 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-20 12:08 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-20 11:37 UTC)
-- 5 new SM suite models (lead 11-20), before -> after: forms 2 -> 10/21, hem-flange 2 -> 3/8, jog-panel 0 -> 3/12,
-  modify-joint 4/11, loft-basic 3/4. Landing: translator (Form's form-library studio -> `library:<form>` + config; SM wall
-  CAP_FACE of `wallThicken` = start: off the line's sheet; sketch on its own in-feature MC -> plane on live's frame, P2
-  SKETCH-ON-IN-FEATURE-MC; CORRESPONDING_IN_FLAT sketch plane -> our flat face), harness (live's in-context "Reference N"
-  wires no parts), sheetmetal.rs (a bend end square to one wall: no ruled end; 24 SM docs A/B, no change elsewhere).
-- Next differences: forms Sketch 3 frame (P2 ticket), Form 5/7 (circle-emboss / circle-knockout tools); hem Hem 1 (INFO
-  "Collision in sheet metal flat pattern." vs WARNING); jog Jog 1: 7 B-spline edges (bend-end arcs, the two bends' seam)
-  where live has circles / lines; joint: our flat lies elsewhere (Sketch 1 on flat: frame (0, -113.5) vs live (120.02, 0)),
-  Extrude 2 "No faces meet flattened sheet metal bodies"; loft: corner faces (live 8 B-spline, ours 2).
+## In flight (11-20 12:08 UTC)
+- 5 new SM suite models (lead 11-20), before -> after: forms 2 -> 10/21, hem-flange 2 -> 7/8, jog-panel 0 -> 5/12,
+  modify-joint 4/11, loft-basic 3/4 (also c2-cov-sm-corner 3 -> 6/6). c41f27d3: translator (Form's form-library studio ->
+  `library:<form>` + config; SM wall CAP_FACE of `wallThicken` = start: off the line's sheet; sketch on its own in-feature
+  MC -> plane on live's frame, P2 SKETCH-ON-IN-FEATURE-MC; CORRESPONDING_IN_FLAT sketch plane -> our flat face), harness
+  (live's in-context "Reference N" wires no parts), sheetmetal.rs (a bend end square to one wall: no ruled end).
+  Next commit: sheetmetal.rs `exact_bend_edges` (B-spline bend arcs / straight seams after the fuse rebuilt as circles /
+  lines, rolled strips too; test a_jog_whose_bends_meet_keeps_exact_edges fails without it); 24 SM docs A/B 195 -> 201.
+- Next differences: forms Sketch 3 frame (P2 ticket), Form 5/7 (circle-emboss / circle-knockout tools); hem Hem 1 status
+  INFO "Collision in sheet metal flat pattern." vs live WARNING (message null; live's SM model 1 is WARNING too = cannot
+  unfold; ours unfolds Hem 1 with a collision); jog Jog 3 ERROR "The bend line did not divide the sheet metal into at
+  least two parts." vs live INFO; joint: our flat lies elsewhere (Sketch 1 on flat: frame (0, -113.5) vs live (120.02,
+  0)), Extrude 2 "No faces meet flattened sheet metal bodies"; loft: live 24 plane + 8 B-spline faces, ours 30 + 2.
+- modify-joint: which wall a THICKEN-of-faces model keeps fixed in its flat (live keeps the top, JHO, region 3 of 3;
+  ours another, flat turned 90°): REQUESTS 'skasm 2026-11-20 11:40' to live; fix flat_place after the answer.
+- Land c41f27d3 queued 11:38 (batch since 11:43; check ~/land/daemon.log on vibe2).
+- Tools: /root/skasm-scratch/pm.sh (ONLY=, SAVE=, build + run), pmrun.sh (TRACE run of the kept binary), smlist.txt
+  (24 SM docs), CLI batch on saved docs: ~/tmp/skasm/saved (copy .noshape + -wal), hemq*.sh / jq.sh / jogq.sh.
 - Feel stack 4e51cce3 verified by qa (green f380b6928); P2 drawn_failed LANDED 8fd60c7a.
 - cf-sheet-metal-model-plus P1 line (SUITE-REGRESSIONS-1108) closed: 318 ms vs live 917.
 
@@ -36,6 +44,7 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
 00. lead 11-20: 5 new SM suite models (forms, hem, jog, joint, SM loft): first difference each, before/after counts.
 00b. qa P2 SUITE-INTRO-TAILFIN-INTERSECTED: "Profile for tail fin" 1 INTERSECTED not found (surf-intro boundary/fill/
    mutualtrim/ruled): Surface 2 area, Curve 1 start, Boundary surface 1 fails; qa-scratch/feel1120/car-one.log.
+00c. dx 11-20 (suite speed, not urgent): c2-sm-rocker-enclosure-body › Mirror 3 160 ms, live 10 ms (doc under the bar).
 0. USER P0 feel: rows of docs/parity/interaction-feel.md in my areas are "=" now; Hover timing is psui's.
 0b. live's camera retakes (025a33f6): sketch-line-from-midpoint, sketch-bezier-polygon, sketch-spline-handle-arm and 7 asm
    takes now compare the camera; rerun them after the land. asm-menu-instance-properties' Pro menu (Where used…, no
