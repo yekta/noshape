@@ -797,6 +797,11 @@ fn finish(drawing: &Drawing, table: &Table, mut data: TableData) -> TableData {
         let inch = drawing.props.units.map_or(!drawing.units_mm, |u| u.imperial());
         data.min_col = if inch { 25.4 } else { 0.0 };
     }
+    // Custom tables too: an inch drawing's columns at least 1.0 in (live drawing/267's Faces, drw-custom-table-cell s7's
+    // Part and Faces), wider ones sized to their text.
+    if matches!(table.kind, TableKind::Custom { .. }) && drawing.props.units.map_or(!drawing.units_mm, |u| u.imperial()) {
+        data.min_col = 25.4;
+    }
     // Hole tables (behaviours "dx 1735" D4, holetable-indicator-ansi.dxf, drw-hole-table-properties.dxf): no title
     // row; rows as a BOM's, columns at least 1.0 in in mm drawings too.
     if matches!(table.kind, TableKind::Hole { .. }) {
@@ -991,7 +996,7 @@ pub fn auto_widths(table: &Table, data: &TableData) -> Vec<f64> {
     }
     let n = data.columns();
     let pad = data.padding[0] * 2.0;
-    let mut w = vec![data.content_height(table) * 3.0; n];
+    let mut w = vec![(data.content_height(table) * 3.0).max(data.min_col); n];
     let text_w = |ri: usize, i: usize, c: &str| {
         let h = cell_height(table, data, ri, i);
         c.lines().map(|l| font::text_width(l, h)).fold(0.0, f64::max) * if table.shown_cell_format(ri, i).bold { 1.05 } else { 1.0 }

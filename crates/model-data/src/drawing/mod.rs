@@ -1836,6 +1836,10 @@ impl Table {
         match &self.kind {
             TableKind::General { header: true, .. } if row == 0 => CellFormat { bold: true, ..Default::default() },
             TableKind::General { .. } => CellFormat { align: CellAlign::Left, ..Default::default() },
+            // A custom table's header on top bold and centred, its body left (live drw-custom-table-cell s10: Bold on
+            // for the Faces header cell).
+            TableKind::Custom { bottom_to_top: false, .. } if row == 0 => CellFormat { bold: true, ..Default::default() },
+            TableKind::Custom { bottom_to_top: false, .. } => CellFormat { align: CellAlign::Left, ..Default::default() },
             _ => CellFormat::default(),
         }
     }

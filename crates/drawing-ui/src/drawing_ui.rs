@@ -80,7 +80,7 @@ impl DrawingEditor {
                 (title, self.note_panel_rows(cx))
             }
             Panel::Datum { .. } | Panel::SurfaceFinish { .. } | Panel::Cell { .. } | Panel::SheetName { .. } | Panel::Rotation { .. } => self.extra_panel_rows(cx)?,
-            Panel::BrokenOut { .. } | Panel::CellFormat { .. } | Panel::CellResize { .. } | Panel::DatumTarget { .. } => self.more_panel_rows(cx)?,
+            Panel::BrokenOut { .. } | Panel::CellResize { .. } | Panel::DatumTarget { .. } => self.more_panel_rows(cx)?,
             Panel::ImageProps { .. } => return self.render_image_props(cx),
             Panel::TitleBlock { inputs } => (
                 "Title block (fields like {part.name}, {sheet.scale} allowed)",

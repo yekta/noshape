@@ -201,6 +201,8 @@ impl DrawingEditor {
         self.tool = Tool::Select;
         self.infer_lines.clear();
         self.selection = vec![Sel::Table(id)];
+        // Read as a BOM table just placed: nothing before the 11-18.1 recorder (live2 drw-hole-table-split s7-s10).
+        self.placed_table = Some(id);
         cx.notify();
     }
 

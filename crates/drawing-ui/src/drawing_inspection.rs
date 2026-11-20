@@ -413,6 +413,7 @@ impl DrawingEditor {
         let row = |label: &'static str, body: AnyElement| h_flex().h(px(30.)).px(px(6.)).child(div().w(px(90.)).text_size(px(12.)).child(label)).child(body).into_any_element();
         let mut body = v_flex().p(px(3.));
         let mut text: Vec<String> = vec![(if reorder.is_some() { "Reorder inspection items" } else { "Inspection item" }).into()];
+        let mut options = 0..0;
         if let Some(st) = reorder.as_ref() {
             // Live (live2 drw-inspection-reorder): the instruction, then Number: (empty until typed).
             const HINT: &str = "Enter new inspection item identifier and then select the item to renumber";
@@ -448,8 +449,11 @@ impl DrawingEditor {
                 opts = opts.child(cell(74., crate::ui_script::wrap(field.into_any_element(), || "dropdown:Text height".into())));
             }
             body = body.child(opts.child(cell(166., shapes.into_any_element())).child(cell(166., widths.into_any_element())));
+            // (The selects' options: left out of the text for later recorders, live drw-inspection-diameter s6.)
+            let start = text.len();
             text.extend(shape_items.iter().map(|i| i.0.clone()));
             text.extend(chars_items.iter().map(|i| i.0.clone()));
+            options = start..text.len();
             if automatic {
                 // Live 2132: Scope ▾ (Drawing · Current sheet · Views) + Preview.
                 let labels = ["Drawing", "Current sheet", "Views"];
@@ -477,11 +481,11 @@ impl DrawingEditor {
             }
         }
         crate::ui_script::note_dialog(|| {
-            let mut j = serde_json::json!({ "kind": "drawing-panel", "title": text[0], "text": text });
+            let mut j = serde_json::json!({ "kind": "drawing-panel", "title": text[0] });
             if reorder.is_none() {
                 j["fields"] = fields;
             }
-            j
+            crate::drawing_panels::panel_text(j, text.iter().enumerate().map(|(i, t)| (t.clone(), options.contains(&i))).collect())
         });
         Some(
             v_flex()

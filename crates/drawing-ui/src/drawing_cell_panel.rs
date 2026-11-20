@@ -36,8 +36,8 @@ impl DrawingEditor {
         let t = self.current_sheet().table(cs.table)?;
         // A revision table's cell too (live2 drw-revision-*: its merge icons disabled).
         // And a hole table's (live drw-hole-table-cell-format: its formats only).
-        // And a BOM's, from one click (live cferr-bomclk-1118 (b)).
-        (matches!(t.kind, TableKind::General { .. } | TableKind::Revision { .. } | TableKind::Hole { .. } | TableKind::Bom { .. }) && self.panel.is_none() && matches!(self.tool, Tool::Select)).then_some(cs)
+        // And a BOM's, from one click (live cferr-bomclk-1118 (b)), and a custom table's (live drw-custom-table-cell).
+        (matches!(t.kind, TableKind::General { .. } | TableKind::Revision { .. } | TableKind::Hole { .. } | TableKind::Bom { .. } | TableKind::Custom { .. }) && self.panel.is_none() && matches!(self.tool, Tool::Select)).then_some(cs)
     }
 
     /// Create / drop the panel's state as the cell selection changes (from render).
@@ -219,9 +219,9 @@ impl DrawingEditor {
             }
         };
         // A hole table's, a revision table's and a BOM's cells: sizes and formats only (live drw-hole-table-cell-format,
-        // live2 drw-revision-cell-format 11-17, tables-1118 e1).
+        // live2 drw-revision-cell-format 11-17, tables-1118 e1), and a custom table's (live drw-custom-table-cell s10).
         let bom = matches!(t.kind, TableKind::Bom { .. });
-        let sizes_only = bom || matches!(t.kind, TableKind::Hole { .. } | TableKind::Revision { .. });
+        let sizes_only = bom || matches!(t.kind, TableKind::Hole { .. } | TableKind::Revision { .. } | TableKind::Custom { .. });
         let row1 = if sizes_only { h_flex().h(px(30.)).pl(px(1.)).gap(px(2.)).child(size_cols).child(size_rows) } else { h_flex()
             .h(px(30.))
             .pl(px(1.))

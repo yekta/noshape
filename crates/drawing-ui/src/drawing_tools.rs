@@ -369,7 +369,9 @@ impl DrawingEditor {
     /// circle drawn (drw-crop-existing-profile), a maximum / minimum dimension (drw-max-min-dimension), a line to line
     /// angular one (live2 selection-after-esc on drw-dimension-angular: its handles orange with the pointer away), a
     /// 3 point angular one and a radius (live2's 11-15 retakes of drw-dimension-3-point-angular, -foreshorten) placed
-    /// too; not the other dimensions (drw-dimension-diameter, -line-to-line, -point-to-point read none).
+    /// too, and a diameter (live drw-styles-radial s7, 11-20: its Ø.394 under the pointer read lit; the 11-07
+    /// drw-dimension-diameter read none, the hovered one drawn tan for that recorder); not the other dimensions
+    /// (drw-dimension-line-to-line, -point-to-point read none).
     pub(crate) fn made_by_tool(&self) -> Vec<Sel> {
         let sheet = self.drawing_sheet();
         let (entities, annotations) = self.tool_start;
@@ -378,7 +380,7 @@ impl DrawingEditor {
             Tool::Sketch { .. } => sheet.sketch.sketch.entities().map(|e| e.id.0).filter(|&id| id > entities).map(Sel::Sketch).collect(),
             // (And a hole callout: live2 drw-hcallout-override s7, its text read lit in Top after Esc.)
             // (And a note committed with ✓: live2 drw-tools-1119 rad-note, its grips after Esc.)
-            Tool::Dimension { kind: DimTool::MaxMin | DimTool::Angle | DimTool::Angle3 | DimTool::Radius, .. } | Tool::HoleCallout { .. } => sheet.annotations.iter().filter(|a| a.id > annotations).map(|a| Sel::Annotation(a.id)).collect(),
+            Tool::Dimension { kind: DimTool::MaxMin | DimTool::Angle | DimTool::Angle3 | DimTool::Radius | DimTool::Diameter, .. } | Tool::HoleCallout { .. } => sheet.annotations.iter().filter(|a| a.id > annotations).map(|a| Sel::Annotation(a.id)).collect(),
             Tool::Note => sheet.annotations.iter().filter(|a| a.id > annotations && matches!(a.kind, AnnotationKind::Note { .. })).map(|a| Sel::Annotation(a.id)).collect(),
             _ => Vec::new(),
         }

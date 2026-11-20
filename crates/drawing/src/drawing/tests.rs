@@ -2474,9 +2474,19 @@ export const partFaces = defineTable(function(context is Context, definition is 
     assert_eq!(data.rows[0][2], "Not set");
     // Live: the column's RIGHT alignment is ignored in drawings.
     assert_eq!(data.col_align, vec![CellAlign::Left; 3]);
+    // Live drw-custom-table-cell s7 (an inch drawing): every column at least 1 in, the narrow Faces one too.
+    let mut inch = drawing.clone();
+    inch.props.units = None;
+    inch.units_mm = false;
+    let d = tables::table_data_with(&inch, &inch.sheets[0].tables[0], None, None, None, &info, &|s| s.to_string());
+    let l = tables::layout(&inch.sheets[0].tables[0], &d);
+    assert!(l.xs.windows(2).all(|w| w[1] - w[0] >= 25.4 - 1e-9), "{:?}", l.xs);
     let built = render_sheet_with(&drawing, 0, &sources, &ViewCache::default(), false, &info).unwrap();
     let txt = texts(&built);
     assert!(txt.iter().any(|s| s == "Faces") && txt.iter().any(|s| s == &data.rows[0][0]), "{txt:?}");
+    // The Cell bar reads its header bold, a body cell not (live drw-custom-table-cell s10).
+    let t = &drawing.sheets[0].tables[0];
+    assert!(t.shown_cell_format(0, 1).bold && !t.shown_cell_format(1, 0).bold);
     // Bottom to top: reversed, header last.
     if let TableKind::Custom { bottom_to_top, .. } = &mut drawing.sheets[0].tables[0].kind {
         *bottom_to_top = true;

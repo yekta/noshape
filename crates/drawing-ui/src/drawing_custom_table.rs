@@ -19,7 +19,7 @@ use noshape_model::TabContent;
 use noshape_model::configuration::ConfigValues;
 use noshape_model::document::TabId;
 use noshape_model::drawing::tables::{CustomTableKey, custom_table_keys};
-use noshape_model::drawing::{SheetLayer, Table, TableCorner, TableKind};
+use noshape_model::drawing::{SheetLayer, TableCorner, TableKind};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -173,6 +173,8 @@ impl DrawingEditor {
         self.custom_tables.dlg = None;
         self.tool = Tool::Select;
         self.selection = vec![Sel::Table(id)];
+        // As a BOM table just placed (live drw-custom-table-cell s7-s11: EDGE Top for the 11-18.1 recorder).
+        self.placed_table = Some(id);
         self.ensure_sources(false, cx);
         cx.notify();
         true
@@ -381,14 +383,6 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    /// Click / double-click a custom table cell (live drawing/269): the
-    /// cell is selected and the Cell format panel opens; the text itself is
-    /// not editable.
-    pub fn open_custom_cell(&mut self, t: &Table, window: &mut Window, cx: &mut Context<Self>) {
-        let Some((r, c)) = self.built.as_ref().and_then(|b| b.table_layout(t.id)).and_then(|l| l.cell_at(self.cursor)) else { return };
-        self.open_cell_format_panel(t.id, r, c, window, cx);
-    }
-
     /// A Part Studio chosen: from the chooser (`version` as [`CustomDlg::version`], at configuration `config`) or the
     /// dialog's dropdown.
     pub(crate) fn pick_studio(&mut self, tab: TabId, version: Option<String>, config: ConfigValues, name: String, cx: &mut Context<Self>) {
@@ -555,26 +549,39 @@ impl DrawingEditor {
             Some(Picker::Table { .. }) => std::iter::once("Select a custom table".to_string()).chain(table_items.iter().map(|i| i.0.clone())).collect(),
             _ => Vec::new(),
         };
+        // Live's reading (live drw-custom-table-cell, recorder 11-18.1): the selects' options marked (older recorders
+        // read them as text), their values as fields.
         crate::ui_script::note_dialog(|| {
-            let mut text: Vec<String> = vec![(if editing { "Custom table properties" } else { "Custom table" }).into()];
+            let mut text = crate::drawing_panels::PanelText::default();
+            text.text(if editing { "Custom table properties" } else { "Custom table" });
+            let mut fields = Vec::new();
+            let select = |l: &str, v: String| serde_json::json!({ "label": l, "kind": "select", "value": v });
+            let order = if d.bottom_to_top { "Bottom to top" } else { "Top to bottom" };
             if editing {
                 let chosen = d.chosen.as_ref();
-                text.extend(["Document:".into(), doc_name.clone(), "Workspace:".into(), ws_name.clone()]);
-                text.extend(["Custom table:".into(), chosen.map(|t| t.display.clone()).unwrap_or_default(), "Feature Studio:".into(), chosen.map(|t| t.fs_name.clone()).unwrap_or_default()]);
-                text.extend(chosen.and_then(|t| t.version_label.clone()));
-                text.extend(["Sheet".into(), self.current_sheet().name.clone()]);
+                text.texts(["Document:".into(), doc_name.clone(), "Workspace:".into(), ws_name.clone()]);
+                text.texts(["Custom table:".into(), chosen.map(|t| t.display.clone()).unwrap_or_default(), "Feature Studio:".into(), chosen.map(|t| t.fs_name.clone()).unwrap_or_default()]);
+                text.texts(chosen.and_then(|t| t.version_label.clone()));
+                text.texts(["Sheet".into(), self.current_sheet().name.clone()]);
             } else {
-                text.push("Add".into());
-                if studio_name.is_some() {
-                    text.extend(studio_items.iter().map(|i| i.0.clone()));
+                text.text("Add");
+                if let Some(n) = studio_name.clone() {
+                    text.options(studio_items.iter().map(|i| i.0.clone()));
+                    fields.push(select("Use existing Part Studio", n));
                 }
-                text.push("Insert".into());
+                text.text("Insert");
                 if d.chosen.is_some() {
-                    text.extend(table_items.iter().map(|i| i.0.clone()));
+                    text.options(table_items.iter().map(|i| i.0.clone()));
                 }
+                fields.push(select("Use existing custom table", d.chosen.as_ref().map(|t| t.display.clone()).unwrap_or_default()));
+                fields.push(select("Order", order.into()));
             }
-            text.extend(["Order", "Top to bottom", "Bottom to top", "Select fixed corner"].map(String::from));
-            serde_json::json!({ "kind": "drawing-panel", "title": text[0], "text": text, "texts": picker_texts })
+            text.text("Order").options(["Top to bottom", "Bottom to top"]).text("Select fixed corner");
+            let mut j = serde_json::json!({ "kind": "drawing-panel", "title": if editing { "Custom table properties" } else { "Custom table" }, "texts": picker_texts });
+            if !editing {
+                j["fields"] = serde_json::json!(fields);
+            }
+            crate::drawing_panels::panel_text(j, text.0)
         });
         let add_row = h_flex().px(px(4.)).pt(px(4.)).gap(px(4.)).child(action("ct-add", "insert", "Add", true, studio_name.is_none(), cx)).when_some(studio_name.clone(), |r, n| r.child(div().flex_1().child(select("ct-studio", n, studio_items))));
         let insert_row = h_flex()
@@ -686,11 +693,18 @@ impl DrawingEditor {
                         .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             if let Some(CustomDlg { picker: Some(Picker::Table { list_open, .. }), .. }) = &mut this.custom_tables.dlg {
                                 *list_open = !*list_open;
+                                if !*list_open {
+                                    crate::ui_script::note_list(None);
+                                }
                             }
                             cx.notify();
                         })),
                 );
                 if list_open {
+                    // Its rows as live's 11-15 recorder reads the open list (live drw-custom-table-cell s3: "Part
+                    // faces"; older ones read none, drw-custom-table-insert).
+                    let rows: Vec<String> = mine.iter().chain(ws.iter()).map(|t| t.display.to_string()).collect();
+                    crate::ui_script::note_list(Some(serde_json::json!({ "kind": "context-menu", "rows": rows, "highlighted": null, "disabled": [], "drawing": true })));
                     let ed = cx.entity();
                     body = body.child(ct::table_list("ct-pick-list", mine, ws, pending.as_ref(), 286., move |t, _, cx| {
                         ed.update(cx, |this, cx| {
@@ -698,6 +712,7 @@ impl DrawingEditor {
                                 *pending = Some(t);
                                 *list_open = false;
                             }
+                            crate::ui_script::note_list(None);
                             cx.notify();
                         })
                     }));

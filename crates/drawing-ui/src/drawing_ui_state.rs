@@ -3,6 +3,7 @@
 use super::*;
 use crate::drawing_sketch::SkTool;
 use noshape_scene::drawing_tools::{DimTool, Pick, PickedPoint, Sel, Tool};
+use noshape_model::drawing::sheet::GripKind;
 use serde_json::{Value, json};
 
 impl DrawingEditor {
@@ -476,6 +477,7 @@ impl DrawingEditor {
                 })
             };
             let lit = |pick: u32| lit_as(pick, false);
+            let dim_pick = |pick: u32| matches!(b.picks.get(pick as usize), Some(PickTarget::Annotation(id)) if sheet.annotations.iter().any(|a| a.id == *id && a.kind.is_dimension()));
             // A selected view's orange inside another view's box counts there too (live2 2442: the Detail view placed
             // over Top's box, right-clicked, is orange all over, its frame, boundary and edges: EDGE Top and EDGE
             // Detail), a view with an edge picked included.
@@ -492,15 +494,46 @@ impl DrawingEditor {
                 let mut px = 0.0;
                 // (Highlighted lines are 2 px wide: render_style; a hovered annotation's are drawn tan over the
                 // orange, about half of it read: live2 drw-dimension-radius s4, its leader into Top read nothing.)
+                // Since the 11-15 recorder a hovered selected dimension reads in full (live drw-styles-radial s3, s9:
+                // EDGE Top with the pointer on R.197; the 11-06 drw-dimension-radius s3 read nothing): `hover_px`.
+                let mut hover_px = 0.0;
+                // A hovered selected dimension's text: read since the 11-08 recorders (live drw-dimension-angular s5,
+                // 11-14), not by the 11-07 one (drw-dimension-diameter s3, Ø.394 under the pointer after Escape).
+                let mut hover_text = 0.0;
                 for l in b.geometry.lines.iter().filter(|l| (lit(l.pick) && !callout_lines.contains(&l.pick)) || selected_view(l.pick, v.id)) {
-                    let width = if self.hover.is_some_and(|h| self.sel_of_pick(h).is_some_and(|s| self.picks_of(s).contains(&l.pick))) { 1.0 } else { 2.0 };
+                    let hovered = self.hover.is_some_and(|h| self.sel_of_pick(h).is_some_and(|s| self.picks_of(s).contains(&l.pick)));
                     for w in l.points.windows(2) {
-                        px += len_in(w[0], w[1]) * self.zoom * width;
+                        let n = len_in(w[0], w[1]) * self.zoom;
+                        px += n * if hovered { 1.0 } else { 2.0 };
+                        if hovered && dim_pick(l.pick) {
+                            hover_px += n;
+                        }
                     }
                 }
                 // (A text's ink: about one and a half times its height a character.)
                 for t in b.geometry.texts.iter().filter(|t| lit(t.pick) && inside(t.pos)) {
-                    px += t.text.chars().count() as f64 * t.height * self.zoom * 1.5;
+                    let n = t.text.chars().count() as f64 * t.height * self.zoom * 1.5;
+                    if dim_pick(t.pick) && self.hover.is_some_and(|h| self.sel_of_pick(h) == self.sel_of_pick(t.pick)) { hover_text += n } else { px += n }
+                }
+                // A selected dimension's orange grips (push_annotation_look): a 9 px dot at each dimension-line end, a
+                // 12 px diamond on each flip handle (live drw-styles-radial s3: R.197's leader end and diamond in Top's
+                // box read EDGE Top).
+                for gr in b.geometry.grips.iter().filter(|gr| gr.kind != GripKind::Origin && lit(gr.pick) && inside(gr.pos) && dim_pick(gr.pick)) {
+                    let n = if gr.kind == GripKind::Handle { 72.0 } else { 64.0 };
+                    if self.hover.is_none_or(|h| self.sel_of_pick(h) != self.sel_of_pick(gr.pick)) { px += n } else { hover_px += n }
+                }
+                // A selected table's tan grips (table_grip_overlay): a 9 px dot on each corner but the fixed one, a 7 px
+                // square on each resize midpoint, kept while a cell is edited; read since the 11-18.1 recorder (live
+                // drw-custom-table-cell s7-s11, s18: the table's top-left dot in Top's box; the 11-08 one read nothing
+                // there, drw-custom-table-delete s9): in `placed_px`. (Not with a cell's menu open: s12-s13.)
+                let cell_menu = self.cell_sel.is_some() && self.frame_menu.as_ref().is_some_and(|m| noshape_app_core::os_menu::is_open_menu(m, cx));
+                let mut placed_px = 0.0;
+                for s in self.selection.iter().filter(|_| !cell_menu) {
+                    let Sel::Table(id) = s else { continue };
+                    let (Some(t), Some(l)) = (sheet.table(*id), b.table_layout(*id)) else { continue };
+                    let fixed = l.fixed_corner(t.corner);
+                    placed_px += l.corners().iter().filter(|c| **c != fixed && inside(**c)).count() as f64 * 64.0
+                        + l.resize_grips(t.corner).iter().filter(|g| inside(**g)).count() as f64 * 49.0;
                 }
                 if px > 60.0 {
                     selection.push(("EDGE".into(), self.ui_view_name(v.id)));
@@ -509,7 +542,6 @@ impl DrawingEditor {
                 // A table just placed: the 2026-11-18.1 recorder reads its view's box under it too (live2's six
                 // drw-bom-* retakes: EDGE Isometric with TABLE from the placing click), older ones nothing (drw-bom-table).
                 let placed = |pick: u32| self.placed_table.is_some_and(|id| self.selection.contains(&Sel::Table(id)) && matches!(b.picks.get(pick as usize), Some(PickTarget::Table(t)) if *t == id));
-                let mut placed_px = 0.0;
                 for l in b.geometry.lines.iter().filter(|l| placed(l.pick)) {
                     for w in l.points.windows(2) {
                         placed_px += len_in(w[0], w[1]) * self.zoom * 2.0;
@@ -522,12 +554,16 @@ impl DrawingEditor {
                     selection.push(("EDGE*".into(), self.ui_view_name(v.id)));
                     continue;
                 }
+                if px + hover_text > 60.0 {
+                    selection.push(("EDGE^".into(), self.ui_view_name(v.id)));
+                    continue;
+                }
                 for l in b.geometry.lines.iter().filter(|l| lit_as(l.pick, true)) {
                     for w in l.points.windows(2) {
                         px += len_in(w[0], w[1]) * self.zoom;
                     }
                 }
-                if px > 60.0 {
+                if px + hover_px + hover_text > 60.0 {
                     selection.push(("EDGE+".into(), self.ui_view_name(v.id)));
                 }
             }
@@ -573,19 +609,21 @@ impl DrawingEditor {
             if self.placed_table != Some(*id) {
                 continue;
             }
-            let Some(t) = sheet.table(*id) else { continue };
+            // (Not a custom table: live drw-custom-table-cell s7-s11 read only its view's box.)
+            let Some(t) = sheet.table(*id).filter(|t| !matches!(t.kind, TableKind::Custom { .. })) else { continue };
             let n = sheet.tables.iter().take_while(|x| x.id != *id).filter(|x| x.type_name() == t.type_name()).count();
             selection.push(("TABLE*".into(), if n == 0 { t.type_name().to_string() } else { format!("{} {}", t.type_name(), n + 1) }));
         }
         selection.sort();
         selection.dedup();
         // (A marked one goes when the same is read anyway.)
-        let plain: Vec<(String, String)> = selection.iter().filter(|(k, _)| !k.ends_with(['+', '-'])).cloned().collect();
-        selection.retain(|(k, o)| k.strip_suffix(['+', '-']).is_none_or(|k| !plain.iter().any(|p| p.0 == k && p.1 == *o)));
+        let plain: Vec<(String, String)> = selection.iter().filter(|(k, _)| !k.ends_with(['+', '-', '^'])).cloned().collect();
+        selection.retain(|(k, o)| k.strip_suffix(['+', '-', '^']).is_none_or(|k| !plain.iter().any(|p| p.0 == k && p.1 == *o)));
         let selection: Vec<Value> = selection
             .into_iter()
             .map(|(k, o)| match (k.strip_suffix('+'), k.strip_suffix('-')) {
                 _ if k.ends_with('*') => json!({ "kind": k.trim_end_matches('*'), "owner": o, "since": "2026-11-18.1" }),
+                _ if k.ends_with('^') => json!({ "kind": k.trim_end_matches('^'), "owner": o, "since": "2026-11-08.1" }),
                 (Some(k), _) => json!({ "kind": k, "owner": o, "new": true }),
                 (_, Some(k)) => json!({ "kind": k, "owner": o, "old": true }),
                 _ => json!({ "kind": k, "owner": o }),

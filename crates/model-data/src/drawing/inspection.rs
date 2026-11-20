@@ -152,7 +152,18 @@ impl Drawing {
                     sheet: si + 1,
                     kind: inspection_type(a),
                     unit: unit.map(|u| u.to_string()).unwrap_or_default(),
-                    nominal: overridden(a).map(|t| t.parse::<f64>().map_or(t.to_string(), |v| self.value_text(v * if unit == Some("in") { 0.0254 } else { 0.001 }, unit))).or(nominal.map(|v| self.value_text(v, unit))).unwrap_or_default(),
+                    // A radius or diameter reads as drawn, its R / Ø with it (live drw-inspection-diameter: "Ø.394").
+                    nominal: overridden(a)
+                        .map(|t| t.parse::<f64>().map_or(t.to_string(), |v| self.value_text(v * if unit == Some("in") { 0.0254 } else { 0.001 }, unit)))
+                        .or_else(|| match (&a.kind, nominal) {
+                            (AnnotationKind::RadialDimension { diameter, .. }, Some(v)) => {
+                                let f = super::DimFormat { tolerance: Tolerance::None, prefix: String::new(), suffix: String::new(), reference: false, ..a.format.clone() };
+                                Some(super::format::dim_text(self, &f, v, false, if *diameter { "Ø" } else { "R" }).main)
+                            }
+                            _ => None,
+                        })
+                        .or(nominal.map(|v| self.value_text(v, unit)))
+                        .unwrap_or_default(),
                     tolerance: tol,
                     upper: up.map(|v| self.value_text(v, unit)).unwrap_or_default(),
                     lower: lo.map(|v| self.value_text(v, unit)).unwrap_or_default(),
@@ -342,5 +353,22 @@ mod tests {
         d.remove_all_inspection();
         d.props.inspection_exclude_callouts = true;
         assert_eq!(d.auto_inspection(Scope::Sheet(0)), 1);
+    }
+
+    #[test]
+    fn a_radius_or_diameter_nominal_reads_as_drawn() {
+        let mut d = Drawing::default();
+        let radial = |id: u64, diameter: bool| Annotation {
+            id,
+            kind: AnnotationKind::RadialDimension { view: ViewId(1), center: [0.0, 0.0], radius: 0.005, diameter, angle: 0.0, dim_line: false, knee: None },
+            format: DimFormat { tolerance: Tolerance::Symmetric { value: 0.0001 }, ..Default::default() },
+            inspection: Some(id as u32),
+            ..Default::default()
+        };
+        d.sheets[0].annotations.extend([radial(1, true), radial(2, false)]);
+        let rows = d.inspection_rows();
+        // Live drw-inspection-diameter: "Ø.394" on an inch drawing; the tolerance in its own column.
+        assert_eq!((rows[0].kind.as_str(), rows[0].nominal.as_str(), rows[0].tolerance.as_str()), ("Diameter dimension", "Ø10", "±0.1"));
+        assert_eq!(rows[1].nominal, "R5");
     }
 }

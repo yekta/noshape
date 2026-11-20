@@ -29,7 +29,6 @@ fn len(a: [f64; 2]) -> f64 {
 }
 
 const AREAS: [&str; 3] = ["Point", "Circle", "Rectangle"];
-const SCOPES: [&str; 4] = ["Cell", "Row", "Column", "Table"];
 
 /// How far (screen px) off a crop profile's first point's x or y the pointer lines up with it.
 pub(crate) const CROP_INFER_REACH_PX: f64 = 8.5;
@@ -622,14 +621,6 @@ impl DrawingEditor {
         Some(d)
     }
 
-    pub fn open_cell_format_panel(&mut self, table: u64, row: usize, col: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(t) = self.current_sheet().table(table) else { return };
-        let f = t.shown_cell_format(row, col);
-        let height = self.input(&f.height.map(|h| format::format_number(h, None, 2)).unwrap_or_default(), window, cx);
-        self.panel = Some(Panel::CellFormat { table, row, col, scope: 0, align: f.align, bold: f.bold, height });
-        cx.notify();
-    }
-
     /// Broken-out section's profile rows (live 12604): the profile tool
     /// (Spline; Spline point in its list) and the closed profile box,
     /// "Create closed profile" (active) until it closes, then the "Profile"
@@ -877,47 +868,6 @@ impl DrawingEditor {
                 }
                 ("Broken-out section", rows)
             }
-            Panel::CellFormat { scope, align, bold, height, .. } => {
-                let (scope, align, bold) = (*scope, *align, *bold);
-                let scope_entries: Vec<MenuEntry> = SCOPES
-                    .iter()
-                    .enumerate()
-                    .map(|(i, n)| {
-                        MenuEntry::check(*n, i == scope, move |t, _, cx| {
-                            if let Some(Panel::CellFormat { scope, .. }) = &mut t.panel {
-                                *scope = i;
-                            }
-                            cx.notify();
-                        })
-                    })
-                    .collect();
-                let align_btn = |id: &'static str, label: &'static str, a: CellAlign| {
-                    Button::new(id).label(label).xsmall().when(align == a, |b| b.primary()).when(align != a, |b| b.outline()).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        if let Some(Panel::CellFormat { align, .. }) = &mut this.panel {
-                            *align = a;
-                        }
-                        cx.notify();
-                    }))
-                };
-                (
-                    "Format cells",
-                    vec![
-                        Self::label_row("Apply to", Button::new("dr-cf-scope").label(SCOPES[scope]).small().outline().dropdown_caret(true).os_dropdown_menu("dr-cf-scope-dd", true, move |m, w, cx| fill_os_menu(m, &scope_entries, &ed, w, cx)).into_any_element()),
-                        Self::label_row("Alignment", h_flex().gap_1().child(align_btn("dr-cf-l", "Left", CellAlign::Left)).child(align_btn("dr-cf-c", "Center", CellAlign::Center)).child(align_btn("dr-cf-r", "Right", CellAlign::Right)).into_any_element()),
-                        Self::label_row("Text height", h_flex().gap_2().child(Input::new(height).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).xsmall().w(px(60.))).child(div().text_xs().text_color(pal.text_faint).child("mm (empty = table)")).into_any_element()),
-                        crate::drawing_chrome::DrCheckbox::new("dr-cf-bold")
-                            .label("Bold")
-                            .checked(bold)
-                            .on_change(cx.listener(|this, v: &bool, _, cx| {
-                                if let Some(Panel::CellFormat { bold, .. }) = &mut this.panel {
-                                    *bold = *v;
-                                }
-                                cx.notify();
-                            }))
-                            .into_any_element(),
-                    ],
-                )
-            }
             Panel::CellResize { width, height, .. } => (
                 {
                     crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Resize", "text": ["Resize", "Column width", "Row height"] }));
@@ -980,12 +930,6 @@ impl DrawingEditor {
                 self.tool = Tool::Select;
                 // (Live 2131: nothing selected after ✓.)
                 self.selection.clear();
-            }
-            Panel::CellFormat { table, row, col, scope, align, bold, height } => {
-                let h = num(val(&height, cx)).filter(|h| *h > 0.5);
-                let layout = self.built.as_ref().and_then(|b| b.table_layout(table)).cloned();
-                let scope = [te::FormatScope::Cell, te::FormatScope::Row, te::FormatScope::Column, te::FormatScope::Table][scope.min(3)];
-                self.edit_table(table, "Format cells", cx, |t| te::format_cells(t, layout.as_ref(), row, col, scope, te::FormatFields { align, bold, height: h }));
             }
             Panel::CellResize { table, col, width, height } => {
                 // Can't exceed the sheet.

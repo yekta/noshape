@@ -745,6 +745,8 @@ impl DrawingEditor {
             return self.apply_view_props_multi(p, m, cx);
         }
         let id = p.view;
+        // OK leaves nothing selected (live drw-views-props-mixed s5, -scale-typed, -synchronize-breaks).
+        self.selection.clear();
         // Scale: "(Sheet)" / "(Parent)" keep the inherited scale; a typed N:N
         // or N/N sets the view's own.
         let typed = p.scale_input.read(cx).value().trim().to_string();

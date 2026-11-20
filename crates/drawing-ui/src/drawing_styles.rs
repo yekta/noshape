@@ -466,7 +466,10 @@ impl DrawingEditor {
                 let sym = u.symbol().to_string();
                 let mut text = crate::drawing_panels::PanelText::default();
                 text.texts(["Styles", "Font"]).options(FONT_FAMILIES.iter().copied());
-                text.texts(["Text height", &sym, "Color", "Arrowhead", &sym, "Text justification", "Text alignment", "Text gap", &sym, "Geometry gap", &sym, "Extension past line", &sym]);
+                text.texts(["Text height", &sym, "Color", "Arrowhead", &sym, "Text justification", "Text alignment", "Text gap", &sym]);
+                if !radii {
+                    text.texts(["Geometry gap", &sym, "Extension past line", &sym]);
+                }
                 let select = |v: &str| serde_json::json!({ "label": "", "kind": "select", "value": v });
                 let check = |l: &str, v: bool| serde_json::json!({ "label": l, "kind": "checkbox", "value": v });
                 let mut fields = vec![select(&font), select(&just), select(&align)];
@@ -492,8 +495,8 @@ impl DrawingEditor {
                 .child(row("Text justification", select("st-just", jl, 220., justs)))
                 .child(row("Text alignment", select("st-align", al, 220., aligns)))
                 .child(row("Text gap", unit(gap_row)))
-                .child(row("Geometry gap", unit(geo_row)))
-                .child(row("Extension past line", unit(ext_row)))
+                // Radius and diameter dimensions have no Geometry gap / Extension past line rows (live drw-styles-radial s12).
+                .when(!radii, |b| b.child(row("Geometry gap", unit(geo_row))).child(row("Extension past line", unit(ext_row))))
                 .when(linear, |b| b.child(ext_check(0, "Show first extension line", cx)).child(ext_check(1, "Show second extension line", cx)))
                 .child(div().h(px(33.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new("st-break").native().label("Break dimension").checked(broken).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;

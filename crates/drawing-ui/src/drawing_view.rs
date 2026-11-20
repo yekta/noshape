@@ -105,8 +105,6 @@ pub enum Panel {
     /// takes clicks on parts.
     /// `add_point`: Spline point (the next click on the profile adds a point).
     BrokenOut { view: ViewId, edit: Option<usize>, profile: Vec<[f64; 2]>, spline: bool, up_to: bool, depth: Entity<InputState>, depth_ref: Option<PointRef>, offset: Option<Entity<InputState>>, exclude: Vec<noshape_model::BodyId>, picking: bool, add_point: bool },
-    /// Table cell formatting; `scope`: 0 cell, 1 row, 2 column, 3 table.
-    CellFormat { table: u64, row: usize, col: usize, scope: usize, align: CellAlign, bold: bool, height: Entity<InputState> },
     /// BOM cell: the value and "Override" (`enabled`: the row has a part number).
     /// Table cell › Resize: the column's width and the row height (sheet mm).
     CellResize { table: u64, col: usize, width: Entity<InputState>, height: Entity<InputState> },
@@ -1743,6 +1741,8 @@ impl DrawingEditor {
                 match self.sel_of_pick(h) {
                     // Onshape (drawing/14): a hovered annotation turns tan with
                     // a tan label box and its grips, drawn on top below.
+                    // A selected dimension keeps its selected look under the pointer (live drw-styles-radial s9).
+                    Some(s @ Sel::Annotation(_)) if !single && dims.contains(&s) => {}
                     Some(s @ Sel::Annotation(_)) if !single => self.push_annotation_look(&mut scene, b, &self.picks_of(s), DRAWING_HOVER),
                     // A hovered view keeps its edges and gets the tan frame (push_view_frames).
                     Some(Sel::View(_) | Sel::Edge(..)) if matches!(self.tool, Tool::Select) => {}
@@ -1759,8 +1759,7 @@ impl DrawingEditor {
                     }
                 }
             }
-            let hovered = self.hover.filter(|_| !self.tool_picks_edges()).and_then(|h| self.sel_of_pick(h));
-            for d in dims.iter().filter(|d| Some(**d) != hovered) {
+            for d in &dims {
                 self.push_annotation_look(&mut scene, b, &self.picks_of(*d), DRAWING_SELECTED);
             }
             self.push_view_frames(&mut scene);

@@ -1277,6 +1277,8 @@ impl DrawingEditor {
                 // A hole table is left selected, its grips shown (live drw-hole-table-properties 5); others placed
                 // unselected (live: a new BOM table isn't drawn orange, drw-bom-table).
                 self.selection = if kind == TableTool::Hole { vec![Sel::Table(id)] } else { Vec::new() };
+                // Read as a table just placed (live2 drw-hole-table-split s7-s10: nothing for the 11-15 recorder).
+                self.placed_table = (kind == TableTool::Hole).then_some(id);
             }
             Tool::Datum { anchor: None } => {
                 // On a GD&T frame edge or a dimension's lines (the red
@@ -2203,11 +2205,8 @@ impl DrawingEditor {
         }
         // Live2 (tables_live2_1013 bomTable): a BOM's cells aren't typed in the drawing (the menu's Switch to BOM takes
         // edits to the assembly): a double-click is one click, its cell and Cell panel (live cferr-bomclk-1118 (b)).
-        if let TableKind::Bom { .. } = t.kind {
-            return;
-        }
-        if let TableKind::Custom { .. } = t.kind {
-            self.open_custom_cell(&t, window, cx);
+        // A custom table's too (live drw-custom-table-cell s10: the Cell bar on the double-clicked cell).
+        if let TableKind::Bom { .. } | TableKind::Custom { .. } = t.kind {
             return;
         }
         let TableKind::General { cells, .. } = &t.kind else {
@@ -2460,7 +2459,7 @@ impl DrawingEditor {
                 });
             }
             Panel::Datum { edit: None, .. } => {}
-            p @ (Panel::BrokenOut { .. } | Panel::CellFormat { .. } | Panel::CellResize { .. } | Panel::DatumTarget { .. }) => self.apply_more_panel(p, cx),
+            p @ (Panel::BrokenOut { .. } | Panel::CellResize { .. } | Panel::DatumTarget { .. }) => self.apply_more_panel(p, cx),
             _ => {}
         }
         cx.notify();
