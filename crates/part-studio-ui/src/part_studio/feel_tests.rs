@@ -986,6 +986,51 @@ fn a_pick_held_up_behind_a_frame_leaves_the_hover_wait(cx: &mut TestAppContext) 
     assert!(avg(cx) < before + 1000.0, "the 10 s behind the frame isn't the pick's: average {before} -> {} ms", avg(cx));
 }
 
+/// A hover after the window rested (no frame drawn for seconds) sends its frame to the render thread when its pick
+/// comes back, not through a redraw of the whole window first (on a software adapter that redraw took the CPU the
+/// frame needed: 100-180 ms of each heavy-document hover, trace diag1 11-20).
+#[gpui::test]
+fn a_hover_after_a_rest_submits_its_frame_without_a_window_redraw(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view, _, _) = block_part(cx, "hover-after-rest");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let pointer = Pointer::new(cx, window, &view);
+    let size = cx.update(|cx| view.read(cx).viewport.read(cx).size());
+    let part = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let c = b.mesh.positions.iter().fold(glam::DVec3::ZERO, |c, p| c + glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)) / b.mesh.positions.len() as f64;
+        v.viewport.read(cx).project(c).unwrap()
+    });
+    pointer.move_to(cx, &view, DVec2::new(size.x * 0.05, size.y * 0.95));
+    let busy = |cx: &mut TestAppContext| cx.update(|cx| pointer.vp.read(cx).frame_in_flight() || pointer.vp.read(cx).pick_pending());
+    let t = std::time::Instant::now();
+    while busy(cx) && t.elapsed() < std::time::Duration::from_secs(15) {
+        cx.update(|cx| view.read(cx).gpu.deliver_frames());
+        draw(cx, window);
+    }
+    let lit_before = cx.update(|cx| view.read(cx).hover.clone());
+    // Two seconds with no window frame, on the viewport's clock and the executor's (a slow move: picked at once).
+    let clock = std::rc::Rc::new(std::cell::Cell::new(cx.update(|cx| pointer.vp.read(cx).now()) + std::time::Duration::from_secs(2)));
+    let c = clock.clone();
+    cx.update(|cx| pointer.vp.update(cx, |vp, _| vp.set_clock(move || c.get())));
+    cx.executor().advance_clock(std::time::Duration::from_secs(2));
+    let laid_out = cx.update(|cx| pointer.vp.read(cx).last_layout());
+    let win = pointer.window_point(cx, part);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(win, None, Modifiers::default());
+    // Picks answered with no window drawn meanwhile.
+    let t = std::time::Instant::now();
+    while cx.update(|cx| pointer.vp.read(cx).pick_pending()) && t.elapsed() < std::time::Duration::from_secs(15) {
+        cx.update(|cx| view.read(cx).gpu.deliver_frames());
+        cx.run_until_parked();
+    }
+    let lit = cx.update(|cx| view.read(cx).hover.clone());
+    assert!(lit.is_some() && lit != lit_before, "the part lit under the pointer: {lit_before:?} -> {lit:?}");
+    assert!(cx.update(|cx| pointer.vp.read(cx).frame_in_flight()), "the lit part's frame on its way");
+    assert_eq!(cx.update(|cx| pointer.vp.read(cx).last_layout()), laid_out, "no window redraw before the frame");
+}
+
 /// Live 3d.json (interaction-feel "Click", "Ctrl+click"): in 3D with no tool a click adds what is lit, a click on a
 /// selected face removes it, a click on empty space clears, Shift+click there keeps the selection, and Ctrl+click
 /// opens the menu of what is under the pointer without selecting it; through the real pointer.

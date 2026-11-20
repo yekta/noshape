@@ -1055,12 +1055,13 @@ impl Viewport {
             cx.defer(move |cx| {
                 let _ = this.update(cx, |this, cx| {
                     this.submit_scheduled = false;
-                    let on_screen = this.last_layout.is_some_and(|t| t.elapsed() < Duration::from_millis(500));
+                    // In the window's last frame, however long ago (a hover after a rest submits at once, not
+                    // through a redraw of the whole window that the software frame then waits behind).
+                    let on_screen = cx.entity_drawn(cx.entity_id()) || this.last_layout.is_some_and(|t| this.now().saturating_duration_since(t) < Duration::from_millis(500));
                     if on_screen {
                         this.submit_if_ready(cx);
                     } else if this.dirty {
-                        // Not drawn lately (idle window or hidden tab): `render`
-                        // submits once the viewport is laid out again.
+                        // Not on screen (a hidden tab): `render` submits once the viewport is laid out again.
                         noshape_render::perf::frame_milestone(this.seq + 1, "waits for a layout");
                         cx.notify();
                     }
@@ -1827,7 +1828,7 @@ impl Viewport {
             window.request_present();
             // Shown in the tree last laid out, so still on screen (camera
             // moves need no layout; see `request_frame`).
-            self.last_layout = Some(Instant::now());
+            self.last_layout = Some(self.now());
         } else {
             cx.notify();
         }
@@ -1899,6 +1900,11 @@ impl Viewport {
     /// Frames shown again from the ones kept, without drawing.
     pub fn frames_reused(&self) -> u64 {
         self.frames_reused
+    }
+
+    /// When a window frame last laid the viewport out, on its clock (tests: no window redraw meanwhile).
+    pub fn last_layout(&self) -> Option<Instant> {
+        self.last_layout
     }
 
     /// Frames presented and frames failed so far (smoke test).
@@ -3385,7 +3391,7 @@ impl Render for Viewport {
                 canvas(
                     move |bounds, window, cx| {
                         entity.update(cx, |this, cx| {
-                            this.last_layout = Some(Instant::now());
+                            this.last_layout = Some(this.now());
                             if let Some(t) = this.presented_at.take() {
                                 noshape_render::perf::record("v.present_to_paint", t.elapsed());
                             }

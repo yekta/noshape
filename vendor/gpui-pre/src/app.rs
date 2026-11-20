@@ -1396,6 +1396,12 @@ impl App {
             .insert(window_handle.id, tracked_entities);
     }
 
+    /// NOSHAPE PATCH: whether a window's last frame drew the entity (its view rendered there, or read while
+    /// rendering): an entity off screen (a hidden tab's) is in none.
+    pub fn entity_drawn(&self, entity_id: EntityId) -> bool {
+        self.tracked_entities.values().any(|entities| entities.contains(&entity_id))
+    }
+
     pub(crate) fn new_observer(&mut self, key: EntityId, value: Handler) -> Subscription {
         let (subscription, activate) = self.observers.insert(key, value);
         self.defer(move |_| activate());
