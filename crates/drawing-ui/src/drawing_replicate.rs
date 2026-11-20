@@ -218,7 +218,9 @@ impl DrawingEditor {
         let prompt = if placing { "Place rectangle" } else if select { "Select closed profile" } else { "Create rectangle" };
         crate::ui_script::note_dialog(|| {
             let text: Vec<&str> = if profile { vec!["Replicate region", "Edit closed profile", "Profile", "×"] } else { vec!["Replicate region", prompt] };
-            serde_json::json!({ "kind": "drawing-panel", "title": "Replicate region", "text": text })
+            // Its tool's and field's tips as `texts` (the drawing matrix; live drawing-replicate-region-dialog).
+            let tips: &[&str] = if profile { &["Rectangle"] } else { &["Rectangle", "No closed profile selected"] };
+            serde_json::json!({ "kind": "drawing-panel", "title": "Replicate region", "text": text, "texts": tips })
         });
         let field = div()
             .id("rr-field")
@@ -283,7 +285,7 @@ impl DrawingEditor {
                 )
                 // The rectangle tool (live: center-point rectangle; pressed
                 // while placing).
-                .child(h_flex().px(px(3.)).py(px(4.)).child(div().size(px(28.)).flex().items_center().justify_center().rounded(px(2.)).when(placing, |e| e.bg(gpui_kit::rgb(0xdfe7ee)).border_1().border_color(gpui_kit::rgb(0xb8c4cf))).child(crate::ui::glyph("center-rectangle", 18., ink))))
+                .child(h_flex().px(px(3.)).py(px(4.)).child(div().id("rr-rect").tooltip(crate::ui::tooltip("Rectangle")).size(px(28.)).flex().items_center().justify_center().rounded(px(2.)).when(placing, |e| e.bg(gpui_kit::rgb(0xdfe7ee)).border_1().border_color(gpui_kit::rgb(0xb8c4cf))).child(crate::ui::glyph("center-rectangle", 18., ink))))
                 .child(field)
                 .into_any_element(),
         )

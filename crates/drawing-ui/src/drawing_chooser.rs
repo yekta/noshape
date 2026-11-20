@@ -277,6 +277,14 @@ impl DrawingEditor {
         }
     }
 
+    fn chooser_title(&self) -> &'static str {
+        match (self.chooser.composite, self.chooser.studio) {
+            (true, _) => "Select a composite part",
+            (_, true) => "Select a Part Studio",
+            _ => "Select a part or assembly",
+        }
+    }
+
     fn chooser_placeholder(&self) -> &'static str {
         match (self.chooser.composite, self.chooser.studio) {
             (true, _) => "Search composite parts",
@@ -1314,11 +1322,7 @@ impl DrawingEditor {
                     .pl(px(4.))
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xd3d7d9))
-                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(match (self.chooser.composite, self.chooser.studio) {
-                        (true, _) => "Select a composite part",
-                        (_, true) => "Select a Part Studio",
-                        _ => "Select a part or assembly",
-                    }))
+                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(self.chooser_title()))
                     .child(div().id("dr-chooser-close").debug_selector(|| "dr-chooser-close".into()).relative().top(px(1.)).left(px(-1.)).w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("panel-close", 24., gpui_kit::rgb(0x999999))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.chooser.composite = false;
                         this.close_studio_chooser();
@@ -1473,9 +1477,15 @@ impl DrawingEditor {
         let by_create = self.chooser.by_create;
         let other = self.chooser.other;
         let placeholder = self.chooser_placeholder();
+        let title = self.chooser_title();
         let search_text = self.chooser.search.as_ref().map(|s| s.read(cx).value().to_string()).unwrap_or_default();
         crate::ui_script::note_dialog(|| {
-            if !by_create && let Some(p) = panel_read.clone() {
+            // The panel's read, with the chooser's title and tabs as `texts` (the drawing matrix; live's recorder
+            // reads only the panel).
+            if !by_create && let Some(mut p) = panel_read.clone() {
+                if let Some(o) = p.as_object_mut() {
+                    o.insert("texts".into(), serde_json::json!([title, "Current document", "Other documents"]));
+                }
                 return p;
             }
             let mut fields = vec![serde_json::json!({ "label": placeholder, "kind": "string", "text": search_text })];

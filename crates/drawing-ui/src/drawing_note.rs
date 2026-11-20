@@ -479,6 +479,7 @@ impl DrawingEditor {
                         menu("Date time format", is_date),
                     ],
                     "old": old,
+                    "texts": ["Color"],
                 });
             }
             serde_json::json!({
@@ -508,6 +509,7 @@ impl DrawingEditor {
                     { "label": "Border size", "kind": "select", "value": format!("{} Character{}", st.flag_chars, if st.flag_chars > 1 { "s" } else { "" }) },
                 ],
                 "old": old,
+                "texts": ["Color"],
             })
         });
         let sizes: Vec<Entry> = (1..=4u8).map(|n| entry(&format!("{n} Character{}", if n > 1 { "s" } else { "" }), None, st.flag_chars == n, std::rc::Rc::new(move |s: &mut NoteStyle| s.flag_chars = n))).collect();

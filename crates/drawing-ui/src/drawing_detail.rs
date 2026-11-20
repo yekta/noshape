@@ -475,7 +475,7 @@ impl DrawingEditor {
                 { "label": "Show detail view profile", "kind": "checkbox", "value": show },
                 { "label": "Clip border to geometry", "kind": "checkbox", "value": clip },
             ]);
-            crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Detail view", "fields": fields }), text.0)
+            crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Detail view", "fields": fields, "texts": SHAPES.map(|s| s.0) }), text.0)
         });
         Some(
             v_flex()

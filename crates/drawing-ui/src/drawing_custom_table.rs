@@ -550,6 +550,11 @@ impl DrawingEditor {
                 (t.display.clone(), d.chosen.as_ref() == Some(t), std::rc::Rc::new(move |e: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| e.pick_table(t2.clone(), cx)) as Set)
             })
             .collect();
+        // The table picker beside it, as `texts` (the drawing matrix; live's recorder reads only the dialog).
+        let picker_texts: Vec<String> = match &d.picker {
+            Some(Picker::Table { .. }) => std::iter::once("Select a custom table".to_string()).chain(table_items.iter().map(|i| i.0.clone())).collect(),
+            _ => Vec::new(),
+        };
         crate::ui_script::note_dialog(|| {
             let mut text: Vec<String> = vec![(if editing { "Custom table properties" } else { "Custom table" }).into()];
             if editing {
@@ -569,7 +574,7 @@ impl DrawingEditor {
                 }
             }
             text.extend(["Order", "Top to bottom", "Bottom to top", "Select fixed corner"].map(String::from));
-            serde_json::json!({ "kind": "drawing-panel", "title": text[0], "text": text })
+            serde_json::json!({ "kind": "drawing-panel", "title": text[0], "text": text, "texts": picker_texts })
         });
         let add_row = h_flex().px(px(4.)).pt(px(4.)).gap(px(4.)).child(action("ct-add", "insert", "Add", true, studio_name.is_none(), cx)).when_some(studio_name.clone(), |r, n| r.child(div().flex_1().child(select("ct-studio", n, studio_items))));
         let insert_row = h_flex()

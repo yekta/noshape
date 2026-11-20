@@ -643,7 +643,9 @@ impl DrawingEditor {
                     text.extend(["Color".into(), "Drawing properties".into()]);
                 }
             }
-            serde_json::json!({ "kind": "drawing-panel", "title": text[0], "text": text })
+            // Its sketch tools' tips as `texts` (the drawing matrix; live's recorder reads the panel's text).
+            let tips: &[&str] = if section_mode { &[] } else { &["Center point circle", "Corner rectangle", "Spline", "Polygon"] };
+            serde_json::json!({ "kind": "drawing-panel", "title": text[0], "text": text, "texts": tips })
         });
         Some(
             v_flex()

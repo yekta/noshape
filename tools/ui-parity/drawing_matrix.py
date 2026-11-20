@@ -82,12 +82,16 @@ OURS_TITLES = {
     "Ordinate dimension": ["Dimension palette"],
     "Move to sheet / Replicate": ["Move to sheet", "Replicate region"],
     "Styles panel": ["Styles"],
-    "Table": ["Table properties"],
+    # A cell's text panel is titled Note (live dom drawing-table-after-ok).
+    "Table": ["Table properties", "Note"],
     # drawing-holetable-titleblock.json's tbDbl is the title block's Note panel.
     "Hole table": ["Cell", "Note"],
     "MBD status": ["MBD status"],
     "Change to version": ["Reference manager"],
 }
+
+
+MENUS = "(our runs' menus)"
 
 
 def ours_shown(run_dir):
@@ -110,6 +114,10 @@ def ours_shown(run_dir):
             continue
         for s in steps:
             st = s.get("state") or {}
+            # A right-click menu our build opened (a sheet row's Move up): counted as our menus are.
+            lst = st.get("list")
+            if isinstance(lst, dict) and lst.get("kind") == "context-menu":
+                walk(lst.get("rows"), pool[MENUS])
             d = st.get("dialog")
             if isinstance(d, dict) and isinstance(d.get("title"), str):
                 for part in (d, st.get("list"), st.get("tooltip")):
@@ -135,7 +143,7 @@ NOISE = re.compile(r"^(Part \d|Part Studio \d|Sheet\d|Drawing \d|Assembly \d|Fro
 
 
 # Live's account's documents, tabs and the runners' copies: user content, not UI.
-USER = re.compile(r"live2?\b|noshape ui parity|^start |Copy \d|\buip\b|^(kern|fs|asb|jt|ctx|pvz|qa\d?|dx|psb|g\d+|w\d+|skb|ui\d?)\s|fluxpad|"
+USER = re.compile(r"live2?\b|noshape ui parity|^noshape mm test$|^FS sizes$|\bof asb drawing src\b|^start |Copy \d|\buip\b|^(kern|fs|asb|jt|ctx|pvz|qa\d?|dx|psb|g\d+|w\d+|skb|ui\d?)\s|fluxpad|"
                   r"Sheet\d|Trial - |Templates$|\.dwt$|^Part \d|Drawing \d+$|Load basic HTML|XeTiming|document\.|^\W*$|"
                   r"^(nist|ktane|psas)_|Shaft_With|OsSvgIconId|gathering statistics|[∅↧⌴]|"
                   r"^(active toolbar tool|hints/toasts|graphics overlays):|^button\.")
@@ -496,7 +504,7 @@ def main():
             rows.append((surface, t, status(seen, in_sources(src, t)), "recorded"))
         mine = set().union(*(v for k, v in shown.items() if any(k == ti or k.startswith(ti) for ti in titles + OURS_TITLES.get(surface, []))))
         # A right-click menu live's panel dump caught open: our menus' rows (the MENUDUMP of our build).
-        mine |= {norm(r.removesuffix(" ▸")) for rows_ in ours_menus.values() for r in rows_}
+        mine |= {norm(r.removesuffix(" ▸")) for rows_ in ours_menus.values() for r in rows_} | shown.get(MENUS, set())
         # A submenu's rows too ("Tangent edges ▸ Hidden | Solid | Phantom"), its name without the badge.
         for rows_ in ours_menus.values():
             for r in rows_:
@@ -512,7 +520,9 @@ def main():
                 rows.append((surface, t, elsewhere[key(t)], "dump (toolbar / menu item)"))
                 continue
             # Live's dump has it and our build showed it in that panel (no take compares the two states).
-            rows.append((surface, t, "shown" if st == "present" and norm(t) in mine else st, "dump"))
+            # Our brand where live names its own ("Show Onshape drawing templates").
+            ours_t = norm(t).replace("Onshape", "Noshape")
+            rows.append((surface, t, "shown" if st == "present" and (norm(t) in mine or ours_t in mine) else st, "dump"))
 
     # Cloud-only rows (out of scope) and dump texts live itself no longer shows (docs/parity/audit-drawing-dataexchange.md).
     rows = [(sf, it, "n/a" if it in CLOUD else ("accepted" if it in ACCEPTED and st != "=" else st), ACCEPTED.get(it, note) if st not in ("=", "accepted") else note)

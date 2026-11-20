@@ -142,7 +142,7 @@ impl DrawingEditor {
                 let sheets = fields.remove(i);
                 fields.splice(0..0, [sheets, serde_json::json!({ "label": "Sheets", "kind": "input", "value": custom.read(cx).value().to_string() })]);
             }
-            crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "modal", "title": "Export Drawing", "fields": fields, "buttons": ["Export", "Cancel"] }));
+            crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "modal", "title": "Export Drawing", "fields": fields, "buttons": ["Export", "Cancel"], "texts": ["File name", "View export rules"] }));
             crate::os_ui::modal_help(dialog, "Export Drawing", 600.)
                 .child(body)
                 .footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Export").disabled(range_empty))).child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))))
