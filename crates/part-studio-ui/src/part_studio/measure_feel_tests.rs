@@ -594,17 +594,26 @@ fn mass_adds_a_clicked_faces_part_and_a_second_click_takes_it_out(cx: &mut TestA
     assert!(summed, "Volume: Part 1 {:?}, both {:?}, Part 2 {:?}: the two parts' sum", volumes[0], volumes[1], volumes[2]);
 }
 
-/// qa analysis-interference (live): a face's summary goes when an analysis tool opens (Interference detection takes
-/// the face's part); no live take has a readout under any dialog.
+/// qa analysis-interference (live): a face's summary goes when Interference detection opens (it takes the face's
+/// part); the other analysis tools keep it (qa ANALYSIS-READOUT-HIDDEN, live analysis-connection, -zebra,
+/// -reflection, -deviation: Area 1120 mm² under their dialogs).
 #[gpui::test]
-fn no_summary_while_an_analysis_tool_is_open(cx: &mut TestAppContext) {
+fn only_interference_detection_hides_the_summary(cx: &mut TestAppContext) {
+    use crate::part_studio::analysis_tools::ToolKind;
     let b = Bench::open(cx, "summary-analysis", 1.0);
-    let face = b.readout(cx, &[TOP], &[]).unwrap();
-    cx.update_window(b.window, |_, w, cx| b.view.update(cx, |v, cx| v.toggle_analysis_tool(crate::part_studio::analysis_tools::ToolKind::Interference, w, cx))).unwrap();
-    wait_until(cx, b.window, |cx| !b.view.read(cx).ui_busy());
-    draw(cx, b.window);
-    let open = cx.update(|cx| (b.view.read(cx).ui.analysis_tool.is_some(), b.view.read(cx).ui.measure_readout.clone()));
-    assert!(!face.is_empty() && open.0 && open.1.is_empty(), "the top face's summary {face:?}; with Interference detection open: {:?}", open.1);
+    let toggle = |cx: &mut TestAppContext, kind: ToolKind| {
+        cx.update_window(b.window, |_, w, cx| b.view.update(cx, |v, cx| v.toggle_analysis_tool(kind, w, cx))).unwrap();
+        wait_until(cx, b.window, |cx| !b.view.read(cx).ui_busy());
+        draw(cx, b.window);
+        cx.update(|cx| (b.view.read(cx).ui.analysis_tool.is_some(), b.view.read(cx).ui.measure_readout.clone()))
+    };
+    for kind in [ToolKind::Interference, ToolKind::Connection, ToolKind::Zebra, ToolKind::Reflection, ToolKind::Deviation] {
+        let face = b.readout(cx, &[TOP], &[]).unwrap();
+        let open = toggle(cx, kind);
+        let hides = matches!(kind, ToolKind::Interference);
+        assert!(!face.is_empty() && open.0 && open.1.is_empty() == hides, "{kind:?}: the top face's summary {face:?}; with its dialog open: {:?}", open.1);
+        toggle(cx, kind);
+    }
 }
 
 /// live2 mass-override-1119: on one part with a material the Center of mass and inertia Override boxes enable (a part

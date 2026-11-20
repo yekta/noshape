@@ -4305,7 +4305,7 @@ neither build. knifehandle Fillet 2 shows a kernel message in place of Onshape's
     to confirm with a run started 2 s after opening.
   - core 03:25: REGEN-SPEED's perf.yml run 40796942944 (main 34cbea98) has the Extrude 1 edit commit at 34 / 38 / 60 ms (macOS / Linux / Windows, budget 200). psui / qa: please confirm "commit shown in" on a current perf run and close.
   qa 17:28 (green e20a0d67, local Xvfb + llvmpipe, a sanity check, not the runners' measure): live-30, 5 Extrude 1 depth edits (bin/editloop3.sh) all commit, preview regen 102–153 ms, full regen ≤ 30 ms, app alive; no step over the 200 ms budget in the logs.
-- [ ] P1 ANALYSIS-READOUT-HIDDEN (psui; qa 11-20 02:55, night ui run on a06ec927, re-run alone 2/2) **psui's 62ef70f3b hides the bottom-right
+- [x] (psui 11-20 03:3x: only Interference detection hides the readout, `interference_open()`; test measure_feel_tests::only_interference_detection_hides_the_summary; qa, re-run the six) P1 ANALYSIS-READOUT-HIDDEN (psui; qa 11-20 02:55, night ui run on a06ec927, re-run alone 2/2) **psui's 62ef70f3b hides the bottom-right
   measure readout while any analysis tool's dialog is open; live hides it only for Interference analysis** (that scenario now matches).
   7 scenarios that matched in 1119-1302 now differ at step 3: analysis-connection, -zebra, -zebra-flip-edges, -reflection, -deviation,
   -deviation-options, and edge-menu-curve-analysis (Length 40 mm) (live's readout kept with the dialog open, ours null). Part Studio mod.rs: the readout is null when

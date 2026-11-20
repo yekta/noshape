@@ -1138,14 +1138,20 @@ impl PartStudioView {
         Some(self.display.connectors.iter().find(|c| &c.reference == r)?.origin)
     }
 
+    /// Interference detection's dialog is open (it hides the bottom-right readout; the other analysis tools don't).
+    pub(super) fn interference_open(&self) -> bool {
+        self.ui.analysis_tool.as_ref().is_some_and(|t| matches!(t.kind, super::analysis_tools::ToolKind::Interference))
+    }
+
     /// The live measurement of the selection left of the evaluation tools
     /// (live part-studio/81: "Perp planes angle: 90.000 deg", the number in
     /// monospace; a point reads "Point: X↘ … Y↗ … Z↑ …" with colored axes).
     pub(super) fn selection_readout(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         self.ui.measure_readout.clear();
-        // None while a feature dialog or an analysis tool's is open (live ui-parity dialog-enter-commits-new,
-        // edge-rclick-fillet, analysis-interference: measure null; no live take has a readout under any dialog).
-        if self.edit.is_some() || self.ui.analysis_tool.is_some() {
+        // None while a feature dialog or Interference detection's is open (live ui-parity dialog-enter-commits-new,
+        // edge-rclick-fillet, analysis-interference: measure null); the other analysis tools keep it (live
+        // analysis-connection, -zebra, -reflection, -deviation: Area 1120 mm²).
+        if self.edit.is_some() || self.interference_open() {
             self.ui.measure_last_line = None;
             return None;
         }
