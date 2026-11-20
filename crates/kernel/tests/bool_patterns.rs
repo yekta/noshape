@@ -1995,6 +1995,22 @@ fn a_bridge_and_its_mirror_image_fuse_glued_on_both_feet() {
     assert!((v / (2.0 * up.volume().unwrap()) - 1.0).abs() < 1e-9, "{v}");
 }
 
+/// A part and its mirror image glued on two pairs of faces on the plane, whose pocket walls also meet their tops on the
+/// plane (qa's crash957 Mirror 1, recorded): not glued, the two halves' arcs there one edge each as OCCT's fuse leaves
+/// them (glued, each was doubled and the document's Chamfer 3 lost its edges).
+#[test]
+fn mirrored_halves_touching_along_arcs_off_the_glued_faces_fuse_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "839309b67d2ac658").expect("the recorded fuse");
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("fused");
+    assert_ne!(k::last_boolean_path(), "glued");
+    let s = &r.shape;
+    assert_eq!((s.count(k::ShapeType::Face), s.count(k::ShapeType::Edge), s.count(k::ShapeType::Vertex)), (c.summary.faces, c.summary.edges, c.summary.vertices));
+    let v = s.volume().unwrap();
+    assert!(s.is_valid() && (v - c.summary.volume).abs() <= 1e-9 * c.summary.volume, "volume {v}");
+}
+
 /// c2-valve-config's Extrude 2 (recorded): a valve body cut by a handle whose end plane crosses the seat cone's axis
 /// past its apex, and whose face's section with the body's chamfer cone (OCCT's, of 0.206 mm) ends 0.2065 mm off where
 /// it leaves the cone's rim: no section on the other nappe, the section's end the rim's vertex (OCCT's bound pave);

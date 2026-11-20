@@ -7738,6 +7738,20 @@ static bool fuse_glued(const TopoDS_Shape& target, const TopoDS_Shape& tool, Top
     for (TopExp_Explorer x(s, TopAbs_VERTEX); x.More(); x.Next())
       if (!fv.Contains(x.Current()) && pl.Distance(BRep_Tool::Pnt(TopoDS::Vertex(x.Current()))) <= 2 * tol)
         return false;
+    // (Nor an edge on the plane but the glued faces': two halves of a pocket wall meeting the top on the plane touch
+    // there too, an edge OCCT's fuse shares and the sewing leaves doubled (crash957's Mirror, its Chamfer 3 lost).)
+    ShapeIMap fe;
+    for (int i = 1; i <= glued_faces.Extent(); ++i)
+      TopExp::MapShapes(glued_faces(i), TopAbs_EDGE, fe);
+    for (TopExp_Explorer x(s, TopAbs_EDGE); x.More(); x.Next())
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+      if (fe.Contains(e) || BRep_Tool::Degenerated(e))
+        continue;
+      if (pl.Distance(BRep_Tool::Pnt(TopExp::FirstVertex(e))) <= 2 * tol && pl.Distance(BRep_Tool::Pnt(TopExp::LastVertex(e))) <= 2 * tol
+          && pl.Distance(mid(e)) <= 2 * tol)
+        return false;
+    }
     return true;
   };
   if (!side(sa, true) || !side(sb, false))
