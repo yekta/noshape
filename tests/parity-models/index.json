@@ -144,6 +144,15 @@
   "original": "https://cad.onshape.com/documents/42a706f298f36e047910ca21/w/3cceb8d55346f6a692c70523/e/99f050b0b6899a0d5ffa611c"
  },
  {
+  "name": "c2-cov-edit-curve",
+  "document": "3e232993ca13a9e80b3b438b",
+  "workspace": "9f2c60d7c7d0e9e277d9fa38",
+  "element": "6605615aac505ab418dae3a9",
+  "url": "https://cad.onshape.com/documents/3e232993ca13a9e80b3b438b/w/9f2c60d7c7d0e9e277d9fa38/e/6605615aac505ab418dae3a9",
+  "title": "cov-edit-curve",
+  "original": "https://cad.onshape.com/documents/3e232993ca13a9e80b3b438b/w/9f2c60d7c7d0e9e277d9fa38/e/6605615aac505ab418dae3a9"
+ },
+ {
   "name": "c2-cov-external-thread",
   "document": "499ad9e1009524567d8a1999",
   "workspace": "baf71a8d791b440edb3865f3",
@@ -171,6 +180,24 @@
   "original": "https://cad.onshape.com/documents/cc7e223db660e9b6fccb0abf/w/2326126bceb6edbd911a1395/e/172235a39f55b9629edcee87"
  },
  {
+  "name": "c2-cov-isoparametric-curve",
+  "document": "a6e810dca204caa8bc074f55",
+  "workspace": "53d34e14cb180d2977dd24d5",
+  "element": "f1c69afb267ce3582d3e7fb2",
+  "url": "https://cad.onshape.com/documents/a6e810dca204caa8bc074f55/w/53d34e14cb180d2977dd24d5/e/f1c69afb267ce3582d3e7fb2",
+  "title": "cov-isoparametric-curve",
+  "original": "https://cad.onshape.com/documents/a6e810dca204caa8bc074f55/w/53d34e14cb180d2977dd24d5/e/f1c69afb267ce3582d3e7fb2"
+ },
+ {
+  "name": "c2-cov-point",
+  "document": "07835a21b4a7cc10ef205ca4",
+  "workspace": "ef34a30dd2201923a9439c67",
+  "element": "3edcca80f40afafd3cd31574",
+  "url": "https://cad.onshape.com/documents/07835a21b4a7cc10ef205ca4/w/ef34a30dd2201923a9439c67/e/3edcca80f40afafd3cd31574",
+  "title": "cov-point",
+  "original": "https://cad.onshape.com/documents/07835a21b4a7cc10ef205ca4/w/ef34a30dd2201923a9439c67/e/3edcca80f40afafd3cd31574"
+ },
+ {
   "name": "c2-cov-sm-bend-relief",
   "document": "5a5e2015996a43ecf6e79224",
   "workspace": "2489cb10e959c382eb255f91",
@@ -189,6 +216,15 @@
   "original": "https://cad.onshape.com/documents/95c87a520e8573bb19efa00d/w/7016b3cc3f67d4f2ed20f620/e/e87fb35d2eafa3c67b5715bb"
  },
  {
+  "name": "c2-cov-sm-recognize",
+  "document": "cc6bc5baee259b14b5c67e9d",
+  "workspace": "b9fb6204aeb22893a83c81cb",
+  "element": "31b575e95725b174b4a47e02",
+  "url": "https://cad.onshape.com/documents/cc6bc5baee259b14b5c67e9d/w/b9fb6204aeb22893a83c81cb/e/31b575e95725b174b4a47e02",
+  "title": "cov-sm-recognize",
+  "original": "https://cad.onshape.com/documents/cc6bc5baee259b14b5c67e9d/w/b9fb6204aeb22893a83c81cb/e/31b575e95725b174b4a47e02"
+ },
+ {
   "name": "c2-cov-sm-rip",
   "document": "a5fc2c76c9ffc26c807fb06b",
   "workspace": "0f70fb10adaf2e4437c18dcc",
@@ -205,6 +241,15 @@
   "url": "https://cad.onshape.com/documents/d4d8d3d98c6974e3bd1dedc2/w/0e5c1964f991cfd156786d8a/e/5246da32402d496dfde6e465",
   "title": "cov-sm-unfold-refold",
   "original": "https://cad.onshape.com/documents/d4d8d3d98c6974e3bd1dedc2/w/0e5c1964f991cfd156786d8a/e/5246da32402d496dfde6e465"
+ },
+ {
+  "name": "c2-cov-trim-curve",
+  "document": "d0019515bfe667b826149a18",
+  "workspace": "e0176b0927f813cac3314492",
+  "element": "3c06a9dedd02b9707b85c2e9",
+  "url": "https://cad.onshape.com/documents/d0019515bfe667b826149a18/w/e0176b0927f813cac3314492/e/3c06a9dedd02b9707b85c2e9",
+  "title": "cov-trim-curve",
+  "original": "https://cad.onshape.com/documents/d0019515bfe667b826149a18/w/e0176b0927f813cac3314492/e/3c06a9dedd02b9707b85c2e9"
  },
  {
   "name": "c2-curve-pattern-composite",

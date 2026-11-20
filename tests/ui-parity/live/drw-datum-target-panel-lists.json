@@ -1,6 +1,6 @@
 {
  "scenario": "drw-datum-target-panel-lists",
- "recorded": "2026-11-17T11:52:45.188Z",
+ "recorded": "2026-11-20T10:21:11.222Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -9,12 +9,12 @@
    1919,
    1079
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.5"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
   "document": "a1e7207bcd206771836609af",
   "workspace": "6d6324b30f07aa9904363635",
-  "element": "c3fbcbf2dd08163d691c1b8f",
+  "element": "02410692a2629f707d79e85a",
   "start": "block-drawing",
   "startElement": "fec75b9b8f06f7e2fe8fa56f",
   "runner": "live2 .nstate-uip-1.json"
@@ -98,7 +98,20 @@
     }
    ],
    "annotations": [],
-   "selection": []
+   "selection": [],
+   "viewport": {
+    "sheet_px": [
+     378,
+     113,
+     1580,
+     1042
+    ],
+    "sheet_mm": [
+     279.4,
+     215.9
+    ],
+    "mmPerPixel": 0.23245
+   }
   }
  },
  "steps": [
@@ -203,10 +216,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 226843
+   "t": 230685
   },
   {
    "step": 2,
@@ -304,10 +330,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 251669
+   "t": 256911
   },
   {
    "step": 3,
@@ -420,10 +459,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 276566
+   "t": 282234
   },
   {
    "step": 4,
@@ -531,10 +583,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 303426
+   "t": 309319
   },
   {
    "step": 5,
@@ -680,10 +745,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 329907
+   "t": 335226
   },
   {
    "step": 6,
@@ -821,10 +899,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 355447
+   "t": 361334
   },
   {
    "step": 7,
@@ -940,10 +1031,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 380334
+   "t": 387084
   },
   {
    "step": 8,
@@ -1051,10 +1155,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 405136
+   "t": 412613
   },
   {
    "step": 9,
@@ -1192,10 +1309,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 430471
+   "t": 438724
   },
   {
    "step": 10,
@@ -1325,10 +1455,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 455495
+   "t": 465906
   },
   {
    "step": 11,
@@ -1444,10 +1587,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 480757
+   "t": 492172
   },
   {
    "step": 12,
@@ -1555,10 +1711,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 505548
+   "t": 518874
   },
   {
    "step": 13,
@@ -1683,10 +1852,23 @@
        "kind": "EDGE",
        "owner": "Front"
       }
-     ]
+     ],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 530827
+   "t": 545468
   },
   {
    "step": 14,
@@ -1825,10 +2007,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 557524
+   "t": 573097
   },
   {
    "step": 15,
@@ -1955,10 +2150,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 584546
+   "t": 599834
   },
   {
    "step": 16,
@@ -2094,10 +2302,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 612607
+   "t": 626424
   },
   {
    "step": 17,
@@ -2233,10 +2454,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 639090
+   "t": 653647
   },
   {
    "step": 18,
@@ -2369,10 +2603,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 652768
+   "t": 670197
   },
   {
    "step": 19,
@@ -2499,10 +2746,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 677836
+   "t": 696579
   },
   {
    "step": 20,
@@ -2636,10 +2896,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 692896
+   "t": 712549
   },
   {
    "step": 21,
@@ -2770,10 +3043,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 719629
+   "t": 739799
   },
   {
    "step": 22,
@@ -2912,10 +3198,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 769913
+   "t": 766638
   },
   {
    "step": 23,
@@ -3046,10 +3345,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 795751
+   "t": 793777
   },
   {
    "step": 24,
@@ -3188,10 +3500,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 846183
+   "t": 819363
   },
   {
    "step": 25,
@@ -3322,10 +3647,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 870739
+   "t": 845412
   },
   {
    "step": 26,
@@ -3421,10 +3759,23 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 896277
+   "t": 872780
   }
  ]
 }
