@@ -284,6 +284,62 @@ TopoDS_Shape single_solid(const TopoDS_Shape& s)
 }
 
 // An edge's ellipse (its curve under any trims), with its range; null when not an ellipse.
+// The largest distance between an edge and its pcurve on `f` (sampled).
+static double pcurve_deviation(const TopoDS_Edge& e, const TopoDS_Face& f, int n = 64)
+{
+  double                          a, b;
+  const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, f, a, b);
+  if (pc.IsNull())
+    return -1;
+  const BRepAdaptor_Curve   c(e);
+  const BRepAdaptor_Surface s(f, false);
+  double                    m = 0;
+  for (int k = 0; k <= n; ++k)
+  {
+    const double   t = a + (b - a) * k / n;
+    const gp_Pnt2d q = pc->Value(t);
+    m                = std::max(m, s.Value(q.X(), q.Y()).Distance(c.Value(t)));
+  }
+  return m;
+}
+// Pcurves more than 10 um off their edges made anew from the edges, each such edge's tolerance then what its pcurves
+// need (in place; how many). OCCT's unify merges two pieces of one cone built from different apexes onto one surface,
+// leaves an edge's pcurve in the other's parameters and widens the edge to cover it: 0.83 mm on fuzz 2756e521's 45°
+// chamfer, the part read 77 mm3 heavy. Seams stay.
+static int with_stray_pcurves_refit(const TopoDS_Shape& s)
+{
+  TopTools_IndexedDataMapOfShapeListOfShape ef;
+  TopExp::MapShapesAndUniqueAncestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+  int          n = 0;
+  BRep_Builder bb;
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(ef.FindKey(i));
+    if (BRep_Tool::Degenerated(e))
+      continue;
+    bool fixed = false;
+    for (const TopoDS_Shape& x : ef(i))
+    {
+      const TopoDS_Face& f = TopoDS::Face(x);
+      if (BRep_Tool::IsClosed(e, f) || pcurve_deviation(e, f) <= 1e-5)
+        continue;
+      bb.UpdateEdge(e, occ::handle<Geom2d_Curve>(), f, BRep_Tool::Tolerance(e));
+      ShapeFix_Edge fix;
+      fix.FixAddPCurve(e, f, false, 1e-7);
+      fixed = true;
+    }
+    if (!fixed)
+      continue;
+    ++n;
+    double d = 0;
+    for (const TopoDS_Shape& x : ef(i))
+      d = std::max(d, pcurve_deviation(e, TopoDS::Face(x)));
+    if (2 * d < BRep_Tool::Tolerance(e))
+      bb.UpdateEdge(e, std::max(2 * d, 1e-7));
+  }
+  return n;
+}
+
 static occ::handle<Geom_Ellipse> ellipse_of(const TopoDS_Edge& e, double& f, double& l)
 {
   occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l);
@@ -10340,8 +10396,10 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
   // (In another order where USD's left two faces on one cylinder apart: 8eebe1e2's R14 wall halves, OCCT's common
   // gives them the other way round and USD merges them.)
   HHist              hs;
-  const TopoDS_Shape unified = usd_any_order(r, 1e-7, hs);
+  TopoDS_Shape unified = usd_any_order(r, 1e-7, hs);
   lap("unify");
+  if (const int k = with_stray_pcurves_refit(unified); k > 0 && dbg)
+    std::fprintf(stderr, "slabs: %d pcurves off their edges made anew\n", k);
   {
     HHist              jh;
     const TopoDS_Shape joined = with_ellipse_pieces_joined(unified, jh);

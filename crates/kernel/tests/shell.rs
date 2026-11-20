@@ -918,6 +918,19 @@ fn walls_that_rebuild_the_part_within_its_rounding_fail_as_live() {
     assert!(r.is_err(), "built {} mm³", r.map(|r| vol(&r.shape) * 1e9).unwrap_or(0.0));
 }
 
+/// Fuzz 2756e521: a part with a 45° chamfer round a boss, Shell 2 mm inward without its face 13. OCCT's unify merged the
+/// chamfer's two cone pieces (built from different apexes) with one edge's pcurve left 0.83 mm off: the part read 77 mm³
+/// heavy. Live: 32108.426 mm³, 45 faces (q-2756e521).
+#[test]
+fn a_shell_s_unified_cone_keeps_its_volume_as_live() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_brep(&dir.join("2756-input.brep")).unwrap();
+    let rm = vec![s.faces()[12].clone()];
+    let r = shell_solid(&s, &rm, 2e-3, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+    assert!((vol(&r) * 1e9 - 32108.426).abs() < 0.05, "{} mm³", vol(&r) * 1e9);
+    assert_eq!(r.count(ShapeType::Face), 45);
+}
+
 /// A user's twisted hexagon vase (11-02): a loft through five regular hexagons on parallel planes, circumradii
 /// 35 / 45 / 40 / 28 / 35 mm at z 0 / 30 / 60 / 90 / 120, each turned 15° more; six B-spline sides with sharp edges
 /// between them, the two hexagon caps.
