@@ -87,41 +87,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    everyday flows, then nightly/flows-done-<mmdd>; qa-w7-nightly waits for that flag (03:20 at the latest) before hat15 / dock;
    user flows after NIGHTLY-DONE. Re-arm each night with the next date. Cut verdict: a must-carry still queued reads PENDING
    at :15 and HOLD only if missing at :50 (timers qa-cut-0450 / 1650). qa-big-after fetches tonight's big run and fixes its fetch line.
-0000. **11-19 21:38 state (thread on Bbedward since 21:08).** Agent ids: only in /root/lead-scratch/roster.md (lead 22:5x); read it before every message_agent, never copy ids here.
-   **v0.4.61 post-release done 21:2x: clean** (qa-alerts line): SHA OK, user docs ALL-SAME (candidate and vs 0.4.60), ticket docs = the
-   cut's 3 (draft-hang, shell-hang-pre, suppress-segv), quit-abort 5/5, hover flow uh/r61 108/108 shots right, spot rows 17-22 on the
-   released app 12/13 (suites/1119-2120-v0461-spot; line-from-midpoint fixed after the release). Compat baseline 0.4.61. Next spot
-   rows 23-24 (feel rows 71 sticky snap, 72 hat15b moved sketch) checked by hand 21:4x: both = (line held 0-4 px, point from
-   5 px; hat15b Sketch 1 lit -6..+8 px round a line at 1247.5, region boundary lit inside the loop as live). Next: rows 25-32.
-   **In flight:** qa-wait-e196 (bin/wait-rows.sh on subject "psui: Routing curve's Multiple" = psui's land job e196bc5a, which carries
-   their 6 feel fixes): on its green re-runs face-rclick-select-fillet-faces, dialog-checkbox-convert-back, dialog-checkbox-rclick-convert,
-   dialog-query-rclick-clear-all, fillet-chip-clear-missing, fillet-chip-edit-healthy-moment, analysis-interference -> one qa-alerts line;
-   mark the TICKETS rows. Suite 1119-1302-291c74b0: ui 2120/2172, models done, assemblies / exchange in vibex8's slot: suites-diff.py
-   vs the last full run when done. psui's 7 rows (019698386) verified 22:33 on green 615bed1f: 7/7, 43/43 (TICKETS marked).
-   sketch-vertical-key: psui 22:16 on live2's camera retake = a real gap (end ~9 px off plumb, past 7.5 px; ours VERTICAL), psui fixes scene.
-   Walks 21:36-22:5x (part modelling, mass, assemblies, drawings, sheet metal, Variable Studio, BOM, hole table): details
-   in archive "## 11-20 moved" (01:05); their tickets are in TICKETS.
-   23:0x: Feature Studio custom feature (QA Box: template, commit, tool search, Size field, builds), version V1, branch B1, edit,
-   merge (dialog, toast, graph) = live; P2 HISTORY-ROW-NAME-OVERLAP (studios, told). Hole table: ✓ only starts placing, a click
-   places it (= live; ticket closed). Drawing hover = rows 130. To verify on their greens: dx BRAND-IN-UI-TEXT, skasm Simulation
-   connection dropped, studios history row + Noshape Labs verified 00:29. Sketch tools 23:09-23:15 (3-point arc, spline,
-   polygon, Slot on a line, Fillet, angle dim, Mirror) = live; P1 SKETCH-SLOT-ON-ARC (skasm). Direct edit 23:18 (Move face, Draft,
-   Split toast), Thicken 23:29, Delete face (CLI: Heal/Cap/Leave open/all), drawing Section view, asm linear pattern, Ball limits,
-   Transform (type order, XYZ triad 60 px at any zoom) = live; P2 ERROR-CHIP-RED-NO-FIELD (psui). asm d67512a33 both P1s VERIFIED 23:42 (green 2574b5b5). App runs: qa-xvfb110 +
-   qa-walk*-app, `xdotool windowfocus` FIRST (else Tab never previews); drawings have no alt+c (letters are shortcuts: n = Note).
-   tabrel.sh: vibe2 slot + 1 retry on SIGTERM (earlyoom 23:01); 4fee queued. Waiters: qa-wait-{dx-brand,skasm-sim,dx-torus,psui-stale} (studios-hist stopped: its fixes verified 00:30 on green eef639d7, 10217c61b; lowercase "noshape" x2 in Preferences sent to studios).
-   00:1x (lead 23:55 list): import/export round trips (CLI, x.* scratch) STEP/IGES/x_t exact, 3MF/OBJ meshes, assembly STEP/x_t,
-   flat DXF/DWG = live (live/qa/rt-1119 answers); P1 SKETCH-DXF-EXPORT-POLYLINES (skasm). Restore to Main, switch, Compare bar /
-   dots / slider = live; P1 COMPARE-COMMON-PARTS-MISSING (studios). Config List + configured #n through a feature pattern +
-   suppression = live (S 2 holes, L 5 holes 11371.681). TOOLBAR-TOOLTIP-AFTER-CLICK verified; psui sketch-vertical-key rerun
-   = live 10/10 (psui told); STALE-SKETCH-HOVER re-walk when ffd85455 (= 00389dbd) is in a green (qa-wait-psui-stale).
-   **Full interaction suite 02:00 (lead 11-20 01:00): timer qa-night-ui 01:40 -> bin/ui-night.sh: newest green to vibex8
-   ~/qa-speed/bin/noshape-night, worktree qa-night (not qa-suite: the 13:02 run's exchange step builds from agents/qa-suite/src),
-   slot ticket ~01:45, shards (3, :471) start at 02:00 (lead 01:1x: vibex8 is ours, blend moved to vibex7; if bool run1.sh still holds it, start when free, the alert line says started HH:MM late + the 02:00 slot owner); score + worse/better vs 1119-1302 -> qa-alerts. The 4-h loop stops after
-   the 13:02 run (suites/stop touched 01:05); restart it (rm stop; systemd-run qa-suites) after the night run.** uip-rerun.sh fixed
-   01:05: an empty shard ran ALL scenarios (psui-vk's shard 1, killed) and its Xvfb kept uip.lock (now 7>&-).
-   Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
-   needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
+0000. **Standing (from the 11-19 21:38 item; its history moved to archive "## 11-20 moved (02:4x)")**: agent ids only from
+   /root/lead-scratch/roster.md. Walk apps: `xdotool windowfocus` FIRST (else Tab never previews); drawings have no alt+c. tabrel.sh:
+   vibe2 slot + 1 retry on SIGTERM. Night ui run: bin/ui-night.sh (timer qa-night-ui, worktree qa-night, vibex8 slot); after it
+   restart the suites loop (rm suites/stop; systemd-run qa-suites). bin/uip-rerun.sh needs ABSOLUTE names paths (uip-rerun-0461.sh
+   = on the 0.4.61 app); systemd-run units have no cwd.
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
    with NOSHAPE_PARITY_VALIDITY=1 (bin/suites-models.sh exports it) models.log prints per feature "CHECK <doc> feature <k>:
    <part> valid <true|false> raw f/e/v; ..." (PartState.check, query parts' "check"; not in report.json). suites-diff.py
