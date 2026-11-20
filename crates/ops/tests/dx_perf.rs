@@ -184,13 +184,16 @@ fn corpus_model(models: &std::path::Path, name: &str, tmp: &std::path::Path) -> 
 /// Every view's hidden-line edges and model edges of the corpus parts' suggested-views drawings, written exactly
 /// (`{:?}`) to `NOSHAPE_VIEWS_DUMP/<model>.txt`: two builds' dumps compared show whether a kernel change (an OCCT
 /// patch) changes any drawing. NOSHAPE_VIEWS_MODELS: the models (default: the exchange suite's drawings and the
-/// heaviest parts).
+/// heaviest parts). Skipped without NOSHAPE_VIEWS_DUMP (the nightly T2 run).
 #[test]
 #[ignore = "T2: the corpus is on the build hosts only"]
 fn dump_corpus_drawing_views() {
     use std::fmt::Write;
     let models = std::path::PathBuf::from(std::env::var("NOSHAPE_PARITY_MODELS").unwrap_or_else(|_| "/root/parity/models".into()));
-    let out = std::path::PathBuf::from(std::env::var("NOSHAPE_VIEWS_DUMP").expect("NOSHAPE_VIEWS_DUMP: the dump directory"));
+    let Ok(out) = std::env::var("NOSHAPE_VIEWS_DUMP").map(std::path::PathBuf::from) else {
+        eprintln!("skipped: NOSHAPE_VIEWS_DUMP (the dump directory) is unset");
+        return;
+    };
     std::fs::create_dir_all(&out).unwrap();
     let list = std::env::var("NOSHAPE_VIEWS_MODELS").unwrap_or_else(|_| {
         "c2-bottle-split,c2-duct-multipart,c2-extension-spring,c2-hex-bookcase-derived,c2-housing-draft,c2-rings-loft,c2-sm-louver,c2-variable-fillet-faceblend,cf-snap-hook,clamp-guillem,c2-impeller-loft,cf-surface-pattern,cf-straight-spline,cf-fill-pattern,cf-drive-train-generator,cf-spur-gear,c2-fan-blade-sweep".into()
