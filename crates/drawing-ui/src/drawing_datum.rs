@@ -484,7 +484,7 @@ impl DrawingEditor {
         // The X / Y flips' tip as `texts` (the drawing matrix; live drawing-datum-target-after).
         let flips = d.rows.iter().any(|r| !r.ann.target.as_ref().is_some_and(|t| t.angular));
         let empty = d.label_text.is_empty() || d.rows.iter().any(|r| r.ann.target.as_ref().is_some_and(|t| t.angular) && r.count.read(cx).value().trim().is_empty());
-        let texts: Vec<&str> = [(flips, "Opposite direction"), (empty, "This field cannot be empty")].into_iter().filter_map(|(on, t)| on.then_some(t)).collect();
+        let texts: Vec<&str> = [(flips, "Opposite direction"), (!d.rows.is_empty(), "Precision"), (empty, "This field cannot be empty")].into_iter().filter_map(|(on, t)| on.then_some(t)).collect();
         crate::ui_script::note_dialog(|| crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Datum", "texts": texts }), datum_dlg_texts(d)));
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);

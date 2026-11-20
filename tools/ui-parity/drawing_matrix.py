@@ -235,13 +235,13 @@ HIDDEN_IS_ABSENT = {"Hole table", "View properties"}
 # inspection table's 9th column of the 10-18 dumps (live 11-17: 8 columns).
 NEVER_SHOWN = {"Reorder items", "Cut from section", "Double circle", "Square circle", "Tight fit", "Nominal & Tolerance"}
 # Per surface (live2 11-17): the general dimension palette's controls, display:none in every hole callout palette
-# dump; «Varies» only as the read-only Hole class value with Fit type User defined, which no recorder reads.
+# dump (Tolerance precision, Offset: display:none in the panel and fit dumps too); «Varies» only as the read-only Hole class value with Fit type User defined, which no recorder reads.
 # live2 11-17: what full-page dumps carry besides the surface (the page's chrome, the document's and account's names,
 # a menu clicked earlier, a transient message); the hole table cell editor's Formulas / Data Types (display:none);
 # Edit hatch's Apply to (display:none in every dump; dx 1735: none with a single-part section).
 PAGE_CHROME = {"Show measure details ([)", "Show analysis tools", "Display mass and section properties", "Create version…", "Version graph", "Set to last viewed configuration"}
 NEVER_SHOWN_IN = {
-    "Hole/thread callout": {"Precision:", "Tolerance: None", "Shaft class", "Reset text position", "Parentheses", "Toggle radius/diameter dimension", "Varies", "«Varies»"},
+    "Hole/thread callout": {"Tolerance precision", "Offset", "Precision:", "Tolerance: None", "Shaft class", "Reset text position", "Parentheses", "Toggle radius/diameter dimension", "Varies", "«Varies»"},
     "Custom table": PAGE_CHROME | {"Switch to Custom tables : pvz 2parts", "Switch to fs tables", "pvz 2parts", "onshape cone", "sketch start test"},
     "Insert DXF or DWG": PAGE_CHROME,
     "Move to sheet / Replicate": {"Hide auto centermarks", "Switch to asb drawing src", "Undo (ctrl+z)", "Redo (ctrl+y)", "Update from this workspace (ctrl+q)"},

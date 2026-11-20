@@ -374,7 +374,7 @@ impl DrawingEditor {
             crate::ui_script::note_list(Some(serde_json::json!({ "kind": "list", "rows": rows, "highlighted": picked, "disabled": [] })));
         }
         crate::ui_script::note_dialog_pinned(|| {
-            serde_json::json!({ "title": "Reference manager", "kind": "feature", "tabs": [{ "label": "Update to latest", "selected": tab == 0 }, { "label": "Selective update", "selected": tab == 1 }], "fields": fields, "error": null, "ok": if enabled { "enabled" } else { "disabled" }, "okLabel": if tab == 0 { "Update all" } else { "Update selected" } })
+            serde_json::json!({ "title": "Reference manager", "kind": "feature", "tabs": [{ "label": "Update to latest", "selected": tab == 0 }, { "label": "Selective update", "selected": tab == 1 }], "fields": fields, "error": null, "ok": if enabled { "enabled" } else { "disabled" }, "okLabel": if tab == 0 { "Update all" } else { "Update selected" }, "texts": if tab == 1 { vec!["Version graph"] } else { vec![] } })
         });
         Some(
             v_flex()

@@ -707,7 +707,9 @@ impl DrawingEditor {
                 if opts.override_tol {
                     fields.push(serde_json::json!({ "label": "Precision", "kind": "combo", "value": picked }));
                 }
-                crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "palette", "title": "Dimension palette", "fields": fields }));
+                // The override row's Tolerance button tip as `texts` (the drawing matrix; live dom drawing-hole-callout-fit).
+                let texts: &[&str] = if opts.override_tol { &["Tolerance"] } else { &[] };
+                crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "palette", "title": "Dimension palette", "fields": fields, "texts": texts }));
             }
             // The count is the Quantity's, not in the callout body (live drw-hcallout-fit 12: "3X" ▾ beside "⌀.197 THRU").
             let mut lines = lines;
