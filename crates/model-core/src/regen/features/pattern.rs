@@ -700,9 +700,11 @@ fn part_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     // keep their seeds apart (ScopeRule 16).
     let scope = match scope {
         Some(sc) if op == "ADD" && !ev.ctx.legacy_pattern_seeds => {
-            let seeds: Vec<usize> = bodies.iter().copied().filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Solid && !sc.contains(&i)).collect();
+            // A seed in the scope too (Merge with all): a tool, so it joins the parts it stands on even where no copy
+            // meets them (pattern_perf's Part ×200: the seed rib on the block).
+            let seeds: Vec<usize> = bodies.iter().copied().filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Solid).collect();
             let targets: Vec<BodyId> = sc.iter().map(|&i| ev.ctx.bodies[i].id.clone()).collect();
-            let target_bodies: Vec<Arc<Body>> = sc.iter().map(|&i| ev.ctx.bodies[i].clone()).collect();
+            let target_bodies: Vec<Arc<Body>> = sc.iter().filter(|i| !seeds.contains(i)).map(|&i| ev.ctx.bodies[i].clone()).collect();
             let joining: Vec<Arc<Body>> = seeds.iter().map(|&i| ev.ctx.bodies[i].clone()).filter(|s| !crate::regen::eval::touching(&target_bodies, std::slice::from_ref(&s.shape), true).is_empty()).collect();
             remove_bodies(ev, &joining.iter().map(|b| b.id.clone()).collect::<Vec<_>>());
             tools.extend(joining.iter().map(|b| body_named(b)));
@@ -1522,12 +1524,15 @@ fn face_pattern_fails(body: &Body, faces: &[usize], instances: &[Instance], merg
         // PATTERN-AFTER-INSERTED-CHAMFER: a hole whose rim a chamfer took, patterned into a shelled tray's cavity: live
         // cuts the floor). A boss's foot there would float.)
         let convex_edge = std::cell::OnceCell::new();
+        // Only a sharp edge (a rim) may land on another face: a round's tangent edge there would need the corner it
+        // took (live kern M1: a corner fillet mirrored to the far corner, "Could not create all instances as entered").
+        let sharp = || edge_convexity(body, e, s as usize, o as usize) != 0;
         let outside = |p: DVec3| {
             *convex_edge.get_or_init(|| edge_convexity(body, e, s as usize, o as usize) == 1) && body.shape.classify_point(p, tol).is_ok_and(|c| c == k::PointClass::Outside)
         };
         if probes.iter().any(|m| {
             let p = m.transform_point3(mid);
-            !on_surface(&other, p, tol) && !on_part(p) && !outside(p)
+            !on_surface(&other, p, tol) && !(sharp() && on_part(p)) && !outside(p)
         }) {
             return true;
         }
