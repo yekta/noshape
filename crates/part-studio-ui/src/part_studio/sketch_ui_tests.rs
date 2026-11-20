@@ -5163,30 +5163,35 @@ fn the_working_spinner_shows_900_ms_into_a_regeneration_centred_low(cx: &mut Tes
             })
         })
         .unwrap();
-        std::time::Instant::now()
+        (std::time::Instant::now(), cx.executor().now())
     };
+    // The spinner's delay runs on the executor's clock: frames_for advances it with the wall clock, the slow case below
+    // by itself (a slow runner's frames can't put it past 900 ms).
+    let sim = |cx: &mut TestAppContext, since: std::time::Instant| cx.executor().now().saturating_duration_since(since);
     // A quick preview: no spinner at any frame (when the host ran it within the 900 ms).
-    let t = start(cx);
+    let (t, t_sim) = start(cx);
     let mut seen = false;
     while cx.update(|cx| view.read(cx).pending.is_some()) && t.elapsed() < std::time::Duration::from_secs(30) {
         frames_for(cx, window, 20);
         seen |= spinner(cx).is_some();
     }
-    if t.elapsed() < super::super::pending::OVERLAY_DELAY {
-        assert!(!seen, "a spinner for a regeneration done in {:?}", t.elapsed());
+    if sim(cx, t_sim) < super::super::pending::OVERLAY_DELAY {
+        assert!(!seen, "a spinner for a regeneration done in {:?}", sim(cx, t_sim));
     }
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
     wait_until(cx, window, |cx| view.read(cx).pending.is_none() && view.read(cx).edit.is_none());
     // A slow one (a regeneration not ending; a held Regenerator would stall the test executor): nothing until 900 ms,
     // then the spinner until it ends.
     let seq = u64::MAX;
-    let t = std::time::Instant::now();
+    let t = cx.executor().now();
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.begin_pending(seq, w, cx))).unwrap();
-    while t.elapsed() < std::time::Duration::from_millis(800) {
-        frames_for(cx, window, 20);
-        assert!(spinner(cx).is_none(), "a spinner at {:?}", t.elapsed());
+    while sim(cx, t) < std::time::Duration::from_millis(880) {
+        cx.executor().advance_clock(std::time::Duration::from_millis(20));
+        draw(cx, window);
+        assert!(spinner(cx).is_none(), "a spinner at {:?}", sim(cx, t));
     }
-    frames_for(cx, window, 300);
+    cx.executor().advance_clock(std::time::Duration::from_millis(40));
+    draw(cx, window);
     let b = spinner(cx).expect("the spinner past 900 ms");
     let area = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("viewport-area").expect("the graphics");
     let f = |p: gpui_kit::Pixels| f32::from(p);
@@ -5223,15 +5228,17 @@ fn switching_configurations_greys_nothing_and_spins_only_past_900_ms(cx: &mut Te
         v.studio(cx).map_or(0, |s| s.features.len().saturating_sub(v.row_ctx.rollback))
     });
     let before = cx.update(|cx| view.read(cx).display.clone());
-    let t = std::time::Instant::now();
+    let (t, t_sim) = (std::time::Instant::now(), cx.executor().now());
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.set_config_value(&input, "B".into(), w, cx))).unwrap();
     let same = |cx: &mut TestAppContext| cx.update(|cx| std::sync::Arc::ptr_eq(&view.read(cx).display, &before));
     assert_eq!((cx.update(|cx| view.read(cx).pending.is_some()), greyed(cx), same(cx)), (true, 0, true), "(regenerating, grey rows, the old model) at once");
     while cx.update(|cx| view.read(cx).pending.is_some()) && t.elapsed() < std::time::Duration::from_secs(30) {
         frames_for(cx, window, 20);
         assert_eq!(greyed(cx), 0, "grey rows at {:?}", t.elapsed());
-        if t.elapsed() < super::super::pending::OVERLAY_DELAY {
-            assert!(!spinner(cx), "a spinner at {:?}", t.elapsed());
+        // The spinner's delay runs on the executor's clock (frames_for advances it with the wall clock).
+        let at = cx.executor().now().saturating_duration_since(t_sim);
+        if at < super::super::pending::OVERLAY_DELAY {
+            assert!(!spinner(cx), "a spinner at {at:?}");
         }
     }
     draw(cx, window);

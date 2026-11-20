@@ -2715,7 +2715,7 @@ impl PartStudioView {
             return;
         }
         // Live: a slow model shows "Opening <feature>…" under the spinner.
-        self.pending_opening(feature.name.clone());
+        self.pending_opening(feature.name.clone(), cx);
         self.open_dialog(feature, index, false, window, cx);
     }
 

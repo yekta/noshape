@@ -24,6 +24,7 @@ pub(super) const OVERLAY_DELAY: Duration = Duration::from_millis(900);
 /// A regeneration whose result isn't shown yet.
 pub(super) struct Pending {
     pub seq: u64,
+    /// On the executor's clock (`BackgroundExecutor::now`: the test clock in tests).
     pub since: Instant,
     /// "Opening <feature>…" (an edit dialog opening on a slow model).
     pub opening: Option<String>,
@@ -48,10 +49,11 @@ impl PartStudioView {
     /// A regeneration started: pending from now (or still pending from an
     /// earlier edit), with the overlay timer.
     pub(super) fn begin_pending(&mut self, seq: u64, window: &mut Window, cx: &mut Context<Self>) {
-        let since = self.pending.as_ref().map(|p| p.since).unwrap_or_else(Instant::now);
+        let now = cx.background_executor().now();
+        let since = self.pending.as_ref().map_or(now, |p| p.since);
         let opening = self.pending.as_mut().and_then(|p| p.opening.take());
         self.pending = Some(Pending { seq, since, opening });
-        let wait = OVERLAY_DELAY.saturating_sub(since.elapsed());
+        let wait = OVERLAY_DELAY.saturating_sub(now.saturating_duration_since(since));
         self.pending_timer = Some(cx.spawn_in(window, async move |this, cx| {
             cx.background_executor().timer(wait).await;
             let _ = this.update(cx, |_, cx| cx.notify());
@@ -59,17 +61,23 @@ impl PartStudioView {
     }
 
     /// The next regeneration opens `name`'s dialog.
-    pub(super) fn pending_opening(&mut self, name: String) {
+    pub(super) fn pending_opening(&mut self, name: String, cx: &App) {
         match &mut self.pending {
             Some(p) => p.opening = Some(name),
-            None => self.pending = Some(Pending { seq: 0, since: Instant::now(), opening: Some(name) }),
+            None => self.pending = Some(Pending { seq: 0, since: cx.background_executor().now(), opening: Some(name) }),
         }
+    }
+
+    /// How long the pending regeneration has run, on the executor's clock.
+    fn pending_for(&self, cx: &App) -> Option<Duration> {
+        self.pending.as_ref().map(|p| cx.background_executor().now().saturating_duration_since(p.since))
     }
 
     /// The regeneration `seq` is fully shown.
     pub(super) fn end_pending(&mut self, seq: u64, cx: &mut Context<Self>) {
         if self.pending.as_ref().is_some_and(|p| p.seq == seq) {
-            let shown = self.pending.take().is_some_and(|p| p.since.elapsed() >= OVERLAY_DELAY);
+            let shown = self.pending_for(cx).is_some_and(|d| d >= OVERLAY_DELAY);
+            self.pending = None;
             self.pending_timer = None;
             if shown {
                 cx.notify();
@@ -80,7 +88,8 @@ impl PartStudioView {
     /// The working overlay over the graphics (live: inserted at +1.2 s,
     /// spinner at the bottom centre, text under it while a dialog opens).
     pub(super) fn render_pending_overlay(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let p = self.pending.as_ref().filter(|p| p.since.elapsed() >= OVERLAY_DELAY)?;
+        self.pending_for(cx).filter(|d| *d >= OVERLAY_DELAY)?;
+        let p = self.pending.as_ref()?;
         let pal = crate::theme::p();
         // Live: the 50 px box 40 px above the bottom, centred (live2 11-18); while a dialog opens, its centre where
         // the 1879×973 capture had it (105 px up) with the text centred 49 px under it.
