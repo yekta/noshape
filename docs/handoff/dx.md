@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-20 03:4x UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-20 05:1x UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -20,42 +20,24 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
   in ours (live 7/14/9): sent to blend 22:3x with repro /root/dx-scratch/si-save/c2-surf-intro-offset.noshape (needs
   fb8f84f42). Rebuild 130 ms -> ~1.5 s (live 0.36-1.2 s): the lofts now build + the failing fillet; recheck after
   blend's fix. Mac scripts: ~/noshape-host/dx-keep/sitrace.sh (copy /tmp/sitrace.sh), sisurf.sh.
-- QUEUED 695043d3 (re-queued 23:37 after the queue's qa.md bug): fb8f84f42 + handoffs. asm-pattern-std A/B (vibex8): A = B, 162/162
-  occurrences, 92/92 mates, 17/17 BOM rows, the same 12 "difference:" lines.
-- BRAND-IN-UI-TEXT (qa P2): QUEUED 3a531aae (00:0x 11-20, with 695043d3): "Import to Noshape", Properties' Category
-  "Noshape …" (shown_category; stored kinds keep live's "Onshape …"), drawing category fields "Noshape …". Tests +
-  clippy + drawing 255 + full ops e2e 260 green (vibex8). qa verifies on green.
-- DXF rows (lead 00:2x: now, surf-intro after blend's fix is on main). dxfdiff on the Mac exs-all run (00:0x;
-  /root/dx-scratch/dxfall/<doc>/{ours,live}.dxf): real geometric misses only in
-  - hex Right: plate top edge + two foot outlines missing: chain_pieces turned pieces joined going BACK the wrong
-    way (far end dropped). FIXED (views.rs + T1 mesh_pieces_chain_both_ways_from_the_first); Mac exs-all A/B: hex
-    1 ours-only + 2 live-only (was 1 + 4, Right = live), others unchanged. QUEUED 9023ff0d.
-  - snap-hook: MODEL, not drawing: all 4 hooks mirrored about their own x (76 vertices differ each side, ours.step vs
-    live.step). Snap Hook 1/2 take hookVector from evAxis of hookDirection (Shell OFFSET_EDGE KY5B; the studio
-    source /root/dx-scratch/snaphook.fs line 96): our edge runs opposite Parasolid's (the known edge-direction class,
-    featurescript.md "Line and plane origins"). Reported to the lead (00:50). Its extra r 3.5 arcs: HLR P1 below.
-  - faceblend Right: an extra 0.242 in line = model (blend's 4a: full-round boundary edges). clamp-guillem Top,
-    housing-draft, rings-loft, extension-spring: known (above / below).
-- HLR P1 (dx, 03:5x, COMMITTED, land after the lead installs the libs): a filleted hole rim's torus outline was drawn
-  VISIBLE behind a plate's front face (exact HLR; snap-hook's extra r 3.5 arcs). OCCT read the outline's approximated
-  end (3.7e-5 off tangent where the fillet meets the face's top edge seen edge on) as a crossing (Out -> outside).
-  patches/occt/0036 (HLRBRep_Data::RejectedPoint): an IN crossing at an end of the hidden edge, in the middle of the
-  boundary, tangents parallel to 1e-3, no other crossing within 1e-4 of the model size: rejected (classification
-  decides). Both guards came from faceblend (outline stubs on its side lines). T1 hlr::a_filleted_hole_rim_behind_
-  the_front_face_is_hidden (fails on stock). A/B (Mac exchange suite vs exdxf-base.log / dxf-base/, dxfdiff):
-  snap-hook 7 ours-only -> 0 (ARC 81->75, LINE 352->345, SPLINE 9->8), rings-loft Right 159->151 entities, the other
-  8 drawings identical; drawing 257, ops e2e 260, kernel hlr green. Faceblend's back view keeps two 1.9 um stubs:
-  stock too. Staged libTKHLR.a (installed lib, only HLRBRep_Data replaced): x86-64 vibex7 ~/agents/dx-keep/occt-0036/
-  libTKHLR.a (24c350e8; g++-15 -march=x86-64, no ymm/fma, g++-13 builds it); arm64 Mac dx-keep/hlr36/libTKHLR.a
-  (279b6f08, mk36.sh). Patch source: /root/dx-scratch/hider/p36b/{a,b}.
-- STEP torus (bool's Shell case 17488d26): QUEUED 0dbd37f4: io.cpp step_direct_faces + step_forward_wires before
-  OCCT's writer; T1 export::a_one_loop_torus_face_round_trips_through_step. Detail: archive (11-20 00:3x).
+- LANDED 04:49 as d9b795e0 (c63e548b, 8 commits): fb8f84f42 (surf-intro refs + open-profile loft), BRAND-IN-UI-TEXT
+  (qa verifies), hex chain_pieces both ways (9023ff0d, 5dd3534a 04:22), STEP one-loop torus, HLR P1 = OCCT patch 0036
+  (HLRBRep_Data::RejectedPoint: an IN end crossing tangent to a boundary's middle, unpaired, rejected; snap-hook 7 stray
+  pieces -> 0, rings-loft Right 159 -> 151; libs installed by the lead on vibe2/vibex6-8, /root/occt, Mac, *.pre0036).
+- QUEUED f573b788 (05:0x, worktree dx-nightly): dump_corpus_drawing_views skips without NOSHAPE_VIEWS_DUMP (nightly
+  T2). Once landed: rm the dx-nightly worktree and vibe2 ~/agents/dx-nightly/target. std_sheet_metal_matches_onshape
+  is skasm's (9e5c392b4's sm_built).
+- snap-hook model mirror (all 4 hooks about their own x; Shell OFFSET_EDGE hookVector from evAxis, our edge opposite
+  Parasolid's, /root/dx-scratch/snaphook.fs line 96): reported to the lead 00:50. faceblend Right's extra line: blend's.
+- sm-louver DXF (05:0x, PARKED, small): geometry as live except the Right view's flange tangent edge: HLR hides 0.64 mm
+  of it at each louver (10 pieces; live one 0.73 in line) and the DXF loses its 17 mm bottom piece (0.35 mm on paper).
+  Not on our STEP re-read (one piece) -> the model's own shape. The type-count gap is sub-0.001 in stubs (live writes
+  tangent edges seen end-on as 0.0005 in LINEs: TANGENT 121/243). Probe diff /root/dx-scratch/smlv-probe.diff
+  (DXPROBE in project_bodies + kernel hlr probe), Mac dx-keep/exone.sh (exchange suite on exs-one = sm-louver).
 - surf-intro (03:0x, blend's 6b6b3b4a0 + fb8f84f42, Mac sitrace2.sh, si-blend.diff applied for the run): all 5 past
   Derived 1, rebuild 300-490 ms (live 359-1202). Next stop in 4: Tail fin extrude UP_TO_VERTEX 3483.23 vs 3567.19 mm²:
   the car's rear vertices (y 254, z 30.343) at x +-33.142, live +-33.941 (Fillet 1's end): sent to blend 03:0x.
   offset doc: Offset surfaces 1 9588.57 vs 9591.44 (likely the same). CLI queries: Mac dx-keep/siq.sh, si-q/.
-- Nightly (lead P2): dump_corpus_drawing_views skips without NOSHAPE_VIEWS_DUMP: e8e1a6107 (worktree dx-nightly)
-  landing; std_sheet_metal_matches_onshape is skasm's (9e5c392b4's sm_built), skasm fixing.
 - Next: the rest of "Next, in order".
 - The Mac's dx-main release target links a PRIVATE TKHLR (OCCT_ROOT=~/noshape-host/dx-keep/hlr/root, counters only
   with DXHLR=1); rebuild with the normal OCCT_ROOT for timings.
@@ -86,10 +68,8 @@ Open, ranked:
    their cuts with the cylinders 56 ELLIPSEs), ours are offsets written as approximations (deg 15x13, 7189 poles), the
    cuts B-splines (/root/dx-scratch/bin/step_edgefaces.py, step_bsurf.py). Reported to the lead for bool/core.
    housing-draft ARC 0/3, ELLIPSE 10/15, SPLINE 15/7; sm-louver ARC 101/68, ELLIPSE 50/86, SPLINE 31/0.
-- sheet-metal-plus .3mf / .obj: live2 meshcheck-1119 (16:0x): live makes 3 parts of each (580567.98, 36048.84,
-  10142.77 mm³), nothing hollowed; the suite expects the model's parts for OBJ / 3MF when they differ from the STL's.
 - c2-config-parts-screws: hang fixed (b777cbd1), still in tests/parity-models/unscored.json: Sweep 1's 14.8 GB
-  Boolean is bool's P0 (lead 11-16). Score it once fixed. Remove vibe5 ~/agents/dx/target-g13 when no longer needed.
+  Boolean is bool's P0 (lead 11-16). Score it once fixed: capped check (16 GB) vibex7 ~/agents/dx-keep/screws.sh 05:1x. Remove vibe5 ~/agents/dx/target-g13 when no longer needed.
 
 ## Other in flight
 - config-parts: see "config-parts at live's 18:0x retake" below (the 11-17 vibe5 runs: archive).
