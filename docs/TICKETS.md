@@ -285,7 +285,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   eef639d7, spot round 2 rows 1-8)
 
 ## qa, 2026-11-19
-- [ ] P2 SHELL-AFTER-WELD-FILLET (bool, lead 11-19; qa 2026-11-19 12:38 UTC) qa's fuzz ticket document cli-shell-hang-pre
+- [ ] (answered by live 11-20 19:0x, behaviours "TICKETS answers that waited on live2": the state before Shell 3 (green CLI on a copy) imported into live shells OK, Shell 3's two faces at 5 mm, so Shell 3 should succeed; bool told by live) P2 SHELL-AFTER-WELD-FILLET (bool, lead 11-19; qa 2026-11-19 12:38 UTC) qa's fuzz ticket document cli-shell-hang-pre
   (vibex7 ~/qa/tickets/cli-shell-hang-pre.noshape): since blend 92c8595b0 its Fillet 1 builds (v0.4.60: "Failed to fillet
   selections."), and Shell 3 on the filleted part now fails with "Could not shell part with selections." (Shell 5 then
   "1 missing selection"). v0.4.60's Ok Shell 3 shelled the unfilleted part. Question: should Shell 3 succeed on the filleted
@@ -959,7 +959,7 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 - [ ] (fixed psui 11-18 22:38, to verify: the tooltip at the chip's right, `ui::with_user_side_tooltip`) **P2 FEEL-CHIP-TOOLTIP-PLACE (psui)**: a selection chip's tooltip shows under the pointer, over the next chip; live puts it to the chip's right.
 - [x] (verified live2 20:2x on green 548d795fb / main 7302f8bd4, psui 17:09 batch: "Delete Edge of Extrude 1") **P2 FEEL-CHIP-X-TOOLTIP (psui)**: the chip's × tooltip reads the chip's name; live "Delete Edge of Extrude 1".
 - [x] (verified live 11-20 on green cd82afd4, ours-verify-1120: the # list 72-88 ms after the key, in the same frame as the "#") (fixed psui 11-18 22:4x, to verify: the dialog redraws when its list opens; a bare "#" changed no value, so the list waited for the caret's next blink) **P1 FEEL-HASH-LIST-DELAY (psui)**: the "#" variable list opens ~0.7 s after the key; live on the next frame.
-- [ ] (ON HOLD qa 12:33: live2 right-clicked Extrude 2, the LAST feature; live's menu with Roll to here was on a feature that wasn't last; live2 checks live's menu on a last feature first) **P1 FEEL-ROW-MENU-ROLL-TO-HERE (psui)**: a feature row's menu has no "Roll to here"; live has it.
+- [ ] (hold answered by live 11-20 19:0x: live has no "Roll to here" on the last feature only, every earlier feature has it; qa judges ours on a non-last feature) (ON HOLD qa 12:33: live2 right-clicked Extrude 2, the LAST feature; live's menu with Roll to here was on a feature that wasn't last; live2 checks live's menu on a last feature first) **P1 FEEL-ROW-MENU-ROLL-TO-HERE (psui)**: a feature row's menu has no "Roll to here"; live has it.
 - [x] (closed qa 12:33: live2's fresh-config retake: 220 px (x 246-466), as live; the 392 came from /root's shared config) **P1 FEEL-FILLET-DIALOG-WIDTH (psui)**: the Fillet dialog is ~394 px wide; live 220.
 - Equal to live (live2): the two-feature suppress, the rollback release, chip click / Delete, expressions, Tab in the "#" list.
 
