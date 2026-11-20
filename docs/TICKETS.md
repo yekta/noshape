@@ -72,7 +72,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P0 FEEL-ASM-DRAG-DEAD-ZONE (asm 04:5x: a real-pointer 100 px drag moves 100 px in its test; the 2 px may be the hover outline: re-walk on a part edge once 5bfaa556 is green; asm; qa 11-20 04:32, live behaviours "feel coverage (11-20)" A1 / A1b, walked on green 9ae062180 vibex8) a dragged instance moves the FULL pointer delta from the press in live (150 px =
   8.84 mm at 0.058965 mm/px; 17 px = 1.002 mm); ours moves 2 px less every time (148 of 150, 3 of 3; single moves d-2). After release
   / Ctrl+Z match. qa-scratch/feel1120/a1/a1-after-0c.png
-- [ ] P0 FEEL-ASM-MATE-PREVIEW-COLOUR (asm; qa 11-20 04:32, live behaviours "feel coverage (11-20)" A2, walked on green 9ae062180 vibex8) Fastened preview: live's mate face highlight is yellow rgb(229,183,37), Part 1's
+- [x] (asm cfbd3ea8e: the picked face filled (229,183,37) with the hover outline (a new PICKED face state), the previewed moving part no longer amber, its hidden edges through the others; tests a_mate_previews_moving_part_shows_its_edges_through_the_others, first pick SELECTED|PICKED) P0 FEEL-ASM-MATE-PREVIEW-COLOUR (asm; qa 11-20 04:32, live behaviours "feel coverage (11-20)" A2, walked on green 9ae062180 vibex8) Fastened preview: live's mate face highlight is yellow rgb(229,183,37), Part 1's
   top edges yellow (221,187,116) and Part 2's coplanar top partly grey; ours orange rgb(229,163,34), Part 1's top edges black, Part 2's top all
   highlight colour. Jump, ghost outline, picks, chips and Escape match. qa-scratch/feel1120/a2/prev-live-vs-ours.png (top live, bottom ours)
 - [ ] P0 FEEL-SM-PARTIAL-FLANGE-MANIP (skasm; qa 11-20 04:32, live behaviours "feel coverage (11-20)" S1, walked on green 9ae062180 vibex8) Flange edit, Partial flange: live's manipulator is a blue ring (~12 px) on the
@@ -97,7 +97,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (label pitch 74 px vs 75). qa-scratch/tickets/drwdlg-export-drawing.png
 
 ## qa, 2026-11-20
-- [ ] P2 **ORACLE-ASM-R3-TOLERANCE (asm)**: the T2 test `model/tests/oracle_asm::assemblies_match_live` fails in every
+- [x] (asm 5f0163137: a Ball part keeps its start turn exactly (the ~2e-6 rad was the solve's finite differences); R3 matches on Linux and macOS) P2 **ORACLE-ASM-R3-TOLERANCE (asm)**: the T2 test `model/tests/oracle_asm::assemblies_match_live` fails in every
   nightly T2 since 11-14 (vibex6 ~/lead/t2-*.log; 11-20 on 5b62f6ca8) on R3 only: instance B's transform vs live's differs
   by ~1e-8 in the rotation and ~2e-6 mm in the position (314.7456023 vs 314.7456043 mm). Far inside live's tolerance band
   (docs/TESTS.md: compare within live's band, never the last digits): widen the comparison, or say why R3 drifts. CP1 matches.
@@ -4331,7 +4331,7 @@ neither build. knifehandle Fillet 2 shows a kernel message in place of Onshape's
   7 scenarios that matched in 1119-1302 now differ at step 3: analysis-connection, -zebra, -zebra-flip-edges, -reflection, -deviation,
   -deviation-options, and edge-menu-curve-analysis (Length 40 mm) (live's readout kept with the dialog open, ours null). Part Studio mod.rs: the readout is null when
   `ui.analysis_tool.is_some()`; it should be null only for Interference.
-- [ ] P2 ASM-INSTANCE-PROPS-FIELD (asm; qa 11-20 02:55) asm-menu-instance-properties step 2: live's retake 025a33f60 records the
+- [x] (asm 164a763c1: the Reference designator input listed as a field (label none, its value) and the modal text; asm-menu-instance-properties 4/4) P2 ASM-INSTANCE-PROPS-FIELD (asm; qa 11-20 02:55) asm-menu-instance-properties step 2: live's retake 025a33f60 records the
   Instance properties modal's Reference designator input (fields 1, text "Part 2 <1> Reference designator"); ours dumps fields [] while its
   focus is that input (same dump as in 1119-1302, so the gap is in our state dump or the field is missing). Re-run alone: the same.
 - [ ] P2 DOCS-CRUMB-TOOLTIP (studios; qa 11-20 02:56, night ui run on a06ec927, re-run alone 2/2) docs-folder-crumb step 2: after a click
@@ -4354,7 +4354,7 @@ neither build. knifehandle Fillet 2 shows a kernel message in place of Onshape's
     features_c::parting_line_draft_on_curves_as_live (A2 6616.061 vs live 6616.046 mm³).
   - dx / featurescript: custom_features::std_sheet_metal_matches_onshape (sm1 0 parts, sm2 SHEET_METAL_FLANGE_NO_EDGES);
     knurl_b94_at_30_tpi_on_a_10_mm_rod "needed more than 15035 MB of memory".
-  - asm: oracle_asm::asm_fuzz_live_matches 75 of 80; assemblies_match_live is P2 ORACLE-ASM-R3-TOLERANCE.
+  - asm: oracle_asm::asm_fuzz_live_matches 75 of 80; assemblies_match_live is P2 ORACLE-ASM-R3-TOLERANCE. (asm 5f0163137: f5 and f50 fixed (a Ball part keeps its start turn), 76/80 on Linux; f53, f54, f55, f64 are the test's KNOWN solver differences (Cylindrical loops, a half-turn's point), not tolerances)
   - regen_profile::bench_edit_latency_reuse (no message beyond its timings; big-plate depth edit 327 ms).
 - [x] verified (qa 11-20 02:36, main 5b62f6ca8 / green a06ec927: nightly T2 on 5b62f6ca8: CP1 matches live (the test still fails on R3 by ~2e-6 mm: P2 ORACLE-ASM-R3-TOLERANCE)) 3f5f69ed (core: extruded cylinders framed as live, z toward the sketch; CP1 matches, out of KNOWN; R3/C1 now flip the pin as live, the solver's −157.5° turn is skasm's) P0 `model/tests/oracle_asm::assemblies_match_live` CP1 regressed by 339de774 (cylinder frame); fs suspects the
   cylinder axis should point toward the sketch (also CP1, R3, C1). Red at the halt.
