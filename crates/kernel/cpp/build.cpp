@@ -1431,7 +1431,7 @@ std::unique_ptr<OcShape> extend_face(const OcShape& on, double len)
   return wrap(out);
 }
 
-std::unique_ptr<OcShape> extend_face_over(const OcShape& on, rust::Slice<const double> pts, double margin)
+std::unique_ptr<OcShape> extend_face_over(const OcShape& on, rust::Slice<const double> pts, double margin, bool own_part)
 {
   const TopoDS_Face& f = as_face(on.shape, "face");
   if (pts.size() % 3 != 0 || !(margin >= 0))
@@ -1444,6 +1444,17 @@ std::unique_ptr<OcShape> extend_face_over(const OcShape& on, rust::Slice<const d
     fail_invalid("the face is not a B-spline");
   double u0, u1, v0, v1;
   bs->Bounds(u0, u1, v0, v1);
+  // own_part: the face's own part of its surface extended, not the whole surface: the rest of a ring's surface can sweep
+  // through what a wall should bound (c2-impeller-loft's chamfer, its other half down to z -51 mm). (No points: the whole
+  // surface.)
+  double fu0, fu1, fv0, fv1;
+  BRepTools::UVBounds(f, fu0, fu1, fv0, fv1);
+  fu0 = std::max(fu0, u0), fu1 = std::min(fu1, u1), fv0 = std::max(fv0, v0), fv1 = std::min(fv1, v1);
+  if (own_part && !pts.empty() && fu1 > fu0 && fv1 > fv0 && (fu1 - fu0 < (1 - 1e-6) * (u1 - u0) || fv1 - fv0 < (1 - 1e-6) * (v1 - v0)))
+  {
+    bs->Segment(fu0, fu1, fv0, fv1);
+    bs->Bounds(u0, u1, v0, v1);
+  }
   // Each side's need: the farthest point whose nearest surface point is on that side's boundary. (The points' nearest
   // surface points in parallel, a projector a run of them: 114 took 9.4 ms one after another on c2-hunting-knife's
   // Fillet 2.)

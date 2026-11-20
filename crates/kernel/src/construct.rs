@@ -258,7 +258,13 @@ pub fn extend_face(face: &Shape, len: f64) -> Result<Shape> {
 /// needs (a quarter more) plus `margin`: a face a blend runs onto, extended to trim it (a long extension of every side
 /// of a dense B-spline makes a surface OCCT's intersections fail on).
 pub fn extend_face_over(face: &Shape, points: &[DVec3], margin: f64) -> Result<Shape> {
-    Shape::from_res(ffi::extend_face_over(face.raw(), &flat(points), margin))
+    Shape::from_res(ffi::extend_face_over(face.raw(), &flat(points), margin, false))
+}
+
+/// [`extend_face_over`] of the face's own part of its surface: a wall a round runs on past its end, which the rest of
+/// a ring's surface would sweep through (c2-impeller-loft's chamfer, its other half down to z -51 mm).
+pub fn extend_face_part_over(face: &Shape, points: &[DVec3], margin: f64) -> Result<Shape> {
+    Shape::from_res(ffi::extend_face_over(face.raw(), &flat(points), margin, true))
 }
 
 /// `shape` (copied) with its face `index` rebuilt on `on`'s surface (one [`extend_face_over`] made of it): the same

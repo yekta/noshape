@@ -583,7 +583,7 @@ pub(crate) mod ffi {
         fn make_edge_on(on: &OcShape, pts: &[f64]) -> Result<UniquePtr<OcShape>>;
         fn face_with_edge_replaced(on: &OcShape, old: &OcShape, edges: &OcShapeList) -> Result<UniquePtr<OcShape>>;
         fn extend_face(on: &OcShape, len: f64) -> Result<UniquePtr<OcShape>>;
-        fn extend_face_over(on: &OcShape, pts: &[f64], margin: f64) -> Result<UniquePtr<OcShape>>;
+        fn extend_face_over(on: &OcShape, pts: &[f64], margin: f64, own_part: bool) -> Result<UniquePtr<OcShape>>;
         fn reface_on(shape: &OcShape, index: u32, on: &OcShape) -> Result<UniquePtr<OcShape>>;
         fn drop_open_wires(shape: &OcShape) -> Result<UniquePtr<OcShape>>;
         fn reverse_edge_curves(shape: &OcShape, edges: &OcShapeList) -> Result<UniquePtr<OcShape>>;

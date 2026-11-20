@@ -634,7 +634,7 @@ fn trimmed_run_on(shape: &Shape, supports: [usize; 2], (tool, names): (Shape, Ve
             continue;
         }
         if matches!(f.face_surface()?, k::Surface::BSpline { .. }) {
-            let ext = k::extend_face_over(f, &points, 0.05 * len)?;
+            let ext = k::extend_face_part_over(f, &points, 0.05 * len)?;
             refaced.push((i, ext.clone()));
             walls.push(ext);
         } else {
@@ -837,7 +837,7 @@ fn closed_run_on(shape: &Shape, ef: &[Vec<u32>], tools: Vec<RunOnTool>, scale: f
                 }
                 let f = &body_faces[i];
                 let free_form = !matches!(f.face_surface()?, k::Surface::Plane(_) | k::Surface::Cylinder { .. } | k::Surface::Cone { .. } | k::Surface::Sphere { .. } | k::Surface::Torus { .. });
-                let wall = if matches!(f.face_surface()?, k::Surface::BSpline { .. }) { k::extend_face_over(f, &points, 0.05 * t.len)? } else { k::extend_face(f, 2.0 * t.len)? };
+                let wall = if matches!(f.face_surface()?, k::Surface::BSpline { .. }) { k::extend_face_part_over(f, &points, 0.05 * t.len)? } else { k::extend_face(f, 2.0 * t.len)? };
                 let cells = k::split(std::slice::from_ref(&piece), std::slice::from_ref(&wall), &k::BooleanOptions::default())?.shape.solids();
                 if n == 0 && cells.len() == 1 {
                     // A face its run-on meets first that doesn't cut it across: a corner, with that face's neighbours
@@ -879,7 +879,7 @@ fn closed_run_on(shape: &Shape, ef: &[Vec<u32>], tools: Vec<RunOnTool>, scale: f
         for &i in &faces {
             let f = &body_faces[i];
             if matches!(f.face_surface()?, k::Surface::BSpline { .. }) {
-                let wall = k::extend_face_over(f, &points, 0.05 * len)?;
+                let wall = k::extend_face_part_over(f, &points, 0.05 * len)?;
                 refaced.push((i, wall.clone()));
                 walls.push(wall);
             } else {
