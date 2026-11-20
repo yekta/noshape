@@ -44,7 +44,9 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 - EXCHANGE TOP-3 LANDED 09:29 as 072a6c50 (2f406fa1). Rings "ours.stl" face 23 no triangles: bool's Shell builder, low.
 - DXF SCORING (DECISIONS 11-20) QUEUED bdf50182 + 6047caa6 (with the hole-rim circle, the tangent-beside-a-curve HLR
   fix, the isaac speed fix, five-point ARC fit). Mac exall-b1: DXF 2/10 (duct, louver); ops e2e 262/262. Rows left:
-  snap-hook 0.107 in of the Iso's r 0.8848 tangent ellipse cut into pieces (ours, cause not probed); bottle-split
+  snap-hook 0.107 in of the Iso's tangent ellipse (edge 52) dropped as lying on the fillet's own silhouette, which
+  touches it within 0.16 mm (model); live draws both. No tolerance separates it: on-curve tol x0.02 / x0.1 -> snap
+  0.033 / 0.067 in but faceblend +0.027 / +0.028, rings-loft +0.029 / +0.019 in of tangent pieces live drops (parked); bottle-split
   Front's lip arc: P3 HLR-TORUS-SELF-OCCLUSION (lead 11-20: parked; collect other drawings showing it for one patch); extension-spring an extra seam LINE + an edge live splits
   into spline + line (model topology); hex-bookcase a 0.05 in rim quarter on the dowel mesh (coincident, our
   under-the-mesh rule hides it); housing-draft live's 4-LINE runs + 0.057 in bow (projection); faceblend ELLIPSE vs
