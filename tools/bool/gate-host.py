@@ -23,14 +23,17 @@ FORMAT = "1"
 # The gate's corpora: bool's whyall set, shfall, the knurls and gears (kg.sh). parity56 against OCCT run here. kall
 # (knurls of 45-50 GB a process) is the nightly run's (kall-nightly.sh, lead 11-12), not each change's.
 REPLAY = ("bool-corpus corpus2 corpus3 corpus4 corpus5 corpus6 direct-corpus sh-new2 parity56 valve2 snap sp-cut shfall "
-          "k10-25 k10-25-12 k25-15 k25-25 k25-71-12 cf-spur-gear gears gpf").split()
+          "shfall-1102 k10-25 k10-25-12 k25-15 k25-25 k25-71-12 cf-spur-gear gears gpf").split()
 VS_OCCT = {"parity56"}
+# Corpora run and reported but never failing the gate (DECISIONS 11-20: the 11-02 Shell recordings): a case only in
+# these lists its new differences from main's run under "report".
+REPORT = {"shfall-1102"}
 # Corpora whose cases take many GB (the memory budget is 16 GB a process, as whyall.sh's): Shell's slab fuses and the
 # gears in a pool of two; the knurls, whose OCCT cuts reached 35-40 GB a process, one at a time, each with 36 GB free
 # (vibe4's earlyoom ends the largest process when memory runs low: eight heavy shards at once lost their results);
 # a case a shard (kall's 324c79d1 alone took 49.5 GB).
 # A shard ended without its results runs again alone after the rest.
-HEAVY = {"shfall", "cf-spur-gear", "gears", "gpf"}
+HEAVY = {"shfall", "shfall-1102", "cf-spur-gear", "gears", "gpf"}
 SOLO = {"kall", "k10-25", "k10-25-12", "k25-15", "k25-25", "k25-71-12"}
 HEAVY_AT_ONCE = 2
 # The cases timed, ours alone, main's binary and the branch's alternating.
@@ -426,7 +429,7 @@ def compare(base_r, new_r, base_s, new_s, spd):
         b = {r[0]: r for r in base_r}
         n = {r[0]: r for r in new_r}
         per = {}
-        new_bad, lost, gained, fixed, reasons, unknown, unrunnable = [], [], [], [], 0, [], []
+        new_bad, lost, gained, fixed, reasons, unknown, unrunnable, report = [], [], [], [], 0, [], [], []
         for key in sorted(set(b) | set(n)):
             rb, rn = b.get(key), n.get(key)
             if rn is None or rb is None:
@@ -444,8 +447,12 @@ def compare(base_r, new_r, base_s, new_s, spd):
                 unrunnable.append(f"{rn[2].split(',')[0]} {rn[1]}")
             elif sb == "noresult":
                 unknown.append(f"{rn[2].split(',')[0]} {rn[1]}: {rb[4]}")
+            elif sn in BAD and not (sb == sn and rounded(rb[4]) == rounded(rn[4])) and set(rn[2].split(",")) <= REPORT:
+                report.append(f"{rn[2].split(',')[0]} {rn[1]}: {sn}: {rn[4]} (main: {sb} {rb[4]})".strip())
             elif sn in BAD and not (sb == sn and rounded(rb[4]) == rounded(rn[4])):
                 new_bad.append(f"{rn[2].split(',')[0]} {rn[1]}: {sn}: {rn[4]} (main: {sb} {rb[4]})".strip())
+            elif sb in TAKEN and sn == "declined" and set(rn[2].split(",")) <= REPORT:
+                report.append(f"{rn[2].split(',')[0]} {rn[1]}: now declined: {rn[4]}")
             elif sb in TAKEN and sn == "declined":
                 lost.append(f"{rn[2].split(',')[0]} {rn[1]}: now declined: {rn[4]}")
             elif sb == "declined" and sn in TAKEN:
@@ -467,6 +474,8 @@ def compare(base_r, new_r, base_s, new_s, spd):
         if lost:
             check.append(f"{len(lost)} cases main takes now declined")
             info += ["  lost: " + x for x in lost[:40]]
+        info.append(f"report ({', '.join(sorted(REPORT))}, not gating): {len(report)} new differences from main's run")
+        info += ["  report: " + x for x in report[:40]]
         info.append(f"replay: {len(n)} distinct cases; taken {sum(r[3] in TAKEN for r in base_r)} -> {sum(r[3] in TAKEN for r in new_r)} "
                     f"(+{len(gained)} -{len(lost)}), differing {sum(r[3] in BAD for r in base_r)} -> {sum(r[3] in BAD for r in new_r)}, "
                     f"fixed {len(fixed)}, decline reasons changed {reasons}")
