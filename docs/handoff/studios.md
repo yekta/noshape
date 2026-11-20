@@ -22,6 +22,7 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
 - Landed 09:57: 782f4c47 as f29e6eb2 (the Windows CI wheel-notch fix and the 18 commits with it).
 - Landed 11:43: 35451185 as 2ce8ad6e (18 commits: the fc8e6c91 batch, drawing_datum_target op, panel-lists s21-24,
   FS bracket box, coverage Resize...).
+- No Mac until 13:44 UTC (user needs it; lead 12:3x): rb.sh / land.sh with NOSHAPE_RB_HOST=vibex7 or vibex8 till then.
 - Landed 12:25: b5048cc1 as 16e0a7e3 (Flip / Rotate 30 px apart; a selected dimension = live dsel3; section End
   type `dropdown:<shown>`).
 - Uncommitted, checked by b30 (/root/studios-scratch/b30.log; baseline b27d, 21 drw-dimension takes all full):
