@@ -78,6 +78,7 @@ fn replay_as(name: &str, describe: bool) -> String {
             let parts = s.children();
             extrude_up_to(&parts[0], v3(&after(&p, "dir", 3)), &parts[1], after(&p, "start_offset", 1)[0])
         }
+        "unify" => unify_same_domain(&s),
         "defeature" => delete_faces(&s, &subs),
         "offset" => offset_faces(&s, &subs, after(&p, "offset", 1)[0]),
         other => panic!("unknown op {other}"),
@@ -108,7 +109,7 @@ fn crashing_kernel_inputs_return() {
     assert!((b.volume().unwrap() - 1.0).abs() < 1e-12);
 }
 
-/// Replays one NOSHAPE_DUMP_OPS capture (fillet, draft, shell, prism_until, defeature, offsetfaces, project_along) and times it:
+/// Replays one NOSHAPE_DUMP_OPS capture (fillet, draft, shell, prism_until, unify, defeature, offsetfaces, project_along) and times it:
 /// `NOSHAPE_REPLAY=<dir>/<name> cargo test -p noshape-kernel --test all crash_inputs::replay_one -- --ignored --nocapture`.
 #[test]
 #[ignore = "T2: a tool; needs NOSHAPE_REPLAY"]
@@ -123,6 +124,7 @@ fn replay_one() {
     let t = std::time::Instant::now();
     let r = replay(&name);
     eprintln!("{name}: {r} in {:.1} ms", t.elapsed().as_secs_f64() * 1e3);
+    kernel_profile_mark("replay");
 }
 
 /// qa's cli-draft-die Draft 5 (BLEND-RUST-DEFAULT-REGEN): a 0.1 mm chamfer face drafted 30° that OCCT's draft

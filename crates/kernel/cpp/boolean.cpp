@@ -163,6 +163,7 @@
 #include <TopoDS_Wire.hxx>
 #include <NCollection_IndexedDataMap.hxx>
 #include <functional>
+#include <set>
 #include <numeric>
 #include <map>
 #include <TopoDS_Shell.hxx>
@@ -3679,6 +3680,10 @@ static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hi
   TopoDS_Shape        s     = cp.Shape();
   HHist               local = new BRepTools_History(to_list(std::vector<TopoDS_Shape>{s0}), cp);
   bool                any   = false;
+  // Groups whose merge failed, by their faces (held, so their addresses stay theirs): not tried again in later rounds
+  // while their faces are the same (isaac's Mirror 1: 470 retries of 43 groups), unless the whole part was what failed.
+  std::set<std::vector<const void*>> failed;
+  std::vector<TopoDS_Shape>          failed_faces;
   for (int round = 0; round < 64; ++round)
   {
     ShapeAncMap ef;
@@ -3688,6 +3693,25 @@ static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hi
     bool merged = false;
     for (const std::vector<int>& g : groups_of(s, ef, fm))
     {
+      std::vector<const void*> members;
+      for (int j : g)
+        members.push_back(fm(j).TShape().get());
+      std::sort(members.begin(), members.end());
+      if (failed.count(members))
+        continue;
+      bool                        whole_failed = false;
+      const std::function<void()> remember = [&]() {
+        if (merged || whole_failed)
+          return;
+        failed.insert(members);
+        for (int j : g)
+          failed_faces.push_back(fm(j));
+      };
+      struct OnExit
+      {
+        const std::function<void()>& f;
+        ~OnExit() { f(); }
+      } on_exit{remember};
       gp_Cylinder C;
       const TopoDS_Face a = TopoDS::Face(fm(g[0]));
       cyl_of(a, C);
@@ -3752,7 +3776,9 @@ static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hi
       }
       if (!closed || chains.empty() || chains.size() > 2)
         continue;
-      ga = BRep_Tool::Surface(a, la);
+      // (A copy of it: the boundary's edges are the shape's, and their curves on a's own surface would replace a's, left
+      // wrong where the merge isn't kept: isaac's Mirror 1, 24 faces invalid, a third of the part lost, 14 s.)
+      ga = occ::down_cast<Geom_Surface>(BRep_Tool::Surface(a, la)->Copy());
       double tol = 1e-7;
       for (const TopoDS_Edge& e : bnd)
         tol = std::max(tol, BRep_Tool::Tolerance(e));
@@ -3798,8 +3824,13 @@ static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hi
         for (size_t k = 1; k < g.size(); ++k)
           rs->Remove(fm(g[k]));
         const TopoDS_Shape out = rs->Apply(s);
-        if (out.IsNull() || (each_valid && !valid_whole(out)))
+        if (out.IsNull())
           return false;
+        if (each_valid && !valid_whole(out))
+        {
+          whole_failed = true;
+          return false;
+        }
         // The volume kept: the new face's share of it against the group's faces' (one integral of each side; the
         // whole solid's integral is noisier than the change: 2.9e-7 of it on a part fused with its mirror, 11ed9bd7,
         // where the faces' shares agree to 1e-11 mm³), within 1e-9 of the box's volume.
