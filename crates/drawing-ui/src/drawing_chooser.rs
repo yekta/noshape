@@ -314,7 +314,7 @@ impl DrawingEditor {
             .pr(px(2.))
             .pt(px(6.))
             .gap(px(5.))
-            .child(div().flex_1().min_w_0().child(Input::new(search).small()))
+            .child(div().flex_1().min_w_0().child(Input::new(search).small().h(px(30.)).text_size(px(13.33))))
             .child(
                 div().debug_selector(|| "dr-ch-sort".into()).on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation()).child(
                     Button::new("dr-ch-sort").ghost().w(px(30.)).h(px(28.)).child(crate::assets::icon("tm-sort", 20., cx)).os_dropdown_menu("dr-ch-sort-dd", true, move |menu, _, _| {
@@ -1059,7 +1059,7 @@ impl DrawingEditor {
                 .id(id)
                 .map(|d| crate::ui_script::mark(d, || format!("tab:{label}")))
                 .flex_1()
-                .h(px(28.))
+                .h(px(30.))
                 .flex()
                 .items_center()
                 .justify_center()
@@ -1307,9 +1307,10 @@ impl DrawingEditor {
             .bg(pal.dialog_bg)
             .shadow(crate::drawing_chrome::dialog_shadow())
             .text_color(pal.text)
+            // Live ct-2-add / iv-2: a 30 px title row and 30 px tabs.
             .child(
                 h_flex()
-                    .h(px(28.))
+                    .h(px(30.))
                     .pl(px(4.))
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xd3d7d9))
@@ -1318,7 +1319,7 @@ impl DrawingEditor {
                         (_, true) => "Select a Part Studio",
                         _ => "Select a part or assembly",
                     }))
-                    .child(div().id("dr-chooser-close").debug_selector(|| "dr-chooser-close".into()).relative().top(px(3.)).left(px(-1.)).w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("panel-close", 24., gpui_kit::rgb(0x999999))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .child(div().id("dr-chooser-close").debug_selector(|| "dr-chooser-close".into()).relative().top(px(1.)).left(px(-1.)).w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("panel-close", 24., gpui_kit::rgb(0x999999))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.chooser.composite = false;
                         this.close_studio_chooser();
                         this.insert.chooser = None;

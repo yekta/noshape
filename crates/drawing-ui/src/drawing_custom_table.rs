@@ -432,7 +432,7 @@ impl DrawingEditor {
         let select = |id: &'static str, label: String, items: Vec<(String, bool, Set)>| {
             let ed = ed.clone();
             let mark = format!("dropdown:{label}");
-            Button::new(id).label(label).map(move |b| crate::ui_script::mark(b, move || mark.clone())).ghost().xsmall().w_full().text_size(px(13.33)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+            Button::new(id).child(div().min_w_0().truncate().text_size(px(13.33)).child(label)).map(move |b| crate::ui_script::mark(b, move || mark.clone())).ghost().xsmall().w_full().dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
                 for (l, on, f) in &items {
                     let (e, f) = (ed.clone(), f.clone());
                     m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| e.update(cx, |t, cx| f(t, cx))));
