@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 05:17 UTC.
+Updated 2026-11-20 06:07 UTC.
 
 ## In flight
 
@@ -19,18 +19,17 @@ origin/main` first. Builds / tests on the lowest 1-min load of vibex7 / vibex8 /
 read the load with `awk`, `cut` is aliased on the hosts). rb.sh skips a file edited during a running sync: `touch` edited files before
 the next run. Run the full ops e2e before any drawing land. vibex8 is qa's quiet speed window 02:00-04:00 (lead 11-20):
 nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdshots-host.sh (PD_HOST=vibe2 PD_DISP=395). A few app runs don't take ~/bin/slot (DECISIONS 11-15).
-- Branch (11-20 04:50, rebased on origin/main): the 9 commits b4-b10 (drawing panels as live's screens, Inspection item,
-  DOCS-CRUMB-TOOLTIP's id-keyed tooltip gate in vendor gpui, VER-COMPARE-READOUT) + b12: custom table picker in Select
-  a Part Studio (05466abc0 line), FS editor feel, VS old-value chip, drawing feel, 8 feel TICKETS rows "to verify".
-  b11 shots: inspection-item 7 = live; ver-compare 5 state = live (no readout), and Compare now zooms to fit the
-  parts as live's step 3 (fit_compare; test compare_zooms_to_fit_the_parts). Mac: drawing-ui lib 119, clippy clean,
-  ops e2e 260/260. Was gated on: b11 shots (vibe2 :395: inspection-item, create-drawing-custom-template, ver-compare-hover-part),
-  Mac round 2 (drawing-ui lib + clippy), full ops e2e. Then land, tell psui the vendor gpui gate change
-  (`Window::tooltip_released_on(id)` / `set_tooltip_released_on(bounds, id)`, test
-  a_clicked_crumb_turned_title_shows_its_tooltip) and the gpui-base editor patches (close_brace_outdent, select_line,
-  wheel step).
+- Queued 11-20 06:07: 5a1b564a (27 commits, one result): 3a462952's 9 (b4-b12; DOCS-CRUMB-TOOLTIP's id-keyed
+  tooltip gate in vendor gpui, VER-COMPARE-READOUT, Compare zooms to fit, 8 feel P0s), qa's 3 dialog tickets, the
+  brand fix, configured studios in Custom table › Add and Insert view, DRW-CHOOSER-SORT, Custom table's second Esc.
+  Mac: drawing-ui lib 123, clippy clean, ops e2e 260/260 (before the chooser commits, which touch drawing-ui only).
+  When landed: tell psui the vendor gpui gate change (`Window::tooltip_released_on(id)` /
+  `set_tooltip_released_on(bounds, id)`, test a_clicked_crumb_turned_title_shows_its_tooltip) and the gpui-base
+  editor patches (close_brace_outdent, select_line, wheel step); report to the lead.
+- b12 shots (vibe2 :395) against live: export-pdf-bw dialog within 2 px; ver-compare's fit shows the same 42 mm of
+  height as live's (ours has a taller viewport); drw-custom-table-add 10/10 states after the Esc fix (the app needed a
+  third Esc: cancel() took insert.chooser but left the studio picker).
 - Matrix with b10's runs and submenu rows: 1224 = + 511 shown of 1855, 0 ≠, 78 present-only.
-- Live request filed 11-20 04:47: configured studio rows in the drawing choosers (chevron, insert-icon + ▾).
 
 ## Next, in order
 1. Lead 11-20: the drawing matrix's items not yet matching, by use (dialogs, menus, placement, rarer panels): check
@@ -40,23 +39,9 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
    /root/studios-scratch/uip-merged). Left at 11-20 00:23: 174 present-only (Create Drawing custom template tab,
    Move to sheet / Replicate page chrome, small rests). b4 compared (above); next: rescreenshot b4 with the new
    build, then the remaining panels (inspection / revision tables, BOM properties, section / detail view panels).
-2. Local, b12 (11-20 04:45, not yet landed): qa's 8 P0 feel tickets (behaviours "feel coverage (11-20)"): FS "}"
-   outdents to its "{" line (gpui-base `close_brace_outdent`), triple-click takes the line's newline (gpui-base
-   `select_line`, code editors), Ace's bracket boxes (feature_studio `update_bracket_box`, fs_lines `bracket_pair`),
-   a wheel notch 72 px on Linux / 60 Windows (gpui-base `on_scroll_wheel`); VS old-value chip (variable_studio);
-   a crowded dimension draws no line inside (sheet.rs, as squeezed); a dimension dragged from unselected ends
-   unselected (`Drag::MoveAnnotation.fresh`); drawing wheel / pan: the last frame moved to the new camera until its
-   frame comes back (drawing_view `FrameCam`; qa rechecks D3 timing quiet). Custom table › Add: the Insert view
-   chooser in a studio mode ("Select a Part Studio", Part Studios only, 40 px right of the dialog), Other documents
-   real (`drawing_custom_table` `document` / `version`; the kind's `version` an ExternalRef key).
-3. Local (11-20 05:17, after 3a462952): qa's DRW-DIALOG-FIRST-FOCUS (first_field / first_due / first_lit in
-   drawing_view; View properties' orientation and Move to sheet's Sheet), DRW-EXPORT-HIDE-INSPECTION-SIZE (labels
-   75 px, native 13 px box), BRAND-IN-UI-TEXT's Version / Workspace Category; Custom table › Add's configured studios
-   (chooser config_expander / config_buttons / config_rows, ChooserState::studio_config, TableKind::Custom `config`,
-   op `configuration`, drawing_hooks::last_viewed_config); `configuration: null` now reaches the ops (Args::get drops
-   nulls: read a.value). Insert view's Part Studios tab for configured studios: not captured by live yet.
-   Next: our run of drw-custom-table-add (live recorded 10/10) to compare, then the matrix.
-4. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.
+2. Live cfg-choosers-1120 left open: whether a custom table's cells take the picked configuration (live's studio
+   has Small = Large). Insert view takes the default configuration, as live's (iv-10: "Size: Small").
+3. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
 - live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell
