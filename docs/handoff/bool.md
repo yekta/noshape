@@ -40,6 +40,14 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   FOLLOW-UP (own ticket): Part 3 = live's input (342822.058 mm3) but ours 183041.69 vs live 183072.272 /
   59 faces / 156 edges / 93 vertices (41 planes, 14 cyl, 4 cones), 30 Shell faces 32018.992 mm2 (per-face areas:
   /root/live-scratch/shellq/shell3-topo.json). (The 141 faces were Part 3 at the END of the doc, not after Shell 3.)
+  ROOT (11-20 22:20): Part 3's Shell is a closed hollow (the 1 mm chamfer removed is thinner than t: slabs give the
+  same with or without it; 1 solid, 7 shells). Quadrics fails even with nothing removed (merged walls: self-
+  intersecting offset wires), so slabs is the path. Slabs' gap: the concave-edge filler (shell.cpp "extend both
+  offsets until they meet", section {E, E+n1 d, M, E+n2 d}) takes M from tangent planes; along the R20 round x the
+  45-deg V faces M sits mm off the r15 offset cylinder -> tools 36/39 (34 faces, 225.7 mm3) leave wall uncovered
+  (-30.6 mm3) and their facets/sides become the cavity strips. FIX PLAN: filler = (wedge scaled ~2x, sides turned in
+  by eps) COMMON (Ext1 FUSE Ext2), Ext = the face's surface's band 0..t (plane: half-space slab, cylinder: tube,
+  cone) -> exact offset faces, unify to live's. Probe prints tools (bool-hat sh3-probe2, NOSHAPE_SHELL_DEBUG).
   Our Shell on live's x_t Part 3 fails ("shell failed"). Part 2 = live. Probe: bool-hat branch sh3-probe2 (= bool-sh3w
   + shell::zz_probe_weld_part3, all methods' faces), Mac, unit bool-p3probe, out /root/bool-scratch/p3probe.out.
   (bool-hat's old sh3-probe debug is WIP commit on branch sh3-probe; patch /root/bool-scratch/bool-hat-sh3-probe-old.patch.)
