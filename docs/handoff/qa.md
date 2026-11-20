@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-20 00:18)
+# QA handoff (agent qa; current state only, updated 2026-11-20 00:30)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -114,12 +114,12 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    23:0x: Feature Studio custom feature (QA Box: template, commit, tool search, Size field, builds), version V1, branch B1, edit,
    merge (dialog, toast, graph) = live; P2 HISTORY-ROW-NAME-OVERLAP (studios, told). Hole table: ✓ only starts placing, a click
    places it (= live; ticket closed). Drawing hover = rows 130. To verify on their greens: dx BRAND-IN-UI-TEXT, skasm Simulation
-   connection dropped, studios f450d0dd (history row ellipsis, "Noshape Labs"). Sketch tools 23:09-23:15 (3-point arc, spline,
+   connection dropped, studios history row + Noshape Labs verified 00:29. Sketch tools 23:09-23:15 (3-point arc, spline,
    polygon, Slot on a line, Fillet, angle dim, Mirror) = live; P1 SKETCH-SLOT-ON-ARC (skasm). Direct edit 23:18 (Move face, Draft,
    Split toast), Thicken 23:29, Delete face (CLI: Heal/Cap/Leave open/all), drawing Section view, asm linear pattern, Ball limits,
    Transform (type order, XYZ triad 60 px at any zoom) = live; P2 ERROR-CHIP-RED-NO-FIELD (psui). asm d67512a33 both P1s VERIFIED 23:42 (green 2574b5b5). App runs: qa-xvfb110 +
    qa-walk*-app, `xdotool windowfocus` FIRST (else Tab never previews); drawings have no alt+c (letters are shortcuts: n = Note).
-   tabrel.sh: vibe2 slot + 1 retry on SIGTERM (earlyoom 23:01); 4fee queued. Waiters: qa-wait-{dx-brand,studios-hist,skasm-sim,dx-torus}.
+   tabrel.sh: vibe2 slot + 1 retry on SIGTERM (earlyoom 23:01); 4fee queued. Waiters: qa-wait-{dx-brand,skasm-sim,dx-torus,psui-stale} (studios-hist stopped: its fixes verified 00:30 on green eef639d7, 10217c61b; lowercase "noshape" x2 in Preferences sent to studios).
    00:1x (lead 23:55 list): import/export round trips (CLI, x.* scratch) STEP/IGES/x_t exact, 3MF/OBJ meshes, assembly STEP/x_t,
    flat DXF/DWG = live (live/qa/rt-1119 answers); P1 SKETCH-DXF-EXPORT-POLYLINES (skasm). Restore to Main, switch, Compare bar /
    dots / slider = live; P1 COMPARE-COMMON-PARTS-MISSING (studios). Config List + configured #n through a feature pattern +
