@@ -26,12 +26,19 @@ pub struct CompareGraphics {
     seen: Option<f32>,
 }
 
-/// A side's display: its Part Studio regenerated (also the Repair panel's, repair_view.rs).
+/// A side's display: its Part Studio regenerated in that side's document, with its Variable Studio variables, other
+/// Part Studios for Derived features and its Feature Studios' custom features, as the Part Studio itself (qa
+/// COMPARE-COMMON-PARTS-MISSING: without them only the parts of built-in features were drawn). Also the Repair
+/// panel's (repair_view.rs).
 pub(crate) fn regenerate(doc: &Document, tab: TabId, config: &noshape_model::configuration::ConfigValues) -> StudioDisplay {
-    match doc.tab(tab).map(|t| &t.content) {
-        Some(TabContent::PartStudio(ps)) => noshape_model::regen::Regenerator::new().regenerate(ps, config, &doc.settings.units, &noshape_model::regen::RegenOptions::default()).display,
-        _ => StudioDisplay::default(),
-    }
+    let Some(TabContent::PartStudio(ps)) = doc.tab(tab).map(|t| &t.content) else { return StudioDisplay::default() };
+    let opts = noshape_model::regen::RegenOptions {
+        document_variables: noshape_model::variables::element_variables(doc, tab),
+        derived: Some(noshape_ops::derived::DocStudios::new(doc.clone(), Default::default())),
+        custom_features: Some(noshape_model::custom::DocumentScripts::from_document(doc)),
+        ..Default::default()
+    };
+    noshape_model::regen::Regenerator::new().regenerate(ps, config, &doc.settings.units, &opts).display
 }
 
 /// The view holding a [`CompareGraphics`]: how to reach it, and what to run
@@ -90,6 +97,38 @@ impl CompareGraphics {
     pub fn clear(&mut self) {
         if self.key.is_some() {
             *self = Self { seen: self.seen, ..Self::default() };
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// qa COMPARE-COMMON-PARTS-MISSING: a compared side's Part Studio regenerates with its document's variables (an
+    /// extrude `#w` deep is drawn, not dropped).
+    #[test]
+    fn a_compared_side_regenerates_with_its_document() {
+        let path = std::env::temp_dir().join(format!("noshape-compare-side-{}.noshape", std::process::id()));
+        for ext in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+        }
+        {
+            let mut ctx = noshape_ops::Ctx::new();
+            let mut call = |tool: &str, args: serde_json::Value| noshape_ops::registry::run(&mut ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+            call("document_create", serde_json::json!({ "path": path.to_str().unwrap() }));
+            call("variable_create_studio", serde_json::json!({}));
+            call("variable_create", serde_json::json!({ "tab": "Variable Studio 1", "name": "w", "value": "10 mm" }));
+            let sk = call("sketch_create", serde_json::json!({ "plane": "plane:top" }))["sketch"].clone();
+            let d = call("sketch_draw", serde_json::json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+            call("feature_add", serde_json::json!({ "type": "extrude", "params": { "entities": [d["regions"][0]["id"]], "depth": "#w" } }));
+        }
+        let store = noshape_store::Document::open(&path).unwrap();
+        let main = store.list_branches().unwrap().remove(0);
+        let doc = noshape_model::document::Document::from_blobs(&store.read_all(store.head(main.id).unwrap()).unwrap()).unwrap();
+        let tab = doc.tabs.iter().find(|t| t.name == "Part Studio 1").expect("Part Studio 1").id;
+        let display = super::regenerate(&doc, tab, &Default::default());
+        assert_eq!(display.bodies.len(), 1, "the #w deep extrude's part");
+        for ext in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
         }
     }
 }
