@@ -30,7 +30,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P0 FEEL-PASTE-PLACE-LEAVES-TOOL (skasm; qa 11-20 04:15, live R6, cov2-copypaste on 9ae062180) sketch: a line selected, Ctrl+C, Ctrl+V
   opens Transform with the copy added and selected (as live), but the click that places the copy leaves live's tool (tool none,
   nothing selected); ours stays in Transform (tool "Transform", nothing selected) until Escape.
-- [ ] P0 FEEL-DIM-TWO-POINTS-ZERO (skasm; qa 11-20 04:15, live R3, cov2-dim-orient on 9ae062180) Dimension tool on a slanted line
+- [ ] P0 FEEL-DIM-TWO-POINTS-ZERO (qa 05:11: still "0 mm" on green 3fd4db71, which has skasm's 94f6df34 stack; skasm; qa 11-20 04:15, live R3, cov2-dim-orient on 9ae062180) Dimension tool on a slanted line
   (0,0)-(30,20): click (0,0), click (30,20), place at (5,25). Live places a linear dimension, its value box reading "29.54803 mm" (the horizontal
   distance; live calls the row weak: the end landed at x 29.55). Ours places one whose box reads "0 mm". Escape twice: same as live (the first keeps
   Dimension, the second leaves it). Possibly the same placement code as skasm's unlanded 94f6df34 stack (P0 SKETCH-DIM-PLACE-CLICK-SELECTS):
@@ -117,7 +117,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   mirrors "Loft with bad singularity"'s body, which ours can't build yet, so qa's saved copy points it at Extrude 1's sheet,
   already mirrored by Mirror 3 into one sheet as live. Ours ends with 2 solids (the 10-face one as live's, 40 169 mm³) until
   that loft builds: core's own open item (live core q-singularity-loft-1119).
-- [ ] P0 **SKETCH-DIM-PLACE-CLICK-SELECTS (skasm; user case "#variable in a sketch dimension")**: ui-parity
+- [x] verified (qa 11-20 05:11, green 3fd4db71 (skasm 3fd4db71f), ui-parity re-run on vibe2: the place click at (75,-8) places the dimension, its box reads "30.01593 mm" and takes "#width", Enter keeps 1 dimension; the scenario's first difference is now step 8's bottom-right readout (live Length 30.016 mm, ours none: psui FEEL-DIM-PICK-READOUT / ANALYSIS-READOUT-HIDDEN)) P0 **SKETCH-DIM-PLACE-CLICK-SELECTS (skasm; user case "#variable in a sketch dimension")**: ui-parity
   sketch-dimension-variable (Top sketch, rectangle (60,0)-(90,20), Esc, d, click the line at (75,0), click (75,-8) to place,
   type "#width", Enter). Live (live2's 11-19 retake): the second click places the dimension (selection 0) and its box takes
   "#width". Ours since green 592b0fc9 (11-17 21:03; fa6f90cc 11:19 matched, 12/12): the second click selects a second item
