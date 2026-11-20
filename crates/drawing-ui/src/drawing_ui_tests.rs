@@ -161,6 +161,8 @@ fn export_drawing_rows_as_live(cx: &mut TestAppContext) {
     let (window, editor) = drawing(cx, "export-rows");
     cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_export_dialog(w, cx))).unwrap();
     draw(cx, window);
+    // PDF's rows (the dialog opens on the last export's format, which another test of this binary may have set).
+    pick(cx, window, "ex-format", "PDF");
     let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
     let mut at = |id: &'static str| vcx.debug_bounds(id).unwrap_or_else(|| panic!("no {id}"));
     let (version, overridden, options, hide) = (at("ex-version"), at("ex-overridden"), at("ex-options"), at("ex-hide-insp"));
