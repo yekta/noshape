@@ -25,17 +25,22 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 - BRAND-IN-UI-TEXT (qa P2): QUEUED 3a531aae (00:0x 11-20, with 695043d3): "Import to Noshape", Properties' Category
   "Noshape …" (shown_category; stored kinds keep live's "Onshape …"), drawing category fields "Noshape …". Tests +
   clippy + drawing 255 + full ops e2e 260 green (vibex8). qa verifies on green.
-- hex-bookcase recheck after d864cf7e1 (vibex7 ~/tmp/dx/exch-hb.log): DXF 0 ELLIPSE / 185 LINE / 15 LWPOLYLINE for
-  live's 2 / 206 / 25 (was 211 / 17 before the deterministic drawings); other rows match, times 15/15. Low priority.
-- DRW-HOLE-TABLE-NOT-SAVED: closed by qa (a click after ✓ places it, = live).
-- STEP torus (lead 23:1x, P1, bool's Shell case 17488d26): live read our round's quarter of a torus (435.1 mm²) as
-  the other 3/4 (1933.6). Cause: OCCT's STEP writer runs DirectFaces (left-handed torus -> right-handed, wire stored
-  REVERSED), then reorders each wire forward on the forward face: a reversed wire's seam takes the other side's
-  p-curves and an unchained wire's circles come out backwards. Our reader repairs it (reads 435), hiding it. Fix
-  io.cpp step_direct_faces + step_forward_wires; T1 export::a_one_loop_torus_face_round_trips_through_step (fixture
-  tests/data/step/torus-face-unchained.brep; oracle step_torus_band reads the loop as live does). Exchange A/B (Mac):
-  every row and score unchanged; torus oracle on all 22 docs' STEP: only motor-mount-jack's R 9.5 face changed,
-  309.56 -> 253.01 mm², = live's own STEP (was wrong before too); knob-jason / pulley = live's. Landing 00:3x.
+- DXF rows (lead 00:2x: now, surf-intro after blend's fix is on main). dxfdiff on the Mac exs-all run (00:0x;
+  /root/dx-scratch/dxfall/<doc>/{ours,live}.dxf): real geometric misses only in
+  - hex Right: plate top edge + two foot outlines missing: chain_pieces turned pieces joined going BACK the wrong
+    way (far end dropped). FIXED (views.rs + T1 mesh_pieces_chain_both_ways_from_the_first); Mac exs-all A/B: hex
+    1 ours-only + 2 live-only (was 1 + 4, Right = live), others unchanged. Landing after vibex8 ops e2e.
+    (dxfdiff/dxfplot now read LWPOLYLINE: older hex diffs undercounted ours.)
+  - snap-hook: MODEL, not drawing: all 4 hooks mirrored about their own x (76 vertices differ each side, ours.step vs
+    live.step). Snap Hook 1/2 take hookVector from evAxis of hookDirection (Shell OFFSET_EDGE KY5B; the studio
+    source /root/dx-scratch/snaphook.fs line 96): our edge runs opposite Parasolid's (the known edge-direction class,
+    featurescript.md "Line and plane origins"). Reported to the lead (00:50). Front / Right's 6 extra r 3.5 arcs are
+    the tori's meridian silhouettes, where our torus seam lies (ours seam x -45.5, live -49.5): HLR repro (kernel
+    hlr::dxprobe_… scratch, vibex8) pending; recheck once the hooks match.
+  - faceblend Right: an extra 0.242 in line = model (blend's 4a: full-round boundary edges). clamp-guillem Top,
+    housing-draft, rings-loft, extension-spring: known (above / below).
+- STEP torus (bool's Shell case 17488d26): QUEUED 0dbd37f4: io.cpp step_direct_faces + step_forward_wires before
+  OCCT's writer; T1 export::a_one_loop_torus_face_round_trips_through_step. Detail: archive (11-20 00:3x).
 - blend (23:4x): car Fillet 1 fixed (7/14/9, 81479.1 mm² vs live 81479.51), lands after its gate: once it and
   fb8f84f42 are on main, rerun the 5 surf-intro docs (Mac sitrace.sh) for "Derived 1" and the rebuild time.
 - Next: the rest of "Next, in order".
@@ -120,26 +125,16 @@ Open, ranked:
 
 ## Open: other
 - c2-impeller-loft: f15's Boolean is a known live difference (bool, DECISIONS); 24/48, see Next 2.
-- Exchange STL rows parked P3 (lead DECISIONS 7210b453e: area / volume / deviation, not triangle counts); archive 11-18.
-- Drawing exports 84 / 84 (exp-1115r + the revision / spline / jog runs). drw-broken-out-section compares within ±1 px
-  (DECISIONS 11-15). Studios' view fit (69f67433) in.
 ## Next, in order
-P. Parked (lead 21:2x: no OCCT class layout change): FClass2d per-wire boxes (/root/dx-scratch/occt-patch/
-   0034-fclass2d-wire-boxes.patch, adds a member): fill-pattern Iso 11.3 -> 1.98 s; land only ABI-neutral.
-N. Drawings deterministic: landed d864cf7e1 (OCCT patch 0035 + mesh_body facet order); hex-bookcase recheck in Now.
+P. Parked: FClass2d per-wire boxes (no OCCT layout change; archive 11-20).
 C. PARKED (lead 11-19 21:0x): TICKETS FAN-BLADE-VIEWS-HLR-SAMPLING has the numbers; work in /root/dx-scratch/hlr-retry.
-Q. asm-robot-relations studio 0c3466's Import 1 (REV-21-1650.STEP): live's stored import = six SURFACE parts, ours one
-   valid 174-face solid (OCCT: valid, 171,983 mm3; live's six sheets = that shell less plane face #5090). live2
-   rr-import-1118 (02:3x): live's own re-import of the same file today gives ONE solid "Combine1" (154 faces), Import 1
-   WARNING "Imported parts contained faults." (Allow faulty parts on), or no parts at all (off). So the six sheets are
-   an old stored translation live no longer makes. Decision asked of the lead (11-19 03:1x): keep ours (one solid).
+Q. asm-robot-relations Import 1: closed by DECISIONS 11-17 (a valid solid stays a solid; ours one solid = the ruling).
 H. Hidden lines vs live (live2 02:32, live/dx/louver-hidden-1119/: sm-louver Front + Top, Show hidden lines, DXF 2018).
    Hidden: live 1348 LINE + 3 ARC + 75 ELLIPSE (105.85 in), ours 774 LINE (105.34 in), each on the other's to 0.010 in.
    TANGENT_HIDDEN (03:4x, hidden tangent edges drawn dashed with tangent edges shown, not under a visible tangent
    edge): live 188 LINE 244.43 in, ours 244.42 in, each on the other's. /root/dx-scratch/bin/hidcmp2.py ours live tol
    LAYER. Hidden curves: live's 75 ELLIPSE / 3 ARC are noise (0.0002 in long, r <= 0.003 in: edges seen end-on), skipped. Runs: Mac exsh2.sh with
    /root/dx-scratch/dxhidden.patch applied (the exchange suite with DXHIDDEN=1), dumps /root/dx-scratch/dxfm/.
-R. Broken STEP answers live's "<file> uploaded but failed to translate.": landed cf5c3d00.
 0. Speed vs live (lead 11-18 06:1x; release, vibex8, dx_perf, same run; live behaviours "speed: drawings", "dx speed:
    drawing creation and NIST import", "dx (2026-11-02, P1 drawing speed on big models)"):
    - bracket drawing, cold (no cached view): create 10 ms (live 30.1 s, server 3.0), insert view 7 ms (3.0 s),

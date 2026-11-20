@@ -3073,8 +3073,9 @@ fn chain_pieces(pieces: Vec<Vec<[f64; 2]>>, tol: f64) -> Vec<Vec<[f64; 2]>> {
                 let end = if forward { line[line.len() - 1] } else { line[0] };
                 let Some(j) = next(cur, end, &used) else { break };
                 used[j] = true;
+                // Oriented to continue the line: starting at its end going forward, ending at its start going back.
                 let mut q = pieces[j].clone();
-                if key(q[0]) != key(end) {
+                if key(if forward { q[0] } else { q[q.len() - 1] }) != key(end) {
                     q.reverse();
                 }
                 if forward {
@@ -4304,6 +4305,23 @@ mod tests {
         let near = lines.iter().flat_map(|e| e.points.windows(2)).map(|w| dist_to_segment(centre, w[0], w[1])).fold(f64::MAX, f64::min);
         assert!(near > 0.004, "a fold drawn {near}: {lines:?}");
         assert_eq!(lines.iter().map(|e| e.points.len() - 1).sum::<usize>(), 6, "the hexagon's six sides: {lines:?}");
+    }
+
+    /// A mesh silhouette's pieces joined both ways from the first: a plate seen edge on, its top piece first, is one
+    /// U through all four corners (c2-hex-bookcase-derived's Right view lost the top: the pieces joined going back were
+    /// turned the wrong way, their far end dropped).
+    #[test]
+    fn mesh_pieces_chain_both_ways_from_the_first() {
+        let top = vec![[0.175, 0.008], [0.005, 0.008]];
+        let left = vec![vec![[0.005, 0.0], [0.005, 0.0005]], vec![[0.005, 0.0005], [0.005, 0.008]]];
+        let right = vec![vec![[0.175, 0.008], [0.175, 0.0005]], vec![[0.175, 0.0], [0.175, 0.0005]]];
+        let mut lines = chain_pieces([vec![top], left, right].concat(), 1e-9);
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        let mut u = lines.remove(0);
+        if u[0][0] > 0.1 {
+            u.reverse();
+        }
+        assert_eq!(u, vec![[0.005, 0.0], [0.005, 0.008], [0.175, 0.008], [0.175, 0.0]]);
     }
 
     /// Two parts touching along a face: the edges each has on the other's are marked shared (live's CAD files write

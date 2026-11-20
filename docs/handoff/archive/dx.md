@@ -3633,3 +3633,30 @@ Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live i
   ~/agents/dx-keep/stoff-prof.log).
 - Tools: /root/dx-scratch/bin/xtdump.py (text x_t / xmm with live's embedded schema); vibex8 ~/agents/dx-land.
 
+
+## 11-20 00:3x, moved from the handoff
+- Exchange STL rows parked P3 (lead DECISIONS 7210b453e: area / volume / deviation, not triangle counts); archive 11-18.
+- Drawing exports 84 / 84 (exp-1115r + the revision / spline / jog runs). drw-broken-out-section compares within ±1 px
+  (DECISIONS 11-15). Studios' view fit (69f67433) in.
+N. Drawings deterministic: landed d864cf7e1 (OCCT patch 0035 + mesh_body facet order); hex-bookcase recheck in Now.
+R. Broken STEP answers live's "<file> uploaded but failed to translate.": landed cf5c3d00.
+P. Parked (lead 21:2x: no OCCT class layout change): FClass2d per-wire boxes (/root/dx-scratch/occt-patch/
+   0034-fclass2d-wire-boxes.patch, adds a member): fill-pattern Iso 11.3 -> 1.98 s; land only ABI-neutral.
+
+## 11-20 00:3x (from handoff)
+- DRW-HOLE-TABLE-NOT-SAVED: closed by qa (a click after ✓ places it, = live).
+- STEP torus (lead 23:1x, P1, bool's Shell case 17488d26): live read our round's quarter of a torus (435.1 mm²) as
+  the other 3/4 (1933.6). Cause: OCCT's STEP writer runs DirectFaces (left-handed torus -> right-handed, wire stored
+  REVERSED), then reorders each wire forward on the forward face: a reversed wire's seam takes the other side's
+  p-curves and an unchained wire's circles come out backwards. Our reader repairs it (reads 435), hiding it. Fix
+  io.cpp step_direct_faces + step_forward_wires; T1 export::a_one_loop_torus_face_round_trips_through_step (fixture
+  tests/data/step/torus-face-unchained.brep; oracle step_torus_band reads the loop as live does). Exchange A/B (Mac):
+  every row and score unchanged; torus oracle on all 22 docs' STEP: only motor-mount-jack's R 9.5 face changed,
+  309.56 -> 253.01 mm², = live's own STEP (was wrong before too); knob-jason / pulley = live's. Landing 00:3x.
+
+## 11-20 00:5x (from handoff; closed by DECISIONS 11-17)
+Q. asm-robot-relations studio 0c3466's Import 1 (REV-21-1650.STEP): live's stored import = six SURFACE parts, ours one
+   valid 174-face solid (OCCT: valid, 171,983 mm3; live's six sheets = that shell less plane face #5090). live2
+   rr-import-1118 (02:3x): live's own re-import of the same file today gives ONE solid "Combine1" (154 faces), Import 1
+   WARNING "Imported parts contained faults." (Allow faulty parts on), or no parts at all (off). So the six sheets are
+   an old stored translation live no longer makes. Decision asked of the lead (11-19 03:1x): keep ours (one solid).
