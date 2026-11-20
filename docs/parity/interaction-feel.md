@@ -217,7 +217,7 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Insert Esc, none pending | closes and removes the session's instances | the same (`cancel_insert`) | GPUI `cancelling_an_insertion_offers_restore`, `closing_the_insert_dialog_after_esc_leaves_no_redo` | = |
 | Insert ✓ | keeps all, the pending one at identity; one undo step | the same (asm e9941770) | asm-insert-ok-pending (live take: REQUESTS 2985, answered) | = |
 | Ring snap | 5° / 1° / 0.1° by the arc at the pointer's radius ≤ 50 px, within 0.4 × (1 + level/3) of a step | the same (asm 641ab465, `ring_snap`) | asm's tests | = |
-| Snap mode ghost | the source part at 0.3 opacity | the same (17:18) | – | = |
+| Snap mode ghost | the source part at 0.3 opacity | the same (17:18) | `a_snap_mode_drag_draws_its_part_as_a_03_ghost` | = |
 | Snap mode lines | none: no dashed line or 8 px box in 3 snap-mode drags over 23 pointer stops (live2 snapmode-1118); the client's INFERENCE_SNAP_* constants aren't drawn there | none | – | = |
 | Snap mode drag (live2 snapmode-1118) | a press-drag on the hovered face's connector: a translucent ghost carries it, the connector follows the pointer and jumps onto a target dot (a corner, an edge midpoint, a face centre) when the pointer is within 50–72 px of it depending on the face under the pointer and the direction (not a square: live2 snap-diag-1118, which corrects the earlier "57 px in x and in y"); release: connector on connector, frames aligned (not flipped), then an uncommitted "Fastened 1" mate dialog with both chips and the HUD; Esc closes it with no mate and the part stays snapped | the same: press-drag, the connector jumps onto a dot of the face under the pointer within 51 px in x and in y (c7d388e8, live2 snap-diag-1118; qa on green: 49 px straight up, 71 px at 45°, live 50–51 / 72), off every part it stays frozen and a release moves nothing; release on a target aligns the frames and opens the uncommitted Fastened dialog (Esc: no mate, the part stays; Ctrl+Z in it does nothing) (assembly_panels `snap_target` / `finish_snap_drag`) | a_snap_drags_reach_is_51_px_in_x_and_y, a_snap_mode_drag_lands_aligned_and_opens_an_uncommitted_fastened | = |
 
@@ -235,7 +235,7 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Row click | selects (blue), tooltip with its name, no explode | the same (17:18: the tooltip) | GPUI `an_exploded_views_row_click_only_selects_and_a_hovered_step_lights_its_parts` (the tooltip: no test) | = |
 | Row menus | collapsed: Activate, Rename, Reset starting position, Duplicate, Delete; active: Collapse, Rename, Show / Hide all explode lines, Delete | the same | ui-parity asm-explode-row-menu, -row-menu-editing | = |
 | Activate | the exploded state, editing again; a hovered step row outlines its instances | the same (17:18: the outline, `step_hover`) | GPUI `activating_an_exploded_view_jumps_to_it_and_to_fit`, `an_exploded_views_row_click_only_selects_and_a_hovered_step_lights_its_parts` | = |
-| Camera menu | Isometric … Section view… | the same (camera_menu.rs) | – | = |
+| Camera menu | Isometric … Section view… | the same (camera_menu.rs) | `the_camera_menu_lists_lives_assembly_rows` | = |
 | Section view… | opens empty with the blue hint "Select a plane, planar face, cylinder, cone, or mate connector." (live2 18:20); Exclude / Include; Items to exclude | the same (the Part Studio's hint) | GPUI `a_section_view_opens_empty_takes_a_face_and_esc_cancels_it` | = |
 | Section: a face click | adds a plane through the face (live2 18:20) | the same (`section_pick`) | GPUI `a_section_view_opens_empty_takes_a_face_and_esc_cancels_it` | = |
 | Section Esc | cancels | the same | GPUI `a_section_view_opens_empty_takes_a_face_and_esc_cancels_it` | = |
@@ -264,9 +264,9 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Row drag look | a blue pill with the name; a blue line with a ring at its left end | the same (17:30, `InstanceDrag`, `list_drop_line`, as the Tab manager's) | GPUI `a_dragged_instance_row_drops_between_rows_in_one_undo_step` | = |
 | Row drop | reorders, one undo step | the same ("Reorder instances") | GPUI `a_dragged_instance_row_drops_between_rows_in_one_undo_step` | = |
 | Hidden mate | grey name and icon | the same | `hidden_mate_rows_are_grey` | = |
-| Suppressed mate | grey italic struck through; "Fastened 1 (Suppressed)" | the same (17:18: the tooltip) | – | = |
+| Suppressed mate | grey italic struck through; "Fastened 1 (Suppressed)" | the same (17:18: the tooltip) | `a_suppressed_mate_row_is_grey_and_its_tooltip_says_suppressed`, `suppressed_rows_are_italic_and_struck_through` | = |
 | Failed mate's colour | rgb(170,37,45); hidden, rgb(196,139,148) (live2 errors-1118 tips) | the same (17:18; was #bd3039; hidden faded red since 11-18, was the strong red) | `hidden_mate_rows_are_grey`, `a_hidden_mate_in_error_is_faded_red` | = |
-| Failed mate's marks | red "!" on the icon, "Fastened 1 has error: …", red Mate features icon and root overlay, ⚠ on the fixed instances | the same | – | = |
+| Failed mate's marks | red "!" on the icon, "Fastened 1 has error: …", red Mate features icon and root overlay, ⚠ on the fixed instances | the same | `a_failed_mate_between_fixed_parts_is_marked` (tooltip, ⚠; the icons' red not asserted) | = |
 
 ### 3D in an assembly (3d.json `assembly`): 11 / 11
 
@@ -278,11 +278,11 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Mate glyph click (4) | selects the mate: row blue, its instances' rows grey, mated faces amber, a dashed line between the connectors | the same | the same test | = |
 | Part hover (3b, asm-feel2 (c)) | the face's boundary edges (every loop) #FFC685, the part's silhouette #FFC20E, the fill unchanged; inside a subassembly only that part (its face with a two-level path), a click takes that face and the collapsed sub's row goes grey | the same (`Highlights::hover_part`, `Scene::hover_outline_rgb`, `picked_inside`) | GPUI `a_part_inside_a_subassembly_hovers_and_is_taken_alone` | = |
 | Instance row tooltip (asm-feel2 (a)) | every row's label shows the instance name, cut off or not, right of the list, fading in ~0.1–0.27 s; the next row's at once; the icon columns their own tips | the same (`with_row_tip`; warm switching for any delay up to the default, GPUI patch) | GPUI `every_instance_row_tooltips_its_name` | = |
-| Graphics → list (2) | nothing lights in the list, no flyout | the same | – | = |
+| Graphics → list (2) | nothing lights in the list, no flyout | the same | `a_part_hovered_in_the_graphics_lights_nothing_in_the_list` | = |
 | Box select (5) | left → right over half a part: nothing; round it: the instance; right → left over half: the whole instance; never faces | the same | GPUI `a_box_takes_whole_instances_as_live` | = |
 | Explicit connector's look | a 36 px disc, 4 px ring, Z line 20 px, X/Y 12 px | the Part Studio's disc (`ConnectorGlyphs::picked`, screen size) | `connector_glyph_extent_counts_for_the_zoom_limits` | = |
-| Implicit, over a face | the centroid wherever the pointer is; corner dots larger than midpoint dots | the same (17:18; Shift still picks among the points) | `a_faces_connector_is_its_centroid_wherever_the_pointer_is` | = |
-| Implicit, over an edge | the midpoint, Z along the edge | the same (17:18) | – | = |
+| Implicit, over a face | the centroid wherever the pointer is; corner dots larger than midpoint dots | the same (17:18; Shift still picks among the points) | `a_faces_connector_takes_a_dot_within_a_48_px_square_else_its_centroid` | = |
+| Implicit, over an edge | the midpoint, Z along the edge | the same (17:18) | `an_edges_connector_is_its_midpoint_with_z_along_it` | = |
 | Vertex / edge over the face | takes over within 6 px, not at 8 | the pick square (psui's 3D matrix: 15 / 15) | psui `the_3d_pick_matrix_matches_live` | = |
 | Free drag | moves in the screen plane by the full pointer delta | the same | GPUI `a_free_instances_drag_keeps_the_default_cursor_and_follows_the_pointer`, `a_dragged_free_instance_takes_the_whole_move_from_the_press` | = |
 | Drag start | > 2 px and > 50 ms | the same (asm ccbc333f) | asm's tests | = |

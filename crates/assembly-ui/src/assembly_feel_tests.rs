@@ -64,6 +64,11 @@ fn document(cx: &mut TestAppContext, name: &str, make: impl FnOnce(&mut Ctx)) ->
 /// Assembly 1 of the document at `path` in a test window with a real renderer, evaluated with `occurrences`
 /// occurrences, seen from the top with its parts filling the middle of the graphics.
 fn open_from_top(cx: &mut TestAppContext, path: &std::path::Path, occurrences: usize) -> (AnyWindowHandle, Entity<AssemblyView>) {
+    open_from_top_when(cx, path, move |v| v.result.occurrences.len() == occurrences && v.result.mates.iter().all(|m| m.frame_b.is_some()))
+}
+
+/// [`open_from_top`] once the assembly is built and `ready` holds.
+fn open_from_top_when(cx: &mut TestAppContext, path: &std::path::Path, ready: impl Fn(&AssemblyView) -> bool) -> (AnyWindowHandle, Entity<AssemblyView>) {
     let session = crate::session::Session::open(path).unwrap();
     let tab = session.doc.tabs.iter().find(|t| t.name == "Assembly 1").unwrap().id;
     let gpu = Gpu::headless_rendering().unwrap();
@@ -80,7 +85,7 @@ fn open_from_top(cx: &mut TestAppContext, path: &std::path::Path, occurrences: u
         (w, view.unwrap())
     });
     draw(cx, window);
-    wait_until(cx, window, &view, |v, _| v.built.is_some() && v.result.occurrences.len() == occurrences && v.result.mates.iter().all(|m| m.frame_b.is_some()));
+    wait_until(cx, window, &view, |v, _| v.built.is_some() && ready(v));
     cx.update_window(window, |_, _, cx| {
         view.update(cx, |v, cx| {
             let (lo, hi) = v.result.bounds().unwrap();
@@ -797,4 +802,66 @@ fn a_section_arrows_drag_steps_by_a_tenth_of_a_mm_and_leaves_its_value_box_focus
         assert!(v.viewport.read(cx).scene().clip_selected[active], "the caps tan while the dialog is open (live: the part's colour after ✓)");
     })
     .unwrap();
+}
+
+/// Interaction-feel "Suppressed mate" (live assembly/198; live2 fields.json mateList.suppressed): a suppressed mate
+/// stays listed, grey (inactive) italic struck through, its tooltip "Fastened 1 (Suppressed)".
+#[gpui::test]
+fn a_suppressed_mate_row_is_grey_and_its_tooltip_says_suppressed(cx: &mut TestAppContext) {
+    let (window, view) = mated_blocks(cx, "mate-suppressed");
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.edit("Suppress", cx, |a| a.mates[0].suppressed = true);
+    }));
+    draw(cx, window);
+    assert!(gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("mate-row Fastened 1").is_some(), "still listed");
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let m = v.assembly(cx).unwrap().mates[0].clone();
+        assert_eq!(v.mate_tooltip(&m).lines().next(), Some("Fastened 1 (Suppressed)"));
+    });
+    assert_eq!(super::feature_row_color(true, true, false), crate::theme::p().text_faint, "grey as an inactive row");
+}
+
+/// Interaction-feel "Failed mate's marks" (live2 errors-1118/1119): a Fastened mate between two fixed parts that it
+/// can't hold fails; its tooltip reads "Fastened 1 has error: …" and each fixed part's icon carries the ⚠ badge
+/// ("More than one part is fixed").
+#[gpui::test]
+fn a_failed_mate_between_fixed_parts_is_marked(cx: &mut TestAppContext) {
+    let path = document(cx, "mate-failed", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+        let top = |ctx: &mut Ctx, i: &str| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].clone();
+        let (a, b) = (top(ctx, "Part 1 <1>"), top(ctx, "Part 2 <1>"));
+        call(ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>", "Part 2 <1>"], "fixed": true }));
+        call(ctx, "assembly_mate", json!({ "type": "fastened", "a": { "instance": "Part 1 <1>", "entity": a }, "b": { "instance": "Part 2 <1>", "entity": b }, "offset": { "x": "30 mm" } }));
+    });
+    let (window, view) = open_from_top_when(cx, &path, |v| v.result.mates.first().is_some_and(|s| !s.ok));
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let m = v.assembly(cx).unwrap().mates[0].clone();
+        let tip = v.mate_tooltip(&m);
+        assert!(tip.starts_with("Fastened 1 has error: "), "{tip}");
+    });
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    for name in ["Part 1 <1>", "Part 2 <1>"] {
+        assert!(vcx.debug_bounds(format!("fixed {name}").leak()).is_some(), "{name}'s fixed icon");
+        assert!(vcx.debug_bounds(format!("fixed-warning {name}").leak()).is_some(), "{name}'s ⚠");
+    }
+}
+
+/// Interaction-feel "Graphics → list (2)": a part hovered in the graphics area lights nothing in the instance list
+/// (no hovered or related row) and opens no flyout.
+#[gpui::test]
+fn a_part_hovered_in_the_graphics_lights_nothing_in_the_list(cx: &mut TestAppContext) {
+    let (window, view) = mated_blocks(cx, "graphics-to-list");
+    let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
+    crate::ui_script::clear_tooltip();
+    move_to(cx, window, &view, (lo + hi) * 0.5);
+    wait_until(cx, window, &view, |v, _| v.hover.is_some());
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.hover.is_some(), "the part is hovered");
+        assert!(v.ui.list_hover.is_none() && v.related_instances(cx).is_empty(), "no row lit");
+    });
+    assert_eq!(crate::ui_script::shown_tooltip(), None, "no flyout");
 }

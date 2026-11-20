@@ -3417,3 +3417,74 @@ fn a_dragged_instance_row_drops_between_rows_in_one_undo_step(cx: &mut TestAppCo
     draw(cx, window);
     assert_eq!(order(cx), before, "one undo puts it back");
 }
+
+/// Interaction-feel "Camera menu" (live qa5 VC8): the ▾ under the view cube opens Onshape's assembly list, the Part
+/// Studio's without Orient normal to sketch on edit and Highlight boundary edges; no Show mates.
+#[gpui::test]
+fn the_camera_menu_lists_lives_assembly_rows(cx: &mut TestAppContext) {
+    let path = pattern_document(cx, "camera-menu");
+    let (window, _view) = open_assembly_with_front(cx, &path);
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let button = vcx.debug_bounds("asm-camera-menu").expect("the camera menu's button");
+    vcx.simulate_click(button.center(), gpui_kit::Modifiers::default());
+    draw(cx, window);
+    let sep = "———";
+    assert_eq!(
+        cx.update(|cx| crate::os_menu::open_labels(cx)),
+        [
+            "Isometric", "Dimetric", "Trimetric", sep, "Graphics preferences…", sep, "Named views…", "Previous view", sep, "Zoom to fit", "Zoom to window", sep, "Perspective view", sep,
+            "Shaded with edges", "Hidden edges removed", "Tangent edges visible", sep, "View in high quality", sep, "Section view…",
+        ]
+    );
+}
+
+/// Interaction-feel "Implicit, over an edge": a straight edge's preview connector is its midpoint, Z along the edge.
+#[gpui::test]
+fn an_edges_connector_is_its_midpoint_with_z_along_it(cx: &mut TestAppContext) {
+    use noshape_scene::{asm_scene::AsmPickTarget, builder::PickKind};
+    let (window, view) = pattern_assembly(cx, "edge-midpoint");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Fastened, w, cx);
+            let id = instance(v, "Part 1 <1>", cx);
+            let occ = v.result.occurrences.iter().position(|o| o.top() == id).unwrap();
+            let o = &v.result.occurrences[occ];
+            let body = o.context.body(&o.body).unwrap();
+            let edges = body.shape.edges();
+            let k = edges.iter().position(|e| e.endpoints().is_ok_and(|(a, b)| e.length().is_ok_and(|l| (l - a.distance(b)).abs() < 1e-9 && l > 1e-3))).expect("a straight edge");
+            let (a, b) = edges[k].endpoints().unwrap();
+            let reference = o.edge_refs[k].clone();
+            v.hover = Some(AsmPickTarget { path: vec![id], reference, kind: PickKind::Edge, occ, anchor: None });
+            v.update_inference(cx);
+            let (_, _, cands) = v.infer.clone().expect("the edge's points");
+            let c = &cands[v.infer_choice.expect("a choice")];
+            assert!(matches!(c.reference, Reference::Implicit { inference: Inference::Midpoint, .. }), "the midpoint");
+            assert!(c.frame.origin.distance((a + b) * 0.5) < 1e-6, "at the middle: {:?}", c.frame.origin);
+            assert!(c.frame.z().dot((b - a).normalize()).abs() > 1.0 - 1e-9, "Z along the edge");
+        })
+    })
+    .unwrap();
+}
+
+/// Interaction-feel "Snap mode ghost" (live client SNAP_SOURCE_OCCURRENCE_OPACITY): once a Snap mode drag starts, the
+/// dragged part is drawn at 0.3 opacity; the others stay opaque.
+#[gpui::test]
+fn a_snap_mode_drag_draws_its_part_as_a_03_ghost(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "snap-ghost");
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let pin = instance(v, "Part 2 <1>", cx);
+            let source = face_connector(v, "Part 2 <1>", true, cx);
+            v.snap_drag = Some(super::SnapDrag { top: pin, press: glam::DVec2::ZERO, started: true, sources: vec![source], source_ix: 0, target: None, start: Default::default(), grab: glam::DVec3::ZERO, normal: glam::DVec3::Z, off_parts: false });
+            let opts = v.scene_options(cx);
+            let built = crate::assembly_scene::build(&v.result, &opts, &mut v.cache, v.gpu.uploader());
+            let alphas = |top: bool| -> Vec<f32> {
+                built.spans.iter().filter(|s| (s.top == pin) == top).flat_map(|s| built.scene.instances[s.start..s.end].iter().map(|i| i.color[3])).collect()
+            };
+            assert!(alphas(true).contains(&0.3), "the dragged part at 0.3: {:?}", alphas(true));
+            assert!(!alphas(false).contains(&0.3), "the others not ghosted");
+        })
+    })
+    .unwrap();
+}

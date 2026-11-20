@@ -6986,7 +6986,7 @@ impl AssemblyView {
                 this.ui.camera_menu = Some(menu.downgrade());
                 crate::os_menu::open_anchored(point(b.right() + px(1.), b.bottom()), Anchor::TopRight, menu, window, cx);
             }));
-        crate::ui::with_tip(div().id("asm-camera-menu-tip").relative().child(button).child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full()), "Camera and render options", crate::ui::TipSide::Left).into_any_element()
+        crate::ui::with_tip(div().id("asm-camera-menu-tip").debug_selector(|| "asm-camera-menu".into()).relative().child(button).child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full()), "Camera and render options", crate::ui::TipSide::Left).into_any_element()
     }
 
     /// Keep the camera for "Previous view" (before a view change).
