@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-20 05:05)
+# QA handoff (agent qa; current state only, updated 2026-11-20 05:16)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -89,6 +89,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    Sketch rows ran as live's recordings (qa-bisect, uncommitted, suites/1120-feel-cov2; R4 inconclusive per live). Crops /root/qa-scratch/feel1120/.
    Quiet-window re-time (02:00-04:00 11-21, vibex8 was at load 21-36): D3 drawing wheel zoom (ours 208-392 ms, live 8-23), V1 cell edit
    (150-200 vs 46), D1 release (470 vs 10 / 767), A1 per-move draw, A2 preview draws, S1 per-move draw.
+00e. skasm stack on 3fd4db71 (05:2x): SKETCH-DIM-PLACE-CLICK-SELECTS, OFFSET-EDIT-SCALES-SKETCH, SKETCH-SLOT-ON-ARC, SMM-EXTRUDE-CLOSED-PROFILE,
+   SKETCH-DXF-EXPORT-POLYLINES verified; FEEL-DIM-TWO-POINTS-ZERO / CHAIN-LASTPOINT / PASTE-PLACE still open. Waiting: qa-rr-psui-readout (re-runs the 6
+   analysis + edge-menu-curve-analysis + cov2-dim-orient on the first green with psui 41d7c720, out suites/1120-psui-readout; then tick
+   ANALYSIS-READOUT-HIDDEN / FEEL-DIM-PICK-READOUT); psui's next batch (ROLLBACK-DROP-ROW, SECTION-ARROW-FOOT): re-walk on its word.
 00d. 05:00 cut: GO 05:05 on 2a43b78b (prerel cut0500-2a43b78b.txt all 0 px; singularities Sketch 2 ok). Lead's fixes 04:5x verified on
    2a43b78b: core cd801518 loft, dx 5dd3534a hex Right, dx 68ba3762 torus 253.01 mm2, dx 281554e9 brand (Version props' "Onshape Version"
    left, studios), studios 7d3a6e28 dialogs (P1 DRW-DIALOG-FIRST-FOCUS, P3 DRW-EXPORT-HIDE-INSPECTION-SIZE), skasm cd4191eb sim removed (code).
