@@ -910,6 +910,34 @@ fn a_gears_tooth_gaps_cut_as_fast_as_occts() {
     assert!(ms <= 2.0 * occt_ms, "{ms:.0} ms, OCCT {occt_ms:.0} ms");
 }
 
+/// c2-config-parts-screws' Sweep 1 cut (recorded): a screw's thread by its helical sweep, the shank's cylinder along a
+/// 0.4 mm wide B-spline flat's edge; OCCT's sections there are 0.6 and 4 mm loose and brought onto both faces point
+/// by point. Ours, live's volume (8.5195e-8 m3; OCCT's own cut 8.648e-8, 30 faces), and no slower than OCCT's: each
+/// point's step past the flat's edge is stopped on it (OCCT's projection searched the whole flat each time: 3.5 s).
+#[test]
+#[ignore = "T2: timed against OCCT"]
+fn a_screws_thread_cut_as_fast_as_occts() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "b95e3b8868eedcd0").expect("the recorded case");
+    let timed = |rust: bool| {
+        k::set_rust_boolean(Some(rust));
+        let t = std::time::Instant::now();
+        let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+        let (ms, path) = (t.elapsed().as_secs_f64() * 1e3, k::last_boolean_path());
+        k::set_rust_boolean(None);
+        (r.expect("the cut"), ms, path)
+    };
+    let _ = timed(true);
+    let (ours, ms, path) = timed(true);
+    let (_, occt_ms, _) = timed(false);
+    assert_eq!(path, "rust");
+    let v = ours.shape.volume().unwrap();
+    assert!(ours.shape.is_valid() && (v - 8.5195e-8).abs() <= 1e-4 * 8.5195e-8, "volume {v}");
+    assert_eq!(ours.shape.count(k::ShapeType::Face), c.summary.faces);
+    assert!(ms <= occt_ms, "{ms:.0} ms, OCCT {occt_ms:.0} ms");
+}
+
 /// The Ø25 × 10 CP30 45° / 30° knurl (recorded, 186 grooves): where the cylinder's sections with two grooves' flanks
 /// cross (exactly), the flanks' own section, 99 times slower at its end, passes 40 nm off, 17 um before its end; its
 /// foot there (the end the nearest sample, Newton's step out of the range) read as its end, 3.8 um off, so it wasn't

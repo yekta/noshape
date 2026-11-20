@@ -5771,6 +5771,44 @@ static bool boolean_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::
   return (free_form(fa) || free_form(fb)) && (resting_on_plane(fa, fb, out, exact) || apart_across_slab(fa, fb, exact) || hulls_apart(fa, fb));
 }
 
+// The point of `s` nearest `p` from `uv` by Newton's steps, on a bound where the step passes one that isn't a period's
+// (OCCT's NextValueOfUV leaves its own steps past a bound, and where |Su x Sv|^2 < 1e-10, and searches the whole
+// surface instead: 0.4 ms a point on a thread's 0.4 mm wide B-spline flat); OCCT's where these stall.
+static gp_Pnt2d next_uv(const occ::handle<ShapeAnalysis_Surface>& q, const occ::handle<Geom_Surface>& s, const gp_Pnt2d& uv, const gp_Pnt& p)
+{
+  double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+  s->Bounds(u0, u1, v0, v1);
+  const bool up = s->IsUPeriodic(), vp = s->IsVPeriodic();
+  double     u = uv.X(), v = uv.Y();
+  for (int i = 0; i < 20; ++i)
+  {
+    gp_Pnt x;
+    gp_Vec su, sv;
+    s->D1(u, v, x, su, sv);
+    const gp_Vec r(x, p);
+    const double a = su.Dot(su), b = su.Dot(sv), c = sv.Dot(sv), det = a * c - b * b;
+    if (!(det > 1e-12 * a * c))
+      break;
+    const double ru = r.Dot(su), rv = r.Dot(sv);
+    double       du = (c * ru - b * rv) / det, dv = (a * rv - b * ru) / det;
+    if (!up && (u + du < u0 || u + du > u1))
+    {
+      du = (u + du < u0 ? u0 : u1) - u;
+      dv = (rv - b * du) / c;
+    }
+    else if (!vp && (v + dv < v0 || v + dv > v1))
+    {
+      dv = (v + dv < v0 ? v0 : v1) - v;
+      du = (ru - b * dv) / a;
+    }
+    u = up ? u + du : std::clamp(u + du, u0, u1);
+    v = vp ? v + dv : std::clamp(v + dv, v0, v1);
+    if ((su * du + sv * dv).Magnitude() <= 1e-13)
+      return gp_Pnt2d(u, v);
+  }
+  return q->NextValueOfUV(uv, p, 1e-10);
+}
+
 // OCCT's section of two faces, one of them free-form, brought onto both surfaces where its approximation is coarse
 // (its tolerance past 1e-5 m: a sphere's section with a B-spline face, cf-surface-pattern's, 2.4e-4 m off them,
 // our grey band about a face's boundary then millimetres wide): 129 of its points (from its own parameters, its
@@ -5798,16 +5836,16 @@ static IntTools_Curve refined_section(const IntTools_Curve& ic, const TopoDS_Fac
   };
   // (A point and its places on the faces, from guesses: on both within 1e-9, else false.)
   auto onto = [&](gp_Pnt m, gp_Pnt2d pa, gp_Pnt2d pb, OnBoth& out) {
-    pa         = qa->NextValueOfUV(pa, m, 1e-10);
-    pb         = qb->NextValueOfUV(pb, m, 1e-10);
+    pa         = next_uv(qa, sa, pa, m);
+    pb         = next_uv(qb, sb, pb, m);
     double gap = 1;
     for (int it = 0; it < 50 && gap > 1e-9; ++it)
     {
       const gp_Pnt xa = sa->Value(pa.X(), pa.Y()), xb = sb->Value(pb.X(), pb.Y());
       gap = xa.Distance(xb);
       m   = gp_Pnt((xa.XYZ() + xb.XYZ()) / 2);
-      pa  = qa->NextValueOfUV(pa, m, 1e-10);
-      pb  = qb->NextValueOfUV(pb, m, 1e-10);
+      pa  = next_uv(qa, sa, pa, m);
+      pb  = next_uv(qb, sb, pb, m);
     }
     out = OnBoth{m, pa, pb};
     return gap <= 1e-8;
