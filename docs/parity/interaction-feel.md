@@ -1637,7 +1637,7 @@ Lane 1 "start two-blocks asm" copy, iso at 0.058965 mm/px; behaviours "feel cove
 
 | Action | Live | Ours | Status |
 |---|---|---|---|
-| A1b A press on a free instance, then a move | a click up to 14 px (selected, not moved); 17 px drags; the drag starts only from a move ≥ ~0.62 s after the press (40 px in 0.2 s, then still: a click) | 15 px and 50 ms (`a_free_instance_drags_from_15_px_and_takes_the_whole_move`) | = [asm]: the ~0.6 s is live's drag-start round trip, not copied |
+| A1b A press on a free instance, then a move | the first move past 2 device px and 50 ms drags, taking the whole delta from the press; the ~0.6 s / 15–17 px of the first take was lane 1's software GL and the drag-start round trip (live drag-delay-1120, A1b withdrawn) | 2 px and 50 ms (`a_free_instance_drags_past_2_px_and_takes_the_whole_move`) | = [asm] |
 | A1 A 150 px drag of a free instance | the full pointer delta in the screen plane (-7.66, -4.422, 0) mm from the press, no dead zone; drawn 7–29 ms after each move; after the release not selected, the hover outline only | the same (`a_free_instances_drag_keeps_the_default_cursor_and_follows_the_pointer`, the 17 px test above) | = [asm] |
 | A2 A new Fastened's second connector | the moving part jumps connector to connector, its hidden edges a thin amber box through the other part; the stored transform unchanged until ✓ | the same: the previewed part drawn x-ray as Insert's (`a_mate_previews_moving_part_shows_its_edges_through_the_others`); stored unchanged till ✓ (`a_new_mates_preview_moves_the_first_pick_alone_…`) | = [asm] (live's draws at 155 / 651 / 1319 ms are its round trips) |
 

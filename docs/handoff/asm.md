@@ -5,7 +5,31 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-20 01:06 UTC)
+## State (2026-11-20 05:00 UTC)
+
+### In flight
+- Queued 04:55: 5bfaa556 (feel A1b/A2, ASM-INSTANCE-PROPS-FIELD, Ball start turn (fuzz 76/80, R3), mate preview
+  colour PICKED, tickets). NEVER run land.sh while it is queued. 8a6d26c4 landed 04:49 as c6c38a39.
+- Uncommitted (land after 5bfaa556):
+  - ASM-FLEX-SUB-RIGID (P1, live flexsub-1120): eval.rs `prepare_subassembly` keeps a sub flexible with linear /
+    circular patterns and Tangent mates (mirror, part pattern, replicate still rigid); the flex-sub loop adds its
+    Tangent mates (`tangent_pair((sub, prefix), ..)`) and its patterns' followers (`pattern_steps`, shared with the
+    top level's Linear / Circular). Test tests.rs `a_flexible_subassembly_keeps_its_patterns_and_tangent_mates`.
+  - SNAP-INSERT-FACE (P1, reopened by qa): live 1704's crops show the centroid is the only dot in reach at A and none
+    at B (no snap, placed without a mate), the same nearest-within-reach rule as ours; T1 test
+    `a_snap_insert_onto_a_plain_face_takes_its_centroid_and_turns_about_x` (assembly_ui_tests.rs: centroid target,
+    180° about X, T (-50, 20, 10), Fastened 1).
+  - ASM-NEW-MATE-PREVIEW-GROUP: dropped a stale "[ ]" duplicate line in TICKETS (verified [x] row stays).
+  - ops tests/parity.rs: live's composite parts (metadata partType "composite"; live's lines never list them) join
+    the live parts list with their mass.json band and centroid (infento 1dc32b's 15 unplaced instances); needs an
+    infento run.
+  - parity.rs nested Derived sources as Arc (`fetched_derived_sources`) + big_assembly_perf.rs
+    `suite_assembly_open_profile`: commit with the scissor rerun.
+- Running: isaac open profile on vibex8 (waiting for the slot since 04:41; output ~/agents/asm-keep/isaac-profile.out)
+  -> top 5 studios / features with ms to the lead.
+- FEEL-ASM-DRAG-START: live drag-delay-1120 withdrew A1b (2 px / 50 ms, whole delta; the 0.6 s was software GL + round trip): 15 px reverted to 2 px (uncommitted, test renamed _past_2_px_); qa told to re-walk DEAD-ZONE after 5bfaa556.
+- Next: (1) profile report; (2) scissor traced rerun with the Arc fix (4ce5c7 / 5aae43 / fed22d / 57725f should
+  build); (3) infento composites (below).
 
 ### Landed today (702c9878: Display states Esc, driver-mate named position, paste; d671313d; 335f8e43; 9f52415c; 123ca4b3 free drag)
 - LOD (91478e2c), Derived mirror of an assembly complete (e87a2b3e, 17c26dc1; left: live's exact node icon, symmetry
@@ -50,11 +74,19 @@ TICKETS ASM-UI-SIGSEGV-AT-EXIT [x].
      Extrude 6/13/46) and Revolute 11 / Ball 13 (on a04711's Part 2) follow it.
    - blend: GearLab 1e81ca / 90f78b #desc fillet → Extrude 1-3 → the 2 Spiral Bevel gears (2 occurrences, 2 BOM rows);
      fillets / chamfers in 00f1d4, 884765, a2e4a2 (Chamfer 4), b29603, c3fdd4, de4eff, e4a405, fa73e1.
-2. Speed (`big_assembly_perf::suite_assemblies_speed`, NOSHAPE_PERF_DOCS=<saved docs>, release binary vibe2
-   ~/agents/asm-keep/bin/ops-speed; top assembly = the one no other inserts). xdev-subs (vibe2 load 23/16, 11-20
-   00:41): open 257 ms load + 89 ms evaluation + 8 ms scene (live 11.8 s), insert 1.3 ms (live 4.96 s); its top has no
-   mates. Mate solve / drag: isaac's saved document when the trace run ends. Live: behaviours 21425 (asm200), 30512.
-3. Then the suite's next differences (xdev-subs 266/266 7/7 74/74 = live; infento timed out at 3600 s in h1119,
+2. Speed (`big_assembly_perf::suite_assemblies_speed`; landed 68eee738). isaac (vibex7 load 24, release): open 140 s
+   cold (prewarm 133 s = regenerating its Part Studios), evaluate again 3.25 s / add a mate 3.21 s (all mate solve),
+   drag frame 234 ms, insert 1.26 s. Live (behaviours "asm (11-20): … isaac-ball timings", software GL): open list
+   46-58 s (drawn 187-238 s), regenerate quiet 18.7 s, Fastened mate quiet 4.1 s, insert quiet 4.4 s; drag not
+   measurable there. So the open is the gap: lead 03:4x made it P1, profile it (`suite_assembly_open_profile`,
+   NOSHAPE_PERF_DOCS=vibe2/vibex7 ~/tmp/asm/speed/asm-isaac-ball.noshape): top 5 studios / features with ms to the lead.
+3. Infento on the current tree (vibex7 ~/agents/asm-keep/infento-cur.out, 04:00): 147/167 occ, 184/187 mates, 56/64 BOM.
+   Not inserted (mine): 15 instances of studio 1dc32b's COMPOSITE parts, which never get a "live part" mapping line (the
+   mapping in rebuild_assembly sees no live entry for them; ours has "Composite part 1-17"): pulleys 46T R8DD /
+   26T RsDD, Seatboard RBHD, Ducktail board RrJD / extension RLID, 7" Wheel asm R8BD x5); Wheel 7inch x5 on subassembly
+   b16934 (DeletedElement in live). Planar 10/11, Revolute 10 cannot resolve; Large wheel tyre <1>/<2> freed move 1.5 m.
+   Studios: 74d3d6 Plane 1 INTERSECT, Sketch 15/23; f0eedd Sketch 7; a3f7a1 Extrude 1 region.
+4. Older notes on the suite's next differences (xdev-subs 266/266 7/7 74/74 = live; infento timed out at 3600 s in h1119,
    rerun with ≥7200 s; scissor running in h1119 on vibex7). Infento (06:37 base): 5 Wheel 7inch instances whose
    subassembly is DeletedElement in live; missing parts (pulleys R8DD/RsDD, Seatboard <2>, Wheellock rings);
    74d3d6 Plane 1 "three faces have no common vertex of ours" (translator, mine) → Sketch 15 / Extrude 24; the

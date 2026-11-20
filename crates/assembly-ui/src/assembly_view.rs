@@ -3521,10 +3521,8 @@ impl AssemblyView {
                     return;
                 }
                 let Some(d) = &self.drag else { return };
-                // An instance moves once the pointer is 15 px from the press (live feel cov-1120 A1b: 14 px a click, 17 px
-                // a drag taking the whole delta); a handle at 2 px.
-                let start_px = if d.handle.is_none() && !d.explode { 15.0 } else { 2.0 };
-                if !d.started && position.distance(d.press) > start_px && d.pressed_at.elapsed() > std::time::Duration::from_millis(50) {
+                // Live drag-delay-1120: the first move past 2 px and 50 ms drags, taking the whole delta from the press.
+                if !d.started && position.distance(d.press) > 2.0 && d.pressed_at.elapsed() > std::time::Duration::from_millis(50) {
                     let (top, explode) = (d.top, d.explode);
                     self.drag.as_mut().unwrap().started = true;
                     // A fixed instance does not move (live 562: no-drop cursor and

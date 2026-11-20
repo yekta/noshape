@@ -2065,10 +2065,10 @@ fn a_free_instances_drag_keeps_the_default_cursor_and_follows_the_pointer(cx: &m
     });
 }
 
-/// Live feel cov-1120 A1 / A1b: a press on a free instance moved 14 px is a click (selected, not moved); moved 17 px it
-/// drags, taking the whole move from the press, and after the release nothing is selected.
+/// Live drag-delay-1120 (feel cov-1120 A1): a press on a free instance moved 2 px is a click (selected, not moved); its
+/// first move past 2 px and 50 ms drags, taking the whole move from the press, and after the release nothing is selected.
 #[gpui::test]
-fn a_free_instance_drags_from_15_px_and_takes_the_whole_move(cx: &mut TestAppContext) {
+fn a_free_instance_drags_past_2_px_and_takes_the_whole_move(cx: &mut TestAppContext) {
     use crate::viewport::ViewportEvent;
     use gpui_kit::Modifiers;
     let (window, view) = pattern_assembly(cx, "drag-start");
@@ -2097,19 +2097,19 @@ fn a_free_instance_drags_from_15_px_and_takes_the_whole_move(cx: &mut TestAppCon
         to
     };
     let before = cx.update(|cx| view.read(cx).result.solved.placement(instance(view.read(cx), "Part 1 <1>", cx)));
-    press_move_release(cx, 14.0);
+    press_move_release(cx, 2.0);
     cx.update(|cx| {
         let v = view.read(cx);
         let id = instance(v, "Part 1 <1>", cx);
-        assert_eq!(v.result.solved.placement(id), before, "14 px: not moved");
-        assert!(v.selected.contains(&id), "14 px: a click, selected");
+        assert_eq!(v.result.solved.placement(id), before, "2 px: not moved");
+        assert!(v.selected.contains(&id), "2 px: a click, selected");
     });
     cx.update(|cx| view.update(cx, |v, _| v.clear_selection()));
-    let to = press_move_release(cx, 17.0);
+    let to = press_move_release(cx, 5.0);
     cx.update(|cx| {
         let v = view.read(cx);
         let now = centre(v, cx);
-        assert!(now.distance(to) < 1.0, "17 px: the part's centre with the pointer, the whole move: {now:?}, pointer {to:?}");
+        assert!(now.distance(to) < 1.0, "5 px: the part's centre with the pointer, the whole move: {now:?}, pointer {to:?}");
         assert!(v.selected.is_empty(), "nothing selected after the drag");
     });
 }
@@ -2233,6 +2233,62 @@ fn cancelling_an_insertion_offers_restore(cx: &mut TestAppContext) {
     cx.update(|cx| view.update(cx, |v, cx| v.restore_insert(cx)));
     assert_eq!(count(cx), before + 1, "Restore brings it back");
     assert!(cx.update(|cx| view.read(cx).ui.insert_restore.is_none()), "the bubble gone");
+}
+
+/// Live 1704 (skasm/snapinsert-1704): in Snap mode a pin placed with its explicit mate connector on the bottom rim (Z
+/// out of the pin) snaps, near the block's top face centre, onto that face's centroid connector with the frames
+/// coincident: turned 180° about X, at (−50, 20, 10) mm, hanging in the block; the click adds Fastened 1 between them.
+#[gpui::test]
+fn a_snap_insert_onto_a_plain_face_takes_its_centroid_and_turns_about_x(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::init);
+    crate::assembly_hooks::register_for_tests();
+    let dir = std::env::temp_dir().join(format!("noshape-asm-ui-snap-insert-face-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("asm.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+    }
+    {
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+        let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }, { "tool": "circle", "points": [[70, 10], [75, 10]] }] }));
+        let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+        let rim = call(&mut ctx, "query_entities", json!({ "kind": "edges", "at": [[75, 10, 0]] }))["edges"][0]["id"].clone();
+        call(&mut ctx, "feature_add", json!({ "type": "mateConnector", "params": { "originQuery": [rim], "entityInferenceType": "CENTER" } }));
+        call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(&mut ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>"], "fixed": true }));
+        call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    }
+    let (window, view) = open_assembly(cx, &path);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let pin = instance(v, "Part 2 <1>", cx);
+            let mates = v.assembly(cx).unwrap().mates.len();
+            v.toggle_snap(w, cx);
+            v.start_placing(vec![pin], cx);
+            v.ui.place_moved = true;
+            let target = face_connector(v, "Part 1 <1>", true, cx);
+            let units = v.units(cx);
+            let centre = v.viewport.read(cx).project(v.result.connector_world(&target, &units).unwrap().origin).unwrap();
+            v.pointer = centre + glam::DVec2::new(6.0, 3.0);
+            assert!(v.update_placing(cx), "snapped");
+            assert_eq!(v.ui.place_snap.as_ref().map(|(_, d)| d), Some(&target), "onto the face's centroid connector");
+            let p = v.result.solved.placement(pin).unwrap();
+            let r = glam::DQuat::from_array(p.rotation);
+            let near = |a: glam::DVec3, b: glam::DVec3| a.distance(b) < 1e-9;
+            assert!(near(r * glam::DVec3::X, glam::DVec3::X) && near(r * glam::DVec3::Z, -glam::DVec3::Z), "180° about X: {r:?}");
+            assert!(near(glam::DVec3::from(p.translation), glam::DVec3::new(-0.05, 0.02, 0.01)), "{:?}", p.translation);
+            v.finish_placing(true, w, cx);
+            let a = v.assembly(cx).unwrap();
+            assert_eq!(a.mates.len(), mates + 1);
+            let m = a.mates.last().unwrap();
+            assert_eq!((m.name.as_str(), m.mate_type), ("Fastened 1", MateType::Fastened));
+            assert_eq!(m.b, target);
+        })
+    })
+    .unwrap();
 }
 
 /// A block (Part 1) and a pin (Part 2) inserted into Assembly 1, then `make`.
