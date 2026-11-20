@@ -195,7 +195,7 @@ pub fn account_title_bar(cx: &App) -> AnyElement {
             h_flex()
                 .w_full()
                 .h_full()
-                .child(h_flex().gap(px(5.)).pl(px(8.)).child(crate::assets::icon("noshape-logo", 22., cx)).child(div().text_size(px(21.)).font_weight(FontWeight::LIGHT).text_color(pal.text_muted).child("noshape")))
+                .child(h_flex().gap(px(5.)).pl(px(8.)).child(crate::assets::icon("noshape-logo", 22., cx)).child(div().text_size(px(21.)).font_weight(FontWeight::LIGHT).text_color(pal.text_muted).child("Noshape")))
                 .child(div().flex_1())
                 .child(
                     h_flex()

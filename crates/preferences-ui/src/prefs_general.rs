@@ -610,7 +610,7 @@ impl Render for UpdatesPrefsView {
                             cx.notify();
                         })),
                 )
-                .child(div().pl(px(16.)).pt(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0xbbbbbb } else { 0x777777 })).child(tr("A banner says when an update is ready; it is installed when you restart noshape."))),
+                .child(div().pl(px(16.)).pt(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0xbbbbbb } else { 0x777777 })).child(tr("A banner says when an update is ready; it is installed when you restart Noshape."))),
         )
     }
 }
