@@ -9,17 +9,22 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
-## Now (00:10 11-20)
-- C (fan-blade HLR sampling) PARKED by the lead (1.66x < 2x): TICKETS FAN-BLADE-VIEWS-HLR-SAMPLING (P3).
-- surf-intro rerun with live2's refs (Mac, dx-main): all 5 (boundary / fill / mutualtrim / offset / ruled) still stop
-  at "Derived 1". Cause 1: live's refs for queries inside an array item ("wireProfilesArray[1].wireProfileEntities")
-  never matched (pid lacked the item path), so the source's Loft 3 went by query text to a wrong edge. Cause 2: our
-  Loft refused coplanar OPEN profiles ("Could not determine loft direction."; live only refuses closed ones). Both fixed
-  in fb8f84f42 (+ model test engine::surface_loft_between_coplanar_open_curves): the derived Car is now the closed
-  5/9/6 car of live's Loft 4. Left: the source's Fillet 1 (r 0.6 in, tangent chain from the right top edge) fails
-  in ours (live 7/14/9): sent to blend 22:3x with repro /root/dx-scratch/si-save/c2-surf-intro-offset.noshape (needs
-  fb8f84f42). Rebuild 130 ms -> ~1.5 s (live 0.36-1.2 s): the lofts now build + the failing fillet; recheck after
-  blend's fix. Mac scripts: ~/noshape-host/dx-keep/sitrace.sh (copy /tmp/sitrace.sh), sisurf.sh.
+## Now (12:0x 11-20): SUITE SPEED (lead 11-20 ~11:45)
+Task: docs whose full regeneration is >= 2x live's AND >= 100 ms slower; profile the top 10 to the slowest feature + op;
+fix mine (FS interpreter, translator, regen plumbing), route the rest with ms (Boolean -> bool, fillet -> blend,
+sweep/loft/pattern -> core, sheet metal -> skasm); report the table to the lead.
+- qa's 10:28 run (/root/qa-scratch/suites/1120-1028-4e51cce3-models/models-report.json) is a DEBUG build at load 12-18:
+  28 flagged (impeller 40.6 s / 2.8, parting-line 6.0 / 0.74, config-screws 5.0 / 0.27, rings 5.9 / 1.6, loft-paths
+  2.6 / 0.43, cpcurves, knifehandle, standoffs, part-draft, hunting-knife, surf-intro x4 "Derived 1" ~0.8 s ...).
+- RUNNING: release parity_models on the Mac (rb.sh slot; Mac ~/noshape-host/dx-keep/pmrun.sh <tag> [only], copy
+  /root/dx-scratch/pmrun.sh): tag r1 -> Mac dx-keep/pm-r1/report.json + pm-r1.log; local log /root/dx-scratch/pm-r1.log.
+  Next: filter report (regen_ms ours = sum of features, live = full_regen_ms) as above; per doc
+  NOSHAPE_PARITY_ONLY=<doc> (each feature vs live) + NOSHAPE_KERNEL_PROFILE=1 / NOSHAPE_FS_PROFILE=fn.
+- Lands: bdf50182 LANDED 5b23eb0e (speed fix + DXF); 6047caa6 checking; c09079ab queued (P3 ticket, 5-point fit,
+  handoff). This handoff edit is committed locally, not landed.
+
+## Earlier (00:10 11-20)
+- Fan-blade HLR sampling: TICKETS P3. surf-intro: see the 03:0x bullet below (archive has the 00:10 rerun).
 - LANDED 04:49 as d9b795e0 (c63e548b, 8 commits): fb8f84f42 (surf-intro refs + open-profile loft), BRAND-IN-UI-TEXT
   (qa verifies), hex chain_pieces both ways (9023ff0d, 5dd3534a 04:22), STEP one-loop torus, HLR P1 = OCCT patch 0036
   (HLRBRep_Data::RejectedPoint: an IN end crossing tangent to a boundary's middle, unpaired, rejected; snap-hook 7 stray
