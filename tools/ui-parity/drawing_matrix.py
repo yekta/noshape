@@ -440,6 +440,11 @@ def main():
         if isinstance(on, dict) and isinstance(on.get("menu"), str) and "dropdown" not in on:
             menu_seen[key(on["menu"])][0 if ok else 1] += 1
             scen_of[("menu", key(on["menu"]))].add(name)
+        # A hovered button (Undo, Redo, Update: never an active tool): its tooltip's title, ours against live's.
+        tip, otip = st.get("tooltip"), ost.get("tooltip")
+        if isinstance(on, dict) and isinstance(on.get("tool"), str) and (ls.get("do") or {}).get("do") == "hover" and isinstance(tip, str):
+            title_of = lambda t: norm(t.split(" / ")[0]) if isinstance(t, str) else None
+            tool_seen[key(on["tool"])][0 if title_of(tip) == title_of(otip) else 1] += 1
         if isinstance(on, dict) and isinstance(on.get("tool"), str):
             for label in (on.get("menu"), on["tool"]):
                 if isinstance(label, str):
