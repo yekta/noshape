@@ -59,8 +59,14 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
   one's bounds; now keyed to the released element's id (vendor gpui-pre window.rs / div.rs / text.rs, NOSHAPE.md);
   test a_clicked_crumb_turned_title_shows_its_tooltip (fails on the old gate), psui's chrome row green. Committed
   979edd4d1 + TICKETS c6b34e769. When it lands: tell psui what changed in vendor gpui (lead).
-- b10 on vibe2 :395 (03:09): app + full ops e2e + shots of hcallout-fit, hatch-panel, bom-table, inspection-item,
-  inspection-table-iso-scrolled (live's retake), create-drawing-custom-template, docs-folder-crumb; then land.
+- b10 on vibe2 (03:19 build): full ops e2e 260/260; hcallout-fit 43/43, hatch-panel 39/39, bom-table 4/4,
+  inspection-item 9/9, inspection-table-iso-scrolled (live's ISO retake) 10/10, docs-folder-crumb 3/3 (crumb fixed in
+  the app). Fixed after it: Inspection item's Text height value and live-look selects; Create Drawing's state as
+  `texts` (live records the modal's text as one innerText string).
+- VER-COMPARE-READOUT (qa 11-20): Compare draws no measure readout (menus.rs render_measure_panel; test hooks'
+  TEST_COMPARE; measure feel row). Committed + TICKETS.
+- Matrix with b10's runs and submenu rows: 1224 = + 511 shown of 1855, 0 ≠, 78 present-only.
+- b11 on vibex8 :394 (04:02): inspection-item, create-drawing-custom-template, ver-compare-hover-part; then land.
 - psui via lead 11-20: version row menu without "Releases": ours already lists none there (qa's run = live's rows).
 
 ## Next, in order
