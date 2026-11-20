@@ -1160,13 +1160,16 @@ impl VariableStudioView {
                 None => (None, None),
             };
             let editing = expr.read(cx).focus_handle(cx).is_focused(window);
-            let shown = result.filter(|_| !editing && is_expression(&v.expr.text)).map(|q| {
+            let at_rest = result.filter(|_| is_expression(&v.expr.text)).map(|q| {
                 let unit = expression_unit(&studio, &v.expr.text, 0).unwrap_or(units.length);
                 noshape_units::format_quantity(q, &noshape_units::UnitPrefs { length: unit, ..units })
             });
             // A length written in another unit shows in the document's (live vs-fs-feel-1117: "2 in" -> "50.8 mm").
-            let shown = shown.or_else(|| result.filter(|_| !editing && foreign_length(&v.expr.text, &units)).map(|q| noshape_units::format_quantity(q, &units)));
-            let shown = shown.or_else(|| (!editing).then(|| rounded_literal(&v.expr.text, &units)).flatten());
+            let at_rest = at_rest.or_else(|| result.filter(|_| foreign_length(&v.expr.text, &units)).map(|q| noshape_units::format_quantity(q, &units)));
+            let at_rest = at_rest.or_else(|| rounded_literal(&v.expr.text, &units));
+            let shown = at_rest.clone().filter(|_| !editing);
+            // While editing: the value it had, a grey chip over the row above (live FEEL-VS-OLD-VALUE-CHIP).
+            let old_value = at_rest.unwrap_or_else(|| noshape_units::localize(&v.expr.text));
             // From import: the imported value, "Not set" before a file is picked (live vs-type-from-import).
             let import_text = (v.kind == Some(VarKind::FromImport)).then(|| v.import.as_ref().map(|imp| noshape_model::variables::import_value(&self.doc.read(cx).session.doc, imp).map(|x| x.to_string()).unwrap_or_else(|e| e)).unwrap_or_else(|| "Not set".into()));
             if crate::ui_script::active() {
@@ -1258,6 +1261,10 @@ impl VariableStudioView {
                                 }))
                             })
                             .child(cell_input(&expr))
+                            // (26 px, 2 px above the cell, its right 46 px in from the cell's: live vs2-hash.)
+                            .when(!old_value.is_empty(), |d| {
+                                d.child(div().debug_selector(|| "vs-old-value".into()).absolute().top(px(-30.)).right(px(45.)).h(px(26.)).px(px(5.)).flex().items_center().bg(rgb(0xd0dbe5)).text_color(rgb(0x333333)).text_size(px(11.)).font_weight(FontWeight::BOLD).whitespace_nowrap().child(old_value.clone()))
+                            })
                             .children(list),
                     )
                     .into_any_element()

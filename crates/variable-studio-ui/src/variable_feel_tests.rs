@@ -144,6 +144,25 @@ fn a_value_cells_tooltip_sits_over_the_cell(cx: &mut TestAppContext) {
     assert!((tip.center().x - cell.center().x).abs() < px(1.), "centred on it, not on the pointer: {tip:?} {cell:?}");
 }
 
+/// Live behaviours "feel coverage (11-20)" V2: while a value cell is edited, its old value sits in a grey chip over the
+/// row above (26 px, 2 px above the cell, its right 46 px in from the cell's), whatever is typed; gone after the edit.
+#[gpui::test]
+fn an_edited_value_shows_its_old_value_in_a_chip(cx: &mut TestAppContext) {
+    let (window, view) = studio(cx, "old-value");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let cell = vcx.debug_bounds("vs-val-0").expect("the value cell");
+    assert!(vcx.debug_bounds("vs-old-value").is_none(), "no chip at rest");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_cell_edit("e0", None, w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["#"]);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let chip = vcx.debug_bounds("vs-old-value").expect("the chip while editing");
+    assert!((chip.size.height - px(26.)).abs() < px(0.5) && (chip.bottom() - (cell.top() - px(2.))).abs() < px(1.), "{chip:?} {cell:?}");
+    assert!((chip.right() - (cell.right() - px(46.))).abs() < px(1.5), "{chip:?} {cell:?}");
+    keys(cx, window, &["escape", "escape"]);
+    assert!(gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("vs-old-value").is_none(), "gone after the edit");
+}
+
 /// Live2 errors-1118: Enter on a value that fails ("1 +") keeps that cell selected with its red border; a good value
 /// moves down a row as before.
 #[gpui::test]
