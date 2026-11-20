@@ -294,7 +294,7 @@ fn apply_corner_breaks(part: &mut Shape, pieces: &mut Vec<Piece>, def: &Definiti
         for f in part.faces().into_iter().filter(|f| is_new(f)) {
             let c = key(&f).map_or(DVec3::ZERO, |k| k.0);
             let v = found.iter().map(|(v, _)| *v).min_by(|a, b| topo.vertices[*a].distance(c).total_cmp(&topo.vertices[*b].distance(c))).unwrap_or(found[0].0);
-            pieces.push(Piece { face: f, from: Def::Vertex(v), relief: true });
+            pieces.push(Piece { face: f, from: Def::Vertex(v) });
         }
         true
     };
@@ -536,8 +536,6 @@ pub(super) fn rename_strings(v: &Value, map: &HashMap<Arc<str>, Arc<str>>) -> Va
 struct Piece {
     face: Shape,
     from: Def,
-    /// A bend or corner relief's cut (live q-sm-creators-1119: its faces are the latest relief rebuild's).
-    relief: bool,
 }
 
 /// One wall's outer loop as straight edges: points and the definition
@@ -1162,26 +1160,9 @@ fn corner_reliefs(def: &Definition, topo: &Topo, outlines: &[Outline], bends: &B
         let Some((l, _, _)) = outline else { continue };
         let m = l.pts.len();
         for k in 0..m {
-            let (mut e1, mut e2) = (l.side[(k + m - 1) % m], l.side[k]);
+            let (e1, e2) = (l.side[(k + m - 1) % m], l.side[k]);
             let v = l.pts[k];
             let vi = topo.nearest_vertex(v);
-            // An automatic miter's corner (live sm-box, q-sm-creators-1119 A-rect: a Rectangle Corner on Flange 1's bend
-            // end): a thickness-long stub of the sheet's edge runs on to the other bend, which carries on in its line;
-            // the relief is the two bends' corner at this end, the other bend clipped from its own end.
-            let mut mate: Option<(usize, DVec3, f64)> = None;
-            if def.corners.get(&vi).is_some_and(|c| matches!(c.style.as_str(), "RECTANGLE" | "SIZED_RECTANGLE")) {
-                let bent = |e: usize| setbacks.contains_key(&e);
-                let in_line = |a: DVec3, b: DVec3| a.normalize_or_zero().cross(b.normalize_or_zero()).length() < 1e-6;
-                let (next, after) = (l.pts[(k + 1) % m], l.pts[(k + 2) % m]);
-                let (prev, before) = (l.pts[(k + m - 1) % m], l.pts[(k + m - 2) % m]);
-                if bent(e1) && !bent(e2) && bent(l.side[(k + 1) % m]) && next.distance(v) <= thickness + TOL && in_line(after - next, next - v) {
-                    e2 = l.side[(k + 1) % m];
-                    mate = Some((e2, next, next.distance(v)));
-                } else if bent(e2) && !bent(e1) && bent(l.side[(k + m - 2) % m]) && prev.distance(v) <= thickness + TOL && in_line(before - prev, prev - v) {
-                    e1 = l.side[(k + m - 2) % m];
-                    mate = Some((e1, prev, prev.distance(v)));
-                }
-            }
             // The Corner feature's setting at this vertex, else the model's
             // (its three-bend style where three bends meet).
             let three = def.bends.keys().filter(|&&e| e < topo.edge_ends.len() && [topo.edge_ends[e].0, topo.edge_ends[e].1].iter().any(|p| p.distance(topo.vertices[vi]) < TOL)).count() >= 3;
@@ -1281,12 +1262,8 @@ fn corner_reliefs(def: &Definition, topo: &Topo, outlines: &[Outline], bends: &B
                 continue;
             }
             let (a, b) = (s2 + x2, s1 + x1);
-            let from_end = |e: usize, d: f64| match mate {
-                Some((me, end, stub)) if me == e => (e, end, d - stub),
-                _ => (e, v, d),
-            };
-            clips.push(from_end(e1, a));
-            clips.push(from_end(e2, b));
+            clips.push((e1, v, a));
+            clips.push((e2, v, b));
             prism(&mut cuts, p, &[v, v + d1 * a, v + d1 * a + d2 * b, v + d2 * b], vi)?;
             // Each flange: along its bend as far as the wall's cut, into it past the bend.
             for (e, d, along, depth) in [(e1, d1, a, b), (e2, d2, b, a)] {
@@ -1927,7 +1904,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
                     if (c - b.start).dot(b.dir) < b.len * 0.5 { Def::Vertex(v0) } else { Def::Vertex(v1) }
                 }
             };
-            pieces.push(Piece { face: f, from, relief: false });
+            pieces.push(Piece { face: f, from });
         }
         solids.push(bend);
     }
@@ -2038,7 +2015,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
                     let c = inner_point(&face).unwrap_or_default();
                     let near = |e: &usize| k::make_vertex(c).ok().and_then(|v| k::distance(&v, &topo.edges[*e]).ok()).map_or(f64::INFINITY, |d| d.distance);
                     let from = edges.iter().copied().min_by(|a, b| near(a).total_cmp(&near(b))).map_or(Def::Face(fi), Def::Edge);
-                    pieces.push(Piece { face, from, relief: false });
+                    pieces.push(Piece { face, from });
                 }
                 tools.push(tool);
             }
@@ -2056,7 +2033,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             slab = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&slab), &tools, &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal bend relief failed: {e}")))?.shape;
             // The slot's faces come from the bend's end vertex.
             for (tool, v) in &reliefs {
-                pieces.extend(tool.faces().into_iter().map(|face| Piece { face, from: Def::Vertex(*v), relief: true }));
+                pieces.extend(tool.faces().into_iter().map(|face| Piece { face, from: Def::Vertex(*v) }));
             }
         }
         for f in slab.faces() {
@@ -2083,7 +2060,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
                     Def::Edge(l.side[k])
                 }
             };
-            pieces.push(Piece { face: f, from, relief: false });
+            pieces.push(Piece { face: f, from });
         }
         wall_flats.push((fi, flat));
         wall_solid.insert(fi, solids.len());
@@ -2146,7 +2123,7 @@ fn plain_wall(topo: &Topo, fi: usize, front: f64, back: f64, solids: &mut Vec<Sh
             let near = |e: &usize| k::make_vertex(c).ok().and_then(|v| k::distance(&v, &topo.edges[*e]).ok()).map_or(f64::INFINITY, |d| d.distance);
             own.iter().copied().min_by(|a, b| near(a).total_cmp(&near(b))).map_or(Def::Face(fi), Def::Edge)
         };
-        pieces.push(Piece { face: f, from, relief: false });
+        pieces.push(Piece { face: f, from });
     }
     solids.push(slab);
     Ok(())
@@ -2291,7 +2268,7 @@ fn rolled_bend(topo: &Topo, fi: usize, face: &Shape, front: f64, back: f64, soli
             }
             _ => Def::Face(fi),
         };
-        pieces.push(Piece { face: f, from, relief: false });
+        pieces.push(Piece { face: f, from });
     }
     solids.push(res);
     Ok(())
@@ -2392,30 +2369,26 @@ fn face_planes(faces: &[Shape]) -> Vec<Option<(DVec3, DVec3)>> {
 }
 
 /// What each face, edge and vertex of the part comes from (`probes`: its faces' [`face_probes`]).
-fn part_sources(part: &Shape, probes: &[Option<(DVec3, DVec3)>], pieces: &[Piece], topo: &Topo) -> (Sources, Vec<bool>) {
+fn part_sources(part: &Shape, probes: &[Option<(DVec3, DVec3)>], pieces: &[Piece], topo: &Topo) -> (Vec<Def>, Vec<Def>, Vec<Def>) {
     // Each piece's box (a point outside it is not on it: most pieces are
     // skipped without projecting onto them).
     let boxes: Vec<Option<k::BoundingBox>> = pieces.iter().map(|x| x.face.bounding_box(false).ok()).collect();
     let planes = face_planes(&pieces.iter().map(|x| x.face.clone()).collect::<Vec<_>>());
     let in_box = |i: usize, p: DVec3| boxes[i].is_none_or(|b| (b.min - DVec3::splat(1e-6)).cmple(p).all() && p.cmple(b.max + DVec3::splat(1e-6)).all()) && planes[i].is_none_or(|(o, n)| (p - o).dot(n).abs() < 1e-6);
-    // Each face's source, and whether it lies on a relief's cut (not on a bend's end: it can share the cut's plane).
-    let (faces, relief): (Vec<Def>, Vec<bool>) = probes
+    let faces: Vec<Def> = probes
         .iter()
         .map(|probe| {
             // (Cancelled: the rest unmatched, the rebuild stops after.)
             if k::thread_cancelled() {
-                return (Def::Face(0), false);
+                return Def::Face(0);
             }
-            let Some((p, n)) = *probe else { return (Def::Face(0), false) };
+            let Some((p, n)) = *probe else { return Def::Face(0) };
             // A piece through the point that faces the same way (a unified wall's
             // middle can lie on the edge of a side piece).
             let along = |x: &Piece| x.face.normal_at_point(p).map_or(true, |b| n.cross(b).length() < 1e-6);
-            let on = |i: usize, x: &Piece| in_box(i, p) && x.face.contains_point(p, 1e-7).unwrap_or(false) && along(x);
-            let Some((_, x)) = pieces.iter().enumerate().find(|(i, x)| on(*i, x)) else { return (Def::Face(0), false) };
-            let on_any = |relief: bool, end: bool| pieces.iter().enumerate().any(|(i, y)| y.relief == relief && (!end || matches!(y.from, Def::Vertex(_))) && on(i, y));
-            (x.from, on_any(true, false) && !on_any(false, true))
+            pieces.iter().enumerate().find(|(i, x)| in_box(*i, p) && x.face.contains_point(p, 1e-7).unwrap_or(false) && along(x)).map_or(Def::Face(0), |(_, x)| x.from)
         })
-        .unzip();
+        .collect();
     let ef = part.edge_faces().unwrap_or_default();
     let edges: Vec<Def> = part
         .edges()
@@ -2449,7 +2422,7 @@ fn part_sources(part: &Shape, probes: &[Option<(DVec3, DVec3)>], pieces: &[Piece
             from_edges.unwrap_or_else(|| Def::Vertex(topo.nearest_vertex(v.vertex_point().unwrap_or_default())))
         })
         .collect();
-    ((faces, edges, vertices), relief)
+    (faces, edges, vertices)
 }
 
 /// A cancelled regeneration stops the rebuild between its steps (cf-fill-pattern's thousand-hole plate: 1.2 s of
@@ -2549,7 +2522,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 }
                 let n_removes = removes.len();
                 let tools: Vec<Shape> = removes.into_iter().chain(adds).collect();
-                pieces.extend(tools.iter().flat_map(|t| t.faces()).map(|face| Piece { face, from: Def::Face(ft.face), relief: false }));
+                pieces.extend(tools.iter().flat_map(|t| t.faces()).map(|face| Piece { face, from: Def::Face(ft.face) }));
                 if ft.cut {
                     cut_shapes.push((ft.face, tools));
                 } else {
@@ -2580,11 +2553,11 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 .into_iter()
                 .map(|solid| {
                     let probes = face_probes(&solid.faces());
-                    let (sources, relief) = part_sources(&solid, &probes, &pieces, &topo);
+                    let sources = part_sources(&solid, &probes, &pieces, &topo);
                     let mut members: Vec<usize> = sources.0.iter().filter_map(|d| if let Def::Face(f) = d { Some(*f) } else { None }).collect();
                     members.sort_unstable();
                     members.dedup();
-                    PartOf { solid, probes, names: Vec::new(), sources, relief, members }
+                    PartOf { solid, probes, names: Vec::new(), sources, members }
                 })
                 .collect();
             stop_if_cancelled()?;
@@ -2607,13 +2580,6 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 let fresh_names = p.names.clone();
                 if let Some(Some(b)) = before.get(k) {
                     keep_names(&p.solid, &p.probes, &mut p.names, &b.shape, &b.faces, ev.feature);
-                    // A relief's cut is the rebuild's own, even on the old relief's planes (live q-sm-creators-1119: two
-                    // Bend reliefs, the second creates the cut faces at both ends; Corner 1's rectangle its cut).
-                    for (fi, n) in p.names.iter_mut().enumerate() {
-                        if p.relief.get(fi) == Some(&true) {
-                            *n = fresh_names[fi].clone();
-                        }
-                    }
                 }
                 // A face this rebuild exposes for the first time (on no face of the part before) is the one its
                 // definition wall or bend's creator made (live sm-box: Flange 2's relief bares a face of Flange 1's
@@ -2624,10 +2590,8 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     && let Some(db) = ev.ctx.bodies.iter().find(|b| b.id == def.body)
                 {
                     let kept: Vec<&Def> = p.sources.0.iter().enumerate().filter(|(fi, _)| p.names.get(*fi) != fresh_names.get(*fi)).map(|(_, d)| d).collect();
-                    // (A bend's end a corner relief moved: beside its bend's faces, live A-rect: Flange 1's.)
-                    let beside = |d: &Def| kept.contains(&d) || matches!(d, Def::Vertex(v) if kept.iter().any(|k| matches!(k, Def::Edge(e) if def.bends.contains_key(e) && topo.edge_ends.get(*e).is_some_and(|(a, b)| a.distance(topo.vertices[*v]) < TOL || b.distance(topo.vertices[*v]) < TOL))));
                     for (fi, n) in p.names.iter_mut().enumerate() {
-                        let Some(src) = p.sources.0.get(fi).filter(|d| *n == fresh_names[fi] && beside(d) && p.relief.get(fi) != Some(&true)) else { continue };
+                        let Some(src) = p.sources.0.get(fi).filter(|d| *n == fresh_names[fi] && kept.contains(d)) else { continue };
                         let Some(c) = definition_creator(db, src, &order).filter(|c| *c != studio_feature) else { continue };
                         *n = Arc::new(crate::reference::TopoName::face(c, crate::reference::Role::Generated(n.clone())));
                     }
@@ -3066,18 +3030,13 @@ fn rip_offset(def: &Definition, topo: &Topo, e: usize, f: usize) -> f64 {
     }
 }
 
-/// Each face's, edge's and vertex's definition source.
-type Sources = (Vec<Def>, Vec<Def>, Vec<Def>);
-
 /// One part built from a definition sheet: its solid, face names, what each
 /// face comes from, and its definition faces (walls and rolled bends).
 struct PartOf {
     solid: Shape,
     probes: Vec<Option<(DVec3, DVec3)>>,
     names: Vec<crate::naming::Name>,
-    sources: Sources,
-    /// The faces on a relief's cut.
-    relief: Vec<bool>,
+    sources: (Vec<Def>, Vec<Def>, Vec<Def>),
     members: Vec<usize>,
 }
 
@@ -3622,41 +3581,14 @@ fn ev_corner_type(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             ve.get(fv).into_iter().flatten().filter(|e| **e != step && sm_attribute(q.st, &q.to_ref(&Ent::Edge(*b, **e as usize)), "JOINT").is_none()).filter_map(|e| leaving(*e, far)).any(|f| f.dot(d) < -1.0 + 1e-6)
         };
         let carries_on = |bend: u32| away(bend).is_some_and(|d| free.iter().any(|e| away(*e).is_some_and(|f| f.dot(d) < -1.0 + 1e-6) || past_step(*e, d)));
-        // An automatic miter ends the other bend one thickness on along the sheet's edge (live sm-box, q-sm-creators-1119
-        // A-rect: a Corner at Flange 1's bend end): both ends are the corner, open.
-        let mitred = |bend: u32| -> Option<Vec<usize>> {
-            let model = sm_attribute(q.st, &q.to_ref(&Ent::Body(*b)), "MODEL")?;
-            let thickness = length_field(&model, "frontThickness") + length_field(&model, "backThickness");
-            let d = away(bend)?;
-            free.iter().find_map(|e| {
-                let info = shape.sub_shape(k::ShapeType::Edge, *e as usize).ok()?.edge_info().ok()?;
-                let far = if info.start.distance(at) < info.end.distance(at) { info.end } else { info.start };
-                if far.distance(at) > thickness + TOL {
-                    return None;
-                }
-                let there: Vec<usize> = shape.vertices().iter().enumerate().filter(|(_, x)| x.vertex_point().is_ok_and(|p| p.distance(far) < TOL)).map(|(n, _)| n).collect();
-                let bent = there.iter().flat_map(|n| ve.get(*n).cloned().unwrap_or_default()).filter(|f| f != e).any(|f| {
-                    let joint = sm_attribute(q.st, &q.to_ref(&Ent::Edge(*b, f as usize)), "JOINT");
-                    joint.is_some_and(|j| j.get("jointType").get("value").as_str().as_deref() == Some("BEND")) && leaving(f, far).is_some_and(|g| g.dot(d).abs() < 1.0 - 1e-6)
-                });
-                bent.then_some(there)
-            })
-        };
-        let mut mate = Vec::new();
         let kind = match (bends.as_slice(), rips) {
             ([], _) => "NOT_A_CORNER",
             ([bend], 0) if carries_on(*bend) => "BEND_END",
-            ([bend], 0) => match mitred(*bend) {
-                Some(there) => {
-                    mate = there;
-                    "OPEN_CORNER"
-                }
-                None => "NOT_A_CORNER",
-            },
+            ([_], 0) => "NOT_A_CORNER",
             ([_, _, ..], 1..) => "CLOSED_CORNER",
             _ => "OPEN_CORNER",
         };
-        Ok((kind, verts.iter().chain(&mate).map(|n| q.to_ref(&Ent::Vertex(*b, *n))).collect::<Vec<Reference>>()))
+        Ok((kind, verts.iter().map(|n| q.to_ref(&Ent::Vertex(*b, *n))).collect::<Vec<Reference>>()))
     })?;
     // Transient ids (std's wrapper makes them queries).
     let mut st = cx.state.lock();
