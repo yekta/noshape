@@ -1418,6 +1418,16 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
   build at load 24, re-check on a release build in the quiet window. Not run: Sketch 3's region (our two-blocks start has no
   Sketch 3), the view cube click.
 
+## Release blockers for the 2026-11-20 17:00 release (qa 15:4x: GO on green 18809b4c1 vs v0.4.62)
+- Must carry, all in 18809b4c1: bool's Gyro fix 593b072ac, bool's revert 61295b96f, core's FILLET-ORIENT fix aa5682636, psui's revert
+  1c6e56e4, psui's spinner test fix 18809b4c1. Pre-release (qa-scratch/prerel/cut17-18809b4c.txt, vibe2): hats SAME regenerated and after
+  variable edits; dock differs only by the accepted B Govde 85 -> 83 faces (COMPAT-DOCK-BGOVDE-MERGE: Rib Round 1's tori one face each);
+  app open at 90 s: dock pixel-identical, hats 163 / 177 / 448 px: a variable row's longer text (studios b76561076, the value as live) and
+  edge outlines moved ~1 px where 24 plane-plane edges are now exact lines, not B-splines (same volumes and statuses; commit bisect running).
+- Known, not blocking (ticket documents): P0 COMPAT-RUSTZERO-FILLET1 (rust-zero-solid-f197 Fillet 1 Ok in v0.4.62 -> Error; blend
+  bisecting); P1 COMPAT-CRASH957-CHAMFER3 (Chamfer 3 Ok in v0.4.62 -> Error from 0a0b9a49; bool). Better than v0.4.62: britatap and
+  mutualtrim Fillet 1, workshop-pipe Fillet - Outer Error -> Ok; crash957 Fillet 2 / workshop-pipe Fillet - Inner Errors reworded.
+
 ## Release blockers for the 2026-11-20 05:00 release (qa 05:05: GO on green 2a43b78b vs v0.4.61)
 - Held 04:0x for core's singularities Sketch 2 fix (2f4f3bc5, landed 04:19 as a2e7c966). On 2a43b78b: userdocs (hats, dock) ALL-SAME, edits
   ALL-SAME, app open pixel-identical at 90 s (4 of 4); singularities Sketch 2 solves; Mirror 2 "no geometry change" accepted (lead: live ends
