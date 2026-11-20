@@ -74,13 +74,15 @@ SURFACES = [
     ("Change to version", ["drawing-change-to-version.txt"], []),
 ]
 CLOUD = {"Add comment"}
+MENUS = "(our runs' menus)"
+MESSAGES = "(our runs' messages)"
 # Our panels' titles where they aren't live's (a surface's tabs, a palette): what ours shows under them counts for it.
 OURS_TITLES = {
     "Drawing properties": ["Annotations", "Dimensions", "Tables", "Views"],
     "Title block": ["Note"],
     "Hole/thread callout": ["Dimension palette"],
     "Ordinate dimension": ["Dimension palette"],
-    "Move to sheet / Replicate": ["Move to sheet", "Replicate region"],
+    "Move to sheet / Replicate": ["Move to sheet", "Replicate region", MESSAGES],
     "Styles panel": ["Styles"],
     # A cell's text panel is titled Note (live dom drawing-table-after-ok).
     "Table": ["Table properties", "Note"],
@@ -91,7 +93,6 @@ OURS_TITLES = {
 }
 
 
-MENUS = "(our runs' menus)"
 
 
 def ours_shown(run_dir):
@@ -115,6 +116,8 @@ def ours_shown(run_dir):
         for s in steps:
             st = s.get("state") or {}
             # A right-click menu our build opened (a sheet row's Move up): counted as our menus are.
+            if isinstance(st.get("message"), str):
+                walk(st["message"], pool[MESSAGES])
             lst = st.get("list")
             if isinstance(lst, dict) and lst.get("kind") == "context-menu":
                 walk(lst.get("rows"), pool[MENUS])
@@ -262,6 +265,8 @@ def texts_of(path, visible_only=False):
         return []
     # An HTML comment is no text a user sees (live's reference manager dump: "<!-- Version graph-->").
     raw = re.sub(r"<!--.*?-->", "", raw, flags=re.S)
+    # Screen-reader-only text is not drawn (live drawing-replicate-toast.html: the ×'s "Close").
+    raw = re.sub(r"<span[^>]*\bsr-only\b[^>]*>[^<]*</span>", "", raw)
     if visible_only and path.endswith(".html"):
         raw = strip_hidden(raw)
     out = []
@@ -535,6 +540,9 @@ def main():
             ours_t = norm(t).replace("Onshape", "Noshape")
             # (A long text a dump wrapped onto lines keeps only its first: ours' full sentence starts with it.)
             wrapped = len(norm(t)) >= 30 and any(m.startswith(norm(t)) for m in mine)
+            # (Counts are the document's: "Successfully replicated 7/7 annotations" is ours' 1/1.)
+            counted = re.sub(r"\d+", "#", norm(t)) in {re.sub(r"\d+", "#", m) for m in mine} if re.search(r"\d+/\d+", t) else False
+            wrapped = wrapped or counted
             rows.append((surface, t, "shown" if st == "present" and (norm(t) in mine or ours_t in mine or wrapped) else st, "dump"))
 
     # Cloud-only rows (out of scope) and dump texts live itself no longer shows (docs/parity/audit-drawing-dataexchange.md).
