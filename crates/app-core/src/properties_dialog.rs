@@ -1086,7 +1086,7 @@ impl Render for MetaForm {
                         .into_any_element()
                 },
             ))
-            .child(group(label("Category", false), gray_box(self.spec_category.to_string(), true).into_any_element()));
+            .child(group(label("Category", false), gray_box(shown_category(self.spec_category), true).into_any_element()));
         if numbered {
             form = form
                 .child(group(label("Part number", false), self.field("Part number", &self.part_number, cx)))
@@ -1871,9 +1871,14 @@ pub fn resizable_props(dialog: gpui_kit::component::dialog::Dialog) -> gpui_kit:
 }
 
 
+/// A category as the dialog shows it: the kind keeps live's name ("Onshape Part"), the app's own name is shown.
+fn shown_category(kind: &str) -> String {
+    kind.strip_prefix("Onshape ").map_or_else(|| kind.to_string(), |k| format!("Noshape {k}"))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{MetaSpec, MetaValues, tab_fields};
+    use super::{MetaSpec, MetaValues, shown_category, tab_fields};
 
     fn spec(category: &'static str, bom_options: Option<Vec<String>>) -> MetaSpec {
         let mut values = MetaValues { name: "T".into(), ..Default::default() };
@@ -1883,6 +1888,14 @@ mod tests {
 
     fn labels(s: &MetaSpec) -> Vec<&'static str> {
         tab_fields(s).into_iter().map(|f| f.0).collect()
+    }
+
+    /// The category is shown with the app's own name (qa BRAND-IN-UI-TEXT), its kind kept as live's.
+    #[test]
+    fn the_category_shows_noshape() {
+        assert_eq!(shown_category("Onshape Part Studio"), "Noshape Part Studio");
+        assert_eq!(shown_category("Onshape Part"), "Noshape Part");
+        assert_eq!(shown_category("Part"), "Part");
     }
 
     /// Live ver-version-properties-tree: a Part Studio picked in a version's tree shows Title 1–3 and Not revision

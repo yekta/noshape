@@ -1268,7 +1268,7 @@ pub fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sou
         // Release / metadata properties with no value yet: "----".
         // An unreleased drawing is "In progress" (as parts, `ItemMeta::state`).
         "drawing.state" => crate::partstudio::RELEASE_STATES[0].to_string(),
-        "drawing.category" => "Onshape Drawing".into(),
+        "drawing.category" => "Noshape Drawing".into(),
         "drawing.not_revision_managed" => "False".into(),
         "drawing.description" => drawing.meta.description.clone(),
         "drawing.number" => drawing.meta.number.clone(),
@@ -1295,7 +1295,7 @@ pub fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sou
         // Live: 3 decimals in the drawing's mass unit ("0.052 LB"); "----"
         // without a material.
         "part.mass" => part_mass(drawing, sheet, sources).map(|m| if drawing.units_mm { format!("{m:.3} kg") } else { format!("{:.3} lb", m / 0.453_592_37) }).unwrap_or_default(),
-        "part.category" => part().map(|(_, _, asm)| if asm { "Onshape Assembly" } else { "Onshape Part" }.to_string()).unwrap_or_default(),
+        "part.category" => part().map(|(_, _, asm)| if asm { "Noshape Assembly" } else { "Noshape Part" }.to_string()).unwrap_or_default(),
         "part.subassembly_bom" => String::new(),
         "sheet.name" => sheet.name.clone(),
         "sheet.number" => (si + 1).to_string(),

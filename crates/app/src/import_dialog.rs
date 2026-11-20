@@ -1,6 +1,6 @@
 //! "+" › Import… inside a document (live document/76–77,
 //! dom/dialog-import-in-document.txt): the OS picker (several files), then
-//! the 400 px "Import to Onshape" modal: two option tiles (180 × 230,
+//! the 400 px "Import to Noshape" modal: two option tiles (180 × 230,
 //! selected `#eaeaea` with a 2 px `#b2ddf6` border) "Import to this
 //! document" / "Combine to a single Part Studio" (+ "Use with small
 //! assemblies"), then ☑ Import appearances, ☐ Orient imported models with Y
@@ -227,7 +227,7 @@ fn show(paths: Vec<PathBuf>, page: bool, join: bool, on_ok: OnOk, window: &mut W
         };
         let (ch, on_ok) = (choice.clone(), on_ok.clone());
         // Live: the documents page's modal is Bootstrap's modal-lg (590 px).
-        os::modal(dialog, "Import to Onshape", if page { 590. } else { 400. })
+        os::modal(dialog, "Import to Noshape", if page { 590. } else { 400. })
             .child(
                 // Live document/77: the tiles 12 px under the header.
                 // Live: the footer rule 27 px under the last checkbox row's text.
