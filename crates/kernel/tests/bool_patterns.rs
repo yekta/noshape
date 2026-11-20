@@ -1123,7 +1123,8 @@ fn grooves_crossing_just_above_the_end() {
     assert!(r.shape.is_valid());
     // (Where they cross: a sliver of ~1e-4 mm³.)
     assert!(v >= want && v - want <= 1e-3 * 1e-9, "volume {v}, the two grooves' own {want}");
-    assert_eq!(r.shape.count(k::ShapeType::Face), 9);
+    // (The cylinder's two pieces sharing an edge one face: USD's merge, its pieces on the merged cylinder itself.)
+    assert_eq!(r.shape.count(k::ShapeType::Face), 8);
 }
 
 /// Two grooves of the Ø25 × 34 knurl at 45° / 45° (its tools 30 and 51; recorded) crossing 37 µm above the end face,
@@ -1433,6 +1434,21 @@ fn a_wire_that_never_closes_leaves_the_unify_its_input() {
     let s = k::read_brep(&path).expect("the thread");
     let u = k::unify_same_domain(&s).expect("unified").shape;
     assert_eq!((u.count(k::ShapeType::Face), u.count(k::ShapeType::Edge)), (s.count(k::ShapeType::Face), s.count(k::ShapeType::Edge)));
+}
+
+/// asm-isaac-ball 850efe's Extrude 5 fuse (recorded, tests/data/unify): two bosses' coaxial cylinders of one radius left
+/// in pieces (part's and tool's, with 0.4 mm² triangles where a sloped face meets them). USD merges them, the volume
+/// changed by 3e-9 of it (their edges'), its pieces on the merged surfaces themselves: kept, live's 36 faces (it was 44).
+#[test]
+fn coaxial_cylinder_pieces_of_one_radius_unify_as_live() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/unify");
+    let c = k::bool_corpus::load(&dir, "coaxial-cylinder-pieces").expect("the recorded fuse");
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("fused").shape;
+    let u = k::unify_same_domain(&r).expect("unified").shape;
+    assert!(u.is_valid(), "unified invalid");
+    assert_eq!(u.count(k::ShapeType::Face), 36);
+    let (v0, v1) = (r.volume().unwrap(), u.volume().unwrap());
+    assert!((v1 - v0).abs() <= 1e-8 * v0, "volume {v0} -> {v1}");
 }
 
 /// Shell's fuse of 38 slabs (1b121fc3), our result (tests/data/unify): walls on one cylinder in faces of one frame
