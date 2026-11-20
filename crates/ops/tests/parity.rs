@@ -1197,12 +1197,23 @@ fn exchange_round_trip() {
                 }
             }
         }
-        let diff = match (dxf_summary(&live_dxf), dxf_summary(&dir.join("ours-drawing.dxf"))) {
-            (Some(live), Some(ours)) if exported => dxf_differences(&live, &ours),
-            _ => vec!["a DXF not read".into()],
+        // (Scored on its curves, DECISIONS 11-20: each file's on the other's within 0.010 in on paper, per layer, of the
+        // same kind where they overlap; its layers live's. Counts per type reported only.)
+        let ours_dxf = dir.join("ours-drawing.dxf");
+        let views = live_view_positions(&dir.join("drawing-live.json"));
+        let (diff, info) = match (dxf_summary(&live_dxf), dxf_summary(&ours_dxf), dxf_curves(&live_dxf), dxf_curves(&ours_dxf)) {
+            (Some(ls), Some(os), Some(lc), Some(oc)) if exported => {
+                let (mut diff, shifted) = dxf_geometry_differences(&lc, &oc, &views);
+                if ls.layers != os.layers {
+                    diff.push(format!("layers {:?}, live {:?}", os.layers, ls.layers));
+                }
+                (diff, [shifted, dxf_differences(&ls, &os).into_iter().filter(|d| !d.starts_with("layers")).collect()].concat())
+            }
+            _ => (vec!["a DXF not read".into()], Vec::new()),
         };
         drawings_ok += usize::from(diff.is_empty());
-        println!("{name}: drawing DXF: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
+        let info = if info.is_empty() { String::new() } else { format!(" ({})", info.join("; ")) };
+        println!("{name}: drawing DXF: {}{info}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
     }
     println!("exchange score: ours imports live's files {imports_ok}/{imports}; live imports ours {exports_ok}/{} ({waiting} of {exports} not imported by live yet); ours reads ours back {selfs_ok}/{exports}; drawings' DXF {drawings_ok}/{drawings}; times at or under live's {faster}/{timed}", exports - waiting);
 }
@@ -1263,6 +1274,40 @@ fn a_dxf_is_summed_by_entity_type_and_layer() {
     assert_eq!(dxf_differences(&s, &other), ["3 LINE, live 2", "layers {\"0\"}, live {\"0\", \"VISIBLE\"}"]);
 }
 
+/// DECISIONS 11-20: a drawing DXF scored on its curves, within 0.010 in on paper and of the same kind where they
+/// overlap: an arc as live's (or live's written along -Z) matches, as do lines as an LWPOLYLINE; the same arc as a run
+/// of lines (but its end along the line it touches), or 0.02 in off, does not; a view placed 0.015 in off live's is
+/// moved onto it first.
+#[test]
+fn a_drawing_dxf_is_scored_on_its_curves() {
+    let dxf = |entities: &[String]| {
+        let path = scratch(&format!("curves-{}.dxf", entities.len() * 1000 + entities.iter().map(String::len).sum::<usize>()));
+        std::fs::write(&path, format!("0\nSECTION\n2\nENTITIES\n{}0\nENDSEC\n0\nEOF\n", entities.concat())).unwrap();
+        dxf_curves(&path).unwrap()
+    };
+    let arc = |cx: f64, cy: f64, z: f64| format!("0\nARC\n8\nVisible\n10\n{}\n20\n{cy}\n40\n1.0\n50\n{}\n51\n{}\n230\n{z}\n", z * cx, if z > 0.0 { 0.0 } else { 90.0 }, if z > 0.0 { 90.0 } else { 180.0 });
+    let lines = |cx: f64, cy: f64, n: usize| (0..n).map(|i| {
+        let (a, b) = (std::f64::consts::FRAC_PI_2 * i as f64 / n as f64, std::f64::consts::FRAC_PI_2 * (i + 1) as f64 / n as f64);
+        format!("0\nLINE\n8\nVisible\n10\n{}\n20\n{}\n11\n{}\n21\n{}\n", cx + a.cos(), cy + a.sin(), cx + b.cos(), cy + b.sin())
+    }).collect::<Vec<_>>();
+    let line = |y: f64, x1: f64| format!("0\nLINE\n8\nVisible\n10\n0\n20\n{y}\n11\n{x1}\n21\n{y}\n");
+    let views = [("Front".to_string(), [0.5, 1.5])];
+    let live = dxf(&[arc(0.0, 0.0, 1.0), line(3.0, 2.0), line(1.0, 0.5)]);
+    assert_eq!(live.iter().map(|c| c.kind).collect::<Vec<_>>(), ["circular", "LINE", "LINE"]);
+    assert!(dxf_geometry_differences(&live, &dxf(&[arc(0.005, 0.0, 1.0), line(3.0, 2.0), line(1.0, 0.5)]), &views).0.is_empty());
+    assert!(dxf_geometry_differences(&live, &dxf(&[arc(0.0, 0.0, -1.0), line(3.0, 2.0), line(1.0, 0.5)]), &views).0.is_empty(), "along -Z");
+    // A mesh part's outline: LINEs as an LWPOLYLINE.
+    let outline = "0\nLWPOLYLINE\n8\nVisible\n90\n2\n70\n0\n10\n0\n20\n3\n10\n2\n20\n3\n".to_string();
+    assert!(dxf_geometry_differences(&live, &dxf(&[arc(0.0, 0.0, 1.0), outline, line(1.0, 0.5)]), &views).0.is_empty(), "LWPOLYLINE");
+    let d = dxf_geometry_differences(&live, &dxf(&[lines(0.0, 0.0, 40), vec![line(3.0, 2.0), line(1.0, 0.5)]].concat()), &views).0;
+    assert!(d.len() == 2 && d[0].starts_with("Visible: ours 0.000 in off live's, 1.4") && d[0].contains("a LINE"), "{d:?}");
+    // A curve alone 0.02 in off; the whole view 0.015 in off is moved onto live's.
+    let d = dxf_geometry_differences(&live, &dxf(&[arc(0.0, 0.0, 1.0), line(3.0, 2.0), line(1.02, 0.5)]), &views).0;
+    assert!(d.iter().any(|d| d.starts_with("Visible: ours 0.5")), "{d:?}");
+    let (d, moved) = dxf_geometry_differences(&live, &dxf(&[arc(0.0, 0.015, 1.0), line(3.015, 2.0), line(1.015, 0.5)]), &views);
+    assert!(d.is_empty() && moved.len() == 1 && moved[0].starts_with("Front moved 0.0000, -0.0150"), "{d:?} {moved:?}");
+}
+
 /// A DXF's entities by type (ENTITIES and BLOCKS, but the blocks' own markers) and its layers (the LAYER table).
 #[derive(Debug, Default, PartialEq)]
 struct DxfSummary {
@@ -1309,6 +1354,206 @@ fn dxf_differences(live: &DxfSummary, ours: &DxfSummary) -> Vec<String> {
         out.push(format!("layers {:?}, live {:?}", ours.layers, live.layers));
     }
     out
+}
+
+/// How near each drawing DXF's curves lie on the other's, on paper (DECISIONS 11-20).
+const DXF_ON_PAPER_IN: f64 = 0.010;
+/// The sheet format's layers: where they are on the sheet, not in a view.
+const DXF_SHEET_LAYERS: &[&str] = &["BORDER_FRAME", "BORDER_ZONES", "TITLE_BLOCK"];
+
+/// A drawing DXF's curve (ENTITIES' LINE, ARC, CIRCLE, ELLIPSE, SPLINE) as points along it on paper (inches), a
+/// quarter of [`DXF_ON_PAPER_IN`] apart; its layer and kind (an ARC, a CIRCLE and a round ELLIPSE one kind: circular).
+#[derive(Clone, Debug)]
+struct DxfCurve {
+    layer: String,
+    kind: &'static str,
+    points: Vec<[f64; 2]>,
+    length: f64,
+}
+
+fn dxf_curves(path: &Path) -> Option<Vec<DxfCurve>> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let lines: Vec<&str> = text.lines().map(str::trim).collect();
+    let pairs: Vec<(&str, &str)> = lines.chunks_exact(2).map(|p| (p[0], p[1])).collect();
+    let (mut out, mut i, mut entities) = (Vec::new(), 0, false);
+    while i < pairs.len() {
+        let (code, kind) = pairs[i];
+        let end = (i + 1..pairs.len()).find(|j| pairs[*j].0 == "0").unwrap_or(pairs.len());
+        let group = &pairs[i + 1..end];
+        match (code, kind) {
+            ("0", "SECTION") => entities = group.iter().any(|g| *g == ("2", "ENTITIES")),
+            ("0", "ENDSEC") => entities = false,
+            ("0", kind) if entities => out.extend(dxf_curve(kind, group)),
+            _ => {}
+        }
+        i = end;
+    }
+    Some(out)
+}
+
+fn dxf_curve(kind: &str, group: &[(&str, &str)]) -> Option<DxfCurve> {
+    use std::f64::consts::TAU;
+    let all = |code: &str| group.iter().filter(|(c, _)| *c == code).filter_map(|(_, v)| v.parse::<f64>().ok()).collect::<Vec<_>>();
+    let one = |code: &str, or: f64| all(code).first().copied().unwrap_or(or);
+    let layer = group.iter().find(|(c, _)| *c == "8").map_or("0", |(_, v)| v).to_string();
+    // (Extruded along -Z, as live writes some arcs and ellipses: the entity's x axis is -X.)
+    let z = if one("230", 1.0) < 0.0 { -1.0 } else { 1.0 };
+    let round = |c: [f64; 2], u: [f64; 2], v: [f64; 2], a0: f64, a1: f64| -> Vec<[f64; 2]> {
+        let a1 = if a1 <= a0 { a1 + TAU } else { a1 };
+        (0..=200).map(|i| a0 + (a1 - a0) * i as f64 / 200.0).map(|a| [c[0] + u[0] * a.cos() + v[0] * a.sin(), c[1] + u[1] * a.cos() + v[1] * a.sin()]).collect()
+    };
+    let (kind, polyline) = match kind {
+        "LINE" => ("LINE", vec![[one("10", 0.0), one("20", 0.0)], [one("11", 0.0), one("21", 0.0)]]),
+        // A mesh part's outline (ours and live's): a run of LINEs.
+        "LWPOLYLINE" => {
+            let mut points: Vec<[f64; 2]> = all("10").into_iter().zip(all("20")).map(|(x, y)| [x, y]).collect();
+            if one("70", 0.0) as i64 & 1 == 1 && let Some(&first) = points.first() {
+                points.push(first);
+            }
+            ("LINE", points)
+        }
+        "ARC" | "CIRCLE" => {
+            let r = one("40", 0.0);
+            let (a0, a1) = if kind == "ARC" { (one("50", 0.0).to_radians(), one("51", 360.0).to_radians()) } else { (0.0, TAU) };
+            ("circular", round([z * one("10", 0.0), one("20", 0.0)], [z * r, 0.0], [0.0, r], a0, a1))
+        }
+        "ELLIPSE" => {
+            let (m, k) = ([one("11", 0.0), one("21", 0.0)], one("40", 1.0));
+            let points = round([one("10", 0.0), one("20", 0.0)], m, [-z * m[1] * k, z * m[0] * k], one("41", 0.0), one("42", TAU));
+            (if (k - 1.0).abs() < 1e-6 { "circular" } else { "ELLIPSE" }, points)
+        }
+        "SPLINE" => {
+            let (p, knots) = (one("71", 3.0) as usize, all("40"));
+            let weights = all("41");
+            let poles: Vec<[f64; 3]> = all("10").into_iter().zip(all("20")).enumerate().map(|(i, (x, y))| {
+                let w = if weights.len() == all("10").len() { weights[i] } else { 1.0 };
+                [x * w, y * w, w]
+            }).collect();
+            let n = poles.len();
+            if n <= p || knots.len() < n + p + 1 {
+                return None;
+            }
+            let (t0, t1) = (knots[p], knots[n]);
+            let points = (0..=400).map(|i| t0 + (t1 - t0) * i as f64 / 400.0).map(|t| {
+                let [x, y, w] = de_boor(p, t, &knots, &poles);
+                [x / w, y / w]
+            }).collect();
+            ("SPLINE", points)
+        }
+        _ => return None,
+    };
+    let step = DXF_ON_PAPER_IN / 4.0;
+    let mut points = Vec::new();
+    let mut length = 0.0;
+    for w in polyline.windows(2) {
+        let d = ((w[1][0] - w[0][0]).powi(2) + (w[1][1] - w[0][1]).powi(2)).sqrt();
+        length += d;
+        let n = ((d / step) as usize).max(1);
+        points.extend((0..n).map(|i| [w[0][0] + (w[1][0] - w[0][0]) * i as f64 / n as f64, w[0][1] + (w[1][1] - w[0][1]) * i as f64 / n as f64]));
+    }
+    points.extend(polyline.last().copied());
+    Some(DxfCurve { layer, kind, points, length })
+}
+
+/// A rational B-spline's homogeneous point at `t` (de Boor), degree `p`.
+fn de_boor(p: usize, t: f64, knots: &[f64], poles: &[[f64; 3]]) -> [f64; 3] {
+    let mut s = p;
+    while s + 1 < poles.len() && knots[s + 1] <= t {
+        s += 1;
+    }
+    let mut d: Vec<[f64; 3]> = (0..=p).map(|j| poles[j + s - p]).collect();
+    for r in 1..=p {
+        for j in (r..=p).rev() {
+            let i = j + s - p;
+            let span = knots[j + 1 + s - r] - knots[i];
+            let a = if span.abs() < 1e-300 { 0.0 } else { (t - knots[i]) / span };
+            for q in 0..3 {
+                d[j][q] = (1.0 - a) * d[j - 1][q] + a * d[j][q];
+            }
+        }
+    }
+    d[p]
+}
+
+/// Live's stored drawing's view positions (sheet inches), in its order.
+fn live_view_positions(path: &Path) -> Vec<(String, [f64; 2])> {
+    let Some(live) = std::fs::read_to_string(path).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()) else { return Vec::new() };
+    live["sheets"][0]["views"].as_array().into_iter().flatten().map(|v| (v["name"].as_str().unwrap_or("").to_string(), [v["position"]["x"].as_f64().unwrap_or(0.0), v["position"]["y"].as_f64().unwrap_or(0.0)])).collect()
+}
+
+/// DECISIONS 11-20: per layer, the length of each file's curves off the other's (by more than [`DXF_ON_PAPER_IN`]) and
+/// where the other's are near but none of its kind (live's SPLINE or ARC never our run of LINEs); a curve shorter than
+/// the band (live's end-on stubs) not counted. Each of our views first moved onto live's by its drawn box's centre
+/// (where the suite placed it from live's stored positions, not the export's doing: c2-bottle-split's Front 0.015 in
+/// off): the views moved, as the second list.
+fn dxf_geometry_differences(live: &[DxfCurve], ours: &[DxfCurve], views: &[(String, [f64; 2])]) -> (Vec<String>, Vec<String>) {
+    let tol = DXF_ON_PAPER_IN;
+    let in_view = |c: &DxfCurve| -> Option<usize> {
+        if DXF_SHEET_LAYERS.contains(&c.layer.as_str()) {
+            return None;
+        }
+        let m = c.points.iter().fold([0.0, 0.0], |a, p| [a[0] + p[0], a[1] + p[1]]).map(|x| x / c.points.len() as f64);
+        (0..views.len()).min_by(|a, b| {
+            let d = |v: [f64; 2]| (v[0] - m[0]).powi(2) + (v[1] - m[1]).powi(2);
+            d(views[*a].1).total_cmp(&d(views[*b].1))
+        })
+    };
+    let centres = |cs: &[DxfCurve]| -> Vec<Option<[f64; 2]>> {
+        let mut boxes = vec![None::<[f64; 4]>; views.len()];
+        for c in cs.iter().filter(|c| c.layer == "Visible" || c.layer == "TANGENT_LINES") {
+            let Some(v) = in_view(c) else { continue };
+            for p in &c.points {
+                let b = boxes[v].get_or_insert([p[0], p[1], p[0], p[1]]);
+                *b = [b[0].min(p[0]), b[1].min(p[1]), b[2].max(p[0]), b[3].max(p[1])];
+            }
+        }
+        boxes.into_iter().map(|b| b.map(|b| [(b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0])).collect()
+    };
+    let (lc, oc) = (centres(live), centres(ours));
+    let shift: Vec<[f64; 2]> = lc.iter().zip(&oc).map(|(l, o)| l.zip(*o).map_or([0.0; 2], |(l, o)| [l[0] - o[0], l[1] - o[1]])).collect();
+    let moved: Vec<String> = views.iter().zip(&shift).filter(|(_, s)| s[0].abs().max(s[1].abs()) > 1e-3).map(|((n, _), s)| format!("{n} moved {:.4}, {:.4} in onto live's", s[0], s[1])).collect();
+    let ours: Vec<DxfCurve> = ours.iter().map(|c| match in_view(c) {
+        Some(v) => DxfCurve { points: c.points.iter().map(|p| [p[0] + shift[v][0], p[1] + shift[v][1]]).collect(), ..c.clone() },
+        None => c.clone(),
+    }).collect();
+    let cell = |p: [f64; 2]| ((p[0] / tol).floor() as i64, (p[1] / tol).floor() as i64);
+    let layers: std::collections::BTreeSet<&str> = live.iter().chain(&ours).map(|c| c.layer.as_str()).collect();
+    let mut out = Vec::new();
+    for layer in layers {
+        for (side, a, b) in [("ours", &ours[..], live), ("live's", live, &ours[..])] {
+            let (a, b): (Vec<&DxfCurve>, Vec<&DxfCurve>) = (a.iter().filter(|c| c.layer == layer).collect(), b.iter().filter(|c| c.layer == layer).collect());
+            let mut grid: HashMap<(i64, i64), Vec<([f64; 2], &str)>> = HashMap::new();
+            for c in &b {
+                for p in &c.points {
+                    grid.entry(cell(*p)).or_default().push((*p, c.kind));
+                }
+            }
+            let (mut off, mut other, mut worst) = (0.0, 0.0, None::<(f64, String)>);
+            for c in a.iter().filter(|c| c.length >= tol) {
+                let each = c.length / c.points.len() as f64;
+                let (mut o, mut k) = (0.0, 0.0);
+                for p in &c.points {
+                    let (i, j) = cell(*p);
+                    let near: Vec<&str> = (i - 1..=i + 1).flat_map(|i| (j - 1..=j + 1).map(move |j| (i, j))).filter_map(|q| grid.get(&q)).flatten().filter(|(q, _)| (q[0] - p[0]).powi(2) + (q[1] - p[1]).powi(2) <= tol * tol).map(|(_, k)| *k).collect();
+                    if near.is_empty() {
+                        o += each;
+                    } else if !near.contains(&c.kind) {
+                        k += each;
+                    }
+                }
+                (off, other) = (off + o, other + k);
+                let m = &c.points[c.points.len() / 2];
+                if o.max(k) > worst.as_ref().map_or(tol, |w| w.0) {
+                    worst = Some((o.max(k), format!("a {} {:.3} in at ({:.3}, {:.3}) {}", c.kind, o.max(k), m[0], m[1], if o >= k { "off them" } else { "on another kind" })));
+                }
+            }
+            if off > tol || other > tol {
+                let them = if side == "ours" { "live's" } else { "ours" };
+                out.push(format!("{layer}: {side} {off:.3} in off {them}, {other:.3} in on another kind ({})", worst.map_or(String::new(), |w| w.1)));
+            }
+        }
+    }
+    (out, moved)
 }
 
 /// Live's import of our file splitting fewer of the model's edges than its import of its own (cf-hose-routing's
