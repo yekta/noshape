@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-20 02:33)
+# QA handoff (agent qa; current state only, updated 2026-11-20 02:47)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -83,6 +83,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    USER-HOVER-STAYS-LIT is listed as known in the cut's entry until psui's latest-wins picking fix passes 3 clean runs.
 
 ## Next (in this order)
+00a. **TICKETS sweep (lead 11-20 02:30): fixed-not-verified rows on green a06ec927.** P0/P1 + feel done (08a2b2e23); P2/P3 rows A
+   (54 + BOOL4B walk) pushed f41055cf8; rows B (snapshot lines 4657-7370, qa-scratch/TICKETS-snap-0240.md) from a subagent: apply with
+   qa-scratch/p23/apply.py <tsv> docs/TICKETS.md <snapshot> <HH:MM> (lines "N|verify|close|text"). Left: speed rows FS-COMPILED-INTERP
+   (snapshot 3081/3085) and Extrude add 308 ms (4653), timed after 04:00 on a quiet host. Filed P2 T2-NIGHTLY-22-FAILURES (lead routes).
+   Waiter qa-wait-psui-chip: d5472335 ERROR-CHIP-RED-NO-FIELD (Thicken both thicknesses 0: red title, no field).
 00b. **Night order (lead 11-19 03:45)**: qa-night-seq-1120 (flow/night-seq.sh latest 1120): 02:00 big document -> session replay ->
    everyday flows, then nightly/flows-done-<mmdd>; qa-w7-nightly waits for that flag (03:20 at the latest) before hat15 / dock;
    user flows after NIGHTLY-DONE. Re-arm each night with the next date. Cut verdict: a must-carry still queued reads PENDING
