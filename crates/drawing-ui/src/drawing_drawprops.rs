@@ -1720,7 +1720,9 @@ impl DrawingEditor {
                 lines.extend(["Update properties from a template...", "Lock drawing properties"].map(|t| (t.to_string(), false)));
             }
             let title = lines[0].0.clone();
-            crate::ui_script::note_dialog(|| crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": title }), lines));
+            // The Views tab's Auxiliary view label prefix, an input's value (the drawing matrix; live dom drawing-properties-views).
+            let texts: Vec<String> = if tab == "Views" { vec![props.view_tab.aux_prefix.clone()] } else { vec![] };
+            crate::ui_script::note_dialog(|| crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": title, "texts": texts }), lines));
         }
         // Live drawing/341: 38 px cells flush left, `#adadad` rules, `#f4f5f6`;
         // the active one white and open to the white section below.
