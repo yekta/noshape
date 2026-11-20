@@ -2267,11 +2267,19 @@ pub struct DatumTargetOpts {
     /// cross-hatched dashed (live 1699 (e)).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub region: Vec<[f64; 2]>,
+    /// Each distance's Precision ▾ (live drawing-datum-target-after): X / Y
+    /// distance (Angle: Diameter distance / Angle); None: the drawing's.
+    #[serde(skip_serializing_if = "no_precisions")]
+    pub precisions: [Option<u8>; 2],
+}
+
+fn no_precisions(p: &[Option<u8>; 2]) -> bool {
+    p.iter().all(Option::is_none)
 }
 
 impl Default for DatumTargetOpts {
     fn default() -> Self {
-        Self { style: TargetStyle::default(), origin: None, origin_ref: None, angular: false, flip_x: false, flip_y: false, hide_dims: true, x_dir: None, radial_lines: false, ref_dir: None, angle_flip: false, angle_rotate: false, instances: 1, region: Vec::new() }
+        Self { style: TargetStyle::default(), origin: None, origin_ref: None, angular: false, flip_x: false, flip_y: false, hide_dims: true, x_dir: None, radial_lines: false, ref_dir: None, angle_flip: false, angle_rotate: false, instances: 1, region: Vec::new(), precisions: [None; 2] }
     }
 }
 

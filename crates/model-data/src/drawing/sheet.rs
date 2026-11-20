@@ -2600,8 +2600,16 @@ impl SheetGeometry {
                             self.lines.push(Polyline2 { points: vec![o, turn(p, *t)], style: LineStyle::Thin, closed: false, pick });
                         }
                     }
-                    let basic = |v: f64, angular: bool, symbol: &str| {
-                        let t = env.text(a, v, angular, symbol);
+                    // Its distance's Precision ▾ (k: X / Diameter distance, Y / Angle) over the drawing's.
+                    let basic = |v: f64, angular: bool, symbol: &str, k: usize| {
+                        let t = match opts.precisions[k] {
+                            Some(p) => {
+                                let mut own = a.clone();
+                                own.format.precision = Some(p);
+                                env.text(&own, v, angular, symbol)
+                            }
+                            None => env.text(a, v, angular, symbol),
+                        };
                         let main = if angular && !env.trailing_zeros() { strip_angle_zeros(&t.main) } else { t.main.clone() };
                         DimText { boxed: true, main, ..t }
                     };
@@ -2619,7 +2627,7 @@ impl SheetGeometry {
                                 }).collect();
                                 self.lines.push(Polyline2 { points: circle, style: LineStyle::Hidden, closed: false, pick });
                                 let model_r = ((anchor[0] - o[0]).powi(2) + (anchor[1] - o[1]).powi(2)).sqrt();
-                                self.linear_dimension_text([2.0 * os[0] - p[0], 2.0 * os[1] - p[1]], p, 0.0, DimOrientation::Aligned, &basic(model_r * 2.0, false, "Ø"), pick);
+                                self.linear_dimension_text([2.0 * os[0] - p[0], 2.0 * os[1] - p[1]], p, 0.0, DimOrientation::Aligned, &basic(model_r * 2.0, false, "Ø", 0), pick);
                                 let rd = rotate2(opts.reference(), rot);
                                 let mut from = rd[1].atan2(rd[0]);
                                 if opts.angle_rotate {
@@ -2628,7 +2636,7 @@ impl SheetGeometry {
                                 let to = (p[1] - os[1]).atan2(p[0] - os[0]);
                                 let ra = r * 0.6;
                                 self.lines.push(Polyline2 { points: vec![os, [os[0] + (ra + 3.0) * from.cos(), os[1] + (ra + 3.0) * from.sin()]], style: LineStyle::Thin, closed: false, pick });
-                                self.target_angle(os, ra, from, to, &basic(opts.measured_angle(*anchor, o), true, ""), pick);
+                                self.target_angle(os, ra, from, to, &basic(opts.measured_angle(*anchor, o), true, "", 1), pick);
                                 if turns.len() > 1 {
                                     let step = std::f64::consts::TAU / turns.len() as f64;
                                     let mut one = env.text(a, step, true, "");
@@ -2651,11 +2659,11 @@ impl SheetGeometry {
                             let (dx, dy) = ((anchor[0] - o[0]).abs(), (anchor[1] - o[1]).abs());
                             if dx > 1e-9 {
                                 let level = if dy <= 1e-9 { os[1] } else if p[1] >= os[1] { os[1] - 8.0 } else { os[1] + 8.0 };
-                                self.linear_dimension_text(os, p, level - os[1].max(p[1]), DimOrientation::Horizontal, &basic(dx, false, ""), pick);
+                                self.linear_dimension_text(os, p, level - os[1].max(p[1]), DimOrientation::Horizontal, &basic(dx, false, "", 0), pick);
                             }
                             if dy > 1e-9 {
                                 let level = if dx <= 1e-9 { os[0] } else if p[0] >= os[0] { os[0] - 8.0 } else { os[0] + 8.0 };
-                                self.linear_dimension_text(os, p, level - os[0].max(p[0]), DimOrientation::Vertical, &basic(dy, false, ""), pick);
+                                self.linear_dimension_text(os, p, level - os[0].max(p[0]), DimOrientation::Vertical, &basic(dy, false, "", 1), pick);
                             }
                         }
                         _ => {}

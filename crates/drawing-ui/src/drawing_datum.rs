@@ -66,6 +66,9 @@ pub struct DatumDlg {
     _subs: Vec<Subscription>,
 }
 
+/// A precision ▾'s rows (help datum: "Area size … with precision"; the targets' distances too).
+const PRECISIONS: [(&str, Option<u8>); 8] = [("0", Some(0)), ("0.1", Some(1)), ("0.12", Some(2)), ("0.123", Some(3)), ("(Drawing)", None), ("0.1234", Some(4)), ("0.12345", Some(5)), ("0.123456", Some(6))];
+
 impl DrawingEditor {
     /// Create / drop the dialog with the Datum tools (from render).
     pub fn sync_datum_dlg(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -426,6 +429,34 @@ impl DrawingEditor {
         self.datum_preview(cx);
     }
 
+    /// A target distance's Precision ▾ beside its field (live drawing-datum-target-after; i: X / Diameter
+    /// distance, Y / Angle).
+    fn target_precision(&self, row: usize, i: usize, cur: Option<u8>, cx: &mut Context<Self>) -> AnyElement {
+        let ed = cx.entity();
+        div()
+            .id(SharedString::from(format!("dt-prec-tip-{row}-{i}")))
+            .tooltip(crate::ui::tooltip("Precision"))
+            .child(Button::new(SharedString::from(format!("dt-prec-{row}-{i}"))).ghost().w(px(20.)).h(px(24.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).dropdown_caret(true).os_dropdown_menu(SharedString::from(format!("dt-prec-dd-{row}-{i}")), true, move |mut m, _, _| {
+                for &(l, p) in &PRECISIONS {
+                    let e = ed.clone();
+                    m = m.item(crate::os_menu::OsMenuItem::new(l).checked(cur == p).on_click(move |_, _, cx| {
+                        e.update(cx, |t, cx| {
+                            t.edit_datum(
+                                |d| {
+                                    if let Some(r) = d.rows.get_mut(row) {
+                                        r.ann.target.get_or_insert_with(Default::default).precisions[i] = p;
+                                    }
+                                },
+                                cx,
+                            )
+                        })
+                    }));
+                }
+                m
+            }))
+            .into_any_element()
+    }
+
     pub fn render_datum_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let d = self.datum_dlg.as_ref()?;
         // The X / Y flips' tip as `texts` (the drawing matrix; live drawing-datum-target-after).
@@ -522,7 +553,6 @@ impl DrawingEditor {
                         .when(area_size && d.area == 3, |e| e.child(div().w(px(80.)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&d.size_b).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())))
                         .when(area_size && sized, |e| {
                             // Its precision ▾ (help datum: "Area size … with precision").
-                            const PRECISIONS: [(&str, Option<u8>); 8] = [("0", Some(0)), ("0.1", Some(1)), ("0.12", Some(2)), ("0.123", Some(3)), ("(Drawing)", None), ("0.1234", Some(4)), ("0.12345", Some(5)), ("0.123456", Some(6))];
                             let cur = d.size_precision;
                             let items: Vec<(String, String, bool, Act)> = PRECISIONS.iter().map(|&(l, p)| (String::new(), l.to_string(), cur == p, std::rc::Rc::new(move |d: &mut DatumDlg| d.size_precision = p) as Act)).collect();
                             let label = PRECISIONS.iter().find(|x| x.1 == cur).map(|x| x.0).unwrap_or("(Drawing)").to_string();
@@ -701,7 +731,7 @@ impl DrawingEditor {
                                         cx.notify();
                                     })))
                                 })
-                                .child(h_flex().mt(px(2.)).h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(&r.x).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())))
+                                .child(h_flex().mt(px(2.)).h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(&r.x).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())).child(self.target_precision(k, 0, opts.precisions[0], cx)))
                                 .child(h_flex().pt(px(2.)).pb(px(1.)).gap(px(4.)).child(crate::ui::caret(true)).child(div().text_size(px(12.)).child("Y position")))
                                 // Setting one direction hides the other (live 1699, as
                                 // the hole table's).
@@ -714,7 +744,7 @@ impl DrawingEditor {
                                         cx.notify();
                                     })))
                                 })
-                                .child(h_flex().mt(px(2.)).h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(&r.y).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())))
+                                .child(h_flex().mt(px(2.)).h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(&r.y).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())).child(self.target_precision(k, 1, opts.precisions[1], cx)))
                                 .child(h_flex().pt(px(2.)).child(flip(("dt-flipx", k), "X", opts.flip_x, true, cx)).child(flip(("dt-flipy", k), "Y", opts.flip_y, false, cx)))
                             })
                             .when(opts.angular, |e| {
@@ -728,7 +758,7 @@ impl DrawingEditor {
                                     )
                                 };
                                 e.when(invalid, |e| e.child(div().text_size(px(11.)).text_color(gpui_kit::rgb(0xd0021b)).child("Invalid origin selected. Angle datum target origin must be an arc or circle center.")))
-                                    .child(input_row("Diameter distance:", &r.x).mt(px(5.)))
+                                    .child(input_row("Diameter distance:", &r.x).mt(px(5.)).child(self.target_precision(k, 0, opts.precisions[0], cx)))
                                     .child(h_flex().mt(px(2.)).h(px(26.)).child(crate::drawing_chrome::DrCheckbox::new(("dt-radial", k)).label("Radial lines").checked(opts.radial_lines).on_click(cx.listener(move |this, v: &bool, _, cx| {
                                         let v = *v;
                                         if let Some(r) = this.datum_dlg.as_mut().and_then(|d| d.rows.get_mut(k)) {
@@ -743,7 +773,7 @@ impl DrawingEditor {
                                         }
                                         cx.notify();
                                     })))
-                                    .child(input_row("Angle:", &r.y).mt(px(2.)))
+                                    .child(input_row("Angle:", &r.y).mt(px(2.)).child(self.target_precision(k, 1, opts.precisions[1], cx)))
                                     .child(input_row("Instance count:", &r.count).mt(px(2.)))
                                     .child(
                                         h_flex()

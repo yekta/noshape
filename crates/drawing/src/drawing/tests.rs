@@ -2708,6 +2708,19 @@ fn a_datum_target_straight_above_its_origin_has_its_dimension_on_their_line() {
 }
 
 #[test]
+fn a_datum_target_distance_takes_its_own_precision() {
+    let (doc, mut drawing) = demo();
+    let vid = drawing.sheets[0].views[0].id;
+    // Live drawing-datum-target-after: each Distance field has its Precision ▾ (here Y's, two places).
+    let target = DatumTargetOpts { origin: Some([0.01, -0.01]), hide_dims: false, precisions: [None, Some(2)], ..Default::default() };
+    drawing.sheets[0].annotations.push(Annotation { id: 904, kind: AnnotationKind::DatumTarget { view: vid, anchor: [0.01, 0.005], label: "A1".into(), area: DatumTargetArea::Point }, position: [300.0, 200.0], target: Some(Box::new(target)), ..Default::default() });
+    let sources = regenerate_sources(&doc, &drawing);
+    let b = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
+    let texts: Vec<&str> = b.geometry.texts.iter().map(|t| t.text.as_str()).filter(|t| t.starts_with("15")).collect();
+    assert_eq!(texts, ["15.00"]);
+}
+
+#[test]
 fn datum_target_origin_dimensions_show_and_hide() {
     let (doc, mut drawing) = demo();
     let vid = drawing.sheets[0].views[0].id;
