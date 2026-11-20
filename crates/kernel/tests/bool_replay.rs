@@ -70,9 +70,9 @@ fn replay(dir: &Path, only_faces_below: Option<usize>) -> (usize, Vec<String>, S
 
 /// The whole corpus (outside the repo).
 #[test]
-#[ignore = "T2: the Boolean corpus (/root/core-scratch/bool-corpus, NOSHAPE_BOOL_CORPUS)"]
+#[ignore = "T2: the Boolean corpus (~/agents/bool-corpora/bool-corpus on the vibe hosts, NOSHAPE_BOOL_CORPUS)"]
 fn bool_corpus_replay() {
-    let dir = std::env::var("NOSHAPE_BOOL_CORPUS").unwrap_or_else(|_| "/root/core-scratch/bool-corpus".into());
+    let dir = std::env::var("NOSHAPE_BOOL_CORPUS").unwrap_or_else(|_| format!("{}/agents/bool-corpora/bool-corpus", std::env::var("HOME").unwrap_or_default()));
     // NOSHAPE_BOOL_MAX_FACES=n: only the cases with fewer input faces.
     let max = std::env::var("NOSHAPE_BOOL_MAX_FACES").ok().and_then(|v| v.parse().ok());
     let (n, bad, report) = replay(Path::new(&dir), max);

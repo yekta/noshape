@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-19 23:40 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-20 01:35 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2; builds + probes on the Mac (NOSHAPE_RB_HOST=mac,
 inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host; land queue vibe2
 (`NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`); private docs only vibex7 ~/lead-private. Never kill a process
@@ -16,14 +16,15 @@ f815832c's 22 faces vs live's 16). 4. Shell 3 Linux 2-solid split. 5. bool2-exac
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
 ## In flight
-- bool-land7 (= bool-stack7 rebased on main 8403d168f; worktree bool-tube, origin/bool-land7, tip 07c3dc068): gate
-  clean except the knurls. Running: unit bool-kn-s7b (/root/bool-scratch/kn-s7b.sh -> kn-s7b.out, "diff-lines 0" per
-  knurl = clean, ends KN-S7B-DONE) and unit bool-udoc-s7b (udoc-s7b.sh -> /root/bool-hat-scratch/udoc-07c3dc068.out,
-  all SAME, ends UDOC-DONE). Both clean -> in bool-tube `git switch bool-land7`, read `git diff --stat
-  $(git merge-base HEAD origin/main) HEAD`, land.sh; tell the lead in the same turn, then dx / core / blend / asm.
-- bool-pole2 (worktree bool-docs, origin/bool-pole2, tip 330ea2052) = bool-land7 + bool-pole's 6 + e87b6b170
-  (HOLE-THROUGH-ROUND-POLE: fixed, asm's repro 302.235 vs exact 302.234 mm3). Gate unit bool-gate-330ea2052-x7 ->
-  /root/bool-hat-scratch/chain-330ea2052.out (vibex7, waiting on the slot). Then knurls + udoc, land, tell asm.
+- bool-land7 (= bool-stack7 rebased; worktree bool-tube): gate, knurls and udoc (13/13 SAME) clean; land.sh started
+  01:05 (clippy on vibe2). QUEUED -> tell the lead, then dx / core / blend / asm; watch `land.sh --status`.
+- bool-pole2 (worktree bool-docs, origin/bool-pole2, tip 330ea2052; knurls clean 01:38; udoc moved to vibex7 01:45: unit bool-udoc-p2b, udoc-p2b.sh) = bool-land7 + bool-pole's 6 + e87b6b170
+  (HOLE-THROUGH-ROUND-POLE: fixed, asm's repro 302.235 vs exact 302.234 mm3). Gate 01:11 (/root/bool-docs-scratch/gate-330ea2052.log):
+  CHECK only for: 24 declined by the 50 um rule (the TO WIN BACK list), c2-parting-line-draft Rib 1 73/234/164 ->
+  73/213/143 (live 73/214/144, nearer); differing 7 -> 4 (none new), shfall 3 -> 1; shells 8 = main's 8, 2756e521 /
+  8e657637 as OCCT now; crate tests pass. Running: unit bool-kn-p2 (kn-p2.sh -> /root/bool-scratch/kn-p2.out,
+  KN-P2-DONE) and unit bool-udoc-p2 (udoc-p2.sh -> /root/bool-hat-scratch/udoc-p2.out, UDOC-DONE; vibex7 udoc2/).
+  Both clean -> land (after bool-land7), tell asm (isaac Fastened 43).
 - bool-pole's 6 commits (now in bool-pole2):
   e4f8a8066 a sphere's pole edge split at the curves ending there (non-manifold cdd336b4 taken = OCCT);
   01775a048 straight edges in a row share one Geom_Line (unify joins them as OCCT's);
@@ -32,16 +33,34 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   Declined by it, TO WIN BACK with a narrower signal: gate corpora 0670c350, 280af0bc, 2b9c38da, 2c9c42e4, 30afb30c,
   475df60e, 570dfc37, 5fc0970a, 70b3fb42, 818552c9, 83b621a3, 8e91c517, 922c847a, 952c2efc, a1186078, a7bdd15b,
   b359e025, cb7bb22b, e1dc8c98, f1c35250, f302ef40; Shell corpus 1451f7cb, 43a947f0, 96d45f42, 9bee135f, c25f7a31.
+  Rule off (bool-hat debug NOSHAPE_SLAB_TOL_RULE=0, Mac u14): 20 of the 21 = OCCT; 570dfc37 (old shfall only, so
+  report-only now) differs: OCCT keeps arg5's vertex (82.95, 41.75, 5) mm at tol 1e-4, ours deletes it. Shell corpus
+  end to end (u16/u21): rule off = rule on = OCCT once a8e67f355's pcurve refit is in (2756e521 was the one off).
+  NEXT: after 04:00 replay rec1 (new shfall) rule off; if clean, drop slab_too_tolerant (commit on bool-sh3).
   afcf858f3 slab union history differing only in vertex records = equivalent (lead 11-19); 0d465cb70 the gate's
   end-to-end Shell check (gate-host.py SHELLS / SHELLS_KNOWN).
-- bool-hat branch sh3-probe on 330ea2052 (gate after bool-pole2 lands, or gate its tip, which includes pole2):
+- bool-sh3 (origin/bool-sh3, tip 8b6d6faba = + Shell's stray-pcurve refit after its unify (2756e521: a 45° cone's merged
+  face had an edge pcurve 0.83 mm off, read 77 mm3 heavy in ours and OCCT; now 32108.414, live 32108.426 / 45 faces (q-2756e521),
+  live 104 edges / 57 vertices vs ours (= OCCT) 115 / 69: seams (Parasolid has none) and one B-spline edge between
+  faces 21 / 25 in two 3.848 mm pieces at (11.203, -20, 2.032) (Mac u24 probe_shell_case_two_edge_vertices): P3; also moves 08f5dc59 / 17488d26, ours = OCCT; clean tree Mac u23 shell:: 36 pass; it also
+  fixed 014f1aba5's const `unified` that only compiled in my WIP) + gate-host.py REPORT shfall-1102 (needs pole2's SHELLS check, so here, not on main); + the ellipse join (014f1aba5) and walls-fill 1e-6, Mac u12: shell:: 34 pass, corpus
+  ours = OCCT but 17488d26 99b55ec9; live 02:07: 7606a33e / 8ec111cc FAIL there too (live/bool/q-*); T1 walls_that_rebuild_the_part_within_its_rounding_fail_as_live
+  (1de09172f; Mac u13 shell:: 35 pass); = bool-hat's sh3-probe + 410e8c3d5 without_inverted_slivers, Shell 3
+  Linux Ok) on 330ea2052 (gate after bool-pole2 lands, or gate its tip, which includes pole2):
   69d3e1059 the gate's Shell check takes volumes within 1e-7 relative as the same (99b55ec9 off SHELLS_KNOWN);
   fb1ddd780 Shell's slab unify retries the face order (usd_any_order, boolean.cpp) where raw USD leaves two faces on
   one cylinder apart (cause: in ours' order USD puts the +x half of 8eebe1e2's R14 wall on the other half's cylinder
   with u 2pi off, the shared edge reads as a seam): 13186b07 b64c8b4e 9134b29f 8eebe1e2 = OCCT (faces, history);
   1d71f0703 oblique_hole_plugs (shell.cpp): a planar face's slab beside a removed hole cylinder crossing its plane
   obliquely gets the hole's ellipse section swept with it, the common trims it at the hole: f815832c = live (16
-  faces, 2720.0495 mm3, live 2720.0509; edges 44 vs live 39: 5 vertices splitting edges, later); also changes
+  faces, 2720.0495 mm3, live 2720.0509; edges 44 vs live 39 = ours less Parasolid's conventions (no seams, ring circles) except 2 vertices splitting the
+  ellipse between the hole cylinder and the 45 deg wall's inner face at (25.997 / 14.003, 19.823, 30.530) mm: USD joins
+  only lines and circles; filling the hole in the slab instead of the plug (bool-hat NOSHAPE_SHELL_HOLE_FILL,
+  /root/bool-scratch/holefill-try.diff) keeps them and gives 2720.0603 mm3 + ae90ae72 differing. Trying (bool-hat, uncommitted): with_ellipse_pieces_joined
+  after the slab unify (joins one ellipse's pieces at a 2-edge vertex between the same faces; /root/bool-scratch/u7.sh
+  -> u12.out): f815 42 edges / 28 vertices, 2720.0497 mm3 (the split pieces' pcurves read 2720.0603 / 2719.9237);
+  21497e46 b5fdaf97 -2 edges; 8ec111cc (25 mm walls fill the part) passed the 1e-9 walls-fill check after the join
+  (1.5e-7 under): the check now 1e-6 (u12: 8ec111cc, 7606a33e, d4d9563e now fail as walls-fill); also changes
   21497e46 / 82ac5e9a (-1 face, +0.85 mm3, OCCT the same); T1 an_oblique_hole_s_wall_ends_on_its_cylinder_as_live;
   8155d4210 an inward Shell whose walls fill the part fails (live q-b79e508b SHELL_FAILED; ours returned the part);
   T1 a_shell_whose_walls_fill_the_part_fails_as_live. SHELLS_KNOWN now 17488d26 2756e521 8e657637.
@@ -49,7 +68,8 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   99b55ec9 (same under the tolerance)).
 - 17488d26: live imports a different solid from our STEP (live/bool/q-17488d26/answers.txt: the torus face's one
   FACE_BOUND loop, live keeps the other side, 1933.6 vs our 435.1 mm2): likely our STEP export of a one-loop torus
-  face (told the lead to route). Stays on SHELLS_KNOWN; no comparable live Shell.
+  face. dx fixed it (queued 0dbd37f4: OCCT's writer reversed an unchained wire on a left-handed torus): once it lands,
+  re-export the case and ask live for the Shell 1 mm off the torus face; until then it stays on SHELLS_KNOWN.
 - live2's Shell 3 ticket (P2 SHELL-AFTER-WELD-FILLET): Mac Ok; Linux (vibe2, instrumented ops xshell3, doc
   ~/tmp/bool/sh3/d.noshape) part 2 at 5 mm gives 2 solids: 183041.69 mm3 and an inside-out -0.00097 mm3 sliver, so
   the feature's solid-count check fails. Fix in the bool-hat working copy (uncommitted): without_inverted_slivers at
@@ -62,18 +82,20 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
 - bool2-exact (bool2-ab, tip 73dcd9e30 = b997c4c3 re-recorded with OCCT). 5101adb8: exception (DECISIONS c8a06136b):
   it is 6bb081c8 turned 90 degrees (probe_case_twins: all 33 arguments' volumes and extents equal); ours gives both
   5.295354594e-4, OCCT 6bb081c8 5.295354633e-4 (= ours, 7e-9) and 5101adb8 5.295373907e-4 (1.93 mm3 off its twin).
-  Name the symmetry in the land commit. 6bb081c8 (volume = OCCT): history diff /root/bool2-scratch/6bb-hist.txt.
-  (a) every edge / face record pairs with OCCT's within 100 um (inputs at OCCT's 1e-4 of 11-02; ours puts vertices
-  on the nominal planes, OCCT 7-30 um off); (b) vertex-only records (afcf858f3 rule); (c) real: the coincident faces'
-  representative: OCCT arg16 Face0 Modified (x2) + arg17 Face2 Generated Edge, ours Deleted. Lead 23:35: don't loosen the replay;
-  RE-RECORD shfall at today's tolerances as a separate step and confirm every other shfall case is unchanged apart
-  from the tolerance. Running: vibex8 ~/agents/bool-keep/shrec/run.sh (qa's clifuzz.py copied, seeds 3000-3029 x 60,
-  CLI of main 91df536c0 frozen in shrec/bin, NOSHAPE_RECORD_BOOLEANS -> shrec/rec/<seed>, log shrec/run.out, ends
-  SHREC-DONE). Then: keep the Shell slab fuses (slab_union recordings), match old shfall cases to new ones (op, tools,
-  target faces, volume within 1e-6), replay both, list any change beyond tolerance; replace shfall in one commit-less
-  corpus swap (~/agents/bool-corpora/shfall, keep the old as shfall-1102). (c): NOSHAPE_SD_RULE=3 scratch in bool2-ab
-  boolean.rs (fuse: unsplit faces by least argument first, split pieces by the later argument in fuses of 4+);
-  A/B over shfall running (vibex8 ~/tmp/bool2/sdr-0.txt / sdr-3.txt).
+  Name the symmetry in the land commit. 6bb081c8 history (/root/bool2-scratch/6bb-hist.txt): (a) records within 100 um
+  of OCCT's (11-02 inputs at 1e-4): settled by the shfall re-record below; (b) vertex-only (afcf858f3 rule); (c) the
+  coincident faces' representative (OCCT arg16 Face0 Modified x2 + arg17 Face2 Generated Edge, ours Deleted):
+  NOSHAPE_SD_RULE=3 scratch in bool2-ab boolean.rs; A/B over shfall: bool-at04 (04:01, vibex8 ~/tmp/bool/sdr/sdr-0.txt / sdr-3.txt, SDR-DONE). On rec1 bool2-exact = main (rp1-*.txt).
+- shfall (DECISIONS 11-20): the gate's shfall becomes the re-recorded OCCT set; the 11-02 set is shfall-1102,
+  report-only (gate-host.py REPORT on bool-sh3 8b02f134b, tested with fake rows; gate sh3 from bool-hat). vibex8
+  ~/agents/bool-keep/shrec: rec1/all = 103 slab Booleans from 260 fuzz Shells (run1.sh; models built with
+  NOSHAPE_BOOL_RUST=0, so OCCT's tolerances: 19 inputs >= 1e-4 m, bin/maxtol.py). run2.sh (vibex8 qa quiet 02-04; vibex7's slot was 3 h deep: local timer bool-at04 runs /root/bool-scratch/at04.sh at
+  04:01 UTC: the SD A/B (vibex8 ~/tmp/bool/sdr/sdr.out) then run2 (vibex8 shrec, seeds 3020+, run2.out,
+  ends SHREC2-DONE): the models built as users get them (ours on), only the Shell probe OCCT-only -> shells2/, rec2/,
+  rp2-main.txt; prints how many inputs are still >= 1e-4. If fewer: rec2 is the new shfall (tell the lead). Swap:
+  mv bool-corpora/shfall -> shfall-1102 (vibex8 and every host holding it), new shfall = rec?/all minus the cases OCCT
+  disagrees with its own recording on every replay (rec1: 0a3e07e3 0e72c08b 63dae116 9166f9a1 cbadd976), named with
+  the reason in shfall/README.
 - sh3-probe verified (Mac u5): kernel shell:: 34 pass; Shell corpus ours vs OCCT: 17488d26, 99b55ec9 (same under the
   tolerance), 2e9c3ddd (ours "took too long" vs "shell failed": load flake, both errors; watch in the gate). 37 fuzz
   shells now fail "the walls fill the part" both ways (they returned the part unchanged, as b79e508b).
@@ -145,6 +167,38 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
 - DECISION ASKED (lead, 11-18 22:00): every Boolean's check as made_valid (changed faces + shells) instead of
   BRepCheck of the whole result (pulleys' 5-tool cut 13.1 -> 6.2 ms).
 - Parked (lead): 129100d95, 846db3d0c, 13b8c4b8d's same-surface merge (no live capture).
+- P2 (lead 11-20, TICKETS T2-NIGHTLY-22-FAILURES, vibex6 nightly T2):
+  - corpora on vibex6 (11-20 03:00): ~/agents/bool-corpora/shellcorpus (422) and bool-corpus (1949); bool-ho's tests read
+    $HOME/agents/bool-corpora/... (shell_corpus_time takes every case when `taken` is absent, faces 1-based); the
+    knurl / gear tests to 1e-6 relative. Uncommitted in bool-ho, land with this handoff.
+  - overlapping_free_form_parts_merge_like_onshape: the fuse now takes ours (path rust, 641 faces, same counts as OCCT's
+    occt_tree); unify leaves 45 (37 cylinder pieces on 2 R2 cylinders apart) vs 15 from OCCT's result. Ours shares
+    surfaces (23 for 641 faces) and 3D curves (109 for 1311 edges). Probe xprobe::probe_free_form_fuse_unify (bool-hat
+    WIP), Mac bool-keep/ff/, here /root/bool-scratch/ff/.
+  - a_25_by_10_knurl_at_30_tpi: passes on vibex7 bool2-keep/kern-cmp (11-14), declined on every Mac binary from 11-18
+    16:40. git bisect (crates/brep, cb8734f6b..1f4521120) in bool2-try on vibex7: /root/bool-scratch/bis.log (BIS-DONE;
+    the worktree is put back on c86ffb0e7).
+  - knurl_b94_at_30_tpi_on_a_10_mm_rod (>15 GB: ours declines, OCCT runs out): new since 11-19, not looked at yet.
+- bool2-exact (bool2-ab, tip 73dcd9e30 = b997c4c3 re-recorded with OCCT). 5101adb8: exception (DECISIONS c8a06136b):
+  it is 6bb081c8 turned 90 degrees (probe_case_twins: all 33 arguments' volumes and extents equal); ours gives both
+  5.295354594e-4, OCCT 6bb081c8 5.295354633e-4 (= ours, 7e-9) and 5101adb8 5.295373907e-4 (1.93 mm3 off its twin).
+  Name the symmetry in the land commit. 6bb081c8 history (/root/bool2-scratch/6bb-hist.txt): (a) records within 100 um
+  of OCCT's (11-02 inputs at 1e-4): settled by the shfall re-record below; (b) vertex-only (afcf858f3 rule); (c) the
+  coincident faces' representative (OCCT arg16 Face0 Modified x2 + arg17 Face2 Generated Edge, ours Deleted):
+  NOSHAPE_SD_RULE=3 scratch in bool2-ab boolean.rs; A/B over shfall: bool-at04 (04:01, vibex8 ~/tmp/bool/sdr/sdr-0.txt / sdr-3.txt, SDR-DONE). On rec1 bool2-exact = main (rp1-*.txt).
+- shfall (DECISIONS 11-20): the gate's shfall becomes the re-recorded OCCT set; the 11-02 set is shfall-1102,
+  report-only (gate-host.py REPORT on bool-sh3 8b02f134b, tested with fake rows; gate sh3 from bool-hat). vibex8
+  ~/agents/bool-keep/shrec: rec1/all = 103 slab Booleans from 260 fuzz Shells (run1.sh; models built with
+  NOSHAPE_BOOL_RUST=0, so OCCT's tolerances: 19 inputs >= 1e-4 m, bin/maxtol.py). run2.sh (vibex8 qa quiet 02-04; vibex7's slot was 3 h deep: local timer bool-at04 runs /root/bool-scratch/at04.sh at
+  04:01 UTC: the SD A/B (vibex8 ~/tmp/bool/sdr/sdr.out) then run2 (vibex8 shrec, seeds 3020+, run2.out,
+  ends SHREC2-DONE): the models built as users get them (ours on), only the Shell probe OCCT-only -> shells2/, rec2/,
+  rp2-main.txt; prints how many inputs are still >= 1e-4. If fewer: rec2 is the new shfall (tell the lead). Swap:
+  mv bool-corpora/shfall -> shfall-1102 (vibex8 and every host holding it), new shfall = rec?/all minus the cases OCCT
+  disagrees with its own recording on every replay (rec1: 0a3e07e3 0e72c08b 63dae116 9166f9a1 cbadd976), named with
+  the reason in shfall/README.
+- sh3-probe verified (Mac u5): kernel shell:: 34 pass; Shell corpus ours vs OCCT: 17488d26, 99b55ec9 (same under the
+  tolerance), 2e9c3ddd (ours "took too long" vs "shell failed": load flake, both errors; watch in the gate). 37 fuzz
+  shells now fail "the walls fill the part" both ways (they returned the part unchanged, as b79e508b).
 
 ## How to run
 - Worktrees: bool-hat (bool-pole; Mac builds, `bash .bin.sh <name>` inside rb.sh builds xprobe into

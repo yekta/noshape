@@ -724,14 +724,23 @@ fn qa_plate_shell_path() {
     }
 }
 
-/// The shell corpus's cases the direct walls take (~/agents/shellcorpus: cases/<name>.brep + .txt as NOSHAPE_DUMP_OPS
-/// writes them, `taken` lists them), each shelled with and without the direct walls, best of 3: one line each way.
+/// The shell corpus's cases (~/agents/bool-corpora/shellcorpus on the vibe hosts: cases/<name>.brep + .txt as
+/// NOSHAPE_DUMP_OPS writes them; those listed in its `taken`, else all), each shelled with and without the direct walls,
+/// best of 3: one line each way.
 /// `tools/tiers/perf.sh -p noshape-kernel --test all -- shell::shell_corpus_time --ignored --nocapture --test-threads=1`
 #[test]
-#[ignore = "T2 bench: needs ~/agents/shellcorpus"]
+#[ignore = "T2 bench: needs ~/agents/bool-corpora/shellcorpus"]
 fn shell_corpus_time() {
-    let dir = std::path::PathBuf::from(format!("{}/agents/shellcorpus", std::env::var("HOME").unwrap_or_default()));
-    let names: Vec<String> = std::fs::read_to_string(dir.join("taken")).expect("taken").lines().map(str::to_string).filter(|l| !l.is_empty()).collect();
+    let dir = std::path::PathBuf::from(format!("{}/agents/bool-corpora/shellcorpus", std::env::var("HOME").unwrap_or_default()));
+    let names: Vec<String> = match std::fs::read_to_string(dir.join("taken")) {
+        Ok(t) => t.lines().map(str::to_string).filter(|l| !l.is_empty()).collect(),
+        Err(_) => {
+            let mut v: Vec<String> = std::fs::read_dir(dir.join("cases")).expect("cases").filter_map(|e| e.ok()?.path().file_stem().map(|x| x.to_string_lossy().to_string())).collect();
+            v.sort();
+            v.dedup();
+            v
+        }
+    };
     let run = |direct: bool| {
         // SAFETY: the bench is single-threaded (--test-threads=1); the kernel reads these per call.
         unsafe {
@@ -748,7 +757,7 @@ fn shell_corpus_time() {
             let body = read_brep(&dir.join(format!("cases/{n}.brep"))).unwrap();
             let txt = std::fs::read_to_string(dir.join(format!("cases/{n}.txt"))).unwrap();
             let faces = body.faces();
-            let picked: Vec<Shape> = txt.lines().filter_map(|l| l.strip_prefix("face ")).map(|i| faces[i.trim().parse::<usize>().unwrap()].clone()).collect();
+            let picked: Vec<Shape> = txt.lines().filter_map(|l| l.strip_prefix("face ")).filter_map(|i| faces.get(i.trim().parse::<usize>().ok()? - 1).cloned()).collect();
             let w: Vec<&str> = txt.lines().last().unwrap().split_whitespace().collect();
             let t: f64 = w[2].parse().unwrap();
             let side = if w[4] == "1" { ShellSide::Outside } else { ShellSide::Inside };
