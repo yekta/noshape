@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 16:55 UTC.
+Updated 2026-11-20 17:16 UTC.
 
 ## In flight
 
@@ -31,10 +31,10 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
 - Reader marks (drawing_ui_state): `+` new (>= live2 11-15.1), `-` old, `*` since 11-18.1 (a table just placed; any
   selected table's grips), `^` since 11-08.1 (a hovered selected dimension's text). Recorders without "live2" read no
   drawing-panel fields (run.py panel_fields_unread).
-- Matrix 09:30: 9 present-only rows. Live's 11-20 takes cover 7, all full in b34 except Inspection Diameter (13/15,
-  live's lag) and Styles (reader artefact): Section Depth / Offset, Custom table Cell, View properties Multiple
-  values, Sheet properties A4 Portrait. Still open: Datum "This field cannot be empty", Split custom table below.
-  Regenerate the matrix after the land (drawing_matrix.py --run /root/studios-scratch/uip-merged ...).
+- Matrix 17:16 (docs/parity/drawing-matrix.md, runs through b35 merged in /root/studios-scratch/uip-merged): 1235 =,
+  563 shown of 1842, 0 differ, 2 present-only, both asked of live (REQUESTS "studios (2026-11-20 17:15 UTC)"):
+  Datum "This field cannot be empty" (take drw-datum-empty-field) and "Split custom table below" (needs a two-part
+  start, block-drawing-table-2parts; take drw-custom-table-split). Re-run the matrix when they land.
 - Live's drawing coverage batches 1-3 (behaviours "## Drawing coverage (11-20)", shots live/drwcov/shots-b2b3/): queued
   by live, not on main at 16:50. Done ahead: Edge to edge on a silhouette. Already as live: 2 point circle centerline
   (centre, then a point). To check when the takes land: Centermark on a circle with its auto centermark adds nothing;

@@ -88,6 +88,8 @@ OURS_TITLES = {
     "Table": ["Table properties", "Note"],
     # drawing-holetable-titleblock.json's tbDbl is the title block's Note panel.
     "Hole table": ["Cell", "Note"],
+    # A custom table's double-clicked cell opens the Cell bar (live drw-custom-table-cell s10).
+    "Custom table": ["Custom table", "Custom table properties", "Cell"],
     "MBD status": ["MBD status"],
     "Change to version": ["Reference manager"],
 }
