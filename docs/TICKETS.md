@@ -22,6 +22,24 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   started (test offscreen::a_dropped_render_worker_has_ended_its_thread fails without it). Not reproduced off CI: 15
   runs of the unfixed binary on vibe2 (lavapipe) all exited 0. Reopen if it comes back on CI.
 
+## qa, 2026-11-20 (live's feel coverage rows, walked on green 9ae062180)
+- [ ] P0 FEEL-CHAIN-LASTPOINT-END (skasm; qa 11-20 04:15, live behaviours "feel coverage round 2" R1, recording cov2-chain-lastpoint run on
+  green 9ae062180, vibe2) Line tool: (0,0), (30,0), then a second click on (30,0). Live: that click ends the chain (no zero-length line), so the next
+  click at (50,30) only starts a new line: still 1 line, constraints COINCIDENT + HORIZONTAL. Ours: also no zero-length line, but the chain goes
+  on: the click at (50,30) adds a 2nd segment (2 lines, COINCIDENT x2 + HORIZONTAL). The chain-close and double-click ends match (R1's other two cases).
+- [ ] P0 FEEL-PASTE-PLACE-LEAVES-TOOL (skasm; qa 11-20 04:15, live R6, cov2-copypaste on 9ae062180) sketch: a line selected, Ctrl+C, Ctrl+V
+  opens Transform with the copy added and selected (as live), but the click that places the copy leaves live's tool (tool none,
+  nothing selected); ours stays in Transform (tool "Transform", nothing selected) until Escape.
+- [ ] P0 FEEL-DIM-TWO-POINTS-ZERO (skasm; qa 11-20 04:15, live R3, cov2-dim-orient on 9ae062180) Dimension tool on a slanted line
+  (0,0)-(30,20): click (0,0), click (30,20), place at (5,25). Live places a linear dimension, its value box reading "29.54803 mm" (the horizontal
+  distance; live calls the row weak: the end landed at x 29.55). Ours places one whose box reads "0 mm". Escape twice: same as live (the first keeps
+  Dimension, the second leaves it). Possibly the same placement code as skasm's unlanded 94f6df34 stack (P0 SKETCH-DIM-PLACE-CLICK-SELECTS):
+  recheck after it lands.
+- [ ] P0 FEEL-DIM-PICK-READOUT (psui; qa 11-20 04:15, live R3, cov2-dim-orient steps 8-12 on 9ae062180) in the sketch Dimension tool, live's
+  bottom-right measure readout shows the picks: after the first point, Point with X / Y / Z 0.000 mm; after the second, "Min dist 35.982 mm",
+  kept while hovering to place. Ours shows no readout (null) throughout. Check against ANALYSIS-READOUT-HIDDEN's fix (readout hidden only for
+  Interference) once it is on green.
+
 ## qa, 2026-11-20
 - [ ] P2 **ORACLE-ASM-R3-TOLERANCE (asm)**: the T2 test `model/tests/oracle_asm::assemblies_match_live` fails in every
   nightly T2 since 11-14 (vibex6 ~/lead/t2-*.log; 11-20 on 5b62f6ca8) on R3 only: instance B's transform vs live's differs
