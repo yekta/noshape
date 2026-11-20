@@ -63,6 +63,9 @@ pub struct DatumDlg {
     pub picking_dir: Option<(usize, bool)>,
     /// The target whose Reference line (Angle) takes the next click.
     pub picking_ref: Option<usize>,
+    /// The Targets list's scroll and whether it overflows its 400 px (live s5: Chrome's scrollbar inside the box).
+    pub scroll: ScrollHandle,
+    pub overflow: std::rc::Rc<std::cell::Cell<bool>>,
     _subs: Vec<Subscription>,
 }
 
@@ -92,7 +95,7 @@ impl DrawingEditor {
                     d.label_text = st.read(cx).value().trim().to_string();
                 }
             });
-            self.datum_dlg = Some(DatumDlg { tab, label, label_text, area: 0, style: TargetStyle::Inside, area_size: false, size_a, size_b, size_precision: None, rows: Vec::new(), open: None, picking_origin: None, picking_dir: None, picking_ref: None, _subs: vec![sub] });
+            self.datum_dlg = Some(DatumDlg { tab, label, label_text, area: 0, style: TargetStyle::Inside, area_size: false, size_a, size_b, size_precision: None, rows: Vec::new(), open: None, picking_origin: None, picking_dir: None, picking_ref: None, scroll: ScrollHandle::new(), overflow: Default::default(), _subs: vec![sub] });
         } else if !active {
             self.datum_dlg = None;
         }
@@ -593,16 +596,17 @@ impl DrawingEditor {
                         }),
                 );
             // The Targets list.
+            let overflow = d.overflow.get();
             let mut list = v_flex()
                 .id("dt-targets")
                 .when(d.rows.is_empty(), |e| e.tooltip(crate::ui::tooltip("Click in space to add a target")))
-                .mx(px(4.))
-                .mb(px(3.))
+                .flex_1()
+                .min_h_0()
+                .overflow_y_scroll()
+                .track_scroll(&d.scroll)
                 .px(px(6.))
                 .py(px(4.))
-                .rounded(px(2.))
-                .border_1()
-                .border_color(gpui_kit::rgb(0x5da7dd))
+                .when(overflow, |e| e.pr(px(gpui_kit::component::menu::NATIVE_SCROLLBAR_WIDTH)))
                 .when(d.rows.is_empty(), |e| e.bg(gpui_kit::rgb(0xd9eef9)))
                 .child(div().text_size(px(if d.rows.is_empty() { 12. } else { 10. })).text_color(gpui_kit::rgb(0x5c6670)).child("Targets"));
             for (k, r) in d.rows.iter().enumerate() {
@@ -683,7 +687,7 @@ impl DrawingEditor {
                             .min_h(px(24.))
                             .rounded(px(2.))
                             .border_1()
-                            .border_color(gpui_kit::rgb(if active { 0x5da7dd } else { 0xdddddd }))
+                            .border_color(gpui_kit::rgb(if active { 0x1b5faa } else { 0xdddddd }))
                             .when(active, |e| e.bg(gpui_kit::rgb(0xd9eef9)))
                             .cursor_pointer()
                             .child(div().text_size(px(if value.is_some() { 10. } else { 11. })).text_color(gpui_kit::rgb(0x8a8a8a)).child(caption))
@@ -837,7 +841,44 @@ impl DrawingEditor {
                     );
                 }
             }
-            body = body.child(list);
+            // Live s5: the box at most 400 px tall, its rows scrolling under Chrome's 15 px scrollbar.
+            let (scroll, flag) = (d.scroll.clone(), d.overflow.clone());
+            body = body.child(
+                div()
+                    .relative()
+                    .flex()
+                    .flex_col()
+                    .max_h(px(400.))
+                    .mx(px(4.))
+                    .mb(px(3.))
+                    .rounded(px(2.))
+                    .border_1()
+                    .border_color(gpui_kit::rgb(0x1b5faa))
+                    .child(list)
+                    .when(overflow, |e| e.child(gpui_kit::component::menu::native_scrollbar(&d.scroll, cx)))
+                    .on_drag_move(cx.listener(|this, e: &DragMoveEvent<gpui_kit::component::menu::NativeThumbDrag>, window, cx| {
+                        if let Some(d) = &this.datum_dlg {
+                            gpui_kit::component::menu::native_scrollbar_drag(&d.scroll, e.event.position.y);
+                        }
+                        window.refresh();
+                        cx.notify();
+                    }))
+                    // Known once laid out: draw again with the scrollbar.
+                    .child(
+                        canvas(
+                            move |_, window, _| {
+                                let o = scroll.max_offset().y > px(0.5);
+                                if o != flag.get() {
+                                    flag.set(o);
+                                    window.request_animation_frame();
+                                }
+                            },
+                            |_, _, _, _| {},
+                        )
+                        .absolute()
+                        .size_0(),
+                    ),
+            );
         }
         let can_accept = tab == 1 && !d.rows.is_empty();
         let invalid_title = (tab == 1)
