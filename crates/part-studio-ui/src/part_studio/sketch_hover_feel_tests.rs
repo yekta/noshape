@@ -313,7 +313,6 @@ fn the_first_pick_at_rest_lights_what_is_under_the_pointer(cx: &mut TestAppConte
 /// for it (back on the line, the line lights again). Reuse is opt-in (`NOSHAPE_FRAME_CACHE=1`) until a click after a
 /// frame shown again draws on time.
 #[gpui::test]
-#[ignore = "T2: GPU frames read back (macOS CI reused none, run 44792538174; its readback is unreliable, run 42333748082); reuse is opt-in"]
 fn a_cleared_hover_shows_the_frame_drawn_before_without_drawing(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
     RENDERING.set(true);
@@ -467,7 +466,10 @@ fn settled_frame(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity
     cx.update(|cx| vp.update(cx, |v, _| v.record_frames(true)));
     let t = std::time::Instant::now();
     while cx.update(|cx| vp.read(cx).recorded_frames().len()) < 2 && t.elapsed() < std::time::Duration::from_secs(15) {
-        cx.update(|cx| vp.update(cx, |v, cx| v.request_frame(cx)));
+        // Asked for only once the last is back (a GPU slower than 10 ms a frame would always have one in flight).
+        if !cx.update(|cx| vp.read(cx).frame_in_flight()) {
+            cx.update(|cx| vp.update(cx, |v, cx| v.request_frame(cx)));
+        }
         cx.update(|cx| view.read(cx).gpu.deliver_frames());
         draw(cx, window);
         cx.executor().advance_clock(std::time::Duration::from_millis(20));

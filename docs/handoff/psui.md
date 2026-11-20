@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-20 20:55 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-20 22:00 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -35,7 +35,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (20:55 UTC 11-20)
+## Now (22:00 UTC 11-20)
 
 1. LANDED: 6f48184a (FS notices compile off the UI thread; A/B 6 max prepaint 534 -> 28 ms on 850efe, 549 -> 37 on
    de4eff), 18809b4c (spinner on the executor clock), 1c6e56e4 + 5c3f3bb7 (revert of a5505f50). Worktrees psui-fsn,
@@ -66,15 +66,16 @@ docs/DECISIONS.md (read first; it wins over anything here).
    rerun on main via uip-some.sh on vibex8 -> ~/tmp/psui/ps1 (log /root/psui-scratch/ps1.log) = the "before":
    4/33 differ on eb8aae4fb (rollback-bar-drag, sketch-dimension-variable, sketch-entity-copy-paste,
    variable-type-angle); the 14:47 run's other 12 + 5 not run all match now. "After": rerun once this batch lands.
-   - P0 (lead 20:0x): macOS CI failed a_cleared_hover_shows_the_frame_drawn_before_without_drawing (reused 0
-     frames): T2'd, LANDED fe8136d5 20:26 (81b0fa91); psui-p0 removed. NEXT after 21:35: on the Mac, why no frame is
-     reused (reads_back / frame_key / in_flight / readback), then make it platform-independent and drop the T2.
+   - P0 (lead 20:0x): macOS CI failed a_cleared_hover_shows_the_frame_drawn_before_without_drawing; T2'd in fe8136d5.
+     Mac diagnosis 21:4x: every submit had a frame in flight (settled_frame asked every 10 ms; Metal frames take
+     longer), and redraws of one view filled the 3-frame cache with copies of it. Fixed (cache one entry per view;
+     settled_frame asks only when none is in flight), T2 dropped: Mac 3/3 + sketch_hover 15/15, vibex8 15/15, clippy.
    - LANDED 5ce123f8 20:46 (c759a122): variable-type-angle ("30 deg"), rollback-bar-drag (driver name marked while the
      tip is off), sketch-entity-copy-paste (a menu paste stays; Transform keeps a picked entity clicked again),
      "Unconfigure suppression" in the row menu (live rollto-menus), FEEL-CONFIG-BOX-WIDTH (cfg-box pr(5)),
      FEEL-FLANGE-EDGE-BEHIND-WALL (selected_only line copies at compare::POST; line shader params.x bit 2).
-   - "After": rerun of the 33 on main -> vibex8 ~/tmp/psui/ps2, log /root/psui-scratch/ps2.log (first try 20:2x timed
-     out waiting for a slot; rerun 20:53). Expected: only sketch-dimension-variable differs.
+   - "After" (ps2, main 5ce123f8, vibex8): 32/33 scenarios, 305/308 states (before 29/33, 300/308). Left:
+     sketch-dimension-variable (live's take placed no dimension; retake asked).
    - Waiting on live: REQUESTS 19:00 (retake sketch-dimension-variable: live's take placed no dimension) and 19:11
      (which rule puts "Section view…" in a row menu).
    - Sheet metal titleState errors (bend-alignment-hold-line, hem-in-place-closed, bend/jog-new-edit-reedit,

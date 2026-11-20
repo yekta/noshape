@@ -1792,6 +1792,13 @@ impl Viewport {
                         }
                         self.reads_back = true;
                         if let Some((_, key, scene)) = self.frame_keys.iter().find(|k| k.0 == seq).cloned() {
+                            // One entry per view: redraws of the same view must not push out the frames before it.
+                            if let Some(i) = self.frame_cache.iter().position(|c| c.0 == key && c.1.same_as(&scene))
+                                && let Some((_, _, old)) = self.frame_cache.remove(i)
+                                && !self.image.as_ref().is_some_and(|shown| Arc::ptr_eq(shown, &old))
+                            {
+                                self.images_to_drop.push(old);
+                            }
                             self.frame_cache.push_back((key, scene, image.clone()));
                             if self.frame_cache.len() > FRAME_CACHE_LEN
                                 && let Some((_, _, old)) = self.frame_cache.pop_front()
