@@ -8882,6 +8882,10 @@ static TopoDS_Shape drop_strip_faces(const TopoDS_Shape& s, HHist& hist, std::ve
     // (Between two planes only: live keeps e54410's 2.3 um flat between two cylinders, Extrude 17.)
     if (BRepAdaptor_Surface(f1, false).GetType() != GeomAbs_Plane || BRepAdaptor_Surface(f2, false).GetType() != GeomAbs_Plane)
       continue;
+    // (A step between parallel planes only, as live's: the PEM S nut's 7 um flat between two of its planes
+    // 138 degrees apart is one of live's 92 faces.)
+    if (!BRepAdaptor_Surface(f1, false).Plane().Axis().IsParallel(BRepAdaptor_Surface(f2, false).Plane().Axis(), 1e-6))
+      continue;
     const double d = std::max(apart(keep, drop), apart(drop, keep));
     if (d > tol)
       continue;
