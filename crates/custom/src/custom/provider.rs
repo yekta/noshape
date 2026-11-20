@@ -193,6 +193,26 @@ pub fn doc_imports(doc: &Document) -> DocImports {
     DocImports(importables(doc))
 }
 
+impl DocImports {
+    /// Changes when a studio's source or a tab it can import changes.
+    pub fn key(&self) -> u64 {
+        let (sources, _, deps) = &self.0;
+        if *deps != 0 {
+            return *deps;
+        }
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        for (t, _, s) in sources {
+            (t, s).hash(&mut h);
+        }
+        h.finish()
+    }
+
+    /// The Feature Studios: (tab, source).
+    pub fn studios(&self) -> impl Iterator<Item = (TabId, &str)> {
+        self.0.0.iter().map(|(t, _, s)| (*t, s.as_str()))
+    }
+}
+
 /// [`compile_in_document`] from a [`DocImports`] snapshot.
 pub fn compile_with_imports(imports: &DocImports, tab: TabId, source: &str) -> Arc<CompiledStudio> {
     let (mut sources, others, deps) = imports.0.clone();
@@ -201,9 +221,9 @@ pub fn compile_with_imports(imports: &DocImports, tab: TabId, source: &str) -> A
     }
     let compiled = HashMap::new();
     let resolver = DocResolver { studios: &sources, compiled: &compiled, others: &others };
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    (deps, source).hash(&mut h);
-    compile_with(tab, source, &resolver, if deps == 0 { 0 } else { h.finish() })
+    // The key a regeneration's compile of the same source has (`DocumentScripts::from_sources`): one cache entry per
+    // studio, not two (850efe's 50+ studios overran the cache and the title bar recompiled them all on every draw).
+    compile_with(tab, source, &resolver, deps)
 }
 
 /// Every Feature Studio of a document, compiled (cached by source hash).

@@ -4872,3 +4872,23 @@ export const toothProfile = defineFeature(function(context is Context, id is Id,
     let mut reg = Regenerator::new();
     assert_ok(&fx.regen(&mut reg, &ps));
 }
+
+/// 850efe (50+ Feature Studios): the notices icon's compile of a committed studio is the regeneration's, from the cache
+/// (two keys per studio overran it, and the title bar recompiled every studio on every draw: 300-500 ms); the studios'
+/// key changes with a source.
+#[test]
+fn a_documents_notices_compile_is_the_regenerations() {
+    let mut doc = Document::new();
+    let a = doc.add_tab("Feature Studio 1", TabContent::FeatureStudio(FeatureStudio::new(&studio(SHAPES))));
+    doc.add_tab("Feature Studio 2", TabContent::FeatureStudio(FeatureStudio::new(&studio(""))));
+    let scripts = DocumentScripts::from_document(&doc);
+    let regen = scripts.studios().find(|s| s.0 == a).map(|s| s.2.clone()).expect("studio 1 compiled");
+    let imports = custom::doc_imports(&doc);
+    let src = imports.studios().find(|s| s.0 == a).map(|s| s.1.to_string()).expect("studio 1's source");
+    assert!(std::sync::Arc::ptr_eq(&custom::compile_with_imports(&imports, a, &src), &regen), "the regeneration's compile, not another");
+    let key = imports.key();
+    if let Some(TabContent::FeatureStudio(f)) = doc.tab_mut(a).map(|t| &mut t.content) {
+        f.source.push_str("\n// edited\n");
+    }
+    assert_ne!(custom::doc_imports(&doc).key(), key, "a new key for an edited studio");
+}

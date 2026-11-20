@@ -42,6 +42,11 @@ pub struct Workspace {
     behind: std::collections::HashSet<TabId>,
     behind_refs: Vec<(TabId, crate::derived::ExternalRef)>,
     behind_task: Option<Task<()>>,
+    /// Whether a Feature Studio's source has compile errors (the notices icon), for the studios' key
+    /// (`DocImports::key`), and the compile running for a newer key: off the UI thread (a document with 50+ studios
+    /// took 300-500 ms a draw).
+    fs_errors: Option<(u64, bool)>,
+    fs_errors_task: Option<(u64, Task<()>)>,
     pub doc: Entity<DocModel>,
     gpu: Gpu,
     pub(crate) active: Option<TabId>,
@@ -181,7 +186,7 @@ impl Workspace {
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
         let tab_thumbs = cx.new(|_| crate::tab_thumbs::TabThumbs::new(doc.clone()));
         noshape_render::perf::milestone("workspace: thumbnailers");
-        let mut this = Self { behind: Default::default(), behind_refs: Vec::new(), behind_task: None, tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), notices_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), switcher: None, tab_manager: None, doc_panel: None, renaming_tab: None, renaming_doc: None, tab_gap: None, shortcut_sheet: None, units_panel: None, open_folder: None, fs_notices: None, notifications_open: false, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
+        let mut this = Self { behind: Default::default(), behind_refs: Vec::new(), behind_task: None, fs_errors: None, fs_errors_task: None, tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), notices_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), switcher: None, tab_manager: None, doc_panel: None, renaming_tab: None, renaming_doc: None, tab_gap: None, shortcut_sheet: None, units_panel: None, open_folder: None, fs_notices: None, notifications_open: false, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
         this._subs.push(focus_lost);
         // Another document may have a new version when the window comes back.
         this._subs.push(cx.observe_window_activation(window, |this: &mut Self, window, cx| {
@@ -2816,14 +2821,35 @@ impl Workspace {
         )
     }
 
+    /// Whether a Feature Studio's committed source has compile errors: the last answer, compiled again in the
+    /// background when the studios change.
+    fn fs_compile_errors(&mut self, cx: &mut Context<Self>) -> bool {
+        let imports = noshape_model::custom::doc_imports(&self.doc.read(cx).session.doc);
+        let key = imports.key();
+        let known = self.fs_errors.filter(|e| e.0 == key);
+        if known.is_none() && self.fs_errors_task.as_ref().is_none_or(|t| t.0 != key) {
+            let task = cx.spawn(async move |this, cx| {
+                let errors = cx
+                    .background_spawn(async move { imports.studios().any(|(tab, src)| crate::feature_studio::studio_notices(&imports, tab, src).iter().any(|n| n.error)) })
+                    .await;
+                let _ = this.update(cx, |this, cx| {
+                    this.fs_errors = Some((key, errors));
+                    this.fs_errors_task = None;
+                    cx.notify();
+                });
+            });
+            self.fs_errors_task = Some((key, task));
+        }
+        self.fs_errors.is_some_and(|e| e.1)
+    }
+
     /// The navbar `{ }` icon (Onshape: "FeatureScript notices"; red `{!}`
     /// while a Feature Studio's committed source has errors).
-    fn render_notices_button(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    fn render_notices_button(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         // Live (part-studio/00): shown in every document, `{✓}` when clean.
         // Red for a Feature Studio's compile errors and for errors a custom
         // feature raised while regenerating.
-        let errors = crate::fs_notices::document_notices(&self.doc, cx).iter().any(|(_, _, n)| n.iter().any(|n| n.error))
-            || noshape_model::custom::run::has_errors(&self.doc.read(cx).session.doc);
+        let errors = self.fs_compile_errors(cx) || noshape_model::custom::run::has_errors(&self.doc.read(cx).session.doc);
         Some(
             h_flex()
                 .id("fs-notices-btn")
