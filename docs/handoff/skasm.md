@@ -35,6 +35,10 @@ lines to "name N/M", LC_ALL=C sort, join, awk $2!=$3). None worse -> land.sh. Th
   Left: sketch points passed through ops into sketchCurves say "Cannot compute tangent line." (the app's filter blocks them).
 - Slot on an arc (44c3ffed, qa P1 SKETCH-SLOT-ON-ARC): slot_chains took the arc's offset sides as caps (they share its
   centre) -> Equal to the Ø cap -> "Ø0" and Esc committed the wreck. Sketch + scene tests; slot tool only (no suite doc).
+- Sketch / face DXF (8dec7bd6, qa P1 SKETCH-DXF-EXPORT-POLYLINES): sketch_export samples the sketch's f64 curves / the
+  face's B-rep edges with conic_lines + freeform_lines, so the writer puts CIRCLE / ARC / ELLIPSE / SPLINE; the op now
+  writes via cad_export::to_dxf_file at DEFAULT_DXF (R14), as the dialog. Live's sketch-DXF capture is requested (qa
+  REQUESTS 11-19 23:57): check layers and spline form against it.
 - Simulation connection removed (77fa48ed, lead; DECISIONS 11-16): mate dialog field + flyout row + model-data/ops
   fields, run.py drops the two labels, scenario asm-slider-simulation-connection deleted. ops e2e assembly 14, coverage,
   assembly-ui 97, clippy clean (vibex8).
@@ -55,17 +59,6 @@ lines to "name N/M", LC_ALL=C sort, join, awk $2!=$3). None worse -> land.sh. Th
 
 - efd27713 sketch patterns linked first (rocker-enclosure-body 28/28); EDGE -> sketch-curve fallback only for a
   PIERCE's edge (parting-line back to 10/17; bool told).
-
-## Landed 17:09 (270e489b)
-Search highlight in the sketch toolbar; hover reach outside sketch mode; SM flip arrow (`CtxState::sm_built`); Title
-text (carry_text_box); MIRROR of two lines = lines mirrored, ends free (ops "mirror"); query text kept for a named
-sketch entity. Suite 1515 (vibe2): 90/126, 1322/1585 (vibe2's cf-sheet-metal-overcut-dogbone 2/10 is its model copy:
-the custom feature doesn't load there; 10/10 on vibex8).
-
-## Landed 18:28 (f1a1c756)
-Alignment wakes on the first snap onto a point (no `ACQUIRE_REST`), a drag aligns with points it snapped onto;
-Symmetric on two lines = one lines-only mirror (second line onto the first's mirror image). ≠ left: a midpoint's /
-quadrant's snap wakes no alignment source (ours aligns with points only).
 
 ## Landed / queued 11-18 evening
 - Landed: cce30a1a (welding Sketch 8 warns, 22/37), f6ea6d5c (Modify joint reuse: `sheetmetal::bend_joint_edit`),

@@ -2367,3 +2367,14 @@ sheet-metal differences, SPUR-GEAR-SPEED and SKETCH-SCREEN-SPACE-REACH. Open ass
   Flange 3's tab (JBJX); one of them makes std fail. Find why getSMDefinitionEntities of the part edge SNCNB gives
   the step's edge too (the part edge's attributes, host sheetmetal.rs associations of free edges / cap edges), or
   whether std adds it as an adjacent edge (holdAdjacentEdges).
+## Landed 17:09 (270e489b)
+Search highlight in the sketch toolbar; hover reach outside sketch mode; SM flip arrow (`CtxState::sm_built`); Title
+text (carry_text_box); MIRROR of two lines = lines mirrored, ends free (ops "mirror"); query text kept for a named
+sketch entity. Suite 1515 (vibe2): 90/126, 1322/1585 (vibe2's cf-sheet-metal-overcut-dogbone 2/10 is its model copy:
+the custom feature doesn't load there; 10/10 on vibex8).
+
+## Landed 18:28 (f1a1c756)
+Alignment wakes on the first snap onto a point (no `ACQUIRE_REST`), a drag aligns with points it snapped onto;
+Symmetric on two lines = one lines-only mirror (second line onto the first's mirror image). ≠ left: a midpoint's /
+quadrant's snap wakes no alignment source (ours aligns with points only).
+
