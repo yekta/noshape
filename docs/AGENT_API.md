@@ -1464,7 +1464,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
-| `plane` | string or object | required | Plane: `plane:top`, `plane:front`, `plane:right`, a Plane feature (`fplane:…`), a planar face id or a mate connector; or `{"query": {query_entities arguments}}` matching one planar face (e.g. the top face: {"query": {"kind": "faces", "normal": [0, 0, 1], "near": [0, 0, 1000], "limit": 1}}). |
+| `plane` | string or object | required | Plane: `plane:top`, `plane:front`, `plane:right`, a Plane feature (`fplane:…`), a planar face id, a mate connector or `{"mate_connector": {its parameters}}` (one made in the field, feature_schema mateConnector); or `{"query": {query_entities arguments}}` matching one planar face (e.g. the top face: {"query": {"kind": "faces", "normal": [0, 0, 1], "near": [0, 0, 1000], "limit": 1}}). |
 | `name` | string |  | Name (default "Sketch N"). |
 | `disable_imprinting` | boolean |  | The dialog's Disable imprinting (default off). |
 
