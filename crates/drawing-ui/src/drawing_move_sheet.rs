@@ -154,31 +154,26 @@ impl DrawingEditor {
         out
     }
 
-    /// Several views selected (live drw2 10-21 j, drawing/1202): Show/hide ▸,
-    /// Tangent edges ▸, Adjust linestyle..., View properties..., Align
-    /// views ▸, Move to sheet..., Paste, Copy, Paste as table | Clear
-    /// selection, Zoom to fit, Delete; the toggles act on every view (shown
-    /// for the first one's state).
+    /// Several views selected (live parity-open-1120 dr2, DRW-MULTI-VIEW-MENU): Show/hide ▸ (hidden lines, shaded
+    /// view, threads, faulty parts, center of mass), Tangent edges ▸, Adjust linestyle..., View properties..., Move
+    /// to sheet..., Paste, Copy, Paste as table | Clear selection, Zoom to fit, Delete; the toggles act on every view
+    /// (shown for the first one's state).
     fn multi_view_entries(&self, ids: Vec<ViewId>, cx: &App) -> Vec<MenuEntry> {
         let first = ids[0];
         let Some(v) = self.current_sheet().view(first).cloned() else { return Vec::new() };
         let hidden_lines = v.style == RenderStyle::HiddenLinesVisible;
         let shaded = v.style == RenderStyle::Shaded;
-        let (threads, cl) = (!v.hide_threads, v.show_centerlines);
+        let (threads, faulty, com) = (!v.hide_threads, v.show_faulty, v.show_com);
         let each = |ids: &[ViewId]| ids.to_vec();
-        let (a, b, c, e) = (each(&ids), each(&ids), each(&ids), each(&ids));
+        let (a, b, c, e, f) = (each(&ids), each(&ids), each(&ids), each(&ids), each(&ids));
         let show = vec![
             MenuEntry::item(if hidden_lines { "Hide hidden lines" } else { "Show hidden lines" }, move |t, _, cx| {
                 t.edit_views("Hidden lines", &a, cx, |v| v.style = if hidden_lines { RenderStyle::HiddenLinesRemoved } else { RenderStyle::HiddenLinesVisible })
             }),
             MenuEntry::item(if shaded { "Hide shaded view" } else { "Show shaded view" }, move |t, _, cx| t.edit_views("Shaded view", &b, cx, |v| v.style = if shaded { RenderStyle::HiddenLinesRemoved } else { RenderStyle::Shaded })),
             MenuEntry::item(if threads { "Hide threads" } else { "Show threads" }, move |t, _, cx| t.edit_views("Threads", &c, cx, |v| v.hide_threads = threads)),
-            MenuEntry::item(if cl { "Hide auto centermarks" } else { "Show auto centermarks" }, move |t, _, cx| {
-                t.edit_views("Centermarks", &e, cx, |v| {
-                    v.show_centerlines = !cl;
-                    v.deleted_centermarks.clear();
-                })
-            }),
+            MenuEntry::item(if faulty { "Hide faulty parts" } else { "Show faulty parts" }, move |t, _, cx| t.edit_views("Faulty parts", &e, cx, |v| v.show_faulty = !faulty)),
+            MenuEntry::item(if com { "Hide center of mass" } else { "Show center of mass" }, move |t, _, cx| t.edit_views("Center of mass", &f, cx, |v| v.show_com = !com)),
         ];
         let tm = crate::drawing_props::TangentMode::of(&v);
         let tangent = [crate::drawing_props::TangentMode::Hidden, crate::drawing_props::TangentMode::Solid, crate::drawing_props::TangentMode::Phantom]
@@ -195,13 +190,6 @@ impl DrawingEditor {
             MenuEntry::item("Adjust linestyle...", move |t, w, cx| t.open_linestyle(first, w, cx)),
             MenuEntry::Separator,
             MenuEntry::item("View properties...", move |t, w, cx| t.open_view_props_multi(props_ids.clone(), w, cx)),
-            MenuEntry::Submenu(
-                "Align views".into(),
-                vec![
-                    MenuEntry::item("Vertically", move |t, _, cx| t.start_align_views(first, true, cx)),
-                    MenuEntry::item("Horizontally", move |t, _, cx| t.start_align_views(first, false, cx)),
-                ],
-            ),
             MenuEntry::Separator,
             MenuEntry::item("Move to sheet...", move |t, _, cx| t.open_move_sheet(MoveTarget::View(first), cx)),
         ];

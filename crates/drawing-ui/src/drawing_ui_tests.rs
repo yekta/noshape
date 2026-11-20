@@ -1582,6 +1582,40 @@ fn a_dimension_dragged_from_unselected_ends_unselected(cx: &mut TestAppContext) 
     assert_eq!(cx.update(|cx| editor.read(cx).selection.clone()), vec![Sel::Annotation(id)], "a selected one stays selected");
 }
 
+/// Live parity-open-1120 dr2 (DRW-MULTI-VIEW-MENU): two views selected, the menu is Show/hide ▸ (hidden lines, shaded
+/// view, threads, faulty parts, center of mass) · Tangent edges ▸ · Adjust linestyle... · View properties... · Move to
+/// sheet... · Copy · Paste as table · Clear selection · Zoom to fit · Delete.
+#[gpui::test]
+fn two_views_menu_as_live(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::Sel;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "multi-view-menu");
+    real_sheet(cx, window, &editor);
+    let rows = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            e.selection = e.current_sheet().views.iter().take(2).map(|v| Sel::View(v.id)).collect();
+            assert_eq!(e.selection.len(), 2, "two views");
+            e.multi_selection_entries(cx)
+        })
+    });
+    fn labels(entries: &[MenuEntry]) -> Vec<String> {
+        entries
+            .iter()
+            .filter_map(|m| match m {
+                MenuEntry::Item { label, .. } => Some(label.to_string()),
+                MenuEntry::Separator => None,
+                MenuEntry::Submenu(label, rows) => Some(format!("{label} ▸ {}", labels(rows).join(" | "))),
+            })
+            .collect()
+    }
+    // (Paste is there only while views are copied: the tests share the clipboard.)
+    let got: Vec<String> = labels(&rows).into_iter().filter(|l| l != "Paste").collect();
+    let show = "Show/hide ▸ Show hidden lines | Show shaded view | Hide threads | Show faulty parts | Show center of mass";
+    assert_eq!(got.first().map(String::as_str), Some(show));
+    assert!(got[1].starts_with("Tangent edges ▸"), "{got:?}");
+    assert_eq!(got[2..], ["Adjust linestyle...", "View properties...", "Move to sheet...", "Copy", "Paste as table", "Clear selection", "Zoom to fit", "Delete"]);
+}
+
 /// Live ct-2-add (cfg-choosers-1120): the Custom table dialog's Add and Insert are 26 px, 2 px apart; the fixed corners
 /// 26 px on a 52 px pitch, 15 px in.
 #[gpui::test]
