@@ -399,6 +399,8 @@ pub struct PartStudioView {
     gpu: Gpu,
     /// Versions and history › Compare graphics.
     compare_gfx: crate::compare_graphics::CompareGraphics,
+    /// Compare just opened: its zoom to fit is due, refitted while the viewport's size (the size fitted at) settles.
+    compare_fit: Option<glam::DVec2>,
     /// Versions and history › View in repair: the Repair panel's graphics while it is open.
     repair_view: Option<Entity<repair_view::RepairView>>,
     pub viewport: Entity<Viewport>,
@@ -603,6 +605,7 @@ impl PartStudioView {
             doc,
             gpu,
             compare_gfx: Default::default(),
+            compare_fit: None,
             repair_view: None,
             viewport,
             display: Arc::new(StudioDisplay::defaults()),
@@ -7421,9 +7424,14 @@ impl Render for PartStudioView {
         // projected pixel, built in the underlay).
         let follows = (self.sketch.is_some() && self.ui.sketch_follows_camera) || self.ui.shown_dims.is_some() || ((self.ui.analysis_tool.is_some() || self.ui.section_dialog.is_some()) && crate::overlay_labels::gpui_labels()) || self.studio(cx).is_some_and(|s| !s.annotations.is_empty());
         self.viewport.update(cx, |vp, _| vp.set_ui_follows_camera(follows));
+        let comparing = self.compare_gfx.comparing();
         if self.compare_gfx.changed(&self.doc, cx) {
+            if !comparing && self.compare_gfx.comparing() {
+                self.compare_fit = Some(glam::DVec2::ZERO);
+            }
             self.refresh_scene(false, cx);
         }
+        self.fit_compare(cx);
         self.ensure_filter_input(window, cx);
         self.ensure_config_box_inputs(window, cx);
         // A feature row's context menu closed: drop its highlight.

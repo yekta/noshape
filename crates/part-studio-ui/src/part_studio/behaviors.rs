@@ -3274,6 +3274,23 @@ impl PartStudioView {
         self.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx));
     }
 
+    /// Live (ver-compare-hover-part 3): Compare zooms to fit the parts (0.25 -> 0.0475 mm/px on a 40 mm block, no
+    /// planes), once the viewport has its size beside the compare panel.
+    pub(super) fn fit_compare(&mut self, cx: &mut Context<Self>) {
+        let Some(fitted_at) = self.compare_fit else { return };
+        let size = self.viewport.read(cx).size();
+        if size == fitted_at {
+            self.compare_fit = None;
+            return;
+        }
+        let Some((lo, hi)) = self.fit_bounds() else { return };
+        if fitted_at == glam::DVec2::ZERO {
+            self.push_camera_history(cx);
+        }
+        self.compare_fit = Some(size);
+        self.viewport.update(cx, |vp, cx| vp.zoom_to_bounds(lo, hi, cx));
+    }
+
     /// What zoom to fit frames (Onshape): visible parts and sketches; the
     /// default planes only when there is nothing else (`None`).
     pub(super) fn fit_bounds(&self) -> Option<(glam::DVec3, glam::DVec3)> {

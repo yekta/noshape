@@ -487,3 +487,24 @@ fn the_navigation_matrix_matches_live(cx: &mut TestAppContext) {
     eprintln!("navigation matrix: {matched} / {} rows match live\n{}", report.len(), report.join("\n"));
     assert!(moved.is_empty(), "rows whose status moved (update interaction-feel.md and the row's gap): {moved:?}");
 }
+
+/// Live ver-compare-hover-part 3: Versions and history › Compare zooms to fit the parts (0.25 -> 0.0475 mm/px on the
+/// 40 mm block, centred on it; no planes); the compare slider moving later leaves the camera alone.
+#[gpui::test]
+fn compare_zooms_to_fit_the_parts(cx: &mut TestAppContext) {
+    let nav = Nav::open(cx, "compare-fit", 1.0);
+    nav.reset(cx);
+    let before = nav.cam(cx);
+    crate::part_studio_hooks::TEST_COMPARE.with(|c| c.set(Some(0.5)));
+    draw(cx, nav.window);
+    nav.settle(cx);
+    let after = nav.cam(cx);
+    assert!(after.distance < before.distance * 0.6, "zoomed in on the block: {} -> {}", before.distance, after.distance);
+    assert!((after.target - DVec3::new(0.020, 0.015, 0.005)).length() < 0.001, "centred on the block: {:?}", after.target);
+    crate::part_studio_hooks::TEST_COMPARE.with(|c| c.set(Some(0.7)));
+    draw(cx, nav.window);
+    nav.settle(cx);
+    let slid = nav.cam(cx);
+    crate::part_studio_hooks::TEST_COMPARE.with(|c| c.set(None));
+    assert_eq!((slid.target, slid.distance), (after.target, after.distance), "the slider doesn't refit");
+}

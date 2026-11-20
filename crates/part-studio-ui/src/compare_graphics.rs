@@ -93,6 +93,11 @@ impl CompareGraphics {
         std::mem::replace(&mut self.seen, blend) != blend
     }
 
+    /// Compare is open (as last seen by [`Self::changed`]).
+    pub fn comparing(&self) -> bool {
+        self.seen.is_some()
+    }
+
     /// Not comparing (any more): forget the displays.
     pub fn clear(&mut self) {
         if self.key.is_some() {
