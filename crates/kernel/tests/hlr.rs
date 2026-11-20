@@ -279,3 +279,21 @@ fn a_slanted_torus_outline_is_freeform() {
     // The polygonal HLR keeps no faces' surfaces: never free-form.
     assert!(project_hlr(&torus, iso, DVec3::Z, false).unwrap().iter().all(|e| !e.freeform));
 }
+
+/// A filleted hole rim seen from the front lies behind the plate's front face: no part of it shows, whichever side
+/// of the hole the torus's seam is on (OCCT read the generated outline's tangent end on the face's top edge as a
+/// crossing and drew it visible: snap-hook's extra r 3.5 arcs; patch 0036).
+#[test]
+fn a_filleted_hole_rim_behind_the_front_face_is_hidden() {
+    let plate = plate_with_holes(6.0, &[(0.0, 0.0)]);
+    let rim: Vec<Shape> = plate.edges().into_iter().filter(|e| e.endpoints().is_ok_and(|(a, b)| a.z > 9.999 && b.z > 9.999) && e.length().is_ok_and(|l| (l - 12.0 * PI).abs() < 1e-3)).collect();
+    assert_eq!(rim.len(), 1);
+    let rounded = fillet(&plate, &rim, 3.0).unwrap().shape;
+    for dir in [DVec3::Y, DVec3::NEG_Y, DVec3::new(0.1, 1.0, 0.0).normalize()] {
+        for exact in [true, false] {
+            let edges = project_hlr(&rounded, dir, DVec3::Z, exact).unwrap();
+            let curved = edges.iter().filter(|e| e.visibility == Visibility::Visible && e.polyline.len() > 2).count();
+            assert_eq!(curved, 0, "{dir:?} exact={exact}:\n{}", dump(&edges));
+        }
+    }
+}

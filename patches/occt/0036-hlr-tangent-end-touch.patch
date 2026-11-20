@@ -1,0 +1,35 @@
+--- a/src/ModelingAlgorithms/TKHLR/HLRBRep/HLRBRep_Data.cxx	2026-11-20 02:22:04.706601808 +0000
++++ b/src/ModelingAlgorithms/TKHLR/HLRBRep/HLRBRep_Data.cxx	2026-11-20 02:55:38.517571016 +0000
+@@ -2404,6 +2404,32 @@
+     }
+   }
+ 
++  // noshape (patch 0036): a crossing found at an end of the hidden edge, along the boundary there, only touches it. A
++  // torus outline's approximation ends 3.7e-5 (sine) off tangent where its fillet meets a face edge seen edge on: read as
++  // crossing, the outline counted as outside the hiding face and was drawn visible. Its state is the classification's.
++  // Not at a vertex of the boundary, nor when the edge crosses it again within 1e-4 of the model size: the pair cancels
++  // out (a fillet's outline running down a side edge seen edge on, out by 1e-10 for its last 2 um).
++  if (st == TopAbs_IN && myLE != myFE && Tr1->PositionOnCurve() != IntRes2d_Middle
++      && Tr2->PositionOnCurve() == IntRes2d_Middle
++      && (Tr1->TransitionType() == IntRes2d_In || Tr1->TransitionType() == IntRes2d_Out))
++  {
++    bool aPaired = false;
++    for (int i = 1; i <= myIntersector.NbPoints() && !aPaired; i++)
++    {
++      const IntRes2d_IntersectionPoint& aP = myIntersector.Point(i);
++      aPaired = &aP != &PInter && aP.Value().Distance(PInter.Value()) < myBigSize * 1.e-4;
++    }
++    gp_Pnt2d Pt;
++    gp_Vec2d TgLE, TgFE;
++    ((HLRBRep_Curve*)myLEGeom)->D1(PInter.ParamOnFirst(), Pt, TgLE);
++    ((HLRBRep_Curve*)myFEGeom)->D1(PInter.ParamOnSecond(), Pt, TgFE);
++    const double aMag = TgLE.Magnitude() * TgFE.Magnitude();
++    if (!aPaired && aMag > 0. && std::abs(TgLE.Crossed(TgFE)) < 1.e-3 * aMag)
++    {
++      return true;
++    }
++  }
++
+   switch (Tr1->TransitionType())
+   { // compute the transition
+     case IntRes2d_In:

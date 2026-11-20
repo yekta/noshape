@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-19 22:21 UTC (fresh dx thread, 11-19 21:0x). Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-20 03:4x UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -29,20 +29,33 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
   /root/dx-scratch/dxfall/<doc>/{ours,live}.dxf): real geometric misses only in
   - hex Right: plate top edge + two foot outlines missing: chain_pieces turned pieces joined going BACK the wrong
     way (far end dropped). FIXED (views.rs + T1 mesh_pieces_chain_both_ways_from_the_first); Mac exs-all A/B: hex
-    1 ours-only + 2 live-only (was 1 + 4, Right = live), others unchanged. Landing after vibex8 ops e2e.
-    (dxfdiff/dxfplot now read LWPOLYLINE: older hex diffs undercounted ours.)
+    1 ours-only + 2 live-only (was 1 + 4, Right = live), others unchanged. QUEUED 9023ff0d.
   - snap-hook: MODEL, not drawing: all 4 hooks mirrored about their own x (76 vertices differ each side, ours.step vs
     live.step). Snap Hook 1/2 take hookVector from evAxis of hookDirection (Shell OFFSET_EDGE KY5B; the studio
     source /root/dx-scratch/snaphook.fs line 96): our edge runs opposite Parasolid's (the known edge-direction class,
-    featurescript.md "Line and plane origins"). Reported to the lead (00:50). Front / Right's 6 extra r 3.5 arcs are
-    the tori's meridian silhouettes, where our torus seam lies (ours seam x -45.5, live -49.5): HLR repro (kernel
-    hlr::dxprobe_… scratch, vibex8) pending; recheck once the hooks match.
+    featurescript.md "Line and plane origins"). Reported to the lead (00:50). Its extra r 3.5 arcs: HLR P1 below.
   - faceblend Right: an extra 0.242 in line = model (blend's 4a: full-round boundary edges). clamp-guillem Top,
     housing-draft, rings-loft, extension-spring: known (above / below).
+- HLR P1 (dx, 03:5x, COMMITTED, land after the lead installs the libs): a filleted hole rim's torus outline was drawn
+  VISIBLE behind a plate's front face (exact HLR; snap-hook's extra r 3.5 arcs). OCCT read the outline's approximated
+  end (3.7e-5 off tangent where the fillet meets the face's top edge seen edge on) as a crossing (Out -> outside).
+  patches/occt/0036 (HLRBRep_Data::RejectedPoint): an IN crossing at an end of the hidden edge, in the middle of the
+  boundary, tangents parallel to 1e-3, no other crossing within 1e-4 of the model size: rejected (classification
+  decides). Both guards came from faceblend (outline stubs on its side lines). T1 hlr::a_filleted_hole_rim_behind_
+  the_front_face_is_hidden (fails on stock). A/B (Mac exchange suite vs exdxf-base.log / dxf-base/, dxfdiff):
+  snap-hook 7 ours-only -> 0 (ARC 81->75, LINE 352->345, SPLINE 9->8), rings-loft Right 159->151 entities, the other
+  8 drawings identical; drawing 257, ops e2e 260, kernel hlr green. Faceblend's back view keeps two 1.9 um stubs:
+  stock too. Staged libTKHLR.a (installed lib, only HLRBRep_Data replaced): x86-64 vibex7 ~/agents/dx-keep/occt-0036/
+  libTKHLR.a (24c350e8; g++-15 -march=x86-64, no ymm/fma, g++-13 builds it); arm64 Mac dx-keep/hlr36/libTKHLR.a
+  (279b6f08, mk36.sh). Patch source: /root/dx-scratch/hider/p36b/{a,b}.
 - STEP torus (bool's Shell case 17488d26): QUEUED 0dbd37f4: io.cpp step_direct_faces + step_forward_wires before
   OCCT's writer; T1 export::a_one_loop_torus_face_round_trips_through_step. Detail: archive (11-20 00:3x).
-- blend (23:4x): car Fillet 1 fixed (7/14/9, 81479.1 mm² vs live 81479.51), lands after its gate: once it and
-  fb8f84f42 are on main, rerun the 5 surf-intro docs (Mac sitrace.sh) for "Derived 1" and the rebuild time.
+- surf-intro (03:0x, blend's 6b6b3b4a0 + fb8f84f42, Mac sitrace2.sh, si-blend.diff applied for the run): all 5 past
+  Derived 1, rebuild 300-490 ms (live 359-1202). Next stop in 4: Tail fin extrude UP_TO_VERTEX 3483.23 vs 3567.19 mm²:
+  the car's rear vertices (y 254, z 30.343) at x +-33.142, live +-33.941 (Fillet 1's end): sent to blend 03:0x.
+  offset doc: Offset surfaces 1 9588.57 vs 9591.44 (likely the same). CLI queries: Mac dx-keep/siq.sh, si-q/.
+- Nightly (lead P2): dump_corpus_drawing_views skips without NOSHAPE_VIEWS_DUMP: e8e1a6107 (worktree dx-nightly)
+  landing; std_sheet_metal_matches_onshape is skasm's (9e5c392b4's sm_built), skasm fixing.
 - Next: the rest of "Next, in order".
 - The Mac's dx-main release target links a PRIVATE TKHLR (OCCT_ROOT=~/noshape-host/dx-keep/hlr/root, counters only
   with DXHLR=1); rebuild with the normal OCCT_ROOT for timings.
@@ -126,7 +139,6 @@ Open, ranked:
 ## Open: other
 - c2-impeller-loft: f15's Boolean is a known live difference (bool, DECISIONS); 24/48, see Next 2.
 ## Next, in order
-P. Parked: FClass2d per-wire boxes (no OCCT layout change; archive 11-20).
 C. PARKED (lead 11-19 21:0x): TICKETS FAN-BLADE-VIEWS-HLR-SAMPLING has the numbers; work in /root/dx-scratch/hlr-retry.
 Q. asm-robot-relations Import 1: closed by DECISIONS 11-17 (a valid solid stays a solid; ours one solid = the ruling).
 H. Hidden lines vs live (live2 02:32, live/dx/louver-hidden-1119/: sm-louver Front + Top, Show hidden lines, DXF 2018).
@@ -157,8 +169,6 @@ H. Hidden lines vs live (live2 02:32, live/dx/louver-hidden-1119/: sm-louver Fro
      (dvsample.sh, /root/skasm-scratch/bin/sample_under.py). live2's times (behaviours "dx drawing views on corpus parts"): impeller / rings / snap-hook / xDev
      1.3-2.6 s a view, Update 4.4-4.9 (ours 10-20x faster); fill-pattern 7.7 / 4.0 / 3.9 / 7.2, Update 9.6 (ours Iso 11.3 =
      1.6x: under 9e5b481d4's 2x); fan-blade 2.0 / 1.7 / 1.6 / 2.1, Update 4.4 (ours ~5.5 / 8.6 = 2.6-3.4x: the one gap; C).
-   - Mac (11-18, release, median of 3): c2-rings-loft x_t import 2.28 s (live 8.6), STEP 0.95; cf-o-ring ACIS 0.63 s
-     (live 10.6; vibex8 4.3-13 s by load); cf-spur-gear regenerates in 467 ms (live's full-regen per-feature sum 697 ms; qa's TICKETS row was loaded vibe2).
    - c2-rings-loft live.x_t import 17.5 -> 7.9 s on vibex8 (live 8.6; STEP 2.7): tube at 10 nm (f91b8d66) and intersection curves
      fit to 10 nm segment by segment (aad79780, queued fbf75841; blend faces' pcurves 13.7k -> 4.6k knots, STEP 2.4k).
      Left vs STEP: ShapeFix projects every pcurve with >= 23 knots and our 11-point curves with 45; STEP's edges are
@@ -188,8 +198,6 @@ H. Hidden lines vs live (live2 02:32, live/dx/louver-hidden-1119/: sm-louver Fro
      0.499 in edges bowing 0.3-0.5 mm (live LINEs) and the Right-view hole rim as a SPLINE (live CIRCLE) come from our
      projection (at most Rotieren 1's grazing cut, bool's parked BOOL-ROTIEREN-TANGENT); extension-spring's Top has a second end rectangle (x 2.230 / 2.268) and
      Fillet 1 (blend); bottle-split's lip outline is live's noise (18 tiny pieces); hex mesh splits (no rule).
-   - Import: "Upload only" for a bare assembly (live upload-only-1118) landed 0e95ad97; "Preserve source IDs" is
-     server-off for live's users (behaviours 15:00): nothing to build.
 1. Exchange m5 (vibex8 06:0x): imports 114/130, live imports ours 46/48, ours reads ours 148/154, DXF 1/10 (duct).
    DXF rows left follow model differences: faceblend full-round fillet edges B-spline in live (blend told 06:1x),
    extension-spring Fillet 1 10/24/16 vs 11/27/18 (blend), rings-loft walls, hex mesh outline splits (live's breaks

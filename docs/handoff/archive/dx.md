@@ -3660,3 +3660,8 @@ Q. asm-robot-relations studio 0c3466's Import 1 (REV-21-1650.STEP): live's store
    rr-import-1118 (02:3x): live's own re-import of the same file today gives ONE solid "Combine1" (154 faces), Import 1
    WARNING "Imported parts contained faults." (Allow faulty parts on), or no parts at all (off). So the six sheets are
    an old stored translation live no longer makes. Decision asked of the lead (11-19 03:1x): keep ours (one solid).
+
+## 11-20 03:2x moved from the handoff
+P. Parked: FClass2d per-wire boxes (no OCCT layout change; archive 11-20).
+   - Mac (11-18, release, median of 3): c2-rings-loft x_t import 2.28 s (live 8.6), STEP 0.95; cf-o-ring ACIS 0.63 s
+     (live 10.6; vibex8 4.3-13 s by load); cf-spur-gear regenerates in 467 ms (live's full-regen per-feature sum 697 ms; qa's TICKETS row was loaded vibe2).
