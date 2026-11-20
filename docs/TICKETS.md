@@ -33,12 +33,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Show faulty parts · Show center of mass. Ours (drawing_move_sheet.rs multi menu): no Tangent edges, an extra
   Align views ▸, and Show/hide lists hidden lines / shaded / threads / auto centermarks (no faulty parts, no centre
   of mass).
-- [ ] P2 **ASM-INSERT-RELEASED-ITEMS (asm)**: release-history 168. Live (company document, Part 1 released as Rev A
+- [x] P2 **ASM-INSERT-RELEASED-ITEMS (asm)**: release-history 168. Live (company document, Part 1 released as Rev A
   · OBS-PN-1 in release "OBS-REL-1", then obsoleted): assembly Insert › Other documents › the document has a ▲ button
   (tooltip "View released items") beside the version graph; on, the Part Studios tab lists "Part 1 OBS-PN-1 (A)";
   after the obsoletion it reads "No Part Studios found." The version graph still lists OBS-REL-1 with its solid ▲
   release mark, unchanged (insertable as a version). Ours: assembly Insert has no released-items view (the drawing
   chooser's `released_items` already does this, drawing.md V1).
+  Done (asm 11-20): ▲ View released items in Insert › Other documents; test an_other_documents_released_items_leave_out_obsoleted_revisions.
 - [ ] P2 **ASM-FACE-TAB-REFERENCE-FRAME (asm)**: assembly.md LA49. Live: Mass and section properties › Face with
   "Mate connector for reference frame" set (a connector on the corner (40,20,10) of a 40x20x10 block, world axes, top
   face picked): Lxx 106666.667, Lxy = Lyx 160000, Lyy 426666.667, Lzz 533333.333 mm⁴ (parallel axis to the

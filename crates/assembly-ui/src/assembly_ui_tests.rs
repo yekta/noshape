@@ -2491,6 +2491,58 @@ fn an_other_documents_studios_sort_by_name_as_the_current_documents(cx: &mut Tes
     assert_eq!(first(cx), "Part Studio 1", "Z → A");
 }
 
+/// Live parity-open-1120 ob (ASM-INSERT-RELEASED-ITEMS): an opened other document's ▲ View released items lists its
+/// released parts as "name [part number] (revision)" and drops obsoleted revisions ("No Part Studios found." once none
+/// is left); the Version graph closes it.
+#[gpui::test]
+fn an_other_documents_released_items_leave_out_obsoleted_revisions(cx: &mut TestAppContext) {
+    // (The release log as release_create / release_obsolete write it: those ops need the company's managed workflows,
+    // a process-wide setting other tests here read off.)
+    let src = two_parts_document(cx, "ins-other-released-src", |ctx| {
+        use noshape_model::release::{ItemKind, Package, PackageKind, ReleaseItem, ReleaseLog};
+        let version = call(ctx, "history_create_version", json!({ "name": "R1" }));
+        let od = ctx.doc(None).unwrap();
+        let version = od.session.store.list_versions().unwrap().into_iter().find(|v| v.name == "R1").unwrap_or_else(|| panic!("R1: {version}")).id.to_string();
+        let tab = noshape_ops::doc::find_tab(&od.session.doc, "Part Studio 1").unwrap();
+        let extrude = match &od.session.doc.tab(tab).unwrap().content {
+            noshape_model::TabContent::PartStudio(s) => s.features.last().unwrap().id,
+            _ => unreachable!(),
+        };
+        let item = |i: u32, pn: &str| ReleaseItem { tab, part: Some(noshape_model::reference::BodyId { feature: extrude, index: i }), name: format!("Part {}", i + 1), kind: ItemKind::Part, part_number: pn.into(), revision: "A".into(), not_revision_managed: false, reverted: false, config: Default::default(), document: None };
+        let package = |id: u64, kind: PackageKind, version: Option<String>, items: Vec<ReleaseItem>| Package { id, kind, name: format!("R{id}"), notes: String::new(), created: 0, version, items, re_releasable: false, approvers: Vec::new(), observers: Vec::new(), state: None, decided_by: None, comments: Vec::new() };
+        let mut log = ReleaseLog::default();
+        log.packages.push(package(1, PackageKind::Release, Some(version), vec![item(0, "OBS-PN-1"), item(1, "OBS-PN-2")]));
+        log.packages.push(package(2, PackageKind::Obsoletion, None, vec![item(1, "OBS-PN-2")]));
+        noshape_ops::release::save_log(&mut od.session, &log).unwrap();
+    });
+    let path = two_parts_document(cx, "ins-other-released", |_| {});
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.ui.insert_memory = Some(noshape_ops::prefs::InsertMemory::default());
+            v.toggle_insert(w, cx);
+            v.ui.insert_source = 1;
+            v.pick_other_document(src.clone(), cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    let listed = |cx: &mut TestAppContext, name: &str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(format!("ins-other-released {name}").leak()).is_some();
+    assert!(!listed(cx, "Part 1"), "the tree until ▲");
+    let click = |cx: &mut TestAppContext, id: &'static str| {
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        let at = vcx.debug_bounds(id).unwrap_or_else(|| panic!("{id} shown")).center();
+        vcx.simulate_click(at, gpui_kit::Modifiers::default());
+        draw(cx, window);
+    };
+    click(cx, "ins-other-released");
+    let released = cx.update(|cx| view.read(cx).ui.insert_other_doc.as_ref().unwrap().released.iter().map(|r| (r.name.clone(), r.part_number.clone(), r.revision.clone())).collect::<Vec<_>>());
+    assert_eq!(released, vec![("Part 1".to_string(), "OBS-PN-1".to_string(), "A".to_string())], "Part 2's obsoleted revision left out");
+    assert!(listed(cx, "Part 1") && !listed(cx, "Part 2"));
+    click(cx, "ins-other-graph");
+    assert!(!listed(cx, "Part 1"), "the Version graph instead");
+}
+
 /// Live2 asm-dialogs-1119 grp / gok: Group on a fixed part and a part Revolute-mated to it shows the mate's error as the
 /// dialog opens (not only after ✓), and ✓ clears the selection.
 #[gpui::test]

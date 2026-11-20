@@ -4664,6 +4664,10 @@ pub struct OtherDoc {
     /// Parts of the expanded Part Studios (tab id → (body, name)).
     pub parts: HashMap<String, Vec<(BodyId, String)>>,
     pub expanded: HashSet<String>,
+    /// Its released parts and assemblies, newest release first, obsoleted revisions left out.
+    pub released: Vec<noshape_drawing_ui::drawing_chooser::Released>,
+    /// View released items (▲) replaces the tree (live parity-open-1120 ob).
+    pub released_view: bool,
 }
 
 impl OtherDoc {
@@ -4687,7 +4691,9 @@ impl OtherDoc {
             at = parent.get(&mv).copied().flatten();
         }
         let name = store.meta().map(|m| m.name).unwrap_or_else(|_| path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
-        let mut d = OtherDoc { path: path.to_path_buf(), name, versions, changes, version: 0, graph: false, tabs: Vec::new(), parts: HashMap::new(), expanded: HashSet::new() };
+        let at = |s: &str| graph.versions.iter().find(|v| v.id.to_string() == s).map(|v| v.microversion).or_else(|| s.parse().ok());
+        let released = store.get_meta(noshape_ops::release::META_KEY).ok().flatten().map(|b| noshape_drawing_ui::drawing_chooser::released_items(&noshape_model::release::ReleaseLog::from_json(&b), &at)).unwrap_or_default();
+        let mut d = OtherDoc { path: path.to_path_buf(), name, versions, changes, version: 0, graph: false, tabs: Vec::new(), parts: HashMap::new(), expanded: HashSet::new(), released, released_view: false };
         d.load_tabs();
         Ok(d)
     }
@@ -5002,6 +5008,7 @@ impl AssemblyView {
             let square = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &App| {
                 div()
                     .id(id)
+                    .debug_selector(move || id.into())
                     .size(px(30.))
                     .flex()
                     .items_center()
@@ -5032,6 +5039,13 @@ impl AssemblyView {
                             .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).text_color(pal.text).child(crate::ui::user_text(d.name.clone())))
                             .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(16.)).child(crate::ui::glyph("branch", 10., pal.text)).child(crate::ui::user_text(version))),
                     )
+                    .child(square("ins-other-released", "legend-release", "View released items", d.released_view, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        if let Some(d) = &mut this.ui.insert_other_doc {
+                            d.released_view = !d.released_view;
+                            d.graph = false;
+                        }
+                        cx.notify();
+                    })))
                     .child(square("ins-other-create-version", "version", "Create version…", false, cx).on_click({
                         let path = d.path.clone();
                         let gpu = self.gpu.clone();
@@ -5042,6 +5056,7 @@ impl AssemblyView {
                     .child(square("ins-other-graph", "version-graph", "Version graph", d.graph, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(d) = &mut this.ui.insert_other_doc {
                             d.graph = !d.graph;
+                            d.released_view = false;
                         }
                         cx.notify();
                     }))),
@@ -5122,6 +5137,9 @@ impl AssemblyView {
             col = col.child(h_flex().h(px(32.)).border_b_1().border_color(rgb(0xeeeeee)).child(dtab("ins-other-ps", "Part Studios", 0, cx)).child(dtab("ins-other-asm", "Assemblies", 1, cx)));
             if let Some(b) = self.insert_search_box(cx) {
                 col = col.child(b);
+            }
+            if d.released_view {
+                return self.render_other_released(col, &d, tab, cx);
             }
             // Unversioned work in the document (live 612).
             if d.changes > 0 {
@@ -5477,6 +5495,61 @@ impl AssemblyView {
     }
 
     /// Insert the parts (or the whole Part Studio, rigid) of an external Part Studio.
+    /// View released items (live parity-open-1120 ob): the document's released parts (Part Studios tab) or assemblies,
+    /// each "name [part number] (revision)" with the solid ▲ of a release, inserted at the version it was released at.
+    fn render_other_released(&mut self, mut col: Div, d: &OtherDoc, tab: u8, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let query = self.ui.insert_query.trim().to_lowercase();
+        let items: Vec<_> = d.released.iter().filter(|r| r.assembly == (tab == 1) && (query.is_empty() || r.name.to_lowercase().contains(&query))).cloned().collect();
+        if items.is_empty() {
+            col = col.child(div().pl(px(10.)).h(px(28.)).flex().items_center().text_size(px(12.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(if tab == 0 { "No Part Studios found." } else { "No Assemblies found." }));
+        }
+        for (i, r) in items.into_iter().enumerate() {
+            let key = crate::derived::ExternalRef { path: d.path.clone(), microversion: r.microversion, tab: r.tab.to_string() }.key();
+            if !r.assembly {
+                self.request_external_thumbs(key.clone(), cx);
+            }
+            let thumb = if r.assembly { None } else { self.external_thumb(&key, r.part.as_ref()) };
+            let selector = format!("ins-other-released {}", r.name);
+            col = col.child(
+                h_flex()
+                    .id(SharedString::from(format!("ins-other-r-{i}")))
+                    .debug_selector(move || selector)
+                    .flex_none()
+                    .h(px(40.))
+                    .pl(px(4.))
+                    .pr(px(8.))
+                    .gap(px(4.))
+                    .cursor_pointer()
+                    .hover(|d| d.bg(pal.row_hover))
+                    .child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(match thumb {
+                        Some(img) => gpui_kit::img(img).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
+                        None => crate::assets::icon(&icon_path(if r.assembly { "sub-assembly" } else { "part" }), 28., cx).into_any_element(),
+                    }))
+                    .child(
+                        h_flex()
+                            .flex_1()
+                            .min_w_0()
+                            .gap(px(4.))
+                            .text_size(px(13.33))
+                            .font_weight(FontWeight::LIGHT)
+                            .child(div().truncate().child(crate::ui::user_text(r.name.clone())))
+                            .when(!r.part_number.is_empty(), |h| h.child(div().flex_none().px(px(4.)).rounded(px(2.)).bg(rgb(0xe5e5e5)).child(crate::ui::user_text(r.part_number.clone()))))
+                            .when(!r.revision.is_empty(), |h| h.child(div().flex_none().text_color(pal.text_muted).child(format!("({})", r.revision)))),
+                    )
+                    .child(crate::assets::icon(&icon_path("legend-release"), 20., cx))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        if r.assembly {
+                            this.insert_external_assembly(key.clone(), r.name.clone(), cx);
+                        } else {
+                            this.insert_external(key.clone(), r.part.clone(), r.name.clone(), cx);
+                        }
+                    })),
+            );
+        }
+        col.into_any_element()
+    }
+
     fn insert_external(&mut self, key: String, only: Option<BodyId>, studio_name: String, cx: &mut Context<Self>) {
         if self.pick_replacement(InstanceSource::External { key: key.clone(), body: only.clone(), config: ConfigValues::default() }, studio_name.clone(), cx) {
             return;
