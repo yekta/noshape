@@ -1,32 +1,41 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-20 11:20 UTC (thread compacted; lead queue: hats Seat lip P0 from qa first when it comes). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-20 14:50 UTC (lead order 13:1x: screws fix (landed), dx items, then parting-line Drafts speed; NO MAC until the lead says (user: left alone till 18:05)). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
 ## In flight (11-20)
-- **LANDED 11-20:** singularities Sketch 2 P0 a2e7c966 (04:19); fillet orientation d80c2c58 (06:10); manualblend
-  Intersection curve 1 (core-icd 5efc58479); T2-NIGHTLY-22 chamfer rim / pattern seed / parting-line draft f7b71172 (08:58).
-  core-icd and core-lam targets removed on vibe2.
-- **LANDED 09:57:** isaac Mirror 1 (lead P1, reported) 21ebd4f7 -> 9c9f2926: op_unify's cylinder merge on a copy of
-  the surface + failed groups not retried. CLI open on vibe2 (~/tmp/core/iz.py, NOSHAPE_KERNEL_PROFILE=1, fresh copy
-  isaac2.noshape): Mirror 1 13,277 -> 1,064 ms, studio 33.5 -> 23.1 s.
-- **P0 COMPAT-FILLET-ORIENT-REFS, core-rp branch core-orient, QUEUED 14136c65 (reported):** d80c2c58e's turning of a
-  fillet face's new edges taken out: OCCT's offset can't join the turned edges (cli-delete-gpf Shell 3 "Courbes non
-  jointives"), also fillet-hang Fillet 2 and fan-blade Sketch 5. cf-snap-hook stays 18/18 without it. Dumps on vibex7
-  ~/tmp/core/{hang-dump,hang-off,gpf-on,gpf-off}; ~/tmp/core/fl.py lists a doc's feature statuses with a CLI. If the
-  snap-hook axis is wanted again: orient at the point of use, never by turning B-rep edges.
-- **screws Sweep 1 (lead P1, reported), core-scr:** our unify after the cut (usd_kept_volume) merged two shank-cylinder
-  strips into an unorientable face. Fix new_faces_valid (a USD merge kept only if its new faces pass BRepCheck).
-  Kernel 546 pass, g13 OK, parity vs rp-run.log: no losses (impeller 27->29, britatap 4->8); screws 28/63, Sweep 1
-  now matches (first difference Extrude 1, feature 28). No T1 (synthetic threads don't reproduce). Speed is bool's
-  (98ef1c012). Follow-up: live has 8 faces there, we 20.
-- **Arc sense, core-arc QUEUED cc22d817 (04e93fd1 failed on a stale AGENT_API.md, regenerated):** sketch Entity.clockwise (live core q-arc-sense-1120). Full parity = rp's
-  but timing (impeller 27/29 is suite flakiness: single runs 29 on main and branch). After land: rm its vibex7 target.
-- **core-bis core-fit1 (fit spline + loft_to_point + pinched free-form thicken refused, da11525f0):** .full.sh on
-  vibex8 -> core-scratch/bis-full.out (kernel, model, singularities x3: no crash, "Thicken failure" as live; full parity
-  -> ~/tmp/core/bis-run.log). Then compare and land.
+- **LANDED 11-20:** singularities Sketch 2 P0 a2e7c966; fillet orientation d80c2c58 (then reverted, below); manualblend
+  Intersection curve 1 5efc58479; T2-NIGHTLY-22 f7b71172; isaac Mirror 1 9c9f2926 (13,277 -> 1,064 ms); arc sense
+  6b384aa69 + AGENT_API 2374eb6fc; P0 COMPAT-FILLET-ORIENT-REFS aa5682636 (d80c2c58e's edge turning out: OCCT's offset
+  can't join turned edges; if snap-hook's axis is wanted again, orient at the point of use); screws Sweep 1 0f8993ef8
+  (unify keeps a USD merge only if its new faces pass BRepCheck; follow-up: live 8 faces there, we 20). Targets removed.
+- **dx: c2-replace-face-exercise Replace face 1 (core-rf on vibex8, WIP commit 080681865 + uncommitted):** ours 89/192/108,
+  586411.92 mm3; live 85/184/104, 688437.672. The pocket floor's r 12.7 mm fillets roll again (reblend + replace_by_prism,
+  direct.rs); first try errored: the prism's Boolean/unify history wasn't carried, the shortened walls lost their images,
+  1 of the fillet edges found. Now faces_through composes it. .rf4.sh: model test replace_face, kernel delete tests,
+  rf-ops, replace-face -> ~/tmp/core/p2/<doc>-4.log: 60/132/76, 1306377 mm3 (overshoot); .rf5.sh adds NOSHAPE_RFDBG
+  eprintlns in reblend / replace_with (STRIP before land) -> ~/tmp/core/p2/rf5.log. Then suite pair (base: core-rp detached at
+  2432e6f6e, vibex7 .gof.sh base-rf -> ~/tmp/core/g/run-base-rf.log), g13, split commits, land. 34009ac98 = dx's
+  cherry-pick (drop if landed).
+- **dx: c2-impeller-loft Delete face 2 (622 ms vs live 12):** comes AFTER the doc's first difference (Fillet 3, blend):
+  our input isn't live's. Face 33 goes onto neighbours; face 39 (x=5 plane with a bore) OCCT spends its bound and
+  gives up (face left; live 65 -> 63 faces). Revisit when Fillet 3 matches. Moving by_region before OCCT broke kernel
+  tests a_boss_and_a_pocket..., delete_and_offset_faces and didn't apply (face 33 has no closed region): reverted
+  (diff /root/core-scratch/defeat-reorder.diff).
+- **Frame 1 (endcap, gusset, saw-table, hgr-riser):** dx's (references/ loader, dx 45ebed800). Not mine.
+- **parting-line Draft 1/2 speed (op_draft_parting_curve, shell.cpp):** ~850 ms under load (live 20): ~600 OCCT
+  Splitter of the slab by the ruled sheet, 120 Rust Boolean (succeeds). Split 3 1.6 s: 12 OCCT Face-Face (shelled
+  B-spline walls x extruded sheet).
+- **P2 SUITE-NEW-INDEX-1120-CORE (TICKETS 7066344c1):** 12 new documents' first differences (Split 2, Sweep 1 invalid,
+  Constrained surface, External thread, 3x Frame 1, Rib 2, ribbed enclosure extrude remove, Projected curve 1, Thicken 1,
+  Wrap 1). Not started.
+- **dx speed list (below the bar):** loft-paths-guides Loft 3, Mirror 1.
+- **core-bis core-fit1 LANDING 14:5x (c0084be13 fit spline one end, 81aff852f loft to point Coons, c548c432f Normal to
+  profile + pinched thicken, 54f6eaf00 flat fan thickens):** 20-doc A/B vs base: singularities 5 -> 8/15, cf-surface-pattern
+  Pattern 3 one edge/vertex nearer live, rest identical. bool asked: screws Sweep 1 still invalid on main: check it with
+  today's binary (cut's result or ours?).
 - **bool-land7 e3078f89:** if a model result moves after it lands, tell bool.
 - **Singularity loft model / Loft 3 / Fill G0:** open item (live core q-singularity-loft-1119): core-scratch/sing
   (model.py, loft3.py), fill/ (FILLDBG prints + crash_inputs case in core-oc, strip before any land).
