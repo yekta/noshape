@@ -100,10 +100,14 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    - car Fillet 1 verified b05f1c014 (Derived 1 matches in 5 surf-intro docs); next diff P2 SUITE-INTRO-TAILFIN-INTERSECTED -> skasm.
    - asm DRAG-START verified 83a8003d9; CHAMFER-ASYM closed afc395406. skasm 4e51cce3 (4 feel P0s): unit qa-wait-skasm-4e51.
      psui 37741d38: 7f6c5e1ae (5 verified; ROLLBACK-DROP-ROW lit row + SECTION-ARROW-FOOT length reopened; DIM-PICK values on skasm's green).
-   - P0s sent 09:59 (TICKETS 95fa940e1): COMPAT-GYRO-REVOLVE -> bool (be2a573c..f943df0b), COMPAT-FILLET-ORIENT-REFS -> core (d80c2c58e).
-   - Live index landed 9b382ec56 + bc95b3943 (145 listed; vibex7 ~/parity/models has 155 with features.json). Suite 1120-0407 is the old
-     126 (models 96/126, 1358/1585; rest stage still on vibex8). The next qa-suites run is the first on it: re-baseline SCORE (coverage
-     note), owners for new failures, its models time (126 docs took 1 h 51 debug) -> split proposal if > 2 h.
+   - New model index: debug run 1120-1028-4e51cce3-models (bin/models-now.sh, vibex7 alone, 29 min incl. build): 99/152, 1505/2051;
+     SCORE re-baselined 8b2a688ba; owners' rows SUITE-NEW-INDEX-1120-* + P1 SUITE-IMPELLER-FILLET3 (core: load/order dependent) 7066344c1.
+     Release run (unit qa-models-rel, qa-speed worktree, vibex7) -> suites/1120-1206-f689de1b-models-rel: the index row comes from it
+     (models-report + 0407's other areas). qa-suites.sh / suites-models.sh now default QA_SPEED_PROFILE=release (dx/lead 12:0x).
+   - qa-nightpm-1121 (bin/nightpm.sh): 00:30 release build on vibex8 (qa-night worktree), the model suite alone at 02:00 (lead 13:4x:
+     x86 speed only from the window) -> nightly/pm-1121. vibex8's feel re-time goes after it.
+   - Compat: FILLET-ORIENT verified 86d1cbc4; P0 COMPAT-RUSTZERO-FILLET1 -> blend (missed since 10:13: read new compat DIFF docs per green,
+     not just the alert tail). Gyro: bool 1b68aa85 queued, unit qa-wait-compat-gyro-revolve. psui a21e5b8f: unit qa-wait-psui-a21e.
    - psui 37741d38 (unit qa-wait-psui-37741): DIM-PICK-READOUT (cov2-dim-orient step 8), ROLLBACK-DROP-ROW, SECTION-ARROW-FOOT,
      EDGE-MIDPOINT-REST-LOOK, HOVER-LEAVES-WINDOW, FAST-OFF-CLEAR, MEASURE-CIRCLE-DEFAULT-PLANE (rows say what to check).
    - Seat lip: a47534be5 (Ok in 0.4.43-0.4.61 + green; vibex7 ~/agents/qa-keep/seatlip-hat8-1120.txt).
