@@ -30,6 +30,9 @@ pub struct DocModel {
     pub session: Session,
     /// Regeneration caches of Part Studios used as Derived sources.
     pub studio_cache: crate::derived::StudioCache,
+    /// The document's assembly evaluator, shared by its Assembly and Drawing tabs: a drawing of an open assembly
+    /// reuses its Part Studios' regenerations (asm-isaac-ball's first view regenerated them all again: 37 s, live 10.7).
+    pub assemblies: std::sync::Arc<parking_lot::Mutex<noshape_model::assembly::eval::AssemblyEvaluator>>,
     /// A tab edit applied but not committed yet, with its description: an
     /// assembly Insert session (live undoes all its instances in one step).
     /// Any other edit, undo or redo commits it first.
@@ -112,7 +115,9 @@ impl DocModel {
     /// undo/redo stacks (Onshape's page load; the history stays).
     pub fn new(mut session: Session) -> Self {
         session.forget_undo();
-        Self { session, studio_cache: Default::default(), pending: PendingEdit::default(), pending_preview: false, client_step: None, window_snapshot: None, undo_held: false, comparing: false, notice_link: None }
+        let studio_cache = crate::derived::StudioCache::default();
+        let assemblies = std::sync::Arc::new(parking_lot::Mutex::new(crate::derived::assembly_evaluator(studio_cache.clone())));
+        Self { session, studio_cache, assemblies, pending: PendingEdit::default(), pending_preview: false, client_step: None, window_snapshot: None, undo_held: false, comparing: false, notice_link: None }
     }
 
     /// An info notice with a link after it ([`notice_bubble`] draws it in whichever view shows the notice).

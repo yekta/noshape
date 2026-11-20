@@ -699,8 +699,8 @@ impl DrawingEditor {
     }
 
     pub fn new(doc: Entity<DocModel>, tab: TabId, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        // Read before `doc` moves into the view (derived parts' sources, DER8).
-        let studio_cache = doc.read(cx).studio_cache.clone();
+        // Read before `doc` moves into the view: the document's assembly evaluator (derived parts' sources, DER8).
+        let assemblies = doc.read(cx).assemblies.clone();
         let (target_id, rx) = gpu.register_target();
         let frames = cx.spawn_in(window, async move |this, cx| {
             while let Ok(res) = rx.recv().await {
@@ -747,7 +747,7 @@ impl DrawingEditor {
             regens: HashMap::new(),
             insert_auto_scale: false,
             insert_scale_was_auto: false,
-            assemblies: Arc::new(Mutex::new(crate::derived::assembly_evaluator(studio_cache))),
+            assemblies,
             regenerating: HashSet::new(),
             failed_sources: HashSet::new(),
             model_bg: None,

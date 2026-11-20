@@ -283,6 +283,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   122 surfaces + 2 curves). It is live's heavy-model feel reference (live 11-18), so the feel rows compare 124 vs 125 bodies.
 
 ## dx, 2026-11-19
+- [x] **P1 ISAAC-DRAWING-VIEW-SPEED [dx]** (lead 11-20; Mac release, dx_perf::timed_saved_drawing_views, cached views
+  dropped each run; live behaviours "dx drawing views on big models (11-20)"): asm-isaac-ball Insert view Front 37.4 s
+  (live 10.7), Create drawing with suggested views 37.5 s (live 18.2). Cause: a drawing evaluated an assembly with an
+  evaluator of its own, regenerating every Part Studio again. Fixed: the agent API primes assembly sources with the
+  document's evaluator; the app's Assembly and Drawing tabs share one evaluator per document (DocModel::assemblies).
+  After: isaac Front 1.60 s, Iso 0.94, Create 2.49; infento 4.3 / 5.5 / 8.2 s (live 12.5 / 10.7 / 22.9); gearbox
+  0.32 / 0.11 / 0.33 s (live 4.1 / 1.7 / 13.3); impeller Front 0.14 s (2.6), hoses Front 1.55 s (2.6).
 - [ ] P3 FAN-BLADE-VIEWS-HLR-SAMPLING (dx; parked by the lead 11-19 21:0x: 1.66x, under the user's 2x bar, DECISIONS
   9e5b481d4, and no live drawing to judge the changed views) c2-fan-blade-sweep's drawing views ~5.5 s each, Update
   8.6 s (live2: 2.0 / 1.7 / 1.6 / 2.1 s, Update 4.4). Cause: HLRBRep_Data::Classify's exact line / surface calls on the

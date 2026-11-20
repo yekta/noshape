@@ -41,13 +41,22 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
   ~/agents/dx-keep/gl.sh <tag> [gl40|gl13] (parity_models + NOSHAPE_FS_PROFILE; NOSHAPE_RECORD_BOOLEANS for cases).
 - URDF-RIGID-SUBASM-SINGLE-LINK LANDED b7c2c4e8a (ticket [x]); open: live's file shape (REQUESTS dx 05:44). Nightly
   dump-test LANDED 3b9ec80cc; dx-nightly worktree + vibe2 target removed 07:4x.
-- EXCHANGE TOP-3 (lead 06:3x) QUEUED 2f406fa1: before (b0) imports 119/130, live 46/48, self 153/154, DXF 1/10, times
-  174/174, 39 failing rows; after (Mac exall-a5.log) imports 127/130, rest same, 16 rows (rings-loft 8->3, faceblend
-  6->1, housing 6->1; the 1s are DXF). Fixes: OBJ/3MF held to live's own OBJ/3MF; IGES/ACIS drop a mesh part beside
-  B-rep parts (export.rs, e2e); STL rows on DECISIONS 11-16 deviation; differences() ties within live's volume band
-  (louvers). Left: DXF + rings STEP area (model, parked); rings "ours.stl" Shell 1 offset faces fold in BRepMesh too
-  (sent to bool; Mac dx-keep/rings-fold/, /root/dx-scratch/rings-fold-probe.patch); duct STL (parked); hose x_t (core).
-- Next: the rest of "Next, in order".
+- EXCHANGE TOP-3 LANDED 09:29 as 072a6c50 (2f406fa1). Rings "ours.stl" face 23 no triangles: bool's Shell builder, low.
+- DXF SCORING (DECISIONS 11-20, uncommitted parity.rs; LWPOLYLINE read as LINEs): Mac exall-a8 DXF 2/10 (duct,
+  louver); ops e2e 262/262. Rows left: snap-hook live's 4th tangent ring 0.0014 in inside a visible ring, dropped by
+  drop_covered_hidden at the chords' tol (FIXED uncommitted kernel hlr.rs off_circle + test
+  a_tangent_arc_beside_a_visible_arc_stays) + one 0.018 in SPLINE where live has an ARC r 0.049 (3.648, 3.069; probe);
+  bottle-split our arc 41.8-90 deg past live's (HLR extent); extension-spring an extra seam LINE + one edge live splits
+  into spline + line (model topology); hex-bookcase a hole rim quarter on the dowel mesh (coincident, live 0.05 in
+  ELLIPSE, ours hidden); housing-draft live's 4-LINE runs (intersection curves?) + 0.057 in bow (projection);
+  faceblend ELLIPSE vs SPLINE (model); rings-loft model; clamp-guillem Top edges inside another part (known, no rule).
+  Hole rims on a cylinder seen along it are its circle (views.rs model_edge, uncommitted, unit test). Tools:
+  /root/dx-scratch/bin/near.py, dxfgeo.py; files /root/dx-scratch/dxf-a8/.
+- DRAWING SPEED (lead 11-20): P1 ISAAC-DRAWING-VIEW-SPEED fixed uncommitted (shared assembly evaluator: ops
+  doc.rs prime_sources, app-core DocModel::assemblies, assembly_view / drawing_view take it; tell asm on landing):
+  isaac Front 37.4 -> 1.60 s (live 10.7), Create 37.5 -> 2.49 (18.2); infento 19.5 -> 4.3. Timing:
+  dx_perf::timed_saved_drawing_views (uncommitted) + Mac dx-keep/dvspeed.sh (copy /root/dx-scratch/dvspeed.sh).
+  All others under live's (TICKETS row).
 - The Mac's dx-main release target links a PRIVATE TKHLR (OCCT_ROOT=~/noshape-host/dx-keep/hlr/root, counters only
   with DXHLR=1); rebuild with the normal OCCT_ROOT for timings.
 

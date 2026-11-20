@@ -89,9 +89,10 @@ impl OpenDoc {
 
     /// A drawing's Part Studio sources in the configuration their tabs show,
     /// regenerated with the tabs' own regenerations (incremental: no work
-    /// when nothing changed), which the drawing's views then reuse
-    /// (`views::regenerate_source` keeps them by content hash) instead of
-    /// regenerating the studio afresh.
+    /// when nothing changed), and its assemblies with the document's
+    /// assembly evaluator (their Part Studios already regenerated), which the
+    /// drawing's views then reuse (`views::regenerate_source` keeps them by
+    /// content hash) instead of regenerating them afresh.
     pub fn prime_drawing_sources(&mut self, drawing: &noshape_model::drawing::Drawing) {
         self.prime_sources(noshape_model::drawing::views::referenced_sources(drawing));
     }
@@ -99,16 +100,28 @@ impl OpenDoc {
     /// [`OpenDoc::prime_drawing_sources`] for these sources.
     pub fn prime_sources(&mut self, keys: impl IntoIterator<Item = noshape_model::drawing::views::SourceKey>) {
         use noshape_model::drawing::views;
+        let (asms, keys): (Vec<views::SourceKey>, Vec<views::SourceKey>) = keys
+            .into_iter()
+            .filter(|k| k.version.is_none())
+            .partition(|k| matches!(self.session.doc.tab(k.tab).map(|t| &t.content), Some(TabContent::Assembly(_))));
         let keys: Vec<views::SourceKey> = keys
             .into_iter()
-            .filter(|k| k.version.is_none() && studio(&self.session.doc, k.tab).is_ok_and(|ps| self.current_config(k.tab).is_ok_and(|c| crate::config::current(ps, &k.config) == c)))
+            .filter(|k| studio(&self.session.doc, k.tab).is_ok_and(|ps| self.current_config(k.tab).is_ok_and(|c| crate::config::current(ps, &k.config) == c)))
             .collect();
-        if keys.is_empty() {
-            return;
+        if !keys.is_empty() {
+            let mut assemblies = crate::derived::assembly_evaluator(Default::default());
+            for key in keys {
+                views::regenerate_source(&self.session.doc, &key, self.regens.entry(key.tab).or_default(), &mut assemblies);
+            }
         }
-        let mut assemblies = crate::derived::assembly_evaluator(Default::default());
-        for key in keys {
-            views::regenerate_source(&self.session.doc, &key, self.regens.entry(key.tab).or_default(), &mut assemblies);
+        // (asm-isaac-ball's first view regenerated every Part Studio afresh: 37 s, live 10.7 s.)
+        if !asms.is_empty() {
+            let cache = self.studio_cache.clone();
+            let ev = self.assemblies.get_or_insert_with(|| crate::derived::assembly_evaluator(cache));
+            ev.retain_tabs(&self.session.doc);
+            for key in asms {
+                views::regenerate_source(&self.session.doc, &key, &mut Regenerator::new(), ev);
+            }
         }
     }
 

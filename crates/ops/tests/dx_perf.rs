@@ -307,6 +307,73 @@ fn timed_corpus_drawing_views() {
     let _ = std::fs::remove_dir_all(&tmp);
 }
 
+/// Lead 11-20: drawing views of the suite's big models from a saved document (`<file.noshape>#<tab>`, an assembly as
+/// parity_assemblies keeps it with NOSHAPE_PARITY_SAVE): the document opened and its tab evaluated once, then each
+/// run cold (no kept view): Insert view Front to its hidden lines drawn (drawing_get), the Isometric projected from it,
+/// and Create drawing with its suggested views. NOSHAPE_DRAWING_SAVED: the list; live's times: REQUESTS dx 11-20.
+#[test]
+#[ignore = "T2: the saved models are on the build hosts only"]
+fn timed_saved_drawing_views() {
+    let Ok(list) = std::env::var("NOSHAPE_DRAWING_SAVED") else {
+        eprintln!("skipped: NOSHAPE_DRAWING_SAVED is unset");
+        return;
+    };
+    let runs: usize = std::env::var("NOSHAPE_PERF_RUNS").ok().and_then(|r| r.parse().ok()).unwrap_or(3);
+    let tmp = std::env::temp_dir().join(format!("noshape-dx-perf-saved-{}", std::process::id()));
+    std::fs::create_dir_all(&tmp).unwrap();
+    let ms = |t: Instant| t.elapsed().as_secs_f64() * 1000.0;
+    for item in list.split(',') {
+        let Some((file, tab)) = item.split_once('#') else { continue };
+        let name = std::path::Path::new(file).file_stem().map_or(file.to_string(), |s| s.to_string_lossy().to_string());
+        // (A copy: the ops save what they change.)
+        let path = tmp.join(format!("{name}.noshape"));
+        for ext in ["", "-wal", "-shm"] {
+            let _ = std::fs::copy(format!("{file}{ext}"), format!("{}{ext}", path.display()));
+        }
+        let mut ctx = Ctx::new();
+        let opened = Instant::now();
+        call(&mut ctx, "document_open", json!({ "path": path }));
+        // (The tab by its name, or the first of that kind: "Assembly".)
+        let info = call(&mut ctx, "document_info", json!({}));
+        let tabs = info["tabs"].as_array().cloned().unwrap_or_default();
+        let Some(found) = tabs.iter().find(|t| t["name"] == tab).or_else(|| tabs.iter().find(|t| t["kind"] == tab)) else {
+            eprintln!("{name}: no tab {tab} in {info}");
+            continue;
+        };
+        let tab = found["name"].as_str().unwrap_or(tab).to_string();
+        let tab = tab.as_str();
+        // (An assembly solved, or a Part Studio regenerated.)
+        if found["kind"] == "Assembly" {
+            call(&mut ctx, "assembly_list", json!({ "tab": tab }));
+        } else {
+            call(&mut ctx, "query_parts", json!({ "tab": tab }));
+        }
+        eprintln!("{name}: opened and {tab} evaluated in {:.0} ms", ms(opened));
+        let (mut front, mut iso, mut suggested) = (Vec::new(), Vec::new(), Vec::new());
+        for _ in 0..runs {
+            noshape_ops::drawing::drop_cached_views();
+            let drawing = call(&mut ctx, "drawing_create", json!({ "source": tab, "template": "ANSI_A_INCH.dwt", "suggested_views": false }))["drawing"].as_str().unwrap().to_string();
+            let at = Instant::now();
+            let view = call(&mut ctx, "drawing_insert_view", json!({ "drawing": drawing, "source": tab, "orientation": "front", "position": [70, 70] }))["view"].clone();
+            call(&mut ctx, "drawing_get", json!({ "drawing": drawing, "edges": false }));
+            front.push(ms(at));
+            let at = Instant::now();
+            call(&mut ctx, "drawing_projected_view", json!({ "drawing": drawing, "parent": view, "position": [180, 170] }));
+            call(&mut ctx, "drawing_get", json!({ "drawing": drawing, "edges": false }));
+            iso.push(ms(at));
+            noshape_ops::drawing::drop_cached_views();
+            let at = Instant::now();
+            let made = call(&mut ctx, "drawing_create", json!({ "source": tab, "template": "ANSI_A_INCH.dwt", "suggested_views": true }));
+            call(&mut ctx, "drawing_get", json!({ "drawing": made["drawing"], "edges": false }));
+            suggested.push(ms(at));
+        }
+        report(&format!("{name}: Insert view Front"), front);
+        report(&format!("{name}: projected Isometric"), iso);
+        report(&format!("{name}: Create drawing with suggested views"), suggested);
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
 /// PLAN 2.7 dx: import of the NIST MTC CRADA assembly from STEP and from
 /// Parasolid (live's own exports of it: tests/perf/nist-mtc-crada-assembly.step
 /// / .x_t), from Import to the parts regenerated and tessellated for display.

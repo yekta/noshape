@@ -624,8 +624,8 @@ impl AssemblyView {
     }
 
     pub fn new(doc: Entity<DocModel>, tab: TabId, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        // Read before `doc` moves into the view (derived parts' sources, DER8).
-        let studio_cache = doc.read(cx).studio_cache.clone();
+        // Read before `doc` moves into the view: the document's assembly evaluator (derived parts' sources, DER8).
+        let assemblies = doc.read(cx).assemblies.clone();
         let viewport = cx.new(|cx| Viewport::new(gpu.clone(), window, cx));
         let mut subs = Vec::new();
         subs.push(cx.subscribe_in(&viewport, window, Self::on_viewport_event));
@@ -717,13 +717,9 @@ impl AssemblyView {
             cube_hover: None,
             cube_origin: None,
             slices: None,
-            evaluator: Arc::new(Mutex::new({
-                // Derived parts and custom features read their sources as in
-                // the Part Studio (qa5 DER8).
-                let mut ev = crate::derived::assembly_evaluator(studio_cache.clone());
-                ev.set_external(Arc::new(AppExternal));
-                ev
-            })),
+            // The document's (its drawings reuse its Part Studios' regenerations); Derived parts and custom features
+            // read their sources as in the Part Studio (qa5 DER8).
+            evaluator: assemblies,
             result: Arc::new(AssemblyResult::default()),
             built: None,
             built_key: None,
