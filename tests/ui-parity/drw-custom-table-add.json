@@ -1,0 +1,20 @@
+{
+  "name": "drw-custom-table-add",
+  "about": "Custom table › Add opens Select a Part Studio; Other documents; back; Escape",
+  "area": "drawing",
+  "source": "studios 11-20: the Custom table picker as live 279 (matrix present-only: Select a Part Studio, Current document, Other documents)",
+  "start": "block-drawing",
+  "steps": [
+    {"do": "click", "on": {"tool": "Custom table"}},
+    {"do": "wait", "until": "ms", "ms": 1000},
+    {"do": "click", "on": {"button": "Add"}},
+    {"do": "wait", "until": "ms", "ms": 1000},
+    {"do": "click", "on": {"tab": "Other documents"}},
+    {"do": "wait", "until": "ms", "ms": 1000},
+    {"do": "click", "on": {"tab": "Current document"}},
+    {"do": "wait", "until": "ms", "ms": 800},
+    {"do": "key", "key": "Escape"},
+    {"do": "wait", "until": "ms", "ms": 500},
+    {"do": "key", "key": "Escape"}
+  ]
+}

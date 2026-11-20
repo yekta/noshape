@@ -879,6 +879,7 @@ impl DrawingEditor {
         let tab_btn = |id: &'static str, label: &'static str, on: bool| {
             div()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, || format!("tab:{label}")))
                 .flex_1()
                 .h(px(28.))
                 .flex()
