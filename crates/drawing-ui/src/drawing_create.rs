@@ -586,7 +586,8 @@ impl Render for CreateDrawingDialog {
         let suggested = self.suggested && has_source;
         // Live's recorder: the header's text (its name box's label) and the name field (recordings from 11-08 on).
         let name = self.name.read(cx).value().to_string();
-        // Its texts too (the drawing matrix reads them; live's recorder lists only the name field).
+        // Its texts too, for the drawing matrix (as `texts`: live's recorder reads the modal's `text` as one innerText
+        // string, its selects' options included, which the step comparison would hold ours to).
         let mut text: Vec<String> = ["Create Drawing:", "Existing templates", "Custom template", "Options", "Suggested views", "No views"].map(String::from).to_vec();
         if suggested {
             text.push("Suggested views provide only necessary views when MBD data is present.".into());
@@ -607,7 +608,7 @@ impl Render for CreateDrawingDialog {
                 text.push("Show Noshape drawing templates".into());
             }
         }
-        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "modal", "title": "Create Drawing: New drawing name", "fields": [{ "label": null, "kind": "input", "value": name }], "buttons": ["OK", "Cancel"], "text": text }));
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "modal", "title": "Create Drawing: New drawing name", "fields": [{ "label": null, "kind": "input", "value": name }], "buttons": ["OK", "Cancel"], "texts": text }));
         let body = if custom { self.render_custom(cx) } else { self.render_existing(cx) };
         // Modal backdrop with the dialog centered.
         div()

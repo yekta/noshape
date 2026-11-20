@@ -54,6 +54,13 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
   properties / Move to sheet page dumps, View properties visible-only: 1224 = + 456 shown of 1855, 0 ≠, 133
   present-only. Not copied: live's revdel step 10 stale selection box of the deleted table (a live draw glitch).
   Left in b9: revision-table 3 has no table on live's side; bom-switch-to-bom 8 live clicked the Sheets tree.
+  Committed aa1e7842a (rebased 11-20 03:08).
+- DOCS-CRUMB-TOOLTIP (qa 11-20, lead: studios fixes): psui's be41a8c2b gate blocked any element drawn in a released
+  one's bounds; now keyed to the released element's id (vendor gpui-pre window.rs / div.rs / text.rs, NOSHAPE.md);
+  test a_clicked_crumb_turned_title_shows_its_tooltip (fails on the old gate), psui's chrome row green. Committed
+  979edd4d1 + TICKETS c6b34e769. When it lands: tell psui what changed in vendor gpui (lead).
+- b10 on vibe2 :395 (03:09): app + full ops e2e + shots of hcallout-fit, hatch-panel, bom-table, inspection-item,
+  inspection-table-iso-scrolled (live's retake), create-drawing-custom-template, docs-folder-crumb; then land.
 - psui via lead 11-20: version row menu without "Releases": ours already lists none there (qa's run = live's rows).
 
 ## Next, in order
@@ -67,7 +74,11 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
 2. live's retakes landed (e4ff71a8e, 11-20): drw-inspection-table-iso-scrolled now ISO A4 (live-1120-inspection-s2:
    Front's edge selected tan after step 2, 40 preview at the pointer): run ours after the rebase and compare.
    drw-revision-table-delete: live's stale box after Delete is a glitch, not copied.
-3. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.
+3. Custom table › Add's "Select a Part Studio" is a bare list in ours; live (dom drawing-custom-table-select-part-studio)
+   is a document-version picker: Current document | Other documents tabs, the document name with Create version /
+   Version graph, then its Part Studios (the Insert view chooser's look, drawing_chooser.rs). Other documents only if
+   a custom table can use another document's studio (check the op first).
+4. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
 - live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell

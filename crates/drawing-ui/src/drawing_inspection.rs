@@ -363,10 +363,24 @@ impl DrawingEditor {
         let fields = serde_json::json!([{ "label": "Border shape", "kind": "select", "value": shape_label }, { "label": "Border size", "kind": "select", "value": chars_label }]);
         let ed2 = ed.clone();
         let items2 = shape_items.clone();
-        let shapes = {
-            let mark = format!("dropdown:{}", shape_label);
-            Button::new("insp-shape").label(shape_label).map(move |b| crate::ui_script::mark(b, move || mark.clone()))
-        }.ghost().small().w_full().dropdown_caret(true).os_dropdown_menu("insp-shape-dd", true, move |mut m, _, _| {
+        // A select's look (live drw-inspection-item 6): its value at the left, the caret at the right edge.
+        let select = |id: &'static str, label: String| {
+            let mark = format!("dropdown:{label}");
+            crate::ui_script::mark(
+                h_flex()
+                    .id(id)
+                    .w(px(164.))
+                    .h(px(24.))
+                    .pl(px(5.))
+                    .pr(px(4.))
+                    .justify_between()
+                    .cursor_pointer()
+                    .child(div().text_size(px(13.33)).text_color(gpui_kit::rgb(0x333333)).child(label))
+                    .child(crate::ui::glyph("ui-select-caret", 8., gpui_kit::rgb(0x555555))),
+                move || mark.clone(),
+            )
+        };
+        let shapes = select("insp-shape", shape_label).os_dropdown_menu("insp-shape-dd", true, move |mut m, _, _| {
             for (label, v) in &items2 {
                 let (e, v) = (ed2.clone(), *v);
                 m = m.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(v == own_shape).on_click(move |_, _, cx| {
@@ -382,10 +396,7 @@ impl DrawingEditor {
         });
         let ed2 = ed.clone();
         let items2 = chars_items.clone();
-        let widths = {
-            let mark = format!("dropdown:{}", chars_label);
-            Button::new("insp-chars").label(chars_label).map(move |b| crate::ui_script::mark(b, move || mark.clone()))
-        }.ghost().small().w_full().dropdown_caret(true).os_dropdown_menu("insp-chars-dd", true, move |mut m, _, _| {
+        let widths = select("insp-chars", chars_label).os_dropdown_menu("insp-chars-dd", true, move |mut m, _, _| {
             for (label, v) in &items2 {
                 let (e, v) = (ed2.clone(), *v);
                 m = m.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(v == own_chars).on_click(move |_, _, cx| {
@@ -433,7 +444,7 @@ impl DrawingEditor {
             let cell = |w: f32, child: AnyElement| div().w(px(w)).h(px(24.)).flex().items_center().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).child(child);
             let mut opts = h_flex().px(px(1.)).gap(px(3.)).h(px(28.));
             if let Some(h) = height.as_ref() {
-                let field = h_flex().w_full().pr(px(4.)).child(div().flex_1().child(Input::new(h).appearance(false).text_size(px(13.33)).text_color(gpui_kit::rgb(0x333333)).xsmall())).child(crate::ui::glyph("ui-select-caret", 8., gpui_kit::rgb(0x555555)));
+                let field = h_flex().w(px(72.)).pl(px(1.)).pr(px(4.)).child(div().flex_1().child(Input::new(h).appearance(false).text_size(px(13.33)).text_color(gpui_kit::rgb(0x333333)).xsmall())).child(crate::ui::glyph("ui-select-caret", 8., gpui_kit::rgb(0x555555)));
                 opts = opts.child(cell(74., crate::ui_script::wrap(field.into_any_element(), || "dropdown:Text height".into())));
             }
             body = body.child(opts.child(cell(166., shapes.into_any_element())).child(cell(166., widths.into_any_element())));
