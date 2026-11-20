@@ -78,7 +78,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   dx 06:2x: the row (Include hidden instances greyed, checked, as live), export_parts `rigid_subassemblies_single_link`
   (an Assembly's URDF was not in the op at all: now it is): a locked or rigid subassembly's parts one link, one mesh.
   Open: live's file shape with it (link / mesh names, merge), REQUESTS dx 05:44.
-- [ ] P2 **URDF-LIVE-FILE-SHAPE (dx)**: an Assembly's URDF is not live's file. Live 13:06 (behaviours "URDF single link
+- [x] done (dx 11-20: URDF export rewritten as live's file; open: Parallel / Tangent / Width mates are not joints, and with nothing fixed the root is the heaviest fastened / rigid cluster, inferred from live's 4 captures) P2 **URDF-LIVE-FILE-SHAPE (dx)**: an Assembly's URDF is not live's file. Live 13:06 (behaviours "URDF single link
   (11-20)", live/export/urdf-single-link-1120/): the zip is `<asm>/urdf/<asm>.urdf`, `<asm>/launch/<asm>.launch`,
   `<asm>/meshes/<Part_name>.stl` (one per part, Part Studio coordinates); robot named the assembly in lower case; a
   link per part (lower case, the fixed one `root`), inertial blocks (mass, COM, inertia), materials named by RGBA, joints
