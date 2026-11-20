@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-19 23:54)
+# QA handoff (agent qa; current state only, updated 2026-11-20 00:18)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -119,7 +119,12 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    Split toast), Thicken 23:29, Delete face (CLI: Heal/Cap/Leave open/all), drawing Section view, asm linear pattern, Ball limits,
    Transform (type order, XYZ triad 60 px at any zoom) = live; P2 ERROR-CHIP-RED-NO-FIELD (psui). asm d67512a33 both P1s VERIFIED 23:42 (green 2574b5b5). App runs: qa-xvfb110 +
    qa-walk*-app, `xdotool windowfocus` FIRST (else Tab never previews); drawings have no alt+c (letters are shortcuts: n = Note).
-   tabrel.sh: vibe2 slot + 1 retry on SIGTERM (earlyoom 23:01); 4fee queued. Waiters: qa-wait-{dx-brand,studios-hist,skasm-sim}.
+   tabrel.sh: vibe2 slot + 1 retry on SIGTERM (earlyoom 23:01); 4fee queued. Waiters: qa-wait-{dx-brand,studios-hist,skasm-sim,dx-torus}.
+   00:1x (lead 23:55 list): import/export round trips (CLI, x.* scratch) STEP/IGES/x_t exact, 3MF/OBJ meshes, assembly STEP/x_t,
+   flat DXF/DWG = live (live/qa/rt-1119 answers); P1 SKETCH-DXF-EXPORT-POLYLINES (skasm). Restore to Main, switch, Compare bar /
+   dots / slider = live; P1 COMPARE-COMMON-PARTS-MISSING (studios). Config List + configured #n through a feature pattern +
+   suppression = live (S 2 holes, L 5 holes 11371.681). TOOLBAR-TOOLTIP-AFTER-CLICK verified; psui sketch-vertical-key rerun
+   (qa-psui-vk, vibe2 slot queue) pending; STALE-SKETCH-HOVER re-walk when 00389dbd lands. Full suite: 02:00-04:00 only (lead).
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
@@ -159,13 +164,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    box of the face under the pointer) queued; HOLD (lead 12:28: asm pulls / redoes e2c20cb2, which froze off-part): qa-wait-reach stopped;
    start af/wait-reach.sh again only when asm says (it re-runs up / 45 deg on the first green with an asm
    snap/reach commit after 12:20 (live 50-51 / 72 px).
-0z. **Heavy-model feel (lead 09:10)**: live measures c2-loft-guide-curves-driven-pattern (Part Studio, live 125 bodies; ours 124, Sweep 1
-   fails: P1 DRIVEN-PATTERN-SWEEP core) + asm-xdev-subs (ours only exists in the assembly suite's scratch: not prepared). Ours:
-   qa-scratch/heavy (heavy.py: live's moves / offsets / 600x400 poll at 140 ms + NOSHAPE_FRAME_LOG; hvs.sh on :154 1920x1080 with
-   vibe2's release build of 80a64725 at ~/tmp/qa/hv/noshape-rel; run.sh as unit qa-heavy). First run r1-0914 (host load 22, live's
-   Chrome running): orbit first 123 ms, 8 fps; pan 7 fps; zoom / fit / Shift+5 / Shift+7 last frame 793 / 829 / 722 / 724 ms; list
-   scroll 8 fps. The model is long and thin: at fit its surfaces are sub-pixel, so screen polls and the hover point find nothing
-   (same for live, probably). Re-run right after live's numbers land, then compare row by row; != -> psui.
+0z. Heavy-model feel (lead 09:10; c2-loft-guide-curves-driven-pattern r1-0914): full notes in archive "11-20 moved"; re-run when live's numbers land.
 0y. **Dock tab return P0 (lead 09:00)**: fff088e5 didn't fix v0.4.54's regression (09:01 same-run: v0.4.53 settle A / B-again
    137 / 189 ms, release build of 80a64725 829 / 813; speed/tab-80a64725.txt, sent to psui). bin/tabrel.sh <sha> [nobuild]
    (release build on vibe2, tabab vs v0.4.53 on vibex7, lock speed/tabrel.lock); unit qa-tabwatch runs it on the green of every

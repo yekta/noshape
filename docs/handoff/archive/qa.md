@@ -2260,3 +2260,12 @@ selection, measure, section view; then P2 assembly and drawing passes; verify th
    singularities volume + pipe Fillet wording noted in compat/accepted.txt; knifehandle Fillet 2 kernel message -> blend (low).
    qa-psui-lod.sh builds through vibex7's slot (SLOT_MIN_GB=12) since earlyoom killed an LTO build there. qa-session-night is retired
    (night-seq does it). qa-night-seq-1120 is armed for tonight; re-arm with 1121 tomorrow. bin/evwait.sh <units> = a wake-up helper.
+
+## 11-20 moved (from the handoff 11-20 00:18)
+0z. **Heavy-model feel (lead 09:10)**: live measures c2-loft-guide-curves-driven-pattern (Part Studio, live 125 bodies; ours 124, Sweep 1
+   fails: P1 DRIVEN-PATTERN-SWEEP core) + asm-xdev-subs (ours only exists in the assembly suite's scratch: not prepared). Ours:
+   qa-scratch/heavy (heavy.py: live's moves / offsets / 600x400 poll at 140 ms + NOSHAPE_FRAME_LOG; hvs.sh on :154 1920x1080 with
+   vibe2's release build of 80a64725 at ~/tmp/qa/hv/noshape-rel; run.sh as unit qa-heavy). First run r1-0914 (host load 22, live's
+   Chrome running): orbit first 123 ms, 8 fps; pan 7 fps; zoom / fit / Shift+5 / Shift+7 last frame 793 / 829 / 722 / 724 ms; list
+   scroll 8 fps. The model is long and thin: at fit its surfaces are sub-pixel, so screen polls and the hover point find nothing
+   (same for live, probably). Re-run right after live's numbers land, then compare row by row; != -> psui.
