@@ -1371,17 +1371,20 @@ struct DxfCurve {
     length: f64,
 }
 
+/// A point of a curve and that curve's kind.
+type KindAt<'a> = ([f64; 2], &'a str);
+
 fn dxf_curves(path: &Path) -> Option<Vec<DxfCurve>> {
     let text = std::fs::read_to_string(path).ok()?;
     let lines: Vec<&str> = text.lines().map(str::trim).collect();
-    let pairs: Vec<(&str, &str)> = lines.chunks_exact(2).map(|p| (p[0], p[1])).collect();
+    let pairs: Vec<(&str, &str)> = lines.as_chunks::<2>().0.iter().map(|p| (p[0], p[1])).collect();
     let (mut out, mut i, mut entities) = (Vec::new(), 0, false);
     while i < pairs.len() {
         let (code, kind) = pairs[i];
         let end = (i + 1..pairs.len()).find(|j| pairs[*j].0 == "0").unwrap_or(pairs.len());
         let group = &pairs[i + 1..end];
         match (code, kind) {
-            ("0", "SECTION") => entities = group.iter().any(|g| *g == ("2", "ENTITIES")),
+            ("0", "SECTION") => entities = group.contains(&("2", "ENTITIES")),
             ("0", "ENDSEC") => entities = false,
             ("0", kind) if entities => out.extend(dxf_curve(kind, group)),
             _ => {}
@@ -1467,8 +1470,9 @@ fn de_boor(p: usize, t: f64, knots: &[f64], poles: &[[f64; 3]]) -> [f64; 3] {
             let i = j + s - p;
             let span = knots[j + 1 + s - r] - knots[i];
             let a = if span.abs() < 1e-300 { 0.0 } else { (t - knots[i]) / span };
-            for q in 0..3 {
-                d[j][q] = (1.0 - a) * d[j - 1][q] + a * d[j][q];
+            let prev = d[j - 1];
+            for (v, w) in d[j].iter_mut().zip(prev) {
+                *v = (1.0 - a) * w + a * *v;
             }
         }
     }
@@ -1522,7 +1526,7 @@ fn dxf_geometry_differences(live: &[DxfCurve], ours: &[DxfCurve], views: &[(Stri
     for layer in layers {
         for (side, a, b) in [("ours", &ours[..], live), ("live's", live, &ours[..])] {
             let (a, b): (Vec<&DxfCurve>, Vec<&DxfCurve>) = (a.iter().filter(|c| c.layer == layer).collect(), b.iter().filter(|c| c.layer == layer).collect());
-            let mut grid: HashMap<(i64, i64), Vec<([f64; 2], &str)>> = HashMap::new();
+            let mut grid: HashMap<(i64, i64), Vec<KindAt<'_>>> = HashMap::new();
             for c in &b {
                 for p in &c.points {
                     grid.entry(cell(*p)).or_default().push((*p, c.kind));
