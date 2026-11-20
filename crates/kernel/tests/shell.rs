@@ -1743,3 +1743,32 @@ fn a_weld_fillet_part_shells_to_one_solid_without_its_inverted_sliver() {
     let v = vol(&r) * 1e9;
     assert!(r.is_valid() && (v - 183072.3).abs() < 2e-4 * 183072.3, "{v} mm3");
 }
+
+/// The same Shell where its R20 round meets the two 45-degree faces of its groove (concave edges between a cylinder and
+/// planes): the wall there runs to where the offsets themselves meet, not their tangent planes. Live's r15 offsets
+/// (102.952 mm2 the round's, 109.060 and 706.858); no sliver voids or faceted strips (the fillers were 34-face fans, the cavity 141 faces in 7
+/// shells, 30.6 mm3 short of live's 183072.272). At the groove's pointed end the offsets of its side and end walls run on
+/// to the bottom's (live's 71.719 / 143.224 / 143.439 mm2 and the bottom's 4212.547; were capped there by two 5.572 mm2
+/// triangles, 13.3 mm3 short).
+#[test]
+fn a_weld_fillet_parts_round_meets_its_groove_on_the_offsets() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_brep(&dir.join("weld-fillet-part3-input.brep")).unwrap();
+    set_working_scale(1000.0).unwrap();
+    let rm: Vec<Shape> = s.faces().into_iter().filter(|f| (f.area().unwrap() * 1e6 - 45.9619).abs() < 1e-3).collect();
+    assert_eq!(rm.len(), 1);
+    let r = shell_solid(&s, &rm, 0.005, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+    assert!(r.is_valid());
+    assert_eq!((r.count(ShapeType::Solid), r.count(ShapeType::Shell)), (1, 2));
+    let small: Vec<(f64, DVec3)> = r.faces().iter().map(|f| (f.area().unwrap() * 1e6, f.centroid().unwrap() * 1e3)).filter(|x| x.0 <= 1.0).collect();
+    assert!(small.is_empty(), "slivers or strips: {small:?}");
+    let mut r15 = r.faces().into_iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { radius, .. }) if (radius - 0.015).abs() < 1e-9)).map(|f| f.area().unwrap() * 1e6).collect::<Vec<_>>();
+    r15.sort_by(f64::total_cmp);
+    assert!(r15.len() == 3 && r15.iter().zip([102.952, 109.060, 706.858]).all(|(a, b)| (a - b).abs() < 1e-3), "{r15:?}");
+    let areas: Vec<f64> = r.faces().iter().map(|f| f.area().unwrap() * 1e6).collect();
+    for a in [71.719, 143.224, 143.439, 4212.547] {
+        assert!(areas.iter().any(|x| (x - a).abs() < 2e-3), "no {a} mm2 face: {areas:?}");
+    }
+    let v = vol(&r) * 1e9;
+    assert!((v - 183072.272).abs() < 1e-6 * 183072.272, "{v} mm3");
+}

@@ -95,6 +95,7 @@
 #include <GeomLib.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <BRepPrimAPI_MakeCone.hxx>
+#include <BRepPrimAPI_MakeHalfSpace.hxx>
 #include <gp_Lin.hxx>
 #include <ElSLib.hxx>
 #include <BRepOffset_Analyse.hxx>
@@ -9509,6 +9510,78 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   return ok2;
 }
 
+// Face `f`'s surface (a plane or a cylinder) over its parameter box grown by `m` (a cylinder's at most all round),
+// thickened by `d` as its slab: where its offset runs on past its edges.
+TopoDS_Shape extended_slab(const TopoDS_Face& f, double d, double m, SourceMap& sources)
+{
+  const BRepAdaptor_Surface s(f, false);
+  double                    u0, u1, v0, v1;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  TopoDS_Face big;
+  if (s.GetType() == GeomAbs_Plane)
+    big = BRepBuilderAPI_MakeFace(s.Plane(), u0 - m, u1 + m, v0 - m, v1 + m).Face();
+  else if (s.GetType() == GeomAbs_Cylinder)
+  {
+    const double r = s.Cylinder().Radius(), uc = (u0 + u1) / 2, du = (u1 - u0) / 2 + m / r;
+    big = du >= M_PI ? BRepBuilderAPI_MakeFace(s.Cylinder(), u0, u0 + 2 * M_PI, v0 - m, v1 + m).Face()
+                     : BRepBuilderAPI_MakeFace(s.Cylinder(), uc - du, uc + du, v0 - m, v1 + m).Face();
+  }
+  else
+    return TopoDS_Shape();
+  big.Orientation(f.Orientation());
+  return slab(big, d, f, sources);
+}
+
+// `op`'s images of `from`'s faces take their sources.
+void pass_sources(const TopoDS_Shape& from, BRepAlgoAPI_BooleanOperation& op, SourceMap& sources)
+{
+  for (TopExp_Explorer y(from, TopAbs_FACE); y.More(); y.Next())
+    if (const Source* src = sources.Seek(y.Current()))
+    {
+      const Source keep = *src;
+      for (ShapeList::Iterator it(op.Modified(y.Current())); it.More(); it.Next())
+        sources.Bind(it.Value(), keep);
+    }
+}
+
+// What lies no deeper than face `f`'s offset by `d`, near it and past its edges by `m`: its run-on's slab and one as
+// thick outside it.
+TopoDS_Shape under_offset(const TopoDS_Face& f, double d, double m, SourceMap& sources)
+{
+  const TopoDS_Shape in = extended_slab(f, d, m, sources), out = extended_slab(f, -d, m, sources);
+  if (in.IsNull() || out.IsNull())
+    return TopoDS_Shape();
+  BRepAlgoAPI_Fuse fu(in, out);
+  if (!fu.IsDone() || solid_count(fu.Shape()) != 1)
+    return TopoDS_Shape();
+  pass_sources(in, fu, sources);
+  pass_sources(out, fu, sources);
+  return single_solid(fu.Shape());
+}
+
+// Filler `wide` (swept on past where the faces' offsets meet) within the offsets of `faces` run
+// on (the tangent planes' mitre runs off a curved face's offset: weld-fillet part 3's R20 round across its
+// 45-degree faces left wall out and its facets in the cavity); its faces keep their sources. Null where that fails.
+TopoDS_Shape within_offsets(const TopoDS_Shape& wide, const std::vector<TopoDS_Face>& faces, double d, double m, SourceMap& sources)
+{
+  TopoDS_Shape r = wide;
+  for (const TopoDS_Face& f : faces)
+  {
+    if (r.IsNull())
+      return TopoDS_Shape();
+    const TopoDS_Shape x = under_offset(f, d, m, sources);
+    if (x.IsNull())
+      return TopoDS_Shape();
+    BRepAlgoAPI_Common cm(r, x);
+    if (!cm.IsDone() || solid_count(cm.Shape()) != 1)
+      return TopoDS_Shape();
+    pass_sources(r, cm, sources);
+    pass_sources(x, cm, sources);
+    r = single_solid(cm.Shape());
+  }
+  return !r.IsNull() && BRepCheck_Analyzer(r).IsValid() ? r : TopoDS_Shape();
+}
+
 // Parasolid bounds an opening's cavity by the removed face's own plane, extended past its edges: a kept face meeting a
 // removed planar face along a concave edge keeps no wall behind that plane (live shell-hang Shell 5: the pocket
 // behind its 45° opening runs on over the face beside it, up to the top's wall, and a wall's thickness past the
@@ -9728,6 +9801,38 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
         tools.Append(fill);
     }
   }
+  ShapeAncMap vfaces, vedges;
+  TopExp::MapShapesAndAncestors(solid, TopAbs_VERTEX, TopAbs_FACE, vfaces);
+  TopExp::MapShapesAndAncestors(solid, TopAbs_VERTEX, TopAbs_EDGE, vedges);
+  // Whether kept faces `a` and `b` meeting at vertex `vx` open a gap there: along an edge they share, as the fillers
+  // tell it (a large face's centroid says nothing about the edge: weld-fillet part 3's bottom); else b's centroid in
+  // front of a's plane, inward.
+  auto opens = [d, &ef, &vedges](const TopoDS_Face& a, const TopoDS_Face& b, const TopoDS_Vertex& vx) {
+    const gp_Pnt V = BRep_Tool::Pnt(vx);
+    if (vedges.Contains(vx))
+      for (ShapeList::Iterator it(vedges.FindFromKey(vx)); it.More(); it.Next())
+      {
+        const TopoDS_Edge& e = TopoDS::Edge(it.Value());
+        if (BRep_Tool::Degenerated(e) || !ef.Contains(e) || ef.FindFromKey(e).Extent() != 2)
+          continue;
+        const TopoDS_Shape &g1 = ef.FindFromKey(e).First(), &g2 = ef.FindFromKey(e).Last();
+        if (!((g1.IsSame(a) && g2.IsSame(b)) || (g1.IsSame(b) && g2.IsSame(a))))
+          continue;
+        BRepAdaptor_Curve c(e);
+        gp_Pnt            P;
+        gp_Vec            T;
+        c.D1(BRep_Tool::Parameter(vx, e), P, T);
+        if (T.Magnitude() < 1e-12)
+          break;
+        T.Normalize();
+        const gp_Vec u = gp_Vec(normal_at(a, V)).Crossed(T * edge_sense(e, a));
+        return u.Dot(gp_Vec(normal_at(b, V))) * (d < 0 ? 1.0 : -1.0) >= 1e-3;
+      }
+    GProp_GProps g;
+    BRepGProp::SurfaceProperties(b, g);
+    const double behind = gp_Vec(V, g.CentreOfMass()).Dot(gp_Vec(normal_at(a, V)));
+    return d > 0 ? behind < -1e-9 : behind > 1e-9;
+  };
   for (int i = 1; i <= ef.Extent(); ++i)
   {
     const TopoDS_Edge& e = TopoDS::Edge(ef.FindKey(i));
@@ -9799,8 +9904,102 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     catch (const Standard_Failure&)
     {
     }
+    const GeomAbs_SurfaceType k1 = BRepAdaptor_Surface(f1).GetType(), k2 = BRepAdaptor_Surface(f2).GetType();
+    const auto                flat_or_round = [](GeomAbs_SurfaceType k) { return k == GeomAbs_Plane || k == GeomAbs_Cylinder; };
+    if (!fill.IsNull() && !r1 && !r2 && (k1 != GeomAbs_Plane || k2 != GeomAbs_Plane) && flat_or_round(k1) && flat_or_round(k2) &&
+        !std::getenv("NOSHAPE_SHELL_TANGENT_MITRE"))
+    {
+      const Section base = section;
+      const Section wide = [&base](double prm) -> std::vector<gp_Pnt> {
+        std::vector<gp_Pnt> q = base(prm);
+        if (q.size() != 4)
+          return {};
+        const gp_Pnt E = q[0];
+        const gp_Vec a1(E, q[1]), a2(E, q[3]), am(E, q[2]);
+        const double l1 = a1.Magnitude(), l2 = a2.Magnitude();
+        if (l1 < 1e-12 || l2 < 1e-12)
+          return {};
+        // Each side turned away from the other by 0.05 rad, all 2.5 times as long.
+        const gp_Vec w1 = a1 / l1, w2 = a2 / l2;
+        gp_Vec       o1 = w1 - w2 * w1.Dot(w2), o2 = w2 - w1 * w1.Dot(w2);
+        if (o1.Magnitude() < 1e-9 || o2.Magnitude() < 1e-9)
+          return {};
+        o1.Normalize();
+        o2.Normalize();
+        // (From behind the edge, in the void the solid's common takes off: over the slabs' ends along it too.)
+        gp_Vec back = w1 + w2;
+        if (back.Magnitude() < 1e-9)
+          return {};
+        back.Normalize();
+        return {E.Translated(back * (-0.25 * std::min(l1, l2))), E.Translated((w1 + o1 * 0.05) * (2.5 * l1)), E.Translated(am * 2.5), E.Translated((w2 + o2 * 0.05) * (2.5 * l2))};
+      };
+      TopoDS_Shape exact;
+      try
+      {
+        exact = within_offsets(sweep_section(e, wide, owner, sources), {f1, f2}, d, 8 * std::abs(d), sources);
+      }
+      catch (const Standard_Failure&)
+      {
+      }
+      if (std::getenv("NOSHAPE_SHELL_DEBUG"))
+        std::fprintf(stderr, "slabs: concave filler on the offsets: %s (%.6g -> %.6g)\n", exact.IsNull() ? "failed" : "ok", volume_of(fill), exact.IsNull() ? 0.0 : volume_of(exact));
+      if (!exact.IsNull())
+        fill = exact;
+    }
     if (!fill.IsNull())
       tools.Append(fill);
+    // A concave edge between planes ending where the other faces there, planes too, meet both of its own along convex
+    // edges (a groove's pointed end at the part's bottom, weld-fillet part 3): no corner fills on past its end, where
+    // the two offsets run on to meet that face's own; the filler swept on past it, on that face's side of its plane.
+    if (fill.IsNull() || r1 || r2 || d > 0 || k1 != GeomAbs_Plane || k2 != GeomAbs_Plane || std::getenv("NOSHAPE_SHELL_NO_FILLER_RUN_ON"))
+      continue;
+    for (const bool at_end : {false, true})
+    {
+      const TopoDS_Vertex vx = at_end ? TopExp::LastVertex(e, true) : TopExp::FirstVertex(e, true);
+      const int           vi = vx.IsNull() ? 0 : vfaces.FindIndex(vx);
+      if (vi == 0)
+        continue;
+      ShapeIMap others;
+      bool      convex = true;
+      for (ShapeList::Iterator it(vfaces(vi)); it.More() && convex; it.Next())
+      {
+        const TopoDS_Face g = TopoDS::Face(it.Value());
+        if (g.IsSame(f1) || g.IsSame(f2) || others.Contains(g))
+          continue;
+        others.Add(g);
+        convex = !rm.Contains(g) && BRepAdaptor_Surface(g).GetType() == GeomAbs_Plane && !opens(f1, g, vx) && !opens(f2, g, vx);
+      }
+      double                        a0, a1;
+      const occ::handle<Geom_Curve> gc = BRep_Tool::Curve(e, a0, a1);
+      if (others.Extent() != 1 || !convex || gc.IsNull())
+        continue;
+      const double l    = 4 * std::abs(d);
+      const bool   last = gc->Value(a1).Distance(BRep_Tool::Pnt(vx)) < gc->Value(a0).Distance(BRep_Tool::Pnt(vx));
+      TopoDS_Shape run;
+      try
+      {
+        const TopoDS_Shape past = sweep_section(BRepBuilderAPI_MakeEdge(gc, last ? a1 : a0 - l, last ? a1 + l : a0).Edge(), section, owner, sources);
+        // (Not the solid's trim alone: it may go on past that face, 82ac's pockets ending on a step.)
+        const gp_Pnt       P = BRep_Tool::Pnt(vx);
+        const gp_Vec       n(normal_at(TopoDS::Face(others(1)), P));
+        if (!past.IsNull())
+        {
+          BRepAlgoAPI_Common cm(past, BRepPrimAPI_MakeHalfSpace(BRepBuilderAPI_MakeFace(gp_Pln(P, gp_Dir(n))).Face(), P.Translated(-n * l)).Solid());
+          if (cm.IsDone() && solid_count(cm.Shape()) == 1)
+          {
+            pass_sources(past, cm, sources);
+            run = single_solid(cm.Shape());
+          }
+        }
+      }
+      catch (const Standard_Failure&)
+      {
+      }
+      if (std::getenv("NOSHAPE_SHELL_DEBUG"))
+        std::fprintf(stderr, "slabs: a concave filler run on past its end: %s\n", run.IsNull() ? "none" : "ok");
+      if (!run.IsNull())
+        tools.Append(run);
+    }
   }
   // Corners where every edge between the kept faces opens a gap (box
   // corners for an outward wall, pocket corners inward): fill the vertex's
@@ -9866,9 +10065,26 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     // Half-spaces (p - o).m <= 0: the offset planes, and the cone's sides
     // (planes through V spanned by the normals of faces sharing an edge).
     const double        sg = d > 0 ? 1.0 : -1.0;
-    std::vector<std::pair<gp_Pnt, gp_Vec>> hs;
-    for (const gp_Vec& m : n)
-      hs.push_back({V.Translated(m * d), m * sg});
+    // (A cylinder's offset by its own surface, not its tangent plane: the corner reaching past it, within it after;
+    // weld-fillet part 3's round's corners at its groove's top.)
+    std::vector<TopoDS_Face> curved;
+    bool                     flat_or_round = true;
+    for (const TopoDS_Face& f : fs)
+    {
+      const GeomAbs_SurfaceType k = BRepAdaptor_Surface(f).GetType();
+      flat_or_round = flat_or_round && (k == GeomAbs_Plane || k == GeomAbs_Cylinder);
+      if (k == GeomAbs_Cylinder)
+        curved.push_back(f);
+    }
+    if (!flat_or_round || std::getenv("NOSHAPE_SHELL_TANGENT_MITRE"))
+      curved.clear();
+    auto is_curved = [&](const TopoDS_Face& f) { return std::any_of(curved.begin(), curved.end(), [&](const TopoDS_Face& c) { return c.IsSame(f); }); };
+    std::vector<std::pair<gp_Pnt, gp_Vec>> hs, wide;
+    for (size_t k = 0; k < n.size(); ++k)
+    {
+      hs.push_back({V.Translated(n[k] * d), n[k] * sg});
+      wide.push_back({V.Translated(n[k] * (is_curved(fs[k]) ? 2.5 * d : d)), n[k] * sg});
+    }
     for (auto [a, b] : pairs)
     {
       gp_Vec m = n[a].Crossed(n[b]);
@@ -9880,6 +10096,7 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
       if (m.Dot(mean) * sg > 0)
         m.Reverse();
       hs.push_back({V, m});
+      wide.push_back({V, m});
     }
     TopoDS_Shape poly;
     try
@@ -9898,6 +10115,33 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
       for (size_t k = 0; k < n.size(); ++k)
         if (std::abs(gp_Vec(V, g.CentreOfMass()).Dot(n[k]) - d) < 1e-7 * (1 + std::abs(d)))
           sources.Bind(e.Current(), Source{fs[k], (uint8_t)REL_GENERATED});
+    }
+    if (!curved.empty())
+    {
+      TopoDS_Shape exact;
+      try
+      {
+        const TopoDS_Shape reach = convex_polyhedron(wide, std::abs(d));
+        if (!reach.IsNull())
+        {
+          for (TopExp_Explorer e(reach, TopAbs_FACE); e.More(); e.Next())
+          {
+            GProp_GProps g;
+            BRepGProp::SurfaceProperties(e.Current(), g);
+            for (size_t k = 0; k < n.size(); ++k)
+              if (std::abs(gp_Vec(V, g.CentreOfMass()).Dot(n[k]) - d) < 1e-7 * (1 + std::abs(d)))
+                sources.Bind(e.Current(), Source{fs[k], (uint8_t)REL_GENERATED});
+          }
+          exact = within_offsets(reach, curved, d, 8 * std::abs(d), sources);
+        }
+      }
+      catch (const Standard_Failure&)
+      {
+      }
+      if (std::getenv("NOSHAPE_SHELL_DEBUG"))
+        std::fprintf(stderr, "slabs: a corner on the offsets: %s\n", exact.IsNull() ? "failed" : "ok");
+      if (!exact.IsNull())
+        poly = exact;
     }
     tools.Append(poly);
   }
