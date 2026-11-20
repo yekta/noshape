@@ -1256,7 +1256,7 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         {
             let start_normal = match &start {
                 k::LoftEnd::Free => Some(None),
-                k::LoftEnd::Normal(m) if (m - 1.0).abs() < 1e-9 => normal(from).map(Some),
+                k::LoftEnd::AlongDirection(m, n) if ev.is("startCondition", "NORMAL_TO_PROFILE") && (m - 1.0).abs() < 1e-9 => Some(Some(n)),
                 _ => None,
             };
             let mut each = Vec::new();
@@ -1270,7 +1270,7 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
             {
                 let apex = to.shape.vertex_point()?;
                 let (wires, conditions): (Vec<Shape>, Vec<bool>) = each.into_iter().unzip();
-                let shape = k::loft_to_point(&from.shape, apex, &wires, start_normal, &conditions).map_err(guided_error)?;
+                let shape = k::loft_to_point(&from.shape, apex, &wires, start_normal.copied(), &conditions).map_err(guided_error)?;
                 let names = name_new(ev, &shape);
                 return super::bshared::surface_result(ev, NamedShape::new(shape, names));
             }

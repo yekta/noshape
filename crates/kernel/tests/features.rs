@@ -226,6 +226,14 @@ fn a_surface_loft_to_a_point_between_guides_is_live_s_coons_face() {
         assert!(close(area, live, tol), "{normal:?} {conditions:?}: {area} mm², live {live}");
         assert!(faces[0].project_point(apex).unwrap().distance < 1e-7);
     }
+    // Thickened 5 mm, alone or joined with its mirror (the document's Thicken failure): it fails, as live's ("Failed to
+    // thicken all selections."), pinched to the point with its curvature growing past any thickness toward it.
+    let r = loft_to_point(&profile, apex, &guides, Some(DVec3::X), &[true, true]).unwrap();
+    let m = transform(&r, &Transform::Mirror(Plane::new(DVec3::ZERO, DVec3::Y, DVec3::X)), true).unwrap().shape;
+    let joined = sew(&[r.clone(), m], 1e-6, false).unwrap().shape;
+    for s in [&r, &joined] {
+        assert!(thicken(s, 0.005, 0.0).is_err());
+    }
 }
 
 /// A surface loft through three open profiles along two guides (c2-surf-workshop-pipe's Loft): one face through every

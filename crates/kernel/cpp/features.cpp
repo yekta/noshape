@@ -5261,45 +5261,18 @@ static TopoDS_Shape orient_solids_outward(const TopoDS_Shape& s)
   return parts.size() == 1 ? parts[0] : compound_of(parts);
 }
 
-// A free-form face pinched to a point where its normal has no one limit (a loft run to a point between guides
-// leaving it at an angle: c2-surf-workshop-singularities' "Loft with bad singularity"): its offset is undefined there
-// (OCCT's osculating surface crashed on it) and Parasolid fails the thicken.
-static bool pinched_without_normal(const TopoDS_Face& f)
+// A free-form face pinched to a point (a degenerated edge): Parasolid fails its thicken, the normal there with no one
+// limit (a loft run to a point between guides leaving it at an angle) or its curvature growing past any thickness
+// toward it (c2-surf-workshop-singularities' "Loft with bad singularity": 1.7 /mm 0.005 mm from the point, "Failed to
+// thicken all selections." at 5 mm). Its offset is undefined there: OCCT's osculating surface crashed on both.
+static bool pinched_free_form(const TopoDS_Face& f)
 {
   const GeomAbs_SurfaceType t = BRepAdaptor_Surface(f, false).GetType();
   if (t != GeomAbs_BSplineSurface && t != GeomAbs_BezierSurface && t != GeomAbs_OtherSurface)
     return false;
-  double u0, u1, v0, v1;
-  BRepTools::UVBounds(f, u0, u1, v0, v1);
-  const gp_Pnt2d                  mid(0.5 * (u0 + u1), 0.5 * (v0 + v1));
-  const occ::handle<Geom_Surface> g = BRep_Tool::Surface(f);
   for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
-  {
-    const TopoDS_Edge& e = TopoDS::Edge(x.Current());
-    if (!BRep_Tool::Degenerated(e))
-      continue;
-    double                          a, b;
-    const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, f, a, b);
-    if (pc.IsNull())
-      continue;
-    // The normals a hair inside the face along the pinched edge.
-    std::vector<gp_Dir> ns;
-    for (int k = 0; k <= 16; ++k)
-    {
-      const gp_Pnt2d q = pc->Value(a + (b - a) * k / 16);
-      const gp_Pnt2d w(q.X() + 1e-3 * (mid.X() - q.X()), q.Y() + 1e-3 * (mid.Y() - q.Y()));
-      gp_Pnt         p;
-      gp_Vec         du, dv;
-      g->D1(w.X(), w.Y(), p, du, dv);
-      const gp_Vec n = du.Crossed(dv);
-      if (n.Magnitude() > 1e-300)
-        ns.emplace_back(n);
-    }
-    for (size_t i = 0; i < ns.size(); ++i)
-      for (size_t j = i + 1; j < ns.size(); ++j)
-        if (ns[i].Angle(ns[j]) > 0.5)
-          return true;
-  }
+    if (BRep_Tool::Degenerated(TopoDS::Edge(x.Current())))
+      return true;
   return false;
 }
 
@@ -5339,7 +5312,7 @@ static bool has_sharp_inner_edge(const TopoDS_Shape& sheet)
 OpOut op_thicken(const OcShape& s, double t1, double t2)
 {
   for (TopExp_Explorer x(s.shape, TopAbs_FACE); x.More(); x.Next())
-    if (pinched_without_normal(TopoDS::Face(x.Current())))
+    if (pinched_free_form(TopoDS::Face(x.Current())))
       fail_op("thicken: a face pinched to a point has no normal there");
   require_non_null(s.shape, "shape");
   const double total = t1 + t2;
