@@ -598,12 +598,14 @@ impl Render for CreateDrawingDialog {
             if ct.border {
                 text.extend(["Horizontal zones", "Vertical zones", "Start zones", "Bottom right", "Top left"].map(String::from));
             }
-            text.push(TitleLanguage::ALL.get(ct.language).map(|l| l.name().to_string()).unwrap_or_default());
-            text.extend(custom_sizes(ct.standard).get(ct.size).map(|(_, s)| s.list_name().to_string()));
+            // Every option of the Language and Size lists, as live's dump holds them (dom dialog-create-drawing).
+            text.extend(TitleLanguage::ALL.iter().map(|l| l.name().to_string()));
+            text.extend(custom_sizes(ct.standard).iter().map(|(_, s)| s.list_name().to_string()));
             text.extend(CUSTOM_UNITS.iter().find(|(u, _)| *u == ct.units).map(|(_, n)| n.to_string()));
         } else {
             text.extend(SOURCES.iter().map(|(l, _)| l.to_string()));
-            text.extend(["All", "ANSI", "ISO", "JIS", "Template", "Document"].map(String::from));
+            // (Owner: the third header, drawn as "…" in the narrow column.)
+            text.extend(["All", "ANSI", "ISO", "JIS", "Template", "Document", "Owner"].map(String::from));
             if self.source_filter == RECENT {
                 text.push("Show Noshape drawing templates".into());
             }
