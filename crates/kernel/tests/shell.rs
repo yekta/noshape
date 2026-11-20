@@ -906,6 +906,18 @@ fn a_shell_whose_walls_fill_the_part_fails_as_live() {
     assert!(r.is_err(), "built {} mm³", r.map(|r| vol(&r.shape) * 1e9).unwrap_or(0.0));
 }
 
+/// Fuzz part 8ec1 (metres), 25 mm walls shelled inward with one face removed: the walls rebuild the part, 0.011 mm³
+/// (1.5e-7) under its volume once the rim's ellipse pieces are joined. Live fails (live/bool/q-8ec111cc: SHELL_FAILED).
+#[test]
+fn walls_that_rebuild_the_part_within_its_rounding_fail_as_live() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_brep(&dir.join("8ec1-input.brep")).unwrap();
+    let rm: Vec<Shape> = s.faces().into_iter().filter(|f| (f.centroid().unwrap() * 1e3 - DVec3::new(20.0, -20.329, 4.131)).length() < 1e-2).collect();
+    assert_eq!(rm.len(), 1);
+    let r = shell_solid(&s, &rm, 25e-3, ShellSide::Inside, ShellMethod::Auto);
+    assert!(r.is_err(), "built {} mm³", r.map(|r| vol(&r.shape) * 1e9).unwrap_or(0.0));
+}
+
 /// A user's twisted hexagon vase (11-02): a loft through five regular hexagons on parallel planes, circumradii
 /// 35 / 45 / 40 / 28 / 35 mm at z 0 / 30 / 60 / 90 / 120, each turned 15° more; six B-spline sides with sharp edges
 /// between them, the two hexagon caps.
