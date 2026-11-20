@@ -407,7 +407,7 @@ fn rows() -> Vec<Row> {
             }
             expect(counts, vec![1, 0, 1], "the edge in the field after each click")
         } },
-        Row { id: "fields / a row hovered lights its entity", live: "the selected orange outline turns light yellow-green (#f2ff80) while the row is hovered (live 121–181 ms after the move; ours in the next frame, no time passing); clears when the pointer leaves", gap: false, check: |cx| {
+        Row { id: "fields / a row hovered lights its entity", live: "its tooltip names the entity (\"Edge of Extrude 1\"); the selected orange outline turns light yellow-green (#f2ff80) while the row is hovered (live 121–181 ms after the move; ours in the next frame, no time passing); clears when the pointer leaves", gap: false, check: |cx| {
             let (window, view, dialog, _) = fillet_on_an_edge(cx, "dlg-row-hover")?;
             let edge = cx.update(|cx| dialog.read(cx).feature.params.query("entities").first().cloned()).ok_or("no edge")?;
             // The preview consumes the edge: it is drawn by the overlay of consumed picks, else by its pick's flag.
@@ -419,24 +419,37 @@ fn rows() -> Vec<Row> {
             let path = cx.update(|cx| dialog.read(cx).active_query.clone()).ok_or("no active field")?;
             let row = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(Box::leak(format!("chip-{path}-0").into_boxed_str())).ok_or("no row")?;
             let before = lit(cx);
+            crate::ui_script::clear_tooltip();
             let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
             vcx.simulate_event(gpui_kit::MouseMoveEvent { position: row.center(), pressed_button: None, modifiers: Modifiers::default() });
             draw(cx, window);
             let on = lit(cx);
+            for _ in 0..50 {
+                cx.executor().advance_clock(std::time::Duration::from_millis(10));
+                draw(cx, window);
+            }
+            let tip = crate::ui_script::shown_tooltip().unwrap_or_default();
+            if !tip.starts_with("Edge of Extrude 1") {
+                return Err(format!("the row's tooltip {tip:?}"));
+            }
             let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
             vcx.simulate_event(gpui_kit::MouseMoveEvent { position: row.center() + gpui_kit::point(px(0.), px(200.)), pressed_button: None, modifiers: Modifiers::default() });
             draw(cx, window);
             expect((before, on, lit(cx)), (false, true, false), "lit before, on the row, after leaving")
         } },
-        Row { id: "fields / a row click leaves the selection as is", live: "clicking a row (not its x) keeps the field's entities", gap: false, check: |cx| {
-            let (window, _view, dialog, _) = fillet_on_an_edge(cx, "dlg-row-click")?;
+        Row { id: "fields / a row click leaves the selection as is", live: "clicking a row (not its x) keeps the field's entities; Delete and Backspace then do nothing (live2 ours-1118)", gap: false, check: |cx| {
+            let (window, view, dialog, _) = fillet_on_an_edge(cx, "dlg-row-click")?;
             let path = cx.update(|cx| dialog.read(cx).active_query.clone()).ok_or("no active field")?;
             let row = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(Box::leak(format!("chip-{path}-0").into_boxed_str())).ok_or("no row")?;
             let at = row.origin + gpui_kit::point(px(20.), row.size.height / 2.);
             let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
             vcx.simulate_click(at, Modifiers::default());
             draw(cx, window);
-            expect(cx.update(|cx| dialog.read(cx).feature.params.query("entities").len()), 1, "entities after the click")
+            let clicked = cx.update(|cx| dialog.read(cx).feature.params.query("entities").len());
+            keys(cx, window, &["delete", "backspace"]);
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            let keyed = cx.update(|cx| (dialog.read(cx).feature.params.query("entities").len(), view.read(cx).edit.is_some()));
+            expect((clicked, keyed), (1, (1, true)), "(entities after the click, (entities, dialog open) after Delete and Backspace)")
         } },
         Row { id: "fields / a chip's x: its tooltip, a click removes the chip", live: "the x hovered: tooltip \"Delete Edge of Extrude 1\"; a click removes that chip (live2 ours-1118, qa CHIP-X-TOOLTIP)", gap: false, check: |cx| {
             let (window, _view, dialog, _) = fillet_on_an_edge(cx, "dlg-chip-x")?;
@@ -1440,4 +1453,258 @@ fn a_routing_curves_multiple_ball_snaps_to_a_faces_inference_point(cx: &mut Test
     let values: Vec<f64> = d.iter().map(|t| noshape_units::evaluate_as(t, noshape_units::Dim::LENGTH, &units, &noshape_units::EmptyScope).map_or(f64::NAN, |q| q.value)).collect();
     assert!((0..3).all(|i| (values[i] - centre[i]).abs() < 1e-12), "multiDx/Dy/Dz: the triad's place from the origin: {d:?}, centre {centre}");
     assert!(cx.update(|cx| view.read(cx).ui.triad_box.is_none() && !view.read(cx).viewport.read(cx).tool_hover && view.read(cx).inference_choice().is_none()), "no value box; picking and the points end with the drag");
+}
+
+/// Live2 ours-1118 pattern (p1audit skip-02..04): with Skip instances on, "Instances to skip" takes the instances' rings:
+/// the one under the pointer lights, a click skips its instance (the item (1, 0), the preview one part fewer) and a
+/// second click on it keeps it again; the seed's dot takes nothing.
+#[gpui::test]
+fn a_skip_ring_lights_and_a_click_skips_its_instance_then_keeps_it(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm", "operationType": "NEW" } },
+        { "type": "linearPattern", "name": "Linear pattern 1", "params": { "patternType": "PART", "entities": ["part 0"], "directionOne": ["edge through [20, 0, 0]"],
+            "distance": "60 mm", "instanceCount": "3", "operationType": "NEW", "skipInstances": true } }
+    ] });
+    let (window, view) = part_studio_from(cx, "skip-rings", Some(start));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.bodies.len() == 3);
+    let id = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Linear pattern 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.edit_feature(id, w, cx);
+        v.zoom_fit(cx);
+    }))
+    .unwrap();
+    // (Drawn first: the dialog opens on its first query, Entities.) "Instances to skip" clicked: its field takes the rings.
+    draw(cx, window);
+    cx.update(|cx| view.read(cx).edit.as_ref().expect("the pattern's dialog").dialog.update(cx, |d, _| d.user_focus_query("skippedInstances")));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).toggle_points(cx).is_some_and(|p| p.len() == 3));
+    draw(cx, window);
+    let shown = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.edit.as_ref().expect("the pattern's dialog").dialog.read(cx);
+        (v.toggle_points(cx).map(<[_]>::len), d.active_query.clone(), v.display.feature_state(d.feature.id).map(|s| s.toggle_points.len()))
+    });
+    assert_eq!(shown.0, Some(3), "the rings once drawn, Instances to skip active: (rings, active field, state's points) {shown:?}");
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the pattern's dialog").dialog.clone());
+    let at = |cx: &mut TestAppContext, index: (i64, i64)| cx.update(|cx| {
+        let v = view.read(cx);
+        let t = v.toggle_points(cx).unwrap().iter().find(|t| t.index == index).cloned().expect("the instance's point");
+        (v.viewport.read(cx).project(glam::DVec3::from_array(t.pos)).expect("on screen"), t.seed)
+    });
+    let send = |cx: &mut TestAppContext, ev: ViewportEvent| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ev, w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+    };
+    let skipped = |cx: &mut TestAppContext| cx.update(|cx| {
+        let d = dialog.read(cx);
+        d.feature.params.array("skippedInstances").iter().map(|it| (it.expr("index1").map(|e| e.text.clone()), it.expr("index2").map(|e| e.text.clone()))).collect::<Vec<_>>()
+    });
+    let parts = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display.bodies.len());
+    let ((seed, is_seed), (ring, _)) = (at(cx, (0, 0)), at(cx, (1, 0)));
+    assert!(is_seed, "the seed's point");
+    // Over the seed's dot nothing lights; over a ring (3 px off its centre) it does.
+    send(cx, ViewportEvent::PointerMove { position: seed, modifiers: Modifiers::default() });
+    assert_eq!(cx.update(|cx| view.read(cx).ui.toggle_hover), None, "the seed's dot lit");
+    send(cx, ViewportEvent::PointerMove { position: ring + glam::DVec2::new(3., 0.), modifiers: Modifiers::default() });
+    assert_eq!(cx.update(|cx| view.read(cx).ui.toggle_hover), Some((1, 0)), "the ring under the pointer lights");
+    send(cx, ViewportEvent::Click { pick: None, position: ring, modifiers: Modifiers::default() });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert_eq!((skipped(cx), parts(cx)), (vec![(Some("1".to_string()), Some("0".to_string()))], 2), "(skipped, parts) after the click");
+    let rings = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.edit.as_ref().expect("the dialog").dialog.read(cx);
+        (d.toggle_points_field(), v.display.feature_state(d.feature.id).map(|s| s.toggle_points.iter().filter(|t| t.selected).count()))
+    });
+    assert_eq!(rings, (Some("skippedInstances"), Some(1)), "(the field taking rings, skipped rings) after the click");
+    let (ring, _) = at(cx, (1, 0));
+    send(cx, ViewportEvent::Click { pick: None, position: ring, modifiers: Modifiers::default() });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert_eq!((skipped(cx), parts(cx)), (vec![], 3), "(skipped, parts) after the second click");
+    send(cx, ViewportEvent::Click { pick: None, position: seed, modifiers: Modifiers::default() });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert_eq!(skipped(cx), vec![], "a click on the seed's dot skips nothing");
+}
+
+/// Live2 pattern-hole-1118 (P0): Mirror of the part across one of its side faces: the plane box reads "Face of
+/// Extrude 1", the preview comes, and the mirror touching its seed turns the operation to Add with the part as the merge
+/// scope (one part after ✓).
+#[gpui::test]
+fn a_mirror_across_a_side_face_adds_into_its_seed(cx: &mut TestAppContext) {
+    let (window, view) = block(cx, "dlg-mirror-side");
+    let (part, side) = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+        let at_x = |i: usize| {
+            let Some(&(first, count)) = b.mesh.face_ranges.get(i) else { return false };
+            b.mesh.indices[first as usize..(first + count) as usize].iter().all(|&k| (b.mesh.positions[k as usize][0] - 0.04).abs() < 1e-6)
+        };
+        let side = b.face_refs.iter().enumerate().find(|(i, _)| at_x(*i)).map(|(_, r)| r.clone()).expect("the face at x = 40 mm");
+        (Reference::Body(b.id.clone()), side)
+    });
+    view.update(cx, |v, _| v.selection = vec![part.clone()]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("mirror", w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Mirror dialog").dialog.clone());
+    assert_eq!(cx.update(|cx| dialog.read(cx).feature.params.query("entities").to_vec()), vec![part.clone()], "the selected part is the seed");
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.user_focus_query("mirrorPlane");
+        d.add_pick(side.clone(), cx);
+    }));
+    let label = cx.update(|cx| view.read(cx).labeler(cx)(&side));
+    assert_eq!(label, "Face of Extrude 1", "the plane box's chip");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && dialog.read(cx).feature.params.enum_("operationType") == "ADD");
+    let state = cx.update(|cx| {
+        let p = &dialog.read(cx).feature.params;
+        (p.enum_("operationType").to_string(), p.bool("defaultScope"), p.query("booleanScope").to_vec())
+    });
+    assert_eq!(state, ("ADD".to_string(), false, vec![part]), "(operation, Merge with all, merge scope) once previewed");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).edit.is_none());
+    assert_eq!(cx.update(|cx| view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count()), 1, "one part after ✓");
+}
+
+/// Live2 pattern-hole-1118 (P0): a new Linear pattern of the part shows no instance until its Direction is picked; the
+/// edge picked, the preview has the instance with nothing else done.
+#[gpui::test]
+fn a_linear_patterns_instance_previews_once_its_direction_is_picked(cx: &mut TestAppContext) {
+    let (window, view) = block(cx, "dlg-lp-direction");
+    let (part, edge) = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+        let along_x = b.edge_refs.iter().zip(&b.mesh.edges).find(|(_, pl)| matches!((pl.first(), pl.last()), (Some(a), Some(z)) if (a[0] - z[0]).abs() > 1e-3 && (a[1] - z[1]).abs() < 1e-6 && (a[2] - z[2]).abs() < 1e-6));
+        (Reference::Body(b.id.clone()), along_x.expect("an edge along x").0.clone())
+    });
+    // The model's extent in mm: 40 for the block, 65 with the instance 25 mm along x.
+    let span = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display.bounds().map(|(lo, hi)| ((hi - lo).max_element() * 1000.).round()));
+    view.update(cx, |v, _| v.selection = vec![part.clone()]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("linearPattern", w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Linear pattern dialog").dialog.clone());
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert_eq!((cx.update(|cx| dialog.read(cx).feature.params.query("entities").to_vec()), span(cx)), (vec![part], Some(40.)), "(the seed, the extent) with no direction");
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.user_focus_query("directionOne");
+        d.add_pick(edge, cx);
+    }));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    assert_eq!(span(cx), Some(65.), "the instance previewed 25 mm along the edge after the Direction pick");
+}
+
+/// Live2 pattern-hole-1118 (P0): the Hole's style tabs: Counterbore adds its diameter and depth rows (10 mm, 5 mm),
+/// Countersink its diameter and angle (10 mm, 90 deg); the Metric tab makes the diameter 5 mm.
+#[gpui::test]
+fn the_hole_tabs_bring_their_rows_and_values(cx: &mut TestAppContext) {
+    use noshape_model::params::ParamValue;
+    let (window, view) = block(cx, "dlg-hole-tabs");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("hole", w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Hole dialog").dialog.clone());
+    // (The Hole's value rows are drawn with an icon, no label: live's recorder reads them as "".) The value rows' texts
+    // in order.
+    let values = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| {
+            let state = dialog.read(cx).ui_state(w, cx);
+            state["fields"].as_array().into_iter().flatten().filter(|f| f["kind"] == "number").filter_map(|f| f["text"].as_str().map(str::to_string)).collect::<Vec<_>>()
+        })
+        .unwrap()
+    };
+    let tab = |cx: &mut TestAppContext, id: &'static str, value: &'static str| {
+        cx.update(|cx| dialog.update(cx, |d, cx| d.set_value(id, ParamValue::Enum(value.into()), cx)));
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        draw(cx, window);
+    };
+    let has = |v: &[String], pair: [&str; 2]| v.windows(2).any(|w| w[0] == pair[0] && w[1] == pair[1]);
+    let simple = values(cx);
+    tab(cx, "styleV2", "C_BORE");
+    let cbore = values(cx);
+    assert!(cbore.len() == simple.len() + 2 && has(&cbore, ["10 mm", "5 mm"]), "Counterbore adds its diameter 10 mm and depth 5 mm rows: {simple:?} -> {cbore:?}");
+    tab(cx, "styleV2", "C_SINK");
+    let csink = values(cx);
+    assert!(csink.len() == simple.len() + 2 && has(&csink, ["10 mm", "90 deg"]), "Countersink adds its diameter 10 mm and angle 90 deg rows: {simple:?} -> {csink:?}");
+    tab(cx, "styleV2", "SIMPLE");
+    assert_eq!(values(cx), simple, "Simple again: its rows as before");
+    tab(cx, "unitsSystem", "METRIC");
+    let metric = values(cx);
+    assert_eq!(metric.first().map(String::as_str), Some("5 mm"), "Metric's diameter: {metric:?}");
+}
+
+/// Live2 pattern-hole-1118 (P0): a Hole's depth typed changes nothing (no regeneration, the preview as it was) until
+/// Enter; Enter takes it and the preview regenerates, the dialog still open.
+#[gpui::test]
+fn a_typed_hole_depth_waits_for_enter(cx: &mut TestAppContext) {
+    let (window, view) = block(cx, "dlg-hole-depth");
+    let top = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+        let at_top = |i: usize| {
+            let Some(&(first, count)) = b.mesh.face_ranges.get(i) else { return false };
+            b.mesh.indices[first as usize..(first + count) as usize].iter().all(|&k| (b.mesh.positions[k as usize][2] - 0.01).abs() < 1e-6)
+        };
+        b.face_refs.iter().enumerate().find(|(i, _)| at_top(*i)).map(|(_, r)| r.clone()).expect("the top face")
+    });
+    view.update(cx, |v, _| v.selection.clear());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("hole", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Hole dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.mc_mode = Some("locations".into());
+        d.active_query = Some("locations".into());
+        d.add_pick(top, cx);
+    }));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let depth = |cx: &mut TestAppContext| cx.update(|cx| dialog.read(cx).feature.params.expr("holeDepthV3").map(|e| e.text.clone()));
+    let shown = cx.update(|cx| view.read(cx).display.clone());
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("holeDepthV3", w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["5"]);
+    for _ in 0..150 {
+        cx.executor().advance_clock(std::time::Duration::from_millis(20));
+        draw(cx, window);
+        let quiet = cx.update(|cx| view.read(cx).pending.is_none() && std::sync::Arc::ptr_eq(&view.read(cx).display, &shown));
+        assert!(quiet, "a regeneration before Enter");
+    }
+    keys(cx, window, &["enter"]);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let taken = depth(cx).is_some_and(|t| t.starts_with('5'));
+    let after = cx.update(|cx| (taken, !std::sync::Arc::ptr_eq(&view.read(cx).display, &shown), view.read(cx).edit.is_some()));
+    assert_eq!(after, (true, true, true), "(the depth taken, the preview regenerated, the dialog open) after Enter");
+}
+
+/// Live2 qv-fillets (11-17): the Query variable dialog shows no count: with a face selected it opens with the face in
+/// its box and no "n items" / "(n)" anywhere in its fields.
+#[gpui::test]
+fn the_query_variable_dialog_shows_no_count(cx: &mut TestAppContext) {
+    let (window, view) = block(cx, "dlg-qv-count");
+    let face = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+        b.face_refs.first().cloned().expect("a face")
+    });
+    view.update(cx, |v, _| v.selection = vec![face]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("queryVariable", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Query variable dialog").dialog.clone());
+    let state = cx.update_window(window, |_, w, cx| dialog.read(cx).ui_state(w, cx)).unwrap();
+    let fields = state["fields"].as_array().cloned().unwrap_or_default();
+    let picked: usize = fields.iter().filter(|f| f["kind"] == "query").map(|f| f["items"].as_array().map_or(0, Vec::len)).sum();
+    assert_eq!(picked, 1, "the selected face in the dialog's box: {fields:?}");
+    let texts: Vec<String> = fields
+        .iter()
+        .flat_map(|f| [f["label"].as_str(), f["text"].as_str().filter(|_| f["kind"] != "number")].into_iter().flatten().map(str::to_string).chain(f["items"].as_array().into_iter().flatten().filter_map(|i| i.as_str().map(str::to_string))))
+        .collect();
+    let counted = |t: &String| {
+        let words: Vec<&str> = t.split_whitespace().collect();
+        let number = |w: &str| w.trim_matches(|c| c == '(' || c == ')').parse::<u32>().is_ok();
+        words.first().is_some_and(|w| number(w) && words.len() > 1 && !w.starts_with('(')) || words.last().is_some_and(|w| w.starts_with('(') && number(w))
+    };
+    assert_eq!(texts.iter().filter(|t| counted(t)).collect::<Vec<_>>(), Vec::<&String>::new(), "no count in the dialog: {texts:?}");
+    assert!(state.get("count").is_none(), "no count in the dialog's state");
 }

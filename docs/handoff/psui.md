@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-19 22:06 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-20 02:34 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -35,33 +35,43 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (updated 23:35 UTC 11-19; this thread replaced 4973e295 at 13:27, Ubeyd's weekly limit)
+## Now (updated 02:34 UTC 11-20; this thread replaced 4973e295 at 13:27 11-19, Ubeyd's weekly limit)
 
-1. LANDED 22:04 (01969838): qa's P0 feel rows, untested-row tests, Routing curve Multiple with its value box.
-2. QUEUED 22:48 b5fce1fd (6 commits): Mass CoM / inertia Override; TOOLBAR-TOOLTIP-AFTER-CLICK; Routing Multiple
-   centre ball; sketch-vertical-key fix (BAND_HOLD_PX 8); row tests. On green: tell qa (TOOLTIP + vertical-key re-run).
-3. STALE-SKETCH-HOVER fix (to land after run88: part-studio lib + app-core lib + clippy on vibex7):
-   leave_sketch drops self.hover / hover_pick / hover_raw / sketch_gpu_hover (the disc is drawn at hover_pick.anchor,
-   so a cancelled sketch's end stayed drawn: (c), and after ✓ (a)); viewport `hover_id_stale` (set by set_scene on a
-   geometry change) makes set_hover re-emit an unchanged id; CameraChanged re-resolves a point's reach (mod.rs, sketch.rs);
-   outside sketch mode no reach lights while the pointer is out of the graphics (shown_sketch_hover_id).
-   Tests (GPU, sketch_hover_feel_tests): a_closed_sketchs_lit_end_goes_with_it (fails without the fix),
-   a_shown_circles_centre_and_region_go_dark_with_the_move_away (view-key part fails without the CameraChanged re-check),
-   a_lines_lit_end_goes_dark_with_one_move_away. Ball test centre now exact (µm-rounded, 1e-12).
-   Real-app repro kit: /root/psui-scratch/stale/ (stale-app.sh + scenarios; run on vibex6 with ~/green/noshape):
-   on green 2bcd6dd7a (b) in sketch mode did NOT reproduce (one xdotool move clears the end) -> qa to re-run on green.
-4. P2 ERROR-CHIP-RED-NO-FIELD fixed (lead 11-20 ok'd the flag): FeatureError::invalid_input / FeatureState.invalid_input
-   (model-core; core told), set at Thicken's both-zero; FeatureDialog.invalid_input skips entry_failing and the red
-   inputs. Feedback matrix row "error / inputs refused". Other validation errors can take it the same way when live
-   shows their inputs dark.
-4c. live retakes eef639d7 (camera recorded, 11-20): check ours against the changed takes: face-menu-select-create-selection
-   (face menu adds "Where used for Part 1…"), ver-compare-hover-part (version row menu without "Releases"),
-   fillet-chip-clear-missing / row 1738 ("Unknown of": likely the start without q2224/fix.js; live asked 00:3x to re-run
-   with it; ours keeps "Missing Edge"), face menu "Where used" already ours (ctx-menus-1117), dialog-query-rclick-clear-all (new Fillet at the account's last radius: scenario now seeds
-   remembered 2 mm). ver-compare-hover-part (history-ui) flagged to the lead. 12 others unchanged apart from the camera.
+1. LANDED: 00389dbd as ffd85455 (00:50, STALE-SKETCH-HOVER; qa verified (a)(b)(c) on green a933e1b7).
+2. IN THE LAND QUEUE: 7c2d7313 (re-queued 01:22 after a handoff conflict): ERROR-CHIP-RED-NO-FIELD (FeatureError /
+   FeatureState `invalid_input`, Thicken's both-zero; core told), the 712 px Configurations panel test, the
+   dialog-query-rclick-clear-all seed. On green tell qa ERROR-CHIP-RED-NO-FIELD is fixed.
+3. NEXT TO LAND (after 7c2d7313): qa P1 EDGE-MIDPOINT-REST-LOOK (TICKETS 5296e9f9c; behaviors `midpoint_rest_edge`:
+   rested on the edge, the edge stays lit and the midpoint is a 6 px #ffd3a0 fill in a 7 px dark ring; test
+   a_rested_edge_midpoint_keeps_the_edge_lit_with_a_filled_ring; tell qa on green, they re-walk it). Feel-row tests:
+   the_working_spinner_shows_900_ms_into_a_regeneration_centred_low (pending.rs "pending-spinner"; the slow case
+   drives begin_pending / end_pending: a held Regenerator stalls GPUI's single-threaded test executor),
+   switching_configurations_greys_nothing_and_spins_only_past_900_ms, parts_list_properties_put_the_state_pill_on_each_part
+   (mod.rs "part-state-{id}"), dialog_field_lists_variables_by_their_word_prefixes (Tab closes the list).
+   run100 (vibex8): perspective, mirror, linear pattern, editing matrix pass; fixed since and in run102 (vibe2):
+   the skip ring (focus "Instances to skip" after the first draw), the Hole tabs (its value rows have no label: read
+   in order), the Hole depth (only "no regeneration" checked), Isolate 198 → 196 px (app-core isolate_ui: the last row
+   18 px, no bottom margin, live dom dialog-assembly-isolate; the assembly's too). New in run102:
+   dialogs_feel_tests::the_query_variable_dialog_shows_no_count (row 1331), feel_tests::
+   a_lit_face_goes_dark_when_the_pointer_leaves_the_window (qa HOVER-LEAVES-WINDOW; GPU, skips without one).
+   On landing also tick in TICKETS (fixed earlier, never ticked): TRANSFORM-GHOST-LOOK (row 1148), SECTION-PREVIEW-
+   COLOUR (1162), HOLE-CALLOUT-PLACE (1464), FLFEEL-BAR-MENU (list matrix "rollback bar / its menu while rolled back");
+   FEEL-FAST-OFF-CLEAR: the clear is on the second fast move, the rest 0-40 ms frame latency, under DECISIONS'
+   100 ms bar (11-18): ask qa to close. vibex8 is qa's until 04:00 UTC 11-20 (nightly suite): no builds there.
+   Restored: perspective_and_render_modes_switch_in_one_step (Window::dispatch_action is deferred:
+   read the state in the next update), a_skip_ring_lights_and_a_click_skips_its_instance_then_keeps_it ("Instances to
+   skip" clicked first: an edit dialog opens on Entities). New P0 rows: dialogs_feel_tests
+   a_mirror_across_a_side_face_adds_into_its_seed, a_linear_patterns_instance_previews_once_its_direction_is_picked,
+   the_hole_tabs_bring_their_rows_and_values, a_typed_hole_depth_waits_for_enter; editing matrix "Shift+Y on a hidden
+   part's selected row", "empty-space menu with a part hidden"; list matrix "menu / one sketch"; dialogs matrix row
+   click + Delete / Backspace, row hover tooltip text; Isolate's place (behaviors "ps-isolate" selector); the configure
+   toast; the section value box + typing (run101). Rows 1208 / 1210 / 1211 now cite existing app-core unit tests.
+   Skipped: 1199 (device px needs an app-core refactor), 1221 (no live inch readouts), 835, the speed rows.
+4. fillet-chip-clear-missing / fillet-edit-cancel-keeps retaken by live (e4ff71a8): both match on green 08525ecd
+   (20/20 states, vibex6 02:4x). Waiting on others: ver-compare-hover-part (history-ui) with the lead.
 5. Interaction-feel rows that match live with no test (grep "missing" in the Test column; P0 sections first).
    Skipped: the two-block box counts (live's camera: iso + 10 wheel steps about an unknown pointer), the rollback
-   bar's hover colour (GPUI group_hover, no test hook), the spinner's 900 ms (`Instant`, not the test clock).
+   bar's hover colour (GPUI group_hover, no test hook); [skasm]-tagged rows; qa's speed-suite rows.
    Asked of live2: the diagonal submenu move's timing (REQUESTS 16:37).
 6. Not to build: 3D Sketch, Fault analysis. Cleanup: vibex7 ~/tmp/psui/priv/dock.noshape when the tab work is over;
    vibe2 ~/tmp/psui/hv binaries. Branch psui-backup-1119 (all landed; delete).
@@ -70,14 +80,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 - Agent ids: ONLY in /root/lead-scratch/roster.md (lead rule 11-19); read it before every message_agent, never copy ids
   into notes. Context cap 200k (user 11-19).
-- P0 sketch-vertical-key (lead after compaction: "match live's default view orientation, re-baseline"): checked 21:1x:
-  ours already opens in live's start view, Camera::default = Trimetric (-0.433, 0.75, -0.5) = live's recorded start
-  camera direction (every live take with a camera); live's Isometric menu item is the true (-1, 1, -1)/√3, as ours
-  (view-cube-iso). The (64, -45) vs (61, -42) gap is the zoom of the camera-less 11-06 take (~0.2885 mm/px implied;
-  live's empty start is 0.2754 in 17 of 25 takes, 0.2507 in today's). live2 retook it with its camera (cf70e676):
-  live shows no Vertical at 0.2507. NEXT: once cf70e676 lands, run sketch-vertical-key on ours (uip-shots.sh); if ours
-  infers Vertical on live's camera, the gap is the reach measure (screen distance to the projected plumb line) — with
-  skasm. No orientation change, no re-baseline unless that run shows one.
+- P0 sketch-vertical-key: matches live on green f6f8069f, 10 of 10 states (qa 11-20).
 
 ## Open decisions
 

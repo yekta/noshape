@@ -727,7 +727,8 @@ fn dimension_box_lists_variables_by_their_word_prefixes(cx: &mut TestAppContext)
     assert!(near(&dimensions(cx, &view), &[0.0024]), "{:?}", dimensions(cx, &view));
 }
 
-/// The same list in a feature dialog's number field: "fcb" in Extrude's Depth, Tab inserts.
+/// The same list in a feature dialog's number field: "fcb" in Extrude's Depth, Tab inserts, closes the list and keeps the
+/// keyboard in the field.
 #[gpui::test]
 fn dialog_field_lists_variables_by_their_word_prefixes(cx: &mut TestAppContext) {
     let (window, view) = studio_with_variables(cx, "dlg-fan", &FAN_VARS);
@@ -742,6 +743,10 @@ fn dialog_field_lists_variables_by_their_word_prefixes(cx: &mut TestAppContext) 
     assert_eq!(rows, Some(serde_json::json!(["#fan_control_board_depth", "#fan_control_board_wall_length"])));
     keys(cx, window, &["down", "tab"]);
     assert_eq!(dialog.update(cx, |d, cx| d.field_text("depth", cx)).as_deref(), Some("#fan_control_board_wall_length"));
+    // Live (green e503ca2f, fields): Tab closes the list and the keyboard stays in the field.
+    assert!(cx.update(|cx| dialog.read(cx).ui_list().is_none()), "the list closed");
+    keys(cx, window, &["*", "2"]);
+    assert_eq!(dialog.update(cx, |d, cx| d.field_text("depth", cx)).as_deref(), Some("#fan_control_board_wall_length*2"), "typed on in the field");
 }
 
 /// VAR-AUTOCOMPLETE-ENTER (live 11-02): `#wall` + Enter in a dimension's value box inserts the highlighted
@@ -2484,6 +2489,23 @@ fn another_section_planes_arrow_drags_it(cx: &mut TestAppContext) {
         assert!(v.ui.section[0].offset > 0.0, "Top moved up: {}", v.ui.section[0].offset);
         assert_eq!(v.ui.section[1].offset, 0.0, "Right stayed");
     });
+    // Live view-tools-1118: a value box at the arrow while dragging, in 0.1 mm steps from the drag's start; typing in
+    // it moves the plane.
+    let (moved, boxed) = cx.update(|cx| {
+        let v = view.read(cx);
+        let moved = v.ui.section[0].offset - v.ui.section_drag0.unwrap_or(0.0);
+        (moved, v.ui.section_offset_edit.as_ref().map(|(i, _)| i.read(cx).value().to_string()))
+    });
+    assert!(((moved / 1e-4) - (moved / 1e-4).round()).abs() < 1e-6, "0.1 mm steps: moved {moved}");
+    let units = cx.update(|cx| view.read(cx).doc.read(cx).session.doc.settings.units);
+    let shown = boxed.as_deref().and_then(|t| noshape_units::evaluate_as(t, noshape_units::Dim::LENGTH, &units, &noshape_units::EmptyScope).ok()).map(|q| q.value);
+    assert!(shown.is_some_and(|d| (d - moved).abs() < 1e-9), "the value box {boxed:?} for {moved}");
+    keys(cx, window, &["5", "enter"]);
+    let typed = cx.update(|cx| {
+        let v = view.read(cx);
+        v.ui.section[0].offset - v.ui.section_drag0.unwrap_or(0.0)
+    });
+    assert!((typed - 0.005).abs() < 1e-9, "\"5\" + Enter: 5 mm from the drag's start, was {moved}, now {typed}");
 }
 
 /// Interaction 6.2 (live qa4-r5-s9-5b / 5f): each rotate handle of the Section view manipulator lights alone along
@@ -3373,6 +3395,12 @@ fn shift_i_isolates_the_selected_part_and_esc_ends_it(cx: &mut TestAppContext) {
         (v.ui.isolate.as_ref().map(|i| (i.mode == crate::part_studio::behaviors::IsolateMode::Isolate, i.bodies.clone())), v.selection.len())
     });
     assert_eq!(state(cx), (Some((true, vec![body.clone()])), 0), "(isolating Part 1, selected after)");
+    // Live (248, 79) 220 × 196: the graphics area's top left, 3 px down, as the feature dialogs.
+    draw(cx, window);
+    let panel = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("ps-isolate").expect("the Isolate dialog");
+    let origin = cx.update(|cx| view.read(cx).viewport.read(cx).origin());
+    let f = |p: gpui_kit::Pixels| f32::from(p).round();
+    assert_eq!((f(panel.origin.x - origin.x), f(panel.origin.y - origin.y), f(panel.size.width), f(panel.size.height)), (0., 3., 220., 196.), "(x, y) in the graphics, its size");
     keys(cx, window, &["escape"]);
     assert_eq!(state(cx).0, None, "Esc ends isolate");
 }
@@ -3694,6 +3722,38 @@ fn an_edge_midpoint_lights_up_its_feature(cx: &mut TestAppContext) {
     });
     view.update(cx, |v, _| v.selection = vec![Reference::Implicit { on: Box::new(edge), inference: noshape_model::reference::Inference::Midpoint }]);
     assert!(cx.update(|cx| view.read(cx).related_features(cx).contains(&maker)));
+}
+
+/// qa EDGE-MIDPOINT-REST-LOOK (live 1981 c1-rest2s): rested on a part edge's midpoint (the dwell made the midpoint the
+/// target, the pointer still on the edge) the whole edge stays lit and the marker is a ~7 px dark ring filled pale
+/// orange; moved off onto the face beside it (still in the midpoint's window) the edge goes dark and the orange disc
+/// marks the target (qa4-r5-s9-6d).
+#[gpui::test]
+fn a_rested_edge_midpoint_keeps_the_edge_lit_with_a_filled_ring(cx: &mut TestAppContext) {
+    let (_window, view, top, _) = block_part(cx, "edge-mid-rest");
+    let (edge, on_edge, on_face) = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+        let e = b.edge_refs.iter().find(|e| v.edge_midpoint(e).is_some()).expect("an edge with ends").clone();
+        let picks = &v.built.as_ref().expect("built").picks;
+        let target = |r: &Reference| picks.ids_for(r).first().and_then(|id| picks.get(*id).cloned()).expect("its pick");
+        (e.clone(), target(&e), target(&top))
+    });
+    let look = |cx: &mut TestAppContext, pick: &crate::scene_builder::PickTarget| {
+        view.update(cx, |v, cx| {
+            v.ui.hover_pick = Some(pick.clone());
+            v.hover = Some(Reference::Implicit { on: Box::new(edge.clone()), inference: noshape_model::reference::Inference::Midpoint });
+            let lit = v.highlighted_hover(cx);
+            let marker: Vec<(u32, f32, bool)> = v.midpoint_sprites(cx).iter().map(|p| (u32::from_be_bytes([0, p.color[0], p.color[1], p.color[2]]), p.size, p.style & noshape_render::PointSprite::RING != 0)).collect();
+            (lit, marker)
+        })
+    };
+    let (lit, marker) = look(cx, &on_edge);
+    assert_eq!(lit, vec![edge.clone()], "rested on the edge: the edge stays lit");
+    assert_eq!(marker, vec![(0xffd3a0, 6.0, false), (0x000000, 7.0, true)], "rested on the edge: a dark ring filled pale orange");
+    let (lit, marker) = look(cx, &on_face);
+    assert!(!lit.contains(&edge), "off the edge, in the window: the edge dark ({lit:?})");
+    assert_eq!(marker.len(), 3, "off the edge: the orange target disc ({marker:?})");
 }
 
 /// A new Extrude on a part's face previews as Add from the first preview: it waits for std's editing logic (which
@@ -4996,6 +5056,153 @@ fn cancel_a_slow_preview_shows_the_model_before_it_at_once_and_after(cx: &mut Te
     assert_eq!(cx.update(|cx| state(view.read(cx))), (false, false, 1, true), "once it has ended");
 }
 
+/// Live (spinner, live's client code 11-18): one working spinner, shown 900 ms after a regeneration starts and none if it
+/// ends sooner; a 50 × 50 box centred 40 px above the graphics' bottom.
+#[gpui::test]
+fn the_working_spinner_shows_900_ms_into_a_regeneration_centred_low(cx: &mut TestAppContext) {
+    let (window, view) = one_part(cx, "pending-spinner");
+    let spinner = |cx: &mut TestAppContext| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("pending-spinner");
+    let start = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                let sk = v.display.sketches.first().expect("the sketch").clone();
+                v.selection = vec![Reference::SketchRegion { sketch: sk.feature, key: sk.regions.first().expect("a region").key.clone() }];
+                v.start_feature("extrude", w, cx);
+            })
+        })
+        .unwrap();
+        std::time::Instant::now()
+    };
+    // A quick preview: no spinner at any frame (when the host ran it within the 900 ms).
+    let t = start(cx);
+    let mut seen = false;
+    while cx.update(|cx| view.read(cx).pending.is_some()) && t.elapsed() < std::time::Duration::from_secs(30) {
+        frames_for(cx, window, 20);
+        seen |= spinner(cx).is_some();
+    }
+    if t.elapsed() < super::super::pending::OVERLAY_DELAY {
+        assert!(!seen, "a spinner for a regeneration done in {:?}", t.elapsed());
+    }
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).pending.is_none() && view.read(cx).edit.is_none());
+    // A slow one (a regeneration not ending; a held Regenerator would stall the test executor): nothing until 900 ms,
+    // then the spinner until it ends.
+    let seq = u64::MAX;
+    let t = std::time::Instant::now();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.begin_pending(seq, w, cx))).unwrap();
+    while t.elapsed() < std::time::Duration::from_millis(800) {
+        frames_for(cx, window, 20);
+        assert!(spinner(cx).is_none(), "a spinner at {:?}", t.elapsed());
+    }
+    frames_for(cx, window, 300);
+    let b = spinner(cx).expect("the spinner past 900 ms");
+    let area = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("viewport-area").expect("the graphics");
+    let f = |p: gpui_kit::Pixels| f32::from(p);
+    assert_eq!((f(b.size.width), f(b.size.height)), (50., 50.), "the box");
+    assert!((f(b.center().x) - f(area.center().x)).abs() < 1., "centred: {b:?} in {area:?}");
+    assert!((f(area.bottom()) - f(b.bottom()) - 40.).abs() < 1., "40 px above the bottom: {b:?} in {area:?}");
+    view.update(cx, |v, cx| v.end_pending(seq, cx));
+    draw(cx, window);
+    assert!(spinner(cx).is_none(), "the spinner gone with the result");
+}
+
+/// Live cfg-1118: switching configurations greys nothing (no row, the old model drawn as it is) and the working
+/// spinner (the_working_spinner_…) comes only past 900 ms.
+#[gpui::test]
+fn switching_configurations_greys_nothing_and_spins_only_past_900_ms(cx: &mut TestAppContext) {
+    let (window, view) = one_part(cx, "cfg-switch-spinner");
+    let input = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let id = v.studio(cx).and_then(|s| s.features.iter().find(|f| f.type_id == "extrude")).map(|f| f.id).expect("Extrude 1");
+            let mut input = String::new();
+            v.edit_config("Configure", cx, |ps| {
+                input = noshape_ops::config::add_input(ps, "List");
+                let b = noshape_ops::config::add_option(ps, &input, "B".into()).expect("row B");
+                noshape_ops::config::configure_parameter(ps, id, "depth", &input);
+                noshape_ops::config::set_configured_text(ps, 0, &b, "40 mm".into());
+            });
+            input
+        })
+    });
+    wait_until(cx, window, |cx| view.read(cx).pending.is_none());
+    let spinner = |cx: &mut TestAppContext| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("pending-spinner").is_some();
+    let greyed = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        v.studio(cx).map_or(0, |s| s.features.len().saturating_sub(v.row_ctx.rollback))
+    });
+    let before = cx.update(|cx| view.read(cx).display.clone());
+    let t = std::time::Instant::now();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.set_config_value(&input, "B".into(), w, cx))).unwrap();
+    let same = |cx: &mut TestAppContext| cx.update(|cx| std::sync::Arc::ptr_eq(&view.read(cx).display, &before));
+    assert_eq!((cx.update(|cx| view.read(cx).pending.is_some()), greyed(cx), same(cx)), (true, 0, true), "(regenerating, grey rows, the old model) at once");
+    while cx.update(|cx| view.read(cx).pending.is_some()) && t.elapsed() < std::time::Duration::from_secs(30) {
+        frames_for(cx, window, 20);
+        assert_eq!(greyed(cx), 0, "grey rows at {:?}", t.elapsed());
+        if t.elapsed() < super::super::pending::OVERLAY_DELAY {
+            assert!(!spinner(cx), "a spinner at {:?}", t.elapsed());
+        }
+    }
+    draw(cx, window);
+    let changed = !same(cx);
+    assert_eq!((spinner(cx), greyed(cx), changed), (false, 0, true), "(spinner, grey rows, B drawn) once regenerated");
+}
+
+/// Live2 ours-1118 prefs: with "Display parts list properties" on, each part's row carries its state pill ("In progress"
+/// while none is set); off, none.
+#[gpui::test]
+fn parts_list_properties_put_the_state_pill_on_each_part(cx: &mut TestAppContext) {
+    let (window, view) = one_part(cx, "parts-props");
+    let part = cx.update(|cx| view.read(cx).display.bodies.first().expect("Part 1").id.clone());
+    let pill = |cx: &mut TestAppContext| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(Box::leak(format!("part-state-{part}").into_boxed_str())).is_some();
+    let state = cx.update(|cx| view.read(cx).studio(cx).and_then(|s| s.part_properties.get(&part)).and_then(|p| p.meta.state.clone()));
+    assert_eq!((pill(cx), state), (false, None), "(pill, state) with the preference off");
+    view.update(cx, |v, cx| {
+        v.ui.show_part_props = true;
+        cx.notify();
+    });
+    draw(cx, window);
+    assert!(pill(cx), "the state pill (\"In progress\") with the preference on");
+}
+
+/// Live2 ours-1118 view: Perspective on / off and a render mode (Translucent, Shaded) change the picture in one step,
+/// with no camera animation; the perspective's field of view is 45°.
+#[gpui::test]
+fn perspective_and_render_modes_switch_in_one_step(cx: &mut TestAppContext) {
+    let (window, view) = one_part(cx, "view-switch");
+    let state = |v: &PartStudioView, cx: &gpui_kit::App| {
+        let vp = v.viewport.read(cx);
+        (vp.camera.projection, vp.animating(), vp.scene().no_occlusion)
+    };
+    let fov = cx.update(|cx| view.read(cx).viewport.read(cx).camera.fov_y.to_degrees());
+    assert!((fov - 45.0).abs() < 1e-9, "the field of view {fov}°");
+    cx.update_window(window, |_, w, cx| {
+        w.activate_window();
+        let focus = view.read(cx).focus.clone();
+        w.focus(&focus, cx);
+    })
+    .unwrap();
+    draw(cx, window);
+    // Window::dispatch_action is deferred to the end of the update: the state read in the next one, no frame between.
+    let toggle = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| w.dispatch_action(Box::new(crate::actions::ToggleProjection), cx)).unwrap();
+        cx.update(|cx| state(view.read(cx), cx))
+    };
+    assert_eq!(toggle(cx), (noshape_render::Projection::Perspective, false, false), "(projection, animating, see-through) right after Perspective");
+    let translucent = cx
+        .update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| v.set_display_mode(crate::scene_builder::DisplayMode::Translucent, w, cx));
+            state(view.read(cx), cx)
+        })
+        .unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.set_display_mode(crate::scene_builder::DisplayMode::ShadedWithEdges, w, cx))).unwrap();
+    let modes = (translucent, toggle(cx));
+    assert_eq!(
+        modes,
+        ((noshape_render::Projection::Perspective, false, true), (noshape_render::Projection::Orthographic, false, false)),
+        "(projection, animating, see-through) right after Translucent, then Shaded with edges and Perspective off"
+    );
+}
+
 /// User P1 (11-05), the user's sequence: the part deleted (its regeneration not shown yet), a new dialog opened at
 /// once, its preview slow (held in a kernel step), cancelled. The model before the dialog shows at once, then the
 /// document as it is (no part) while the cancelled step still runs: no spinner waiting for it, and its late result
@@ -6132,6 +6339,8 @@ fn escape_on_a_dialog_takes_its_configured_field_away(cx: &mut TestAppContext) {
     let configured = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).map(|s| s.configuration.configured.len()).unwrap_or(0));
     view.update(cx, |v, cx| v.configure_dialog_param("lengthValue", true, cx));
     assert_eq!(configured(cx), 1, "Configure adds the column at once");
+    let toast = cx.update(|cx| view.read(cx).message.clone().map(|(s, t)| (s == noshape_model::display::FeatureStatus::Info, t)));
+    assert!(toast.as_ref().is_some_and(|(info, t)| *info && t.ends_with(" added to List")), "the toast \"<feature> <parameter> added to List\": {toast:?}");
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
     draw(cx, window);
     assert_eq!(configured(cx), 0, "Esc takes it away");
@@ -6437,8 +6646,6 @@ fn where_used_for_the_part_has_its_own_group_after_export(cx: &mut TestAppContex
     assert_eq!((rows[at - 2].as_str(), rows[at - 1].as_str(), rows.get(at + 1).map(String::as_str)), ("Export…", "———", Some("———")), "{rows:?}");
 }
 
-/// Live2 cfg-1118 (qa CFGFEEL-ROW-CLICK-SWITCHES): a plain click on a configuration row doesn't switch to it; only the
-/// row menu's Switch to and the feature list's box do.
 /// Live cfg-1118: Configurations docks at the right, 712 px with its 6 px gutter, and the graphics shrink by it (live's
 /// 1920 px window).
 #[gpui::test]
@@ -6461,6 +6668,8 @@ fn the_configurations_panel_docks_712_px_and_the_graphics_shrink(cx: &mut TestAp
     assert!((before - after - w).abs() < 2.0, "the graphics shrink by the panel: {before} -> {after}, the panel {w}");
 }
 
+/// Live2 cfg-1118 (qa CFGFEEL-ROW-CLICK-SWITCHES): a plain click on a configuration row doesn't switch to it; only the
+/// row menu's Switch to and the feature list's box do.
 #[gpui::test]
 fn a_click_on_a_configuration_row_doesnt_switch_to_it(cx: &mut TestAppContext) {
     let (window, view) = studio_with_variables(cx, "cfg-row-click", &[("width", "30 mm")]);

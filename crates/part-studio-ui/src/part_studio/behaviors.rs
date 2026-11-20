@@ -1292,9 +1292,18 @@ impl PartStudioView {
                     _ => vec![r.clone()],
                 }
             }
+            // Rested on the edge itself, its midpoint the target: the edge stays lit (live 1981 c1-rest2s).
+            Some(Reference::Implicit { .. }) if self.midpoint_rest_edge().is_some() => self.midpoint_rest_edge().into_iter().cloned().collect(),
             Some(r) => vec![r.clone()],
             None => Vec::new(),
         }
+    }
+
+    /// The edge whose midpoint is the hover target while the pointer still rests on the edge itself (the dwell's snap),
+    /// not over a face beside it.
+    pub(super) fn midpoint_rest_edge(&self) -> Option<&Reference> {
+        let Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) = &self.hover else { return None };
+        self.ui.hover_pick.as_ref().is_some_and(|t| t.reference == **on).then_some(&**on)
     }
 
     /// Features related to the current selection (Onshape cross-highlight:
@@ -3247,7 +3256,7 @@ impl PartStudioView {
             cx,
         );
         // Live: at the graphics area's top left, like the other panel dialogs.
-        Some(crate::ui::moved_panel(div().absolute().top(px(3.)).left_0().child(dialog), self.ui.panels.get("ps-isolate")))
+        Some(crate::ui::moved_panel(div().absolute().top(px(3.)).left_0().debug_selector(|| "ps-isolate".into()).child(dialog), self.ui.panels.get("ps-isolate")))
     }
 
     // ------------------------------------------------------------ camera
@@ -3891,7 +3900,18 @@ impl PartStudioView {
     /// with a dialog open only when its field takes points, like Onshape);
     /// a hovered shown sketch point's disc.
     pub(super) fn midpoint_overlay(&self, cx: &App) -> Vec<noshape_render::Instance> {
-        use noshape_render::{Drawable, Instance, LineSegment, PointData, PointSprite};
+        use noshape_render::{Drawable, Instance, PointData};
+        let points = self.midpoint_sprites(cx);
+        if points.is_empty() {
+            return Vec::new();
+        }
+        let up = self.gpu.uploader();
+        vec![Instance::new(Drawable::Points(up.upload_points(&PointData { points }))).per_primitive_color().unpickable().ignore_clip().layer(22)]
+    }
+
+    /// [`Self::midpoint_overlay`]'s points.
+    pub(super) fn midpoint_sprites(&self, cx: &App) -> Vec<noshape_render::PointSprite> {
+        use noshape_render::{LineSegment, PointSprite};
         let mut points = Vec::new();
         let sprite = |m: glam::DVec3, color: u32, size: f32, style: u32| PointSprite { position: m.as_vec3().into(), color: [(color >> 16) as u8, (color >> 8) as u8, color as u8, 255], pick_id: 0, size, style: LineSegment::ON_TOP | style, _pad: 0 };
         // Live (part-studio/qa4-r5-s9-6d, 6e): the midpoint target is an
@@ -3915,8 +3935,15 @@ impl PartStudioView {
             // Not for Select other's highlight: it isn't a pick under the
             // pointer (Onshape suppresses mouse-move picking while it's open).
             Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) if self.sketch.is_none() && self.ui.select_other.is_none() => {
-                if let Some(m) = self.edge_midpoint(on) {
-                    marker(&mut points, m, crate::theme::viewport::POINT_HOVER);
+                match self.edge_midpoint(on) {
+                    // Rested on the edge (live 1981 c1-rest2s, qa EDGE-MIDPOINT-REST-LOOK): the lit edge keeps its
+                    // highlight and the marker is a ~7 px dark ring filled pale orange.
+                    Some(m) if self.midpoint_rest_edge().is_some() => {
+                        points.push(sprite(m, 0xffd3a0, 6.0, 0));
+                        points.push(sprite(m, 0x000000, 7.0, PointSprite::RING));
+                    }
+                    Some(m) => marker(&mut points, m, crate::theme::viewport::POINT_HOVER),
+                    None => {}
                 }
             }
             // A shown sketch's point outside sketch mode: a ~10 px light orange disc (live2 11-18 hover-p0 pt.png; at
@@ -3939,11 +3966,7 @@ impl PartStudioView {
             }
             _ => {}
         }
-        if points.is_empty() {
-            return Vec::new();
-        }
-        let up = self.gpu.uploader();
-        vec![Instance::new(Drawable::Points(up.upload_points(&PointData { points }))).per_primitive_color().unpickable().ignore_clip().layer(22)]
+        points
     }
 
     /// An edge armed and not yet snapped: re-check the hover once the dwell is over (the pointer may rest).
@@ -3972,7 +3995,8 @@ impl PartStudioView {
     /// marker, over the adjacent faces too (orange marker, the edge loses
     /// its highlight); arriving straight on the midpoint gives the edge, and
     /// resting there the midpoint after a short dwell (live 1954: a click
-    /// after a still rest picks the midpoint point, even 8 px off).
+    /// after a still rest picks the midpoint point, even 8 px off; 1981: the
+    /// edge stays lit then, [`Self::midpoint_rest_edge`]).
     /// Not in sketch mode, nor with a field that takes no points.
     pub(super) fn update_hover(&mut self, cx: &App) -> bool {
         let raw = self.ui.hover_pick.as_ref().map(|t| t.reference.clone());

@@ -163,6 +163,28 @@ fn rows() -> Vec<Row> {
             let selected = cx.update(|cx| view.read(cx).selection.len());
             expect(selected, 0, "selected after Shift+Y")
         } },
+        Row { id: "Shift+Y on a hidden part's selected row", live: "shows it (live2 view-tools-1118)", gap: false, check: |cx| {
+            let (window, view) = block(cx, "ed-shift-y-hidden");
+            let part = cx.update(|cx| view.read(cx).display.bodies.first().map(|b| Reference::Body(b.id.clone()))).ok_or("no part")?;
+            cx.update(|cx| view.update(cx, |v, cx| v.set_visibility(std::slice::from_ref(&part), true, cx)));
+            wait_until(cx, window, |cx| view.read(cx).display.bodies.first().is_some_and(|b| b.hidden));
+            cx.update(|cx| view.update(cx, |v, _| v.selection = vec![part.clone()]));
+            keys(cx, window, &["shift-y"]);
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            let hidden = cx.update(|cx| view.read(cx).display.bodies.first().map(|b| b.hidden));
+            expect(hidden, Some(false), "hidden after Shift+Y")
+        } },
+        Row { id: "empty-space menu with a part hidden", live: "Show all, then Show all parts (live2 view-tools-1118)", gap: false, check: |cx| {
+            let (window, view) = block(cx, "ed-menu-hidden");
+            let part = cx.update(|cx| view.read(cx).display.bodies.first().map(|b| Reference::Body(b.id.clone()))).ok_or("no part")?;
+            cx.update(|cx| view.update(cx, |v, cx| v.set_visibility(std::slice::from_ref(&part), true, cx)));
+            wait_until(cx, window, |cx| view.read(cx).display.bodies.first().is_some_and(|b| b.hidden));
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_context_menu(None, gpui_kit::point(px(600.), px(400.)), w, cx))).unwrap();
+            draw(cx, window);
+            let labels = cx.update(|cx| view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_default());
+            let at = |t: &str| labels.iter().position(|l| l == t);
+            expect(at("Show all").zip(at("Show all parts")).is_some_and(|(a, b)| b == a + 1), true, &format!("rows {labels:?}"))
+        } },
         Row { id: "eye icons / a click toggles, the selection stays", live: "a row's eye (at its right on hover) toggles that item: Part 1 hidden -> shown, a hidden sketch's closed eye -> shown; the selection as it was", gap: false, check: |cx| {
             let (window, view) = block(cx, "ed-eyes");
             select_feature(cx, &view, "Extrude 1");

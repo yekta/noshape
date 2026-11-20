@@ -858,3 +858,42 @@ fn a_click_beside_an_open_context_menu_only_closes_it(cx: &mut TestAppContext) {
     assert!(opened && after == (false, Vec::new()), "the face's menu opened ({opened}); after a click beside it (open, selected): {after:?}");
     assert!(matches!(second.as_slice(), [Reference::Plane(_)]), "the next click selects the plane: {second:?}");
 }
+
+/// qa HOVER-LEAVES-WINDOW (11-18): a face lit as the pointer leaves the window goes dark, also when its pick was still
+/// on its way, and nothing lights again while the pointer is out.
+#[gpui::test]
+fn a_lit_face_goes_dark_when_the_pointer_leaves_the_window(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view, top, _) = block_part(cx, "hover-leaves-window");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let centre = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let i = b.face_refs.iter().position(|r| *r == top).expect("the top face");
+        let (first, count) = b.mesh.face_ranges[i];
+        let idx = &b.mesh.indices[first as usize..(first + count) as usize];
+        let c = idx.iter().map(|&k| { let q = b.mesh.positions[k as usize]; glam::DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64) }).sum::<glam::DVec3>() / idx.len() as f64;
+        v.viewport.read(cx).project(c).expect("the top face on screen")
+    });
+    let pointer = Pointer::new(cx, window, &view);
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).hover.clone());
+    let leave = |cx: &mut TestAppContext| {
+        let y = pointer.window_point(cx, centre).y;
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseExitEvent { position: gpui_kit::point(px(-2.), y), pressed_button: None, modifiers: Modifiers::default() });
+        // 400 ms of frames: a pick still on its way comes back meanwhile.
+        for _ in 0..4 {
+            pointer.frames(cx, &view);
+        }
+    };
+    pointer.move_to(cx, &view, centre);
+    assert_eq!(lit(cx), Some(top.clone()), "the top face lit under the pointer");
+    leave(cx);
+    assert_eq!(lit(cx), None, "the pointer out of the window: nothing lit");
+    // Onto the face and straight out: its pick still on its way as the pointer leaves.
+    pointer.move_to(cx, &view, centre);
+    let win = pointer.window_point(cx, centre + DVec2::new(12.0, 0.0));
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(win, None, Modifiers::default());
+    leave(cx);
+    assert_eq!(lit(cx), None, "out of the window with a pick on its way: nothing lit");
+}

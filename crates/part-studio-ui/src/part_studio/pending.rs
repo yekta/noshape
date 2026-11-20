@@ -86,7 +86,7 @@ impl PartStudioView {
         // the 1879×973 capture had it (105 px up) with the text centred 49 px under it.
         let row = |bottom: f32| div().absolute().left_0().right_0().bottom(px(bottom)).flex().justify_center();
         let spinner = self.pending_spinner.get_or_insert_with(|| cx.new(|_| Spinner)).clone();
-        let mut layer = div().absolute().top_0().left_0().size_full().child(row(if p.opening.is_some() { 80. } else { 40. }).child(spinner));
+        let mut layer = div().absolute().top_0().left_0().size_full().child(row(if p.opening.is_some() { 80. } else { 40. }).child(div().debug_selector(|| "pending-spinner".into()).child(spinner)));
         if let Some(name) = p.opening.clone() {
             layer = layer.child(row(47.).child(div().h(px(18.)).text_size(px(14.)).text_color(pal.text).child(format!("Opening {name}…"))));
         }

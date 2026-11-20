@@ -2922,8 +2922,7 @@ impl PartStudioView {
         let vars = self.scope_variables(Some(index), cx);
         let later = self.studio(cx).is_some_and(|s| !is_new && index + 1 < s.features.len());
         // A reference whose creating feature is gone (deleted or suppressed) is missing: a red "Missing Edge" chip with
-        // Clear missing references (live 1993 (c)). (block-fillet's REST-built Fillet reads "Unknown of" in live from the
-        // start: its query isn't a pick.)
+        // Clear missing references (live 1993 (c); retaken fillet-chip-clear-missing e4ff71a8).
         let missing: Arc<dyn Fn(&Reference) -> bool + Send + Sync> = match self.studio(cx) {
             Some(s) => Arc::new(noshape_ops::studio::missing_reference(&self.doc.read(cx).session.doc, s)),
             None => Arc::new(|_: &Reference| false),
@@ -4889,7 +4888,10 @@ impl PartStudioView {
                     div().ml(px(4.)).h(px(h)).pl(px(4.)).pr(px(if bg == 0xeeeeee { 3. } else { 4. })).min_w_0().flex_shrink(1.).flex().items_center().rounded(px(3.)).bg(gpui_kit::rgb(bg)).text_color(gpui_kit::rgb(0x333333)).child(div().truncate().child(crate::ui::user_text(text)))
                 };
                 d.when_some(props.part_number.filter(|t| !t.is_empty()), |d, t| d.child(pill(t, 0xd7d7d7, 22.)))
-                    .child(pill(props.meta.state.clone().filter(|t| !t.is_empty()).unwrap_or_else(|| "In progress".into()), 0xeeeeee, 20.))
+                    .child(pill(props.meta.state.clone().filter(|t| !t.is_empty()).unwrap_or_else(|| "In progress".into()), 0xeeeeee, 20.).debug_selector({
+                        let id = b.id.clone();
+                        move || format!("part-state-{id}")
+                    }))
                     .when_some(props.revision.filter(|t| !t.is_empty()), |d, t| d.child(div().ml(px(4.)).min_w_0().flex_shrink(1.).truncate().text_color(gpui_kit::rgb(0x333333)).child(crate::ui::user_text(format!("({t})")))))
                     .child(div().flex_1())
             })

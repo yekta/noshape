@@ -443,6 +443,10 @@ fn rows() -> Vec<Row> {
             let counts = l.menu(cx).iter().any(|s| s == "Add appearance to 3 features…");
             expect((counts, l.selected(cx)), (true, names(&["Extrude 1", "Extrude 2"])), "counts 3, selected")
         } },
+        Row { id: "menu / one sketch", live: "Rename | Edit… | Copy sketch | Show dimensions | Add selection to folder… | Show | Create Drawing of Sketch 1… | Export as DXF/DWG… | Section view… | Suppress | Dynamic suppression | Zoom to selection | View normal to | Show dependencies… | Roll to here | Edit sketch appearance… | Delete (live keys-1118; Add comment: cloud)", gap: false, check: |l, cx| {
+            l.right_click(cx, "feature:Sketch 1");
+            expect(l.menu(cx), names(&["Rename", "Edit…", "Copy sketch", "Show dimensions", "Add selection to folder…", "Show", "Create Drawing of Sketch 1…", "Export as DXF/DWG…", "Section view…", "Suppress", "Dynamic suppression", "Zoom to selection", "View normal to", "Show dependencies…", "Roll to here", "Edit sketch appearance…", "Delete"]), "rows")
+        } },
         Row { id: "menu / two sketches", live: "Add selection to folder… | Show | Show all sketches | Section view… | Suppress | Dynamic suppression | Clear selection | Edit appearance of 2 sketches… | Delete", gap: false, check: |l, cx| {
             l.click(cx, "feature:Sketch 1", NONE);
             l.click(cx, "feature:Sketch 2", NONE);

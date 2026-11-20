@@ -112,11 +112,14 @@ pub fn dialog<V: 'static>(d: IsoDialog<V>, cx: &mut Context<V>) -> AnyElement {
                 .text_size(px(13.33)),
         )
         .child(
+            // Live (dom dialog-assembly-isolate): an 18 px row 5 px under the select, the knob 5 px into it, the
+            // dialog's bottom right under it (220 × 196 in all).
             h_flex()
                 .mt(px(5.))
-                .mb(px(5.))
-                .child(div().flex_1().child(slider(Slider { key: d.key, name: "expand", t: d.expand, tip: d.expand_tip, track: Track::Line }, d.drag, d.set_expand, cx)))
-                .child(div().mr(px(4.)).size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa)))),
+                .h(px(18.))
+                .items_start()
+                .child(div().flex_1().pt(px(3.)).child(slider(Slider { key: d.key, name: "expand", t: d.expand, tip: d.expand_tip, track: Track::Line }, d.drag, d.set_expand, cx)))
+                .child(div().mt(px(5.)).mr(px(4.)).size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa)))),
         )
         .into_any_element()
 }
