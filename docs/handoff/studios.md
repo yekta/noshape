@@ -29,7 +29,7 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
 - b12 shots (vibe2 :395) against live: export-pdf-bw dialog within 2 px; ver-compare's fit shows the same 42 mm of
   height as live's (ours has a taller viewport); drw-custom-table-add 10/10 states after the Esc fix (the app needed a
   third Esc: cancel() took insert.chooser but left the studio picker).
-- Matrix with b10's runs and submenu rows: 1224 = + 511 shown of 1855, 0 ≠, 78 present-only.
+- Matrix (06:09, b12 runs merged): 1224 = + 475 shown of 1855, 0 ≠, 114 present-only (Create Drawing 46, panels' list options).
 
 ## Next, in order
 1. Lead 11-20: the drawing matrix's items not yet matching, by use (dialogs, menus, placement, rarer panels): check
