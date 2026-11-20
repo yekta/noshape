@@ -7575,10 +7575,14 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     // Shells inside out are voids: of the one solid there is (else declined). (One shell alone is a solid; a shell
     // whose volume by its edges' chords is next to nothing beside its box's (a cone's piece bounded by two planes'
     // edges: the chords span nothing, its sign rounding's) is unclear, but for one whole sphere or torus face, out
-    // by its own normal unless reversed (a sphere cut by one inside it, corpus2 6cf25eee).)
+    // by its own normal (a sphere cut by one inside it, corpus2 6cf25eee).)
     let shells = std::mem::take(&mut out.body.solids);
     let whole = |s: &Solid| match &s.shells[0][..] {
-        &[f] if matches!(out.body.faces[f as usize].surface, Surface::Sphere { .. } | Surface::Torus { .. }) => Some(if out.body.faces[f as usize].reversed { -1.0 } else { 1.0 }),
+        &[f] => match out.body.faces[f as usize].surface {
+            // (Its parameters' normal points in where its frame is left-handed: a mirrored revolve's tori, qa Gyro.)
+            Surface::Sphere { xdir, ydir, zdir, .. } | Surface::Torus { xdir, ydir, zdir, .. } => Some(xdir.cross(ydir).dot(zdir).signum() * if out.body.faces[f as usize].reversed { -1.0 } else { 1.0 }),
+            _ => None,
+        },
         _ => None,
     };
     if shells.len() > 1 {
