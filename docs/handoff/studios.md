@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 10:09 UTC.
+Updated 2026-11-20 10:17 UTC.
 
 ## In flight
 
@@ -26,12 +26,14 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
   X / Y flips = flip-direction icon, Length / Angle dropdown 13.33 px #555, distance text 12 px; bc65e1c09 Origin field
   stays active once picked (live s5; test); 5b8590995 Targets box ≤400 px with a scrollbar, #1b5faa borders. Mac:
   drawing-ui 126, clippy clean.
-- Local, uncommitted (10:08): DRW-DATUM-TARGET-OP. Op `drawing_datum_target` (ops drawing_tools.rs): area / size /
-  area precision, style, origin, Length (x_edge / y_edge, distance_x / _y, flip_x / _y) or Angle (reference_edge,
-  diameter_distance, angle, flip, rotate, instances, radial_lines), precision_1 / _2; e2e
-  drawing_datum_target_takes_area_style_origin_and_distances. Shared with the dialog via scene opts.rs
-  `datum_target_at`, `datum_target_distances`, SheetPick `datum_target_custom`, `straight_edge_dir_at` (drawing-ui's
-  copies removed). Needs: Mac ops tests + clippy, then the full ops e2e (scene changed), land.
+- Local after fc8e6c91 (to land once it does): 8305af19d coverage MENUS "drawing:Resize..." (856e293d8 renamed the cell
+  menu's item; without it ops coverage::every_menu_item_is_listed fails, so fc8e6c91 may fail on it: fix = this);
+  404ed8a14 DRW-DATUM-TARGET-OP: op `drawing_datum_target` (ops drawing_tools.rs): area / size / area precision,
+  style, origin, Length (x_edge / y_edge, distance_x / _y, flip_x / _y) or Angle (reference_edge, diameter_distance,
+  angle, flip, rotate, instances, radial_lines), precision_1 / _2; e2e
+  drawing_datum_target_takes_area_style_origin_and_distances; shared with the dialog via scene opts.rs
+  `datum_target_at`, `datum_target_distances`, SheetPick `datum_target_custom`, `straight_edge_dir_at`. Mac: ops all
+  (450 + coverage 11) ok, drawing-ui 126, clippy clean; AGENT_API regenerated.
 - Matrix 09:30: 1232 = + 558 shown of 1841, 0 ≠, 9 present-only, all conditional rows that wait on live's takes
   (REQUESTS "studios (2026-11-20 08:08 UTC)", not captured at 09:30): Section Depth / Offset distance, Datum "This
   field cannot be empty" (live's hidden Instance count row), Custom table Cell / Split custom table below, Inspection
