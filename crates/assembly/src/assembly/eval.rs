@@ -405,6 +405,15 @@ pub fn relation_values(kind: RelationType, a: MateType, b: MateType) -> Result<(
     }
 }
 
+/// A relation's mate and its id in this solve: this assembly's own (`path` empty), else the mate of the flexible
+/// subassembly at `path`, solved here under a synthetic id.
+fn relation_mate<'a>(asm: &'a Assembly, prepared: &'a Prepared, path: &[InstanceId], id: MateId) -> Option<(&'a super::Mate, MateId)> {
+    if path.is_empty() {
+        return asm.mate(id).map(|m| (m, id));
+    }
+    prepared.flex_mates.iter().find(|(p, m, _)| p == path && m.id == id).map(|(_, m, synth)| (m, *synth))
+}
+
 fn relation_kind(t: RelationType) -> RelationKind {
     match t {
         RelationType::Gear => RelationKind::Gear,
@@ -1051,11 +1060,17 @@ impl AssemblyResult {
     /// Relation reference values (the current free values of its two mates)
     /// to store in [`Relation::base`] when a relation is created or edited.
     pub fn relation_base(&self, asm: &Assembly, kind: RelationType, mates: [MateId; 2]) -> Option<[f64; 2]> {
-        let ta = asm.mate(mates[0])?.mate_type;
-        let tb = asm.mate(mates[1])?.mate_type;
-        let (ia, ib) = relation_values(kind, ta, tb).ok()?;
-        let va = self.solved.mate_values.get(&mates[0])?;
-        let vb = self.solved.mate_values.get(&if kind == RelationType::Screw { mates[0] } else { mates[1] })?;
+        self.relation_base_at(asm, kind, mates, &Default::default())
+    }
+
+    /// [`Self::relation_base`] of mates that may live in flexible subassemblies ([`Relation::mate_paths`]).
+    pub fn relation_base_at(&self, asm: &Assembly, kind: RelationType, mates: [MateId; 2], paths: &[Vec<InstanceId>; 2]) -> Option<[f64; 2]> {
+        let side = if kind == RelationType::Screw { 0 } else { 1 };
+        let (ma, a) = relation_mate(asm, &self.prepared, &paths[0], mates[0])?;
+        let (mb, b) = relation_mate(asm, &self.prepared, &paths[1], mates[1])?;
+        let (ia, ib) = relation_values(kind, ma.mate_type, mb.mate_type).ok()?;
+        let va = self.solved.mate_values.get(&a)?;
+        let vb = self.solved.mate_values.get(if side == 0 { &a } else { &b })?;
         Some([va[ia], vb[ib]])
     }
 }
@@ -2544,7 +2559,7 @@ impl AssemblyEvaluator {
             .map(|r| {
                 // Live (E4 / E5): a relation on an inactive or suppressed
                 // mate is itself inactive, not an error.
-                if !r.suppressed && r.mates.iter().any(|id| prepared.inactive_mates.contains(id)) {
+                if !r.suppressed && r.own_mates().any(|id| prepared.inactive_mates.contains(&id)) {
                     return RelationStatus { id: r.id, ok: true, inactive: true, message: Some("One or more mates is inactive or suppressed".into()) };
                 }
                 if let Some((_, msg)) = prepared.failed_relations.iter().find(|(id, _)| *id == r.id) {
@@ -3600,21 +3615,21 @@ impl AssemblyEvaluator {
     }
 
     fn prepare_relation(&self, asm: &Assembly, r: &Relation, prepared: &Prepared, units: &UnitPrefs) -> Result<PreparedRelation, String> {
-        let b_id = if r.relation_type == RelationType::Screw { r.mates[0] } else { r.mates[1] };
-        let ma = asm.mate(r.mates[0]).ok_or("One or more mates in this relation do not exist.")?;
-        let mb = asm.mate(b_id).ok_or("One or more mates in this relation do not exist.")?;
+        let side = if r.relation_type == RelationType::Screw { 0 } else { 1 };
+        let (ma, a) = relation_mate(asm, prepared, &r.mate_paths[0], r.mates[0]).ok_or("One or more mates in this relation do not exist.")?;
+        let (mb, b) = relation_mate(asm, prepared, &r.mate_paths[side], r.mates[side]).ok_or("One or more mates in this relation do not exist.")?;
         if ma.suppressed || mb.suppressed {
             return Err("One or more mates in this relation are suppressed.".into());
         }
-        if r.relation_type != RelationType::Screw && ma.id == mb.id {
+        if r.relation_type != RelationType::Screw && a == b {
             return Err("A relation needs two different mates".into());
         }
         let values = relation_values(r.relation_type, ma.mate_type, mb.mate_type)?;
-        if !prepared.mates.iter().any(|(id, _, _)| *id == ma.id) || !prepared.mates.iter().any(|(id, _, _)| *id == mb.id) {
+        if !prepared.mates.iter().any(|(id, _, _)| *id == a) || !prepared.mates.iter().any(|(id, _, _)| *id == b) {
             return Err("One or more mates in this relation are invalid.".into());
         }
         let ratio = relation_ratio(r, units)?;
-        Ok(PreparedRelation { id: r.id, kind: relation_kind(r.relation_type), a: ma.id, b: mb.id, ratio, reverse: r.reverse, values, base: r.base })
+        Ok(PreparedRelation { id: r.id, kind: relation_kind(r.relation_type), a, b, ratio, reverse: r.reverse, values, base: r.base })
     }
 
     /// Contact geometry for a tangent mate of `asm` (a flexible subassembly's at `prefix`, this assembly's when empty):

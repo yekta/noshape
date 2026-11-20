@@ -3155,7 +3155,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `type` | one of `gear`, `rack_and_pinion`, `screw`, `linear` | required | Relation type. |
-| `mates` | array of string | required | The two mates (ids or names); screw: one cylindrical mate. |
+| `mates` | array of string | required | The two mates (ids or names); screw: one cylindrical mate. A flexible subassembly's mate through its instances: "Sub <1> > Revolute 1" (listed as "inst:N > mate:M"). |
 | `ratio` | string or number |  | Gear / linear: the ratio (default 1); rack and pinion / screw: the distance per revolution (default 25 mm). An expression in the assembly's variables (#name). |
 | `reverse` | boolean |  | Reverse direction. |
 | `edit` | string |  | An existing relation to edit (id or name). |

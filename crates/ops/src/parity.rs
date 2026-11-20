@@ -10274,9 +10274,20 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             res.untranslated.push(format!("{live_name}: no relation type"));
             continue;
         };
-        // (Its mates by live's names, as ours are named.)
-        let mate_name = |q: &Value| levels[k].features.iter().find(|m| m["featureId"] == q["featureId"]).and_then(|m| m["name"].as_str());
-        let mates: Vec<&str> = par("matesQuery").and_then(|p| p["queries"].as_array()).into_iter().flatten().filter_map(mate_name).collect();
+        // (Its mates by live's names, as ours are named; a flexible subassembly's through its instances, live infento
+        // Gear 2: "Sub <1> > Revolute 2".)
+        let mate_name = |q: &Value| -> Option<String> {
+            let path = ids(&q["path"]);
+            let (mut level, mut names) = (levels[k].element.clone(), Vec::new());
+            for id in &path {
+                names.push(ours.get(&(level.clone(), id.clone()))?.clone());
+                level = element_of.get(&(level, id.clone()))?.clone();
+            }
+            let at = levels.iter().find(|l| l.element == level)?;
+            names.push(at.features.iter().find(|m| m["featureId"] == q["featureId"])?["name"].as_str()?.to_string());
+            Some(names.join(" > "))
+        };
+        let mates: Vec<String> = par("matesQuery").and_then(|p| p["queries"].as_array()).into_iter().flatten().filter_map(mate_name).collect();
         // Screw and Rack and pinion: a length per revolution; Gear and Linear: a ratio.
         let length = matches!(ty.as_str(), "screw" | "rack_and_pinion");
         let ratio = par(if length { "relationLength" } else { "relationRatio" }).and_then(|p| p["expression"].as_str().map(str::to_string).or_else(|| p["value"].as_f64().map(|v| if length { format!("{v} m") } else { v.to_string() })));

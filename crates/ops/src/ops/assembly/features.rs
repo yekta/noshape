@@ -37,7 +37,7 @@ pub fn ops() -> Vec<Op> {
                 doc_field(),
                 asm_field(),
                 req("type", json!({ "type": "string", "enum": RELATIONS.iter().map(|r| r.0).collect::<Vec<_>>() }), "Relation type."),
-                req("mates", strings(), "The two mates (ids or names); screw: one cylindrical mate."),
+                req("mates", strings(), "The two mates (ids or names); screw: one cylindrical mate. A flexible subassembly's mate through its instances: \"Sub <1> > Revolute 1\" (listed as \"inst:N > mate:M\")."),
                 opt("ratio", json!({ "type": ["string", "number"] }), "Gear / linear: the ratio (default 1); rack and pinion / screw: the distance per revolution (default 25 mm). An expression in the assembly's variables (#name)."),
                 opt("reverse", json!({ "type": "boolean" }), "Reverse direction."),
                 opt("edit", s(), "An existing relation to edit (id or name)."),
@@ -186,7 +186,7 @@ pub(super) fn relations_json(a: &noshape_model::assembly::Assembly, r: &noshape_
                 "id": format!("mate:{}", x.id.0),
                 "name": x.name,
                 "type": RELATIONS.iter().find(|k| k.1 == x.relation_type).map(|k| k.0),
-                "mates": x.mates.iter().map(|m| format!("mate:{}", m.0)).collect::<Vec<_>>(),
+                "mates": x.mates.iter().zip(&x.mate_paths).map(|(m, p)| p.iter().map(|i| format!("inst:{} > ", i.0)).collect::<String>() + &format!("mate:{}", m.0)).collect::<Vec<_>>(),
                 "ratio": x.ratio.text,
                 "reverse": x.reverse,
                 "suppressed": x.suppressed,
@@ -198,13 +198,45 @@ pub(super) fn relations_json(a: &noshape_model::assembly::Assembly, r: &noshape_
         .collect()
 }
 
+/// A relation's mate: this assembly's (id or name), or a flexible subassembly's through its instances
+/// ("Sub <1> > Revolute 1", live infento Gear 2): (the path to that subassembly, the mate, its type).
+fn relation_mate(d: &noshape_model::Document, asm: &noshape_model::assembly::Assembly, key: &str) -> Result<(Vec<InstanceId>, MateId, noshape_model::assembly::MateType), OpError> {
+    let mut parts: Vec<&str> = key.split(" > ").map(str::trim).collect();
+    let mate = parts.pop().unwrap_or_default();
+    let mut level = asm;
+    let mut path = Vec::new();
+    for name in parts {
+        let id = find_instance(level, name, "mates")?;
+        let Some(inst) = level.instance(id) else { return Err(OpError::param("mates", &format!("no instance `{name}`"))) };
+        let InstanceSource::Assembly { assembly: tab, .. } = &inst.source else { return Err(OpError::param("mates", &format!("`{name}` is not a subassembly"))) };
+        if !inst.lock.is_flexible() {
+            return Err(OpError::param("mates", &format!("`{name}` is locked: only a flexible subassembly's mates can be related")));
+        }
+        let Some(TabContent::Assembly(sub)) = d.tab(*tab).map(|t| &t.content) else { return Err(OpError::param("mates", &format!("`{name}`'s assembly is missing"))) };
+        path.push(id);
+        level = sub;
+    }
+    let id = find_mate(level, mate)?;
+    let m = level.mate(id).ok_or_else(|| OpError::not_found(format!("no mate `{key}`")).with_param("mates"))?;
+    Ok((path, id, m.mate_type))
+}
+
 fn relation(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = target(ctx, a)?;
     let asm = assembly(od, tab)?.clone();
     let ty = a.str("type")?.to_lowercase().replace([' ', '-'], "_");
     let kind = RELATIONS.iter().find(|r| r.0 == ty).map(|r| r.1).ok_or_else(|| OpError::param("type", "gear, rack_and_pinion, screw or linear"))?;
-    let mates: Vec<MateId> = a.array("mates")?.iter().map(|v| find_mate(&asm, v.as_str().unwrap_or_default())).collect::<Result<_, _>>()?;
-    let mates = sa::check_relation(&asm, kind, mates.first().copied(), mates.get(1).copied()).map_err(|(_, e)| OpError::param("mates", &e))?;
+    let picked: Vec<_> = a.array("mates")?.iter().map(|v| relation_mate(od.doc(), &asm, v.as_str().unwrap_or_default())).collect::<Result<_, _>>()?;
+    let own = picked.iter().all(|p| p.0.is_empty());
+    let (mates, paths) = if own {
+        let ids: Vec<MateId> = picked.iter().map(|p| p.1).collect();
+        (sa::check_relation(&asm, kind, ids.first().copied(), ids.get(1).copied()).map_err(|(_, e)| OpError::param("mates", &e))?, Default::default())
+    } else {
+        let screw = kind == RelationType::Screw;
+        let (Some(x), Some(y)) = (picked.first(), if screw { picked.first() } else { picked.get(1) }) else { return Err(OpError::param("mates", "Select two mates for the relation.")) };
+        noshape_model::assembly::eval::relation_values(kind, x.2, y.2).map_err(|e| OpError::param("mates", &e))?;
+        ([x.1, y.1], [x.0.clone(), y.0.clone()])
+    };
     let editing = match a.opt_str("edit")? {
         Some(k) => Some(asm.relations.iter().find(|r| r.name == k || format!("mate:{}", r.id.0) == k || r.id.0.to_string() == k).map(|r| r.id).ok_or_else(|| OpError::not_found(format!("no relation `{k}`")).with_param("edit"))?),
         None => None,
@@ -223,8 +255,14 @@ fn relation(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         return Err(OpError::param("ratio", "Enter a valid expression."));
     }
     let result = solve(od, tab, &SolveOptions::default())?;
-    let base = result.relation_base(&asm, kind, mates);
-    let id = commit(od, tab, &sa::relation_description(kind), &result, |a| sa::commit_relation(a, editing, kind, mates, ExprValue::new(ratio), reverse, base))?;
+    let base = result.relation_base_at(&asm, kind, mates, &paths);
+    let id = commit(od, tab, &sa::relation_description(kind), &result, |a| {
+        let id = sa::commit_relation(a, editing, kind, mates, ExprValue::new(ratio), reverse, base);
+        if let Some(r) = a.relations.iter_mut().find(|r| r.id == id) {
+            r.mate_paths = paths;
+        }
+        id
+    })?;
     let name = assembly(od, tab)?.relations.iter().find(|r| r.id == id).map(|r| r.name.clone()).unwrap_or_default();
     let mut v = describe(od, tab)?;
     v["relation"] = json!(format!("mate:{}", id.0));

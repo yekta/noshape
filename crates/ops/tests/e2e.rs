@@ -1245,6 +1245,51 @@ fn variable_studio_rename_reaches_assemblies() {
     assert!(!c.to_string().contains("#w"), "no #w left: {c}");
 }
 
+/// Live infento Gear 2: a gear relation between a top-level Revolute and a flexible subassembly's ("Sub <1> > Revolute 2"):
+/// turning the top one 30° turns the subassembly's pin 60° in its block at ratio 2; listed with the mate's path; deleting
+/// the subassembly instance takes the relation with it.
+#[test]
+fn a_relation_reaches_a_flexible_subassemblys_mate() {
+    let mut ctx = Ctx::new();
+    let (b1, p1) = two_part_assembly(&mut ctx, "asm-cross-level-gear.noshape");
+    let parts = call(&mut ctx, "query_parts", json!({}));
+    let id = |k: usize| parts["parts"][k]["id"].as_str().unwrap().to_string();
+    let ins = |ctx: &mut Ctx, part: &str| call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": part }))["instance"].as_str().unwrap().to_string();
+    let (b2, p2) = (ins(&mut ctx, &id(0)), ins(&mut ctx, &id(1)));
+    call(&mut ctx, "assembly_set_state", json!({ "instances": [b1], "fixed": true }));
+    let cyl = |ctx: &mut Ctx, i: &str| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "surface": "cylinder" }))["faces"][0]["id"].as_str().unwrap().to_string();
+    for (pin, block) in [(&p1, &b1), (&p2, &b2)] {
+        let (pf, hf) = (cyl(&mut ctx, pin), cyl(&mut ctx, block));
+        let m = call(&mut ctx, "assembly_mate", json!({ "type": "revolute", "a": { "instance": pin, "entity": pf }, "b": { "instance": block, "entity": hf } }));
+        assert_eq!(m["mate_ok"], true, "{m}");
+    }
+    let m = call(&mut ctx, "assembly_move_to_subassembly", json!({ "instances": [b2, p2] }));
+    let sub = m["new_instance"]["name"].as_str().unwrap().to_string();
+    let sub_id = m["new_instance"]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "assembly_set_state", json!({ "instances": [sub_id], "fixed": true }));
+    let nested = format!("{sub} > Revolute 2");
+    let r = call(&mut ctx, "assembly_relation", json!({ "type": "gear", "mates": ["Revolute 1", nested], "ratio": 2 }));
+    let g = r["relations"][0].clone();
+    assert_eq!((g["name"].clone(), g["ok"].clone()), (json!("Gear 1"), json!(true)), "{g}");
+    assert!(g["mates"][1].as_str().is_some_and(|m| m.starts_with(&format!("{sub_id} > mate:"))), "the subassembly's mate by its path: {g}");
+    // The pin's turn in its block, about their common axis (degrees).
+    let turn = |ctx: &mut Ctx| {
+        let l = call(ctx, "assembly_list", json!({}));
+        let occ = |name: &str| l["occurrences"].as_array().unwrap().iter().find(|o| o["path"].as_str().is_some_and(|p| p.starts_with(&format!("{sub} > ")) && p.contains(name))).map(|o| glam::DQuat::from_xyzw(num(&o["rotation"][0]), num(&o["rotation"][1]), num(&o["rotation"][2]), num(&o["rotation"][3]))).unwrap();
+        let rel = occ("Part 1").inverse() * occ("Part 2");
+        (2.0 * rel.z.atan2(rel.w)).to_degrees()
+    };
+    let before = turn(&mut ctx);
+    call(&mut ctx, "assembly_mate_value", json!({ "mate": "Revolute 1", "dof": "rz", "value": "30 deg" }));
+    let d = (turn(&mut ctx) - before + 540.0).rem_euclid(360.0) - 180.0;
+    assert!((d.abs() - 60.0).abs() < 1e-3, "the subassembly's pin turned {d}°, not 60°");
+    // A name that doesn't lead to a flexible subassembly's mate is refused, naming the field.
+    let e = try_call(&mut ctx, "assembly_relation", json!({ "type": "gear", "mates": ["Revolute 1", "Revolute 1 > Revolute 2"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("mates"), "{e:?}");
+    call(&mut ctx, "assembly_delete", json!({ "instances": [sub_id] }));
+    assert!(call(&mut ctx, "assembly_list", json!({}))["relations"].as_array().unwrap().is_empty(), "the relation goes with the subassembly");
+}
+
 /// Live dm-1120: a mate offset "#w" is refused until the assembly has a Variable Studio defining w; an inserted
 /// "Dims" with w = 0.5 in reads "12.7 mm" in the assembly's Variable table, and the offset then solves to it.
 #[test]

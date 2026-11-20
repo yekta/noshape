@@ -439,7 +439,7 @@ impl Assembly {
         sub.mates = self.mates.iter().filter(|m| internal.contains(&m.id)).cloned().collect();
         sub.connectors = self.connectors.iter().filter(|c| moved_conns.contains(&c.id)).cloned().collect();
         sub.patterns = self.patterns.iter().filter(|p| moved_pats.contains(&p.id)).cloned().collect();
-        sub.relations = self.relations.iter().filter(|r| r.mates.iter().all(|m| internal.contains(m))).cloned().collect();
+        sub.relations = self.relations.iter().filter(|r| r.own_mates().count() == 2 && r.mates.iter().all(|m| internal.contains(m))).cloned().collect();
         sub.groups = self.groups.iter().filter(|g| g.instances.iter().all(|i| moved.contains(i)) && g.patterns.iter().all(|p| moved_pats.contains(p))).cloned().collect();
         let moved_groups: Vec<MateId> = sub.groups.iter().map(|g| g.id).collect();
         let moved_rels: Vec<MateId> = sub.relations.iter().map(|r| r.id).collect();
@@ -556,8 +556,26 @@ impl Assembly {
         for r in &sub.relations {
             let mut n = r.clone();
             n.id = feat_map[&r.id];
-            n.mates = r.mates.map(|m| feat_map.get(&m).copied().unwrap_or(m));
+            for (m, p) in n.mates.iter_mut().zip(&mut n.mate_paths) {
+                match p.first_mut() {
+                    None => *m = feat_map.get(m).copied().unwrap_or(*m),
+                    Some(first) => *first = inst_map.get(first).copied().unwrap_or(*first),
+                }
+            }
             self.relations.push(n);
+        }
+        // The parent's relations on its mates now relate this assembly's own (or a deeper one's through the moved instance).
+        for r in &mut self.relations {
+            for (m, p) in r.mates.iter_mut().zip(&mut r.mate_paths) {
+                if p.first() != Some(&sub_inst) {
+                    continue;
+                }
+                p.remove(0);
+                match p.first_mut() {
+                    None => *m = feat_map.get(m).copied().unwrap_or(*m),
+                    Some(first) => *first = inst_map.get(first).copied().unwrap_or(*first),
+                }
+            }
         }
         for g in &sub.groups {
             let mut n = g.clone();

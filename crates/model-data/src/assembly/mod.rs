@@ -510,6 +510,26 @@ pub struct Relation {
     /// documents) measures from the positions at each solve.
     #[serde(default)]
     pub base: Option<[f64; 2]>,
+    /// Where each of `mates` lives: empty for this assembly's own, else the path to the flexible subassembly instance
+    /// whose mate it is (live infento Gear 2: a top-level Revolute geared to a flexible subassembly's).
+    #[serde(default, skip_serializing_if = "own_mates")]
+    pub mate_paths: [Vec<InstanceId>; 2],
+}
+
+fn own_mates(p: &[Vec<InstanceId>; 2]) -> bool {
+    p.iter().all(Vec::is_empty)
+}
+
+impl Relation {
+    /// This assembly's own mates among its two (a flexible subassembly's are left out).
+    pub fn own_mates(&self) -> impl Iterator<Item = MateId> + '_ {
+        self.mates.iter().zip(&self.mate_paths).filter(|(_, p)| p.is_empty()).map(|(m, _)| *m)
+    }
+
+    /// Does it relate a mate inside the subassembly instance `id` (a path through it)?
+    pub fn reaches_into(&self, id: InstanceId) -> bool {
+        self.mate_paths.iter().any(|p| p.first() == Some(&id))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1334,7 +1354,7 @@ impl Assembly {
         self.connectors.retain(|c| !dead_conn.contains(&c.id));
         let dead: Vec<MateId> = self.mates.iter().filter(|m| m.uses_instance(id) || m.connectors().any(|c| Self::uses_dead_connector(c, &dead_conn))).map(|m| m.id).collect();
         self.mates.retain(|m| !dead.contains(&m.id));
-        self.relations.retain(|r| !r.mates.iter().any(|m| dead.contains(m)));
+        self.relations.retain(|r| !r.own_mates().any(|m| dead.contains(&m)) && !r.reaches_into(id));
         for p in &mut self.patterns {
             for g in &mut p.generated {
                 if g.mate.is_some_and(|m| dead.contains(&m)) {
@@ -1403,7 +1423,7 @@ impl Assembly {
             return;
         }
         self.mates.retain(|m| m.id != id);
-        self.relations.retain(|r| r.id != id && !r.mates.contains(&id));
+        self.relations.retain(|r| r.id != id && !r.own_mates().any(|m| m == id));
         self.groups.retain(|g| g.id != id);
         // A pattern driven by this mate (part pattern / replicate) goes too.
         if let Some(pid) = self.patterns.iter().find(|p| matches!(p.kind, PatternKind::PartPattern { mate } | PatternKind::Replicate { mate, .. } if mate == id)).map(|p| p.id) {
@@ -1531,7 +1551,7 @@ impl Assembly {
         for g in &stale {
             for m in g.mate.iter().chain(&g.more_mates) {
                 self.mates.retain(|x| x.id != *m);
-                self.relations.retain(|r| !r.mates.contains(m));
+                self.relations.retain(|r| !r.own_mates().any(|x| x == *m));
             }
             if let Some(pp) = self.patterns.iter_mut().find(|x| x.id == id) {
                 pp.generated.retain(|x| x.instance != g.instance);

@@ -436,7 +436,7 @@ pub fn commit_relation(a: &mut Assembly, editing: Option<MateId>, kind: Relation
     }
     let id = MateId(a.next_id());
     let name = a.next_feature_name(relation_name(kind));
-    a.relations.push(Relation { id, name, relation_type: kind, mates, ratio, reverse, suppressed: false, base });
+    a.relations.push(Relation { id, name, relation_type: kind, mates, ratio, reverse, suppressed: false, base, mate_paths: Default::default() });
     id
 }
 

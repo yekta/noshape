@@ -596,7 +596,7 @@ fn group_moves_rigidly_and_gear_relation() {
             mate(10, MateType::Revolute, conn(1, hole.clone(), Inference::MidAxis), conn(2, pf.clone(), Inference::MidAxis)),
             mate(11, MateType::Revolute, conn(1, hole, Inference::MidAxis), conn(3, pf, Inference::MidAxis)),
         ],
-        relations: vec![Relation { id: MateId(40), name: "Gear 1".into(), relation_type: RelationType::Gear, mates: [MateId(10), MateId(11)], ratio: ExprValue::new("2"), reverse: false, suppressed: false, base: None }],
+        relations: vec![Relation { id: MateId(40), name: "Gear 1".into(), relation_type: RelationType::Gear, mates: [MateId(10), MateId(11)], ratio: ExprValue::new("2"), reverse: false, suppressed: false, base: None, mate_paths: Default::default() }],
         ..Default::default()
     };
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
@@ -826,7 +826,7 @@ fn relation_measured_from_stored_reference() {
     for (id, p) in &res.solved.placements {
         asm.instance_mut(*id).unwrap().placement = *p;
     }
-    asm.relations.push(Relation { id: MateId(40), name: "Gear 1".into(), relation_type: RelationType::Gear, mates: [MateId(10), MateId(11)], ratio: ExprValue::new("2"), reverse: false, suppressed: false, base: Some(base) });
+    asm.relations.push(Relation { id: MateId(40), name: "Gear 1".into(), relation_type: RelationType::Gear, mates: [MateId(10), MateId(11)], ratio: ExprValue::new("2"), reverse: false, suppressed: false, base: Some(base), mate_paths: Default::default() });
     // Turn pin 1 by 0.2 rad in the stored placements (as an outside edit would):
     // the relation is enforced against the stored reference, not the new start.
     let p2 = asm.instance(InstanceId(2)).unwrap().placement;
@@ -2850,7 +2850,7 @@ fn a_linear_relation_moves_its_follower_the_opposite_way() {
             mate(10, MateType::Slider, conn(1, top.clone(), Inference::Centroid), conn(2, bottom.clone(), Inference::Centroid)),
             mate(11, MateType::Slider, conn(1, top.clone(), Inference::Centroid), conn(3, bottom.clone(), Inference::Centroid)),
         ],
-        relations: vec![Relation { id: MateId(12), name: "Linear 1".into(), relation_type: RelationType::Linear, mates: [MateId(10), MateId(11)], ratio: ExprValue::new("1"), reverse: false, suppressed: false, base: None }],
+        relations: vec![Relation { id: MateId(12), name: "Linear 1".into(), relation_type: RelationType::Linear, mates: [MateId(10), MateId(11)], ratio: ExprValue::new("1"), reverse: false, suppressed: false, base: None, mate_paths: Default::default() }],
         ..Default::default()
     };
     let z = |res: &eval::AssemblyResult, s: &eval::Solved, id: u64| {
@@ -2887,7 +2887,7 @@ fn a_flexible_subassembly_keeps_its_relations() {
             mate(10, MateType::Slider, conn(1, top.clone(), Inference::Centroid), conn(2, bottom.clone(), Inference::Centroid)),
             mate(11, MateType::Slider, conn(1, top.clone(), Inference::Centroid), conn(3, bottom.clone(), Inference::Centroid)),
         ],
-        relations: vec![Relation { id: MateId(12), name: "Linear 1".into(), relation_type: RelationType::Linear, mates: [MateId(10), MateId(11)], ratio: ExprValue::new("2"), reverse: false, suppressed: false, base: None }],
+        relations: vec![Relation { id: MateId(12), name: "Linear 1".into(), relation_type: RelationType::Linear, mates: [MateId(10), MateId(11)], ratio: ExprValue::new("2"), reverse: false, suppressed: false, base: None, mate_paths: Default::default() }],
         ..Default::default()
     };
     let sub_tab = f.doc.add_tab("Sub", TabContent::Assembly(Box::new(sub)));
@@ -3625,7 +3625,7 @@ fn dynamic_suppression_applies_to_mates() {
 fn dynamic_suppression_applies_to_relations() {
     let f = doc_with(vec![block_studio()]);
     let mut asm = Assembly {
-        relations: vec![Relation { id: MateId(40), name: "Gear 1".into(), relation_type: RelationType::Gear, mates: [MateId(10), MateId(11)], ratio: ExprValue::new("2"), reverse: false, suppressed: false, base: None }],
+        relations: vec![Relation { id: MateId(40), name: "Gear 1".into(), relation_type: RelationType::Gear, mates: [MateId(10), MateId(11)], ratio: ExprValue::new("2"), reverse: false, suppressed: false, base: None, mate_paths: Default::default() }],
         ..Default::default()
     };
     asm.unsuppressed_if.insert(MateId(40), "0".into());
@@ -5228,7 +5228,7 @@ fn relation_and_mate_errors_use_live_texts() {
     let (pin, rq) = body_of(&mut ev, &f.doc, f.studios[1]);
     let hole = cylinder_face(&rp);
     let pf = cylinder_face(&rq);
-    let gear = |mates: [MateId; 2]| Relation { id: MateId(40), name: "Gear 1".into(), relation_type: RelationType::Gear, mates, ratio: ExprValue::new("1"), reverse: false, suppressed: false, base: None };
+    let gear = |mates: [MateId; 2]| Relation { id: MateId(40), name: "Gear 1".into(), relation_type: RelationType::Gear, mates, ratio: ExprValue::new("1"), reverse: false, suppressed: false, base: None, mate_paths: Default::default() };
     let mut asm = Assembly {
         instances: vec![
             part_instance(1, "Plate <1>", f.studios[0], plate, DVec3::ZERO, true),
