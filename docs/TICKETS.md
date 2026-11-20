@@ -19,7 +19,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   row reads "#name = <evaluated value>" in document units, 3 decimals with trailing zeros dropped: "#w = 30 mm" for
   #h * 3 (h = 10 mm in a Variable Studio), "#q = 32 mm" for #w + 2 mm, "#t = 3.333 mm" for #h / 3, "#u = 2.5 mm";
   tooltip "#w = 30 mm [Variable]". Ours shows the typed expression, "#w = #h * 3" (model-core interaction.rs:557).
-- [ ] P2 **DRW-MULTI-VIEW-MENU (studios)**: drawing.md V39. Live, two views selected (a Front and its projected
+- [ ] fixed (studios 11-20: Show/hide ▸ as live, no Align views ▸; Tangent edges ▸ was already there), to verify P2 **DRW-MULTI-VIEW-MENU (studios)**: drawing.md V39. Live, two views selected (a Front and its projected
   view): Show/hide ▸ · Tangent edges ▸ · Adjust linestyle... · View properties... · Move to sheet... · Copy · Paste as
   table · Clear selection · Zoom to fit · Delete; Show/hide ▸ = Show hidden lines · Show shaded view · Hide threads ·
   Show faulty parts · Show center of mass. Ours (drawing_move_sheet.rs multi menu): no Tangent edges, an extra
