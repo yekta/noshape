@@ -75,6 +75,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   dx 06:2x: the row (Include hidden instances greyed, checked, as live), export_parts `rigid_subassemblies_single_link`
   (an Assembly's URDF was not in the op at all: now it is): a locked or rigid subassembly's parts one link, one mesh.
   Open: live's file shape with it (link / mesh names, merge), REQUESTS dx 05:44.
+- [ ] P2 **URDF-LIVE-FILE-SHAPE (dx)**: an Assembly's URDF is not live's file. Live 13:06 (behaviours "URDF single link
+  (11-20)", live/export/urdf-single-link-1120/): the zip is `<asm>/urdf/<asm>.urdf`, `<asm>/launch/<asm>.launch`,
+  `<asm>/meshes/<Part_name>.stl` (one per part, Part Studio coordinates); robot named the assembly in lower case; a
+  link per part (lower case, the fixed one `root`), inertial blocks (mass, COM, inertia), materials named by RGBA, joints
+  from the mates (Revolute → `continuous`, Fastened → `fixed`, at the connector's frame), explicit mate connectors as
+  1e-9 links on fixed joints, a rigid subassembly's other parts on `hanging_node_to_root_joint`. With the option on, a
+  rigid subassembly or a Fastened pair is one link with a `<visual>` per part (masses and inertias summed, no merged
+  mesh) and the connector links fold into their parts. Ours: every part a link fixed to `base_link`, no joints,
+  no inertia, no launch file, and the option merges one mesh.
 ## psui, 2026-11-20 (live's feel coverage cov-1120; docs/parity/interaction-feel.md "cov-1120")
 - [x] done (studios 11-20: c249e0ed9 / f29e6eb2; the same rows as qa's FEEL-FS-* below, verified 07:0x on green 0bc7e772e) **P1 FS-WHEEL-72PX [studios]**: a wheel notch scrolls the Feature Studio's code 72 px in live (Ace: 4.5 lines of
   16 px, the first draw 9 ms after; behaviours "feel coverage (11-20)" F3, live/feel/cov-1120/fs-mouse*.json). Ours: the
