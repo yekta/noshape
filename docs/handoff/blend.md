@@ -1,37 +1,33 @@
 # Blends (agent "blend"): current state
 
-Updated 11-19 22:55 UTC (fresh blend thread 11-19 21:10 after the old one stalled at the usage limit). History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-20 09:13 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-20 02:05)
+## Now (11-20 09:13)
 
-- Queue (lead 11-19/20): land car, 805e29, suspension when their gates are clean; then mutualtrim; knifehandle Fillet 2
-  parked. Hosts by load (bin/pickhost); vibex8 off-limits from 02:00 (qa nightly); model-suite pairs on vibex7 or vibe2.
-  Userdocs only vibex7, one CLI run at a time (bin/ud-gate.sh waits). vibe hosts cap concurrent cargo builds ("waiting
-  for one of N build slots" = queued). Host ~/tmp is pruned: bin/ud-pair.sh restores userdocs.py/nscli.py first.
-  bin/g13h.sh now uses its own target per worktree (two runs used to clobber one dir), default host vibe2. Units via
-  `systemd-run -E HOME=/root -E PATH=$PATH`; never a `timeout` round land.sh (it killed one in the clippy queue).
-- Car Fillet 1 (dx's, blocks 5 c2-surf-intro docs): blend5 d1124ae95 -> QUEUED 5a27ad71 (from worktree blend-carland,
-  lead: land before the pair). checked_blend's last fallback `repaired` (ShapeFix_Shape + ReShape history, kept only as
-  one valid solid of the same faces). T1 a_cars_top_edges_round_along_their_tangent_chain_as_live 7/14/9. Gate: tests,
-  g13, userdocs 4/4 SAME; suite pair unit blend-pcar (vibex7) -> suite-ecar.cmp: a difference = fix forward or revert at
-  once and tell the lead. Tell dx when it is on main.
-- 805e29 exact edges (blend2 62616b568): all clean but the suite pair (blend-gate805, vibe2 slot) -> suite-e805.cmp.
-- Suspension LCA Fillet 3 canals (blend13 b56173a9f): all 8 corners spliced (make_edge_on unwraps UVs from a seam
-  point; face_with_edge_replaced drops a run's first/last piece that retraces the kept neighbour edge, pcurves walked
-  in period). T1 rounds_running_into_a_tube_close_on_canals_as_live. Tests, userdocs SAME, g13 OK; suite pair
-  (blend-gatesusp, vibe2) -> suite-esusp.cmp. Land when clean.
-- Mutualtrim Fillet 1 (blend4 4908fc786 on 5b62f6ca8): 8/8 as live. Sheet round = sheet_blend (split the sheet along the
-  tools' touch curves, drop pieces along the rounded edge, sew in the rounds); op_split_on: projection fallback, and
-  BRepAlgoAPI_Splitter when BRepFeat_SplitShape leaves a face of no area (closed touch loops). T1
-  a_surfaces_round_between_its_trimmed_halves_stays_a_surface_as_live (data/mutualtrim-fillet1-input.brep). T1 ok.
-  Gate blend-gatemt (bin/gatemt.sh: vs mt-base worktree = its parent; builds vibe2, userdocs -> ud-mt.log, g13-mt.log,
-  pair on vibex7 -> suite-emt.cmp). Land when clean.
-- bool-land7 (e3078f89, crates/brep + kernel Boolean/Shell) queued 11-20: if a blend result moves after it, tell bool.
+- Landed 11-20: car Fillet 1, 805e29, suspension canals, mutualtrim (dfc773b80), CHAMFER-ASYM (5a7f9ba8e; qa told).
+- Lead's queue (11-20): land the groups speed fix, then the fillet work bound, then the impeller Halter (Fillet 3's
+  chamfer extended past its foot as live). Extrude 6's regions (850efe's input) are skasm's, the assembly path feeding
+  Fillet 3 a different input asm's.
+- Groups speed (blend-speed 1bf9c67c0): fillet_by_groups rounds groups whose rmax-grown boxes can't meet in one layer,
+  one Common per layer (isaac-ball 00f1d4 Fillet 6 5246 -> 968 ms, Fillet 8 2382 -> 594). T1
+  rounds_meeting_on_several_ribs_are_their_common. Tests + userdocs ALL-SAME; suite pair (blend-gategroups, vibex8 vs
+  groups-base) -> suite-egroups.cmp. Land when clean.
+- Car end (blend-carend 66fbe5e60: dx's rear vertices ±33.142 vs live ±33.941): gate blend-gatecarend on vibex7, then
+  blend-udcarend. Land when clean, tell dx and the lead.
+- Fillet work bound (blend-fwork, on 1bf9c67c0, uncommitted): build_fillet_bounded = ScopedWork(FILLET_WORK) round
+  every BRepFilletAPI_MakeFillet build (patch 0030's break hook counts each math solve; no clock, DECISIONS 11-15);
+  set_fillet_work / with_fillet_work for the T1 a_fillet_past_its_work_bound_fails_and_the_next_one_builds.
+  850efe Fillet 3's runaway: BRepBlend_AppFuncRoot::SearchPoint's quadratic InsertBefore on edge 85. FILLET_WORK from
+  bin/fwork-cal.sh (NOSHAPE_WORK_TRACE over kernel + model tests, 850efe) -> logs/fwork-cal.out.
+- Halter: probes in worktree blend-f850 (vibex8, never commit: ZZ_FACES / ZZE face + edge dumps in detail.rs, ZZRUN in
+  blend_section.rs, zz_f850 in crash_inputs.rs, ZZ_ASIS / ZZ_PARAMS in features.cpp); bin/imp-faces.sh <wt> <tag>.
+  Run-on trace: the near-end run-on (q x 1.5, out -x, tip 2.94 mm) meets no face; live's chamfer JfS is extended in u
+  past its x 1.5 foot to the tip x 0.097 (q-imp-chamfer-surf/surf.json).
 - Agent ids: only in /root/lead-scratch/roster.md; read it before every message_agent, never copy ids here.
 
 ## In flight (older)
