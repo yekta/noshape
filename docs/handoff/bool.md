@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-20 22:03 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-20 22:56 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -19,12 +19,12 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
 
 ## In flight
 - COMPAT-CRASH957-CHAMFER3: LANDED 43c2644a (20:10), qa verified on green 00bc521e and ticked it. Closed.
-- 850efe Extrude 6 (worktree/branch bool-m85, 4f4fa433f on main 698df935f): 68e96d2fc + 4f4fa433f (replace_by refuses
-  a merged cylinder face whose UVBounds u span > 2 pi: c2-fan-blade-sweep's 9 thread-land strips were one 7.7-turn
-  face, Boolean 2's cut then OCCT's and invalid; T1 a_threads_helical_land_stays_in_strips_on_unify, case 935abddf).
-  fan-blade now 56/139/84 valid = main (live 56/143/88, a gap of main's too). Full gate on vibex8 (unit
-  bool-gate-m85b, script /root/bool-scratch/gate-m85.sh, out /root/bool-hat-scratch/chain-bool-m85.out, from 20:06).
-  PASS -> land, tell skasm (root of the 30 s Fillet 3) + lead; rm worktree, vibex7/8 ~/agents/bool-m85{,-gate}.
+- 850efe Extrude 6 (bool-m85, 4f4fa433f on main 698df935f): QUEUED 06dcd168 22:49 (gate CHECK only for the knurls:
+  replay = main; 2 shells now as OCCT's; impeller Fillet 3 34 faces = live). Lead 22:5x: the knurls are part of the
+  gate: run them for every gate (no host has 48 GB: OCCT side from cache vibex8 ~/agents/bool-keep/knocc = vibex7's
+  11-12 OCCT results, ours main vs branch: /root/bool-scratch/kn-run.sh <host> <dir> with k-main / k-br in
+  ~/tmp/bool/<dir>). m85's: unit bool-kn-m85 -> /root/bool-scratch/kn-m85.out (vibex8 ~/tmp/bool/knm85). Differ ->
+  revert or fix forward at once, tell lead. Then rm worktree, vibex7/8 ~/agents/bool-m85{,-gate}.
 - impeller Extrude (worktree/branch bool-imp, 1b2e274a3 on main 55749fd6f): free-form face's edges imprinted on
   another free-form face of its surface (edge_over_free_face bsplines, free::past_patch_along); ours = OCCT 97/221/141,
   ~1.0 s vs OCCT 1.8 s; T1 impeller_seats_on_its_free_form_wall_fuse_as_occt (case 23c0c38476a63ecf, 1.09 MB, rel
@@ -35,21 +35,23 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
 - SHELL-AFTER-WELD-FILLET (worktree/branch bool-sh3w, a4cfa07d3 on main 55749fd6f): 407bb5cf6's
   without_inverted_slivers alone + T1 a_weld_fillet_part_shells_to_one_solid_without_its_inverted_sliver
   (tests/data/shell/weld-fillet-part3-input.brep = qa doc's Part 3 before Shell 3). shell:: 33 ok; the T1 fails on main.
-  Gate on vibex7 (unit bool-gate-sh3w, /root/bool-scratch/gate-sh3w.sh, out chain-bool-sh3w.out, from 21:36).
+  Gate on vibex7 (unit bool-gate-sh3w, /root/bool-scratch/gate-sh3w.sh, out chain-bool-sh3w.out, from 21:36) + knurls.
   PASS -> land, tell qa + lead.
   FOLLOW-UP (own ticket): Part 3 = live's input (342822.058 mm3) but ours 183041.69 vs live 183072.272 /
   59 faces / 156 edges / 93 vertices (41 planes, 14 cyl, 4 cones), 30 Shell faces 32018.992 mm2 (per-face areas:
   /root/live-scratch/shellq/shell3-topo.json). (The 141 faces were Part 3 at the END of the doc, not after Shell 3.)
-  ROOT (11-20 22:20): Part 3's Shell is a closed hollow (the 1 mm chamfer removed is thinner than t: slabs give the
-  same with or without it; 1 solid, 7 shells). Quadrics fails even with nothing removed (merged walls: self-
-  intersecting offset wires), so slabs is the path. Slabs' gap: the concave-edge filler (shell.cpp "extend both
-  offsets until they meet", section {E, E+n1 d, M, E+n2 d}) takes M from tangent planes; along the R20 round x the
-  45-deg V faces M sits mm off the r15 offset cylinder -> tools 36/39 (34 faces, 225.7 mm3) leave wall uncovered
-  (-30.6 mm3) and their facets/sides become the cavity strips. FIX PLAN: filler = (wedge scaled ~2x, sides turned in
-  by eps) COMMON (Ext1 FUSE Ext2), Ext = the face's surface's band 0..t (plane: half-space slab, cylinder: tube,
-  cone) -> exact offset faces, unify to live's. Probe prints tools (bool-hat sh3-probe2, NOSHAPE_SHELL_DEBUG).
-  Our Shell on live's x_t Part 3 fails ("shell failed"). Part 2 = live. Probe: bool-hat branch sh3-probe2 (= bool-sh3w
-  + shell::zz_probe_weld_part3, all methods' faces), Mac, unit bool-p3probe, out /root/bool-scratch/p3probe.out.
+  ROOT: Part 3's Shell is a closed hollow (the 1 mm chamfer removed is thinner than t); quadrics fails (merged walls),
+  slabs is the path; its concave-edge filler took the mitre from tangent planes (R20 round x 45-deg V faces).
+  FIX bool-p3 (bool-hat worktree, eee1fb172 on bool-sh3w): within_offsets (filler swept 2.5x, sides turned 0.05 rad,
+  from behind the edge, COMMON each face's under_offset = extended_slab(d) FUSE extended_slab(-d); plane/cylinder
+  only; corners with a cylinder alike; NOSHAPE_SHELL_TANGENT_MITRE=1 = old). 141 faces/7 shells -> 62/2 (live 59),
+  -30.6 -> -13.3 mm3. shell:: 34 ok; T1 a_weld_fillet_parts_round_meets_its_groove_on_the_offsets fails without.
+  Gate on vibex8 (unit bool-gate-p3, /root/bool-scratch/gate-p3.sh, out chain-bool-p3.out, from 22:51) + knurls.
+  LEFT (-13.3 mm3, 3 faces): two 5.572 mm2 triangles (normal (-1,1,1)/sqrt3 = a corner cone side of end wall x V
+  face) at (-38.65, -7.35/9.35, -14.31) at the V groove's far end (x -60..-44): ours 67.17/134.x, live 71.719/
+  143.2; bottom offset ours 4231.85 live 4212.547 (a run-on of the concave filler past the end changed nothing);
+  the cone 518.307 split 225.08 + 293.23 (unify). Probe: bool-hat branch sh3-probe2 (WIP commit), p3probe.sh /
+  p3cmp.py (ours vs live per face).
   (bool-hat's old sh3-probe debug is WIP commit on branch sh3-probe; patch /root/bool-scratch/bool-hat-sh3-probe-old.patch.)
   Files: vibex7 ~/tmp/bool/sh3w/{d.noshape (qa doc copy), pre-shell3.x_t, dump/shell-17 (Part 3), shell-18 (Part 2)}.
 - screws Sweep 1: speed landed 0a0b9a49; "not a valid solid" was my 13:06 A/B parity (maybe before core's 0f8993ef8);
