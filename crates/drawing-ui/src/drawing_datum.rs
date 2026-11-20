@@ -447,7 +447,7 @@ impl DrawingEditor {
                     .border_color(gpui_kit::rgb(0xcccccc))
                     .rounded_l(px(2.))
                     .px(px(4.))
-                    .child(Input::new(st).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall().text_center()),
+                    .child(Input::new(st).text_size(px(12.)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall().text_center()),
             )
             .child(self.target_precision(row, i, cur, cx))
             .into_any_element()
@@ -646,7 +646,8 @@ impl DrawingEditor {
                     let modes: Vec<(String, bool, bool)> = vec![("Length".into(), !opts.angular, false), ("Angle".into(), opts.angular, true)];
                     let mode_btn = {
                         let ed = ed.clone();
-                        Button::new(("dt-mode", k)).ghost().xsmall().w_full().dropdown_caret(true).label(if opts.angular { "Angle" } else { "Length" }).os_dropdown_menu(SharedString::from(format!("dt-mode-dd-{k}")), true, move |mut m, _, _| {
+                        // Live's Wt dropdown: 13.33 px, #555 (as the hole table's).
+                        Button::new(("dt-mode", k)).ghost().xsmall().w_full().accessibility_label(mode_name).child(div().text_size(px(13.33)).child(mode_name)).text_color(gpui_kit::rgb(0x555555)).dropdown_caret(true).os_dropdown_menu(SharedString::from(format!("dt-mode-dd-{k}")), true, move |mut m, _, _| {
                             for (l, on, v) in &modes {
                                 let (e, v) = (ed.clone(), *v);
                                 m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, window, cx| {
@@ -688,7 +689,7 @@ impl DrawingEditor {
                     };
                     let flip = |id: (&'static str, usize), label: &'static str, on: bool, x: bool, cx: &mut Context<Self>| {
                         v_flex().w(px(25.)).items_center().child(div().text_size(px(10.)).whitespace_nowrap().child(label)).child(
-                            div().id(id).tooltip(crate::ui::tooltip("Opposite direction")).size(px(20.)).flex().items_center().justify_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).when(on, |e| e.bg(gpui_kit::rgb(0xdfe7ee))).cursor_pointer().child(div().text_size(px(11.)).child("⤢")).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            div().id(id).tooltip(crate::ui::tooltip("Opposite direction")).size(px(20.)).flex().items_center().justify_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).bg(gpui_kit::rgb(if on { 0xdfe7ee } else { 0xffffff })).cursor_pointer().child(crate::assets::icon_inked("flip-direction", 16., 0x616b73, cx)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 if let Some(d) = &mut this.datum_dlg
                                     && let Some(r) = d.rows.get_mut(k)
                                 {
