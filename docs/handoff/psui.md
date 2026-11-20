@@ -1,12 +1,12 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-20 18:04 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-20 18:56 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
 
 - Worktree /root/projects/noshape-wt/psui, branch agent/psui. Commit as yekta (AGENTS.md), subject "psui: …".
-- Mac available again 18:06 UTC 11-20 (NOSHAPE_RB_HOST=mac, headless only). Builds and crate tests: plain `NOSHAPE_RB_HOST=vibex8 tools/tiers/rb.sh bash -c "$(cat script)"` (DECISIONS 9e5b481d4;
+- Mac off limits until 21:35 UTC 11-20 (lead; tunnel shut): build on vibex7/vibex8. Builds and crate tests: plain `NOSHAPE_RB_HOST=vibex8 tools/tiers/rb.sh bash -c "$(cat script)"` (DECISIONS 9e5b481d4;
   ~/bin/slot only for suites, gates, timing pairs). Scripts in /root/psui-scratch/run*.sh. The GPUI dialog matrix is
   `dialogs::the_dialogs_matrix_matches_live` (rows filter: DIALOG_ROW=…).
 - Scenario / app runs: vibex6, at most 3 app instances (shared with studios). Heavy runs (scenario shards) through
@@ -35,7 +35,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (18:04 UTC 11-20)
+## Now (18:55 UTC 11-20)
 
 1. LANDED: 6f48184a (FS notices compile off the UI thread; A/B 6 max prepaint 534 -> 28 ms on 850efe, 549 -> 37 on
    de4eff), 18809b4c (spinner on the executor clock), 1c6e56e4 + 5c3f3bb7 (revert of a5505f50). Worktrees psui-fsn,
@@ -44,23 +44,24 @@ docs/DECISIONS.md (read first; it wins over anything here).
    Configurations box pane (FEEL-CONFIG-BOX-WIDTH). run156 green (clippy, part-studio-ui 354, app-core 115, offscreen).
    A/B 7/8 (vibex6, load 5-10): select the same at low load (5-7 ms both); under load both slip (main 64-171, re-land
    96-154), waiting for the first window present after the click. Not a re-land regression.
-3. Heavy-doc hover. FOUND (trace diag1, gpui notify backtraces): after 500 ms with no window frame the viewport's
-   request_frame took itself as off screen and notified: every hover after a rest redrew the whole window first (present
-   100-180 ms on llvmpipe) and submitted its frame from that draw, the frame then sharing the CPU with it. FIX
-   (landing 18:13): vendor gpui `App::entity_drawn` (NOSHAPE PATCH: the entity in a window's last frame) decides on
-   screen; last_layout on the viewport's clock. Test feel_tests a_hover_after_a_rest_submits_its_frame_without_a_window_redraw
-   asserts `Viewport::last_layout()` unchanged (GPUI's test mode draws dirty windows inside flush_effects, so only that
-   tells the paths apart); run159 vibex8: passes fixed, fails with the old line; run158 part-studio-ui 355 + app-core 115.
-   A/B 11 (vibex6: noshape-b = same tree without the fix,
-   noshape-f) -> /root/psui-scratch/ab11.log. A/B 9 hover main -> 87ffadda: block 416-644 -> 271-431, impeller
-   415-712 -> 385-600, de4eff 641-770 -> 224-748 (load 13). de4eff frame r.gpu_ms 120-250 (147k tris); A/B 10 per-pass
-   skips too noisy under falling load to attribute (none 227 then 82). Fast-move wait = 5 x pick (30-60 ms on de4eff).
+3. Heavy-doc hover. LANDED 51c01c9c 18:35 (0808250d): after 500 ms with no window frame the viewport took itself as
+   off screen, so every hover after a rest redrew the whole window (present 100-180 ms on llvmpipe) before its frame;
+   now vendor gpui `App::entity_drawn` (NOSHAPE PATCH) decides on screen. Test
+   a_hover_after_a_rest_submits_its_frame_without_a_window_redraw asserts `Viewport::last_layout()` unchanged (GPUI's
+   test mode draws dirty windows in flush_effects). Land check flaked once on clicks_in_3d_…ctrl_opens_the_menu and
+   feature-studio a_double_click_…: 5/5 and 3/3 alone on vibex8 at load 13.
+   A/B 11 (vibex6 load 8-11, same-tree baseline): hover medians de4eff 380/237 -> 283/253, impeller 207/180 -> 164/222,
+   block 187/183 -> 82/232: mixed under load, clear only at low load.
+   DONE (lead 18:5x: software-only frame cost is below the open feel rows): scratch bench /root/psui-scratch/pick_bench.rs
+   (never land; run162.sh copies it in on the host), 151k tris + 17k segments 1600x1000 llvmpipe, load 11-13: frame
+   71-106 ms with nothing skipped; skipping ao / silhouettes / backsil (alone or together) 63-142, in the noise; meshes
+   skipped 28-38; pick 0.1-2 ms. The shaded mesh pass is the cost; no cheap pass win that also helps GPU frames.
    Tools vibex6 ~/agents/psui-keep: ab9/10/11.sh, hf3t.sh, hfeel-t.py, hovtrace.py, hovtrace2.py (+ DIAG lines from
    the trace patch /root/psui-scratch/diag2.py: NOSHAPE_NOTIFY_TRACE, never land); docs in ~/tmp/psui (850efe
    bb49db4ceba0762c, de4eff 874aef1a8b008b1b, impeller 844c39ce20497196, block cc4a172465de10c6).
 4. Flange handle vs live flange-handle-1120: the orange inside the heads is the selected edge seen through the hollow
    heads: nothing more to draw.
-5. Cleanup: vibex6 ~/tmp/psui/noshape-b, noshape-s, hf/ab7*, ab8* after the A/Bs; vibex8 ~/agents/psui/target size.
+5. Cleanup done 18:56 (vibex6 A/B binaries and hf/, vibex8 target/release).
    Not to build: 3D Sketch, Fault analysis.
 
 ## Agents
