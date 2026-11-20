@@ -532,7 +532,9 @@ def main():
             # Live's dump has it and our build showed it in that panel (no take compares the two states).
             # Our brand where live names its own ("Show Onshape drawing templates").
             ours_t = norm(t).replace("Onshape", "Noshape")
-            rows.append((surface, t, "shown" if st == "present" and (norm(t) in mine or ours_t in mine) else st, "dump"))
+            # (A long text a dump wrapped onto lines keeps only its first: ours' full sentence starts with it.)
+            wrapped = len(norm(t)) >= 30 and any(m.startswith(norm(t)) for m in mine)
+            rows.append((surface, t, "shown" if st == "present" and (norm(t) in mine or ours_t in mine or wrapped) else st, "dump"))
 
     # Cloud-only rows (out of scope) and dump texts live itself no longer shows (docs/parity/audit-drawing-dataexchange.md).
     rows = [(sf, it, "n/a" if it in CLOUD else ("accepted" if it in ACCEPTED and st != "=" else st), ACCEPTED.get(it, note) if st not in ("=", "accepted") else note)
