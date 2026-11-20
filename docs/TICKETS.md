@@ -847,10 +847,18 @@ Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: al
   live capture of the empty-again state requested (REQUESTS.md qa 11-19). Shot: qa-scratch/tickets/pattern-check-stays-enabled-1119.png
   (q0 open, q1 Part 1, q3 emptied again).
 
-- [x] fixed (psui 11-19: vendor gpui-pre TooltipPressGate + Window::tooltip_released_on, the click redrew the button as a new element; chrome row "tooltip / kept while pressed, gone at the release") P1 **TOOLBAR-TOOLTIP-AFTER-CLICK (psui)**: hover a Part Studio toolbar button (Linear pattern) until its tooltip shows, click:
+- [x] verified be41a8c2 (qa 00:01 on green f6f8069f: Extrude button hovered 1.2 s, held 600 ms: the tooltip stays; 50 ms after release it is gone, still gone 1.5 s later over the open dialog = live) fixed (psui 11-19: vendor gpui-pre TooltipPressGate + Window::tooltip_released_on, the click redrew the button as a new element; chrome row "tooltip / kept while pressed, gone at the release") P1 **TOOLBAR-TOOLTIP-AFTER-CLICK (psui)**: hover a Part Studio toolbar button (Linear pattern) until its tooltip shows, click:
   ours: the tooltip still shows 1.5 s after the click, over the open dialog. Live (behaviours "qa (11-19): dialog ✓ after emptying /
   tooltip on click", live/qa/dialog-tip-1119 B): shows ~40 ms after hover, fades in over ~250 ms, stays during the press (80 and
   600 ms holds), gone the first frame after release, no fade-out. (qa 11-19, green a58eee8c)
+
+- [ ] P1 **COMPARE-COMMON-PARTS-MISSING (studios)**: Versions and history › B1 › Compare (Main vs B1), Part Studio 1 tab (dot ○
+  unchanged, Features list empty; B1's Part Studio 1 = Main's, 6 parts): the graphics show only 2 of the 6 parts (a ring and the
+  cone), tinted blue (base-only) at the Main end and red at the B1 end; the plate and the other 3 rings are not drawn, and zoom to
+  fit frames empty space as if they were there. Live (behaviours "Compare mode graphics: the blend slider"): common geometry is
+  drawn in normal grey at every slider position, only base-only / target-only geometry blue / red. Part Studio 2 (changed) is
+  right: common flange grey, B1's box red. Walk doc walk3/r.noshape (Main after a Restore to V1; B1 from V1).
+  Shot: qa-scratch/tickets/compare-ps1-two-parts-1120.png. (qa 00:13, green f6f8069f)
 
 - [ ] P1 **SKETCH-DXF-EXPORT-POLYLINES (skasm)**: a sketch's (or planar face's) Export as DXF/DWG… writes every curve as a
   tessellated POLYLINE in f32 (crates/ops/src/sketch_export.rs plane_sheet; the app's modal uses the same sketch_sheet / face_sheet).
