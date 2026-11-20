@@ -2581,9 +2581,14 @@ export const noOpCut = defineFeature(function(context is Context, id is Id, defi
     let _ = &mut fx;
 }
 
+/// One B94.6 knurl regenerating at a time in the test process: the Boolean's memory budget is the process's growth, and
+/// two at once passed it (the nightly T2: the Ø10 rod's knurl stopped at 15 GB beside the 15 angle pairs).
+static KNURLS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// The B94.6 knurl on the 50 × 50 cylinder (as `knurl_feature_b94_on_a_cylinder`): `kind`, CP12, outer face, groove
 /// depth 100 %, the tooth and helix angles given: the regeneration, its seconds.
 fn knurl_b94(kind: &str, tooth_deg: f64, helix_deg: f64, size: Option<(f64, f64)>, pitch: &str) -> (RegenResult, f64) {
+    let _one = KNURLS.lock().unwrap_or_else(|e| e.into_inner());
     const CYLINDER: &str = r#"
 annotation { "Feature Type Name" : "Test cylinder" }
 export const testCylinder = defineFeature(function(context is Context, id is Id, definition is map)
@@ -2722,6 +2727,7 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
     });
 "#;
     let src = format!("{}\n{CYLINDER}", include_str!("fs/knurl_b94.fs"));
+    let _one = KNURLS.lock().unwrap_or_else(|e| e.into_inner());
     let only = std::env::var("KNURL").ok();
     // Live (behaviours request 1615, evVolume at default accuracy): Straight 95877.733 mm³, 224 faces, 0.8 s;
     // Diamond 94271.838 mm³, 10362 faces, 49 s.

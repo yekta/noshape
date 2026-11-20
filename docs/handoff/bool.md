@@ -39,7 +39,7 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   NEXT: after 04:00 replay rec1 (new shfall) rule off; if clean, drop slab_too_tolerant (commit on bool-sh3).
   afcf858f3 slab union history differing only in vertex records = equivalent (lead 11-19); 0d465cb70 the gate's
   end-to-end Shell check (gate-host.py SHELLS / SHELLS_KNOWN).
-- bool-sh3 (origin/bool-sh3, tip 8b6d6faba = + Shell's stray-pcurve refit after its unify (2756e521: a 45° cone's merged
+- bool-sh3 (origin/bool-sh3, tip 1f27fa8ca = + the unify's segmented volume recheck (free-form fuse, P2 below); 8b6d6faba + Shell's stray-pcurve refit after its unify (2756e521: a 45° cone's merged
   face had an edge pcurve 0.83 mm off, read 77 mm3 heavy in ours and OCCT; now 32108.414, live 32108.426 / 45 faces (q-2756e521),
   live 104 edges / 57 vertices vs ours (= OCCT) 115 / 69: seams (Parasolid has none) and one B-spline edge between
   faces 21 / 25 in two 3.848 mm pieces at (11.203, -20, 2.032) (Mac u24 probe_shell_case_two_edge_vertices): P3; also moves 08f5dc59 / 17488d26, ours = OCCT; clean tree Mac u23 shell:: 36 pass; it also
@@ -171,14 +171,16 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   - corpora on vibex6 (11-20 03:00): ~/agents/bool-corpora/shellcorpus (422) and bool-corpus (1949); bool-ho's tests read
     $HOME/agents/bool-corpora/... (shell_corpus_time takes every case when `taken` is absent, faces 1-based); the
     knurl / gear tests to 1e-6 relative. Uncommitted in bool-ho, land with this handoff.
-  - overlapping_free_form_parts_merge_like_onshape: the fuse now takes ours (path rust, 641 faces, same counts as OCCT's
-    occt_tree); unify leaves 45 (37 cylinder pieces on 2 R2 cylinders apart) vs 15 from OCCT's result. Ours shares
-    surfaces (23 for 641 faces) and 3D curves (109 for 1311 edges). Probe xprobe::probe_free_form_fuse_unify (bool-hat
-    WIP), Mac bool-keep/ff/, here /root/bool-scratch/ff/.
+  - overlapping_free_form_parts_merge_like_onshape: FIXED on bool-sh3 1f27fa8ca (gate with sh3): the fuse is ours now;
+    the unify's USD merge to live's 15 was refused (OCCT's integrals 4e-9 off on our B-spline bounded cylinder pieces,
+    the segmented ones 9e-10); a change within 1e-8 of the box's volume is now decided by the segmented integrals of
+    the changed faces (62 ms there). Mac u32: the test passes. Debug in bool-hat WIP: NOSHAPE_USD_DEBUG / _FACES.
   - a_25_by_10_knurl_at_30_tpi: passes on vibex7 bool2-keep/kern-cmp (11-14), declined on every Mac binary from 11-18
     16:40. git bisect (crates/brep, cb8734f6b..1f4521120) in bool2-try on vibex7: /root/bool-scratch/bis.log (BIS-DONE;
     the worktree is put back on c86ffb0e7).
-  - knurl_b94_at_30_tpi_on_a_10_mm_rod (>15 GB: ours declines, OCCT runs out): new since 11-19, not looked at yet.
+  - knurl_b94_at_30_tpi_on_a_10_mm_rod (>15 GB): alone it passes, ours, 46 s (Mac, bool-hat); in the nightly it ran beside
+    knurl_feature_b94_tooth_and_helix_angles (both >60 s in t2-2026-11-20.log) and the budget is the process's growth:
+    the B94 knurl tests now take one lock (KNURLS). Its Boolean recorded: Mac bool-keep/b94/e83dc201f84a455f.
 - bool2-exact (bool2-ab, tip 73dcd9e30 = b997c4c3 re-recorded with OCCT). 5101adb8: exception (DECISIONS c8a06136b):
   it is 6bb081c8 turned 90 degrees (probe_case_twins: all 33 arguments' volumes and extents equal); ours gives both
   5.295354594e-4, OCCT 6bb081c8 5.295354633e-4 (= ours, 7e-9) and 5101adb8 5.295373907e-4 (1.93 mm3 off its twin).
