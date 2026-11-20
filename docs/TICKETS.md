@@ -22,6 +22,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   started (test offscreen::a_dropped_render_worker_has_ended_its_thread fails without it). Not reproduced off CI: 15
   runs of the unfixed binary on vibe2 (lavapipe) all exited 0. Reopen if it comes back on CI.
 
+## qa, 2026-11-20
+- [ ] P1 **EDGE-MIDPOINT-REST-LOOK (psui)**: Part Studio, no tool open, the pointer resting on a part edge's midpoint (walk
+  doc, the plate's front top edge). Live (behaviours psui 1981, shot live/psui/edgemid-1981/c1-rest2s.png; also 1954): after
+  the rest the whole edge stays lit orange and a small marker shows at the midpoint (an orange fill about 5 px inside a dark
+  ring about 8 px). Ours: before the dwell the edge is lit with a hollow dark ring at the midpoint; from about 300 ms the edge
+  is unlit and only an 11 px light-orange disc with a pale centre is drawn. What the click takes (the point) is right. Shots:
+  qa-scratch/tickets/edgemid-rest-ours-0105.png (left: 80 ms, right: 600 ms), edgemid-rest-live-1981.png. (qa 01:04, green
+  eef639d7, spot round 2 rows 1-8)
+
 ## qa, 2026-11-19
 - [ ] P2 SHELL-AFTER-WELD-FILLET (bool, lead 11-19; qa 2026-11-19 12:38 UTC) qa's fuzz ticket document cli-shell-hang-pre
   (vibex7 ~/qa/tickets/cli-shell-hang-pre.noshape): since blend 92c8595b0 its Fillet 1 builds (v0.4.60: "Failed to fillet
