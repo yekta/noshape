@@ -30,20 +30,18 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
   black caret; matrix
   script: hovered toolbar tips, HTML comments / "none" dumps skipped, wrapped long texts, never-shown hole palette
   Tolerance precision / Offset and Move to sheet's Clear. Mac: drawing-ui 125, clippy clean.
-- Matrix 08:30 (b18-b20 merged): 1227 = + 551 shown of 1842, 0 ≠, 22 present-only (doc not regenerated yet). Our
-  replicate gap was a stale run: b19 replicates 1/1 with live's toast. Datum target distance fields checked vs live s5
-  (centred, ▾ joined; then the 8 x 4 black caret, 312017e9c).
-- b21 DONE 09:03 (4/4 takes full: 48, 7, 7, 12 states): app build on vibex7 → scp -3 to vibe2 → shots drw-create-drawing-custom-lists
-  drw-create-drawing-custom-template drw-properties-views drw-datum-target-hide-dim (log
-  /root/studios-scratch/b21.log: APPDONE, COPIED, scores, SHOTSDONE). Then: cp pd/b21/out/*.json into uip-merged,
-  regenerate the matrix, splice docs/parity/drawing-matrix.md (from "| surface | items | = matching" on, prose counts),
-  check b21 Datum caret vs live s5, land everything local (full ops e2e first: drawing changed) once c8ab739d lands.
-- Left present-only besides takes: 5 menu rows (MENUDUMP test has no BOM / revision row / sheet tree / custom table),
-  Datum "This field cannot be empty" (a hidden Instance count row in live's dump), Create Drawing "New drawing name".
-- Rows needing a live take: REQUESTS "studios (2026-11-20 08:08 UTC)" (styles on a radial dim, section Blind +
-  Offset, mixed views' Multiple values, a diameter inspection item, a custom table's cell / menu, ISO sheet sizes).
-- b17 (vibe2, running 07:38): app build + shots drw-insert-view-top-1to1 (focused search border vs live iv s2: crop
-  live +290+200, ours +855+470) and drw-datum-target-hide-dim (Precision ▾ vs live s5, crop live 330x700+0+80).
+- Local after 782f4c47 (to land once it does): a8b7e4c61 / 2d0b3a87e matrix doc (b21 merged; live's visually-hidden
+  labels dropped); 856e293d8 BOM / cut list / custom cell menu = live's bom-table-cell (Size ▸, Resize… | Copy) and the
+  MENUDUMP test lists BOM header / row / cell, a revision's row, the sheet tree's reference row; 0cf22ebd0 Datum target
+  X / Y flips = flip-direction icon, Length / Angle dropdown 13.33 px #555, distance text 12 px; bc65e1c09 Origin field
+  stays active once picked (live s5; test). Mac: drawing-ui 126, clippy clean. No crates/drawing change (no ops e2e).
+- Matrix 09:30: 1232 = + 558 shown of 1841, 0 ≠, 9 present-only, all conditional rows that wait on live's takes
+  (REQUESTS "studios (2026-11-20 08:08 UTC)", not captured at 09:30): Section Depth / Offset distance, Datum "This
+  field cannot be empty" (live's hidden Instance count row), Custom table Cell / Split custom table below, Inspection
+  Diameter dimension, View properties Multiple values, Sheet properties A4 Portrait, Styles Show dimension line.
+- b22 (09:35, task b5danw6oa): `/root/studios-scratch/bin/b-app-shots.sh vibex6 b22 drw-datum-target-hide-dim
+  drw-datum-target-panel-lists` (build on the host, scp -3 to vibe2, shots; log b22.log). Check s4-s5 vs live (Origin
+  active, flips, Length) with crops live 330x700+0+80, ours +560+350.
 - qa 11-20: 9 of 10 to-verify rows verified (6c3c0a8fe); FEEL-DRW-WHEEL-ZOOM-SLOW stays open (re-timed 02:00-04:00).
 
 ## Next, in order
