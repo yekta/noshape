@@ -1278,6 +1278,15 @@ std::unique_ptr<OcShape> reverse_edge_curves(const OcShape& in, const OcShapeLis
       B.UpdateEdge(ne, rpc, su, sl, tol);
       B.Range(ne, su, sl, a, b);
     }
+    // Its regularity between its two faces kept (a fillet's tangent edge: OCCT's draft intersects a G1 pair's new
+    // surfaces as B-splines without it, cf-snap-hook's Draft 1).
+    if (const ShapeList& fl = ef.FindFromKey(e); fl.Extent() == 2)
+    {
+      const TopoDS_Face& F1 = TopoDS::Face(fl.First());
+      const TopoDS_Face& F2 = TopoDS::Face(fl.Last());
+      if (BRep_Tool::HasContinuity(e, F1, F2))
+        B.Continuity(ne, F1, F2, BRep_Tool::Continuity(e, F1, F2));
+    }
     B.SameRange(ne, same_range && BRep_Tool::SameRange(e));
     B.SameParameter(ne, same_range && BRep_Tool::SameParameter(e));
     if (!same_range)

@@ -1546,6 +1546,26 @@ fn a_picked_faces_fillet_leaves_its_tangent_edges() {
 }
 
 #[test]
+fn a_fillets_new_edges_run_clockwise_round_its_face_as_live() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.04, "20 mm");
+    let res = t.ok();
+    let edge = edge_near(&res.context.bodies[0], DVec3::new(0.04, 0.04, 0.01));
+    t.add("fillet", &[("entities", q(vec![edge])), ("radius", e("3 mm"))]);
+    let res = t.ok();
+    let shape = &res.context.bodies[0].shape;
+    let round = shape.faces().into_iter().find(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. }))).expect("the round");
+    let edges = round.edges();
+    assert_eq!(edges.len(), 4);
+    for e in &edges {
+        assert_eq!(round.edge_orientation_in(e).unwrap(), noshape_kernel::Orientation::Reversed);
+    }
+    let rises: Vec<f64> = edges.iter().filter_map(|e| e.endpoints().ok()).map(|(a, b)| b.z - a.z).filter(|d| d.abs() > 1e-9).collect();
+    assert_eq!(rises.len(), 2);
+    assert!(rises[0] * rises[1] < 0.0, "{rises:?}");
+}
+
+#[test]
 fn modify_fillet_radius_and_remove() {
     let mut t = T::new();
     t.block(0.0, 0.0, 0.04, 0.04, "20 mm");

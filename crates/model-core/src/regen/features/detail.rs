@@ -368,7 +368,42 @@ fn in_onshape_words(r: FResult<()>, message: &str) -> FResult<()> {
 }
 
 pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
-    in_onshape_words(fillet_in(ev), "Failed to fillet selections.")
+    in_onshape_words(fillet_in(ev), "Failed to fillet selections.")?;
+    orient_round_edges(ev)
+}
+
+/// The edges round a fillet face of its own (no edge shared with another face of the fillet) run clockwise about its
+/// outward normal, as Parasolid's (live core q-snaphook-shell-edges-1120: cf-snap-hook's Fillet 1 and Fillet 2; a
+/// Shell edge off one is its Snap Hooks' axis).
+fn orient_round_edges(ev: &mut EvalCtx) -> FResult<()> {
+    let feature = ev.feature;
+    let blend = |n: &Name| matches!(&**n, crate::reference::TopoName::Face { feature: f, role: Role::Blend(_) } if *f == feature);
+    // Only the bodies this fillet made blend faces in (it read them already): other bodies stay unread, so reusable.
+    let mine: Vec<usize> = ev.ctx.bodies.untracked().iter().enumerate().filter(|(_, b)| b.faces.iter().any(blend)).map(|(i, _)| i).collect();
+    for bi in mine.into_iter().rev() {
+        let body = ev.ctx.bodies[bi].clone();
+        let own = |f: u32| body.faces.get(f as usize).is_some_and(blend);
+        let (faces, edges, edge_faces) = (body.shape.faces(), body.shape.edges(), body.shape.edge_faces()?);
+        let mut joined = vec![false; faces.len()];
+        for fs in &edge_faces {
+            if let [a, b] = fs.as_slice() && own(*a) && own(*b) {
+                joined[*a as usize] = true;
+                joined[*b as usize] = true;
+            }
+        }
+        let mut flip = Vec::new();
+        for (e, fs) in edges.iter().zip(&edge_faces) {
+            let Some(&f) = fs.iter().find(|&&f| own(f) && !joined[f as usize]) else { continue };
+            if faces[f as usize].edge_orientation_in(e)? == k::Orientation::Forward {
+                flip.push(e.clone());
+            }
+        }
+        if !flip.is_empty() {
+            let shape = k::reverse_edge_curves(&body.shape, &flip)?;
+            ev.replace_body(bi, shape, body.faces.clone());
+        }
+    }
+    Ok(())
 }
 
 fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
