@@ -18,7 +18,7 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   0)), Extrude 2 "No faces meet flattened sheet metal bodies"; loft: live 24 plane + 8 B-spline faces, ours 30 + 2.
 - modify-joint: which wall a THICKEN-of-faces model keeps fixed in its flat (live keeps the top, JHO, region 3 of 3;
   ours another, flat turned 90°): REQUESTS 'skasm 2026-11-20 11:40' to live; fix flat_place after the answer.
-- Land c41f27d3 queued 11:38 (batch since 11:43; check ~/land/daemon.log on vibe2).
+- c41f27d3 LANDED as b0475a22 (12:12); fd7b5d66 (exact_bend_edges) queued 12:15.
 - Tools: /root/skasm-scratch/pm.sh (ONLY=, SAVE=, build + run), pmrun.sh (TRACE run of the kept binary), smlist.txt
   (24 SM docs), CLI batch on saved docs: ~/tmp/skasm/saved (copy .noshape + -wal), hemq*.sh / jq.sh / jogq.sh.
 - Feel stack 4e51cce3 verified by qa (green f380b6928); P2 drawn_failed LANDED 8fd60c7a.
@@ -45,6 +45,9 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
 00b. qa P2 SUITE-INTRO-TAILFIN-INTERSECTED: "Profile for tail fin" 1 INTERSECTED not found (surf-intro boundary/fill/
    mutualtrim/ruled): Surface 2 area, Curve 1 start, Boundary surface 1 fails; qa-scratch/feel1120/car-one.log.
 00c. dx 11-20 (suite speed, not urgent): c2-sm-rocker-enclosure-body › Mirror 3 160 ms, live 10 ms (doc under the bar).
+00d. qa P2 SUITE-NEW-INDEX-1120-SKASM (TICKETS 7066344c1, on green 4e51cce3, before c41f27d3 / 566a4bc6): Form 1, jog
+   Sketch 1, Corner 1, hem SM model 1 gone on my branch. Open: c2-cov-sm-bend-relief Bend relief 1 volume +3.9 mm3;
+   c2-cov-sm-rip Rip 1 48/106/60 vs 46/100/56; c2-cov-sm-unfold-refold Unfold 1 56/128/74 vs 46/100/56; loft; joint.
 0. USER P0 feel: rows of docs/parity/interaction-feel.md in my areas are "=" now; Hover timing is psui's.
 0b. live's camera retakes (025a33f6): sketch-line-from-midpoint, sketch-bezier-polygon, sketch-spline-handle-arm and 7 asm
    takes now compare the camera; rerun them after the land. asm-menu-instance-properties' Pro menu (Where used…, no
