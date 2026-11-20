@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-20 19:00 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-20 20:55 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -35,7 +35,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (18:55 UTC 11-20)
+## Now (20:55 UTC 11-20)
 
 1. LANDED: 6f48184a (FS notices compile off the UI thread; A/B 6 max prepaint 534 -> 28 ms on 850efe, 549 -> 37 on
    de4eff), 18809b4c (spinner on the executor clock), 1c6e56e4 + 5c3f3bb7 (revert of a5505f50). Worktrees psui-fsn,
@@ -67,27 +67,18 @@ docs/DECISIONS.md (read first; it wins over anything here).
    4/33 differ on eb8aae4fb (rollback-bar-drag, sketch-dimension-variable, sketch-entity-copy-paste,
    variable-type-angle); the 14:47 run's other 12 + 5 not run all match now. "After": rerun once this batch lands.
    - P0 (lead 20:0x): macOS CI failed a_cleared_hover_shows_the_frame_drawn_before_without_drawing (reused 0
-     frames): T2'd from worktree /root/projects/noshape-wt/psui-p0 (branch agent/psui-p0), QUEUED 81b0fa91 20:11.
-     Diagnose on the Mac after 21:35 (frame_key / in_flight / readback); remove psui-p0 once landed.
-   - variable-type-angle: title "0°" vs live "0 deg": fixed (uncommitted) in feature_dialog `shown_length`
-     (dialog_angle_text), test angle_text_tests::an_angle_variables_name_reads_deg (run163).
-   - sketch-dimension-variable: live's take is broken (no dimension placed; "#width" typed into shortcuts): retake
-     asked of live in REQUESTS 19:00.
-   - FEEL-ROW-MENU-ROLL-TO-HERE: live answered 19:0x (live/dm/rollto-menus.json): Roll to here on every row but the
-     last, after Show dependencies… = ours already (roll_items). New from it: "Unconfigure suppression" for a feature
-     whose suppression is configured: added (uncommitted) in the row menu + coverage.rs line + list matrix row
-     "menu / configured suppression" (run163). Open: "Section view…" on Extrude 1's row but not Extrude 2's: asked of
-     live in REQUESTS 19:11.
+     frames): T2'd, LANDED fe8136d5 20:26 (81b0fa91); psui-p0 removed. NEXT after 21:35: on the Mac, why no frame is
+     reused (reads_back / frame_key / in_flight / readback), then make it platform-independent and drop the T2.
+   - LANDED 5ce123f8 20:46 (c759a122): variable-type-angle ("30 deg"), rollback-bar-drag (driver name marked while the
+     tip is off), sketch-entity-copy-paste (a menu paste stays; Transform keeps a picked entity clicked again),
+     "Unconfigure suppression" in the row menu (live rollto-menus), FEEL-CONFIG-BOX-WIDTH (cfg-box pr(5)),
+     FEEL-FLANGE-EDGE-BEHIND-WALL (selected_only line copies at compare::POST; line shader params.x bit 2).
+   - "After": rerun of the 33 on main -> vibex8 ~/tmp/psui/ps2, log /root/psui-scratch/ps2.log (first try 20:2x timed
+     out waiting for a slot; rerun 20:53). Expected: only sketch-dimension-variable differs.
+   - Waiting on live: REQUESTS 19:00 (retake sketch-dimension-variable: live's take placed no dimension) and 19:11
+     (which rule puts "Section view…" in a row menu).
    - Sheet metal titleState errors (bend-alignment-hold-line, hem-in-place-closed, bend/jog-new-edit-reedit,
      bend-angle-align-to-geometry) are skasm's features.
-   - rollback-bar-drag: after a drop the bar's tip is off (FEEL-ROLLBACK-DROP-ROW), and with it its driver name
-     "button:Rollback bar": now marked while the tip is off too (uncommitted, mod.rs render_rollback_bar).
-   - sketch-entity-copy-paste: a menu paste no longer follows the pointer (Ctrl+V still does, R6); Transform keeps a
-     picked entity clicked again (inferred from this take only). Test sketch_mode a_menu_paste_stays_... (run163).
-   - qa 19:2x: FEEL-CONFIG-BOX-WIDTH reopened (5 px): cfg-box pr(5) (title split 10 px from the border, rows to 220);
-     test the_configurations_box_stays_one_input_tall_with_two. FEEL-FLANGE-EDGE-BEHIND-WALL: a preview's picked edge
-     lines drawn again (selected_only line instances, compare::POST; line shader bit 2); tests offscreen
-     a_previews_picked_edge_stays_whole_over_the_mix + the linear-pattern preview test (run163).
 4b. Flange handle vs live flange-handle-1120: the orange inside the heads is the selected edge seen through the hollow
    heads: nothing more to draw.
 5. Cleanup done 18:56 (vibex6 A/B binaries and hf/, vibex8 target/release).
