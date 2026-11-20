@@ -335,10 +335,11 @@ fn round_overrun(shape: &Shape, edges: &[usize], amount: &dyn Fn(usize, f64) -> 
         for &(f, w, setback) in sides {
             for &o in face_edges.get(f as usize).into_iter().flatten() {
                 let Some((p, q)) = line(o) else { continue };
-                // Parallel, across the face, beside this edge for some length.
+                // Parallel, across the face, beside this edge all along it (an L-shaped face's shorter edge across
+                // is run past: c2-saw-table-frame-weldment's Chamfer 1, 7.874 mm through a 3.175 mm angle leg).
                 let width = (p - a).dot(w);
                 let (s0, s1) = ((p - a).dot(d), (q - a).dot(d));
-                if o == *e || (q - p).normalize_or_zero().dot(d).abs() < 1.0 - 1e-9 || width <= tol || s0.max(s1) <= tol || s0.min(s1) >= (b - a).length() - tol {
+                if o == *e || (q - p).normalize_or_zero().dot(d).abs() < 1.0 - 1e-9 || width <= tol || s0.min(s1) > tol || s0.max(s1) < (b - a).length() - tol {
                     continue;
                 }
                 if setback > width + tol {

@@ -3129,6 +3129,26 @@ fn a_rim_chamfer_of_edges_in_line_builds() {
     assert!(st == FeatureStatus::Ok && faces == 18 && (v - 12890.0).abs() < 5.0, "{st:?} {msg:?} {v:.4} mm³ {faces} faces");
 }
 
+/// A chamfer deeper than an angle's leg is thick (live c2-saw-table-frame-weldment's Chamfer 1: 0.31 in on both end
+/// edges of a 2 x 2 x 1/8 angle's flat face, OK): the end face is L-shaped, the leg's bottom edge across it shorter than
+/// the chamfered edge, so the chamfer runs through the leg into the other one (the section a triangle, +1 face per end).
+#[test]
+fn a_chamfer_through_an_angle_leg_builds() {
+    let (w, th, len, d) = (50.8, 3.175, 100.0, 7.874);
+    let mut t = T::new();
+    let (_, regions) = t.sketch(&[&[(0.0, 0.0), (w, 0.0), (w, w), (w - th, w), (w - th, th), (0.0, th)]], &[]);
+    t.add("extrude", &[("entities", q(regions)), ("depth", e(&format!("{len} mm"))), ("operationType", en("NEW"))]);
+    let ends = t.edges_where(|i| !vertical(i) && i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9 && (i.end.x - i.start.x).abs() > 0.04);
+    assert_eq!(ends.len(), 2);
+    let f = t.chamfer(ends, &format!("{d} mm"));
+    let (st, msg, v) = status(&mut t, f);
+    let faces = t.regen().context.bodies.first().map_or(0, |b| b.faces.len());
+    let section = (w * th + (w - th) * th) * len;
+    let per_end = (d * th - th * th / 2.0) * (w - th) + d * d / 2.0 * th;
+    let want = section - 2.0 * per_end;
+    assert!(st == FeatureStatus::Ok && faces == 10 && (v - want).abs() < 1e-2, "{st:?} {msg:?} {v:.4} mm³ (want {want:.4}) {faces} faces");
+}
+
 /// qa CYL-UNIFY-OPPOSITE (live request 1584): a Ø12 circle on Front extruded
 /// 10 mm (New), then the same region 10 mm the other way (Add): one part of 3
 /// faces, one 753.98 mm² cylinder over the full 20 mm.
