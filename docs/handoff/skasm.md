@@ -4,13 +4,10 @@ Updated 2026-11-20 09:31 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## In flight (11-20 09:31 UTC)
-- Feel stack queued on main (after psui 37741d38): dx T2 `std_sheet_metal_matches_onshape` (`forget_sm_built`); qa round-2
-  feel P0s CHAIN-LASTPOINT, PASTE-PLACE (8 ui-parity scenarios sketch-line-* etc.), FEEL-SM-PARTIAL-FLANGE-MANIP (edge lit
-  whole), FEEL-DIM-TWO-POINTS-ZERO (a point in reach beats the stale hovered line, sketch.rs click path). The readout picks
-  and S1's TANGENTIAL handle are psui's (1c202f031, e0181b9f3). When it lands: tell dx (T2 fix), tell qa (P0s on green),
-  close the tickets.
+- Feel stack LANDED 4e51cce3 (dx T2 `forget_sm_built`; CHAIN-LASTPOINT, PASTE-PLACE, FEEL-SM-PARTIAL-FLANGE-MANIP,
+  FEEL-DIM-TWO-POINTS-ZERO): tickets marked fixed to verify, feel R3 row =; dx and qa told.
 - Redo of the 4 reverted renames LANDED b0995d8f (names keep the pick order's, old names alias the new: `Bodies::aliases`,
-  `rename_aliases`, `alias_chain`). Remove worktree skasm-revert and its target.
+  `rename_aliases`, `alias_chain`). Worktrees skasm-revert / skasm-bisect and their vibe2 targets removed.
 - qa SNAP-INSERT-FACE: asm's, routed via the lead.
 
 ## Closed 11-19: big-sketch feel (no row >= 100 ms and >= 2x live; live: open 2.6-25 s, edit 2.7-13 s, press 31-56 ms;
