@@ -5285,11 +5285,16 @@ impl<'a> Translator<'a> {
         };
         // Its own in-feature mate connector (ours has none in a sketch): a plane on live's frame (c2-sheet-metal-forms'
         // Sketch 3 on a connector at a wall face's centroid).
-        let plane = match plane.as_str().filter(|p| p.starts_with(SUB_FEATURE)) {
-            Some(_) => {
-                problems.push("its plane, an in-feature mate connector, taken as a plane on live's frame".into());
-                self.plane_at_frame(&oid).map(Value::from).ok_or("its plane: an in-feature mate connector, and no plane of ours on live's frame")?
-            }
+        // None there: the connector made in the plane field (c2-hgr-riser-weldment's Bottom, below).
+        let plane = match plane.as_str().filter(|p| p.starts_with(SUB_FEATURE)).map(|p| p[SUB_FEATURE.len()..].to_string()) {
+            Some(sub) => match self.plane_at_frame(&oid) {
+                Some(p) => {
+                    problems.push("its plane, an in-feature mate connector, taken as a plane on live's frame".into());
+                    Value::from(p)
+                }
+                None if self.sub_params.contains_key(&sub) => plane,
+                None => return Err("its plane: an in-feature mate connector, and no plane of ours on live's frame".into()),
+            },
             None => plane,
         };
         // A face off live's sketch frame (an id whose newest earlier line named another entity: asm-bjr-config 5d8bc1's
