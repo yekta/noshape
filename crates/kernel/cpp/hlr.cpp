@@ -635,7 +635,11 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
       if (work.w.hit)
         break;
       if (!loaded)
+      {
+        if (std::getenv("NOSHAPE_WORK_TRACE"))
+          std::fprintf(stderr, "work: hlr.exact load failed (attempt %d)\n", attempt + 1);
         continue;
+      }
       out.exact                    = true;
       occ::handle<HLRBRep_Data> DS = algo->DataStructure();
       if (DS.IsNull())

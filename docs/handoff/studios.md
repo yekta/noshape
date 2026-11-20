@@ -20,24 +20,19 @@ tools/ui-parity to vibe2:agents/studios/src first). Crate tests on vibex7 / vibe
 11-20 21:xx: a hung test held a vibex8 slot 43 min). `touch` edited files before rb.sh. Full ops e2e before a drawing
 land. vibex8 02:00-04:00 is qa's quiet window. Never `git checkout <file>` over uncommitted work (21:20 it wiped the
 e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
-- To land (WIP 49a54ca7f + edits; checks x52 / x53 on vibex8 running 21:2x):
-  - P0 19:18 follow-up: drawing_get reports a view's `error`; the drawing-ui fixture's panic prints the views and the
-    fixture starts with `drop_cached_views()` (T1's tests share one process); test
-    `a_failed_view_is_computed_once_until_its_inputs_change` (failures cached by view_key, as main already did). The
-    "don't cache failed views" try was reverted: it made a part-gone view recompute every frame (hung
-    feel::a_view_whose_part_is_gone_goes_blank_with_failed_to_resolve_part).
-  - Live drw-custom-table-split: the original stays selected (fill_os_menu `keeps`). Not re-shot yet.
-  - Live dm batches 1-2: drawing Change configuration stores every input (defaults filled; app + op); merge from a
-    branch takes the branch's configured values (merge.rs `merge_configuration_from_source`); variable_create refuses
-    a value naming no visible variable ("Bad variable expression: …", param value); e2e tests for the four.
-  - Feel (asm): 16 rows with tests now (feel doc), 16 left: Fields, Toolbar's place / grip, Connector chip, Animate…,
-    Named positions empty, Insert preview, Snap mode ghost / lines, Camera menu, Suppressed mate, Failed mate's marks,
-    Graphics → list (2), Implicit over an edge, Drag feel (software GL), Short press.
-- Next (lead P1, after this land): random OCCT HLR load failures (hlr.cpp retries a load once, then falls back to the
-  triangulation: the likely 19:18 "no line on the first view"). Stress test drafted in
-  /root/studios-scratch/hlr_stress.rs (200 serial vs 8 threads x 200 on one shape; T2). If only parallel fails:
-  serialise HLR's load / Update behind a mutex (or find the shared state), drop the retry if unneeded. Kernel C++:
-  compile with g++-13 against /opt/occt before landing.
+- QUEUED 1efc6dad (22:47): the 96c5ff9f fix-forward. 96c5ff9f failed on a Variable Studio's own configuration
+  variables (#t) never being in scope in its table (now in studio_evaluation_as / studio_variables_at) and on two
+  explode feel tests (they need `open_assembly_with_front`: panels and the yellow banner draw in the front host).
+  Carries: P0 19:18 diagnostics (drawing_get `error`, fixture prints the views, `drop_cached_views()` at fixture
+  start, failed views cached by view_key test); live dm batches 1-2 (drawing configuration inputs, merge takes the
+  branch's configured values, variable_create refuses an undefined name); drw-custom-table-split; asm feel tests.
+- To land next (lead OK 22:48): T2 `hlr::exact_hlr_on_8_threads_gives_the_single_threads_answer` + a
+  NOSHAPE_WORK_TRACE "load failed" line in hlr.cpp (branch studios-hlr-wip; g++-13 check x57 on vibex7). Result:
+  0 load failures, 0 differing answers in 1,800 + 2,000 exact HLRs (8 threads; 6 HLR beside 2 re-meshing): no mutex,
+  retry kept. If the fixture's views printout catches the 19:18 empty view again, that is P1 again.
+- Then: the 16 asm feel rows left: Fields, Toolbar's place / grip, Connector chip, Animate…, Named positions empty,
+  Insert preview, Snap mode ghost / lines, Camera menu, Suppressed mate, Failed mate's marks, Graphics → list (2),
+  Implicit over an edge, Drag feel (software GL), Short press.
 - Then: re-shoot drw-custom-table-split + drw-datum-empty-field (start block-drawing-table-2parts), re-run the matrix.
 
 ## Next, in order

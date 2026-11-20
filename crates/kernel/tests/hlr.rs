@@ -297,3 +297,48 @@ fn a_filleted_hole_rim_behind_the_front_face_is_hidden() {
         }
     }
 }
+
+/// One HLR's answer, for comparing runs: each fragment's visibility, class, point count and ends (nm).
+fn signature(edges: &[ProjectedEdge]) -> Vec<(bool, EdgeClass, usize, [i64; 4])> {
+    let q = |x: f64| (x * 1e6).round() as i64;
+    let ends = |e: &ProjectedEdge| {
+        let (a, b) = (e.polyline[0], e.polyline[e.polyline.len() - 1]);
+        [q(a.x), q(a.y), q(b.x), q(b.y)]
+    };
+    let mut s: Vec<_> = edges.iter().map(|e| (e.visibility == Visibility::Visible, e.class, e.polyline.len(), ends(e))).collect();
+    s.sort_by_key(|k| format!("{k:?}"));
+    s
+}
+
+/// Lead 11-20 (the 19:18 red: a drawing view with no lines): exact HLRs of a few shapes on 6 threads at once, while 2
+/// more re-mesh the same shapes finer each time (a sheet's views and the display share them), each give the single
+/// thread's answer; so do as many one after another. Run with NOSHAPE_WORK_TRACE=1 to count OCCT's load failures
+/// ("load failed") that the retry hides.
+#[test]
+#[ignore = "T2: 2,000 exact HLRs, a thread-safety stress run"]
+fn exact_hlr_on_8_threads_gives_the_single_threads_answer() {
+    let plate = plate_with_holes(6.0, &[(0.0, 0.0), (30.0, 0.0)]);
+    let rim: Vec<Shape> = plate.edges().into_iter().filter(|e| e.endpoints().is_ok_and(|(a, b)| a.z > 9.999 && b.z > 9.999) && e.length().is_ok_and(|l| (l - 12.0 * PI).abs() < 1e-3)).collect();
+    let rounded = fillet(&plate, &rim, 3.0).unwrap().shape;
+    let ring = cut(&make_torus(&Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 20.0, 6.0, 2.0 * PI).unwrap(), &make_sphere(&Plane::new(DVec3::new(20.0, 0.0, 0.0), DVec3::Z, DVec3::X), 8.0, 2.0 * PI).unwrap()).unwrap().shape;
+    let shapes = [plate, rounded, ring];
+    let views = [(DVec3::NEG_Y, DVec3::Z), (DVec3::NEG_Z, DVec3::Y), (DVec3::new(-1.0, -1.0, -1.0).normalize(), DVec3::Z)];
+    let run = |k: usize| signature(&project_hlr_raw(&shapes[k % 3], views[k / 3 % 3].0, views[k / 3 % 3].1, true, 0.2).unwrap());
+    let reference: Vec<_> = (0..9).map(run).collect();
+    let (run, reference, shapes) = (&run, &reference, &shapes);
+    let serial = (0..200).filter(|k| run(*k) != reference[k % 9]).count();
+    eprintln!("exact HLR: 200 one after another done; 8 threads next");
+    let parallel: usize = std::thread::scope(|s| {
+        let hlr: Vec<_> = (0..6).map(|t| s.spawn(move || (0..300).filter(|k| run(t + k) != reference[(t + k) % 9]).count())).collect();
+        for t in 0..2 {
+            s.spawn(move || {
+                for k in 0..150 {
+                    tessellate(&shapes[(t + k) % 3], 2.0 / (1 + k) as f64, 0.5, k % 2 == 0).unwrap();
+                }
+            });
+        }
+        hlr.into_iter().map(|h| h.join().unwrap()).sum()
+    });
+    eprintln!("exact HLR answers unlike the reference: {serial} of 200 one after another, {parallel} of 1800 on 6 threads beside 2 meshing");
+    assert_eq!((serial, parallel), (0, 0));
+}
