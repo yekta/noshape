@@ -256,6 +256,20 @@ fn a_draft_past_its_work_bound_fails_and_the_next_one_builds() {
     assert!(r.is_valid() && vol_mm3(&r) < 8000.0 - 1.0, "{}", vol_mm3(&r));
 }
 
+/// OCCT's fillet is bounded by work, not time (isaac-ball 850efe's Fillet 3 never ended in OCCT): past its bound every
+/// build fails at once, the same on every machine, and leaves nothing behind (the next fillet on the thread builds).
+#[test]
+fn a_fillet_past_its_work_bound_fails_and_the_next_one_builds() {
+    setup();
+    let b = bx([0.0; 3], [40.0, 20.0, 10.0]);
+    let edge = b.edges().into_iter().find(|e| e.endpoints().is_ok_and(|(p, q)| (p - q).length() > 39.0 * MM && p.y < 1e-9 && p.z < 1e-9)).unwrap();
+    let stopped = with_fillet_work(1, || fillet(&b, std::slice::from_ref(&edge), 3.0 * MM));
+    assert!(stopped.is_err(), "{:?}", stopped.map(|r| vol_mm3(&r.shape)));
+    let r = fillet(&b, &[edge], 3.0 * MM).expect("the fillet builds").shape;
+    let want = 8000.0 - (1.0 - std::f64::consts::FRAC_PI_4) * 9.0 * 40.0;
+    assert!(r.is_valid() && (vol_mm3(&r) - want).abs() < 1e-6 * want, "{} vs {want}", vol_mm3(&r));
+}
+
 /// A draft's result checked where it changed (the drafted faces and their neighbours) is valid as the whole part is;
 /// an index past the part's faces is not.
 #[test]

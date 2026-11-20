@@ -6770,6 +6770,17 @@ static void rim_seams_off_joints(const TopoDS_Shape& input, TopoDS_Shape& r, HHi
 }
 
 } // namespace
+
+// set_fillet_work's (tests): this thread's bound instead (0: FILLET_WORK).
+thread_local uint64_t t_fillet_work = 0;
+
+uint64_t set_fillet_work(uint64_t steps)
+{
+  const uint64_t was = t_fillet_work;
+  t_fillet_work      = steps;
+  return was;
+}
+
 std::optional<TopoDS_Face> fair_g1_fill(const std::vector<TopoDS_Edge>& edges, const std::vector<TopoDS_Face>& supports, bool share);
 namespace {
 
@@ -7753,6 +7764,28 @@ static bool short_step_beside(const TopoDS_Shape& input, const std::vector<TopoD
   return false;
 }
 
+// OCCT's fillet built within a bound of work (its math solves, patch 0030's break hook): false where it fails or runs
+// out (isaac-ball 850efe's Fillet 3: one B-spline edge's round, its approximation inserting points without end).
+// The kernel and model tests' fillets take 5410 at most; 850efe's took 203k, then ran 30 s. NOSHAPE_WORK_TRACE=1
+// prints each build's work.
+constexpr uint64_t FILLET_WORK = 50000;
+static bool build_fillet_bounded(BRepFilletAPI_MakeFillet& mk)
+{
+  const ScopedWork work(t_fillet_work != 0 ? t_fillet_work : FILLET_WORK);
+  try
+  {
+    mk.Build();
+  }
+  catch (const Standard_Failure&)
+  {
+    if (!work.w.hit)
+      throw;
+  }
+  if (std::getenv("NOSHAPE_WORK_TRACE"))
+    std::fprintf(stderr, "work: fillet %llu steps%s\n", (unsigned long long)work.w.used, work.w.hit ? " (spent)" : "");
+  return !work.w.hit && mk.IsDone();
+}
+
 OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const char* what,
                    const MakeBuild& make, bool step_beside = false)
 {
@@ -7937,7 +7970,8 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_past_end_faces(const TopoDS
     }
     // OCCT's fillet can crash on the extended part (qa FILLET-SEGV:
     // ChFi3d_Builder::PerformIntersectionAtEnd): then this doesn't apply.
-    if (!run_guarded([&] { mk.Build(); }) || !mk.IsDone())
+    bool built = false;
+    if (!run_guarded([&] { built = build_fillet_bounded(mk); }) || !built)
       return std::nullopt;
     HHist        h2      = history_of({full}, mk);
     TopoDS_Shape rounded = mk.Shape();
@@ -8122,7 +8156,8 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_groups(const TopoDS_Shap
       BRepFilletAPI_MakeFillet mk(input);
       for (size_t i : idx)
         mk.Add(rs.size() == es.size() ? rs[i] : rs[0], es[i]);
-      if (!run_guarded([&] { mk.Build(); }) || !mk.IsDone())
+      bool built = false;
+      if (!run_guarded([&] { built = build_fillet_bounded(mk); }) || !built)
         return std::nullopt;
       HHist        h       = history_of({input}, mk);
       TopoDS_Shape rounded = mk.Shape();
@@ -9128,8 +9163,7 @@ static BlendBuild fillet_build(const Scaled& sc, const std::vector<TopoDS_Edge>&
     auto build = [&](BRepFilletAPI_MakeFillet& mk) {
       for (size_t i = 0; i < es.size(); ++i)
         mk.Add(rs[i] * scale * sc.factor, TopoDS::Edge(sc.image(es[i])));
-      mk.Build();
-      return mk.IsDone();
+      return build_fillet_bounded(mk);
     };
     // One lone edge's blend in several faces (ChFi3d's walk restarted part way at its default tolerances: the
     // Planetary Gears' root fillets, 0.5 + 4.6 mm of a 5.1 mm edge; Parasolid's is one face): again with tolerances
@@ -9294,8 +9328,7 @@ static std::optional<std::pair<TopoDS_Shape, HHist>> fillet_over_smaller_blends(
       return std::nullopt;
     big.Add(rs[i], TopoDS::Edge(e));
   }
-  big.Build();
-  if (!big.IsDone() || !valid_shape(big.Shape()))
+  if (!build_fillet_bounded(big) || !valid_shape(big.Shape()))
     return std::nullopt;
   const TopoDS_Shape s1  = big.Shape();
   const HHist        h01 = compose(input, h0, history_of({s0}, big));
@@ -9335,8 +9368,7 @@ static std::optional<std::pair<TopoDS_Shape, HHist>> fillet_over_smaller_blends(
     if (edges_of[i].empty())
       return std::nullopt;
   }
-  small.Build();
-  if (!small.IsDone() || !valid_shape(small.Shape()))
+  if (!build_fillet_bounded(small) || !valid_shape(small.Shape()))
     return std::nullopt;
   const HHist h2 = history_of({s1}, small);
   HHist       h  = compose(input, h01, h2);
@@ -9920,8 +9952,7 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
       BRepFilletAPI_MakeFillet mk(slab);
       for (int i : idx)
         mk.Add(rs[(size_t)i], TopoDS::Edge(image(es[(size_t)i])));
-      mk.Build();
-      if (!mk.IsDone())
+      if (!build_fillet_bounded(mk))
         return false;
       r  = mk.Shape();
       rh = history_of({slab}, mk);
@@ -10097,8 +10128,7 @@ static OpOut op_fillet_variable_unbudgeted(const OcShape& s, const OcShape& edge
         ur((int)i + 1) = gp_Pnt2d(ps[i], rs[i] * scale * sc.factor);
       BRepFilletAPI_MakeFillet mk(sc.shape);
       mk.Add(ur, TopoDS::Edge(sc.image(e)));
-      mk.Build();
-      if (!mk.IsDone())
+      if (!build_fillet_bounded(mk))
         return false;
       out = mk.Shape();
       h   = history_of({sc.shape}, mk);
@@ -10197,8 +10227,7 @@ OpOut op_fillet_variable_edges(const OcShape& s, const OcShapeList& edges_in, ru
           }
           mk.SetRadius(ur, ic, j);
         }
-        mk.Build();
-        if (!mk.IsDone())
+        if (!build_fillet_bounded(mk))
           return false;
         res = mk.Shape();
         h   = history_of({sc.shape}, mk);

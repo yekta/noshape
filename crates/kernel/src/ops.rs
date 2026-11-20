@@ -743,6 +743,19 @@ pub fn with_draft_work<T>(steps: u64, f: impl FnOnce() -> T) -> T {
     f()
 }
 
+/// Runs `f` with this thread's OCCT fillet builds bounded by `steps` of work each (OCCT's break-hook checks; tests),
+/// past which a build fails and the fillet goes on to its fallbacks; 0 for the default bound.
+pub fn with_fillet_work<T>(steps: u64, f: impl FnOnce() -> T) -> T {
+    struct Restore(u64);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            ffi::set_fillet_work(self.0);
+        }
+    }
+    let _restore = Restore(ffi::set_fillet_work(steps));
+    f()
+}
+
 /// A thin loft's wall grown `t` outward along the loft sheet's normals (two profiles, ruled faces), the faces'
 /// offsets mitred where they crease, trimmed to the profile planes `p0` / `p1` (Onshape's Thin loft with Trim
 /// ends), or (`trim_ends` false) ending at the profiles with caps ruled from each profile edge to its offset (live:
