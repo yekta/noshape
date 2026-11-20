@@ -1474,7 +1474,9 @@ fn boolean_regenerates_as_std() {
         s.add("booleanBodies", |p| set(p, &r));
         (name, s)
     };
-    cases.push(two("nothing selected", |_, _| {}));
+    // Nothing selected: live marks Tools at fault (ui-parity boolean-new-edit-reedit), std's opBoolean names no field.
+    let (name, s) = two("nothing selected", |_, _| {});
+    assert_eq!(same_as_std_but(name, "booleanBodies", &s, false), None);
     cases.push(two("union", |p, r| p.set("tools", ParamValue::Query(vec![body_ref(r, 0), body_ref(r, 1)]))));
     cases.push(two("union of one part", |p, r| p.set("tools", q(body_ref(r, 0)))));
     cases.push(two("subtract", |p, r| {

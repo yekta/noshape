@@ -282,12 +282,23 @@ fn planar_faces_mesh_flat_along_their_normal() {
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
+/// The corpus directory (NOSHAPE_PLANAR_CORPUS, default ~/agents/psui/corpus); None, the test skipped with a note, on a
+/// host that has none (the nightly T2's).
+fn corpus_dir() -> Option<String> {
+    let dir = std::env::var("NOSHAPE_PLANAR_CORPUS").unwrap_or_else(|_| format!("{}/agents/psui/corpus", std::env::var("HOME").unwrap_or_default()));
+    if std::path::Path::new(&dir).is_dir() {
+        return Some(dir);
+    }
+    eprintln!("skipped: no corpus at {dir} (make one with NOSHAPE_PARITY_SAVE=<dir> on the parity suite)");
+    None
+}
+
 /// The parity corpus: every Part Studio's parts (NOSHAPE_PARITY_SAVE's translated documents under
 /// NOSHAPE_PLANAR_CORPUS, default ~/agents/psui/corpus), their planar faces and every face's coverage.
 #[test]
 #[ignore = "T2: the parity corpus lives outside the repo (other people's work)"]
 fn corpus_planar_faces_mesh_flat_along_their_normal() {
-    let dir = std::env::var("NOSHAPE_PLANAR_CORPUS").unwrap_or_else(|_| format!("{}/agents/psui/corpus", std::env::var("HOME").unwrap_or_default()));
+    let Some(dir) = corpus_dir() else { return };
     let mut docs: Vec<_> = std::fs::read_dir(&dir).expect("the corpus directory").flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "noshape")).collect();
     docs.sort();
     assert!(!docs.is_empty(), "no documents in {dir}");
@@ -325,7 +336,7 @@ fn corpus_planar_faces_mesh_flat_along_their_normal() {
 #[test]
 #[ignore = "T2: the parity corpus lives outside the repo (other people's work)"]
 fn corpus_export_meshes_are_closed_and_oriented() {
-    let dir = std::env::var("NOSHAPE_PLANAR_CORPUS").unwrap_or_else(|_| format!("{}/agents/psui/corpus", std::env::var("HOME").unwrap_or_default()));
+    let Some(dir) = corpus_dir() else { return };
     let only = std::env::var("NOSHAPE_PLANAR_ONLY").ok();
     let mut docs: Vec<_> = std::fs::read_dir(&dir).expect("the corpus directory").flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "noshape")).filter(|p| only.as_ref().is_none_or(|o| p.file_stem().is_some_and(|s| s == o.as_str()))).collect();
     docs.sort();
@@ -386,7 +397,7 @@ fn corpus_export_meshes_are_closed_and_oriented() {
 #[test]
 #[ignore = "T2: the parity corpus lives outside the repo (other people's work)"]
 fn corpus_triangle_counts_against_brepmesh() {
-    let dir = std::env::var("NOSHAPE_PLANAR_CORPUS").unwrap_or_else(|_| format!("{}/agents/psui/corpus", std::env::var("HOME").unwrap_or_default()));
+    let Some(dir) = corpus_dir() else { return };
     let only = std::env::var("NOSHAPE_PLANAR_ONLY").ok();
     let mut docs: Vec<_> = std::fs::read_dir(&dir).expect("the corpus directory").flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "noshape")).filter(|p| only.as_ref().is_none_or(|o| p.file_stem().is_some_and(|s| s == o.as_str()))).collect();
     docs.sort();

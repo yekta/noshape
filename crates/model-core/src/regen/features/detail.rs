@@ -220,6 +220,31 @@ enum Overrun {
     PastUnselected,
 }
 
+/// Live's chamfer of edges that meet at corners (a face's whole rim, live core q-chamfer-top-face-1120: a 40 mm cube's top
+/// face at d 20 builds, its strips meeting mid-face; at 20.5 it fails): two parallel straight selected edges of one
+/// planar face whose distance strips overlap on it. (Edges that don't meet may overlap up to the face's width:
+/// [`round_overrun`].)
+fn meeting_strips_overlap(shape: &Shape, edges: &[usize], d: f64) -> bool {
+    let (Ok(ef), Ok(ve), all, faces) = (shape.edge_faces(), shape.vertex_edges(), shape.edges(), shape.faces()) else { return false };
+    let picked = |e: u32| edges.contains(&(e as usize));
+    if !ve.iter().any(|es| es.iter().filter(|&&e| picked(e)).count() >= 2) {
+        return false;
+    }
+    let line = |e: usize| match all.get(e).map(|s| s.edge_info()) {
+        Some(Ok(i)) if matches!(i.curve, k::Curve::Line { .. }) => Some((i.start, (i.end - i.start).normalize_or_zero())),
+        _ => None,
+    };
+    let lines: Vec<(usize, DVec3, DVec3)> = edges.iter().filter_map(|&e| line(e).map(|(a, u)| (e, a, u))).collect();
+    lines.iter().enumerate().any(|(i, &(e, a, u))| {
+        lines[i + 1..].iter().any(|&(f, b, v)| {
+            let shared = ef.get(e).zip(ef.get(f)).and_then(|(x, y)| x.iter().find(|g| y.contains(g)).copied());
+            let planar = shared.is_some_and(|g| matches!(faces.get(g as usize).map(|f| f.face_surface()), Some(Ok(k::Surface::Plane(_)))));
+            let across = (b - a) - u * (b - a).dot(u);
+            planar && u.cross(v).length() < 1e-9 && across.length() < 2.0 * d - 1e-9
+        })
+    })
+}
+
 /// Live's rule for rounds and chamfers of two or more edges (behaviours
 /// "spec: kernel FILLET-OVERSIZE-OK chamfer cases and fillet thresholds",
 /// request 1516 / 1587): a selected straight edge between planar faces that
@@ -1200,6 +1225,11 @@ fn chamfer_in(ev: &mut EvalCtx) -> FResult<()> {
             None if matches!(spec, k::ChamferSpec::Equal(_)) => (spec, Vec::new()),
             None => (spec, distance_one_faces(ev, &body, &edges, &flipped, ev.bool("oppositeDirection"))?),
         };
+        if let k::ChamferSpec::Equal(d) = spec
+            && meeting_strips_overlap(&body.shape, &edges, d)
+        {
+            return err("Failed to chamfer selections.");
+        }
         // OCCT runs a chamfer on along tangent edges; Onshape stops at the selection and runs the section out onto the
         // neighbour (G7). (Two distances: one edge, its distance 1 on the reference face.)
         let distances = match spec {

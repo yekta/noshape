@@ -431,7 +431,11 @@ fn bench_profile_live30_display_mesh() {
 #[ignore = "T2 bench: needs ~/agents/profdocs"]
 fn bench_profdocs() {
     let dir = std::env::var_os("NOSHAPE_PROFILE_DIR").map_or_else(|| std::path::PathBuf::from(format!("{}/agents/profdocs", std::env::var("HOME").unwrap_or_default())), std::path::PathBuf::from);
-    let mut files: Vec<_> = std::fs::read_dir(&dir).expect("profile documents").filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "noshape")).collect();
+    let Ok(rd) = std::fs::read_dir(&dir) else {
+        eprintln!("skipped: no profile documents at {}", dir.display());
+        return;
+    };
+    let mut files: Vec<_> = rd.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "noshape")).collect();
     files.sort();
     let tmp = std::env::temp_dir().join(format!("noshape-profdocs-{}", std::process::id()));
     std::fs::create_dir_all(&tmp).unwrap();
@@ -598,9 +602,13 @@ fn bench_editing_logic() {
 #[test]
 #[ignore = "T2 bench: tools/tiers/perf.sh"]
 fn bench_edit_latency() {
+    let _one = EDITS.lock().unwrap_or_else(|e| e.into_inner());
     noshape_model::regen::set_reuse(Some(false));
     edit_latency(false);
 }
+
+/// The edit benches one at a time: reuse is a process-wide switch (the nightly T2 runs tests in parallel).
+static EDITS: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// [`bench_edit_latency`] with incremental regeneration, each edit's result checked against a full regeneration
 /// (no cache, no reuse) of the edited Part Studio: every body (id, name, kind, colour, names, volume, area, faces)
@@ -608,6 +616,7 @@ fn bench_edit_latency() {
 #[test]
 #[ignore = "T2 bench: tools/tiers/perf.sh"]
 fn bench_edit_latency_reuse() {
+    let _one = EDITS.lock().unwrap_or_else(|e| e.into_inner());
     noshape_model::regen::set_reuse(Some(true));
     edit_latency(true);
     noshape_model::regen::set_reuse(None);
@@ -621,7 +630,7 @@ fn edit_latency(check: bool) {
         dirs.extend(more.split(':').map(std::path::PathBuf::from));
     }
     let only = std::env::var("NOSHAPE_PROFILE_ONLY").ok();
-    let tmp = std::env::temp_dir().join(format!("noshape-edits-{}", std::process::id()));
+    let tmp = std::env::temp_dir().join(format!("noshape-edits-{}-{check}", std::process::id()));
     std::fs::create_dir_all(&tmp).unwrap();
     // Round edits, as typed: a length one 1 mm more, anything else 1 % more.
     let scaled = |e: &noshape_units::ExprValue| noshape_units::ExprValue::new(if e.text.trim_end().ends_with("mm") { format!("({}) + 1 mm", e.text) } else { format!("({}) * 1.01", e.text) });

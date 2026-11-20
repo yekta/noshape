@@ -3089,6 +3089,31 @@ fn oversize_chamfers_like_onshape() {
     assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
 
+/// A chamfer of a 40 mm cube's whole top rim (live core q-chamfer-top-face-1120): edges that meet at the corners may
+/// set back until their strips meet mid-face (d 20, a pyramid on a 20 mm box), not past (20.5, 30, 40 fail).
+#[test]
+fn a_chamfer_round_a_whole_face_stops_where_its_strips_meet() {
+    let mut base = T::new();
+    base.block(40.0, 40.0, 40.0);
+    let top = base.edges_where(|i| !vertical(i) && (i.start.z - 0.04).abs() < 1e-9);
+    assert_eq!(top.len(), 4);
+    let mut bad = Vec::new();
+    for (d, want) in [("20 mm", Ok((42666.6667, 9))), ("20.5 mm", Err(())), ("30 mm", Err(())), ("40 mm", Err(()))] {
+        let mut t = base.fork();
+        let f = t.chamfer(top.clone(), d);
+        let (st, msg, v) = status(&mut t, f);
+        let faces = t.regen().context.bodies.first().map_or(0, |b| b.faces.len());
+        let ok = match want {
+            Ok((wv, wf)) => st == FeatureStatus::Ok && (v - wv).abs() < 5e-3 && faces == wf,
+            Err(()) => st == FeatureStatus::Error && msg.as_deref() == Some("Failed to chamfer selections.") && (v - 64000.0).abs() < 5e-3,
+        };
+        if !ok {
+            bad.push(format!("{d}: {st:?} {msg:?} {v:.4} mm³ {faces} faces, live {want:?}"));
+        }
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
 /// qa CYL-UNIFY-OPPOSITE (live request 1584): a Ø12 circle on Front extruded
 /// 10 mm (New), then the same region 10 mm the other way (Add): one part of 3
 /// faces, one 753.98 mm² cylinder over the full 20 mm.
