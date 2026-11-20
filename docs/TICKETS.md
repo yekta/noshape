@@ -23,6 +23,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   runs of the unfixed binary on vibe2 (lavapipe) all exited 0. Reopen if it comes back on CI.
 
 ## qa, 2026-11-20
+- [ ] P0 **SKETCH-DIM-PLACE-CLICK-SELECTS (skasm; user case "#variable in a sketch dimension")**: ui-parity
+  sketch-dimension-variable (Top sketch, rectangle (60,0)-(90,20), Esc, d, click the line at (75,0), click (75,-8) to place,
+  type "#width", Enter). Live (live2's 11-19 retake): the second click places the dimension (selection 0) and its box takes
+  "#width". Ours since green 592b0fc9 (11-17 21:03; fa6f90cc 11:19 matched, 12/12): the second click selects a second item
+  (selection 2, no dimension), so "#width" runs as shortcuts ("#" = Shift+3 turns the view to Right). Every full run since fails
+  (9/12, read as only a focus.kind difference until live's camera retake); spot round 2 01:08 on green eef639d7: 8/12. Likely
+  244412385 (skasm 11-17 14:08: "past every reach the region under the pointer", the Dimension tool's reach), not bisected.
+  Ours: qa-scratch/suites/1120-0059-green-spot1r2 (vibe2 ~/tmp/qa/uipr/…/sketch-dimension-variable.json).
 - [ ] P1 **EDGE-MIDPOINT-REST-LOOK (psui)**: Part Studio, no tool open, the pointer resting on a part edge's midpoint (walk
   doc, the plate's front top edge). Live (behaviours psui 1981, shot live/psui/edgemid-1981/c1-rest2s.png; also 1954): after
   the rest the whole edge stays lit orange and a small marker shows at the midpoint (an orange fill about 5 px inside a dark
