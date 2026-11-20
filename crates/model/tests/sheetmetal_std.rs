@@ -266,6 +266,55 @@ fn the_latest_bend_relief_creates_every_reliefs_cut_faces() {
     assert_eq!(got(&r, &[(10.0, -1.0, 14.5), (30.0, -2.0, 14.5), (50.0, 0.0194052, 2.0194052)]), vec![Some(f1); 3], "the wall's end and side, the bend's end");
 }
 
+/// A Sized rectangle bend relief ends its depth past the bend's tangent line (live c2-cov-sm-bend-relief: a 100 x 60 x
+/// 1.6 plate, R 2.3, a partial Inner flange 20 mm in from both ends, 11843.613306 mm³; Rectangle - Sized 6 mm at its
+/// x 20 end cuts the slot to 8.3 mm in, 11835.365146 mm³; ours was 6.85 mm, 3.944 mm³ more).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_sized_relief_runs_its_depth_past_the_bend_as_live() {
+    // Live c2-cov-sm-bend-relief: 6 mm deep, both end 8.3 mm in (the rectangle's far face, the obround's round tip).
+    for (style, live) in [("SIZED_RECTANGLE", 11835.365146), ("SIZED_OBROUND", 11835.861306)] {
+        let mut s = Studio::new();
+        let region = s.rectangle(100.0, 60.0);
+        s.add("sheetMetalStart", |p| {
+            p.set("process", en("THICKEN"));
+            p.set("regions", ParamValue::Query(vec![region]));
+            p.set("thickness", expr("1.6 mm"));
+            p.set("radius", expr("2.3 mm"));
+        });
+        let r = s.ok();
+        let front = edge_at(&r, DVec3::new(50.0, 0.0, 1.6));
+        s.add("sheetMetalFlange", |p| {
+            p.set("edges", ParamValue::Query(vec![front]));
+            p.set("flangeAlignment", en("INNER"));
+            p.set("distance", expr("25 mm"));
+            p.set("isPartialFlange", ParamValue::Bool(true));
+            p.set("firstBoundType", en("BLIND"));
+            p.set("firstBoundOffset", expr("20 mm"));
+            p.set("hasSecondBound", ParamValue::Bool(true));
+            p.set("secondBoundType", en("BLIND"));
+            p.set("secondBoundOffset", expr("20 mm"));
+        });
+        let r = s.ok();
+        assert!((volume_mm3(&r) - 11843.613306).abs() < 1e-3, "Flange 1: {} mm³", volume_mm3(&r));
+        let b = &r.context.bodies[part(&r)];
+        let at = DVec3::new(20.0, -1.6, 3.9) * 1e-3;
+        let i = (0..b.vertices.len()).min_by(|&x, &y| {
+            let d = |k: usize| b.shape.vertices()[k].vertex_point().map_or(f64::INFINITY, |q| q.distance(at));
+            d(x).total_cmp(&d(y))
+        }).unwrap();
+        let end = Reference::Vertex((*b.vertices[i]).clone());
+        s.add("sheetMetalBendRelief", |p| {
+            p.set("bendRelief", ParamValue::Query(vec![end]));
+            p.set("bendReliefStyle", en(style));
+            p.set("bendReliefDepth", expr("6 mm"));
+            p.set("extendBendRelief", ParamValue::Bool(true));
+        });
+        let r = s.ok();
+        assert!((volume_mm3(&r) - live).abs() < 1e-3, "{style}: {} mm³", volume_mm3(&r));
+    }
+}
+
 /// A flange leaves the plate's other top edges their references (std rebuilds
 /// the part: its faces kept their names only by being on the old ones), so in
 /// the Flange dialog's preview the next edge can still be picked (the preview's

@@ -1,24 +1,22 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-20 12:08 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-20 13:30 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-20 12:08 UTC)
-- 5 new SM suite models (lead 11-20), before -> after: forms 2 -> 10/21, hem-flange 2 -> 7/8, jog-panel 0 -> 5/12,
-  modify-joint 4/11, loft-basic 3/4 (also c2-cov-sm-corner 3 -> 6/6). c41f27d3: translator (Form's form-library studio ->
-  `library:<form>` + config; SM wall CAP_FACE of `wallThicken` = start: off the line's sheet; sketch on its own in-feature
-  MC -> plane on live's frame, P2 SKETCH-ON-IN-FEATURE-MC; CORRESPONDING_IN_FLAT sketch plane -> our flat face), harness
-  (live's in-context "Reference N" wires no parts), sheetmetal.rs (a bend end square to one wall: no ruled end).
-  Next commit: sheetmetal.rs `exact_bend_edges` (B-spline bend arcs / straight seams after the fuse rebuilt as circles /
-  lines, rolled strips too; test a_jog_whose_bends_meet_keeps_exact_edges fails without it); 24 SM docs A/B 195 -> 201.
-- Next differences: forms Sketch 3 frame (P2 ticket), Form 5/7 (circle-emboss / circle-knockout tools); hem Hem 1 status
-  INFO "Collision in sheet metal flat pattern." vs live WARNING (message null; live's SM model 1 is WARNING too = cannot
-  unfold; ours unfolds Hem 1 with a collision); jog Jog 3 ERROR "The bend line did not divide the sheet metal into at
-  least two parts." vs live INFO; joint: our flat lies elsewhere (Sketch 1 on flat: frame (0, -113.5) vs live (120.02,
-  0)), Extrude 2 "No faces meet flattened sheet metal bodies"; loft: live 24 plane + 8 B-spline faces, ours 30 + 2.
-- modify-joint: which wall a THICKEN-of-faces model keeps fixed in its flat (live keeps the top, JHO, region 3 of 3;
-  ours another, flat turned 90°): REQUESTS 'skasm 2026-11-20 11:40' to live; fix flat_place after the answer.
-- c41f27d3 LANDED as b0475a22 (12:12); fd7b5d66 (exact_bend_edges) queued 12:15.
+## In flight (11-20 13:30 UTC)
+- Landing now: Thicken / Convert flat lies by the model's largest wall (live 2468 follow-up; Extrude keeps its first
+  segment), `Definition::extracted` = a wall created by `extractSurface`; a Sized bend relief (rectangle and obround)
+  ends depth + R tan(a/2) in (live 12:48: 8.3 mm); test a_sized_relief_runs_its_depth_past_the_bend_as_live.
+  24 SM docs 201 -> 209/295 (bend-relief 5/5, modify-joint 10/11), no doc worse; T2 + clippy green.
+- Rejected: extract surface's faces in body order (fits modify-joint, but hem-flange SM model 2 thickens to the wrong
+  side 7 -> 4/8 and frames' convert BUTT/BUTT2 swap); patch ~/agents/skasm-keep/extract-order.patch (local).
+- modify-joint Sketch 1 frame origin ours 50.33 vs live 120.02 (x): the flat's plane origin convention, open.
+- Rip 1 (c2-cov-sm-rip): live no-op (behaviours "skasm 12:58 (11-20)"); ours 48/106/60, -16 mm3: std Rip runs
+  (std_route), our coplanar rip has offset 0 and isn't a relief's free side: cause not found yet, trace next.
+- Unfold 1 (c2-cov-sm-unfold-refold, CONVERT): live unrolls bend KSCB only, hold KMaB, box (0,-36.944,0)-(100,60,40),
+  27666.721, topology 46/100; ours (native sheetmetal_unfold.rs) 56/128/74, 27740.64.
+- Next differences: forms Sketch 3 frame (P2 ticket), Form 5/7; hem Hem 1 INFO vs live WARNING; jog Jog 3 ERROR vs live
+  INFO; loft: live 24 plane + 8 B-spline faces, ours 30 + 2.
 - Tools: /root/skasm-scratch/pm.sh (ONLY=, SAVE=, build + run), pmrun.sh (TRACE run of the kept binary), smlist.txt
   (24 SM docs), CLI batch on saved docs: ~/tmp/skasm/saved (copy .noshape + -wal), hemq*.sh / jq.sh / jogq.sh.
 - Feel stack 4e51cce3 verified by qa (green f380b6928); P2 drawn_failed LANDED 8fd60c7a.
