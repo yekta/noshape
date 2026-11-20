@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 17:34 UTC.
+Updated 2026-11-20 18:03 UTC.
 
 ## In flight
 
@@ -49,6 +49,15 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
   7 Properties takes a run.py bug (brand pass ran before the category normalisation: f29fe434, suite 2043 -> 2050).
   ver-*-copy-link (4) exist only in /root/parity/ui/scenarios (old copy), not in the repo.
 - To land after 226bafad (CHECKING since 17:15): c70f0dfd (matrix) + f29fe434 (run.py).
+- Lead 11-20 17:4x: interaction-feel rows without a test in our sections (docs/parity/interaction-feel.md): 58 ->
+  33. Queued 18:03: 74cf59e2 (25 rows: 4 drawing, 11 documents / tabs, 8 instance list, 2 existing asm tests cited).
+  start-ui feel tests in start_feel_tests.rs (one hooks registration for the crate: `feel_tests::register_test_hooks`;
+  the fixture waits for the page's own folder scan before setting its documents). Left (asm): mates 13 (Fields, Type
+  order, toolbar place / grip, connector chip, Animate, named positions empty, snap ghost / lines; partial: Ctrl+M,
+  after the second pick, type switch, mate row hover, insert preview, insert Esc), views 10, list 4 (row tooltip:
+  every_instance_row_tooltips_its_name contradicts the row's "only a cut-off name"), 3D 4.
+- Live 18:0x: drw-custom-table-split + drw-datum-empty-field queued with start block-drawing-table-2parts (behaviours
+  "drawing matrix takes (11-20)"): shoot both, then re-run the matrix.
 - qa 11-20: 9 of 10 to-verify rows verified (6c3c0a8fe); FEEL-DRW-WHEEL-ZOOM-SLOW stays open (re-timed 02:00-04:00).
 
 ## Next, in order
