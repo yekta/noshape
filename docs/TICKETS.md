@@ -58,6 +58,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Live 05:42, assembly Export › URDF: Geometry format, STL Format, Resolution, Options, ☐ "Export rigid subassemblies as a
   single link", ☐ Include hidden instances in export. Ours' URDF export has no such option. Evidence:
   releases/rn-1222-1223/urdf-export.png, rn4.json.
+  dx 06:2x: the row (Include hidden instances greyed, checked, as live), export_parts `rigid_subassemblies_single_link`
+  (an Assembly's URDF was not in the op at all: now it is): a locked or rigid subassembly's parts one link, one mesh.
+  Open: live's file shape with it (link / mesh names, merge), REQUESTS dx 05:44.
 
 ## asm, 2026-11-19
 - [ ] **P2 HOLE-THROUGH-ROUND-POLE [bool]** (asm 20:38, isaac-ball Fastened 43): a Ø6 REMOVE extrude coaxial with an

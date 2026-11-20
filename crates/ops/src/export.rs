@@ -129,6 +129,8 @@ pub struct ExportSettings {
     pub hidden: bool,
     /// URDF: index into `URDF_GEOMETRY`.
     pub urdf_geometry: usize,
+    /// URDF: "Export rigid subassemblies as a single link" (live 1.223; its settings' mergeFastenedComponents).
+    pub urdf_single_link: bool,
     /// Options: 0 Download, 1 Download and store file in a new tab, 2 Store
     /// file in a new tab (see [`store_file_tab`]).
     pub options: usize,
@@ -208,6 +210,7 @@ pub struct SolidExportPrefs {
     pub custom: CustomResolution,
     pub urdf_geometry: usize,
     pub urdf_stl_text: bool,
+    pub urdf_single_link: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -264,6 +267,7 @@ impl Default for SolidExportPrefs {
             custom: CustomResolution::default(),
             urdf_geometry: 0,
             urdf_stl_text: false,
+            urdf_single_link: false,
         }
     }
 }
@@ -317,7 +321,7 @@ impl SolidExportPrefs {
             PartFormat::Glb => (self.glb_compress, self.mesh_resolution) = (s.compress, s.resolution),
             PartFormat::Obj | PartFormat::ThreeMf => self.mesh_resolution = s.resolution,
             PartFormat::Stl => (self.stl_resolution, self.stl_text, self.stl_units) = (s.resolution, s.stl_text, s.units),
-            PartFormat::Urdf => (self.mesh_resolution, self.urdf_geometry, self.urdf_stl_text) = (s.resolution, s.urdf_geometry, s.stl_text),
+            PartFormat::Urdf => (self.mesh_resolution, self.urdf_geometry, self.urdf_stl_text, self.urdf_single_link) = (s.resolution, s.urdf_geometry, s.stl_text, s.urdf_single_link),
             PartFormat::Parasolid | PartFormat::Rhino | PartFormat::Acis | PartFormat::Jt | PartFormat::InspectionList => {}
         }
     }
@@ -330,7 +334,7 @@ impl SolidExportPrefs {
         (s.version, s.latest) = (v.version, v.latest);
         let p = &self.step;
         (s.preprocessing, s.custom_units, s.derived_tolerances, s.mbd_text_height, s.mbd_text_mm) = (p.preprocessing.min(STEP_PREPROCESSING.len() - 1), p.custom_units, p.derived_tolerances, p.mbd_text_height, p.mbd_text_mm);
-        (s.iges_compat, s.pvz_group, s.urdf_geometry) = (self.iges_compat, self.pvz_group, self.urdf_geometry.min(URDF_GEOMETRY.len() - 1));
+        (s.iges_compat, s.pvz_group, s.urdf_geometry, s.urdf_single_link) = (self.iges_compat, self.pvz_group, self.urdf_geometry.min(URDF_GEOMETRY.len() - 1), self.urdf_single_link);
         s.compress = if s.format == PartFormat::Glb { self.glb_compress } else { self.gltf_compress };
         let stl = s.format == PartFormat::Stl;
         s.resolution = if stl { self.stl_resolution } else { self.mesh_resolution }.min(CUSTOM_RESOLUTION);
@@ -404,6 +408,7 @@ impl Default for ExportSettings {
             individual: false,
             hidden: false,
             urdf_geometry: 0,
+            urdf_single_link: false,
             options: 0,
             custom: CustomResolution::default(),
             inspection: String::new(),
@@ -627,6 +632,8 @@ pub struct AssemblyExport {
     pub parts: Vec<(String, k::Shape, [f32; 4])>,
     /// (part index, instance name, placement in meters).
     pub instances: Vec<(usize, String, glam::DMat4)>,
+    /// Each instance's rigid subassembly (the outermost one it moves with, as one body): (its path, its name).
+    pub rigid: Vec<Option<(Vec<noshape_model::assembly::InstanceId>, String)>>,
 }
 
 impl AssemblyExport {
@@ -641,7 +648,7 @@ impl AssemblyExport {
     /// subassembly: its path from the top-level instance).
     pub fn of_occurrences(root: &str, result: &noshape_model::assembly::eval::AssemblyResult, paths: Option<&[Vec<noshape_model::assembly::InstanceId>]>, include_hidden: bool) -> Self {
         let mut keys: Vec<(noshape_model::document::TabId, noshape_model::BodyId, noshape_model::configuration::ConfigValues)> = Vec::new();
-        let mut out = AssemblyExport { root: root.to_string(), parts: Vec::new(), instances: Vec::new() };
+        let mut out = AssemblyExport { root: root.to_string(), parts: Vec::new(), instances: Vec::new(), rigid: Vec::new() };
         for o in result.occurrences.iter().filter(|o| (include_hidden || !o.hidden) && paths.is_none_or(|ps| ps.iter().any(|p| o.path.starts_with(p)))) {
             let key = (o.studio, o.body.clone(), o.config.clone());
             let part = match keys.iter().position(|k| *k == key) {
@@ -655,8 +662,34 @@ impl AssemblyExport {
                 }
             };
             out.instances.push((part, o.instance_name.clone(), o.transform));
+            out.rigid.push(rigid_subassembly(&result.nodes, o));
         }
         out
+    }
+
+    /// [`Self::placed`], the parts of each rigid subassembly as one (named after its instance; the first part's
+    /// colour): URDF's "Export rigid subassemblies as a single link".
+    pub fn placed_links(&self) -> anyhow::Result<Vec<(String, k::Shape, [f32; 4])>> {
+        let placed = self.placed()?;
+        let mut out: Vec<(String, k::Shape, [f32; 4])> = Vec::new();
+        let mut groups: Vec<(&[noshape_model::assembly::InstanceId], usize, Vec<k::Shape>)> = Vec::new();
+        for (p, r) in placed.into_iter().zip(&self.rigid) {
+            let Some((path, name)) = r else {
+                out.push(p);
+                continue;
+            };
+            match groups.iter_mut().find(|g| g.0 == path.as_slice()) {
+                Some(g) => g.2.push(p.1),
+                None => {
+                    groups.push((path, out.len(), vec![p.1.clone()]));
+                    out.push((name.clone(), p.1, p.2));
+                }
+            }
+        }
+        for (_, at, shapes) in groups.into_iter().filter(|g| g.2.len() > 1) {
+            out[at].1 = k::Shape::compound(&shapes);
+        }
+        Ok(out)
     }
 
     /// Each instance as a placed part, named after it (formats without
@@ -664,6 +697,23 @@ impl AssemblyExport {
     pub fn placed(&self) -> anyhow::Result<Vec<(String, k::Shape, [f32; 4])>> {
         self.instances.iter().map(|(p, name, t)| Ok((name.clone(), self.parts[*p].1.transformed(&k::Transform::Matrix(*t))?, self.parts[*p].2))).collect()
     }
+}
+
+/// The outermost subassembly instance a part occurrence moves with as one body: one riding on its parent whole (not
+/// flexible: locked, patterned, …; its top-level instance when the part isn't in a flexible one), or one whose own
+/// instances can't move (no degrees of freedom, one fixed: the rigid assembly icon). (Path, name.)
+fn rigid_subassembly(nodes: &[noshape_model::assembly::eval::InstanceNode], o: &noshape_model::assembly::eval::PartOccurrence) -> Option<(Vec<noshape_model::assembly::InstanceId>, String)> {
+    // The instance the part's placement follows: its top-level one, or (inside flexible subassemblies) that child.
+    let rides = o.flex.as_ref().map_or(1, |f| f.0.len());
+    let mut level = nodes;
+    for (d, id) in o.path.iter().enumerate().take(rides.min(o.path.len() - 1)) {
+        let n = level.iter().find(|n| n.path.last() == Some(id))?;
+        if n.kind == noshape_model::assembly::eval::NodeKind::Assembly && (n.rigid || d + 1 == rides) {
+            return Some((o.path[..=d].to_vec(), n.name.clone()));
+        }
+        level = &n.children;
+    }
+    None
 }
 
 /// Write an Assembly's export: STEP, Parasolid and IGES keep the assembly
@@ -685,6 +735,9 @@ pub fn write_assembly_export(s: &ExportSettings, path: &std::path::Path, a: &Ass
     if s.format == PartFormat::Iges && !s.individual {
         k::write_iges_assembly(path, &parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect::<Vec<_>>(), &instances, k::LengthUnit::Meter)?;
         return Ok(path.to_path_buf());
+    }
+    if s.format == PartFormat::Urdf && s.urdf_single_link {
+        return write_export(s, path, a.placed_links()?);
     }
     if s.format != PartFormat::Step || s.individual {
         return write_export(s, path, a.placed()?);

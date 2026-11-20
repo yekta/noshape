@@ -11,7 +11,7 @@ pub fn ops() -> Vec<Op> {
     vec![Op {
         group: "export",
         verb: "parts",
-        summary: "Export a Part Studio's parts or an Assembly to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino)",
+        summary: "Export a Part Studio's parts or an Assembly to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino; an Assembly's URDF)",
         description: "Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`; with `tab` an Assembly, its visible instances (or `parts`: instance ids or names) — STEP, Parasolid and IGES keep the assembly (the root product / ASSEMBLY / subfigures, each part once, placed by its instances), the other formats get the placed parts; with `tab` a CAD file's tab (a STEP in CAD Imports, its menu's Export…), the file's parts converted to PARASOLID, ACIS, IGES, PVZ, JT, RHINO, GLTF, GLB, OBJ or 3MF, the stored file named after the file without its extension. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine/custom for mesh formats; Coarse / Medium / Fine are chordal 0.24 / 0.12 / 0.06 mm at 12.5 / 6.25 / 2.5°; Custom's fields: STL `chordal_tolerance` / `angular_deviation` deg / `min_facet_width` in the STL's `units` (metres unless `units` says otherwise); an STL is facetted as Onshape's are at these values (its Coarse / Medium / Fine: the same triangle counts and smoothness), the other mesh formats `distance_tolerance` m / `angular_tolerance` deg / `max_chord_length` m; unset fields keep the last-used ones, first Medium's), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`. An option not given takes the value the app's Export dialog last exported with (per format, as Onshape remembers them; the first time Onshape's defaults: Medium, STL in Meter and Binary, the latest versions); `options` defaults to download.",
         fields: vec![
             doc_field(),
@@ -41,6 +41,7 @@ pub fn ops() -> Vec<Op> {
             opt("group_composites", json!({ "type": "boolean" }), "PVZ: Group composite parts into a single part file."),
             opt("compress", json!({ "type": "boolean" }), "glTF / GLB: Compress."),
             opt("geometry_format", json!({ "type": "string", "enum": crate::export::URDF_GEOMETRY.iter().map(|f| f.label()).collect::<Vec<_>>() }), "URDF: Geometry format (default STL)."),
+            opt("rigid_subassemblies_single_link", json!({ "type": "boolean" }), "URDF of an Assembly: Export rigid subassemblies as a single link (each rigid subassembly instance's parts one link, one mesh)."),
         ],
         mutates: true,
         destructive: false,
@@ -50,16 +51,26 @@ pub fn ops() -> Vec<Op> {
 
 fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let label = a.str("format")?;
-    let format = PartFormat::part_row_list().into_iter().chain([PartFormat::Rhino]).find(|f| f.label().eq_ignore_ascii_case(label) || f.ext().eq_ignore_ascii_case(label)).ok_or_else(|| {
+    let format = PartFormat::part_row_list().into_iter().chain([PartFormat::Rhino, PartFormat::Urdf]).find(|f| f.label().eq_ignore_ascii_case(label) || f.ext().eq_ignore_ascii_case(label)).ok_or_else(|| {
         let names: Vec<&str> = PartFormat::ALL.iter().chain(&[PartFormat::InspectionList]).map(|f| f.label()).collect();
         OpError::param("format", &format!("`{label}` is not an export format{}; formats: {}", crate::error::did_you_mean(label, names.iter().copied()), names.join(", ")))
     })?;
+    // URDF is an Assembly's (live lists it in an Assembly's Export only).
+    let urdf = format == PartFormat::Urdf;
+    if urdf && !super::configuration::asm::is_assembly(ctx, a)? {
+        return Err(OpError::param("format", "URDF is an Assembly's export: give the Assembly's `tab`"));
+    }
     // The options not given are the Export dialog's remembered ones.
-    let mut s = SolidExportPrefs::load().settings_in(&PartFormat::part_row_list());
-    let Some(row) = PartFormat::part_row_list().iter().position(|f| *f == format) else {
+    let list = if urdf { PartFormat::list(true) } else { PartFormat::part_row_list() };
+    let mut s = SolidExportPrefs::load().settings_in(&list);
+    let Some(row) = list.iter().position(|f| *f == format) else {
         return Err(OpError::param("format", "RHINO export is not in this build (it needs openNURBS; releases have it)"));
     };
-    crate::export::set_part_row_format(&mut s, row);
+    if urdf {
+        crate::export::set_asm_format(&mut s, row);
+    } else {
+        crate::export::set_part_row_format(&mut s, row);
+    }
     // Live lists Inspection list in a part row's Export… only, not the Part Studio tab's.
     if format == PartFormat::InspectionList && a.opt_array("parts")?.is_none_or(|p| p.is_empty()) {
         return Err(OpError::param("parts", "Inspection list is a part's export (its row's Export…): give the part"));
@@ -79,6 +90,7 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     s.iges_compat = a.bool_or("iges_compatibility", s.iges_compat)?;
     s.pvz_group = a.bool_or("group_composites", s.pvz_group)?;
     s.compress = a.bool_or("compress", s.compress)?;
+    s.urdf_single_link = a.bool_or("rigid_subassemblies_single_link", s.urdf_single_link)?;
     if let Some(p) = a.opt_str("preprocessing")? {
         s.preprocessing = crate::export::STEP_PREPROCESSING.iter().position(|x| x.eq_ignore_ascii_case(p)).ok_or_else(|| OpError::param("preprocessing", "one of the listed choices"))?;
     }

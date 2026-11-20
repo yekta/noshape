@@ -5068,6 +5068,31 @@ fn drawing_raster_export_matches_live() {
     }
 }
 
+/// URDF of an Assembly with "Export rigid subassemblies as a single link" (live 1.223): a locked subassembly's two
+/// instances are one link, one mesh, named after it; off, a link each.
+#[test]
+fn urdf_export_takes_a_rigid_subassembly_as_one_link() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "urdf-link.noshape");
+    let ids: Vec<String> = (0..3).map(|_| call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1" }))["instance"].as_str().unwrap().to_string()).collect();
+    let m = call(&mut ctx, "assembly_move_to_subassembly", json!({ "instances": [ids[0], ids[1]] }));
+    let sub = m["new_instance"]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "assembly_lock", json!({ "tab": "Assembly 1", "instance": sub, "lock": "current" }));
+    // The .urdf's links (base_link aside) and mesh files; the zip is stored, its .urdf readable in place.
+    let urdf = |ctx: &mut Ctx, on: bool| -> (Vec<String>, usize) {
+        let f = scratch(&format!("urdf-link-{on}.zip"));
+        let r = call(ctx, "export_parts", json!({ "tab": "Assembly 1", "format": "URDF", "file": f.to_str().unwrap(), "rigid_subassemblies_single_link": on }));
+        let text = String::from_utf8_lossy(&std::fs::read(r["file"].as_str().unwrap()).unwrap()).to_string();
+        let links = text.match_indices("<link name=\"").map(|(i, _)| text[i + 12..].split('"').next().unwrap().to_string()).filter(|n| n != "base_link").collect();
+        (links, text.matches("<visual>").count())
+    };
+    let (off, meshes) = urdf(&mut ctx, false);
+    assert_eq!((off.len(), meshes), (3, 3), "{off:?}");
+    let (on, meshes) = urdf(&mut ctx, true);
+    assert_eq!((on.len(), meshes), (2, 2), "{on:?}");
+    assert!(on.iter().any(|l| l.starts_with("Assembly_2")), "the subassembly's link (Assembly 2 <1>): {on:?}");
+}
+
 /// The instance and mate menus: copy and paste, folders, subassemblies,
 /// lock, instance properties, dynamic suppression, Change configuration,
 /// inserting a sketch.

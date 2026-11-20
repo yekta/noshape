@@ -330,12 +330,12 @@ fn open_modal(base: String, assembly: bool, parts_only: bool, cad_file: bool, ru
         // checkboxes 39 px apart, a label right after a checkbox 2 px closer.
         enum Row {
             Select { id: &'static str, label: &'static str, opts: Vec<String>, cur: usize, disabled: bool, set: fn(&mut ExportSettings, usize) },
-            Check { id: &'static str, label: &'static str, on: bool, set: fn(&mut ExportSettings, bool) },
+            Check { id: &'static str, label: &'static str, on: bool, disabled: bool, set: fn(&mut ExportSettings, bool) },
             Number { label: String, input: Entity<InputState>, error: Option<&'static str> },
             Note(&'static str),
         }
         let sel = |id, label, opts: &[&str], cur, disabled, set| Row::Select { id, label, opts: opts.iter().map(|o| o.to_string()).collect(), cur, disabled, set };
-        let chk = |id, label, on, set| Row::Check { id, label, on, set };
+        let chk = |id, label, on, set| Row::Check { id, label, on, disabled: false, set };
         let formats = if cad_file {
             file_formats()
         } else if part_row {
@@ -425,9 +425,12 @@ fn open_modal(base: String, assembly: bool, parts_only: bool, cad_file: bool, ru
         if !parts_only {
             if f != PartFormat::Urdf {
                 rows.push(chk("ex-individual", "Export unique parts as individual files", s.individual, |s, v| s.individual = v));
+            } else if assembly {
+                rows.push(chk("ex-single-link", "Export rigid subassemblies as a single link", s.urdf_single_link, |s, v| s.urdf_single_link = v));
             }
             if !cad_file {
-                rows.push(chk("ex-hidden", "Include hidden instances in export", s.hidden, |s, v| s.hidden = v));
+                // (URDF: checked and greyed out, live urdf-export 1.223.)
+                rows.push(Row::Check { id: "ex-hidden", label: "Include hidden instances in export", on: s.hidden, disabled: f == PartFormat::Urdf, set: |s, v| s.hidden = v });
             }
         }
         crate::ui_script::note_dialog(|| {
@@ -512,7 +515,12 @@ fn open_modal(base: String, assembly: bool, parts_only: bool, cad_file: bool, ru
                     prev_check = false;
                     body.child(div().pt(px(6.)).text_size(px(13.33)).child(text))
                 }
-                Row::Check { id, label, on, set } => {
+                Row::Check { id, label, on, disabled: true, .. } => {
+                    let mt = if prev_check { CHECK_GAP } else { CHECK_MT };
+                    prev_check = true;
+                    body.child(div().mt(px(mt)).child(modal_checkbox_disabled(id, label, on)))
+                }
+                Row::Check { id, label, on, set, .. } => {
                     let mt = if prev_check { CHECK_GAP } else { CHECK_MT };
                     prev_check = true;
                     body.child(div().mt(px(mt)).child(modal_checkbox(id, label, on).on_click(move |_, w, _| {
@@ -576,13 +584,22 @@ fn custom_text(s: &ExportSettings, f: &CustomField) -> String {
 /// A Bootstrap modal checkbox (live document/80): a 14 px box (1 px gray,
 /// radius 3; checked blue with a white check), 8 px gap, 14 px `#333` label.
 pub(super) fn modal_checkbox(id: &'static str, label: &'static str, on: bool) -> Stateful<Div> {
+    checkbox_row(id, label, on, false).cursor_pointer()
+}
+
+/// [`modal_checkbox`] greyed out, its value fixed (live's URDF export 1.223: Include hidden instances, checked): a
+/// `#e5e5e5` box, 1 px `#d4d4d4`, a white check; the label as an enabled one's.
+fn modal_checkbox_disabled(id: &'static str, label: &'static str, on: bool) -> Stateful<Div> {
+    checkbox_row(id, label, on, true)
+}
+
+fn checkbox_row(id: &'static str, label: &'static str, on: bool, disabled: bool) -> Stateful<Div> {
     let pal = crate::theme::p();
     crate::ui_script::mark(h_flex(), move || format!("checkbox:{label}"))
         .debug_selector(move || id.into())
         .id(id)
         .h(px(27.))
         .gap(px(8.))
-        .cursor_pointer()
         .text_size(px(14.))
         .text_color(pal.text)
         .child(
@@ -594,8 +611,8 @@ pub(super) fn modal_checkbox(id: &'static str, label: &'static str, on: bool) ->
                 .justify_center()
                 .rounded(px(3.))
                 .border_1()
-                .border_color(if on { pal.accent } else { gpui_kit::rgb(0xadadad) })
-                .bg(if on { pal.accent } else { gpui_kit::rgb(0xffffff) })
+                .border_color(if disabled { gpui_kit::rgb(0xd4d4d4) } else if on { pal.accent } else { gpui_kit::rgb(0xadadad) })
+                .bg(if disabled { gpui_kit::rgb(0xe5e5e5) } else if on { pal.accent } else { gpui_kit::rgb(0xffffff) })
                 .when(on, |d| d.child(crate::ui::glyph("check", 10., gpui_kit::rgb_static(0xffffff)))),
         )
         .child(label)
