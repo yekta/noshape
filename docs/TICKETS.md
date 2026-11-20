@@ -6,6 +6,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## live, 2026-11-20 (docs/parity open rows, P1 areas; evidence live/parity-open-1120/findings.md)
+- [ ] P2 **DRW-DATUM-TARGET-OP (studios)**: the Datum dialog's Datum target tab has no operation: `drawing_datum` makes only the feature symbol, so an agent can't place a target with its area, style, origin, Length / Angle positions, X / Y flips, per-distance Precision or instances (AGENTS: everything the app does is an op). Found 11-20 adding the distances' Precision ▾.
 - [ ] P2 **MEASURE-CIRCLE-DEFAULT-PLANE (psui)**: interaction.md 4.4. Live: a circle with the Top plane reads Min dist ·
   Center dist when apart (circle at z 10: 10.000 / 10.000 mm), and Face tangent angle · Center dist · Min dist when it
   lies on Top (0.000 deg / 0.000 / 0.000 mm); no Length and no Curvature deviation in either. A vertex or an edge

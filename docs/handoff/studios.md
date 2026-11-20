@@ -30,8 +30,7 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
   1224 = + 496 shown of 1849, 0 ≠, 87 present-only (Create Drawing 46: our old runs lack `texts`; a rerun of the
   drw-create-drawing* takes with the new build turns them shown).
 - Still present-only, need a take or a look: Section view Depth / Offset distance; Hole callout palette's Tolerance
-  precision / Offset tips; Datum target's expanded rows (Precision ▾, X / Y Opposite direction flips: ours has the
-  flips in code, check the row against live drawing-datum-target-after); Styles' Center / Show dimension line / Help;
+  precision / Offset tips; Styles' Center / Show dimension line / Help;
   Inspection item's Name / Diameter dimension / table note; View properties' Opposite direction / Multiple values;
   Title block's auto / DejaVu S / Color; MBD status note; Reference manager's Version graph; Drawing properties'
   Auxiliary; Undo / Redo / Update toolbar tips; menu rows Hide revision callouts, BOM Switch to, cell Size ▸,
@@ -42,8 +41,12 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
   queued 07:03 as 0c681a1c (22 commits, carries 5a1b564a / 019a2040).
 - qa 11-20 (green 0bc7e772e): 9 of 10 to-verify rows verified (6c3c0a8fe); FEEL-DRW-WHEEL-ZOOM-SLOW stays open (qa
   re-times it 02:00-04:00).
-- Next gap: Datum target's Distance fields have live's precision ▾ (live uip drw-datum-target-hide-dim-5): ours has
-  none (model DatumTargetOpts x / y precision, the position dims' format, drawing_datum op params, e2e).
+- Local, to land after 0c681a1c (full ops e2e first): db2a556d4 chooser focus, faaa2f80d Datum target Precision ▾
+  per distance (DatumTargetOpts::precisions, drawn by sheet.rs `basic`), 074d71889 live's release-history 120 (an
+  assembly's Release… lists its linked parts, no version icon on them; ops release::tab_items), 3639f81f8 matrix doc.
+  Ops gap to ticket: Datum targets (origin, Length / Angle, flips, precision) have no op (drawing_datum makes only
+  the feature symbol).
+- Matrix 07:25 (b16 Create Drawing takes rerun, 100/100 states): 1224 = + 531 shown of 1849, 0 ≠, 52 present-only.
 
 ## Next, in order
 1. Lead 11-20: the drawing matrix's items not yet matching, by use (dialogs, menus, placement, rarer panels): check
