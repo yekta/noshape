@@ -210,7 +210,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - Agent ids: only /root/lead-scratch/roster.md (read before every message_agent). No qa script holds agent ids.
 
 ## Expected userdocs differences (not regressions)
-- none against 0.4.56. hat15 vs 0.4.43 always DIFFs (Fan Riser +5.83 mm³, STEP reference 51188.66 -> .65): known.
+- dock B Govde 85/206/126 -> 83/200/122 since 61295b96f (Rib Round 1's tori one face each; accepted by the lead 11-20 15:0x;
+  cut-verdict.sh skips exactly these two signatures). none against 0.4.56. hat15 vs 0.4.43 always DIFFs (Fan Riser +5.83 mm³, STEP reference 51188.66 -> .65): known.
 
 ## Tools
 - userdocs.py <cliA> <tagA> <cliB> <tagB> <doc>...: fresh 600 copies in ~/tmp/qa/ud-<pid>, per Part Studio feature status /
