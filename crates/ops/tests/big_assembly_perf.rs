@@ -343,8 +343,11 @@ fn suite_assemblies_speed() {
                 "  drag: solve median {:.2} ms (worst {:.2}){}",
                 ms(s.median),
                 ms(s.worst),
-                frame.map(|f| format!(", frame {:.2} ms (worst {:.2} ms)", ms(f.median), ms(f.worst))).unwrap_or_default()
+                frame.as_ref().map(|f| format!(", frame {:.2} ms (worst {:.2} ms)", ms(f.median), ms(f.worst))).unwrap_or_default()
             );
+            // isaac's 93-part group (lead 11-20: 252 ms a frame at v0.4.62, 7-10 s after 33c176a43).
+            let f = frame.map_or(s.median, |f| f.median);
+            assert!(ms(f) <= 300.0, "{path}: a drag frame takes {:.0} ms (300 at most)", ms(f));
         }
         // An insert: a copy of the first instance, away from the rest.
         let mut with = asm.clone();

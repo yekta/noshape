@@ -932,6 +932,11 @@ fn residuals(p: &Problem, poses: &[Frame], out: &mut Vec<f64>) {
 /// free bodies' 6 pose parameters each. A body's columns re-evaluate only
 /// the terms that read it (a 20-link chain: 2 of 19 mates per body).
 fn jacobian(p: &Problem, poses: &[Frame], free: &[usize], r: &[f64], scale: f64, eps: f64) -> DMatrix<f64> {
+    jacobian_rows(p, poses, free, r, scale, eps).0
+}
+
+/// [`jacobian`] and, for each free body, the row spans (start, length) its columns can fill.
+fn jacobian_rows(p: &Problem, poses: &[Frame], free: &[usize], r: &[f64], scale: f64, eps: f64) -> (DMatrix<f64>, Vec<Vec<(usize, usize)>>) {
     let mut spans = Vec::new();
     let mut by_body: Vec<Vec<usize>> = vec![Vec::new(); poses.len()];
     let mut row = 0;
@@ -984,7 +989,179 @@ fn jacobian(p: &Problem, poses: &[Frame], free: &[usize], r: &[f64], scale: f64,
             }
         }
     }
-    jac
+    let rows = free.iter().map(|&bi| by_body[bi].iter().map(|&ti| (spans[ti].1, spans[ti].2)).collect()).collect();
+    (jac, rows)
+}
+
+/// JᵀJ and Jᵀr over each row's bodies (`rows`: [`jacobian_rows`]' spans, a body's 6 columns each): a row reads one or
+/// two bodies (a mate, a stay), so a 93-part group's 546 columns cost a few 6×6 products a row, not a dense product.
+fn normal_equations(jac: &DMatrix<f64>, rows: &[Vec<(usize, usize)>], r: &[f64]) -> (DMatrix<f64>, DVector<f64>) {
+    let (m, n) = (jac.nrows(), rows.len() * 6);
+    // Each row's bodies, ascending (rows compressed).
+    let mut start = vec![0usize; m + 1];
+    for spans in rows {
+        for &(s, len) in spans {
+            for i in s..s + len {
+                start[i + 1] += 1;
+            }
+        }
+    }
+    for i in 0..m {
+        start[i + 1] += start[i];
+    }
+    let mut at = start.clone();
+    let mut of_row = vec![0usize; start[m]];
+    for (k, spans) in rows.iter().enumerate() {
+        for &(s, len) in spans {
+            for i in s..s + len {
+                of_row[at[i]] = k;
+                at[i] += 1;
+            }
+        }
+    }
+    let (mut jtj, mut g) = (DMatrix::<f64>::zeros(n, n), DVector::<f64>::zeros(n));
+    let part = |i: usize, k: usize| -> [f64; 6] { std::array::from_fn(|c| jac[(i, k * 6 + c)]) };
+    for (i, ri) in r.iter().enumerate() {
+        let bodies = &of_row[start[i]..start[i + 1]];
+        for (x, &k) in bodies.iter().enumerate() {
+            let jk = part(i, k);
+            for c in 0..6 {
+                g[k * 6 + c] += jk[c] * ri;
+            }
+            for &l in &bodies[..=x] {
+                let jl = if l == k { jk } else { part(i, l) };
+                for (a, va) in jk.iter().enumerate() {
+                    for (b, vb) in jl.iter().enumerate() {
+                        jtj[(l * 6 + b, k * 6 + a)] += va * vb;
+                    }
+                }
+            }
+        }
+    }
+    jtj.fill_lower_triangle_with_upper_triangle();
+    (jtj, g)
+}
+
+/// Jᵀv over each body's row spans ([`jacobian_rows`]).
+fn jt_mul(jac: &DMatrix<f64>, rows: &[Vec<(usize, usize)>], v: &[f64]) -> DVector<f64> {
+    let mut out = DVector::<f64>::zeros(rows.len() * 6);
+    for (k, spans) in rows.iter().enumerate() {
+        for c in 0..6 {
+            let col = jac.column(k * 6 + c);
+            out[k * 6 + c] = spans.iter().map(|&(s, len)| (s..s + len).map(|i| col[i] * v[i]).sum::<f64>()).sum();
+        }
+    }
+    out
+}
+
+/// Solves `m x = b` for a symmetric positive definite `m` made of 6×6 body blocks, most of them zero (two bodies share
+/// a block only through a mate): a block Cholesky in minimum degree order, over the blocks that are or become nonzero
+/// (a 93-part group: a few blocks a column instead of a dense 558² factorization). None if `m` isn't positive definite.
+fn solve_spd_blocks(m: DMatrix<f64>, b: &DVector<f64>) -> Option<DVector<f64>> {
+    BlockCholesky::new(m)?.solve(b)
+}
+
+/// [`solve_spd_blocks`]'s factor, kept for more right-hand sides.
+struct BlockCholesky {
+    /// L's blocks below the diagonal, in place of `m`'s (named by their own indices).
+    m: DMatrix<f64>,
+    order: Vec<usize>,
+    /// Each eliminated block's later neighbours (its column of L).
+    below: Vec<Vec<usize>>,
+    diag: Vec<nalgebra::Matrix6<f64>>,
+}
+
+impl BlockCholesky {
+    fn new(mut m: DMatrix<f64>) -> Option<Self> {
+        let nb = m.nrows() / 6;
+        // The block graph, then the elimination order: the fewest neighbours first, each eliminated block's neighbours
+        // joined (the fill).
+        let mut adj = vec![false; nb * nb];
+        for j in 0..nb {
+            for i in j + 1..nb {
+                if m.fixed_view::<6, 6>(i * 6, j * 6).iter().any(|v| *v != 0.0) {
+                    adj[i * nb + j] = true;
+                    adj[j * nb + i] = true;
+                }
+            }
+        }
+        let mut degree: Vec<usize> = (0..nb).map(|i| (0..nb).filter(|&j| adj[i * nb + j]).count()).collect();
+        let mut done = vec![false; nb];
+        let mut order = Vec::with_capacity(nb);
+        let mut below: Vec<Vec<usize>> = Vec::with_capacity(nb);
+        for _ in 0..nb {
+            let k = (0..nb).filter(|&i| !done[i]).min_by_key(|&i| degree[i])?;
+            let nbrs: Vec<usize> = (0..nb).filter(|&j| !done[j] && adj[k * nb + j]).collect();
+            for (x, &i) in nbrs.iter().enumerate() {
+                degree[i] -= 1;
+                for &j in &nbrs[x + 1..] {
+                    if !adj[i * nb + j] {
+                        adj[i * nb + j] = true;
+                        adj[j * nb + i] = true;
+                        degree[i] += 1;
+                        degree[j] += 1;
+                    }
+                }
+            }
+            done[k] = true;
+            order.push(k);
+            below.push(nbrs);
+        }
+        // Right-looking block Cholesky in that order, in place.
+        let mut diag = Vec::with_capacity(nb);
+        for (&k, nbrs) in order.iter().zip(&below) {
+            let l = nalgebra::Cholesky::new(block6(&m, k, k))?.l();
+            let mut cols = Vec::with_capacity(nbrs.len());
+            for &i in nbrs {
+                // L_ik = A_ik L_kk⁻ᵀ.
+                let lik = l.solve_lower_triangular(&block6(&m, i, k).transpose())?.transpose();
+                m.fixed_view_mut::<6, 6>(i * 6, k * 6).copy_from(&lik);
+                cols.push(lik);
+            }
+            for (x, &i) in nbrs.iter().enumerate() {
+                for (y, &j) in nbrs.iter().enumerate().take(x + 1) {
+                    let upd = cols[x] * cols[y].transpose();
+                    let mut v = m.fixed_view_mut::<6, 6>(i * 6, j * 6);
+                    v -= upd;
+                    if i != j {
+                        let mut w = m.fixed_view_mut::<6, 6>(j * 6, i * 6);
+                        w -= upd.transpose();
+                    }
+                }
+            }
+            diag.push(l);
+        }
+        Some(BlockCholesky { m, order, below, diag })
+    }
+
+    /// L y = b, then Lᵀ x = y.
+    fn solve(&self, b: &DVector<f64>) -> Option<DVector<f64>> {
+        type V6 = nalgebra::Vector6<f64>;
+        let mut x = b.clone();
+        let seg = |x: &DVector<f64>, i: usize| -> V6 { x.fixed_rows::<6>(i * 6).into_owned() };
+        for (p, &k) in self.order.iter().enumerate() {
+            let yk = self.diag[p].solve_lower_triangular(&seg(&x, k))?;
+            x.fixed_rows_mut::<6>(k * 6).copy_from(&yk);
+            for &i in &self.below[p] {
+                let d = block6(&self.m, i, k) * yk;
+                let mut xi = x.fixed_rows_mut::<6>(i * 6);
+                xi -= d;
+            }
+        }
+        for (p, &k) in self.order.iter().enumerate().rev() {
+            let mut xk = seg(&x, k);
+            for &i in &self.below[p] {
+                xk -= block6(&self.m, i, k).transpose() * seg(&x, i);
+            }
+            let xk = self.diag[p].transpose().solve_upper_triangular(&xk)?;
+            x.fixed_rows_mut::<6>(k * 6).copy_from(&xk);
+        }
+        Some(x)
+    }
+}
+
+fn block6(m: &DMatrix<f64>, i: usize, j: usize) -> nalgebra::Matrix6<f64> {
+    m.fixed_view::<6, 6>(i * 6, j * 6).into_owned()
 }
 
 fn apply_delta(pose: &Frame, d: &[f64]) -> Frame {
@@ -1306,7 +1483,7 @@ fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations
             // mate a little, a gain growing with the group), and a constant,
             // tiny damping: relative damping would smother a coupled motion
             // the mates make stiff on the diagonal (a gear).
-            let mut jac = jacobian(&problem, &poses, free, &res, scale, 1e-7);
+            let (mut jac, rows) = jacobian_rows(&problem, &poses, free, &res, scale, 1e-7);
             let drag_rows = 3 * terms.iter().filter(|t| matches!(t, Term::Drag(_))).count();
             for row in res.len() - drag_rows..res.len() {
                 res[row] *= 1e-3;
@@ -1315,20 +1492,19 @@ fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations
                 }
             }
             let cost: f64 = res.iter().map(|v| v * v).sum();
-            // Predicted cost drop of one Gauss-Newton step over `cols`.
-            let gain = |cols: &[usize]| -> Option<f64> {
-                let j = jac.select_columns(cols.iter());
-                let jt = j.transpose();
-                let mut a = &jt * &j;
+            // Predicted cost drop of one Gauss-Newton step over the bodies `ks` (indices into `free`).
+            let gain = |ks: &[usize]| -> Option<f64> {
+                let cols: Vec<usize> = ks.iter().flat_map(|&k| k * 6..k * 6 + 6).collect();
+                let sub: Vec<Vec<(usize, usize)>> = ks.iter().map(|&k| rows[k].clone()).collect();
+                let (mut a, g) = normal_equations(&jac.select_columns(cols.iter()), &sub, &res);
                 for i in 0..a.nrows() {
                     a[(i, i)] += 1e-16;
                 }
-                let g = &jt * DVector::from_column_slice(&res);
-                let delta = a.cholesky()?.solve(&(-&g));
+                let delta = solve_spd_blocks(a, &(-&g))?;
                 Some(-g.dot(&delta))
             };
-            let all: Vec<usize> = (0..jac.ncols()).collect();
-            let own: Vec<usize> = free.iter().enumerate().filter(|(_, b)| moving.contains(b)).flat_map(|(k, _)| k * 6..k * 6 + 6).collect();
+            let all: Vec<usize> = (0..free.len()).collect();
+            let own: Vec<usize> = free.iter().enumerate().filter(|(_, b)| moving.contains(b)).map(|(k, _)| k).collect();
             let (Some(g_all), Some(g_own)) = (gain(&all), gain(&own)) else { return None };
             if g_all - g_own > 1e-3 * cost {
                 return None;
@@ -2141,11 +2317,8 @@ fn levenberg_marquardt(problem: &Problem, poses: &mut Vec<Frame>, free: &[usize]
         if !dragged && history.len() > 5 && cost.sqrt() > bound && cost > 0.99 * history[history.len() - 6] {
             break;
         }
-        let jac = jacobian(problem, poses, free, &r, scale, eps);
-        let rv = DVector::from_vec(r.clone());
-        let jt = jac.transpose();
-        let jtj = &jt * &jac;
-        let g = &jt * &rv;
+        let (jac, rows) = jacobian_rows(problem, poses, free, &r, scale, eps);
+        let (jtj, g) = normal_equations(&jac, &rows, &r);
         let mut improved = false;
         let mut stalled = false;
         for _ in 0..12 {
@@ -2153,21 +2326,46 @@ fn levenberg_marquardt(problem: &Problem, poses: &mut Vec<Frame>, free: &[usize]
             for i in 0..n {
                 a[(i, i)] += lambda * (1.0 + jtj[(i, i)]);
             }
-            let Some(delta) = a.cholesky().map(|c| c.solve(&(-&g))) else {
+            let factor = BlockCholesky::new(a);
+            let solved = factor.as_ref().and_then(|f| f.solve(&(-&g)));
+            let (Some(factor), Some(delta)) = (factor, solved) else {
                 lambda *= 10.0;
                 continue;
             };
-            let mut trial = poses.clone();
-            for (k, &bi) in free.iter().enumerate() {
-                let mut d = [0.0; 6];
-                for j in 0..6 {
-                    d[j] = delta[k * 6 + j] * if j < 3 { scale } else { 1.0 };
+            let step = |from: &[Frame], delta: &DVector<f64>| -> Vec<Frame> {
+                let mut to = from.to_vec();
+                for (k, &bi) in free.iter().enumerate() {
+                    let mut d = [0.0; 6];
+                    for j in 0..6 {
+                        d[j] = delta[k * 6 + j] * if j < 3 { scale } else { 1.0 };
+                    }
+                    to[bi] = apply_delta(&from[bi], &d);
                 }
-                trial[bi] = apply_delta(&poses[bi], &d);
-            }
-            problem.driven.place(problem.mates, &mut trial, None);
+                problem.driven.place(problem.mates, &mut to, None);
+                to
+            };
+            let mut trial = step(poses, &delta);
             residuals(problem, &trial, &mut r2);
-            let c2: f64 = r2.iter().map(|v| v * v).sum();
+            let mut c2: f64 = r2.iter().map(|v| v * v).sum();
+            // Following a drag, a step along curved mates leaves them by its square, which the soft drag term can't
+            // pay for (the damping then shrinks every step to a creep): the same Jacobian's steps from the trial
+            // take the mates back (a second-order correction: one more back substitution each, no new Jacobian).
+            if dragged {
+                let mut r3 = Vec::new();
+                for _ in 0..4 {
+                    let g2 = jt_mul(&jac, &rows, &r2);
+                    let Some(d2) = factor.solve(&(-g2)) else { break };
+                    let t2 = step(&trial, &d2);
+                    residuals(problem, &t2, &mut r3);
+                    let c3: f64 = r3.iter().map(|v| v * v).sum();
+                    if c3 >= c2 {
+                        break;
+                    }
+                    trial = t2;
+                    std::mem::swap(&mut r2, &mut r3);
+                    c2 = c3;
+                }
+            }
             if c2 < cost {
                 // Following a drag, the soft target may be out of reach
                 // (Gauss-Newton then converges only linearly): stop once a
@@ -2288,6 +2486,26 @@ fn least_change(problem: &Problem, poses: &mut [Frame], free: &[usize], scale: f
         // of those, two thirds of every evaluation's solve).
         if delta.amax() < 1e-12 {
             break;
+        }
+    }
+    // A body whose mates leave it free to turn about its anchor (a Ball): its start turn exactly, the anchor where the
+    // rounds put it, when the mates hold as well (live fuzz f5: the rounds' finite differences left the pin ~2e-6 rad
+    // off its turn, live keeps it).
+    for (k, &bi) in free.iter().enumerate() {
+        let (s, c) = (problem.bodies[bi].pose, trial[bi]);
+        if s.rotation == c.rotation {
+            continue;
+        }
+        let a = anchors[k];
+        let kept = Frame { rotation: s.rotation, origin: c.transform_point(a) - s.rotation * a };
+        let mut turned = trial.clone();
+        turned[bi] = kept;
+        problem.driven.place(problem.mates, &mut turned, None);
+        let mut rt = Vec::new();
+        residuals(problem, &turned, &mut rt);
+        if cost(&rt) <= cost(&r).max(1e-12) {
+            trial = turned;
+            r = rt;
         }
     }
     if cost(&r) <= before {
@@ -2971,5 +3189,120 @@ mod tests {
         let want = wrap_angle(0.5 * turned);
         assert!(turned.abs() > std::f64::consts::PI * 1.5, "the driver turned {}°", turned.to_degrees());
         assert!(wrap_angle(b.abs() - want.abs()).abs() < 1e-3, "the driver turned {}°, the driven gear is at {}°", turned.to_degrees(), b.to_degrees());
+    }
+
+    /// The block solver gives the dense Cholesky's answer on a loop of 12 bodies with a chord (fill), and refuses a
+    /// matrix that isn't positive definite.
+    #[test]
+    fn the_block_solver_matches_the_dense_one() {
+        let nb = 12;
+        let n = nb * 6;
+        let mut seed = 7u64;
+        let mut rnd = move || {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (seed >> 11) as f64 / (1u64 << 53) as f64 - 0.5
+        };
+        let pairs: Vec<(usize, usize)> = (0..nb).map(|i| (i, (i + 1) % nb)).chain([(0, 6), (3, 9)]).collect();
+        let mut j = DMatrix::<f64>::zeros(pairs.len() * 6 + n, n);
+        for (r, &(a, b)) in pairs.iter().enumerate() {
+            for row in r * 6..r * 6 + 6 {
+                for c in 0..6 {
+                    j[(row, a * 6 + c)] = rnd();
+                    j[(row, b * 6 + c)] = rnd();
+                }
+            }
+        }
+        for i in 0..n {
+            j[(pairs.len() * 6 + i, i)] = 1e-3;
+        }
+        let a = j.transpose() * &j;
+        let b = DVector::from_fn(n, |_, _| rnd());
+        let dense = a.clone().cholesky().unwrap().solve(&b);
+        let ours = solve_spd_blocks(a.clone(), &b).unwrap();
+        assert!((&ours - &dense).amax() < 1e-9 * dense.amax(), "{}", (&ours - &dense).amax());
+        let mut bad = a.clone();
+        bad[(10, 10)] = -1.0;
+        assert!(solve_spd_blocks(bad, &b).is_none());
+    }
+
+    /// The normal equations over the rows' bodies are the dense JᵀJ and Jᵀr: rows of one body, of two, and a body's
+    /// span listed for rows it leaves zero.
+    #[test]
+    fn the_normal_equations_match_the_dense_ones() {
+        let mut seed = 11u64;
+        let mut rnd = move || {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (seed >> 11) as f64 / (1u64 << 53) as f64 - 0.5
+        };
+        // Bodies 0..4; terms (rows 6 each): 0-1, 1-2, 2-3, 3-0, stay 2, and 1-3 with body 3's columns zero.
+        let terms: [(&[usize], usize); 6] = [(&[0, 1], 6), (&[1, 2], 6), (&[2, 3], 6), (&[3, 0], 6), (&[2], 6), (&[1, 3], 3)];
+        let m: usize = terms.iter().map(|t| t.1).sum();
+        let mut jac = DMatrix::<f64>::zeros(m, 24);
+        let mut rows: Vec<Vec<(usize, usize)>> = vec![Vec::new(); 4];
+        let mut at = 0;
+        for (t, (bodies, len)) in terms.iter().enumerate() {
+            for &b in *bodies {
+                rows[b].push((at, *len));
+                if t == 5 && b == 3 {
+                    continue;
+                }
+                for i in at..at + len {
+                    for c in 0..6 {
+                        jac[(i, b * 6 + c)] = rnd();
+                    }
+                }
+            }
+            at += len;
+        }
+        let r: Vec<f64> = (0..m).map(|_| rnd()).collect();
+        let (jtj, g) = normal_equations(&jac, &rows, &r);
+        let dense = jac.transpose() * &jac;
+        let dg = jac.transpose() * DVector::from_column_slice(&r);
+        assert!((&jtj - &dense).amax() < 1e-12, "{}", (&jtj - &dense).amax());
+        assert!((&g - &dg).amax() < 1e-12, "{}", (&g - &dg).amax());
+    }
+
+    /// A closed planar linkage: ground, then `n` links of 20 mm zig-zagging ±30°, each Revolute (Z) to the next at its
+    /// ends, the last back to ground. A middle link can't move alone (its two joints hold it); its group can.
+    fn zigzag_linkage(n: usize) -> (Vec<SolverBody>, Vec<SolverMate>) {
+        let l = 0.02;
+        let z = |o: DVec3| Frame::from_axes(o, DVec3::Z, DVec3::X);
+        let mut bodies = vec![body(DVec3::ZERO, true)];
+        let mut p = DVec3::ZERO;
+        let mut mates = Vec::new();
+        for i in 0..n {
+            let a = if i % 2 == 0 { 30f64 } else { -30.0 }.to_radians();
+            bodies.push(SolverBody { pose: Frame::new(p, DQuat::from_rotation_z(a)), fixed: false });
+            let (prev, at) = if i == 0 { (0, z(DVec3::ZERO)) } else { (i, z(DVec3::new(l, 0.0, 0.0))) };
+            mates.push(mate(MateType::Revolute, prev, at, i + 1, z(DVec3::ZERO)));
+            p += DVec3::new(a.cos(), a.sin(), 0.0) * l;
+        }
+        mates.push(mate(MateType::Revolute, n, z(DVec3::new(l, 0.0, 0.0)), 0, z(p)));
+        (bodies, mates)
+    }
+
+    /// A drag step of a 92-link closed linkage (the whole group moves) in 300 ms at most (isaac's 93-part group, lead
+    /// 11-20); `NOSHAPE_LINKAGE_N` sets the links.
+    #[test]
+    #[ignore = "T2: timing, release build"]
+    fn a_linkage_drag_step_takes_300_ms_at_most() {
+        let n: usize = std::env::var("NOSHAPE_LINKAGE_N").ok().and_then(|v| v.parse().ok()).unwrap_or(92);
+        let (start, mates) = zigzag_linkage(n);
+        let mid = n / 2;
+        let local = DVec3::new(0.01, 0.0, 0.0);
+        let grab = start[mid].pose.transform_point(local);
+        let mut times = Vec::new();
+        for i in 1..=20 {
+            let target = grab + DVec3::new(0.0, 0.5e-3, 0.0) * i as f64;
+            let mut bodies = start.clone();
+            let t = std::time::Instant::now();
+            let r = solve_with(&mut bodies, &mates, &[], &[DragTarget { body: mid, local_point: local, target, along: Some(DVec3::Z) }], false);
+            times.push(t.elapsed().as_secs_f64() * 1e3);
+            let got = bodies[mid].pose.transform_point(local);
+            println!("step {i}: {:.1} ms, moved {:.3} mm of {:.3}, converged {}", times[i - 1], (got - grab).length() * 1e3, (target - grab).length() * 1e3, r.converged);
+        }
+        times.sort_by(f64::total_cmp);
+        println!("linkage {n}: median {:.1} ms, worst {:.1} ms", times[times.len() / 2], times[times.len() - 1]);
+        assert!(times[times.len() / 2] <= 300.0, "a drag step takes {:.0} ms", times[times.len() / 2]);
     }
 }

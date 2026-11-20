@@ -597,16 +597,13 @@ fn cases_len(b: &serde_json::Value) -> usize {
 #[test]
 #[ignore = "T2: live fuzz batch vs live (assemblies)"]
 fn asm_fuzz_live_matches() {
-    // Known differences from live (handoff "Solver fuzz"): f50, where B now
-    // matches (a Revolute opposed to its Cylindrical still slides the plate,
-    // probes 1786 cb1) but C's free Ball pose is 2e-6 off in its rotation:
-    // the conflict stops the solve just short of full convergence.
-    // Batch 3 (live 11-02 15:36, 23/30 at first; f53's statuses, f69, f80
-    // since): f54 which mates of a conflicting loop of Cylindricals read
-    // red; f53 the half-turn's point when both parts are held (probes 1798
-    // (c): it depends on what the turned part carries); f52 / f55 / f64 a
-    // free part's pose after a Ball / Cylindrical / Slider chain.
-    const KNOWN: &[&str] = &["f50", "f53", "f54", "f55", "f64"];
+    // Known differences from live (handoff "Solver fuzz"). Batch 3 (live
+    // 11-02 15:36, 23/30 at first; f53's statuses, f69, f80 since): f54
+    // which mates of a conflicting loop of Cylindricals read red; f53 the
+    // half-turn's point when both parts are held (probes 1798 (c): it
+    // depends on what the turned part carries); f55 / f64 a free part's
+    // pose after a Cylindrical / Slider chain.
+    const KNOWN: &[&str] = &["f53", "f54", "f55", "f64"];
     let mut parts = parts();
     let (mut answered, mut matches, mut report) = (0, 0, Vec::new());
     for n in 1.. {
