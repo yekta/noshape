@@ -42,6 +42,8 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   the rule's 8 declines fall to other reasons. Dropped: bool-sh3 5b38e5c92.
   afcf858f3 slab union history differing only in vertex records = equivalent (lead 11-19); 0d465cb70 the gate's
   end-to-end Shell check (gate-host.py SHELLS / SHELLS_KNOWN).
+- bool-k25x10 (bool-tube worktree): d2a26a12a alone on main (lead 11-20: land it ahead of sh3); gate on vibex8 once
+  pole2 (1ff271cf, queued 06:04) is in main, then land.
 - bool-sh3 (origin/bool-sh3, tip a0b85fef4 = + d494b222e, a0b85fef4 (standoffs speed, below); 5b38e5c92 the 50 um rule removed; d2a26a12a the Ø25×10 knurl's touch (P2 below);
   1f27fa8ca the unify's segmented volume recheck (free-form fuse, P2 below); 8b6d6faba + Shell's stray-pcurve refit after its unify (2756e521: a 45° cone's merged
   face had an edge pcurve 0.83 mm off, read 77 mm3 heavy in ours and OCCT; now 32108.414, live 32108.426 / 45 faces (q-2756e521),
@@ -94,8 +96,8 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
 - shfall (DECISIONS 11-20): the gate's shfall becomes the re-recorded OCCT set; the 11-02 set is shfall-1102,
   report-only (gate-host.py REPORT on bool-sh3 8b02f134b, tested with fake rows; gate sh3 from bool-hat). vibex8
   ~/agents/bool-keep/shrec: rec1/all = 103 slab Booleans from 260 fuzz Shells (run1.sh; models built with
-  NOSHAPE_BOOL_RUST=0, so OCCT's tolerances: 19 inputs >= 1e-4 m, bin/maxtol.py). run2.sh (vibex8 qa quiet 02-04; vibex7's slot was 3 h deep: local timer bool-at04 runs /root/bool-scratch/at04.sh at
-  04:01 UTC: the SD A/B (vibex8 ~/tmp/bool/sdr/sdr.out) then run2 (vibex8 shrec, seeds 3020+, run2.out,
+  NOSHAPE_BOOL_RUST=0, so OCCT's tolerances: 19 inputs >= 1e-4 m, bin/maxtol.py). run2.sh (11-20 06:08: on vibe2 ~/agents/bool-keep/shrec in its slot, held by a
+  backgrounded ssh; vibex8's slot was qa's 04:09-06:05+, vibex7's 6 deep; run2.out,
   ends SHREC2-DONE): the models built as users get them (ours on), only the Shell probe OCCT-only -> shells2/, rec2/,
   rp2-main.txt; prints how many inputs are still >= 1e-4. If fewer: rec2 is the new shfall (tell the lead). Swap:
   mv bool-corpora/shfall -> shfall-1102 (vibex8 and every host holding it), new shfall = rec?/all minus the cases OCCT
@@ -163,8 +165,9 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
 - P1 SPEED-STANDOFFS: its Booleans all ours on land7. Mac document (ops xshell3::xpul, XPUL_DOC) 455 ms vs live ~200.
   The unify's volume checks were ~40% (usd_kept_volume: faces_volume_precise, volume0): both on all threads in the
   faces' order (bool-sh3 d494b222e): ~345 ms. bool-sh3 a0b85fef4: 1f27fa8ca's segmented-integral
-  rescue only where those and OCCT's agree on the solid to 1e-8 (it broke kernel tube-chamfer 34 / knurl grooves 9). Next: brep uv_of's fold retry (16 Newton per point off the
-  thread root strip, from stretches_over's 257 samples per edge, ~11%), then waiting on occt_ahead.
+  rescue only where those and OCCT's agree on the solid to 1e-8 (it broke kernel tube-chamfer 34 / knurl grooves 9). uv_of's fold retry (11-20 06:20,
+  counted): 1463 retries a regeneration, 847 end on the surface at the 7.7th of 16 candidates; an early stop saves ~10
+  ms (3%): dropped (345 vs live ~200 is under 2x).
 - qa's backlog (TICKETS a3ff6d481): standoffs Revolve 2 / Boolean 1 / 2 (OCCT 450-980 ms, ours "a piece's point on
   another solid's face"), wire-clip / gamma Boolean 1 (87-tool fuse, "cylinders nearly coincident", OCCT 2-2.9 s) and
   Boolean 2. Cases Mac bool-keep/rec-<doc>.
