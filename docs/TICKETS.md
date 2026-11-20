@@ -61,7 +61,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   panel's bottom (16 px, the table's visible width; 18 px while the pointer is over it) whenever the table's own bottom is
   out of view (osc-sticky-scroll-component). Ours (config_panel.rs): the header scrolls away; the sideways scrollbar is
   only at the table's bottom. Evidence: releases/rn-1222-1223/st2.json, st7.json, sticky-h-*.png, sticky-800.png.
-- [ ] P2 **URDF-RIGID-SUBASM-SINGLE-LINK (dx)**: Onshape 1.223 "merging subassemblies into a single body in URDF export".
+- [x] (dx 11-20: b7c2c4e8a, e2e test) P2 **URDF-RIGID-SUBASM-SINGLE-LINK (dx)**: Onshape 1.223 "merging subassemblies into a single body in URDF export".
   Live 05:42, assembly Export › URDF: Geometry format, STL Format, Resolution, Options, ☐ "Export rigid subassemblies as a
   single link", ☐ Include hidden instances in export. Ours' URDF export has no such option. Evidence:
   releases/rn-1222-1223/urdf-export.png, rn4.json.

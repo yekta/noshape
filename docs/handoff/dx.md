@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-20 06:2x UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-20 07:4x UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -24,9 +24,6 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
   (qa verifies), hex chain_pieces both ways (9023ff0d, 5dd3534a 04:22), STEP one-loop torus, HLR P1 = OCCT patch 0036
   (HLRBRep_Data::RejectedPoint: an IN end crossing tangent to a boundary's middle, unpaired, rejected; snap-hook 7 stray
   pieces -> 0, rings-loft Right 159 -> 151; libs installed by the lead on vibe2/vibex6-8, /root/occt, Mac, *.pre0036).
-- QUEUED f573b788 (05:0x, worktree dx-nightly): dump_corpus_drawing_views skips without NOSHAPE_VIEWS_DUMP (nightly
-  T2). Once landed: rm the dx-nightly worktree and vibe2 ~/agents/dx-nightly/target. std_sheet_metal_matches_onshape
-  is skasm's (9e5c392b4's sm_built).
 - snap-hook model mirror (all 4 hooks about their own x; Shell OFFSET_EDGE hookVector from evAxis, our edge opposite
   Parasolid's, /root/dx-scratch/snaphook.fs line 96): reported to the lead 00:50. faceblend Right's extra line: blend's.
 - sm-louver DXF (05:0x, PARKED, small): geometry as live except the Right view's flange tangent edge: HLR hides 0.64 mm
@@ -42,9 +39,20 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
   body ∪ its herringbone mirror 14.4 s (occt), core ∪ 40 teeth 3.3 s (occt_tree). Sent to bool 06:21 with the
   recorded cases vibex7 ~/agents/dx-keep/gl-bool (.brep/.txt). gl13 2d7dc1: 0.8 + 0.9 s, live 515 ms. Repro: vibex7
   ~/agents/dx-keep/gl.sh <tag> [gl40|gl13] (parity_models + NOSHAPE_FS_PROFILE; NOSHAPE_RECORD_BOOLEANS for cases).
-- URDF-RIGID-SUBASM-SINGLE-LINK QUEUED 752aa551 (06:0x, with 898a054b5 screws = LANDED 615fe712): ExportSettings
-  urdf_single_link, AssemblyExport.rigid + placed_links, op opt rigid_subassemblies_single_link, dialog row; e2e
-  urdf_export_takes_a_rigid_subassembly_as_one_link. Open: live's file shape (REQUESTS dx 05:44).
+- URDF-RIGID-SUBASM-SINGLE-LINK LANDED b7c2c4e8a (ticket [x]); open: live's file shape (REQUESTS dx 05:44). Nightly
+  dump-test LANDED 3b9ec80cc; dx-nightly worktree + vibe2 target removed 07:4x.
+- EXCHANGE TOP-3 (lead 06:3x), uncommitted in dx-land: baseline b0 (Mac, old binary, 22 docs; screws not in the set):
+  imports 119/130, live imports ours 46/48, self 153/154, DXF 1/10, times 174/174; 39 failing rows (/root/dx-scratch/
+  b0-fails.txt): rings-loft 8, faceblend 6, housing-draft 6. Fixes: (1) parity.rs OBJ/3MF held to live's OWN OBJ/3MF
+  mesh (file_mesh), not its STL; (2) export.rs IGES/ACIS leave a mesh part out beside B-rep parts (as live's hex
+  files) + e2e iges_and_acis_leave_a_mesh_part_out_beside_brep_parts + read-back kept parts; (3) "ours.stl as live
+  will read it" passes on DECISIONS 11-16 deviation (stl_within_deviation), as the live-imports row. NOT a mesher
+  change (lead 07:3x: rows pass on deviation, never count): our B-spline STL is ~2.5-3x fewer triangles than live's
+  (hoses 76922/222374, faceblend 3662/9204) but within 0.003 mm mean. Rest: DXF + rings STEP area = model causes
+  (parked). a3: all fixed but DXF, rings STEP (parked), rings "ours.stl" and sm-louver OBJ/3MF louvers mispaired ->
+  (4) ops/src/parity.rs differences(): ours within live's volume band ties (both boxed), box pairs; a4: sm-louver
+  clean. Rings "ours.stl": Shell 1 offset faces mesh with folds/open edges in plain BRepMesh too (part valid) -> sent
+  to bool 08:1x (Mac dx-keep/rings-fold/, /root/dx-scratch/rings-fold-probe.patch). Then e2e, commit, land, full run.
 - Next: the rest of "Next, in order".
 - The Mac's dx-main release target links a PRIVATE TKHLR (OCCT_ROOT=~/noshape-host/dx-keep/hlr/root, counters only
   with DXHLR=1); rebuild with the normal OCCT_ROOT for timings.

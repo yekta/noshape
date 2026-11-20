@@ -483,6 +483,9 @@ pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(Stri
     // Intersection edges exact where the faces allow it: a reader refits approximated ones (live's import of a sheet
     // metal part made 61 faces of its 58, PS-INEXACT-INTERSECTION-EDGES).
     let parts: Vec<(String, k::Shape, [f32; 4])> = parts.into_iter().map(|(n, sh, c)| (n, k::exact_edges(&sh).unwrap_or(sh), c)).collect();
+    // Live's IGES and ACIS leave a mesh part out beside B-rep parts (c2-hex-bookcase-derived: live.igs and live.sat
+    // hold its B-rep part alone).
+    let parts = if matches!(s.format, PartFormat::Iges | PartFormat::Acis) && parts.iter().any(|p| !p.1.is_mesh()) { parts.into_iter().filter(|p| !p.1.is_mesh()).collect() } else { parts };
     let parts: Vec<(String, k::Shape, [f32; 4])> = if faceted_meshes(s.format) { parts.into_iter().map(|(n, sh, c)| (n, faceted(sh), c)).collect() } else { parts };
     // Y axis up: the model's +Z becomes +Y.
     let parts: Vec<(String, k::Shape, [f32; 4])> = if s.y_up && s.format != PartFormat::Urdf {

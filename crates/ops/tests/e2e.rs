@@ -3104,6 +3104,38 @@ fn a_mesh_part_exports_to_brep_formats() {
     }
 }
 
+/// Beside a B-rep part, IGES and ACIS leave a mesh part out, as live's (c2-hex-bookcase-derived: live.igs and live.sat
+/// hold its B-rep part alone); STEP and Parasolid keep both.
+#[test]
+fn iges_and_acis_leave_a_mesh_part_out_beside_brep_parts() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "mesh_beside");
+    let stl = call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "STL", "file": scratch("mesh_beside.stl").to_str().unwrap(), "units": "Millimeter" }))["file"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "import_files", json!({ "files": [stl], "keep_files": false }));
+    let studio = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap()["name"].as_str().unwrap().to_string();
+    let sk = call(&mut ctx, "sketch_create", json!({ "tab": studio, "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "tab": studio, "sketch": sk, "tool": "corner_rectangle", "points": [[60, -10], [80, 10]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "tab": studio, "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    let ex = call(&mut ctx, "feature_add", json!({ "tab": studio, "type": "extrude", "params": { "entities": [region], "depth": "10 mm", "operationType": "NEW" } }));
+    assert_eq!(ex["feature_status"]["status"], "Ok", "{ex}");
+    let q = call(&mut ctx, "query_parts", json!({ "tab": studio }));
+    let vols: Vec<f64> = q["parts"].as_array().unwrap().iter().map(|p| num(&p["volume"])).collect();
+    assert_eq!(vols.len(), 2, "{q}");
+    let block = vols.iter().copied().fold(f64::MAX, f64::min);
+    for (format, parts) in [("IGES", 1), ("ACIS", 1), ("STEP", 2), ("PARASOLID", 2)] {
+        let out = call(&mut ctx, "export_parts", json!({ "tab": studio, "format": format, "file": scratch(&format!("mesh_beside_{format}")).to_str().unwrap() }));
+        let back = call(&mut ctx, "import_files", json!({ "files": [out["file"]], "keep_files": false }));
+        let tab = back["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap()["name"].as_str().unwrap().to_string();
+        let q = call(&mut ctx, "query_parts", json!({ "tab": tab }));
+        let p = q["parts"].as_array().unwrap();
+        assert_eq!(p.len(), parts, "{format}: {q}");
+        if parts == 1 {
+            let v = num(&p[0]["volume"]);
+            assert!((v - block).abs() < block * 1e-6, "{format}: the block alone, {v} for {block}");
+        }
+    }
+}
+
 /// Every format the Import dialog takes that we can write: the block is
 /// exported in each and imported back. B-rep formats keep the volume;
 /// mesh formats come back as one mesh part.

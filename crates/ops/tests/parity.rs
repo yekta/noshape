@@ -898,16 +898,33 @@ fn exchange_round_trip() {
         let volume = |v: &[PartState]| v.iter().filter_map(|p| p.volume).sum::<f64>();
         // Live's own import holding only some of its Parasolid's parts, each at its volume: the format can't hold the
         // rest (IGES and ACIS drop c2-hex-bookcase-derived's mesh part "imported"), not an import off its file.
-        let dropped = |own: &[PartState], x: &[PartState]| {
-            own.len() < x.len() && own.iter().all(|o| x.iter().any(|p| p.name == o.name && p.volume.zip(o.volume).is_some_and(|(a, b)| (a - b).abs() <= 1e-3 * a.abs())))
-        };
+        // (By volume: our IGES names its parts "Part n".)
+        let same = |p: &PartState, o: &PartState| p.volume.zip(o.volume).is_some_and(|(a, b)| (a - b).abs() <= 1e-3 * a.abs());
+        let dropped = |own: &[PartState], x: &[PartState]| own.len() < x.len() && own.iter().all(|o| x.iter().any(|p| same(p, o)));
         // The Parasolid's parts such a format holds (all of them otherwise).
         let kept = |own: &[PartState], x: &[PartState]| -> Vec<PartState> {
-            if dropped(own, x) { x.iter().filter(|p| own.iter().any(|o| o.name == p.name)).cloned().collect() } else { x.to_vec() }
+            if dropped(own, x) { x.iter().filter(|p| own.iter().any(|o| same(p, o))).cloned().collect() } else { x.to_vec() }
         };
         let xt = (!selfs["PARASOLID"].is_null()).then(|| parts_from_live_import(&selfs["PARASOLID"], false));
+        // Live's OBJ and 3MF are meshes of their own, coarser than its STL (c2-rings-loft 26760 triangles for 36738)
+        // and live has no import of them: the file's own mesh, as ours reads it (the file's triangle sums: faceblend's
+        // OBJ 136841.2892 mm³ both, its 3MF 136841.2709).
+        let file_mesh: HashMap<&str, Vec<PartState>> = FORMATS
+            .iter()
+            .filter(|(f, _)| matches!(*f, "OBJ" | "3MF") && selfs[*f].is_null())
+            .filter_map(|(f, ext)| {
+                let file = [format!("live.{ext}"), format!("live.{ext}.zip")].into_iter().map(|n| dir.join(n)).find(|p| p.is_file())?;
+                import(&scratch(&format!("{name}-own-{ext}.noshape")), &file)
+                    .ok()
+                    // (Its box pairs parts of one volume, sm-louver's louvers: ours inside it, grown by live's chord.)
+                    .map(|parts| {
+                        let grow = |b: [[f64; 3]; 2]| [b[0].map(|c| c - LIVE_STL_CHORD_MM * 1e-3), b[1].map(|c| c + LIVE_STL_CHORD_MM * 1e-3)];
+                        (*f, mesh_counts(parts).into_iter().map(|p| PartState { bbox: p.bbox.map(grow), bbox_outer: true, centroid: None, centroid_band: None, ..p }).collect())
+                    })
+            })
+            .collect();
         // `ours`: what live's import of our file is held to (an STL of live's off its model by over 1 %: the model's).
-        // (No own import of ACIS, OBJ or 3MF: its Parasolid's or its STL's, the same model and mesher.)
+        // (No own import of ACIS: its Parasolid's.)
         let model_mesh = || {
             let chord = LIVE_STL_CHORD_MM * 1e-3;
             xt.as_ref().map(|x| {
@@ -920,6 +937,11 @@ fn exchange_round_trip() {
         let expected = |format: &str, ours: bool| -> Option<Vec<PartState>> {
             if mesh(format) && LIVE_MESH_SHEETS.contains(&name.as_str()) {
                 return model_mesh();
+            }
+            if let (Some(own), Some(x)) = (file_mesh.get(format), &xt)
+                && own.len() == x.len()
+            {
+                return Some(held_to_model(own.clone(), x, 2.0, ours, true));
             }
             let key = match format {
                 "ACIS" if selfs[format].is_null() => "PARASOLID",
@@ -1075,13 +1097,27 @@ fn exchange_round_trip() {
             if mesh(format)
                 && let (Ok(b), Some(live)) = (&back, expected(format, true))
             {
-                let d = differences(&live, &mesh_counts(b.clone()));
-                println!("{name}: ours.{ext} as live will read it: {}", if d.is_empty() { "matches".into() } else { d.join("; ") });
+                let read = mesh_counts(b.clone());
+                let d = differences(&live, &read);
+                // (Off the bands, an STL passes on its deviation, as live's import of it: DECISIONS fdc24d65f.)
+                let why = (format == "STL" && !d.is_empty()).then(|| stl_within_deviation(&dir.join("live.stl"), &file, &read, &live)).flatten();
+                println!(
+                    "{name}: ours.{ext} as live will read it: {}",
+                    match why {
+                        Some(why) => format!("off live's bands, within its deviation ({why})"),
+                        None if d.is_empty() => "matches".into(),
+                        None => d.join("; "),
+                    }
+                );
             }
             // (Within the edges' tolerance, either side's: `within_edge_tolerance`.)
             let tol = |v: &[PartState]| v.iter().filter_map(|p| p.edge_tolerance).fold(0.0f64, f64::max);
             let diff = match back {
-                Ok(b) if matches!(format, "IGES" | "STEP" | "ACIS") => differences(&mesh_counts(within_edge_tolerance(&native, tol(&native).max(tol(&b)))), &mesh_counts(b)),
+                // (IGES and ACIS leave a mesh part out, as live's: the parts they hold.)
+                Ok(b) if matches!(format, "IGES" | "STEP" | "ACIS") => {
+                    let native = if format != "STEP" && dropped(&b, &native) { kept(&b, &native) } else { native.clone() };
+                    differences(&mesh_counts(within_edge_tolerance(&native, tol(&native).max(tol(&b)))), &mesh_counts(b))
+                }
                 Ok(b) if mesh(format) => {
                     let read_by_live = (!theirs[format].is_null()).then(|| parts_from_live_import(&theirs[format], true));
                     let (a, n) = (total(&b), read_by_live.as_deref().map_or_else(|| total(&native), total));
@@ -2659,6 +2695,9 @@ fn differences_use_lives_bands() {
     let at = |x: f64, y: f64, volume: f64| PartState { bbox: Some([[x, y, 0.0], [x + 0.01, y + 0.01, 0.05]]), ..part(volume, 6) };
     let live = [at(0.0253, -0.0213, 1.0e-6), at(-0.0213, 0.0253, 1.0e-6)];
     assert!(differences(&live, &[at(-0.0213, 0.0253, 1.0e-6), at(0.0253, -0.0213, 1.0e-6 + 1e-17)]).is_empty());
+    // In a mesh the instances' volumes part by more, all within live's band (c2-sm-louver's louvers): by the box still.
+    let live = live.map(|p| PartState { volume_band: Some([0.999e-6, 1.001e-6]), ..p });
+    assert!(differences(&live, &[at(-0.0213, 0.0253, 0.9999e-6), at(0.0253, -0.0213, 0.9995e-6)]).is_empty());
     // The UI fetch's box is the client's bounds, loose round a fillet
     // (knob-kraut's ±15 mm knob read −15.4005 / +15.3382): ours inside is no difference.
     let round = |lo: f64, hi: f64| PartState { bbox: Some([[lo, lo, 0.0], [hi, hi, 0.1]]), ..part(1.0e-6, 6) };

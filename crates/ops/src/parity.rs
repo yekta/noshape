@@ -8277,7 +8277,9 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
             };
             let apart = p.bbox.zip(l.bbox).map_or(0.0, |(x, y)| (0..2).flat_map(|c| (0..3).map(move |i| (x[c][i] - y[c][i]).powi(2))).sum::<f64>().sqrt());
             let tie = |r: f64| if r < 1e-6 { 0.0 } else { r };
-            (if p.body_type == l.body_type { 0.0 } else { 1.0 }, tie(volume), tie(area), apart)
+            // (Within live's volume band a tie too: c2-sm-louver's louvers in a mesh, 398754 and 398729 mm³ for 398783.)
+            let banded = p.bbox.is_some() && l.bbox.is_some() && l.volume_band.is_some_and(|[lo, hi]| (lo..=hi).contains(&a));
+            (if p.body_type == l.body_type { 0.0 } else { 1.0 }, if banded { 0.0 } else { tie(volume) }, tie(area), apart)
         };
         let Some(i) = (0..free.len()).min_by(|a, b| d(free[*a]).partial_cmp(&d(free[*b])).unwrap_or(std::cmp::Ordering::Equal)) else {
             continue;
