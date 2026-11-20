@@ -1252,6 +1252,20 @@ fn chamfer_in(ev: &mut EvalCtx) -> FResult<()> {
             super::blend_section::section_blend(ev, bi, &edges, &spec).map_err(|e| blend_failed("Failed to chamfer selections.", e.message))?;
             continue;
         }
+        use super::blend_section::{BlendSpec, ChamferRef, Section};
+        let faces = body.shape.faces();
+        let refs: Vec<usize> = reference.iter().filter_map(|r| faces.iter().position(|f| f.is_same(r))).collect();
+        let (r1, r2, angle) = match spec {
+            k::ChamferSpec::Equal(d) => (d, d, None),
+            k::ChamferSpec::TwoDistances(a, b) => (a, b, None),
+            k::ChamferSpec::DistanceAngle(d, a) => (d, d, Some(a)),
+        };
+        let sections = BlendSpec { section: Section::Chamfer, r1, r2, width: None, partial: None, run_on: true, cliff: false, sides: None, overflow: false, reference: Some(ChamferRef { faces: refs, angle, offsets: None, stopped: stops }) };
+        // (A distance and angle, or two distances on several edges: each section from its edge's reference face.)
+        if stops && !matches!(spec, k::ChamferSpec::Equal(_)) {
+            super::blend_section::section_blend(ev, bi, &edges, &sections).map_err(|e| blend_failed("Failed to chamfer selections.", e.message))?;
+            continue;
+        }
         if let k::ChamferSpec::Equal(d) = spec {
             match round_overrun(&body.shape, &edges, &|_, _| d) {
                 Some(Overrun::PastSelected) => return err("End boundary intersects unchamfered edge."),
@@ -1289,15 +1303,6 @@ fn chamfer_in(ev: &mut EvalCtx) -> FResult<()> {
         // Where OCCT can't build it (c2-hunting-knife's Chamfer 1: an offset and angle along a blade's B-spline grind
         // face): as sections along the edges, each from its reference face. (A distance-and-angle or two-distance
         // chamfer, sections to fall back on: OCCT's invalid result not retried at slightly smaller sizes, 0.2 s there.)
-        use super::blend_section::{BlendSpec, ChamferRef, Section};
-        let faces = body.shape.faces();
-        let refs: Vec<usize> = reference.iter().filter_map(|r| faces.iter().position(|f| f.is_same(r))).collect();
-        let (r1, r2, angle) = match spec {
-            k::ChamferSpec::Equal(d) => (d, d, None),
-            k::ChamferSpec::TwoDistances(a, b) => (a, b, None),
-            k::ChamferSpec::DistanceAngle(d, a) => (d, d, Some(a)),
-        };
-        let sections = BlendSpec { section: Section::Chamfer, r1, r2, width: None, partial: None, run_on: true, cliff: false, sides: None, overflow: false, reference: Some(ChamferRef { faces: refs, angle, offsets: None }) };
         let quick = !matches!(spec, k::ChamferSpec::Equal(_));
         let first = if quick { k::without_blend_retries(|| k::chamfer_checked(&body.shape, &shapes, spec, &reference)) } else { k::chamfer_checked(&body.shape, &shapes, spec, &reference) };
         let res = match first {

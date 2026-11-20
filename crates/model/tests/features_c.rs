@@ -4244,8 +4244,14 @@ fn a_chamfer_stopped_at_its_selection_sets_back_its_distance_on_a_drafted_wall()
         shape.edges().iter().filter_map(|e| e.edge_info().ok()).filter(|i| matches!(i.curve, noshape_kernel::Curve::Line { .. })).map(|i| (i.start, i.end)).collect()
     };
     let top = mm(10.0);
-    // Two distances: 1 and 2 mm, one on each face.
-    for (extra, sizes) in [(vec![("width", expr("1 mm"))], [1.0, 1.0]), (vec![("chamferType", en("TWO_OFFSETS")), ("width1", expr("1 mm")), ("width2", expr("2 mm"))], [1.0, 2.0])] {
+    // Two distances: 1 and 2 mm, one on each face. Distance and angle: 1 mm at 45° to the reference face, its other
+    // distance 1 sin 45° / sin 55° (the top and the drafted wall meet at 80°).
+    let da = 45f64.to_radians().sin() / 55f64.to_radians().sin();
+    for (extra, sizes) in [
+        (vec![("width", expr("1 mm"))], [1.0, 1.0]),
+        (vec![("chamferType", en("TWO_OFFSETS")), ("width1", expr("1 mm")), ("width2", expr("2 mm"))], [1.0, 2.0]),
+        (vec![("chamferType", en("OFFSET_ANGLE")), ("width", expr("1 mm")), ("angle", expr("45 deg"))], [1.0, da]),
+    ] {
         let mut s = Studio::new();
         let mut sk = noshape_sketch::Sketch::new();
         sk.add_line(DVec2::new(mm(-10.0), mm(-5.0)), DVec2::new(mm(10.0), mm(-5.0)));
@@ -4286,6 +4292,51 @@ fn a_chamfer_stopped_at_its_selection_sets_back_its_distance_on_a_drafted_wall()
         // It stops at the selection: the back top edge stays.
         assert!(lines.iter().any(|(a, c)| (a.z - top).abs() < 1e-9 && (c.z - top).abs() < 1e-9 && (a.y + y0).abs() < 1e-9), "{sizes:?}: {lines:?}");
     }
+}
+
+/// Tangent propagation off stops two distances on several edges too: a stadium's two straight top edges chamfered 1 / 2
+/// mm run straight out into its end cylinders, which keep their r 5 arcs on the top (qa's CHAMFER-ASYM-NO-PROPAGATION;
+/// OCCT ran the chamfer on round them).
+#[test]
+fn two_distance_chamfers_on_several_edges_stop_at_the_selection() {
+    let top = mm(10.0);
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_line(DVec2::new(mm(-10.0), mm(-5.0)), DVec2::new(mm(10.0), mm(-5.0)));
+    sk.add_arc(DVec2::new(mm(10.0), 0.0), DVec2::new(mm(10.0), mm(-5.0)), DVec2::new(mm(10.0), mm(5.0)));
+    sk.add_line(DVec2::new(mm(10.0), mm(5.0)), DVec2::new(mm(-10.0), mm(5.0)));
+    sk.add_arc(DVec2::new(mm(-10.0), 0.0), DVec2::new(mm(-10.0), mm(5.0)), DVec2::new(mm(-10.0), mm(-5.0)));
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let picked: Vec<Reference> = b.shape.edges().iter().enumerate().filter(|(_, e)| e.edge_info().is_ok_and(|i| matches!(i.curve, noshape_kernel::Curve::Line { .. }) && (i.start.z - top).abs() < 1e-9 && (i.end.z - top).abs() < 1e-9)).map(|(k, _)| Reference::Edge((*b.edges[k]).clone())).collect();
+    assert_eq!(picked.len(), 2);
+    s.add("chamfer", move |p| {
+        p.set("entities", ParamValue::Query(picked));
+        p.set("tangentPropagation", ParamValue::Bool(false));
+        p.set("chamferType", en("TWO_OFFSETS"));
+        p.set("width1", expr("1 mm"));
+        p.set("width2", expr("2 mm"));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    assert!(shape.is_valid() && shape.solids().len() == 1);
+    let tops: Vec<_> = shape.edges().iter().filter_map(|e| e.edge_info().ok()).filter(|i| (i.start.z - top).abs() < 1e-9 && (i.end.z - top).abs() < 1e-9).collect();
+    let listed: Vec<String> = tops.iter().map(|i| format!("{:?} {:.4} mm {:.3?}..{:.3?}", std::mem::discriminant(&i.curve), i.length / mm(1.0), i.start / mm(1.0), i.end / mm(1.0))).collect();
+    // The end arcs on the top stay r 5 (live G7: the section runs straight out and trims the neighbours), each cut back
+    // at both ends where the chamfer's plane leaves the top d in from the edge: by acos((5 - d) / 5).
+    let cut = |d: f64| ((5.0 - d) / 5.0).acos();
+    let arcs: Vec<f64> = tops.iter().filter(|i| matches!(i.curve, noshape_kernel::Curve::Circle { radius, .. } if near(radius, mm(5.0), 1e-9))).map(|i| i.length / mm(1.0)).collect();
+    let fits = |l: f64| [1.0, 2.0].iter().any(|a| [1.0, 2.0].iter().any(|b| (l - 5.0 * (PI - cut(*a) - cut(*b))).abs() < 1e-4));
+    assert!(arcs.len() == 2 && arcs.iter().all(|l| fits(*l)), "{arcs:?} mm: {listed:#?}");
+    // Each chamfer's line on the top 1 or 2 mm in from its edge.
+    let ins: Vec<f64> = tops.iter().filter(|i| matches!(i.curve, noshape_kernel::Curve::Line { .. })).map(|i| (mm(5.0) - i.start.y.abs()) / mm(1.0)).collect();
+    assert!(ins.len() == 2 && ins.iter().all(|d| (d - 1.0).abs() < 1e-6 || (d - 2.0).abs() < 1e-6), "{ins:?} mm in");
 }
 
 /// Distance and angle past 90° at an acute edge (std allows 0.1-179.9°; OCCT stops below 90°): a 60° wedge, 2 mm at

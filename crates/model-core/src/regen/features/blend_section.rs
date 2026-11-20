@@ -66,6 +66,9 @@ pub struct ChamferRef {
     /// chord between the feet of a point at fixed offsets from both faces, sized so its distances (and angle) are the
     /// asked ones at the middle of the chain's longest edge): set by [`section_blend`].
     pub offsets: Option<(f64, f64)>,
+    /// Stopped at its selection (tangent propagation off): sections even where the faces' angle is the same all along,
+    /// which OCCT would run on.
+    pub stopped: bool,
 }
 
 /// The offsets from the reference face and the other whose feet lie `d` and `e` from the edge, faces at cos `c`.
@@ -1012,6 +1015,10 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
     let chain = chain_ordered(shape, edges, ball)?;
     let total: f64 = chain.iter().map(|c| c.length).sum();
+    // An edge's ends free in the chain: the chain's own ends, or where the next selected edge doesn't start (a stadium's
+    // two straight edges, each run out at both ends).
+    let free_start = |ci: usize| ci == 0 || (chain[ci - 1].end - chain[ci].start).length() > 1e-9;
+    let free_end = |ci: usize| ci + 1 == chain.len() || (chain[ci].end - chain[ci + 1].start).length() > 1e-9;
     // Distance along the chain of a bound.
     let along = |bd: Bound| bound_along(&chain, total, bd);
     let (lo, hi) = match spec.partial {
@@ -1177,7 +1184,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                 let a = fr.u[0].dot(fr.u[1]).clamp(-1.0, 1.0).acos();
                 spread = (spread.0.min(a), spread.1.max(a));
             }
-            if spread.1 - spread.0 < 1e-3 {
+            if !r.stopped && spread.1 - spread.0 < 1e-3 {
                 return Err(fail("the faces' angle is the same all along"));
             }
             let (_, fr, ref_first, _) = station(mid)?;
@@ -1301,7 +1308,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                 // (Its corner: the edge's point, or out in the air for a chamfer as sections.)
                 let corner = e3[0].edge_info()?.start;
                 // A chamfer as sections runs straight on past a free end of its chain until it is off the part.
-                let run_on = if spec.reference.is_some() && !closed && convex && ((k == 0 && pi == 0) || (k == n && pi == last_piece)) {
+                let run_on = if spec.reference.is_some() && !closed && convex && ((k == 0 && (pi == 0 || free_start(ci))) || (k == n && (pi == last_piece || free_end(ci)))) {
                     let out = if k == 0 { -tangent } else { tangent };
                     let e = 2.0 * spec.r1.max(spec.r2);
                     let probe = p + out * e + (fr.u[0] + fr.u[1]) * (0.1 * e);
@@ -1401,7 +1408,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
         let r_ext = 2.0 * spec.r1.max(spec.r2).max(spec.width.unwrap_or(0.0));
         // How far to run on past a bound: only at the chain's ends, not at partial bounds.
         let ext_at = |is_start: bool| -> FResult<f64> {
-            let (end_of_chain, at_bound) = if is_start { (ci == 0, partial && a > 1e-12) } else { (ci + 1 == chain.len(), partial && b < c.length - 1e-12) };
+            let (end_of_chain, at_bound) = if is_start { (free_start(ci), partial && a > 1e-12) } else { (free_end(ci), partial && b < c.length - 1e-12) };
             // A closed edge has no free end.
             if !end_of_chain || at_bound || (c.start - c.end).length() < 1e-9 {
                 return Ok(0.0);
