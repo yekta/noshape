@@ -4240,6 +4240,9 @@ neither build. knifehandle Fillet 2 shows a kernel message in place of Onshape's
 - [ ] P2 ASM-INSTANCE-PROPS-FIELD (asm; qa 11-20 02:55) asm-menu-instance-properties step 2: live's retake 025a33f60 records the
   Instance properties modal's Reference designator input (fields 1, text "Part 2 <1> Reference designator"); ours dumps fields [] while its
   focus is that input (same dump as in 1119-1302, so the gap is in our state dump or the field is missing). Re-run alone: the same.
+- [ ] P2 DOCS-CRUMB-TOOLTIP (studios; qa 11-20 02:56, night ui run on a06ec927, re-run alone 2/2) docs-folder-crumb step 2: after a click
+  on the breadcrumb's "Owned by me" (from inside uip Folder) live shows its tooltip "Owned by me" under the resting pointer, ours none. Matched in
+  1119-1302 (291c74b0); start-ui changes between: studios' b54408712 (Documents table pinned columns).
 - [ ] P2 T2-NIGHTLY-22-FAILURES (lead routes; qa 11-20 02:44) **the watcher's nightly T2 (vibex6 ~/lead/t2-*.log) fails
   18–22 tests every night since 11-17** (11-20 on 5b62f6ca8: 7 kernel, 9 model, 6 ops; new since 11-19: knurl_b94_at_30_tpi_on_a_10_mm_rod,
   dx_perf::dump_corpus_drawing_views). By cause:
