@@ -247,6 +247,9 @@ NEVER_SHOWN_IN = {
     "Hole/thread callout": {"Tolerance precision", "Offset", "Precision:", "Tolerance: None", "Shaft class", "Reset text position", "Parentheses", "Toggle radius/diameter dimension", "Varies", "«Varies»"},
     "Custom table": PAGE_CHROME | {"Switch to Custom tables : pvz 2parts", "Switch to fs tables", "pvz 2parts", "onshape cone", "sketch start test"},
     "Insert DXF or DWG": PAGE_CHROME,
+    # drawing-titleblock-clicks.json: "auto" is blankcell_hoverSel's cursor, "DejaVu S" a font list cut at the
+    # recorder's length cap.
+    "Title block": {"auto", "DejaVu S"},
     # (Clear: drawing-move-to-sheet.txt's XeTimingWatcher debug overlay on the page.)
     "Move to sheet / Replicate": {"Clear", "Hide auto centermarks", "Switch to asb drawing src", "Undo (ctrl+z)", "Redo (ctrl+y)", "Update from this workspace (ctrl+q)"},
     # The page's hidden Inspection table, Styles and MBD status panels (their own surfaces count them).
