@@ -274,7 +274,10 @@ impl DrawingEditor {
     /// A click while the dialog waits for a target's origin. True when used.
     pub fn datum_origin_click(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let Some(k) = self.datum_dlg.as_ref().and_then(|d| d.picking_origin) else { return false };
-        let Some(mut pp) = self.any_point(self.cursor) else { return true };
+        // Live s5: the Origin field stays active once picked (another point replaces it); then a click in space
+        // goes on to add a target.
+        let picked = self.datum_dlg.as_ref().and_then(|d| d.rows.get(k)).and_then(|r| r.ann.target.as_ref()).is_some_and(|t| t.origin.is_some());
+        let Some(mut pp) = self.any_point(self.cursor) else { return !picked };
         // On a circle's center: that circle's reference (Angle needs an arc
         // or circle center; the snap may be a centermark's point).
         if !matches!(pp.r, Some(noshape_model::drawing::PointRef::Center { .. }))
@@ -296,7 +299,6 @@ impl DrawingEditor {
         if let Some(r) = pp.r {
             row.ann.refs.push(AnnotationRef { slot: 1, point: r });
         }
-        d.picking_origin = None;
         self.datum_fill_distances(k, window, cx);
         true
     }

@@ -1841,3 +1841,40 @@ fn insert_view_lists_a_configured_studios_inputs_above_its_parts(cx: &mut TestAp
     press(cx, window, &format!("dr-ch-c-{studio}-0"));
     assert!(cx.update(|cx| editor.read(cx).insert.chooser.is_none()), "a part picked closes the chooser");
 }
+
+/// Live drw-datum-target-hide-dim s4–s5: a placed target's Origin field is active; picking a point keeps it active
+/// (another point replaces it), and a click in space then starts the next target.
+#[gpui::test]
+fn a_datum_targets_origin_field_stays_active_once_picked(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_scene::drawing_tools::Tool;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "dt-origin");
+    real_sheet(cx, window, &editor);
+    let (a, b) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let bt = e.built.as_ref().expect("built");
+        let l = bt.geometry.lines.iter().find(|l| l.points.len() >= 2 && matches!(bt.picks.get(l.pick as usize), Some(PickTarget::Edge { .. }))).expect("a view edge");
+        (l.points[0], l.points[l.points.len() - 1])
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::DatumTarget { anchor: None }, cx)));
+    draw(cx, window);
+    let click = |cx: &mut TestAppContext, at: [f64; 2]| {
+        cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+            e.cursor = at;
+            e.extra_tool_click(w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+    };
+    click(cx, a);
+    click(cx, [a[0] + 15.0, a[1] + 15.0]);
+    let picking = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).datum_dlg.as_ref().and_then(|d| d.picking_origin));
+    assert_eq!(picking(cx), Some(0), "the placed target's Origin field is active");
+    click(cx, b);
+    let origin = cx.update(|cx| editor.read(cx).datum_dlg.as_ref().and_then(|d| d.rows.first()).and_then(|r| r.ann.target.as_ref()).and_then(|t| t.origin));
+    assert!(origin.is_some(), "the origin picked");
+    assert_eq!(picking(cx), Some(0), "the Origin field stays active once picked");
+    click(cx, [5.0, 5.0]);
+    assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::DatumTarget { anchor: Some(_) })), "a click in space starts the next target");
+}
