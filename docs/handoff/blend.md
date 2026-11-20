@@ -7,43 +7,31 @@ fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_cha
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-19 17:25)
+## Now (11-20 02:05)
 
-- Queue (lead 11-19): suspension LCA Fillet 3 face-level splice in landable steps; core's mutualtrim Fillet 1
-  (parked). Hosts by load (bin/pickhost), not vibex7 while it is loaded (lead 14:00); userdocs only vibex7, one CLI run
-  there at a time (bin/ud-gate.sh waits). Units via `systemd-run -E HOME=/root -E PATH=$PATH`. No std::thread joins on
-  rayon workers (dx f1e0c74ef).
-- LANDED: isaac chamfers (bb667320d, f8865fb7e), kernel failures in Onshape's words (74ebd649c).
-- Knifehandle Fillet 3 LANDED 5a26a0d6 (with the inside-out decline).
-- Knifehandle Fillet 2 PARKED (time box 15:00; blend12 c87fec635, probes blend-scratch/khf2-with-probes.patch). On its
-  old base (8bb9824b9) it built live's 11/27/18: (1) x 15.4 end: the last ball section's feet lay a few um off the
-  square end plane and left 0.065 mm2 wedge faces; a tool carried past the plane instead broke the direct build (the
-  plane got cut curves); the end section's contacts moved into the plane fixed it (end face 90.374, live 90.377).
-  (2) Tip: the tip edge was dropped as "along the boundary" (snap 0.052 mm): within = min(snap, 2 % of the chord); the
-  small rounds' run-on stopped after 2 steps ("no rolling ball fits") leaving the tool's cap inside (0.008 mm2 faces):
-  shorter steps toward where the ball leaves the faces; section-size check on the edge's own sections only. 0.653 mm2
-  small rounds vs live 0.595 (our Sweep 2 tip). After rebasing on main (welding's run-on direct build 92c8595b0 and
-  c6905d82d's faster closed_run_on) both T1s fail: Fillet 3 6/14/10 (my direct retry on the refaced part skips main's
-  merge of the refaced faces), Fillet 2 13/41/30 (that retry now builds an invalid solid, the Boolean leaves 13 faces).
-  Next: retry the direct build only where the Boolean fails, merge the refaced faces after it, check the new run-on
-  pieces (bin/khboth.sh -> logs/khboth.out).
-- Car Fillet 1 (dx's, blocks 5 c2-surf-intro docs at "Derived 1"): FIXED in blend5 d1124ae95 (on 227468d9a, without
-  dx's fb8f84f42: the T1 reads data/car-fillet1-input.brep). OCCT's fillet came out inside out with a face's pcurves
-  off; checked_blend's last fallback `repaired` (ShapeFix_Shape + ShapeBuild_ReShape history, kept only as one valid
-  solid of the same faces, volume > 0). T1 a_cars_top_edges_round_along_their_tangent_chain_as_live: 7/14/9, area
-  81479.1 vs live 81479.51 mm2 (live.jsonl index 16), volume +0.023% (input loft 2.1 mm2 off live already). Gate unit
-  blend-gatecar (bin/gatecar.sh vibex8): logs/gcar-tests.out, g13-car.log, ud-car.log, suite-ecar.cmp. Land when clean.
-- 805e29 exact edges (blend2 62616b568, rebased): pcurves moved into the old edge's period (edge_on_curve), volume
-  check 1e-8 for edges only; kernel 531 / features_c 103 ok, g13 OK. Userdocs unit blend-g805-ud2 (bin/ud805.sh;
-  ud-gate.sh's pgrep matched itself, fixed with [d]) -> ud-805.log; suite pair in blend-gate805 -> suite-e805.cmp.
-- Suspension splice (blend13, uncommitted on 8d9420223 = step 1 make_edge_on; diff all this thread's): step 3
-  canal_corners; 3 of 8 corners spliced (z -15). z +15 cause: make_edge_on's UV not unwrapped from a point on the
-  round's seam (2pi, then -0.09): the contact edge looped round. Fixed (unwrap in make_edge_on) + face_with_edge_replaced
-  now walks each piece's pcurve from the run's start (in_period). T1 rerun blend-lca-t1l (vibex8). Next: canal
-  face_on status 32/18 if still there, then all 8, strip ZZ_CANAL/ZZK debug (blend_section.rs, build.cpp zz_statuses,
-  piece prints, BRepCheck_Result/Geom2d_Curve includes), kernel + T1 + g13 + gate, land steps 1-3.
-  bin/lca-t1.sh [host] -> logs/lca-t1.out + lca-full.log. Probe parked/zz-lca-splice-probe.patch (drop from land).
-- Mutualtrim Fillet 1 (blend4, parked): split_on turns closed touch loops into zero-area faces.
+- Queue (lead 11-19/20): land car, 805e29, suspension when their gates are clean; then mutualtrim; knifehandle Fillet 2
+  parked. Hosts by load (bin/pickhost); vibex8 off-limits from 02:00 (qa nightly); model-suite pairs on vibex7 or vibe2.
+  Userdocs only vibex7, one CLI run at a time (bin/ud-gate.sh waits). vibe hosts cap concurrent cargo builds ("waiting
+  for one of N build slots" = queued). Host ~/tmp is pruned: bin/ud-pair.sh restores userdocs.py/nscli.py first.
+  bin/g13h.sh now uses its own target per worktree (two runs used to clobber one dir), default host vibe2. Units via
+  `systemd-run -E HOME=/root -E PATH=$PATH`; never a `timeout` round land.sh (it killed one in the clippy queue).
+- Car Fillet 1 (dx's, blocks 5 c2-surf-intro docs): blend5 d1124ae95 -> QUEUED 5a27ad71 (from worktree blend-carland,
+  lead: land before the pair). checked_blend's last fallback `repaired` (ShapeFix_Shape + ReShape history, kept only as
+  one valid solid of the same faces). T1 a_cars_top_edges_round_along_their_tangent_chain_as_live 7/14/9. Gate: tests,
+  g13, userdocs 4/4 SAME; suite pair unit blend-pcar (vibex7) -> suite-ecar.cmp: a difference = fix forward or revert at
+  once and tell the lead. Tell dx when it is on main.
+- 805e29 exact edges (blend2 62616b568): all clean but the suite pair (blend-gate805, vibe2 slot) -> suite-e805.cmp.
+- Suspension LCA Fillet 3 canals (blend13 b56173a9f): all 8 corners spliced (make_edge_on unwraps UVs from a seam
+  point; face_with_edge_replaced drops a run's first/last piece that retraces the kept neighbour edge, pcurves walked
+  in period). T1 rounds_running_into_a_tube_close_on_canals_as_live. Tests, userdocs SAME, g13 OK; suite pair
+  (blend-gatesusp, vibe2) -> suite-esusp.cmp. Land when clean.
+- Mutualtrim Fillet 1 (blend4 4908fc786 on 5b62f6ca8): 8/8 as live. Sheet round = sheet_blend (split the sheet along the
+  tools' touch curves, drop pieces along the rounded edge, sew in the rounds); op_split_on: projection fallback, and
+  BRepAlgoAPI_Splitter when BRepFeat_SplitShape leaves a face of no area (closed touch loops). T1
+  a_surfaces_round_between_its_trimmed_halves_stays_a_surface_as_live (data/mutualtrim-fillet1-input.brep). T1 ok.
+  Gate blend-gatemt (bin/gatemt.sh: vs mt-base worktree = its parent; builds vibe2, userdocs -> ud-mt.log, g13-mt.log,
+  pair on vibex7 -> suite-emt.cmp). Land when clean.
+- bool-land7 (e3078f89, crates/brep + kernel Boolean/Shell) queued 11-20: if a blend result moves after it, tell bool.
 - Agent ids: only in /root/lead-scratch/roster.md; read it before every message_agent, never copy ids here.
 
 ## In flight (older)
