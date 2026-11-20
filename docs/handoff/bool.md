@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-20 19:30 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-20 21:00 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is OFF
 until the lead says (11-20 18:xx -> 21:35: no rb.sh mac, ssh or scp), else builds + probes there (NOSHAPE_RB_HOST=mac,
 inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -18,15 +18,28 @@ op_boolean 666 ms; screws Sweep 1's sections_ahead 907 ms) and 850efe. End a tur
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
 ## In flight
-- COMPAT-CRASH957-CHAMFER3 (qa P1): fix 42aea9f11 (fuse_glued's side() refuses an edge on the plane that isn't a glued
-  face's; T1 mirrored_halves_touching_along_arcs_off_the_glued_faces_fuse_as_occt) gate clean (vibex7, knurls skipped),
-  QUEUED 76ea1739 19:26. On main -> tell qa; rm worktree bool-c957 + its vibex7/vibex8 targets.
-- 850efe Extrude 6 (worktree bool-m85: 68e96d2fc + 0dd287cf7 one-turn helix check; 28 faces = live, OCCT 31; T1
-  slotted_coaxial_cylinder_bands_unify_as_live). Gate 13:45 FAIL: c2-fan-blade-sweep Boolean 2 (feature 48) invalid on
-  the branch only (56/144/89, live 56/143/88); 0dd287cf7 doesn't fix it. Its OCCT cut (case a31f7995a8fb85d0, vibex7
-  ~/tmp/bool/fan) is the same and invalid on both (60/161/99, faces 53/59 cylinders at x +-51 mm invalid) and
-  unify_same_domain alone keeps it: the break is later (boolean_into_with's other steps, or another Boolean of the
-  feature). Probe test zz_probe_fan_blade_boolean_2 (uncommitted, bool-m85; strip). Then full gate, land, tell skasm.
+- COMPAT-CRASH957-CHAMFER3: LANDED 43c2644a (20:10), qa asked to re-verify; worktree + targets removed.
+- 850efe Extrude 6 (worktree/branch bool-m85, 4f4fa433f on main 698df935f): 68e96d2fc + 4f4fa433f (replace_by refuses
+  a merged cylinder face whose UVBounds u span > 2 pi: c2-fan-blade-sweep's 9 thread-land strips were one 7.7-turn
+  face, Boolean 2's cut then OCCT's and invalid; T1 a_threads_helical_land_stays_in_strips_on_unify, case 935abddf).
+  fan-blade now 56/139/84 valid = main (live 56/143/88, a gap of main's too). Full gate on vibex8 (unit
+  bool-gate-m85b, script /root/bool-scratch/gate-m85.sh, out /root/bool-hat-scratch/chain-bool-m85.out, from 20:06).
+  PASS -> land, tell skasm (root of the 30 s Fillet 3) + lead; rm worktree, vibex7/8 ~/agents/bool-m85{,-gate}.
+- impeller Extrude (worktree/branch bool-imp, 2d59d7104 on main 55749fd6f): free-form face's edges imprinted on
+  another free-form face of its surface (edge_over_free_face bsplines, free::past_patch_along); ours = OCCT 97/221/141,
+  ~1.0 s vs OCCT 1.8 s; T1 impeller_seats_on_its_free_form_wall_fuse_as_occt (case 23c0c38476a63ecf, 1.09 MB).
+  Chain on vibex7 (unit bool-imp-chain: bool_patterns + brep tests, then full gate; out
+  /root/bool-hat-scratch/chain-bool-imp.out). PASS -> land, tell dx + lead.
+- SHELL-AFTER-WELD-FILLET (worktree/branch bool-sh3w, on main 55749fd6f): 407bb5cf6's without_inverted_slivers alone
+  (conflict resolved: main's return, no walls-fill check) + T1 a_weld_fillet_part_shells_to_one_solid_without_its_
+  inverted_sliver (tests/data/shell/weld-fillet-part3-input.brep = qa doc's Part 3 before Shell 3). qa doc regenerates
+  Shell 3 Ok. Check running: /root/bool-scratch/sh3t.sh (unit bool-sh3t, out sh3t.out: shell:: on the branch, then the
+  T1 against main's shell.cpp, which should fail; the script restores shell.cpp). Then gate (after a gate host frees),
+  land, tell qa + lead.
+  FOLLOW-UP (own ticket): Part 3 = live's input (342822.058 mm3) but ours 183041.69 / 141 faces vs live 183072.272 /
+  59 faces / 156 edges / 93 vertices (41 planes, 14 cyl, 4 cones), 30 Shell faces 32018.992 mm2 (per-face areas:
+  /root/live-scratch/shellq/shell3-topo.json). Our Shell on live's x_t Part 3 fails ("shell failed"). Part 2 = live.
+  Files: vibex7 ~/tmp/bool/sh3w/{d.noshape (qa doc copy), pre-shell3.x_t, dump/shell-17 (Part 3), shell-18 (Part 2)}.
 - impeller-loft Extrude Bohrungssitz Ansaugflansch (dx; worktree bool-imp, uncommitted, DEBUG under NOSHAPE_DBG_ON +
   test zz_probe_case to strip): case vibex8 ~/tmp/bool/impslow/23c0c38476a63ecf (fuse, 58-face part + 9 seats, OCCT
   1773 ms). Declined "a piece's point on another solid's face": face 79 (seat's extrusion, z -5..0) runs on face 26
@@ -79,7 +92,7 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   FACE_BOUND loop, live keeps the other side, 1933.6 vs our 435.1 mm2): likely our STEP export of a one-loop torus
   face. dx fixed it (queued 0dbd37f4: OCCT's writer reversed an unchained wire on a left-handed torus): once it lands,
   re-export the case and ask live for the Shell 1 mm off the torus face; until then it stays on SHELLS_KNOWN.
-- live2's Shell 3 ticket (P2 SHELL-AFTER-WELD-FILLET): live 19:15 builds it (Part 2 bottom 2941.8 mm2 + Part 3's
+- (old notes) live2's Shell 3 ticket (P2 SHELL-AFTER-WELD-FILLET): live 19:15 builds it (Part 2 bottom 2941.8 mm2 + Part 3's
   45.96 mm2 chamfer, 5 mm in: 175798.2 / 183072.3 mm3; x_t /root/live-scratch/shellq/pre-shell3.x_t; centroids lie on
   coincident faces of Parts 1-3, pick exact faces), so ours is a bug. Mac Ok; Linux (vibe2, instrumented ops xshell3, doc
   ~/tmp/bool/sh3/d.noshape) part 2 at 5 mm gives 2 solids: 183041.69 mm3 and an inside-out -0.00097 mm3 sliver, so
