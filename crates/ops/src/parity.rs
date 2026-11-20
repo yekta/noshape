@@ -4113,7 +4113,108 @@ impl<'a> Translator<'a> {
         if let Some(r) = self.hole_body_faces(&strings) {
             return Some(r);
         }
+        if let Some(r) = self.frame_side_faces(&strings) {
+            return Some(r);
+        }
+        if let Some(r) = self.hole_shaft_faces(&strings) {
+            return Some(r);
+        }
         self.extrude_name_from_tree(tree).map(|r| r.map(|f| vec![f]))
+    }
+
+    /// A Frame's side face (`SWEPT_FACE` of `<frame>.….sweep.opSweep`) from a line of its profile: ours of that Frame as
+    /// far from the middle of its part as the line is from its profile's (c2-hgr-riser-weldment's Hole 3: a tube's
+    /// outer wall, not its inner one). Opposite walls both answer; the query's other side picks one.
+    fn frame_side_faces(&mut self, strings: &[String]) -> Option<Result<Vec<String>, String>> {
+        if !strings.iter().any(|s| s == "SWEPT_FACE") {
+            return None;
+        }
+        let frame = strings.iter().find_map(|s| s.strip_suffix(".sweep.opSweep"))?.split('.').next()?.to_string();
+        let ours = self.feature_ids.get(&frame).cloned()?;
+        // The profile's line: an entity of the Frame's own copy of its profile sketch (`<frame>.sketch.….<sketch>.wireOp`).
+        let mut op: Option<&str> = None;
+        let mut named = None;
+        for w in strings.windows(2) {
+            if let Some(o) = w[0].strip_suffix(".wireOp") {
+                op = Some(o);
+            }
+            if w[0] == "sketchEntityId"
+                && let Some(o) = op.filter(|o| o.starts_with(&format!("{frame}.sketch.")))
+            {
+                named = o.rsplit('.').next().map(|sk| (sk.to_string(), w[1].clone()));
+                break;
+            }
+        }
+        let (sketch, line) = named?;
+        let entities_of = |features: &[Value]| features.iter().find(|f| f["featureId"] == sketch.as_str()).and_then(|f| f["entities"].as_array().cloned());
+        let Some(entities) = entities_of(&self.features).or_else(|| self.derived_sources.values().find_map(|s| entities_of(s["doc"]["features"].as_array()?))) else {
+            return Some(Err(format!("SWEPT_FACE: frame {frame}'s profile sketch {sketch} not fetched")));
+        };
+        // The profile's box (lines' ends, arcs' whole circles) and the line.
+        let (mut lo, mut hi) = ([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]);
+        let mut grow = |p: [f64; 2]| (0..2).for_each(|i| (lo[i], hi[i]) = (lo[i].min(p[i]), hi[i].max(p[i])));
+        let mut target = None;
+        for e in entities.iter().filter(|e| e["isConstruction"] != true) {
+            let g = |k: &str| e["geometry"][k].as_f64();
+            if let (Some(px), Some(py), Some(dx), Some(dy)) = (g("pntX"), g("pntY"), g("dirX"), g("dirY")) {
+                let (a, b) = (e["startParam"].as_f64().unwrap_or(0.0), e["endParam"].as_f64().unwrap_or(0.0));
+                grow([px + dx * a, py + dy * a]);
+                grow([px + dx * b, py + dy * b]);
+                if e["entityId"] == line.as_str() {
+                    target = Some(([px, py], [dx, dy]));
+                }
+            } else if let (Some(cx), Some(cy), Some(r)) = (g("xCenter"), g("yCenter"), g("radius")) {
+                grow([cx - r, cy - r]);
+                grow([cx + r, cy + r]);
+            }
+        }
+        let Some((p, d)) = target else { return Some(Err(format!("SWEPT_FACE: {line} is no line of frame {frame}'s profile"))) };
+        let c = [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0];
+        let off = ((c[0] - p[0]) * d[1] - (c[1] - p[1]) * d[0]).abs() / d[0].hypot(d[1]);
+        let faces = match self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "surface": "plane", "limit": 100000 })) {
+            Ok(f) => f,
+            Err(e) => return Some(Err(e)),
+        };
+        let k = per_unit(&faces["units"]);
+        let parts = match self.call("query_parts", json!({})) {
+            Ok(p) => p,
+            Err(e) => return Some(Err(e)),
+        };
+        let middle = |part: &str| {
+            let b = &parts["parts"].as_array()?.iter().find(|p| p["id"] == part)?["bounding_box"];
+            let (lo, hi) = (f3(&b["min"])?, f3(&b["max"])?);
+            Some([0, 1, 2].map(|i| (lo[i] + hi[i]) / 2.0))
+        };
+        let ids: Vec<String> = faces["faces"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|f| {
+                let (Some(at), Some(n), Some(m)) = (f3(&f["centroid"]), f3(&f["normal"]), f["part"].as_str().and_then(middle)) else { return false };
+                let dist = (0..3).map(|i| (at[i] - m[i]) * n[i]).sum::<f64>().abs() * k;
+                (dist - off).abs() <= 1e-6
+            })
+            .filter_map(|f| f["id"].as_str().map(str::to_string))
+            .collect();
+        Some(if ids.is_empty() { Err(format!("SWEPT_FACE: frame {frame} has no side {:.6} mm from its middle", off * 1e3)) } else { Ok(ids) })
+    }
+
+    /// A Hole's bore (`HOLE_FACE` "shaft" of `….opHole`): ours of that Hole, its narrowest cylinders (one through each
+    /// wall it crosses).
+    fn hole_shaft_faces(&mut self, strings: &[String]) -> Option<Result<Vec<String>, String>> {
+        if !strings.iter().any(|s| s == "HOLE_FACE") || strings.iter().position(|s| s == "faceName").and_then(|i| strings.get(i + 1)).is_none_or(|n| n != "shaft") {
+            return None;
+        }
+        let op = strings.iter().find(|s| s.ends_with(".opHole")).and_then(|s| s.split(".op").next())?;
+        let Some(ours) = self.feature_ids.get(op).cloned() else { return Some(Err(format!("HOLE_FACE: hole {op} was not built"))) };
+        let faces = match self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "surface": "cylinder", "limit": 100000 })) {
+            Ok(f) => f["faces"].as_array().cloned().unwrap_or_default(),
+            Err(e) => return Some(Err(e)),
+        };
+        let radius = |f: &Value| f["radius"].as_f64().unwrap_or(f64::INFINITY);
+        let r = faces.iter().map(radius).fold(f64::INFINITY, f64::min);
+        let ids: Vec<String> = faces.iter().filter(|f| radius(f) <= r * (1.0 + 1e-9)).filter_map(|f| f["id"].as_str().map(str::to_string)).collect();
+        Some(if ids.is_empty() { Err(format!("HOLE_FACE: hole {op} has no bore of ours")) } else { Ok(ids) })
     }
 
     /// The faces a line of a Hole's profile sketch swept (`SWEPT_FACE` of `<hole>.holeBodies.*.opRevolve`, std hole.fs'
