@@ -4365,7 +4365,7 @@ neither build. knifehandle Fillet 2 shows a kernel message in place of Onshape's
 - [ ] fixed (studios 11-20: not b54408712 but be41a8c2b's tooltip gate, which blocked any element drawn in the released one's bounds; now keyed to the released element's id: the title the crumb turns into shows its tooltip; start-ui test a_clicked_crumb_turned_title_shows_its_tooltip, chrome row unchanged), to verify P2 DOCS-CRUMB-TOOLTIP (studios; qa 11-20 02:56, night ui run on a06ec927, re-run alone 2/2) docs-folder-crumb step 2: after a click
   on the breadcrumb's "Owned by me" (from inside uip Folder) live shows its tooltip "Owned by me" under the resting pointer, ours none. Matched in
   1119-1302 (291c74b0); start-ui changes between: studios' b54408712 (Documents table pinned columns).
-- [ ] P2 VER-COMPARE-READOUT (studios; qa 11-20 03:59, night ui run on a06ec927, re-run alone the same) ver-compare-hover-part step 5: in
+- [ ] fixed (studios 11-20: Compare draws no measure readout for a selection; measure feel row "one circular edge in Versions and history › Compare"), to verify P2 VER-COMPARE-READOUT (studios; qa 11-20 03:59, night ui run on a06ec927, re-run alone the same) ver-compare-hover-part step 5: in
   Compare V1, a click on the box's face selects it and live shows no bottom-right readout; ours shows "Diameter 10.000 mm". Not new in ours
   (the same dump in 1119-1302); live's retake 24af0f0f2 now records the readout's absence, so it differs since.
 - [ ] P2 T2-NIGHTLY-22-FAILURES (lead routes; qa 11-20 02:44) **the watcher's nightly T2 (vibex6 ~/lead/t2-*.log) fails
