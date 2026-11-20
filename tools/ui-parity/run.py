@@ -748,12 +748,13 @@ def panel_list_over_view(a, b):
         la["selection"] = [x for x in la["selection"] if not (isinstance(x, dict) and x.get("kind") == "EDGE")]
 
 
-def panel_fields_unread(a, b, recorded):
+def panel_fields_unread(a, b, recorded, recorder):
     """A drawing panel's fields: live's recorder read none before 11-10 (drw-inspection-table-export-csv, 11-07:
     "fields": []) and a panel's checkboxes from 11-14 on (live2's reader; drw-section-vertical 11-12: "fields": []), so
-    ours' aren't compared against a take that read none before 11-15."""
+    ours' aren't compared against a take that read none before 11-15, or by a recorder without live2's reader (none of
+    its eight drawing takes reads a panel's fields: drw-custom-table-add, 11-20)."""
     da, db = (a or {}).get("dialog"), (b or {}).get("dialog")
-    if recorded < "2026-11-15" and isinstance(da, dict) and isinstance(db, dict) and da.get("kind") == "drawing-panel" and da.get("fields") == [] and db.get("fields"):
+    if (recorded < "2026-11-15" or "live2" not in recorder) and isinstance(da, dict) and isinstance(db, dict) and da.get("kind") == "drawing-panel" and not da.get("fields") and db.get("fields"):
         db["fields"] = []
 
 
@@ -1508,12 +1509,12 @@ def compare(live, ours, whole_document=True):
                 # Live's start studio is named after its start document ("start block Copy 1", live2 drw-custom-table-*).
                 d["text"] = [re.sub(r"^start [\w-]+( Copy \d+)?$", "Part Studio 1", t) if isinstance(t, str) else t for t in d["text"]]
                 # A select's value naming it too (Sheet properties › Reference "start block Copy 1 Part 1", live2
-                # drw-sheet-properties-custom-zones).
+                # drw-sheet-properties-custom-zones; Custom table's "Use existing Part Studio", live drw-custom-table-cell).
                 for fld in d.get("fields") or []:
                     if isinstance(fld, dict) and isinstance(fld.get("value"), str):
                         # (A BOM's source assembly, live's runner's copy of it: "Use existing", live2's drw-bom-* retakes.)
                         fld["value"] = re.sub(r"\bstart \S+ asm( Copy \d+)?$", "start asm", fld["value"])
-                        fld["value"] = re.sub(r"^start (?!asm )[\w-]+( Copy \d+)? ", "Part Studio 1 ", fld["value"])
+                        fld["value"] = re.sub(r"^start (?!asm )[\w-]+( Copy \d+)?(?= |$)", "Part Studio 1", fld["value"])
                 if d.get("title") in ("View properties", "BOM table properties", "Cut list table properties", "Custom table properties", "Image properties") and len(d["text"]) > 2 and d["text"][1] in ("Document", "Document:"):
                     d["text"][2] = "<document>"
             dr = side.get("drawing")
@@ -1640,7 +1641,7 @@ def compare(live, ours, whole_document=True):
         nm, bd = late_modal.get(name), (b or {}).get("dialog") if isinstance(b, dict) else None
         if isinstance(a, dict) and isinstance(nm, dict) and isinstance(bd, dict) and a.get("dialog") != bd and all(nm.get(k) == bd.get(k) for k in ("title", "fields", "buttons")):
             a["dialog"] = nm
-        panel_fields_unread(a, b, str(live.get("recorded") or ""))
+        panel_fields_unread(a, b, str(live.get("recorded") or ""), str((live.get("app") or {}).get("recorder") or ""))
         panel_list_over_view(a, b)
         if centermarks_unread:
             for side in (a, b):
