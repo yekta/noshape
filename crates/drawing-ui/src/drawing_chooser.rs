@@ -95,6 +95,8 @@ pub struct ChooserState {
     pub studio: bool,
     /// Its configured studios' inputs as set in the list (live cfg-choosers-1120), taken with the studio.
     pub studio_config: HashMap<TabId, ConfigValues>,
+    /// The sort button's Name: Z → A (live DRW-CHOOSER-SORT; A → Z the default).
+    pub desc: bool,
     /// Current document › Version graph: the list shown, and the version
     /// chosen (new views are pinned to it).
     pub graph: bool,
@@ -300,6 +302,39 @@ impl DrawingEditor {
         cx.notify();
     }
 
+    /// The search box of the current or an opened document and, right of it, its sort button (live iv-2,
+    /// DRW-CHOOSER-SORT; Onshape 1.223): Name: A → Z (the default) | Name: Z → A, as the assembly's Insert.
+    fn search_with_sort(&self, search: &Entity<InputState>, cx: &mut Context<Self>) -> AnyElement {
+        use crate::os_ui::OsDropdownExt as _;
+        use gpui_kit::component::button::{Button, ButtonVariants as _};
+        let ed = cx.entity();
+        let desc = self.chooser.desc;
+        h_flex()
+            .pl(px(6.))
+            .pr(px(2.))
+            .pt(px(6.))
+            .gap(px(5.))
+            .child(div().flex_1().min_w_0().child(Input::new(search).small()))
+            .child(
+                div().debug_selector(|| "dr-ch-sort".into()).on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation()).child(
+                    Button::new("dr-ch-sort").ghost().w(px(30.)).h(px(28.)).child(crate::assets::icon("tm-sort", 20., cx)).os_dropdown_menu("dr-ch-sort-dd", true, move |menu, _, _| {
+                        let (e1, e2) = (ed.clone(), ed.clone());
+                        let pick = |e: Entity<Self>, desc: bool| {
+                            move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
+                                e.update(cx, |t, cx| {
+                                    t.chooser.desc = desc;
+                                    cx.notify();
+                                })
+                            }
+                        };
+                        menu.item(crate::os_menu::OsMenuItem::new("Name: A → Z").checked(!desc).on_click(pick(e1, false)))
+                            .item(crate::os_menu::OsMenuItem::new("Name: Z → A").checked(desc).on_click(pick(e2, true)))
+                    }),
+                ),
+            )
+            .into_any_element()
+    }
+
     /// A configured studio's › / ⌄ in Select a Part Studio: shows its inputs under the row.
     fn config_expander(&self, id: TabId, open: bool, cx: &mut Context<Self>) -> AnyElement {
         div()
@@ -383,9 +418,10 @@ impl DrawingEditor {
             .into_any_element()
     }
 
-    /// A configured studio's inputs under its row (live cfg-choosers-1120): the name left (with its default once
-    /// another value is set: "Size: (Default: Small)"), the value a full-width list or a checkbox.
-    fn config_rows(&self, id: TabId, inputs: &[ConfigInput], cx: &mut Context<Self>) -> Vec<AnyElement> {
+    /// A configured studio's inputs under its row (live cfg-choosers-1120): the name left (in Select a Part Studio with
+    /// its default once another value is set: "Size: (Default: Small)"; Insert view keeps "Size", iv-4), the value a
+    /// full-width list or a checkbox.
+    fn config_rows(&self, id: TabId, inputs: &[ConfigInput], relabel: bool, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let cur = self.chooser.studio_config.get(&id).cloned().unwrap_or_default();
         let ed = cx.entity();
         let mut out = Vec::new();
@@ -406,7 +442,7 @@ impl DrawingEditor {
                     let value = cur.0.get(&input.id).cloned().unwrap_or_else(|| default.clone());
                     let at = options.iter().position(|o| o.id == value).unwrap_or(0);
                     let label = match options.iter().find(|o| o.id == *default) {
-                        Some(d) if value != *default => format!("{}: (Default: {})", input.name, d.name),
+                        Some(d) if relabel && value != *default => format!("{}: (Default: {})", input.name, d.name),
                         _ => input.name.clone(),
                     };
                     let ids: Vec<String> = options.iter().map(|o| o.id.clone()).collect();
@@ -432,6 +468,7 @@ impl DrawingEditor {
     pub fn close_studio_chooser(&mut self) {
         if std::mem::take(&mut self.chooser.studio) {
             self.insert.chooser = None;
+            self.chooser.studio_config.clear();
         }
         if let Some(d) = self.custom_tables.dlg.as_mut().filter(|d| d.picker == Some(crate::drawing_custom_table::Picker::Studio)) {
             d.picker = None;
@@ -981,7 +1018,7 @@ impl DrawingEditor {
         // The tree lists this document, or the other document opened in
         // Other documents (at its version; no pictures).
         let other_doc = self.chooser.other_doc.clone().filter(|_| self.chooser.other);
-        let tabs: Vec<(TabId, String, bool)> = match &other_doc {
+        let mut tabs: Vec<(TabId, String, bool)> = match &other_doc {
             Some(d) => d.tabs.clone(),
             None => doc
                 .session
@@ -995,6 +1032,12 @@ impl DrawingEditor {
                 })
                 .collect(),
         };
+        // Live iv-2 (cfg-choosers-1120): the studios by name, A → Z unless the sort button says Z → A; an opened
+        // other document's too (Onshape 1.223).
+        tabs.sort_by_cached_key(|t| t.1.to_lowercase());
+        if self.chooser.desc {
+            tabs.reverse();
+        }
         let key_of = |id: TabId| match &other_doc {
             Some(d) => SourceKey { version: d.key(id).map(|k| k.0), ..SourceKey::studio(id) },
             None => SourceKey::studio(id),
@@ -1084,7 +1127,7 @@ impl DrawingEditor {
                             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.pick_custom_studio(id, name.clone(), window, cx))),
                     );
                     if open {
-                        for row in self.config_rows(id, &inputs, cx) {
+                        for row in self.config_rows(id, &inputs, true, cx) {
                             list = list.child(row);
                         }
                     }
@@ -1129,11 +1172,20 @@ impl DrawingEditor {
             read_rows.push(row_read(&name, false));
             let open = self.chooser.open.contains(&id) || !query.is_empty();
             let studio = name.clone();
+            // A configured studio (live iv-*, cfg-choosers-1120): a 31 px row with the configuration buttons, its
+            // inputs above its parts once open; the inputs only browse, the view takes the default.
+            let inputs = match self.doc.read(cx).session.doc.tab(id).map(|t| &t.content) {
+                Some(TabContent::PartStudio(ps)) => ps.configuration.inputs.clone(),
+                _ => Vec::new(),
+            };
             list = list.child(
                 row_base(SharedString::from(format!("dr-ch-ps-{id}")), 0.)
+                    .debug_selector(move || format!("dr-ch-ps-{id}"))
+                    .when(!inputs.is_empty(), |d| d.min_h(px(31.)))
                     .map(|d| crate::ui_script::mark(d, || format!("list_row:{studio}")))
                     .child(crate::assets::icon(if open { "chevron-down" } else { "chevron-right" }, 14., cx))
-                    .child(div().truncate().child(crate::ui::user_text(name)))
+                    .child(div().flex_1().min_w_0().truncate().child(crate::ui::user_text(name)))
+                    .when(!inputs.is_empty(), |d| d.child(self.config_buttons(id, cx)))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if let Some(i) = this.chooser.open.iter().position(|t| *t == id) {
                             this.chooser.open.remove(i);
@@ -1146,11 +1198,14 @@ impl DrawingEditor {
             if !open {
                 continue;
             }
+            for row in self.config_rows(id, &inputs, false, cx) {
+                list = list.child(row);
+            }
             for (i, (label, what, part, flat, sketch)) in shown.into_iter().enumerate() {
                 read_rows.push(row_read(&label, true));
                 let pic = pic_of(id, what);
                 let name = label.to_string();
-                list = list.child(row_base(SharedString::from(format!("dr-ch-c-{id}-{i}")), 36.).min_h(px(38.)).map(|d| crate::ui_script::mark(d, || format!("list_row:{name}"))).child(thumb(pic)).child(div().truncate().child(label)).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                list = list.child(row_base(SharedString::from(format!("dr-ch-c-{id}-{i}")), 36.).debug_selector(move || format!("dr-ch-c-{id}-{i}")).min_h(px(38.)).map(|d| crate::ui_script::mark(d, || format!("list_row:{name}"))).child(thumb(pic)).child(div().truncate().child(label)).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                     if this.chooser.composite {
                         this.pick_composite(id, part.clone(), window, cx);
                         return;
@@ -1334,7 +1389,7 @@ impl DrawingEditor {
                         let body = if released { self.render_released(&d, tab == 1, cx) } else { list.into_any_element() };
                         panel
                             .when(!composite, |p| p.child(sub_tabs))
-                            .children(self.chooser.search.as_ref().map(|s| div().px(px(6.)).pt(px(6.)).child(Input::new(s).small())))
+                            .children(self.chooser.search.as_ref().map(|s| self.search_with_sort(s, cx)))
                             .children(view_released)
                             .when(tab == 0 && !released && !composite, |d| d.child(filters).child(div().h(px(1.)).bg(gpui_kit::rgb(0xeeeeee))))
                             .children(changes)
@@ -1401,7 +1456,7 @@ impl DrawingEditor {
                 // (Select a composite part: no kinds, filters or Import, live2 2278.)
                 panel
                     .when(!composite, |p| p.child(sub_tabs))
-                    .children(self.chooser.search.as_ref().map(|s| div().px(px(6.)).pt(px(6.)).child(Input::new(s).small())))
+                    .children(self.chooser.search.as_ref().map(|s| self.search_with_sort(s, cx)))
                     .when(tab == 0 && !composite, |d| d.child(filters).child(div().h(px(1.)).bg(gpui_kit::rgb(0xeeeeee))))
                     .child(list)
                     .when(!composite, |p| p.child(import_row(cx)))

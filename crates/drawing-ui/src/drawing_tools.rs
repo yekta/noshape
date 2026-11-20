@@ -206,6 +206,13 @@ impl DrawingEditor {
             self.close_table_dlg(false, cx);
             return;
         }
+        // Custom table › Add's / Cut list's chooser: closed with its picker, the dialog stays (live drw-custom-table-add).
+        if self.chooser.studio || self.chooser.composite {
+            self.close_composite_chooser();
+            self.close_studio_chooser();
+            cx.notify();
+            return;
+        }
         if self.insert.chooser.take().is_some() | std::mem::take(&mut self.insert.panel) {
             cx.notify();
             return;

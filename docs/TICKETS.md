@@ -38,7 +38,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (assembly_panels.rs, insert_source == 0). Live 05:52: the button is in an opened document's lists only (Name: A → Z / Z → A);
   the Recently opened / Created by me / … source lists have none. Evidence: onshape-research/live/releases/rn-1222-1223/ins-other.png,
   so1.json, rn1-rn3.json.
-- [ ] P2 **DRW-CHOOSER-SORT (studios)**: the drawing Insert view chooser "Select a part or assembly" has a sort button right
+- [ ] fixed (studios 11-20: a sort button right of the search box, Name: A → Z (default) | Name: Z → A, in the current and an opened document; the studios listed by name), to verify P2 **DRW-CHOOSER-SORT (studios)**: the drawing Insert view chooser "Select a part or assembly" has a sort button right
   of "Search parts or sketches" (live drawing/cfg-choosers-1120/iv-2-insert.png; the custom table's "Select a Part Studio"
   also has one). Ours (drawing_chooser.rs) has none. Options not opened in the drawing; the assembly's are Name: A → Z / Z → A.
 - [ ] P2 **PARTS-LIST-PROPERTIES (psui)**: Onshape 1.222 "Display parts list properties". Live 05:52: right-clicking the Part

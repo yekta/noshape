@@ -1616,6 +1616,50 @@ fn custom_table_add_picks_a_part_studio_in_the_chooser(cx: &mut TestAppContext) 
     draw(cx, window);
     let (studio_mode, open, dlg) = state(cx);
     assert!(!studio_mode && open.is_none() && dlg.as_ref().is_some_and(|d| !d.2), "Esc closes it, the dialog stays: {dlg:?}");
+    // Esc reaching the drawing (the app's Cancel) closes it the same, and the next one ends the tool and its dialog
+    // (live drw-custom-table-add 9-10).
+    cx.update(|cx| cx.bind_keys([gpui_kit::KeyBinding::new("escape", noshape_app_core::actions::Cancel, Some("Drawing && !Input"))]));
+    press(cx, window, "ct-add");
+    cx.update_window(window, |_, w, cx| { let f = editor.read(cx).focus.clone(); w.focus(&f, cx) }).unwrap();
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    draw(cx, window);
+    let (studio_mode, open, dlg) = state(cx);
+    assert!(!studio_mode && open.is_none() && dlg.as_ref().is_some_and(|d| !d.2), "the first Esc closes the chooser only: {dlg:?}");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    draw(cx, window);
+    let (_, _, dlg) = state(cx);
+    let select = cx.update(|cx| matches!(editor.read(cx).tool, Tool::Select));
+    assert!(dlg.is_none() && select, "the second Esc closes Custom table: {dlg:?}");
+}
+
+/// Live iv-2 (DRW-CHOOSER-SORT): the chooser lists the studios by name, A → Z; its sort button's Name: Z → A
+/// reverses them.
+#[gpui::test]
+fn the_chooser_sorts_studios_by_name(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::{TableTool, Tool};
+    SUGGESTED.set(true);
+    SETUP.set(Some(|ctx, _| {
+        call(ctx, "tab_create", json!({ "kind": "partstudio", "name": "Zed studio" }));
+        call(ctx, "tab_create", json!({ "kind": "partstudio", "name": "a studio" }));
+    }));
+    let (window, editor) = drawing(cx, "chooser-sort");
+    real_sheet(cx, window, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Table { kind: TableTool::Custom, view: None, origin: None }, cx)));
+    draw(cx, window);
+    press(cx, window, "ct-add");
+    let ids: Vec<(String, noshape_model::document::TabId)> = cx.update(|cx| {
+        let doc = &editor.read(cx).doc.read(cx).session.doc;
+        doc.ordered_tabs().into_iter().filter(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_))).map(|t| (t.name.clone(), t.id)).collect()
+    });
+    let order = |cx: &mut TestAppContext| {
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        let mut rows: Vec<(gpui_kit::Pixels, String)> = ids.iter().map(|(n, id)| (vcx.debug_bounds(Box::leak(format!("dr-ch-ps-{id}").into_boxed_str())).expect("a studio row").origin.y, n.clone())).collect();
+        rows.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        rows.into_iter().map(|r| r.1).collect::<Vec<_>>()
+    };
+    assert_eq!(order(cx), ["a studio", "Part Studio 1", "Zed studio"], "A → Z");
+    pick(cx, window, "dr-ch-sort", "Name: Z → A");
+    assert_eq!(order(cx), ["Zed studio", "Part Studio 1", "a studio"], "Z → A");
 }
 
 /// Live cfg-choosers-1120: a configured studio's row in Select a Part Studio has a › that shows its inputs under it
@@ -1651,4 +1695,42 @@ fn custom_table_add_takes_a_configured_studios_configuration(cx: &mut TestAppCon
     press(cx, window, &format!("dr-ch-ps-{studio}"));
     let config = cx.update(|cx| editor.read(cx).custom_tables.dlg.as_ref().map(|d| (d.studio, d.config.0.get(&input).cloned())));
     assert_eq!(config, Some((Some(studio), Some(large))), "the studio at Size Large");
+}
+
+/// Live cfg-choosers-1120 (iv-*): in Insert view's chooser a configured studio's row is 31 px with the configuration
+/// buttons; opening it shows its inputs above its parts, and a part picked there still goes in (the inline value is
+/// only browsed: live's view says "Size: Small").
+#[gpui::test]
+fn insert_view_lists_a_configured_studios_inputs_above_its_parts(cx: &mut TestAppContext) {
+    SETUP.set(Some(|ctx, _| {
+        call(ctx, "config_add_input", json!({ "tab": "Part Studio 1", "kind": "list", "name": "Size" }));
+        call(ctx, "config_add_option", json!({ "tab": "Part Studio 1", "input": "Size", "name": "Large" }));
+    }));
+    let (window, editor) = drawing(cx, "iv-studio-config");
+    real_sheet(cx, window, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| e.open_insert_chooser(cx)));
+    draw(cx, window);
+    let (studio, input) = cx.update(|cx| {
+        let doc = &editor.read(cx).doc.read(cx).session.doc;
+        let tab = doc.ordered_tabs().into_iter().find(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_))).unwrap();
+        let noshape_model::TabContent::PartStudio(ps) = &tab.content else { unreachable!() };
+        (tab.id, ps.configuration.inputs.first().expect("Size").id.clone())
+    });
+    let list = format!("dr-ch-cfg-{studio}-{input}");
+    let row = format!("dr-ch-ps-{studio}");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let r = vcx.debug_bounds(Box::leak(row.clone().into_boxed_str())).expect("the studio's row");
+    assert_eq!(r.size.height, px(31.), "a configured studio's row");
+    assert!(vcx.debug_bounds(Box::leak(format!("dr-ch-cfg-last-{studio}").into_boxed_str())).is_some(), "its configuration buttons");
+    assert!(vcx.debug_bounds(Box::leak(list.clone().into_boxed_str())).is_none(), "its inputs folded");
+    press(cx, window, &row);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let l = vcx.debug_bounds(Box::leak(list.clone().into_boxed_str())).expect("its Size list once open");
+    assert!(cx.update(|cx| editor.read(cx).insert.chooser.is_some()), "the name only opens it");
+    pick(cx, window, &list, "Large");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let part = vcx.debug_bounds(Box::leak(format!("dr-ch-c-{studio}-0").into_boxed_str())).expect("its first part row");
+    assert!(part.origin.y > l.origin.y, "the inputs above the parts");
+    press(cx, window, &format!("dr-ch-c-{studio}-0"));
+    assert!(cx.update(|cx| editor.read(cx).insert.chooser.is_none()), "a part picked closes the chooser");
 }
