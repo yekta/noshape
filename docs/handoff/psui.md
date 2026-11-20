@@ -103,9 +103,13 @@ docs/DECISIONS.md (read first; it wins over anything here).
    (`Window::pointer_out`: no hit test after MouseExited until the next move). run116/117 fixes: section test grabs the head
    (45 px), skip ring focuses the dialog as the array field's click, empty new folder collapsed (live
    featurelist-gaps emptyFolder; model-data); run118 (vibex8). Rollback row tooltip after a drop: REQUESTS row 04:51.
-3g. FEEL-EDGE-VS-FACE-HOLD parked: reach-px-1119 (no hold) vs ours-verify-1120 (hold 8-10); REQUESTS 05:00;
-   fix in /root/psui-scratch/edge-hold.patch (PickBuffer::pick_holding, EDGE_HOLD 9 px; feel_tests:137 needs the
-   hold rows). FEEL-HASH-LIST-DELAY verified by live (close on rebase).
+3g. Batch fcf678ce FAILED 05:42 on studios 3a462952; rebased on it 06:12 (feature_studio_ui_tests.rs: both sides'
+   tests kept) with fa765f055 on top: no tooltip on the dropped-on row (`ui.rollback_drop_row`), feel-row tests (3D
+   clicks, sketch Escape/double-click, circle/spline colours, snap glyph (30, 30), line/point reach), live's P2s
+   PARTS-LIST-PROPERTIES (PN pill 20 px, matrix row) and TABLES-STICKY-HEADER-HSCROLL (Cut list per feature via
+   `table_section`, sticky header from `ct.panel_scroll` + `grid_tops`, `h_scrollbar(16, 18)` pinned; the grid is
+   flex_none so wide custom tables scroll sideways at all). run128 green. On green: tell qa (DIM readout, rollback
+   drop row, section arrow foot, midpoint rest, leave-window, fast-off clear) and studios/asm/skasm as listed below.
 3e. qa P0 FEEL-DIM-PICK-READOUT (15e785522, live R3 cov2-dim-orient): the sketch readout reads the Dimension tool's
    picks (`SketchEditor::readout_entities`); sketch_ui_tests::the_dimension_tools_picks_fill_the_readout. Tick it and
    tell qa on green. run114 (vibex8) also showed 5 part-studio tests failing that this batch doesn't touch (config

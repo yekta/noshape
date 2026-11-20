@@ -191,6 +191,21 @@ fn a_shown_sketchs_line_and_point_reach_outside_sketch_mode_as_live(cx: &mut Tes
             wrong.push(format!("{d} px off a corner: no disc"));
         }
     }
+    // Live hover-pick-1120 row 2: moving along a line toward its end the end point takes over 8 px before it (the line
+    // back at 9); ours 7 (the point's square): 6 px in the point, 10 px in the line.
+    let along = (b - a).normalize();
+    for (d, point) in [(10.0, false), (6.0, true)] {
+        pointer.move_to(cx, &view, a + along * d);
+        let got = hovered(cx, &view);
+        let is_point = cx.update(|cx| {
+            let shown = view.read(cx).display.sketches.iter().find(|s| s.feature == feature);
+            matches!(&got, Some(Reference::SketchEntity { sketch, entity }) if *sketch == feature && shown.is_some_and(|s| s.points.iter().any(|q| q.entity == *entity)))
+        });
+        let lit = if point { is_point } else { is_line(&got, id) };
+        if !lit {
+            wrong.push(format!("{d} px along line {id} from its end: lit {got:?}, want the {}", if point { "point" } else { "line" }));
+        }
+    }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 

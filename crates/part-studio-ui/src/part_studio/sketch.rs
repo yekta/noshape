@@ -4530,6 +4530,7 @@ impl PartStudioView {
             // live's 14 px horizontal bar and 16 px perpendicular base).
             out.push(
                 h_flex()
+                    .debug_selector(|| "snap-glyphs".into())
                     .absolute()
                     .left(px(x + dx))
                     .top(px(y + dy))

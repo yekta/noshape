@@ -1391,6 +1391,11 @@ pub fn right_panel_w() -> f32 {
     RIGHT_W.with(|w| w.get())
 }
 
+/// The right panels' width for this run (the splitter also saves it).
+pub fn set_right_panel_w(w: f32) {
+    RIGHT_W.with(|c| c.set(w.max(RIGHT_PANEL_MIN)));
+}
+
 /// Dragging a right panel's splitter.
 #[derive(Clone)]
 pub struct RightSplitDrag;
@@ -1423,7 +1428,7 @@ pub fn right_resizable<E: InteractiveElement + ParentElement>(panel: E, inset: f
             let max = (f32::from(window.viewport_size().width) - 400.).max(RIGHT_PANEL_MIN);
             let w = (f32::from(e.bounds.right() - e.event.position.x) - inset).round().clamp(RIGHT_PANEL_MIN, max);
             if w != right_panel_w() {
-                RIGHT_W.with(|c| c.set(w));
+                set_right_panel_w(w);
                 let p = crate::paths::config_dir().join("right_panel_width.txt");
                 if let Some(dir) = p.parent() {
                     let _ = std::fs::create_dir_all(dir);

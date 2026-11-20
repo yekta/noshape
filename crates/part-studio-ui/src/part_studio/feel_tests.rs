@@ -928,3 +928,60 @@ fn a_fast_move_off_a_lit_face_clears_it_on_that_move(cx: &mut TestAppContext) {
     let after = cx.update(|cx| (view.read(cx).hover.clone(), view.read(cx).viewport.read(cx).hover_settled()));
     assert_eq!(after.0, None, "the face dark on the move off, before any pause or frame (settled: {})", after.1);
 }
+
+/// Live 3d.json (interaction-feel "Click", "Ctrl+click"): in 3D with no tool a click adds what is lit, a click on a
+/// selected face removes it, a click on empty space clears, Shift+click there keeps the selection, and Ctrl+click
+/// opens the menu of what is under the pointer without selecting it; through the real pointer.
+#[gpui::test]
+fn clicks_in_3d_add_remove_clear_and_ctrl_opens_the_menu(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view, top, _) = block_part(cx, "click-mods-3d");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let centres: Vec<(Reference, DVec2)> = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let vp = v.viewport.read(cx);
+        b.face_refs
+            .iter()
+            .zip(&b.mesh.face_ranges)
+            .filter_map(|(r, &(first, count))| {
+                let idx = &b.mesh.indices[first as usize..(first + count) as usize];
+                let c = idx.iter().map(|&k| { let q = b.mesh.positions[k as usize]; glam::DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64) }).sum::<glam::DVec3>() / idx.len() as f64;
+                Some((r.clone(), vp.project(c)?))
+            })
+            .collect()
+    });
+    let pointer = Pointer::new(cx, window, &view);
+    let lit_at = |cx: &mut TestAppContext, at: DVec2| {
+        pointer.move_to(cx, &view, at);
+        cx.update(|cx| view.read(cx).hover.clone())
+    };
+    let on_top = centres.iter().find(|(r, _)| *r == top).expect("the top face on screen").1;
+    let (side, on_side) = centres.iter().filter(|(r, _)| *r != top).find(|(r, at)| lit_at(cx, *at).as_ref() == Some(r)).cloned().expect("a side face lit at its centre");
+    let empty = DVec2::new(15.0, 15.0);
+    assert_eq!(lit_at(cx, empty), None, "nothing lights at the viewport's corner");
+    let press = |cx: &mut TestAppContext, at: DVec2, modifiers: Modifiers| {
+        pointer.move_to(cx, &view, at);
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(pointer.window_point(cx, at), modifiers);
+        draw(cx, window);
+        cx.update(|cx| view.read(cx).selection.clone())
+    };
+    let shift = Modifiers { shift: true, ..Default::default() };
+    let ctrl = Modifiers { control: true, ..Default::default() };
+    let mut wrong = Vec::new();
+    let mut row = |what: &str, got: Vec<Reference>, want: &[&Reference]| {
+        if got.len() != want.len() || !want.iter().all(|w| got.contains(w)) {
+            wrong.push(format!("{what}: {got:?}, want {want:?}"));
+        }
+    };
+    row("click the top", press(cx, on_top, Modifiers::default()), &[&top]);
+    row("then click a side", press(cx, on_side, Modifiers::default()), &[&top, &side]);
+    row("click the top again", press(cx, on_top, Modifiers::default()), &[&side]);
+    row("click empty space", press(cx, empty, Modifiers::default()), &[]);
+    row("click the top", press(cx, on_top, Modifiers::default()), &[&top]);
+    row("Shift+click empty space", press(cx, empty, shift), &[&top]);
+    row("Ctrl+click the side", press(cx, on_side, ctrl), &[&top]);
+    assert!(cx.update(|cx| view.read(cx).context_menu.is_some()), "Ctrl+click opened the context menu");
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}

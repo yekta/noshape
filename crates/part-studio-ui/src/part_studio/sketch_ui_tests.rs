@@ -7293,3 +7293,71 @@ fn a_hovered_edge_tints_no_list_row(cx: &mut TestAppContext) {
     });
     assert_eq!(state, (false, 0, 0, None, 0), "(nothing lit, related rows, selected rows, list hover, tinted part rows)");
 }
+
+/// Live 1.223 (rn-1222-1223 st4.json, sticky-h-*.png; TABLES-STICKY-HEADER-HSCROLL): the Cut list is live's table
+/// ("Frame" members' Item | Qty | Standard | Description | Length | Angle 1 | Angle 2); scrolling the panel, the 34 px
+/// column header stops at the panel's top while the rows pass under it, and is back under the title once scrolled back.
+#[gpui::test]
+fn a_cut_list_header_sticks_to_the_panel_top(cx: &mut TestAppContext) {
+    // 24 unconnected members of different lengths: as many rows, taller than the panel.
+    let shapes: Vec<serde_json::Value> = (0..24).map(|i| serde_json::json!({ "line": [[0, 40 * i], [20 + 5 * i, 40 * i]] })).collect();
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": shapes },
+        { "type": "frame", "name": "Frame 1", "params": { "selections": ["Sketch 1 edges"] } }
+    ] });
+    let (window, view) = part_studio_from(cx, "cut-list-sticky", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).has_frames());
+    view.update(cx, |v, cx| {
+        v.right_panel = Some(crate::part_studio::config_panel::RightPanel::CutList);
+        cx.notify();
+    });
+    draw(cx, window);
+    let head = |cx: &mut TestAppContext| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("table-head:Cut list").map(|b| f32::from(b.top()));
+    let panel_top = |cx: &mut TestAppContext| cx.update(|cx| f32::from(view.read(cx).ui.ct.panel_scroll.bounds().top()));
+    let scroll = |cx: &mut TestAppContext, y: f32| {
+        // A frame clamps the offset to the content (as a wheel scroll does at once), the next renders from it.
+        cx.update(|cx| view.read(cx).ui.ct.panel_scroll.set_offset(gpui::point(px(0.), px(-y))));
+        draw(cx, window);
+        draw(cx, window);
+    };
+    let rows = cx.update(|cx| view.read(cx).context.as_ref().map(|c| noshape_model::regen::features::frames::cut_list(c, None).len()));
+    let at_rest = head(cx).expect("the cut list's column header");
+    let top = panel_top(cx);
+    scroll(cx, 300.);
+    let scrolled = head(cx).expect("the header while scrolled");
+    let (offset, max) = cx.update(|cx| {
+        let s = &view.read(cx).ui.ct.panel_scroll;
+        (f32::from(s.offset().y), f32::from(s.max_offset().y))
+    });
+    let bar = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("table-hscroll:Cut list");
+    let panel = cx.update(|cx| view.read(cx).ui.ct.panel_scroll.bounds());
+    let laid = cx.update(|cx| view.read(cx).ui.ct.grid_tops.borrow().clone());
+    scroll(cx, 0.);
+    let back = head(cx).expect("the header scrolled back");
+    let near = |a: f32, b: f32| (a - b).abs() < 1.5;
+    // Narrower than the table: the sideways bar sits on the panel's bottom while the table's own bottom is out of
+    // view, and right under the table once scrolled to its end.
+    let wide = crate::ui::right_panel_w();
+    crate::ui::set_right_panel_w(300.);
+    scroll(cx, 0.);
+    let bar_at = |cx: &mut TestAppContext| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("table-hscroll:Cut list").map(|b| f32::from(b.bottom()));
+    let grid_bottom = |cx: &mut TestAppContext| {
+        let (offset, laid) = cx.update(|cx| (f32::from(view.read(cx).ui.ct.panel_scroll.offset().y), view.read(cx).ui.ct.grid_tops.borrow().get("Cut list").copied()));
+        laid.map(|(t, h)| t + offset + h)
+    };
+    let pinned = bar_at(cx);
+    let panel_bottom = cx.update(|cx| f32::from(view.read(cx).ui.ct.panel_scroll.bounds().bottom()));
+    scroll(cx, 10_000.);
+    let (under, end) = (bar_at(cx), grid_bottom(cx));
+    crate::ui::set_right_panel_w(wide);
+    assert_eq!(
+        (pinned.map(|b| near(b, panel_bottom)), under.zip(end).map(|(b, e)| near(b, e + 16.))),
+        (Some(true), Some(true)),
+        "(the bar on the panel's bottom, then under the table): {pinned:?} vs {panel_bottom}, {under:?} vs {end:?} + 16"
+    );
+    assert_eq!(
+        (rows, at_rest > top + 30., near(scrolled, top), near(back, at_rest)),
+        (Some(24), true, true, true),
+        "(cut list rows, header under the title at rest, at the panel's top scrolled 300 px, back in place): at rest {at_rest}, scrolled {scrolled}, back {back}, panel top {top}; scrolled to {offset} of {max}, panel {panel:?}, sideways bar {bar:?}, grids {laid:?}"
+    );
+}

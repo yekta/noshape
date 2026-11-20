@@ -988,7 +988,7 @@ impl PartStudioView {
         let bends_table = v_flex()
             .w_full()
             .child(v_flex().id("sm-bends").w_full().overflow_x_scroll().track_scroll(&scroll).child(v_flex().flex_none().min_w(px(1. + bend_cols.iter().map(|c| c.1).sum::<f32>())).items_start().child(bend_head).children(bend_rows)))
-            .children(h_scrollbar(&scroll, cx))
+            .children(h_scrollbar(&scroll, 15., 15., cx))
             .into_any_element();
         // Other joints: Name (frozen) | Type ▾ | Style ▾.
         let select_cell = |text: &'static str| {
@@ -1219,8 +1219,9 @@ impl PartStudioView {
 
 /// Chrome's classic horizontal scrollbar under a table wider than the
 /// panel (live sm-091: a 15 px `#fcfcfc` track, ◂ / ▸ buttons, a 9 px
-/// round `#8b8b8b` thumb); none when everything fits.
-fn h_scrollbar(handle: &ScrollHandle, cx: &mut Context<PartStudioView>) -> Option<AnyElement> {
+/// round `#8b8b8b` thumb); none when everything fits. `tall`: the height
+/// while the pointer is over it.
+pub(super) fn h_scrollbar(handle: &ScrollHandle, height: f32, tall: f32, cx: &mut Context<PartStudioView>) -> Option<AnyElement> {
     let (view_w, max) = (f32::from(handle.bounds().size.width), f32::from(handle.max_offset().x));
     if max <= 0.5 || view_w <= 0.0 {
         // Laid out once the table has its size.
@@ -1246,7 +1247,8 @@ fn h_scrollbar(handle: &ScrollHandle, cx: &mut Context<PartStudioView>) -> Optio
     let h = handle.clone();
     Some(
         h_flex()
-            .h(px(15.))
+            .h(px(height))
+            .hover(move |s| s.h(px(tall)))
             .bg(gpui_kit::rgb(0xfafafa))
             .border_l_1()
             .border_color(gpui_kit::rgb(0xaaaaaa))
@@ -1257,7 +1259,9 @@ fn h_scrollbar(handle: &ScrollHandle, cx: &mut Context<PartStudioView>) -> Optio
                     .flex_1()
                     .h_full()
                     .relative()
-                    .child(div().absolute().left(px(x)).top(px(3.)).h(px(9.)).w(px(thumb)).rounded_full().bg(ink))
+                    .flex()
+                    .items_center()
+                    .child(div().absolute().left(px(x)).h(px(9.)).w(px(thumb)).rounded_full().bg(ink))
                     .on_mouse_down(MouseButton::Left, move |e, window, _| {
                         // A press on the track jumps the thumb's middle there.
                         let start = f32::from(e.position.x - h.bounds().origin.x) - 15.0;

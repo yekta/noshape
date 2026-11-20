@@ -394,7 +394,7 @@ impl PartStudioView {
                 )
                 // Its rows take the keyboard on a right press, as live's focusable rows (`panel_row_focus`, tracked off
                 // the rows: a left click in the panel takes no focus).
-                .child(v_flex().id("right-panel-body").flex_1().p(px(5.)).gap_2().overflow_y_scroll().child(div().absolute().size_0().track_focus(&self.panel_row_focus)).child(body))
+                .child(v_flex().id("right-panel-body").flex_1().p(px(5.)).gap_2().overflow_y_scroll().track_scroll(&self.ui.ct.panel_scroll).child(div().absolute().size_0().track_focus(&self.panel_row_focus)).child(body))
                 .child(
                     h_flex()
                         .h(px(40.))

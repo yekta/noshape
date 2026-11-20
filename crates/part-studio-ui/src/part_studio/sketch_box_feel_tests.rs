@@ -242,3 +242,99 @@ fn midpoint_glyph_and_plane_clicks_in_a_sketch_as_live(cx: &mut TestAppContext) 
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
+
+/// Live2 "feel (sketch)" (interaction-feel "Clearing; double-click"): editing a sketch with no tool, Escape keeps the
+/// selection and a click on empty space clears it; a double-click on a rectangle's line selects it then deselects it,
+/// taking none of the other lines (no chain); through the real pointer.
+#[gpui::test]
+fn sketch_escape_keeps_an_empty_click_clears_and_a_double_click_toggles_twice(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "sketch-clear-dbl", Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let a = lines(cx, &view)[0];
+    let on_a = (a.1 + a.2) * 0.5;
+    let pointer = Pointer::new(cx, window, &view);
+    let press = |cx: &mut TestAppContext, at: DVec2, click_count: usize| {
+        pointer.move_to(cx, &view, at);
+        let win = pointer.window_point(cx, at);
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: win, modifiers: Modifiers::default(), click_count, first_mouse: false });
+        vcx.simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: win, modifiers: Modifiers::default(), click_count });
+        draw(cx, window);
+        selected(cx, &view).0
+    };
+    let mut got = vec![("click A", press(cx, on_a, 1))];
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    draw(cx, window);
+    got.push(("Escape", selected(cx, &view).0));
+    // Empty space: a spot where nothing lights (the Sketch dialog covers the viewport's top-left corner).
+    let size = cx.update(|cx| pointer.vp.read(cx).size());
+    let empty = [(0.5, 0.92), (0.1, 0.92), (0.9, 0.92), (0.1, 0.5), (0.5, 0.08)].into_iter().map(|(u, v)| DVec2::new(size.x * u, size.y * v)).find(|&at| {
+        pointer.move_to(cx, &view, at);
+        cx.update(|cx| view.read(cx).hover.is_none())
+    });
+    let empty = empty.expect("an empty spot in the viewport");
+    got.push(("click empty space", press(cx, empty, 1)));
+    got.push(("double-click A, first click", press(cx, on_a, 1)));
+    got.push(("double-click A, second click", press(cx, on_a, 2)));
+    let still_editing = cx.update(|cx| view.read(cx).sketch_data(cx).is_some());
+    let want = vec![("click A", vec![a.0]), ("Escape", vec![a.0]), ("click empty space", vec![]), ("double-click A, first click", vec![a.0]), ("double-click A, second click", vec![])];
+    assert_eq!((got, still_editing), (want, true), "(selection after each step, still editing the sketch)");
+}
+
+/// Live (interaction-feel "Nothing recoloured under the pointer mid-draw"): a sketch line under the pointer lights with
+/// no tool; once a line tool's first click is down the same line under the pointer isn't recoloured (the snap shows).
+#[gpui::test]
+fn a_sketch_line_under_the_pointer_mid_draw_is_not_recoloured(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "mid-draw-no-recolour", Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let line = lines(cx, &view)[0].0;
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| {
+        view.update(cx, |v, _| {
+            let sketch = v.sketch.as_ref().expect("sketch mode").feature;
+            v.hover = Some(Reference::SketchEntity { sketch, entity: line });
+        });
+        !view.read(cx).highlighted_hover(cx).is_empty()
+    });
+    let at_rest = lit(cx);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+    let tool_on = lit(cx);
+    click(cx, window, &view, (400., 500.));
+    let mid_draw = (cx.update(|cx| view.read(cx).sketch.as_ref().is_some_and(|ed| ed.mid_draw())), lit(cx));
+    assert_eq!((at_rest, tool_on, mid_draw), (true, true, (true, false)), "(lit with no tool, with the Line tool before its first click, (mid-draw, lit) after it)");
+}
+
+/// Live2 sketch-snaps (interaction-feel "Inference glyph"): with the Line tool's first click down, a single snap's
+/// 20 px glyph box is centred ≈ 30 px right of and 30 below the pointer (live2's ±2 px).
+#[gpui::test]
+fn a_snap_glyph_sits_30_px_right_of_and_below_the_pointer(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "snap-glyph-place", Tool::Line);
+    // Level in the sketch's plane (the camera isn't normal to it): a horizontal snap.
+    let wpp = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().world_per_px);
+    let a = DVec2::new(-60.0, 40.0) * wpp;
+    let p = on_screen(cx, &view, a);
+    click(cx, window, &view, (p.x, p.y));
+    let target = on_screen(cx, &view, a + DVec2::new(150.0, 0.0) * wpp);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        let vp = v.viewport.clone();
+        vp.update(cx, |vp, _| vp.place_pointer(target));
+        v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: target, modifiers: Modifiers::default() }, w, cx);
+        v.on_viewport_event(&vp, &ViewportEvent::Hover(None), w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    let icons = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().snap_icons());
+    assert_eq!(icons, vec!["horizontal"], "one snap glyph by the pointer");
+    let pointer = Pointer::new(cx, window, &view);
+    let at = pointer.window_point(cx, target);
+    let glyph = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("snap-glyphs").expect("the glyphs drawn");
+    let off = (f32::from(glyph.center().x - at.x), f32::from(glyph.center().y - at.y));
+    assert!((off.0 - 30.0).abs() <= 2.0 && (off.1 - 30.0).abs() <= 2.0, "the glyph box centred {off:?} from the pointer, live ≈ (30, 30)");
+}

@@ -2160,6 +2160,29 @@ mod state_tests {
         assert_eq!((r.state(arc), r.state(start), r.state(end)), (Some(ConstraintState::FullyConstrained), Some(ConstraintState::UnderConstrained), Some(ConstraintState::UnderConstrained)), "radius dimensioned");
     }
 
+    /// Live2 (11-13, colours; interaction-feel "…a circle, a spline"): a circle with its centre held is blue while its
+    /// radius is free, its centre black, and black once the radius is dimensioned; a spline is blue while any of its
+    /// points is free.
+    #[test]
+    fn a_circle_is_defined_by_its_radius_and_a_spline_by_all_its_points() {
+        let mut sk = Sketch::new();
+        let circle = sk.add_circle(DVec2::ZERO, 0.02);
+        let crate::Geometry::Circle { center, .. } = sk.entity(circle).unwrap().geometry else { panic!("a circle") };
+        sk.add_constraint(ConstraintKind::Fix { entity: center }).unwrap();
+        let r = sk.solve();
+        assert_eq!((r.state(circle), r.state(center)), (Some(ConstraintState::UnderConstrained), Some(ConstraintState::FullyConstrained)), "radius free");
+        sk.add_constraint(ConstraintKind::Radius { curve: circle, value: 0.02 }).unwrap();
+        assert_eq!(sk.solve().state(circle), Some(ConstraintState::FullyConstrained), "radius dimensioned");
+        let spline = sk.add_fit_spline(&[DVec2::new(0.05, 0.0), DVec2::new(0.06, 0.01), DVec2::new(0.07, 0.0)]).unwrap();
+        let crate::Geometry::FitSpline { points, .. } = sk.entity(spline).unwrap().geometry.clone() else { panic!("a fit spline") };
+        for p in &points[..2] {
+            sk.add_constraint(ConstraintKind::Fix { entity: *p }).unwrap();
+        }
+        assert_eq!(sk.solve().state(spline), Some(ConstraintState::UnderConstrained), "its last point free");
+        sk.add_constraint(ConstraintKind::Fix { entity: points[2] }).unwrap();
+        assert_eq!(sk.solve().state(spline), Some(ConstraintState::FullyConstrained), "every point held");
+    }
+
     /// An end free on a guide that isn't along the line (a fixed vertical line): moving it turns the line, so the
     /// line is under defined; an end free only along a guide that lies on the line keeps it defined.
     #[test]

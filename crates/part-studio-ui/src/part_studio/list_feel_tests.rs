@@ -487,6 +487,23 @@ fn rows() -> Vec<Row> {
             l.right_click(cx, "part:Part 2");
             expect(l.menu(cx), names(&["Properties…", "Assign material for 2 parts…", "Edit appearance for 2 parts…", "Check interference for 2 parts…", "Boolean", "Copy 2 items", "Hide", "Hide other parts", "Hide all parts", "Isolate…", "Make transparent…", "Export…", "Delete"]), "rows")
         } },
+        Row { id: "parts / the Parts header's menu shows and hides the parts list properties", live: "right-clicking 'Parts (n)': one item, 'Show parts list properties'; on, each part row shows its state chip 'In progress' (#eeeeee, 20 px high, radius 3) after its name; the item then reads 'Hide parts list properties' (live rn-1222-1223 pl1 / pl2.json, Onshape 1.222)", gap: false, check: |l, cx| {
+            let chip = |l: &List, cx: &mut TestAppContext| {
+                let part = cx.update(|cx| l.view.read(cx).display.bodies.iter().find(|b| b.name == "Part 1").map(|b| b.id.clone()))?;
+                l.bounds(cx, &format!("part-state-{part}")).map(|b| f32::from(b.size.height).round())
+            };
+            let before = chip(l, cx);
+            l.right_click(cx, "section:parts");
+            let off = l.menu(cx);
+            let at = l.bounds(cx, "menu:Show parts list properties").ok_or("no Show parts list properties row")?.center();
+            l.press(cx, at, MouseButton::Left, NONE, 1);
+            let on = chip(l, cx);
+            l.right_click(cx, "section:parts");
+            let menu_on = l.menu(cx);
+            let at = l.bounds(cx, "menu:Hide parts list properties").ok_or("no Hide parts list properties row")?.center();
+            l.press(cx, at, MouseButton::Left, NONE, 1);
+            expect((before, off, on, menu_on, chip(l, cx)), (None, names(&["Show parts list properties"]), Some(20.0), names(&["Hide parts list properties"]), None), "(chip before, the header's menu, chip height on, the menu on, chip after hiding)")
+        } },
         Row { id: "menu / a hidden part", live: "… Show, Show all parts, Isolate… (no Hide other / all parts; live2 view-tools-1118)", gap: false, check: |l, cx| {
             let hidden = |cx: &gpui_kit::App| l.view.read(cx).display.bodies.iter().find(|b| b.name == "Part 1").map(|b| b.hidden);
             l.right_click(cx, "part:Part 1");
@@ -805,7 +822,7 @@ fn rows() -> Vec<Row> {
             l.release(cx, to);
             expect(held, (true, true, Some("Extrude 3".to_string()), 3, Some("Extrude 1".to_string())), "(dragging, a slot shown, rolled to, parts, the row lit under it)")
         } },
-        Row { id: "rollback bar / its tooltip 3 px under it, none on it after a drop", live: "'Rollback bar' 3 px under the 7 px bar (its centre ~20 px above the tip's); after a drag the dropped bar shows no tooltip (live cov-1120 R8, qa FEEL-ROLLBACK-DROP-ROW)", gap: false, check: |l, cx| {
+        Row { id: "rollback bar / its tooltip 3 px under it, none on it after a drop", live: "'Rollback bar' 3 px under the 7 px bar (its centre ~20 px above the tip's); after a drop on a row no tooltip in 2.2 s, nor after a 1 px move, the row's hover band kept (live cov-1120 R8, rollback-drop-tip-1120; qa FEEL-ROLLBACK-DROP-ROW)", gap: false, check: |l, cx| {
             l.hover(cx, "rollback", 600);
             let shown = crate::ui_script::shown_tooltip();
             let bar = l.bounds(cx, "rollback").ok_or("no bar")?.center().y;
@@ -820,7 +837,7 @@ fn rows() -> Vec<Row> {
             let h = f32::from(l.bounds(cx, "feature:Extrude 3").ok_or("no row")?.size.height);
             let (from, to) = (l.at(cx, "rollback"), l.at_y(cx, "feature:Extrude 3", h - 6.));
             l.drag(cx, from, to, true);
-            expect((shown.as_deref(), gap, after.as_deref() == Some("Rollback bar")), (Some("Rollback bar"), true, false), "(tooltip on hover, 6.5 px under the bar's centre, the bar's tooltip back after a drop)")
+            expect((shown.as_deref(), gap, after), (Some("Rollback bar"), true, None), "(tooltip on hover, 6.5 px under the bar's centre, any tooltip after a drop on a row)")
         } },
         Row { id: "rollback bar / on release the rows below grey and the Parts list follows", live: "the bar above Extrude 1: Parts (1) -> Parts (0) here (every part's extrude rolled back); back at the end all three again", gap: false, check: |l, cx| {
             let h = f32::from(l.bounds(cx, "feature:Sketch 1").ok_or("no row")?.size.height);

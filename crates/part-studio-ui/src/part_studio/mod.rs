@@ -4377,6 +4377,7 @@ impl PartStudioView {
             col = col
                 .child(
                     crate::ui::tree_row(SharedString::from(format!("{key}-folder")), false)
+                        .debug_selector(move || format!("section:{key}"))
                         .group("section-head")
                         .child(crate::ui::caret(!collapsed))
                         .child(div().flex_1().child(format!("{title} ({n})")))
@@ -4880,14 +4881,14 @@ impl PartStudioView {
                     .into_any_element(),
             })
             // Parts list properties (live "psui (2026-10-28, P1) part-studio 7.7"): after the name, the part
-            // number in a #d7d7d7 pill (if set), the state in a #eeeeee pill (always, "In progress" by default) and
+            // number in a #d7d7d7 pill (if set; 20 px high as the state's, live rn-1222-1223 pl2.json), the state in a #eeeeee pill (always, "In progress" by default) and
             // the revision in parentheses (if set), each ellipsised on its own; the eye stays at the right end.
             .when(show_props, |d| {
                 let props = self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).cloned().unwrap_or_default();
                 let pill = |text: String, bg: u32, h: f32| {
                     div().ml(px(4.)).h(px(h)).pl(px(4.)).pr(px(if bg == 0xeeeeee { 3. } else { 4. })).min_w_0().flex_shrink(1.).flex().items_center().rounded(px(3.)).bg(gpui_kit::rgb(bg)).text_color(gpui_kit::rgb(0x333333)).child(div().truncate().child(crate::ui::user_text(text)))
                 };
-                d.when_some(props.part_number.filter(|t| !t.is_empty()), |d, t| d.child(pill(t, 0xd7d7d7, 22.)))
+                d.when_some(props.part_number.filter(|t| !t.is_empty()), |d, t| d.child(pill(t, 0xd7d7d7, 20.)))
                     .child(pill(props.meta.state.clone().filter(|t| !t.is_empty()).unwrap_or_else(|| "In progress".into()), 0xeeeeee, 20.).debug_selector({
                         let id = b.id.clone();
                         move || format!("part-state-{id}")
@@ -6250,6 +6251,10 @@ impl PartStudioView {
                 // Leaving a row only counts while it is the one hovered (going row to row the next row's enter may
                 // come first).
                 let new = if *h { Some(id) } else { None };
+                if !*h && this.ui.rollback_drop_row == Some(id) {
+                    this.ui.rollback_drop_row = None;
+                    cx.notify();
+                }
                 let coming = this.ui.list_hover_next.as_ref().map(|(n, _)| *n).unwrap_or(this.ui.list_hover);
                 if coming == new || (!*h && coming != Some(id)) {
                     return;
@@ -6334,6 +6339,7 @@ impl PartStudioView {
                 let slot = Some((i, e.event.position.y >= e.bounds.center().y));
                 // (No "Rollback bar" tooltip on the dropped bar until the pointer leaves it: qa FEEL-ROLLBACK-DROP-ROW.)
                 this.ui.rollback_tip_off = true;
+                this.ui.rollback_drop_row = Some(id);
                 if this.ui.feature_drop.get() != slot || this.ui.list_hover != Some(id) {
                     this.ui.feature_drop.set(slot);
                     this.ui.list_hover = Some(id);
@@ -6409,7 +6415,7 @@ impl PartStudioView {
         // No row tooltips while a row is dragged: one scheduled over a row the
         // drag passed showed after the drop over the moved row, naming the
         // other (REORDER-MISSING-MSG's stale tooltip).
-        let row = if cx.has_active_drag() { row } else { crate::ui::with_lazy_side_tooltip(row, self.row_anchor(slot), tip) };
+        let row = if cx.has_active_drag() || self.ui.rollback_drop_row == Some(id) { row } else { crate::ui::with_lazy_side_tooltip(row, self.row_anchor(slot), tip) };
         let view = cx.entity();
         // Roll to here unless the bar already sits right after this
         // feature, Roll to end while it isn't at the end (live qa4 r5 s2,

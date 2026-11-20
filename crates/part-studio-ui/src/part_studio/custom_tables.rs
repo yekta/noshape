@@ -20,8 +20,10 @@ use gpui_kit::*;
 use noshape_model::custom::table::{TABLE_ERRORS, TableResult};
 use noshape_model::document::TabId;
 use noshape_model::reference::Reference;
-use std::collections::HashSet;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::Arc;
 
 const BLUE: u32 = 0x1651b0;
@@ -45,6 +47,13 @@ pub struct CtState {
     result: Option<(Stamp, Arc<TableResult>)>,
     task: Option<(Stamp, Task<()>)>,
     pub add: Option<AddState>,
+    /// The right panel's scroll (a table's header sticks to its top).
+    pub panel_scroll: ScrollHandle,
+    /// Each table grid's top in the panel's content (its top less the scroll then) and height, by title, as last laid
+    /// out.
+    pub grid_tops: Rc<RefCell<HashMap<String, (f32, f32)>>>,
+    /// Each table grid's sideways scroll, by title.
+    pub grid_scrolls: RefCell<HashMap<String, ScrollHandle>>,
 }
 
 /// A document at a version in the Add custom tables flyout.
@@ -283,10 +292,11 @@ impl PartStudioView {
                 }
                 cx.notify();
             }));
-        let mut section = v_flex().child(header);
+        let section = v_flex().child(header);
         if !open {
             return section.into_any_element();
         }
+        let mut body = v_flex();
         let grid = gpui_kit::rgb(GRID);
         // Live: 140 px columns + their 1 px right border, a 1 px left border per row.
         // Column widths: live's grips (`ui::col_grip`, 140 px until dragged), per table.
@@ -298,7 +308,6 @@ impl PartStudioView {
                 .relative()
                 .child(crate::ui::col_grip(&key, &c.id, 140.))
         }));
-        section = section.child(h_flex().child(head));
         for (ri, row) in t.rows.iter().enumerate() {
             let entities = row.entities.clone();
             // Multi-line cells (the Hole table's callouts) make the row taller.
@@ -340,9 +349,43 @@ impl PartStudioView {
                     .when_some(error, |d, tip| d.tooltip(crate::ui::tooltip(tip)));
                 r = r.child(cell(widths[ci], content.into_any_element()));
             }
-            section = section.child(r);
+            body = body.child(r);
         }
-        section.into_any_element()
+        // Live 1.223 (rn-1222-1223 st4.json, sticky-h-*.png): scrolling the panel, the 34 px column header stops at
+        // its top while the rows pass under it, until the table's end; the title bar scrolls away. Wider than the
+        // panel, the grid scrolls sideways.
+        let scroll = &self.ui.ct.panel_scroll;
+        let laid = self.ui.ct.grid_tops.borrow().get(&t.title).map(|&(top, h)| (top + f32::from(scroll.offset().y), h));
+        let dy = laid.map_or(0., |(now, h)| (f32::from(scroll.bounds().top()) - now).clamp(0., (h - 34.).max(0.)));
+        // Wider than the panel, the sideways scrollbar (16 px, 18 under the pointer) sits under the grid, pinned to
+        // the panel's bottom while the grid's own bottom is out of view.
+        let sideways = self.ui.ct.grid_scrolls.borrow_mut().entry(t.title.clone()).or_default().clone();
+        let bar = super::sheet_metal_panel::h_scrollbar(&sideways, 16., 18., cx).map(|bar| {
+            let (now, h) = laid.unwrap_or((0., 0.));
+            let y = (f32::from(scroll.bounds().bottom()) - now - 16.).min(h).max(34_f32.min(h));
+            div().absolute().left_0().right_0().top(px(y)).h(px(16.)).debug_selector({
+                let title = t.title.clone();
+                move || format!("table-hscroll:{title}")
+            }).child(div().absolute().left_0().right_0().bottom_0().child(bar))
+        });
+        let (tops, handle, key) = (self.ui.ct.grid_tops.clone(), scroll.clone(), t.title.clone());
+        let measure = canvas(
+            move |b, _, _| {
+                tops.borrow_mut().insert(key, (f32::from(b.top() - handle.offset().y), f32::from(b.size.height)));
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .top_0()
+        .left_0()
+        .size_full();
+        let grid = div().relative().pt(px(34.)).child(body).child(measure).child(div().absolute().left_0().top(px(dy)).debug_selector({
+            let title = t.title.clone();
+            move || format!("table-head:{title}")
+        }).child(h_flex().child(head)));
+        let wide = bar.is_some();
+        let grid = div().id(("ct-grid", index)).flex().overflow_x_scroll().track_scroll(&sideways).child(grid.flex_none());
+        section.child(div().relative().when(wide, |d| d.pb(px(16.))).child(grid).children(bar)).into_any_element()
     }
 
     /// The footer's Add custom tables (shown with tables; live 632).

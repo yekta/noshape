@@ -318,6 +318,9 @@ pub struct UiState {
     pub rollback_hovered: Option<usize>,
     /// The rollback bar was just dragged: no tooltip on it until the pointer leaves it (live cov-1120 R8).
     pub rollback_tip_off: bool,
+    /// The row the rollback bar was dropped on: no tooltip on it until the pointer leaves it, its hover band kept
+    /// (live rollback-drop-tip-1120: none in 2.2 s, nor after a 1 px move).
+    pub rollback_drop_row: Option<noshape_model::reference::FeatureId>,
     /// The edited sketch's splines were given handle arms on entry: regenerate once the display is applied.
     pub regen_for_arms: bool,
     /// The last toast that hides by itself (`flash_for`): Esc drops it.
@@ -882,6 +885,7 @@ impl UiState {
             rollback_keyboard: None,
             rollback_hovered: None,
             rollback_tip_off: false,
+            rollback_drop_row: None,
             regen_for_arms: false,
             flashed: None,
             dependencies: None,
