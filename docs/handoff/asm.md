@@ -25,10 +25,10 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
     infento run.
   - parity.rs nested Derived sources as Arc (`fetched_derived_sources`) + big_assembly_perf.rs
     `suite_assembly_open_profile`: commit with the scissor rerun.
-- Running: isaac open profile on vibex8 (waiting for the slot since 04:41; output ~/agents/asm-keep/isaac-profile.out)
-  -> top 5 studios / features with ms to the lead.
+- Isaac open profile reported 05:3x (vibe2 ~/agents/asm-keep/isaac-profile.out): 171 s sequential, display ≈3.7 s; top:
+  850efe Fillet 3 30.2 s (Error), de4eff Mirror 1 14.6 s, 8f5622 Gear Lab 14.1 s, Fillet 6 ×4 studios ~7 s each.
 - FEEL-ASM-DRAG-START: live drag-delay-1120 withdrew A1b (2 px / 50 ms, whole delta; the 0.6 s was software GL + round trip): 15 px reverted to 2 px (uncommitted, test renamed _past_2_px_); qa told to re-walk DEAD-ZONE after 5bfaa556.
-- Next: (1) profile report; (2) scissor traced rerun with the Arc fix (4ce5c7 / 5aae43 / fed22d / 57725f should
+- Next: (1) land the 2 local commits after 5bfaa556; (2) scissor traced rerun with the Arc fix (4ce5c7 / 5aae43 / fed22d / 57725f should
   build); (3) infento composites (below).
 
 ### Landed today (702c9878: Display states Esc, driver-mate named position, paste; d671313d; 335f8e43; 9f52415c; 123ca4b3 free drag)
