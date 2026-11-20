@@ -340,6 +340,22 @@ fn arguments_sharing_sub_shapes_keep_them_as_occt() {
     assert_eq!(k::bool_corpus::Summary::of(&r).differences(&c.summary), Vec::<String>::new());
 }
 
+/// Three rings revolved whole (a recorded fuse of a revolve's regions), each two tori, the inner one the ring's hollow:
+/// tori whose frames are left-handed (normals in where their faces aren't reversed) are told solid or void by where
+/// their normal points; voids in a result of several solids noshape's Boolean leaves to OCCT: three solids (were six,
+/// three inside out: the revolve failed).
+#[test]
+fn whole_torus_shells_in_left_handed_frames_are_voids_where_their_normals_point_in() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "2b68c8a5422a54b2").expect("the recorded fuse");
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("fused");
+    assert_eq!(r.shape.count(k::ShapeType::Solid), 3);
+    assert!(!r.shape.has_inside_out_solid());
+    let v = r.shape.volume().unwrap();
+    assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-6 * c.summary.volume, "volume {v}");
+}
+
 /// Arguments sharing a corner where only faces on one plane of each meet it (a recorded fuse): OCCT keeps or remakes
 /// such a shape as its rounding falls (here keeps; at the mirror image of another such corner it remakes). noshape's
 /// Boolean takes it: OCCT's result, the shared shapes remade at their places (Modified where OCCT says Kept: lead 11-17).
