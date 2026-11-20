@@ -643,7 +643,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "datum_target",
             summary: "Datum target: area, style, origin and its distances",
-            description: "The Datum dialog's Datum target tab, ✓ once per call (\"Datum target\"): the target at `anchor` (sheet mm; on a view's geometry it follows the view, in space a sheet point), its callout at `position` (at least 4 mm away), labelled the next set's first (A1, then B1…) unless `label`. `origin` (a point of the target's view) positions it: Length by `distance_x` along the X direction (the view's, or `x_edge`'s / a quarter turn clockwise from `y_edge`'s straight edge) and `distance_y` across it, `flip_x` / `flip_y` putting each on the other side; Angle by `diameter_distance` round the origin and `angle` (deg) from the reference (the view's X, or `reference_edge`), `flip` / `rotate` measuring the other way round or from the reference's other end, with `instances` targets spaced round the origin and `radial_lines`. Distances not given keep the target where it is (the flips from its side). A Custom area outlines the closed region round the target and has no origin. A new target shows no dimensions until drawing_annotation_edit show_dimensions.",
+            description: "The Datum dialog's Datum target tab, ✓ once per call (\"Datum target\"): the target at `anchor` (sheet mm; on a view's geometry it follows the view, in space a sheet point), its callout at `position` (at least 4 mm away), labelled the next set's first (A1, then B1…) unless `label`. `origin` (a point of the target's view) positions it: Length by `distance_x` along the X direction (the view's, or `x_edge`'s / a quarter turn clockwise from `y_edge`'s straight edge) and `distance_y` across it, `flip_x` / `flip_y` putting each on the other side; Angle by `diameter_distance` round the origin and `angle` (deg) from the reference (the view's X, or `reference_edge`), `flip` / `rotate` measuring the other way round or from the reference's other end, with `instances` targets spaced round the origin (the other way with `opposite_direction`) and `radial_lines`. Distances not given keep the target where it is (the flips from its side). A Custom area outlines the closed region round the target and has no origin. A new target shows no dimensions until drawing_annotation_edit show_dimensions.",
             fields: with(
                 common(),
                 vec![
@@ -671,6 +671,7 @@ pub fn ops() -> Vec<Op> {
                     opt("rotate", json!({ "type": "boolean", "default": false }), "Angle: measured from the reference's other end."),
                     opt("instances", json!({ "type": "integer", "minimum": 1, "maximum": 64, "default": 1 }), "Angle: Instance count."),
                     opt("radial_lines", json!({ "type": "boolean", "default": false }), "Angle: Radial lines."),
+                    opt("opposite_direction", json!({ "type": "boolean", "default": false }), "Angle: the instances go round the other way."),
                     opt("precision_1", json!({ "type": ["integer", "string"] }), "X / Diameter distance decimals 0–6, or \"drawing\"."),
                     opt("precision_2", json!({ "type": ["integer", "string"] }), "Y distance / Angle decimals 0–6, or \"drawing\"."),
                 ],
@@ -1686,6 +1687,7 @@ fn datum_target(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     o.precisions = [decimals_arg(a, "precision_1")?, decimals_arg(a, "precision_2")?];
     o.angle_rotate = a.bool_or("rotate", false)?;
     o.radial_lines = a.bool_or("radial_lines", false)?;
+    o.instances_reverse = a.bool_or("opposite_direction", false)?;
     o.instances = a.opt_u64("instances")?.unwrap_or(1).clamp(1, 64) as u32;
     let edge = |name: &str| -> Result<Option<[f64; 2]>, OpError> {
         let Some(v) = a.get(name) else { return Ok(None) };

@@ -2263,6 +2263,9 @@ pub struct DatumTargetOpts {
     pub angle_flip: bool,
     pub angle_rotate: bool,
     pub instances: u32,
+    /// Instance count's Opposite direction (live a34-1699 14): the
+    /// instances go round the other way.
+    pub instances_reverse: bool,
     /// Target area Custom: the picked region's outline (view coordinates),
     /// cross-hatched dashed (live 1699 (e)).
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -2279,7 +2282,7 @@ fn no_precisions(p: &[Option<u8>; 2]) -> bool {
 
 impl Default for DatumTargetOpts {
     fn default() -> Self {
-        Self { style: TargetStyle::default(), origin: None, origin_ref: None, angular: false, flip_x: false, flip_y: false, hide_dims: true, x_dir: None, radial_lines: false, ref_dir: None, angle_flip: false, angle_rotate: false, instances: 1, region: Vec::new(), precisions: [None; 2] }
+        Self { style: TargetStyle::default(), origin: None, origin_ref: None, angular: false, flip_x: false, flip_y: false, hide_dims: true, x_dir: None, radial_lines: false, ref_dir: None, angle_flip: false, angle_rotate: false, instances: 1, instances_reverse: false, region: Vec::new(), precisions: [None; 2] }
     }
 }
 
@@ -2296,10 +2299,10 @@ impl DatumTargetOpts {
     }
 
     /// Angle mode: the instances' turns about the origin (radians, the
-    /// first 0), clockwise when flipped.
+    /// first 0), clockwise when flipped or reversed (not both).
     pub fn instance_turns(&self) -> Vec<f64> {
         let n = self.instances.max(1);
-        let s = if self.angle_flip { -1.0 } else { 1.0 };
+        let s = if self.angle_flip != self.instances_reverse { -1.0 } else { 1.0 };
         (0..n).map(|k| s * std::f64::consts::TAU * f64::from(k) / f64::from(n)).collect()
     }
 

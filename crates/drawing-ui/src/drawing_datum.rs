@@ -408,16 +408,22 @@ impl DrawingEditor {
                     .px(px(4.))
                     .child(Input::new(st).text_size(px(12.)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall().text_center()),
             )
-            .child(self.target_precision(row, i, cur, cx))
+            .child(self.target_precision(row, i, cur, st.read(cx).value().trim().is_empty(), cx))
             .into_any_element()
     }
 
-    fn target_precision(&self, row: usize, i: usize, cur: Option<u8>, cx: &mut Context<Self>) -> AnyElement {
+    /// Live (uip drw-datum-target-panel-lists s22-24): beside an empty field the ▾ opens no list.
+    fn target_precision(&self, row: usize, i: usize, cur: Option<u8>, empty: bool, cx: &mut Context<Self>) -> AnyElement {
         let ed = cx.entity();
+        let button = Button::new(SharedString::from(format!("dt-prec-{row}-{i}"))).ghost().w(px(20.)).h(px(25.)).border_1().border_l_0().border_color(gpui_kit::rgb(0xcccccc)).rounded_r(px(2.)).rounded_l(px(0.)).bg(gpui_kit::rgb(0xffffff)).p_0().child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., gpui_kit::rgb(0x000000)));
+        if empty {
+            return div().id(SharedString::from(format!("dt-prec-tip-{row}-{i}"))).debug_selector(move || format!("dt-prec-{row}-{i}")).tooltip(crate::ui::tooltip("Precision")).child(button).into_any_element();
+        }
         div()
             .id(SharedString::from(format!("dt-prec-tip-{row}-{i}")))
+            .debug_selector(move || format!("dt-prec-{row}-{i}"))
             .tooltip(crate::ui::tooltip("Precision"))
-            .child(Button::new(SharedString::from(format!("dt-prec-{row}-{i}"))).ghost().w(px(20.)).h(px(25.)).border_1().border_l_0().border_color(gpui_kit::rgb(0xcccccc)).rounded_r(px(2.)).rounded_l(px(0.)).bg(gpui_kit::rgb(0xffffff)).p_0().child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., gpui_kit::rgb(0x000000))).os_dropdown_menu(SharedString::from(format!("dt-prec-dd-{row}-{i}")), true, move |mut m, _, _| {
+            .child(button.os_dropdown_menu(SharedString::from(format!("dt-prec-dd-{row}-{i}")), true, move |mut m, _, _| {
                 for &(l, p) in &PRECISIONS {
                     let e = ed.clone();
                     m = m.item(crate::os_menu::OsMenuItem::new(l).checked(cur == p).on_click(move |_, _, cx| {
@@ -440,10 +446,9 @@ impl DrawingEditor {
 
     pub fn render_datum_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let d = self.datum_dlg.as_ref()?;
-        // The X / Y flips' tip as `texts` (the drawing matrix; live drawing-datum-target-after).
-        let flips = d.rows.iter().any(|r| !r.ann.target.as_ref().is_some_and(|t| t.angular));
+        // The X / Y flips' and the instances' tip as `texts` (the drawing matrix; live drawing-datum-target-after).
         let empty = d.label_text.is_empty() || d.rows.iter().any(|r| r.ann.target.as_ref().is_some_and(|t| t.angular) && r.count.read(cx).value().trim().is_empty());
-        let texts: Vec<&str> = [(flips, "Opposite direction"), (!d.rows.is_empty(), "Precision"), (empty, "This field cannot be empty")].into_iter().filter_map(|(on, t)| on.then_some(t)).collect();
+        let texts: Vec<&str> = [(!d.rows.is_empty(), "Opposite direction"), (!d.rows.is_empty(), "Precision"), (empty, "This field cannot be empty")].into_iter().filter_map(|(on, t)| on.then_some(t)).collect();
         crate::ui_script::note_dialog(|| crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Datum", "texts": texts }), datum_dlg_texts(d)));
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);
@@ -734,11 +739,26 @@ impl DrawingEditor {
                             })
                             .when(opts.angular, |e| {
                                 let invalid = opts.origin.is_some() && !matches!(opts.origin_ref, Some(noshape_model::drawing::PointRef::Center { .. }));
-                                // Live (px-datum-dt-angle): a caption over a 20 px icon button, as the X / Y flips.
+                                // Live (px-datum-dt-angle, a34-1699 10-15, uip panel-lists s21): a caption over a 20 px icon
+                                // button, as the X / Y flips; Flip, Rotate and the instances wait for an origin.
+                                let has_origin = opts.origin.is_some();
                                 let toggle = |id: (&'static str, usize), label: &'static str, on: bool, cx: &mut Context<Self>, f: OnToggle| {
                                     let tip = if label == "Flip" { "Flip measurement from reference line" } else { "Rotate angle measurement" };
+                                    let icon = if label == "Flip" { "flip-direction" } else { "flip-circular-opposite" };
                                     v_flex().w(px(25.)).items_center().child(div().text_size(px(10.)).whitespace_nowrap().child(label)).child(
-                                        div().id(id).tooltip(crate::ui::tooltip(tip)).size(px(20.)).flex().items_center().justify_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).when(on, |e| e.bg(gpui_kit::rgb(0xdfe7ee))).cursor_pointer().child(div().text_size(px(11.)).child(if label == "Flip" { "⤢" } else { "↻" })).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| f(this, window, cx))),
+                                        div()
+                                            .id(id)
+                                            .tooltip(crate::ui::tooltip(tip))
+                                            .size(px(20.))
+                                            .flex()
+                                            .items_center()
+                                            .justify_center()
+                                            .rounded(px(2.))
+                                            .border_1()
+                                            .border_color(gpui_kit::rgb(if has_origin { 0xcccccc } else { 0xe0e0e0 }))
+                                            .bg(gpui_kit::rgb(if on { 0xdfe7ee } else { 0xffffff }))
+                                            .child(crate::assets::icon_inked(icon, 16., if has_origin { 0x616b73 } else { 0xb4b9bd }, cx))
+                                            .when(has_origin, |e| e.cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, window, cx| f(this, window, cx)))),
                                     )
                                 };
                                 e.when(invalid, |e| e.child(div().text_size(px(11.)).text_color(gpui_kit::rgb(0xd0021b)).child("Invalid origin selected. Angle datum target origin must be an arc or circle center.")))
@@ -758,20 +778,50 @@ impl DrawingEditor {
                                         cx.notify();
                                     })))
                                     .child(h_flex().mt(px(2.)).h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Angle:")).child(self.target_distance(&r.y, k, 1, opts.precisions[1], cx)))
-                                    // Live (dom drawing-datum-target-after): an emptied count is invalid (red), "This field cannot be empty".
+                                    // Live (dom drawing-datum-target-after): an emptied count is invalid (red), "This field cannot be
+                                    // empty"; an underlined field and its Opposite direction button (FlipInstancesDirection), on with
+                                    // an origin and two or more instances (a34-1699 10 / 14).
                                     .child({
                                         let empty = r.count.read(cx).value().trim().is_empty();
-                                        h_flex().mt(px(2.)).h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Instance count:")).child(
-                                            div()
-                                                .id(("dt-count", k))
-                                                .flex_1()
-                                                .border_1()
-                                                .border_color(gpui_kit::rgb(if empty { 0xd9534f } else { 0xcccccc }))
-                                                .rounded(px(2.))
-                                                .px(px(4.))
-                                                .when(empty, |e| e.tooltip(crate::ui::tooltip("This field cannot be empty")))
-                                                .child(Input::new(&r.count).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall()),
-                                        )
+                                        let rev_on = has_origin && opts.instances > 1;
+                                        h_flex()
+                                            .mt(px(2.))
+                                            .h(px(26.))
+                                            .gap(px(6.))
+                                            .child(div().text_size(px(12.)).child("Instance count:"))
+                                            .child(
+                                                div()
+                                                    .id(("dt-count", k))
+                                                    .flex_1()
+                                                    .border_b_1()
+                                                    .border_color(gpui_kit::rgb(if empty { 0xd9534f } else { 0xcccccc }))
+                                                    .px(px(4.))
+                                                    .when(empty, |e| e.tooltip(crate::ui::tooltip("This field cannot be empty")))
+                                                    .child(Input::new(&r.count).text_size(px(13.33)).text_color(gpui_kit::rgb(if has_origin { 0x555555 } else { 0xaaaaaa })).appearance(false).xsmall().disabled(!has_origin)),
+                                            )
+                                            .child(
+                                                div()
+                                                    .id(("dt-irev", k))
+                                                    .tooltip(crate::ui::tooltip("Opposite direction"))
+                                                    .size(px(25.))
+                                                    .flex()
+                                                    .items_center()
+                                                    .justify_center()
+                                                    .rounded(px(2.))
+                                                    .border_1()
+                                                    .border_color(gpui_kit::rgb(0xcccccc))
+                                                    .bg(gpui_kit::rgb(if !rev_on { 0xf0f0f0 } else if opts.instances_reverse { 0xdfe7ee } else { 0xffffff }))
+                                                    .child(crate::assets::icon_inked("flip-circular-opposite", 18., if rev_on { 0x616b73 } else { 0xb4b9bd }, cx))
+                                                    .when(rev_on, |e| {
+                                                        e.cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                                            if let Some(r) = this.datum_dlg.as_mut().and_then(|d| d.rows.get_mut(k)) {
+                                                                let o = r.ann.target.get_or_insert_with(Default::default);
+                                                                o.instances_reverse = !o.instances_reverse;
+                                                            }
+                                                            this.datum_preview(cx);
+                                                        }))
+                                                    }),
+                                            )
                                     })
                                     .child(
                                         h_flex()

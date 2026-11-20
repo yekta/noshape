@@ -1878,3 +1878,43 @@ fn a_datum_targets_origin_field_stays_active_once_picked(cx: &mut TestAppContext
     click(cx, [5.0, 5.0]);
     assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::DatumTarget { anchor: Some(_) })), "a click in space starts the next target");
 }
+
+/// Live drw-datum-target-panel-lists s22-24: in Angle mode with no origin the Diameter distance is empty and its
+/// Precision ▾ opens no list; once the origin fills it, the ▾ lists the precisions.
+#[gpui::test]
+fn an_empty_target_distances_precision_opens_no_list(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_scene::drawing_tools::Tool;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "dt-prec-empty");
+    real_sheet(cx, window, &editor);
+    let (a, b) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let bt = e.built.as_ref().expect("built");
+        let l = bt.geometry.lines.iter().find(|l| l.points.len() >= 2 && matches!(bt.picks.get(l.pick as usize), Some(PickTarget::Edge { .. }))).expect("a view edge");
+        (l.points[0], l.points[l.points.len() - 1])
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::DatumTarget { anchor: None }, cx)));
+    draw(cx, window);
+    let click = |cx: &mut TestAppContext, at: [f64; 2]| {
+        cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+            e.cursor = at;
+            e.extra_tool_click(w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+    };
+    click(cx, a);
+    click(cx, [a[0] + 15.0, a[1] + 15.0]);
+    cx.update(|cx| editor.update(cx, |e, _| {
+        if let Some(r) = e.datum_dlg.as_mut().and_then(|d| d.rows.first_mut()) {
+            r.ann.target.get_or_insert_with(Default::default).angular = true;
+        }
+    }));
+    draw(cx, window);
+    press(cx, window, "dt-prec-0-0");
+    assert!(!cx.update(|cx| crate::os_menu::is_open(cx)), "an empty Diameter distance's ▾ opens no list");
+    click(cx, b);
+    press(cx, window, "dt-prec-0-0");
+    assert!(cx.update(|cx| crate::os_menu::is_open(cx)), "a filled one lists the precisions");
+}

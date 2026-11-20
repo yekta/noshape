@@ -5011,7 +5011,7 @@ Examples:
 
 Datum target: area, style, origin and its distances (edits the document (one undoable history entry)).
 
-The Datum dialog's Datum target tab, ✓ once per call ("Datum target"): the target at `anchor` (sheet mm; on a view's geometry it follows the view, in space a sheet point), its callout at `position` (at least 4 mm away), labelled the next set's first (A1, then B1…) unless `label`. `origin` (a point of the target's view) positions it: Length by `distance_x` along the X direction (the view's, or `x_edge`'s / a quarter turn clockwise from `y_edge`'s straight edge) and `distance_y` across it, `flip_x` / `flip_y` putting each on the other side; Angle by `diameter_distance` round the origin and `angle` (deg) from the reference (the view's X, or `reference_edge`), `flip` / `rotate` measuring the other way round or from the reference's other end, with `instances` targets spaced round the origin and `radial_lines`. Distances not given keep the target where it is (the flips from its side). A Custom area outlines the closed region round the target and has no origin. A new target shows no dimensions until drawing_annotation_edit show_dimensions.
+The Datum dialog's Datum target tab, ✓ once per call ("Datum target"): the target at `anchor` (sheet mm; on a view's geometry it follows the view, in space a sheet point), its callout at `position` (at least 4 mm away), labelled the next set's first (A1, then B1…) unless `label`. `origin` (a point of the target's view) positions it: Length by `distance_x` along the X direction (the view's, or `x_edge`'s / a quarter turn clockwise from `y_edge`'s straight edge) and `distance_y` across it, `flip_x` / `flip_y` putting each on the other side; Angle by `diameter_distance` round the origin and `angle` (deg) from the reference (the view's X, or `reference_edge`), `flip` / `rotate` measuring the other way round or from the reference's other end, with `instances` targets spaced round the origin (the other way with `opposite_direction`) and `radial_lines`. Distances not given keep the target where it is (the flips from its side). A Custom area outlines the closed region round the target and has no origin. A new target shows no dimensions until drawing_annotation_edit show_dimensions.
 
 Examples:
 
@@ -5049,6 +5049,7 @@ Examples:
 | `rotate` | boolean |  | Angle: measured from the reference's other end. |
 | `instances` | integer |  | Angle: Instance count. |
 | `radial_lines` | boolean |  | Angle: Radial lines. |
+| `opposite_direction` | boolean |  | Angle: the instances go round the other way. |
 | `precision_1` | integer or string |  | X / Diameter distance decimals 0–6, or "drawing". |
 | `precision_2` | integer or string |  | Y distance / Angle decimals 0–6, or "drawing". |
 

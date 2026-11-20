@@ -3216,6 +3216,11 @@ fn datum_target_angle_mode() {
     let four = DatumTargetOpts { instances: 4, ..o.clone() };
     let turns: Vec<f64> = four.instance_turns().iter().map(|t| t.to_degrees().round()).collect();
     assert_eq!(turns, [0.0, 90.0, 180.0, 270.0]);
+    // Instance count's Opposite direction goes round the other way; with Flip, back again.
+    let rev = DatumTargetOpts { instances_reverse: true, ..four.clone() };
+    let turns: Vec<f64> = rev.instance_turns().iter().map(|t| t.to_degrees().round()).collect();
+    assert_eq!(turns, [0.0, -90.0, -180.0, -270.0]);
+    assert_eq!(DatumTargetOpts { angle_flip: true, ..rev }.instance_turns(), four.instance_turns());
     assert_eq!((DatumTargetOpts::instance_label("A1", 3), DatumTargetOpts::instance_label("B", 1)), ("A4".to_string(), "B2".to_string()));
     // An origin on a vertex (no circle center): red.
     let mut doc = crate::Document::new();
