@@ -1503,5 +1503,50 @@
   "url": "https://cad.onshape.com/documents/435360f2c69d9c6b7681298d/w/b5021707307c3d238aa3ddeb/e/2e475ac608d97c94198204a8",
   "title": "Untitled document",
   "original": "https://cad.onshape.com/documents/8f35c5a91d33e0107c4cc00b/w/c615b2e75d24860fcd79ef04/e/05e9e3934f8e39f04ce1e2fb"
+ },
+ {
+  "name": "c2-opt-fillet-partial-asym-smooth",
+  "document": "302f3f622e3784395e99c4e8",
+  "workspace": "4cd5945617338f8610d42fee",
+  "element": "af661150005414933a855238",
+  "url": "https://cad.onshape.com/documents/302f3f622e3784395e99c4e8/w/4cd5945617338f8610d42fee/e/af661150005414933a855238",
+  "title": "opt-fillet-partial-asym-smooth",
+  "original": "https://cad.onshape.com/documents/8dcbda2d9ce46a05914bcb5c/w/bb9566ca1e0b2420222e3d11/e/9a9b170c11723444259ac0be"
+ },
+ {
+  "name": "c2-opt-sweep-twist-scale",
+  "document": "a09856096694955789fc156b",
+  "workspace": "8eacd702047e5ae79c1e70da",
+  "element": "4c309ecce1da0e0a217a8027",
+  "url": "https://cad.onshape.com/documents/a09856096694955789fc156b/w/8eacd702047e5ae79c1e70da/e/4c309ecce1da0e0a217a8027",
+  "title": "opt-sweep-twist-scale",
+  "original": "https://cad.onshape.com/documents/2117539fb1ad44621aae2f9f/w/7e8f9a81e4a000dbb474aeeb/e/623ff18c812efe51479aafa3"
+ },
+ {
+  "name": "c2-opt-sweep-lock-direction",
+  "document": "40acac5a2bb8b590278e3498",
+  "workspace": "e650784ff5d16114f2bfb446",
+  "element": "c6af285d4e73755b16b99ff0",
+  "url": "https://cad.onshape.com/documents/40acac5a2bb8b590278e3498/w/e650784ff5d16114f2bfb446/e/c6af285d4e73755b16b99ff0",
+  "title": "opt-sweep-lock-direction",
+  "original": "https://cad.onshape.com/documents/eee25b827b1776540b50088a/w/c4ebb42b8e4f3d6f138c184c/e/022248dc5051ae19ee22b31e"
+ },
+ {
+  "name": "c2-opt-hole-standards-ends",
+  "document": "ba046dc9ed4a33579b5e91e3",
+  "workspace": "945cc29b28b8272c1858dcb7",
+  "element": "070bdc5a1d95207473c8ca07",
+  "url": "https://cad.onshape.com/documents/ba046dc9ed4a33579b5e91e3/w/945cc29b28b8272c1858dcb7/e/070bdc5a1d95207473c8ca07",
+  "title": "opt-hole-standards-ends",
+  "original": "https://cad.onshape.com/documents/3dab2c754219edc923219111/w/9d8d967ae323913b3470b7fa/e/6b72da32d657345157e8c264"
+ },
+ {
+  "name": "c2-opt-pattern-skip-centred",
+  "document": "97090bf9080a13b17cc75501",
+  "workspace": "97b83e8ff9bc5822900e0aac",
+  "element": "c139e4962dd74b52522eace6",
+  "url": "https://cad.onshape.com/documents/97090bf9080a13b17cc75501/w/97b83e8ff9bc5822900e0aac/e/c139e4962dd74b52522eace6",
+  "title": "opt-pattern-skip-centred",
+  "original": "https://cad.onshape.com/documents/b148971c702e8aad5f3fd601/w/e4ae2511a34654d8164c5367/e/01878fb75eccd0c7d6ff8570"
  }
 ]
