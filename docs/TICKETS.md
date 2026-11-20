@@ -1421,6 +1421,11 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
 - Known, not blocking (ticket documents): P0 COMPAT-RUSTZERO-FILLET1 (rust-zero-solid-f197 Fillet 1 Ok in v0.4.62 -> Error; blend
   bisecting); P1 COMPAT-CRASH957-CHAMFER3 (Chamfer 3 Ok in v0.4.62 -> Error from 0a0b9a49; bool). Better than v0.4.62: britatap and
   mutualtrim Fillet 1, workshop-pipe Fillet - Outer Error -> Ok; crash957 Fillet 2 / workshop-pipe Fillet - Inner Errors reworded.
+- Published (qa 21:01, compat/published-0.4.63.txt, rel-0.4.63.txt): v0.4.63 assets match SHA256SUMS; the released CLI regenerates the
+  user documents as the candidate (ALL-SAME); QUIT-ABORT-DOCK x5 rc 0; compat baseline -> 0.4.63. Against v0.4.62: user documents only the
+  accepted dock B Govde change; ticket documents RUSTZERO and CRASH957 as listed (both fixed on main after the cut: blend 19fa1ed6, verified;
+  bool 43c2644a, waiting for a green), cli-fillet-segv as accepted, and shape-only with the same statuses: cli-shell-gpf 3 parts 56213.73 ->
+  56210.25 mm³ (6e-5), rust-union-point-touch Part 1 9 -> 8 vertices (same volume).
 
 ## Release blockers for the 2026-11-20 05:00 release (qa 05:05: GO on green 2a43b78b vs v0.4.61)
 - Held 04:0x for core's singularities Sketch 2 fix (2f4f3bc5, landed 04:19 as a2e7c966). On 2a43b78b: userdocs (hats, dock) ALL-SAME, edits
