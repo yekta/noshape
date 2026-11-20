@@ -97,11 +97,22 @@ pub fn spinner(size: f32) -> impl IntoElement {
     spinner_ring(size, 13.5 * size / 41.)
 }
 
+/// One turn of the spinner.
+pub const SPINNER_TURN: Duration = Duration::from_millis(1100);
+
+/// The spinner's arcs at `t` (0 to 1) into a turn, drawn in order: (from, to radians clockwise from 3 o'clock, colour):
+/// the whole grey ring, then the blue quarter turning with it.
+pub fn spinner_arcs(t: f32) -> [(f32, f32, Rgba); 2] {
+    let tau = std::f32::consts::TAU;
+    let start = t * tau - tau / 4.;
+    [(0., tau, rgb(0xd7d7d7)), (start, start + tau / 4., rgb(0x1651b0))]
+}
+
 /// Onshape's spinner (live2 11-18, computed CSS): a 30 px circle, its 3 px ring rgb(215,215,215) with a quarter in
 /// rgb(22,81,176), turning once in 1.1 s; `r` the ring's middle radius in a `size` px box.
 pub fn spinner_ring(size: f32, r: f32) -> impl IntoElement {
     let scale = r / 13.5;
-    div().size(px(size)).flex_none().with_animation(SharedString::from(format!("pending-spinner-{size}")), Animation::new(Duration::from_millis(1100)).repeat(), move |d, t| {
+    div().size(px(size)).flex_none().with_animation(SharedString::from(format!("pending-spinner-{size}")), Animation::new(SPINNER_TURN).repeat(), move |d, t| {
         d.child(
             canvas(
                 |_, _, _| {},
@@ -119,10 +130,9 @@ pub fn spinner_ring(size: f32, r: f32) -> impl IntoElement {
                             window.paint_path(path, color);
                         }
                     };
-                    let tau = std::f32::consts::TAU;
-                    ring(0., tau, rgb(0xd7d7d7), window);
-                    let start = t * tau - tau / 4.;
-                    ring(start, start + tau / 4., rgb(0x1651b0), window);
+                    for (from, to, color) in spinner_arcs(t) {
+                        ring(from, to, color, window);
+                    }
                 },
             )
             .size_full(),
@@ -195,7 +205,21 @@ fn evict(dir: &Path, cap: u64) {
 
 #[cfg(test)]
 mod tests {
-    use super::{evict, load, path, store};
+    use super::{SPINNER_TURN, evict, load, path, spinner_arcs, store};
+
+    /// Live2 spinner 11-18 (computed CSS): a grey rgb(215,215,215) ring under a blue rgb(22,81,176) quarter that turns
+    /// once in 1.1 s, starting at 12 o'clock.
+    #[test]
+    fn the_spinner_is_a_grey_ring_with_a_blue_quarter_turning_in_1_1_s() {
+        let tau = std::f32::consts::TAU;
+        assert_eq!(SPINNER_TURN, std::time::Duration::from_millis(1100));
+        let [ring, quarter] = spinner_arcs(0.);
+        assert_eq!((ring.0, ring.1, ring.2), (0., tau, gpui_kit::rgb(0xd7d7d7)), "the whole ring, grey");
+        assert_eq!(quarter.2, gpui_kit::rgb(0x1651b0), "the quarter, blue");
+        assert!((quarter.0 + tau / 4.).abs() < 1e-6 && (quarter.1 - quarter.0 - tau / 4.).abs() < 1e-6, "a quarter from 12 o'clock: {quarter:?}");
+        let [_, half] = spinner_arcs(0.5);
+        assert!((half.0 - quarter.0 - tau / 2.).abs() < 1e-5, "half a turn on at t = 0.5: {half:?}");
+    }
 
     /// The least recently used go first, until the cache fits.
     #[test]

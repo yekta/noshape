@@ -199,3 +199,74 @@ fn tab_after_a_new_name_adds_the_variable(cx: &mut TestAppContext) {
     keys(cx, window, &["h", "enter"]);
     assert_eq!(names(cx, &view), ["w", "d", "h"], "the next typing was a new name");
 }
+
+/// A press and release at `at` as the `count`-th click.
+fn click_at(cx: &mut TestAppContext, window: AnyWindowHandle, at: Point<gpui_kit::Pixels>, count: usize) {
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let none = gpui_kit::Modifiers::default();
+    vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: none, click_count: count, first_mouse: false });
+    vcx.simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: none, click_count: count });
+    draw(cx, window);
+}
+
+/// Live feel cov-1120 V1: a double-click on a Value cell edits it with its whole text selected; Esc reverts and keeps
+/// the cell selected; an edit is committed by a click on another cell; a second single click on the selected cell
+/// doesn't edit.
+#[gpui::test]
+fn a_double_clicked_value_edits_all_selected_esc_reverts_a_click_away_commits(cx: &mut TestAppContext) {
+    let (window, view) = studio(cx, "value-dblclick");
+    keys(cx, window, &["h", "enter"]);
+    let cell = |cx: &mut TestAppContext, i: usize| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(["vs-val-0", "vs-val-1"][i]).expect("the value cell").center();
+    let state = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let input = v.inputs.get("e0").map(|(st, _)| (st.read(cx).value().to_string(), st.read(cx).selected_range()));
+            (v.cell_editing.clone(), v.cell_selected.clone(), input)
+        })
+    };
+    let w = cell(cx, 0);
+    click_at(cx, window, w, 1);
+    click_at(cx, window, w, 2);
+    assert_eq!(state(cx), (Some("e0".into()), Some("e0".into()), Some(("10 mm".into(), 0..5))), "(editing, selected, (text, selection)) after the double-click");
+    keys(cx, window, &["2"]);
+    keys(cx, window, &["escape"]);
+    let (editing, selected, input) = state(cx);
+    assert_eq!((editing, selected, input.map(|i| i.0)), (None, Some("e0".into()), Some("10 mm".into())), "(editing, selected, text) after Esc");
+    click_at(cx, window, w, 1);
+    click_at(cx, window, w, 2);
+    keys(cx, window, &["end", " ", "+", " ", "1", " ", "m", "m"]);
+    let h = cell(cx, 1);
+    click_at(cx, window, h, 1);
+    let w_value = cx.update(|cx| view.read(cx).studio(cx).and_then(|s| s.variables.first().map(|v| v.expr.text.clone())));
+    assert_eq!((w_value.as_deref(), state(cx).0), (Some("10 mm + 1 mm"), None), "(w, editing) after a click on h's value");
+    cx.executor().advance_clock(std::time::Duration::from_millis(900));
+    let h = cell(cx, 1);
+    click_at(cx, window, h, 1);
+    assert_eq!(state(cx).0, None, "a second single click on the selected cell edits it");
+}
+
+/// Live feel cov-1120 V2: "#" in a Value cell lists only the variables above its row, with no "New variable…".
+#[gpui::test]
+fn the_value_cells_hash_list_holds_the_variables_above_only(cx: &mut TestAppContext) {
+    let (window, view) = studio(cx, "value-hash");
+    keys(cx, window, &["h", "enter"]);
+    keys(cx, window, &["d", "enter"]);
+    let list = |cx: &mut TestAppContext, key: &str| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_cell_edit(key, None, w, cx))).unwrap();
+        draw(cx, window);
+        keys(cx, window, &["backspace", "#"]);
+        let got = cx.update(|cx| {
+            view.read(cx).completion.as_ref().map(|c| {
+                let vars: Vec<String> = c.entries.iter().filter_map(|e| match e {
+                    crate::var_complete::Entry::Variable(n) => Some(n.clone()),
+                    _ => None,
+                }).collect();
+                (vars, c.new_variable.clone())
+            })
+        });
+        keys(cx, window, &["escape"]);
+        got
+    };
+    assert_eq!(list(cx, "e1"), Some((vec!["w".to_string()], None)), "h's row: (variables, New variable…)");
+    assert_eq!(list(cx, "e2"), Some((vec!["w".to_string(), "h".to_string()], None)), "d's row: (variables, New variable…)");
+}

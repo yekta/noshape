@@ -407,7 +407,7 @@ fn rows() -> Vec<Row> {
             }
             expect(counts, vec![1, 0, 1], "the edge in the field after each click")
         } },
-        Row { id: "fields / a row hovered lights its entity", live: "its tooltip names the entity (\"Edge of Extrude 1\"); the selected orange outline turns light yellow-green (#f2ff80) while the row is hovered (live 121–181 ms after the move; ours in the next frame, no time passing); clears when the pointer leaves", gap: false, check: |cx| {
+        Row { id: "fields / a row hovered lights its entity", live: "its tooltip names the entity (\"Edge of Extrude 1\") to the chip's right; the selected orange outline turns light yellow-green (#f2ff80) while the row is hovered (live 121–181 ms after the move; ours in the next frame, no time passing); clears when the pointer leaves", gap: false, check: |cx| {
             let (window, view, dialog, _) = fillet_on_an_edge(cx, "dlg-row-hover")?;
             let edge = cx.update(|cx| dialog.read(cx).feature.params.query("entities").first().cloned()).ok_or("no edge")?;
             // The preview consumes the edge: it is drawn by the overlay of consumed picks, else by its pick's flag.
@@ -431,6 +431,11 @@ fn rows() -> Vec<Row> {
             let tip = crate::ui_script::shown_tooltip().unwrap_or_default();
             if !tip.starts_with("Edge of Extrude 1") {
                 return Err(format!("the row's tooltip {tip:?}"));
+            }
+            // To the chip's right (live2 ours-1118; FEEL-CHIP-TOOLTIP-PLACE), level with it, not under the pointer.
+            let shown = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("placed-tooltip").ok_or("no tooltip drawn")?;
+            if shown.left() < row.right() || shown.top() > row.bottom() || shown.bottom() < row.top() {
+                return Err(format!("the tooltip at {shown:?}, the chip at {row:?}: not to its right"));
             }
             let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
             vcx.simulate_event(gpui_kit::MouseMoveEvent { position: row.center() + gpui_kit::point(px(0.), px(200.)), pressed_button: None, modifiers: Modifiers::default() });
@@ -1477,7 +1482,8 @@ fn a_skip_ring_lights_and_a_click_skips_its_instance_then_keeps_it(cx: &mut Test
     .unwrap();
     // (Drawn first: the dialog opens on its first query, Entities.) "Instances to skip" clicked: its field takes the rings.
     draw(cx, window);
-    cx.update(|cx| view.read(cx).edit.as_ref().expect("the pattern's dialog").dialog.update(cx, |d, _| d.user_focus_query("skippedInstances")));
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the pattern's dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, _| d.user_focus_query("skippedInstances")));
     wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).toggle_points(cx).is_some_and(|p| p.len() == 3));
     draw(cx, window);
     let shown = cx.update(|cx| {
@@ -1486,7 +1492,6 @@ fn a_skip_ring_lights_and_a_click_skips_its_instance_then_keeps_it(cx: &mut Test
         (v.toggle_points(cx).map(<[_]>::len), d.active_query.clone(), v.display.feature_state(d.feature.id).map(|s| s.toggle_points.len()))
     });
     assert_eq!(shown.0, Some(3), "the rings once drawn, Instances to skip active: (rings, active field, state's points) {shown:?}");
-    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the pattern's dialog").dialog.clone());
     let at = |cx: &mut TestAppContext, index: (i64, i64)| cx.update(|cx| {
         let v = view.read(cx);
         let t = v.toggle_points(cx).unwrap().iter().find(|t| t.index == index).cloned().expect("the instance's point");
@@ -1594,6 +1599,10 @@ fn a_linear_patterns_instance_previews_once_its_direction_is_picked(cx: &mut Tes
     wait_until(cx, window, |cx| !view.read(cx).ui_busy());
     draw(cx, window);
     assert_eq!(span(cx), Some(65.), "the instance previewed 25 mm along the edge after the Direction pick");
+    // Translucent: the preview is drawn blended over the part as it was (at the Preview slider's rest), so the new
+    // instance shows see-through.
+    let mix = cx.update(|cx| view.read(cx).viewport.read(cx).scene().preview_mix);
+    assert_eq!(mix, Some(crate::feature_dialog::PREVIEW_REST), "the preview blended at rest over the scene before it");
 }
 
 /// Live2 pattern-hole-1118 (P0): the Hole's style tabs: Counterbore adds its diameter and depth rows (10 mm, 5 mm),

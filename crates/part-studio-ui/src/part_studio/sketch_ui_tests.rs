@@ -4444,6 +4444,15 @@ fn only_radius_and_measurement_carry_and_a_cancel_remembers_nothing(cx: &mut Tes
     dialog.update(cx, |d, _| d.feature.params.set("radius", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("4 mm"))));
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
     assert_eq!(opens("fillet", cx).params.expr("radius").map(|x| x.text.clone()), Some("3.5 mm".to_string()), "a cancelled dialog isn't remembered");
+    // A Fillet committed with nothing to fillet (it fails): its 6 mm is remembered all the same.
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.clone())).expect("the Fillet dialog");
+    dialog.update(cx, |d, cx| d.set_value("radius", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("6 mm")), cx));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).edit.is_none());
+    let failed = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().any(|f| f.type_id == "fillet"));
+    assert!(failed, "the failing Fillet committed");
+    assert_eq!(opens("fillet", cx).params.expr("radius").map(|x| x.text.clone()), Some("6 mm".to_string()), "a committed Fillet that fails is remembered");
 }
 
 /// A view with a cached slice holding a nested cached row, and a focusable element outside both: counts their renders.
@@ -4579,6 +4588,11 @@ fn opening_the_configuration_select_moves_nothing(cx: &mut TestAppContext) {
     };
     let closed = bounds(cx);
     assert!(closed.iter().all(|(_, b)| b.is_some()), "{closed:?}");
+    // Live cfg-1118 (e2dd): "Configuration [A ▾]" 193 × 26 at (42, 112) on a page whose graphics start at y 76.
+    let sel = closed.last().unwrap().1.unwrap();
+    let top = cx.update(|cx| view.read(cx).viewport.read(cx).origin().y);
+    let place = (f32::from(sel.origin.x), f32::from(sel.origin.y - top), f32::from(sel.size.width), f32::from(sel.size.height));
+    assert_eq!(place, (42., 36., 193., 26.), "the select's (x, y under the graphics' top, width, height)");
     let at = closed.last().unwrap().1.unwrap().center();
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at, Modifiers::default());
     draw(cx, window);
@@ -6341,6 +6355,12 @@ fn escape_on_a_dialog_takes_its_configured_field_away(cx: &mut TestAppContext) {
     assert_eq!(configured(cx), 1, "Configure adds the column at once");
     let toast = cx.update(|cx| view.read(cx).message.clone().map(|(s, t)| (s == noshape_model::display::FeatureStatus::Info, t)));
     assert!(toast.as_ref().is_some_and(|(info, t)| *info && t.ends_with(" added to List")), "the toast \"<feature> <parameter> added to List\": {toast:?}");
+    // Its × closes it, nothing else changed.
+    draw(cx, window);
+    let x = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("bubble-x").expect("the toast's ×");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(x.center(), Modifiers::default());
+    draw(cx, window);
+    assert_eq!((cx.update(|cx| view.read(cx).message.is_some()), configured(cx)), (false, 1), "(the toast shown, configured) after its ×");
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
     draw(cx, window);
     assert_eq!(configured(cx), 0, "Esc takes it away");
@@ -7199,4 +7219,52 @@ fn a_reach_lit_end_goes_dark_with_the_move_away(cx: &mut TestAppContext) {
     assert!(lit(cx).is_some(), "the end lit within its reach");
     real_move(cx, 600.0, 350.0);
     assert_eq!(lit(cx), None, "dark after the one move away");
+}
+
+/// Live rb-followup 11-18 (feel rows "The bar is #b8b8b8 away from the pointer, #c8d9e2 hovered"): the rollback bar is
+/// grey, light blue-grey while the pointer is on it and grey again once it leaves.
+#[gpui::test]
+fn the_rollback_bar_is_grey_and_light_blue_grey_while_hovered(cx: &mut TestAppContext) {
+    let (window, view) = one_part(cx, "rb-hover");
+    draw(cx, window);
+    let grey = crate::theme::p().rollback;
+    assert_eq!(grey, gpui_kit::rgb(0xb8b8b8), "the bar's grey");
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        crate::part_studio::rollback_bar_colour(false, v.ui.rollback_hovered.is_some(), grey)
+    });
+    let to = |cx: &mut TestAppContext, at: Point<gpui_kit::Pixels>| {
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() });
+        draw(cx, window);
+    };
+    let bar = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("rollback").expect("the rollback bar");
+    to(cx, gpui_kit::point(px(900.), px(600.)));
+    let away = lit(cx);
+    to(cx, bar.center());
+    let on = lit(cx);
+    to(cx, bar.center() + gpui_kit::point(px(0.), px(120.)));
+    assert_eq!((away, on, lit(cx)), (grey, gpui_kit::rgb(0xc8d9e2), grey), "the bar away, under the pointer, after it left");
+}
+
+/// Live (ps-list-1119 "a hole edge hovered in the graphics"): a hovered edge lights in the graphics and tints no row of
+/// the feature list or the Parts list.
+#[gpui::test]
+fn a_hovered_edge_tints_no_list_row(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "edge-hover-rows");
+    view.update(cx, |v, _| v.selection.clear());
+    let edge = cx
+        .update(|cx| view.read(cx).built.as_ref().and_then(|b| b.picks.ids_where(|t| t.kind == noshape_scene::builder::PickKind::Edge).next()))
+        .expect("an edge pick");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        let vp = v.viewport.clone();
+        v.on_viewport_event(&vp, &ViewportEvent::Hover(Some(edge)), w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    let state = cx.update(|cx| {
+        let v = view.read(cx);
+        let rows = v.display.bodies.iter().map(|b| v.part_row_flags(b, cx)).filter(|f| *f != (false, false)).count();
+        (v.highlighted_hover(cx).is_empty(), v.related_features(cx).len(), v.selected_features.len(), v.ui.list_hover, rows)
+    });
+    assert_eq!(state, (false, 0, 0, None, 0), "(nothing lit, related rows, selected rows, list hover, tinted part rows)");
 }

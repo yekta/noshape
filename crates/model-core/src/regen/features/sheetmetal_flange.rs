@@ -438,6 +438,27 @@ fn partial_bounds(ev: &EvalCtx, ef: &EdgeFrame) -> FResult<(f64, f64)> {
     Ok((a.max(0.0), b.min(ef.len)))
 }
 
+/// A partial flange's blind bounds as std's handles (sheetMetalFlange.fs `addPartialFlangeManipulators`, keyed as std
+/// keys them so its `flangeManipulatorChange` applies a drag): at the edge's end a bound is measured from, along the
+/// edge into it (live feel cov-1120 S1: a point on the edge, the Distance in 0.1 mm steps).
+fn partial_flange_manipulators(ev: &mut EvalCtx, ef: &EdgeFrame) {
+    use crate::display::FeatureManipulator as M;
+    let (flip, second) = (ev.bool("flipFlangeBounds"), ev.bool("hasSecondBound"));
+    let (start, end) = (ef.o, ef.o + ef.d * ef.len);
+    let mut bound = |key: &str, ty: &str, dist: &str, from_start: bool| {
+        if !ev.is(ty, "BLIND") {
+            return;
+        }
+        let Ok(offset) = ev.length(dist) else { return };
+        let (base, direction) = if from_start { (start, ef.d) } else { (end, -ef.d) };
+        ev.manipulators.push((key.into(), M::Linear { base, direction, offset, min: 0.0, max: f64::INFINITY, secondary: false, primary: Some(dist.into()) }));
+    };
+    bound("Partial flange on start edge manipulator", "firstBoundType", "firstBoundOffset", !flip);
+    if second {
+        bound("Partial flange on end edge manipulator", "secondBoundType", "secondBoundOffset", flip);
+    }
+}
+
 /// Shorten flanges meeting at shared vertices so their bends do not collide.
 fn shorten_corners(frames: &[EdgeFrame], geoms: &mut [FlangeGeom], gap: f64) {
     let tol = 1e-7;
@@ -487,6 +508,9 @@ pub fn flange(ev: &mut EvalCtx) -> FResult<()> {
             let straight = flange_straight(ev, &ef, angle, r, t, u_t)?;
             let partial = ev.bool("isPartialFlange");
             let s = if partial { partial_bounds(ev, &ef)? } else { (0.0, ef.len) };
+            if partial && ev.manipulators.is_empty() {
+                partial_flange_manipulators(ev, &ef);
+            }
             geoms.push(FlangeGeom { angle, radius: r, k_factor: data.k_factor, u_t, straight, s_flange: s, s_trim: s, kind: BendKind::Bend, relief: true });
             frames.push(ef);
         }

@@ -561,6 +561,7 @@ pub fn message_bubble(id: impl Into<ElementId>, kind: impl Into<BubbleKind>, mes
         .child(
             div()
                 .id("bubble-x")
+                .debug_selector(|| "bubble-x".into())
                 .absolute()
                 .right(px(5.))
                 .top(px(0.))

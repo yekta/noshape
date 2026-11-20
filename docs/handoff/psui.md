@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-20 02:34 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-20 03:10 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -35,12 +35,13 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (updated 02:34 UTC 11-20; this thread replaced 4973e295 at 13:27 11-19, Ubeyd's weekly limit)
+## Now (updated 03:10 UTC 11-20; this thread replaced 4973e295 at 13:27 11-19, Ubeyd's weekly limit)
 
-1. LANDED: 00389dbd as ffd85455 (00:50, STALE-SKETCH-HOVER; qa verified (a)(b)(c) on green a933e1b7).
-2. IN THE LAND QUEUE: 7c2d7313 (re-queued 01:22 after a handoff conflict): ERROR-CHIP-RED-NO-FIELD (FeatureError /
-   FeatureState `invalid_input`, Thicken's both-zero; core told), the 712 px Configurations panel test, the
-   dialog-query-rclick-clear-all seed. On green tell qa ERROR-CHIP-RED-NO-FIELD is fixed.
+1. LANDED: 7c2d7313 as d5472335 (02:40: ERROR-CHIP-RED-NO-FIELD, qa's waiter armed; the 712 px Configurations test).
+2. URGENT, NEXT TO LAND: qa P1 ANALYSIS-READOUT-HIDDEN (62ef70f3b hid the bottom-right readout under every analysis
+   tool; live only under Interference: `interference_open()` in menus.rs, used by selection_readout and ui_script's
+   measure; test measure_feel_tests::only_interference_detection_hides_the_summary; 6 analysis-* scenarios). Tick it in
+   TICKETS after the rebase (it is on main only) and tell qa on green. run108 (vibe2, 03:08) runs it with the rest.
 3. NEXT TO LAND (after 7c2d7313): qa P1 EDGE-MIDPOINT-REST-LOOK (TICKETS 5296e9f9c; behaviors `midpoint_rest_edge`:
    rested on the edge, the edge stays lit and the midpoint is a 6 px #ffd3a0 fill in a 7 px dark ring; test
    a_rested_edge_midpoint_keeps_the_edge_lit_with_a_filled_ring; tell qa on green, they re-walk it). Feel-row tests:
@@ -58,6 +59,14 @@ docs/DECISIONS.md (read first; it wins over anything here).
    COLOUR (1162), HOLE-CALLOUT-PLACE (1464), FLFEEL-BAR-MENU (list matrix "rollback bar / its menu while rolled back");
    FEEL-FAST-OFF-CLEAR: the clear is on the second fast move, the rest 0-40 ms frame latency, under DECISIONS'
    100 ms bar (11-18): ask qa to close. vibex8 is qa's until 04:00 UTC 11-20 (nightly suite): no builds there.
+   Added 02:5x (run105 / run106, vibe2): the chip tooltip right of its chip (dialogs matrix, row 1399), a committed
+   failing Fillet remembered (873), the Linear pattern preview blended at 0.7 (1457), the configure toast's × (1274;
+   os_ui "bubble-x" selector), the Configuration select at (42, 36 under the graphics) 193 × 26 (1268), the rollback
+   bar grey / #c8d9e2 hovered (1045 / 1070: `ui.rollback_hovered` by on_hover instead of group_hover;
+   `rollback_bar_colour`), the spinner's arcs and 1.1 s turn (app-core `spinner_arcs`, 1077), Form's Location(s) left
+   empty by a face click (1415); row 1412 cites the handle colour test. Added 03:0x (run108): sketch_ui_tests::
+   a_hovered_edge_tints_no_list_row (1683), scene builder sketch_look_tests (567 / 572 / 573: sketch colours, widths,
+   construction dash-dot).
    Restored: perspective_and_render_modes_switch_in_one_step (Window::dispatch_action is deferred:
    read the state in the next update), a_skip_ring_lights_and_a_click_skips_its_instance_then_keeps_it ("Instances to
    skip" clicked first: an edit dialog opens on Entities). New P0 rows: dialogs_feel_tests
@@ -67,6 +76,14 @@ docs/DECISIONS.md (read first; it wins over anything here).
    click + Delete / Backspace, row hover tooltip text; Isolate's place (behaviors "ps-isolate" selector); the configure
    toast; the section value box + typing (run101). Rows 1208 / 1210 / 1211 now cite existing app-core unit tests.
    Skipped: 1199 (device px needs an app-core refactor), 1221 (no live inch readouts), 835, the speed rows.
+3b. live cov-1120 (12 feel rows, behaviours "feel coverage (11-20)", interaction-feel "cov-1120"; run109 on vibe2 03:2x):
+   tests FS typing_pairs_nothing_and_enter_after_a_brace_indents_without_closing_it, VS
+   a_double_clicked_value_edits_all_selected_esc_reverts_a_click_away_commits / the_value_cells_hash_list_holds_the_variables_above_only,
+   model sheetmetal_frames::partial_flange_bound_handles_as_std. S1 fixed: the Flange evaluator adds std's partial bound
+   handles (`partial_flange_manipulators`, model-core sheetmetal_flange.rs, skasm's file: tell skasm on landing). NEXT
+   (psui): S1's look, std's TANGENTIAL style (a ~12 px blue ring with an arrowhead each way; partial Fillet too): needs a
+   style on `FeatureManipulator::Linear` (13 constructors, custom host status.rs reads "style"). Tickets filed:
+   FS-WHEEL-72PX, FS-BRACKET-BOXES [studios], ASM-DRAG-START-15PX [asm]: tell them on landing.
 4. fillet-chip-clear-missing / fillet-edit-cancel-keeps retaken by live (e4ff71a8): both match on green 08525ecd
    (20/20 states, vibex6 02:4x). Waiting on others: ver-compare-hover-part (history-ui) with the lead.
 5. Interaction-feel rows that match live with no test (grep "missing" in the Test column; P0 sections first).

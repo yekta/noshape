@@ -2424,3 +2424,27 @@ mod free_end_tests {
         assert!(!closed.contains(&a), "a closed curve's seam");
     }
 }
+
+#[cfg(test)]
+mod sketch_look_tests {
+    use super::{LineSegment, SketchEntityState, sketch_color, sketch_curve_style};
+    use crate::graphics_prefs::GraphicsPrefs;
+    use noshape_model::display::SketchCurveDisplay;
+
+    /// Live (interaction-feel "sketch look"): an edited sketch's lines under-defined #0000d0, fully defined #000,
+    /// over-defined #cd0000, 2 px; an inactive sketch's #999, 1 px; construction the entity's colour, dash-dot.
+    #[test]
+    fn sketch_lines_take_lives_colours_and_widths() {
+        let g = GraphicsPrefs::default();
+        let rgb = |c: [u8; 4]| (u32::from(c[0]) << 16 | u32::from(c[1]) << 8 | u32::from(c[2]), c[3] == 255);
+        let edited = [SketchEntityState::Under, SketchEntityState::Full, SketchEntityState::Over].map(|st| rgb(sketch_color(&g, st, false, true, false)));
+        assert_eq!(edited, [(0x0000d0, true), (0x000000, true), (0xcd0000, true)], "(under, full, over) while edited");
+        assert_eq!(rgb(sketch_color(&g, SketchEntityState::Under, false, false, false)), (0x999999, true), "inactive");
+        assert_eq!(rgb(sketch_color(&g, SketchEntityState::Full, false, true, true)).0, 0x000000, "used geometry");
+        assert_eq!(rgb(sketch_color(&g, SketchEntityState::Under, true, true, false)).0, 0x0000d0, "construction keeps the colour");
+        assert_eq!((g.sketch_line_width, g.inactive_line_width), (2.0, 1.0), "(active, inactive) width");
+        let curve = |construction| SketchCurveDisplay { entity: 1, points: vec![], construction, external: false, state: SketchEntityState::Under, handle: false };
+        assert_ne!(sketch_curve_style(&curve(true), true) & LineSegment::CONSTRUCTION, 0, "construction dash-dot");
+        assert_eq!(sketch_curve_style(&curve(false), true) & LineSegment::CONSTRUCTION, 0, "a plain line solid");
+    }
+}

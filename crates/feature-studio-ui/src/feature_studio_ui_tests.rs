@@ -446,3 +446,118 @@ fn ace_feel_outdent_triple_click_bracket_boxes_and_wheel(cx: &mut TestAppContext
     assert_eq!(f32::from(moved), want, "one notch");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Live feel cov-1120 F1 / F2 (Ace's behaviours off): "(", "[" and '"' insert themselves alone, "(" over a selection
+/// replaces it; Enter after "{" indents the new line 4 more and adds no "}", and a "}" typed on that indented blank
+/// line outdents to its "{" line.
+#[gpui::test]
+fn typing_pairs_nothing_and_enter_after_a_brace_indents_without_closing_it(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        super::bind_keys(cx);
+    });
+    let dir = std::env::temp_dir().join(format!("noshape-ui-fs-pairs-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("ui.noshape");
+    let _ = std::fs::remove_file(&path);
+    {
+        use serde_json::json;
+        let mut ctx = noshape_ops::Ctx::new();
+        let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+    }
+    let session = crate::session::Session::open(&path).unwrap();
+    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::FeatureStudio(_))).unwrap().id;
+    let (window, view, doc) = cx.update(|cx| {
+        let doc = cx.new(|_| DocModel::new(session));
+        let bounds = Bounds { origin: Point::default(), size: size(px(1600.), px(900.)) };
+        let mut view = None;
+        let d = doc.clone();
+        let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+            let v = cx.new(|cx| FeatureStudioView::new(d, tab, window, cx));
+            view = Some(v.clone());
+            cx.new(|_| Workspace(v))
+        })
+        .unwrap();
+        (w, view.unwrap(), doc)
+    });
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_new(w, cx))).unwrap();
+    let start = cx.update(|cx| text_of(&doc, tab, cx)).unwrap();
+    let lines = |cx: &mut TestAppContext| {
+        pause(cx, window, 2000);
+        let t = cx.update(|cx| text_of(&doc, tab, cx)).unwrap();
+        t.strip_prefix(start.as_str()).map(str::to_string).unwrap_or(t)
+    };
+    for k in ["enter", "(", "[", "\"", "backspace"] {
+        type_key(cx, window, k);
+    }
+    assert_eq!(lines(cx), "\n([", "brackets and quotes alone; Backspace takes one character");
+    for k in [" ", "a", "b", "c", "shift-left", "shift-left", "shift-left", "("] {
+        type_key(cx, window, k);
+    }
+    assert_eq!(lines(cx), "\n([ (", "\"(\" replaces the selection");
+    for k in ["secondary-a", "backspace", "{", "enter", "x", ";", "enter", "}"] {
+        type_key(cx, window, k);
+    }
+    assert_eq!(lines(cx), "{\n    x;\n}", "Enter after an open brace: 4 more, no closing one; a typed closing brace outdents");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Live feel cov-1120 F3: a double-click selects the word under it, a triple-click its line with the line's newline.
+#[gpui::test]
+fn a_double_click_takes_the_word_and_a_triple_click_the_line_with_its_newline(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        super::bind_keys(cx);
+    });
+    let dir = std::env::temp_dir().join(format!("noshape-ui-fs-clicks-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("ui.noshape");
+    let _ = std::fs::remove_file(&path);
+    {
+        use serde_json::json;
+        let mut ctx = noshape_ops::Ctx::new();
+        let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+    }
+    let session = crate::session::Session::open(&path).unwrap();
+    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::FeatureStudio(_))).unwrap().id;
+    let (window, view, doc) = cx.update(|cx| {
+        let doc = cx.new(|_| DocModel::new(session));
+        let bounds = Bounds { origin: Point::default(), size: size(px(1600.), px(900.)) };
+        let mut view = None;
+        let d = doc.clone();
+        let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+            let v = cx.new(|cx| FeatureStudioView::new(d, tab, window, cx));
+            view = Some(v.clone());
+            cx.new(|_| Workspace(v))
+        })
+        .unwrap();
+        (w, view.unwrap(), doc)
+    });
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_new(w, cx))).unwrap();
+    let start = cx.update(|cx| text_of(&doc, tab, cx)).unwrap();
+    for k in ["enter", "x", " ", "=", " ", "t", "r", "u", "e", ";", "enter", "y"] {
+        type_key(cx, window, k);
+    }
+    pause(cx, window, 100);
+    let word = start.len() + 5;
+    let at = cx.update(|cx| view.read(cx).editor.read(cx).range_to_bounds(&(word..word + 4))).expect("laid out").center();
+    let click = |cx: &mut TestAppContext, count: usize| {
+        let mut v = gpui_kit::VisualTestContext::from_window(window, cx);
+        let none = gpui_kit::Modifiers::default();
+        v.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: none, click_count: count, first_mouse: false });
+        v.simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: none, click_count: count });
+        draw(cx, window);
+        cx.update(|cx| view.read(cx).editor.read(cx).selected_range())
+    };
+    click(cx, 1);
+    assert_eq!(click(cx, 2), word..word + 4, "a double-click: \"true\"");
+    let line = start.len() + 1;
+    assert_eq!(click(cx, 3), line..line + 10, "a triple-click: \"x = true;\" and its newline");
+    let _ = std::fs::remove_dir_all(&dir);
+}

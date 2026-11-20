@@ -1005,12 +1005,10 @@ fn rows() -> Vec<Row> {
             l.wait(cx, 100);
             expect((seen, l.lit_row(cx)), (Vec::new(), Some("Sketch 2".to_string())), "lit while sweeping, at rest")
         } },
-        Row { id: "folders / New folder with nothing selected", live: "the 'Folder name' popover; Enter makes an empty 'New folder (0)' just above the rollback bar", gap: false, check: |l, cx| {
+        Row { id: "folders / New folder with nothing selected", live: "the 'Folder name' popover; Enter makes an empty 'New folder (0)' just above the rollback bar, its caret shown collapsed (live featurelist-gaps 11-16)", gap: false, check: |l, cx| {
             l.new_folder(cx, true);
             let after = cx.update(|cx| l.view.read(cx).studio(cx).and_then(|s| s.folders.first().and_then(|fd| fd.after).and_then(|a| s.feature(a)).map(|f| f.name.clone())));
-            // (Its caret: live2's queued feature-list-new-folder-empty says whether an empty one opens collapsed.)
-            let folders: Vec<(String, Vec<String>)> = l.folders(cx).into_iter().map(|(n, f, _)| (n, f)).collect();
-            expect((folders, after), (vec![("New folder".to_string(), Vec::new())], Some("Extrude 3".to_string())), "folders, listed after")
+            expect((l.folders(cx), after), (vec![("New folder".to_string(), Vec::new(), true)], Some("Extrude 3".to_string())), "(folders (name, features, collapsed), listed after)")
         } },
         Row { id: "folders / a selected folder's menu starts with the sketch hide items", live: "a new folder over Sketch 1 + Extrude 1: right-clicked unselected, Section view… first (ui-parity folder-rclick-menu); selected, Hide other sketches, Hide all sketches, then Section view… (live list-1119 p6)", gap: false, check: |l, cx| {
             l.click(cx, "feature:Sketch 1", NONE);

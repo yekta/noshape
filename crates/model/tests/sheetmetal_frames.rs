@@ -885,6 +885,47 @@ fn end_cap_manipulators_as_std() {
     assert!(!ev.bool("thicknessDirection"), "{changed:?}");
 }
 
+/// A partial flange's bound handles as std's (live feel cov-1120 S1): on the flange edge, each at its bound (10 mm in
+/// from either end of the 60 mm edge), keyed as std keys them; a drag of the start one to 28.9 mm runs std's
+/// `flangeManipulatorChange`, which sets End conditions › Distance.
+#[test]
+fn partial_flange_bound_handles_as_std() {
+    use noshape_model::display::FeatureManipulator as M;
+    let mut s = plate();
+    let r = s.ok();
+    let edge = edge_at(&r, 0, DVec3::new(mm(30.0), mm(40.0), mm(2.0)));
+    let flange = s.add("sheetMetalFlange", move |p| {
+        p.set("edges", ParamValue::Query(vec![edge]));
+        p.set("distance", expr("20 mm"));
+        p.set("isPartialFlange", ParamValue::Bool(true));
+        p.set("firstBoundOffset", expr("10 mm"));
+        p.set("hasSecondBound", ParamValue::Bool(true));
+        p.set("secondBoundOffset", expr("10 mm"));
+    });
+    let r = s.ok();
+    let m = &r.display.feature_state(flange).expect("state").manipulators;
+    let tip = |key: &str| match m.iter().find(|(k, _)| k == key) {
+        Some((_, M::Linear { base, direction, offset, primary, .. })) => (*base + *direction * *offset, primary.clone()),
+        _ => panic!("no {key}: {m:?}"),
+    };
+    let (start, end) = (tip("Partial flange on start edge manipulator"), tip("Partial flange on end edge manipulator"));
+    let mut xs = [start.0.x / mm(1.0), end.0.x / mm(1.0)];
+    xs.sort_by(f64::total_cmp);
+    assert!(near(xs[0], 10.0, 1e-9) && near(xs[1], 50.0, 1e-9) && [start.0, end.0].iter().all(|p| near(p.y, mm(40.0), 1e-9)), "tips {start:?} {end:?}");
+    assert_eq!((start.1.as_deref(), end.1.as_deref()), (Some("firstBoundOffset"), Some("secondBoundOffset")));
+    let (key, first) = m.iter().find(|(k, _)| k.contains("start")).cloned().unwrap();
+    let mut moved = first.clone();
+    if let M::Linear { offset, .. } = &mut moved {
+        *offset = mm(28.9);
+    }
+    let f = s.ps.features.iter().find(|f| f.id == flange).unwrap().clone();
+    let before = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions { upto: Some(s.ps.features.len() - 1), ..Default::default() }).context;
+    let changed = noshape_model::custom::std_feature::manipulator_change_in((*before).clone(), "sheetMetalFlange", f.id, &f.name, &s.units, &f.params, &key, &moved).expect("std's change function ran");
+    let vars = std::collections::BTreeMap::new();
+    let ev = noshape_model::regen::eval::EvalCtx::new(f.id, "", &changed, &s.units, (*before).clone(), &vars);
+    assert!(near(ev.length("firstBoundOffset").unwrap(), mm(28.9), 1e-9), "{changed:?}");
+}
+
 #[test]
 #[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn frame_butt_endcap_gusset_and_trim() {

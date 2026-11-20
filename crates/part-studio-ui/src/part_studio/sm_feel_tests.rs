@@ -406,3 +406,27 @@ fn a_rips_side_face_in_corner_or_bend_relief_is_its_edge_and_fails_as_lives(cx: 
         (vec!["Edge of Sheet metal model 1".to_string()], Some("Selection is not a bend relief.".to_string())),
     ]);
 }
+
+/// Live2 sm-form-1118: Form's Location(s) takes points (sketch points, mate connectors); a click on a face leaves it
+/// empty, the face neither picked nor its part.
+#[gpui::test]
+fn a_face_click_leaves_forms_locations_empty(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "sm-form-face", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let face = cx.update(|cx| view.read(cx).display.bodies.iter().find_map(|b| b.face_refs.first().cloned()).expect("a face"));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("sheetMetalFormed", w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Form dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, _| d.user_focus_query("locations")));
+    cx.update(|cx| view.update(cx, |v, cx| v.pick(noshape_scene::builder::PickTarget { reference: face.clone(), kind: noshape_scene::builder::PickKind::Face, anchor: None }, cx)));
+    draw(cx, window);
+    let state = cx.update(|cx| {
+        let d = dialog.read(cx);
+        (d.active_query.clone(), d.feature.params.query("locations").to_vec())
+    });
+    assert_eq!(state, (Some("locations".to_string()), Vec::new()), "(the active field, Location(s)) after a face click");
+}

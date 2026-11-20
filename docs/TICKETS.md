@@ -68,6 +68,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   dx 06:2x: the row (Include hidden instances greyed, checked, as live), export_parts `rigid_subassemblies_single_link`
   (an Assembly's URDF was not in the op at all: now it is): a locked or rigid subassembly's parts one link, one mesh.
   Open: live's file shape with it (link / mesh names, merge), REQUESTS dx 05:44.
+## psui, 2026-11-20 (live's feel coverage cov-1120; docs/parity/interaction-feel.md "cov-1120")
+- [ ] **P1 FS-WHEEL-72PX [studios]**: a wheel notch scrolls the Feature Studio's code 72 px in live (Ace: 4.5 lines of
+  16 px, the first draw 9 ms after; behaviours "feel coverage (11-20)" F3, live/feel/cov-1120/fs-mouse*.json). Ours: the
+  editor's 3 lines (48 px) on Linux / Windows (gpui's `ScrollDelta::Lines` × the line height in vendor/gpui-base
+  `on_scroll_wheel`), macOS the OS's pixels.
+- [ ] **P2 FS-BRACKET-BOXES [studios]**: with the caret just before or after a bracket, live boxes it and its partner,
+  1 px solid rgb(192,192,192), 8 × 16, no fill; none at Home (F3, fs-bracket-after.png). Ours draws none.
+- [ ] **P1 ASM-DRAG-START-15PX [asm]**: an instance drag in live starts only once the pointer is 15–17 px from the press
+  (14 px over 1.26 s never moves it; a press with one 2–8 px move is a click), then takes the full delta from the press
+  (A1 / A1b, asm-thr*.json). Ours starts at 2.5 px past 50 ms (the Part Studio's press thresholds). Live's extra wait
+  (a move ≥ ~0.6 s after the press) is its round trip: not a target.
 
 ## asm, 2026-11-19
 - [ ] **P2 HOLE-THROUGH-ROUND-POLE [bool]** (asm 20:38, isaac-ball Fastened 43): a Ø6 REMOVE extrude coaxial with an
@@ -194,7 +205,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (9/12, read as only a focus.kind difference until live's camera retake); spot round 2 01:08 on green eef639d7: 8/12. Likely
   244412385 (skasm 11-17 14:08: "past every reach the region under the pointer", the Dimension tool's reach), not bisected.
   Ours: qa-scratch/suites/1120-0059-green-spot1r2 (vibe2 ~/tmp/qa/uipr/…/sketch-dimension-variable.json).
-- [ ] P1 **EDGE-MIDPOINT-REST-LOOK (psui)**: Part Studio, no tool open, the pointer resting on a part edge's midpoint (walk
+- [x] (psui 11-20 02:43: fixed, behaviors `midpoint_rest_edge`: rested on the midpoint the edge stays lit and the marker is a 6 px #ffd3a0 fill in a 7 px dark ring, as live 1981; test a_rested_edge_midpoint_keeps_the_edge_lit_with_a_filled_ring; qa to re-walk) P1 **EDGE-MIDPOINT-REST-LOOK (psui)**: Part Studio, no tool open, the pointer resting on a part edge's midpoint (walk
   doc, the plate's front top edge). Live (behaviours psui 1981, shot live/psui/edgemid-1981/c1-rest2s.png; also 1954): after
   the rest the whole edge stays lit orange and a small marker shows at the midpoint (an orange fill about 5 px inside a dark
   ring about 8 px). Ours: before the dwell the edge is lit with a hollow dark ring at the midpoint; from about 300 ms the edge
@@ -872,21 +883,21 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 ## Interaction feel: live2's "Ours" cells, batch 3 (manip-feel-1118 rows 981-983; live2 12:42, green e503ca2f, landed 9a3a9c645)
 - [x] (verified live2 20:2x on green 548d795fb / main 7302f8bd4, psui 17:09 batch: Translate by XYZ's triad at the bounding-box centre) **P1 TRANSFORM-TRIAD-CENTRE (psui)**: the Transform triad sits on the top face's centre; live (and std findCenter) puts it at the
   bounding-box centre (~24 px lower on the block).
-- [ ] **P1 TRANSFORM-GHOST-LOOK (psui)**: our old place is a tan translucent copy with all edges brown and the preview is the part's
+- [x] (psui 11-20 02:43: fixed 11-18, never ticked: the old place light grey #C9CED2 at 0.6 with no edges and its selection outline (feel row "During any triad drag"); test a_transforms_old_place_is_a_light_grey_ghost) **P1 TRANSFORM-GHOST-LOOK (psui)**: our old place is a tan translucent copy with all edges brown and the preview is the part's
   blue; live: a light grey ghost with an orange silhouette, the preview dark grey.
 - [x] (verified live2 17:5x on green 87edba24, 3 runs: the X arrow grabbed 35 px out reads 0.4 mm at 6 px, 2 mm at 31 px; not blue after release) **P1 ASM-TRIAD-ARROW-JUMP (asm)**: an arrow drag puts the triad's origin under the pointer (6 px -> 4.3 mm at once); live starts
   at 0 mm and keeps the grab offset. Minor: the last handle used stays blue after the release.
 
 ## Interaction feel: live2's "Ours" cells, batch 4 (view-tools 992-995, field-keys 1309-1313; live2 12:50, green e503ca2f, landed 422aacaa7 / ae075b8eb)
 - [x] (verified live2 20:2x on green 548d795fb / main 7302f8bd4, psui 17:09 batch: 3 frames over 150-230 ms, 3 runs (live 3 over ~240)) **P1 NAMED-VIEW-RESTORE-ANIM (psui)**: a named view restores in one step at 0.24-0.40 s; live animates, 3 frames over ~240 ms.
-- [ ] **P2 SECTION-PREVIEW-COLOUR (psui)**: our section view's preview cap is #E3C9A7; live's #EBBD8A / #E9C497.
+- [x] (psui 11-20 02:43: fixed 11-19, never ticked: tan #E9C497 while the plane is just picked in the open dialog (live2 cap-plane-1119); test sketch_ui_tests::a_section_cap_is_tan_only_while_its_plane_is_just_picked) **P2 SECTION-PREVIEW-COLOUR (psui)**: our section view's preview cap is #E3C9A7; live's #EBBD8A / #E9C497.
 - [ ] (skasm 13:05: fixed in 6389133a, queued; live2 re-measures on its green, then close) **P1 SEARCH-TOOLS-TOOLBAR-HIGHLIGHT (skasm)**: with "Highlight tool" on in Search tools, no toolbar button lights; live lights the
   match #FCDA7F.
 - Equal to live (live2): view-tools 992, field-keys 1309-1312.
 
 ## Interaction feel: live2's "Ours" cells, batch 5 (pattern-hole-1118 rows 1268-1280: 11 equal, 2 not; live2 13:05, green e503ca2f, landed 4f4dc4df3)
 - [x] (verified live2 20:2x on green 548d795fb / main 7302f8bd4, psui 17:09 batch: "… did not regenerate properly: No hole points selected.", nothing appended) **P2 HOLE-NOPOINT-TOOLTIP (psui)**: the Hole's no-point tooltip appends "A parameter value is not valid."; live's doesn't.
-- [ ] **P1 HOLE-CALLOUT-PLACE (psui)**: our hole callout runs on a long leader along the face's far edge; live's lies by the hole.
+- [x] (psui 11-20 02:43: fixed 11-19, never ticked: one label on a leader to the first hole, in the face plane, fixed screen size (live2 hole-callout-1119); test hole_callout::tests::the_callout_text_is_lives_length) **P1 HOLE-CALLOUT-PLACE (psui)**: our hole callout runs on a long leader along the face's far edge; live's lies by the hole.
 
 ## Interaction feel: live2's "Ours" cells, batch 6 (sm-form row 1288; live2 13:09, green)
 - [x] (dropped qa 13:10: a remembered value; live2's fresh config had none yet, after one Form ours opens with Circle emboss as live; row 1288 = in 792d2e7b8) **P1 FORM-DEFAULT-STUDIO (skasm)**: the sheet-metal Form dialog opens with "Form Part Studio" empty; live's opens with Circle emboss. The rest matches.
@@ -1159,7 +1170,7 @@ run (import takes ~60-100 ms), lit = the light-orange outline; feature list: 45 
 - 3D slow approach (2 px / 16 ms): follows the pointer, lit at rest; no stale hover at rest after leaving (1.2 s). Pass.
 - Selection latency: ours face 216 / plane 153 / row 163 / box 218 ms (v0.4.57 release, polled crops) vs live's 964 / 955 / 693 / 15321
   with the same method (software). Ours faster on every row. Pass.
-- [ ] (psui 06:57: cleared at the second fast move event; the 0-40 ms is the cleared frame's latency, a scene rebuild before present: psui's perf item) **P1 FEEL-FAST-OFF-CLEAR (psui)**: after a fast move off a lit face (4 moves in 32 ms) the outline is still drawn in a crop taken
+- [ ] (psui 11-20 02:43: the rest is under DECISIONS' 100 ms human-scale bar (11-18): qa, close it if you agree. psui 06:57: cleared at the second fast move event; the 0-40 ms is the cleared frame's latency, a scene rebuild before present: psui's perf item) **P1 FEEL-FAST-OFF-CLEAR (psui)**: after a fast move off a lit face (4 moves in 32 ms) the outline is still drawn in a crop taken
   ~0-40 ms after the stop (2/2 runs, and 3/3 in r1), gone by the crop ending 157 ms. Live clears it during the move (the first fast
   move runs a remove-only pick, behaviours "hover timing with no tool").
 - [x] (verified qa 09:29 on green 83922ad8 = 4c5eba9fb, vibex8 load ~25: a sketch line lights by ~205 ms after a fast sweep stops, with the Line tool and without (unlit at 120-150 ms, the frame-latency floor on this host), was 600-800 ms; the screen can't separate tool from no tool here; qa-scratch/hv2/sk2) (psui 06:57: cafe3c2af picks at once in any sketch state; the 600-800 ms is pick + frame latency on llvmpipe. psui's next land makes it live's rule, pause with no tool / every move with a tool; re-run then, Line still slow = a perf ticket) **P1 FEEL-SKETCH-TOOL-PICK (psui)**: on a sketch line, a fast sweep in lights it at the same time with the Line tool active as with
@@ -1208,7 +1219,7 @@ animate ~550-690 ms from the first frame to the last (500 ms + a frame on this d
 - [x] a3974c745 **verified 5076e98c** (qa 01:22: the wall's broad face hovered in Flange lights nothing, its bend strip lights) **P1 SMFEEL-FLANGE-BROAD-FACE (skasm)**: in Flange's "Edges or side faces to flange" the front wall's broad face lights (outlined
   orange) at its centre; live never lights the walls' or the bottom's broad faces there.
 - [x] 591643fc4 **verified 5076e98c** (qa 01:52, vibex8: face + edge menu ends "Add appearance to face…") **P2 MENUFEEL-FACE-EDGE (psui)**: a face + an edge selected: no "Add appearance to face…" (live keeps it). psui: fixed in 2234f511.
-- [ ] **P2 HOVER-LEAVES-WINDOW (psui)**: a face hovered just before the pointer leaves the window stays outlined (twice, sm-box and
+- [x] (psui 11-20 02:43: GPUI clears the viewport's hover on the window's MouseExited (also with a pick on its way: it lands only while the pointer is inside); test feel_tests::a_lit_face_goes_dark_when_the_pointer_leaves_the_window; qa to re-walk on Xvfb) **P2 HOVER-LEAVES-WINDOW (psui)**: a face hovered just before the pointer leaves the window stays outlined (twice, sm-box and
   block-fillet).
 - Joint rows (skasm's route: Bend A's row menu › "Convert Bend A to rip"): "Modify joint 1" added, Joint A | Rip ▾ | Edge joint ▾ under
   Other joints; Type offers Bend, Rip (= live); Rip -> Bend puts it back in Bends as "Bend A" within 1 s, flat view redrawn, but the
@@ -1240,7 +1251,7 @@ snippet, Tab closes and inserts a tab, Esc keeps "op"; Commit solid blue while e
 - [x] not a bug (same recapture) **P2 FLFEEL-BAR-END-COLOUR (psui)**: the bar dragged back to the end stays light blue-grey (200,217,226) 2 s later; live turns
   it grey (184,184,184) at the end (as ours draws it in a fresh document). Recapture: #b8b8b8 with the pointer away, rolled back or
   not; (200,217,226) only while hovered: my 2 s shot had the pointer still on it. 8d2e0056 restores ours.
-- [ ] **P2 FLFEEL-BAR-MENU (psui)**: a right-click on the rollback bar opens no menu; live's has "Roll to end".
+- [x] (psui 11-20 02:43: fixed earlier, never ticked: a rolled-back bar's menu is "Roll to end" alone, none at the end (live2 doc-level-1117); list matrix row "rollback bar / its menu while rolled back: Roll to end") **P2 FLFEEL-BAR-MENU (psui)**: a right-click on the rollback bar opens no menu; live's has "Roll to end".
 - [x] (studios d94834aa7; qa verified 11-19 03:50 on green 3d422009, vibe2 Xvfb, qa-scratch/stv/vs-enter.png: "1x" plain while typed, pink with a red border after Enter with the text kept, Esc empties it; live marks it ~0.5 s after Enter, behaviours fsvs-feel-1118) **P1 VSFEEL-NAME-RED (studios)**: an invalid name ("10", "1x") isn't marked while typed (live: red border, pink fill at once);
   after an Enter on it, Esc keeps the text (live throws it away).
 - [x] (studios d94834aa7; qa verified 11-19 03:35 on green 3d422009, vibe2 Xvfb, shots qa-scratch/stv: "2 in" -> 50.8 mm; a hovered value shows "2 in" over the Value header) **P1 VSFEEL-UNITS (studios)**: "2 in" in a Length (mm document) stays "2 in" in the cell (live: "50.8 mm"); a selected value cell

@@ -407,7 +407,7 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | While a sketch is edited (live2 sketch-entry-1118) | the rows after it grey italic, Parts (2) -> Parts (1), ✗ brings them back; another feature row clicked does nothing | the rows and parts the same; a row click selected the feature; now nothing | = (fixed) |
 | Delete on a used sketch (live2 keys-1118) | no dialog; its user red, the tooltip "Extrude 1 did not regenerate properly: Select face or sketch region to extrude." + "1 missing selection" | the same | = (new) |
 | Tab from the graphics (live2 keys-1118 (2)) | after a click on empty graphics: Show measure details → Show analysis tools → Display mass and section properties → out of the page, then Share; Shift+Tab back; Space / Enter press the focused button; no list row or toolbar button is a stop | Tab did nothing; now those three stops, then the top bar (`StudioTab`, `eval_tab`), Space / Enter their click | = (fixed) |
-| Not yet in the matrix | the 6 px drag threshold (Chrome's, not Onshape's); an empty new folder's caret (live featurelist-gaps 11-16: shown, collapsed, on "New folder (0)"); the insertion line (live featurelist-gaps: rgb(22, 81, 176), 2 px, the row's width, a ~6 px ring filled rgb(202, 216, 237) at its left end, centred on the boundary above the hovered row in its upper half, below in its lower half; ours the same, the ring's fill was white) | – | – |
+| Not yet in the matrix | the 6 px drag threshold (Chrome's, not Onshape's); the insertion line (live featurelist-gaps: rgb(22, 81, 176), 2 px, the row's width, a ~6 px ring filled rgb(202, 216, 237) at its left end, centred on the boundary above the hovered row in its upper half, below in its lower half; ours the same, the ring's fill was white) | – | – |
 
 ## Measure (matrix)
 
@@ -434,7 +434,7 @@ entities found with `query_entities` by a point on them); `MEASURE_ROW=<part of 
 | The panel's rows hovered | a distance row: the dashed line; an X / Y / Z row: the legs dashed in X red, Y green, Z blue, zero ones left out | the line only; now the legs too (`measure_hover_lines`) | = (fixed) |
 | The panel's size | 220 × 345 with a distance and its X / Y / Z rows | 220 × 347 (6 px above the footer); now 4 px, 345 | = (fixed) |
 | A second entity hovered | no preview: the first one's readout | the same | = |
-| Not yet in the matrix | a click near an edge's middle takes its midpoint: live measure-gaps (11-16) 8–9 px either side along the edge (10 px takes the edge), the mark from the first shot (~100 ms, no dwell needed); ours the 9 px window (`midpoint_target_tests`) and a 60 ms dwell (was 250; 60 ms is Onshape's hover wake, live sketch-gaps) | – | – |
+| Not yet in the matrix | a click near an edge's middle takes its midpoint: live measure-gaps (11-16) 8–9 px either side along the edge (10 px takes the edge), the mark from the first shot (~100 ms, no dwell needed); ours the 9 px window (`midpoint_target_tests`) and a 60 ms dwell (was 250; 60 ms is Onshape's hover wake, live sketch-gaps); at rest the edge stays lit and the midpoint is a filled ring (qa EDGE-MIDPOINT-REST-LOOK) | behaviors `midpoint_target_tests`, sketch_ui_tests::a_rested_edge_midpoint_keeps_the_edge_lit_with_a_filled_ring | = |
 
 Added 11-18 (live2 measure-mass-1118; part-studio-ui `measure::measure_pairs_on_lives_wedges_and_cylinder`, 22 pairs
 on live's own studio, all as live): two faces or two edges read the angle between the directions from where they meet
@@ -564,13 +564,13 @@ beside it, times its slope (/root/psui-scratch/chrome/ink.py, ink2.py on screens
 |---|---|---|---|---|
 | Part edges | 1 px, ~0.84 px of ink at 1×, never solid black (darkest L ~60) | was 1.25 px (~1.15–1.2 px, solid black); now 1 px (`PART_EDGE_WIDTH`): 0.81 offscreen, 0.85–1.0 in the app | = (fixed) | render `part_edges_carry_lives_ink` |
 | Back-face silhouettes | 1.2 × the edge (BACKFACE_SILHOUETTE_WIDTH_FACTOR) | was 1.25 px; now 1.2 × | = (fixed) | scene `cylinder_sides_show_silhouettes` |
-| Inactive sketch lines | 1 px | was 1.5 px; now 1 px | = (fixed) | – |
+| Inactive sketch lines | 1 px | was 1.5 px; now 1 px | = (fixed) | scene `sketch_lines_take_lives_colours_and_widths` |
 | Active sketch lines | #0000d0, 2 px (1.73 px of ink on sketch-underconstrained.png) | #0000d0, 1.79 px | = | screenshots |
 | Sketch region | #9aa5af 0.2 (212,220,227 over the plane) | 210,219,225 | = | screenshots |
 | Sketch points | ~9 × 8 px blue dots | 9 × 9 | = | screenshots |
 | Highlight colours | hover #ffc685, selected #ffa90a, selected part #ffc04c, secondary #f2ff80, error #bd3039 | the same (`palette.rs`; the selected part in shaders.wgsl, linear) | = | scene `edge_and_face_highlights_look_as_live` |
-| Sketch colours | under #0000d0 (#4040ff seen through), fully #000, over #cd0000, inactive #999 | the same (`palette.rs`, `graphics_prefs.rs`) | = | – |
-| Construction | the entity's colour, dash-dot 4-6-30-6 px | the same (graphics preferences) | = | – |
+| Sketch colours | under #0000d0 (#4040ff seen through), fully #000, over #cd0000, inactive #999 | the same (`palette.rs`, `graphics_prefs.rs`) | = | scene `sketch_lines_take_lives_colours_and_widths` |
+| Construction | the entity's colour, dash-dot 4-6-30-6 px | the same (graphics preferences) | = | scene `sketch_lines_take_lives_colours_and_widths` |
 | Drawing preview | rgb(68,156,205) | #449ccd (`SKETCH_PREVIEW_COLOR`) | = | – |
 | Constraint glyphs | 20 px white tiles 2 px apart, centre 20 px off the entity inside the shape, corners 17 px diagonally out | 20 px tiles on a 22 px pitch, 20.5 px off, corners centred (-17, -16) | = | – |
 | Dimension values | Flama 18 px: digits 11 px tall, 8 px wide, 10 px pitch | 12 / 8 / ~10 px | = | screenshots (glyphs-show-constraints-x3.png) |
@@ -871,7 +871,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 |---|---|---|
 | Fillet Radius remembered across documents as typed (plain or a variable-free expression), metric and inch kept apart | = | sketch_ui_tests::a_remembered_value_never_carries_a_variable |
 | A value with a #variable is never remembered: the earlier memory stays | = | sketch_ui_tests::a_remembered_value_never_carries_a_variable |
-| A cancelled dialog isn't remembered; a committed one that fails is | = | sketch_ui_tests::only_radius_and_measurement_carry_and_a_cancel_remembers_nothing (the failed one: missing) |
+| A cancelled dialog isn't remembered; a committed one that fails is | = | sketch_ui_tests::only_radius_and_measurement_carry_and_a_cancel_remembers_nothing (the failed one too) |
 | Fillet carries Radius and Measurement; not Tangent propagation, overflow, smooth corners, Asymmetric / Partial / Variable | = | sketch_ui_tests::only_radius_and_measurement_carry_and_a_cancel_remembers_nothing |
 | Extrude Depth is never remembered (25 mm / 1 in default) | = | sketch_ui_tests::only_radius_and_measurement_carry_and_a_cancel_remembers_nothing |
 | A Hole's remembered values: Units / Style everywhere, the diameter only in documents of the same length unit | = | sketch_ui_tests::remembered_hole_values_follow_the_document_units |
@@ -1043,7 +1043,7 @@ each display from the right-click to the menu's first frame. Evidence live/feel/
 |---|---|---|
 | Rollback bar held: a chip follows, the insertion line shows, the bar stays, nothing greys | = | list matrix "rollback bar / while held nothing moves or greys" |
 | On release the bar moves, the rows below grey (rgb(154,154,154) italic), the Parts list follows | = | list matrix "rollback bar / on release the rows below grey and the Parts list follows" |
-| The bar is #b8b8b8 away from the pointer (rolled back or at the end), #c8d9e2 hovered | = | missing |
+| The bar is #b8b8b8 away from the pointer (rolled back or at the end), #c8d9e2 hovered | = | `sketch_ui_tests::the_rollback_bar_is_grey_and_light_blue_grey_while_hovered` |
 | It drops between any features or above the first, never into Default geometry | = | list matrix "rollback bar / above the first feature", "rollback bar / onto default geometry: the top" |
 | A reorder the history can't take is accepted, then fails red rgb(170,37,45) with a warning triangle, no message | = | list matrix "drag / a reorder the history can't take: red, no message" |
 | A sketch dragged onto Default geometry: nothing | = | list matrix "drag / onto default geometry: nothing" |
@@ -1068,14 +1068,14 @@ each display from the right-click to the menu's first frame. Evidence live/feel/
 | Finding | Ours | Test |
 |---|---|---|
 | Released over Default geometry (expanded or collapsed) it lands at the last legal slot the line showed: the top for a normal drag | = | list matrix "rollback bar / onto default geometry: the top" |
-| Its colour: #b8b8b8 away (rolled back or at the end), rgb(200,217,226) hovered | = | missing |
+| Its colour: #b8b8b8 away (rolled back or at the end), rgb(200,217,226) hovered | = | `sketch_ui_tests::the_rollback_bar_is_grey_and_light_blue_grey_while_hovered` |
 
 ### spinner (the working spinner, live's client code, 11-18 00:20)
 
 | Finding | Ours | Test |
 |---|---|---|
 | One spinner, shown 900 ms after a call starts (none if it finishes sooner); body loading and box select at once | = | sketch_ui_tests::the_working_spinner_shows_900_ms_into_a_regeneration_centred_low (a regeneration; body loading and box select: missing) |
-| Its look: 50 × 50 rgba(255,255,255,0.75), radius 10, 40 px above the bottom; a 30 px ring rgb(215,215,215) with a blue quarter, 1.1 s a turn, no pulse | = | sketch_ui_tests::the_working_spinner_shows_900_ms_into_a_regeneration_centred_low (box and place; colours and turn: missing) |
+| Its look: 50 × 50 rgba(255,255,255,0.75), radius 10, 40 px above the bottom; a 30 px ring rgb(215,215,215) with a blue quarter, 1.1 s a turn, no pulse | = | sketch_ui_tests::the_working_spinner_shows_900_ms_into_a_regeneration_centred_low (box and place); app-core `display_cache::tests::the_spinner_is_a_grey_ring_with_a_blue_quarter_turning_in_1_1_s` (colours and turn) |
 
 ### parts-list-1118 (Parts list and appearance, live 11-18 01:47)
 
@@ -1266,13 +1266,13 @@ each display from the right-click to the menu's first frame. Evidence live/feel/
 | Finding | Ours | Test |
 |---|---|---|
 | The panel docks at the right, ~700 px, the graphics shrink; the empty state ~346 ms after the click | = | sketch_ui_tests::the_configurations_panel_docks_712_px_and_the_graphics_shrink |
-| The feature list's "Configurations" box with "Configuration [A ▾]" 193 × 26 | = | sketch_ui_tests::opening_the_configuration_select_moves_nothing (the place: missing) |
+| The feature list's "Configurations" box with "Configuration [A ▾]" 193 × 26 | = | sketch_ui_tests::opening_the_configuration_select_moves_nothing (its place and size too) |
 | A duplicate row name is accepted, stored as "A0" | = | sketch_ui_tests::a_duplicate_configuration_name_and_a_bad_value_wait_for_their_row |
 | A row's menu: Switch to / Set as default / Duplicate row / Move up / Move down / Delete row | = | sketch_ui_tests::a_configuration_rows_menu_offers_what_live_offers |
 | A plain click on a row name doesn't switch | = | sketch_ui_tests::a_click_on_a_configuration_row_doesnt_switch_to_it |
 | A bad configured value stays plain until its row is active; then pink and bold, its feature red, its part gone | = | sketch_ui_tests::a_bad_configured_value_is_pink_only_on_the_active_row, a_duplicate_configuration_name_and_a_bad_value_wait_for_their_row |
 | Switching: no greying; the spinner only past 900 ms | = | sketch_ui_tests::switching_configurations_greys_nothing_and_spins_only_past_900_ms |
-| Configure from a field: the menu just "Configure", the toast with ×, the amber dotted outline until ✓ | = | sketch_ui_tests::escape_on_a_dialog_takes_its_configured_field_away (the toast's text; its ×: missing) |
+| Configure from a field: the menu just "Configure", the toast with ×, the amber dotted outline until ✓ | = | sketch_ui_tests::escape_on_a_dialog_takes_its_configured_field_away (the toast's text and its ×) |
 
 ### reverify-1118 (older feel facts retaken, 11-18 02:10)
 
@@ -1397,7 +1397,7 @@ each display from the right-click to the menu's first frame. Evidence live/feel/
 
 | Finding | Ours | Test |
 |---|---|---|
-| A chip hovered: its tooltip with its name to the right; that entity yellow-green, the others still orange | ≠ (live2 ours-1118, green 4a69d55b): the edge yellow-green, the others orange as live, but the name tooltip showed under the pointer over the next chip (live: to the chip's right); fixed psui 11-18 22:38: to the chip's right (`with_user_side_tooltip`) | dialogs matrix "fields / a row hovered lights its entity" (the tooltip's text; its side: missing) |
+| A chip hovered: its tooltip with its name to the right; that entity yellow-green, the others still orange | ≠ (live2 ours-1118, green 4a69d55b): the edge yellow-green, the others orange as live, but the name tooltip showed under the pointer over the next chip (live: to the chip's right); fixed psui 11-18 22:38: to the chip's right (`with_user_side_tooltip`) | dialogs matrix "fields / a row hovered lights its entity" (the tooltip's text and its place right of the chip) |
 | A chip's × hovered: red, tooltip "Delete Edge of Extrude 1"; a click removes that chip | ≠ (live2 ours-1118, green 4a69d55b): the × turns red and a click removes the chip, but its tooltip reads the chip's name, not "Delete Edge of Extrude 1"; = since 11-18 (verified live2 20:2x) | dialogs matrix "fields / a chip's x: its tooltip, a click removes the chip" |
 | A click on a chip's body changes nothing; Delete and Backspace then do nothing | = (live2 ours-1118, green 4a69d55b) | dialogs matrix "fields / a row click leaves the selection as is" |
 | A bare expression keeps its form with the default unit: "10+5" → "(10+5) mm", "(10+5)/3" → "((10+5)/3) mm"; "25.4mm" → "25.4 mm"; "1 in", "10 mm + 1 in", "2*#wall" as typed; "7 xyz" kept, pink (invalid) | = (live2 ours-1118, green 4a69d55b): "(10+5) mm", "((10+5)/3) mm", "25.4 mm", "1 in", "7 xyz" pink | fields matrix "Enter: the expression, its unit added" |
@@ -1410,10 +1410,10 @@ each display from the right-click to the menu's first frame. Evidence live/feel/
 |---|---|---|
 | Sheet metal table and flat view: graphics shrink 0.40 s, panel 0.75 s, table text 2.6 s, flat part drawn 2.9 s; the strip moves to the panel's left edge; close in one frame at 1.0 s | ≈ faster: the panel and table in the first frame (`toggle_panel`), the flat part computed in the background (`ensure_flats`); the strip sits at the graphics' right edge, so at the panel's left; the same button closes it in one frame | missing (strip position, one-frame close) |
 | Bend row hover: the bend lit in 3D and flat at 0.59 s, the row tint at 0.69 s | = (`sm_hover_refs` in 3D, the bend zone outlined in the flat view), at once | sheet metal matrix "table / a row hovered lights its bend" (3D and the bend zone on the flat; timing: missing) |
-| Sheet metal model edit: a white arrow at the plate's middle (blue when hovered); a click flips it and ticks "Flip direction up" | = std's own flip manipulator (`addFlipDirectionUpManipulator`), a click sets flipDirectionUp; at the plate's middle pointing up: inside the feature std's qCreatedBy(id, BODY) is the definition sheet, not the part built at its end (live smflip-1118; was a side face of the part, fixed 11-18) | model `sheet_metal_model_adds_std_s_flip_manipulator` (place and direction; colours: missing) |
+| Sheet metal model edit: a white arrow at the plate's middle (blue when hovered); a click flips it and ticks "Flip direction up" | = std's own flip manipulator (`addFlipDirectionUpManipulator`), a click sets flipDirectionUp; at the plate's middle pointing up: inside the feature std's qCreatedBy(id, BODY) is the definition sheet, not the part built at its end (live smflip-1118; was a side face of the part, fixed 11-18) | model `sheet_metal_model_adds_std_s_flip_manipulator` (place and direction); colours: std's arrows are drawn as ours (`std_handle` → `arrow_glyph`), `manipulators::tests::a_dragged_handle_is_one_solid_blue_stroke` (white core, blue halo hovered) |
 | Flange edit: no manipulator in the graphics (only the Bend angle flip button) | = (std adds manipulators only for a partial flange) | sheet metal matrix "Flange" |
 | Tab: a picked profile fills "Flange to merge" by itself ("Face of Sheet metal model 1"), Subtraction offset 0.02 mm; the flat view shows the tab at once; no arrows | = std's editing logic fills the merge face from the profile and the offset with the model's minimal gap (0.02 mm); no manipulators; the flat as soon as its background recompute ends | model `tab_editing_logic_fills_merge_face_and_offset` (T2) |
-| Form: "Preparing form…" with a spinner at the graphics' bottom centre while loading; Location(s) takes points, a face click leaves it empty | ≈ Location(s) takes sketch points and mate connectors only (std's filter), so a face is refused; no "Preparing form…": ours has no load to wait for (the library thumbnails load in the background) | missing (a face click) |
+| Form: "Preparing form…" with a spinner at the graphics' bottom centre while loading; Location(s) takes points, a face click leaves it empty | ≈ Location(s) takes sketch points and mate connectors only (std's filter), so a face is refused; no "Preparing form…": ours has no load to wait for (the library thumbnails load in the background) | `sm_feel_tests::a_face_click_leaves_forms_locations_empty` (a face click) |
 
 ### asm-views2-1118 (exploded, named positions, section, live2 11-18 09:19) [asm]
 
@@ -1455,7 +1455,7 @@ feel): Hole dialog follow-up"; times on live's software-GL lane (preview times a
 |---|---|---|
 | Linear and Circular pattern: no manipulator, no distance / count / angle arrow in the graphics | = (green e503ca2f, live2 ours-1118 pattern: neither draws an arrow or a value box) | dialogs matrix "manipulators / patterns: none" |
 | A typed count or distance changes nothing until Enter (3–4 s watched); Enter: the preview at 0.8–1.5 s | = (green e503ca2f, live2 ours-1118 pattern: "3" and "40" typed: no change for 3.5 s; Enter: the preview at 0.32 s) | dialogs matrix "preview / Linear pattern: a typed count waits for Enter" |
-| Linear pattern: the preview instance (translucent) after the Direction edge is picked (3.0 s on live's lane) | = (green e503ca2f, live2 ours-1118 pattern: translucent instance 0.57 s after the edge pick) | dialogs_feel_tests::a_linear_patterns_instance_previews_once_its_direction_is_picked (the translucency: missing) |
+| Linear pattern: the preview instance (translucent) after the Direction edge is picked (3.0 s on live's lane) | = (green e503ca2f, live2 ours-1118 pattern: translucent instance 0.57 s after the edge pick) | dialogs_feel_tests::a_linear_patterns_instance_previews_once_its_direction_is_picked (translucent: the preview blended at 0.7) |
 | Skip instances ☑: "Instances to skip" and a small white ring at each instance's centroid (the seed a dot); a hovered ring turns blue | = (green e503ca2f, live2 ours-1118 pattern: white rings at the instances' centroids, the seed a dot, the hovered ring blue) | missing |
 | A ring click adds the chip "(1, 0)" with a CLEAR link and drops the instance from the preview; a second click on it removes the chip | = (green e503ca2f, live2 ours-1118 pattern: chip "(1, 0)" with CLEAR, the instance gone at 0.74 s; a second click removes it at 0.24 s) | missing |
 | Circular pattern fields: Entities, Axis of pattern, Angle 360 deg, Instance count 4, Equal spacing ☑, Centered, Skip instances | = (green e503ca2f, live2 ours-1118 pattern: the same fields and defaults; a vertical edge as axis: the preview at 0.35 s, no arrows) | dialogs matrix "fields / Circular pattern's fields and defaults" |
@@ -1693,7 +1693,7 @@ Evidence: live/feel/list-1119/ (p*.json, shots); ours /root/live-scratch/fl19/ou
 | Parts list eye | 20 × 20 at the row's right end (x 210–230 of 40–240), shown on hover; a click greys the row in 107–114 ms, graphics settled 1.0–1.4 s; a second click shows it again in 134–213 ms | the same place; 112–159 ms / 135–222 ms, graphics 0.36–0.87 s | = |
 | Parts list row tooltip | "Part 1" beside the list, right of the row and centred on it, like a feature row's | under the pointer (a plain tooltip; feature rows have the side one) | = (fixed psui 11-19: beside the list as a feature row's, also the default geometry and curve rows; list matrix "hover / a Parts row's tooltip right of the row"; live2 retake 11-19 12:30, green d6bf1d4c7, recheck-1119/psui-list: holds: "Part 1" right of the row, centred (t1c.png)) |
 | Parts list row look | the part icon and the name; no appearance swatch (the colour is only in the graphics and Edit appearance…) | the same | = |
-| A hole edge hovered in the graphics | lit; no feature row tinted (every row's class unchanged) | – (not taken) | – |
+| A hole edge hovered in the graphics | lit; no feature row tinted (every row's class unchanged) | the same: graphics hover lights the edge only (`highlighted_hover`), rows tint from the selection or a row hover | = (psui 11-20, test sketch_ui_tests::a_hovered_edge_tints_no_list_row) |
 
 ### sm-cfg-io-1119 (sheet metal tools, configurations, import / export: gaps, live 11-18 / 11-19) [skasm, studios, dx]
 
@@ -1753,6 +1753,27 @@ Evidence: live/feel/tools-1119/; ours /root/live-scratch/tl19/ours/. The complet
 | face-rclick-select-fillet-faces: Select ▸ Fillet faces on a flat face selects nothing (live 0) | ≠ → = (fixed psui 11-19: the driver's diagonal move to the submenu row crosses "Select other…", which closes the submenu at once, as live's (live2 submenu-diag-1119: no safe triangle, the crossed row takes the hover in its first frame); the click then lands beside the still open context menu, where live's only closes the menu and ours selected the Top plane under it: a left press that closes an open menu now gives the graphics nothing. The face menu flipping above the pointer (eed093d94, live's) put the path over that row) | chrome matrix "menus / a diagonal move to a submenu row closes it on the row it crosses"; feel_tests::a_click_beside_an_open_context_menu_only_closes_it |
 | dialog-checkbox-convert-back / -rclick-convert, dialog-query-rclick-clear-all, fillet-chip-clear-missing / -edit-healthy-moment: after a field's menu item one Esc cancels the dialog | ≠ → = (fixed psui 11-19: the menu item's keyboard hand-back counted as Tab past the dialog's end, which leaves Esc dead (fea9cbbe); only a forward Tab does now; the vibe2 rerun: clear-all and clear-missing match) | dialogs matrix "fields / after a field's menu item, one Esc cancels" |
 | analysis-interference: no bottom-right readout while Interference detection's dialog is open; the other analysis tools keep it (analysis-connection, -zebra, -zebra-flip-edges, -reflection, -deviation, -deviation-options: Area 1120 / 1200 mm²) | ≠ → = (fixed psui 11-19: ours kept the face's "Area" after Interference detection took its part; 11-20: that fix hid it under every analysis tool, qa ANALYSIS-READOUT-HIDDEN, now Interference only) | measure_feel_tests::only_interference_detection_hides_the_summary |
+
+### cov-1120 (feel coverage: Feature / Variable Studio, drawings, assembly drag, a partial flange; live 11-20 02:50–03:10) [studios, asm, psui]
+
+Live: behaviours "feel coverage (11-20)", live/feel/cov-1120/ (lane 4 FS / VS scratch elements, page ms from the input; lane 1 drawing / asm /
+SM on kept copies, ANSI A at 0.23245 mm/px, the two-blocks iso at 0.058965 mm/px, sm-box iso 6 notches in).
+
+| Item | Live | Ours | Status / test |
+|---|---|---|---|
+| F1 FS typing pairs | no auto-pairing (Ace behaviours off): "(", "[", '"' alone, Backspace one character; "(" over a selection replaces it | the same (`auto_close(false)`) | = feature_studio_ui_tests::typing_pairs_nothing_and_enter_after_a_brace_indents_without_closing_it |
+| F2 FS Enter after "{" | the new line +4 (soft tabs), no "}"; a statement keeps the indent; "}" on the indented blank line outdents to its "{" line | the editor's smart indent | = the same test |
+| F3 FS mouse: words, lines | double-click a word, triple-click the line with its newline, Shift+click extends, a drag selects per character | the editor's (select_word / select_line) | = feature_studio_ui_tests::a_double_click_takes_the_word_and_a_triple_click_the_line_with_its_newline |
+| F3 FS wheel | 72 px a notch (4.5 lines of 16 px), drawn 9 ms after the wheel | 3 lines a notch (48 px) on Linux / Windows; macOS the OS's pixels | ≠ [studios] (ticket FS-WHEEL-72PX) |
+| F3 FS bracket match | the caret beside "(" / ")": both brackets boxed 1 px rgb(192,192,192), 8 × 16, no fill; none at Home | no bracket boxes (only Ctrl+\ jumps) | ≠ [studios] (ticket FS-BRACKET-BOXES) |
+| V1 VS double-click a Value | its editor in 46 ms with the whole text selected; typing replaces; Esc reverts with the cell selected; a click on another cell commits; a second single click on the selected cell doesn't edit | the same | = variable_feel_tests::a_double_clicked_value_edits_all_selected_esc_reverts_a_click_away_commits |
+| V2 VS "#" in a Value | the list in 62 ms, under the cell, 31 px rows: only the variables above the row, no "New variable…"; "#b" filters; Enter commits | the same (the list on the key) | = variable_feel_tests::the_value_cells_hash_list_holds_the_variables_above_only |
+| D1 drawing view drag | an orange (selected) frame while dragged; its aligned children stay, then jump on release; not selected after | moves alone, children follow on release, unselected after | = drawing feel::a_dragged_view_moves_alone_until_release_and_esc_puts_it_back (the orange frame: no test) |
+| D2 dimension text drag | the line follows the text's height, extension lines lengthen, arrows flip outside near an extension line; drawn plain while dragged; tan with grips after | the same | = drawing feel::a_dimension_moves_from_5_px_and_4_px_is_a_click, the_dimension_tool_marks_its_picks_as_live_and_keeps_the_placed_one_selected (drawn plain while dragged) |
+| D3 drawing wheel | ×1.060 a notch about the pointer, out the exact inverse; drawn 8–23 ms after | the same (`drawing_wheel_zoom_amount`, 2^(1/12)) | = app-core navigation::tests::wheel_notch_zoom_per_platform, drawing_wheel_uses_delta_y_when_wheel_delta_is_zero |
+| A1 / A1b asm instance drag start | a move ≥ 15–17 px from the press (14 px never) takes the full delta, no dead zone subtracted; also only from ~0.6 s after the press (live's round trip, not a target) | from 2.5 px past 50 ms (the Part Studio's press thresholds) | ≠ [asm] (ticket ASM-DRAG-START-15PX) |
+| A2 asm mate preview | the 2nd connector click jumps Part 2 onto Part 1 (a thin yellow ghost box at its old place), settled 1.32 s; stored only on ✓ | the same, settled in a frame or two | = (faster; qa's speed rows) |
+| S1 SM partial flange handle | a point on the flange edge: a ~12 px blue ring with an arrowhead each way; dragging it along the edge sets End conditions › Distance in 0.1 mm steps (25 → 36.8 mm over 60 px at 0.23 mm/px), no value box | none (the native Flange added no handle); now std's handles from the evaluator (`partial_flange_manipulators`, keyed as std so `flangeManipulatorChange` applies the drag; 0.1 mm steps by `linear_step`), drawn as a plain arrow | ≈ (fixed psui 11-20, model sheetmetal_frames::partial_flange_bound_handles_as_std; the ring-with-two-arrowheads look still ≠, psui next) |
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;

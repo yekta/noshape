@@ -5883,9 +5883,15 @@ impl PartStudioView {
             .flex_none()
             .items_center()
             // Live (dom/cursors.txt): the default arrow, also while dragging.
-            .group("rollback")
             .tip("Rollback bar", crate::ui::TipSide::Below)
-            .child(div().w_full().h(px(7.)).bg(if focused { gpui_kit::rgb(0xa0c7dd) } else { pal.rollback }).group_hover("rollback", |d| d.bg(gpui_kit::rgb(0xc8d9e2))))
+            .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                let now = if *hovered { Some(index) } else { this.ui.rollback_hovered.filter(|&i| i != index) };
+                if this.ui.rollback_hovered != now {
+                    this.ui.rollback_hovered = now;
+                    cx.notify();
+                }
+            }))
+            .child(div().w_full().h(px(7.)).bg(rollback_bar_colour(focused, self.ui.rollback_hovered == Some(index), pal.rollback)))
             // Live (ps-feel2-1118): the drag starts past 6 px (no drop line at 6, one at 9).
             .drag_threshold(ROLLBACK_DRAG_PX)
             .on_drag(RollbackDrag, {
@@ -8432,6 +8438,16 @@ fn several_parts_menu(menu: crate::os_menu::OsMenu, view: &Entity<PartStudioView
 
 /// A toolbar tool's tooltip title. Onshape: "Extrude (shift+e)", "Mate connector (ctrl+m)"; the Sketch button "Create
 /// new sketch (shift+s)" (live keys-1118, the same under every OS).
+/// The rollback bar's colour (live rb-followup 11-18): light blue-grey while hovered, light blue once a click or ↑/↓ gave
+/// it the keyboard, else grey.
+pub(super) fn rollback_bar_colour(focused: bool, hovered: bool, grey: gpui_kit::Rgba) -> gpui_kit::Rgba {
+    match (hovered, focused) {
+        (true, _) => gpui_kit::rgb(0xc8d9e2),
+        (false, true) => gpui_kit::rgb(0xa0c7dd),
+        (false, false) => grey,
+    }
+}
+
 fn tool_tooltip(ty: &FeatureType) -> String {
     let name = if ty.id == "sketch" { "Create new sketch" } else { ty.name };
     match ty.shortcut {
