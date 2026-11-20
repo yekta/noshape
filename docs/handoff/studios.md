@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 17:16 UTC.
+Updated 2026-11-20 17:34 UTC.
 
 ## In flight
 
@@ -43,6 +43,12 @@ nothing of ours there then; shots elsewhere with /root/studios-scratch/bin/pdsho
   (285, 447) ▾: ours' Targets box in Angle mode is 370 px, under live's 400, so no scrollbar), revision-table-delete
   7/10 (live's s7-s10 "EDGE Top" is the deleted table's stale paint). Both asked of live: REQUESTS "studios
   (2026-11-20 09:55 UTC)".
+- Lead 11-20 17:2x: non-drawing areas in suite 1120-0407 (main 81d23c9b, 02:56 build): 671 doc/docs/fs/prefs/rel/
+  tab/variable/ver/vs takes, 598 matched, 70 differed, 3 not run. Re-shot on b35 (s36: 69 takes, s37: 4) and
+  rescored: all 73 match. 61 were the brand renames (62bb68a2a), 2 the crumb tooltip / Compare readout (11-20 06:10),
+  7 Properties takes a run.py bug (brand pass ran before the category normalisation: f29fe434, suite 2043 -> 2050).
+  ver-*-copy-link (4) exist only in /root/parity/ui/scenarios (old copy), not in the repo.
+- To land after 226bafad (CHECKING since 17:15): c70f0dfd (matrix) + f29fe434 (run.py).
 - qa 11-20: 9 of 10 to-verify rows verified (6c3c0a8fe); FEEL-DRW-WHEEL-ZOOM-SLOW stays open (re-timed 02:00-04:00).
 
 ## Next, in order
