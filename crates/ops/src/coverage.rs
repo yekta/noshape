@@ -469,6 +469,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Change configuration...", Op("drawing_change_configuration")),
     ("drawing:Replicate annotations\\tbeta", Op("drawing_replicate")),
     ("drawing:Revision table properties...", Op("drawing_table_properties")),
+    ("drawing:Resize...", Op("drawing_table_edit")),
     ("drawing:Rows Equally", Op("drawing_table_edit")),
     ("drawing:Send to back", Op("drawing_view_edit")),
     ("drawing:Sheet properties...", Op("drawing_sheet")),
