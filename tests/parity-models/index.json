@@ -1593,5 +1593,41 @@
   "url": "https://cad.onshape.com/documents/54420c486787ae9653517e04/w/7c07769accb656deca0feb49/e/472f8b1b55a64f3343b3aca1",
   "title": "opt-loft-continuity",
   "original": "https://cad.onshape.com/documents/5032e4caa0f08ff226f250da/w/3e4c2097b9d9662c4b2f6e00/e/d7fc2ada4758443686e686d1"
+ },
+ {
+  "name": "c2-opt-draft-pull-refillet",
+  "document": "c7e77413a8fb8dfbf012c1b8",
+  "workspace": "b657c0bebb6ec31add4ea820",
+  "element": "3699f9f037540e2e4ee59c51",
+  "url": "https://cad.onshape.com/documents/c7e77413a8fb8dfbf012c1b8/w/b657c0bebb6ec31add4ea820/e/3699f9f037540e2e4ee59c51",
+  "title": "opt-draft-pull-refillet",
+  "original": "https://cad.onshape.com/documents/f20238bdebef1bc97e40d89c/w/d2f445d4a046c11607ae4b43/e/a805b3b4a38467e60633cf41"
+ },
+ {
+  "name": "c2-opt-shell-outward-hole-last",
+  "document": "be02b20e5080cd4d468ff315",
+  "workspace": "f875df2475e7be0240a04e4d",
+  "element": "2603ea3ae0365620d13c04da",
+  "url": "https://cad.onshape.com/documents/be02b20e5080cd4d468ff315/w/f875df2475e7be0240a04e4d/e/2603ea3ae0365620d13c04da",
+  "title": "opt-shell-outward-hole-last",
+  "original": "https://cad.onshape.com/documents/c37c9547c1bb758b3b016195/w/6d099a648ccec6be57e23894/e/40523b917ec0472f84e738a8"
+ },
+ {
+  "name": "c2-opt-boolean-intersect-offset",
+  "document": "d0a71e2860eb23d6f2b139ae",
+  "workspace": "d83c1561214d6a79c09c799a",
+  "element": "f08207c811305f9a62f58479",
+  "url": "https://cad.onshape.com/documents/d0a71e2860eb23d6f2b139ae/w/d83c1561214d6a79c09c799a/e/f08207c811305f9a62f58479",
+  "title": "opt-boolean-intersect-offset",
+  "original": "https://cad.onshape.com/documents/adaaeb143d872fbab25b8472/w/4cea3e048cf968ba66807420/e/75cf862d69f704e9a9528b04"
+ },
+ {
+  "name": "c2-opt-mirror-pattern-ops",
+  "document": "3c47bd5fbd9ad2cbb4e1d14d",
+  "workspace": "728fd46698d94e0bad243937",
+  "element": "44643d5e8ab40d0f0359389c",
+  "url": "https://cad.onshape.com/documents/3c47bd5fbd9ad2cbb4e1d14d/w/728fd46698d94e0bad243937/e/44643d5e8ab40d0f0359389c",
+  "title": "opt-mirror-pattern-ops",
+  "original": "https://cad.onshape.com/documents/7784095af76cf11affb1afd7/w/652f716ff0846c0bc127cdf8/e/258caeb805fbd189fc51d1ab"
  }
 ]
