@@ -502,7 +502,7 @@ def normalize_live(state):
     if isinstance(d, dict) and d.get("title") == "Properties" and isinstance(d.get("fields"), list):
         f = [x for x in d["fields"] if not (isinstance(x, dict) and x.get("label") == "Description")]
         for x in f:
-            if isinstance(x, dict) and str(x.get("label", "")).startswith("Onshape "):
+            if isinstance(x, dict) and str(x.get("label", "")).startswith(("Onshape ", "Noshape ")):
                 x["label"], x["value"] = "Category", ""
         # Live's recorder from 2026-11-13.1 reads a part's Mass group first (its Override checkbox and the greyed
         # computed value, parts-multi-properties); ours' "Mass Override" checkbox comes last.
