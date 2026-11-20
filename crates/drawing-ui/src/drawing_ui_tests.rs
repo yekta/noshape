@@ -154,6 +154,22 @@ fn export_drawing_opens_with_the_last_exports_choices(cx: &mut TestAppContext) {
     assert_eq!(DrawingExportPrefs::load().as_ref(), Some(&saved));
 }
 
+/// qa DRW-EXPORT-HIDE-INSPECTION-SIZE (live drawing/1358-dk-export-default): Export Drawing's labels 75 px apart, and
+/// "Hide inspection items" Chrome's 13 px box at the fields' left edge, 19 px under the Options select.
+#[gpui::test]
+fn export_drawing_rows_as_live(cx: &mut TestAppContext) {
+    let (window, editor) = drawing(cx, "export-rows");
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_export_dialog(w, cx))).unwrap();
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let mut at = |id: &'static str| vcx.debug_bounds(id).unwrap_or_else(|| panic!("no {id}"));
+    let (version, overridden, options, hide) = (at("ex-version"), at("ex-overridden"), at("ex-options"), at("ex-hide-insp"));
+    assert_eq!(overridden.top() - version.top(), px(75.), "75 px from one select to the next");
+    let box_top = hide.top() + (hide.size.height - px(13.)) / 2.;
+    assert!((box_top - options.bottom() - px(19.)).abs() < px(1.), "the box 19 px under Options: {options:?} {hide:?}");
+    assert_eq!(hide.left(), options.left(), "at the fields' left edge");
+}
+
 /// Lead 11-06, the display cache: a drawing's sheet comes back from the cache as it was built; while it stands in
 /// (the sources regenerating) the sheet shows it, a tool asked for waits with the message at once, and the complete
 /// real sheet replaces it and starts the tool.

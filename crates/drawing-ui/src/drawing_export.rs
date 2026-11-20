@@ -47,7 +47,8 @@ impl DrawingEditor {
             let select = |id: &'static str, label: &'static str, opts: Vec<String>, cur: usize, set: fn(&mut ExportSettings, usize)| {
                 shown.borrow_mut().push(serde_json::json!({ "label": label, "kind": "select", "value": opts.get(cur).cloned().unwrap_or_default() }));
                 let st = st.clone();
-                div().pt(px(5.)).child(crate::os_ui::field_label(label)).child(div().pt(px(4.)).child(crate::os_ui::select_field(id, opts, cur, move |i, w, _| {
+                // Live 1358-dk-export-default: labels 75 px apart (25 px from a select to the next label).
+                div().pt(px(6.5)).child(crate::os_ui::field_label(label)).child(div().pt(px(4.)).child(crate::os_ui::select_field(id, opts, cur, move |i, w, _| {
                     set(&mut st.borrow_mut(), i);
                     w.refresh();
                 })))
@@ -55,7 +56,9 @@ impl DrawingEditor {
             let check = |id: &'static str, label: &'static str, on: bool, set: fn(&mut ExportSettings, bool)| {
                 shown.borrow_mut().push(serde_json::json!({ "label": label, "kind": "checkbox", "value": on }));
                 let st = st.clone();
-                crate::os_ui::checkbox(id, label, on).on_click(move |_, w, _| {
+                // Live 1358-dk-export-default: Chrome's own 13 px box at the fields' left edge, 7 px from its 14 px #333 label.
+                let row = gpui_kit::component::h_flex().debug_selector(move || id.to_string()).id(id).h(px(27.)).gap(px(7.)).cursor_pointer().child(crate::os_ui::checkbox_box(on)).child(div().text_size(px(14.)).text_color(gpui_kit::rgb(0x333333)).child(label));
+                crate::ui_script::mark(row, || format!("checkbox:{label}")).on_click(move |_, w, _| {
                     set(&mut st.borrow_mut(), !on);
                     w.refresh();
                 })
@@ -63,10 +66,10 @@ impl DrawingEditor {
             let strs = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
             let range_empty = matches!(f, DrawingFormat::Dwg | DrawingFormat::Dxf) && s.sheets == 2 && custom.read(cx).value().trim().is_empty();
             // Live drawing/40: 25 px from a field to the next label, 16 from a label to its field.
-            let mut body = crate::os_ui::modal_body().pt(px(0.)).gap(px(4.))
+            let mut body = crate::os_ui::modal_body().pt(px(0.)).mt(px(-1.)).gap(px(4.))
                 // Live drawing/40: "View export rules" next to the label.
                 .child(gpui_kit::component::h_flex().gap(px(4.)).items_end().child(crate::os_ui::field_label("File name")).child(crate::drawing_hooks::export_rules_link("ex-rules")))
-                .child(Input::new(&file).h(px(34.)).text_size(px(14.)))
+                .child(div().mb(px(-1.)).child(Input::new(&file).h(px(34.)).text_size(px(14.))))
                 // Live (dom g39-export-drawing-pdf): an empty name is an error.
                 .when(file.read(cx).value().trim().is_empty(), |d| d.child(div().mt(px(4.)).text_size(px(12.)).text_color(gpui_kit::rgb(0xdc3545)).child("Valid file name is required.")))
                 .child(select("ex-format", "Format", DrawingFormat::ALL.iter().map(|f| f.label().to_string()).collect(), DrawingFormat::ALL.iter().position(|x| *x == f).unwrap_or(0), |s, i| s.set_format(DrawingFormat::ALL[i])));
@@ -124,7 +127,7 @@ impl DrawingEditor {
                 body = body.child(check("ex-z", "Set z-height to zero and normals to positive", s.z_zero, |s, v| s.z_zero = v));
             }
             if !f.csv() {
-                body = body.child(div().pt(px(6.)).child(check("ex-hide-insp", "Hide inspection items", s.hide_inspection, |s, v| s.hide_inspection = v)));
+                body = body.child(div().pt(px(8.)).child(check("ex-hide-insp", "Hide inspection items", s.hide_inspection, |s, v| s.hide_inspection = v)));
             }
             if f.cad() {
                 body = body.child(check("ex-offsheet", "Exclude off-sheet content", s.exclude_off_sheet, |s, v| s.exclude_off_sheet = v));
