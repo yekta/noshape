@@ -18,7 +18,14 @@ op_boolean 666 ms; screws Sweep 1's sections_ahead 907 ms) and 850efe. End a tur
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
 ## In flight
-- isaac P0 (lead 11-21 00:xx, asm bisect: mates 16 -> 38 under 72fe51df1): REVERT QUEUED b67c313c (01:03). Mac A/B
+- Memory budget machine-independent (lead 11-21 P1; worktree/branch bool-mem): default flat 8 GB (was half the
+  RAM, 4-16 GB), 3/4 of RAM only under 11 GB; NOSHAPE_WORK_TRACE=1 prints each op's growth past 128 MB. Trace of the
+  16 gate corpora (vibe2 ~/tmp/bool/memtr/tr-*.txt): OCCT ops <= 0.3 GB, Rust ops < 128 MB; progress checks don't
+  follow memory (no work count). boolean_budget + bool_patterns ok (Mac). Gate queued on vibex7 after imp (unit
+  bool-mem-gate, /root/bool-scratch/mem-gate.sh, out chain-bool-mem.out) + knurls -> land, tell lead.
+  Aside: the vibe2 trace build's replays had 2 cases off their recordings (bool-corpus 2a5740b0d124e53d edges 18 was
+  21; gpf 49eaef95f9ced6bf volume 2e-11) on main + trace only: check whether main drifted.
+- isaac P0 (lead 11-21 00:xx, asm bisect: mates 16 -> 38 under 72fe51df1): REVERT LANDED 9f6ce35e (01:26; asm asked to recount). Mac A/B
   (/root/bool-scratch/isaac-ab.sh, out isaac-ab.out; models ~/noshape-host/bool-keep/isaacm/isaac-{00f1,de4e}): with
   72fe51df1 Fillet 4 (feature 31) is an invalid solid and Part 1 is gone from Extrude 23 on (both studios); reverted,
   Part 1 lives (first diff Extrude 7: 22 faces, live 21). NEXT: re-land the coaxial merge with Fillet 4 valid (dump
