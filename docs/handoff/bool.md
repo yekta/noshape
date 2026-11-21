@@ -40,8 +40,15 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
 - SHELL-HANG-SPEED (P1) + SHELL5-AFTER-SHELL3 (P2), TICKETS bool 11-21: qa's cli-shell-hang-pre (vibex7
   ~/qa/tickets/cli-shell-hang-pre.noshape; copy vibe2 ~/tmp/bool/sh5.noshape): ours Shell 3 12.8 s (live 40 ms), Shell 5
   (Part 2, 3 mm, faces 1475.653 mm2 Shell 3 / 282.843 mm2 Linear pattern 2) fails in 25.4 s, live OK 20 ms 172908.326 mm3
-  59/163/98 (live/bool/shell5-1121.json; live rebuilds cov-shellq with sq.js). NEXT after the gates: dump both shells
-  (NOSHAPE_DUMP_OPS), profile Shell 3, find why Shell 5 fails. bool-p3 changes Part 3 after Shell 3.
+  59/163/98 (live/bool/shell5-1121.json; live rebuilds cov-shellq with sq.js). Mac dumps ~/noshape-host/bool-keep/sh5/dump/shell-{17
+  Part 3, 18 Part 2 (Shell 3), 21 (Shell 5)}; Mac regen: Shell 3 2.5 s, Shell 5 4.2 s. quadrics declines both in 1-2 ms,
+  slabs takes them (17: 2.7 s; 21: fails after 20 s). Shell 5 CAUSE: Shell 3's slab result for Part 2 has its z -20 rim
+  (face 3, a plane) meeting itself along a 5 mm slit edge (-60,-7.5)->(-56.46,-11.04) (OCCT USD keeps the last shared edge
+  of a ring of pieces; core's request 1761 saw the same pinch); quadrics: "an edge not between two faces". PLAN (branch
+  bool-sh5 on bool-p3, WIP probes commit): after the slabs' unify (shell.cpp ~10422) drop slit edges of planar faces
+  (edge twice in the face, not IsClosed), rebuild the wires (ConnectEdgesToWires; largest = outer; ShapeFix_Face),
+  ReShape + history merge, keep if valid. Shell 3's Part 3 quadrics: "a corner's offset far from it" (vertex at
+  (-60,41,-10.7) on 2 faces / 2 edges). Parked for the impeller speed P0 (blend 11-21).
 - SHELL-AFTER-WELD-FILLET (worktree/branch bool-sh3w, a4cfa07d3 on main 55749fd6f): 407bb5cf6's
   without_inverted_slivers alone + T1 a_weld_fillet_part_shells_to_one_solid_without_its_inverted_sliver
   (tests/data/shell/weld-fillet-part3-input.brep = qa doc's Part 3 before Shell 3). shell:: 33 ok; the T1 fails on main.
