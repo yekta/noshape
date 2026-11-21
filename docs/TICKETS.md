@@ -5,6 +5,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## asm, 2026-11-21 (asm-scissor-lift open profile)
+- [ ] P3 **FS-ERROR-ENUM-VERSION (core)**: at FeatureScript 1576 our std rejects BOOLEAN_NON_MANIFOLD_RESULT as an
+  ErrorStringEnum value (it's gated at V2033_BOOLEAN_NON_MANIFOLD_RESULT_ERROR), so the feature's error text becomes "Type
+  error: value BOOLEAN_NON_MANIFOLD_RESULT cannot be enum ErrorStringEnum" (std error.fs processError 126:27, from
+  feature.fs defineFeature 71:25). Repro: asm-scissor-lift Studio 184ad0's Spur Gear (its Feature Studio is FeatureScript
+  1576; the herringbone `opBoolean` failing is bool's, routed). Saved doc vibe2 ~/tmp/asm/q/scissor.noshape:
+  featurestudio_monitor {part_studio: "Studio 184ad0"}.
+
 ## skasm, 2026-11-21 (Mac parity suite on main 01d8226a + skasm's Corner+Joint)
 - [ ] P2 **LOFT3-EDGES (core)**: c2-loft-paths-guides' first difference is feature 16 "Loft 3" (solid, ADD, profiles JVC and JYC,
   spine JcB = Sketch 7's wire, addSections, trimGuidesByProfiles): "Part 1" 15/37/27 faces/edges/vertices, live 15/33/23 (same 15
