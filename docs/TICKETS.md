@@ -100,6 +100,8 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   intersections or end conditions." The range's only model-core change is core's 3bbeb6096 (an invalid Boundary fill now
   fails). Wanted: live's valid 1-face surface, not an error. Repro: compat / parity model c2-surf-workshop-manualblend; live
   parts in its live.jsonl, row 18.
+  qa 11-21 08:2x (green ceec84d25, compat ceec84d2): core's c62392284 makes Move boundary 1 and 2 Ok (manualblend 12/19, +879.46 mm2 each, live
+  +879.47); Boundary surface 1 still fails with the same error (Sketch 6/7's arcs miss Split 1's edges by ~0.06 mm, core tracing).
 - [ ] P1 **KNIFEHANDLE-LOFT1 (core)**: c2-surf-workshop-knifehandle's Loft 1 (feature 24) fails on ours; live builds it OK, solid
   "Blade" 11 faces / 27 edges / 18 vertices, 10392.85 mm³ (parity corpus live.jsonl). Ours failed in 0.4.63 too ("Could not create
   valid profiles from selections."); since green 2407ded2 (the range's only model-core commit is core's f9ad07b50) it fails with
