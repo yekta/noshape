@@ -2722,10 +2722,16 @@ impl SketchEditor {
                         }
                     },
                     _ => {
-                        let at = data.sketch.curve(id).map(|c| c.closest(p).1).unwrap_or(p);
+                        let ends = data.sketch.endpoints(id);
+                        let (at, mid) = self.split_point(&data.sketch, id, p);
                         let used = used_ends_before(data, id);
                         let r = data.sketch.split(id, at);
-                        if r.is_ok() {
+                        if let Ok(res) = &r {
+                            if mid
+                                && let (Some(&point), Some((a, b))) = (res.created.first(), ends)
+                            {
+                                let _ = data.sketch.add_constraint(ConstraintKind::MidpointOf { point, a, b });
+                            }
                             keep_used_ends(data, id, used, false);
                         }
                         r
@@ -5477,6 +5483,18 @@ impl SketchEditor {
         if h == PatternHandle::MoveX { u } else { v }
     }
 
+    /// Where a Split click at `p` cuts curve `id`, and whether that is a line's midpoint: by a line's middle the split
+    /// takes it, MIDPOINT of the line's ends (live sk2-1121 split-at-crossing, geo-list3 / geo-list6).
+    fn split_point(&self, sk: &Sketch, id: EntityId, p: DVec2) -> (DVec2, bool) {
+        let reach = self.world_per_px * INFERENCE_PX;
+        let near = |v: DVec2| self.screen_metric().map_or(v.length() <= reach * noshape_sketch::inference::MIDPOINT_REACH, |m| m.box_len(v) < reach);
+        match sk.curve(id) {
+            Some(Curve2::Line { a, b }) if near((a + b) * 0.5 - p) => ((a + b) * 0.5, true),
+            Some(c) => (c.closest(p).1, false),
+            None => (p, false),
+        }
+    }
+
     /// How far the selection has moved along a Transform arrow.
     pub fn xf_move_value(&self, h: PatternHandle) -> f64 {
         self.xf_offset.dot(self.xf_move_axis(h))
@@ -5691,7 +5709,7 @@ impl SketchEditor {
             // second pick is refused with the warning bubble, the picks clear
             // and the tool stays on.
             if let [first] = ids.as_slice()
-                && unmeasurable_curve_pair(&data.sketch, *first, e)
+                && (unmeasurable_curve_pair(&data.sketch, *first, e) || ellipse_and_plane(data, *first, e))
             {
                 self.picks.clear();
                 self.toast = Some(DIMENSION_FAILED.into());
@@ -6769,9 +6787,9 @@ impl SketchEditor {
         // Split marker on the hovered curve.
         if self.tool == Tool::Split
             && let (Some(h), Some(c)) = (self.hover, self.cursor)
-            && let Some(curve) = data.sketch.curve(h)
+            && data.sketch.curve(h).is_some()
         {
-            let q = curve.closest(c).1;
+            let q = self.split_point(&data.sketch, h, c).0;
             points.points.push(PointSprite { position: w(q), color: guide_color, pick_id: 0, size: 9.0, style: on_top, _pad: 0 });
         }
         // Pattern / transform previews.
@@ -7451,7 +7469,8 @@ fn fillet_legs(sk: &Sketch, arc: EntityId) -> Vec<(EntityId, DVec2)> {
 }
 
 /// The sketch's Origin point ([`origin_point`]).
-fn is_origin(sk: &Sketch, e: EntityId) -> bool {
+/// The sketch's Origin point (external, reference only, at 0).
+pub fn is_origin(sk: &Sketch, e: EntityId) -> bool {
     sk.entity(e).is_some_and(|e| e.external && e.reference_only && matches!(e.geometry, noshape_sketch::Geometry::Point { pos } if pos.length() < 1e-12))
 }
 
@@ -8465,6 +8484,15 @@ fn unmeasurable_curve_pair(sk: &Sketch, a: EntityId, b: EntityId) -> bool {
     }
     let ends = |e: EntityId| sk.endpoints(e).map(|(s, t)| vec![s, t]).unwrap_or_default();
     !ends(a).iter().any(|p| ends(b).contains(p))
+}
+
+/// An ellipse and a plane can't be dimensioned (live sk2-1121 dim-ellipse-axes: an ellipse, then the Front plane
+/// behind it: "A dimension cannot be created between these items.").
+fn ellipse_and_plane(data: &SketchData, a: EntityId, b: EntityId) -> bool {
+    use noshape_model::reference::Reference;
+    let ellipse = |e: EntityId| matches!(data.sketch.kind(e), Some(EntityKind::Ellipse | EntityKind::EllipticalArc));
+    let plane = |e: EntityId| matches!(data.external_refs.get(&e.0), Some(Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }));
+    (ellipse(a) && plane(b)) || (ellipse(b) && plane(a))
 }
 
 /// Distances to circles / arcs picked on their rim measure to the nearest
@@ -9939,6 +9967,22 @@ mod tests {
         assert_eq!(lone.selection_readout_icon(&d), Some("circle"));
         lone.selection = vec![c1, a1];
         assert_eq!(lone.selection_readout_icon(&d), None, "pairs have no icon");
+    }
+
+    /// Live sk2-1121 dim-ellipse-axes: the Dimension tool on an ellipse, then a plane: refused with live's words, the
+    /// picks dropped.
+    #[test]
+    fn an_ellipse_and_a_plane_cannot_be_dimensioned() {
+        let (mut ed, mut d) = editor(Tool::Dimension);
+        let ellipse = d.sketch.add_ellipse(v(0.0, 0.0), v(0.03, 0.0), 0.015);
+        let r = d.sketch.use_external(&noshape_sketch::Curve2::Line { a: v(-0.05, 0.0), b: v(0.05, 0.0) }).unwrap();
+        let plane = *r.created.last().unwrap();
+        d.external_refs.insert(plane.0, noshape_model::reference::Reference::Plane(noshape_model::reference::DatumPlane::Front));
+        for (p, e) in [(v(0.03, 0.0), ellipse), (v(0.04, 0.005), plane)] {
+            ed.tool_down(&mut d, p, Some(e), false, false);
+            ed.tool_up(&mut d, p);
+        }
+        assert_eq!((ed.toast.as_deref(), ed.picks.len()), (Some(DIMENSION_FAILED), 0));
     }
 
     #[test]
@@ -12986,6 +13030,23 @@ mod tests {
         let cons = d.sketch.entities().filter(|e| e.kind() == EntityKind::Point && e.construction && !e.external).count();
         let coincident = d.sketch.constraints().filter(|c| matches!(c.kind, ConstraintKind::Coincident { .. })).count();
         assert_eq!((count(&d, EntityKind::Circle), cons, coincident), (1, 1, 4), "(circles, construction points, coincidents)");
+    }
+
+    /// Live sk2-1121 split-at-crossing (geo-list3 / geo-list6): a split by a line's middle cuts at the midpoint, MIDPOINT
+    /// of the line's ends, the pieces collinear and joined; elsewhere where clicked, no MIDPOINT.
+    #[test]
+    fn a_split_by_a_lines_middle_takes_the_midpoint() {
+        let midpoints = |d: &SketchData| d.sketch.constraints().filter(|c| matches!(c.kind, ConstraintKind::MidpointOf { .. })).count();
+        for (click_at, cut, mids) in [(v(0.0153, 0.0002), v(0.015, 0.0), 1), (v(0.02, 0.0001), v(0.02, 0.0), 0)] {
+            let (mut ed, mut d) = editor(Tool::Split);
+            d.sketch.add_line(v(0.0, 0.0), v(0.03, 0.0));
+            click(&mut ed, &mut d, click_at);
+            let ends: Vec<DVec2> = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).filter_map(|e| d.sketch.endpoints(e.id)).map(|(_, b)| d.sketch.point(b).unwrap()).collect();
+            assert_eq!(count(&d, EntityKind::Line), 2, "split in two");
+            assert!(ends.iter().any(|q| (*q - cut).length() < 1e-9), "cut at {cut}: {ends:?}");
+            assert_eq!(midpoints(&d), mids, "MIDPOINT of the ends at the middle only");
+            assert!(matches!(d.sketch.solve().status, noshape_sketch::SolveStatus::Solved), "consistent");
+        }
     }
 
     #[test]

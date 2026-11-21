@@ -1624,6 +1624,8 @@ fn a_dimension_between_a_lines_ends_clicked_quickly_reads_their_distance(cx: &mu
     }
     let picks = cx.update(|cx| { let v = view.read(cx); let d = v.sketch_data(cx).unwrap(); v.sketch.as_ref().unwrap().tool_picks().iter().map(|e| d.sketch.kind(*e)).collect::<Vec<_>>() });
     assert_eq!(picks, [Some(noshape_sketch::EntityKind::Point); 2], "both ends picked, not the line");
+    let origin = cx.update(|cx| { let v = view.read(cx); let d = v.sketch_data(cx).unwrap(); v.sketch.as_ref().unwrap().tool_picks().iter().any(|e| crate::sketch_mode::is_origin(&d.sketch, *e)) });
+    assert!(!origin, "the line's start, not the Origin under it (live sk-1 dim-hv-two-points)");
     // (The ends where the clicks' pixels put them, about 30 mm apart across: live's 29.548 mm.)
     let across = cx.update(|cx| {
         let d = view.read(cx).sketch_data(cx).unwrap();

@@ -1165,10 +1165,11 @@ fn reference_misc_point_composite_query() {
         p.set("name", ParamValue::Text("q".into()));
         p.set("selectionQuery", ParamValue::Query(vec![bd]));
     });
-    s.add("nameEntity", |_| {});
+    let top = top_face(&r);
+    let named = top.clone();
+    s.add("nameEntity", move |p| p.set("entity", ParamValue::Query(vec![named])));
     let pt = Reference::Body(BodyId { feature: s.ps.features[2].id, index: 0 });
     s.add("compositePart", move |p| p.set("bodies", ParamValue::Query(vec![body, pt])));
-    let top = top_face(&r);
     s.add("offsetSurface", move |p| p.set("surfacesAndFaces", ParamValue::Query(vec![top])));
     let r = s.ok();
     assert_eq!(r.context.points.len(), 1);

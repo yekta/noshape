@@ -36,20 +36,25 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (08:46 UTC 11-21)
+## Now (09:33 UTC 11-21)
 
-Queued: 4dbaaee1 (checking 08:25) carrying 724a4f2b: empty features as live dlg-1121; Import / CSV unit list in std's
-order; Routing curve Previous / Next (std 3132, stepped natively with wrap; buttons as live routing-btns-1121).
+LAND FAILED 08:43: 4dbaaee1 + 724a4f2b on features_b::reference_misc_point_composite_query (its filler Name entity was
+empty; 724a4f2b's "Invalid input selections." is live's). Test fixed in tree (names the top face); f90a1ef9 (sk batch,
+queued 09:18) carries the same and will fail too: re-land after the Mac run of model features_a / features_b.
 
-sk-1 + sk-2 (21 takes, live 07:21): scenarios + recordings in tests/ui-parity with the sk fixes commit (queued 09:2x).
-First run vibex8 ~/agents/psui-keep/sk12: 7/21, 300/344 (copy /root/psui-scratch/sk/sk12; stepdiff.py <repo> <live>
-<ours>). Fixed (scene 195 / sketch UI 311 green on the Mac): Show constraints checkbox marked (5 takes stopped there);
-no "Sides: n" message; run.py sorts dimensions (live lists them in model map order); an Origin pick doesn't relate the
-sketch; Transform arrows leave a distance box (+72, -48 px) that opens for typing, Esc closes only it; a dragged point
-takes nothing on a curve it lay on at the drag's start (polygon side midpoint); a sketch point on the Origin is
-inferred before the Origin (3pt circle). Rerun sk12b on vibex8 (built before the last two): stepdiff the rest, most
-used first. Asked live (REQUESTS 08:40): centre point arc end on a point off its circle (cparc-clockwise-onto-point:
-live VERTICAL, no COINCIDENT). Then the dialog table (item 8 b).
+sk-1 + sk-2 (21 takes, in tests/ui-parity with f90a1ef9). Rerun sk12b (vibex8, copy /root/psui-scratch/sk/sk12b):
+12/21, 306/344. In tree since (not in sk12b): polygon drop (curves held at the drag's start), 3pt circle Origin tie;
+a sketch point on the Origin picked before it (sketch_pick_at; dim hv-two-points, circle-centres); Split by a line's
+middle cuts at the midpoint + MIDPOINT of its ends (live geo-list6); an ellipse and a plane refused with
+DIMENSION_FAILED (dim-ellipse-axes); tests in scene sketch_mode + sketch_ui_tests. Open: transform-drag-copy (live's
+arrow drag leaves the box focused "9.9 mm"; ours no focus: arrow hit in iso view?), circle-rims step 22 (our click on
+circle 1's rim at (-5, 0) picks nothing), split-at-crossing step 11 (live PERPENDICULAR to the crossed line, ours
+VERTICAL: no rule known), circle-centres "Construction" tool readout while a construction point is picked,
+cparc end off-circle (REQUESTS 08:40). Shots of 3 takes: vibex8 ~/agents/psui-keep/bin/shots.sh (frames every 0.4 s)
+-> ~/agents/psui-keep/shots (waiting on slot).
+
+qa P1 FEEL-ROW-DBLCLICK-DISTANCE: closed by qa (xev-measured gaps on vibe2: 80 px opens to ~380 ms, not ~420, as one spot).
+Then the dialog table (item 8 b).
 
 std 3132 vs 3112 (reported to lead 06:5x): our crates/featurescript/std is exactly 3112; 14 files / 181 lines differ
 (live/std-3132, live/std-3132-vs-3112.diff, stddiff.py in psui-scratch/std). Geometry ones (SM pattern collapsed

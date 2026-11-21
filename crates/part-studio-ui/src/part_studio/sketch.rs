@@ -819,6 +819,12 @@ impl PartStudioView {
             Some(s) => data.sketch.pick_with_report_on_screen(p, r, &s.report, screen.as_ref()),
             None => data.sketch.pick_on_screen(p, r, screen.as_ref()),
         }?;
+        // A sketch point on the Origin is taken before the Origin (live sk-1 dim-hv-two-points: the line's start there).
+        let at_origin = |x: &&noshape_sketch::Entity| !x.external && matches!(x.geometry, noshape_sketch::Geometry::Point { pos } if pos.length() < 1e-12);
+        let e = match crate::sketch_mode::is_origin(&data.sketch, e) {
+            true => data.sketch.entities().find(at_origin).map_or(e, |x| x.id),
+            false => e,
+        };
         self.in_sketch_reach(e, p, cx).then_some(e)
     }
 
