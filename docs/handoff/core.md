@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-21 10:31 UTC (lead order 11-21: STD-3132, SPEED-VALVE-CONFIG, KNIFEHANDLE, infento chamfer sense, then THICKEN-DIRECT). Mac: builds + crate tests via NOSHAPE_RB_HOST=mac tools/tiers/rb.sh, single-model repros in ~/noshape-host/core-keep/models. Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-21 11:52 UTC (lead order 11-21: P0 trunk-hanger, then knife loft + infento chamfer sense, then THICKEN-DIRECT). Mac: builds + crate tests via NOSHAPE_RB_HOST=mac tools/tiers/rb.sh, single-model repros in ~/noshape-host/core-keep/models. Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
@@ -22,18 +22,24 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   sheet is downstream (Bridging curves on wrong geometry). Goes with the Face blend 1 item.
 - **SPEED-VALVE-CONFIG LANDED c17f6eaab.** Impeller Delete face 2 / Extrude 4 speed PARKED (lead 11-21): from feature 29
   our impeller is a wrong model (Halter, Extrude impellerraum 38 vs 59 faces); wait for blend's cascade fix.
-- **STD-3132 QUEUED 11-21 10:31 (core-th):** std/ = live/std-3132, STD_VERSION/LANGUAGE_VERSION + templates 3132,
-  @setThinWallOneSided no-op (status.rs + native_args IGNORES_MAP), 3112 as a pack. Suite pair vibex7: 126/176 docs,
-  1879/2327 features both sides, every first difference and custom-feature line identical (24 SM docs included). Tell
-  skasm when it lands.
-- **KNIFEHANDLE-LOFT1 + INFENTO-CHAMFER-SENSE (core-bis2, branch core-thd, 2 commits on 2f740a084, not queued):**
+- **P0 TRUNK-HANGER (lead 11-21, skasm bisect): 18354ec79's region dedupe broke c2-genesis-trunk-hanger's Sweep 1**
+  (profiles A, B, A; live sweeps A twice; 20 -> 12/73). Fixed forward (queued 11-21 ~11:55 from core-cache): picked_regions
+  as before, EvalCtx::distinct_regions only for Extrude (impeller Extrude 4 keeps its speed-up). skasm on the Mac:
+  18354ec79 + fix = 20/73. Main is still 12/73 (same Sweep 1 100/200/100 vs live 73/152/80, Mac and vibex7): a SECOND
+  cause landed between 18354ec79 and ~10:00 (vibex7 main 12/73 at 10:00). Bisecting in core-th on vibex7 with the fix
+  cherry-picked (/root/core-scratch/bis-run.sh <commits>; candidates a111a35f7, 9612b4685, f3f4d2334, a9c26c41c,
+  c62392284, c17f6eaab).
+- **STD-3132 LANDED 8631c5717** (skasm told).
+- **KNIFEHANDLE-LOFT1 + INFENTO-CHAMFER-SENSE (core-bis2, branch core-thd, 2 commits, not queued):**
   k::loft_guided_multi (loft_guided.cpp: stations by chord length between profile centres, guides mapped by monotone
   cubic, columns interpolated, Hermite tents across the guides, u-periodic grid fit, seam through guide 0, the end loop
-  split at the other guides): knifehandle Handle 1/2/3 as live, area 21387.08 vs 21477.23 (-0.42 %), Loft 1 38 ms (live
-  40); the doc's first difference stays Sweep 2 (Blade -1.4 mm2), then Fillet (feature 10) ERROR. Its P4 sketch fix was
-  live's sketches.json in the parity models (translator unchanged). Chamfer: detail.rs blend_edge_senses (new edges
-  run as the neighbour face's loop runs them; live core/infento-chamfer-sense-1121.json). Suite pair on vibex7 running
-  (base core-cache at 2f740a084, branch .kp.sh also runs asm-infento-subs alone). Then land.
+  split at the other guides): Handle 1/2/3 as live, area -0.42 %. Suite pair vibex7: every document's count unchanged
+  (1880/2327 both). But knifehandle now builds Loft 1 / Mutual trim 1 / Boolean 1 / Fillet 1 (base failed them in 2 ms)
+  and they are still wrong: Mutual trim 1's Surface 2 1/5/4 (live 1/1/0), Boolean 1 a sheet (live solid), Fillet 1
+  ERROR after 3 s -> doc 0.7 -> 3.8 s on the Mac. Grid halved (12 per guide x 24 rows, same area, Mutual trim 338 ->
+  180 ms, uncommitted in core-bis2). NOT landing the loft until Mutual trim / Boolean 1 are right (no 3 s regression).
+  Chamfer (blend_edge_senses, live core/infento-chamfer-sense-1121.json) lands alone once asm-infento-subs (queued in
+  vibex7's slot) shows Linear pattern 1 at +y.
 - **THICKEN-DIRECT next:** core-bis2's .thv.sh (vibex7) dumps every thicken input of the 20 thicken docs
   (NOSHAPE_DUMP_ONLY=thicken) into ~/agents/core-keep/thdump/<doc>; then the direct builder (offset faces trimmed at
   concave sharp edges, ruled walls, sewn; OCCT fallback; same faces/edges/volume as OCCT on every dump).
