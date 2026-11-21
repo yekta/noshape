@@ -5,6 +5,25 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## qa, 2026-11-21 (x86 speed, 02:00-04:00 quiet window, vibex8 release build of green f9ad07b50)
+Model suite 02:00-02:14 alone on vibex8 (load 0.1-1.4): 118/174 documents, 1840/2315 features. Gaps counted at >= 2x and >= 100 ms
+(regen ms ours vs live; live = parity corpus timings). Part Studio speed reference (CLI, vs live's server column, behaviours "Speed
+reference (11-20)"): ours is faster on every edit, undo and roll except c2-impeller-loft (below); screws, surfaces-lofts-projected
+and opt-mirror-pattern-ops rerun after a script error (results to follow).
+- [ ] P0 **SPEED-SPLIT-THICKEN (core)**: c2-surf-workshop-split regenerates in 410 ms vs live 112 (3.7x); Thicken 1 takes 316 ms.
+  It was 56-124 ms in 0.4.60 and 407-756 ms in 0.4.61 (the same alternating run, nightly/models-1120.jsonl), so this is a
+  regression. Cause: core 7dd227351 ("Thicken of a sheet whose faces meet at an angle … c2-surf-workshop-split's Thicken 1"),
+  the only Thicken change between them. Wanted: that shape at no more than 2x of live (<= ~220 ms) with its parts kept.
+- [ ] P1 **SPEED-MUTUALTRIM-FILLET1 (blend)**: c2-surf-workshop-mutualtrim 384 ms vs live 76 (5.1x); Fillet 1 takes 308 ms. Not a
+  regression: Fillet 1 failed until 0.4.61 (Error -> Ok), so this is its first cost.
+- [ ] P1 **SPEED-VALVE-CONFIG (core)**: c2-valve-config 443 ms vs live 175 (2.5x); Circular pattern 1 takes 201 ms. It was at 1.9x
+  (308 vs 164) in an older run (row "Near the bar"); now over the bar.
+- SPEED-IMPELLER (P1, below) on the user action: editing Extrude 3 takes 24.7 s vs live's server 3.5-3.7 s (6.8x), undo 2.0 vs
+  0.9-1.1 s, open 24.8 s; regen 23409 ms vs live 2773 (Fillet Flansch 5261 ms). bool's 908abe7b8 (the flange fuse) is not in
+  this build; to recheck on the first green that has it.
+- At the bar, not filed: c2-config-parts-screws 547 vs 266 ms (2.06x), c2-hunting-knife 1257 vs 622 ms (2.02x; editing Extrude 1
+  takes 2.45 s vs live's 1.58, 1.55x).
+
 ## qa, 2026-11-21 (compat alerts on green 2407ded2)
 - [ ] P1 **KNIFEHANDLE-LOFT1 (core)**: c2-surf-workshop-knifehandle's Loft 1 (feature 24) fails on ours; live builds it OK, solid
   "Blade" 11 faces / 27 edges / 18 vertices, 10392.85 mm³ (parity corpus live.jsonl). Ours failed in 0.4.63 too ("Could not create
