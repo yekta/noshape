@@ -18,6 +18,16 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   regression: Fillet 1 failed until 0.4.61 (Error -> Ok), so this is its first cost.
 - [ ] P1 **SPEED-VALVE-CONFIG (core)**: c2-valve-config 443 ms vs live 175 (2.5x); Circular pattern 1 takes 201 ms. It was at 1.9x
   (308 vs 164) in an older run (row "Near the bar"); now over the bar.
+- [ ] P1 **SPEED-ASM-OPEN (asm)**: opening asm-scissor-lift takes 30.5-31.5 s to solved (live's server finishes at 8.3-10.7 s, 3x)
+  and asm-infento-subs 42.1-42.6 s (live 8.9-11.3 s, 4x). Nearly all of it is the first assembly_list (document_open 0.05 s).
+  The other three are as fast as live or faster: robot-relations 4.6-5.3 s (live 9.4-11.2), isaac-ball 13.9 (8.3-13.1),
+  pattern-std 13.4 (40-67). Measured with qa-scratch/bin/speedref_asm.py: a fresh CLI on a fresh copy of the
+  parity_assemblies-saved document, 3 runs each. Wanted: where the 30-42 s goes (Part Studio regens or the solve), then at
+  most 2x of live.
+  The drag was not comparable, so it is not filed: 6 assembly_transform steps of +2 mm take 0.23-0.30 s each (live's
+  in-drag server reply is 0.03-0.13 s), but it is a numeric move, not the app's drag. It moved 2 / 0 / 1 / 1 instances where
+  live's drag moved 132 / 8 / 12 / 8, and the infento handlebar didn't move at all. The app's drag path needs its own
+  measurement.
 - SPEED-IMPELLER (P1, below) on the user action: editing Extrude 3 takes 24.7 s vs live's server 3.5-3.7 s (6.8x), undo 2.0 vs
   0.9-1.1 s, open 24.8 s; regen 23409 ms vs live 2773 (Fillet Flansch 5261 ms). bool's 908abe7b8 (the flange fuse) is not in
   this build; to recheck on the first green that has it.
