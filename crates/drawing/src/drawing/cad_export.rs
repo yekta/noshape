@@ -865,7 +865,8 @@ impl Sheet<'_> {
                 EntityType::Line(Line::from_points(p3(a), p3(b)))
             }
             // Export splines as polylines: a vertex at each ~3.5° of turn (live-opt-drw-poly: 2.98–3.67° on average
-            // between segments), a 3D POLYLINE, or an LWPOLYLINE when two points are left.
+            // between segments), a 3D POLYLINE on layer 0 with its vertices (live's, whatever the edge's layer), or an
+            // LWPOLYLINE on the edge's layer when two points are left.
             None if self.g.splines_as_polylines && MODEL_EDGES.contains(&self.g.cad_line_layer(li)) => {
                 let pts = turn_vertices(&l.points, SPLINE_POLYLINE_TURN);
                 if pts.len() == 2 && !l.closed {
@@ -874,7 +875,7 @@ impl Sheet<'_> {
                     let mut e = Polyline3D::from_points(pts.iter().map(|p| p3(*p)).collect());
                     e.flags.closed = l.closed;
                     for v in &mut e.vertices {
-                        v.layer.clone_from(&layer);
+                        v.layer = "0".into();
                     }
                     EntityType::Polyline3D(e)
                 }
@@ -902,8 +903,9 @@ impl Sheet<'_> {
                 EntityType::Polyline2D(self.polyline(&l.points, l.closed, continuous))
             }
         };
+        let on_zero = matches!(e, EntityType::Polyline3D(_));
         let common = e.common_mut();
-        (common.layer, common.color) = (layer, c);
+        (common.layer, common.color) = (if on_zero { "0".into() } else { layer }, c);
         if dim {
             common.line_weight = LineWeight::Value(13);
         }
@@ -2126,7 +2128,7 @@ mod tests {
         }).collect();
         types.sort();
         assert_eq!(types, ["CENTER", "CONTINUOUS"]);
-        // Export splines as polylines: a 3D POLYLINE on the edge's layer with a vertex each ~3.5° of turn (live
+        // Export splines as polylines: a 3D POLYLINE on layer 0 with a vertex each ~3.5° of turn (live
         // live-opt-drw-poly), the ELLIPSE kept.
         g.splines_as_polylines = true;
         let doc = acadrust::DxfReader::from_reader(std::io::Cursor::new(to_dxf_version(&g, 4, DxfVersion::AC1015).unwrap())).unwrap().read().unwrap();
@@ -2138,7 +2140,7 @@ mod tests {
         }).collect();
         assert_eq!(polys.len(), 2, "the wave and the free-form ellipse");
         let wave3 = polys.iter().find(|p| (p.vertices[0].position.x - 20.0).abs() < 1e-9).expect("the wave");
-        assert!(wave3.common.layer == "Visible" && wave3.vertices.iter().all(|v| v.flags == 32), "{:?}", wave3.common.layer);
+        assert!(wave3.common.layer == "0" && wave3.vertices.iter().all(|v| v.flags == 32 && v.layer == "0"), "{:?}", wave3.common.layer);
         assert!((10..=41).contains(&wave3.vertices.len()), "{}", wave3.vertices.len());
         let end = wave3.vertices.last().unwrap().position;
         assert!((end.x - 60.0).abs() < 1e-9 && (end.y - wave[40][1]).abs() < 1e-9);
