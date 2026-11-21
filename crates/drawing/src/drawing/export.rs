@@ -246,7 +246,8 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
             tf.push(g.text_font(i).cloned());
             continue;
         }
-        out.exploded_layers.extend(kind);
+        // Its layer stays in the table (live's polyall keeps ANNOTATION_TEXT for the empty view labels).
+        out.exploded_layers.push(g.cad_text_layer(i));
         if !o.strokes && !font::text_is_stroked(&t, g.text_font(i)) {
             let (pts, idx) = font::text_fill_font(&t, g.text_font(i));
             for tri in idx.chunks(3).filter(|c| c.len() == 3) {
@@ -1457,6 +1458,11 @@ mod tests {
         assert!(dxf.contains("\nANNOTATION_TEXT\n"));
         g.texts.pop();
         let p = prepare(&g, &ExportOptions { explode_all: true, strokes: true, ..Default::default() });
+        assert_eq!(p.exploded_layers, [CadLayer::AnnotationText]);
+        // An empty view label has no layer span: still ANNOTATION_TEXT.
+        let mut g = SheetGeometry::new(279.4, 215.9);
+        g.texts.push(Text2 { pos: [80.0, 50.0], height: 5.0, text: String::new(), angle: 0.0, anchor: Anchor::TopCenter, pick: 0 });
+        let p = prepare(&g, &ExportOptions { explode_all: true, ..Default::default() });
         assert_eq!(p.exploded_layers, [CadLayer::AnnotationText]);
     }
 
