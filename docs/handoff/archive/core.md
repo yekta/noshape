@@ -4669,3 +4669,100 @@ skasm meanwhile; I'll list what I change here before landing.
   live; its 2 blend faces stay rational B-splines (u6 v2; parallel-axis cylinders, live cylinders): SurfToAna gap?
   Next: Face blend 1 across parts, body-draft-naming Fillet 1 (live 6 B-curve edges, ours 2), genesis snap-holes
   (live ellipses), Fill 1, sweep twist.
+
+## 11-18/19 (archived 11-21 06:33)
+- **Lead 11-19:** cpcurves Sweep 5's 8/9/2 (live splits the R16 circle into a CIRCLE arc + an OTHER curve) is live's
+  representation, a known difference, not a target. Build hosts: the lowest 1-min load of vibex7/vibex8/vibe2 each
+  time (DECISIONS a67911bef); private docs on vibex7 only.
+- **LANDED 11-19:** loft sections of different edge counts refused 82d75f4a5 (P0); Thicken one-sided intersection join
+  7dd227351 (split 12/12; singularities corpus exact); Routing curve multiDx/Dy/Dz/RotationMatrix aeb0cc0a7 (live2 audit
+  row 4; psui told: the multi triad / toggle-points manipulators are UI + host manipulator kinds).
+- **nuts (c2-config-parts-nuts):** on main Sweep 1 volume = live (135.2676), faces 29 = live; one face type off: live's
+  thread crest is an exact cylinder, ours OCCT's B-spline (also Revolve 2, Part Number 1). nuts3 59df02227 stays
+  dropped. WIP core-loft branch core-helixcyl 9c5711eab turns a helical sweep's crest/root into exact cylinders (kernel
+  T1 a_helical_teeths_crest_and_root_are_cylinders passes, Pappus volume) but OCCT's Boolean of a cylinder face wrapping
+  22 turns is invalid (thread::helical_teeth_add_to_the_core): parked. Probes vibex8 ~/tmp/core/nutsrec (ftypes, cylfit).
+- **Wave-washer ring: core-rp branch core-ring5 fc8b33664 (committed, NOT landed):** sections = every profile carried by
+  a rotation-minimising frame, mixed with natural-spline weights over the profiles' arc places (first profile again at
+  s = total), stations total*i/(N+1) (core-scratch/ring/nat.py: live's sections to 0.06 mm); skin = natural_loft
+  periodic (periodic_seam_derivative clamps both ends) at chord-length params; ThruSections iso unsmoothed first.
+  Fix inside: natural_loft read a REVERSED face's closed edge pcurves swapped (CurveOnSurface flips, UpdateEdge
+  doesn't): now read on the face taken forward (affects every natural loft with reversed faces: suite pair needed).
+  Doc: 7/7 match, Loft 1 2079.32 vs live 2080.67 mm3, 109 ms (was error / 1453 ms); vs live's faces max 0.163 / mean
+  0.014-0.064 mm (bar 0.1: DECISION ASKED of the lead 23:20). Residual = live's knots (.1722 .2519 .3339 .5 .6702
+  .7504 .8319, asymmetric) vs our chord (.1694 .2506 .3322): rule unknown (kn.py / kn2.py). Kernel T1 features::
+  a_loft_round_a_closed_path_mixes_its_sections_from_every_profile. SUITE PAIR running 23:20 on vibex8: branch
+  ~/tmp/core/g/run-ring5.log, base (core-cache detached at 2f9ab4c4c) run-base5.log; local log
+  /root/core-scratch/ring5-suite.out. Compare SAME-PER-DOC + validity, then g++-13 build, then land if the lead OKs.
+  Probes: vibex8 ~/tmp/core/{ringl,ringsurf,pcv,chk,spar} (src core-scratch/brepq/).
+- **asm isaac a2e4a2 Chamfer 2: CLOSED 11-19 (asm: Part 1 39921.44 mm3 fits live on main; the rest is asm's connectors).**
+  PROBE lines `// PROBE` in features.cpp (nl false / ok valid, ring wires, ringloft dump) to strip before landing.
+  Tools: vibex8 ~/tmp/core/ringl <wires.brep> ring-live-surf.txt (src core-scratch/brepq/ringl.cpp), .r5.sh. Bar 0.1 mm
+  (0.17 would need the lead: decision).
+- **11-19 afternoon:** guided-loft conditions e02fe92f (queued/landed: Normal to guide aslant -> BSURF_INCONSISTENT text;
+  start/end conditions checked against guides; T1 a_guided_loft_with_guide_and_end_conditions_as_live). f197 closed
+  (Mirror 3 splits one B-spline edge at (1.2061,39,20): DECISIONS 11-16). surf-intro Derived 1 +0.1 in = asm's
+  90d254008 (handed to asm; live's body differs, can't judge). qa re-saved cpcurves/mutualtrim: left cpcurves Split 5
+  Info + extra 1227.58 mm3 part (= Split 3 keeps the wrong piece) -> after pipe.
+- **Re-queued 21:20 b9d47a3d** (failed 18:07 on the batch partner's coverage row "partStudio:Row B", not ours).
+- **Pipe Loft LANDING 11-19 (lead: within 0.1 mm of live where ours errored lands, DECISIONS 11-19):** core-loft
+  core-nloft2 9a112af34 + checklist 2d162d3e8: loft_guided_open through > 2 open profiles: a natural cubic across the
+  profiles (live: zero 2nd derivative at the end profiles), each profile paired by its own curve parameter (live's section
+  points sit at parameter share u), a guide's derivative ignored (live2: None / magnitude 2 / 10 identical poles); start /
+  end conditions there still refused. 0.093 mm max two-way off live's face, area 600.16 vs 596.66 (the tube's curvature
+  turns 0.05 mm into 0.6 %); kernel T1 a_surface_loft_through_three_profiles_along_curved_guides_is_live_s_face (live2's
+  curves, boundaries < 1 um, interior < 0.1 mm). Parity row stays: live skins ~13 sections of its own rule with C1 cubics
+  (rest in v .55-.75, mid u). Tools: vibex7 ~/tmp/core/livesurf, projpt (BRepExtrema glitches 4.7 mm here), devlive.
+- **singularities Mirror 3 QUEUED 21:25 072505c2:** a surface mirrored / patterned with Add joins the surfaces it
+  touches (merge scope + seeds) into one sheet (live: one 2-face sheet); singularities 2 -> 5/15, 30-doc subset otherwise
+  same (vibex7 ~/tmp/core/glm.log vs glsl.log). T1 features_a::a_surface_mirrored_with_add_joins_its_mirror. Next there:
+  Loft with bad singularity (ours errors, live 3425 mm2 sheet).
+- **asm a2e4a2 Chamfer 2 (isaac):** blend's bb667320d removed its state difference (see asm isaac 23:00 above). a2e4a2 left: Chamfer 4
+  "Failed to chamfer selections." (blend's?), Extrude 15/16 (vibex7 ~/agents/asm-keep/suite/h1119-asm-isaac-ball.out).
+- **qa compat 11-19 17:0x answered:** split's corpus copy had Split 2's selection saved while Extrude 1 failed (qa re-saved,
+  12/12); singularities Thicken 20 084.5 mm3 exact for our input (22 880 - 90 deg concave corner 2 795; 7dd227351).
+- **asm 11-19 FYI (asm-suspension, studio geometry, mine when reached):** 805e29 Fillet 3/4 fail -> Knuckle a 0-volume
+  sliver; 995636 Body two parts (90 419 + 4 712) vs live one 109 049 mm3, Cup / Cap off. Trace vibex7
+  ~/agents/asm-keep/susp.out.
+- **Volume measure warning:** on impeller parts OCCT's plain Gauss VolumeProperties is ~1.2 % off (input 97755.8 vs
+  mesh-converged ~96555, kernel props 95977.8 after the delete ~= mesh): the old "OCCT 97123.4" targets were plain
+  Gauss. Compare with kernel props (replay prints them) or vibex7 ~/tmp/core/imp/mvol (mesh).
+- **Fan-blade P0 (fix forward):** main after core-oc 1484 ms vs 0.4.56 730; Boolean 2 877 vs 122 (live 364). bool's
+  b5b566884 drops the wasted Rust attempt; my lever: per-tool offsets' edges 52 + check 24 ms (NOSHAPE_OFFSET_DEBUG=1).
+- **Queue after those:**
+  1. qa: c2-fan-blade-sweep Boolean 2 (~1.2 s loaded vs live 364; 75-88 ms before my exact offsets, which fixed the
+     volume): offsets 2 x ~176 ms in parallel (edges 73, volume check 62 -> ~17 with adaptive GProp: core-oc 482163a60), noshape Boolean decline ~300 ms + OCCT ~1.3 s on the exact offset faces (bool's). B-spline
+     approximation of the offsets: slower, dropped.
+  2. pulleys Circular pattern 1 speed (273 ms unloaded vs live 23): bool took the Boolean (arc across a seam).
+  3. c2-loft-paths-guides: see 4c (centripetal path loft, pair waiting).
+  4b. asm a04711 Extrude 4 "non-manifold" (asm's c22): our op_boolean's OCCT path cuts Part 3 to 422.23 mm3 (13 faces,
+     non-manifold) where plain BRepAlgoAPI_Cut on the recorded case gives live's 213.964: sent to bool 22:40 (case
+     vibex8 ~/tmp/core/a04rec/ad565563c0275193, probe ~/tmp/core/probefan/cutp, src brepq/cutp.cpp).
+  5. asm (P2, on its unlanded asm-partorigin): robot-relations 0c3466 Thicken 1 of live's sheet JFD's 28 faces gives 11
+     tiny parts (8.5 mm3) vs live one part 223.99 mm3 (silent wrong geometry until one part or an error); repro vibex7
+     ~/agents/asm-keep/m0c with ~/agents/asm-keep/bin/ops-c05.
+  6. dx (P2): GearLab 8f5622 faces fixed in core-oc (074b9b7ed); its speed 12.9 s vs live 1.15 s is next after it.
+  7. asm (low): asm-pattern-std 36b90f Extrude 12 (feature 41; ADD, both directions UP_TO_SURFACE to RCBW, draft 3 deg;
+     twin Extrude 11 matches): AR-S1/S2-108.2 17/43/28 vs live 14/36/24, volume/area = live (3 faces split where live's
+     caps merge; not the Boolean per bool). Repro vibex8 ~/agents/asm-keep/mps/run.sh <bin tag> (mps/36b90f).
+  8. asm (low): asm-robotic-arm 21ab69 Extrude 2 523/1504/992 vs live 540/1574/1032; repro vibex7 ~/agents/asm-keep/mra/run.sh.
+- **core-pipe2 (core-trace; HELD by lead until Split 1's Surface 1 = live 9608 mm2):** 3e106dca0 N-profile guided loft
+  without conditions, 829ac26ef intersection n1 x n2, f6aa8f16f parity pairs by type, bd2a1af82 sheet halves,
+  a1142dcfb Move boundary on free-form sheets (extend_face_sides) + Keep front by a sheet piece's area (T1s).
+  manualblend now: Sweep 2 8223.1 (live 8224.9), MB2 9102.5 (9104.4), MB1 = live, Split 1 6 parts as live but Surface 1
+  9594.6 vs 9607.8. Root: our Intersection curve 1 (Loft 1 x Sweep 1) starts 0.057 mm beside live's (Sketch 5's circle
+  centre, stored at live's curve end, Concentric to it: the harness keeps live's position), so the tube is off-centre.
+  Next: why the section starts 0.057 mm off (inputs meet at a shallow angle? needs live's surfaces / x_t).
+- **Lofts (mine, from dx's list):**
+  c2-loft-guide-curves-wave-washer Loft 1: Sketch 4's rectangles are 63.5 mm off live's (an external COINCIDENT to
+  live vertex JHk/JH4 unresolved: in skasm's handoff 11-16), which explains the "83 mm off the ring" below; redo the
+  closed-path WIP once skasm fixes that. 4 profiles along a closed path; live closes it (4/4/0, 2080.8 mm³). WIP
+  /root/core-scratch/loft-closed-path-wip.patch closes it round the path but comes out −11279 mm³: two profiles sit
+  83 mm off the 26 mm ring, so MakePipeShell's carried sections twist. c2-surf-workshop-pipe: guided loft of more than
+  two profiles unsupported (a Gordon surface over n profiles: big kernel item).
+- Probe (uncommitted, /root/core-scratch/probe-wip.patch): ops parity::bodies_after_feature_probe (+ NOSHAPE_PROBE_SKETCH: a
+  sketch's regions)
+  (NOSHAPE_PROBE_DOC = a copy WITH its -wal / -shm, NOSHAPE_PROBE_AFTER, NOSHAPE_PROBE_OUT, NOSHAPE_PROBE_PART,
+  NOSHAPE_PROBE_TAB): bodies as .brep, a part's faces (surface, edge indices), edges and vertices with shown flags.
+  Saved documents' part names are Part N, not live's.
+
