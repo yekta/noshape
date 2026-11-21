@@ -9,34 +9,30 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
-## Now (03:30 11-21): HGR (dx-land) / EXCHANGE (dx-urdf)
-- LANDED 3f5d8b6f + b4f52649 (dx-land): parity translates a Frame's SWEPT_FACE and a Hole's HOLE_FACE shaft (hgr
-  Hole 3 35 -> 36/52); a straight Frame member's side edges run along its path (frames.rs along_path: op_prism sweeps
-  back toward the sketch, live's Frame is opSweep): hgr 36 -> 46/52; VALID-HGR-FOOT-OFFSET closed. 3-way A/B on vibe2
-  (/root/dx-scratch/ab3.out, ~/agents/dx-keep/ab3.sh): 14 docs, no loss. Probe ~/agents/dx-keep/hgredge.sh <index>.
-- c2-sm-louver 36 -> 35 came from main (Sketch 9 frame origin): skasm's.
-- LANDED 5aecd7e2: Cut list keeps a selected part that isn't a frame (hgr 46 -> 47/52).
-- LANDED 016c2ab0: a std or custom feature's number reads a Variable feature's value (custom run.rs
-  took ev.ctx into the FS context before definition() evaluated the params: "Variable not found"): hgr 47 -> 52/52,
-  matches to the end. A/B on the Mac (~/noshape-host/dx-keep/abvar.sh, /root/dx-scratch/abvar.out): 12 docs, the
-  rest equal. Test custom_features::a_custom_features_length_reads_a_variable_features_value.
-- LANDED 04f5085d (dx-urdf exchange batch): glTF nodes as parts, flattened STEP names, IGES compat + sewn read, zips,
-  DXF splines as polylines, exploded glyph outlines, Parasolid v28 read (exo d options 39/50, read back 43/62).
-- LANDED 02ac91ea (dx-urdf, 3 commits): spline POLYLINEs + VERTEXes on layer 0 (lead 11-21: copy live's layers unless
-  that loses geometry); exploded text keeps its layer in the table (duct polyall ANNOTATION_TEXT); IGES compat writes
-  B-splines only (NurbsConvert, closed faces halved): housing's file reads back as the solid (was a sheet, area 1367 vs
-  1630 mm2); queued f9fcc67e: a face of revolution over 180 degrees split too (ShapeDivideAngle pi):
-  housing's file has live's 46 / 52 / 104 (144 / 142 / 102). Read back 39/91/54 (live's file 36/80/45): our merge
-  (boolean.cpp merge_same_surface_faces) leaves 2 pairs: the full cone z 4-5 (halves at y=0 as
-  live's, recognized alike to 1e-9) and the cylinder r13 z 0-1.5; suspect the sew / pcurves of our halves, not the split
-  (probe: a kernel test printing read_iges_parts faces' face_surface / area; files /root/dx-scratch/igc). Mac drawing 263, ops e2e 272, kernel 550 ok; housing suite ~/noshape-host/dx-keep/exs-igc (exx.sh).
-- c2-impeller-loft on main 016c2ab0 (bool's fuse landed): 24 -> 27/48, first difference Fillet 3 (39/113/71 vs live
-  34/95/62: SUITE-IMPELLER-FILLET3, core/blend); regenerates in 12.2 s, live 2.8 s (Fillet 3 3.1 s). hgr 52/52 on main.
-- Open exchange rows: DXF-POLY MTEXT vs live's LWPOLYLINE (textOption, REQUESTS), housing IGES
-  compat import 36/80/45 vs 36/79/44 (read back 39/91/54), STL-YUP / multipart STL (ticket).
-- live 11-21 00:0x: speed reference complete (10 Part Studios + Assemblies 1-5, behaviours "Speed reference (11-20)");
-  server-side only for drags (SwiftShader frames).
-- textOption: REQUESTS asks live whether "true" = notes or all; the suite maps true -> explode_notes until then.
+## Now (05:20 11-21): EXCHANGE (dx-urdf)
+- LANDED f42d3736 (docs): docs/parity/formats.md "Translator options audit": every format / option live offers, ours
+  full / partial / untested; no format or option missing (3MF, OBJ, ACIS, glTF all have ops, e2e and suite rows).
+- QUEUED (land.sh 05:15, dx-urdf, 3 commits): 3912e394 drawing DXF / DWG "Explode into polylines (notes)" explodes
+  every text (DXF-POLY rows match on duct + housing); f5cfb364 OBJ / 3MF / glTF / GLB facet with STL's faceter without
+  its minimum facet width (housing 3MF Coarse / Medium / Fine 1132 / 2156 / 5710 tris, live 1258 / 2340 / 6188, were
+  2160 / 4332 / 11512; test obj_and_3mf_presets_facet_as_onshapes); 0b69ee32 suite: an OBJ / 3MF with no live file
+  held to the model, not live's 5-degree STL. Mac: ops e2e 273 ok, clippy clean. Suite run 3 (exs-full3.log): 63 rows
+  off live (run 1 62, run 2 71); new off: rings-loft OBJ / 3MF area -0.108 % (ours 20746 tris, live 26760: coarser on
+  its B-spline / cone faces), sm-louver OBJ.
+- ACIS (c2-extension-spring area 600.7855, live 600.7224, band to 600.7827): the two side planes 150.4149 mm2 each;
+  the SAT's own 3D curves give 150.3934 (/root/dx-scratch/bin/satarea.py file.sat <face>), our edges' lengths equal
+  them. Cause: tolerant edges (0.0325 mm: 3D cubic vs quadratic pcurve) -> heal_import's SameParameter approximates the
+  plane pcurves. Fix in progress: plane faces' pcurves as exact projections after healing (sat_read.cpp).
+- glTF: our `compress` is stored but writes nothing; live writes KHR_draco_mesh_compression (live-opt-compress.glb /
+  .gltf) and we can't read those files (POSITION accessors without a bufferView). Plan: draco-core 2.3.3 (pure Rust,
+  Apache-2.0, dep bytemuck) to read and write. Live's glTF: a primitive per face with TEXCOORD_0, ours one per part.
+- live batch 2 (behaviours "Exchange option coverage, batch 2"): 17 cases on housing, 13 on duct (Rhino V6 / V7, STEP
+  preprocessing on duct rerun 17:20 UTC). Next: add them to parity.rs OPTION_FILES (JT, PVZ, GLB Coarse / Fine /
+  Compress, GLTF-COMPRESS, Parasolid 25 / 33.1, Rhino V2 / V4 / V6 / V7, STEP-PRE-AUTO / BSURF, IGES-POSTPROC,
+  PARASOLID-DENSITY) with markers (SCH_2500000, "3D Geometry File Format       60", no PLANE( in BSURF).
+- Drawing rows (2/10): bottle Front's lip arc 41.8..180 deg (live 90..180) and views 0.015 in low; hex iso circles as
+  LWPOLYLINE (live ELLIPSE); faceblend ELLIPSE vs SPLINE; the rest hidden-line geometry. Files /root/dx-scratch/drw.
+- Open: multipart STL import 2 parts (live 4/9), housing IGES compat read-back 39 vs 36 faces, Rhino 45 vs 46.
 
 ## In flight: data exchange (lead 08:0x)
 Task: 10 corpus docs x every format + a drawing vs live's exports; re-import live's STEP / x_t; times vs live's.

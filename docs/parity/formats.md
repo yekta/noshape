@@ -41,7 +41,7 @@ Every option live shows has an `export_parts` / `import_files` parameter: no for
 | all | Export unique parts as individual files (off) | `individual` | full | STEP-SPLIT, STL-SPLIT: zip entries as live's |
 | all | Include hidden instances in export (off) | `include_hidden` | full | HIDDEN-EXCLUDED / -INCLUDED |
 | PARASOLID | Version (38.1, 38.1 … 25.0; Use latest version) | `version` | partial | 28.0 full; 25.0, 33.x and x_b untested; cf-hose-routing's hoses read back with 14 edges / 4 vertices (live 12 / 0) |
-| ACIS | – | – | full | live.sat imports on 21 of 22 documents (c2-extension-spring's spring area +0.01 %) |
+| ACIS | – | – | partial | live.sat imports on 21 of 22 documents; c2-extension-spring area +0.01 %: tolerant edges' plane pcurves approximated by the healing (fix in progress) |
 | STEP | Version (AP242; AP214, AP203) | `version` | full | AP203 (CONFIG_CONTROL_DESIGN), AP214 |
 | STEP | Preprocessing (None; Automatic, Remove small entities only basic / advanced, … and convert all surfaces to b-surfaces) | `preprocessing` | untested | |
 | STEP | Use custom units for export (off) | `units` | full | STEP-INCH (CONVERSION_BASED_UNIT('INCH')) |
@@ -52,9 +52,9 @@ Every option live shows has an `export_parts` / `import_files` parameter: no for
 | JT | – | – | untested | no live JT file yet |
 | RHINO | Version (8; 7 … 2; Use latest version) | `version` | partial | v5 / v8 import as live's; ours read back with 45 faces on the housing (live 46); v2, v4, v6, v7 untested |
 | GLTF / GLB | Resolution (Medium; Coarse, Fine, Custom: distance / angular tolerance, max chord length) | `resolution`, `distance_tolerance`, `angular_tolerance`, `max_chord_length` | partial | Medium full; Coarse / Fine untested; ours meshes as OBJ / 3MF (below) |
-| GLTF / GLB | Compress (off) | `compress` | untested | |
-| OBJ | Resolution (Medium; as glTF) | as glTF | partial | live's files import as live's; ours is denser than live's: housing Coarse 2106 triangles (live 1258), Fine 10256 (6188) |
-| 3MF | Resolution (Medium; as glTF) | as glTF | partial | as OBJ; housing Coarse reads back +0.065 % area |
+| GLTF / GLB | Compress (off) | `compress` | missing | live writes KHR_draco_mesh_compression (live-opt-compress.glb / .gltf, batch 2); ours writes the file uncompressed and can't read live's compressed files |
+| OBJ | Resolution (Medium; as glTF) | as glTF | partial | facets as STL without its minimum facet width (dx-urdf f5cfb364): housing Coarse / Medium / Fine 1132 / 2156 / 5710 triangles (live 1258 / 2340 / 6188); rings-loft 20746 (live 26760): coarser on B-spline / cone faces |
+| 3MF | Resolution (Medium; as glTF) | as glTF | partial | as OBJ |
 | STL | STL Format (Binary; Text) | `stl_text` | full | STL-TEXT-INCH |
 | STL | Units (Millimeter; Centimeter, Foot, Inch, Meter, Yard) | `units` | full | STL-CM, STL-FT, STL-TEXT-INCH |
 | STL | Resolution (Medium; Coarse, Fine, Custom: chordal tolerance, angular deviation, minimum facet width) | `resolution`, `chordal_tolerance`, `angular_deviation`, `min_facet_width` | partial | housing Coarse full; Fine / Custom read back up to +0.02 % area; Coarse 678 triangles (live 924) |
