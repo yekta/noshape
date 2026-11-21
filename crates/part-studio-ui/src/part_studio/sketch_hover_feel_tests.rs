@@ -459,7 +459,7 @@ fn the_pointer_lights_the_line_under_it_whatever_the_window_and_list(cx: &mut Te
 }
 
 /// The presented frame's sRGB pixels (device px, BGRA in the image) and its width, after the scene settles.
-fn settled_frame(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>) -> (Vec<u8>, usize) {
+pub(super) fn settled_frame(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>) -> (Vec<u8>, usize) {
     let vp = cx.update(|cx| view.read(cx).viewport.clone());
     let pointer = Pointer::new(cx, window, view);
     pointer.frames(cx, view);

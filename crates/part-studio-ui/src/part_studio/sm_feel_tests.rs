@@ -434,6 +434,65 @@ fn a_face_click_leaves_forms_locations_empty(cx: &mut TestAppContext) {
     assert_eq!(state, (Some("locations".to_string()), Vec::new()), "(the active field, Location(s)) after a face click");
 }
 
+/// Qa 11-21 (FEEL-FLANGE-EDGE-BEHIND-WALL, live flange-handle-1120): editing a partial flange, its picked edge is drawn
+/// whole in the selection's bright orange through the preview, also where the new wall covers it (ours there was tan,
+/// (131,123,85): the orange blended away under the wall). The frame's pixels along the edge, every 5 % of it.
+#[gpui::test]
+fn a_flanges_picked_edge_is_bright_orange_under_its_wall(cx: &mut TestAppContext) {
+    let Some(_gpu) = super::feel::gpu_pointer() else { return };
+    RENDERING.set(true);
+    const SELECT: [i32; 3] = [0xFF, 0xA9, 0x0A];
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [60, 40]] }] },
+        { "type": "sheetMetalStart", "name": "Sheet metal model 1", "params": { "process": "THICKEN", "regions": ["Sketch 1 region 0"], "thickness": "2 mm", "radius": "2 mm" } },
+        { "type": "sheetMetalFlange", "name": "Flange 1", "params": { "edges": ["edge through [20, 0, 2]"] } },
+        { "type": "sheetMetalFlange", "name": "Flange 2", "params": { "edges": ["edge through [60, 25, 2]"] } },
+    ] });
+    let (window, view) = part_studio_from(cx, "sm-flange-edge-px", Some(start));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let flange = cx.update(|cx| view.read(cx).studio(cx).and_then(|st| st.features.iter().find(|f| f.name == "Flange 1").map(|f| f.id))).expect("Flange 1");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(flange, w, cx))).unwrap();
+    wait_until(cx, window, |cx| {
+        let v = view.read(cx);
+        !v.ui_busy() && v.ui.preview_before.is_some() && v.display.feature_state(flange).is_some_and(|s| s.status == noshape_model::display::FeatureStatus::Ok)
+    });
+    let check = |cx: &mut TestAppContext| -> Vec<String> {
+        let (px, w) = super::sketch_hover::settled_frame(cx, window, &view);
+        let scale = w as f64 / cx.update(|cx| view.read(cx).viewport.read(cx).size().x).round();
+        let rgb = |x: i32, y: i32| -> Option<[i32; 3]> {
+            let o = (y.max(0) as usize * w + x.max(0) as usize) * 4;
+            px.get(o..o + 3).map(|b| [b[2] as i32, b[1] as i32, b[0] as i32])
+        };
+        let mut off = Vec::new();
+        for k in 1..20 {
+            let t = k as f64 / 20.0;
+            let p = glam::DVec3::new(0.060 * t, 0.0, 0.002);
+            let Some(s) = cx.update(|cx| view.read(cx).viewport.read(cx).project(p)) else { continue };
+            let (x, y) = ((s.x * scale).round() as i32, (s.y * scale).round() as i32);
+            let r = (3.0 * scale).ceil() as i32;
+            let near = (-r..=r).flat_map(|dy| (-r..=r).map(move |dx| (dx, dy))).filter_map(|(dx, dy)| rgb(x + dx, y + dy)).any(|c| (0..3).all(|i| (c[i] - SELECT[i]).abs() <= 24));
+            if !near {
+                off.push(format!("x {:.0} mm: {:?}", p.x * 1e3, rgb(x, y)));
+            }
+        }
+        off
+    };
+    let mut off = vec![("opened", check(cx))];
+    // As qa walked it: Partial flange unticked (the wall along the whole edge), then ticked again, in the dialog.
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Flange dialog").dialog.clone());
+    for (on, what) in [(true, "Partial flange on"), (false, "Partial flange off again")] {
+        cx.update(|cx| dialog.update(cx, |d, cx| d.set_value("isPartialFlange", noshape_model::params::ParamValue::Bool(on), cx)));
+        wait_until(cx, window, |cx| {
+            let v = view.read(cx);
+            !v.ui_busy() && v.ui.preview_before.is_some() && v.display.feature_state(flange).is_some_and(|s| s.status == noshape_model::display::FeatureStatus::Ok)
+        });
+        off.push((what, check(cx)));
+    }
+    let off: Vec<String> = off.into_iter().filter(|(_, o)| !o.is_empty()).map(|(what, o)| format!("{what}: {}", o.join(", "))).collect();
+    assert!(off.is_empty(), "the picked edge not bright orange at:\n{}", off.join("\n"));
+}
+
 /// Live feel S1 (qa FEEL-SM-PARTIAL-FLANGE-MANIP): editing a partial flange, its picked edge is lit whole, as it was
 /// before the flange (ours lit only the piece the flange leaves).
 #[gpui::test]
@@ -456,4 +515,11 @@ fn a_partial_flanges_edge_is_lit_whole_while_edited(cx: &mut TestAppContext) {
     assert_eq!(edges.len(), 1, "the flange's edge: {edges:?}");
     let changed = cx.update(|cx| view.read(cx).changed_picks(&edges));
     assert_eq!(changed, edges, "the shortened edge drawn as before the flange");
+    // Qa 11-21 (FEEL-FLANGE-EDGE-BEHIND-WALL, live flange-handle-1120): drawn whole over the preview's blend, so the
+    // stretch under the new wall stays bright orange (it was drawn in the blend, (131,123,85) under the wall).
+    draw(cx, window);
+    let mix = cx.update(|cx| view.read(cx).viewport.read(cx).scene().preview_mix);
+    let overlay: Vec<u8> = view.update(cx, |v, _| v.consumed_picks_overlay(&edges, &[], &edges).iter().map(|i| i.compare).collect());
+    assert!(mix.is_some(), "the preview blended over the model before it");
+    assert!(!overlay.is_empty() && overlay.iter().all(|&c| c == noshape_render::scene::compare::POST), "the whole edge drawn over the blend: {overlay:?}");
 }
