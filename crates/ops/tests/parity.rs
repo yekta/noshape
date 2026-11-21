@@ -895,7 +895,7 @@ fn exchange_round_trip() {
             noshape_ops::registry::run(&mut ctx, op, &args).map(|o| o.value).map_err(|e| e.to_json().to_string())
         };
         let yes = |k: &str| o[k] == "true";
-        let args = json!({ "files": [file], "mesh_unit": o["unit"].as_str().unwrap_or("Millimeter"), "y_up": yes("yAxisIsUp"), "combine": yes("flattenAssemblies"), "join": yes("joinAdjacentSurfaces") });
+        let args = json!({ "files": [file], "mesh_unit": o["unit"].as_str().unwrap_or("Millimeter"), "y_up": yes("yAxisIsUp"), "combine": yes("flattenAssemblies"), "join": yes("joinAdjacentSurfaces"), "iges_postprocessing": yes("useIGESImportPostProcessing"), "density": yes("importMaterialDensity") });
         let r = op("document_create", json!({ "path": doc, "length_unit": "mm" })).and_then(|_| op("import_files", args)).map_err(|e| format!("import failed: {e}"))?;
         let tabs: Vec<&Value> = r["tabs"].as_array().into_iter().flatten().filter(|t| t["kind"] != "File").collect();
         let studio = tabs.iter().find(|t| t["kind"] == "Part Studio").map_or(r["first"].clone(), |t| t["id"].clone());
@@ -918,7 +918,7 @@ fn exchange_round_trip() {
     let (mut option_imports, mut option_imports_ok, mut option_exports, mut option_exports_ok) = (0, 0, 0, 0);
     // live-opt-self.json's cases and their files.
     // (Live can't import its own OBJ zip: the bare .obj, in metres, is the "-OBJ" case.)
-    const OPTION_FILES: [(&str, &str); 31] = [
+    const OPTION_FILES: [(&str, &str); 48] = [
         ("STEP-AP203", "live-opt-ap203.step"),
         ("PARASOLID-28.0", "live-opt-v28.x_t"),
         ("IGES-COMPAT", "live-opt-compat.igs"),
@@ -950,10 +950,29 @@ fn exchange_round_trip() {
         ("STEP-SPLIT", "live-opt-split.step.zip"),
         ("ASM-STEP-NOFLAT", "live-opt-asm-clamp.step"),
         ("ASM-STEP-FLAT", "live-opt-asm-clamp.step"),
+        // Batch 2 (live 11-21, behaviours "Exchange option coverage, batch 2").
+        ("JT", "live.jt"),
+        ("PVZ-GROUPED", "live-opt-pvz-grouped.pvz"),
+        ("PVZ-SPLIT", "live-opt-pvz-split.pvz"),
+        ("GLB-COARSE", "live-opt-coarse.glb"),
+        ("GLB-FINE", "live-opt-fine.glb"),
+        ("GLB-COMPRESS", "live-opt-compress.glb"),
+        ("GLTF-COMPRESS", "live-opt-compress.gltf"),
+        ("PARASOLID-25.0", "live-opt-v25.x_t"),
+        ("PARASOLID-33.1", "live-opt-v33.x_t"),
+        ("RHINO-V2", "live-opt-v2.3dm"),
+        ("RHINO-V4", "live-opt-v4.3dm"),
+        ("RHINO-V6", "live-opt-v6.3dm"),
+        ("RHINO-V7", "live-opt-v7.3dm"),
+        ("STEP-PRE-AUTO", "live-opt-pre-auto.step"),
+        ("STEP-PRE-BSURF", "live-opt-pre-bsurf.step"),
+        // (Live imported its compatibility-mode file with IGES post-processing.)
+        ("IGES-POSTPROC", "live-opt-compat.igs"),
+        ("PARASOLID-DENSITY", "live.x_t"),
     ];
     // Cases of live's import options only (their files exported as the default ones, or from an Assembly): not
     // exported by ours again.
-    const IMPORT_ONLY: [&str; 7] = ["STEP-FLAT", "STEP-NOFLAT", "IGES-COMPAT-JOIN", "STL-CM", "STL-FT", "ASM-STEP-NOFLAT", "ASM-STEP-FLAT"];
+    const IMPORT_ONLY: [&str; 9] = ["STEP-FLAT", "STEP-NOFLAT", "IGES-COMPAT-JOIN", "STL-CM", "STL-FT", "ASM-STEP-NOFLAT", "ASM-STEP-FLAT", "IGES-POSTPROC", "PARASOLID-DENSITY"];
     // A case's format ("ASM-STEP-…": an Assembly's STEP).
     let case_format = |case: &str| case.trim_start_matches("ASM-").split('-').next().unwrap_or_default().to_string();
     for dir in dirs {
@@ -1093,13 +1112,17 @@ fn exchange_round_trip() {
                 continue;
             }
             let format = case_format(case);
-            let is_mesh = mesh(&format) || matches!(format.as_str(), "GLB" | "GLTF");
+            let is_mesh = mesh(&format) || matches!(format.as_str(), "GLB" | "GLTF" | "PVZ");
             option_imports += 1;
             let diff = match import_with(&scratch(&format!("{name}-option-{case}.noshape")), &file, &live_import["import"]) {
                 Err(e) => vec![e],
                 Ok((ours, tabs)) => {
                     let live = parts_from_live_import(live_import, is_mesh);
-                    let mut diff = if is_mesh { differences(&live, &mesh_counts(ours.clone())) } else { differences(&live, &ours) };
+                    // Live's import empty (its PVZ of c2-housing-draft: a sheet of no faces, its file's mesh not
+                    // closed; ours has the mesh as sheets): its parts by name only.
+                    let names_only = |v: &[PartState]| -> Vec<PartState> { v.iter().map(|p| PartState { name: p.name.clone(), ..Default::default() }).collect() };
+                    let empty = !live.is_empty() && live.iter().all(|p| p.volume.is_none() && p.area.is_none());
+                    let mut diff = if empty { differences(&names_only(&live), &names_only(&ours)) } else if is_mesh { differences(&live, &mesh_counts(ours.clone())) } else { differences(&live, &ours) };
                     // Its tabs as live's (an Assembly's STEP: "<file> parts" and the Assembly, or one Part Studio when
                     // flattened), live's names without the copy document's prefix and " (n)".
                     let result = &live_import["importResult"];
@@ -1289,10 +1312,13 @@ fn exchange_round_trip() {
             let mut args = json!({ "format": format, "file": dir.join(format!("ours-opt-{}.{ext}", case.to_lowercase())) });
             match case.as_str() {
                 "STEP-AP203" => args["version"] = json!("AP203"),
-                "PARASOLID-28.0" => args["version"] = json!("28.0"),
                 "IGES-COMPAT" => args["iges_compatibility"] = json!(true),
-                "RHINO-V5" => args["version"] = json!("5"),
-                "RHINO-V8" => args["version"] = json!("8"),
+                "STEP-PRE-AUTO" => args["preprocessing"] = json!("Automatic"),
+                "STEP-PRE-BSURF" => args["preprocessing"] = json!("Remove small entities only (advanced) and convert all surfaces to b-surfaces"),
+                // (Live's two PVZ cases differ in exportCompositeConstituentsWithOriginalBodyIds only, its files alike.)
+                "PVZ-GROUPED" | "PVZ-SPLIT" => args["group_composites"] = json!(true),
+                c if c.starts_with("PARASOLID-") => args["version"] = json!(&c["PARASOLID-".len()..]),
+                c if c.starts_with("RHINO-V") => args["version"] = json!(&c["RHINO-V".len()..]),
                 "STEP-INCH" => args["units"] = json!("Inch"),
                 "STL-TEXT-INCH" => {
                     args["stl_text"] = json!(true);
@@ -1303,6 +1329,9 @@ fn exchange_round_trip() {
                     (args["angular_deviation"], args["chordal_tolerance"], args["min_facet_width"]) = (json!(2.5), json!(0.01), json!(0.01));
                 }
                 c => {
+                    if c.ends_with("-COMPRESS") {
+                        args["compress"] = json!(true);
+                    }
                     if let Some(r) = c.split('-').find(|r| matches!(*r, "FINE" | "COARSE")) {
                         args["resolution"] = json!(if r == "FINE" { "Fine" } else { "Coarse" });
                     }
@@ -1322,7 +1351,7 @@ fn exchange_round_trip() {
             }
             let file = if file.is_file() { file } else { file.with_extension("zip") };
             option_exports += 1;
-            let is_mesh = mesh(format) || matches!(format, "GLB" | "GLTF");
+            let is_mesh = mesh(format) || matches!(format, "GLB" | "GLTF" | "PVZ");
             let unit = live_import["import"]["unit"].as_str().unwrap_or("Millimeter");
             let y_up = live_import["import"]["yAxisIsUp"] == "true";
             let own = parts_from_live_import(live_import, is_mesh);
@@ -1339,6 +1368,16 @@ fn exchange_round_trip() {
             let marker = match case.as_str() {
                 "STEP-AP203" => Some(("its schema CONFIG_CONTROL_DESIGN", text.contains("CONFIG_CONTROL_DESIGN"))),
                 "PARASOLID-28.0" => Some(("SCH_2800000 on its body line", text.contains("SCH_2800000"))),
+                "PARASOLID-25.0" => Some(("SCH_2500000 on its body line", text.contains("SCH_2500000"))),
+                "PARASOLID-33.1" => Some(("SCH_3301000 on its body line", text.contains("SCH_3301000"))),
+                "STEP-PRE-BSURF" => Some(("B-spline surfaces only", text.contains("B_SPLINE_SURFACE") && !text.contains("PLANE(") && !text.contains("CYLINDRICAL_SURFACE"))),
+                "GLB-COMPRESS" | "GLTF-COMPRESS" => Some(("Draco meshes (KHR_draco_mesh_compression)", text.contains("KHR_draco_mesh_compression"))),
+                c if c.starts_with("RHINO-V") => {
+                    // The header's version, right-aligned in 8 columns: 2, 3 and 4 as they are, then 50, 60, 70, 80.
+                    let v: u32 = c["RHINO-V".len()..].parse().unwrap_or(0);
+                    let want = format!("3D Geometry File Format {:>8}", if v < 5 { v } else { v * 10 });
+                    Some(("its header's version", text.starts_with(&want)))
+                }
                 "IGES-COMPAT" => Some(("trimmed surfaces (144) and no MSBO (186)", iges_entity_count(&text, 144) > 0 && iges_entity_count(&text, 186) == 0)),
                 "STL-TEXT-INCH" => Some(("text", text.starts_with("solid"))),
                 "STEP-INCH" => Some(("its unit CONVERSION_BASED_UNIT('INCH')", text.contains("CONVERSION_BASED_UNIT('INCH'"))),
@@ -1352,7 +1391,8 @@ fn exchange_round_trip() {
         }
         // Unique parts as individual files (live: always a zip, even of one part, its entries "<tab> - <part>.<ext>";
         // live doesn't import it back): ours' entries as live's.
-        for (case, f) in OPTION_FILES.iter().filter(|(c, _)| c.ends_with("-SPLIT")) {
+        // (PVZ-SPLIT is live's "composite constituents" option, one file.)
+        for (case, f) in OPTION_FILES.iter().filter(|(c, _)| c.ends_with("-SPLIT") && !c.starts_with("PVZ-")) {
             let theirs = dir.join(f);
             if !theirs.is_file() {
                 continue;
