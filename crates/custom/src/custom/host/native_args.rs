@@ -191,6 +191,7 @@ const IGNORES_MAP: &[&str] = &[
     "setFeatureHiddenParameters",
     "setExternalDisambiguation",
     "setHighlightedEntities",
+    "setThinWallOneSided",
     "setPatternData",
     "setFeaturePatternInstanceData",
     "setDimensionedEntities",

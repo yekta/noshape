@@ -46,6 +46,8 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("setHighlightedEntities", noop),
     ("transferSubfeatureErrorDisplay", noop),
     ("setDimensionedEntities", noop),
+    // (3132's thin extrude: whether its wall is one-sided, for live's annotation manager; no annotations here.)
+    ("setThinWallOneSided", noop),
     ("addAuxiliaryEntities", noop),
     ("addReferenceCSysFrame", noop),
     ("setPatternData", noop),
