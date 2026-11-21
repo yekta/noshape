@@ -42,12 +42,12 @@ Status: = same, ≠ differs, pending = live's answer asked.
 | Composite curve | compositeCurve | 9 (1 sel, 4 val, 4 tog, 0 list) | = | = | = | At least one edge is required. | pending | = spec, error pending (dlg-1) |
 | Composite part | compositePart | 2 (1 sel, 0 val, 1 tog, 0 list) | = | = | = | Select entities to create a composite part. | pending | = spec, error pending (dlg-1) |
 | Constrained surface | constrainedSurface | 10 (1 sel, 3 val, 2 tog, 3 list) | = | = | = | Select at least three distinct points. | pending | = spec, error pending (dlg-1) |
-| Copy part | copyPart | 1 (1 sel, 0 val, 0 tog, 0 list) | = | = | = | Select parts to pattern. | pending | = spec, error pending (dlg-1) |
+| Copy part | copyPart | 1 (1 sel, 0 val, 0 tog, 0 list) | = | = | = | Select parts to copy. (was "…to pattern.") | Select parts to copy. (std transformCopy.fs) | = spec, = error (fixed) |
 | Corner | sheetMetalCorner | 5 (1 sel, 3 val, 0 tog, 1 list) | = | = | = | Select a corner to modify. | pending | = spec, error pending (dlg-1) |
 | Corner break | sheetMetalCornerBreak | 21 (3 sel, 9 val, 4 tog, 5 list) | = | = | = | Select sheet metal edges or vertices to fillet or chamfer. | pending | = spec, error pending (dlg-1) |
 | Cube | cube | 1 (0 sel, 1 val, 0 tog, 0 list) | = | = | = | (none: builds) | pending | = spec, error pending (dlg-1) |
 | Curve pattern | curvePattern | 16 (5 sel, 2 val, 3 tog, 4 list) | = | = | = | Select parts to pattern. | pending | = spec, error pending (dlg-1) |
-| Cut list | cutlist | 3 (1 sel, 0 val, 1 tog, 0 list) | = | = | = | Select frames to create a cutlist | pending | = spec, error pending (dlg-1) |
+| Cut list | cutlist | 3 (1 sel, 0 val, 1 tog, 0 list) | = | = | = | Select frames to create a cutlist | Select frames to create a cutlist (std cutlist.fs) | = spec, = error |
 | Decal | decal | 13 (3 sel, 5 val, 3 tog, 1 list); ours only: imageOriginIndex | = | = | = | Select face for decal | pending | = spec, error pending (dlg-1) |
 | Delete face | deleteFace | 3 (1 sel, 0 val, 1 tog, 1 list) | = | = | = | Select faces to delete. | pending | = spec, error pending (dlg-1) |
 | Delete part | deleteBodies | 3 (2 sel, 0 val, 0 tog, 1 list) | = | = | = | Select entities to delete. | pending | = spec, error pending (dlg-1) |
@@ -107,7 +107,7 @@ Status: = same, ≠ differs, pending = live's answer asked.
 | Sheet metal loft | sheetMetalLoft | 22 (3 sel, 11 val, 3 tog, 4 list); ours only: generalGroup, materialGroup, reliefGroup | = | = | = | Select profiles for sheet metal loft. | pending | = spec, error pending (dlg-1) |
 | Sheet metal model | sheetMetalStart | 46 (12 sel, 15 val, 13 tog, 6 list); ours only: initEntities, selectionsGroup, generalGroup, materialGroup, reliefGroup, parameterLibraryPurposeId | = | = | = | Cannot resolve entities. | pending | = spec, error pending (dlg-1) |
 | Shell | shell | 5 (2 sel, 1 val, 2 tog, 0 list) | = | = | = | Select faces to remove. | pending | = spec, error pending (dlg-1) |
-| Sphere | fSphere | no live spec | no live spec | no live spec | no live spec | Select a center point | pending | no live spec, error pending (dlg-1) |
+| Sphere | fSphere | no live spec | no live spec | no live spec | no live spec | (none: builds at the origin; was "Select a center point") | (none: builds at the origin, std primitives.fs) | no live spec, = error (fixed) |
 | Split | splitPart | 13 (5 sel, 0 val, 6 tog, 2 list); ours only: edgeProjectionOptionsGroup | = | = | = | Select parts, surfaces, or curves to split. | pending | = spec, error pending (dlg-1) |
 | Sweep | sweep | 30 (8 sel, 7 val, 10 tog, 5 list) | = | = | = | Select entities for sweep path. | pending | = spec, error pending (dlg-1) |
 | Tab | sheetMetalTab | 4 (3 sel, 1 val, 0 tog, 0 list) | = | = | = | Select a face for the tab. | pending | = spec, error pending (dlg-1) |
@@ -115,6 +115,6 @@ Status: = same, ≠ differs, pending = live's answer asked.
 | Thicken | thicken | 10 (2 sel, 3 val, 4 tog, 1 list) | = | = | = | Select surfaces or faces to thicken. | pending | = spec, error pending (dlg-1) |
 | Transform | transform | 23 (7 sel, 9 val, 5 tog, 2 list) | = | = | = | Cannot resolve entities. | pending | = spec, error pending (dlg-1) |
 | Trim curve | trimCurve | 9 (4 sel, 1 val, 1 tog, 3 list) | = | = | = | Select a curve to adjust. | pending | = spec, error pending (dlg-1) |
-| Unfold | sheetMetalUnfold | 4 (3 sel, 0 val, 1 tog, 0 list) | = | = | = | Select the sheet metal part to unfold | pending | = spec, error pending (dlg-1) |
+| Unfold | sheetMetalUnfold | 4 (3 sel, 0 val, 1 tog, 0 list) | = | = | = | No part selected to unfold. (was "Select the sheet metal part to unfold") | No part selected to unfold. (std sheetMetalUnfold.fs) | = spec, = error (fixed) |
 | Variable | assignVariable | 42 (4 sel, 18 val, 6 tog, 9 list); ours only: initEntities, rowGroup, columnGroup, axisMeasurementsGroup | = | = | ≠ conversionFactor default: 0 / 1 | Variable name must be a letter followed by a string of letters or numbers. | pending | ≠ spec, error pending (dlg-1) |
 | Wrap | wrap | 19 (5 sel, 4 val, 8 tog, 2 list); ours only: positionGroup | = | = | = | Select planar faces or sketch regions to wrap. | pending | = spec, error pending (dlg-1) |

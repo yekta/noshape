@@ -36,18 +36,25 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (05:45 UTC 11-21)
+## Now (05:48 UTC 11-21)
 
 8. NOW (lead 05:3x) a) Sketch tool coverage: every one of the 55 sketch tools has >= 1 uip scenario with a live take
    (coverage.py; per tool: /root/psui-scratch/sk/tools.json, union 169 in sk/names.txt; 18 tools have one). Missing:
    dimension kinds (h/v/aligned, point-line, parallel lines, circle centres / rims, line-circle, angle quadrants, arc,
    ellipse, to origin): live batch sk-1 asked 05:36 (REQUESTS). Run of the 169 on main: vibex8 ~/tmp/psui/sk1, log
-   /root/psui-scratch/sk1.log -> fix the differences, most-used first; then batch sk-2 (thin tools' depth).
+   /root/psui-scratch/sk1.log -> fix the differences, most-used first. Batch sk-2 asked 05:49 (10 second takes for
+   the thin tools: centre point arc x2, 3 point circle, ellipse, polygon x2, aligned rect, chamfer, transform, split).
    skasm 05:4x: all sketch scenarios are psui's; tell skasm before a crates/sketch or sketch_mode fix.
    b) Feature dialog audit: docs/parity/feature-dialogs.md (scripts /root/psui-scratch/dlg/: specdiff.py,
    empty_errors.py, gen_table.py). 83 / 89 equal on live's 3095 specs; Hole / Jog / Tag version skew (ours 3112);
    Import, Recognize, Variable differ in a default or option order. Live dlg-1 asked 05:40: fresh specs + every
    feature's empty error by REST. Then fix and regenerate the table.
+   05:48 from std 3112's source (live/std-3112/*.fs, errorstringenum.gen.fs) before dlg-1: Copy part "Select parts to
+   copy." (was "…to pattern."), Sphere with no center builds at the origin (was an error), Unfold "No part selected to
+   unfold." / "No bend or rolled wall selected to unfold."; tests features_a primitives / transform_…, features_c
+   unfold_with_nothing_selected_…; Mac run, then land. Derived mirror's empty text waits for dlg-1 (std says IMPORT_
+   DERIVED_NO_PARTS, but live's Derived with a deleted source reads "Error regenerating.").
+   Only 4 of 89 empty texts aren't std error strings (cutlist's is std's literal; smFormTool is ours, not live's Form).
 
 
 3714e6ce FAILED 04:40 (row_keys test: the sketch under the bar now shown, not only drawn); fixed forward,

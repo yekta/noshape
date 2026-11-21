@@ -2315,10 +2315,8 @@ pub fn sphere(ev: &mut EvalCtx) -> FResult<()> {
     if r <= 0.0 {
         return crate::regen::eval::err_at(&["radius"], "Error regenerating: a parameter is out of range.");
     }
-    let c = match ev.query("center").first() {
-        Some(q) => ev.resolve_vertex_point(q).ok_or_else(|| fe("The sphere center no longer exists"))?,
-        None => return err("Select a center point"),
-    };
+    // std primitives.fs fSphere: no (or a lost) center point is the origin.
+    let c = ev.query("center").first().and_then(|q| ev.resolve_vertex_point(q)).unwrap_or(DVec3::ZERO);
     let shape = k::make_sphere(&k::Plane::new(c, DVec3::Z, DVec3::X), r, std::f64::consts::TAU)?;
     let names = name_new(ev, &shape);
     ev.apply_operation(vec![NamedShape::new(shape, names)], "NEW", None, BodyKind::Solid)

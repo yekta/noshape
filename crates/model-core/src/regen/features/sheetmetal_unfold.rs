@@ -422,7 +422,11 @@ fn body_of_selection(ev: &EvalCtx, ids: &[&str]) -> Option<usize> {
 pub fn unfold(ev: &mut EvalCtx) -> FResult<()> {
     let all = ev.bool("unfoldAll");
     let Some(bi) = body_of_selection(ev, &[if all { "partToUnfold" } else { "entitiesToUnfold" }, "holdEntity"]) else {
-        return err(if all { "Select the sheet metal part to unfold" } else { "Select the bends to unfold" });
+        return if all {
+            err_at(&["partToUnfold"], "No part selected to unfold.")
+        } else {
+            err_at(&["entitiesToUnfold"], "No bend or rolled wall selected to unfold.")
+        };
     };
     let mut data = (*active_data(ev, bi)?).clone();
     let t = data.thickness;

@@ -1203,6 +1203,16 @@ fn recognize_bends_a_sharp_corner_at_its_radius() {
 }
 
 #[test]
+fn unfold_with_nothing_selected_says_so_as_std() {
+    let mut s = plate();
+    s.ok();
+    s.add("sheetMetalUnfold", |_| {});
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "No part selected to unfold.".into()));
+    s.add("sheetMetalUnfold", |p| p.set("unfoldAll", ParamValue::Bool(false)));
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "No bend or rolled wall selected to unfold.".into()));
+}
+
+#[test]
 fn unfold_then_refold_restores_the_part() {
     let mut s = plate();
     let r = s.ok();

@@ -2414,7 +2414,8 @@ pub fn transform(ev: &mut EvalCtx) -> FResult<()> {
 pub fn copy_part(ev: &mut EvalCtx) -> FResult<()> {
     let bodies = ev.resolve_bodies(ev.query("entities"));
     if bodies.is_empty() {
-        return err_at(&["entities"], "Select parts to pattern.");
+        // std transformCopy.fs: COPY_SELECT_PARTS.
+        return err_at(&["entities"], "Select parts to copy.");
     }
     let inst = [Instance { code: 1, t: k::Transform::Translate(DVec3::ZERO) }];
     for (_, bj, kind, ns) in copy_bodies(ev, &bodies, &inst)? {

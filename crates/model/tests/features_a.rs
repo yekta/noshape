@@ -846,6 +846,11 @@ fn primitives() {
     assert_eq!(res.context.bodies.len(), 2);
     let v = total_volume(&res.context);
     assert!(near(v, 1e-6 + 4.0 / 3.0 * PI * 0.02f64.powi(3), 1e-3), "{v}");
+    // std fSphere: no center point is the origin, not an error.
+    t.add("fSphere", &[("radius", e("5 mm"))]);
+    let res = t.ok();
+    let bb = res.context.bodies[2].shape.bounding_box(true).unwrap();
+    assert!((bb.min + bb.max).length() < 1e-9 && near(bb.max.x, 0.005, 1e-4), "{bb:?}");
 }
 
 // ------------------------------------------------------------------ hole
@@ -1949,7 +1954,10 @@ fn transform_move_copy_rotate_scale() {
     let res = t.ok();
     let bb = res.context.bodies[0].shape.bounding_box(true).unwrap();
     assert!((bb.max.x).abs() < 1e-6 && (bb.min.x + 0.01).abs() < 1e-6, "{bb:?}");
-    t.add("copyPart", &[("entities", q(vec![body_ref(&id)]))]);
+    let cp = t.add("copyPart", &[("entities", q(vec![]))]);
+    let st = t.regen().display.features.last().cloned().unwrap();
+    assert_eq!(st.message.as_deref(), Some("Select parts to copy."));
+    t.set(cp, "entities", q(vec![body_ref(&id)]));
     let res = t.ok();
     assert_eq!(res.context.bodies.len(), 2);
 }
