@@ -70,13 +70,14 @@ Every option live shows has an `export_parts` / `import_files` parameter: no for
 | all | Create a composite part when importing multiple or non-solid bodies (off) | `composite` | untested | e2e only |
 | STEP, Parasolid, IGES | Join adjacent surfaces (off) | `join` | full | IGES-COMPAT-JOIN |
 | Parasolid | Import material density (off) | `density` | full | PARASOLID-DENSITY imports as live on housing + duct |
-| IGES | IGES postprocessing (off) | `iges_postprocessing` | partial | live's compatibility-mode file with it: ours 36 / 80 / 45 faces / edges / vertices, live 36 / 79 / 44 (as without it) |
-| STL | Units (Millimeter) | `mesh_unit` | partial | a multi-part STL: c2-duct-multipart reads as 2 parts (live 4) |
+| IGES | IGES postprocessing (off) | `iges_postprocessing` | partial | live's compatibility-mode file of c2-housing-draft, with it or without: ours 36 / 80 / 45 faces / edges / vertices, live 36 / 79 / 44. The one extra: a closed 4.33 mm B-spline rim at (12.5, 0, 2.7) mm, written as two IGES curves, read as two edges (join_loop_pieces joins only pieces of one curve; dx 11-21) |
+| STL | Units (Millimeter) | `mesh_unit` | partial | a multi-part STL: c2-duct-multipart's live.stl reads as 2 parts, live 9 sheets (c2-bottle-split 2, live 148); joining only across edges two triangles share gives 31 / 142, so live's rule isn't that (REQUESTS dx 11-21 14:06) |
 | OBJ | Units (Meter) | `mesh_unit` | full | OBJ-*-OBJ |
 | DXF, PNG, PDF, CSV | no dialog: a file tab after the active tab | as live | full | e2e |
 
 Next, in the lead's order (3MF, OBJ, ACIS, glTF, then the rest): the OBJ / 3MF / glTF meshes at live's density, then
-the multi-part STL import, ACIS's spring, the Rhino face count, the IGES compatibility read-back.
+the multi-part STL import, ACIS's spring, the IGES compatibility read-back. (The Rhino face count is as live: c2-housing-draft's
+live-opt-v5.3dm reads 46 / 118 / 76, dx 11-21.)
 
 ## Live's own big files (request 1755, 11-02)
 

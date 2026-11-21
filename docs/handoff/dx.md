@@ -59,7 +59,11 @@ Design (step 1; step 2, B-reps for selection, later):
 ## Exchange leftovers (11-21)
 - Drawing rows (2/10): bottle Front's lip arc 41.8..180 deg (live 90..180) and views 0.015 in low; hex iso circles as
   LWPOLYLINE (live ELLIPSE); faceblend ELLIPSE vs SPLINE; the rest hidden-line geometry. Files /root/dx-scratch/drw.
-- Open: multipart STL import 2 parts (live 4/9), housing IGES compat read-back 39 vs 36 faces, Rhino 45 vs 46.
+- Open: STL split (duct 2 parts vs live's 9 sheets, bottle 2 vs 148: rule unknown, REQUESTS dx 11-21 14:06;
+  /root/dx-scratch/stlcomp.py), housing IGES compat 80 / 45 edges / vertices vs 79 / 44 (one closed B-spline rim in two
+  IGES curves: join two G1 B-spline pieces bounding the same two faces in boolean.cpp's merge, kernel). Rhino as live
+  (46 / 118 / 76). CLI import probe: vibex6 ~/agents/dx-keep/sr/impprobe.py ./cli <file> [pp].
+- vibex6 dx-keep trimmed 11-21 (12 -> 3.5 GB): bin/exch.sh's default ops-ex is gone (pass OPSBIN or use the Mac's exx.sh).
 
 ## In flight: data exchange (lead 08:0x)
 Task: 10 corpus docs x every format + a drawing vs live's exports; re-import live's STEP / x_t; times vs live's.
