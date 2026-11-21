@@ -10249,6 +10249,32 @@ fn obj_and_3mf_presets_facet_as_onshapes() {
     }
 }
 
+/// glTF / GLB Compress writes each mesh as Draco (KHR_draco_mesh_compression, as live's live-opt-compress files), a
+/// smaller file that imports back as the uncompressed one does (lossless, as live's).
+#[test]
+fn gltf_compress_writes_draco_meshes_that_import_back() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "gltf_draco.noshape");
+    for format in ["GLB", "GLTF"] {
+        let mut sizes = Vec::new();
+        let mut volumes = Vec::new();
+        for compress in [false, true] {
+            let file = scratch(&format!("gltf_draco_{compress}.{}", format.to_lowercase()));
+            call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": format, "file": file.to_str().unwrap(), "compress": compress }));
+            let bytes = std::fs::read(&file).unwrap();
+            assert_eq!(String::from_utf8_lossy(&bytes).contains("KHR_draco_mesh_compression"), compress, "{format} compress {compress}");
+            sizes.push(bytes.len());
+            let r = call(&mut ctx, "import_files", json!({ "files": [file.to_str().unwrap()], "mesh_unit": "Meter" }));
+            let studio = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap_or_else(|| panic!("{r}"))["name"].as_str().unwrap().to_string();
+            let q = call(&mut ctx, "query_parts", json!({ "tab": studio }));
+            assert_eq!(q["parts"].as_array().unwrap().len(), 1, "{format} compress {compress}: {q}");
+            volumes.push(num(&q["parts"][0]["volume"]));
+        }
+        assert!(sizes[1] < sizes[0], "{format}: compressed {} bytes, plain {}", sizes[1], sizes[0]);
+        assert!((volumes[1] - volumes[0]).abs() < 1e-9 * volumes[0], "{format}: compressed {} mm³, plain {}", volumes[1], volumes[0]);
+    }
+}
+
 /// An STL's fillet torus on live's grid (live 3052, knob-jason's R11.5 fillet: ceil(sweep / angle) steps across the
 /// profile and round the axis). The hole's R 2 rim fillet (tube centre R 7 at z 18) at Coarse: 8 steps over its 90°,
 /// 29 round.

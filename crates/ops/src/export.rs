@@ -1023,7 +1023,7 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
                         std::fs::write(path, obj_and_mtl(&meshes, &stem).0)?;
                     }
                 }
-                PartFormat::Gltf | PartFormat::Glb => std::fs::write(path, gltf(&meshes, f == PartFormat::Glb))?,
+                PartFormat::Gltf | PartFormat::Glb => std::fs::write(path, gltf(&meshes, f == PartFormat::Glb, s.compress)?)?,
                 _ => std::fs::write(path, three_mf(&meshes))?,
             }
         }
@@ -1034,8 +1034,9 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
 
 /// glTF 2.0: one mesh node per part (positions, normals, indices) with its
 /// colour as a PBR material; `.glb` packs JSON and buffer into one file,
-/// `.gltf` embeds the buffer as a data URI.
-fn gltf(meshes: &[(String, k::Tessellation, [f32; 4])], binary: bool) -> Vec<u8> {
+/// `.gltf` embeds the buffer as a data URI. `compress`: each mesh a Draco
+/// buffer (KHR_draco_mesh_compression), as live's Compress.
+fn gltf(meshes: &[(String, k::Tessellation, [f32; 4])], binary: bool, compress: bool) -> anyhow::Result<Vec<u8>> {
     let mut buf: Vec<u8> = Vec::new();
     let (mut views, mut accessors, mut materials, mut gmeshes, mut nodes) = (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
     for (i, (name, m, c)) in meshes.iter().enumerate() {
@@ -1046,25 +1047,41 @@ fn gltf(meshes: &[(String, k::Tessellation, [f32; 4])], binary: bool) -> Vec<u8>
                 hi[k] = hi[k].max(p[k]);
             }
         }
-        let mut push = |bytes: &[u8], target: u32| {
+        // (A Draco buffer's view has no target.)
+        let mut push = |bytes: &[u8], target: Option<u32>| {
             while !buf.len().is_multiple_of(4) {
                 buf.push(0);
             }
             let off = buf.len();
             buf.extend_from_slice(bytes);
-            views.push(serde_json::json!({"buffer": 0, "byteOffset": off, "byteLength": bytes.len(), "target": target}));
+            let mut view = serde_json::json!({"buffer": 0, "byteOffset": off, "byteLength": bytes.len()});
+            if let Some(target) = target {
+                view["target"] = target.into();
+            }
+            views.push(view);
             views.len() - 1
         };
-        let pos: Vec<u8> = m.positions.iter().flatten().flat_map(|v| v.to_le_bytes()).collect();
-        let nor: Vec<u8> = m.normals.iter().flatten().flat_map(|v| v.to_le_bytes()).collect();
-        let idx: Vec<u8> = m.indices.iter().flat_map(|v| v.to_le_bytes()).collect();
-        let (vp, vn, vi) = (push(&pos, 34962), push(&nor, 34962), push(&idx, 34963));
         let a0 = accessors.len();
-        accessors.push(serde_json::json!({"bufferView": vp, "componentType": 5126, "count": m.positions.len(), "type": "VEC3", "min": lo, "max": hi}));
-        accessors.push(serde_json::json!({"bufferView": vn, "componentType": 5126, "count": m.normals.len(), "type": "VEC3"}));
-        accessors.push(serde_json::json!({"bufferView": vi, "componentType": 5125, "count": m.indices.len(), "type": "SCALAR"}));
+        let mut primitive = serde_json::json!({"attributes": {"POSITION": a0, "NORMAL": a0 + 1}, "indices": a0 + 2, "material": i});
+        if compress {
+            // The accessors hold the decoded counts and no data (KHR_draco_mesh_compression).
+            let (data, points, ids) = draco_mesh(m)?;
+            let view = push(&data, None);
+            accessors.push(serde_json::json!({"componentType": 5126, "count": points, "type": "VEC3", "min": lo, "max": hi}));
+            accessors.push(serde_json::json!({"componentType": 5126, "count": points, "type": "VEC3"}));
+            accessors.push(serde_json::json!({"componentType": 5125, "count": m.indices.len(), "type": "SCALAR"}));
+            primitive["extensions"] = serde_json::json!({"KHR_draco_mesh_compression": {"bufferView": view, "attributes": {"POSITION": ids[0], "NORMAL": ids[1]}}});
+        } else {
+            let pos: Vec<u8> = m.positions.iter().flatten().flat_map(|v| v.to_le_bytes()).collect();
+            let nor: Vec<u8> = m.normals.iter().flatten().flat_map(|v| v.to_le_bytes()).collect();
+            let idx: Vec<u8> = m.indices.iter().flat_map(|v| v.to_le_bytes()).collect();
+            let (vp, vn, vi) = (push(&pos, Some(34962)), push(&nor, Some(34962)), push(&idx, Some(34963)));
+            accessors.push(serde_json::json!({"bufferView": vp, "componentType": 5126, "count": m.positions.len(), "type": "VEC3", "min": lo, "max": hi}));
+            accessors.push(serde_json::json!({"bufferView": vn, "componentType": 5126, "count": m.normals.len(), "type": "VEC3"}));
+            accessors.push(serde_json::json!({"bufferView": vi, "componentType": 5125, "count": m.indices.len(), "type": "SCALAR"}));
+        }
         materials.push(serde_json::json!({"name": name, "pbrMetallicRoughness": {"baseColorFactor": c, "metallicFactor": 0.0, "roughnessFactor": 0.5}}));
-        gmeshes.push(serde_json::json!({"name": name, "primitives": [{"attributes": {"POSITION": a0, "NORMAL": a0 + 1}, "indices": a0 + 2, "material": i}]}));
+        gmeshes.push(serde_json::json!({"name": name, "primitives": [primitive]}));
         nodes.push(serde_json::json!({"name": name, "mesh": i}));
     }
     while !buf.len().is_multiple_of(4) {
@@ -1074,7 +1091,7 @@ fn gltf(meshes: &[(String, k::Tessellation, [f32; 4])], binary: bool) -> Vec<u8>
     if !binary {
         buffer["uri"] = serde_json::Value::String(format!("data:application/octet-stream;base64,{}", base64(&buf)));
     }
-    let doc = serde_json::json!({
+    let mut doc = serde_json::json!({
         "asset": {"version": "2.0", "generator": "Noshape"},
         "scene": 0,
         "scenes": [{"nodes": (0..nodes.len()).collect::<Vec<_>>()}],
@@ -1085,9 +1102,12 @@ fn gltf(meshes: &[(String, k::Tessellation, [f32; 4])], binary: bool) -> Vec<u8>
         "bufferViews": views,
         "buffers": [buffer],
     });
+    if compress {
+        (doc["extensionsUsed"], doc["extensionsRequired"]) = (serde_json::json!(["KHR_draco_mesh_compression"]), serde_json::json!(["KHR_draco_mesh_compression"]));
+    }
     let mut json = serde_json::to_vec(&doc).unwrap_or_default();
     if !binary {
-        return json;
+        return Ok(json);
     }
     while !json.len().is_multiple_of(4) {
         json.push(b' ');
@@ -1103,7 +1123,33 @@ fn gltf(meshes: &[(String, k::Tessellation, [f32; 4])], binary: bool) -> Vec<u8>
     out.extend_from_slice(&(buf.len() as u32).to_le_bytes());
     out.extend_from_slice(b"BIN\0");
     out.extend_from_slice(&buf);
-    out
+    Ok(out)
+}
+
+/// A part's mesh as a Draco buffer (EdgeBreaker, unquantized, as live's): its bytes, its decoded point count and its position and
+/// normal attributes' ids.
+fn draco_mesh(m: &k::Tessellation) -> anyhow::Result<(Vec<u8>, usize, [u32; 2])> {
+    use draco_core::{DataType, GeometryAttributeType, PointAttribute, PointIndex};
+    let mut mesh = draco_core::Mesh::new();
+    for (kind, values) in [(GeometryAttributeType::Position, &m.positions), (GeometryAttributeType::Normal, &m.normals)] {
+        let mut att = PointAttribute::new();
+        att.init(kind, 3, DataType::Float32, false, values.len());
+        let bytes: Vec<u8> = values.iter().flatten().flat_map(|v| v.to_le_bytes()).collect();
+        att.buffer_mut().write(0, &bytes);
+        mesh.add_attribute(att);
+    }
+    mesh.set_num_points(m.positions.len());
+    for t in m.indices.as_chunks::<3>().0 {
+        mesh.add_face([PointIndex(t[0]), PointIndex(t[1]), PointIndex(t[2])]);
+    }
+    // Lossless, as live's (its decoded values are the floats it meshed: -0.0004, -0.012).
+    let options = draco_core::EncoderOptions::new();
+    let mut encoder = draco_core::MeshEncoder::new();
+    encoder.set_mesh(mesh);
+    let mut out = draco_core::EncoderBuffer::new();
+    let info = encoder.encode_with_info(&options, &mut out).map_err(|e| anyhow::anyhow!("the mesh couldn't be compressed: {e}"))?;
+    let id = |kind| info.attributes.iter().find(|a| a.attribute_type == kind).map_or(0, |a| a.unique_id);
+    Ok((out.data().to_vec(), info.num_encoded_points, [id(GeometryAttributeType::Position), id(GeometryAttributeType::Normal)]))
 }
 
 /// 3MF: the core-spec package (a zip with the content types, the root

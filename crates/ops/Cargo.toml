@@ -33,6 +33,8 @@ tiff = "0.11"
 resvg = { version = "0.46", default-features = false }
 # PDF file tabs' pages (file_preview.rs): a pure-Rust rasterizer.
 hayro = "0.8"
+# glTF / GLB Compress: Draco meshes (KHR_draco_mesh_compression), as live writes them.
+draco-core = "2.3"
 noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 # Integration tests (tools/tiers/merge-tests.py): tests/all.rs holds every file but the standalone ones.

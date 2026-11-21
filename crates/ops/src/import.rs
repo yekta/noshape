@@ -336,6 +336,12 @@ fn read_gltf_groups(path: &Path) -> anyhow::Result<(noshape_kernel::Shape, Vec<n
             Some(u) => Ok(std::fs::read(dir.join(u))?),
         })
         .collect::<anyhow::Result<_>>()?;
+    // A buffer view's bytes.
+    let view = |v: usize| -> Option<&[u8]> {
+        let bv = &j["bufferViews"][v];
+        let start = bv["byteOffset"].as_u64().unwrap_or(0) as usize;
+        buffers.get(bv["buffer"].as_u64()? as usize)?.get(start..start + bv["byteLength"].as_u64()? as usize)
+    };
     // An accessor's elements as numbers (`n` per element).
     let read = |a: usize, n: usize| -> Option<Vec<f64>> {
         let acc = &j["accessors"][a];
@@ -390,13 +396,23 @@ fn read_gltf_groups(path: &Path) -> anyhow::Result<(noshape_kernel::Shape, Vec<n
         let (mut verts, mut faces) = (String::new(), String::new());
         let mut base = 0;
         for p in mesh["primitives"].as_array().into_iter().flatten().filter(|p| p["mode"].as_u64().unwrap_or(4) == 4) {
-            let Some(pos) = p["attributes"]["POSITION"].as_u64().and_then(|a| read(a as usize, 3)) else { continue };
+            // Compressed (live's Compress): the positions and triangles in the extension's Draco buffer view.
+            let draco = &p["extensions"]["KHR_draco_mesh_compression"];
+            let (pos, index) = if draco.is_object() {
+                let data = draco["bufferView"].as_u64().and_then(|v| view(v as usize)).ok_or_else(|| anyhow::anyhow!("a compressed mesh without its data"))?;
+                let id = draco["attributes"]["POSITION"].as_u64().ok_or_else(|| anyhow::anyhow!("a compressed mesh without positions"))?;
+                draco_triangles(data, id as u32)?
+            } else {
+                let Some(pos) = p["attributes"]["POSITION"].as_u64().and_then(|a| read(a as usize, 3)) else { continue };
+                let n = pos.len() / 3;
+                let index = p["indices"].as_u64().and_then(|a| read(a as usize, 1)).map_or_else(|| (0..n).collect(), |v| v.into_iter().map(|x| x as usize).collect());
+                (pos, index)
+            };
             let n = pos.len() / 3;
             for v in pos.chunks(3) {
                 let w = at.transform_point3(DVec3::new(v[0], v[1], v[2]));
                 verts.push_str(&format!("v {} {} {}\n", w.x, w.y, w.z));
             }
-            let index: Vec<usize> = p["indices"].as_u64().and_then(|a| read(a as usize, 1)).map_or_else(|| (0..n).collect(), |v| v.into_iter().map(|x| x as usize).collect());
             for t in index.as_chunks::<3>().0.iter().filter(|t| t.iter().all(|x| *x < n)) {
                 faces.push_str(&format!("f {} {} {}\n", base + t[0] + 1, base + t[1] + 1, base + t[2] + 1));
             }
@@ -410,6 +426,16 @@ fn read_gltf_groups(path: &Path) -> anyhow::Result<(noshape_kernel::Shape, Vec<n
     }
     anyhow::ensure!(!groups.is_empty(), "no meshes in the file");
     mesh_groups(groups, noshape_kernel::LengthUnit::Meter)
+}
+
+/// A Draco mesh's positions (the attribute of unique id `position`) and triangles' point indices.
+fn draco_triangles(data: &[u8], position: u32) -> anyhow::Result<(Vec<f64>, Vec<usize>)> {
+    let mut mesh = draco_core::Mesh::new();
+    draco_core::MeshDecoder::new().decode(&mut draco_core::DecoderBuffer::new(data), &mut mesh).map_err(|e| anyhow::anyhow!("a compressed mesh that doesn't decode: {e}"))?;
+    let att = mesh.attribute_by_unique_id(position).ok_or_else(|| anyhow::anyhow!("a compressed mesh without positions"))?;
+    let pos = att.read_f32s(mesh.num_points(), 3).into_iter().map(f64::from).collect();
+    let index = (0..mesh.num_faces() as u32).flat_map(|f| mesh.face(draco_core::FaceIndex(f))).map(|p| p.0 as usize).collect();
+    Ok((pos, index))
 }
 
 /// Standard base64 (a glTF data URI's buffer); other characters skipped.
