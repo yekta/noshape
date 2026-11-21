@@ -54,7 +54,6 @@ cparc end off-circle (REQUESTS 08:40). Shots of 3 takes: vibex8 ~/agents/psui-ke
 -> ~/agents/psui-keep/shots (waiting on slot).
 
 qa P1 FEEL-ROW-DBLCLICK-DISTANCE: closed by qa (xev-measured gaps on vibe2: 80 px opens to ~380 ms, not ~420, as one spot).
-Then the dialog table (item 8 b).
 
 std 3132 vs 3112 (reported to lead 06:5x): our crates/featurescript/std is exactly 3112; 14 files / 181 lines differ
 (live/std-3132, live/std-3132-vs-3112.diff, stddiff.py in psui-scratch/std). Geometry ones (SM pattern collapsed
@@ -67,12 +66,9 @@ host builtin) -> core with the suite gate. Hole V2 diameter is in 3112 too (lega
    pick (live checking). sk-2 (10 second takes for the thin tools) recording. When they land in tests/ui-parity: run
    them (psui-shards.sh on vibex8), fix the differences, most-used first. skasm: tell before a crates/sketch or
    sketch_mode fix.
-   b) Feature dialog audit: docs/parity/feature-dialogs.md; scripts /root/psui-scratch/dlg/ (specdiff.py <bin> <out>
-   [<live specs>]; empty_errors.py <bin> <out>; gen_table.py <specdiff> <ours-empty> [<live empty-errors>]). Live
-   dlg-1: live/psui/dlg-1121/. All 10 empty-error diffs fixed (31161180 + 724a4f2b) or not diffs (Frame: REST skips
-   the library default; live UI = ours). Kept: Import appearances on (live UI), Recognize 25 mm (hidden). Jog / Tag
-   order: mutually exclusive fields, not visible. Variable conversionFactor: to judge. After 724a4f2b lands:
-   empty_errors.py with /root/green/noshape, gen_table.py with live's errors -> the table, land docs.
+   b) Feature dialog audit DONE 10:46: docs/parity/feature-dialogs.md regenerated on green 4553fc38a against live's
+   dlg-1121 specs (std 3132) and empty errors: 80/86 specs, 85/87 errors; the rest explained there (Hole = std skew).
+   Scripts /root/psui-scratch/dlg/ (specdiff.py, empty_errors.py, gen_table.py). Open: Variable conversionFactor.
 
 
 3714e6ce FAILED 04:40 (row_keys test: the sketch under the bar now shown, not only drawn); fixed forward,
