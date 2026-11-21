@@ -68,6 +68,7 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   ….667 / ….667 / ….333: our integration is off by up to 0.012 mm⁴ on a flat rectangle.
 
 - [x] verified green 665560c83 (qa 11-21 06:5x, vibe2, qa-scratch/walk2/e1c, e2c.png: rolled under Sketch 1, its menu is live's with no Section view…; Frame 1 below the bar unchanged) P3 **ROLLBACK-ABOVE-BAR-SECTION-VIEW (psui)**: fixed psui 11-21 06:09 (a pick from a row's menu leaves nothing selected behind it, only a dismissed sketch row's menu does; list_feel "menu / rolled back under Sketch 1" picks Roll to here), to verify. green 70795e7e3 (9790d27d7), live dm/rollback-menus.json. With the bar rolled
+- [ ] P3 **ROLLBACK-ABOVE-BAR-SECTION-VIEW (psui)**: fixed psui 11-21 06:09 (a pick from a row's menu leaves nothing selected behind it, only a dismissed sketch row's menu does; list_feel "menu / rolled back under Sketch 1" picks Roll to here), to verify. green 70795e7e3 (9790d27d7), live dm/rollback-menus.json. With the bar rolled
   under Sketch 1, Sketch 1's menu matches live (Hide in place of Show, Roll to end in place of Roll to here) but has an extra
   "Section view…" after Export as DXF/DWG…. Live's Sketch 1 menu has none, before or after the roll; ours has none before the
   roll. Frame 1 below the bar matches live's Extrude 1 (Configure suppression only with a configuration, Add comment is cloud).
