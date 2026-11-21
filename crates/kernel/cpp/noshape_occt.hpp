@@ -1087,7 +1087,7 @@ StepTree                 read_step_tree(rust::Str path);
 StepTree                 read_iges_tree(rust::Str path);
 void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names,
                 rust::Slice<const float> colors, rust::Slice<const bool> has_color,
-                rust::Str path, uint8_t schema, uint8_t file_unit);
+                rust::Str path, uint8_t schema, uint8_t file_unit, bool all_bsurfaces);
 rust::Vec<rust::String> read_step_pmi(rust::Str path);
 std::unique_ptr<OcShape> read_iges(rust::Str path);
 std::unique_ptr<OcShape> straighten_edges(const OcShape& s, double tol);

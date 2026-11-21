@@ -557,6 +557,8 @@ pub struct StepOptions {
     pub file_unit: Option<LengthUnit>,
     /// Each shape's MBD (index = shape), written as AP242 semantic PMI.
     pub pmi: Vec<Option<PartPmi>>,
+    /// Every surface written as a B-surface (Preprocessing "… and convert all surfaces to b-surfaces").
+    pub all_bsurfaces: bool,
 }
 
 /// A part's MBD for STEP AP242 as Onshape writes it (live 1746: CAx-IF
@@ -729,7 +731,7 @@ fn step_parts(shapes: &[ExportShape], unit: LengthUnit, opts: &StepOptions) -> R
     // 2.0 s writing 2000 parts), each its own product named by its index.
     let tmp = tmp_file();
     let tokens: Vec<String> = (0..v.len()).map(|i| format!("noshape-part-{i}")).collect();
-    let occt = read_back(&tmp, ck(ffi::write_step(&vec_to_list(&v), &tokens, &[], &[], path_str(&tmp)?, schema, file_unit)))?;
+    let occt = read_back(&tmp, ck(ffi::write_step(&vec_to_list(&v), &tokens, &[], &[], path_str(&tmp)?, schema, file_unit, opts.all_bsurfaces)))?;
     let sdrs = occt.sdrs_by_product();
     for (i, t) in tokens.iter().enumerate() {
         // A shape OCCT merged with another (the same shape twice) is written
@@ -743,7 +745,7 @@ fn step_parts(shapes: &[ExportShape], unit: LengthUnit, opts: &StepOptions) -> R
             continue;
         }
         let tmp = tmp_file();
-        let occt = read_back(&tmp, ck(ffi::write_step(&vec_to_list(std::slice::from_ref(sh)), &[], &[], &[], path_str(&tmp)?, schema, file_unit)))?;
+        let occt = read_back(&tmp, ck(ffi::write_step(&vec_to_list(std::slice::from_ref(sh)), &[], &[], &[], path_str(&tmp)?, schema, file_unit, opts.all_bsurfaces)))?;
         let sdr = occt.sdr()?;
         parts[i] = Some(crate::step_out::Part { name: name_of(i), color: shapes[i].color, occt, sdr, pmi: pmi_of(i) });
     }

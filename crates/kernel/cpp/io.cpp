@@ -1107,14 +1107,14 @@ namespace
 {
 void write_step_impl(const OcShapeList& shapes, rust::Slice<const rust::String> names,
                      rust::Slice<const float> colors, rust::Slice<const bool> has_color,
-                     rust::Str path, uint8_t schema, uint8_t file_unit);
+                     rust::Str path, uint8_t schema, uint8_t file_unit, bool all_bsurfaces);
 } // namespace
 
 void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names,
                 rust::Slice<const float> colors, rust::Slice<const bool> has_color,
-                rust::Str path, uint8_t schema, uint8_t file_unit)
+                rust::Str path, uint8_t schema, uint8_t file_unit, bool all_bsurfaces)
 {
-  write_step_impl(shapes, names, colors, has_color, path, schema, file_unit);
+  write_step_impl(shapes, names, colors, has_color, path, schema, file_unit, all_bsurfaces);
 }
 
 rust::Vec<rust::String> read_step_pmi(rust::Str path)
@@ -1215,10 +1215,11 @@ TopoDS_Shape step_forward_wires(const TopoDS_Shape& in)
 // Offset surfaces and linear extrusions as B-surfaces, as live's STEP and IGES write them (c2-rings-loft: B-spline
 // surfaces, no OFFSET_SURFACE / SURFACE_OF_LINEAR_EXTRUSION, IGES 140 / 122): with no p-curves in the file (as live's) a reader projects the
 // faces' boundaries onto those surfaces and missed (ours read the ring's Part 1 back at 176 mm³ for 440.8). Only a
-// part that has one is converted (ConvertToBSpline copies it).
-TopoDS_Shape step_bsurfaces(const TopoDS_Shape& in)
+// part that has one is converted (ConvertToBSpline copies it). With `all` (STEP preprocessing "… convert all surfaces
+// to b-surfaces") every surface is one, the edges' curves kept (live-opt-pre-bsurf.step: 38 B-surfaces, its 75 LINEs).
+TopoDS_Shape step_bsurfaces(const TopoDS_Shape& in, bool all)
 {
-  bool any = false;
+  bool any = all;
   for (TopExp_Explorer ef(in, TopAbs_FACE); ef.More() && !any; ef.Next())
   {
     TopLoc_Location           loc;
@@ -1229,7 +1230,8 @@ TopoDS_Shape step_bsurfaces(const TopoDS_Shape& in)
   }
   if (!any)
     return in;
-  const TopoDS_Shape out = ShapeCustom::ConvertToBSpline(in, true, false, true, false);
+  const TopoDS_Shape out = all ? ShapeCustom::ConvertToBSpline(ShapeCustom::ConvertToRevolution(in), true, true, true, true)
+                              : ShapeCustom::ConvertToBSpline(in, true, false, true, false);
   // A face that runs past its new B-surface's seam (a periodic extrusion's, converted closed but not periodic: the
   // face's p-curves at u 6.05..6.52 on a 0..2π surface, c2-rings-loft's top band) gets the surface cut to the part it
   // covers, in the same parameters (made periodic first), so no reader trims it across the seam.
@@ -1352,7 +1354,7 @@ namespace
 {
 void write_step_impl(const OcShapeList& shapes, rust::Slice<const rust::String> names,
                      rust::Slice<const float> colors, rust::Slice<const bool> has_color,
-                     rust::Str path, uint8_t schema, uint8_t file_unit)
+                     rust::Str path, uint8_t schema, uint8_t file_unit, bool all_bsurfaces)
 {
   const LockedSection locked_section_487;
   std::lock_guard<std::mutex> lock(xde_mutex());
@@ -1382,7 +1384,7 @@ void write_step_impl(const OcShapeList& shapes, rust::Slice<const rust::String> 
       s = BRepBuilderAPI_Transform(s.Located(TopLoc_Location()), s.Location().Transformation(), true).Shape();
     if (yard)
       s = BRepBuilderAPI_Transform(s, third, true).Shape();
-    s = step_bsurfaces(compact_bspline_edges(step_forward_wires(step_direct_faces(s))));
+    s = step_bsurfaces(compact_bspline_edges(step_forward_wires(step_direct_faces(s))), all_bsurfaces);
     TDF_Label l = st->AddShape(s, false);
     if (i < names.size() && !names[i].empty())
     {
@@ -2186,7 +2188,7 @@ std::vector<TopoDS_Shape> add_iges_parts(IGESControl_Writer& w, const OcShapeLis
   for (const auto& s : shapes.items)
   {
     require_non_null(s, "exported shape");
-    written.push_back(compat ? iges_compat_shape(s) : step_bsurfaces(compact_bspline_edges(s)));
+    written.push_back(compat ? iges_compat_shape(s) : step_bsurfaces(compact_bspline_edges(s), false));
     w.AddShape(written.back());
   }
   w.ComputeModel();

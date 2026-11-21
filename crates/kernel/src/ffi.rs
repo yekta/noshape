@@ -889,6 +889,7 @@ pub(crate) mod ffi {
             path: &str,
             schema: u8,
             file_unit: u8,
+            all_bsurfaces: bool,
         ) -> Result<()>;
         /// [`write_step`] of one part with its MBD as AP242 semantic PMI.
         /// A STEP file's semantic PMI as OCCT's XDE reads it: one line per

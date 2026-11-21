@@ -874,7 +874,7 @@ fn step_options(s: &ExportSettings) -> k::StepOptions {
     } else {
         None
     };
-    k::StepOptions { schema, file_unit, pmi: s.pmi.clone() }
+    k::StepOptions { schema, file_unit, pmi: s.pmi.clone(), all_bsurfaces: s.preprocessing == STEP_PREPROCESSING.len() - 1 }
 }
 
 /// The Part Studio Format list's row `i` ([`PartFormat::list`]).
