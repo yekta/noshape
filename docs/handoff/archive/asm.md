@@ -1049,3 +1049,38 @@ Where everything stood:
 - Connectors: implicit (MID_POINT / CENTER / POINT on a face with a second id = the edge / vertex), explicit Mate
   connector features (flipPrimary, secondaryAxisType, transform -> the mate end's flip / reorient / move; not when
   realigned to other entities), live's matedEntities CS paired with picks by occurrence path.
+## State (2026-11-21 18:12 UTC) — RESUME HERE
+- Landed today: 407b09fc as 89180ec5 (scissor P0), d5b89d4d as 4a22b296 (Between / Realign in a flexible sub's parent solve, Lxy 0), 5658c8fc as
+  4c701d14 (Insert › Other documents graph residuals).
+- P0 scissor (asm-scissor-lift 10 s -> 349 s / 18-22 GB): fix LANDED 89180ec5. Causes: (1) my 42f934e10 rebuilt each
+  Derived's whole source chain in every studio (0c2c42 feature 6 4.3 -> 37 s); (2) tests/parity.rs' `named` loop
+  copied every same-corpus source (with its own sources) into each studio's derivedSources: 8.8 GB before the first
+  feature, earlyoom at 18 GB; (3) new data: Plate (0da59a) derives 2d82a0 (178 features, fetched 11-21 04:33), which
+  derives 9cbb0e. Fix: `derived_built` shared by the assembly's Translators and nested sources (once each), studios
+  ordered sources-first (`current_derived_elements`), the assembly's own tab reused as a source (`source_parts`) when
+  a Derived takes it as it is now (`e…::m…`) and it has no configuration; one taken at a version (`d…::v…::e…`,
+  97ad5f's Derived 1 of 264eb3: the reused tab gave other bodies, Linear pattern 1 hung) keys `<element>@version`, a
+  tab of its own (`derived_key`). vibe2: run 4 (no reuse) 38:25 / 11.5 GB, run 5 (fix) 22:20 / 11.1 GB, both
+  207/239, 16/34 mates (34 on today's data), 60/87 BOM; 2d82a0 differences 51 -> 13, all 352 -> 313 (the reused tab has live's refs).
+- Deep per-occurrence placement `>= 2` reverted (welding 41/81 either way). Welding: our top-level solve turns
+  flexible sub instances on free DOFs off live's (Sub 0eadef, e23695); e23695 Fastened 4 "cannot resolve". Solver.
+- Landing with it: parity.rs (tests) compares live's connectors.json via query_datums (c2-cov2-mate-connector-
+  inference 21/22 -> VIRTUAL_SHARP in refgeom.rs `virtual_sharp`, test features_b
+  a_virtual_sharp_mate_connector_is_at_the_rounded_corner). transform-carry (ops/assembly.rs, mate_flip.rs) HELD,
+  out of the worktree: /root/asm-scratch/transform-carry.patch (git apply after the land).
+- Scissor user-facing open (saved doc, open_profile, vibe2 17:5x): 100 s one after another, 1.9 GB; the app's parallel
+  prewarm leaves 57725f's Derived chain (serial) at 53 s vs live 17-19 s. All failing-slow features (live OK): 2d82a0
+  Fillet 13 18.9 s, 9cbb0e Fillet 23, 665cf3 Fillet 4 -> blend P0; Move face b58244 6/8/2, 0139f2 2/3, 665cf3 1 -> core
+  P0; 184ad0 Spur Gear (herringbone opBoolean NON_MANIFOLD, helical+double only) -> bool P0 (took it 18:05); ticket
+  FS-ERROR-ENUM-VERSION (core) landed da49b2418. isaac open: 86 s serial, slowest studio 15 s (≈ live in parallel).
+- isaac a04711: Sketch 9 / 10 translate exactly on live's vertices; volumes as live through live index 22. Extrude 14
+  (ADD symmetric 12 mm, scope Part 2): Part 2 ∪ tool drops the tool (OCCT and ours alike; tool's front half apart, back
+  inside; live +776.4 mm³). Routed to bool P1 (repro vibex8 ~/tmp/asm/q/id.jsonl on isaac.noshape); blend told. Our
+  Part 2 has 19 faces vs live 17 from Loft 1.
+- Then: xdev-subs / pinslot reruns (vibex7 ops-mc, before 146/266 and 24/42), suspension rerun, infento traced rerun
+  (sub-mate offsets bdf7bf 4.6 mm, b63c40 8.33 / 7.2 mm, dfc972 1.56 mm). bjr Sub c1e15f Fastened 3/4, pinslot
+  Revolute 5, tvc 41/43, keyboard BOM 15/16.
+- Cleanup: asm-base worktree, vibex7 ops-bis / ops-1120 / ops-bt / ops-mc, vibex8 ops-main / ops-subs / ops-mc,
+  vibe2 ops-mc / ops-mc2 / ab1120e-*.out / mc/*.out + rss logs / ~/tmp/asm/ab-1120e.sh, ~/tmp/asm pm / pm2 / q copies.
+  Mac target pruned 17:0x (25 -> 12 GB).
+
