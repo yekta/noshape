@@ -6650,11 +6650,13 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
-- [ ] P3 SETLIB-IMAGES (dx, studios 11-08, lead ruling) Set library's "My images": `noshape_ops::prefs::LibraryFolders::load().0` maps the library key `images` to the folder the user chose (Documents › a
-  folder's Set library ▸ "My images", op `documents_set_library`; `libraries.json` in the config dir; one folder per
-  library, setting another replaces it). Insert image in drawings (drawing-ui drawing_images.rs) should list, next to Onshape's own library, a "My images" entry holding
-  that folder's `.noshape` documents (its subfolders as folders, as the documents page shows them), each document's
-  image file tabs, picked like a document from Other documents (inserted at its latest version). No folder set: no entry.
+- [ ] P3 SETLIB-IMAGES (dx, studios 11-08, lead ruling; live 11-21 behaviours "dx (11-21 15:31)") Set library's "My images":
+  `noshape_ops::prefs::LibraryFolders::load().0` maps the library key `images` to the folder the user chose (Documents ›
+  a folder's Set library ▸ "My images", op `documents_set_library`; `libraries.json` in the config dir). Live shows it
+  only in a sketch's Insert image › Library: "<user's full name> images" above "Onshape images" (which stays the
+  default); Type lists the folder's top-level documents and subfolders by name, a subfolder's Image list holds its
+  documents' images directly; rows are thumbnail + file name; no version picker. Drawing › Insert image is unchanged (no
+  library there). No folder set: no entry. The name: `noshape_store::local_user_name()` (Preferences' name).
 - [x] verified (qa 11-20 02:36, main 5b62f6ca8 / green a06ec927: export::parasolid_bare_binary_reads_as_text test(s) on main, not ignored (run by the watcher each commit)) (dx 11-08 09:29: fe7b499c, bare binary and v9 schema read; xdev-subs' 34 files + 1 text read, 32 valid) P1 XT-B3-BINARY-TRANSMIT (dx; asm 2026-11-08 06:18 UTC, the assembly corpus' xdev-subs): **a Parasolid file with a text
   header (`FORMAT=binary`) whose body starts `B3   : TRANSMIT FILE created by modeller version 2900122
   SCH_900000_9008` is refused**: "parasolid: not a transmit file" (crates/kernel/cpp/xt_read.cpp takes `PS\0\0` binary
