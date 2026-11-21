@@ -924,7 +924,7 @@ FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 OTHER DEALINGS IN THE FONT SOFTWARE.
 
 ==============================================================================
-Rust packages (881): name version: licence
+Rust packages (882): name version: licence
 ==============================================================================
 
 acadrust 0.6.5: MPL-2.0
@@ -1089,6 +1089,7 @@ displaydoc 0.2.7: MIT OR Apache-2.0
 dlib 0.5.3: MIT
 document-features 0.2.12: MIT OR Apache-2.0
 downcast-rs 1.2.1: MIT/Apache-2.0
+draco-core 2.3.3: Apache-2.0; used under Apache-2.0 (its standard text below), Copyright (c) the draco-core authors
 dunce 1.0.5: CC0-1.0 OR MIT-0 OR Apache-2.0
 dwrote 0.11.5: MPL-2.0; used under MPL-2.0 (its standard text below), Copyright (c) The Servo Project Developers, Vladimir Vukicevic <vladimir@pobox.com>
 dyn-clone 1.0.20: MIT OR Apache-2.0
