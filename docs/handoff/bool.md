@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-21 05:53 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-21 11:00 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -12,36 +12,39 @@ bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates throu
 only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `systemctl stop <unit>`. Agent ids: only
 /root/lead-scratch/roster.md (read before messaging).
 
-## Order (lead 11-20 12:20)
-Both P0s landed (isaac drag revert 61295b96, Gyro 593b072a). Now: dx's speed items (impeller-loft Extrude Bohrungssitz
-op_boolean 666 ms; screws Sweep 1's sections_ahead 907 ms) and 850efe. End a turn after each land.
+## Order (lead 11-21)
+P0 impeller speed (c2-impeller-loft, blend measures per feature); P1 asm's SPEED-ASM-OPEN (infento). Gates + knurls
+for every brep / Boolean / Shell land; list the corpora each gate ran. End a turn after each land.
+Knurls: /root/bool-scratch/kn-run.sh <host> <dir> (systemd unit) with k-main / k-br = the gate trees'
+all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/knocc; delete the copies after.
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
-## In flight
-- Memory budget machine-independent (lead 11-21 P1): QUEUED 33b53875 (05:50; branch bool-mem): flat 8 GB (3/4 of RAM
-  under 11 GB); NOSHAPE_WORK_TRACE=1 prints growth past 128 MB; gate corpora <= 0.3 GB. Gate CHECK = main, knurls at the
-  default budget (vibex7) = main; lead told. After it lands: rm worktrees bool-mem, bool-mem-gate.
-  Aside: bool-corpus 2a5740b0d124e53d (edges 18 was 21) and gpf 49eaef95f9ced6bf off their recordings: check main drift.
-- IMPELLER speed P0 (blend 11-21, log /root/blend-scratch/logs/imp-prof-c44c0240d.out): Extrude Bohrungssitz 1511 ms vs
-  live 177 (op_boolean 1292), Remove Bohrung 364 vs 59, Shell Gehaeuse 150 vs 31. Mac recording
-  ~/noshape-host/bool-keep/imprec (22 cases), impsel = 8432b6b73fb1fb56 (cut, OCCT 946 ms), 6466e208ed35c9a4,
-  9717da1578778eaf (fuse 436 ms, "a face lost"). 8432/6466 decline in boolean.rs on_free's stretches_over branch
-  ("an edge on another argument's free-form face", the 3rd site): 8432's run (edge 6 on face 33, 0.3 mm spline) is 0.31 mm
-  off the face, projected() takes GREY*tol 0.07 mm but stretches_over took it at gap 0.9 mm (loose loft edges); 6466's
-  spline is on the face (3e-12) yet projected() fails (param jump?). Probe on bool-hat branch imp-speed (uncommitted
-  prints, never land). Then 65346691 / fbcf363f (OCCT-invalid 9-tool cases), cb63b85d (replays 20 faces vs recorded 16).
-- isaac P0: REVERT LANDED 9f6ce35e; asm: 16 failed mates again. Closed. RE-LAND branch bool-re (3139c1975, bool-hat
-  worktree: the revert reverted): blend fixed checked_blend (a retry invalid at the part's scale with no neck: next step;
-  their branch blend-fix, gate running 03:2x). Mac A/B (/root/bool-scratch/isaac-re.sh, out isaac-re.out; main + both):
-  isaac-00f1 48/103, de4e 48/90 features match (main 14 each), first diff Extrude 24, regen 5.1 s (main 9.0 s). NEXT:
-  after blend's sha lands, gate bool-re (+ knurls), check 850efe Extrude 6 = 33 faces, land, tell asm to recount mates.
-  Probes: bool-hat branch isaac-bis "WIP probes (never land)"; isaac-re = test branch (blend's diff copied): never land.
-- COMPAT-CRASH957-CHAMFER3: LANDED 43c2644a (20:10), qa verified on green 00bc521e and ticked it. Closed.
-- 850efe Extrude 6: LANDED 06dcd168 as 9c70297b (23:22); knurls run apart on vibex8 = main (only timings differ). Knurls
-  for every gate (lead 22:5x; no host has 48 GB): /root/bool-scratch/kn-run.sh <host> <dir> with k-main / k-br (the gate
-  trees' all-96c035059fc28abb) in ~/tmp/bool/<dir>, OCCT side from vibex8 ~/agents/bool-keep/knocc (11-12 cache); report
-  each gate's corpora. Worktree + host copies removed.
-- impeller Extrude: LANDED 908abe7b8.
+## In flight (11-21 11:00 UTC)
+- bool-re (isaac coaxial re-land, 72fe51df1 again after blend's a9c26c41): QUEUED f33f4448 10:43. Gate vibex7 CHECK
+  (knurls only), corpora 3114 -> 3114, differing 2 -> 2, models 127 -> 127, shells 6 = main; knurls vibex7 = main.
+  asm recounts isaac mates once on main. After: rm worktree bool-re (+ vibex7 gate tree).
+- bool-mend (worktree bool-mend, tip 0170472fc on main ceec84d25), gate vibex8 (unit bool-mend-gate, chain
+  /root/bool-scratch/chain-bool-mend.out): ce09aaef1 boolean.cpp mend_loose_sections (a new section edge whose pcurve
+  is > 10x the inputs' loosest tolerance off: pcurve re-projected, edge + new vertices tightened; impeller Fillet 3's
+  cut out 2.24e-4 (was 2.55e-3), chamfer cut 1.7e-5 (was 2.1e-4); test on tests/data/booleans/cc3caf4644ba152b);
+  56bb5c47b brep: a cut's tool piece on other tools alone taken (infento Circular pattern 4: 26 rim tools, ours 58 ms
+  vs OCCT 1.6 s); 0170472fc kernel: tools that are copies of an earlier one in place left out, history copied (infento
+  Extrude 42 5.5 -> 0.7 s; asm's translator no longer makes the copies, still general). Then knurls, land, tell blend
+  (remeasures Fillet 3), asm, lead.
+- bool-shg (worktree bool-shg, 58dad8e39 on main 4a22b2966), gate vibex7 (unit bool-shg-gate, chain-bool-shg.out):
+  shell.cpp normal_at warm-started by Newton from the last foot (full grid search only off the surface), solve3 gives
+  up after 12 steps without progress. Shell Gehaeuse (dump Mac bool-keep/shgeh/shell-62, probe
+  shell::probe_shell_dump_profile in bool-hat, SHELL_DUMP / SHELL_ROUNDS) 145-160 ms vs 160-220; live 31. Left on the
+  path (second quadrics try, tangent extensions): self-interference 63 ms (meshed_copies + CheckerSI EF), faces 26
+  (add_pcurve), edges 20, runs 15. The first try (fails: edge 3's marched point 0.2 mm off face 1) runs in parallel.
+- imp-speed (3ada93d19, brep free-form projection): gate clean, DROPPED: no gain on the impeller after bool-mend (Mac
+  A/B: Bohrungssitz 267 vs 292 ms best). Branch kept, never land.
+- Impeller (Mac, bool-mend): Bohrungssitz Ansaugflansch ~270 ms (live 177), Remove Bohrung 25 (59), Boolean
+  Flansch+Gehaeuse 250-300 (154), Shell Gehaeuse ~145 (31); Fillet 3 / chamfer / fillets are blend's.
+- infento (asm P1): Extrude 42 also declined by ours ("an invalid result", the object is invalid); private cases vibex8
+  ~/tmp/bool/inf/{rec,c2}, Mac bool-keep/infento: never commit. Delete vibex8 ~/tmp/bool/inf when done.
+- bool-hat (Mac worktree) = bool-mend + imp-speed + bool-shg's shell.cpp + probes (rust_boolean.cpp PROBE_INVALID,
+  brep_replay.rs / shell.rs probes): never land from it.
 - SHELL-HANG-SPEED (P1) + SHELL5-AFTER-SHELL3 (P2), TICKETS bool 11-21: qa's cli-shell-hang-pre (vibex7
   ~/qa/tickets/cli-shell-hang-pre.noshape; copy vibe2 ~/tmp/bool/sh5.noshape): ours Shell 3 12.8 s (live 40 ms), Shell 5
   (Part 2, 3 mm, faces 1475.653 mm2 Shell 3 / 282.843 mm2 Linear pattern 2) fails in 25.4 s, live OK 20 ms 172908.326 mm3
@@ -152,43 +155,8 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   tolerance), 2e9c3ddd (ours "took too long" vs "shell failed": load flake, both errors; watch in the gate). 37 fuzz
   shells now fail "the walls fill the part" both ways (they returned the part unchanged, as b79e508b).
 
-## From bool2 (owned since 11-19 20:45)
-- Landed 11-19: 41fcfd2c bool2-cbs (closed B-spline faces' period; 2a5740b0 gate exception backed by live capture
-  live/bool2/q-fb-ell-asym-1119); 09ad4e81 bool2-rim (B-spline edge along another argument's face rim; Shell common
-  f9b29e1d = OCCT now).
-- bool2-exact: NOT landable (gate86 FAILED 19:58). Worktree /root/projects/noshape-wt/bool2-ab, branch bool2-exact,
-  tip 2a8da63d4 on main e2abe938a: 819a9c81d off-plane check by curve ends + vertex tolerance; 9b9c09518 a piece keeps
-  its edge's end within its merged vertex's tolerance; 957b0f4b9 plane-plane straight edges on the planes' exact line
-  (brep Output.edge_line, ffi, bridge Geom_Line); 50a079ef6 / 79eb8832f a new arc ending at a tolerant vertex ends at
-  the crossing with an input line there (and tangent case); 2a8da63d4 T1 b997c4c3 to recorded_as_occt (fails).
-  gate86 (/root/bool2-ab-scratch/gate-2a8da63d4.log): +2 taken, differing 6 -> 8 (shfall 6bb081c8 / 5101adb8 fuses,
-  32 tools, path direct), T1 fails; c2-parting-line-draft Rib 1 edges 234 -> 225 (live 214).
-  Measurement: rerun as unit bool-tdbg53e (the first two died: build failed on `mod sampler;` missing from bool2-ab's
-  uncommitted all.rs, now added) -> /root/bool2-scratch/tdbg53c.out, "VOL ours" / "VOL occt" per case:
-  - b997c4c389ff7abe: ours 4.0555e-6 vs recorded 4.05697e-6. VOL occt ~4.0555e-6 -> stale recording (re-record);
-    4.05697e-6 -> needs the rest of the tail stack (bool2-taildbg b02a9be42 + 62e8ccdad).
-  - 6bb081c8 / 5101adb8: ours 5.295354594164e-4 both; recordings 5.2953546335e-4 / 5.2953739068e-4 (OCCT disagrees
-    with itself). If VOL occt = ours: history only ("rust only" records: arg0/1/10 Edge0 Generated Vertex at (57467,
-    39967, 18000 / 18967) mm, Modified edges along x 57500, arg1 Face0 Modified): fix the history or re-record
-    (DECISIONS 0e603d4c9), never decline.
-  Plan (lead 20:30): fix why the plane lines take those fuses and differ, re-gate on vibex8 via slot, land at 0 differing.
-- bool2-taildbg (same worktree): WIP debug + real commits b02a9be42 (split_params ends allowance, Line only),
-  62e8ccdad (arrange cycle areas with chords), 43eebd26d, 38bad0785, f1bf78ea5, 855863591, 7b7052072, 07df21fea. With
-  all of it 11cc92b2 / dbc28f46 and b997c4c3 match OCCT in volume and history, but 11cc92b2 / dbc28f46 unify
-  differently (ours 25 faces, OCCT 27: OCCT's USD merges two 0.052 mm2 slivers on ours, not on its own): keep those two
-  declined to land, or find a live document.
-- bool2's parked tail reasons (none an OCCT difference; details archive/bool2.md end): two edges leave a vertex
-  (11cc92b2/dbc28f46 slivers; gpf ee95f96d / b7a02f84 need > 4 regroup rounds); coincident pieces differ (gpf
-  9f0b0c04, 54630d70, corpus4 3cca316c: piece_key keys a cone's Apex by its vertex, then a 0.5 um sliver at th0 x=0);
-  a plane nearly along a cylinder (gpf 1b0a04c4 OCCT 1.3 s, eee70623; BOOL2_LONGELL); an arc across a cylinder's seam
-  (parity56 ce4e3c99: th0 = pi exactly); a section touching a face's boundary (c38a6db8, 890acd4d); short sections
-  (parked, lead); OCCT's result invalid (tiny arc 63bd60d0 b70f339a fda1114a 91923f72; internal face b25113011
-  addb9a14; 09489f90; 0c6f868e; f516559d 1ba3f24a); inside-out tool (869aabac 5059c49e 269c06e4); unclear shell
-  orientation (a3bfaa87 adeba320 6cf25eee); cones at an apex (ba2e862f, 620253d9); 50a8ad1c; fz1144 a46cf4d0.
-- bool2's trees: bool2-ab (bool2-exact, bool2-taildbg, bool2-rimdbg; rb.sh target vibex8 ~/agents/bool2-ab; probe
-  binaries vibex8 ~/tmp/bool2/ab kp-*; uncommitted `mod xprobe;`), bool2-xs / bool2-k25 (landed), bool2 (old), bool2-ho.
-  Gate trees vibe2 / vibex8 ~/agents/bool2-ab-gate. Debug envs on taildbg: BOOL2_ARR / COINC / TOUCH / SAME / LONGELL
-  / SEAMARC / USD / SLIT / FLATSEAM / OFFPL / TWICE / CROSS / ELT / PN2 / APEX / ROUNDS / SHORT / VOFF.
+## From bool2
+bool2's branches and parked tail reasons: docs/handoff/archive/bool.md (end, "From bool2", moved 11-21).
 
 ## Share and decline reasons
 - Share (main 548d795fb's replay): ours 3121/3477 (general 3026, direct 95), OCCT 356, differing 6.

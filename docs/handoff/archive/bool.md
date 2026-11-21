@@ -5192,3 +5192,42 @@ cf-snap-hook 866 / 274 (suite run 18:5x); c2-bottle-split Split 1 ~12 ms in rele
   NOSHAPE_PROJECT_OCCT, NOSHAPE_SPLIT_DEBUG, NOSHAPE_SHELL_DEBUG; per-pair section timer for occt_ahead:
   /root/bool-scratch/torus-and-ahead-debug.diff (NOSHAPE_AHEAD_DEBUG).
 - Notes for the snap-hook work: /root/bool-scratch/notes-snap.txt.
+
+## From bool2 (moved from the handoff 11-21)
+- Landed 11-19: 41fcfd2c bool2-cbs (closed B-spline faces' period; 2a5740b0 gate exception backed by live capture
+  live/bool2/q-fb-ell-asym-1119); 09ad4e81 bool2-rim (B-spline edge along another argument's face rim; Shell common
+  f9b29e1d = OCCT now).
+- bool2-exact: NOT landable (gate86 FAILED 19:58). Worktree /root/projects/noshape-wt/bool2-ab, branch bool2-exact,
+  tip 2a8da63d4 on main e2abe938a: 819a9c81d off-plane check by curve ends + vertex tolerance; 9b9c09518 a piece keeps
+  its edge's end within its merged vertex's tolerance; 957b0f4b9 plane-plane straight edges on the planes' exact line
+  (brep Output.edge_line, ffi, bridge Geom_Line); 50a079ef6 / 79eb8832f a new arc ending at a tolerant vertex ends at
+  the crossing with an input line there (and tangent case); 2a8da63d4 T1 b997c4c3 to recorded_as_occt (fails).
+  gate86 (/root/bool2-ab-scratch/gate-2a8da63d4.log): +2 taken, differing 6 -> 8 (shfall 6bb081c8 / 5101adb8 fuses,
+  32 tools, path direct), T1 fails; c2-parting-line-draft Rib 1 edges 234 -> 225 (live 214).
+  Measurement: rerun as unit bool-tdbg53e (the first two died: build failed on `mod sampler;` missing from bool2-ab's
+  uncommitted all.rs, now added) -> /root/bool2-scratch/tdbg53c.out, "VOL ours" / "VOL occt" per case:
+  - b997c4c389ff7abe: ours 4.0555e-6 vs recorded 4.05697e-6. VOL occt ~4.0555e-6 -> stale recording (re-record);
+    4.05697e-6 -> needs the rest of the tail stack (bool2-taildbg b02a9be42 + 62e8ccdad).
+  - 6bb081c8 / 5101adb8: ours 5.295354594164e-4 both; recordings 5.2953546335e-4 / 5.2953739068e-4 (OCCT disagrees
+    with itself). If VOL occt = ours: history only ("rust only" records: arg0/1/10 Edge0 Generated Vertex at (57467,
+    39967, 18000 / 18967) mm, Modified edges along x 57500, arg1 Face0 Modified): fix the history or re-record
+    (DECISIONS 0e603d4c9), never decline.
+  Plan (lead 20:30): fix why the plane lines take those fuses and differ, re-gate on vibex8 via slot, land at 0 differing.
+- bool2-taildbg (same worktree): WIP debug + real commits b02a9be42 (split_params ends allowance, Line only),
+  62e8ccdad (arrange cycle areas with chords), 43eebd26d, 38bad0785, f1bf78ea5, 855863591, 7b7052072, 07df21fea. With
+  all of it 11cc92b2 / dbc28f46 and b997c4c3 match OCCT in volume and history, but 11cc92b2 / dbc28f46 unify
+  differently (ours 25 faces, OCCT 27: OCCT's USD merges two 0.052 mm2 slivers on ours, not on its own): keep those two
+  declined to land, or find a live document.
+- bool2's parked tail reasons (none an OCCT difference; details archive/bool2.md end): two edges leave a vertex
+  (11cc92b2/dbc28f46 slivers; gpf ee95f96d / b7a02f84 need > 4 regroup rounds); coincident pieces differ (gpf
+  9f0b0c04, 54630d70, corpus4 3cca316c: piece_key keys a cone's Apex by its vertex, then a 0.5 um sliver at th0 x=0);
+  a plane nearly along a cylinder (gpf 1b0a04c4 OCCT 1.3 s, eee70623; BOOL2_LONGELL); an arc across a cylinder's seam
+  (parity56 ce4e3c99: th0 = pi exactly); a section touching a face's boundary (c38a6db8, 890acd4d); short sections
+  (parked, lead); OCCT's result invalid (tiny arc 63bd60d0 b70f339a fda1114a 91923f72; internal face b25113011
+  addb9a14; 09489f90; 0c6f868e; f516559d 1ba3f24a); inside-out tool (869aabac 5059c49e 269c06e4); unclear shell
+  orientation (a3bfaa87 adeba320 6cf25eee); cones at an apex (ba2e862f, 620253d9); 50a8ad1c; fz1144 a46cf4d0.
+- bool2's trees: bool2-ab (bool2-exact, bool2-taildbg, bool2-rimdbg; rb.sh target vibex8 ~/agents/bool2-ab; probe
+  binaries vibex8 ~/tmp/bool2/ab kp-*; uncommitted `mod xprobe;`), bool2-xs / bool2-k25 (landed), bool2 (old), bool2-ho.
+  Gate trees vibe2 / vibex8 ~/agents/bool2-ab-gate. Debug envs on taildbg: BOOL2_ARR / COINC / TOUCH / SAME / LONGELL
+  / SEAMARC / USD / SLIT / FLATSEAM / OFFPL / TWICE / CROSS / ELT / PN2 / APEX / ROUNDS / SHORT / VOFF.
+
