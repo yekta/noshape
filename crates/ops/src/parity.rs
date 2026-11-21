@@ -5301,6 +5301,20 @@ impl<'a> Translator<'a> {
         // nearest in space (that wedge's point lies on the curve between it and its 197 mm² neighbour).
         if let Some(m) = r.measure.filter(|m| *m > 0.0) {
             let rel = |e: &&Value| e[key].as_f64().map_or(f64::INFINITY, |ours| (ours * scale - m).abs() / m);
+            // None of live's curve type: of any type, the nearest in space (its mirror image is as long), before the nearest
+            // of its type. Live's 20.04 mm LINE on Surface 1 is a bspline of ours, 0.5 % longer: c2-surf-intro-boundary's
+            // Boundary surface 1 profile, not 3D fit spline 2's line beside it.
+            if kind == "edges" && r.geometry.is_some() && !found.iter().any(|e| rel(&e) <= 5e-2) {
+                let mut any = a.clone();
+                any.as_object_mut().map(|o| o.remove("curve"));
+                let pool = self.call("query_entities", any).ok().and_then(|v| v[kind].as_array().cloned()).unwrap_or_default();
+                let dist = |e: &&Value| f3(&e["midpoint"]).map_or(f64::INFINITY, |c| (0..3).map(|i| (c[i] * k - p[i]).powi(2)).sum::<f64>());
+                let close: Vec<&Value> = pool.iter().filter(|e| rel(e) <= 5e-2).collect();
+                let theirs: Vec<&Value> = close.iter().copied().filter(on_part).collect();
+                if let Some(e) = if theirs.is_empty() { close } else { theirs }.into_iter().min_by(|x, y| dist(x).total_cmp(&dist(y))) {
+                    return id(e);
+                }
+            }
             let close: Vec<&Value> = found.iter().filter(|e| rel(e) <= 5e-2).collect();
             let theirs: Vec<&Value> = close.iter().copied().filter(on_part).collect();
             if let Some(e) = if theirs.is_empty() { close } else { theirs }.into_iter().min_by(|x, y| rel(x).total_cmp(&rel(y))) {

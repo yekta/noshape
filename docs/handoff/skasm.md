@@ -90,11 +90,17 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
    core's (fit spline), told via the lead; Boundary surface 1 fails on it.
 00c. LANDED 5cf3fc94: a feature pattern re-runs each seed once per group: rocker-enclosure-body Mirror 3 200 -> 88 ms.
    Left: nested seeds re-run as tools (Mirror 1 / 2 inside Mirror 3).
-00d. core 11-21: surf-intro Boundary surface 1's uProfile 0 (live Jvx, a LINE of Surface 1 at x 50.52, 20.04 mm; no ids,
-   '&' query) went to 3D fit spline 2's wire: our Surface 1 edge there is a bspline 20.145 mm (0.5 % off), so `nearest`
-   kept only lines and fell to the first. Fix: any curve type within 5 % before the first of live's type.
-00e. live 11-21: cov2 models c2-cov2-sm-flange-bounds / -sm-hem-jog / -sm-corner-break-relief-joint /
-   -sm-start-extrude-bounds / -frame-corners-trim-endcap-gusset (behaviours "lead (11-21 13:59): coverage batch 2").
+00d. LANDING 11-21: an edge with no curve of live's type within 5 % of live's length takes the nearest of any type within
+   5 % (live's part first): surf-intro Boundary surface 1's uProfile 0 (live Jvx LINE, ours a 0.5 % longer bspline) is
+   Surface 1's +x edge, Boundary surface 1 builds in boundary/fill/mutualtrim/ruled (5 parts as live; core's WARNING
+   "boundary conditions not applied"). Mac suite 128/188, 1943/2680 unchanged; 3 untranslated refs resolved
+   (workshop-bridging Bridge patch - Top JNB, Side blend curve, a Fillet 1 JyB); impeller-loft's Sketch Bohrung takes
+   back by another first move (rows the same).
+00e. live 11-21 cov2 (behaviours "lead (11-21 13:59): coverage batch 2"), Mac rows: frame Frame 1 4.5x volume = no
+   derived/94de05…/options.tsv in the model (tube sized from the id 2x6; asked live to add it); corner-break Corner 2
+   OK, live WARNING SHEET_METAL_CORNER_UNDER_SIZED (corner_reliefs skips an undersized SIZED_ROUND silently) and
+   sheetMetalJoint `entity` rejected (2 selections, takes 1); hem-jog "Hem straight opposite closed" ERROR Cannot
+   create hem.; start-extrude-bounds "Sheet metal second up to next" ERROR; flange-bounds matches.
 0. USER P0 feel: rows of docs/parity/interaction-feel.md in my areas are "=" now; Hover timing is psui's.
 0b. DONE 11-21 13:35: sketch-line-from-midpoint / sketch-bezier-polygon / sketch-spline-handle-arm match with the camera
    (3/3, 40/40 states, green 6241cf347 on vibe2; skasm-scratch/bin/uipg.sh); the 7 asm takes are asm's.
