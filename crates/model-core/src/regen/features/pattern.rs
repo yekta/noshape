@@ -1194,12 +1194,15 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
             })
             .collect();
         let targets: Vec<usize> = groups.iter().filter_map(|(id, _)| index_of_body(ev, id)).collect();
+        // Each seed re-run once (a mirror of mirrors re-runs the inner ones, each its own seeds).
+        let seeds: Vec<(FeatureId, Shape)> = if groups.is_empty() { Vec::new() } else { group.iter().filter_map(|&g| seed_tool(ev, g).map(|t| (g, t))).collect() };
+        let tools: Vec<Shape> = seeds.iter().map(|(_, t)| t.clone()).collect();
         if let Some((id, fs)) = groups.first()
             && let Some(bi) = index_of_body(ev, id)
-            && group.iter().any(|&g| copies_fail(ev, g, &targets, instances))
+            && seeds.iter().any(|(g, t)| copies_fail(ev, *g, t, &targets, instances))
         {
             let body = ev.ctx.bodies[bi].clone();
-            ev.error_shapes = failed_instances(ev, &group, &body, fs, instances);
+            ev.error_shapes = failed_instances(&tools, &body, fs, instances);
             return crate::regen::eval::err_at(&["fullFeaturePattern"], SWITCH_TO_PER_INSTANCE);
         }
         for (id, fs) in groups {
@@ -1212,7 +1215,7 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
             {
                 let body = ev.ctx.bodies[bi].clone();
                 if instances.len() > 1 {
-                    ev.error_shapes = failed_instances(ev, &group, &body, &fs, instances);
+                    ev.error_shapes = failed_instances(&tools, &body, &fs, instances);
                     return crate::regen::eval::err_at(&["fullFeaturePattern"], SWITCH_TO_PER_INSTANCE);
                 }
                 let caps: Vec<Shape> = fs.iter().filter_map(|&i| body.shape.sub_shape(ShapeType::Face, i).ok()).collect();
@@ -1222,15 +1225,12 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
                 ev.replace_body(bi, res.shape, names);
                 continue;
             }
-            let merged = index_of_body(ev, &id).and_then(|bi| {
-                let tools: Vec<Shape> = group.iter().filter_map(|&g| seed_tool(ev, g)).collect();
-                (!tools.is_empty()).then(|| tools.iter().flat_map(|t| merged_faces(t, &ev.ctx.bodies[bi], &fs)).collect::<BTreeSet<usize>>().into_iter().collect::<Vec<usize>>())
-            });
+            let merged = index_of_body(ev, &id).and_then(|bi| (!tools.is_empty()).then(|| tools.iter().flat_map(|t| merged_faces(t, &ev.ctx.bodies[bi], &fs)).collect::<BTreeSet<usize>>().into_iter().collect::<Vec<usize>>()));
             if let Some(bi) = index_of_body(ev, &id)
                 && face_pattern_fails(&ev.ctx.bodies[bi], &fs, instances, merged.as_deref())
             {
                 let body = ev.ctx.bodies[bi].clone();
-                ev.error_shapes = failed_instances(ev, &group, &body, &fs, instances);
+                ev.error_shapes = failed_instances(&tools, &body, &fs, instances);
                 return crate::regen::eval::err_at(&["fullFeaturePattern"], SWITCH_TO_PER_INSTANCE);
             }
             pattern_faces(ev, &id, &fs, instances, false)?;
@@ -1255,15 +1255,14 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
 /// seed's whole tool body moved there, plus the part's faces the seed merged
 /// into (a coplanar face of the part running on into the tool is the
 /// feature's face too in Parasolid: the user's flush side) moved likewise.
-fn failed_instances(ev: &EvalCtx, group: &[FeatureId], body: &Body, fs: &[usize], instances: &[Instance]) -> Vec<Shape> {
+fn failed_instances(tools: &[Shape], body: &Body, fs: &[usize], instances: &[Instance]) -> Vec<Shape> {
     let mut ghost: Vec<Shape> = Vec::new();
-    let tools: Vec<Shape> = group.iter().filter_map(|&g| seed_tool(ev, g)).collect();
     if tools.is_empty() {
         ghost.extend(fs.iter().filter_map(|&i| body.shape.sub_shape(ShapeType::Face, i).ok()));
     }
     for tool in tools {
-        ghost.extend(merged_faces(&tool, body, fs).into_iter().filter_map(|i| body.shape.sub_shape(ShapeType::Face, i).ok()));
-        ghost.push(tool);
+        ghost.extend(merged_faces(tool, body, fs).into_iter().filter_map(|i| body.shape.sub_shape(ShapeType::Face, i).ok()));
+        ghost.push(tool.clone());
     }
     let seed = Shape::compound(&ghost);
     // Moved, not copied: the ghosts share the seed's geometry and mesh.
@@ -1548,13 +1547,12 @@ fn face_pattern_fails(body: &Body, faces: &[usize], instances: &[Instance], merg
 /// all off the part (O3's one copy, M2). Some copies off the part are skipped,
 /// added (oracle_p1 CV1, CP2) or removed (O1). The seed's tool is the feature
 /// evaluated as New where it stands.
-fn copies_fail(ev: &EvalCtx, f: FeatureId, targets: &[usize], instances: &[Instance]) -> bool {
-    let Some(tool) = seed_tool(ev, f) else { return false };
+fn copies_fail(ev: &EvalCtx, f: FeatureId, tool: &Shape, targets: &[usize], instances: &[Instance]) -> bool {
     let add = matches!(ev.features.iter().find(|x| x.id == f).and_then(|x| x.params.get("operationType")), Some(crate::params::ParamValue::Enum(o)) if o == "ADD");
     let mirror = verb(ev) == "mirror";
     let mut tools = vec![tool.clone()];
     // Moved, not copied: only their boxes are compared.
-    tools.extend(instances.iter().filter_map(|inst| k::transform(&tool, &inst.t, false).ok().map(|r| r.shape)));
+    tools.extend(instances.iter().filter_map(|inst| k::transform(tool, &inst.t, false).ok().map(|r| r.shape)));
     let size = tool.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0);
     let boxes: Vec<Option<k::BoundingBox>> = tools.iter().map(|t| t.bounding_box(false).ok()).collect();
     for i in 0..tools.len() {
@@ -1577,7 +1575,7 @@ fn copies_fail(ev: &EvalCtx, f: FeatureId, targets: &[usize], instances: &[Insta
     // patterned ×2 is OK).
     let target_boxes: Vec<k::BoundingBox> = targets.iter().filter_map(|&bi| ev.ctx.bodies[bi].shape.bounding_box(false).ok()).collect();
     let copies: Vec<&k::BoundingBox> = boxes[1..].iter().flatten().collect();
-    (mirror || (add && !merged_into(ev, f, &tool, targets))) && !copies.is_empty() && copies.iter().all(|b| !target_boxes.iter().any(|a| boxes_meet(a, b, 1e-7)))
+    (mirror || (add && !merged_into(ev, f, tool, targets))) && !copies.is_empty() && copies.iter().all(|b| !target_boxes.iter().any(|a| boxes_meet(a, b, 1e-7)))
 }
 
 /// Whether a planar face of `tool` lies on a face of the target parts facing

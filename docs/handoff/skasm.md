@@ -32,20 +32,24 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - LANDED 381554f1: Hem 1 (c2-sm-hem-flange) keeps "Sheet metal model cannot be unfolded." (219 -> 222/295).
 - LANDED 9f5250bf: SM loft profiles with different corner counts walk the least total fold (host/loft.rs).
 - SM suite (Mac 11-21 12:30, my build after bc92cab1): 22/23 docs, 259/260 features; only c2-sm-loft-basic's apex left.
-- Loft apex (c2-sm-loft-basic 38 vs 40 faces), WAITING on live (REQUESTS skasm 11-21 12:32: fan-tol0p022 / 0p035 with
-  corner relief Simple, Square - Sized 1 mm, Round - Scaled 1.0, full capture format). Samples:
+- Loft apex (c2-sm-loft-basic 38 vs 40 faces): box rule still open after live's 12:32 copies. Samples:
   live/skasm/sm-loft-fans-1121/<name> (chordal 0.1 / 0.05 / 0.035 / 0.022 in = 3-6 bends; "-plane4" = Plane 1 at 4 in,
-  two apexes, other differences too: 37 vs 44 faces; fan-tol0p05 = loft-basic itself). Parity on them: copy the dirs
-  (features.json, live.jsonl, source.json) to Mac ~/noshape-host/tmp-skasm/fans, set NOSHAPE_PARITY_MODELS;
-  skasm-scratch/loft/ours.sh saves + dumps ours. FOUND (skasm-scratch/loft/flat.py develops live's walls / bends at the
-  neutral radius into the middle bend's plane; rect.py corners, sc.py maps another capture's cut planes): live cuts the
-  apex by ONE rectangle in the flat, open toward the tip: u < uP (square to bend floor(n/2): its two walls and itself
-  end on that plane, the other interior walls on its unfolded line) and vlo < v < vhi (lines along that bend: the outer
-  walls' cuts). Each other bend's end is two splines along the rectangle's edges. The rectangle = scale x a box about
-  the box's centre (0p022 at 1.0 and 1.2: to 1e-4 mm). Box top = the last wall's corner (its free edge x its bend's
-  tangent line), all 4 samples. 0p022 box (flat mm): u -115.0448..-110.7088, v -1.2643..0.7095; wall corners span u
-  -114.8561..-111.1292, v -1.1424..0.7095. Bottom = the base's corner only at 3 bends; u ends unexplained (tried:
-  strip overlaps, square bend ends, apex-axial strip starts, virtual sharps). Ours: each bend squared at its corners.
+  two apexes, other differences too; fan-tol0p05 = loft-basic itself; 0p022 / 0p035 -simple / -sized1 / -round1 with
+  edge-ends.json). Parity on them: copy the dirs to Mac ~/noshape-host/tmp-skasm/fans, set NOSHAPE_PARITY_MODELS;
+  skasm-scratch/loft/ours.sh saves + dumps ours. Scratch: skasm-scratch/loft/flat.py develops live's walls / bends at
+  the neutral radius into bend m = floor(n/2)'s plane (u along it, from its cylinder's origin: sized1's origin differs
+  by 1.0954 mm, the others agree; canonical u = from the definition corner A (0, 203.2, 0)'s foot on bend m's axis);
+  rect.py corners, rnd.py round centres, cen.py centre lines, arc.py, verts.py. FOUND: live cuts the apex by ONE
+  rectangle in the flat, open toward the tip: u < uP (square to bend m) and vlo < v < vhi (lines along bend m).
+  Rectangle = scale x a box about its centre (0p022 at 1.0 / 1.2 to 1e-4 mm). Round (Scaled 1.0) = one circle centred
+  where the first and last bends' centre lines cross (both samples, 1e-4 mm), radius = to the box's far corner
+  (umax, vmin) (0p022 5.1083). Simple: every wall ends on one arc in the flat (0p022 centre canonical (-1.4033,
+  0.0699), r 5.3194; the bend strips end where their tangent lines cross it). Sized 1 mm: under-sized warning, each
+  bend squared at its wall corners (= ours today). Box (canonical mm, scale 1): 0p022 u -0.1395..4.1965, v
+  -1.2643..0.7095; 0p035 u -0.1030..3.9320, v -0.7085..0.8526 (u from the round's radius). vmax = the last wall's
+  corner v (free edge x its bend's tangent line); umin = bend 0's wall-0 tangent line's point nearest A (0.6 / 0.3 µm,
+  float32 captures); umax, vmin unexplained (tried: strip overlaps, square bend ends, A's feet, virtual sharps, arc
+  hits, 3D bbox in bend m's frame). Ours: each bend squared at its corners.
 - Debug std: throw a custom regenError message (FS println goes to notices, not stderr); restore edited files with a
   fresh mtime (rb.sh rsync keeps the old one and cargo skips the rebuild). NOSHAPE_FS_TRACE=1 names the throw's line.
 - LANDED 6d80df66: Unfold unrolls only its bend, Refold puts back the held side (unfold-refold 6/6, 212/295).
@@ -79,16 +83,17 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
 
 ## Next, in order
 00. lead 11-20 SM suite models / qa 00d: all match but c2-sm-loft-basic (apex, above). Mac 12:30: 22/23, 259/260.
-00b. qa P2 SUITE-INTRO-TAILFIN-INTERSECTED: LANDING 11-21: an Intersection lands within 1 µm of live's ends (ours 0.19 µm
+00b. qa P2 SUITE-INTRO-TAILFIN-INTERSECTED: LANDED 37638c76: an Intersection lands within 1 µm of live's ends (ours 0.19 µm
    off): no INTERSECTED left / no take-back in surf-intro boundary/fill/mutualtrim/ruled (A/B over the 7 INTERSECTED
    docs: nothing else changed). Left: Tail fin surface area 1.2e-5 off (3567.145 vs 3567.188 mm², ~0.6 µm of profile
    length, cause not found) and 3D fit spline 1's shape (starts x 32.70, live 33.94, same ends and start direction):
    core's (fit spline), told via the lead; Boundary surface 1 fails on it.
-00c. dx 11-20 (suite speed, not urgent): c2-sm-rocker-enclosure-body › Mirror 3 160-200 ms, live 10 ms (doc under the bar).
+00c. LANDING 11-21: a feature pattern re-runs each seed once per group (was per check and per target, nested: a mirror
+   of mirrors re-ran the inner ones each time): rocker-enclosure-body Mirror 3 200 -> 88 ms (live 8; doc 401 -> 244 ms, live
+   411); Mac same-base A/B over 176 docs identical. Left: nested seeds re-run as tools (Mirror 1 / 2 inside Mirror 3).
 0. USER P0 feel: rows of docs/parity/interaction-feel.md in my areas are "=" now; Hover timing is psui's.
-0b. live's camera retakes (025a33f6): sketch-line-from-midpoint, sketch-bezier-polygon, sketch-spline-handle-arm and 7 asm
-   takes now compare the camera; rerun them after the land. asm-menu-instance-properties' Pro menu (Where used…, no
-   Release…) is already asm's on main; "Create task…" is CLOUD_ONLY in run.py.
+0b. DONE 11-21 13:35: sketch-line-from-midpoint / sketch-bezier-polygon / sketch-spline-handle-arm match with the camera
+   (3/3, 40/40 states, green 6241cf347 on vibe2; skasm-scratch/bin/uipg.sh); the 7 asm takes are asm's.
 1. loft-paths-guides now lists only Sketch 2's take-back and Sketch 4's 3 PROJECTED (Sketch 5's PIERCEs on its
    Intersection's ends are skipped as the tool's own). The other PIERCE take-backs (09:20, sec.log) all sit behind an
    upstream difference: surf-intro tail fins (Intersection face from the unbuilt Derived 1), manualblend Sketch 6 / 7
