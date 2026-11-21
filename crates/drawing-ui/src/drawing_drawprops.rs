@@ -132,6 +132,7 @@ fn select_field(id: &'static str, current: String, w: f32) -> Stateful<Div> {
     let shown = current.clone();
     h_flex()
         .id(id)
+        .debug_selector(move || id.to_string())
         // (Two showing the same value: the first, in the panel's order, as live's runner: live2 drw-dprops-precision's
         // "0.123" is Precision's, not Tolerance precision's.)
         .map(|d| crate::ui_script::mark_first(d, move || format!("dropdown:{shown}")))
@@ -1266,7 +1267,8 @@ impl DrawingEditor {
                         .item(crate::os_menu::OsMenuItem::new("Third angle").checked(proj == Projection::ThirdAngle).on_click(move |_, _, cx| a.update(cx, |t, cx| t.edit("Projection angle", cx, |d| noshape_model::drawing::views::change_projection(d, Projection::ThirdAngle)))))
                 })
                 .into_any_element();
-            let simp: [(&str, Simplification); 5] = [("None", Simplification::None), ("Auto", Simplification::Auto), ("Absolute", Simplification::Absolute(0.001)), ("Ratio to studio", Simplification::RatioToStudio(0.01)), ("Ratio to part", Simplification::RatioToPart(0.01))];
+            // Live drawing-properties-views: None, Absolute, Ratio to studio, Ratio to part, Auto.
+            let simp: [(&str, Simplification); 5] = [("None", Simplification::None), ("Absolute", Simplification::Absolute(0.001)), ("Ratio to studio", Simplification::RatioToStudio(0.01)), ("Ratio to part", Simplification::RatioToPart(0.01)), ("Auto", Simplification::Auto)];
             let simp_label = simp.iter().find(|s| std::mem::discriminant(&s.1) == std::mem::discriminant(&vd.simplification)).map(|s| s.0).unwrap_or("Auto");
             let simp_items: Vec<(String, bool, Act)> = simp.iter().map(|&(n, s)| (n.to_string(), n == simp_label, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_defaults.simplification = s) as Act)).collect();
             let hidden_items: Vec<(String, bool, Act)> = vec![

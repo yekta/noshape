@@ -15,6 +15,7 @@ Ours, per item:
 - missing: neither.
 """
 import argparse
+import html
 import glob
 import json
 import re
@@ -128,6 +129,43 @@ def ours_shown(run_dir):
                 for part in (d, st.get("list"), st.get("tooltip")):
                     walk(part, pool[d["title"]])
     return pool
+def ours_sequences(run_dir):
+    """Our panels' texts in their order (a list's options stand side by side), by the panel's title."""
+    pool = defaultdict(list)
+    for p in glob.glob(f"{run_dir}/*.json"):
+        try:
+            steps = json.loads(Path(p).read_text()).get("steps", [])
+        except (ValueError, OSError):
+            continue
+        for s in steps:
+            d = (s.get("state") or {}).get("dialog")
+            if not isinstance(d, dict) or not isinstance(d.get("title"), str):
+                continue
+            if isinstance(d.get("text"), list):
+                pool[d["title"]].append([norm(t) for t in d["text"] if isinstance(t, str)])
+            for f in d.get("fields") or []:
+                if isinstance(f, dict) and isinstance(f.get("options"), list):
+                    pool[d["title"]].append([norm(o) for o in f["options"] if isinstance(o, str)])
+    return pool
+
+
+def live_option_lists(path):
+    """A dump's lists, each in live's order ('[select] = "Noto Sans" of {APMONO | ARComp | …}')."""
+    raw = open(path, errors="ignore").read()
+    lists = [[norm(o) for o in m.group(1).split(" | ")] for m in re.finditer(r"\bof \{([^{}]+)\}", raw)]
+    # An HTML dump's <select>: its options (display:none ones aren't shown).
+    for m in re.finditer(r"<select\b[^>]*>(.*?)</select>", raw, flags=re.S):
+        opts = [o for o in re.findall(r"<option\b(?![^>]*display:\s*none)[^>]*>([^<]*)</option>", m.group(1)) if o.strip()]
+        lists.append([norm(html.unescape(o)) for o in opts])
+    return lists
+
+
+def in_order(options, seqs):
+    """The options side by side in live's order in one of our panels' texts."""
+    n = len(options)
+    return any(seq[i:i + n] == options for seq in seqs for i in range(len(seq) - n + 1))
+
+
 ACCEPTED = {
     "Formulas": "live 1735: no Formulas in the hole table's Cell panel or menus",
     "All views in a hole table must be of a common singular part": "live 1744: other parts' views aren't pickable, no error",
@@ -434,6 +472,7 @@ def main():
     args = ap.parse_args()
     src = sources()
     shown = ours_shown(args.run)
+    ordered = ours_sequences(args.run)
 
     # What live's recordings show, and how ours compared.
     tool_seen = defaultdict(lambda: [0, 0])  # tool -> [states ours matched (tool active alike), states not]
@@ -513,8 +552,14 @@ def main():
                 elsewhere[key(it)] = st
     for surface, globs_, titles in SURFACES:
         texts = []
+        # Lists whose every option our panel shows side by side in live's order: those options compare equal.
+        seqs = [q for k, v in ordered.items() if any(k == ti or k.startswith(ti) for ti in titles + OURS_TITLES.get(surface, [])) for q in v]
+        same_order = set()
         for g in globs_:
             for p in sorted(glob.glob(f"{args.dom}/{g}")):
+                for opts in live_option_lists(p):
+                    if len(opts) >= 2 and in_order(opts, seqs):
+                        same_order |= set(opts)
                 hidden = {norm(x) for x in NEVER_SHOWN_IN.get(surface, ())}
                 texts += [t for t in texts_of(p, surface in HIDDEN_IS_ABSENT) if t not in texts and t not in hidden]
         recorded = {t for (title, t) in text_seen if title in titles}
@@ -548,6 +593,9 @@ def main():
             # (Counts are the document's: "Successfully replicated 7/7 annotations" is ours' 1/1.)
             counted = re.sub(r"\d+", "#", norm(t)) in {re.sub(r"\d+", "#", m) for m in mine} if re.search(r"\d+/\d+", t) else False
             wrapped = wrapped or counted
+            if st == "present" and norm(t) in same_order:
+                rows.append((surface, t, "=", "dump: its list's options in live's order"))
+                continue
             rows.append((surface, t, "shown" if st == "present" and (norm(t) in mine or ours_t in mine or wrapped) else st, "dump"))
 
     # Cloud-only rows (out of scope) and dump texts live itself no longer shows (docs/parity/audit-drawing-dataexchange.md).

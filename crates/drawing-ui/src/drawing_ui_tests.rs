@@ -730,6 +730,22 @@ fn the_note_insert_lists_are_lives_size(cx: &mut TestAppContext) {
     }
 }
 
+/// Live drawing-properties-views: Drawing properties › Views › View simplification lists None, Absolute, Ratio to studio,
+/// Ratio to part, Auto (as Insert view's).
+#[gpui::test]
+fn the_view_simplification_list_is_in_lives_order(cx: &mut TestAppContext) {
+    let (window, editor) = drawing(cx, "drawprops-simp-order");
+    real_sheet(cx, window, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        e.open_drawing_props(cx);
+        e.drawing_props.tab = 3;
+    }));
+    draw(cx, window);
+    press(cx, window, "dp-vsimp");
+    let labels = cx.update(|cx| noshape_app_core::os_ui::open_dropdown_labels("dp-vsimp-dd", cx));
+    assert_eq!(labels, Some(["None", "Absolute", "Ratio to studio", "Ratio to part", "Auto"].map(String::from).to_vec()));
+}
+
 /// Live2 tables_live2_1013 (dw4-resized): dragging a BOM's inner border moves that border only (the left column
 /// widens, the right one narrows, the total stays); a general table's grows the column on the fixed corner's side
 /// (live 1613 (b)).
