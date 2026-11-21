@@ -179,6 +179,30 @@ fn feature_pattern(t: &mut T, feats: Vec<FeatureId>, count: &str, reapply: bool)
     )
 }
 
+/// A region picked twice is extruded once, as live's query (a set) has it: with the region it touches, one face across
+/// both (c2-impeller-loft's Extrude 4: two queries of one region; its prism made twice and fused).
+#[test]
+fn a_region_picked_twice_extrudes_once() {
+    let mut t = T::new();
+    let mut sk = rect(0.0, 0.0, 0.02, 0.01);
+    let (a, b) = (sk.add_point(DVec2::new(0.01, 0.0)), sk.add_point(DVec2::new(0.01, 0.01)));
+    sk.add_line_between(a, b).unwrap();
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let r = t.regions(s);
+    assert_eq!(r.len(), 2);
+    let x = t.extrude(r[0].clone(), "5 mm", "NEW");
+    t.set(x, "entities", q(vec![r[0].clone(), r[0].clone()]));
+    let res = t.ok();
+    assert_eq!(res.context.bodies.len(), 1);
+    assert_eq!(res.context.bodies[0].shape.faces().len(), 6);
+    assert!(near(total_volume(&res.context), 0.01 * 0.01 * 0.005, 1e-9));
+    t.set(x, "entities", q(vec![r[0].clone(), r[1].clone(), r[0].clone()]));
+    let res = t.ok();
+    assert_eq!(res.context.bodies.len(), 1);
+    assert_eq!(res.context.bodies[0].shape.faces().len(), 6);
+    assert!(near(total_volume(&res.context), 0.02 * 0.01 * 0.005, 1e-9));
+}
+
 #[test]
 fn reapplied_pocket_pattern_follows_seed_edits() {
     let mut t = T::new();

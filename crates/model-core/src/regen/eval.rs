@@ -890,8 +890,16 @@ impl<'a> EvalCtx<'a> {
         if noshape_kernel::legacy_topology() {
             return Ok(out);
         }
+        // A region picked twice once (a query is a set: c2-impeller-loft's Extrude 4, two queries of one region, made
+        // its prism twice and fused the copies).
+        for i in 1..out.len() {
+            let same = |j: usize| matches!((&refs[i], &refs[j], &out[i], &out[j]), (Reference::SketchRegion { sketch: a, .. }, Reference::SketchRegion { sketch: b, .. }, Some((_, x)), Some((_, y))) if a == b && x.id == y.id);
+            if (0..i).any(same) {
+                out[i] = None;
+            }
+        }
         for sk in sketches {
-            let idx: Vec<usize> = (0..refs.len()).filter(|&i| matches!(&refs[i], Reference::SketchRegion { sketch, .. } if *sketch == sk)).collect();
+            let idx: Vec<usize> = (0..refs.len()).filter(|&i| out[i].is_some() && matches!(&refs[i], Reference::SketchRegion { sketch, .. } if *sketch == sk)).collect();
             let picked: Vec<_> = idx.iter().filter_map(|&i| out[i].clone()).collect();
             if picked.len() < 2 {
                 continue;
