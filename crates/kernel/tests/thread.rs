@@ -74,3 +74,83 @@ fn a_helix_of_whole_turns_is_fitted() {
         assert!(fit.axis.cross(DVec3::Z).length() < 1e-9 && fit.origin.length() < 1e-12 && fit.left_handed, "{turns} turns: {fit:?}");
     }
 }
+
+/// A helical gear's tooth (scissor-lift's herringbone Spur Gear): a profile in the plane the helix starts on, swept up
+/// it. Its start cap lies on that plane and its wire runs the cap's way round, whichever way the axis points and the
+/// profile runs and faces: the cap re-seated on a left-handed plane was BRepCheck's BadOrientationOfSubshape, and the
+/// gear's cut by its teeth failed.
+#[test]
+fn a_helical_tooths_start_cap_is_valid_either_way_its_profile_faces() {
+    let ccw = [(9.0, -0.6), (10.5, -0.4), (10.5, 0.4), (9.0, 0.6)];
+    for (axis, x) in [(DVec3::Z, DVec3::X), (-DVec3::Z, DVec3::X), (DVec3::Y, DVec3::Z), (-DVec3::Y, DVec3::Z)] {
+        let frame = Plane::new(DVec3::ZERO, axis, x);
+        let helix = make_helix(&frame, 10.0 * MM, 120.0 * MM, 5.0 * MM, false, 0.0).unwrap();
+        let p = |(u, v): (f64, f64)| (x * u + axis.cross(x) * v) * MM;
+        let polygon = |pts: &[(f64, f64)]| -> Vec<Shape> { (0..pts.len()).map(|i| make_line(p(pts[i]), p(pts[(i + 1) % pts.len()])).unwrap()).collect() };
+        // And the gear's: a gap between arcs round the axis (r 9 and 10.5, 0.1 rad either side).
+        let at = |r: f64, t: f64| p((r * t.cos(), r * t.sin()));
+        let arcs = vec![
+            make_arc(DVec3::ZERO, axis, x, 10.5 * MM, -0.1, 0.1).unwrap(),
+            make_line(at(10.5, 0.1), at(9.0, 0.1)).unwrap(),
+            make_arc(DVec3::ZERO, axis, x, 9.0 * MM, -0.1, 0.1).unwrap().reversed().unwrap(),
+            make_line(at(9.0, -0.1), at(10.5, -0.1)).unwrap(),
+        ];
+        // And spline flanks, as its involutes.
+        let spline = |pts: &[(f64, f64)]| make_interpolated_spline(&pts.iter().map(|&q| p(q)).collect::<Vec<_>>(), &[], false).unwrap();
+        let flanks = vec![
+            spline(&[(9.0, -0.6), (9.75, -0.52), (10.5, -0.4)]),
+            make_line(p((10.5, -0.4)), p((10.5, 0.4))).unwrap(),
+            spline(&[(10.5, 0.4), (9.75, 0.52), (9.0, 0.6)]),
+            make_line(p((9.0, 0.6)), p((9.0, -0.6))).unwrap(),
+        ];
+        let rev: Vec<(f64, f64)> = ccw.iter().rev().copied().collect();
+        for edges in [polygon(&ccw), polygon(&rev), arcs, flanks] {
+            let face = make_face_from_wire(&make_wire(&edges).unwrap(), true).unwrap();
+            let area = surface_properties(&face).unwrap().mass / MM.powi(2);
+            for profile in [face.reversed().unwrap(), face] {
+                let tooth = sweep(&profile, &helix, &SweepOptions { solid: true, ..Default::default() }).unwrap().shape;
+                let on_start = tooth.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Plane(q)) if q.unit_normal().dot(axis).abs() > 1.0 - 1e-12 && q.origin.dot(axis).abs() < 1e-12)).count();
+                assert_eq!(on_start, 1, "the start cap on the profile's plane ({axis})");
+                assert!(tooth.faces().iter().all(|f| f.is_valid()), "every face valid ({axis})");
+                assert!(tooth.is_valid());
+                let v = volume_properties(&tooth).unwrap().mass / MM.powi(3);
+                assert!((v - area * 5.0).abs() < 0.05, "{v}");
+            }
+        }
+    }
+}
+
+/// A helical gear's tooth gap (scissor-lift's Spur Gear): its profile's arcs round the helix's axis sweep pieces of
+/// that axis's cylinders, exact ones, and the outer one is the blank's own: on OCCT's B-spline fit, 0.3 um off it, the
+/// gear's cut by its teeth was non-manifold.
+#[test]
+fn a_helical_tooth_gaps_arcs_sweep_exact_cylinders_and_cut_its_blank_cleanly() {
+    let frame = Plane::from_normal(DVec3::ZERO, DVec3::Z);
+    let helix = make_helix(&frame, 10.0 * MM, 120.0 * MM, 5.0 * MM, false, 0.0).unwrap();
+    let a = 0.1;
+    let at = |r: f64, t: f64| DVec3::new(r * t.cos(), r * t.sin(), 0.0) * MM;
+    let edges = [
+        make_arc(DVec3::ZERO, DVec3::Z, DVec3::X, 10.0 * MM, -a, a).unwrap(),
+        make_line(at(10.0, a), at(8.0, a)).unwrap(),
+        make_arc(DVec3::ZERO, DVec3::Z, DVec3::X, 8.0 * MM, -a, a).unwrap().reversed().unwrap(),
+        make_line(at(8.0, -a), at(10.0, -a)).unwrap(),
+    ];
+    let face = make_face_from_wire(&make_wire(&edges).unwrap(), true).unwrap();
+    let gap = sweep(&face, &helix, &SweepOptions { solid: true, ..Default::default() }).unwrap().shape;
+    let radii: Vec<f64> = gap.faces().iter().filter_map(|f| match f.face_surface() {
+        Ok(Surface::Cylinder { radius, .. }) => Some(radius / MM),
+        _ => None,
+    }).collect();
+    assert_eq!(radii.len(), 2, "{radii:?}");
+    assert!(radii.iter().any(|r| (r - 10.0).abs() < 1e-9) && radii.iter().any(|r| (r - 8.0).abs() < 1e-9), "{radii:?}");
+    assert!(gap.is_valid());
+    let area = a * (10.0f64.powi(2) - 8.0f64.powi(2));
+    let v = volume_properties(&gap).unwrap().mass / MM.powi(3);
+    assert!((v - area * 5.0).abs() < 0.01, "{v}");
+    let blank = make_cylinder(&frame, 10.0 * MM, 5.0 * MM, std::f64::consts::TAU).unwrap();
+    let gear = cut(&blank, &gap).unwrap().shape;
+    assert!(gear.is_valid());
+    assert!(gear.edge_faces().unwrap().iter().all(|f| f.len() == 2), "every edge between two faces");
+    let v = volume_properties(&gear).unwrap().mass / MM.powi(3);
+    assert!((v - (std::f64::consts::PI * 100.0 * 5.0 - area * 5.0)).abs() < 0.01, "{v}");
+}

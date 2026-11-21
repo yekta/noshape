@@ -3,6 +3,7 @@
 #include "internal.hpp"
 #include <map>
 #include <optional>
+#include <tuple>
 #include <gp_Cylinder.hxx>
 #include <gp_Lin.hxx>
 #include <GeomLib_IsPlanarSurface.hxx>
@@ -1860,6 +1861,117 @@ static bool is_helix_path(const TopoDS_Wire& w)
   return any;
 }
 
+// The axis of a helical sweep path (one edge whose curve lies on a cylinder, or a helix in 3D), or nothing.
+static std::optional<gp_Ax1> helix_path_axis(const TopoDS_Wire& w)
+{
+  TopExp_Explorer one(w, TopAbs_EDGE);
+  if (!one.More())
+    return std::nullopt;
+  const TopoDS_Edge e = TopoDS::Edge(one.Current());
+  one.Next();
+  if (one.More())
+    return std::nullopt;
+  occ::handle<Geom2d_Curve> pc;
+  occ::handle<Geom_Surface> sf;
+  TopLoc_Location           l;
+  double                    f, t;
+  BRep_Tool::CurveOnSurface(e, pc, sf, l, f, t);
+  if (const occ::handle<Geom_CylindricalSurface> cy = occ::down_cast<Geom_CylindricalSurface>(sf); !pc.IsNull() && !cy.IsNull())
+    return cy->Axis().Transformed(l.Transformation());
+  if (const auto h = helix_like_edge(e))
+    return h->ax.Axis();
+  return std::nullopt;
+}
+
+// Along a helix, a profile arc round the helix's axis sweeps a piece of that axis's cylinder: OCCT's swept surface is a
+// B-spline within its tolerance of it, and a Boolean with the cylinder itself (a helical gear's addendum on its blank)
+// left nanometre slivers, a non-manifold result (scissor-lift's herringbone gear). Each such face on the exact
+// cylinder, its edges' curves on it made again; a face that doesn't check valid then stays as it was.
+static void exact_helical_cylinders(BRepOffsetAPI_MakePipeShell& mk, const std::vector<TopoDS_Shape>& profiles, const gp_Ax1& axis, double tol)
+{
+  const gp_Lin line(axis);
+  for (const TopoDS_Shape& p : profiles)
+    for (TopExp_Explorer pe(p, TopAbs_EDGE); pe.More(); pe.Next())
+    {
+      const BRepAdaptor_Curve pc(TopoDS::Edge(pe.Current()));
+      if (pc.GetType() != GeomAbs_Circle)
+        continue;
+      const gp_Circ ci = pc.Circle();
+      if (std::abs(std::abs(ci.Axis().Direction().Dot(axis.Direction())) - 1) > 1e-9 || line.Distance(ci.Location()) > tol)
+        continue;
+      for (const TopoDS_Shape& g : mk.Generated(pe.Current()))
+      {
+        if (g.ShapeType() != TopAbs_FACE)
+          continue;
+        const TopoDS_Face               face = TopoDS::Face(g);
+        TopLoc_Location                 fl;
+        const occ::handle<Geom_Surface> old = BRep_Tool::Surface(face, fl);
+        if (old.IsNull() || !occ::down_cast<Geom_CylindricalSurface>(old).IsNull())
+          continue;
+        double u0, u1, v0, v1;
+        BRepTools::UVBounds(face, u0, u1, v0, v1);
+        const gp_Trsf ft = fl.Transformation();
+        bool          on = true;
+        gp_XYZ        mid;
+        for (int i = 0; i <= 6 && on; ++i)
+          for (int j = 0; j <= 6 && on; ++j)
+          {
+            const gp_Pnt q = old->Value(u0 + (u1 - u0) * i / 6, v0 + (v1 - v0) * j / 6).Transformed(ft);
+            on = std::abs(line.Distance(q) - ci.Radius()) <= std::max(tol, 1e-6); // (OCCT's fit: 0.34 um off at r 10 mm)
+            if (i == 3 && j == 3)
+              mid = q.XYZ();
+          }
+        if (!on)
+          continue;
+        // (The surface's normal at the middle against the radial direction: an indirect frame where it points in. Its
+        // X opposite the middle, so the face lies round u = pi, clear of the seam.)
+        const gp_XYZ radial = mid - line.Location().XYZ() - axis.Direction().XYZ() * (mid - line.Location().XYZ()).Dot(axis.Direction().XYZ());
+        if (radial.Modulus() < tol)
+          continue;
+        GeomLProp_SLProps props(old, (u0 + u1) / 2, (v0 + v1) / 2, 1, 1e-9);
+        if (!props.IsNormalDefined())
+          continue;
+        gp_Ax3 frame(line.Location(), axis.Direction(), gp_Dir(radial.Reversed()));
+        if (props.Normal().Transformed(ft).XYZ().Dot(radial) < 0)
+          frame.YReverse();
+        const occ::handle<Geom_CylindricalSurface> cyl = new Geom_CylindricalSurface(frame, ci.Radius());
+        std::vector<std::tuple<TopoDS_Edge, occ::handle<Geom2d_Curve>, double, double>> saved;
+        for (TopExp_Explorer fe(face, TopAbs_EDGE); fe.More(); fe.Next())
+        {
+          const TopoDS_Edge e = TopoDS::Edge(fe.Current());
+          double            a, b;
+          saved.emplace_back(e, BRep_Tool::CurveOnSurface(e, face, a, b), a, b);
+        }
+        const double ftol = BRep_Tool::Tolerance(face);
+        BRep_Builder bb;
+        bb.UpdateFace(face, cyl, TopLoc_Location(), ftol);
+        bool done = true;
+        for (const auto& [e, c2, a, b] : saved)
+        {
+          bb.UpdateEdge(e, occ::handle<Geom2d_Curve>(), old, fl, 0.0);
+          ShapeFix_Edge sfe;
+          sfe.FixAddPCurve(e, face, false, tol);
+          double x, y;
+          done = done && !BRep_Tool::CurveOnSurface(e, face, x, y).IsNull();
+        }
+        if (done)
+        {
+          BRepLib::SameParameter(face, tol, true);
+          done = BRepCheck_Analyzer(face).IsValid();
+        }
+        if (done)
+          continue;
+        for (const auto& [e, c2, a, b] : saved)
+        {
+          bb.UpdateEdge(e, occ::handle<Geom2d_Curve>(), cyl, TopLoc_Location(), 0.0);
+          bb.UpdateEdge(e, c2, old, fl, BRep_Tool::Tolerance(e));
+          bb.Range(e, old, fl, a, b);
+        }
+        bb.UpdateFace(face, old, fl, ftol);
+      }
+    }
+}
+
 OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const SweepOpts& o,
                     const OcShape& aux)
 {
@@ -2161,9 +2273,9 @@ OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const Swe
         on = on && off <= 1e-7;
         if (!on)
           continue;
-        gp_Ax3 ax = pp.Position();
-        if (cn.Dot(pn) < 0)
-          ax.ZReverse();
+        // (Facing the cap's way, right-handed: a reversed Z alone made it left-handed, the cap's wire then running the
+        // wrong way round (scissor-lift's herringbone gear, its teeth's start caps).)
+        const gp_Ax3 ax(pp.Location(), cn.Dot(pn) < 0 ? pn.Reversed() : pn, pp.XAxis().Direction());
         BRep_Builder().UpdateFace(face, new Geom_Plane(ax), TopLoc_Location(), BRep_Tool::Tolerance(face));
         // Its edges' curves on the old plane go: on a plane OCCT finds them from the 3D curves.
         for (TopExp_Explorer e(face, TopAbs_EDGE); e.More(); e.Next())
@@ -2172,6 +2284,13 @@ OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const Swe
         break;
       }
   }
+  if (!twisted && std::abs(o.scale_end - 1.0) <= 1e-12 && mode == 1)
+    if (const std::optional<gp_Ax1> axis = helix_path_axis(sw))
+    {
+      Bnd_Box sb;
+      BRepBndLib::Add(sw, sb);
+      exact_helical_cylinders(mk, used, *axis, std::max(1e-7, (sb.IsVoid() ? 1.0 : std::sqrt(sb.SquareExtent())) * 1e-5));
+    }
   // History is keyed on the wires actually swept; map faces of face profiles
   // through their outer wires (the wires are sub-shapes of the faces).
   std::vector<TopoDS_Shape> hargs = args;
