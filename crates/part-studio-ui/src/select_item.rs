@@ -169,6 +169,15 @@ pub struct SelectItemPanel {
     lib_image: &'static str,
     lib_image_select: Option<(Entity<crate::os_select::OsSelect>, Subscription)>,
     lib_image_thumb: Option<(&'static str, Arc<RenderImage>)>,
+    /// Insert image's user library (live behaviours "dx (11-21 15:31)": Library ▾ "‹name› images" above Onshape
+    /// images, the default), read as the panel opens; whether it is the one shown, its Type, the image picked, the
+    /// images' pictures by value, and the Library / Type / Image selects.
+    images_lib: Option<noshape_ops::images_library::ImagesLibrary>,
+    img_user: bool,
+    img_type: usize,
+    img_pick: Option<String>,
+    img_pictures: HashMap<String, Arc<RenderImage>>,
+    img_selects: HashMap<&'static str, (Entity<crate::os_select::OsSelect>, Subscription)>,
     /// Feature Studios whose features are hidden (Add custom features).
     collapsed: HashSet<String>,
     /// Frame's profile library: offered, the (standard, profile) its selects show, and those selects.
@@ -333,6 +342,25 @@ fn texts(mode: PanelMode) -> (&'static str, &'static str, &'static str) {
     }
 }
 
+/// An image as GPUI draws it (BGRA).
+fn render_image(mut buf: image::RgbaImage) -> Arc<RenderImage> {
+    for px in buf.as_chunks_mut::<4>().0 {
+        px.swap(0, 2);
+    }
+    Arc::new(RenderImage::new(vec![image::Frame::new(buf)]))
+}
+
+/// A user library image's picture (its file tab at the library's version), at most the 240 × 136 preview.
+fn library_picture(value: &str) -> Option<image::RgbaImage> {
+    let r = crate::derived::ExternalRef::parse(value)?;
+    let doc = crate::derived::external_snapshot(&r.path, r.microversion).ok()?;
+    let bytes = doc.tabs.iter().find(|t| t.id.to_string() == r.tab).and_then(|t| match &t.content {
+        noshape_model::document::TabContent::File(f) => f.bytes(),
+        _ => None,
+    })?;
+    Some(image::load_from_memory(&bytes).ok()?.thumbnail(240, 136).to_rgba8())
+}
+
 impl SelectItemPanel {
     pub fn new(setup: PanelSetup, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let PanelSetup { mode, sources, doc_name, doc_path, except, gpu, value, libraries, frame_profiles } = setup;
@@ -408,6 +436,12 @@ impl SelectItemPanel {
             lib_image: noshape_scene::environment_maps::NAMES[0],
             lib_image_select: None,
             lib_image_thumb: None,
+            images_lib: None,
+            img_user: false,
+            img_type: 0,
+            img_pick: None,
+            img_pictures: HashMap::new(),
+            img_selects: HashMap::new(),
             collapsed: HashSet::new(),
             added: HashSet::new(),
             frame_profiles,
@@ -431,13 +465,81 @@ impl SelectItemPanel {
         if features {
             panel.load_version_sources(false, cx);
         }
+        if libraries && mode == PanelMode::Reference(ReferenceKind::Image) {
+            panel.load_images_library(cx);
+        }
         panel
+    }
+
+    /// The user's images library and its pictures, read off the UI thread (each document at its latest version).
+    fn load_images_library(&mut self, cx: &mut Context<Self>) {
+        cx.spawn(async move |this, cx| {
+            let loaded = cx
+                .background_spawn(async move {
+                    let lib = noshape_ops::images_library::load()?;
+                    let pictures: Vec<(String, image::RgbaImage)> = lib.types.iter().flat_map(|t| &t.images).filter_map(|i| Some((i.value.clone(), library_picture(&i.value)?))).collect();
+                    Some((lib, pictures))
+                })
+                .await;
+            let Some((lib, pictures)) = loaded else { return };
+            let _ = this.update(cx, |this, cx| {
+                this.img_pictures = pictures.into_iter().map(|(v, buf)| (v, render_image(buf))).collect();
+                this.images_lib = Some(lib).filter(|l| !l.types.is_empty());
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// A select of Insert image's Libraries tab; a pick goes to [`Self::pick_library_image`].
+    fn image_select(&mut self, id: &'static str, cx: &mut Context<Self>) -> Entity<crate::os_select::OsSelect> {
+        if let Some((s, _)) = self.img_selects.get(id) {
+            return s.clone();
+        }
+        let s = cx.new(|_| crate::os_select::OsSelect::new(id));
+        let sub = cx.subscribe(&s, move |this: &mut Self, _, ev: &crate::os_select::OsSelectEvent, cx| {
+            let crate::os_select::OsSelectEvent::Picked(v) = ev;
+            this.pick_library_image(id, v, cx);
+        });
+        self.img_selects.insert(id, (s.clone(), sub));
+        s
+    }
+
+    /// Library ▾ / Type ▾ / Image ▾ (live: choosing the user's library, or a Type, takes its first image).
+    fn pick_library_image(&mut self, select: &str, v: &str, cx: &mut Context<Self>) {
+        let first = |lib: Option<&noshape_ops::images_library::ImagesLibrary>, t: usize| lib.and_then(|l| l.types.get(t)?.images.first()).map(|i| i.value.clone());
+        match select {
+            "sel-lib-library" => {
+                self.img_user = v == "user";
+                self.img_type = 0;
+                self.img_pick = first(self.images_lib.as_ref(), 0);
+            }
+            "sel-lib-type" => {
+                self.img_type = v.parse().unwrap_or(0);
+                self.img_pick = first(self.images_lib.as_ref(), self.img_type);
+            }
+            _ => self.img_pick = Some(v.to_string()),
+        }
+        cx.notify();
     }
 
     /// The keyboard is in the panel, outside its boxes (live: a focused div, a "field" without a label).
     #[cfg(test)]
     pub fn in_libraries(&self) -> bool {
         self.in_libraries
+    }
+
+    /// Tests: the user's images library as if read from its folder.
+    #[cfg(test)]
+    pub fn set_images_library(&mut self, lib: noshape_ops::images_library::ImagesLibrary, cx: &mut Context<Self>) {
+        self.images_lib = Some(lib);
+        cx.notify();
+    }
+
+    /// Tests: a pick in Insert image's Library ▾ / Type ▾ / Image ▾ (by the select's id).
+    #[cfg(test)]
+    pub fn pick_in_libraries(&mut self, select: &str, v: &str, cx: &mut Context<Self>) {
+        self.pick_library_image(select, v, cx);
     }
 
     pub fn has_keyboard(&self, window: &Window) -> bool {
@@ -1287,13 +1389,9 @@ impl SelectItemPanel {
         select.update(cx, |s, _| s.set_items(items, chosen.to_string()));
         if self.lib_image_thumb.as_ref().is_none_or(|(n, _)| *n != chosen)
             && let Some(img) = env::generate(chosen)
-            && let Some(mut buf) = image::RgbaImage::from_raw(img.width, img.height, img.rgba)
+            && let Some(buf) = image::RgbaImage::from_raw(img.width, img.height, img.rgba)
         {
-            // GPUI images are BGRA.
-            for px in buf.as_chunks_mut::<4>().0 {
-                px.swap(0, 2);
-            }
-            self.lib_image_thumb = Some((chosen, Arc::new(RenderImage::new(vec![image::Frame::new(buf)]))));
+            self.lib_image_thumb = Some((chosen, render_image(buf)));
         }
         let row = |label: &'static str, control: AnyElement| {
             h_flex().h(px(30.)).px(px(6.)).gap(px(6.)).child(div().w(px(56.)).flex_none().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child(label)).child(div().flex_1().child(control))
@@ -1310,19 +1408,52 @@ impl SelectItemPanel {
                 .child(crate::ui::glyph("expander-down", 8., pal.text))
                 .into_any_element()
         };
-        let mut col = v_flex()
-            .flex_1()
-            .min_h_0()
-            .pt(px(6.))
-            .gap(px(2.))
-            .child(row("Library", fixed("Onshape images")))
-            .child(row("Type", fixed("Environment maps")))
-            .child(row("Image", select.into_any_element()));
-        if let Some((_, img)) = &self.lib_image_thumb {
-            col = col.child(div().pl(px(30.)).pt(px(6.)).child(gpui_kit::img(img.clone()).w(px(240.)).h(px(136.)).object_fit(ObjectFit::Contain)));
+        // The user's library, once read: Library ▾ lists it above Onshape images (the default).
+        let user_lib = self.images_lib.as_ref().map(|l| (l.types.clone(), noshape_ops::images_library::title()));
+        let library = match &user_lib {
+            Some((_, title)) => {
+                let sel = self.image_select("sel-lib-library", cx);
+                let items = vec![(SharedString::from("user"), SharedString::from(title.clone())), (SharedString::from("onshape"), SharedString::from("Onshape images"))];
+                let current = if self.img_user { "user" } else { "onshape" };
+                sel.update(cx, |s, _| s.set_items(items, current));
+                sel.into_any_element()
+            }
+            None => fixed("Onshape images"),
+        };
+        let mut col = v_flex().flex_1().min_h_0().pt(px(6.)).gap(px(2.)).child(row("Library", library));
+        let mut done_value: Option<String> = None;
+        match user_lib.filter(|_| self.img_user) {
+            Some((types, _)) => {
+                let t = self.img_type.min(types.len().saturating_sub(1));
+                let type_sel = self.image_select("sel-lib-type", cx);
+                let type_items: Vec<(SharedString, SharedString)> = types.iter().enumerate().map(|(i, t)| (SharedString::from(i.to_string()), SharedString::from(t.name.clone()))).collect();
+                type_sel.update(cx, |s, _| s.set_items(type_items, t.to_string()));
+                let images = types.get(t).map(|t| t.images.clone()).unwrap_or_default();
+                let pick = self.img_pick.clone().filter(|v| images.iter().any(|i| &i.value == v)).or_else(|| images.first().map(|i| i.value.clone()));
+                let image_sel = self.image_select("sel-lib-user-image", cx);
+                let image_items: Vec<(SharedString, SharedString)> = images.iter().map(|i| (SharedString::from(i.value.clone()), SharedString::from(i.name.clone()))).collect();
+                let pictures = images.iter().filter_map(|i| Some((SharedString::from(i.value.clone()), self.img_pictures.get(&i.value)?.clone()))).collect();
+                // (Live's rows: a 70 × 40 thumbnail and the file name.)
+                image_sel.update(cx, |s, _| {
+                    s.set_pictures(pictures);
+                    s.set_items(image_items, pick.clone().unwrap_or_default());
+                });
+                col = col.child(row("Type", type_sel.into_any_element())).child(row("Image", image_sel.into_any_element()));
+                if let Some(img) = pick.as_ref().and_then(|v| self.img_pictures.get(v)) {
+                    col = col.child(div().pl(px(30.)).pt(px(6.)).child(gpui_kit::img(img.clone()).w(px(240.)).h(px(136.)).object_fit(ObjectFit::Contain)));
+                }
+                done_value = pick;
+            }
+            None => {
+                col = col.child(row("Type", fixed("Environment maps"))).child(row("Image", select.into_any_element()));
+                if let Some((_, img)) = &self.lib_image_thumb {
+                    col = col.child(div().pl(px(30.)).pt(px(6.)).child(gpui_kit::img(img.clone()).w(px(240.)).h(px(136.)).object_fit(ObjectFit::Contain)));
+                }
+            }
         }
         let done = div()
             .id("sel-lib-image-done")
+            .debug_selector(|| "sel-lib-image-done".into())
             .h(px(30.))
             .px(px(16.))
             .flex()
@@ -1334,7 +1465,11 @@ impl SelectItemPanel {
             .cursor_pointer()
             .hover(|d| d.bg(pal.panel_hover))
             .child("Done")
-            .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| cx.emit(SelectItemEvent::LibraryImage(chosen))));
+            .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| match &done_value {
+                // A user library image goes in as an image of another document would.
+                Some(v) => cx.emit(SelectItemEvent::Picked(v.clone())),
+                None => cx.emit(SelectItemEvent::LibraryImage(chosen)),
+            }));
         v_flex().flex_1().min_h_0().child(col).child(h_flex().flex_none().justify_center().p(px(8.)).child(done)).into_any_element()
     }
 

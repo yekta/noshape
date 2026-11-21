@@ -321,7 +321,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **ops**: [`ops_list`](#ops_list), [`ops_describe`](#ops_describe), [`ops_call`](#ops_call)
 - **document**: [`document_create`](#document_create), [`document_update_workspace`](#document_update_workspace), [`document_update_references`](#document_update_references), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
 - **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_show_code`](#tab_show_code), [`tab_delete`](#tab_delete), [`tab_folder_create`](#tab_folder_create), [`tab_move`](#tab_move), [`tab_move_to_document`](#tab_move_to_document), [`tab_folder_unpack`](#tab_folder_unpack), [`tab_activate`](#tab_activate), [`tab_manager`](#tab_manager)
-- **documents**: [`documents_list`](#documents_list), [`documents_create_folder`](#documents_create_folder), [`documents_rename`](#documents_rename), [`documents_move`](#documents_move), [`documents_copy`](#documents_copy), [`documents_details`](#documents_details), [`documents_trash`](#documents_trash), [`documents_restore`](#documents_restore), [`documents_delete`](#documents_delete), [`documents_empty_trash`](#documents_empty_trash), [`documents_label`](#documents_label), [`documents_forget_recent`](#documents_forget_recent), [`documents_set_library`](#documents_set_library), [`documents_forms_library`](#documents_forms_library), [`documents_frames_library`](#documents_frames_library), [`documents_import`](#documents_import)
+- **documents**: [`documents_list`](#documents_list), [`documents_create_folder`](#documents_create_folder), [`documents_rename`](#documents_rename), [`documents_move`](#documents_move), [`documents_copy`](#documents_copy), [`documents_details`](#documents_details), [`documents_trash`](#documents_trash), [`documents_restore`](#documents_restore), [`documents_delete`](#documents_delete), [`documents_empty_trash`](#documents_empty_trash), [`documents_label`](#documents_label), [`documents_forget_recent`](#documents_forget_recent), [`documents_set_library`](#documents_set_library), [`documents_forms_library`](#documents_forms_library), [`documents_frames_library`](#documents_frames_library), [`documents_images_library`](#documents_images_library), [`documents_import`](#documents_import)
 - **feature**: [`feature_frame_profiles`](#feature_frame_profiles), [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_clear_missing`](#feature_clear_missing), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_size_plane`](#feature_size_plane), [`feature_show_all`](#feature_show_all)
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
 - **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move), [`variable_insert_studio`](#variable_insert_studio), [`variable_remove_studio`](#variable_remove_studio), [`variable_move_studio`](#variable_move_studio), [`variable_create_studio`](#variable_create_studio), [`variable_studio_settings`](#variable_studio_settings)
@@ -1012,6 +1012,18 @@ Examples:
 List your frame profiles library (the Frame's Sketch profile › Libraries › ‹you› frame profiles).
 
 The Part Studios of the folder set as My frame profiles library, as it was built (documents_set_library; none is checked: an untagged one is listed too): its name ("‹your name› frame profiles"), version, and each document (the folders above it, its version) with its Part Studios as `forms`. A profile's `value` is the Frame feature's profileSketch: the sketch a Frame Tag names in that Part Studio (else its first sketch), at the library's version. `frames_library` is null when none is set.
+
+Examples:
+
+```json
+{}
+```
+
+#### documents_images_library
+
+List your images library (a sketch's Insert image › Libraries › ‹you› images).
+
+The images of the folder set as My images (documents_set_library), each document at its latest version: the library's name ("‹your name› images") and its Types, the folder's top-level documents and subfolders by name (a subfolder's images are those of every document under it), each with its images' file names. An image's `value` is that file at its document's version: sketch_insert_image's `image`. `images_library` is null when none is set.
 
 Examples:
 
@@ -2081,7 +2093,7 @@ Examples:
 
 Import an image into the sketch (Insert image) (edits the document (one undoable history entry)).
 
-Places a PNG, JPEG, GIF or BMP image in the rectangle from the first corner toward the second (the aspect ratio is kept, as when drawing the rectangle).
+Places a PNG, JPEG, GIF or BMP image in the rectangle from the first corner toward the second (the aspect ratio is kept, as when drawing the rectangle): a file of this computer (Import…), or one of your images library (Libraries › ‹you› images: an image's `value` from documents_images_library).
 
 Examples:
 
@@ -2094,7 +2106,8 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
-| `file` | string | required | Path of the image. |
+| `file` | string |  | Path of the image. |
+| `image` | string |  | An image of your images library (its `value`), instead of `file`. |
 | `points` | array of array of number or string | required | [corner, opposite corner]. |
 
 ### variable

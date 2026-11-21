@@ -189,8 +189,8 @@ pub fn ops() -> Vec<Op> {
         op(
             "insert_image",
             "Import an image into the sketch (Insert image)",
-            "Places a PNG, JPEG, GIF or BMP image in the rectangle from the first corner toward the second (the aspect ratio is kept, as when drawing the rectangle).",
-            vec![req("file", s(), "Path of the image."), req("points", json!({ "type": "array", "items": point(), "minItems": 2, "maxItems": 2 }), "[corner, opposite corner].")],
+            "Places a PNG, JPEG, GIF or BMP image in the rectangle from the first corner toward the second (the aspect ratio is kept, as when drawing the rectangle): a file of this computer (Import…), or one of your images library (Libraries › ‹you› images: an image's `value` from documents_images_library).",
+            vec![opt("file", s(), "Path of the image."), opt("image", s(), "An image of your images library (its `value`), instead of `file`."), req("points", json!({ "type": "array", "items": point(), "minItems": 2, "maxItems": 2 }), "[corner, opposite corner].")],
             insert_image,
         ),
     ]
@@ -734,7 +734,10 @@ fn insert_image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let mut t = target(od, tab, a)?;
     let before = existing(&t);
-    let image = sm::load_image(std::path::Path::new(a.str("file")?)).map_err(|m| OpError::param("file", &m))?;
+    let image = match a.opt_str("image")? {
+        Some(v) => library_image(v)?,
+        None => sm::load_image(std::path::Path::new(a.str("file")?)).map_err(|m| OpError::param("file", &m))?,
+    };
     let pts = point_list(a, "points", &t)?;
     let mut ed = editor(&t);
     ed.set_tool(Tool::InsertImage);
@@ -747,6 +750,20 @@ fn insert_image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         changed |= ed.tool_up(&mut t.data, *p).changed;
     }
     finish(od, t, &ed, changed, &before)
+}
+
+/// An image of the user's images library, by its value: its file name, bytes and aspect.
+fn library_image(value: &str) -> Result<(String, Vec<u8>, f64), OpError> {
+    let gone = || OpError::param("image", "not an image of your images library (documents_images_library lists them)");
+    let lib = crate::images_library::load().ok_or_else(gone)?;
+    let (_, img) = lib.find(value).ok_or_else(gone)?;
+    let r = crate::derived::ExternalRef::parse(&img.value).ok_or_else(gone)?;
+    let doc = crate::derived::external_snapshot(&r.path, r.microversion).map_err(|_| gone())?;
+    let bytes = doc.tabs.iter().find(|t| t.id.to_string() == r.tab).and_then(|t| match &t.content {
+        noshape_model::document::TabContent::File(f) => f.bytes(),
+        _ => None,
+    });
+    sm::image_from_bytes(img.name.clone(), bytes.ok_or_else(gone)?).map_err(|m| OpError::param("image", &m))
 }
 
 /// Pattern summaries for sketch_get.

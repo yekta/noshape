@@ -7865,11 +7865,17 @@ pub fn insert_dxf_file(data: &mut SketchData, path: &std::path::Path, unit_scale
 /// height), what the editor's `pending_image` holds. Errors carry the
 /// message the panel shows.
 pub fn load_image(path: &std::path::Path) -> Result<(String, Vec<u8>, f64), String> {
-    let (bytes, w, h) = std::fs::read(path).map_err(|e| e.to_string()).and_then(|b| image::load_from_memory(&b).map(|img| (b, img.width(), img.height())).map_err(|e| e.to_string())).map_err(|e| format!("Could not read the image: {e}"))?;
+    let bytes = std::fs::read(path).map_err(|e| format!("Could not read the image: {e}"))?;
+    let name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_else(|| "image".into());
+    image_from_bytes(name, bytes)
+}
+
+/// An image's bytes as Insert image takes them: (name, bytes, width / height).
+pub fn image_from_bytes(name: String, bytes: Vec<u8>) -> Result<(String, Vec<u8>, f64), String> {
+    let (w, h) = image::load_from_memory(&bytes).map(|img| (img.width(), img.height())).map_err(|e| format!("Could not read the image: {e}"))?;
     if w == 0 || h == 0 {
         return Err("The image is empty".into());
     }
-    let name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_else(|| "image".into());
     Ok((name, bytes, w as f64 / h as f64))
 }
 

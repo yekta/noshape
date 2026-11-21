@@ -183,6 +183,16 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "documents",
+            verb: "images_library",
+            summary: "List your images library (a sketch's Insert image › Libraries › ‹you› images)",
+            description: "The images of the folder set as My images (documents_set_library), each document at its latest version: the library's name (\"‹your name› images\") and its Types, the folder's top-level documents and subfolders by name (a subfolder's images are those of every document under it), each with its images' file names. An image's `value` is that file at its document's version: sketch_insert_image's `image`. `images_library` is null when none is set.",
+            fields: vec![],
+            mutates: false,
+            destructive: false,
+            run: images_library,
+        },
+        Op {
+            group: "documents",
             verb: "import",
             summary: "Import CAD files as new documents (Create ▾ › Import files…: Import to a single document, Split into multiple documents, Combine to a single Part Studio)",
             description: "The documents page's Import to Onshape modal. `mode` \"single\" (default): one document for all the files, named after the first (with its extension), its Part Studios and Assemblies first, the files in \"CAD Imports\", V1 made at once. \"split\": each file its own document; a STEP, Parasolid or IGES assembly with subassemblies becomes a folder named after the file holding one document per subassembly (its Assembly, one Part Studio per part, CAD Imports, V1) and the top document named after the file (Assembly 1, its own parts' Part Studios), each assembly using its subassemblies' documents at their V1; a STEP of loose parts becomes one document there, its Assembly named after the file placing each part (an IGES file's top Assembly is named after the file too). \"per_part\": as split, every part and assembly its own document. `combine` is Combine to a single Part Studio. The reply lists the documents made (`open`: the one the page opens) and the files that failed, with why.",
@@ -604,6 +614,12 @@ fn forms_library(_ctx: &mut Ctx, _a: &Args) -> Result<OpOutput, OpError> {
     use crate::forms_library::Kind;
     let Some(lib) = crate::forms_library::load(Kind::Forms) else { return Ok(json!({ "forms_library": null }).into()) };
     Ok(json!({ "forms_library": forms_library_json(Kind::Forms, &lib) }).into())
+}
+
+fn images_library(_ctx: &mut Ctx, _a: &Args) -> Result<OpOutput, OpError> {
+    let Some(lib) = crate::images_library::load() else { return Ok(json!({ "images_library": null }).into()) };
+    let types: Vec<serde_json::Value> = lib.types.iter().map(|t| json!({ "name": t.name, "images": t.images.iter().map(|i| json!({ "name": i.name, "value": i.value })).collect::<Vec<_>>() })).collect();
+    Ok(json!({ "images_library": { "name": crate::images_library::title(), "folder": lib.folder, "types": types } }).into())
 }
 
 fn frames_library(_ctx: &mut Ctx, _a: &Args) -> Result<OpOutput, OpError> {

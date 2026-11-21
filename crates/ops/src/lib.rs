@@ -32,6 +32,7 @@ pub mod error;
 pub mod export;
 pub mod urdf;
 pub mod forms_library;
+pub mod images_library;
 pub mod file_preview;
 pub mod import;
 pub mod import_documents;

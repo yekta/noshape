@@ -6968,7 +6968,7 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   (views.rs bodies_center) at the position, so a view whose axes reach further one way sits off live's by half the
   difference: bottle Front 0.075 in (axes 0.45 in below, 0.30 above), housing Top 0.045 in. The on-screen frame (8 px
   out, live2) and the DXF rows (views aligned first) don't depend on it.
-- [ ] P3 SETLIB-IMAGES (dx, studios 11-08, lead ruling; live 11-21 behaviours "dx (11-21 15:31)") Set library's "My images":
+- [x] (dx 11-21: Insert image › Libraries lists "‹name› images" above Onshape images, Type / Image with thumbnails / preview; op documents_images_library, sketch_insert_image `image`; tests ops prefs images_library, sketchtools feel row) P3 SETLIB-IMAGES (dx, studios 11-08, lead ruling; live 11-21 behaviours "dx (11-21 15:31)") Set library's "My images":
   `noshape_ops::prefs::LibraryFolders::load().0` maps the library key `images` to the folder the user chose (Documents ›
   a folder's Set library ▸ "My images", op `documents_set_library`; `libraries.json` in the config dir). Live shows it
   only in a sketch's Insert image › Library: "<user's full name> images" above "Onshape images" (which stays the

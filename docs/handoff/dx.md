@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-21 18:53 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-21 20:46 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -13,51 +13,34 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 18:53 11-21 (read first)
-- HOSTS (user 18:5x, corrected 19:2x, DECISIONS a16b39297): default builds on vibe2; the Mac only via its ONE 4-job nice-19 slot (RB_HOST=mac waits), was: NEVER mac except
-  checks that must run on macOS (one 2-job slot), and delete that target after. Mac dx-open target (12 GB) deleted 18:5x
-  after its run; dx-urdf gone (22 GB): no dx target on the Mac.
-- QUEUED a19a2e97 (CHECKING since 18:39): step 4 = bf8e5d80b + 81d343526 (cached display clicks select; AsmPickMap ids
-  per occurrence run (by_path), picks 208 -> 24 ms; milestones on the frame that draws the model; reused frames log).
-  infento vibex6 fresh cache: rows 16 ms, decoded 157, cached display 192 ms, scene build 58 (was 298), scene set 292,
-  model frame 1033 ms (~600 ms llvmpipe: vibex6 has no GPU), click -> drawn 249 ms. Step 3's "342 ms" timed a frame
-  WITHOUT the model: tell the lead.
-- UNCOMMITTED in dx-open (stacked on a19a2e97): STEP Preprocessing index 4 "convert all surfaces to b-surfaces" now
-  reaches the writer: kernel StepOptions.all_bsurfaces (io.cpp step_bsurfaces(all): ConvertToRevolution then
-  ConvertToBSpline(all true); curves kept, as live's live-opt-pre-bsurf.step: 38 B-surfaces, 75 LINE), ffi/io.rs,
-  ops export.rs step_options. Test kernel export::step_all_surfaces_as_bsurfaces. Mac: kernel export:: 60 pass, ops
-  export 17 pass, clippy kernel+ops clean.
-  GCC 13 (vibe2 g++-13 -fsyntax-only against /opt/occt, staged ~/tmp/dx/g13): rc 0 (18:56).
-  NEXT: duct rows on vibe2 (NOSHAPE_RB_HOST=vibe2 rb.sh bash ~/agents/dx-keep/duct.sh; this worktree's rb-hosts is old) (expect STEP-PRE-BSURF read-back matches); commit "dx: STEP Preprocessing ... b-surfaces ..."; land after
-  a19a2e97 (NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh).
-- Duct rows (vibex8, before the fix): imports RHINO-V6/V7, STEP-PRE-AUTO/BSURF match; score "imports live's files 6/7;
-  option exports 34/43; read back 40/47; times <= live 15/15". STL rows "2 parts, live 9" only because dx-open lacked
-  c497ac8c.
-- REPORT at queue empty (<=5 lines): step 4 numbers + step-3 correction; Mac targets freed; duct rows; STL split c497ac8c.
+## STATE 21:0x 11-21 (read first)
+- HOSTS (user 18:5x, corrected 19:2x, DECISIONS a16b39297): default builds on vibe2; the Mac only via its slot (RB_HOST=mac
+  waits), only when vibe2 is busy. No dx target on the Mac (dx-open 12 GB, dx-urdf 22 GB deleted 18:5x).
+- LANDED a19a2e97 as 62694171 (19:09): step 4 (AsmPickMap per occurrence, picks 208 -> 24 ms). infento vibex6 fresh cache:
+  rows 16 ms, decoded 157, cached display 192, scene build 58 (was 298), model frame 1033, click -> drawn 249. Step 3's
+  "342 ms" timed a frame WITHOUT the model.
+- CHECKING b51ca6b9 (queued 20:18): STEP "convert all surfaces to b-surfaces" (duct 38 B-surfaces; read back 41/47, was 40).
+- COMMIT NEXT (staged in dx-open): P3 SETLIB-IMAGES (ops images_library.rs, op documents_images_library,
+  sketch_insert_image `image`, select_item.rs Library ▾ "‹name› images"; tests ops --test prefs (passed), sketchtools feel
+  row "insert image / the user's images library"; run /root/dx-scratch/img/t2.out = UI test + clippy). Commit, land.
+- IN WORK (dx-open, unstaged): P3 DRW-VIEW-CENTRE. views.rs `Reach` (bodies' tight box + every >= half cylinder axis's
+  ends, `cylinder_axes_3d`), ViewGeometry.reach + `placed_origin(scale)` (axis reach 0.09 in / scale), build.rs
+  placement_of uses it; source_origin takes the scale. One 3D point per source, so aligned / section views stay aligned.
+  Test drawing tests::a_view_is_centred_on_its_box_with_the_axes_reach (demo plate + a rod out of +X). Then run drawing
+  --lib, ops --test all e2e:: (drawing changes need the ops e2e), drawing-ui; land.
+- NEXT after: exchange leftovers (STL surface edges; bottle Front views 0.015 in low in DXF rows: recheck after
+  DRW-VIEW-CENTRE).
+- REPORT at queue empty (<=5 lines): step 4 numbers + step-3 correction; Mac targets freed; duct 41/47; STL split
+  c497ac8c; SETLIB-IMAGES; DRW-VIEW-CENTRE.
 - Probe: /root/dx-scratch/open4/openpick2.sh (vibex6 ~/agents/dx-keep); full run (no skip1) after any rebuild: rows
   are keyed by build. Clicks repeated at one spot hit the triad: probe artifact.
-- LANDED today: 5bbec61b (exchange stack), fast open 92d02c14 / f626b268 / 28f6bf2c (step 3: the last-viewed tab's row
-  decoded as soon as the rows are read; infento cached model frame 342 ms on vibex6, target <= 0.5 s met), drawing
-  5c4bc11c (CONIC_TOL 30 um; rims round a view-axis cylinder get its centermark: rings-loft Top view as live). Nothing
-  queued. Reported to the lead 14:19.
-- rings-loft per feature matches live (Extrude 7 / Shell 2 rims); TICKETS EDGE-CENTRE-SEAM (core, sent 14:17): our edge
-  centre (linear_properties) is off on a rim crossing its ellipse's seam. Probe vibex6 ~/agents/dx-keep/sr/rlmid.py ./cli
-  ~/agents/dx-keep/sr/rl-saved.noshape ~/parity/models/c2-rings-loft/live.jsonl.
-- PARKED 15:4x: the housing compat IGES rim (36 / 80 / 45 vs live 36 / 79 / 44). Cause: OCCT's r 12.5 mm cylinder needs
-  a seam, which ends at the rim's top (12.5, 0, 3.25); with the joint test loosened to G1 sin 1e-4 (the IGES pieces meet
-  at 6.6e-6) no other vertex of the wall's loop can take it (a seam up from the hole's lower corners crosses the rim).
-  Live's Parasolid face has no seam. Only a counting rule would match; P3 note in formats.md. Whole WIP (round_about,
-  the seamed stage, t_joint_sin, DXJOIN traces) in /root/dx-scratch/igesseam-wip2.patch, probe scripts there too;
-  it changed no count, so nothing landed. dx-urdf is clean on main (branch dx-exch).
-- SPEED-RINGS-SHELL (bool, P1) has live's Shell 1 results (9313d85f4): OK at 8-10.4 mm, faces / volumes in TICKETS.
-- Drawing rows 2/10 (duct, louver); rings-loft's Top-view circle done (5c4bc11c). Mac suite dirs
-  ~/noshape-host/dx-keep/exs-drw (10 docs, `bash exx.sh exs-drw exs-drw.log`), exs-rings.
-- View centres (live drawing-live.json boundingBoxPoints; /root/dx-scratch/vc/pads.py <doc>): live's position is the
-  centre of a box padded by 5% of its larger side; that box is the drawn one for duct, louver, rings Front and every
-  Isometric (ours matches there), larger in bottle Front/Right (+0.45 in model below, +0.30 in above: round inches, so
-  construction geometry or the split tool, not poles), housing Front/Right/Top and rings Right/Top. Not yet known what
-  live counts there; the suite aligns views first, so the DXF rows don't depend on it.
-
+- TICKETS EDGE-CENTRE-SEAM (core, sent 14:17): our edge centre (linear_properties) is off on a rim crossing its ellipse's
+  seam. Probe vibex6 ~/agents/dx-keep/sr/rlmid.py ./cli ~/agents/dx-keep/sr/rl-saved.noshape ~/parity/models/c2-rings-loft/live.jsonl.
+- PARKED 15:4x: the housing compat IGES rim (36 / 80 / 45 vs live 36 / 79 / 44). OCCT's r 12.5 mm cylinder needs a seam
+  ending at the rim's top; live's Parasolid face has none. Only a counting rule would match; P3 note in formats.md. WIP
+  in /root/dx-scratch/igesseam-wip2.patch (changed no count).
+- Drawing rows 2/10 (duct, louver). Mac suite dirs ~/noshape-host/dx-keep/exs-drw (10 docs, `bash exx.sh exs-drw
+  exs-drw.log`), exs-rings. View centres: /root/dx-scratch/vc/pads.py <doc> (live drawing-live.json boundingBoxPoints).
 ## Exchange leftovers (11-21)
 - Drawing rows (2/10): bottle Front's lip arc 41.8..180 deg (live 90..180) and views 0.015 in low; hex iso circles as
   LWPOLYLINE (live ELLIPSE); faceblend ELLIPSE vs SPLINE; the rest hidden-line geometry. Files /root/dx-scratch/drw.

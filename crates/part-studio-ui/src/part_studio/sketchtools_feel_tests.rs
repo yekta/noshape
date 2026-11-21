@@ -273,6 +273,34 @@ fn rows() -> Vec<Row> {
             });
             expect((dialog, aspect), (Some((Some("Insert an image"), true)), Some(2.0)), "the dialog's title and Libraries tab, the box's width / height")
         } },
+        Row { id: "insert image / the user's images library", live: "behaviours dx (11-21 15:31): Library lists '‹name› images' above Onshape images, which stays the default; choosing it sets Type to its first entry and Image to that one's first image; Done takes it to the image box", gap: false, check: |cx| {
+            let dir = std::env::temp_dir().join(format!("noshape-st-imglib-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&dir);
+            std::fs::create_dir_all(dir.join("lib")).map_err(|e| e.to_string())?;
+            let png = dir.join("img-A.png");
+            std::fs::write(&png, noshape_scene::png::encode_png(vec![255; 2 * 4], 2, 1, 2, 1)?).map_err(|e| e.to_string())?;
+            let mut ctx = noshape_ops::Ctx::new();
+            for (tool, args) in [
+                ("document_create", serde_json::json!({ "path": dir.join("lib").join("img doc two.noshape") })),
+                ("import_files", serde_json::json!({ "files": [png] })),
+                ("history_create_version", serde_json::json!({ "name": "V1" })),
+            ] {
+                noshape_ops::registry::run(&mut ctx, noshape_ops::registry::by_tool_name(tool).ok_or(tool)?, &args).map_err(|e| e.message)?;
+            }
+            let lib = noshape_ops::images_library::build(&dir.join("lib"));
+            let (window, view) = sketch_with(cx, "st-image-lib", Tool::InsertImage);
+            let panel = cx.update(|cx| view.read(cx).ui_ref().and_then(|u| u.insert_panel.as_ref()).map(|(p, _)| p.clone())).ok_or("no dialog")?;
+            cx.update(|cx| panel.update(cx, |p, cx| p.set_images_library(lib, cx)));
+            draw(cx, window);
+            cx.update(|cx| panel.update(cx, |p, cx| p.pick_in_libraries("sel-lib-library", "user", cx)));
+            draw(cx, window);
+            let done = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("sel-lib-image-done").ok_or("no Done")?;
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(done.center(), Modifiers::default());
+            draw(cx, window);
+            let pending = cx.update(|cx| view.read(cx).sketch.as_ref().and_then(|s| s.pending_image.as_ref()).map(|(n, _, a)| (n.clone(), *a)));
+            let _ = std::fs::remove_dir_all(&dir);
+            expect(pending, Some(("img-A.png".to_string(), 2.0)), "the library's first image (2:1) ready for its box")
+        } },
         Row { id: "search / Alt+C opens the panel", live: "search-tools-1118: a 600 px panel 10 px under the toolbar at the window's right edge, the toolbar box 'Close search', the input focused, 'Start typing to search tools', Highlight tool in toolbar on; Esc closes it", gap: false, check: |cx| {
             let (window, view) = sketch_with(cx, "st-search-open", Tool::Select);
             keys(cx, window, &["alt-c"]);

@@ -172,7 +172,7 @@ fn empty_folder(folder: &Path) -> String {
 }
 
 /// The newest named version of a document, else its first state ("Start").
-fn latest(path: &Path) -> Option<(crate::derived::ExternalDocInfo, String, noshape_store::MicroversionId)> {
+pub(crate) fn latest(path: &Path) -> Option<(crate::derived::ExternalDocInfo, String, noshape_store::MicroversionId)> {
     let info = crate::derived::external_doc_info(path).ok()?;
     let (label, mv) = match info.versions.iter().find(|v| v.label != "Current state") {
         Some(v) => (v.label.clone(), v.microversion),
@@ -192,17 +192,21 @@ pub fn check_folder(key: &str, folder: &Path) -> Result<(), Vec<String>> {
     if key != "images" {
         return Ok(());
     }
-    let image = |n: &str| matches!(Path::new(n).extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref(), Some("png" | "jpg" | "jpeg" | "gif" | "bmp" | "tif" | "tiff" | "svg" | "webp"));
     let problems: Vec<String> = docs
         .iter()
         .filter_map(|(_, path)| {
             let (info, label, mv) = latest(path)?;
             let doc = info.versions.iter().any(|v| v.label == label && v.label != "Current state").then(|| crate::derived::external_snapshot(path, mv).ok()).flatten();
-            let n = doc.map_or(0, |d| d.tabs.iter().filter(|t| matches!(&t.content, TabContent::File(f) if image(&f.file_name))).count());
+            let n = doc.map_or(0, |d| d.tabs.iter().filter(|t| matches!(&t.content, TabContent::File(f) if is_image(&f.file_name))).count());
             (n == 0).then(|| format!("Document \"{}\" has 0 versioned images. One versioned image is required.", info.name))
         })
         .collect();
     if problems.is_empty() { Ok(()) } else { Err(problems) }
+}
+
+/// An image file, by its name (My images' versioned images).
+pub(crate) fn is_image(name: &str) -> bool {
+    matches!(Path::new(name).extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref(), Some("png" | "jpg" | "jpeg" | "gif" | "bmp" | "tif" | "tiff" | "svg" | "webp"))
 }
 
 impl FormsLibrary {
@@ -218,7 +222,7 @@ pub fn save(kind: Kind, lib: &FormsLibrary) -> std::io::Result<()> {
 }
 
 /// The `.noshape` documents under `dir`, with the folders between, by name.
-fn collect(dir: &Path, folders: &mut Vec<String>, out: &mut Vec<(Vec<String>, PathBuf)>) {
+pub(crate) fn collect(dir: &Path, folders: &mut Vec<String>, out: &mut Vec<(Vec<String>, PathBuf)>) {
     let Ok(rd) = std::fs::read_dir(dir) else { return };
     let mut entries: Vec<PathBuf> = rd.flatten().map(|e| e.path()).collect();
     entries.sort();

@@ -86,6 +86,7 @@ fn graphics_preferences_toolbar_and_shortcuts_read_set_and_kept() {
     libraries(&mut ctx, &dir);
     forms_library(&mut ctx, &dir);
     frames_library(&mut ctx, &dir);
+    images_library(&mut ctx, &dir);
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -283,3 +284,50 @@ fn frames_library(ctx: &mut Ctx, dir: &std::path::Path) {
     assert_eq!(call(ctx, "documents_frames_library", json!({})).unwrap()["frames_library"], Value::Null);
 }
 
+
+/// An image document: `images` (2 x 1 px PNGs) as file tabs, versioned "V1" when `versioned`.
+fn image_document(path: &std::path::Path, images: &[&str], versioned: bool) {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() })).unwrap();
+    let dir = path.with_extension("files");
+    std::fs::create_dir_all(&dir).unwrap();
+    let files: Vec<String> = images
+        .iter()
+        .map(|n| {
+            let f = dir.join(n);
+            std::fs::write(&f, noshape_scene::png::encode_png(vec![255; 2 * 4], 2, 1, 2, 1).unwrap()).unwrap();
+            f.to_str().unwrap().to_string()
+        })
+        .collect();
+    call(&mut ctx, "import_files", json!({ "files": files })).unwrap();
+    if versioned {
+        call(&mut ctx, "history_create_version", json!({ "name": "V1" })).unwrap();
+    }
+}
+
+/// My images (live behaviours "dx (11-21 15:31)"): its Types are the folder's top-level documents and subfolders by
+/// name, a subfolder's images those of the documents in it; Insert image takes one; unset, there's none.
+fn images_library(ctx: &mut Ctx, dir: &std::path::Path) {
+    let lib_dir = dir.join("live img lib");
+    std::fs::create_dir_all(lib_dir.join("sub folder")).unwrap();
+    image_document(&lib_dir.join("img doc two.noshape"), &["img-A.png", "img-B.png"], true);
+    image_document(&lib_dir.join("sub folder").join("img doc in sub.noshape"), &["img-C.png"], true);
+    assert_eq!(call(ctx, "documents_images_library", json!({})).unwrap()["images_library"], Value::Null);
+    call(ctx, "documents_set_library", json!({ "library": "images", "folder": lib_dir.to_str().unwrap() })).unwrap();
+    let lib = call(ctx, "documents_images_library", json!({})).unwrap()["images_library"].clone();
+    assert_eq!(lib["name"], format!("{} images", noshape_store::local_user_name()), "{lib}");
+    let types: Vec<(Value, Vec<Value>)> = lib["types"].as_array().unwrap().iter().map(|t| (t["name"].clone(), t["images"].as_array().unwrap().iter().map(|i| i["name"].clone()).collect())).collect();
+    assert_eq!(types, vec![(json!("img doc two"), vec![json!("img-A.png"), json!("img-B.png")]), (json!("sub folder"), vec![json!("img-C.png")])], "{lib}");
+    // Insert image › Libraries › the user's images: the picked image, its 2:1 aspect kept.
+    let value = lib["types"][1]["images"][0]["value"].clone();
+    let mut user = Ctx::new();
+    call(&mut user, "document_create", json!({ "path": dir.join("uses images.noshape").to_str().unwrap() })).unwrap();
+    let sk = call(&mut user, "sketch_create", json!({ "plane": "plane:top" })).unwrap()["sketch"].as_str().unwrap().to_string();
+    call(&mut user, "sketch_insert_image", json!({ "sketch": sk, "image": value, "points": [[0, 0], [8, 8]] })).unwrap();
+    let st = call(&mut user, "sketch_get", json!({ "sketch": sk })).unwrap();
+    assert_eq!(st["images"][0]["name"], "img-C.png", "{st}");
+    let e = call(&mut user, "sketch_insert_image", json!({ "sketch": sk, "image": "ext:nope", "points": [[0, 0], [8, 8]] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("image"), "{e:?}");
+    call(ctx, "documents_set_library", json!({ "library": "images", "clear": true })).unwrap();
+    assert_eq!(call(ctx, "documents_images_library", json!({})).unwrap()["images_library"], Value::Null);
+}
