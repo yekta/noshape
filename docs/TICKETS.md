@@ -293,7 +293,8 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   R0.5 preview arc; live only lights the corner point (sketch/110, 1933; behaviours "Sketch fillet": the arc comes on the click).
   (b) After Enter (value box open) the hollow arrow manipulator stays drawn over the radius dimension; live drops it and shows the
   R label being edited (1935). Crops qa-scratch/tickets/skfillet-flow-w3.png (top live 1933/1934/1935, bottom ours).
-- [ ] P0 **FEEL-POLYGON-SPINNER-DRIFT (skasm)**: Inscribed polygon, centre on the origin, 2nd click at (15, 0): the "◀ 6 ▶"
+- [x] not a bug (qa 21:0x: live 10-27 behaviours "sketch polygon side count after the 2nd click": sides = 6 + one per 10 px
+  of pointer distance past the click, as ours; my walk missed that section) P0 **FEEL-POLYGON-SPINNER-DRIFT (skasm)**: Inscribed polygon, centre on the origin, 2nd click at (15, 0): the "◀ 6 ▶"
   spinner then follows the pointer: moving down 15 mm gives 8 sides, moving to empty space above 36; with the pointer still it
   stays 6. Live changes the count only with the arrows or typed digits (behaviours "Polygons", "Sketch polygon commits" 4).
   qa-scratch/tickets/polygon-spinner-w3.png (top: pointer still; bottom: pointer moved).
