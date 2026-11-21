@@ -28,7 +28,10 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
 - isaac P0 (lead 11-21 00:xx, asm bisect: mates 16 -> 38 under 72fe51df1): REVERT LANDED 9f6ce35e (01:26; asm asked to recount). Mac A/B
   (/root/bool-scratch/isaac-ab.sh, out isaac-ab.out; models ~/noshape-host/bool-keep/isaacm/isaac-{00f1,de4e}): with
   72fe51df1 Fillet 4 (feature 31) is an invalid solid and Part 1 is gone from Extrude 23 on (both studios); reverted,
-  Part 1 lives (first diff Extrude 7: 22 faces, live 21). NEXT: re-land the coaxial merge with Fillet 4 valid (dump
+  Part 1 lives (first diff Extrude 7: 22 faces, live 21). Bisect (isaac-bis in bool-hat, env M72_*; /root/bool-scratch/
+  bis.out): only the slack volume check matters (it lets Extrude 7 merge as live); dumps of Fillet 4's input
+  (/root/bool-scratch/isaacf4, Mac isaacm/dump-{main,rv}) both valid, tol 1e-7; main's fillet result invalid with
+  every face valid alone (shell/seam level); main's merged cylinder face has a different boundary (6 edges vs 7). NEXT: re-land the coaxial merge with Fillet 4 valid (dump
   Part 1 before Fillet 4, find the merged face's bad p-curve/seam), test on both isaac studios + 850efe Extrude 6.
   asm to recount mates after b67c313c is green. Worktree bool-rv (rm after both lands).
 - COMPAT-CRASH957-CHAMFER3: LANDED 43c2644a (20:10), qa verified on green 00bc521e and ticked it. Closed.
@@ -36,13 +39,7 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   for every gate (lead 22:5x; no host has 48 GB): /root/bool-scratch/kn-run.sh <host> <dir> with k-main / k-br (the gate
   trees' all-96c035059fc28abb) in ~/tmp/bool/<dir>, OCCT side from vibex8 ~/agents/bool-keep/knocc (11-12 cache); report
   each gate's corpora. Worktree + host copies removed.
-- impeller Extrude (worktree/branch bool-imp, 1b2e274a3 on main 55749fd6f): free-form face's edges imprinted on
-  another free-form face of its surface (edge_over_free_face bsplines, free::past_patch_along); ours = OCCT 97/221/141,
-  ~1.0 s vs OCCT 1.8 s; T1 impeller_seats_on_its_free_form_wall_fuse_as_occt (case 23c0c38476a63ecf, 1.09 MB, rel
-  1e-7: volume 2.6e-8 off OCCT). Amended ~22:00: a both-free imprint that declines with nothing added is skipped
-  (a7ab967d + an_edge_along_..._rim declined "an edge on another argument's free-form face" otherwise); bool_patterns
-  155 ok + brep ok. Gate queued on vibex7 after sh3w (unit bool-imp-gate waits on bool-gate-sh3w; script
-  /root/bool-scratch/imp-gate.sh, out /root/bool-hat-scratch/chain-bool-imp.out). PASS -> land, tell dx + lead.
+- impeller Extrude: QUEUED 30efb247 (02:26; gate CHECK clean but knurls, knurls on vibe2 = main); dx + lead told.
 - SHELL-AFTER-WELD-FILLET (worktree/branch bool-sh3w, a4cfa07d3 on main 55749fd6f): 407bb5cf6's
   without_inverted_slivers alone + T1 a_weld_fillet_part_shells_to_one_solid_without_its_inverted_sliver
   (tests/data/shell/weld-fillet-part3-input.brep = qa doc's Part 3 before Shell 3). shell:: 33 ok; the T1 fails on main.
