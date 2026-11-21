@@ -1244,6 +1244,8 @@ Sheets tickets/asm-snapmode-sheet.png, row-dblclick-sheet.png, drw-feel-1118.png
   Escape closes it with no mate and the part stays.
 - [ ] (psui 11-18 22:49, to verify: the list's 400 ms rule also reads the X server's press times (vendored gpui-pre-linux `last_press`), so a second click handled late on a busy UI thread still counts) - [ ] (qa 09:29 on green 83922ad8 = 850ae7f32: 80 px / 200 ms now opens (live too); 80 px / 330 ms still opens nothing (live opens within ~370-400 ms); 150 px / 200 ms opens, as live (live2 08:2x: 80-163 px along the row opened, off the row didn't; live's "120 px didn't" was a stray, behaviours line 43576; our 150 px click stayed on the row, x 710 of 527-726); same spot opens, 450 ms doesn't, as live; qa-scratch/hv2/rk2) **P1 FEEL-ROW-DBLCLICK-DISTANCE (psui)**: two clicks 80 px apart along the Extrude 1 row, 200 or 330 ms apart, open nothing.
   Live opens the dialog for two clicks on the same row within ~370-400 ms at any distance along it (30 and 80 px did; the 120 px miss was a stray: any distance along the row).
+  qa 11-21 10:2x (green 5b840ddf0, vibe2 :497, walk2/mcmp.png, Extrude 1's row): same spot 200 ms and 330 ms open the dialog; 80 px
+  apart at 330 ms still opens nothing (live opens within ~370-400 ms at any distance along the row). Still open (psui).
 
 ## P1 walk 11-19 (qa 21:36, green a58eee8c, :110 Xvfb, real pointer): sketch -> extrude -> fillet -> linear pattern
 Sketch on Top (rectangle), Shift+E, Fillet on a face, Part pattern by a face: all build; Part 2 made. One finding:
