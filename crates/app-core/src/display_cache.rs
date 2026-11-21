@@ -1,7 +1,8 @@
 //! The display cache (lead 11-06: "how Onshape opens instantly"): a tab's last displayed model kept with the
 //! document, so opening it shows that model at once while the real regeneration runs (view-only until that lands).
-//! Keyed by the whole document's content, what the tab adds (its id, configuration, …) and the build, so an edit or
-//! another build never shows a stale model. Kept in the .noshape itself (meta rows `display:<tag>`, one per tab and
+//! Keyed by the whole document's content, what the tab adds (its id, configuration, …) and the build, so an edit never
+//! shows a stale model; another build's display of the same content stands in too (a new release opens at once), as
+//! every cached display does only until the regeneration replaces it. Kept in the .noshape itself (meta rows `display:<tag>`, one per tab and
 //! level, replaced on each save: lead 11-21, a copied document or a new release opens at once too) and in the user
 //! cache directory (`paths::cache_dir()/displays`, at most [`CAP_BYTES`], the least recently used evicted).
 //! The studios keep their own snapshot types (Part Studio display, assembly occurrences, drawing sheets).
@@ -84,9 +85,10 @@ pub(crate) fn build_id() -> &'static str {
     })
 }
 
-/// The cache key of a tab's display, "<tag>.<hash>": the tag names its slot (`slot`: the studio and tab, one row each
-/// in the document), the hash its content (the whole document, as other tabs feed it: Part Studios, Feature Studios,
-/// derived sources; the slot; what else the display depends on, `extra`: configuration, level; the build).
+/// The cache key of a tab's display, "<tag>.<content>.<build>": the tag names its slot (`slot`: the studio and tab, one
+/// row each in the document), the content hash what it shows (the whole document, as other tabs feed it: Part Studios,
+/// Feature Studios, derived sources; the slot; what else the display depends on, `extra`: configuration, level), the
+/// build hash the build that made it.
 pub fn key(doc: &noshape_model::Document, slot: &impl Serialize, extra: &impl Serialize) -> Option<String> {
     key_for(doc, slot, extra, build_id())
 }
@@ -102,8 +104,21 @@ pub(crate) fn key_for(doc: &noshape_model::Document, slot: &impl Serialize, extr
         serde_json::to_writer(&mut w, extra).ok()?;
         std::io::Write::flush(&mut w).ok()?;
     }
-    h.update(build.as_bytes());
-    Some(format!("{tag}.{}", h.finalize().to_hex()))
+    let b = blake3::hash(build.as_bytes()).to_hex();
+    Some(format!("{tag}.{}.{}", h.finalize().to_hex(), &b[..16]))
+}
+
+/// A key without its build ("<tag>.<content>"; an older key whole).
+fn content(key: &str) -> &str {
+    match key.rsplit_once('.') {
+        Some((head, _)) if head.contains('.') => head,
+        _ => key,
+    }
+}
+
+/// Whether a stored key shows what `key` asks for: the same, or the same content made by another build.
+fn shows(stored: &str, key: &str) -> bool {
+    stored == key || content(stored) == content(key)
 }
 
 /// The tag of `slot`'s keys (their row in the document).
@@ -228,15 +243,30 @@ fn doc_row(doc: &Path, key: &str) -> Option<Vec<u8>> {
     tag_row(doc, tag(key)).filter(|(k, _)| k == key).map(|(_, body)| body)
 }
 
+/// A document's row showing `key`'s content, made by this build or another (then only if it reads as this build's
+/// type, [`same_layout`]), decoded.
+fn doc_row_any_build<T: DeserializeOwned + Serialize>(doc: &Path, key: &str) -> Option<T> {
+    let (stored, body) = tag_row(doc, tag(key)).filter(|(k, _)| shows(k, key))?;
+    let v = decode(&body)?;
+    (stored == key || same_layout(&v, &body)).then_some(v)
+}
+
+/// Whether `v`, decoded from another build's `body`, encodes back to the same bytes: its type's layout unchanged
+/// (bincode isn't self-describing: a field added or retyped since reads as other values, not an error).
+fn same_layout<T: Serialize>(v: &T, body: &[u8]) -> bool {
+    let Some(raw) = body.strip_prefix(MAGIC.as_slice()).and_then(|b| zstd::decode_all(b).ok()) else { return false };
+    bincode::serialize(v).is_ok_and(|e| e == raw)
+}
+
 fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Option<T> {
     let body = bytes.strip_prefix(MAGIC.as_slice())?;
     bincode::deserialize(&zstd::decode_all(body).ok()?).ok()
 }
 
-/// What is cached under `key`, if anything: the document's own row first, then the directory's (its use time
-/// refreshed for the eviction). A row of another key (an older content or build) is never used.
-pub fn load<T: DeserializeOwned>(shelf: &Shelf, key: &str) -> Option<T> {
-    if let Some(v) = shelf.doc.as_deref().and_then(|d| doc_row(d, key)).and_then(|b| decode(&b)) {
+/// What is cached under `key`, if anything: the document's own row first (this build's or another's of the same
+/// content), then the directory's (its use time refreshed for the eviction). A row of an older content is never used.
+pub fn load<T: DeserializeOwned + Serialize>(shelf: &Shelf, key: &str) -> Option<T> {
+    if let Some(v) = shelf.doc.as_deref().and_then(|d| doc_row_any_build(d, key)) {
         return Some(v);
     }
     dir_load(shelf, key)
@@ -253,12 +283,12 @@ fn dir_load<T: DeserializeOwned>(shelf: &Shelf, key: &str) -> Option<T> {
 }
 
 /// `load` of `key(doc, slot, extra)`, the document's row of the slot decoded as it opened (`decode_early`) or meanwhile
-/// on a thread of its own, used only if it holds that key. Returns the key too.
-pub fn load_for<T: DeserializeOwned + Send + 'static>(shelf: &Shelf, doc: &noshape_model::Document, slot: &impl Serialize, extra: &impl Serialize) -> Option<(String, T)> {
+/// on a thread of its own, used only if it shows that key's content. Returns the key too.
+pub fn load_for<T: DeserializeOwned + Serialize + Send + 'static>(shelf: &Shelf, doc: &noshape_model::Document, slot: &impl Serialize, extra: &impl Serialize) -> Option<(String, T)> {
     load_keyed(shelf, slot, || key(doc, slot, extra))
 }
 
-fn load_keyed<T: DeserializeOwned + Send + 'static>(shelf: &Shelf, slot: &impl Serialize, key: impl FnOnce() -> Option<String>) -> Option<(String, T)> {
+fn load_keyed<T: DeserializeOwned + Serialize + Send + 'static>(shelf: &Shelf, slot: &impl Serialize, key: impl FnOnce() -> Option<String>) -> Option<(String, T)> {
     let early = shelf.doc.as_deref().zip(slot_tag(slot)).and_then(|(d, tag)| match take_early::<T>(d, &tag) {
         Some((stored, v)) => Some((stored, Decoding::Done(v))),
         None => {
@@ -270,8 +300,9 @@ fn load_keyed<T: DeserializeOwned + Send + 'static>(shelf: &Shelf, slot: &impl S
     let key = key()?;
     noshape_render::perf::milestone("open: display key");
     if let Some((stored, decoding)) = early
-        && stored == key
+        && shows(&stored, &key)
         && let Some(v) = decoding.value()
+        && (stored == key || shelf.doc.as_deref().and_then(|d| tag_row(d, tag(&key))).is_some_and(|(k, body)| k == stored && same_layout(&v, &body)))
     {
         return Some((key, v));
     }
@@ -485,10 +516,11 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
     }
 
-    /// Lead 11-21 (fast open): the display kept in the .noshape opens on another machine (an empty cache directory);
-    /// after an edit or with another build its key differs and the row isn't used; a save replaces its tab's row.
+    /// Lead 11-21 (fast open): the display kept in the .noshape opens on another machine (an empty cache directory) and
+    /// with another release (until the regeneration replaces it); after an edit its key differs and the row isn't
+    /// used; a save replaces its tab's row.
     #[test]
-    fn a_document_keeps_its_display_for_its_content_and_build_only() {
+    fn a_document_keeps_its_display_for_its_content() {
         let d = std::env::temp_dir().join(format!("noshape-display-cache-doc-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
@@ -500,6 +532,7 @@ mod tests {
         let tab = doc.tabs[0].id;
         let build = build_id_of("0.5.0", true, Some("c8d74e607a47"), "1:2", "p1");
         let k = key_for(&doc, &("part studio", tab), &"config", &build).unwrap();
+        let other = key_for(&doc, &("part studio", tab), &"config", &build_id_of("0.5.1", true, Some("c8d74e607a47"), "1:2", "p1")).unwrap();
         store(&here, &k, &vec![7u32; 3]).unwrap();
         // A hit from the file alone, its coarse level beside it.
         assert_eq!(load::<Vec<u32>>(&elsewhere, &k), Some(vec![7; 3]));
@@ -541,9 +574,13 @@ mod tests {
         assert_eq!(super::take_early::<Vec<u32>>(&file, "another tab"), None, "only the tab it opens on");
         super::prefetch_rows(&file, vec![(tag, super::decode_boxed::<Vec<u32>>)]);
         assert_eq!(super::load_keyed::<Vec<u32>>(&elsewhere, &slot, || Some(edited.clone())), None, "decoded early, another key");
-        // A miss with another release; a release's commit or executable doesn't matter, a development build's does.
-        let other = key_for(&doc, &("part studio", tab), &"config", &build_id_of("0.5.1", true, Some("c8d74e607a47"), "1:2", "p1")).unwrap();
+        // Another release's key: the row of the same content stands in (the next save adds this build's); a release's
+        // commit or executable doesn't matter, a development build's does.
         assert_ne!(other, edited);
+        assert_ne!(other, k);
+        assert_eq!(load::<Vec<u32>>(&elsewhere, &other), Some(vec![7; 3]));
+        assert_eq!(super::load_keyed::<Vec<u32>>(&elsewhere, &slot, || Some(other.clone())), Some((other.clone(), vec![7; 3])));
+        assert!(!super::contains(&elsewhere, &other), "kept again for this build");
         assert_eq!(build_id_of("0.5.0", true, Some("aaa"), "3:4", "p1"), build);
         assert_ne!(build_id_of("0.0.0-dev", false, Some("aaa"), "1:2", "p1"), build_id_of("0.0.0-dev", false, Some("bbb"), "1:2", "p1"));
         assert_ne!(build_id_of("0.0.0-dev", false, None, "1:2", "p1"), build_id_of("0.0.0-dev", false, None, "1:3", "p1"));
