@@ -1204,12 +1204,10 @@ pub fn view_bodies<'a>(ctx: &'a Context, part: Option<&BodyId>) -> Vec<&'a Arc<B
     }
 }
 
-/// View coordinates of the center of a source's bodies (the point a base or
-/// projected view of it places at the view position).
-pub fn source_origin(sources: &Sources, key: &SourceKey, part: Option<&BodyId>, frame: &ViewFrame) -> Option<[f64; 2]> {
+/// The view coordinates a base or projected view of a source places at the view position at `scale` (see [`Reach`]).
+pub fn source_origin(sources: &Sources, key: &SourceKey, part: Option<&BodyId>, frame: &ViewFrame, scale: f64) -> Option<[f64; 2]> {
     let src = sources.get(key)?;
-    let bodies = view_bodies(&src.context, part);
-    (!bodies.is_empty()).then(|| frame.project(bodies_center(&bodies)))
+    Reach::of(&view_bodies(&src.context, part)).map(|r| frame.project(r.center(scale)))
 }
 
 // ------------------------------------------------------------ cutting lines
@@ -1371,8 +1369,10 @@ pub struct ViewGeometry {
     pub cut_shapes: Vec<(BodyId, Shape)>,
     pub id: ViewId,
     pub frame: Option<ViewFrame>,
-    /// View coordinates that sit at the view's sheet position.
+    /// View coordinates that sit at the view's sheet position (without `reach`'s axes; see [`ViewGeometry::placed_origin`]).
     pub origin: [f64; 2],
+    /// A model view's box: the bodies' (world) and each cylinder axis's ends with their outward directions.
+    pub reach: Option<Reach>,
     pub edges: Vec<ViewEdge>,
     pub model_edges: Vec<ModelEdge>,
     pub snaps: Vec<Snap>,
@@ -1480,7 +1480,50 @@ impl AlignedMap {
     }
 }
 
+/// What a model view's position centres (live behaviours "dx (11-21 14:20)"): the bodies' box plus each cylinder axis
+/// drawn 0.09 in (sheet) past its face's ends. One 3D point for every view of a source, so aligned views stay aligned;
+/// in a view along the model's axes it is the centre of the view's box, as live's.
+#[derive(Clone, Debug)]
+pub struct Reach {
+    pub lo: DVec3,
+    pub hi: DVec3,
+    pub axis_ends: Vec<(DVec3, DVec3)>,
+}
+
+/// An axis's reach past its face's ends on the sheet (live: 0.09 in).
+const AXIS_REACH_IN: f64 = 0.09;
+
+impl Reach {
+    fn of(bodies: &[&Arc<Body>]) -> Option<Reach> {
+        let (lo, hi) = bodies_box(bodies, true)?;
+        let shapes: Vec<Shape> = bodies.iter().map(|b| b.shape.clone()).collect();
+        let axis_ends = cylinder_axes_3d(&shapes, None).into_iter().flat_map(|(o, a, t0, t1)| [(o + a * t0, -a), (o + a * t1, a)]).collect();
+        Some(Reach { lo, hi, axis_ends })
+    }
+
+    /// The centre at `scale`.
+    pub fn center(&self, scale: f64) -> DVec3 {
+        let d = AXIS_REACH_IN * 0.0254 / scale.max(1e-9);
+        let (lo, hi) = self.axis_ends.iter().fold((self.lo, self.hi), |(lo, hi), (p, a)| (lo.min(*p + *a * d), hi.max(*p + *a * d)));
+        (lo + hi) * 0.5
+    }
+}
+
 impl ViewGeometry {
+    /// The view coordinates at the view's sheet position at `scale`.
+    pub fn placed_origin(&self, scale: f64) -> [f64; 2] {
+        match (&self.reach, &self.frame) {
+            (Some(r), Some(f)) => f.project(r.center(scale)),
+            _ => self.origin,
+        }
+    }
+
+    /// Centres the view on `bodies` (see [`Reach`]).
+    fn center_on(&mut self, bodies: &[&Arc<Body>], frame: &ViewFrame) {
+        self.reach = Reach::of(bodies);
+        self.origin = frame.project(self.reach.as_ref().map(|r| (r.lo + r.hi) * 0.5).unwrap_or(DVec3::ZERO));
+    }
+
     /// Whether view point `p` is on a section's cut face (even-odd over its boundary segments).
     pub fn in_cut_face(&self, p: [f64; 2]) -> bool {
         self.section_segments.iter().filter(|[u, v]| (u[1] > p[1]) != (v[1] > p[1]) && p[0] < u[0] + (p[1] - u[1]) / (v[1] - u[1]) * (v[0] - u[0])).count() % 2 == 1
@@ -1990,16 +2033,12 @@ pub fn sample_edge(e: &Shape, segments: usize) -> Vec<DVec3> {
 
 /// Bounding box center of a set of bodies.
 fn bodies_center(bodies: &[&Arc<Body>]) -> DVec3 {
-    let mut acc: Option<(DVec3, DVec3)> = None;
-    for b in bodies {
-        if let Ok(bb) = b.shape.bounding_box(false) {
-            acc = Some(match acc {
-                None => (bb.min, bb.max),
-                Some((a, c)) => (a.min(bb.min), c.max(bb.max)),
-            });
-        }
-    }
-    acc.map(|(a, b)| (a + b) * 0.5).unwrap_or(DVec3::ZERO)
+    bodies_box(bodies, false).map(|(a, b)| (a + b) * 0.5).unwrap_or(DVec3::ZERO)
+}
+
+/// The bounding box of a set of bodies (`tight`: their exact extent).
+fn bodies_box(bodies: &[&Arc<Body>], tight: bool) -> Option<(DVec3, DVec3)> {
+    bodies.iter().filter_map(|b| b.shape.bounding_box(tight).ok()).map(|bb| (bb.min, bb.max)).reduce(|(a, c), (lo, hi)| (a.min(lo), c.max(hi)))
 }
 
 fn bodies_diagonal(bodies: &[&Arc<Body>]) -> f64 {
@@ -2900,6 +2939,12 @@ fn model_edge(body: &Arc<Body>, edge_index: usize, frame: &ViewFrame, topo: &mut
 /// Axes of (at least half) cylindrical faces perpendicular to the view
 /// direction, as projected segments covering the faces' extent.
 fn cylinder_axes(shapes: &[Shape], frame: &ViewFrame) -> Vec<[[f64; 2]; 2]> {
+    cylinder_axes_3d(shapes, Some(frame.dir)).into_iter().map(|(o, a, t0, t1)| [frame.project(o + a * t0), frame.project(o + a * t1)]).collect()
+}
+
+/// Axes of (at least half) cylindrical faces (perpendicular to `across`, if given): origin, unit axis and the faces'
+/// extent along it.
+fn cylinder_axes_3d(shapes: &[Shape], across: Option<DVec3>) -> Vec<(DVec3, DVec3, f64, f64)> {
     // (origin, axis, angular intervals, tmin, tmax)
     type Group = (DVec3, DVec3, Vec<(f64, f64)>, f64, f64);
     let mut groups: Vec<Group> = Vec::new();
@@ -2908,7 +2953,7 @@ fn cylinder_axes(shapes: &[Shape], frame: &ViewFrame) -> Vec<[[f64; 2]; 2]> {
         for f in shape.faces() {
             let Ok(Surface::Cylinder { origin, axis, radius, .. }) = f.face_surface() else { continue };
             let axis = axis.normalize();
-            if axis.dot(frame.dir).abs() > 1e-6 || radius <= 0.0 {
+            if across.is_some_and(|d| axis.dot(d).abs() > 1e-6) || radius <= 0.0 {
                 continue;
             }
             let Ok(uv) = f.uv_bounds() else { continue };
@@ -2949,7 +2994,7 @@ fn cylinder_axes(shapes: &[Shape], frame: &ViewFrame) -> Vec<[[f64; 2]; 2]> {
     groups
         .into_iter()
         .filter(|g| angular_coverage(&g.2) >= std::f64::consts::PI - 1e-6)
-        .map(|(o, a, _, t0, t1)| [frame.project(o + a * t0), frame.project(o + a * t1)])
+        .map(|(o, a, _, t0, t1)| (o, a, t0, t1))
         .collect()
 }
 
@@ -3339,7 +3384,7 @@ fn projected_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &
     let bodies = view_bodies(ctx, part);
     let pbs: Vec<ProjBody> = bodies.iter().map(|b| ProjBody { body: b, shape: b.shape.clone(), edge_map: None }).collect();
     let mut g = project_bodies(id, &pbs, frame, exact, &|_, _| true);
-    g.origin = frame.project(bodies_center(&bodies));
+    g.center_on(&bodies, frame);
     g.update_bounds();
     g
 }
@@ -3548,7 +3593,7 @@ fn section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &Vi
         let near = diag * 1e-5 + 1e-9;
         g.edges.retain(|e| e.visible && e.points.iter().all(|p| segs.iter().any(|s| dist_to_segment(*p, s[0], s[1]) < near)));
     }
-    g.origin = frame.project(center);
+    g.center_on(&all, frame);
     g.update_bounds();
     g
 }
@@ -3592,7 +3637,7 @@ fn named_section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, fram
         g.error = error;
     }
     g.section_segments = section_segments_of(&faces, frame);
-    g.origin = frame.project(center);
+    g.center_on(&bodies, frame);
     g.update_bounds();
     g
 }
@@ -3728,7 +3773,7 @@ fn aligned_section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, fr
     }
     g.section_segments = section_segments_of(&faces, frame);
     drop_fold_seam(&mut g, frame.project(axis_origin), frame.project(axis_origin + parent.dir), diag);
-    g.origin = frame.project(center3);
+    g.center_on(&bodies, frame);
     g.aligned = Some(map);
     g.update_bounds();
     g
@@ -3842,7 +3887,6 @@ pub fn broken_out_depth(ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame,
 fn broken_out_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, view: &ViewFrame, cuts: &[(BrokenOut, ViewFrame)], exact: bool) -> ViewGeometry {
     let bodies = view_bodies(ctx, part);
     let diag = bodies_diagonal(&bodies);
-    let center = bodies_center(&bodies);
     let margin = diag * 0.05 + 1e-4;
     let mut tools: Vec<(Shape, &[BodyId])> = Vec::new();
     let mut regions: Vec<(Vec<[f64; 2]>, f64, ViewFrame)> = Vec::new();
@@ -3910,7 +3954,7 @@ fn broken_out_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, view: &
         g.error = error.or(err2);
     }
     g.section_segments = section_segments_of(&faces, frame);
-    g.origin = frame.project(center);
+    g.center_on(&bodies, frame);
     g.update_bounds();
     g
 }

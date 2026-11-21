@@ -531,6 +531,60 @@ fn automatic_centerlines_on_hole_axes() {
     assert!(v.style == RenderStyle::HiddenLinesVisible && v.tangent_phantom && v.show_centerlines && v.auto_centerlines == Some(false));
 }
 
+/// A view's position is the centre of its box (live behaviours "dx (11-21 14:20)"): the drawn extent plus each cylinder
+/// axis 0.09 in (sheet) past its face's ends. A rod out of the demo plate's +X side reaches its axis past the rod's end
+/// (the plate's holes reach theirs below the plate and past their top fillets), so Front's box reaches 0.09 in further right than
+/// its edges; Top and Right stay aligned with Front.
+#[test]
+fn a_view_is_centred_on_its_box_with_the_axes_reach() {
+    use crate::params::ParamValue;
+    use crate::reference::{DatumPlane, Reference};
+    use noshape_units::{ExprValue, UnitPrefs};
+    let (mut doc, drawing) = demo();
+    let units = UnitPrefs::default();
+    let TabContent::PartStudio(ps) = &mut doc.tabs[0].content else { panic!("the demo studio") };
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(glam::DVec2::new(0.0, 0.006), 0.004);
+    let mut f = ps.new_feature("sketch", &units).unwrap();
+    f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Right)]));
+    f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(crate::sketch_feature::SketchData { sketch: sk, ..Default::default() })));
+    let sid = f.id;
+    ps.features.push(f);
+    let r = crate::regen::Regenerator::new().regenerate(ps, &Default::default(), &units, &Default::default());
+    let region = r.display.sketches.iter().find(|s| s.feature == sid).and_then(|s| s.regions.first()).expect("the rod's region").key.clone();
+    let mut f = ps.new_feature("extrude", &units).unwrap();
+    f.params.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: sid, key: region }]));
+    f.params.set("depth", ParamValue::Expr(ExprValue::new("70 mm")));
+    ps.features.push(f);
+    let sources = regenerate_sources(&doc, &drawing);
+    let (key, _) = views::view_source(&drawing.sheets[0], ViewId(1)).unwrap();
+    assert_eq!(sources[&key].context.bodies.iter().filter(|b| b.kind == crate::display::BodyKind::Solid).count(), 2, "the plate and the rod");
+    let cache = ViewCache::new();
+    let sheet = &drawing.sheets[0];
+    let view = |id: u64| {
+        let g = compute_view(&drawing, sheet, ViewId(id), &sources, &cache, false);
+        assert!(g.error.is_none(), "{:?}", g.error);
+        let pts = || g.edges.iter().filter(|e| e.visible).flat_map(|e| e.points.iter().copied());
+        let lo = pts().fold([f64::MAX; 2], |a, p| [a[0].min(p[0]), a[1].min(p[1])]);
+        let hi = pts().fold([f64::MIN; 2], |a, p| [a[0].max(p[0]), a[1].max(p[1])]);
+        (g.placed_origin(views::view_scale(sheet, ViewId(id))), lo, hi)
+    };
+    let reach = 0.09 * 0.0254 / views::view_scale(sheet, ViewId(1));
+    let (o, lo, hi) = view(1);
+    assert!((hi[0] - lo[0] - 0.12).abs() < 1e-6, "the plate's -X side to the rod's end: {lo:?} {hi:?}");
+    assert!((o[0] - (lo[0] + hi[0] + reach) / 2.0).abs() < 1e-7, "Front: the box reaches {reach} m past the rod: {o:?} {lo:?} {hi:?}");
+    // The holes' faces end at the top fillets (z 10 mm): their axes reach below the plate and past z 10 mm.
+    let holes = |lo: f64, hi: f64| (lo - reach + hi.max(0.010 + reach)) / 2.0;
+    assert!((o[1] - holes(lo[1], hi[1])).abs() < 1e-7, "{o:?} {lo:?} {hi:?}");
+    let (t, tlo, thi) = view(2);
+    assert!((t[0] - (tlo[0] + thi[0] + reach) / 2.0).abs() < 1e-7 && (t[1] - (tlo[1] + thi[1]) / 2.0).abs() < 1e-7, "Top: {t:?} {tlo:?} {thi:?}");
+    assert!((tlo[0] - t[0] - (lo[0] - o[0])).abs() < 1e-9, "Top stays aligned with Front");
+    // Right sees the rod end-on.
+    let (r, rlo, rhi) = view(3);
+    assert!((r[1] - holes(rlo[1], rhi[1])).abs() < 1e-7, "Right: {r:?} {rlo:?} {rhi:?}");
+    assert!((rlo[1] - r[1] - (lo[1] - o[1])).abs() < 1e-9, "Right stays aligned with Front");
+}
+
 /// Drawing properties › Views: the edges' pens (live's 0.40 / 0.15 mm by
 /// default), dash scale and colour, the view labels' height and colour, and
 /// the new insert defaults.

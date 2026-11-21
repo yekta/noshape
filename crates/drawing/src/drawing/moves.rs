@@ -75,7 +75,7 @@ impl ViewMoves for Drawing {
                         v.label = Some(format!("DETAIL {label}"));
                     }
                     // Keep the detail content where it was on the sheet.
-                    if let Some(o) = sources.and_then(|s| views::source_origin(s, &key, part.as_ref(), &frame)) {
+                    if let Some(o) = sources.and_then(|s| views::source_origin(s, &key, part.as_ref(), &frame, scale)) {
                         let k = scale * 1000.0;
                         let d = views::rotate2([(o[0] - center[0]) * k, (o[1] - center[1]) * k], rotation);
                         v.position = [v.position[0] + d[0], v.position[1] + d[1]];

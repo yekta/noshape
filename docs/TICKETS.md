@@ -6962,7 +6962,7 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
-- [ ] P3 DRW-VIEW-CENTRE (dx 11-21; live behaviours "dx (11-21 14:20)") A view's position in live is the centre of its box:
+- [x] (dx 11-21: views.rs Reach: the bodies' tight box plus every (at least half) cylinder axis 0.09 in past its faces, one 3D point per source so aligned and section views stay aligned; test drawing tests::a_view_is_centred_on_its_box_with_the_axes_reach) P3 DRW-VIEW-CENTRE (dx 11-21; live behaviours "dx (11-21 14:20)") A view's position in live is the centre of its box:
   the drawn extent (sketches and planes never count, centermarks neither) plus each cylindrical face's axis drawn 0.09 in
   (sheet) past the face's ends; each side + 5 % of the larger side, at least 0.68 in. Ours puts the bodies' box centre
   (views.rs bodies_center) at the position, so a view whose axes reach further one way sits off live's by half the

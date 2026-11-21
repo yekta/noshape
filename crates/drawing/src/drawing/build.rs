@@ -540,7 +540,7 @@ pub fn break_line_points(s0: [f64; 2], s1: [f64; 2], nrm: [f64; 2], style: Break
 pub fn placement_of(sheet: &Sheet, id: ViewId, g: &ViewGeometry, frame_of: &dyn Fn(ViewId) -> Option<views::ViewFrame>) -> Option<ViewPlacement> {
     let v = sheet.view(id)?;
     let scale = views::view_scale(sheet, id);
-    let mut p = ViewPlacement::new(id, g.origin, v.position, scale);
+    let mut p = ViewPlacement::new(id, g.placed_origin(scale), v.position, scale);
     p.rotation = views::view_rotation(sheet, id);
     let k = scale * 1000.0;
     let eff = views::effective_breaks(sheet, id, frame_of);

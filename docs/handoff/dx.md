@@ -42,7 +42,10 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
 - Drawing rows 2/10 (duct, louver). Mac suite dirs ~/noshape-host/dx-keep/exs-drw (10 docs, `bash exx.sh exs-drw
   exs-drw.log`), exs-rings. View centres: /root/dx-scratch/vc/pads.py <doc> (live drawing-live.json boundingBoxPoints).
 ## Exchange leftovers (11-21)
-- Drawing rows (2/10): bottle Front's lip arc 41.8..180 deg (live 90..180) and views 0.015 in low; hex iso circles as
+- Drawing rows (2/10): bottle Front's lip arc 41.8..180 deg (live 90..180): Part 1 is one revolved solid (14 closed
+  edges), the arc is the lip torus's outline; its inner 41.8..90 part should be hidden by the torus's near side, ours
+  draws it on the left only (right 0..90 right): the torus seam in HLR (probe vibex6 ~/tmp/dx/lip.py). Views 0.015 in
+  low = DRW-VIEW-CENTRE (axes 0.09 in below, 0.06 above at 1:5); hex iso circles as
   LWPOLYLINE (live ELLIPSE); faceblend ELLIPSE vs SPLINE; the rest hidden-line geometry. Files /root/dx-scratch/drw.
 - Open: STL split (duct 2 parts vs live's 9 sheets, bottle 2 vs 148: rule unknown, REQUESTS dx 11-21 14:06;
   /root/dx-scratch/stlcomp.py), housing IGES compat 80 / 45 edges / vertices vs 79 / 44 (one closed B-spline rim in two
