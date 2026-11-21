@@ -88,13 +88,19 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
    docs: nothing else changed). Left: Tail fin surface area 1.2e-5 off (3567.145 vs 3567.188 mm², ~0.6 µm of profile
    length, cause not found) and 3D fit spline 1's shape (starts x 32.70, live 33.94, same ends and start direction):
    core's (fit spline), told via the lead; Boundary surface 1 fails on it.
-00c. LANDING 11-21: a feature pattern re-runs each seed once per group (was per check and per target, nested: a mirror
-   of mirrors re-ran the inner ones each time): rocker-enclosure-body Mirror 3 200 -> 88 ms (live 8; doc 401 -> 244 ms, live
-   411); Mac same-base A/B over 176 docs identical. Left: nested seeds re-run as tools (Mirror 1 / 2 inside Mirror 3).
+00c. LANDED 5cf3fc94: a feature pattern re-runs each seed once per group: rocker-enclosure-body Mirror 3 200 -> 88 ms.
+   Left: nested seeds re-run as tools (Mirror 1 / 2 inside Mirror 3).
+00d. core 11-21: surf-intro Boundary surface 1's uProfile 0 (live Jvx, a LINE of Surface 1 at x 50.52, 20.04 mm; no ids,
+   '&' query) went to 3D fit spline 2's wire: our Surface 1 edge there is a bspline 20.145 mm (0.5 % off), so `nearest`
+   kept only lines and fell to the first. Fix: any curve type within 5 % before the first of live's type.
+00e. live 11-21: cov2 models c2-cov2-sm-flange-bounds / -sm-hem-jog / -sm-corner-break-relief-joint /
+   -sm-start-extrude-bounds / -frame-corners-trim-endcap-gusset (behaviours "lead (11-21 13:59): coverage batch 2").
 0. USER P0 feel: rows of docs/parity/interaction-feel.md in my areas are "=" now; Hover timing is psui's.
 0b. DONE 11-21 13:35: sketch-line-from-midpoint / sketch-bezier-polygon / sketch-spline-handle-arm match with the camera
    (3/3, 40/40 states, green 6241cf347 on vibe2; skasm-scratch/bin/uipg.sh); the 7 asm takes are asm's.
-1. loft-paths-guides now lists only Sketch 2's take-back and Sketch 4's 3 PROJECTED (Sketch 5's PIERCEs on its
+1. LANDING 11-21: a DISTANCE to a model circle in a sketch without live's frame takes our frame (loft-paths-guides
+   Sketch 2 solved, Mac suite otherwise identical). loft-paths-guides left: Sketch 4's 3 PROJECTED; Sketch 6's take-back
+   (0.5 in to JUV, Extrude 1's seam line at x -50.8, ours elsewhere: 390 mm move; older than this). (Sketch 5's PIERCEs on its
    Intersection's ends are skipped as the tool's own). The other PIERCE take-backs (09:20, sec.log) all sit behind an
    upstream difference: surf-intro tail fins (Intersection face from the unbuilt Derived 1), manualblend Sketch 6 / 7
    (sections on Sweep 2, wrong after Sketch 5's CONCENTRIC), pipe (core's Loft first), knifehandle (Sweep 2 first).

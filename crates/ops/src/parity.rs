@@ -167,6 +167,8 @@ pub struct Translator<'a> {
     /// Onshape sketch frames by feature id (`sketches` from `GET …/sketches`):
     /// origin, x, y in metres.
     frames: HashMap<String, [[f64; 3]; 3]>,
+    /// Our sketch frames (m) by live's feature id, for a sketch whose live frame wasn't fetched.
+    our_frames: HashMap<String, [[f64; 3]; 3]>,
     /// The sketch being translated has a Use that landed where live's model had it, off its stale stored entity: its
     /// constraints' moves follow live's solve.
     stale_uses: bool,
@@ -498,7 +500,7 @@ impl<'a> Translator<'a> {
                 config_defaults.entry(k.to_string()).or_insert_with(|| v.to_string());
             }
         }
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, stale_uses: false, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, live_states: doc["featureStates"].clone(), sub_feature: None, array_item: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().into_iter().flatten().map(|(e, v)| (e.clone(), Arc::new(v.clone()))).collect(), profile_options: doc["profileOptions"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), derived_sketches: HashMap::new(), sketch_tabs: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, our_frames: HashMap::new(), stale_uses: false, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, live_states: doc["featureStates"].clone(), sub_feature: None, array_item: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().into_iter().flatten().map(|(e, v)| (e.clone(), Arc::new(v.clone()))).collect(), profile_options: doc["profileOptions"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), derived_sketches: HashMap::new(), sketch_tabs: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -5499,6 +5501,9 @@ impl<'a> Translator<'a> {
         let made = self.call("sketch_create", args)?;
         let id = made["sketch"].as_str().ok_or("sketch_create gave no id")?.to_string();
         let frame = self.frames.get(&oid).copied();
+        if let (Some(o), Some(x), Some(y)) = (f3(&made["frame"]["origin"]), f3(&made["frame"]["x"]), f3(&made["frame"]["y"])) {
+            self.our_frames.insert(oid.clone(), [o.map(|c| c * 1e-3), x, y]);
+        }
         if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
             eprintln!("TRACE sketch {:?} plane {plane} ours {} live {frame:?}", f["name"], made["frame"]);
         }
@@ -6834,7 +6839,7 @@ impl<'a> Translator<'a> {
     /// A circular model edge's centre (in sketch `oid`'s plane, m) and radius (m), when its axis is along the
     /// sketch's normal.
     fn circle_in_sketch(&mut self, oid: &str, edge: &str) -> Option<([f64; 2], f64)> {
-        let [o, x, y] = *self.frames.get(oid)?;
+        let [o, x, y] = *self.frames.get(oid).or_else(|| self.our_frames.get(oid))?;
         let edges = self.call("query_entities", json!({ "kind": "edges", "curve": "circle", "limit": 100000 })).ok()?;
         let e = edges["edges"].as_array()?.iter().find(|e| e["id"] == edge)?.clone();
         let (c, r, a) = (f3(&e["center"])?, e["radius"].as_f64()? * 1e-3, f3(&e["axis"])?);
@@ -7028,6 +7033,9 @@ impl<'a> Translator<'a> {
             let circle = ["localFirst", "localSecond"].iter().filter_map(|n| par0(n)).any(|e| self.circles.contains_key(&(oid.to_string(), e)));
             if kind == "distance" && circle && args.get("mode").is_none() {
                 args["mode"] = json!(self.resting_mode(id, &args));
+            }
+            if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+                eprintln!("TRACE dimension {ty} {args} (external circle {external_circle:?})");
             }
             match self.call("sketch_dimension", args) {
                 Ok(r) => {
