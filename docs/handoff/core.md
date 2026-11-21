@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-21 11:52 UTC (lead order 11-21: P0 trunk-hanger, then knife loft + infento chamfer sense, then THICKEN-DIRECT). Mac: builds + crate tests via NOSHAPE_RB_HOST=mac tools/tiers/rb.sh, single-model repros in ~/noshape-host/core-keep/models. Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-21 12:42 UTC (lead order 11-21: P0 trunk-hanger, then knife loft + infento chamfer sense, then THICKEN-DIRECT). Mac: builds + crate tests via NOSHAPE_RB_HOST=mac tools/tiers/rb.sh, single-model repros in ~/noshape-host/core-keep/models. Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
@@ -23,23 +23,20 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
 - **SPEED-VALVE-CONFIG LANDED c17f6eaab.** Impeller Delete face 2 / Extrude 4 speed PARKED (lead 11-21): from feature 29
   our impeller is a wrong model (Halter, Extrude impellerraum 38 vs 59 faces); wait for blend's cascade fix.
 - **P0 TRUNK-HANGER (lead 11-21, skasm bisect): 18354ec79's region dedupe broke c2-genesis-trunk-hanger's Sweep 1**
-  (profiles A, B, A; live sweeps A twice; 20 -> 12/73). Fixed forward (queued 11-21 ~11:55 from core-cache): picked_regions
-  as before, EvalCtx::distinct_regions only for Extrude (impeller Extrude 4 keeps its speed-up). skasm on the Mac:
-  18354ec79 + fix = 20/73. Main is still 12/73 (same Sweep 1 100/200/100 vs live 73/152/80, Mac and vibex7): a SECOND
-  cause landed between 18354ec79 and ~10:00 (vibex7 main 12/73 at 10:00). Bisecting in core-th on vibex7 with the fix
-  cherry-picked (/root/core-scratch/bis-run.sh <commits>; candidates a111a35f7, 9612b4685, f3f4d2334, a9c26c41c,
-  c62392284, c17f6eaab).
-- **STD-3132 LANDED 8631c5717** (skasm told).
-- **KNIFEHANDLE-LOFT1 + INFENTO-CHAMFER-SENSE (core-bis2, branch core-thd, 2 commits, not queued):**
-  k::loft_guided_multi (loft_guided.cpp: stations by chord length between profile centres, guides mapped by monotone
-  cubic, columns interpolated, Hermite tents across the guides, u-periodic grid fit, seam through guide 0, the end loop
-  split at the other guides): Handle 1/2/3 as live, area -0.42 %. Suite pair vibex7: every document's count unchanged
-  (1880/2327 both). But knifehandle now builds Loft 1 / Mutual trim 1 / Boolean 1 / Fillet 1 (base failed them in 2 ms)
-  and they are still wrong: Mutual trim 1's Surface 2 1/5/4 (live 1/1/0), Boolean 1 a sheet (live solid), Fillet 1
-  ERROR after 3 s -> doc 0.7 -> 3.8 s on the Mac. Grid halved (12 per guide x 24 rows, same area, Mutual trim 338 ->
-  180 ms, uncommitted in core-bis2). NOT landing the loft until Mutual trim / Boolean 1 are right (no 3 s regression).
-  Chamfer (blend_edge_senses, live core/infento-chamfer-sense-1121.json) lands alone once asm-infento-subs (queued in
-  vibex7's slot) shows Linear pattern 1 at +y.
+  (profiles A, B, A; live sweeps A twice; 20 -> 12/73). First cause fixed: LANDED c30ff0e4 (picked_regions as before,
+  EvalCtx::distinct_regions only for Extrude). A SECOND cause landed after 9612b4685 (9612b4685 + fix = 20/73 on vibex7;
+  main 12/73, Sweep 1 100/200/100 vs live 73/152/80). Left: f3f4d2334, a9c26c41c, c62392284, c17f6eaab, 43dc96575,
+  89b884427, 7d1b596f9. Bisect in core-th on vibex7 (/root/core-scratch/bis-run.sh <commits> -> bis.out).
+- **INFENTO-CHAMFER-SENSE: queued alone 11-21 (blend_edge_senses + kernel_robustness test).** asm-infento-subs on the Mac
+  with it: 157/167, no a3f7a1 feature differences (Extrude 3 / Chamfer 3 OK).
+- **KNIFEHANDLE-LOFT1 (core-bis2, branch core-thd, not queued):** k::loft_guided_multi (loft_guided.cpp): Handle 1/2/3 as
+  live, area -0.42 %; grid 12 per guide x 24 rows (Mutual trim 338 -> 180 ms). Loft must not land before Mutual trim /
+  Boolean 1 / Fillet 1 are right (now they build and fail: doc 0.7 -> 3.8 s on the Mac). Live normals
+  (live/core/q-knifehandle-normals-1121): Mutual trim keeps qSplitBy's BACK side on both bodies; live's Handle faces
+  OUTWARD (+z top, +y side; its profiles' loops run either way), Surface 2 = profile tangent x path (-x). Ours: Handle
+  faced inward. In core-bis2 (uncommitted): the loft face turned outward from the ring centre; mutual_trim keeps the
+  groups behind the other set (behind_of: sample points whose foot is inside a tool face, nearest the cut), larger-side
+  fallback. Checking on the 4 mutual-trim docs (Mac .kmt3.sh; workshop-mutualtrim must stay 8/8).
 - **THICKEN-DIRECT next:** core-bis2's .thv.sh (vibex7) dumps every thicken input of the 20 thicken docs
   (NOSHAPE_DUMP_ONLY=thicken) into ~/agents/core-keep/thdump/<doc>; then the direct builder (offset faces trimmed at
   concave sharp edges, ruled walls, sewn; OCCT fallback; same faces/edges/volume as OCCT on every dump).
