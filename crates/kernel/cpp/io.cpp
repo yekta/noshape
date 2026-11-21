@@ -15,6 +15,7 @@
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <ShapeFix_Shape.hxx>
+#include <ShapeUpgrade_ShapeDivideAngle.hxx>
 #include <ShapeUpgrade_ShapeDivideClosed.hxx>
 #include <BRepTools_ReShape.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
@@ -2150,11 +2151,13 @@ std::vector<occ::handle<IGESData_IGESEntity>> name_iges_solids(IGESControl_Write
 
 // The parts to an IGES writer in BRep mode, each with its long splines cut
 // to the parts its edges use; the shapes written.
-// Compatibility mode as live's (live-opt-compat.igs: 128 / 126 / 102 only, a closed face in halves): every surface
-// and curve a B-spline.
+// Compatibility mode as live's (live-opt-compat.igs: 128 / 126 / 102 only, no face of revolution over 180 degrees,
+// a closed face in halves): every surface and curve a B-spline.
 TopoDS_Shape iges_compat_shape(const TopoDS_Shape& in)
 {
-  ShapeUpgrade_ShapeDivideClosed d(BRepBuilderAPI_Copy(in, true, false).Shape());
+  ShapeUpgrade_ShapeDivideAngle a(M_PI, BRepBuilderAPI_Copy(in, true, false).Shape());
+  a.Perform();
+  ShapeUpgrade_ShapeDivideClosed d(a.Result());
   d.SetNbSplitPoints(1);
   d.Perform();
   const TopoDS_Shape split = d.Result();

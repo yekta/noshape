@@ -628,8 +628,8 @@ fn iges_header() {
 }
 
 /// IGES "Use compatibility mode for surfaces and curves" (live exchange batch 1, 11-20): each face a Trimmed Surface
-/// (144), no Manifold Solid (186), every surface and curve a B-spline (128 / 126 / 102, a closed face in halves: live
-/// c2-housing-draft's live-opt-compat.igs); its faces read back sewn into the solid, as live imports them.
+/// (144), no Manifold Solid (186), every surface and curve a B-spline (128 / 126 / 102, no face of revolution over 180
+/// degrees: live c2-housing-draft's live-opt-compat.igs); its faces read back sewn into the solid, as live imports them.
 #[test]
 fn iges_compatibility_mode_reads_back_as_a_solid() {
     let dir = std::env::temp_dir().join(format!("noshape-igs-compat-{}", std::process::id()));
@@ -637,7 +637,9 @@ fn iges_compatibility_mode_reads_back_as_a_solid() {
     let block = (make_box(&Plane::xy(), 0.04, 0.03, 0.01).unwrap(), 6, 1.2e-5);
     // Its side in halves, and the two caps.
     let cylinder = (make_cylinder(&Plane::xy(), 0.01, 0.02, std::f64::consts::TAU).unwrap(), 4, std::f64::consts::PI * 1e-4 * 0.02);
-    for (i, (s, faces, want)) in [block, cylinder].into_iter().enumerate() {
+    // A 270-degree wedge: its side in two (no face of revolution over 180 degrees), two caps, two flat sides.
+    let wedge = (make_cylinder(&Plane::xy(), 0.01, 0.02, 1.5 * std::f64::consts::PI).unwrap(), 6, 0.75 * std::f64::consts::PI * 1e-4 * 0.02);
+    for (i, (s, faces, want)) in [block, cylinder, wedge].into_iter().enumerate() {
         let path = dir.join(format!("compat-{i}.igs"));
         write_iges_parts_as(&path, &[ExportShape { shape: s, name: None, color: None }], LengthUnit::Meter, true).unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
