@@ -1387,9 +1387,6 @@ fn chamfer_in(ev: &mut EvalCtx) -> FResult<()> {
             }
             None => (res.shape, face_names),
         };
-        // (Where the edges can't be turned round, or turned they break the body, it stays as built: cf-surface-pattern's
-        // Chamfer 2 failed.)
-        let shape = blend_edge_senses(&shape, &face_names, ev.feature).ok().flatten().filter(|s| s.is_valid()).unwrap_or(shape);
         ev.replace_body(bi, shape, face_names);
     }
     // Never an empty body: a chamfer far larger than its part can take every face, which live fails.
@@ -1397,32 +1394,6 @@ fn chamfer_in(ev: &mut EvalCtx) -> FResult<()> {
         return err("Failed to chamfer selections.");
     }
     Ok(())
-}
-
-/// The edges between `feature`'s blend faces and the faces they meet running as those faces' loops run them, against
-/// the blend face's (live core infento-chamfer-sense-1121: the chamfer of a hole's rim turns the end face's edge round,
-/// a pattern along it goes +y; the hole face's edge keeps its way).
-/// None where none needs turning.
-fn blend_edge_senses(shape: &Shape, faces: &[Name], feature: crate::reference::FeatureId) -> FResult<Option<Shape>> {
-    use crate::reference::TopoName;
-    let ours = |f: u32| faces.get(f as usize).is_some_and(|n| matches!(&**n, TopoName::Face { feature: g, role: Role::Blend(_) } if *g == feature));
-    let (all, edges) = (shape.faces(), shape.edges());
-    let mut flip = Vec::new();
-    for (e, fs) in shape.edge_faces()?.iter().enumerate() {
-        let &[a, b] = fs.as_slice() else { continue };
-        let neighbour = match (ours(a), ours(b)) {
-            (true, false) => b,
-            (false, true) => a,
-            _ => continue,
-        };
-        if all[neighbour as usize].edge_orientation_in(&edges[e])? == k::Orientation::Reversed {
-            flip.push(edges[e].clone());
-        }
-    }
-    if flip.is_empty() {
-        return Ok(None);
-    }
-    Ok(Some(k::reverse_edge_curves(shape, &flip)?))
 }
 
 /// A chamfer OCCT reads otherwise than Onshape (see `blend_section::ChamferSides`) as two distances, where its edges' sections are

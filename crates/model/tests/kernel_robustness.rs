@@ -1083,38 +1083,6 @@ fn chamfer_distance_one_face_matches_onshape() {
     assert!((v - 7164.336354145117).abs() < 1e-6, "(i) {v}");
 }
 
-/// A chamfer's new edges run as the faces they bound run them, against the chamfer face (live core
-/// infento-chamfer-sense-1121: the end face of a ring with a hole chamfered 0.5 mm; the end face's new hole edge runs
-/// the other way to the edge it replaced, the hole wall's as before; a pattern along it goes that way). Here a 40 mm
-/// block 20 high with a 10 mm square hole, its top face chamfered.
-#[test]
-fn chamfer_edges_run_as_the_faces_they_bound() {
-    let mut t = T::new();
-    t.block(40.0, 40.0, 20.0);
-    let (_, hole) = t.sketch(&[&[(15.0, 15.0), (25.0, 15.0), (25.0, 25.0), (15.0, 25.0)]], &[]);
-    t.add("extrude", &[("entities", q(hole)), ("endBound", en("THROUGH_ALL")), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true))]);
-    let top = t.faces_where(|c| (c.z - 20.0).abs() < 1e-6);
-    let f = t.add("chamfer", &[("entities", q(top)), ("chamferType", en("EQUAL_OFFSETS")), ("width", e("0.5 mm"))]);
-    let r = t.ok(f);
-    let edges = r.context.bodies[0].shape.edges();
-    let way = |y: f64, z: f64| -> f64 {
-        let mut found = edges.iter().filter_map(|x| x.edge_info().ok()).filter(|i| {
-            let m = (i.start + i.end) * 0.5e3;
-            (m.x - 20.0).abs() < 1e-6 && (m.y - y).abs() < 1e-6 && (m.z - z).abs() < 1e-6
-        });
-        let i = found.next().unwrap_or_else(|| panic!("no edge at y {y} z {z}"));
-        (i.end.x - i.start.x).signum()
-    };
-    // The top face: its outer loop counter-clockwise from above, the hole's clockwise.
-    assert_eq!(way(0.5, 20.0), 1.0, "top face, front rim");
-    assert_eq!(way(25.5, 20.0), 1.0, "top face, hole's far edge");
-    assert_eq!(way(14.5, 20.0), -1.0, "top face, hole's near edge");
-    // The walls' new top edges as each wall's loop runs them.
-    assert_eq!(way(0.0, 19.5), -1.0, "front wall");
-    assert_eq!(way(25.0, 19.5), -1.0, "hole's far wall");
-    assert_eq!(way(15.0, 19.5), 1.0, "hole's near wall");
-}
-
 /// Live G46 (qa4 F8/F9): a 50 × 30 × 30 block, R3 fillets on the two top
 /// edges meeting at (50, 0, 30), a chamfer on the vertical edge between them,
 /// then Shell with the top removed; and the same with the chamfer first.
