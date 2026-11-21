@@ -1,18 +1,22 @@
 {
  "scenario": "doc-tab-menu-change-to-version",
- "recorded": "2026-11-13T19:28:17.369Z",
+ "recorded": "2026-11-21T21:13:00.752Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-13.1"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "f2edf1facf11ae4db88b48e4",
-  "start": "block-drawing",
-  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "document": "2e94f3333016d9a7cf830df7",
+  "workspace": "654f12e42cb85764f4ce7861",
+  "element": "36c6f0cf596a5f0c2d32eb05",
+  "start": "block-v1-drawing",
+  "startElement": "36c6f0cf596a5f0c2d32eb05",
   "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
@@ -94,8 +98,49 @@
     }
    ],
    "annotations": [],
-   "selection": []
-  }
+   "selection": [],
+   "viewport": {
+    "sheet_px": [
+     378,
+     113,
+     1580,
+     1042
+    ],
+    "sheet_mm": [
+     279.4,
+     215.9
+    ],
+    "mmPerPixel": 0.23245
+   }
+  },
+  "document": {
+   "workspace": "Main",
+   "history": null,
+   "compare": null,
+   "tabs": [
+    {
+     "name": "Part Studio 1",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part 1 Drawing 1",
+     "kind": "drawing",
+     "active": true
+    },
+    {
+     "name": "Assembly 1",
+     "kind": "assembly",
+     "active": false
+    }
+   ],
+   "folder": null,
+   "renaming": null,
+   "panel": null,
+   "switcher": null
+  },
+  "variables": null,
+  "featurestudio": null
  },
  "steps": [
   {
@@ -108,7 +153,7 @@
    },
    "ok": true,
    "at": [
-    775,
+    381,
     1063
    ],
    "state": {
@@ -131,7 +176,7 @@
       "Select as document thumbnail",
       "Move to document…",
       "Export…",
-      "Release…"
+      "Create task…"
      ],
      "highlighted": null,
      "disabled": []
@@ -206,10 +251,51 @@
       }
      ],
      "annotations": [],
-     "selection": []
-    }
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
    },
-   "t": 227480
+   "t": 209997
   },
   {
    "step": 2,
@@ -221,47 +307,49 @@
    },
    "ok": true,
    "at": [
-    807,
-    945
+    385,
+    947
    ],
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": {
-     "kind": "panel",
      "title": "Reference manager",
-     "text": [
-      "Update to latest",
-      "Selective update",
-      "Newer versions available for 0 documents",
-      "[ ] ",
-      "noshape ui parity live2-1",
-      "Main",
-      "⇨",
-      "Start",
-      "Update selected"
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Update to latest",
+       "selected": true
+      },
+      {
+       "label": "Selective update",
+       "selected": false
+      }
      ],
      "fields": [
       {
-       "label": null,
-       "kind": "checkbox",
-       "value": false
+       "label": "Newer versions available for 1 document",
+       "kind": "text",
+       "text": ""
+      },
+      {
+       "label": "live2 uip block-v1-drawing 2026-11-21T21:09:46",
+       "kind": "string",
+       "text": "Main ⇨ V1"
       }
-     ]
+     ],
+     "error": null,
+     "ok": "enabled",
+     "okLabel": "Update all"
     },
     "dialogs": [],
     "panels": [
      {
       "id": "external-reference-update-dialog",
       "title": "Reference manager",
-      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 0 documents / noshape ui parity live2-1 / Main / ⇨ / Start / Update selected",
-      "inputs": [
-       {
-        "placeholder": null,
-        "value": false
-       }
-      ]
+      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 1 document / live2 uip block-v1-drawing 2026-11-21T21:09:46 / Main / ⇨ / V1 / Update all",
+      "inputs": []
      }
     ],
     "list": null,
@@ -335,10 +423,51 @@
       }
      ],
      "annotations": [],
-     "selection": []
-    }
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       238,
+       113,
+       1580,
+       959
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.2082
+     }
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
    },
-   "t": 253811
+   "t": 238909
   },
   {
    "step": 3,
@@ -349,8 +478,8 @@
    "ok": true,
    "pointer": {
     "at": [
-     806,
-     945
+     384,
+     947
     ],
     "hover": [],
     "element": "iframe.foreign-data-container"
@@ -434,10 +563,51 @@
       }
      ],
      "annotations": [],
-     "selection": []
-    }
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
    },
-   "t": 279578
+   "t": 265677
   }
  ]
 }
