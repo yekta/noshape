@@ -3964,6 +3964,33 @@ fn fit_spline_with_only_an_end_direction_starts_free() {
     assert!(near(poles(1.0)) || near(poles(-1.0)), "{:?}", b.poles);
 }
 
+/// A fit spline with both end directions takes std's derivatives at both ends: the magnitude times the points' box
+/// diagonal on [0, 1] (c2-surf-intro-boundary's 3D fit spline 1 bulged to x 32.70 under OCCT's interpolation, live
+/// 33.94, and Boundary surface 1 failed).
+#[test]
+fn fit_spline_with_both_end_directions_as_std() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts = [DVec2::new(0.0, 0.0), DVec2::new(0.04, 0.02)].map(|p| sk.add_point(p));
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let se = |e: u32| Reference::SketchEntity { sketch: sid, entity: e };
+    s.add("fitSpline", |p| {
+        p.set("vertices", ParamValue::Query(pts.iter().map(|p| se(p.0)).collect()));
+        p.set("startDirection", q(Reference::Plane(DatumPlane::Right)));
+        p.set("endDirection", q(Reference::Plane(DatumPlane::Front)));
+    });
+    let r = s.ok();
+    let edges: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Wire).flat_map(|b| b.shape.edges()).collect();
+    let [e] = edges.as_slice() else { panic!("one edge: {}", edges.len()) };
+    let b = e.edge_bspline().unwrap();
+    // The Hermite cubic from a to d: derivatives ±X and ±Y times the box diagonal, so poles a + d0 / 3 and d - d1 / 3.
+    let (a, d) = (DVec3::ZERO, DVec3::new(0.04, 0.02, 0.0));
+    let span = 0.04f64.hypot(0.02);
+    let fits = |q: [DVec3; 4]| b.degree == 3 && b.poles.len() == 4 && b.poles.iter().zip(q).all(|(p, q)| p.distance(q) < 1e-9);
+    let ok = [1.0, -1.0].iter().any(|&sx| [1.0, -1.0].iter().any(|&sy| fits([a, a + DVec3::X * sx * span / 3.0, d - DVec3::Y * sy * span / 3.0, d])));
+    assert!(ok, "{:?}", b.poles);
+}
+
 /// A fit spline through two vertices with no end directions is a line, as live's (its edge reads LINE: asm-rack-pinion's
 /// Transform 1 turns a gear about one; a spline of ours there read as another straight edge).
 #[test]

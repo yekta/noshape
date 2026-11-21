@@ -311,7 +311,6 @@ pub fn fit_spline(ev: &mut EvalCtx) -> FResult<()> {
         if pts.len() < 2 {
             return crate::regen::eval::err_at(&["vertices"], "Select at least two vertices to make a spline.");
         }
-        let mut tangents = Vec::new();
         if !closed {
             // The picked direction and the magnitude, negated by its flip (std).
             // std: an edge's magnitude is scaled by the points' summed square-root spacing over its end segment's.
@@ -355,29 +354,20 @@ pub fn fit_spline(ev: &mut EvalCtx) -> FResult<()> {
                 let direction = if back { -d } else { d };
                 ev.manipulators.push((key.into(), crate::display::FeatureManipulator::Linear { base: at, direction, offset: m * span / 3.0, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, tangential: false, primary: Some(primary.into()) }));
             }
-            // One end's direction only: that end's derivative (std's magnitude times the points' box diagonal), the
-            // other end natural (live's 3D fit spline 2 of c2-surf-intro-examples, 171.648 mm; OCCT's interpolation
-            // gave the free end a zero derivative, 170.589 mm).
-            if s.is_some() != e.is_some() {
+            // Each end with a direction takes std's derivative (the magnitude times the points' box diagonal) at the
+            // centripetal parameters on [0, 1], an end without one natural (live's 3D fit spline 2 of
+            // c2-surf-intro-examples, 171.648 mm; OCCT's interpolation gave the free end a zero derivative, 170.589 mm,
+            // and with both ends bulged: c2-surf-intro-boundary's 3D fit spline 1 reached x 32.70, live 33.94).
+            if s.is_some() || e.is_some() {
                 let at = |c: Option<(DVec3, f64, f64)>| c.map(|(d, m, k)| d * m * k * span);
                 return add_wire_bodies(ev, vec![k::make_wire(&[fit_spline_edge(&pts, at(s), at(e))?])?]);
             }
-            if s.is_some() || e.is_some() {
-                let mut t = vec![DVec3::ZERO; pts.len()];
-                t[0] = s.map_or(DVec3::ZERO, |(d, m, k)| d * m * k);
-                if let Some(last) = t.last_mut() {
-                    *last = e.map_or(DVec3::ZERO, |(d, m, k)| d * m * k);
-                }
-                tangents = t;
-            }
         }
         // Two vertices and no end directions: a line, as live's (asm-rack-pinion's Transform axis through two points).
-        if let [a, b] = pts.as_slice()
-            && tangents.is_empty()
-        {
+        if let [a, b] = pts.as_slice() {
             k::make_line(*a, *b)?
         } else {
-            k::make_interpolated_spline(&pts, &tangents, closed)?
+            k::make_interpolated_spline(&pts, &[], closed)?
         }
     };
     add_wire_bodies(ev, vec![k::make_wire(&[edge])?])
