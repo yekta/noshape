@@ -86,13 +86,17 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   and 9 (59/171/114, 69/199/132, 72/210/140, 93/283/186 at feature 38, all valid) become empty shapes (0/0/0, valid false) and stay so
   through feature 51 "Finish sheet metal model 1" (the lead's F50/51 are the tail of it). Live after Foot Offset: 20 parts, ours 11
   ("Outside Post" 69/198/130 vs live 20/52/32, 4095 vs 147310 mm³).
-- [x] P1 **VALID-LORA-BATTERY-REMOVE (core)**: fixed 11-21 (core, "no invalid bodies from Battery Remove's unify..."): op_unify keeps the cut as it came when a face it merged is invalid; doc 0 invalid bodies (feature 16 region mapping still differs). Was: c2-lora-enclosure-ribs, first invalid at feature 41 "Battery Remove" (extrude remove):
+- [x] verified (qa 11-21 05:4x, green 3bbeb6096 release parity_models with NOSHAPE_PARITY_VALIDITY=1 on vibex8, qa-scratch/valid/core1121/pm.log): 0 invalid bodies over all 46 features. P1 **VALID-LORA-BATTERY-REMOVE (core)**: fixed 11-21 (core, "no invalid bodies from Battery Remove's unify..."): op_unify keeps the cut as it came when a face it merged is invalid; doc 0 invalid bodies (feature 16 region mapping still differs). Was: c2-lora-enclosure-ribs, first invalid at feature 41 "Battery Remove" (extrude remove):
   "Base" not a valid solid (raw 170/451/278; named 170/436/257 vs live 185/468/281, 13559.99 vs 13690.61 mm³), still invalid at 42.
   Also 6 parts vs live 2 there (Parts 3-6, 5/9/6, 7.6 mm³ each, not in live).
-- [x] P1 **VALID-SURFLOFTS-BOUNDARY-SURFACE (core)**: fixed 11-21 (core, same commit): two U curves meeting + one V = a 3-sided Coons, an invalid fill fails as live; doc 0 invalid (Curves 7 / 8 lines vs live other: still open). Was: c2-surfaces-lofts-projected, first invalid at feature 39 "Boundary surface 1":
+- [ ] P1 **VALID-SURFLOFTS-LOFT1 (core)**: c2-surfaces-lofts-projected's Loft 1 (feature 8) makes Surface 1 an invalid body
+  (OCCT's shape check), and it stays invalid through the last feature (37 of 45 features hold it). Ours is 1 face / 3 edges /
+  2 vertices, live's 1 / 4 / 4. Found while verifying VALID-SURFLOFTS-BOUNDARY-SURFACE, (qa 11-21 05:4x, green 3bbeb6096 release parity_models with NOSHAPE_PARITY_VALIDITY=1 on vibex8, qa-scratch/valid/core1121/pm.log). Wanted: Loft 1 as live's
+  4-edge sheet, valid.
+- [x] verified for Boundary surface 1 (qa 11-21 05:4x, green 3bbeb6096 release parity_models with NOSHAPE_PARITY_VALIDITY=1 on vibex8, qa-scratch/valid/core1121/pm.log): it no longer makes an invalid body; the doc still has one, see VALID-SURFLOFTS-LOFT1. P1 **VALID-SURFLOFTS-BOUNDARY-SURFACE (core)**: fixed 11-21 (core, same commit): two U curves meeting + one V = a 3-sided Coons, an invalid fill fails as live; doc 0 invalid (Curves 7 / 8 lines vs live other: still open). Was: c2-surfaces-lofts-projected, first invalid at feature 39 "Boundary surface 1":
   "Surface 4" invalid, raw 1 face bounded by 1 edge with 2 vertices (named 1/4/4 vs live 1/3/3, area 68.07 vs 259.97 mm²), invalid
   through feature 44 "Thicken 3"; Curves 7 / 8 there are lines where live's are other curves, in another place.
-- [x] P1 **VALID-WRAP-TEXT-WRAP1 (core)**: fixed 11-21 (core, same commit): wrapped curves at the wrap's tolerance, walls from the target's surface: Wrap 1 = live 119/320/212, 282776.39 mm³, valid (edge types: 6 lines vs live other). Was: c2-wrap-text-cylinders, first invalid at feature 4 "Wrap 1": Part 1 not a valid solid
+- [x] verified (qa 11-21 05:4x, green 3bbeb6096 release parity_models with NOSHAPE_PARITY_VALIDITY=1 on vibex8, qa-scratch/valid/core1121/pm.log): 0 invalid bodies over all 10 features. P1 **VALID-WRAP-TEXT-WRAP1 (core)**: fixed 11-21 (core, same commit): wrapped curves at the wrap's tolerance, walls from the target's surface: Wrap 1 = live 119/320/212, 282776.39 mm³, valid (edge types: 6 lines vs live other). Was: c2-wrap-text-cylinders, first invalid at feature 4 "Wrap 1": Part 1 not a valid solid
   (64/164/108 vs live 119/320/212; 282764.74 vs 282776.39 mm³), invalid through feature 9 "Boolean 1" (raw 304/784/533).
 
 ## dx, 2026-11-20
