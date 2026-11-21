@@ -1023,7 +1023,7 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
                         std::fs::write(path, obj_and_mtl(&meshes, &stem).0)?;
                     }
                 }
-                PartFormat::Gltf | PartFormat::Glb => std::fs::write(path, gltf(&meshes, f == PartFormat::Glb, s.compress)?)?,
+                PartFormat::Gltf | PartFormat::Glb => std::fs::write(path, gltf(&meshes, &parts.iter().zip(&meshes).map(|(p, m)| face_uvs(&p.1, &m.1)).collect::<Vec<_>>(), f == PartFormat::Glb, s.compress)?)?,
                 _ => std::fs::write(path, three_mf(&meshes))?,
             }
         }
@@ -1032,75 +1032,98 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
     Ok(())
 }
 
-/// glTF 2.0: one mesh node per part (positions, normals, indices) with its
-/// colour as a PBR material; `.glb` packs JSON and buffer into one file,
-/// `.gltf` embeds the buffer as a data URI. `compress`: each mesh a Draco
-/// buffer (KHR_draco_mesh_compression), as live's Compress.
-fn gltf(meshes: &[(String, k::Tessellation, [f32; 4])], binary: bool, compress: bool) -> anyhow::Result<Vec<u8>> {
+/// glTF 2.0 as live's: a node and mesh per part, a primitive per face (positions, normals, the face's (u, v) scaled to
+/// 0..1, indices), a double-sided material per colour named by its components; `.glb` packs JSON and buffer into one
+/// file, `.gltf` embeds the buffer as a data URI. `compress`: each primitive a Draco buffer
+/// (KHR_draco_mesh_compression), as live's Compress.
+fn gltf(meshes: &[(String, k::Tessellation, [f32; 4])], uvs: &[Vec<[f32; 2]>], binary: bool, compress: bool) -> anyhow::Result<Vec<u8>> {
+    fn bounds<const N: usize>(values: &[[f32; N]]) -> ([f32; N], [f32; N]) {
+        values.iter().fold(([f32::MAX; N], [f32::MIN; N]), |(lo, hi), p| (std::array::from_fn(|k| lo[k].min(p[k])), std::array::from_fn(|k| hi[k].max(p[k]))))
+    }
     let mut buf: Vec<u8> = Vec::new();
-    let (mut views, mut accessors, mut materials, mut gmeshes, mut nodes) = (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    let (mut views, mut accessors, mut materials, mut gmeshes, mut nodes) = (Vec::new(), Vec::new(), Vec::<serde_json::Value>::new(), Vec::new(), Vec::new());
+    let mut primitives_so_far = 0;
     for (i, (name, m, c)) in meshes.iter().enumerate() {
-        let (mut lo, mut hi) = ([f32::MAX; 3], [f32::MIN; 3]);
-        for p in &m.positions {
-            for k in 0..3 {
-                lo[k] = lo[k].min(p[k]);
-                hi[k] = hi[k].max(p[k]);
+        let srgb = |v: f32| f32::from(crate::appearance::lin_to_srgb(v)) / 255.0;
+        let rgb = [srgb(c[0]), srgb(c[1]), srgb(c[2])];
+        let material_name = format!("{:.6}_{:.6}_{:.6}_0.000000_0.000000", rgb[0], rgb[1], rgb[2]);
+        let material = materials.iter().position(|x| x["name"] == material_name.as_str()).unwrap_or_else(|| {
+            materials.push(serde_json::json!({"doubleSided": true, "name": material_name, "pbrMetallicRoughness": {"baseColorFactor": [rgb[0], rgb[1], rgb[2], c[3]], "metallicFactor": 0.0}}));
+            materials.len() - 1
+        });
+        let mesh_name = format!("mesh{primitives_so_far}_mesh");
+        let mut primitives = Vec::new();
+        for r in m.faces.iter().filter(|r| r.index_count > 0) {
+            let at = format!("mesh{primitives_so_far}");
+            primitives_so_far += 1;
+            let vs = r.first_vertex as usize..(r.first_vertex + r.vertex_count) as usize;
+            let (pos, nor) = (&m.positions[vs.clone()], &m.normals[vs.clone()]);
+            let tex = uvs.get(i).and_then(|u| u.get(vs.clone())).map_or_else(|| vec![[0.0; 2]; pos.len()], <[_]>::to_vec);
+            let idx: Vec<u32> = m.indices[r.first_index as usize..(r.first_index + r.index_count) as usize].iter().map(|v| v - r.first_vertex).collect();
+            let mut push = |bytes: &[u8], view_name: Option<(&str, u32)>| {
+                while !buf.len().is_multiple_of(4) {
+                    buf.push(0);
+                }
+                let mut view = serde_json::json!({"buffer": 0, "byteLength": bytes.len(), "byteOffset": buf.len()});
+                buf.extend_from_slice(bytes);
+                // (A Draco buffer's view has no name or target.)
+                if let Some((kind, target)) = view_name {
+                    (view["name"], view["target"]) = (format!("{at}_{kind}_bufferView").into(), target.into());
+                }
+                views.push(view);
+                views.len() - 1
+            };
+            let a0 = accessors.len();
+            let mut primitive = serde_json::json!({"attributes": {"NORMAL": a0 + 1, "POSITION": a0, "TEXCOORD_0": a0 + 2}, "indices": a0 + 3, "material": material});
+            let ((plo, phi), (nlo, nhi), (tlo, thi)) = (bounds(pos), bounds(nor), bounds(&tex));
+            let imax = idx.iter().copied().max().unwrap_or(0);
+            let mut list = [
+                serde_json::json!({"componentType": 5126, "count": pos.len(), "max": phi, "min": plo, "name": format!("{at}_coord_accessor"), "type": "VEC3"}),
+                serde_json::json!({"componentType": 5126, "count": nor.len(), "max": nhi, "min": nlo, "name": format!("{at}_norm_accessor"), "type": "VEC3"}),
+                serde_json::json!({"componentType": 5126, "count": tex.len(), "max": thi, "min": tlo, "name": format!("{at}_texcoord_accessor"), "type": "VEC2"}),
+                serde_json::json!({"componentType": 5125, "count": idx.len(), "max": [imax], "min": [0], "name": format!("{at}_idx_accessor"), "type": "SCALAR"}),
+            ];
+            if compress {
+                // The accessors hold the decoded counts and no data (KHR_draco_mesh_compression).
+                let (data, points, ids) = draco_mesh(pos, nor, &tex, &idx)?;
+                let view = push(&data, None);
+                for a in &mut list[..3] {
+                    a["count"] = points.into();
+                }
+                primitive["extensions"] = serde_json::json!({"KHR_draco_mesh_compression": {"attributes": {"NORMAL": ids[1], "POSITION": ids[0], "TEXCOORD_0": ids[2]}, "bufferView": view}});
+            } else {
+                let bytes = |v: &mut dyn Iterator<Item = f32>| v.flat_map(f32::to_le_bytes).collect::<Vec<u8>>();
+                let vp = push(&bytes(&mut pos.iter().flatten().copied()), Some(("coord", 34962)));
+                let vn = push(&bytes(&mut nor.iter().flatten().copied()), Some(("norm", 34962)));
+                let vt = push(&bytes(&mut tex.iter().flatten().copied()), Some(("texcoord", 34962)));
+                let vi = push(&idx.iter().flat_map(|v| v.to_le_bytes()).collect::<Vec<u8>>(), Some(("idx", 34963)));
+                for (a, v) in list.iter_mut().zip([vp, vn, vt, vi]) {
+                    a["bufferView"] = v.into();
+                }
             }
+            accessors.extend(list);
+            primitives.push(primitive);
         }
-        // (A Draco buffer's view has no target.)
-        let mut push = |bytes: &[u8], target: Option<u32>| {
-            while !buf.len().is_multiple_of(4) {
-                buf.push(0);
-            }
-            let off = buf.len();
-            buf.extend_from_slice(bytes);
-            let mut view = serde_json::json!({"buffer": 0, "byteOffset": off, "byteLength": bytes.len()});
-            if let Some(target) = target {
-                view["target"] = target.into();
-            }
-            views.push(view);
-            views.len() - 1
-        };
-        let a0 = accessors.len();
-        let mut primitive = serde_json::json!({"attributes": {"POSITION": a0, "NORMAL": a0 + 1}, "indices": a0 + 2, "material": i});
-        if compress {
-            // The accessors hold the decoded counts and no data (KHR_draco_mesh_compression).
-            let (data, points, ids) = draco_mesh(m)?;
-            let view = push(&data, None);
-            accessors.push(serde_json::json!({"componentType": 5126, "count": points, "type": "VEC3", "min": lo, "max": hi}));
-            accessors.push(serde_json::json!({"componentType": 5126, "count": points, "type": "VEC3"}));
-            accessors.push(serde_json::json!({"componentType": 5125, "count": m.indices.len(), "type": "SCALAR"}));
-            primitive["extensions"] = serde_json::json!({"KHR_draco_mesh_compression": {"bufferView": view, "attributes": {"POSITION": ids[0], "NORMAL": ids[1]}}});
-        } else {
-            let pos: Vec<u8> = m.positions.iter().flatten().flat_map(|v| v.to_le_bytes()).collect();
-            let nor: Vec<u8> = m.normals.iter().flatten().flat_map(|v| v.to_le_bytes()).collect();
-            let idx: Vec<u8> = m.indices.iter().flat_map(|v| v.to_le_bytes()).collect();
-            let (vp, vn, vi) = (push(&pos, Some(34962)), push(&nor, Some(34962)), push(&idx, Some(34963)));
-            accessors.push(serde_json::json!({"bufferView": vp, "componentType": 5126, "count": m.positions.len(), "type": "VEC3", "min": lo, "max": hi}));
-            accessors.push(serde_json::json!({"bufferView": vn, "componentType": 5126, "count": m.normals.len(), "type": "VEC3"}));
-            accessors.push(serde_json::json!({"bufferView": vi, "componentType": 5125, "count": m.indices.len(), "type": "SCALAR"}));
-        }
-        materials.push(serde_json::json!({"name": name, "pbrMetallicRoughness": {"baseColorFactor": c, "metallicFactor": 0.0, "roughnessFactor": 0.5}}));
-        gmeshes.push(serde_json::json!({"name": name, "primitives": [primitive]}));
-        nodes.push(serde_json::json!({"name": name, "mesh": i}));
+        gmeshes.push(serde_json::json!({"name": mesh_name, "primitives": primitives}));
+        nodes.push(serde_json::json!({"mesh": i, "name": name}));
     }
     while !buf.len().is_multiple_of(4) {
         buf.push(0);
     }
-    let mut buffer = serde_json::json!({"byteLength": buf.len()});
+    let mut buffer = serde_json::json!({"byteLength": buf.len(), "name": "Total_buffer"});
     if !binary {
         buffer["uri"] = serde_json::Value::String(format!("data:application/octet-stream;base64,{}", base64(&buf)));
     }
     let mut doc = serde_json::json!({
-        "asset": {"version": "2.0", "generator": "Noshape"},
-        "scene": 0,
-        "scenes": [{"nodes": (0..nodes.len()).collect::<Vec<_>>()}],
-        "nodes": nodes,
-        "meshes": gmeshes,
-        "materials": materials,
         "accessors": accessors,
+        "asset": {"generator": "Noshape", "version": "2.0"},
         "bufferViews": views,
         "buffers": [buffer],
+        "materials": materials,
+        "meshes": gmeshes,
+        "nodes": nodes,
+        "scene": 0,
+        "scenes": [{"name": "Root", "nodes": (0..nodes.len()).collect::<Vec<_>>()}],
     });
     if compress {
         (doc["extensionsUsed"], doc["extensionsRequired"]) = (serde_json::json!(["KHR_draco_mesh_compression"]), serde_json::json!(["KHR_draco_mesh_compression"]));
@@ -1126,20 +1149,73 @@ fn gltf(meshes: &[(String, k::Tessellation, [f32; 4])], binary: bool, compress: 
     Ok(out)
 }
 
-/// A part's mesh as a Draco buffer (EdgeBreaker, unquantized, as live's): its bytes, its decoded point count and its position and
-/// normal attributes' ids.
-fn draco_mesh(m: &k::Tessellation) -> anyhow::Result<(Vec<u8>, usize, [u32; 2])> {
+/// Each vertex's face (u, v) scaled to 0..1 over its face, as live's glTF TEXCOORD_0 (none when the mesh's faces aren't
+/// the shape's).
+fn face_uvs(sh: &k::Shape, m: &k::Tessellation) -> Vec<[f32; 2]> {
+    let faces = sh.faces();
+    if faces.len() != m.faces.len() {
+        return Vec::new();
+    }
+    let mut out = vec![[0.0f32; 2]; m.positions.len()];
+    for (face, r) in faces.iter().zip(&m.faces) {
+        let vs = r.first_vertex as usize..(r.first_vertex + r.vertex_count) as usize;
+        let mut uv: Vec<[f64; 2]> = Vec::with_capacity(vs.len());
+        let mut near: Option<glam::DVec2> = None;
+        for p in &m.positions[vs.clone()] {
+            let p = glam::DVec3::new(p[0].into(), p[1].into(), p[2].into());
+            let hit = near.and_then(|seed| face.project_point_near(p, seed).ok()).or_else(|| face.project_point(p).ok());
+            let q = hit.map_or([0.0; 2], |h| [h.u, h.v]);
+            near = hit.map(|h| glam::DVec2::new(h.u, h.v));
+            uv.push(q);
+        }
+        // A closed face's seam: a triangle across it has a vertex at either end of the period; move those at the start
+        // to the end.
+        if let Ok(b) = face.uv_bounds() {
+            for (k, (lo, hi)) in [(0, (b[0], b[1])), (1, (b[2], b[3]))] {
+                if ((hi - lo) - std::f64::consts::TAU).abs() > 1e-6 {
+                    continue;
+                }
+                for t in m.indices[r.first_index as usize..(r.first_index + r.index_count) as usize].as_chunks::<3>().0 {
+                    let at = t.map(|v| (v - r.first_vertex) as usize);
+                    let (min, max) = at.iter().fold((f64::MAX, f64::MIN), |(a, b), &v| (a.min(uv[v][k]), b.max(uv[v][k])));
+                    if max - min > std::f64::consts::PI {
+                        for v in at {
+                            if uv[v][k] - lo < std::f64::consts::PI {
+                                uv[v][k] += std::f64::consts::TAU;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let (lo, hi) = uv.iter().fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), q| ([lo[0].min(q[0]), lo[1].min(q[1])], [hi[0].max(q[0]), hi[1].max(q[1])]));
+        let unit = |x: f64, k: usize| if hi[k] - lo[k] > 0.0 { ((x - lo[k]) / (hi[k] - lo[k])) as f32 } else { 0.0 };
+        for (o, q) in out[vs].iter_mut().zip(&uv) {
+            *o = [unit(q[0], 0), unit(q[1], 1)];
+        }
+    }
+    out
+}
+
+/// A face's mesh as a Draco buffer (EdgeBreaker, unquantized, as live's): its bytes, its decoded point count and its
+/// position, normal and texture-coordinate attributes' ids.
+fn draco_mesh(positions: &[[f32; 3]], normals: &[[f32; 3]], uvs: &[[f32; 2]], indices: &[u32]) -> anyhow::Result<(Vec<u8>, usize, [u32; 3])> {
     use draco_core::{DataType, GeometryAttributeType, PointAttribute, PointIndex};
     let mut mesh = draco_core::Mesh::new();
-    for (kind, values) in [(GeometryAttributeType::Position, &m.positions), (GeometryAttributeType::Normal, &m.normals)] {
+    let flat3 = |v: &[[f32; 3]]| v.iter().flatten().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>();
+    let attributes = [
+        (GeometryAttributeType::Position, 3, flat3(positions)),
+        (GeometryAttributeType::Normal, 3, flat3(normals)),
+        (GeometryAttributeType::TexCoord, 2, uvs.iter().flatten().flat_map(|x| x.to_le_bytes()).collect()),
+    ];
+    for (kind, comps, bytes) in attributes {
         let mut att = PointAttribute::new();
-        att.init(kind, 3, DataType::Float32, false, values.len());
-        let bytes: Vec<u8> = values.iter().flatten().flat_map(|v| v.to_le_bytes()).collect();
+        att.init(kind, comps, DataType::Float32, false, positions.len());
         att.buffer_mut().write(0, &bytes);
         mesh.add_attribute(att);
     }
-    mesh.set_num_points(m.positions.len());
-    for t in m.indices.as_chunks::<3>().0 {
+    mesh.set_num_points(positions.len());
+    for t in indices.as_chunks::<3>().0 {
         mesh.add_face([PointIndex(t[0]), PointIndex(t[1]), PointIndex(t[2])]);
     }
     // Lossless, as live's (its decoded values are the floats it meshed: -0.0004, -0.012).
@@ -1149,7 +1225,7 @@ fn draco_mesh(m: &k::Tessellation) -> anyhow::Result<(Vec<u8>, usize, [u32; 2])>
     let mut out = draco_core::EncoderBuffer::new();
     let info = encoder.encode_with_info(&options, &mut out).map_err(|e| anyhow::anyhow!("the mesh couldn't be compressed: {e}"))?;
     let id = |kind| info.attributes.iter().find(|a| a.attribute_type == kind).map_or(0, |a| a.unique_id);
-    Ok((out.data().to_vec(), info.num_encoded_points, [id(GeometryAttributeType::Position), id(GeometryAttributeType::Normal)]))
+    Ok((out.data().to_vec(), info.num_encoded_points, [id(GeometryAttributeType::Position), id(GeometryAttributeType::Normal), id(GeometryAttributeType::TexCoord)]))
 }
 
 /// 3MF: the core-spec package (a zip with the content types, the root

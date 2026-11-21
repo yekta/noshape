@@ -10264,6 +10264,9 @@ fn gltf_compress_writes_draco_meshes_that_import_back() {
             let bytes = std::fs::read(&file).unwrap();
             assert_eq!(String::from_utf8_lossy(&bytes).contains("KHR_draco_mesh_compression"), compress, "{format} compress {compress}");
             sizes.push(bytes.len());
+            if format == "GLB" && !compress {
+                gltf_primitive_per_face(&mut ctx, &bytes);
+            }
             let r = call(&mut ctx, "import_files", json!({ "files": [file.to_str().unwrap()], "mesh_unit": "Meter" }));
             let studio = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap_or_else(|| panic!("{r}"))["name"].as_str().unwrap().to_string();
             let q = call(&mut ctx, "query_parts", json!({ "tab": studio }));
@@ -10272,6 +10275,38 @@ fn gltf_compress_writes_draco_meshes_that_import_back() {
         }
         assert!(sizes[1] < sizes[0], "{format}: compressed {} bytes, plain {}", sizes[1], sizes[0]);
         assert!((volumes[1] - volumes[0]).abs() < 1e-9 * volumes[0], "{format}: compressed {} mm³, plain {}", volumes[1], volumes[0]);
+    }
+}
+
+/// A GLB as live's: a primitive per face, each with its face's (u, v) scaled to 0..1 as TEXCOORD_0, no triangle across
+/// the hole's seam (its u at both ends of the period).
+fn gltf_primitive_per_face(ctx: &mut Ctx, glb: &[u8]) {
+    let n = u32::from_le_bytes(glb[12..16].try_into().unwrap()) as usize;
+    let doc: Value = serde_json::from_slice(&glb[20..20 + n]).unwrap();
+    let bin = &glb[20 + n + 8..];
+    let faces = call(ctx, "query_entities", json!({ "kind": "faces" }))["faces"].as_array().unwrap().len();
+    let primitives = doc["meshes"][0]["primitives"].as_array().unwrap();
+    assert_eq!(primitives.len(), faces, "{}", doc["meshes"]);
+    let read = |a: &Value| -> Vec<f32> {
+        let view = &doc["bufferViews"][a["bufferView"].as_u64().unwrap() as usize];
+        let at = view["byteOffset"].as_u64().unwrap() as usize;
+        bin[at..at + view["byteLength"].as_u64().unwrap() as usize].as_chunks::<4>().0.iter().map(|b| f32::from_le_bytes(*b)).collect()
+    };
+    for p in primitives {
+        let uv = read(&doc["accessors"][p["attributes"]["TEXCOORD_0"].as_u64().unwrap() as usize]);
+        let index = &doc["accessors"][p["indices"].as_u64().unwrap() as usize];
+        let view = &doc["bufferViews"][index["bufferView"].as_u64().unwrap() as usize];
+        let at = view["byteOffset"].as_u64().unwrap() as usize;
+        let tris: Vec<usize> = bin[at..at + view["byteLength"].as_u64().unwrap() as usize].as_chunks::<4>().0.iter().map(|b| u32::from_le_bytes(*b) as usize).collect();
+        assert!(uv.iter().all(|t| (0.0..=1.0).contains(t)), "{uv:?}");
+        let normals = read(&doc["accessors"][p["attributes"]["NORMAL"].as_u64().unwrap() as usize]);
+        if normals.as_chunks::<3>().0.iter().all(|n| (n[0] - normals[0]).abs() + (n[1] - normals[1]).abs() + (n[2] - normals[2]).abs() < 1e-6) {
+            continue;
+        }
+        for t in tris.as_chunks::<3>().0 {
+            let u = t.map(|v| uv[2 * v]);
+            assert!(u.iter().fold(0f32, |m, a| m.max(u.iter().map(|b| (a - b).abs()).fold(0.0, f32::max))) < 0.5, "a triangle across the seam: {u:?}");
+        }
     }
 }
 
