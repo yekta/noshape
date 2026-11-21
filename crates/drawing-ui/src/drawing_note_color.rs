@@ -80,8 +80,26 @@ impl DrawingEditor {
                 }
             }));
         }
+        // Live drw-note-format-lists s14: the panel opens with its hex field focused, the value selected.
+        hex.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
         self.note_color = Some(NoteColorDlg { color: c, orig: c, mixer: false, mix: crate::color_mixer::MixerState::from_rgb(c), hex, rgb, _subs: subs });
         cx.notify();
+    }
+
+    /// The Note color panel's hex field holding the keyboard, as live's recorder reads it: a field.
+    pub fn note_color_focus(&self, window: &Window, cx: &App) -> Option<serde_json::Value> {
+        let st = self.note_color.as_ref()?.hex.read(cx);
+        if !st.focus_handle(cx).is_focused(window) {
+            return None;
+        }
+        let text = st.value().to_string();
+        let r = st.selected_range();
+        let chars = |b: usize| text.get(..b.min(text.len())).map_or(0, |t| t.chars().count());
+        let (a, b) = (chars(r.start), chars(r.end));
+        Some(serde_json::json!({ "kind": "field", "label": null, "text": text, "selection": [a, b], "all": a == 0 && b == text.chars().count() && b > 0 }))
     }
 
     fn pick_note_color(&mut self, c: [u8; 3], window: &mut Window, cx: &mut Context<Self>) {

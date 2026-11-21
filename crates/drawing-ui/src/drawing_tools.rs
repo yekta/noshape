@@ -19,6 +19,7 @@ impl DrawingEditor {
     // ------------------------------------------------------------ tools
 
     pub fn set_tool(&mut self, tool: Tool, cx: &mut Context<Self>) {
+        self.esc_kept.clear();
         if !matches!(tool, Tool::Select) {
             let again = tool.clone();
             if self.wait_for_sheet(Box::new(move |this, cx| this.set_tool(again, cx)), cx) {
@@ -348,11 +349,13 @@ impl DrawingEditor {
             self.note_leader = None;
             self.hover_snap = None;
             // Onshape: Esc ends the tool and nothing stays selected (the
-            // base view of a projected-view chain is no longer orange), but what a sketch tool or the maximum /
-            // minimum dimension made.
-            self.esc_kept = made.clone();
+            // base view of a projected-view chain is no longer orange), but what a sketch tool made. An annotation it
+            // made is only hovered under the resting pointer, black once it moves (live REQUESTS studios 17:02 (a), (d)).
+            let (kept, made): (Vec<Sel>, Vec<Sel>) = made.into_iter().partition(|s| matches!(s, Sel::Annotation(_)));
             self.selection = made;
             self.set_preview(None, cx);
+            self.update_hover(cx);
+            self.esc_kept = kept;
             self.redraw(cx);
             return;
         }
@@ -367,7 +370,7 @@ impl DrawingEditor {
         self.redraw(cx);
     }
 
-    /// The drawing's tab left: what Esc left lit goes, and nothing stays hovered.
+    /// The drawing's tab left: the grips Esc left drawn go, and nothing stays hovered.
     pub fn tab_left(&mut self, cx: &mut Context<Self>) {
         let kept = std::mem::take(&mut self.esc_kept);
         self.selection.retain(|s| !kept.contains(s));

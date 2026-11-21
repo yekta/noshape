@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-21 17:04 UTC.
+Updated 2026-11-21 21:20 UTC.
 
 ## In flight
 
@@ -72,22 +72,24 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
   s3); a right-panel strip button clears the sheet hover, and with Styles open a selected dimension off the pointer
   reads nothing (drw-styles-radial s12, live (c)); leaving a drawing tab drops what Esc left lit (`esc_kept`,
   `tab_left`: drw-update-deleted-feature s9, live (a)/(b)).
-  - Live's answers 17:02 (a)-(e) (behaviours "studios (11-21 17:02)"): after Esc the made annotation is only HOVERED
-    (tan while the pointer rests there; black once it moves, nothing selected; the last crossed entity's grips stay).
-    Ours still selects it (`made_by_tool`): the real fix (Esc selects nothing, the reader reads a hovered annotation's
-    tan in a view's box since 11-14) needs a full drw-* suite run; it also fixes drw-max-min-fillet-arc s6 (live [],
-    its text and grips below Front) and drw-centerline-2-point-cylinder-axis s5 (live EDGE Front, centerline hovered).
-  - drw-export-formats: Change to version… only in documents with versions (live (e)); (f) re-takes of export-formats,
-    custom-table-cell, table-cell-menu running on lane 1. hole-centres: live's export lacks 3 point centerlines.
-- REQUESTS for live (11-21): 08:58 the drawing matrix's 40 most-used shown rows (six takes); 14:33 all answered.
-- Audit: #7–#10 done. interaction-feel's FS F2/F3 rows marked = (fixed c249e0ed9, qa verified).
-- Live fc-1121 drawing feel (behaviours "studios fc-1121"): (1) a dimension being placed shows the line to another's
-  x / y without snapping (still held on a + mark, live2 rad-note); (3) caret at the click (`note_caret_at`), a
-  double-click in the editor selects all; (5) a dragged box draws its picks selected (`box_preview`); (2), (4), (6)
-  already as live (tests for (6)). Live's leftover grips after Esc and an empty window box kept after release are
-  stale paint, not copied.
-- Asm feel rows: none left untested in interaction-feel's asm tables.
-
+  - LANDED e591ac9a as 21da2808 (20:32) holds the above. IN WORK (uncommitted, x153 green): Esc after a tool selects no
+    annotation; what it made is hovered under the resting pointer (`update_hover` in `cancel`), black once the pointer
+    moves; `esc_kept` keeps only its grips for live's reader (stale paint, not drawn) until another hover, a press,
+    a tool or leaving the tab; the reader reads a hovered non-note annotation as a lit one. Run r48 on vibex7 (slot):
+    the 46 affected drw-* scenarios, baseline (uip1121e) then the rework (uip1121f); land if f >= e. r45 (84 of
+    my scenarios, main's e591ac9a binary) runs on vibe2 into uip1121d.
+  - drw-max-min-fillet-arc s6 (live [] after Esc): ours starts the side's extension line at the perpendicular's foot
+    (40, 6), so 12 mm of extension lines lie in Front's box (~94 px read); live starts it at the side's end nearest
+    the dimension line (40, 0): only the left one's 6 mm (~47 px). IN WORK (x154): MaxMinDimension.b_edge (resolved
+    edge ends, not saved; set by build.rs and pending.rs), sheet.rs `ext_from_edge` moves that line's start.
+  - IN WORK too: Note colour panel opens with its hex focused + selected, `note_color_focus` reads it as a field
+    (note-format-lists s14; s16 waits on REQUESTS (j)); run.py drops Change to version… in pre-Pro takes (5
+    drw-export-* matched in r45's re-compare); styles-radial s14 test `with_styles_open_a_clicked_dimension_reads`
+    (x156). r49 (vibe2): app from this tree + the 11 affected scenarios into uip1121g, then commit + ops e2e + land.
+  - Live (f): Export opens on the account's last-used format (ours remembers it too; drw-export-formats' take opened
+    on DXF from an earlier export: artefact). A placed custom table IS listed under annotations (uncommitted: listed,
+    run.py strips live's MTEXT braces); live re-takes cell/split/table-cell-menu land as 0eccd76a; (h) done
+    (1336af80: insert/delete/properties list it; the other three place no table); (g) re-recorded, landing as 648646fa; (i) drw-export-formats after a PDF export, (j) swatch twice: next on lane 1.
 ## Next, in order
 1. Drawing matrix (11-21 05:21): 1419 = / 381 shown / 0 differs / 0 present-only / 0 missing of 1842 (05:21: the Note
    panel's nested reading counted; its Border size gained Tight fit and 5 Characters). Every panel
@@ -124,8 +126,6 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
   closes) + toast with Restore; New document Enter creates. Import: "CAD Imports" tab ~1.8 s, the Part Studio tab
   ~6.9 s, active tab unchanged, blue bar, toast. Derived / Insert search ~350 ms after the last key (live's server debounce, not a
   target; ours filters at once), Enter nothing; Derived Enter / Esc 1 close the panel, 2 commit / cancel (done 11-18).
-- live2 document level (live/feel/doc-level-1117/): tab switch order (URL, old list / canvas gone at once, toolbar,
-  list, 3D last; no spinner); undo / redo as ours; regen spinner is psui's.
 
 ## Lead's queue (11-17, restated after compaction)
 1. Land what is green. 2. User P0: hover / select parity in Assemblies (instances, mate connectors, mates list <->

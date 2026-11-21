@@ -737,8 +737,9 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
                 _ => {}
             }
         }
-        if let ([Some(e0), Some(e1)], AnnotationKind::MaxMinDimension { a: pa, b: pb, .. }) = (edge, &mut a.kind) {
+        if let ([Some(e0), Some(e1)], AnnotationKind::MaxMinDimension { a: pa, b: pb, b_edge, .. }) = (edge, &mut a.kind) {
             *pb = foot_on_line(*pa, e0, e1);
+            *b_edge = Some([e0, e1]);
         }
         if !ok {
             // A centermark doesn't dangle: it goes with its circle and comes

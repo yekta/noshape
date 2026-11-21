@@ -987,6 +987,28 @@ fn esc_in_the_note_editor_ends_the_note_tool(cx: &mut TestAppContext) {
     });
 }
 
+/// Live drw-note-format-lists s14: the Note editor's colour swatch opens the colour panel with its hex field holding the
+/// keyboard, "000000" selected, read as a field.
+#[gpui::test]
+fn the_note_colour_panel_opens_with_its_hex_selected(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::Tool;
+    let (window, editor) = drawing(cx, "note-colour-hex");
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Note, cx)));
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| {
+        editor.update(cx, |e, cx| {
+            e.cursor = [60.0, 40.0];
+            e.tool_click(w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_note_color(w, cx))).unwrap();
+    draw(cx, window);
+    let focus = cx.update_window(window, |_, w, cx| editor.read(cx).note_color_focus(w, cx)).unwrap();
+    assert_eq!(focus, Some(json!({ "kind": "field", "label": null, "text": "000000", "selection": [0, 6], "all": true })));
+}
+
 /// Live2 drw-revision-table-properties: Esc closes a revision table's properties and drops its selection.
 #[gpui::test]
 fn esc_closes_revision_table_properties_and_drops_the_selection(cx: &mut TestAppContext) {
@@ -1959,6 +1981,23 @@ fn custom_table_add_takes_a_configured_studios_configuration(cx: &mut TestAppCon
 /// Live cfgtbl-1121: a configured studio's custom table has Change configuration... between Split custom table below
 /// and Copy; its panel opens on the table's value, and Reset to default + ✓ stores the default's value (kept when the
 /// default changes later, (c)).
+/// Live drw-table-cell-menu, drw-custom-table-cell and -split (fresh takes, REQUESTS studios 17:02 (f)): a placed custom
+/// table is listed under the drawing's annotations as a table.
+#[gpui::test]
+fn a_placed_custom_table_is_listed_with_the_annotations(cx: &mut TestAppContext) {
+    let (window, editor) = drawing(cx, "ct-listed");
+    real_sheet(cx, window, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        let tab = e.doc.read(cx).session.doc.ordered_tabs().into_iter().find(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_))).map(|t| t.id).unwrap();
+        let kind = noshape_scene::drawing_tools::custom_table_kind(tab, None, tab, "t".into(), None, false, Default::default());
+        let id = e.current_sheet().tables.iter().map(|t| t.id).max().unwrap_or(0) + 1;
+        e.edit_sheet("Table", cx, |s| s.tables.push(noshape_model::drawing::Table::new(id, kind, [200.0, 150.0])));
+    }));
+    draw(cx, window);
+    let anns = cx.update(|cx| editor.read(cx).ui_drawing_state(cx)["annotations"].clone());
+    assert!(anns.as_array().is_some_and(|a| a.iter().any(|x| x["kind"] == "table")), "{anns}");
+}
+
 #[gpui::test]
 fn a_custom_tables_change_configuration_stores_the_values(cx: &mut TestAppContext) {
     use noshape_model::drawing::{Table, TableKind};
@@ -2145,6 +2184,75 @@ fn with_styles_open_a_selected_dimension_off_the_pointer_reads_nothing(cx: &mut 
     assert_ne!(closed, json!([]), "the selected dimension reads in its view's box");
     assert_eq!(read(cx, true, false), json!([]), "Styles open, the pointer on the panel");
     assert_ne!(read(cx, true, true), json!([]), "Styles open, the pointer on it");
+}
+
+/// Live drw-styles-radial s14: with Styles open, a dimension clicked where the runner clicks (its position) is selected
+/// and, under the resting pointer, reads.
+#[gpui::test]
+fn with_styles_open_a_clicked_dimension_reads(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    DIMENSIONED.set(true);
+    let (window, editor) = drawing(cx, "dim-click-styles");
+    DIMENSIONED.set(false);
+    real_sheet(cx, window, &editor);
+    let text = cx.update(|cx| editor.update(cx, |e, cx| {
+        let id = e.current_sheet().annotations.iter().find(|a| a.kind.is_dimension()).map(|a| a.id).expect("a dimension");
+        e.selection.clear();
+        e.right_panel = Some(crate::drawing_panels::RightPanel::Styles);
+        e.redraw(cx);
+        e.ui_annotation_text(id).expect("its text")
+    }));
+    draw(cx, window);
+    let w = cx.update(|cx| editor.read(cx).ui_target_point(&json!({"annotation": text}), cx)).expect("where the runner clicks");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_mouse_move(w, None, Modifiers::default());
+    vcx.simulate_click(w, Modifiers::default());
+    draw(cx, window);
+    let (sel, hover, read) = cx.update(|cx| editor.update(cx, |e, cx| (e.selection.clone(), e.hover, e.ui_drawing_state(cx)["selection"].clone())));
+    assert_ne!(read, json!([]), "selection {sel:?}, hover {hover:?}");
+}
+
+/// Live REQUESTS studios 17:02 (a), (d): Esc after placing a dimension leaves it hovered under the resting pointer, not
+/// selected; moved off, nothing is hovered and only its grips are kept (`esc_kept`) until something else is hovered.
+#[gpui::test]
+fn esc_leaves_the_placed_dimension_hovered_not_selected(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_scene::drawing_tools::{DimTool, Sel, Tool};
+    SUGGESTED.set(true);
+    DIMENSIONED.set(true);
+    let (window, editor) = drawing(cx, "dim-esc-hover");
+    DIMENSIONED.set(false);
+    real_sheet(cx, window, &editor);
+    let (id, on) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        e.current_sheet().annotations.iter().filter(|a| a.kind.is_dimension()).find_map(|a| {
+            let l = b.geometry.lines.iter().find(|l| b.picks.get(l.pick as usize) == Some(&PickTarget::Annotation(a.id)) && l.points.len() >= 2)?;
+            Some((a.id, [(l.points[0][0] + l.points[1][0]) / 2.0, (l.points[0][1] + l.points[1][1]) / 2.0]))
+        }).expect("a dimension with a line")
+    });
+    let hovered = |e: &DrawingEditor| e.hover.and_then(|h| e.sel_of_pick(h));
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        e.tool_start = (0, id - 1);
+        e.tool = Tool::Dimension { kind: DimTool::Diameter, picks: Vec::new() };
+        e.cursor = on;
+        e.cancel(cx);
+    }));
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        assert!(e.selection.is_empty(), "nothing selected: {:?}", e.selection);
+        assert_eq!(hovered(e), Some(Sel::Annotation(id)), "hovered under the resting pointer");
+        assert!(e.esc_kept.contains(&Sel::Annotation(id)));
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        e.cursor = [-1.0e4, -1.0e4];
+        e.update_hover(cx);
+    }));
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        assert_eq!(hovered(e), None, "moved off");
+        assert!(e.esc_kept.contains(&Sel::Annotation(id)), "its grips kept until something else is hovered");
+    });
 }
 
 /// Live drw-update-deleted-feature s9: Ø.394 placed and Esc, a Part Studio tab and back: nothing lit (Esc left it

@@ -1607,7 +1607,7 @@ fn max_min_dimensions() {
         let b = if rb > 0.0 { [0.038, 0.018] } else { [-0.05, -0.03] };
         drawing.sheets[0].annotations.push(Annotation {
             id,
-            kind: AnnotationKind::MaxMinDimension { view: ViewId(2), a: [0.0, 0.0], ra: 0.012, ca, b, rb, cb, offset: 8.0, orientation: DimOrientation::Horizontal },
+            kind: AnnotationKind::MaxMinDimension { view: ViewId(2), a: [0.0, 0.0], ra: 0.012, ca, b, rb, cb, offset: 8.0, orientation: DimOrientation::Horizontal, b_edge: None },
             position: [0.0; 2],
             ..Default::default()
         });
@@ -5047,7 +5047,7 @@ fn maxmin_to_an_edge_measures_square_to_it() {
     let id = drawing.sheets[0].next_annotation_id();
     drawing.sheets[0].annotations.push(Annotation {
         id,
-        kind: AnnotationKind::MaxMinDimension { view, a: center.p, ra: 0.001, ca: ArcCondition::Max, b: [9.0, 9.0], rb: 0.0, cb: ArcCondition::Center, offset: 0.0, orientation: DimOrientation::Aligned },
+        kind: AnnotationKind::MaxMinDimension { view, a: center.p, ra: 0.001, ca: ArcCondition::Max, b: [9.0, 9.0], rb: 0.0, cb: ArcCondition::Center, offset: 0.0, orientation: DimOrientation::Aligned, b_edge: None },
         position: [0.0; 2],
         refs: vec![AnnotationRef { slot: 0, point: center.point.clone().unwrap() }, AnnotationRef { slot: 2, point: e0.point.clone().unwrap() }, AnnotationRef { slot: 3, point: e1.point.clone().unwrap() }],
         ..Default::default()

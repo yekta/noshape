@@ -141,6 +141,8 @@ pub struct SheetGeometry {
     /// other dimensions' lines cross its lines (Break dimension).
     jogs: [Option<super::ExtJog>; 2],
     cuts: Vec<[f64; 2]>,
+    /// The linear dimension being drawn: the straight edge (sheet coordinates) its second point lies on.
+    ext_edge: Option<[[f64; 2]; 2]>,
     /// Inserted images (drawn under the geometry; exports embed them).
     pub images: Vec<GeomImage>,
     /// Texts in a font other than the default (last span wins).
@@ -2416,7 +2418,7 @@ impl SheetGeometry {
                         });
                     }
                 }
-                AnnotationKind::MaxMinDimension { view, a: pa, ra, ca, b: pb, rb, cb, offset, orientation } => {
+                AnnotationKind::MaxMinDimension { view, a: pa, ra, ca, b: pb, rb, cb, offset, orientation, b_edge } => {
                     let (sa, sb) = (env.to_sheet(*view, *pa), env.to_sheet(*view, *pb));
                     let rot = env.rotation(*view);
                     let k = env.scale(*view);
@@ -2448,6 +2450,7 @@ impl SheetGeometry {
                     let qa = [sa[0] + dir[0] * s * da * k, sa[1] + dir[1] * s * da * k];
                     let qb = [sb[0] + dir[0] * s * db * k, sb[1] + dir[1] * s * db * k];
                     let t = env.text(a, value.abs(), false, "");
+                    self.ext_edge = b_edge.map(|e| e.map(|x| env.to_sheet(*view, x)));
                     self.linear_dimension_text(qa, qb, *offset, *orientation, &t, pick);
                 }
                 AnnotationKind::ForeshortenedRadial { view, center, radius, angle, jog } => {
@@ -3284,7 +3287,10 @@ impl SheetGeometry {
 
     /// Linear dimension with a formatted label.
     pub fn linear_dimension_text(&mut self, p: [f64; 2], q: [f64; 2], offset: f64, orientation: DimOrientation, text: &DimText, pick: u32) {
-        let f = linear_frame(p, q, offset, orientation, &self.jogs, self.style.lock_jog_45, self.style.geometry_gap, self.style.extension);
+        let mut f = linear_frame(p, q, offset, orientation, &self.jogs, self.style.lock_jog_45, self.style.geometry_gap, self.style.extension);
+        if let Some(edge) = self.ext_edge.take() {
+            ext_from_edge(&mut f.ext, p, q, edge, self.style.geometry_gap, self.style.extension);
+        }
         let (dir, dp, dq) = (f.dir, f.dp, f.dq);
         let half = self.style.dim_text * 0.4;
         let cuts = std::mem::take(&mut self.cuts);
@@ -3491,6 +3497,32 @@ pub struct LinearFrame {
     /// Per extension line: (model point, unit direction, length to the
     /// dimension line) — for jog editing.
     pub legs: [([f64; 2], [f64; 2], f64); 2],
+}
+
+/// An extension line from `q` along the straight edge `q` lies on starts at the edge's end nearest the dimension line,
+/// and there is none when the line crosses the edge (live drw-max-min-fillet-arc: Front's side edge carries no line).
+fn ext_from_edge(ext: &mut Vec<Vec<[f64; 2]>>, p: [f64; 2], q: [f64; 2], [e0, e1]: [[f64; 2]; 2], gap: f64, overshoot: f64) {
+    let sub = |a: [f64; 2], b: [f64; 2]| [a[0] - b[0], a[1] - b[1]];
+    let dot = |a: [f64; 2], b: [f64; 2]| a[0] * b[0] + a[1] * b[1];
+    let len = |a: [f64; 2]| a[0].hypot(a[1]);
+    let Some(k) = ext.iter().position(|e| e.len() == 2 && len(sub(e[0], q)) < len(sub(e[0], p))) else { return };
+    let v = sub(ext[k][1], q);
+    let (d, l) = (sub(e1, e0), len(v));
+    if l < 1e-9 || len(d) < 1e-9 {
+        return;
+    }
+    let u = [v[0] / l, v[1] / l];
+    if (d[0] * u[1] - d[1] * u[0]).abs() > 1e-3 * len(d) {
+        return;
+    }
+    let (t0, t1) = (dot(sub(e0, q), u), dot(sub(e1, q), u));
+    let line = l - overshoot;
+    let start = line.clamp(t0.min(t1), t0.max(t1)) + gap;
+    if start >= line {
+        ext.remove(k);
+        return;
+    }
+    ext[k][0] = [q[0] + u[0] * start, q[1] + u[1] * start];
 }
 
 /// The geometry of a linear dimension between sheet points `p` and `q`.
@@ -3988,6 +4020,25 @@ pub fn note_leader_paths(bbox: [f64; 4], leaders: &[super::Leader], targets: &[[
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A max/min dimension to a straight edge along its extension line: that line starts at the edge's end nearest
+    /// the dimension line, and there is none when the dimension line crosses the edge (live drw-max-min-fillet-arc s6).
+    #[test]
+    fn an_extension_line_along_the_measured_edge_starts_at_its_end() {
+        let at_x = |g: &SheetGeometry, x: f64| g.lines.iter().filter(|l| l.points.len() == 2 && l.points.iter().all(|p| (p[0] - x).abs() < 1e-9)).map(|l| [l.points[0][1], l.points[1][1]]).collect::<Vec<_>>();
+        let mut g = SheetGeometry::new(420.0, 297.0);
+        let gap = g.style.geometry_gap;
+        g.ext_edge = Some([[90.0, 112.0], [90.0, 100.0]]);
+        g.linear_dimension_text([50.0, 106.0], [90.0, 106.0], -20.0, DimOrientation::Aligned, &DimText::plain("40"), 1);
+        assert!(g.ext_edge.is_none(), "used once");
+        let right = at_x(&g, 90.0);
+        assert!(right.len() == 1 && (right[0][0] - (100.0 - gap)).abs() < 1e-9, "from the edge's lower end: {right:?}");
+        assert!(at_x(&g, 50.0).iter().any(|l| (l[0] - (106.0 - gap)).abs() < 1e-9), "the other side unchanged");
+        let mut g = SheetGeometry::new(420.0, 297.0);
+        g.ext_edge = Some([[90.0, 112.0], [90.0, 100.0]]);
+        g.linear_dimension_text([50.0, 106.0], [90.0, 106.0], -3.0, DimOrientation::Aligned, &DimText::plain("40"), 1);
+        assert!(at_x(&g, 90.0).is_empty(), "the dimension line crosses the edge: {:?}", at_x(&g, 90.0));
+    }
 
     /// ANSI, the value dragged against the right extension line (feel coverage 11-20 D2): the arrows go outside with
     /// their tails, nothing between the extension lines but the value.

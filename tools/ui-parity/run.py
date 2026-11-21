@@ -286,6 +286,10 @@ CLOUD_ONLY = {"View support tickets", "App Store dev portal", "Sign out", "Add c
 # with managed workflows on (ours by default off): those rows aren't compared in Free takes.
 LIVE_PROFESSIONAL_FROM = "2026-11-13T19:31:00Z"
 FREE_PLAN_ROWS = {"Release…", "Releases", "Revision history", "Revision history…"}
+# A drawing tab's Change to version… showed with only Start before the account went Professional (11-05 to 11-13
+# takes on block-drawing, doc-tab-menu-change-to-version at 19:28); since, only in a document with a version (live
+# REQUESTS studios 17:02 (e), drw-export-formats 11-21). Ours is the Professional one.
+FREE_PLAN_ROWS |= {"Change to version…"}
 
 
 # Live's recorder reads a drawing's open part picker (Select a part or assembly) as a feature dialog since 11-14;
@@ -549,6 +553,9 @@ def normalize_live(state):
     for an in (((state or {}).get("drawing") or {}).get("annotations") or []):
         if isinstance(an, dict) and isinstance(an.get("text"), str):
             an["text"] = live_annotation_text(an["text"])
+            # A custom table's cells come in MTEXT groups (live drw-table-cell-menu: "{Part} {Faces} {Part 1} {6}").
+            if an.get("kind") == "table":
+                an["text"] = re.sub(r"[{}]", "", an["text"])
     # The dimension palette's value (live drw-hole-callout-palette: "∅ .197 THRU"): live's palette spells the diameter
     # ∅ (U+2205) apart from the number, ours (and its drawings) ⌀ (U+2300) before it.
     pd = (state or {}).get("dialog")

@@ -411,8 +411,9 @@ pub struct DrawingEditor {
     pub insert_continuation: bool,
     pub hover_snap: Option<[f64; 2]>,
     pub selection: Vec<Sel>,
-    /// What Esc left lit of what the tool made, until the next press: live draws it hovered, not selected (a tab
-    /// round trip drops it: live drw-update-deleted-feature s9; a clicked one stays, drw-dim-tab-switch3).
+    /// The annotations a tool made, left by Esc: live keeps their grips drawn once the pointer moves off, until
+    /// something else is hovered or pressed or the tab is left (stale paint, not drawn here; its reader reads it:
+    /// live2 selection-after-esc on drw-dimension-angular, REQUESTS studios 17:02 (a)).
     pub esc_kept: Vec<Sel>,
     pub drag: Drag,
     pub cursor: [f64; 2],
@@ -2234,6 +2235,9 @@ impl DrawingEditor {
         let placing = |t: &PickTarget| matches!(t, PickTarget::Table(id) if self.drawing_sheet().table(*id).is_none());
         let hover = self.pk().hover_at().filter(|h| !self.built.as_ref().and_then(|b| b.picks.get(*h as usize)).is_some_and(placing));
         if hover != self.hover {
+            if hover.and_then(|h| self.sel_of_pick(h)).is_some_and(|s| !self.esc_kept.contains(&s)) {
+                self.esc_kept.clear();
+            }
             self.hover = hover;
             self.redraw(cx);
         } else if self.replicate_dlg.is_some() {

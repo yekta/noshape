@@ -1125,8 +1125,22 @@ pub enum AnnotationKind {
     /// or the far side (Max) of the circle. Slots: 0 = `a`, 1 = `b` (circle
     /// center references also update the radius).
     /// Slots: 0 = `a`, 1 = `b`; to a straight edge (live: any non-curve
-    /// geometry), 2 and 3 = its ends and `b` is the perpendicular's foot.
-    MaxMinDimension { view: ViewId, a: [f64; 2], ra: f64, ca: ArcCondition, b: [f64; 2], rb: f64, cb: ArcCondition, offset: f64, orientation: DimOrientation },
+    /// geometry), 2 and 3 = its ends and `b` is the perpendicular's foot;
+    /// `b_edge` holds the ends (resolved, not saved): `b`'s extension line
+    /// starts at the edge's end nearest the dimension line.
+    MaxMinDimension {
+        view: ViewId,
+        a: [f64; 2],
+        ra: f64,
+        ca: ArcCondition,
+        b: [f64; 2],
+        rb: f64,
+        cb: ArcCondition,
+        offset: f64,
+        orientation: DimOrientation,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        b_edge: Option<[[f64; 2]; 2]>,
+    },
     /// Foreshortened radius: like a radial dimension, but the leader starts
     /// at a false center `jog` (view coordinates) and reaches the arc through
     /// a zigzag, for arcs whose true center is far away. Slot 0 = center.

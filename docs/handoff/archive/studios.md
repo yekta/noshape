@@ -1312,3 +1312,15 @@ Next, in order:
   Drawing properties 101 → 22 shown, matrix 04:45: 1344 = / 456 shown of 1842; View simplification was None, Auto, …: now live's None, Absolute, Ratio to
   studio, Ratio to part, Auto (test `the_view_simplification_list_is_in_lives_order`). REQUESTS fc-1121 (6) added:
   a table hover-lit after Esc under a resting pointer (split s14-15).
+- REQUESTS for live (11-21): 08:58 the drawing matrix's 40 most-used shown rows (six takes); 14:33 all answered.
+- Audit: #7–#10 done. interaction-feel's FS F2/F3 rows marked = (fixed c249e0ed9, qa verified).
+- Asm feel rows: none left untested in interaction-feel's asm tables.
+- Live fc-1121 drawing feel (behaviours "studios fc-1121"): (1) a dimension being placed shows the line to another's
+  x / y without snapping (still held on a + mark, live2 rad-note); (3) caret at the click (`note_caret_at`), a
+  double-click in the editor selects all; (5) a dragged box draws its picks selected (`box_preview`); (2), (4), (6)
+  already as live (tests for (6)). Live's leftover grips after Esc and an empty window box kept after release are
+  stale paint, not copied.
+
+## Moved 2026-11-21 21:20 (feel rows, done)
+- live2 document level (live/feel/doc-level-1117/): tab switch order (URL, old list / canvas gone at once, toolbar,
+  list, 3D last; no spinner); undo / redo as ours; regen spinner is psui's.

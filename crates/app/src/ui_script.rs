@@ -1255,6 +1255,9 @@ pub(crate) fn window_state(w: &mut Workspace, window: &mut Window, cx: &mut Cont
         if noshape_app_core::file_tab_view::picker_search_focused(window, cx) {
             s["focus"] = serde_json::json!({ "kind": "field", "label": null });
         }
+        if let Some(f) = d.read(cx).note_color_focus(window, cx) {
+            s["focus"] = f;
+        }
         s
     } else if let Some(a) = w.active_assembly() {
         a.read(cx).ui_state(cx)

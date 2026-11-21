@@ -149,8 +149,8 @@ pub fn showcase_document() -> Document {
             s.annotations.push(Annotation { id, kind, position, ..Default::default() });
             id += 1;
         };
-        add(s, AnnotationKind::MaxMinDimension { view: ViewId(2), a: [0.0, 0.0], ra: 0.012, ca: ArcCondition::Min, b: [-0.05, -0.03], rb: 0.0, cb: ArcCondition::Center, offset: -8.0, orientation: DimOrientation::Horizontal }, [0.0; 2]);
-        add(s, AnnotationKind::MaxMinDimension { view: ViewId(2), a: [0.0, 0.0], ra: 0.012, ca: ArcCondition::Max, b: [0.038, 0.018], rb: 0.0048, cb: ArcCondition::Max, offset: 6.0, orientation: DimOrientation::Horizontal }, [0.0; 2]);
+        add(s, AnnotationKind::MaxMinDimension { view: ViewId(2), a: [0.0, 0.0], ra: 0.012, ca: ArcCondition::Min, b: [-0.05, -0.03], rb: 0.0, cb: ArcCondition::Center, offset: -8.0, orientation: DimOrientation::Horizontal, b_edge: None }, [0.0; 2]);
+        add(s, AnnotationKind::MaxMinDimension { view: ViewId(2), a: [0.0, 0.0], ra: 0.012, ca: ArcCondition::Max, b: [0.038, 0.018], rb: 0.0048, cb: ArcCondition::Max, offset: 6.0, orientation: DimOrientation::Horizontal, b_edge: None }, [0.0; 2]);
         add(s, AnnotationKind::ForeshortenedDiameter { view: ViewId(1), axis: [[0.0, 0.0], [0.0, 0.012]], edge: [0.012, 0.006], direct: false }, [150.0, 262.0]);
         add(s, AnnotationKind::ForeshortenedRadial { view: ViewId(5), center: [0.038, 0.018], radius: 0.0048, angle: -0.8, jog: [0.028, -0.012] }, [0.0; 2]);
         add(s, AnnotationKind::DatumTarget { view: ViewId(2), anchor: [-0.04, 0.02], label: "A1".into(), area: DatumTargetArea::Point }, [28.0, 190.0]);

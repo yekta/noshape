@@ -315,9 +315,9 @@ impl DrawingEditor {
                 Some(crate::drawing_view::Panel::Cell { table, note: Some(_), .. }) if self.fresh_table == Some(*table) => Some(*table),
                 _ => None,
             };
-            // (Nor a custom table: live2 drw-custom-table-insert lists none after placing one; nor a cut list,
-            // drw-cut-list-table-properties; nor a revision table, drw-revision-table.)
-            for t in sheet.tables.iter().filter(|t| !matches!(t.kind, TableKind::Hole { .. } | TableKind::Custom { .. } | TableKind::CutList { .. } | TableKind::Revision { .. }) && Some(t.id) != editing) {
+            // (Nor a cut list, drw-cut-list-table-properties; nor a revision table, drw-revision-table. A custom table
+            // is: live's fresh drw-table-cell-menu, drw-custom-table-cell and -split takes, REQUESTS studios 17:02 (f).)
+            for t in sheet.tables.iter().filter(|t| !matches!(t.kind, TableKind::Hole { .. } | TableKind::CutList { .. } | TableKind::Revision { .. }) && Some(t.id) != editing) {
                 let mut texts: Vec<_> = b.geometry.texts.iter().filter(|x| matches!(b.picks.get(x.pick as usize), Some(PickTarget::Table(id)) if *id == t.id)).collect();
                 // Bottom to top: live's recorder reads the rows in their data order (the header, item 1, item 2…; live2
                 // drw-bom-multi-level-bottom-to-top), bottom up here.
@@ -516,8 +516,17 @@ impl DrawingEditor {
             // drw-styles-radial s12-s13, recorder 11-18.1: R.197 clicked, then Styles; drw-dim-styles-open2 shows it).
             let styles = self.right_panel == Some(crate::drawing_panels::RightPanel::Styles);
             let unread_dim = |a: u64| styles && self.hover.and_then(|h| self.sel_of_pick(h)) != Some(Sel::Annotation(a)) && sheet.annotations.iter().any(|x| x.id == a && x.kind.is_dimension());
+            // A hovered annotation, a note's but, is read as its selection is (tan: live drw-styles-radial s4, s8,
+            // drw-centerline-2-point-cylinder-axis s5: what Esc left under the resting pointer, REQUESTS 17:02 (a), (d)).
+            let hovered_ann = self.hover.and_then(|h| self.sel_of_pick(h)).and_then(|s| match s {
+                Sel::Annotation(a) if !sheet.annotations.iter().any(|x| x.id == a && matches!(x.kind, AnnotationKind::Note { .. })) => Some(a),
+                _ => None,
+            });
             let lit_as = |pick: u32, thin_ones: bool| {
                 let Some(p) = b.picks.get(pick as usize) else { return false };
+                if let (Some(a), PickTarget::Annotation(t)) = (hovered_ann, p) && a == *t && thin(a) == thin_ones {
+                    return true;
+                }
                 self.selection.iter().any(|s| match (s, p) {
                     // A table with cells picked is orange only in them (live2 drw-revision-cell-*: no view's box reads it).
                     // (One just placed reads nothing for recorders before 2026-11-18.1 (live2 drw-bom-table s2); see `placed`.)
@@ -572,7 +581,9 @@ impl DrawingEditor {
                 // A selected dimension's orange grips (push_annotation_look): a 9 px dot at each dimension-line end, a
                 // 12 px diamond on each flip handle (live drw-styles-radial s3: R.197's leader end and diamond in Top's
                 // box read EDGE Top).
-                for gr in b.geometry.grips.iter().filter(|gr| gr.kind != GripKind::Origin && lit(gr.pick) && inside(gr.pos) && dim_pick(gr.pick)) {
+                // (And the grips Esc left drawn once the pointer moved off: `esc_kept`.)
+                let stale = |pick: u32| matches!(b.picks.get(pick as usize), Some(PickTarget::Annotation(t)) if self.esc_kept.contains(&Sel::Annotation(*t)));
+                for gr in b.geometry.grips.iter().filter(|gr| gr.kind != GripKind::Origin && (lit(gr.pick) || stale(gr.pick)) && inside(gr.pos) && dim_pick(gr.pick)) {
                     let n = if gr.kind == GripKind::Handle { 72.0 } else { 64.0 };
                     if self.hover.is_none_or(|h| self.sel_of_pick(h) != self.sel_of_pick(gr.pick)) { px += n } else { hover_px += n }
                 }

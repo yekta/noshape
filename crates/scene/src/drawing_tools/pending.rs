@@ -321,6 +321,7 @@ impl SheetPick<'_> {
             Tool::Dimension { kind: DimTool::MaxMin, picks } if picks.len() == 2 => {
                 let Pick::CircleAt { view, center, radius, r, at } = &picks[0] else { return None };
                 let mut edge = Vec::new();
+                let mut b_edge = None;
                 let (b, rb, cb, rref) = match &picks[1] {
                     Pick::Point(p) => (p.p, 0.0, ArcCondition::Center, p.r.clone()),
                     Pick::CircleAt { center: c2, radius: r2, r, at: at2, .. } => {
@@ -331,6 +332,7 @@ impl SheetPick<'_> {
                     // perpendicular's foot.
                     Pick::Line { a: e0, b: e1 } => {
                         edge = vec![(2, e0.r.clone()), (3, e1.r.clone())];
+                        b_edge = Some([e0.p, e1.p]);
                         (noshape_model::drawing::build::foot_on_line(*center, e0.p, e1.p), 0.0, ArcCondition::Center, None)
                     }
                     _ => return None,
@@ -342,7 +344,7 @@ impl SheetPick<'_> {
                 let offset = dim_offset(ps, qs, o, c);
                 Some(Annotation {
                     id,
-                    kind: AnnotationKind::MaxMinDimension { view: *view, a: *center, ra: *radius, ca, b, rb, cb, offset, orientation: o },
+                    kind: AnnotationKind::MaxMinDimension { view: *view, a: *center, ra: *radius, ca, b, rb, cb, offset, orientation: o, b_edge },
                     position: c,
                     refs: refs([vec![(0, r.clone()), (1, rref)], edge].concat()),
                     ..Default::default()
