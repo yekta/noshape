@@ -1448,6 +1448,12 @@ pub fn inference_icons(inf: &Inference, on_model_edge: bool) -> Vec<&'static str
 }
 
 impl SketchEditor {
+    /// Whether a plane's face (not only its outline) can be picked: not by the Dimension tool once an ellipse is
+    /// picked (live plane-behind-1121: Front's face then lights nowhere, the Right plane's outline still does).
+    pub fn takes_plane_faces(&self, data: &SketchData) -> bool {
+        self.tool != Tool::Dimension || !self.picks.iter().any(|(e, _)| matches!(data.sketch.kind(*e), Some(EntityKind::Ellipse | EntityKind::EllipticalArc)))
+    }
+
     pub fn new(feature: FeatureId, frame: PlaneFrame) -> Self {
         let opened_options = sketch_options();
         Self {
@@ -8511,8 +8517,8 @@ fn unmeasurable_curve_pair(sk: &Sketch, a: EntityId, b: EntityId) -> bool {
     !ends(a).iter().any(|p| ends(b).contains(p))
 }
 
-/// An ellipse and a plane can't be dimensioned (live sk2-1121 dim-ellipse-axes: an ellipse, then the Front plane
-/// behind it: "A dimension cannot be created between these items.").
+/// An ellipse and a plane can't be dimensioned (live sk2-1121 dim-ellipse-axes: an ellipse, then the Right plane by its
+/// outline: "A dimension cannot be created between these items.").
 fn ellipse_and_plane(data: &SketchData, a: EntityId, b: EntityId) -> bool {
     use noshape_model::reference::Reference;
     let ellipse = |e: EntityId| matches!(data.sketch.kind(e), Some(EntityKind::Ellipse | EntityKind::EllipticalArc));

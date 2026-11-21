@@ -7001,8 +7001,9 @@ impl<'a> Translator<'a> {
             if matches!(ty, "MAJOR_DIAMETER" | "MINOR_DIAMETER")
                 && let Some([cx, cy, xd, yd, a, b]) = par0("localFirst").and_then(|e| self.ellipses.get(&(oid.to_string(), e)).copied())
             {
-                // Beyond the axis' end.
-                let (d, r) = if ty == "MAJOR_DIAMETER" { ([xd, yd], a) } else { ([-yd, xd], b) };
+                // Off across the measured axis, as live's Dimension tool reads it (a horizontal ellipse's major from a
+                // label above it, its minor from one at the side).
+                let (d, r) = if ty == "MAJOR_DIAMETER" { ([-yd, xd], b) } else { ([xd, yd], a) };
                 let l = self.sketch_map.local([cx + d[0] * (r + 0.005), cy + d[1] * (r + 0.005)]);
                 args["label"] = json!(l.map(|x| format!("{} mm", x * 1e3)));
             }

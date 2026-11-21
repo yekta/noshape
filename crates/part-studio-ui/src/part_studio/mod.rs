@@ -6728,10 +6728,10 @@ impl PartStudioView {
                 m = m.item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| this.open_cad_export(flat_export::CadSource::Sketch(id), w, cx))));
             }
             m = m.separator();
-            // Live (psui 11-21 04:12, secmenu-1121): Section view… through the sketch, before Suppress, only while the
-            // sketch is already selected (a click on its row, or its own menu closed: selected unshown).
-            let selected_before = { let v = view.read(cx); v.ui.menu_left == Some(id) || v.selected_features.contains(&id) };
-            if is_sketch && selected_before {
+            // Live 1714 (secmenu-rerecord-1121: on a plain right-click too): Section view… through the sketch, before Suppress;
+            // none on the sketch right above a rolled-back bar (live rollback-menus 11-21).
+            let at_bar = view.read(cx).studio(cx).and_then(|s| s.rolled_to_sketch()) == Some(id);
+            if is_sketch && !at_bar {
                 m = m.item(item("Section view…", Box::new(move |this, w, cx| this.section_through_all(&[Reference::Sketch(id)], w, cx))).icon_name("menu-section-view"));
             }
             m = configure(dynamic(m.item(suppress), window, cx));

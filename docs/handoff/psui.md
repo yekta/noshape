@@ -36,16 +36,20 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (12:45 UTC 11-21)
+## Now (13:50 UTC 11-21)
 
 LANDED 4553fc38, 0cd43606, 70ab4b581 (docs), f0902e77 (Variable conversionFactor 0; cparc end only alignments;
 Transform moves by pointer travel). sk12c (vibex8, /root/psui-scratch/sk/sk12c): 16/21, 325/344 before f0902e77.
-QUEUED (this commit): circle-rims step 22: a glyph's clear margin gives way to the open sketch's entity under the
-pointer; the 20 px tile takes it back (sketch_hover + the tile's own on_hover, ui.glyph_yielded / glyph_tile; glyph_boxes
-can lag the drawn tiles by ~11 px, so the tile state comes from GPUI's hover); GPU test
-a_small_circle_round_the_origin_lights_on_its_rim. ellipse-axes: smart_dimension's ellipse rule as live (6) Dimension
-tool: label above a horizontal ellipse = MAJOR, at the side = MINOR (more_dimension_kinds). Left at step 18: ours lights
-the Front plane at (5, 25), live nothing; asked live (REQUESTS 12:40, live/psui/plane-behind-1121/).
+3dd4f04b FAILED to land (ops parity ellipse test: parity.rs placed ellipse dim labels by the old rule); re-queued in
+this commit with: circle-rims step 22 (a glyph's clear margin gives way to the open sketch's entity under the pointer,
+the 20 px tile takes it back: ui.glyph_yielded / glyph_tile; GPU test a_small_circle_round_the_origin_lights_on_its_rim);
+ellipse-axes: smart_dimension's ellipse rule as live (6) (label off across the major axis = MAJOR, at the side = MINOR),
+parity.rs + e2e labels to match; step 18 (live plane-behind-1121): with the Dimension tool and an ellipse picked, a plane
+lights only within 6 px of its outline, never by its face (SketchEditor::takes_plane_faces, near_plane_outline; GPU test
+an_ellipse_picked_for_a_dimension_takes_no_plane_face). Not done: Front's face not picked 3.3 mm above the sketch plane
+(live picks it at 13-17 mm). UIP-SKETCH-ROW-SECTION-VIEW (qa P1): Section view… back on a sketch row's plain right-click
+(live secmenu-rerecord-1121, takes 3f3cb529); kept off the sketch right above a rolled-back bar (rollback-menus; asked
+live REQUESTS 13:49 to recheck with a moved pointer). After landing: check cov-dm-config's take.
 split-at-crossing PERPENDICULAR: skasm's queue (crates/sketch square_at_mid). Shots: vibex8
 ~/agents/psui-keep/shots2/<take> (shots-run.sh in psui-scratch: build + one app, frames every 0.4 s).
 
@@ -147,11 +151,10 @@ part-studio-ui list/sketch_hover/cut_list 41, ops studio:: 5, clippy. On land: t
    restrict_scroll_to_axis (GPUI turned a plain wheel sideways); test a_cut_list_wheel_scrolls_the_panel_and_a_sideways_
    wheel_the_table. FEEL-ROW-MENU-ROLL-TO-HERE (live 03:15, dm/rollback-menus.json): rows below the bar get Section
    view… (menu_left) / a sketch's Hide other + all sketches and (Un)configure suppression; a shown sketch with other
-   sketches: Hide, Hide other sketches, Hide all sketches; list row "menu / rolled back under Sketch 1". Open: live's
-   sketch menus in cov-dm-config have no Section view… before Suppress, ours (keys-1118) do: live answered 04:5x
-   (behaviours "psui 11-21 04:12", secmenu-1121): only while the selection already holds a planar item (plane, sketch,
-   planar face), the same sketch included (its own right-click + Esc, or a row click). Ours now: a sketch row's
-   Section view… only when it was selected before (menu_left or selected_features); list row "menu / one sketch".
+   sketches: Hide, Hide other sketches, Hide all sketches; list row "menu / rolled back under Sketch 1". Section view… on
+   a sketch row: back on every plain right-click (live secmenu-rerecord-1121, 13:4x: the 11-06 takes hold; the 04:47
+   secmenu probe right-clicked without moving onto the row; qa P1 UIP-SKETCH-ROW-SECTION-VIEW). cov-dm-config's live
+   menus lack it: check that take after this lands.
    "After" uip rerun of the 33 (ps-names.txt) on the batch's tree (vibex8 ~/tmp/psui/ps6, log /root/psui-scratch/ps6.log,
    05:2x): 33/33 scenarios, 308/308 states (before 29/33, 300/308).
    Mac: incremental dirs got emptied mid-build twice (11-21 02:4x, 03:1x): runs use CARGO_INCREMENTAL=0.

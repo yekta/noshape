@@ -49,8 +49,8 @@ fn ellipse_axis_dimension_reads_its_diameter() {
     let dims: Vec<&Value> = st["constraints"].as_array().unwrap().iter().filter(|c| c["type"] == "Ellipse radius").collect();
     assert_eq!(dims.len(), 1, "{st}");
     assert_eq!((dims[0]["value"].clone(), dims[0]["expression"].clone()), (json!("Ø30"), json!("2 * 15 mm")), "{st}");
-    // `diameter` takes the other axis the same way.
-    call(&mut ctx, "sketch_dimension", json!({ "sketch": sketch, "kind": "diameter", "entities": [el], "label": [0, 12], "value": "12 mm" }));
+    // `diameter` takes the other axis the same way: a label at the side is the minor (live (6) Dimension tool).
+    call(&mut ctx, "sketch_dimension", json!({ "sketch": sketch, "kind": "diameter", "entities": [el], "label": [25, 0], "value": "12 mm" }));
     let st = call(&mut ctx, "sketch_get", json!({ "sketch": sketch }));
     let values: Vec<String> = st["constraints"].as_array().unwrap().iter().filter(|c| c["type"] == "Ellipse radius").map(|c| c["value"].as_str().unwrap().to_string()).collect();
     assert_eq!(values, ["Ø30", "Ø12"], "{st}");

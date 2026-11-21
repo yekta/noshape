@@ -1038,6 +1038,20 @@ impl PartStudioView {
 
     /// The GPU's hover pick in sketch mode (and again on each move while it stands: `sketch_gpu_hover`), resolved by
     /// [`Self::sketch_hover_id`] and applied.
+    /// Whether viewport point `at` is within the pick's reach (5 px, live's MOUSE_PICK_RADIUS_PX) of plane `p`'s outline.
+    fn near_plane_outline(&self, p: &Reference, at: DVec2, vp: &Entity<Viewport>, cx: &App) -> bool {
+        let Some(q) = self.display.planes.iter().find(|q| &q.reference == p) else { return false };
+        let vp = vp.read(cx);
+        let c = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)].map(|(u, v)| vp.project(q.corner(u, v)));
+        (0..4).any(|k| match (c[k], c[(k + 1) % 4]) {
+            (Some(a), Some(b)) => {
+                let t = ((at - a).dot(b - a) / (b - a).length_squared().max(1e-9)).clamp(0.0, 1.0);
+                (a + (b - a) * t).distance(at) <= 6.0
+            }
+            _ => false,
+        })
+    }
+
     /// Whether the resolved pick is an entity of the open sketch.
     fn picks_own_sketch_entity(&self, id: Option<u32>) -> bool {
         matches!(id.and_then(|i| self.built.as_ref()?.picks.get(i)).map(|t| &t.reference), Some(Reference::SketchEntity { sketch, .. }) if self.sketch.as_ref().is_some_and(|s| s.feature == *sketch))
@@ -1072,7 +1086,14 @@ impl PartStudioView {
             }
             return true;
         }
-        let r = id.and_then(|id| self.built.as_ref()?.picks.get(id).map(|t| t.reference.clone()));
+        let mut r = id.and_then(|id| self.built.as_ref()?.picks.get(id).map(|t| t.reference.clone()));
+        if let Some(p @ (Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. })) = &r
+            && self.sketch_data(cx).is_some_and(|d| self.sketch.as_ref().is_some_and(|ed| !ed.takes_plane_faces(&d)))
+            && !self.near_plane_outline(p, vp.read(cx).pointer_position(), vp, cx)
+        {
+            r = None;
+        }
+        let pick = if r.is_none() { None } else { *id };
         // Live Onshape: the sketch's own plane (or face) is never
         // pre-highlighted while sketching on it, except a face for
         // Use, which projects its edges (qa5 CTX-USE).
@@ -1127,7 +1148,7 @@ impl PartStudioView {
         }
         // (Picking under the pointer is off while Select other is open.)
         if self.ui.select_other.is_none() {
-            self.apply_hover_pick(*id, vp, window, cx);
+            self.apply_hover_pick(pick, vp, window, cx);
         }
         true
     }

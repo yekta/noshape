@@ -443,24 +443,18 @@ fn rows() -> Vec<Row> {
             let counts = l.menu(cx).iter().any(|s| s == "Add appearance to 3 features…");
             expect((counts, l.selected(cx)), (true, names(&["Extrude 1", "Extrude 2"])), "counts 3, selected")
         } },
-        Row { id: "menu / one sketch", live: "Rename | Edit… | Copy sketch | Show dimensions | Add selection to folder… | Show | Show all sketches | Create Drawing of Sketch 1… | Export as DXF/DWG… | Suppress | Dynamic suppression | Zoom to selection | View normal to | Show dependencies… | Roll to here | Edit sketch appearance… | Delete with nothing selected; Section view… after Export as DXF/DWG… only once the sketch is selected: its own right-click + Esc (selected unshown, keys-1118's case) or a click on its row, then with Clear selection after View normal to (live psui 11-21 04:12, secmenu-1121; with another sketch there Show all sketches too: live 1714; Add comment: cloud)", gap: false, check: |l, cx| {
-            let plain = ["Rename", "Edit…", "Copy sketch", "Show dimensions", "Add selection to folder…", "Show", "Show all sketches", "Create Drawing of Sketch 1…", "Export as DXF/DWG…", "Suppress", "Dynamic suppression", "Zoom to selection", "View normal to", "Show dependencies…", "Roll to here", "Edit sketch appearance…", "Delete"];
-            let with = |rows: &[&str]| {
-                let mut v = names(rows);
-                let k = v.iter().position(|r| r == "Export as DXF/DWG…").map_or(0, |k| k + 1);
-                v.insert(k, "Section view…".to_string());
-                v
-            };
+        Row { id: "menu / one sketch", live: "Rename | Edit… | Copy sketch | Show dimensions | Add selection to folder… | Show | Show all sketches | Create Drawing of Sketch 1… | Export as DXF/DWG… | Section view… | Suppress | Dynamic suppression | Zoom to selection | View normal to | Show dependencies… | Roll to here | Edit sketch appearance… | Delete on a plain right-click, again after its own menu's Esc; after a click on its row Clear selection after View normal to (live keys-1118, secmenu-rerecord-1121, secmenu-1121 state 12; with another sketch there Show all sketches too: live 1714; Add comment: cloud)", gap: false, check: |l, cx| {
+            let plain = names(&["Rename", "Edit…", "Copy sketch", "Show dimensions", "Add selection to folder…", "Show", "Show all sketches", "Create Drawing of Sketch 1…", "Export as DXF/DWG…", "Section view…", "Suppress", "Dynamic suppression", "Zoom to selection", "View normal to", "Show dependencies…", "Roll to here", "Edit sketch appearance…", "Delete"]);
             l.right_click(cx, "feature:Sketch 1");
-            expect(l.menu(cx), names(&plain), "nothing selected")?;
+            expect(l.menu(cx), plain.clone(), "nothing selected")?;
             l.keys(cx, "escape");
             l.right_click(cx, "feature:Sketch 1");
-            expect(l.menu(cx), with(&plain), "after its own menu")?;
+            expect(l.menu(cx), plain.clone(), "after its own menu")?;
             l.keys(cx, "escape");
             l.click(cx, "feature:Sketch 1", NONE);
             l.right_click(cx, "feature:Sketch 1");
             // Selected visibly: Clear selection after View normal to (secmenu-1121 state 12).
-            let mut clicked = with(&plain);
+            let mut clicked = plain;
             let k = clicked.iter().position(|r| r == "View normal to").map_or(0, |k| k + 1);
             clicked.insert(k, "Clear selection".to_string());
             expect(l.menu(cx), clicked, "after a click on its row")

@@ -916,3 +916,58 @@ fn a_small_circle_round_the_origin_lights_on_its_rim(cx: &mut TestAppContext) {
     rims(cx, "after one");
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
+
+/// Live plane-behind-1121 (sk2-1121 dim-ellipse-axes): with the Dimension tool's ellipse picked no plane's face lights
+/// (the Front plane's lights at (5, 25) mm before), a plane's outline still does, and a click at (5, 25) on nothing
+/// dimensions the major axis (a label above the horizontal ellipse).
+#[gpui::test]
+fn an_ellipse_picked_for_a_dimension_takes_no_plane_face(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "sketch-hover-ellipse-planes", Tool::Ellipse);
+    let screen = |cx: &mut TestAppContext, x: f64, y: f64| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let ed = v.sketch.as_ref().unwrap();
+            v.viewport.read(cx).project(ed.frame.to_world(DVec2::new(x, y) * 1e-3)).unwrap()
+        })
+    };
+    for (x, y) in [(0., 0.), (30., 0.), (0., 15.)] {
+        let a = screen(cx, x, y);
+        click(cx, window, &view, (a.x, a.y));
+    }
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Dimension, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let pointer = Pointer::new(cx, window, &view);
+    let plane = |r: &Option<Reference>| matches!(r, Some(Reference::Plane(_)));
+    let above = screen(cx, 5., 25.);
+    pointer.move_to(cx, &view, above);
+    let before = hovered(cx, &view);
+    assert!(plane(&before), "nothing picked: a plane's face lights at (5, 25) mm, lit {before:?}");
+    // Just inside the Right plane's +y outline (75 mm out), 40 mm above the sketch plane.
+    let edge = cx.update(|cx| view.read(cx).viewport.read(cx).project(glam::DVec3::new(0., 0.074, 0.04)).unwrap());
+    pointer.move_to(cx, &view, edge);
+    let edge_before = hovered(cx, &view);
+    let rim = screen(cx, 0., 15.);
+    pointer.move_to(cx, &view, rim);
+    pointer.click(cx, &view, rim);
+    let mut wrong = Vec::new();
+    pointer.move_to(cx, &view, above);
+    let got = hovered(cx, &view);
+    if plane(&got) {
+        wrong.push(format!("the ellipse picked: at (5, 25) mm lit {got:?}"));
+    }
+    pointer.move_to(cx, &view, edge);
+    let got = hovered(cx, &view);
+    if got != Some(Reference::Plane(DatumPlane::Right)) {
+        wrong.push(format!("the ellipse picked: by the Right plane's outline lit {got:?} (before the pick {edge_before:?})"));
+    }
+    pointer.move_to(cx, &view, above);
+    pointer.click(cx, &view, above);
+    let made = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.constraints().filter_map(|c| match c.kind { noshape_sketch::ConstraintKind::EllipseRadius { major, .. } => Some(major), _ => None }).collect::<Vec<_>>());
+    if made != vec![true] {
+        wrong.push(format!("a click at (5, 25) mm: ellipse dimensions {made:?}, want the major"));
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
