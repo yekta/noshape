@@ -3139,7 +3139,7 @@ TopoDS_Shape rim_chain_seams(const TopoDS_Shape& s, HHist& hist)
 // with it; join_loop_pieces then joins what the old seam split. Null where it doesn't apply or doesn't come out valid
 // with the same area.
 TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const gp_Cylinder& ca, const std::vector<TopoDS_Edge>& seams,
-                            const TopoDS_Edge& end, const std::vector<TopoDS_Edge>& rest, HHist& hist)
+                            const TopoDS_Edge& end, const std::vector<TopoDS_Edge>& rest, const ShapeAncMap& ef, HHist& hist)
 {
   auto uv = [&ca](const gp_Pnt& p) {
     double u, v;
@@ -3155,8 +3155,6 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
     TopExp::MapShapes(e, TopAbs_VERTEX, chain_v);
   // A joint of the chain: two chain edges on the same other face going on smoothly, pieces of one curve (where OCCT's
   // seam split it; not a corner, nor where a line runs on tangent from an ellipse).
-  ShapeAncMap ef;
-  TopExp::MapShapesAndUniqueAncestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
   auto joint = [&](const TopoDS_Vertex& x) {
     std::vector<gp_Vec>       ds;
     std::vector<TopoDS_Shape> others;
@@ -3577,93 +3575,112 @@ namespace {
 // seams, live's loops are whole): the seam moved to the widest angle no other edge reaches, the end circles' vertices
 // with it, the other edges the face's inner wires. One face at a time; the shape unchanged where nothing applies or
 // the result isn't valid with the same area.
-TopoDS_Shape move_seams_off_holes(const TopoDS_Shape& s, HHist& hist)
+TopoDS_Shape move_seams_off_holes(const TopoDS_Shape& s0, HHist& hist)
 {
-  for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More(); fx.Next())
+  // A seam moved, the faces again from the first, but not those tried before and the same since (held, so their
+  // addresses stay theirs; wire-clip's Boolean 2: 26 moves, 383 tries of its faces); the part's edges' faces mapped
+  // once a pass, where needed.
+  TopoDS_Shape              s = s0;
+  std::set<const void*>     tried;
+  std::vector<TopoDS_Shape> held;
+  for (bool again = true; again;)
   {
-    const TopoDS_Face                    a = TopoDS::Face(fx.Current().Oriented(TopAbs_FORWARD));
-    TopLoc_Location                      la;
-    occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(a, la));
-    if (cs.IsNull())
-      continue;
-    const gp_Cylinder ca = cs->Cylinder().Transformed(la.Transformation());
-    // Its seams, end circles (closed edges round the axis) and the rest.
-    std::vector<TopoDS_Edge> seams, ends, rest;
-    ShapeIMap                seen;
-    bool                     ok = true;
-    for (TopExp_Explorer x(a, TopAbs_EDGE); x.More() && ok; x.Next())
+    again = false;
+    ShapeAncMap ef;
+    for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More() && !again; fx.Next())
     {
-      const TopoDS_Edge& e = TopoDS::Edge(x.Current());
-      if (seen.Contains(e))
+      if (!tried.insert(fx.Current().TShape().get()).second)
         continue;
-      seen.Add(e);
-      if (BRep_Tool::IsClosed(e, a))
+      held.push_back(fx.Current());
+      const TopoDS_Face                    a = TopoDS::Face(fx.Current().Oriented(TopAbs_FORWARD));
+      TopLoc_Location                      la;
+      occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(a, la));
+      if (cs.IsNull())
+        continue;
+      const gp_Cylinder ca = cs->Cylinder().Transformed(la.Transformation());
+      // Its seams, end circles (closed edges round the axis) and the rest.
+      std::vector<TopoDS_Edge> seams, ends, rest;
+      ShapeIMap                seen;
+      bool                     ok = true;
+      for (TopExp_Explorer x(a, TopAbs_EDGE); x.More() && ok; x.Next())
       {
-        seams.push_back(e);
+        const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+        if (seen.Contains(e))
+          continue;
+        seen.Add(e);
+        if (BRep_Tool::IsClosed(e, a))
+        {
+          seams.push_back(e);
+          continue;
+        }
+        TopoDS_Vertex v0, v1;
+        TopExp::Vertices(e, v0, v1);
+        BRepAdaptor_Curve c(e);
+        if (!v0.IsNull() && v0.IsSame(v1) && c.GetType() == GeomAbs_Circle && c.Circle().Axis().Direction().IsParallel(ca.Axis().Direction(), 1e-9))
+          ends.push_back(e);
+        else
+          rest.push_back(e);
+      }
+      if (seams.empty() || ends.empty() || ends.size() > 2 || rest.empty())
+        continue;
+      // Only where a seam meets the other edges.
+      ShapeIMap rest_v;
+      for (const TopoDS_Edge& e : rest)
+        for (TopExp_Explorer v(e, TopAbs_VERTEX); v.More(); v.Next())
+          rest_v.Add(v.Current());
+      bool touches = false;
+      for (const TopoDS_Edge& e : seams)
+        for (TopExp_Explorer v(e, TopAbs_VERTEX); v.More() && !touches; v.Next())
+          touches = rest_v.Contains(v.Current());
+      if (!touches)
+        continue;
+      double u0, u1, v0f, v1f;
+      BRepTools::UVBounds(a, u0, u1, v0f, v1f);
+      if (std::abs(u1 - u0 - 2 * M_PI) > 1e-9)
+        continue;
+      if (ends.size() == 1)
+      {
+        if (ef.IsEmpty())
+          TopExp::MapShapesAndUniqueAncestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+        const TopoDS_Shape out = seam_to_vertex(s, a, ca, seams, ends[0], rest, ef, hist);
+        if (out.IsNull())
+          continue;
+        s     = out;
+        again = true;
         continue;
       }
-      TopoDS_Vertex v0, v1;
-      TopExp::Vertices(e, v0, v1);
-      BRepAdaptor_Curve c(e);
-      if (!v0.IsNull() && v0.IsSame(v1) && c.GetType() == GeomAbs_Circle && c.Circle().Axis().Direction().IsParallel(ca.Axis().Direction(), 1e-9))
-        ends.push_back(e);
-      else
-        rest.push_back(e);
-    }
-    if (seams.empty() || ends.empty() || ends.size() > 2 || rest.empty())
-      continue;
-    // Only where a seam meets the other edges.
-    ShapeIMap rest_v;
-    for (const TopoDS_Edge& e : rest)
-      for (TopExp_Explorer v(e, TopAbs_VERTEX); v.More(); v.Next())
-        rest_v.Add(v.Current());
-    bool touches = false;
-    for (const TopoDS_Edge& e : seams)
-      for (TopExp_Explorer v(e, TopAbs_VERTEX); v.More() && !touches; v.Next())
-        touches = rest_v.Contains(v.Current());
-    if (!touches)
-      continue;
-    double u0, u1, v0f, v1f;
-    BRepTools::UVBounds(a, u0, u1, v0f, v1f);
-    if (std::abs(u1 - u0 - 2 * M_PI) > 1e-9)
-      continue;
-    if (ends.size() == 1)
-    {
-      const TopoDS_Shape out = seam_to_vertex(s, a, ca, seams, ends[0], rest, hist);
+      // The angles the other edges cover (their curves on the face, sampled): the new seam in the widest gap.
+      std::vector<double> us;
+      for (const TopoDS_Edge& e : rest)
+      {
+        double                          f2, l2;
+        const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, a, f2, l2);
+        if (pc.IsNull())
+        {
+          ok = false;
+          break;
+        }
+        for (int k = 0; k <= 32; ++k)
+          us.push_back(u0 + std::fmod(std::fmod(pc->Value(f2 + (l2 - f2) * k / 32.0).X() - u0, 2 * M_PI) + 2 * M_PI, 2 * M_PI));
+      }
+      if (!ok || us.empty())
+        continue;
+      std::sort(us.begin(), us.end());
+      double gap = us.front() + 2 * M_PI - us.back(), alpha = us.back() + gap / 2;
+      for (size_t k = 0; k + 1 < us.size(); ++k)
+        if (us[k + 1] - us[k] > gap)
+        {
+          gap   = us[k + 1] - us[k];
+          alpha = us[k] + gap / 2;
+        }
+      if (gap < 1e-3)
+        continue;
+      const TopoDS_Shape out = band_seam_to(s, a, la, ca, seams, ends, rest, alpha, hist);
       if (out.IsNull())
         continue;
-      return move_seams_off_holes(out, hist);
+      s     = out;
+      again = true;
     }
-    // The angles the other edges cover (their curves on the face, sampled): the new seam in the widest gap.
-    std::vector<double> us;
-    for (const TopoDS_Edge& e : rest)
-    {
-      double                          f2, l2;
-      const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, a, f2, l2);
-      if (pc.IsNull())
-      {
-        ok = false;
-        break;
-      }
-      for (int k = 0; k <= 32; ++k)
-        us.push_back(u0 + std::fmod(std::fmod(pc->Value(f2 + (l2 - f2) * k / 32.0).X() - u0, 2 * M_PI) + 2 * M_PI, 2 * M_PI));
-    }
-    if (!ok || us.empty())
-      continue;
-    std::sort(us.begin(), us.end());
-    double gap = us.front() + 2 * M_PI - us.back(), alpha = us.back() + gap / 2;
-    for (size_t k = 0; k + 1 < us.size(); ++k)
-      if (us[k + 1] - us[k] > gap)
-      {
-        gap   = us[k + 1] - us[k];
-        alpha = us[k] + gap / 2;
-      }
-    if (gap < 1e-3)
-      continue;
-    const TopoDS_Shape out = band_seam_to(s, a, la, ca, seams, ends, rest, alpha, hist);
-    if (out.IsNull())
-      continue;
-    return move_seams_off_holes(out, hist);
   }
   return s;
 }
@@ -3805,6 +3822,7 @@ static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hi
   // while their faces are the same (isaac's Mirror 1: 470 retries of 43 groups), unless the whole part was what failed.
   std::set<std::vector<const void*>> failed;
   std::vector<TopoDS_Shape>          failed_faces;
+  bool                               one_by_one = each_valid;
   for (int round = 0; round < 64; ++round)
   {
     ShapeAncMap ef;
@@ -3812,17 +3830,56 @@ static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hi
     ShapeIMap fm;
     TopExp::MapShapes(s, TopAbs_FACE, fm);
     bool merged = false;
+    // (The round's groups merged one after another on the maps above, not a round each (c2-wire-clip-imported's
+    // Boolean 2: the maps of its 946 faces again for each of 37 groups); a group with a face a merge of this round
+    // changed (merged, or rebuilt round a moved circle) waits for the next round's maps.)
+    std::set<const void*> changed;
+    auto                  note = [&](const std::vector<int>& g, const TopoDS_Edge& moved_from) {
+      for (int j : g)
+        changed.insert(fm(j).TShape().get());
+      if (const ShapeList* us = moved_from.IsNull() ? nullptr : ef.Seek(moved_from))
+        for (const TopoDS_Shape& u : *us)
+          changed.insert(u.TShape().get());
+    };
+    // The round's merges, applied at once at its end (where nothing needs the part after each); the part's box.
+    occ::handle<BRepTools_ReShape>                                 batch;
+    std::vector<std::pair<std::vector<TopoDS_Shape>, TopoDS_Face>> batched;
+    std::unique_ptr<Bnd_Box>                                       part_box;
+    auto flush = [&]() {
+      if (batch.IsNull())
+        return;
+      const TopoDS_Shape out = batch->Apply(s);
+      HHist              h   = batch->History();
+      batch.Nullify();
+      if (out.IsNull())
+      {
+        one_by_one = true;
+        batched.clear();
+        return;
+      }
+      if (h.IsNull())
+        h = new BRepTools_History();
+      for (const auto& [faces, F] : batched)
+        for (size_t k = 1; k < faces.size(); ++k)
+          h->AddModified(faces[k], F);
+      batched.clear();
+      local->Merge(h);
+      s = out;
+      part_box.reset();
+    };
     for (const std::vector<int>& g : groups_of(s, ef, fm))
     {
+      if (std::any_of(g.begin(), g.end(), [&](int j) { return changed.count(fm(j).TShape().get()) != 0; }))
+        continue;
       std::vector<const void*> members;
       for (int j : g)
         members.push_back(fm(j).TShape().get());
       std::sort(members.begin(), members.end());
       if (failed.count(members))
         continue;
-      bool                        whole_failed = false;
+      bool                        whole_failed = false, done = false, later = false;
       const std::function<void()> remember = [&]() {
-        if (merged || whole_failed)
+        if (done || whole_failed || later)
           return;
         failed.insert(members);
         for (int j : g)
@@ -3947,19 +4004,26 @@ static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hi
         BRepTools::UVBounds(F, u0f, u1f, v0f, v1f);
         if (u1f - u0f > 2 * M_PI + 1e-6)
           return false;
-        occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
-        if (!swap_from.IsNull())
-          rs->Replace(swap_from, swap_to);
-        rs->Replace(a.Oriented(TopAbs_FORWARD), F);
-        for (size_t k = 1; k < g.size(); ++k)
-          rs->Remove(fm(g[k]));
-        const TopoDS_Shape out = rs->Apply(s);
-        if (out.IsNull())
-          return false;
-        if (each_valid && !valid_whole(out))
+        const bool                     batched_here = !one_by_one;
+        occ::handle<BRepTools_ReShape> rs;
+        TopoDS_Shape                   out;
+        if (!batched_here)
         {
-          whole_failed = true;
-          return false;
+          flush();
+          rs = new BRepTools_ReShape;
+          if (!swap_from.IsNull())
+            rs->Replace(swap_from, swap_to);
+          rs->Replace(a.Oriented(TopAbs_FORWARD), F);
+          for (size_t k = 1; k < g.size(); ++k)
+            rs->Remove(fm(g[k]));
+          out = rs->Apply(s);
+          if (out.IsNull())
+            return false;
+          if (each_valid && !valid_whole(out))
+          {
+            whole_failed = true;
+            return false;
+          }
         }
         // The volume kept: the new face's share of it against the group's faces' (one integral of each side; the
         // whole solid's integral is noisier than the change: 2.9e-7 of it on a part fused with its mirror, 11ed9bd7,
@@ -3967,8 +4031,12 @@ static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hi
         std::vector<TopoDS_Shape> before;
         for (int j : g)
           before.push_back(fm(j));
-        Bnd_Box box;
-        BRepBndLib::Add(s, box, false);
+        if (!part_box)
+        {
+          part_box = std::make_unique<Bnd_Box>();
+          BRepBndLib::Add(s, *part_box, false);
+        }
+        const Bnd_Box& box = *part_box;
         const double bv = box.IsVoid() ? 0 : std::pow(std::sqrt(box.SquareExtent()), 3);
         // (OCCT's integrals; in op_unify_precise's unify, where they disagree, the segmented ones about the box's
         // middle: GProp is loose on faces a Boolean's B-spline intersection curves bound, c2-impeller-loft's chamfer 26,
@@ -4029,6 +4097,18 @@ static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hi
           if (!t_precise_cylinder_merge || std::abs(faces_volume_precise({F.Oriented(a.Orientation())}, o) - faces_volume_precise(before, o)) > 1e-9 * bv)
             return false;
         }
+        if (batched_here)
+        {
+          if (batch.IsNull())
+            batch = new BRepTools_ReShape;
+          if (!swap_from.IsNull())
+            batch->Replace(swap_from, swap_to);
+          batch->Replace(a.Oriented(TopAbs_FORWARD), F);
+          for (size_t k = 1; k < g.size(); ++k)
+            batch->Remove(fm(g[k]));
+          batched.emplace_back(std::vector<TopoDS_Shape>(before.begin(), before.end()), F);
+          return true;
+        }
         HHist h = rs->History();
         if (h.IsNull())
           h = new BRepTools_History();
@@ -4036,6 +4116,7 @@ static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hi
           h->AddModified(fm(g[k]), F);
         local->Merge(h);
         s = out;
+        part_box.reset();
         return true;
       };
       if (chains.size() == 1)
@@ -4143,8 +4224,11 @@ static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hi
         };
         if (!build(false) && !build(true))
           continue;
-        merged = any = true;
-        break;
+        merged = any = done = true;
+        note(g, swap_from);
+        if (one_by_one)
+          break;
+        continue;
       }
       auto uv = [&](const gp_Pnt& p) {
         double u, v;
@@ -4209,7 +4293,13 @@ static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hi
         BRepBuilderAPI_MakeEdge        mk(circ, t0, t0 + 2 * M_PI);
         const ShapeList*               users = ef.Seek(e1);
         bool                           ok    = !p0.IsNull() && mk.IsDone() && users != nullptr;
-        TopoDS_Edge                    moved = ok ? mk.Edge() : TopoDS_Edge();
+        // (Its circle's other faces merged or rebuilt earlier this round: next round, on new maps.)
+        if (ok)
+          for (const TopoDS_Shape& u : *users)
+            later = later || changed.count(u.TShape().get()) != 0;
+        if (later)
+          continue;
+        TopoDS_Edge moved = ok ? mk.Edge() : TopoDS_Edge();
         if (ok)
         {
           BRep_Builder bb;
@@ -4474,9 +4564,12 @@ static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hi
       B.Add(F, W);
       if (!replace_by(F))
         continue;
-      merged = any = true;
-      break;
+      merged = any = done = true;
+      note(g, swap_from);
+      if (one_by_one)
+        break;
     }
+    flush();
     if (!merged)
       break;
   }

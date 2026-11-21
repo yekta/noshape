@@ -592,3 +592,42 @@ fn a_patterns_tools_group_as_their_copies_do() {
         assert_eq!(counts(&a), counts(&b), "width {width}");
     }
 }
+
+/// 16 pins of two stacked cylinders, the upper one mirrored (its frame left-handed) or turned a quarter turn (its
+/// circles' vertices elsewhere), fused to a plate: the model's unify gives each pin's wall one face, as one-piece pins
+/// (its groups merged in one pass over the part, not a pass each: c2-wire-clip-imported's Boolean 2).
+#[test]
+fn stacked_pins_unify_as_one_piece_pins() {
+    let plate = make_box_corners(DVec3::ZERO, DVec3::new(100.0, 100.0, 5.0)).unwrap();
+    let (r, n) = (4.0, 4);
+    let pins = |split: bool| {
+        let mut tools: Vec<Shape> = Vec::new();
+        for i in 0..n {
+            for j in 0..n {
+                let c = DVec3::new(20.0 + 20.0 * i as f64, 20.0 + 20.0 * j as f64, 4.0);
+                if !split {
+                    tools.push(make_cylinder(&Plane::new(c, DVec3::Z, DVec3::X), r, 21.0, 2.0 * PI).unwrap());
+                    continue;
+                }
+                tools.push(make_cylinder(&Plane::new(c, DVec3::Z, DVec3::X), r, 11.0, 2.0 * PI).unwrap());
+                let top = c + DVec3::new(0.0, 0.0, 11.0);
+                if (i + j) % 2 == 1 {
+                    tools.push(make_cylinder(&Plane::new(top, DVec3::Z, DVec3::Y), r, 10.0, 2.0 * PI).unwrap());
+                    continue;
+                }
+                let upper = make_cylinder(&Plane::new(top, DVec3::Z, DVec3::X), r, 10.0, 2.0 * PI).unwrap();
+                tools.push(upper.transformed(&Transform::Mirror(Plane::new(c, DVec3::Y, DVec3::X))).unwrap());
+            }
+        }
+        let fused = boolean(BooleanOp::Fuse, std::slice::from_ref(&plate), &tools, &BooleanOptions::default()).unwrap().shape;
+        unify_same_domain(&fused).unwrap().shape
+    };
+    let (split, whole) = (pins(true), pins(false));
+    assert!(split.is_valid(), "unified invalid");
+    let counts = |s: &Shape| (s.count(ShapeType::Face), s.count(ShapeType::Edge), s.count(ShapeType::Vertex));
+    assert_eq!(counts(&split), counts(&whole));
+    assert_eq!(split.count(ShapeType::Face), 6 + 2 * n * n);
+    let want = 100.0 * 100.0 * 5.0 + (n * n) as f64 * PI * r * r * 20.0;
+    let v = split.volume().unwrap();
+    assert!((v - want).abs() <= 1e-9 * want, "volume {v} against {want}");
+}
