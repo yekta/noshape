@@ -2973,7 +2973,8 @@ namespace noshape {
 void dump_op(const char* name, const TopoDS_Shape& s, const std::vector<TopoDS_Shape>& subs, const std::string& params)
 {
   const char* dir = std::getenv("NOSHAPE_DUMP_OPS");
-  if (dir == nullptr || s.IsNull())
+  const char* only = std::getenv("NOSHAPE_DUMP_ONLY");
+  if (dir == nullptr || s.IsNull() || (only != nullptr && std::string(only) != name))
     return;
   static std::atomic<int> seq{0};
   const std::string       base = std::string(dir) + "/" + name + "-" + std::to_string(seq++);

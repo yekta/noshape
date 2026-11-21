@@ -824,6 +824,12 @@ pub fn loft_guided_open(profiles: &[Shape], guides: &[Shape], trim_guides: bool,
     Shape::from_res(ffi::loft_guided_open(&p, &g, trim_guides, trim_profiles))
 }
 
+/// A surface loft through closed `profiles` in order (a point may end it at either side) along two `guides` or more
+/// meeting each: one face through every profile and guide.
+pub fn loft_guided_multi(profiles: &[Shape], guides: &[Shape]) -> Result<Shape> {
+    Shape::from_res(ffi::loft_guided_multi(&vec_to_list(profiles), &vec_to_list(guides)))
+}
+
 /// A surface loft from an open `profile` to the point `apex` between two `guides` from the profile's ends to it, as
 /// live's: the Coons sum of the four by their own parameters, smoothstep across the guides. `start_normal` (Normal to
 /// profile) turns the start onto that normal; `guide_conditions` (one per guide) mark guides with a condition.

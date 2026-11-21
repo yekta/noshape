@@ -387,8 +387,13 @@ const LOFT_GUIDE_MISS: &str = "All guides should intersect each profile boundary
 /// corners, ruled where no guide is, a Gordon surface with cubic Hermite
 /// blending through the guides elsewhere (within 0.2 mm³ of live).
 fn loft_guided(shapes: &[Shape], guides: &[Shape], solid: bool) -> FResult<Shape> {
-    let [a, b] = shapes else { return err("Loft guides with more than two profiles are not supported yet") };
-    k::loft_guided_curved(a, b, guides, solid).map_err(guided_error)
+    match shapes {
+        [a, b] => k::loft_guided_curved(a, b, guides, solid).map_err(guided_error),
+        // A surface through more profiles: one face (c2-surf-workshop-knifehandle's Loft 1: six closed profiles to a
+        // point between two guides, live one face).
+        _ if !solid && guides.len() >= 2 => k::loft_guided_multi(shapes, guides).map_err(guided_error),
+        _ => err("Loft guides with more than two profiles are not supported yet"),
+    }
 }
 
 fn guided_error(e: k::KernelError) -> crate::regen::eval::FeatureError {
@@ -1318,6 +1323,13 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         }
         let shape = if open {
             k::loft_guided_open(&shapes, &guides, ev.bool("trimGuidesByProfiles"), ev.bool("trimProfiles")).map_err(guided_error)?
+        } else if shapes.len() > 2 && !solid {
+            // Each guide on its own: guides meeting at a point profile chain into one wire.
+            let mut each = Vec::new();
+            for g in ev.params.array("guidesArray") {
+                each.extend(wires_from(&resolve_curves(ev, g.query("guideEntities"))?)?);
+            }
+            loft_guided(&shapes, &each, solid)?
         } else {
             loft_guided(&shapes, &guides, solid)?
         };

@@ -1110,6 +1110,42 @@ fn a_guided_loft_of_smooth_closed_profiles_has_one_side_face() {
     assert!((v - PI * 100.0 * 30.0).abs() < 1.0, "{v} mm³");
 }
 
+/// A surface loft through three circles to a point along two guides (c2-surf-workshop-knifehandle's Loft 1: six profiles
+/// to a point between two guides, live one face): one face through every profile and guide, its first circle two edges
+/// between the guides' ends, as live's (1/2/3 with the apex), where ours refused more than two profiles.
+#[test]
+fn a_guided_surface_loft_through_more_profiles_is_one_face() {
+    let stations = [(0.0, 10.0), (10.0, 9.0), (20.0, 6.0)];
+    let mut profiles: Vec<Shape> = stations.iter().map(|&(z, r)| make_wire(&[make_circle(DVec3::new(0.0, 0.0, z), DVec3::Z, r).unwrap()]).unwrap()).collect();
+    let apex = DVec3::new(0.0, 0.0, 30.0);
+    profiles.push(make_vertex(apex).unwrap());
+    let guides = [1.0, -1.0].map(|side: f64| {
+        let mut pts: Vec<DVec3> = stations.iter().map(|&(z, r)| DVec3::new(side * r, 0.0, z)).collect();
+        pts.push(apex);
+        make_interpolated_spline(&pts, &[], false).unwrap()
+    });
+    let s = loft_guided_multi(&profiles, &guides).unwrap();
+    assert!(s.is_valid());
+    let shown = s.shown_topology().unwrap();
+    assert_eq!((shown.face_count(), shown.edge_count(), shown.vertex_count()), (1, 2, 3), "faces / edges / vertices shown");
+    let face = &s.faces()[0];
+    for &(z, r) in &stations {
+        for k in 0..12 {
+            let a = k as f64 * PI / 6.0;
+            let d = face.project_point(DVec3::new(r * a.cos(), r * a.sin(), z)).unwrap().distance;
+            assert!(d < 1e-3, "profile at z {z}, angle {a}: {d} mm off the face");
+        }
+    }
+    for g in &guides {
+        let i = g.edge_info().unwrap();
+        for k in 1..10 {
+            let p = g.point_at(i.first_param + (i.last_param - i.first_param) * k as f64 / 10.0).unwrap();
+            let d = face.project_point(p).unwrap().distance;
+            assert!(d < 1e-3, "guide point {p}: {d} mm off the face");
+        }
+    }
+}
+
 /// A circle of two arcs (R12, at z 30) with straight guides at y ±10 → ±12 from the profile below, all times `k`
 /// (1e-3: metres, as the app models; its sewing tolerance is 1 µm there).
 fn loft_to_two_arcs(bottom: &Shape, k: f64) -> Shape {
