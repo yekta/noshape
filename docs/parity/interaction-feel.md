@@ -823,7 +823,7 @@ real app (green build, Xvfb, one app): our screen at live's camera (the ui-parit
 same crop round the pointer after live's rest, compared by shape, size at 1x and sampled colours: = or ≠. psui fixes,
 qa re-scores the cells on each land. Our crops: qa-scratch/hm/ (walk kit vibe2 ~/agents/qa-keep/walk3).
 
-**Matched: 31 / 88** (18:17: 28 / 77 on green 5b9feb71a; 4f2cb3ce's green adds the three midpoint approach cells (along the edge, from the
+**Matched: 31 / 92** (18:26, batch 3 0 / 15: 28 / 77 on green 5b9feb71a; 4f2cb3ce's green adds the three midpoint approach cells (along the edge, from the
 face, on a selected edge); batch 3 0 / 11 on 4f2cb3ce. Before psui's 1e44717c: Part Studio 18 / 26, sketch entities in the Part Studio 5 / 21,
 in sketch edit 8 / 25, Line-tool inference 0 / 5). Ours: live's document (block 40×30×20 + Sketch 2: point (60,25), line (60,5)–(90,5),
 arc c(75,15) r8 0.3..2.8 rad, circle c(100,20) r6), `f`, the same targets and states, a fresh app per cell; our fit matches live's camera
@@ -933,7 +933,7 @@ Line tool inference, sketch edit (0 / 5; live sk/inference-*-at):
 | … onto the line away from its midpoint | line lit, blue through; coincident cursor | line lit opaque; cursor = | ≠ P0 FEEL-SKETCH-BAND-MIDDLE |
 
 
-A feature dialog's selection field and the origin (batch 3; 0 / 11 on green 4f2cb3ce; live b3/, `_f` 1.2 s after arriving,
+A feature dialog's selection field, the origin and a mate connector (batch 3; 0 / 15 on green 4f2cb3ce; the Fillet cells with an edge picked at live's 1.3 mm radius; live b3/, `_f` 1.2 s after arriving,
 `_s` after the click; ours qa-scratch/hm2/b3-4f2c.png):
 
 | Cell | Live | Ours | Status |
@@ -942,13 +942,17 @@ A feature dialog's selection field and the origin (batch 3; 0 / 11 on green 4f2c
 | Fillet field, midpoint hovered | = the edge (no marker, no ring) | = our edge | ≠ P0 FEEL-FIELD-HOVER-DIM |
 | Fillet field, face hovered | 2 px #FFC685 boundary | boundary muted #B28A5D | ≠ P0 FEEL-FIELD-HOVER-DIM |
 | Fillet field, vertex hovered | the top front edge lights (the field takes edges and faces) | the vertical edge lights, muted | ≠ P0 FEEL-FIELD-VERTEX-EDGE, FEEL-FIELD-HOVER-DIM |
-| Fillet field, edge picked | #FFA90A band + the radius manipulator + the preview at live's 1.3 mm radius (4.6 px) | at 1.3 mm: pending | – |
-| Fillet field, picked edge hovered | = picked | at 1.3 mm: pending | – |
-| Fillet field, face hovered with an edge picked | the edge #FFA90A, the face boundary #FFC685 | boundary muted | ≠ P0 FEEL-FIELD-HOVER-DIM |
+| Fillet field, edge picked | at live's 1.3 mm radius: a ≈6 px orange strip (the band over the round's shading), the manipulator's open white arrow in the front face below the edge, pointing away from it | at 1.3 mm: a ≈3 px band between two black tangent lines; a filled white triangle on the band, pointing up | ≠ P0 FEEL-FILLET-MANIPULATOR |
+| Fillet field, picked edge hovered | = picked | = our picked | ≠ P0 FEEL-FILLET-MANIPULATOR |
+| Fillet field, face hovered with an edge picked | the edge #FFA90A, the face boundary #FFC685 | boundary muted; our manipulator | ≠ P0 FEEL-FIELD-HOVER-DIM, FEEL-FILLET-MANIPULATOR |
 | origin at the block's corner, hovered | the +x edge through it lights; the origin stays a black ring | the vertical edge lights, with its black midpoint marker | ≠ P0 FEEL-ORIGIN-HOVER-EDGE |
 | origin, clicked | the +x edge selected | the vertical edge selected | ≠ P0 FEEL-ORIGIN-HOVER-EDGE |
 | origin, selected + hovered | = selected | = our selected | ≠ P0 FEEL-ORIGIN-HOVER-EDGE |
 | origin hovered, the right face selected | = hovered | = our hovered | ≠ P0 FEEL-ORIGIN-HOVER-EDGE |
+| mate connector (top back right corner) hovered | disc fill #F4DF99, the owner face's edges #E1EC87 / #CDD975, the rim soft olive #C2C187 | fill and edges the same; a crisp 1 px navy #002847 rim round the ring and disc, a navy square at its front | ≠ P0 FEEL-MC-LOOK |
+| mate connector selected | fill #F6DA83, the same edges, the faces unchanged | fill the same; the owner faces tinted green #BED5A8 / #AFC39C; navy rim | ≠ P0 FEEL-MC-LOOK |
+| mate connector selected + hovered | = hovered | = our selected | ≠ P0 FEEL-MC-LOOK |
+| mate connector hovered, something else selected | = hovered | = our hovered | ≠ P0 FEEL-MC-LOOK |
 
 ## Captures 11-17 / 11-18 (audit: one row per feel finding)
 
