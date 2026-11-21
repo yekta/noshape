@@ -1,9 +1,9 @@
 {
  "scenario": "drw-custom-table-split",
- "recorded": "2026-11-20T17:30:16.926Z",
+ "recorded": "2026-11-21T20:03:00.139Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
   "viewport": [
    1919,
@@ -14,7 +14,7 @@
  "live": {
   "document": "060c0461ca301a2c112f155e",
   "workspace": "96663039d748842f7c25efc6",
-  "element": "a1fd548e3a9a18f4d66af5fc",
+  "element": "e7808d2d588ff10b744dbe08",
   "start": "block-drawing-table-2parts",
   "startElement": "0ecaddf2df9c5f5c2e342147",
   "runner": "live2 .nstate-uip-4.json"
@@ -45,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (2)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -181,7 +181,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -250,7 +250,7 @@
      }
     }
    },
-   "t": 226658
+   "t": 229688
   },
   {
    "step": 2,
@@ -313,7 +313,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -382,7 +382,7 @@
      }
     }
    },
-   "t": 253852
+   "t": 255826
   },
   {
    "step": 3,
@@ -457,7 +457,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -526,7 +526,7 @@
      }
     }
    },
-   "t": 280168
+   "t": 282612
   },
   {
    "step": 4,
@@ -609,7 +609,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -678,7 +678,7 @@
      }
     }
    },
-   "t": 305863
+   "t": 309361
   },
   {
    "step": 5,
@@ -754,7 +754,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -823,7 +823,7 @@
      }
     }
    },
-   "t": 332164
+   "t": 335994
   },
   {
    "step": 6,
@@ -891,7 +891,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -960,7 +960,7 @@
      }
     }
    },
-   "t": 358138
+   "t": 361680
   },
   {
    "step": 7,
@@ -1023,7 +1023,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1092,7 +1092,7 @@
      }
     }
    },
-   "t": 384661
+   "t": 388358
   },
   {
    "step": 8,
@@ -1136,7 +1136,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1188,7 +1188,16 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "{Part} {Faces} {Part 1} {6} {Part 2} {6}",
+       "position": [
+        124.4,
+        139.4
+       ]
+      }
+     ],
      "selection": [
       {
        "kind": "EDGE",
@@ -1210,7 +1219,7 @@
      }
     }
    },
-   "t": 411398
+   "t": 415824
   },
   {
    "step": 9,
@@ -1253,7 +1262,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1305,7 +1314,16 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "{Part} {Faces} {Part 1} {6} {Part 2} {6}",
+       "position": [
+        124.4,
+        139.4
+       ]
+      }
+     ],
      "selection": [
       {
        "kind": "EDGE",
@@ -1327,7 +1345,7 @@
      }
     }
    },
-   "t": 439012
+   "t": 442445
   },
   {
    "step": 10,
@@ -1363,7 +1381,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1415,7 +1433,16 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "{Part} {Faces} {Part 1} {6} {Part 2} {6}",
+       "position": [
+        124.4,
+        139.4
+       ]
+      }
+     ],
      "selection": [
       {
        "kind": "EDGE",
@@ -1437,7 +1464,7 @@
      }
     }
    },
-   "t": 464911
+   "t": 468976
   },
   {
    "step": 11,
@@ -1542,7 +1569,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1594,7 +1621,16 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "{Part} {Faces} {Part 1} {6} {Part 2} {6}",
+       "position": [
+        124.4,
+        139.4
+       ]
+      }
+     ],
      "selection": [
       {
        "kind": "EDGE",
@@ -1616,7 +1652,7 @@
      }
     }
    },
-   "t": 492096
+   "t": 495708
   },
   {
    "step": 12,
@@ -1713,7 +1749,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1765,7 +1801,16 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "{Part} {Faces} {Part 1} {6} {Part 2} {6}",
+       "position": [
+        124.4,
+        139.4
+       ]
+      }
+     ],
      "selection": [
       {
        "kind": "EDGE",
@@ -1787,7 +1832,7 @@
      }
     }
    },
-   "t": 519236
+   "t": 521613
   },
   {
    "step": 13,
@@ -1828,7 +1873,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1880,7 +1925,24 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "{Part} {Faces} {Part 1} {6}",
+       "position": [
+        124.4,
+        143
+       ]
+      },
+      {
+       "kind": "table",
+       "text": "{Part} {Faces} {Part 2} {6}",
+       "position": [
+        124.4,
+        125.7
+       ]
+      }
+     ],
      "selection": [
       {
        "kind": "EDGE",
@@ -1902,7 +1964,7 @@
      }
     }
    },
-   "t": 545950
+   "t": 549223
   },
   {
    "step": 14,
@@ -1938,7 +2000,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1990,7 +2052,24 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "{Part} {Faces} {Part 1} {6}",
+       "position": [
+        124.4,
+        143
+       ]
+      },
+      {
+       "kind": "table",
+       "text": "{Part} {Faces} {Part 2} {6}",
+       "position": [
+        124.4,
+        125.7
+       ]
+      }
+     ],
      "selection": [
       {
        "kind": "EDGE",
@@ -2012,7 +2091,7 @@
      }
     }
    },
-   "t": 572434
+   "t": 576087
   },
   {
    "step": 15,
@@ -2055,7 +2134,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2107,7 +2186,24 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "{Part} {Faces} {Part 1} {6}",
+       "position": [
+        124.4,
+        143
+       ]
+      },
+      {
+       "kind": "table",
+       "text": "{Part} {Faces} {Part 2} {6}",
+       "position": [
+        124.4,
+        125.7
+       ]
+      }
+     ],
      "selection": [
       {
        "kind": "EDGE",
@@ -2129,7 +2225,7 @@
      }
     }
    },
-   "t": 599284
+   "t": 603973
   },
   {
    "step": 16,
@@ -2165,7 +2261,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2217,7 +2313,24 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "{Part} {Faces} {Part 1} {6}",
+       "position": [
+        124.4,
+        143
+       ]
+      },
+      {
+       "kind": "table",
+       "text": "{Part} {Faces} {Part 2} {6}",
+       "position": [
+        124.4,
+        125.7
+       ]
+      }
+     ],
      "selection": [
       {
        "kind": "EDGE",
@@ -2239,7 +2352,7 @@
      }
     }
    },
-   "t": 625298
+   "t": 632184
   }
  ]
 }
