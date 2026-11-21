@@ -36,14 +36,15 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (09:33 UTC 11-21)
+## Now (10:02 UTC 11-21)
 
-LAND FAILED 08:43: 4dbaaee1 + 724a4f2b on features_b::reference_misc_point_composite_query (its filler Name entity was
-empty; 724a4f2b's "Invalid input selections." is live's). Test fixed in tree (names the top face); f90a1ef9 (sk batch,
-queued 09:18) carries the same and will fail too: re-land after the Mac run of model features_a / features_b.
+QUEUED f2dd922d (10:01): 39e9d745 (empty-feature errors, was 724a4f2b) + a8fd1889 (Routing curve buttons) + f90a1ef9
+(sk batch) + b5ef75d4 (Split midpoint, Origin pick, ellipse/plane refused, drag rule, features_b filler names a face).
+Mac before: model features_a + features_b::reference_misc 126/126, scene 197, part-studio-ui sketch 311, clippy clean.
+(Lands at 08:43 and 09:35 failed on features_b::reference_misc_point_composite_query: the filler Name entity was empty.)
 
 sk-1 + sk-2 (21 takes, in tests/ui-parity with f90a1ef9). Rerun sk12b (vibex8, copy /root/psui-scratch/sk/sk12b):
-12/21, 306/344. In tree since (not in sk12b): polygon drop (curves held at the drag's start), 3pt circle Origin tie;
+12/21, 306/344. In f2dd922d (not in sk12b): polygon drop (curves held at the drag's start), 3pt circle Origin tie;
 a sketch point on the Origin picked before it (sketch_pick_at; dim hv-two-points, circle-centres); Split by a line's
 middle cuts at the midpoint + MIDPOINT of its ends (live geo-list6); an ellipse and a plane refused with
 DIMENSION_FAILED (dim-ellipse-axes); tests in scene sketch_mode + sketch_ui_tests. Open: transform-drag-copy (live's
