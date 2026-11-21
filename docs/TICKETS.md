@@ -67,6 +67,12 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   Lyy 106666.657, Lzz 133333.321; about the corner, 106666.664 / 426666.657 / 533333.321. Live (exact for a plane) reads
   ….667 / ….667 / ….333: our integration is off by up to 0.012 mm⁴ on a flat rectangle.
 
+- [ ] P3 **ROLLBACK-ABOVE-BAR-SECTION-VIEW (psui)**: green 70795e7e3 (9790d27d7), live dm/rollback-menus.json. With the bar rolled
+  under Sketch 1, Sketch 1's menu matches live (Hide in place of Show, Roll to end in place of Roll to here) but has an extra
+  "Section view…" after Export as DXF/DWG…. Live's Sketch 1 menu has none, before or after the roll; ours has none before the
+  roll. Frame 1 below the bar matches live's Extrude 1 (Configure suppression only with a configuration, Add comment is cloud).
+  Not judged: Hide other / all sketches (live's doc had two sketches, ours one). qa-scratch/walk2/g1c, g5c, g7c.png.
+
 ## qa, 2026-11-21 (agent API gaps)
 - [ ] P2 **OP-MASS-FACE-SECTION (asm; Part Studio side: lead to route)**: Mass and section properties › Face (area, perimeter,
   area moments Lxx / Lxy / Lyy / Lzz, optionally about "Mate connector for reference frame") has no op. assembly_mass_properties
@@ -194,7 +200,7 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   panel's bottom (16 px, the table's visible width; 18 px while the pointer is over it) whenever the table's own bottom is
   out of view (osc-sticky-scroll-component). Ours (config_panel.rs): the header scrolls away; the sideways scrollbar is
   only at the table's bottom. Evidence: releases/rn-1222-1223/st2.json, st7.json, sticky-h-*.png, sticky-800.png.
-- [ ] P2 **CUTLIST-WHEEL-SIDEWAYS (psui)** (fixed psui 11-21 04:0x, to verify: a 24-row Cut list wider than the panel: a plain wheel over the rows or header scrolls the panel, Shift+wheel or a sideways wheel the table (the panel stays), the footer strip nothing) (qa 11-21 00:2x, green 16046fa3a vibe2, walk1.md): in the Cut list, a mouse wheel over the rows scrolls the table sideways instead of scrolling the panel down (wider-than-panel table). Live (behaviours "CUTLIST-WHEEL-SIDEWAYS", 11-21 03:11, live/qa/cutlist-wheel/: 24-row Cut list, 981 px table in a 697 px Tables panel): a plain wheel over the rows or the header scrolls the PANEL down, never the table sideways; Shift+wheel or a horizontal wheel (deltaX) scrolls the table sideways and the panel stays put; a wheel over the footer strip below the table scrolls nothing. Ours is wrong.
+- [x] verified green 70795e7e3 (qa 11-21 06:0x, vibe2, qa-scratch/walk2/cl-wheel.png, cl-h7c.png: 25-row Cut list; wheel over the footer: nothing; sideways wheel and Shift+wheel over the rows: the table scrolls, the title stays; plain wheel over the rows: the panel scrolls (header sticky, sideways offset kept); wheel up over the sticky header: the panel back to the top) P2 **CUTLIST-WHEEL-SIDEWAYS (psui)** (fixed psui 11-21 04:0x, to verify: a 24-row Cut list wider than the panel: a plain wheel over the rows or header scrolls the panel, Shift+wheel or a sideways wheel the table (the panel stays), the footer strip nothing) (qa 11-21 00:2x, green 16046fa3a vibe2, walk1.md): in the Cut list, a mouse wheel over the rows scrolls the table sideways instead of scrolling the panel down (wider-than-panel table). Live (behaviours "CUTLIST-WHEEL-SIDEWAYS", 11-21 03:11, live/qa/cutlist-wheel/: 24-row Cut list, 981 px table in a 697 px Tables panel): a plain wheel over the rows or the header scrolls the PANEL down, never the table sideways; Shift+wheel or a horizontal wheel (deltaX) scrolls the table sideways and the panel stays put; a wheel over the footer strip below the table scrolls nothing. Ours is wrong.
 - [x] (dx 11-20: b7c2c4e8a, e2e test) P2 **URDF-RIGID-SUBASM-SINGLE-LINK (dx)**: Onshape 1.223 "merging subassemblies into a single body in URDF export".
   Live 05:42, assembly Export › URDF: Geometry format, STL Format, Resolution, Options, ☐ "Export rigid subassemblies as a
   single link", ☐ Include hidden instances in export. Ours' URDF export has no such option. Evidence:

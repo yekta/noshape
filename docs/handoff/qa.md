@@ -86,7 +86,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    USER-HOVER-STAYS-LIT is listed as known in the cut's entry until psui's latest-wins picking fix passes 3 clean runs.
 
 ## Next (in this order)
-00c. asm P2 walk 11-21 05:5x DONE (b3ece860, vibe2 ~/tmp/qa/walk2: mk.py docs A / Others / Rel, run.sh, x.sh; shots /root/qa-scratch/walk2): 4 verified; new ASM-VERTEX-CONNECTOR-WORLD-AXES, INSERT-OTHER-DOC-GRAPH-MARKS, P3 FACE-MOMENT-DIGITS (asm). Waiting on greens: psui 3714e6ce (CUTLIST-WHEEL-SIDEWAYS walk), asm f0783c78 (CLI faces+reference: expect 106666.667/160000/426666.667/533333.333 with a world-aligned connector), core MANUALBLEND Move boundary.
+00c. asm P2 walk 11-21 05:5x DONE (b3ece860, vibe2 ~/tmp/qa/walk2: mk.py docs A / Others / Rel, run.sh, x.sh; shots /root/qa-scratch/walk2): 4 verified; new ASM-VERTEX-CONNECTOR-WORLD-AXES, INSERT-OTHER-DOC-GRAPH-MARKS, P3 FACE-MOMENT-DIGITS (asm). CUTLIST-WHEEL-SIDEWAYS verified 06:0x (70795e7e3), P3 ROLLBACK-ABOVE-BAR-SECTION-VIEW (psui). Waiting on greens: asm f0783c78 (queued; match by subject) (CLI faces+reference: expect 106666.667/160000/426666.667/533333.333 with a world-aligned connector), core MANUALBLEND Move boundary.
 00b. **Live's 21 feel rows (11-20, lead 04:1x) DONE 04:3x** on green 9ae062180: 18 P0 feel tickets, all routed (rows FEEL-* in TICKETS
    "qa, 2026-11-20 (live's feel coverage rows …)": 15e785522 sketch skasm 3 / psui 1, e79906b34 studios 8, 51d079b3c asm 3 / skasm 1 / psui 2).
    Sketch rows ran as live's recordings (qa-bisect, uncommitted, suites/1120-feel-cov2; R4 inconclusive per live). Crops /root/qa-scratch/feel1120/.
