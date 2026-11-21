@@ -5,10 +5,10 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-21 17:07 UTC) — RESUME HERE
-- Landed today: d5b89d4d as 4a22b296 (Between / Realign in a flexible sub's parent solve, Lxy 0), 5658c8fc as
+## State (2026-11-21 18:12 UTC) — RESUME HERE
+- Landed today: 407b09fc as 89180ec5 (scissor P0), d5b89d4d as 4a22b296 (Between / Realign in a flexible sub's parent solve, Lxy 0), 5658c8fc as
   4c701d14 (Insert › Other documents graph residuals).
-- P0 scissor (asm-scissor-lift 10 s -> 349 s / 18-22 GB): fix landing 17:1x. Causes: (1) my 42f934e10 rebuilt each
+- P0 scissor (asm-scissor-lift 10 s -> 349 s / 18-22 GB): fix LANDED 89180ec5. Causes: (1) my 42f934e10 rebuilt each
   Derived's whole source chain in every studio (0c2c42 feature 6 4.3 -> 37 s); (2) tests/parity.rs' `named` loop
   copied every same-corpus source (with its own sources) into each studio's derivedSources: 8.8 GB before the first
   feature, earlyoom at 18 GB; (3) new data: Plate (0da59a) derives 2d82a0 (178 features, fetched 11-21 04:33), which
@@ -24,11 +24,15 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   inference 21/22 -> VIRTUAL_SHARP in refgeom.rs `virtual_sharp`, test features_b
   a_virtual_sharp_mate_connector_is_at_the_rounded_corner). transform-carry (ops/assembly.rs, mate_flip.rs) HELD,
   out of the worktree: /root/asm-scratch/transform-carry.patch (git apply after the land).
-- NEXT isaac Studio a04711 (blend sent back): Sketch 10 untranslated (solve moved 4.8e15 mm), sketches 5/8/9 external
-  refs unmapped (Sketch 9 Jpc/JpV/JpU, Sketch 10 J3Q/J1B/JpN/JyM: "no live geometry"; the studio has context.jsonl,
-  no refs.jsonl), Extrude 14 "no geometry change" (live Part 2 5480 -> 6256.4 mm³ at index 23). Save run (ops-mc2)
-  -> vibe2 ~/tmp/asm/save/asm-isaac-ball.noshape: copy to a 700 dir, delete features from 23 on, query_parts vs live
-  (index 22: Part 1 1789.9, Part 2 5480.0, Part 3 667.4 mm³). Mates before: 126/129, BOM 60/62.
+- Scissor user-facing open (saved doc, open_profile, vibe2 17:5x): 100 s one after another, 1.9 GB; the app's parallel
+  prewarm leaves 57725f's Derived chain (serial) at 53 s vs live 17-19 s. All failing-slow features (live OK): 2d82a0
+  Fillet 13 18.9 s, 9cbb0e Fillet 23, 665cf3 Fillet 4 -> blend P0; Move face b58244 6/8/2, 0139f2 2/3, 665cf3 1 -> core
+  P0; 184ad0 Spur Gear (herringbone opBoolean NON_MANIFOLD, helical+double only) -> bool P0 (took it 18:05); ticket
+  FS-ERROR-ENUM-VERSION (core) landed da49b2418. isaac open: 86 s serial, slowest studio 15 s (≈ live in parallel).
+- isaac a04711: Sketch 9 / 10 translate exactly on live's vertices; volumes as live through live index 22. Extrude 14
+  (ADD symmetric 12 mm, scope Part 2): Part 2 ∪ tool drops the tool (OCCT and ours alike; tool's front half apart, back
+  inside; live +776.4 mm³). Routed to bool P1 (repro vibex8 ~/tmp/asm/q/id.jsonl on isaac.noshape); blend told. Our
+  Part 2 has 19 faces vs live 17 from Loft 1.
 - Then: xdev-subs / pinslot reruns (vibex7 ops-mc, before 146/266 and 24/42), suspension rerun, infento traced rerun
   (sub-mate offsets bdf7bf 4.6 mm, b63c40 8.33 / 7.2 mm, dfc972 1.56 mm). bjr Sub c1e15f Fastened 3/4, pinslot
   Revolute 5, tvc 41/43, keyboard BOM 15/16.
