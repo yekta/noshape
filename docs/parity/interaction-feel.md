@@ -811,6 +811,23 @@ live2's feedback.json (11-13 09:39, for psui and studios). part-studio-ui `feedb
 | Its dialog | Sketch 1 deleted under Extrude 1: the title red, the lost region a red "Missing Face" entry, ✓ not disabled (an edge whose feature is only below reads "Edge of Extrude 1": live fillet-chip-edit-healthy-moment) | "Face of deleted feature"; now "Missing Face" | = (fixed) |
 | Not yet in the matrix | a failed preview (live feedback-gaps 11-16, Shell 20 mm on the 10 mm block: every edge of the part red rgb(189, 48, 57) ~5 px, faces tinted (rgb(125, 106, 119) on the dark sides), the title red, the face chip and the feature row red, ✓ still enabled; ours the same since 11-16 (core's `FeatureState::error_parts` 601df0ac, `scene_builder::error_geometry(…, ghost: false)`: the part's shading under rgb(189,48,57) at 25 %, edges 5 px): top face (162,156,176) as live, front (124,107,120) vs (125,107,120); a Feature pattern's ghosts keep the dark 60 % style); the commit's working overlay (live first seen 1119 ms after ✓, polled every 40–150 ms; ours 1200 ms: within a frame or two, not changed without a finer measure); toasts (studios: success rgb(221,246,204), top centre, 5.1 s, no stacking, hover doesn't pause); empty states | – | – |
 
+## Hover × selection state (matrix, USER P0 11-21; scored by qa)
+
+What a hover looks like on top of a selection, the combinations the rows above test one state at a time. Live:
+live/psui/hover-matrix-1121/ (capture started 11-21 16:39). A cell is a hover target (vertex, an edge's midpoint, an
+edge away from it, a face, a plane, a sketch point / line / midpoint, a mate connector) × a selection state (nothing;
+the target itself; its owner, e.g. the edge of a hovered point or the face of a hovered edge; something else) × a
+context (Part Studio with no tool, sketch mode, a feature dialog's field, an assembly). qa scores each cell on the
+real app (green build, Xvfb, one app): our screen at live's camera (the ui-parity replay with NOSHAPE_UI_SHOTS), the
+same crop round the pointer after live's rest, compared by shape, size at 1x and sampled colours: = or ≠. psui fixes,
+qa re-scores the cells on each land. Our crops: qa-scratch/hm/ (walk kit vibe2 ~/agents/qa-keep/walk3).
+
+**Matched: 0 / 1** (11-21 16:5x, green 5b9feb71a; the rest when live's cells land)
+
+| Cell (context / hover target / selection) | Live | Ours | Status |
+|---|---|---|---|
+| Part Studio, no tool / an edge's midpoint / that edge selected | a solid orange dot with a soft orange halo (user shot, lead-scratch/user-shots/) | a cream dot with a black ring, as on an unselected edge (hm/B.png B1) | ≠ P0 FEEL-HOVER-POINT-ON-SELECTED-EDGE |
+
 ## Captures 11-17 / 11-18 (audit: one row per feel finding)
 
 Every feel finding recorded in onshape-research/live/behaviours.md on 11-17 and 11-18 for the Part Studio, with the
