@@ -300,7 +300,7 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   Ours: hovered a ring with an opaque light centre (#F8C488 rim, centre #FFD8AC: the midpoint's arrived-ring look), selected the
   yellow midpoint ring (#FAC012 rim, #FFD65B centre), so 4 of the 5 vertex cells differ. Side by side: qa-scratch/hm2/cmp-1.png
   (top row; live / ours alternate). qa 17:1x, green 5b9feb71a, live's block and camera (gen kit qa-scratch/hm2/gen).
-- [ ] P0 (model edges verified qa 18:51, green 1118a1b6f: 3 cells =; the sketch line cells re-running) **FEEL-MIDPOINT-MARKER-OVER-BAND (psui)**: the dark marker at a hovered edge's midpoint. Live draws it under the 5 px hover
+- [x] verified (qa 18:51 model edges, green 1118a1b6f; 19:57 the sketch line in the Part Studio, green 6be52caf4: dark only at its sides under the band) **FEEL-MIDPOINT-MARKER-OVER-BAND (psui)**: the dark marker at a hovered edge's midpoint. Live draws it under the 5 px hover
   band: dark only at its two sides along the edge, 15 px darker than luma 80 in the 21×21 round it (8 near-black), its centre
   #FFD3A0; ≈7 px across, ours ≈10. Ours draws an opaque black ring over the band: 22 px dark (11 black). 6 cells differ: an edge
   hovered / selected + hovered / hovered with a face selected, and the same three on a sketch line in the Part Studio (the
@@ -314,25 +314,25 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   the edge, 90°, ±45°, 135°, 1–2 px steps) lights only the point (light-orange ring, the edge black), already at 0.2 s. Ours on
   5b9feb71a, approached in 2 px steps from the top or the front face: band + black ring (qa-scratch/hm2/midapp.png). So the jump
   case must not be kept apart: psui's 4f2cb3ce subject says it keeps the edge lit when landed straight on (re-scored on its green).
-- [ ] (psui 18:13 11-21: fixed in the batch-2 commit, hover_matrix sketch_*/sk_* cells; qa to verify) P0 **FEEL-SKETCH-BAND-MIDDLE (psui)**: a hovered or selected sketch curve. Live blends the band with the curve's own colour: in the
+- [ ] (qa 19:57, green 6be52caf4: 33 of the 34 cells now blend as live, e.g. sketch edit hovered #C79B95 vs live #C79A95; still open: the line the Line tool's inference lights (inf-on-line) is opaque, #ECB78A / #FFC685 with no blue through, live #C79A95) P0 **FEEL-SKETCH-BAND-MIDDLE (psui)**: a hovered or selected sketch curve. Live blends the band with the curve's own colour: in the
   Part Studio (grey curve) the middle reads #F2C694 hovered / #F2B034 selected; in sketch edit (blue curve) #C89C96 / #C88536,
   the blue showing through. Ours darkens the middle: #D2A674 / #D29015 in the Part Studio, #CA9F6D / #CA890D in sketch edit, no blue.
   Lines, arcs, the circle; 17 cells (live hover-matrix-1121 ps/sketch-*, sk/*; ours qa-scratch/hm2/b2-ps.png, b2-sk.png).
-- [ ] (psui 18:13 11-21: fixed in the batch-2 commit, hover_matrix sketch_*/sk_* cells; qa to verify) P0 **FEEL-SKETCH-POINT-LOOK (psui)**: a sketch point. Live hovered: an 11 px translucent light-orange disc with the point's ring
+- [x] verified (qa 19:57, green 6be52caf4, psui ee4c1f6a; ours qa-scratch/hm2/ps-ee4c.png, sk-ee4c.png, inf-ee4c.png) P0 **FEEL-SKETCH-POINT-LOOK (psui)**: a sketch point. Live hovered: an 11 px translucent light-orange disc with the point's ring
   showing through (centre #FFD8AC). Live selected: a filled orange disc (#FEB01E, centre #FFC458), the ring through. Ours hovered:
   a flat opaque #F8C488 disc in the Part Studio, a hollow ring with a white centre in sketch edit. Ours selected: a hollow #FFA90A
   ring with a white centre. Selected + hovered: live = selected, ours the hovered look (Part Studio). 8 cells.
-- [ ] (psui 18:13 11-21: fixed in the batch-2 commit, hover_matrix sketch_*/sk_* cells; qa to verify) P0 **FEEL-SKETCH-CIRCLE-CENTRE-PS (psui)**: a sketch circle's centre point, in the Part Studio (sketch not edited). Live draws it at
+- [x] verified (qa 19:57, green 6be52caf4, psui ee4c1f6a; ours qa-scratch/hm2/ps-ee4c.png, sk-ee4c.png, inf-ee4c.png) P0 **FEEL-SKETCH-CIRCLE-CENTRE-PS (psui)**: a sketch circle's centre point, in the Part Studio (sketch not edited). Live draws it at
   rest (a grey #999A9B dot) and selected (an 11 px #FFA90A dot). Ours draws it only while hovered; selected leaves a 2 px trace.
   Sketch edit =. 3 cells (live ps/sketch-region-*).
-- [ ] (psui 18:13 11-21: fixed in the batch-2 commit, hover_matrix sketch_*/sk_* cells; qa to verify) P0 **FEEL-SKETCH-MIDPOINT-CLICK-PS (psui)**: in the Part Studio, a click on a sketch line's or arc's midpoint selects the midpoint
+- [x] verified (qa 19:57, green 6be52caf4, psui ee4c1f6a; ours qa-scratch/hm2/ps-ee4c.png, sk-ee4c.png, inf-ee4c.png) P0 **FEEL-SKETCH-MIDPOINT-CLICK-PS (psui)**: in the Part Studio, a click on a sketch line's or arc's midpoint selects the midpoint
   in live (the yellow ring #F7C01D / #FFD65B; hovered then the light-orange ring). Ours selects the whole curve. A model edge's
   midpoint already selects as live. 4 cells (ps/sketch-linemid-selected*, sketch-arc-selected*).
-- [ ] (psui 18:13 11-21: fixed in the batch-2 commit, hover_matrix sketch_*/sk_* cells; qa to verify) P0 **FEEL-SKETCH-INFERENCE-MARKER (psui)**: Line tool in sketch edit at an iso view, pointer on a point or on a line's midpoint.
+- [x] verified (qa 19:57, green 6be52caf4, psui ee4c1f6a; ours qa-scratch/hm2/ps-ee4c.png, sk-ee4c.png, inf-ee4c.png) P0 **FEEL-SKETCH-INFERENCE-MARKER (psui)**: Line tool in sketch edit at an iso view, pointer on a point or on a line's midpoint.
   Live: a #FFCC34 square lying in the sketch plane (a rhombus at this view) round the target, and the target lit (the point's
   light-orange disc; the line's #FFC685 band). Ours: a screen-aligned yellow square, the target not lit. Glyphs and cursors =.
   Live sk/inference-on-point-at, inference-mid-of-line-at; ours qa-scratch/hm2/inf-zoom.png.
-- [ ] (psui 18:13 11-21: fixed in the batch-2 commit, hover_matrix sketch_*/sk_* cells; qa to verify) P0 **FEEL-SKETCH-PREVIEW-LENGTH (psui)**: the length label while drawing a line at an iso view. Live writes it in the sketch
+- [x] verified (qa 19:57, green 6be52caf4, psui ee4c1f6a; ours qa-scratch/hm2/ps-ee4c.png, sk-ee4c.png, inf-ee4c.png) P0 **FEEL-SKETCH-PREVIEW-LENGTH (psui)**: the length label while drawing a line at an iso view. Live writes it in the sketch
   plane (slanted, small, light blue, beside the line's middle). Ours writes it upright in screen space, larger, over the line's start.
   Live sk/inference-horiz-to-point-at, inference-vertical-at; ours qa-scratch/hm2/inf-zoom.png, inf-v.png.
   All six: qa 18:0x, green 5b9feb71a, live's document and camera (kit qa-scratch/hm2/gen2); scored in interaction-feel.md.

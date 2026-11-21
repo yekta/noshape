@@ -824,7 +824,7 @@ real app (green build, Xvfb, one app): our screen at live's camera (the ui-parit
 same crop round the pointer after live's rest, compared by shape, size at 1x and sampled colours: = or ≠. psui fixes,
 qa re-scores the cells on each land. Our crops: qa-scratch/hm/ (walk kit vibe2 ~/agents/qa-keep/walk3).
 
-**Matched: 39 / 92** (18:51: Part Studio 26 / 26 on green 1118a1b6f (psui's 1e44717c), batch 3 0 / 15 there too; sketch tables pending their re-run. Before, 18:26: 28 / 77 on green 5b9feb71a; 4f2cb3ce's green adds the three midpoint approach cells (along the edge, from the
+**Matched: 76 / 92** (19:57: batch 2 50 / 51 on green 6be52caf4 (psui's ee4c1f6a); Part Studio 26 / 26 and batch 3 0 / 15 unchanged. Before, 39 / 92 at 18:51: Part Studio 26 / 26 on green 1118a1b6f (psui's 1e44717c), batch 3 0 / 15 there too; sketch tables pending their re-run. Before, 18:26: 28 / 77 on green 5b9feb71a; 4f2cb3ce's green adds the three midpoint approach cells (along the edge, from the
 face, on a selected edge); batch 3 0 / 11 on 4f2cb3ce. Before psui's 1e44717c: Part Studio 18 / 26, sketch entities in the Part Studio 5 / 21,
 in sketch edit 8 / 25, Line-tool inference 0 / 5). Ours: live's document (block 40×30×20 + Sketch 2: point (60,25), line (60,5)–(90,5),
 arc c(75,15) r8 0.3..2.8 rad, circle c(100,20) r6), `f`, the same targets and states, a fresh app per cell; our fit matches live's camera
@@ -866,72 +866,72 @@ Part Studio, no tool (26 / 26 on 1118a1b6f, psui's 1e44717c):
 | plane / selected + hovered | = selected | the same | = |
 | plane / hovered, a face selected | = hovered | the same | = |
 
-Sketch 2's entities in the Part Studio, sketch not edited (5 / 21; the arc and the line midpoint hovered or hovered with the circle
+Sketch 2's entities in the Part Studio, sketch not edited (21 / 21 on 6be52caf4, psui's ee4c1f6a; the arc and the line midpoint hovered or hovered with the circle
 selected are single-jump cells, not scored):
 
 | Target / state | Live | Ours | Status |
 |---|---|---|---|
 | arc / none | grey arc | the same | = |
-| arc / selected (click at its middle) | the midpoint selected: yellow ring | the arc selected (band) | ≠ P0 FEEL-SKETCH-MIDPOINT-CLICK-PS (fixed psui 11-21 18:13, qa to re-score) |
-| arc / selected + hovered | light-orange ring | band + black ring | ≠ P0 FEEL-SKETCH-MIDPOINT-CLICK-PS (fixed psui 11-21 18:13, qa to re-score) |
+| arc / selected (click at its middle) | the midpoint selected: yellow ring | the same on 6be52caf4 | = |
+| arc / selected + hovered | light-orange ring | the same on 6be52caf4 | = |
 | line / none | grey line | the same | = |
-| line / hovered | band, middle light #F2C694, + marker under it | middle dark #D2A674, black ring over it | ≠ P0 FEEL-SKETCH-BAND-MIDDLE, P0 FEEL-MIDPOINT-MARKER-OVER-BAND |
-| line / selected | band #FDB124, middle #F2B034 | middle #D29015 | ≠ P0 FEEL-SKETCH-BAND-MIDDLE (fixed psui 11-21 18:13, qa to re-score) |
-| line / selected + hovered | = selected + marker | dark middle + black ring | ≠ P0 FEEL-SKETCH-BAND-MIDDLE, P0 FEEL-MIDPOINT-MARKER-OVER-BAND |
-| line / hovered, the circle selected | = hovered | = our hovered | ≠ P0 FEEL-SKETCH-BAND-MIDDLE, P0 FEEL-MIDPOINT-MARKER-OVER-BAND |
+| line / hovered | band, middle light #F2C694, + marker under it | the same on 6be52caf4 | = |
+| line / selected | band #FDB124, middle #F2B034 | the same on 6be52caf4 | = |
+| line / selected + hovered | = selected + marker | the same on 6be52caf4 | = |
+| line / hovered, the circle selected | = hovered | the same on 6be52caf4 | = |
 | line midpoint / none | — | the same | = |
-| line midpoint / selected | yellow ring #F7C01D / #FFD65B | the line selected | ≠ P0 FEEL-SKETCH-MIDPOINT-CLICK-PS (fixed psui 11-21 18:13, qa to re-score) |
-| line midpoint / selected + hovered | light-orange ring #FFD8AC | band + black ring | ≠ P0 FEEL-SKETCH-MIDPOINT-CLICK-PS (fixed psui 11-21 18:13, qa to re-score) |
+| line midpoint / selected | yellow ring #F7C01D / #FFD65B | the same on 6be52caf4 | = |
+| line midpoint / selected + hovered | light-orange ring #FFD8AC | the same on 6be52caf4 | = |
 | point / none | grey ring | the same | = |
-| point / hovered | 11 px translucent light-orange disc, the point's ring through (centre #FFD8AC) | opaque flat #F8C488 disc | ≠ P0 FEEL-SKETCH-POINT-LOOK (fixed psui 11-21 18:13, qa to re-score) |
-| point / selected | orange disc #FEB01E, centre #FFC458 | hollow #FFA90A ring, white centre | ≠ P0 FEEL-SKETCH-POINT-LOOK (fixed psui 11-21 18:13, qa to re-score) |
-| point / selected + hovered | = selected | the hovered disc | ≠ P0 FEEL-SKETCH-POINT-LOOK (fixed psui 11-21 18:13, qa to re-score) |
-| point / hovered, the circle selected | = hovered | = our hovered | ≠ P0 FEEL-SKETCH-POINT-LOOK (fixed psui 11-21 18:13, qa to re-score) |
-| circle centre / none | grey dot #999A9B | not drawn | ≠ P0 FEEL-SKETCH-CIRCLE-CENTRE-PS (fixed psui 11-21 18:13, qa to re-score) |
+| point / hovered | 11 px translucent light-orange disc, the point's ring through (centre #FFD8AC) | the same on 6be52caf4 | = |
+| point / selected | orange disc #FEB01E, centre #FFC458 | the same on 6be52caf4 | = |
+| point / selected + hovered | = selected | the same on 6be52caf4 | = |
+| point / hovered, the circle selected | = hovered | the same on 6be52caf4 | = |
+| circle centre / none | grey dot #999A9B | the same on 6be52caf4 | = |
 | circle centre / hovered | light-orange dot #FEC789 | #F8C488 | = |
-| circle centre / selected | 11 px #FFA90A dot | a 2 px trace | ≠ P0 FEEL-SKETCH-CIRCLE-CENTRE-PS (fixed psui 11-21 18:13, qa to re-score) |
-| circle centre / selected + hovered | = selected | the hovered dot | ≠ P0 FEEL-SKETCH-CIRCLE-CENTRE-PS (fixed psui 11-21 18:13, qa to re-score) |
-| circle centre / hovered, the circle selected | circle band light middle #EEAB2F | dark middle #D18B09 | ≠ P0 FEEL-SKETCH-BAND-MIDDLE (fixed psui 11-21 18:13, qa to re-score) |
+| circle centre / selected | 11 px #FFA90A dot | the same on 6be52caf4 | = |
+| circle centre / selected + hovered | = selected | the same on 6be52caf4 | = |
+| circle centre / hovered, the circle selected | circle band light middle #EEAB2F | the same on 6be52caf4 | = |
 
-Sketch edit (double-click Sketch 2; 8 / 25):
+Sketch edit (double-click Sketch 2; 25 / 25 on 6be52caf4):
 
 | Target / state | Live | Ours | Status |
 |---|---|---|---|
 | arc / none | blue | the same | = |
-| arc / hovered | #FFC685 band, the blue {n} through its middle #C89C96 | middle #CA9F6D, no blue | ≠ P0 FEEL-SKETCH-BAND-MIDDLE (fixed psui 11-21 18:13, qa to re-score) |
-| arc / selected | #FFA90A over blue, middle #C88536 | middle #CA890D | ≠ P0 FEEL-SKETCH-BAND-MIDDLE (fixed psui 11-21 18:13, qa to re-score) |
-| arc / selected + hovered | = selected | = our selected | ≠ P0 FEEL-SKETCH-BAND-MIDDLE (fixed psui 11-21 18:13, qa to re-score) |
-| arc / hovered, the circle selected | = hovered | = our hovered | ≠ P0 FEEL-SKETCH-BAND-MIDDLE (fixed psui 11-21 18:13, qa to re-score) |
+| arc / hovered | #FFC685 band, the blue {n} through its middle #C89C96 | the same on 6be52caf4 | = |
+| arc / selected | #FFA90A over blue, middle #C88536 | the same on 6be52caf4 | = |
+| arc / selected + hovered | = selected | the same on 6be52caf4 | = |
+| arc / hovered, the circle selected | = hovered | the same on 6be52caf4 | = |
 | line / none | blue | the same | = |
-| line / hovered | #FFC685 band, the blue {n} through its middle #C89C96 | middle #CA9F6D, no blue | ≠ P0 FEEL-SKETCH-BAND-MIDDLE (fixed psui 11-21 18:13, qa to re-score) |
-| line / selected | #FFA90A over blue, middle #C88536 | middle #CA890D | ≠ P0 FEEL-SKETCH-BAND-MIDDLE (fixed psui 11-21 18:13, qa to re-score) |
-| line / selected + hovered | = selected | = our selected | ≠ P0 FEEL-SKETCH-BAND-MIDDLE (fixed psui 11-21 18:13, qa to re-score) |
-| line / hovered, the circle selected | = hovered | = our hovered | ≠ P0 FEEL-SKETCH-BAND-MIDDLE (fixed psui 11-21 18:13, qa to re-score) |
+| line / hovered | #FFC685 band, the blue {n} through its middle #C89C96 | the same on 6be52caf4 | = |
+| line / selected | #FFA90A over blue, middle #C88536 | the same on 6be52caf4 | = |
+| line / selected + hovered | = selected | the same on 6be52caf4 | = |
+| line / hovered, the circle selected | = hovered | the same on 6be52caf4 | = |
 | line midpoint / none | blue | the same | = |
-| line midpoint / hovered | #FFC685 band, the blue {n} through its middle #C89C96 (no marker) | middle #CA9F6D, no blue | ≠ P0 FEEL-SKETCH-BAND-MIDDLE (fixed psui 11-21 18:13, qa to re-score) |
-| line midpoint / selected | #FFA90A over blue, middle #C88536 | middle #CA890D | ≠ P0 FEEL-SKETCH-BAND-MIDDLE (fixed psui 11-21 18:13, qa to re-score) |
-| line midpoint / selected + hovered | = selected | = our selected | ≠ P0 FEEL-SKETCH-BAND-MIDDLE (fixed psui 11-21 18:13, qa to re-score) |
-| line midpoint / hovered, the circle selected | = hovered | = our hovered | ≠ P0 FEEL-SKETCH-BAND-MIDDLE (fixed psui 11-21 18:13, qa to re-score) |
+| line midpoint / hovered | #FFC685 band, the blue {n} through its middle #C89C96 (no marker) | the same on 6be52caf4 | = |
+| line midpoint / selected | #FFA90A over blue, middle #C88536 | the same on 6be52caf4 | = |
+| line midpoint / selected + hovered | = selected | the same on 6be52caf4 | = |
+| line midpoint / hovered, the circle selected | = hovered | the same on 6be52caf4 | = |
 | point / none | blue ring | the same | = |
-| point / hovered | light-orange disc, the blue ring through (#C59A99), centre #FFD8AC | hollow light-orange ring, white centre | ≠ P0 FEEL-SKETCH-POINT-LOOK (fixed psui 11-21 18:13, qa to re-score) |
-| point / selected | orange disc, ring through, centre #FFC558 | hollow #FFA90A ring, white centre | ≠ P0 FEEL-SKETCH-POINT-LOOK (fixed psui 11-21 18:13, qa to re-score) |
-| point / selected + hovered | = selected | = our selected | ≠ P0 FEEL-SKETCH-POINT-LOOK (fixed psui 11-21 18:13, qa to re-score) |
-| point / hovered, the circle selected | = hovered | = our hovered | ≠ P0 FEEL-SKETCH-POINT-LOOK (fixed psui 11-21 18:13, qa to re-score) |
+| point / hovered | light-orange disc, the blue ring through (#C59A99), centre #FFD8AC | the same on 6be52caf4 | = |
+| point / selected | orange disc, ring through, centre #FFC558 | the same on 6be52caf4 | = |
+| point / selected + hovered | = selected | the same on 6be52caf4 | = |
+| point / hovered, the circle selected | = hovered | the same on 6be52caf4 | = |
 | circle centre / none | blue dot | the same | = |
 | circle centre / hovered | light-orange dot | the same | = |
 | circle centre / selected | orange dot | the same | = |
 | circle centre / selected + hovered | = selected | the same | = |
-| circle centre / hovered, the circle selected | circle band, blue through (#CB8835) | opaque, middle #CC8708 | ≠ P0 FEEL-SKETCH-BAND-MIDDLE (fixed psui 11-21 18:13, qa to re-score) |
+| circle centre / hovered, the circle selected | circle band, blue through (#CB8835) | the same on 6be52caf4 | = |
 
-Line tool inference, sketch edit (0 / 5; live sk/inference-*-at):
+Line tool inference, sketch edit (4 / 5 on 6be52caf4; live sk/inference-*-at):
 
 | Move | Live | Ours | Status |
 |---|---|---|---|
-| Line tool from (45,−10): horizontal, under the point | — glyph; length label in the sketch plane (slanted, small, above the line's middle) | glyph =; label upright, larger, over the line's start | ≠ P0 FEEL-SKETCH-PREVIEW-LENGTH (fixed psui 11-21 18:13, qa to re-score) |
-| … vertical | | glyph; label in the plane | glyph =; label upright | ≠ P0 FEEL-SKETCH-PREVIEW-LENGTH (fixed psui 11-21 18:13, qa to re-score) |
-| … onto the line's midpoint | line lit #FFC685 + a #FFCC34 square lying in the sketch plane (a rhombus here) at the midpoint, -•- glyph | line not lit; a screen-aligned yellow square; glyph = | ≠ P0 FEEL-SKETCH-INFERENCE-MARKER (fixed psui 11-21 18:13, qa to re-score) |
-| … onto the point | the point lit (light-orange disc) inside the in-plane #FFCC34 square; coincident cursor | point not lit, screen-aligned square; cursor = | ≠ P0 FEEL-SKETCH-INFERENCE-MARKER (fixed psui 11-21 18:13, qa to re-score) |
-| … onto the line away from its midpoint | line lit, blue through; coincident cursor | line lit opaque; cursor = | ≠ P0 FEEL-SKETCH-BAND-MIDDLE (fixed psui 11-21 18:13, qa to re-score) |
+| Line tool from (45,−10): horizontal, under the point | — glyph; length label in the sketch plane (slanted, small, above the line's middle) | the same on 6be52caf4 | = |
+| … vertical | | glyph; label in the plane | the same on 6be52caf4 | = |
+| … onto the line's midpoint | line lit #FFC685 + a #FFCC34 square lying in the sketch plane (a rhombus here) at the midpoint, -•- glyph | the same on 6be52caf4 | = |
+| … onto the point | the point lit (light-orange disc) inside the in-plane #FFCC34 square; coincident cursor | the same on 6be52caf4 | = |
+| … onto the line away from its midpoint | line lit, blue through; coincident cursor | line lit, but opaque: no blue through (#ECB78A / #FFC685; the hover and selection bands elsewhere now blend as live) | ≠ P0 FEEL-SKETCH-BAND-MIDDLE |
 
 
 A feature dialog's selection field, the origin and a mate connector (batch 3; 0 / 15 on green 4f2cb3ce; the Fillet cells with an edge picked at live's 1.3 mm radius; live b3/, `_f` 1.2 s after arriving,
