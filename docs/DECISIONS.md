@@ -177,3 +177,6 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   unreadable).
 - 11-21 (lead) No kernel limit may change a result with the machine: time limits become work-step counts (blend
   5942f962), the Boolean's memory limit is a flat 8 GB (3/4 of RAM below 11 GB; bool-mem).
+- 11-21 (lead) Opening a heavy document shows a stored display result at once (the open target is ≤ 0.5 s): each Part
+  Studio's tessellation and part list are saved in the .noshape, keyed by its feature list, configuration and app/kernel
+  version; the real regeneration runs in the background and replaces it. A stale cache is never shown (dx).
