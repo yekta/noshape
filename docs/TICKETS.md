@@ -260,6 +260,12 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   rigid subassembly or a Fastened pair is one link with a `<visual>` per part (masses and inertias summed, no merged
   mesh) and the connector links fold into their parts. Ours: every part a link fixed to `base_link`, no joints,
   no inertia, no launch file, and the option merges one mesh.
+## qa, 2026-11-21 (USER P0: combined hover × selection states; live hover-matrix-1121, scored in docs/parity/interaction-feel.md "Hover × selection")
+
+- [ ] P0 **FEEL-HOVER-POINT-ON-SELECTED-EDGE (psui, from the user)**: Part Studio, an edge selected, the pointer on a point of it (its midpoint):
+  live draws a solid orange dot with a soft orange halo; ours a cream dot with a black ring, as on an unselected edge (user shots
+  lead-scratch/user-shots/hover-point-on-selected-edge-{noshape,onshape}.png; copies qa-scratch/hm/). psui fixing (lead 11-21 16:3x).
+
 ## psui, 2026-11-20 (live's feel coverage cov-1120; docs/parity/interaction-feel.md "cov-1120")
 - [x] done (studios 11-20: c249e0ed9 / f29e6eb2; the same rows as qa's FEEL-FS-* below, verified 07:0x on green 0bc7e772e) **P1 FS-WHEEL-72PX [studios]**: a wheel notch scrolls the Feature Studio's code 72 px in live (Ace: 4.5 lines of
   16 px, the first draw 9 ms after; behaviours "feel coverage (11-20)" F3, live/feel/cov-1120/fs-mouse*.json). Ours: the
