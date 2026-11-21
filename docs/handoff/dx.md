@@ -9,28 +9,28 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
-## Now (02:10 11-21): HGR (dx-land) / EXCHANGE (dx-urdf)
+## Now (02:55 11-21): HGR (dx-land) / EXCHANGE (dx-urdf)
 - LANDED 3f5d8b6f + b4f52649 (dx-land): parity translates a Frame's SWEPT_FACE and a Hole's HOLE_FACE shaft (hgr
   Hole 3 35 -> 36/52); a straight Frame member's side edges run along its path (frames.rs along_path: op_prism sweeps
   back toward the sketch, live's Frame is opSweep): hgr 36 -> 46/52; VALID-HGR-FOOT-OFFSET closed. 3-way A/B on vibe2
   (/root/dx-scratch/ab3.out, ~/agents/dx-keep/ab3.sh): 14 docs, no loss. Probe ~/agents/dx-keep/hgredge.sh <index>.
 - c2-sm-louver 36 -> 35 came from main (Sketch 9 frame origin): skasm's.
-- dx-land commit (land.sh 02:2x): Cut list keeps a selected part that isn't a frame as std's
-  (cutlist.fs buildUngroupedRows: a row with no data, in the composite, no warning); hgr 43 "Cut list 2" takes the
-  Foot: hgr 46 -> 47/52, saw-table 27/27, endcap / gusset 4/4. Test in frame_rectangle_mitered_cut_list; Mac sheetmetal_frames 19 ok, clippy clean. Run on the Mac
-  (~/noshape-host/dx-keep/pm-hgr/models: hgr, saw-table, cov-frame endcap / gusset) -> /root/dx-scratch/hgr43.out.
-  Diff also at /root/dx-scratch/cutlist.diff.
-- hgr next: feature 47 "Sheet metal model 1" (sheetMetalStart): ours ERROR "Variable not found, is suppressed, or has
-  not been set.", live OK (20 parts, live 21: Funnel Guide).
-- CHECKING 6ba3c899 (dx-urdf): glTF nodes as parts, flattened STEP names, IGES compat + sewn read, zips, DXF splines
-  as polylines, exploded glyph outlines, Parasolid v28 read. exo d (vibe2, ~/agents/dx-keep/exo2.sh): options in ours
-  34/50 -> 39/50, read back 40/62 -> 43/62, times 30/30.
-- dx-urdf aa7fb5d18 (commit, land after 6ba3c899): spline POLYLINEs and their VERTEXes on layer 0 as live's (lead
-  11-21: copy live's layers unless that loses geometry); a 2-point LWPOLYLINE keeps its edge's layer. Mac drawing 263
-  lib, clippy, full ops e2e 272 ok.
-- Open exchange rows: duct DXF-POLYALL lacks layer ANNOTATION_TEXT (live keeps it for the empty view labels;
-  exploded_layers isn't reached for them), DXF-POLY MTEXT vs live's LWPOLYLINE (textOption, REQUESTS), housing IGES
-  compat 36/80/45 vs 36/79/44, STL-YUP / multipart STL (ticket).
+- LANDED 5aecd7e2: Cut list keeps a selected part that isn't a frame (hgr 46 -> 47/52).
+- dx-land commit (land.sh 02:5x): a std or custom feature's number reads a Variable feature's value (custom run.rs
+  took ev.ctx into the FS context before definition() evaluated the params: "Variable not found"): hgr 47 -> 52/52,
+  matches to the end. A/B on the Mac (~/noshape-host/dx-keep/abvar.sh, /root/dx-scratch/abvar.out): 12 docs, the
+  rest equal. Test custom_features::a_custom_features_length_reads_a_variable_features_value.
+- LANDED 04f5085d (dx-urdf exchange batch): glTF nodes as parts, flattened STEP names, IGES compat + sewn read, zips,
+  DXF splines as polylines, exploded glyph outlines, Parasolid v28 read (exo d options 39/50, read back 43/62).
+- dx-urdf 3 commits (land.sh 02:5x): spline POLYLINEs + VERTEXes on layer 0 (lead 11-21: copy live's layers unless
+  that loses geometry); exploded text keeps its layer in the table (duct polyall ANNOTATION_TEXT); IGES compat writes
+  B-splines only (NurbsConvert, closed faces halved): housing's file reads back as the solid (was a sheet, area 1367 vs
+  1630 mm2); ours 45 faces / 51 loops vs live 46 / 52 (one face live halves that DivideClosed doesn't, as Rhino 45 vs
+  46). Mac drawing 263, ops e2e 272, kernel 550 ok; housing suite ~/noshape-host/dx-keep/exs-igc (exx.sh).
+- bool 11-21: c2-impeller-loft's Extrude "Bohrungssitz Ansaugflansch" fuse in our Boolean (queued 30efb247): recheck
+  impeller once it lands.
+- Open exchange rows: DXF-POLY MTEXT vs live's LWPOLYLINE (textOption, REQUESTS), housing IGES
+  compat import 36/80/45 vs 36/79/44 (read back 38/88/52), STL-YUP / multipart STL (ticket).
 - live 11-21 00:0x: speed reference complete (10 Part Studios + Assemblies 1-5, behaviours "Speed reference (11-20)");
   server-side only for drags (SwiftShader frames).
 - textOption: REQUESTS asks live whether "true" = notes or all; the suite maps true -> explode_notes until then.

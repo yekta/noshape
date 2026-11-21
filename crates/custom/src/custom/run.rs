@@ -102,6 +102,12 @@ fn sketch_curves(sketches: &[Arc<crate::regen::context::SketchResult>], refs: &[
     }).collect()
 }
 
+/// A context with only `ctx`'s variables: what a definition's expressions read (#GuideLG) while the FeatureScript
+/// context holds the rest.
+fn variables_of(ctx: &crate::regen::context::Context) -> crate::regen::context::Context {
+    crate::regen::context::Context { variables: ctx.variables.clone(), fs_variables: ctx.fs_variables.clone(), ..Default::default() }
+}
+
 /// Build the definition map for `params`.
 fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev: &EvalCtx, provider: Option<&dyn super::CustomFeatureProvider>) -> FResult<Value> {
     let mut m = Map::new();
@@ -262,7 +268,9 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
     // Printed object numbers restart per feature run (the Context is "BuiltIn: 0").
     noshape_featurescript::value::reset_shown_numbers();
     let first_colour = ev.ctx.next_color;
-    let cx = FsContext::new(std::mem::take(&mut ev.ctx), ev.feature, ev.name.to_string(), *ev.units, ev.outer_vars.clone(), ev.xform);
+    let ctx = std::mem::take(&mut ev.ctx);
+    ev.ctx = variables_of(&ctx);
+    let cx = FsContext::new(ctx, ev.feature, ev.name.to_string(), *ev.units, ev.outer_vars.clone(), ev.xform);
     cx.state.lock().feature_order = ev.features.order();
     let definition = match definition(&cx, params, &values, ev, provider) {
         Ok(d) => d,
@@ -419,7 +427,7 @@ pub(crate) fn run_editing_logic(
     fill_defaults(specs, &mut news, units);
     let hidden: Vec<crate::reference::Reference> = ctx.fs_hidden_bodies.iter().map(|b| crate::reference::Reference::Body(b.id.clone())).collect();
     let outer = std::collections::BTreeMap::new();
-    let ev = EvalCtx::new(feature, name, &news, units, Default::default(), &outer);
+    let ev = EvalCtx::new(feature, name, &news, units, variables_of(&ctx), &outer);
     let cx = FsContext::new(ctx, feature, name.to_string(), *units, outer.clone(), None);
     // No previous values: Onshape's first call on a new feature passes {}
     // (std cPlaneLogic and holeEditLogic act on preselection only then).
@@ -472,7 +480,7 @@ pub(crate) fn run_manipulator_change(
     let mut news = values.clone();
     fill_defaults(specs, &mut news, units);
     let outer = std::collections::BTreeMap::new();
-    let ev = EvalCtx::new(feature, name, &news, units, Default::default(), &outer);
+    let ev = EvalCtx::new(feature, name, &news, units, variables_of(&ctx), &outer);
     let cx = FsContext::new(ctx, feature, name.to_string(), *units, outer.clone(), None);
     let provider = super::fallback_provider();
     let new_def = definition(&cx, decls, &news, &ev, Some(&*provider)).ok()?;

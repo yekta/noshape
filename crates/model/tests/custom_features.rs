@@ -127,6 +127,28 @@ fn box_and_filleted_cylinder() {
     assert_ne!(r.context.bodies[0].id, r.context.bodies[1].id);
 }
 
+/// A custom or std feature's number reads a Variable feature's value (c2-hgr-riser-weldment's Sheet metal model 1:
+/// depth #GuideLG, thickness #GuideThick; was "Variable not found").
+#[test]
+fn a_custom_features_length_reads_a_variable_features_value() {
+    let fx = Fixture::new(&studio(SHAPES));
+    let mut ps = PartStudio::new();
+    let mut v = ps.new_feature("assignVariable", &fx.units).unwrap();
+    v.params.set("name", ParamValue::Text("w".into()));
+    v.params.set("variableType", ParamValue::Enum("LENGTH".into()));
+    v.params.set("lengthValue", expr("15 mm"));
+    ps.features.push(v);
+    let mut f = ps.new_feature(&fx.ty("boxAndPin"), &fx.units).unwrap();
+    f.params.set("size", expr("#w + 5 mm"));
+    f.params.set("radius", expr("4 mm"));
+    f.params.set("fillet", expr("1 mm"));
+    ps.features.push(f);
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+    let cube = r.context.bodies.iter().find(|b| b.faces.len() == 6).expect("box with 6 faces");
+    assert!((cube.shape.volume().unwrap() - 0.02f64.powi(3)).abs() < 1e-12);
+}
+
 const BOSS: &str = r#"
 annotation { "Feature Type Name" : "Boss" }
 export const boss = defineFeature(function(context is Context, id is Id, definition is map)
