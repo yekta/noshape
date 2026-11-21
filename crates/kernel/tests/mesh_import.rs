@@ -286,13 +286,13 @@ fn stl_with_a_fold_is_a_solid() {
     assert!((v - 1e-6).abs() < 1e-10, "volume {v}");
 }
 
-/// Two closed meshes touching along edges (c2-bottle-split: its two solid halves as STL, every edge where they touch on
-/// four triangles) are two solids, each triangle joined to the next one turning into its inside about the edge
-/// (ours read one piece; live's import makes 148 sheets of it: its edges on more than two triangles split it).
+/// Triangles join only across an edge exactly two of them use; where three or more meet, the pieces split, and a
+/// triangle repeated is read once (live stl-split-1121: c2-duct-multipart's STL 9 surfaces, c2-bottle-split's 148).
+/// Two closed cubes side by side: the shared x = 1 squares (other diagonals) and both open boxes are four surfaces;
+/// with the same triangles there, three (the repeated square once).
 #[test]
-fn closed_meshes_touching_along_edges_stay_two_solids() {
-    // Two unit cubes side by side sharing the face x = 1: written without that face, each cube's other faces meet on
-    // the shared square's four edges (four triangles each).
+fn mesh_pieces_split_where_more_than_two_triangles_meet() {
+    // A unit cube at x0, without its face at x = `skip_x`.
     let v = |x: f64, y: f64, z: f64| [x, y, z];
     let cube = |x0: f64, skip_x: Option<f64>| {
         let mut t = Vec::new();
@@ -307,23 +307,32 @@ fn closed_meshes_touching_along_edges_stay_two_solids() {
         }
         t
     };
-    // Each cube closed with its own face on x = 1 as well (two coincident squares, opposite ways).
+    let read = |tris: &[[[f64; 3]; 3]], tag: &str| {
+        let mut stl = String::from("solid two\n");
+        for t in tris {
+            stl += "facet normal 0 0 0\nouter loop\n";
+            for p in t {
+                stl += &format!("vertex {} {} {}\n", p[0], p[1], p[2]);
+            }
+            stl += "endloop\nendfacet\n";
+        }
+        stl += "endsolid two\n";
+        let path = std::env::temp_dir().join(format!("noshape-two-cubes-{tag}-{}.stl", std::process::id()));
+        std::fs::write(&path, stl).unwrap();
+        let s = read_mesh_bodies(&path, LengthUnit::Meter).unwrap();
+        let _ = std::fs::remove_file(&path);
+        s
+    };
+    // Each cube closed with its own face on x = 1 (two coincident squares, opposite ways, other diagonals).
     let mut tris = cube(0.0, None);
     tris.extend(cube(1.0, None));
-    let mut stl = String::from("solid two\n");
-    for t in &tris {
-        stl += "facet normal 0 0 0\nouter loop\n";
-        for p in t {
-            stl += &format!("vertex {} {} {}\n", p[0], p[1], p[2]);
-        }
-        stl += "endloop\nendfacet\n";
-    }
-    stl += "endsolid two\n";
-    let path = std::env::temp_dir().join(format!("noshape-two-cubes-{}.stl", std::process::id()));
-    std::fs::write(&path, stl).unwrap();
-    let s = read_mesh_bodies(&path, LengthUnit::Meter).unwrap();
-    let _ = std::fs::remove_file(&path);
-    assert_eq!(s.count(ShapeType::Solid), 2);
-    let vol = volume_properties(&s).unwrap().mass;
-    assert!((vol - 2.0).abs() < 1e-9, "{vol}");
+    let s = read(&tris, "a");
+    assert_eq!((s.count(ShapeType::Solid), s.count(ShapeType::Face)), (0, 4), "two open boxes and two squares");
+    // The second cube's square as the first's two triangles, turned the other way: read once.
+    let mut tris = cube(0.0, None);
+    let shared: Vec<[[f64; 3]; 3]> = tris.iter().filter(|t| t.iter().all(|p| p[0] == 1.0)).map(|t| [t[0], t[2], t[1]]).collect();
+    tris.extend(cube(1.0, Some(1.0)));
+    tris.extend(shared);
+    let s = read(&tris, "b");
+    assert_eq!((s.count(ShapeType::Solid), s.count(ShapeType::Face)), (0, 3), "two open boxes and the square once");
 }
