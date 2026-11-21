@@ -5938,6 +5938,17 @@ fn documents_page() {
     assert_eq!(c["name"], "Bracket v2 - Copy", "{c}");
     let d = call(&mut ctx, "documents_details", json!({ "path": moved, "description": "Wall bracket" }));
     assert_eq!(d["description"], "Wall bracket", "{d}");
+    // Created by me reaches into folders; the search box and a column header click over a place's documents.
+    call(&mut ctx, "document_create", json!({ "path": dir.join("Fixtures").join("Plate.noshape").to_str().unwrap() }));
+    call(&mut ctx, "document_close", json!({}));
+    let names = |l: &Value| l["documents"].as_array().unwrap().iter().map(|d| d["name"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    let mine = call(&mut ctx, "documents_list", json!({ "place": "created", "search": "PLATE" }));
+    assert_eq!((names(&mine), mine["place"].as_str()), (vec!["Plate".to_string()], Some("Created by me")), "{mine}");
+    assert!(!mine["documents"][0]["owner"].as_str().unwrap().is_empty() && mine["documents"][0]["owner"] == mine["documents"][0]["modified_by"], "{mine}");
+    let z = call(&mut ctx, "documents_list", json!({ "folder": "Fixtures", "search": "bracket", "documents_sort": "name", "reverse": true }));
+    assert_eq!(names(&z), ["Bracket v2 - Copy", "Bracket v2"], "{z}");
+    let e = try_call(&mut ctx, "documents_list", json!({ "documents_sort": "size" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("documents_sort"), "{e:?}");
     // The trash: send, restore, send again and delete, a folder and Empty trash.
     let copy = c["copy"].as_str().unwrap().to_string();
     let t = call(&mut ctx, "documents_trash", json!({ "path": copy }));

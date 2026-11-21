@@ -17,10 +17,13 @@ pub fn ops() -> Vec<Op> {
             group: "documents",
             verb: "list",
             summary: "The documents page's list: a folder's documents and folders, Recently opened, a label's, or the Trash",
-            description: "Without arguments the documents folder (Owned by me): its folders and documents (name, path, modified, labels). `folder` lists another folder; `place` \"recent\" the Recently opened list, \"trash\" the Trash (its items' `id`s for documents_restore / documents_delete); `label` the documents with that label. `labels` lists every label.",
+            description: "Without arguments the documents folder (Owned by me): its folders and documents (name, path, modified, modified_by, owner, labels). `folder` lists another folder; `place` \"recent\" the Recently opened list, \"created\" every document you created (Created by me), \"trash\" the Trash (its items' `id`s for documents_restore / documents_delete); `label` the documents with that label. `search` keeps the documents whose name holds the text, as the page's search box does in the place shown; `documents_sort` orders them as a click on the list's column header. `labels` lists every label.",
             fields: vec![
                 opt("folder", s(), "A folder to list (a path; a bare name is in the documents folder)."),
-                opt("place", json!({ "type": "string", "enum": ["owned", "recent", "trash"] }), "Owned by me (default), Recently opened or the Trash."),
+                opt("place", json!({ "type": "string", "enum": ["owned", "recent", "created", "trash"] }), "Owned by me (default), Recently opened, Created by me or the Trash."),
+                opt("search", s(), "The search box: only the documents whose name holds this text (any case)."),
+                opt("documents_sort", json!({ "type": "string", "enum": ["modified", "name", "modified_by", "owned_by"] }), "The documents' order, as a click on the list's column header: Modified (newest first), Name (A → Z), Modified by or Owned by (A → Z). Without it Owned by me lists them by name, Recently opened most recent first."),
+                opt("reverse", json!({ "type": "boolean" }), "The column header's second click: the documents_sort order reversed."),
                 opt("label", s(), "Only the documents with this label."),
                 opt("sort", json!({ "type": "string", "enum": ["name", "name_desc", "modified"] }), "The folders' order, as the Folders row's sort menu: Name: A → Z (default), Name: Z → A, Last modified (newest first)."),
             ],
@@ -287,11 +290,73 @@ fn failed(e: anyhow::Error, param: &str) -> OpError {
     OpError::invalid(format!("{e:#}")).with_param(param)
 }
 
-fn doc_json(p: &Path, labels: &lib::Labels) -> Value {
-    let meta = noshape_store::Document::open_read_only(p).ok().and_then(|d| d.meta().ok());
+/// A document's row on the page.
+struct DocRow {
+    path: PathBuf,
+    name: String,
+    modified: Option<i64>,
+    description: String,
+    owner: String,
+    modified_by: String,
+}
+
+fn doc_row(p: &Path) -> DocRow {
+    let doc = noshape_store::Document::open_read_only(p).ok();
+    let meta = doc.as_ref().and_then(|d| d.meta().ok());
+    let (owner, modified_by) = doc.as_ref().and_then(|d| d.owner_and_last_author().ok()).unwrap_or_default();
     let name = meta.as_ref().map(|m| m.name.clone()).filter(|n| !n.is_empty()).unwrap_or_else(|| p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
-    let mine: Vec<&String> = labels.labels.iter().filter(|l| labels.has(p, l)).collect();
-    json!({ "name": name, "path": p.display().to_string(), "modified": meta.as_ref().map(|m| m.modified), "description": meta.map(|m| m.description).unwrap_or_default(), "labels": mine })
+    DocRow { path: p.to_path_buf(), name, modified: meta.as_ref().map(|m| m.modified), description: meta.map(|m| m.description).unwrap_or_default(), owner, modified_by }
+}
+
+fn doc_json(p: &Path, labels: &lib::Labels) -> Value {
+    row_json(&doc_row(p), labels)
+}
+
+fn row_json(r: &DocRow, labels: &lib::Labels) -> Value {
+    let mine: Vec<&String> = labels.labels.iter().filter(|l| labels.has(&r.path, l)).collect();
+    json!({ "name": r.name, "path": r.path.display().to_string(), "modified": r.modified, "modified_by": r.modified_by, "owner": r.owner, "description": r.description, "labels": mine })
+}
+
+/// The names your history is written under: documents first written under one are "Created by me".
+fn my_names() -> [String; 3] {
+    [noshape_store::local_user_name(), noshape_store::os_user_name(), noshape_store::os_login()]
+}
+
+/// Every document under `dir` and its folders (not hidden ones).
+fn documents_under(dir: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(rd) = std::fs::read_dir(dir) else { return };
+    for p in rd.filter_map(|e| e.ok().map(|e| e.path())) {
+        if p.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.')) {
+            continue;
+        }
+        if p.is_dir() {
+            documents_under(&p, out);
+        } else if p.extension().is_some_and(|e| e == lib::EXT) {
+            out.push(p);
+        }
+    }
+}
+
+/// The page's search box and column sort over a place's documents.
+fn shown_docs(paths: Vec<PathBuf>, a: &Args, labels: &lib::Labels) -> Result<Vec<Value>, OpError> {
+    let mut rows: Vec<DocRow> = paths.iter().map(|p| doc_row(p)).collect();
+    if let Some(q) = a.opt_str("search")?.map(|q| q.trim().to_lowercase()).filter(|q| !q.is_empty()) {
+        rows.retain(|r| r.name.to_lowercase().contains(&q));
+    }
+    if let Some(key) = a.opt_str("documents_sort")? {
+        let text = |t: &str| t.to_lowercase();
+        match key {
+            "modified" => rows.sort_by_key(|r| std::cmp::Reverse(r.modified)),
+            "name" => rows.sort_by_key(|r| text(&r.name)),
+            "modified_by" => rows.sort_by_key(|r| (text(&r.modified_by), std::cmp::Reverse(r.modified))),
+            "owned_by" => rows.sort_by_key(|r| (text(&r.owner), std::cmp::Reverse(r.modified))),
+            other => return Err(OpError::param("documents_sort", &format!("\"{other}\": modified, name, modified_by or owned_by"))),
+        }
+        if a.bool_or("reverse", false)? {
+            rows.reverse();
+        }
+    }
+    Ok(rows.iter().map(|r| row_json(r, labels)).collect())
 }
 
 fn trash_json(t: &TrashItem) -> Value {
@@ -305,11 +370,26 @@ fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         if !labels.labels.iter().any(|x| x == l) {
             return Err(OpError::not_found(format!("no label \"{l}\"; labels: {}", labels.labels.join(", "))).with_param("label"));
         }
-        let docs: Vec<Value> = labels.assign.iter().filter(|(_, ls)| ls.iter().any(|x| x == l)).map(|(p, _)| PathBuf::from(p)).filter(|p| p.exists()).map(|p| doc_json(&p, &labels)).collect();
+        let docs = shown_docs(labels.assign.iter().filter(|(_, ls)| ls.iter().any(|x| x == l)).map(|(p, _)| PathBuf::from(p)).filter(|p| p.exists()).collect(), a, &labels)?;
         return Ok(json!({ "label": l, "documents": docs, "labels": labels.labels }).into());
     }
     match a.opt_str("place")?.unwrap_or("owned") {
-        "recent" => Ok(json!({ "place": "Recently opened", "documents": lib::recent().iter().map(|p| doc_json(p, &labels)).collect::<Vec<_>>(), "labels": labels.labels }).into()),
+        "recent" => Ok(json!({ "place": "Recently opened", "documents": shown_docs(lib::recent(), a, &labels)?, "labels": labels.labels }).into()),
+        "created" => {
+            let mut paths = Vec::new();
+            for dir in std::iter::once(documents(ctx)).chain(lib::watched_folders()) {
+                documents_under(&dir, &mut paths);
+            }
+            let canon = |p: &PathBuf| p.canonicalize().unwrap_or_else(|_| p.clone());
+            paths.sort_by_key(canon);
+            paths.dedup_by_key(|p| canon(p));
+            let me = my_names();
+            paths.retain(|p| {
+                let owner = doc_row(p).owner;
+                owner.is_empty() || me.contains(&owner)
+            });
+            Ok(json!({ "place": "Created by me", "documents": shown_docs(paths, a, &labels)?, "labels": labels.labels }).into())
+        }
         "trash" => Ok(json!({ "place": "Trash", "items": Trash::load().items.iter().map(trash_json).collect::<Vec<_>>() }).into()),
         "owned" => {
             let dir = folder_arg(ctx, a, "folder")?;
@@ -323,10 +403,10 @@ fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 other => return Err(OpError::param("sort", &format!("\"{other}\": name, name_desc or modified"))),
             }
             let folders: Vec<Value> = entries.iter().filter(|p| p.is_dir()).map(|p| json!({ "name": p.file_name().map(|n| n.to_string_lossy().to_string()), "path": p.display().to_string() })).collect();
-            let docs: Vec<Value> = entries.iter().filter(|p| p.is_file() && is_doc(p)).map(|p| doc_json(p, &labels)).collect();
+            let docs = shown_docs(entries.iter().filter(|p| p.is_file() && is_doc(p)).cloned().collect(), a, &labels)?;
             Ok(json!({ "place": "Owned by me", "folder": dir.display().to_string(), "folders": folders, "documents": docs, "labels": labels.labels }).into())
         }
-        other => Err(OpError::param("place", &format!("\"{other}\" isn't a place: owned, recent or trash"))),
+        other => Err(OpError::param("place", &format!("\"{other}\" isn't a place: owned, recent, created or trash"))),
     }
 }
 

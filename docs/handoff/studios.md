@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-21 09:34 UTC.
+Updated 2026-11-21 09:52 UTC.
 
 ## In flight
 
@@ -26,17 +26,18 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
   documents-versions.md): row hover icons in view, sort up/down/default, Enter leaves the trash modal open, "No
   revision history found.", Restore deleted workspaces with Name / Deleted by / Deleted at (store `BranchInfo::
   deleted_at`: `branches.deleted` holds the deletion time in ms, 1 = older files; no schema bump).
-- In the tree (testing x112, vibex7): audit #1, the documents page's Versions and history page (live 2435):
-  `HistoryPanel::page` (history-ui page mode), start-ui `StartView::page` in place of the list (hook
-  `start_hooks::versions_page`, app `files::versions_page` on a session of its own; the logo goes back), tests
-  `the_versions_page_selects_on_click_and_acts_from_its_dots`, `versions_and_history_opens_its_page_in_place_of_the_list`.
-  Parity rows 89 / 106 (Category "Noshape …") are = per TICKETS BRAND-IN-UI-TEXT (qa verified 09:2x).
+- Committed, to land after eabacbef: 3730a047 the documents page's Versions and history page (live 2435:
+  `HistoryPanel::page`, start-ui `StartView::page` in place of the list, hook `start_hooks::versions_page`, app
+  `files::versions_page`; legend right under the rows; shot on vibe2 matches q2435-vh-30s); 3c1810c3 the deleted-
+  workspace bubble 30 s (`NoticeLink::stays`, set per `info_with_link` caller). Parity rows 89 / 106 = (BRAND-IN-UI-TEXT).
+- In the tree (testing x119, vibex7): audit #10's documents op gap: `documents_list` gains place "created", `search`,
+  `documents_sort` (+ `reverse`), rows with owner / modified_by; e2e `documents_page`; AGENT_API.md regenerated on the
+  host (scp vibex7:tmp/studios/AGENT_API.md back).
 - REQUESTS for live (11-21): 08:58 the drawing matrix's 40 most-used shown rows (six takes); 09:12 documents /
   versions gaps (11 items + 09:33 the page's workspace / version ••• menus). Take their rows as they land.
 - Audit next: #7 Start row Properties… / Publish FeatureScript… (take asked), #8 Compare revisions (take asked), #9
-  search relevance, rename while open, #10 op gaps (documents search / Created by me / sort, history_merge strategy,
-  create_version at / publish, approver error words). Deleted-workspace bubble 35 s vs live 30 s
-  (app/src/workspace.rs:151, shared with the Merge toast).
+  search relevance, rename while open, #10 op gaps (history_merge strategy,
+  create_version at / publish, approver error words).
 - Live fc-1121 drawing feel (behaviours "studios fc-1121"): (1) a dimension being placed shows the line to another's
   x / y without snapping (still held on a + mark, live2 rad-note); (3) caret at the click (`note_caret_at`), a
   double-click in the editor selects all; (5) a dragged box draws its picks selected (`box_preview`); (2), (4), (6)

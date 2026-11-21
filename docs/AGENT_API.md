@@ -771,7 +771,7 @@ Examples:
 
 The documents page's list: a folder's documents and folders, Recently opened, a label's, or the Trash.
 
-Without arguments the documents folder (Owned by me): its folders and documents (name, path, modified, labels). `folder` lists another folder; `place` "recent" the Recently opened list, "trash" the Trash (its items' `id`s for documents_restore / documents_delete); `label` the documents with that label. `labels` lists every label.
+Without arguments the documents folder (Owned by me): its folders and documents (name, path, modified, modified_by, owner, labels). `folder` lists another folder; `place` "recent" the Recently opened list, "created" every document you created (Created by me), "trash" the Trash (its items' `id`s for documents_restore / documents_delete); `label` the documents with that label. `search` keeps the documents whose name holds the text, as the page's search box does in the place shown; `documents_sort` orders them as a click on the list's column header. `labels` lists every label.
 
 Examples:
 
@@ -784,7 +784,10 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `folder` | string |  | A folder to list (a path; a bare name is in the documents folder). |
-| `place` | one of `owned`, `recent`, `trash` |  | Owned by me (default), Recently opened or the Trash. |
+| `place` | one of `owned`, `recent`, `created`, `trash` |  | Owned by me (default), Recently opened, Created by me or the Trash. |
+| `search` | string |  | The search box: only the documents whose name holds this text (any case). |
+| `documents_sort` | one of `modified`, `name`, `modified_by`, `owned_by` |  | The documents' order, as a click on the list's column header: Modified (newest first), Name (A → Z), Modified by or Owned by (A → Z). Without it Owned by me lists them by name, Recently opened most recent first. |
+| `reverse` | boolean |  | The column header's second click: the documents_sort order reversed. |
 | `label` | string |  | Only the documents with this label. |
 | `sort` | one of `name`, `name_desc`, `modified` |  | The folders' order, as the Folders row's sort menu: Name: A → Z (default), Name: Z → A, Last modified (newest first). |
 
