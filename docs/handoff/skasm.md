@@ -1,16 +1,25 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-21 06:28 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-21 07:22 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## In flight (11-21 04:30 UTC)
 - LANDED 0f86a0f8: flat-face sketches (louver 36/36, modify-joint 11/11) + Rip 1 (c2-cov-sm-rip 5/5); 6a4ac440
   Recognize 6/6. SM 25 docs (Mac): 22/24 docs, 291/295 features.
-- hem-plus Offset surface 1: Mac-only (Linux 6/6): OCCT's joined offset (PerformByJoin) fails on the Mac's last digits
-  and falls back to each face alone (not extended). op_offset_shape retries in millimetres first: Mac 6/6; other
-  offset docs unchanged (replace-face 6/8, surf-intro boundary/fill/mutualtrim/offset/ruled 8/12, 8/13, 8/17, 6/8,
-  8/14, cf-sheet-metal-hem 6/6). Committed 1cb74771; g++-13 kernel build on vibex8 (task started 06:15), then land.
-- Next after that land (lead 11-21): the next item of "Next, in order"; sketch-solver parity rows if sheet metal has none.
+- QUEUED ca26da57 (06:43): hem-plus Offset surface 1 (Mac-only; OCCT's joined offset fails in metres on the Mac,
+  op_offset_shape retries in millimetres: Mac 6/6, other offset docs unchanged; g++-13 build clean on vibex8).
+- P1 (lead 11-21, from asm): sketch regions over tiny gaps, infento a3f7a1 Sketch 1 (ours 1645.904 + 317.591 mm²,
+  live 905.898 + 740.006 + 317.591: our toothed loop is open at 24 gaps). Facts: live joins unconstrained free ends
+  only within 0.2 µm, any scale (REQUESTS 06:44 row, live 11-21). Our gaps are the circular pattern's instances: the
+  Use-line copy ends 9.159 µm short of the fillet-arc copy's end, collinear with the arc's tangent (the line's end
+  0.042 µm off the arc's circle); in the seed a 9.2 µm stub line (not a pattern seed) joins them. Live's feature has
+  no coincidence there either; live's region drops the seed's 9.2 µm stubs (shortest region edge 0.4286 mm). So
+  neither "coincident ends join" nor a distance rule explains it. Coincident-join attempt set aside:
+  ~/agents/skasm-keep/gap-coincident.patch (vibe local; did not change infento). Follow-up REQUESTS row 07:22 (live:
+  the tangent-collinear 9.16 µm case, a sideways one, a 9.2 µm stub in a rectangle, 20 / 50 µm). Our saved doc:
+  mac ~/noshape-host/tmp-skasm/saved2 (the studio is tab "2c9baaa07ea1fd5475c4b299"), our sketch_get in
+  skasm-scratch/gap/sk1.json; reduced corpus copy mac ~/noshape-host/tmp-skasm/gapm (asm.sh): delete both after.
+- Next after that (lead 11-21): the next item of "Next, in order"; sketch-solver parity rows if sheet metal has none.
 - LANDING: forms 21/21 (c2-sheet-metal-forms 10 -> 21/21; Mac A/B vs 97df380f1: 108 -> 109/174 docs, 1779 -> 1790
   features, no other doc changed): Sketch 3 connector at live's frame; Form 4 fuse skipped when adds add nothing;
   Form 5 region_from_query derived branch; lance bends meeting at asin(1 - h/(rmi+rme)) with no wall, the lance
@@ -30,7 +39,8 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   1.4355 along on the base, 3.26 on JQ); the base's free edge runs to L1 exactly, then a vertical cut to (1.3588,
   201.4963). Ours: every bend ends square, the base runs past L1 to y 202.785. Data: skasm-scratch/loft/apex.py,
   ours-all.out. PARKED (lead 11-21 06:30): don't guess from one sample; live REQUESTS P3 row skasm 11-21 06:27 (fans of
-  3 / 5 bends), taken after live's feel and speed batches.
+  3 / 5 bends). Samples IN (live 11-21 06:56): live/skasm/sm-loft-fans-1121/<name>/{live.jsonl,features.json}: loft-basic
+  with chordal tol 0.1 in (3 bends), 0.035 (5), 0.022 (6); Plane 1 at 4 in: 0.05 (4), 0.1 (3). Read the apex rule after the P1.
 - Debug std: throw a custom regenError message (FS println goes to notices, not stderr); restore edited files with a
   fresh mtime (rb.sh rsync keeps the old one and cargo skips the rebuild). NOSHAPE_FS_TRACE=1 names the throw's line.
 - LANDED 6d80df66: Unfold unrolls only its bend, Refold puts back the held side (unfold-refold 6/6, 212/295).
