@@ -311,6 +311,39 @@ fn a_sketch_line_under_the_pointer_mid_draw_is_not_recoloured(cx: &mut TestAppCo
     assert_eq!((at_rest, tool_on, mid_draw), (true, true, (true, false)), "(lit with no tool, with the Line tool before its first click, (mid-draw, lit) after it)");
 }
 
+/// Live hover-matrix-1121 sk/inference-on-point-at, inference-mid-of-line-at: mid-draw what the snap lands on lights,
+/// a corner itself, the line for its midpoint or a point on it.
+#[gpui::test]
+fn mid_draw_the_snapped_point_or_the_line_of_a_snapped_midpoint_lights(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "mid-draw-snap-lit", Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let (line, a, b) = lines(cx, &view)[0];
+    click(cx, window, &view, (380., 520.));
+    let lit_at = |cx: &mut TestAppContext, at: DVec2| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            vp.update(cx, |vp, _| vp.place_pointer(at));
+            v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: at, modifiers: Modifiers::default() }, w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let kind = v.sketch.as_ref().unwrap().inference.as_ref().map(|i| i.kind);
+            (kind, v.highlighted_hover(cx))
+        })
+    };
+    let sketch = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().feature);
+    let (_, lit) = lit_at(cx, (a + b) * 0.5);
+    assert_eq!(lit, vec![Reference::SketchEntity { sketch, entity: line }], "on the line's middle: the line lit");
+    let (kind, lit) = lit_at(cx, a);
+    let corner = matches!(lit.as_slice(), [Reference::SketchEntity { entity, .. }] if *entity != line);
+    assert!(kind == Some(noshape_sketch::inference::InferenceKind::Endpoint) && corner, "on a corner: the corner lit ({kind:?}, {lit:?})");
+}
+
 /// Live2 sketch-snaps (interaction-feel "Inference glyph"): with the Line tool's first click down, a single snap's
 /// 20 px glyph box is centred ≈ 30 px right of and 30 below the pointer (live2's ±2 px).
 #[gpui::test]

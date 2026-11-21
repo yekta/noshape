@@ -796,6 +796,8 @@ struct LineOut {
     // edge's dark core (0: none), in physical px.
     @location(6) across: f32,
     @location(7) @interpolate(flat) core: f32,
+    // The line's own colour (linear) under a lit core: a part edge's near-black, a sketch curve's grey or blue.
+    @location(8) @interpolate(flat) under: vec3<f32>,
 };
 
 fn clip_near(p: vec4<f32>, q: vec4<f32>) -> vec4<f32> {
@@ -1104,6 +1106,7 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     o.across = side * half;
     // A part edge's own highlight band (fs_line).
     o.core = select(0.0, 1.0, own_edge);
+    o.under = base;
     if ((st & HIDDEN) != 0u) { o.pos = vec4(0.0, 0.0, -2.0, 1.0); }
     return o;
 }
@@ -1137,7 +1140,8 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
     // A hovered or selected part edge (live behaviours "psui (2026-10-27, P1) EDGE-HIGHLIGHT-LOOK", Onshape's
     // HIGHLIGHT_LINE_WIDTH_MIN_PX 5, HIGHLIGHT_EDGE_OPACITY 0.78, HIGHLIGHT_EDGE_BORDER_OPACITY 1): one colour, the
     // outer device pixel on each side opaque, the core at 78 % over the scene, so the plain near-black edge under
-    // its middle shows through at 22 %. No dark outline.
+    // its middle shows through at 22 %. No dark outline. A sketch curve's own grey or blue shows through the same way
+    // (live hover-matrix-1121 ps/sketch-*, sk/*: #F2C694 over a grey line, #C89C96 over a blue one).
     if (i.core > 0.0) {
         let dpr = max(g.viewport.z, 1.0);
         let a = abs(i.across);
@@ -1145,10 +1149,10 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
         let col = linear_to_srgb(i.color.rgb);
         let rim = max(1.0, 0.6 * dpr);
         if (a > half - rim) { return vec4(col, i.color.a); }
-        // The plain edge (1 CSS px, antialiased) under the core: its black adds to the cover, nothing to the colour.
+        // The plain line (1 CSS px, antialiased) under the core.
         let edge = clamp(0.5 * dpr + 0.5 - a, 0.0, 1.0) * 0.22;
         let alpha = 0.78 + edge;
-        return vec4(col * (0.78 / alpha), alpha * i.color.a);
+        return vec4((col * 0.78 + linear_to_srgb(i.under) * edge) / alpha, alpha * i.color.a);
     }
     return enc(i.color);
 }
@@ -1161,8 +1165,9 @@ fn fs_line_plain(i: LineOut) -> @location(0) vec4<f32> {
         let dpr = max(g.viewport.z, 1.0);
         let a = abs(i.across);
         let col = linear_to_srgb(i.color.rgb);
-        let alpha = select(0.78 + clamp(0.5 * dpr + 0.5 - a, 0.0, 1.0) * 0.22, 1.0, a > 2.5 * dpr - max(1.0, 0.6 * dpr));
-        return vec4(col * select(0.78 / alpha, 1.0, alpha >= 1.0), alpha * i.color.a);
+        let edge = clamp(0.5 * dpr + 0.5 - a, 0.0, 1.0) * 0.22;
+        if (a > 2.5 * dpr - max(1.0, 0.6 * dpr)) { return vec4(col, i.color.a); }
+        return vec4((col * 0.78 + linear_to_srgb(i.under) * edge) / (0.78 + edge), (0.78 + edge) * i.color.a);
     }
     return enc(i.color);
 }
@@ -1218,6 +1223,9 @@ fn vs_point(@builtin(vertex_index) index: u32, p: PointIn) -> PointOut {
     // Live (behaviours "icons2 plane/origin highlight"): the hovered or
     // selected origin (style 4) is a 13 px filled disc; other points grow.
     if ((st & (HOVER | SELECTED)) != 0u) { size = select(size * 1.5 + 1.0, size + 2.0, (p.style & 4u) != 0u); }
+    // A lit sketch centre (style 128 + 256): at least 11 px, from the Part Studio's 4 px dot (live hover-matrix-1121
+    // ps/sketch-region-*).
+    if ((st & (HOVER | SELECTED)) != 0u && (p.style & (128u | 256u)) == (128u | 256u)) { size = max(size, 11.0); }
     // A lit spline handle tip (style 64): a 14 px disc hovered, 15 px selected (live 2221), whatever its size at rest.
     if ((st & (HOVER | SELECTED)) != 0u && (p.style & 64u) != 0u) { size = select(14.0, 15.0, (st & SELECTED) != 0u); }
     // The pick pass: a point's disc 1 px smaller, at most 5 px, lit or not (a vertex or a sketch point lights from
@@ -1292,7 +1300,16 @@ fn fs_point(i: PointOut) -> @location(0) vec4<f32> {
     // points, white inside 0.45 of the radius).
     if ((i.style & 8u) != 0u) {
         let inner = select(0.55, 0.45, (i.style & 32u) != 0u);
-        rgb = mix(rgb, vec3<f32>(1.0), clamp(inner * i.rpx - d + 0.5, 0.0, 1.0));
+        if ((i.style & 128u) != 0u && (state_of(i.pick) & (HOVER | SELECTED)) != 0u) {
+            // A sketch's hollow point lit: the state colour's 11 px disc, the point's ring and white middle at rest
+            // showing through it at 30 %, blended in sRGB (live hover-matrix-1121 ps/sketch-point-*, sk/point-*:
+            // centre #ffd8ac hovered, #ffc458 selected).
+            let rest = (i.rpx * 2.0 / g.viewport.z - 1.0) / 1.5 * g.viewport.z * 0.5;
+            let under = mix(i.base, vec3<f32>(1.0), clamp(inner * rest - d + 0.5, 0.0, 1.0));
+            rgb = srgb_to_linear(mix(linear_to_srgb(rgb), linear_to_srgb(under), 0.3 * clamp(rest - d + 0.5, 0.0, 1.0)));
+        } else {
+            rgb = mix(rgb, vec3<f32>(1.0), clamp(inner * i.rpx - d + 0.5, 0.0, 1.0));
+        }
     }
     // Style bit 64: a spline's handle tip. At rest hollow, white inside 0.7 of the radius; lit, the state colour over
     // the whole 14 px disc, at 90 % over the handle at rest (10 px: its 0.6 grey ring, white inside 7 px) where that

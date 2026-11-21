@@ -6234,6 +6234,18 @@ impl SketchEditor {
     /// Live values next to the rubber-band preview while drawing (live
     /// Onshape: line length, rectangle width and height, circle `Ø`, arc `R`,
     /// 13 px light blue, no box). Positions are sketch coordinates.
+    /// The direction (sketch plane) the line being drawn runs: its length value is written along it, lying in the plane
+    /// (live hover-matrix-1121 sk/inference-horiz-to-point-at, inference-vertical-at). None for other tools' values.
+    pub fn preview_value_direction(&self, data: &SketchData) -> Option<DVec2> {
+        let c = self.snapped()?.0;
+        let from = match self.tool {
+            Tool::Line if !self.tangent_mode => self.anchor_pos(&data.sketch)?,
+            Tool::MidpointLine => *self.clicks.first().map(|k| &k.pos)?,
+            _ => return None,
+        };
+        (c - from).try_normalize()
+    }
+
     pub fn preview_values(&self, data: &SketchData, units: &UnitPrefs) -> Vec<(DVec2, String)> {
         let Some(c) = self.snapped().map(|s| s.0) else { return Vec::new() };
         let anchors: Vec<DVec2> = self.clicks.iter().map(|k| k.pos).collect();
@@ -7101,10 +7113,12 @@ impl SketchEditor {
         // line being drawn shows on the line itself (its dash and end dot),
         // an alignment by its guide alone (live part-studio/1032).
         // Live (behaviours "sketch snapping and hover", 11-12): a point or midpoint snapped to gets a yellow-orange 1 px
-        // square round it, 17 px across (the point keeps its colour); an end snapped onto a curve only its glyph.
+        // square round it, 17 px across (the point keeps its colour); an end snapped onto a curve only its glyph. The
+        // square lies in the sketch plane, along its axes: a rhombus in an iso view (live hover-matrix-1121
+        // sk/inference-on-point-at, inference-mid-of-line-at).
         let mut snap_square = |q: DVec2| {
-            let c = self.plane_to_screen(q);
-            let pts3: Vec<[f32; 3]> = [(-1., -1.), (1., -1.), (1., 1.), (-1., 1.), (-1., -1.)].iter().map(|(x, y)| w(self.screen_to_plane(c + DVec2::new(*x, *y) * SNAP_SQUARE_HALF_PX))).collect();
+            let half = SNAP_SQUARE_HALF_PX * self.world_per_px;
+            let pts3: Vec<[f32; 3]> = [(-1., -1.), (1., -1.), (1., 1.), (-1., 1.), (-1., -1.)].iter().map(|(x, y)| w(q + DVec2::new(*x, *y) * half)).collect();
             lines.push_polyline(&pts3, SNAP_SQUARE_COLOR, 0, 1.0, on_top);
         };
         let point_like = |k: InferenceKind| matches!(k, InferenceKind::Endpoint | InferenceKind::Center | InferenceKind::Midpoint | InferenceKind::Quadrant);
@@ -10102,6 +10116,12 @@ mod tests {
         click(&mut ed, &mut d, v(0.0, 0.0));
         ed.pointer_move(&mut d, v(0.0, 0.015), true, false);
         assert_eq!(ed.preview_values(&d, &u).into_iter().map(|x| x.1).collect::<Vec<_>>(), vec!["15".to_string()]);
+        // A line's length lies in the plane along it (live sk/inference-vertical-at); a circle's Ø doesn't.
+        assert_eq!(ed.preview_value_direction(&d), Some(DVec2::Y));
+        let (mut ed, mut d) = editor(Tool::Circle);
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        ed.pointer_move(&mut d, v(0.01, 0.0), true, false);
+        assert_eq!(ed.preview_value_direction(&d), None);
     }
 
     #[test]

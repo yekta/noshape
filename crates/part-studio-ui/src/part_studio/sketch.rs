@@ -195,6 +195,10 @@ fn glyph_linger_redraw(cx: &mut Context<PartStudioView>) -> Task<()> {
 
 /// The clear margin round a constraint glyph's 20 px tile that still hovers it (live2 sktools-1118: lit to 14 px from
 /// its centre, off at 15–16).
+/// The line being drawn's length in the sketch plane: cap height (px) and colour (live sk/inference-*-at: small, the
+/// rubber band's light blue).
+const PREVIEW_TEXT_PX: f64 = 9.0;
+const PREVIEW_TEXT_COLOR: u32 = 0x449ccd;
 const GLYPH_MARGIN: f32 = 4.0;
 /// The margin while it is hovered: a slide holds it to 16 px (a jump there lights nothing).
 const GLYPH_HOLD_MARGIN: f32 = 6.0;
@@ -1594,7 +1598,42 @@ impl PartStudioView {
         if !points.points.is_empty() {
             out.push(Instance::new(Drawable::Points(up.upload_points(&points))).per_primitive_color().unpickable().ignore_clip().layer(31));
         }
+        out.extend(self.preview_length_in_plane(ed, &data, &units, cx));
         out
+    }
+
+    /// The line being drawn's length, lying in the sketch plane along the line, beside its middle: small light blue text
+    /// (live hover-matrix-1121 sk/inference-horiz-to-point-at, inference-vertical-at; a slant in iso).
+    fn preview_length_in_plane(&self, ed: &SketchEditor, data: &SketchData, units: &noshape_units::UnitPrefs, cx: &App) -> Option<Instance> {
+        use noshape_model::drawing::font;
+        use noshape_model::drawing::sheet::{Anchor, Text2};
+        let dir = ed.preview_value_direction(data)?;
+        let (pos, text) = ed.preview_values(data, units).into_iter().next()?;
+        let frame = ed.frame;
+        let cam = &self.viewport.read(cx).camera;
+        // Read from the side the camera is on, left to right on screen.
+        let n = if frame.normal.dot(-cam.forward()) >= 0.0 { frame.normal } else { -frame.normal };
+        let mut u = (frame.x * dir.x + frame.y * dir.y).normalize_or_zero();
+        if u.dot(cam.right()) < 0.0 {
+            u = -u;
+        }
+        let v = n.cross(u);
+        let wpp = ed.world_per_px;
+        let centre = frame.to_world(pos) + n * (0.5 * wpp);
+        let t = Text2 { pos: [0.0, 0.0], height: PREVIEW_TEXT_PX * wpp, text, angle: 0.0, anchor: Anchor::Center, pick: 0 };
+        let (pts, idx) = font::text_fill(&t);
+        if idx.is_empty() {
+            return None;
+        }
+        let f32v = |p: glam::DVec3| [p.x as f32, p.y as f32, p.z as f32];
+        let mut mesh = noshape_render::MeshData::default();
+        for p in &pts {
+            mesh.positions.push(f32v(centre + u * p[0] + v * p[1]));
+            mesh.normals.push(f32v(n));
+            mesh.pick_ids.push(0);
+        }
+        mesh.indices = idx;
+        Some(Instance::new(Drawable::Mesh(self.gpu.uploader().upload_mesh(&mesh))).with_color(noshape_scene::palette::lin(PREVIEW_TEXT_COLOR)).unlit().unpickable().ignore_clip().on_top().layer(32))
     }
 
     /// Use tool: preview the projection of the hovered edge / face edges.
@@ -4771,7 +4810,9 @@ impl PartStudioView {
         }
 
         // ---- live values of the shape being drawn (live: `#449ccd`, 13 px, no box)
-        for (pos, text) in ed.preview_values(&data, &units) {
+        // (A line's length lies in the sketch plane: `preview_length_in_plane`.)
+        let in_plane = ed.preview_value_direction(&data).is_some();
+        for (pos, text) in ed.preview_values(&data, &units).into_iter().filter(|_| !in_plane) {
             let Some((x, y)) = project(pos) else { continue };
             let w = crate::sketch_mode::label_width_px(&text) as f32 * 13.0 / 14.0;
             out.push(div().absolute().left(px(x - w * 0.5)).top(px(y - 9.0)).text_size(px(13.)).text_color(rgb(0x449ccd)).whitespace_nowrap().child(text).into_any_element());

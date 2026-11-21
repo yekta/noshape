@@ -36,35 +36,30 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (17:40 UTC 11-21) — USER P0: hover × selection look matrix (DECISIONS 11-21)
+## Now (18:48 UTC 11-21) — USER P0: hover × selection look matrix (DECISIONS 11-21)
 
-LANDED 4f2cb3ce 17:22 (point-only marker arrived along the edge; POINT_HOVER_ON_SELECTED #ffb32e).
-FINAL (live mid-paths + lead, 17:3x): EVERY approach lights only the midpoint ring (#f6c285 / #c49867 / #ffd8ac), edge
-black, from the first frame in the 9 px square; on a selected edge the #ffb32e dot. Band + dark marker only came from a
-single-event CDP jump: don't match it. live/psui/hover-matrix-1121/ps/mid-paths/, index "Midpoint approach paths".
-IN TREE, uncommitted (testing on the Mac, run-hm3.sh = full part-studio-ui lib + clippy part-studio-ui/render/scene):
-- behaviors.rs: update_hover snaps whenever the pointer is in the hovered (or armed) edge's midpoint window
-  (midpoint_hover_step(armed, on_edge, in_window)); REMOVED MIDPOINT_DWELL, midpoint_armed_at/_since,
-  midpoint_dwell_task, schedule_midpoint_dwell, midpoint_landed_edge (+ ui_hover_settling only hover_pending).
-- marker under the band (FEEL-MIDPOINT-MARKER-OVER-BAND): midpoint_overlay splits the black RING sprites (layer 22)
-  from a band piece (`midpoint_band_piece`: ±6 px of the hovered part edge, its own pick id, CORE|ON_TOP, so the
-  shader draws the real band) drawn after the points; other sprites after it. Renderer: Instance::over_lines on Lines
-  -> new list lines_over_points (after points), on Points -> points_over_lines (after those).
-- builder.rs vertex disc: live's 11 px see-through disc (alpha 184 + 190 RING rim), qa FEEL-VERTEX-HOVER-SELECT-LOOK.
-- hover_matrix_tests.rs (mod hover_matrix in sketch_ui_tests.rs): live's block + camera; `cells!` = one GPU test per
-  cell (vertex/edge/mid/face × hovered/selected/sel+hov/other-selected, mid arrived, on selected edge, 6 paths at
-  0/180/±90/45/135°) probing live's colours near the target; part_studio_hover_matrix_crops dumps PPMs
-  (NOSHAPE_HOVER_MATRIX_DUMP). Score: scp mac:noshape-host/agents/psui/hm1/*.ppm -> /root/psui-scratch/hm/oursN,
-  `python3 /root/psui-scratch/hm/compare.py <ours> /root/onshape-research/live/psui/hover-matrix-1121/ps <sxs>`
-  (per-target shift ≤3 px from the -none crop, 1 px neighbourhood, TOL 40, PASS 0.8). Pre-change run: 26/27
-  (pixel-exact 13/27); the miss was mid-selected-hovered (fixed: any approach snaps). qa's kit: /root/qa-scratch/hm2.
-- docs/parity/interaction-feel.md rows "Edge midpoint target", "…its look", new "A vertex hovered / selected".
-NEXT: land all of it (tell lead + qa the commit and matrix N/M); batch 2 (sketch, live index "Batch 2": point disc
-#fec788 / #feab11, sketch line band + midpoint marker outside sketch, none in sketch edit; region dot) as cells; then
-assembly / mate connector / origin / dialog field when live has them. Then: drop `at_bar` (Section view… above a
-rolled-back bar, live rollmenu-move-1121) + list matrix row; sketch-constraint-refusals (step 49) and
-sketch-entity-copy-paste (step 12) in full1 (vibex8 ~/agents/psui-keep/full1, 227/233).
-skasm 17:3x: reverted its crossing rule (fab3198d); trim takes back to VERTICAL; split-at-crossing awaits live 17:28.
+1e44717c LANDED as 5b7743f97 (batch 1 27/27). Batch 2 (qa's six FEEL-SKETCH tickets) COMMITTED + land.sh 18:5x
+("psui: sketch entities hovered and selected as live …"; check `tools/tiers/land.sh --status`). Batch 2 46/50 vs live-b2
+(the 4 misses = PS linemid/arc hovered, live's CDP-jump look, ruled not to match). Length label (sk-line-tool-length)
+viewed: in-plane along the line as live sk/inference-horiz-to-point-before.
+What batch 2 changed: update_hover raw_edge takes SketchCurves; midpoint_band_piece sketch colour (scene::builder::
+sketch_curve_color); shaders LineOut.under (curve colour 22 % through the band core); fs_point lit sketch point = disc over
+rest ring 30 %; PS centres 4 px dot, lit >= 11 px; snap_square in plane units; mid-draw lit = inference entity;
+sketch_mode preview_value_direction + sketch.rs preview_length_in_plane (text_fill mesh 9 px #449ccd).
+NEXT: qa batch 3 P0s (TICKETS; pictures qa-scratch/hm2/b3-4f2c.png, b3y.png, b3z.png; qa 0/15 on 4f2cb3ce; qa's scenario
+specs qa-scratch/hm2/gen2/b3-*.json; live crops onshape-research/live/psui/hover-matrix-1121/b3/):
+  FEEL-FIELD-HOVER-DIM (Fillet field hover band has a dark middle / muted; suspect the dialog preview body's own black
+  edges drawn over the band, or Highlighting.dialog), FEEL-FIELD-VERTEX-EDGE (corner in the Fillet field: live the
+  top-front x edge, ours the vertical), FEEL-ORIGIN-HOVER-EDGE (origin at the block corner: live the +x edge, ours the
+  vertical + its marker; renderer pick_reaching ties by coverage then lower id; both live picks are the longest-on-screen
+  x edge), FEEL-MC-LOOK (MC rim soft olive not navy #002847 + square; selected: no green owner-face tint),
+  FEEL-FILLET-MANIPULATOR (open white arrow in the front face pointing away from the edge). Batch 3 cells need a mate
+  connector at (40,30,20) in matrix_studio. Then batch 4 (assembly, live as/). Score kit: rsync
+  mac:noshape-host/agents/psui/hm1/ to /root/psui-scratch/hm/oursN; `python3 /root/psui-scratch/hm/compare.py oursN
+  live-b1c|live-b2 sxsN`. Crops run: run-hm6.sh (touch -c changed files first: a stale Mac binary skipped a dump once).
+Mac disk: keep ~/noshape-host/agents/psui/target <= 10 GB (lead 18:4x): trim incremental + old binaries after runs.
+Later: drop `at_bar` (Section view… above a rolled-back bar) + list matrix row; full1 sketch-constraint-refusals (49) /
+sketch-entity-copy-paste (12) (vibex8 ~/agents/psui-keep/full1).
 
 ### Earlier today
 

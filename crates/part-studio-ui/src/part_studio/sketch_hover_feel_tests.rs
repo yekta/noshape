@@ -164,16 +164,15 @@ fn a_shown_sketchs_line_and_point_reach_outside_sketch_mode_as_live(cx: &mut Tes
             }
         }
     }
-    // On a line's middle, resting there: still the line, no tool being open (live2 rr/ln.png).
+    // On a line's middle: its midpoint, as a part edge's (live hover-matrix-1121 ps/sketch-linemid-*).
     let (id, a, b) = lines[0];
     let mid = (a + b) * 0.5;
     pointer.move_to(cx, &view, mid + (b - a).perp().normalize() * 3.0);
     pointer.move_to(cx, &view, mid);
-    std::thread::sleep(std::time::Duration::from_millis(160));
     pointer.frames(cx, &view);
     let got = hovered(cx, &view);
-    if !is_line(&got, id) {
-        wrong.push(format!("resting on line {id}'s middle: lit {got:?}, not the line"));
+    if !matches!(&got, Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) if is_line(&Some((**on).clone()), id)) {
+        wrong.push(format!("on line {id}'s middle: lit {got:?}, not its midpoint"));
     }
     let corner = lines[0].1;
     let out = (corner - centre).normalize();

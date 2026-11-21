@@ -1006,13 +1006,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 if c.handle {
                     picks.boost(id);
                 }
-                // Custom sketch appearance (Edit sketch appearance) when not editing.
-                let color = match sk.color.filter(|_| !editing) {
-                    Some(c) => lin_to_u8(c),
-                    // (A handle arm: Onshape's thin grey handle line, sketch/100–101.)
-                    None if c.handle => theme::rgb8(theme::viewport::SKETCH_HANDLE_LINE),
-                    None => sketch_color(&opts.graphics, c.state, c.construction, editing || through, c.external),
-                };
+                let color = sketch_curve_color(opts, sk, c);
                 // Hovered / selected it keeps a dark core like a part edge
                 // (live sketch/21, 22).
                 // (A handle arm on top: it runs along its spline from the end, and under it it couldn't be picked.)
@@ -1022,8 +1016,8 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 lines.push_polyline(&c.points, color, id, width, style);
             }
             let mut points = PointData::default();
-            // At rest a curve's free end (no other curve ends there) shows as a ~4 px dot in the sketch's colour; shared
-            // corners, centres and handles don't (live2 nav-feel-1119: a lone line's ends rgb 153; a rectangle's corners
+            // At rest a curve's free end (no other curve ends there) and a centre show as a ~4 px dot in the sketch's
+            // colour; shared corners and handles don't (live2 nav-feel-1119: a lone line's ends rgb 153; a rectangle's corners
             // undrawn, live2 11-18).
             let free_end = if editing || through { FreeEnds::default() } else { FreeEnds::of(&sk.curves) };
             let free_end = |q: &[f32; 3]| free_end.contains(q);
@@ -1045,7 +1039,8 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 let size = if p.standalone {
                     7.0
                 } else if !editing && !through {
-                    if !p.center && !p.handle && !p.tip && free_end(&p.position) { 4.0 } else { 0.0 }
+                    // (And a circle's or an arc's centre: live hover-matrix-1121 ps/sketch-region-none, sketch-arc-none.)
+                    if p.center || (!p.handle && !p.tip && free_end(&p.position)) { 4.0 } else { 0.0 }
                 } else if p.tip {
                     9.0
                 } else if p.handle {
@@ -1194,6 +1189,18 @@ pub fn add_consumed_edge_picks(built: &mut BuiltScene, base: &StudioDisplay, up:
     built.scene.instances.insert(built.static_instances, Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().pick_only().layer(1));
     built.static_instances += 1;
     built.scene.states.resize(built.picks.len() + 1, 0);
+}
+
+/// A shown sketch curve's drawn colour: custom sketch appearance (Edit sketch appearance) when not editing, a handle
+/// arm's grey, else the Graphics preferences' colour for its state.
+pub fn sketch_curve_color(opts: &SceneOptions, sk: &noshape_model::display::SketchDisplay, c: &noshape_model::display::SketchCurveDisplay) -> [u8; 4] {
+    let editing = opts.editing_sketch == Some(sk.feature);
+    match sk.color.filter(|_| !editing) {
+        Some(c) => lin_to_u8(c),
+        // (A handle arm: Onshape's thin grey handle line, sketch/100–101.)
+        None if c.handle => theme::rgb8(theme::viewport::SKETCH_HANDLE_LINE),
+        None => sketch_color(&opts.graphics, c.state, c.construction, editing || opts.through_sketches.contains(&sk.feature), c.external),
+    }
 }
 
 fn sketch_color(g: &crate::graphics_prefs::GraphicsPrefs, st: SketchEntityState, construction: bool, editing: bool, external: bool) -> [u8; 4] {

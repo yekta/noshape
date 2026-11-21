@@ -1285,9 +1285,15 @@ impl PartStudioView {
         }
         // A whole part hovered (its Parts list row, or a face under a parts field) is the part itself: drawn as its
         // outline in hover orange (`with_highlights`; live "psui (2026-10-27, P2) PART-HOVER-RED look").
+        // Mid-draw what the snap lands on lights, not what the pointer's pick is (the rubber band under it): the point,
+        // the line for its midpoint or a point on it (live hover-matrix-1121 sk/inference-on-point-at,
+        // inference-mid-of-line-at).
+        if let Some((ed, e)) = self.sketch.as_ref().filter(|ed| ed.mid_draw()).and_then(|ed| Some((ed, ed.inference.as_ref()?.entity?))) {
+            return vec![Reference::SketchEntity { sketch: ed.feature, entity: e.0 }];
+        }
         match &self.hover {
             Some(r @ Reference::Body(_)) => vec![r.clone()],
-            // Mid-draw the open sketch's entity under the pointer isn't recoloured (live: the snap shows instead).
+            // Else mid-draw the open sketch's entity under the pointer isn't recoloured.
             Some(Reference::SketchEntity { sketch, .. }) if self.sketch.as_ref().is_some_and(|ed| ed.feature == *sketch && ed.mid_draw()) => Vec::new(),
             // A sketch curve under a region field pre-highlights its region.
             Some(r @ Reference::SketchEntity { .. }) => {
@@ -3951,19 +3957,24 @@ impl PartStudioView {
         [(!under.is_empty()).then(|| points_at(under, 22)), Some(band), (!over.is_empty()).then(|| points_at(over, 22).over_lines())].into_iter().flatten().collect()
     }
 
-    /// The lit edge's band again over the ~12 px round its midpoint marker ([`Self::midpoint_overlay`]): the edge's own
-    /// pick id, so the band is drawn with its state's look.
+    /// The lit edge's or sketch curve's band again over the ~12 px round its midpoint marker
+    /// ([`Self::midpoint_overlay`]): its own pick id and colour, so the band is drawn with its state's look.
     fn midpoint_band_piece(&self, cx: &App) -> Option<noshape_render::LineSegment> {
         use noshape_render::LineSegment;
         let edge = self.hover.as_ref()?;
-        if !matches!(edge, Reference::Edge(_)) {
-            return None;
-        }
+        let color = match edge {
+            Reference::Edge(_) => [0, 0, 0, 255],
+            Reference::SketchEntity { sketch, entity } => {
+                let sk = self.display.sketches.iter().find(|s| s.feature == *sketch)?;
+                noshape_scene::builder::sketch_curve_color(&self.opts, sk, sk.curves.iter().find(|c| c.entity == *entity)?)
+            }
+            _ => return None,
+        };
         let pick_id = *self.built.as_ref()?.picks.ids_for(edge).first()?;
         let (m, dir) = self.edge_midpoint_along(edge)?;
         let vp = self.viewport.read(cx);
         let half = dir * vp.camera.world_per_pixel(vp.size().y) * 6.0;
-        Some(LineSegment { a: (m - half).as_vec3().into(), b: (m + half).as_vec3().into(), color: [0, 0, 0, 255], pick_id, width: 5.0, style: LineSegment::CORE | LineSegment::ON_TOP })
+        Some(LineSegment { a: (m - half).as_vec3().into(), b: (m + half).as_vec3().into(), color, pick_id, width: 5.0, style: LineSegment::CORE | LineSegment::ON_TOP })
     }
 
     /// [`Self::midpoint_overlay`]'s points.
@@ -4000,9 +4011,12 @@ impl PartStudioView {
                 }
             }
             // A shown sketch's point outside sketch mode: a ~10 px light orange disc (live2 11-18 hover-p0 pt.png; at
-            // rest a corner isn't drawn).
-            Some(r @ Reference::SketchEntity { .. })
-                if self.sketch.is_none() && self.ui.select_other.is_none() && self.ui.hover_pick.as_ref().is_some_and(|t| t.kind == PickKind::SketchPoint && t.reference == *r) =>
+            // rest a corner isn't drawn). A standalone point or a centre, drawn at rest, lights itself (fs_point).
+            Some(r @ Reference::SketchEntity { sketch, entity })
+                if self.sketch.is_none()
+                    && self.ui.select_other.is_none()
+                    && self.ui.hover_pick.as_ref().is_some_and(|t| t.kind == PickKind::SketchPoint && t.reference == *r)
+                    && !self.display.sketches.iter().filter(|s| s.feature == *sketch).flat_map(|s| &s.points).any(|p| p.entity == *entity && (p.standalone || p.center)) =>
             {
                 if let Some(at) = self.ui.hover_pick.as_ref().and_then(|t| t.anchor) {
                     points.push(sprite(at, crate::theme::viewport::POINT_HOVER[0], 10.0, 0));
@@ -4029,9 +4043,9 @@ impl PartStudioView {
     /// Not in sketch mode, nor with a field that takes no points.
     pub(super) fn update_hover(&mut self, cx: &App) -> bool {
         let raw = self.ui.hover_pick.as_ref().map(|t| t.reference.clone());
-        // A shown sketch's curve with no tool open is only itself: its midpoint never takes the hover (live2 rr/ln.png,
-        // qa FEEL-SKETCH-REACH-OUTSIDE: lit from 6-7 px down to 0 px, no midpoint ring); a part edge's midpoint does.
-        let raw_edge = self.ui.hover_pick.as_ref().filter(|t| t.kind == PickKind::Edge || (t.kind == PickKind::SketchCurve && self.edit.is_some())).map(|t| t.reference.clone());
+        // A shown sketch's line or arc takes its midpoint as a part edge does (live hover-matrix-1121 ps/sketch-linemid-*,
+        // sketch-arc-*: a click there selects the midpoint).
+        let raw_edge = self.ui.hover_pick.as_ref().filter(|t| matches!(t.kind, PickKind::Edge | PickKind::SketchCurve)).map(|t| t.reference.clone());
         let points_ok = self.sketch.is_none() && self.active_field_filter(cx).is_none_or(field_takes_points) && !self.inference_applies(cx);
         // Out of the graphics nothing snaps (HOVER-VERTEX-STAYS: the pointer's last place inside kept an armed edge's
         // midpoint lit after it left).
