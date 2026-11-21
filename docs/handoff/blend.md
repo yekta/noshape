@@ -1,40 +1,45 @@
 # Blends (agent "blend"): current state
 
-Updated 11-21 03:58 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-21 07:36 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-21 03:58, thread on the Hello account)
+## Now (11-21 07:36, thread on the Hello account)
 
-- Landed: P1 3d5ca01e (self_intersects / Boolean offsets by work counts; userdocs 71 SAME), Halter step 2094e64b
-  (extend_face_over takes the face's own part of the surface; impeller Fillet 3 tip x 1.502 -> 0.957, live 0.097).
-- 1. isaac Fillet 4 (bool's cause, blocks bool's re-land of bool-re 3139c1975): worktree blend-fix (off 8ea54c877,
-  uncommitted): checked_blend's retry with nothing to cut and invalid at the part's scale goes on to the next step
-  (`if (r4.IsNull() && !as_is) continue;`). Mac replay of bool's private dump: valid true, 64 faces. Gate
-  bin/gatefix.sh (unit blend-gatefix2: g13, kernel/model tests, suite pair vibex8, userdocs vibex7 -> gatefix.done).
-  Then commit, land, tell bool the main sha.
-- 2. P1b/P1c (every time limit left in crates/kernel -> work counts; list in /root/blend-scratch/notes-p1b.md):
-  worktree blend-p1c (+ blend10), patches blend-scratch/p1b-wip.patch, p1c-wip.patch. run_bounded(what, steps, f)
-  (op work chain t_op_work; fillet/chamfer/draft/defeature/shell/self_intersects), with_op_work for Replace face,
-  SharedWork for BRepMesh (counted in every thread's UserBreak), op_section's call budget removed; time backstops
-  raised (blend 120 s, mesh 240 s, Replace 360 s). Bounds are UINT64_MAX while measuring: bin/p1b-meas.sh (traced
-  suite + userdocs vibex7 -> p1b-meas.done), bin/p1c-probe.sh (Replace face probe, mesh steps all threads vs one
-  core). Then per-op bounds ~10x the max seen; strip TMP/TMPT timers (boolean.cpp op_split_on, blend_section.rs);
-  TESTS.md Budgets; gate; land. Not converted: FeatureScript TIME_LIMIT 60 s / DIALOG_LIMIT 15 s (crates/custom).
-- 3. P1 SPEED-MUTUALTRIM-FILLET1 (Fillet 1 308 ms vs doc live 76): sheet_blend path. split_on falls back to the
-  general splitter after BRepFeat (no_area), GeomProjLib projections fail; `off` classifies 128 points. Timed Mac run
-  -> logs/mt-prof3.out (corpus copy Mac ~/noshape-host/agents/blend-models).
-- 4. Impeller: correctness first (SUITE-IMPELLER-FILLET3, first difference 27/48; live's extension rule, feature 29),
-  then speed (12.2 s vs live 2.8; Fillet 3 3.1 s): scaled retries, Bohrungssitz split_closed, Ansaugflansch
-  fillet_overflows.
-- 5. c2-opt-fillet-partial-asym-smooth Fillet 2 (3/6 mm: ours 20 lines + 2 edges vs live 18 + 4). 6. P2
-  c2-curve-pattern-composite Fillet 2 28/58/32 vs live 26/52/28.
-- P2 FILLET-FAIL-SLOW (TICKETS): cli-draft-hang2 Fillet 2 fails after 14.1 s (qa fuzz doc, no live copy).
-- Cleanup left: vibex7 ~/agents/blend-speed (gate base), ~/tmp/blend/impdump; Mac blend-models, blend-mtdump;
-  worktree blend-p1c after P1b lands.
+- Queued: 479fd0ec isaac Fillet 4 (checked_blend: a retry valid only at the working scale, nothing to cut -> next
+  step). When on main: tell bool the sha (its re-land of bool-re 3139c1975 waits on it).
+- 1. Impeller speed P0 (lead: qa's quiet run edit 24.7 s vs live 3.5-3.7 s; fix the fillet share first, Boolean /
+  Shell shares to bool with numbers). Per feature (Mac): Fillet 3 2.4 s (ball tools 95, closed_run_on 936, reface
+  100, Cut 1155 ms), Fillet Ansaugflansch 4.1 s vibex7 (op_fillet 3.0 s; fillet_overflows 0.9 s).
+  - Deferred overflow check: worktree blend-ovfd (uncommitted, still holds the TMPR trace to strip): op_fillet's
+    fillet_overflows (only picks the message) runs only when every Rust fallback failed too (thread_local
+    t_overflow_deferred; ops.rs with_fillet_overflow_deferred, off while recording blends). model kernel_robustness
+    54 + fillet 29 pass. Timing: bin/ovfd-test.sh -> logs/imp-ovfd.out.
+  - Retry skip (next): Mac impeller TMPR: 12 fillet builds whose first try failed outright never built at any eps.
+    Suite + userdocs evidence: bin/retry-meas.sh (worktree blend-f850 = branch blend-impspeed, TMPR) ->
+    logs/retry-meas-{suite,ud}.out. If none builds after an outright failure: skip those retries, combine with ovfd,
+    gate (g13, kernel/model, suite pair, userdocs SAME), land, report.
+  - Fillet 3's Cut is slow on a body with bad pcurves (edge tolerance 2.24e-4 in, 2.55e-3 out): bool fixes
+    op_boolean's output pcurves (boolean.cpp). The 2.1e-4 comes from Chamfer Stevenrohr Halterung (rim_chamfer_cut:
+    Cut -> unify_same_domain_precise -> join_edges_at): TOLC trace bin/f3t3-mac.sh -> logs/f3t3.out; mine if unify
+    or join raises it. closed_run_on breakdown: bin/f3t4-mac.sh (f3time2.patch) -> logs/f3t4.out.
+  - Temp instrumentation only (never land): worktree blend-f3time, patches blend-scratch/f3time{,2}.patch.
+- SUITE-IMPELLER-FILLET3 geometry is core's (culprit 9c9f29267, the Copy() of a merged face's surface; core fixes
+  in core-bis2). Fillet 3 speed stays mine.
+- 2. SUSPENSION-CIRCPAT1 (P1, after the impeller): asm-suspension 805e29 Fillet 3 (R2.5, 17 edges after tangent
+  propagation) "Failed to fillet selections" on 28/43/16 (live 53/98/46); Fillet 4 and Circular pattern 1 follow.
+  Plain OCCT fails on all 17. Our section blend: concave edges refused, 8 ball tools, direct build "an invalid
+  solid". Dump vibex7 ~/agents/blend-keep/susp/fillet-19.{brep,txt}; model m2/susp-805e29 (NOSHAPE_PARITY_ONLY=
+  susp-805e29 NOSHAPE_PARITY_MODELS=<m2>). Probe crash_inputs::zz_susp in worktree blend-speed (uncommitted).
+- 3. P1b/P1c time limits -> work counts (worktree blend-p1c + p1b/p1c-wip.patch; notes-p1b.md): per-op bounds
+  ~10x the max seen, strip TMP timers, TESTS.md Budgets, gate, land.
+- 4. SPEED-MUTUALTRIM-FILLET1 (low: 82 ms gap). 5. c2-opt-fillet-partial-asym-smooth Fillet 2. 6. P2
+  c2-curve-pattern-composite Fillet 2. P2 FILLET-FAIL-SLOW (cli-draft-hang2 Fillet 2 fails after 14.1 s).
+- Cleanup left: worktrees blend-f3time, blend-p1c; vibex7 ~/agents/blend-speed target, ~/tmp/blend/impdump; Mac
+  blend-models, blend-mtdump; Mac blend10 back to branch blend-p1c-wip after the Mac runs.
 - Agent ids: only in /root/lead-scratch/roster.md; read it before every message_agent, never copy ids here.
 
 ## In flight (older)
