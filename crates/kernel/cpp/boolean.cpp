@@ -227,11 +227,20 @@ bool cancelled(const std::atomic<bool>* flag)
 // crossing helical tools took 17 GB and ran on): the process's resident
 // memory may grow by this much while an operation builds, then the
 // operation stops with an error. Set from Rust before each boolean
-// (NOSHAPE_BOOLEAN_MEMORY_MB, default 4096: std::getenv on Windows reads the
+// (NOSHAPE_BOOLEAN_MEMORY_MB, default set_memory_budget_mb's: std::getenv on Windows reads the
 // CRT's copy of the environment and misses changes made after startup).
 std::atomic<uint64_t> g_memory_budget_mb{8192};
 
 size_t memory_budget() { return (size_t)g_memory_budget_mb.load() << 20; }
+
+// With NOSHAPE_WORK_TRACE: an operation's growth (sampled every 50 ms) when past 128 MB, to see how far the
+// budget is from real work.
+void trace_growth(const char* what, size_t peak)
+{
+  static const bool on = std::getenv("NOSHAPE_WORK_TRACE") != nullptr;
+  if (on && peak >= (size_t(128) << 20))
+    std::fprintf(stderr, "%s: %zu MB growth (budget %zu MB)\n", what, peak >> 20, memory_budget() >> 20);
+}
 
 // Set when an operation ran out of its budget (also on a pool thread); the
 // operation then fails (fail_if_cancelled) instead of trying another way.
@@ -245,7 +254,11 @@ class CancelIndicator : public Message_ProgressIndicator
 public:
   explicit CancelIndicator(const std::atomic<bool>* flag) : myFlag(flag), myStart(resident_bytes()) {}
   // (With NOSHAPE_KERNEL_PROFILE: the time to here goes to the step OCCT last showed.)
-  ~CancelIndicator() override { Show(nullptr); }
+  ~CancelIndicator() override
+  {
+    Show(nullptr);
+    trace_growth("occt build", myPeak);
+  }
   bool UserBreak() override
   {
     if (work_step() || budget_spent() || cancelled(myFlag) || myOver)
@@ -265,6 +278,8 @@ public:
       return false;
     myChecked = now;
     const size_t rss = resident_bytes();
+    if (rss > myStart)
+      myPeak = std::max(myPeak, rss - myStart);
     if (rss > myStart && rss - myStart > memory_budget())
     {
       myOver = true;
@@ -295,6 +310,7 @@ private:
   const std::atomic<bool>*              myFlag;
   Deadline*                             myDeadline = t_deadline;
   size_t                                myStart;
+  size_t                                myPeak = 0;
   bool                                  myOver = false;
   std::chrono::steady_clock::time_point myChecked = std::chrono::steady_clock::now();
   std::mutex                            myStepLock;
@@ -432,15 +448,21 @@ namespace {
 // whether it has grown past the budget since.
 thread_local size_t t_rust_rss_start = 0;
 thread_local bool   t_rust_over      = false;
+thread_local size_t t_rust_peak      = 0;
 } // namespace
 
 RustMemoryWatch::RustMemoryWatch() : myPrevious(t_rust_rss_start)
 {
   t_rust_rss_start = std::max<size_t>(resident_bytes(), 1);
   t_rust_over      = false;
+  t_rust_peak      = 0;
 }
 
-RustMemoryWatch::~RustMemoryWatch() { t_rust_rss_start = myPrevious; }
+RustMemoryWatch::~RustMemoryWatch()
+{
+  trace_growth("noshape boolean", t_rust_peak);
+  t_rust_rss_start = myPrevious;
+}
 
 bool RustMemoryWatch::over() { return t_rust_over; }
 
@@ -462,7 +484,9 @@ extern "C" int noshape_should_break()
     {
       next_rss         = now + 0.05;
       const size_t rss = resident_bytes();
-      t_rust_over      = rss > t_rust_rss_start && rss - t_rust_rss_start > memory_budget();
+      if (rss > t_rust_rss_start)
+        t_rust_peak = std::max(t_rust_peak, rss - t_rust_rss_start);
+      t_rust_over = rss > t_rust_rss_start && rss - t_rust_rss_start > memory_budget();
     }
     if (t_rust_over)
       return 1;
@@ -8719,14 +8743,14 @@ extern "C" void noshape_bop_set_pairs_parallel(int on); // OCCT patch 0004
 
 void set_bop_pairs_parallel(bool on) { noshape_bop_set_pairs_parallel(on ? 1 : 0); }
 
-// The default: half the machine's memory, 4 to 16 GB. A flat 4 GB stopped
-// a diamond knurl's subtract (5.9 GB at its peak in the model's metres; lead
-// 10-30 11:30: "Selected tools and targets do not intersect."), and the 17 GB
-// runaway the budget is for still stops on a 16 GB machine (at 8 GB).
+// The default: 8 GB on every machine, so a result never depends on the machine (lead 11-21). The gate's corpora
+// grow by 0.3 GB at most (NOSHAPE_WORK_TRACE=1 prints growth past 128 MB); a diamond knurl's subtract took 5.9 GB
+// and its 17 GB runaway stops. Only a machine too small to hold 8 GB more (under 11 GB) stops sooner, at 3/4 of its
+// memory, where the operation would otherwise run it out.
 void set_memory_budget_mb(uint64_t mb)
 {
-  const uint64_t half = physical_memory_mb() / 2;
-  g_memory_budget_mb.store(mb > 0 ? mb : std::min<uint64_t>(std::max<uint64_t>(half, 4096), 16384));
+  const uint64_t room = physical_memory_mb() / 4 * 3;
+  g_memory_budget_mb.store(mb > 0 ? mb : room > 0 ? std::min<uint64_t>(8192, room) : 8192);
 }
 
 namespace

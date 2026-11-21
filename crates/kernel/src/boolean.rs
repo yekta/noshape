@@ -161,7 +161,7 @@ pub fn boolean(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &Boolean
 /// platform), set before each OCCT Boolean, split or up-to extrude: the first of a session may be any of them.
 pub(crate) fn occt_bop_settings() {
     // The memory budget (NOSHAPE_BOOLEAN_MEMORY_MB, MB of growth; the kernel's
-    // default otherwise: half the machine's memory, 4 to 16 GB).
+    // default otherwise: 8 GB on every machine).
     ffi::set_memory_budget_mb(std::env::var("NOSHAPE_BOOLEAN_MEMORY_MB").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(0));
     // OCCT's booleans in parallel (NOSHAPE_BOP_PARALLEL; serial by default):
     // likewise.

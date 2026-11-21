@@ -134,7 +134,9 @@ fast and a slow machine, idle or loaded. So:
   so the cut falls at the same step everywhere (Sweep's self-intersection check, a Boolean's offset tools, fillets'
   and Draft's tries). Calibrate the limit with NOSHAPE_WORK_TRACE=1 against the cases where the step works.
 - Not a geometry choice, so still by time: FeatureScript's 60 s limit and Replace face's 90 s (they fail visibly).
-- Still machine-dependent (open): the memory budget (a Rust Boolean past it gives way to OCCT's).
+- The memory budget (an operation's growth of the process, then it fails) is 8 GB on every machine, 25x the
+  gate corpora's largest (0.3 GB; NOSHAPE_WORK_TRACE=1 prints each past 128 MB), so it only stops runaways. A
+  machine under 11 GB stops at 3/4 of its memory, where the operation would otherwise run it out.
 
 ## UI keystroke tests
 
