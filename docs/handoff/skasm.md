@@ -14,7 +14,7 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - Handed to core 11-21 10:50: infento a3f7a1 Linear pattern 1's direction JMx = Chamfer 2's new edge on Extrude 1's
   ring (ours runs -y, live +y); and P0 c2-genesis-trunk-hanger 20 -> 12/73 = core's 18354ec79 (bisected; fixed by
   8631c5717, Mac 20/73 on that tree; main still 12/73 from a second cause core is bisecting).
-- QUEUED b3345866 + 6ef0420c (22:3x; A/B green: suite 127 -> 129/188 docs, 1986 -> 1999 features, no doc worse; start-extrude 34/34,
+- QUEUED b3345866 + 6ef0420c + af26939c (Offset label hover; 22:4x; after they land tell core + qa, report to lead; A/B green: suite 127 -> 129/188 docs, 1986 -> 1999 features, no doc worse; start-extrude 34/34,
   overcut-dogbone 10/10; base ab6-base.out vibe2, new vibex7 ~/agents/skasm-keep/ab6-new.out):
   - parity.rs: ruled_piece_from_query (mutualtrim SWEPT_*), region_query_sketch hint + pieces rule (scissor
     b58244 Extrude 1 KICB 445 mm², 0139f2 Extrude 8 Sketch 6's regions); recheck sc-* in vibe2 ~/tmp/skasm/scm.
