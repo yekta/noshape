@@ -180,3 +180,9 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-21 (lead) Opening a heavy document shows a stored display result at once (the open target is ≤ 0.5 s): each Part
   Studio's tessellation and part list are saved in the .noshape, keyed by its feature list, configuration and app/kernel
   version; the real regeneration runs in the background and replaces it. A stale cache is never shown (dx).
+- 11-21 (user) Hover and selection looks must match live in every combined state, not only one state at a time (the user
+  found a midpoint hovered on a selected edge drawn as a cream dot with a black ring; live: a solid orange dot with a soft
+  orange halo). P0: a matrix of target (vertex, midpoint, edge, face, plane, origin, mate connector, sketch entities,
+  snap glyphs) × owner state (none, hovered, selected, selected + hovered, another selected, in a selection field) ×
+  context (Part Studio, sketch, assembly); live captures each cell, psui matches it with a test per cell, qa scores it
+  in the interaction feel suite and walks the app as a user.
