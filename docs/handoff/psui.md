@@ -49,8 +49,8 @@ a sketch point on the Origin picked before it (sketch_pick_at; dim hv-two-points
 middle cuts at the midpoint + MIDPOINT of its ends (live geo-list6); an ellipse and a plane refused with
 DIMENSION_FAILED (dim-ellipse-axes); tests in scene sketch_mode + sketch_ui_tests. Open: transform-drag-copy (live's
 arrow drag leaves the box focused "9.9 mm"; ours no focus: arrow hit in iso view?), circle-rims step 22 (our click on
-circle 1's rim at (-5, 0) picks nothing), split-at-crossing step 11 (live PERPENDICULAR to the crossed line, ours
-VERTICAL: no rule known), circle-centres "Construction" tool readout while a construction point is picked,
+circle 1's rim at (-5, 0) picks nothing), split-at-crossing step 11 (live PERPENDICULAR: the line crosses the
+held line at its midpoint; crates/sketch square_at_mid, sent to skasm 10:1x), circle-centres "Construction" tool readout while a construction point is picked,
 cparc end off-circle (REQUESTS 08:40). Shots of 3 takes: vibex8 ~/agents/psui-keep/bin/shots.sh (frames every 0.4 s)
 -> ~/agents/psui-keep/shots (waiting on slot).
 

@@ -6130,8 +6130,14 @@ impl SketchEditor {
     pub fn construction_shown(&self, sk: &Sketch) -> bool {
         // (A handle line selected shows it too: live's ui-parity sketch-spline-handle-arm.)
         // (A model edge's reference line isn't: live sketch-mirror-model-edge, the edge as the mirror line, Mirror shown.)
-        let curves: Vec<EntityId> = self.selection.iter().copied().filter(|id| !is_point(sk, *id) && sk.entity(*id).is_some_and(|e| !e.external)).collect();
-        self.construction || (!curves.is_empty() && curves.iter().all(|id| sk.entity(*id).is_some_and(|e| e.construction)))
+        // (A circle's, arc's or ellipse's centre counts as construction, picked by a tool too: live sketch-dim-circle-centres;
+        // a line's end doesn't: sketch-dim-hv-two-points.)
+        if self.construction {
+            return true;
+        }
+        let centre = |id: EntityId| is_point(sk, id) && sk.entities().any(|e| e.center() == Some(id));
+        let mut shown = self.selection.iter().copied().chain(self.picks.iter().map(|p| p.0)).filter(|id| centre(*id) || (!is_point(sk, *id) && sk.entity(*id).is_some_and(|e| !e.external))).peekable();
+        shown.peek().is_some() && shown.all(|id| centre(id) || sk.entity(id).is_some_and(|e| e.construction))
     }
 
     /// Apply a constraint tool to the current selection if it fits; a selection that more picks could complete
@@ -9983,6 +9989,24 @@ mod tests {
             ed.tool_up(&mut d, p);
         }
         assert_eq!((ed.toast.as_deref(), ed.picks.len()), (Some(DIMENSION_FAILED), 0));
+    }
+
+    /// Live sk2-1121 dim-circle-centres: a circle's centre picked by Dimension shows Construction active; a line's end
+    /// (dim-hv-two-points) doesn't.
+    #[test]
+    fn a_picked_circle_centre_shows_construction() {
+        for centre in [true, false] {
+            let (mut ed, mut d) = editor(Tool::Dimension);
+            let circle = d.sketch.add_circle(v(0.03, 0.0), 0.004);
+            let line = d.sketch.add_line(v(0.0, 0.02), v(0.03, 0.02));
+            let (p, e) = match centre {
+                true => (v(0.03, 0.0), d.sketch.entity(circle).unwrap().center().unwrap()),
+                false => (v(0.0, 0.02), d.sketch.endpoints(line).unwrap().0),
+            };
+            ed.tool_down(&mut d, p, Some(e), false, false);
+            ed.tool_up(&mut d, p);
+            assert_eq!((ed.picks.len(), ed.construction_shown(&d.sketch)), (1, centre));
+        }
     }
 
     #[test]
