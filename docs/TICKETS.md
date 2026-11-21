@@ -6650,6 +6650,12 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
+- [ ] P3 DRW-VIEW-CENTRE (dx 11-21; live behaviours "dx (11-21 14:20)") A view's position in live is the centre of its box:
+  the drawn extent (sketches and planes never count, centermarks neither) plus each cylindrical face's axis drawn 0.09 in
+  (sheet) past the face's ends; each side + 5 % of the larger side, at least 0.68 in. Ours puts the bodies' box centre
+  (views.rs bodies_center) at the position, so a view whose axes reach further one way sits off live's by half the
+  difference: bottle Front 0.075 in (axes 0.45 in below, 0.30 above), housing Top 0.045 in. The on-screen frame (8 px
+  out, live2) and the DXF rows (views aligned first) don't depend on it.
 - [ ] P3 SETLIB-IMAGES (dx, studios 11-08, lead ruling; live 11-21 behaviours "dx (11-21 15:31)") Set library's "My images":
   `noshape_ops::prefs::LibraryFolders::load().0` maps the library key `images` to the folder the user chose (Documents ›
   a folder's Set library ▸ "My images", op `documents_set_library`; `libraries.json` in the config dir). Live shows it
