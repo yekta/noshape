@@ -10220,6 +10220,35 @@ fn stl_presets_facet_as_onshapes() {
     assert_eq!(metres, medium, "Medium in metres is the millimetres' mesh scaled (live 3052)");
 }
 
+/// 3MF and OBJ facet as live's, with STL's faceter and no minimum facet width (c2-housing-draft: live's 3MF shares
+/// 317 of its STL's 460 Coarse vertices; 1258 / 2340 / 6188 triangles, ours were 2160 / 4332 / 11512): the R5 rim
+/// in 29 / 58 / 144 segments at Coarse / Medium / Fine.
+#[test]
+fn obj_and_3mf_presets_facet_as_onshapes() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "mesh_presets.noshape");
+    let rim = |ctx: &mut Ctx, format: &str, resolution: &str| -> usize {
+        let file = scratch(&format!("mesh_presets_{resolution}.{}", format.to_lowercase()));
+        let out = call(ctx, "export_parts", json!({ "format": format, "file": file.to_str().unwrap(), "resolution": resolution }))["file"].as_str().unwrap().to_string();
+        // Both are stored zips: the model's text is in the file as it is (metres).
+        let text = String::from_utf8_lossy(&std::fs::read(out).unwrap()).into_owned();
+        let points: Vec<[f64; 3]> = if format == "3MF" {
+            text.split("<vertex ").skip(1).map(|v| ["x=\"", "y=\"", "z=\""].map(|k| v.split(k).nth(1).and_then(|s| s.split('"').next()).unwrap().parse().unwrap())).collect()
+        } else {
+            text.lines().filter_map(|l| l.strip_prefix("v ")).map(|l| { let c: Vec<f64> = l.split_whitespace().map(|x| x.parse().unwrap()).collect(); [c[0], c[1], c[2]] }).collect()
+        };
+        let mut on: Vec<(i64, i64)> = points.iter().filter(|p| (p[2] - 0.020).abs() < 1e-6 && ((p[0] * p[0] + p[1] * p[1]).sqrt() - 0.005).abs() < 1e-6).map(|p| ((p[0] * 1e7).round() as i64, (p[1] * 1e7).round() as i64)).collect();
+        on.sort_unstable();
+        on.dedup();
+        on.len()
+    };
+    let near = |got: usize, want: f64| (got as f64 - want).abs() <= (want * 0.06).max(2.0);
+    for format in ["3MF", "OBJ"] {
+        let (coarse, medium, fine) = (rim(&mut ctx, format, "Coarse"), rim(&mut ctx, format, "Medium"), rim(&mut ctx, format, "Fine"));
+        assert!(near(coarse, 29.0) && near(medium, 58.0) && near(fine, 144.0), "{format}: coarse {coarse}, medium {medium}, fine {fine} (live 29 / 58 / 144)");
+    }
+}
+
 /// An STL's fillet torus on live's grid (live 3052, knob-jason's R11.5 fillet: ceil(sweep / angle) steps across the
 /// profile and round the axis). The hole's R 2 rim fillet (tube centre R 7 at z 18) at Coarse: 8 steps over its 90°,
 /// 29 round.
