@@ -1656,5 +1656,113 @@
   "url": "https://cad.onshape.com/documents/622bc2049d57b85f6ed1729d/w/87a25c917a25200f227cc8d0/e/c009f014caa82561afcdd270",
   "title": "opt-revolve-surface-add-mirror-reapply",
   "original": "https://cad.onshape.com/documents/18be675fb57477de8fbb9ee0/w/e2fd9b9d31a8bbe1ebc9bc8f/e/503568a0bb1cb174b6c55b37"
+ },
+ {
+  "name": "c2-cov2-curves-project-bridge-fit-offset-helix",
+  "document": "0d7234a91f7443920ecef2d2",
+  "workspace": "f8bd7a3f36e0fef41d587f15",
+  "element": "9ae9e7e0472b38bdd053028b",
+  "url": "https://cad.onshape.com/documents/0d7234a91f7443920ecef2d2/w/f8bd7a3f36e0fef41d587f15/e/9ae9e7e0472b38bdd053028b",
+  "title": "cov2-curves-project-bridge-fit-offset-helix",
+  "original": "https://cad.onshape.com/documents/0d7234a91f7443920ecef2d2/w/f8bd7a3f36e0fef41d587f15/e/9ae9e7e0472b38bdd053028b"
+ },
+ {
+  "name": "c2-cov2-face-blend-partial-fillet",
+  "document": "74040e005a1a48e3f7ac8570",
+  "workspace": "4e3521247b473d1859578261",
+  "element": "fca788176eb5f424fafc5fa9",
+  "url": "https://cad.onshape.com/documents/74040e005a1a48e3f7ac8570/w/4e3521247b473d1859578261/e/fca788176eb5f424fafc5fa9",
+  "title": "cov2-face-blend-partial-fillet",
+  "original": "https://cad.onshape.com/documents/74040e005a1a48e3f7ac8570/w/4e3521247b473d1859578261/e/fca788176eb5f424fafc5fa9"
+ },
+ {
+  "name": "c2-cov2-flex-pcb",
+  "document": "f1df8fa052a63d0e2923b25a",
+  "workspace": "f857c35cc04a3c031e337671",
+  "element": "2fef608db89d05b3be108009",
+  "url": "https://cad.onshape.com/documents/f1df8fa052a63d0e2923b25a/w/f857c35cc04a3c031e337671/e/2fef608db89d05b3be108009",
+  "title": "cov2-flex-pcb",
+  "original": "https://cad.onshape.com/documents/f1df8fa052a63d0e2923b25a/w/f857c35cc04a3c031e337671/e/2fef608db89d05b3be108009"
+ },
+ {
+  "name": "c2-cov2-frame-corners-trim-endcap-gusset",
+  "document": "d77a61be3bb4133a48693021",
+  "workspace": "049c9bf3f5d86cb1e05ef2ab",
+  "element": "20280651bb340ec1122d6295",
+  "url": "https://cad.onshape.com/documents/d77a61be3bb4133a48693021/w/049c9bf3f5d86cb1e05ef2ab/e/20280651bb340ec1122d6295",
+  "title": "cov2-frame-corners-trim-endcap-gusset",
+  "original": "https://cad.onshape.com/documents/d77a61be3bb4133a48693021/w/049c9bf3f5d86cb1e05ef2ab/e/20280651bb340ec1122d6295"
+ },
+ {
+  "name": "c2-cov2-isocline-query-tag",
+  "document": "b23cc589f8ef164cd5e08067",
+  "workspace": "df6a7a38a4f7ae86f337b89b",
+  "element": "d5a8c4c3e7f10e42fa79d4f7",
+  "url": "https://cad.onshape.com/documents/b23cc589f8ef164cd5e08067/w/df6a7a38a4f7ae86f337b89b/e/d5a8c4c3e7f10e42fa79d4f7",
+  "title": "cov2-isocline-query-tag",
+  "original": "https://cad.onshape.com/documents/b23cc589f8ef164cd5e08067/w/df6a7a38a4f7ae86f337b89b/e/d5a8c4c3e7f10e42fa79d4f7"
+ },
+ {
+  "name": "c2-cov2-mate-connector-inference",
+  "document": "dee853961d9690a5c86db9fe",
+  "workspace": "05f5a48dd4a1a2c80ee32e6d",
+  "element": "b115708d6e954f55452e97f3",
+  "url": "https://cad.onshape.com/documents/dee853961d9690a5c86db9fe/w/05f5a48dd4a1a2c80ee32e6d/e/b115708d6e954f55452e97f3",
+  "title": "cov2-mate-connector-inference",
+  "original": "https://cad.onshape.com/documents/dee853961d9690a5c86db9fe/w/05f5a48dd4a1a2c80ee32e6d/e/b115708d6e954f55452e97f3"
+ },
+ {
+  "name": "c2-cov2-sm-corner-break-relief-joint",
+  "document": "b6e9d737211900a62cebd010",
+  "workspace": "35e8db825047c2cc4698f93e",
+  "element": "af26938f5bae9488111b3c4d",
+  "url": "https://cad.onshape.com/documents/b6e9d737211900a62cebd010/w/35e8db825047c2cc4698f93e/e/af26938f5bae9488111b3c4d",
+  "title": "cov2-sm-corner-break-relief-joint",
+  "original": "https://cad.onshape.com/documents/b6e9d737211900a62cebd010/w/35e8db825047c2cc4698f93e/e/af26938f5bae9488111b3c4d"
+ },
+ {
+  "name": "c2-cov2-sm-flange-bounds",
+  "document": "1388c02e25ab041b4e877395",
+  "workspace": "988e242524b7fd6c2f81ad0a",
+  "element": "3074d9e8ef00bdcf911f9281",
+  "url": "https://cad.onshape.com/documents/1388c02e25ab041b4e877395/w/988e242524b7fd6c2f81ad0a/e/3074d9e8ef00bdcf911f9281",
+  "title": "cov2-sm-flange-bounds",
+  "original": "https://cad.onshape.com/documents/1388c02e25ab041b4e877395/w/988e242524b7fd6c2f81ad0a/e/3074d9e8ef00bdcf911f9281"
+ },
+ {
+  "name": "c2-cov2-sm-hem-jog",
+  "document": "6c4da405d67fbfdc38e757dc",
+  "workspace": "81cddf4be3deca02be1dfd3d",
+  "element": "612275fc0459712716c70afe",
+  "url": "https://cad.onshape.com/documents/6c4da405d67fbfdc38e757dc/w/81cddf4be3deca02be1dfd3d/e/612275fc0459712716c70afe",
+  "title": "cov2-sm-hem-jog",
+  "original": "https://cad.onshape.com/documents/6c4da405d67fbfdc38e757dc/w/81cddf4be3deca02be1dfd3d/e/612275fc0459712716c70afe"
+ },
+ {
+  "name": "c2-cov2-sm-start-extrude-bounds",
+  "document": "802ac2fde472e2d7f10cae8d",
+  "workspace": "b94fce049c29beb0988c5efe",
+  "element": "4b6170c5d3205cda984dbb1a",
+  "url": "https://cad.onshape.com/documents/802ac2fde472e2d7f10cae8d/w/b94fce049c29beb0988c5efe/e/4b6170c5d3205cda984dbb1a",
+  "title": "cov2-sm-start-extrude-bounds",
+  "original": "https://cad.onshape.com/documents/802ac2fde472e2d7f10cae8d/w/b94fce049c29beb0988c5efe/e/4b6170c5d3205cda984dbb1a"
+ },
+ {
+  "name": "c2-cov2-surface-extend-ruled-enclose-thicken",
+  "document": "a2a3bb3b0adcb4e9382d307f",
+  "workspace": "c347a3babd2e8be4cd88864a",
+  "element": "0073a44014be6278b8b57f1e",
+  "url": "https://cad.onshape.com/documents/a2a3bb3b0adcb4e9382d307f/w/c347a3babd2e8be4cd88864a/e/0073a44014be6278b8b57f1e",
+  "title": "cov2-surface-extend-ruled-enclose-thicken",
+  "original": "https://cad.onshape.com/documents/a2a3bb3b0adcb4e9382d307f/w/c347a3babd2e8be4cd88864a/e/0073a44014be6278b8b57f1e"
+ },
+ {
+  "name": "c2-cov2-transform-curvepattern-split-moveface-draft-loft",
+  "document": "7f03e197872e6f31643705da",
+  "workspace": "67ce5bc007c9be8a62b5e4db",
+  "element": "d7c2c50cbdfa35773a2065b3",
+  "url": "https://cad.onshape.com/documents/7f03e197872e6f31643705da/w/67ce5bc007c9be8a62b5e4db/e/d7c2c50cbdfa35773a2065b3",
+  "title": "cov2-transform-curvepattern-split-moveface-draft-loft",
+  "original": "https://cad.onshape.com/documents/7f03e197872e6f31643705da/w/67ce5bc007c9be8a62b5e4db/e/d7c2c50cbdfa35773a2065b3"
  }
 ]
