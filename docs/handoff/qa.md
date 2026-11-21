@@ -103,9 +103,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
      SCORE re-baselined 8b2a688ba; owners' rows SUITE-NEW-INDEX-1120-* + P1 SUITE-IMPELLER-FILLET3 (core: load/order dependent) 7066344c1.
      Release run (unit qa-models-rel, qa-speed worktree, vibex7) -> suites/1120-1206-f689de1b-models-rel: the index row comes from it
      (models-report + 0407's other areas). qa-suites.sh / suites-models.sh now default QA_SPEED_PROFILE=release (dx/lead 12:0x).
-   - qa-nightpm-1121 (bin/nightpm.sh): 00:30 release build on vibex8 (qa-night worktree), the model suite alone at 02:00 (lead 13:4x:
-     x86 speed only from the window), then bin/speedref.py (live "Speed reference (11-20)" PS 1-5: open / edit / undo / rollbacks, green CLI)
-     -> nightly/pm-1121 (speedref.txt). vibex8 feel re-time after. Compat (baseline 0.4.63): RUSTZERO + CRASH957 verified; both Fillet 2s back to 0.4.62 accepted (compat/accepted.txt), live asked to confirm.
+   - qa-nightpm-1121 (bin/nightpm.sh): release build on vibex8 (qa-night worktree; outside the slot since 00:5x: 4 others' jobs queued),
+     ~/.slot-quiet 01:40 to the end (only SLOT_QUIET_OK starts), model suite at 02:00, then speedref.py (PS 1-10) + speedref_asm.py (Asm 1-5)
+     -> nightly/pm-1121 (speedref*.txt). vibex8 feel re-time after. Compat (0.4.63): RUSTZERO + CRASH957 verified; Fillet 2s accepted (accepted.txt), live to confirm.
      17:00 cut: GO 15:4x on 18809b4c (prerel/cut17-18809b4c.txt: hats SAME, dock = accepted B Govde; known: rust-zero F1, crash957 Ch3 P1
      bool). Hat open px (163-448): b76561076 variable row text + 24 plane-plane edges B-spline -> line; bisect 19:49: blend b749ad59e (fillet edges between analytic faces rebuilt exact), intended.
    - Seat lip: a47534be5 (Ok in 0.4.43-0.4.61 + green; vibex7 ~/agents/qa-keep/seatlip-hat8-1120.txt).
