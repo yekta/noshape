@@ -307,6 +307,11 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - [ ] P0 **FEEL-SHELL-RECLICK-REMOVED-FACE (psui)** (live 22:54 (3), walk6-3-shell-reclick-*): Shell with the top face in "Faces
   to remove", click where the top face was. Live takes it out of the field: the field empties, the title turns red, the preview is
   the solid block again, and the inner floor isn't added. Ours leaves the field as it was (s8-shl-reclick-face).
+- [ ] P0 **FEEL-FILLET-PICKED-STRIP (psui)** (qa 23:3x, green 9f33d43, batch 3 cells dlg-edge-selected13 / selhover13 /
+  face-otherhover13, hm2/cmp-b3psui): an edge picked in Fillet at live's 1.3 mm. Live fills the round between its two tangent lines:
+  5 px, #FFA90A at both tangent lines and #DDA027..#FFAF25 between, the tangent lines #586E7B / #2C363C. Ours draws a 3 px #FFA90A
+  line in the middle with the face colour showing on both sides up to darker tangent lines (#2E3A41 / #1F262B). The same with the
+  picked edge hovered and with a face hovered.
 - [ ] P0 **FEEL-FILLET-ARROW-DRAG (psui)** (qa 23:3x, green 9f33d43, out-w6fa s8-fil-arrow-drag-*; live's numbers asked in REQUESTS qa
   23:02): Fillet on the edge (40, 10, 10) at 5 mm, a 36 px press-drag on the arrow into the material sets Radius **34.03035 mm**,
   and 36 px the other way sets **24.03035 mm**: both directions grow it, by far more than the pointer moved (about 3.4 px per mm
