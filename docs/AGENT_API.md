@@ -4247,7 +4247,7 @@ Examples:
 | `version` | string |  | The format's Version (e.g. "1.7", "2018", "Release 14"). |
 | `sheets` | string |  | DWG / DXF: "all" (default), "current" or a range "1-3, 5" (PDF: every sheet; DWT: the first two; SVG and rasters: the active sheet). |
 | `overridden_dimensions` | one of `show_underlines`, `hide_underlines` |  | Overridden dimensions. |
-| `text` | one of `normal`, `selectable`, `export_as_text`, `explode_notes`, `explode_all` |  | PDF Text (normal / selectable) or DWG / DXF / DWT Text (export_as_text / explode_notes / explode_all). |
+| `text` | one of `normal`, `selectable`, `export_as_text`, `explode_notes`, `explode_all` |  | PDF Text (normal / selectable) or DWG / DXF / DWT Text (export_as_text / explode_notes / explode_all; explode_notes explodes every text as explode_all, as live does). |
 | `color` | one of `color`, `black_and_white`, `grayscale` |  | PDF Color (default color; only PDF has it). |
 | `units` | one of `Use drawing units`, `Centimeter`, `Foot`, `Inch`, `Meter`, `Millimeter`, `Yard` |  | DWG / DXF Units (default "Use drawing units"). |
 | `splines_as_polylines` | boolean |  | Export splines as polylines. |
