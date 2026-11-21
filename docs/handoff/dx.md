@@ -13,7 +13,7 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 17:50 11-21 (read first)
+## STATE 17:57 11-21 (read first)
 - LANDED: STL split c497ac8c (duct 9 / bottle 148 surfaces as live; ours lists them as one composite part with 0 edges,
   live has one closed edge per boundary loop: P3 note, not ticketed yet). Docs d4cb27b07 (SETLIB-IMAGES ticket follows
   live: library only in sketch Insert image, name = noshape_store::local_user_name()), ac8324e90 (DRW-VIEW-CENTRE P3
@@ -28,20 +28,21 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
     "open: first hover lit" once, "select: click drawn" every click; asm_scene.rs prepare_bodies (new meshes uploaded
     on all cores, std::thread::scope); a perf log line in rebuild_scene_in_background (waited / cache lock / built ms).
     Mac: assembly-ui ui_tests 94/94, noshape-scene all pass (before the perf log line).
-- MEASURED (vibex6, infento Assembly 1, run 2 = fresh cache = another machine, openpick2.sh): honest model frame
-  ~0.97-1.0 s (my step 3 "342 ms" timed a frame without the model: TELL THE LEAD, P1 target <= 0.5 s NOT met);
-  hover lights within a frame once the model is drawn; click -> drawn 232 ms in cached view, 125 ms after the full
-  model. prepare_bodies didn't visibly help. Suspect: AsmPickMap::push clones path + Reference per face/edge/vertex of
-  every occurrence into by_ref HashMap (asm_scene.rs ~38). Run s6 (with the build timing line) running on vibex6:
-  /root/dx-scratch/open4/s6.out (EXIT when done), app logs ~/tmp/dx/openpick-s6/run2.log there.
-- NEXT: read s6 timings; if build-bound, make the pick map cheap (lazy by_ref, or index by occurrence) and re-measure;
-  check why fullclick2/3 logged no "select: click drawn"; then commit, land (assembly-ui, scene, render crates), report
-  to the lead with the corrected numbers. Then: duct exchange rows (live 17:20 rerun done: Rhino V6/V7, STEP-PRE
-  Automatic / b-surfaces, 4 parts each, /root/parity/exchange/c2-duct-multipart/live-opt-*, live-opt-self.json).
+- MEASURED s6 (vibex6, infento, run 2 = fresh cache): cached display in 0.52 s, scene build 0.69 s (cache lock 0),
+  scene set on the viewport 1.31 s, model frame presented 2.36 s: the last 1 s is llvmpipe (vibex6 has no GPU, the
+  regen saturates its 8 cores), not ours. The old "342 ms" timed a frame without the model: TELL THE LEAD (P1 <= 0.5 s
+  not met; cut the 0.69 s build and the 0.38 s row decode). Full-model click -> drawn 330 ms on llvmpipe.
+  fullclick2/3 had no log: the viewport REUSED a cached frame (frame_cache) and never logged armed milestones; fixed
+  uncommitted in app-core viewport.rs (log_milestones_up_to, also on the reused path).
+  s7 (running, /root/dx-scratch/open4/s7.out, EXIT at end): asm_scene.rs logs "bodies prepared in / picks in / all in".
+- NEXT: read s7; if picks dominate, make AsmPickMap cheap (lazy by_ref or index per occurrence); commit, land
+  (assembly-ui, scene, render, app-core), report. Then duct exchange rows: live's files copied to vibex6
+  ~/tmp/dx/exs-duct; build the ops test binary (dx-open), OPSBIN=<it> exch.sh x duct ~/tmp/dx/exs-duct (cases
+  RHINO-V6/V7, STEP-PRE-AUTO/BSURF already in parity.rs's table).
 - Probe: /root/dx-scratch/open4/openpick2.sh (copy on vibex6 ~/agents/dx-keep; `bash openpick2.sh <binary> <tag>`):
   run 1 writes rows, run 2 fresh cache hovers/clicks at (1000,560) once the cached model frame is up, 3 clicks after
   the full model, run 3 = same machine; prints ms since start + click -> drawn. Binary vibex6 ~/agents/dx-keep/noshape-B.
-- Hosts: Mac dx-urdf removed (22 GB; ~/noshape-host 126 GB at 18:3x); vibex8 dx-urdf + dx-main targets removed.
+- Hosts: Mac dx-urdf removed (22 GB; ~/noshape-host 126 GB at 17:5x); vibex8 dx-urdf + dx-main targets removed.
 - LANDED today: 5bbec61b (exchange stack), fast open 92d02c14 / f626b268 / 28f6bf2c (step 3: the last-viewed tab's row
   decoded as soon as the rows are read; infento cached model frame 342 ms on vibex6, target <= 0.5 s met), drawing
   5c4bc11c (CONIC_TOL 30 um; rims round a view-axis cylinder get its centermark: rings-loft Top view as live). Nothing
