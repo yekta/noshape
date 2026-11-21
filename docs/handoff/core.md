@@ -1,45 +1,41 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-21 15:53 UTC (lead order 11-21: P0s done; knifehandle, infento chamfer re-land, THICKEN-DIRECT). Mac: builds + crate tests via NOSHAPE_RB_HOST=mac tools/tiers/rb.sh, single-model repros in ~/noshape-host/core-keep/models. Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-21 18:51 UTC. Mac: NO builds/tests/replays/A-Bs (user order 11-21; one 2-job slot for macOS-only checks; my Mac targets deleted); rb.sh picks the host from tools/tiers/rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
-## Now (11-21 16:55 UTC)
-- **LANDED 11-21:** trunk-hanger P0 724b9cd2; chamfer edge sense bc6d41f13 REVERTED dc58aff9; fit spline both ends
-  349ebdae9 + two-direction surface extrude ec2e52f99. QUEUED 928231bc: UIP-THREAD-MESSAGE-TWICE (qa P2: External thread
-  with chamfer/undercut said "Exact match for thread size not found." twice, hole.rs + std 3132; now once).
-- **INFENTO-CHAMFER-SENSE (re-land), cause found:** in qa's saved cf-surface-pattern, Sketch 7 (between Chamfer 1 and
-  2) holds a 9.144 mm square by Offset constraints to model edges; the offset's side is signed by each projected edge's
-  direction, so Chamfer 1's turned edges moved it to 15.24 mm and Chamfer 2's OCCT chamfer failed (parity's translated
-  sketch has no saved direction, so it passed). Fix on core-cache branch core-chs (= main + revert of the revert +
-  sketch.rs update_external: a projected line keeps its saved direction when the new projection runs the other way).
-  Verify: core-cache/.kch8.sh (vibex7: userdocs.py vs 0.4.64 on cli-draft-hang + cf-surface-pattern, must be SAME), then
-  asm-infento-subs (157/167, a3f7a1 Linear pattern 1 +y). Remove the CHDBG / NOSHAPE_NOSENSE debug before landing.
-- **In flight on core-th (uncommitted):** surf-intro Fill 1: G2 edge OCCT's plate can't hold falls back to tangent
-  (test oracle_p1::fill_tangent_to_four_walls_... now G1 and G2); Boundary surface MATCH_TANGENT/MATCH_CURVATURE rows
-  filled tangent to uReference/vReference (warning only for other conditions or when that fill fails); EDGE-CENTRE-SEAM:
-  ops query.rs joined edge's midpoint = length-weighted centre of its pieces (was the first piece's), test
-  e2e::a_seam_crossing_edge_is_centred_on_all_its_pieces (Mac .kt3.sh). Then commit + land.
-- **Fit-spline bulge (surf-intro, 3D fit spline 1 starts x 32.70 vs live 33.94):** not the fit spline: Tail Fin's
-  UP_TO_VERTEX goes to Offset surface 1's edge end (z 15.31 vs live 15.21, SURF-INTRO-OFFSET-END). Offset 0 is a plain
-  copy, so the edge (B-spline 20.145 mm, live LINE 20.042) comes from the derived studio b7635b82 (lofts + projected
-  curves + Fillet 1 of a car body). Next: find which derived feature makes that edge.
-- **KNIFEHANDLE: Fillet 1 -> blend (lead 11-21 16:00); branch origin/core-knifehandle (acd07e321), NOT to land until
-  Fillet 1 builds at live's time.** Commits on main b6edc9e2c: 1ca7cf105 guided loft (Handle 1/2/3); 7d0194a28 Mutual trim
-  behind_of + loft face outward + surface sweep wall direction (Mutual trim 1: Handle 1/1/1, Surface 2 1/1/0 as live);
-  acd07e321 Union of surfaces that close -> solid (std boolean.fs makeSolid; Boolean 1 Handle solid 203250 mm3, live
-  205333; test features_a::a_union_of_surfaces_that_close_is_a_solid). Repro: c2-surf-workshop-knifehandle Fillet 1
-  (feature 32: EDGE, entities = the cap face JuC, CONIC, radius 1 mm, rho 0.5; live OK 6/10/7, 204 ms). With the branch:
-  ERROR "Failed to fillet selections." after 2339 ms on the Mac (doc 1.1 -> 3.4 s). NOSHAPE_BLEND_DEBUG=1 shows the
-  section blend on the cap's one closed edge (length 0.1412 m): "the rolling balls jump along the edge", then "loft of 64
-  sections (closed true, chain 1 edges): valid true", then "boolean valid false ... the result is not one valid solid".
-  Run: `NOSHAPE_BLEND_DEBUG=1 NOSHAPE_PARITY_ONLY=c2-surf-workshop-knifehandle NOSHAPE_PARITY_MODELS=<models>
-  <ops test binary> parity::parity_models --ignored --nocapture`. Left of ours: cap box x max 10.47 vs live 16.52,
-  Extend handle 1/1/1 vs live 1/2/3, Handle area -0.12 % (geometry, not blocking).
-- **Surf-intro (skasm's Jvx translator fix landed):** builder side mine: Boundary surface 1 WARNING "Boundary conditions
-  are not applied yet" (live OK), Fill 1 "continuity requirement might be too high", Mutual trim 1 "Select a surface.";
-  SURF-INTRO-OFFSET-END: Surface 1 edge at Jvx a B-spline 20.145 mm ending z 15.31, live a LINE 20.042 mm, z 15.21.
+## Now (11-21 18:51 UTC)
+- **LANDED 11-21:** trunk-hanger 724b9cd2; fit spline ends 349ebdae9 + two-direction surface extrude ec2e52f99;
+  UIP-THREAD-MESSAGE-TWICE 02ccb4ef; EDGE-CENTRE-SEAM + surf-intro Fill 1 / Boundary surface 1 dc6e16ff.
+- **CHAMFER EDGE-SENSE RE-LAND (core-cache, committed 44a490744 on top of the revert's revert, not queued):** lead's
+  conditions: qa's user docs SAME and cli-draft-hang's Chamfer 3 in live's words; land after asm-infento-subs 157/167.
+  Fixes: sketch.rs update_external keeps a projected line's saved way (cf-surface-pattern Sketch 7); detail.rs defers a
+  body failing for no named reason (cli-draft-hang Chamfer 3 "Distance of chamfer on face too large."); sketch
+  regions.rs find_region_in: a key whose curves all turned round finds its region when unique (c2-fan-blade-sweep
+  Sketch 6 on Chamfer 2's face: imprinted face-edge keys flipped, Extrude 9 took a neighbour, 93 vs live 83 faces).
+  First compat (before the regions fix): only fan-blade new; after it fan-blade/cli-draft-hang/cf-surface-pattern SAME.
+  Running (vibex7, core-cache/.kall.sh): infento parity (log ~/tmp/core/ch/kinf.log, a3f7a1 Linear pattern 1 +y), then
+  the full compat (~/agents/core-keep/kcompat.sh -> ~/tmp/core/ch/compat.txt; compare with qa's latest main run in
+  /root/qa-scratch/compat/). Then land, tell qa + lead.
+- **SCISSOR DERIVED COST (asm's P0 ask, core-th uncommitted):** Regenerator lending (DerivedProvider
+  lend/return_regenerator; AssemblyEvaluator::studio/prewarm lend DocStudios' Regenerator for default-config studios).
+  Same-base A/B on vibex7 assembly_list: base 77.8/96.6 s, lend 87.8/90.0 s, outputs identical: NO GAIN. Probe build
+  (.ksc2.sh, temporary RTRACE/NOSHAPE_NOLEND lines to remove) counts regenerations per studio with/without lending.
+  Earlier serial per-tab measure: ~70 of 172 s duplicate Derived regeneration (tab views' OpenDoc.regens vs DocStudios
+  cache); failing chain Fillet 13 18 s x2, Spur Gears 11+16 s. Report the split to asm.
+- **KNIFEHANDLE (back from blend 11-21 18:4x):** Fillet 1 fails because its input is wrong: Extend handle (extendSurface
+  BLIND 20 mm, curved face) gives 1/1/1, live 1/2/3; Boolean 1 Handle 203250 vs live 205332 mm3. Cause suspected:
+  k::extend_face_at rebuilds the face from the whole extended surface (BRepBuilderAPI_MakeFace) and loses the loft's
+  boundary (Loft 1 is 1/2/3 as live). Branch core-kh in core-bis2 (= origin/core-knifehandle); .kkh.sh runs its parity.
+- **SURF-INTRO-OFFSET-END:** the edge is the car body's (derived b7635b82) rear end where Fillet 1 (R 0.6 in) meets
+  the lofted side: our spring line 0.1 mm off. Upstream: Loft 1 (two open projected curves, no guides, ThruSections)
+  12748.85 vs live 12749.86 mm2; Loft 2-4 about -2 mm2; Fillet 1 removes 3575.2 vs live 3578.3. Every surf-intro model's
+  first difference (Tail fin area) follows from it. Next: pair the two profiles by arc length (Open in
+  loft_guided.cpp) vs parameter and compare Loft 1's area. Scripts vibex7 ~/agents/core-keep/sib (dv.py, ar.py, ed2.py).
+- **Surf-intro Mutual trim 1 / Ruled surface 3 -> skasm (sent 11-21):** translator gives the sketch entity for Ruled
+  surface 1's SWEPT_EDGE/FACE/BODY of edge Ao0Xs1GgygP800; repro vibex7 ~/agents/core-keep/mt.
+- Surf-intro builder side still mine: Boundary surface 1 WARNING (live OK), Fill 1 continuity.
 - **Queue after:** THICKEN-DIRECT (below), Face blend 1 (+VALID-SURFLOFTS-LOFT1), MANUALBLEND-BOUNDARY1, dx's
   EDGE-CENTRE-SEAM (P2: props_linear centre of a seam-crossing ellipse rim; probe vibex6 ~/agents/dx-keep/sr/rlmid.py),
   live's 6 cov2 models (c2-cov2-*; error rules in behaviours "lead (11-21 13:59): coverage batch 2").
@@ -189,7 +185,7 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
 ## How to run
 - Agent ids: /root/lead-scratch/roster.md only (read it before every message_agent; never copy ids into notes).
 - Builds / tests: `NOSHAPE_RB_HOST=<host> tools/tiers/rb.sh bash <script>` from the worktree (env prefixes don't
-  reach the host: put them in the script). Mac: builds and crate tests only, one worktree of mine at a time.
+  reach the host: put them in the script). No Mac builds (user 11-21); rb-hosts picks vibex7 for core*.
 - Heavy runs on a vibe host (suites, gates, pairs) through `~/bin/slot <cmd>` there (one per host).
 - Suite pair: `core-base/.gof.sh <tag>` (copy into the worktree; `branch` as tag also builds the kernel with g++-13
   and profiles Lighten 1) builds the ops tests in release and runs parity_models into ~/tmp/core/g/run-<tag>.log.
