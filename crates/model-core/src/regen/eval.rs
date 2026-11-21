@@ -892,16 +892,8 @@ impl<'a> EvalCtx<'a> {
         if noshape_kernel::legacy_topology() {
             return Ok(out);
         }
-        // A region picked twice once (a query is a set: c2-impeller-loft's Extrude 4, two queries of one region, made
-        // its prism twice and fused the copies).
-        for i in 1..out.len() {
-            let same = |j: usize| matches!((&refs[i], &refs[j], &out[i], &out[j]), (Reference::SketchRegion { sketch: a, .. }, Reference::SketchRegion { sketch: b, .. }, Some((_, x)), Some((_, y))) if a == b && x.id == y.id);
-            if (0..i).any(same) {
-                out[i] = None;
-            }
-        }
         for sk in sketches {
-            let idx: Vec<usize> = (0..refs.len()).filter(|&i| out[i].is_some() && matches!(&refs[i], Reference::SketchRegion { sketch, .. } if *sketch == sk)).collect();
+            let idx: Vec<usize> = (0..refs.len()).filter(|&i| matches!(&refs[i], Reference::SketchRegion { sketch, .. } if *sketch == sk)).collect();
             let picked: Vec<_> = idx.iter().filter_map(|&i| out[i].clone()).collect();
             if picked.len() < 2 {
                 continue;
@@ -913,6 +905,28 @@ impl<'a> EvalCtx<'a> {
             }
         }
         Ok(out)
+    }
+
+    /// `refs` with each sketch region once (an extrude's query is a set: c2-impeller-loft's Extrude 4, two queries of one
+    /// region, made its prism twice and fused the copies). Not a sweep's profiles: live sweeps a region as often as it is
+    /// picked (c2-genesis-trunk-hanger's Sweep 1, regions A, B, A).
+    pub fn distinct_regions(&self, refs: &[Reference]) -> Vec<Reference> {
+        if noshape_kernel::legacy_topology() {
+            return refs.to_vec();
+        }
+        let mut seen = Vec::new();
+        refs.iter()
+            .filter(|r| {
+                let Reference::SketchRegion { sketch, key } = r else { return true };
+                let Some((_, region)) = self.resolve_region(*sketch, key) else { return true };
+                let new = !seen.contains(&(*sketch, region.id.clone()));
+                if new {
+                    seen.push((*sketch, region.id));
+                }
+                new
+            })
+            .cloned()
+            .collect()
     }
 
     /// Build profile faces from sketch regions and planar faces. Face

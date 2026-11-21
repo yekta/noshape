@@ -45,7 +45,7 @@ fn eval_inner(ev: &mut EvalCtx) -> FResult<()> {
         return crate::regen::eval::err_at(if thin { &["wallShape"] } else { &["entities"] }, if thin { "Select edges or faces to define the path of the thin wall." } else { "Select face or sketch region to extrude." });
     }
     let t0 = std::time::Instant::now();
-    let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::Along(&|f, _| f.normal), false)? } else { ev.profiles(refs)? };
+    let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::Along(&|f, _| f.normal), false)? } else { ev.profiles(&ev.distinct_regions(refs))? };
     if profiles.is_empty() {
         // (What was picked is gone: std's query is empty.)
         return crate::regen::eval::err_at(&["entities"], "Select face or sketch region to extrude.");
