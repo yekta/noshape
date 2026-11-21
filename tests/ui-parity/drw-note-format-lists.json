@@ -1,0 +1,142 @@
+{
+  "name": "drw-note-format-lists",
+  "about": "studios 08:58: Note editor alignment, list kind, colour and flag note lists (rev: colour swatch px, Flag notes enables Border shape/size)",
+  "area": "studios",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "studios 2026-11-21 08:58 (drawing matrix shown rows)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Note"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          60,
+          40
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "type",
+      "text": "MATRIX"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Horizontal alignment"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Horizontal alignment"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 700
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "List"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "List"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 700
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          809,
+          659
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          809,
+          659
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 700
+    },
+    {
+      "do": "click",
+      "on": {
+        "checkbox": "Flag notes"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "checkbox": "Flag notes"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 700
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    }
+  ]
+}

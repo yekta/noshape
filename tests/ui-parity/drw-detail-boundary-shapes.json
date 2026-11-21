@@ -1,0 +1,82 @@
+{
+  "name": "drw-detail-boundary-shapes",
+  "about": "studios 08:58: Detail view boundary Circle, Rectangle, Polygon and the id field",
+  "area": "studios",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "studios 2026-11-21 08:58 (drawing matrix shown rows)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Detail view"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          57,
+          121
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          91,
+          121
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          158,
+          121
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          100,
+          153
+        ]
+      },
+      "ms": 900
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    }
+  ]
+}

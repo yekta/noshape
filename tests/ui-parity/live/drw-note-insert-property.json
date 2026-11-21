@@ -1,0 +1,2532 @@
+{
+ "scenario": "drw-note-insert-property",
+ "recorded": "2026-11-21T10:59:30.509Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "da58d288ced15d1f8eb3b7a8",
+  "start": "block-drawing",
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "other",
+   "tag": "iframe"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": {
+   "tab": "Part 1 Drawing 1",
+   "sheet": "Sheet1",
+   "sheets": [
+    "Sheet1"
+   ],
+   "tool": null,
+   "views": [
+    {
+     "name": "Front",
+     "kind": "base",
+     "position": [
+      81,
+      81
+     ],
+     "parent": null,
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Isometric",
+     "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Right",
+     "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Top",
+     "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    }
+   ],
+   "annotations": [],
+   "selection": [],
+   "viewport": {
+    "sheet_px": [
+     432,
+     110,
+     1526,
+     955
+    ],
+    "sheet_mm": [
+     279.4,
+     215.9
+    ],
+    "mmPerPixel": 0.25539
+   }
+  }
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Note"
+    }
+   },
+   "ok": true,
+   "at": [
+    794,
+    59
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Note",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
+    }
+   },
+   "t": 233269
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "sheet_point": [
+      60,
+      40
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    667,
+    799
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "cell-format",
+     "title": "Note",
+     "rect": [
+      666,
+      582,
+      394,
+      160
+     ],
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Noto Sans ( Note )"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "List",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Note order",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert symbol",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert drawing property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert sheet reference property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Text format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Date time format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "on"
+      },
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Flag (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Note",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
+    }
+   },
+   "t": 261884
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1200
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "cell-format",
+     "title": "Note",
+     "rect": [
+      666,
+      582,
+      394,
+      160
+     ],
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Noto Sans ( Note )"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "List",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Note order",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert symbol",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert drawing property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert sheet reference property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Text format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Date time format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "on"
+      },
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Flag (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Note",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
+    }
+   },
+   "t": 289773
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Insert drawing property"
+    }
+   },
+   "ok": true,
+   "at": [
+    741,
+    692
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "cell-format",
+     "title": "Note",
+     "rect": [
+      666,
+      582,
+      394,
+      160
+     ],
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Noto Sans ( Note )"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "List",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Note order",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert symbol",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert drawing property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert sheet reference property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Text format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Date time format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "on"
+      },
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Flag (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "NoteFieldMenu",
+     "rows": [
+      "Drawing drawn by",
+      "Drawing date drawn",
+      "Drawing last changed by",
+      "Drawing last changed date",
+      "Drawing name",
+      "Drawing description",
+      "Drawing part number",
+      "Drawing revision",
+      "Drawing state",
+      "Drawing title 1",
+      "Drawing title 2",
+      "Drawing title 3",
+      "Sheet number",
+      "Sheet scale",
+      "Sheet size",
+      "Total sheets",
+      "Drawing approved by",
+      "Drawing approved date",
+      "Category",
+      "Not revision managed",
+      "Revision description",
+      "Inspection count"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Note",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Front"
+      },
+      {
+       "kind": "EDGE",
+       "owner": "Top"
+      }
+     ],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
+    }
+   },
+   "t": 316837
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1200
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "cell-format",
+     "title": "Note",
+     "rect": [
+      666,
+      582,
+      394,
+      160
+     ],
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Noto Sans ( Note )"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "List",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Note order",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert symbol",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert drawing property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert sheet reference property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Text format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Date time format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "on"
+      },
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Flag (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "NoteFieldMenu",
+     "rows": [
+      "Drawing drawn by",
+      "Drawing date drawn",
+      "Drawing last changed by",
+      "Drawing last changed date",
+      "Drawing name",
+      "Drawing description",
+      "Drawing part number",
+      "Drawing revision",
+      "Drawing state",
+      "Drawing title 1",
+      "Drawing title 2",
+      "Drawing title 3",
+      "Sheet number",
+      "Sheet scale",
+      "Sheet size",
+      "Total sheets",
+      "Drawing approved by",
+      "Drawing approved date",
+      "Category",
+      "Not revision managed",
+      "Revision description",
+      "Inspection count"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Note",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Front"
+      },
+      {
+       "kind": "EDGE",
+       "owner": "Top"
+      }
+     ],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
+    }
+   },
+   "t": 345332
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "hover",
+    "on": {
+     "menu": "Drawing name"
+    },
+    "ms": 600
+   },
+   "ok": true,
+   "at": [
+    813,
+    456
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "cell-format",
+     "title": "Note",
+     "rect": [
+      666,
+      582,
+      394,
+      160
+     ],
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Noto Sans ( Note )"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "List",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Note order",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert symbol",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert drawing property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert sheet reference property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Text format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Date time format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "on"
+      },
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Flag (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "NoteFieldMenu",
+     "rows": [
+      "Drawing drawn by",
+      "Drawing date drawn",
+      "Drawing last changed by",
+      "Drawing last changed date",
+      "Drawing name",
+      "Drawing description",
+      "Drawing part number",
+      "Drawing revision",
+      "Drawing state",
+      "Drawing title 1",
+      "Drawing title 2",
+      "Drawing title 3",
+      "Sheet number",
+      "Sheet scale",
+      "Sheet size",
+      "Total sheets",
+      "Drawing approved by",
+      "Drawing approved date",
+      "Category",
+      "Not revision managed",
+      "Revision description",
+      "Inspection count"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": 4
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Note",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Front"
+      },
+      {
+       "kind": "EDGE",
+       "owner": "Top"
+      }
+     ],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
+    }
+   },
+   "t": 372580
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "hover",
+    "on": {
+     "menu": "Total sheets"
+    },
+    "ms": 600
+   },
+   "ok": true,
+   "at": [
+    813,
+    744
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "cell-format",
+     "title": "Note",
+     "rect": [
+      666,
+      582,
+      394,
+      160
+     ],
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Noto Sans ( Note )"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "List",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Note order",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert symbol",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert drawing property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert sheet reference property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Text format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Date time format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "on"
+      },
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Flag (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "NoteFieldMenu",
+     "rows": [
+      "Drawing drawn by",
+      "Drawing date drawn",
+      "Drawing last changed by",
+      "Drawing last changed date",
+      "Drawing name",
+      "Drawing description",
+      "Drawing part number",
+      "Drawing revision",
+      "Drawing state",
+      "Drawing title 1",
+      "Drawing title 2",
+      "Drawing title 3",
+      "Sheet number",
+      "Sheet scale",
+      "Sheet size",
+      "Total sheets",
+      "Drawing approved by",
+      "Drawing approved date",
+      "Category",
+      "Not revision managed",
+      "Revision description",
+      "Inspection count"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Note",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Top"
+      }
+     ],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
+    }
+   },
+   "t": 399416
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Drawing name"
+    }
+   },
+   "ok": true,
+   "at": [
+    813,
+    456
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "cell-format",
+     "title": "Note",
+     "rect": [
+      666,
+      582,
+      394,
+      160
+     ],
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Noto Sans ( Note )"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "List",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Note order",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert symbol",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert drawing property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert sheet reference property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Text format",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Date time format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "on"
+      },
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Flag (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Note",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
+    }
+   },
+   "t": 426420
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1000
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "cell-format",
+     "title": "Note",
+     "rect": [
+      666,
+      582,
+      394,
+      160
+     ],
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Noto Sans ( Note )"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "List",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Note order",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert symbol",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert drawing property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert sheet reference property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Text format",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Date time format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "on"
+      },
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Flag (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Note",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
+    }
+   },
+   "t": 452969
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     931,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
+    }
+   },
+   "t": 480369
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
+    }
+   },
+   "t": 507217
+  }
+ ]
+}

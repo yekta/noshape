@@ -1,0 +1,207 @@
+{
+  "name": "drw-table-cell-menu",
+  "about": "studios 08:58: custom table cell menu Insert / Remove, Merge two cells, Unmerge",
+  "area": "studios",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "studios 2026-11-21 08:58 (drawing matrix shown rows)",
+  "start": "block-drawing-table",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Custom table"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Insert"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Select a custom table"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "list_row": "Part faces"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Done"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          150,
+          150
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          140,
+          146
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          140,
+          146
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "hover",
+      "on": {
+        "menu": "Insert"
+      },
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "menu": "Remove"
+      },
+      "ms": 1200
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 600
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          140,
+          146
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 600
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          140,
+          139
+        ]
+      },
+      "mods": "shift"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          140,
+          139
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Merge"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          140,
+          142
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Unmerge"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    }
+  ]
+}

@@ -1,0 +1,198 @@
+{
+  "name": "drw-section-cutline-types",
+  "about": "studios 08:58: Section view cut line choices, the cut line's menu (Edit cutting line), Section depth Opposite direction (rev2: live cut-line menu = Edit section... / Flip direction; no Edit cutting line item)",
+  "area": "studios",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "studios 2026-11-21 08:58 (drawing matrix shown rows)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Section view"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "tab": "Vertical"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "tab": "Horizontal"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "tab": "Angular"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "tab": "Vertical"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            20,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            80,
+            15,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            20,
+            8,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Edit section..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1800
+    },
+    {
+      "do": "click",
+      "on": {
+        "checkbox": "Section depth"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "checkbox": "Opposite direction"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            20,
+            8,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Flip direction"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 2500
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "name": "drw-note-insert-property",
+  "about": "studios 08:58: Note editor Insert drawing property list, pick Drawing name",
+  "area": "studios",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "studios 2026-11-21 08:58 (drawing matrix shown rows)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Note"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          60,
+          40
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Insert drawing property"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "menu": "Drawing name"
+      },
+      "ms": 600
+    },
+    {
+      "do": "hover",
+      "on": {
+        "menu": "Total sheets"
+      },
+      "ms": 600
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Drawing name"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    }
+  ]
+}
