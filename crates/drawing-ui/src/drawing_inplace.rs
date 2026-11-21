@@ -137,6 +137,29 @@ impl DrawingEditor {
         Some(InplaceBox { left: tl[0], top: tl[1], width: (br[0] - tl[0]).max(font_px), height: (br[1] - tl[1]).max(pitch_px), font_px, pitch_px, family, bold, italic, text_top })
     }
 
+    /// Where a click at `p` (sheet mm) puts the caret in the open note editor: (line, character) at the nearest
+    /// character boundary (live fc-1121 (3): a click in the O of NOTE A gives "N|OTE A").
+    pub(crate) fn note_caret_at(&self, p: [f64; 2], window: &Window, cx: &App) -> Option<(u32, u32)> {
+        let b = self.note_inplace_box(cx)?;
+        let Some(Panel::Note { input, .. }) = &self.panel else { return None };
+        let text = input.read(cx).value().to_string();
+        let lines: Vec<&str> = text.split('\n').collect();
+        let l = self.sheet_to_local(p);
+        let row = (((l[1] - b.text_top) / b.pitch_px).floor().max(0.0) as usize).min(lines.len() - 1);
+        let line = lines[row];
+        let mut f = font(SharedString::from(b.family.clone()));
+        if b.bold {
+            f.weight = FontWeight::BOLD;
+        }
+        if b.italic {
+            f.style = FontStyle::Italic;
+        }
+        let run = TextRun { len: line.len(), font: f, color: black(), background_color: None, underline: None, strikethrough: None };
+        let shaped = window.text_system().shape_line(SharedString::from(line.to_string()), px(b.font_px as f32), &[run], None);
+        let i = shaped.closest_index_for_x(px((l[0] - b.left) as f32)).min(line.len());
+        Some((row as u32, line.get(..i).map_or(0, |s| s.chars().count()) as u32))
+    }
+
     /// The note's text editor on the sheet: the ruler, then the text in a
     /// thin solid box.
     pub fn render_note_inplace(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -209,7 +232,23 @@ impl DrawingEditor {
                 .items_start()
                 .child(div().h(px(RULER_H as f32)).ml(px((pad + 1.0 + TEXT_PX - 25.0) as f32)).child(ruler))
                 // A thin solid box (live2 drw-tools-1119 rad-note 30; a table cell's stays dashed).
-                .child(div().p(px(pad as f32)).border_1().border_color(gpui_kit::rgb(0x3f3f3f)).child(text))
+                .child(
+                    div()
+                        .p(px(pad as f32))
+                        .border_1()
+                        .border_color(gpui_kit::rgb(0x3f3f3f))
+                        // A double-click in the text selects all of it, not a word (live fc-1121 (3)).
+                        .capture_any_mouse_down(cx.listener(|this, e: &MouseDownEvent, window, cx| {
+                            if e.button == MouseButton::Left
+                                && e.click_count == 2
+                                && let Some(Panel::Note { input, .. }) = &this.panel
+                            {
+                                input.update(cx, |s, cx| s.select_all(window, cx));
+                                cx.stop_propagation();
+                            }
+                        }))
+                        .child(text),
+                )
                 .into_any_element(),
         )
     }

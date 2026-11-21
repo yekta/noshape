@@ -323,6 +323,66 @@ fn placing_a_dimension_shows_the_alignment_line_without_snapping(cx: &mut TestAp
     }
 }
 
+/// Live fc-1121 (3): a double-click on a note opens its editor with the caret at the click, the nearest character
+/// boundary ("N|OTE A" for a click in the O), not at the end.
+#[gpui::test]
+fn a_double_clicked_note_puts_the_caret_at_the_click(cx: &mut TestAppContext) {
+    use gpui_kit::{MouseDownEvent, MouseUpEvent};
+    use noshape_model::drawing::build::PickTarget;
+    SUGGESTED.set(true);
+    SETUP.set(Some(|ctx, dw| {
+        call(ctx, "drawing_note", json!({ "drawing": dw, "text": "NOTE A", "position": [30, 40] }));
+    }));
+    let (window, editor) = drawing(cx, "feel-note-caret");
+    real_sheet(cx, window, &editor);
+    // The note's drawn text box: (left, right, middle height).
+    let (x0, x1, y) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let id = e.current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Note { .. })).map(|a| a.id).expect("the note");
+        let b = e.built.as_ref().expect("built");
+        let quads: Vec<[[f64; 2]; 4]> = b.geometry.texts.iter().filter(|t| b.picks.get(t.pick as usize) == Some(&PickTarget::Annotation(id))).map(noshape_model::drawing::font::text_box).collect();
+        let xs = quads.iter().flatten().map(|p| p[0]);
+        let ys: Vec<f64> = quads.iter().flatten().map(|p| p[1]).collect();
+        (xs.clone().fold(f64::MAX, f64::min), xs.fold(f64::MIN, f64::max), (ys.iter().copied().fold(f64::MAX, f64::min) + ys.iter().copied().fold(f64::MIN, f64::max)) / 2.0)
+    });
+    for (frac, want) in [(0.2, 1), (0.95, 6)] {
+        let at = at_window(cx, &editor, [x0 + (x1 - x0) * frac, y]);
+        cx.executor().advance_clock(std::time::Duration::from_millis(600));
+        cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+            e.on_mouse_move(&gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }, w, cx);
+            for n in 1..=2 {
+                e.on_mouse_down(&MouseDownEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: n, first_mouse: false }, w, cx);
+                e.on_mouse_up(&MouseUpEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: n }, w, cx);
+            }
+        }))
+        .unwrap();
+        draw(cx, window);
+        let caret = cx.update(|cx| match &editor.read(cx).panel {
+            Some(crate::drawing_view::Panel::Note { input, .. }) => Some(input.read(cx).cursor_position()),
+            _ => None,
+        });
+        let caret = caret.expect("the note editor open");
+        assert_eq!((caret.line, caret.character), (0, want), "a double-click {frac} of the way along \"NOTE A\"");
+        // In the editor a double-click selects the whole text, not the word.
+        let mut v = VisualTestContext::from_window(window, cx);
+        for n in 1..=2 {
+            v.simulate_event(MouseDownEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: n, first_mouse: false });
+            v.simulate_event(MouseUpEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: n });
+        }
+        draw(cx, window);
+        let range = cx.update(|cx| match &editor.read(cx).panel {
+            Some(crate::drawing_view::Panel::Note { input, .. }) => Some(input.read(cx).selected_range()),
+            _ => None,
+        });
+        assert_eq!(range, Some(0..6), "the double-click in the editor selects \"NOTE A\"");
+        cx.update(|cx| editor.update(cx, |e, cx| {
+            e.discard_inplace(cx);
+            e.selection.clear();
+        }));
+        draw(cx, window);
+    }
+}
+
 /// qa 11-19 walk: after a Table's ✓ its placement's alignment line and ✕ went on being drawn, the pointer elsewhere.
 #[gpui::test]
 fn a_tables_alignment_line_goes_with_its_check_mark(cx: &mut TestAppContext) {

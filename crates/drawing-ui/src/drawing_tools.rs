@@ -2331,13 +2331,18 @@ impl DrawingEditor {
                 match note {
                     Some(Annotation { kind: AnnotationKind::Note { .. }, position, .. }) => {
                         self.open_note_panel(Some(id), position, window, cx);
+                        // The caret at the click (live fc-1121 (3)); a triple click selects all (help H:note).
+                        let caret = (!triple).then(|| self.note_caret_at(self.cursor, window, cx)).flatten();
                         // After the editor takes the focus (deferred in `textarea`).
-                        if triple && let Some(Panel::Note { input, .. }) = &self.panel {
+                        if let Some(Panel::Note { input, .. }) = &self.panel {
                             let input = input.downgrade();
                             window.defer(cx, move |window, cx| {
-                                if let Some(input) = input.upgrade() {
-                                    input.update(cx, |s, cx| s.select_all(window, cx));
-                                }
+                                let Some(input) = input.upgrade() else { return };
+                                input.update(cx, |s, cx| match caret {
+                                    Some((line, character)) => s.set_cursor_position(gpui_kit::component::input::Position { line, character }, window, cx),
+                                    None if triple => s.select_all(window, cx),
+                                    None => {}
+                                });
                             });
                         }
                     }
