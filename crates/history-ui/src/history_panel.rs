@@ -12,6 +12,7 @@ use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use crate::os_menu::OsContextMenuExt as _;
 use crate::ui::TipExt as _;
+use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::*;
 use noshape_model::document::{TabContent, TabId};
 use noshape_store::{BranchId, MicroversionId, VersionGraph};
@@ -47,6 +48,53 @@ fn graph_column(key: &str, node: (f32, f32), branch: SharedString, on_hover: imp
         .child(div().id(SharedString::from(sel.clone())).debug_selector(move || sel.clone()).absolute().left(px(node.0 - 6.)).top(px(node.1 - 6.)).size(px(12.)).on_hover(on_hover).tooltip(crate::ui::tooltip(branch)))
 }
 const CHANGE_H: f32 = 30.;
+/// The page's ••• column at the rows' right end.
+const PAGE_MORE_W: f32 = 50.;
+
+/// The page's ••• on its selected row (live 2435 q2435-vh-row-menu, Start): Open · Open in new browser tab · Branch to
+/// create workspace… · Properties… (Copy link is web-only).
+fn page_more(r: &Row, version_id: Option<noshape_store::VersionId>, open: PageOpen, doc: &Entity<DocModel>) -> AnyElement {
+    let target = match r.kind {
+        RowKind::Workspace(b) => PageTarget::Workspace(b),
+        _ => PageTarget::Point(r.mv),
+    };
+    let (kind, mv, name, doc) = (r.kind, r.mv, r.name.clone(), doc.clone());
+    div()
+        .w(px(PAGE_MORE_W))
+        .flex_none()
+        .flex()
+        .justify_center()
+        .child(
+            div()
+                .id("hist-page-more-btn")
+                .debug_selector(|| "hist-page-more".into())
+                .map(|d| crate::ui_script::mark(d, || "button:More".into()))
+                .px(px(4.))
+                .rounded(px(3.))
+                .cursor_pointer()
+                .text_size(px(14.))
+                .font_weight(FontWeight::BOLD)
+                .text_color(p().text)
+                .hover(|d| d.bg(rgb(0xd7d7d7)))
+                .child("•••")
+                .os_dropdown_menu("hist-page-more", false, move |m, _, _| {
+                    let m = m.row_height(27.).text_px(14.).text_inset(20.).min_width(222.);
+                    let (o1, o2) = (open.clone(), open.clone());
+                    let m = m.item(crate::os_menu::OsMenuItem::new("Open").on_click(move |_, window, cx| o1(target, window, cx))).item(crate::os_menu::OsMenuItem::new("Open in new browser tab").on_click(move |_, window, cx| o2(target, window, cx)));
+                    let (d1, d2, n1) = (doc.clone(), doc.clone(), name.clone());
+                    let m = match kind {
+                        RowKind::Workspace(_) | RowKind::Change | RowKind::Merge | RowKind::Merged => m,
+                        _ => m.item(crate::os_menu::OsMenuItem::new("Branch to create workspace…").on_click(move |_, window, cx| open_branch_dialog(d1.clone(), mv, n1.clone(), window, cx))),
+                    };
+                    match (kind, version_id) {
+                        (RowKind::Workspace(b), _) => m.item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| crate::version_properties::open(d2.clone(), crate::version_properties::Item::Workspace(b), window, cx))),
+                        (_, Some(id)) => m.item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| crate::version_properties::open(d2.clone(), crate::version_properties::Item::Version(id), window, cx))),
+                        _ => m,
+                    }
+                }),
+        )
+        .into_any_element()
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum RowKind {
@@ -102,8 +150,27 @@ struct Row {
     description: String,
 }
 
+/// The documents page's Versions and history page (live 2435): the table alone, with no document open; a click
+/// selects a row and shows its •••.
+struct Page {
+    title: SharedString,
+    selected: Option<String>,
+    open: PageOpen,
+}
+
+/// What a page's row opens: a workspace, or a version or other history point (read-only).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PageTarget {
+    Workspace(BranchId),
+    Point(MicroversionId),
+}
+
+/// The page's Open / Open in new browser tab (the app opens the document's window there).
+pub type PageOpen = Rc<dyn Fn(PageTarget, &mut Window, &mut App)>;
+
 pub struct HistoryPanel {
     doc: Entity<DocModel>,
+    page: Option<Page>,
     /// The row whose graph node is under the pointer: the node tooltips its branch and the row isn't tinted (live
     /// fv-1121).
     node_hover: Option<String>,
@@ -186,6 +253,7 @@ impl HistoryPanel {
         subs.push(cx.observe(&date_to, |_, _, cx| cx.notify()));
         Self {
             doc,
+            page: None,
             graph: None,
             graph_stamp: None,
             node_hover: None,
@@ -211,6 +279,20 @@ impl HistoryPanel {
             header_out: Default::default(),
             _subs: subs,
         }
+    }
+
+    /// The Versions and history page of the document `title` (the documents page's row › Versions and history): its
+    /// current workspace selected on arrival.
+    pub fn page(doc: Entity<DocModel>, title: SharedString, open: PageOpen, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let mut this = Self::new(doc, window, cx);
+        let branch = this.doc.read(cx).session.branch;
+        this.page = Some(Page { title, selected: Some(format!("w{}", branch.0)), open });
+        this
+    }
+
+    /// The selected row's key on the page (None: the panel).
+    pub fn page_selected(&self) -> Option<&str> {
+        self.page.as_ref().and_then(|p| p.selected.as_deref())
     }
 
     /// Does a microversion pass the applied filter?
@@ -1366,6 +1448,8 @@ impl Render for HistoryPanel {
         };
         let mut list: Vec<AnyElement> = Vec::new();
         let mut drawn: Vec<serde_json::Value> = Vec::new();
+        let paged = self.page.is_some();
+        let page_sel = self.page.as_ref().map(|p| p.selected.clone());
         // A version made with no change since the row before it shares its
         // microversion (V1 right after Start): the version row is the one meant.
         let version_at = |mv: MicroversionId| placed.iter().any(|p| p.row.kind == RowKind::Version && p.row.mv == mv);
@@ -1386,13 +1470,18 @@ impl Render for HistoryPanel {
             let picked = first_pick.is_some_and(is_row);
             // While picking entries to compare only the picks are selected (live ver-compare-entries); while picking
             // one to repair none is (live ver-vh-header-repair).
-            let selected = comparing.is_none()
-                && !picking
-                && !repair_picking
-                && match r.kind {
-                    RowKind::Workspace(b) => b == current_branch && viewing.is_none(),
-                    _ => viewing == Some(r.mv),
-                };
+            let selected = match &page_sel {
+                Some(sel) => sel.as_deref() == Some(r.key.as_str()),
+                None => {
+                    comparing.is_none()
+                        && !picking
+                        && !repair_picking
+                        && match r.kind {
+                            RowKind::Workspace(b) => b == current_branch && viewing.is_none(),
+                            _ => viewing == Some(r.mv),
+                        }
+                }
+            };
             let (mv, kind, name) = (r.mv, r.kind, r.name.clone());
             if crate::ui_script::active() {
                 let k = match kind {
@@ -1427,7 +1516,15 @@ impl Render for HistoryPanel {
             let repair_label = if kind == RowKind::Change { format!("{current_name} :: {name}") } else { name.clone() };
             let repair_label2 = repair_label.clone();
             let pick_label = name.clone();
+            let row_key = r.key.clone();
             let open = cx.listener(move |this, e: &ClickEvent, _, cx| match kind {
+                // On the page a click (or a double-click) only selects the row (live 2435).
+                _ if this.page.is_some() => {
+                    if let Some(p) = this.page.as_mut() {
+                        p.selected = Some(row_key.clone());
+                    }
+                    cx.notify();
+                }
                 // "Compare history entries" is on: the first pick is the base,
                 // the second the target (help "Comparing").
                 _ if crate::compare_mode::picking(&this.doc, cx) => {
@@ -1487,7 +1584,8 @@ impl Render for HistoryPanel {
                     // tooltip.
                     .tooltip(crate::ui::user_tooltip(format!("{}: Change by {} at {}", r.name, r.author, history_time(r.time))))
                     .child(graph_column(&r.key, (lane_x(r.lane), 13.), lane_name(r.lane), node_hover(r.key.clone())))
-                    .child(div().w(px(115.)).flex_none().truncate().child(crate::ui::user_text(r.name.clone())))
+                    .child(div().map(|d| if paged { d.flex_1().min_w_0() } else { d.w(px(115.)).flex_none() }).truncate().child(crate::ui::user_text(r.name.clone())))
+                    .when(paged, |d| d.child(div().flex_1()).child(div().flex_1().truncate().child(history_time(r.time))).child(div().flex_1().truncate().child(r.author.clone())))
             } else {
                 let changes = r.changes.len();
                 let key = r.key.clone();
@@ -1545,8 +1643,7 @@ impl Render for HistoryPanel {
                     .child(graph_column(&r.key, (lane_x(r.lane), 8.), lane_name(r.lane), node_hover(r.key.clone())))
                     .child(
                         v_flex()
-                            .w(px(115.))
-                            .flex_none()
+                            .map(|d| if paged { d.flex_1().min_w_0() } else { d.w(px(115.)).flex_none() })
                             .child(h_flex().h(px(21.)).min_w_0().overflow_hidden().child(name_el))
                             .when(changes > 0, |d| {
                                 d.child(
@@ -1571,7 +1668,14 @@ impl Render for HistoryPanel {
                                 )
                             }),
                     )
-                    .child(v_flex().pl(px(3.)).flex_1().min_w_0().child(div().truncate().child(r.author.clone())).child(div().truncate().child(history_time(r.time))))
+                    .map(|d| {
+                        if !paged {
+                            return d.child(v_flex().pl(px(3.)).flex_1().min_w_0().child(div().truncate().child(r.author.clone())).child(div().truncate().child(history_time(r.time))));
+                        }
+                        // The page's columns (live 2435): Description · Modified · Modified by.
+                        let cell = |text: String| div().flex_1().min_w_0().truncate().child(crate::ui::user_text(text));
+                        d.child(cell(r.description.clone())).child(cell(history_time(r.time))).child(cell(r.author.clone()))
+                    })
             };
             let version_id = if r.kind == RowKind::Version { graph.versions.iter().find(|x| x.microversion == mv && x.name == r.name).map(|x| x.id) } else { None };
             // Main (the default workspace) can't be deleted (help: Versions and history).
@@ -1579,7 +1683,17 @@ impl Render for HistoryPanel {
             // A version of another workspace merges into this one too (help
             // "Merging": "merge a version from another branch").
             let other_version = r.kind == RowKind::Version && graph.microversions.iter().find(|m| m.id == mv).is_some_and(|m| m.branch != current_branch);
+            // The page's selected row shows its ••• at the right end (live 2435); the others keep the room.
+            let row = match &self.page {
+                Some(page) if selected && !pl.change => row.child(page_more(&r, version_id, page.open.clone(), &self.doc)),
+                Some(_) => row.child(div().w(px(PAGE_MORE_W)).flex_none()),
+                None => row,
+            };
             let row = row.on_click(open).os_context_menu(move |m, window, cx| {
+                // The page's rows have no right-click menu (live 2435).
+                if paged {
+                    return m;
+                }
                 // Live (menus/rmb-version-v1, dk-9a1): a Bootstrap dropdown's
                 // 27 px rows and 14 px text, ~222 px wide.
                 let m = m.row_height(27.).text_px(14.).text_inset(20.).min_width(222.);
@@ -1761,10 +1875,26 @@ impl Render for HistoryPanel {
             let text = if label == "Workspace" { text.px(px(3.)).rounded(px(3.)).border_1().border_color(pal.accent).bg(rgb(0xd0dbe5)) } else { text };
             h_flex().gap(px(4.)).child(icon).child(text)
         };
+        // The page (live 2435 q2435-vh-30s): 105 px margins, the document's icon and name (24 px, 500) over a rule.
+        let page_title = self.page.as_ref().map(|p| p.title.clone());
         v_flex()
             .size_full()
-            .bg(pal.panel)
-            .child(
+            .bg(if paged { pal.app_bg } else { pal.panel })
+            .when(paged, |d| d.px(px(105.)))
+            .when_some(page_title, |d, title| {
+                d.child(
+                    h_flex()
+                        .debug_selector(|| "hist-page-title".into())
+                        .h(px(76.))
+                        .flex_none()
+                        .gap(px(6.))
+                        .border_b_1()
+                        .border_color(rgb(0xcccccc))
+                        .child(crate::assets::icon("document", 30., cx))
+                        .child(div().text_size(px(24.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(crate::ui::user_text(title))),
+                )
+            })
+            .when(!paged, |d| d.child(
                 h_flex()
                     .h(px(37.))
                     .flex_none()
@@ -1807,7 +1937,7 @@ impl Render for HistoryPanel {
                         }))
                     })
                     .child(crate::ui::icon_button("hist-close", "close", 30., false, cx).tooltip("Close").map(|d| crate::ui_script::mark(d, || "button:Close".into())).on_click(|_, window, cx| window.dispatch_action(Box::new(crate::actions::ToggleVersionGraph), cx))),
-            )
+            ))
             // Live cmp2-901: "Select two history entries to compare."
             .when(crate::compare_mode::picking(&self.doc, cx), |d| {
                 d.child(div().mx(px(10.)).mt(px(6.)).px(px(15.)).py(px(7.)).rounded(px(3.)).bg(pal.info_fill).border_1().border_color(pal.info_outline).text_size(px(14.)).text_color(pal.info_text).child("Select two history entries to compare.").map(|d| crate::ui_script::mark_message(d, || "Select two history entries to compare.".into())))
@@ -1832,8 +1962,13 @@ impl Render for HistoryPanel {
                         .font_weight(FontWeight::SEMIBOLD)
                         .text_color(pal.text)
                         .child(div().w(px(GRAPH_W + 5.)).flex_none())
-                        .child(div().w(px(118.)).flex_none().child("Name"))
-                        .child(div().child("Modified"))
+                        .map(|d| {
+                            if !paged {
+                                return d.child(div().w(px(118.)).flex_none().child("Name")).child(div().child("Modified"));
+                            }
+                            let col = |label: &'static str| div().flex_1().min_w_0().child(label);
+                            d.child(col("Name")).child(col("Description")).child(col("Modified")).child(col("Modified by")).child(div().w(px(PAGE_MORE_W)).flex_none())
+                        })
                 };
                 let out = self.header_out.clone();
                 let header_probe = canvas(
@@ -1931,11 +2066,28 @@ impl Render for HistoryPanel {
                                             .children(ghosts.into_iter().map(|(y, h, name)| crate::ui_script::mark(div().absolute().top(px(y)).left_0().w_full().h(px(h)), move || name)))
                                             .child(graph_canvas),
                                     )
-                                    .child(div().flex_1().min_h(px(20.)))
+                                    .when(!paged, |d| d.child(div().flex_1().min_h(px(20.))))
                                     // Legend (live document/22): three centred rows, 14 px semibold; the
                                     // workspace label in its chip, "Change" faint. Then the 31 px `#eee`
                                     // hint bar.
-                                    .child(
+                                    .when(paged, |d| {
+                                        // The page's legend: one row under the table, from its left (live 2435).
+                                        d.child(
+                                            h_flex()
+                                                .debug_selector(|| "hist-page-legend".into())
+                                                .flex_none()
+                                                .pt(px(36.))
+                                                .pl(px(30.))
+                                                .gap(px(24.))
+                                                .child(legend_item(crate::assets::icon("legend-workspace", 20., cx), "Workspace", false))
+                                                .child(legend_item(crate::assets::icon("legend-version", 20., cx), "Version", false))
+                                                .child(legend_item(crate::assets::icon("legend-change", 20., cx), "Change", true))
+                                                .child(legend_item(crate::assets::icon("legend-release-candidate", 20., cx), "Release candidate", false))
+                                                .child(legend_item(crate::assets::icon("legend-release", 20., cx), "Release", false))
+                                                .child(legend_item(crate::assets::icon("legend-obsoletion", 20., cx), "Contains obsoletion", false)),
+                                        )
+                                    })
+                                    .when(!paged, |d| d.child(
                                         v_flex()
                                             .flex_none()
                                             .items_center()
@@ -1946,12 +2098,12 @@ impl Render for HistoryPanel {
                                             .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-workspace", 20., cx), "Workspace", false)).child(legend_item(crate::assets::icon("legend-version", 20., cx), "Version", false)).child(legend_item(crate::assets::icon("legend-change", 20., cx), "Change", true)))
                                             .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-release-candidate", 20., cx), "Release candidate", false)).child(legend_item(crate::assets::icon("legend-release", 20., cx), "Release", false)))
                                             .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-obsoletion", 20., cx), "Contains obsoletion", false)).child(legend_item(crate::assets::icon("hide-auto-versions", 20., cx), "Automatic version", false))),
-                                    )
+                                    ))
                             ),
                     )
-                    .when(self.header_out.get(), |d| d.child(header().mt_0().absolute().top_0().left_0().w_full().bg(pal.panel)))
+                    .when(self.header_out.get(), |d| d.child(header().mt_0().absolute().top_0().left_0().w_full().bg(if paged { pal.app_bg } else { pal.panel })))
             })
-            .child(
+            .when(!paged, |d| d.child(
                 h_flex()
                     .h(px(31.))
                     .flex_none()
@@ -1961,7 +2113,7 @@ impl Render for HistoryPanel {
                     .border_color(rgb(0xcccccc))
                     .child(div().flex_1().text_size(px(12.)).text_color(pal.text_muted).child("Right-click on a row to perform actions"))
                     .child(crate::assets::icon("help-faint", 16., cx)),
-            )
+            ))
     }
 }
 

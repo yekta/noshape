@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-21 08:41 UTC.
+Updated 2026-11-21 09:34 UTC.
 
 ## In flight
 
@@ -17,21 +17,26 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; read `git diff --stat origin/main...HEAD` first. App builds for
 shots on vibex7 / vibex6 (never vibe2: its slot is the land queue's), shots on vibe2 (rsync tests/ui-parity +
 tools/ui-parity to vibe2:agents/studios/src first). Crate tests on vibex7 / vibex8, every run under `timeout` (lead
-11-20 21:xx: a hung test held a vibex8 slot 43 min). `touch` edited files before rb.sh. Full ops e2e before a drawing
-land. vibex8 02:00-04:00 is qa's quiet window. Never `git checkout <file>` over uncommitted work (21:20 it wiped the
-e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
-- LANDED through 8e66e885 (05:34, as 090b40b5): triad ball snap (live triad-snap-1121), its snapped release,
-  psui fc-1120 Version compare, fc-1121 drawing feel, the drawing matrix's option order.
-- Ball-snap feel test `the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point` (lead P0: 20/20
-  under load on vibex8 before un-ignoring). x103 17/20: the drag's snap stale after a new result: fixed by `move_ball`
-  + `DragState::ball_at` (a new result during a centre drag snaps the ball again at the last pointer spot). x104 19/20:
-  the press came before the GPU hover pick named the ball, so the part was dragged: the test now hovers the ball and
-  waits for `manip_hover == Center` before pressing. x106 (20x, vibex8 under load) 20/20 at 08:50: un-ignored (T1).
-- In the branch: version graph node hover leaves its row untinted (fv-1121); live fv-1121 dark: focused column header
-  #333333 in dark, the Part Studio Variable table panel greys its focused column's header and shows the edited
-  value's chip (theme `tooltip`: #d0dbe5 / #4b5761) as the Variable Studio does.
-- LANDED e3de7e78 (07:01, as 2e7b8371): qa VARIABLE-KEYWORD-NAMES (+ configured variable cells), custom table
-  configuration, Note Border sizes, fv-1121 fixes (node tooltip, tab rename Esc, FS clear 580 ms, VS header grey).
+11-20 21:xx: a hung test held a vibex8 slot 43 min). `touch -c` edited files before rb.sh. Full ops e2e before a
+drawing land. vibex8 02:00-04:00 is qa's quiet window. Never `git checkout <file>` over uncommitted work: WIP-commit
+or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `git apply --3way`).
+- LANDED 092af642 (09:18, as 69273482): triad ball test 20/20 under load (un-ignored), node hover, dark headers,
+  the Part Studio Variable table panel's focused header and value chip.
+- QUEUED eabacbef (09:3x): lead 11-21 audit of the documents page / versions / release (docs/parity/
+  documents-versions.md): row hover icons in view, sort up/down/default, Enter leaves the trash modal open, "No
+  revision history found.", Restore deleted workspaces with Name / Deleted by / Deleted at (store `BranchInfo::
+  deleted_at`: `branches.deleted` holds the deletion time in ms, 1 = older files; no schema bump).
+- In the tree (testing x112, vibex7): audit #1, the documents page's Versions and history page (live 2435):
+  `HistoryPanel::page` (history-ui page mode), start-ui `StartView::page` in place of the list (hook
+  `start_hooks::versions_page`, app `files::versions_page` on a session of its own; the logo goes back), tests
+  `the_versions_page_selects_on_click_and_acts_from_its_dots`, `versions_and_history_opens_its_page_in_place_of_the_list`.
+  Parity rows 89 / 106 (Category "Noshape …") are = per TICKETS BRAND-IN-UI-TEXT (qa verified 09:2x).
+- REQUESTS for live (11-21): 08:58 the drawing matrix's 40 most-used shown rows (six takes); 09:12 documents /
+  versions gaps (11 items + 09:33 the page's workspace / version ••• menus). Take their rows as they land.
+- Audit next: #7 Start row Properties… / Publish FeatureScript… (take asked), #8 Compare revisions (take asked), #9
+  search relevance, rename while open, #10 op gaps (documents search / Created by me / sort, history_merge strategy,
+  create_version at / publish, approver error words). Deleted-workspace bubble 35 s vs live 30 s
+  (app/src/workspace.rs:151, shared with the Merge toast).
 - Live fc-1121 drawing feel (behaviours "studios fc-1121"): (1) a dimension being placed shows the line to another's
   x / y without snapping (still held on a + mark, live2 rad-note); (3) caret at the click (`note_caret_at`), a
   double-click in the editor selects all; (5) a dragged box draws its picks selected (`box_preview`); (2), (4), (6)

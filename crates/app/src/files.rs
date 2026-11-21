@@ -234,12 +234,32 @@ pub fn update_linked_instance(window: &mut Window, other: noshape_app_core::asse
     Ok(())
 }
 
-/// Open a document (or bring its window to the front) with its Versions and history panel open (the documents
-/// page's row › Versions and history: live lands on the document's /versionsAndHistory).
-pub fn open_document_history(path: PathBuf, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
-    open_document_window(path.clone(), None, gpu, cx)?;
-    with_workspace(&path, |ws, window, cx| ws.update(cx, |w, cx| w.show_history(window, cx)), cx);
-    Ok(())
+/// The documents page's row › Versions and history: the document's Versions and history page, on a session of its
+/// own (live 2435: /versionsAndHistory, no document open). Its rows' Open opens the document's window on that
+/// workspace, or a window at that version or change.
+pub fn versions_page(path: PathBuf, name: String, window: &mut Window, cx: &mut App) -> anyhow::Result<AnyView> {
+    let session = session::Session::open(&path)?;
+    let doc = cx.new(|_| doc_model::DocModel::new(session));
+    let open: noshape_history_ui::history_panel::PageOpen = std::rc::Rc::new(move |target, window, cx| {
+        let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
+        let opened = match target {
+            noshape_history_ui::history_panel::PageTarget::Point(mv) => open_version_window(path.clone(), mv, gpu, cx).map(|_| ()),
+            noshape_history_ui::history_panel::PageTarget::Workspace(b) => open_document_window(path.clone(), None, gpu, cx).map(|()| {
+                with_workspace(&path, move |ws, _, cx| {
+                    let doc = ws.read(cx).doc.clone();
+                    doc.update(cx, |d, cx| {
+                        if d.session.branch != b && d.session.switch_branch(b).is_ok() {
+                            d.reloaded(cx);
+                        }
+                    })
+                }, cx)
+            }),
+        };
+        if let Err(e) = opened {
+            noshape_start_ui::start_window::page_error(window, cx, format!("Could not open document: {e:#}"));
+        }
+    });
+    Ok(cx.new(|cx| noshape_history_ui::history_panel::HistoryPanel::page(doc, name.into(), open, window, cx)).into())
 }
 
 /// A document at a version in a window of its own, read-only (Onshape opens

@@ -16,11 +16,21 @@ pub(super) fn register_test_hooks() {
             Ok(())
         },
         open_document_at: |_, _, _, _| Ok(()),
-        open_document_history: |_, _, _| Ok(()),
+        versions_page: |_, name, _, cx| Ok(cx.new(|_| TestPage(name)).into()),
         build_label: String::new,
         import_dialog: |_, _, _, _| {},
         help_items: |m| m,
     });
+}
+
+/// The app's Versions and history page, as the tests stand it in: its document's name.
+struct TestPage(String);
+
+impl gpui_kit::Render for TestPage {
+    fn render(&mut self, _: &mut gpui_kit::Window, _: &mut gpui_kit::Context<Self>) -> impl gpui_kit::IntoElement {
+        use gpui_kit::{ParentElement as _, Styled as _};
+        gpui_kit::div().size_full().child(self.0.clone())
+    }
 }
 
 /// The page listing documents A to E (list view), drawn.
@@ -52,6 +62,8 @@ fn page(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<StartVi
     cx.update(|cx| {
         view.update(cx, |v, cx| {
             (v.source, v.view, v.loaded, v.docs, v.panel) = (Source::All, ViewMode::List, true, docs, None);
+            // The default sort (another test's header clicks save theirs to the shared preferences).
+            (v.sort, v.descending, v.sort_cleared) = (super::SortKey::Modified, true, false);
             v.refresh_body(cx);
         })
     });
@@ -247,4 +259,23 @@ fn send_to_trash_words_count_the_rows() {
     assert_eq!(super::trash_question(1), "1 selection will be sent to the trash.");
     assert_eq!(super::trash_question(3), "3 selections will be sent to the trash.");
     assert_eq!(super::trashed_toast(3), "3 items have been sent to the trash and will be automatically deleted after 30 days.");
+}
+
+/// Live 2435: a row's Versions and history opens the document's own page in place of the list ("Versions and history
+/// of <doc>", the top bar without its search), no document window; the logo goes back to the list.
+#[gpui::test]
+fn versions_and_history_opens_its_page_in_place_of_the_list(cx: &mut TestAppContext) {
+    let (w, view) = page(cx, "versions-page");
+    let path = view.read_with(cx, |v, _| v.docs.iter().find(|d| d.name == "C").unwrap().path.clone());
+    cx.update_window(w, |_, window, cx| view.update(cx, |v, cx| v.open_history(path, "C".into(), window, cx))).unwrap();
+    draw(cx, w);
+    let mut vcx = VisualTestContext::from_window(w, cx);
+    assert!(vcx.debug_bounds("versions-page").is_some(), "the page");
+    assert!(vcx.debug_bounds("doc-row:C").is_none(), "no list under it");
+    let logo = bounds(cx, w, "start-logo").center();
+    VisualTestContext::from_window(w, cx).simulate_click(logo, Modifiers::none());
+    draw(cx, w);
+    draw(cx, w);
+    assert!(VisualTestContext::from_window(w, cx).debug_bounds("versions-page").is_none(), "the logo goes back");
+    assert!(VisualTestContext::from_window(w, cx).debug_bounds("doc-row:C").is_some());
 }

@@ -6,11 +6,13 @@ use crate::doc_model::DocModel;
 use gpui_kit::{AnyWindowHandle, AppContext as _, Bounds, Entity, IntoElement, Modifiers, MouseButton, MouseDownEvent, MouseUpEvent, ParentElement as _, PlatformInput, Point, Render, Styled as _, TestAppContext, VisualTestContext, Window, WindowBounds, WindowOptions, div, point, px, size};
 use serde_json::json;
 
-struct Host(Entity<HistoryPanel>);
+/// The panel 420 px wide at the window's left, or (`.1`) the page over the whole window.
+struct Host(Entity<HistoryPanel>, bool);
 
 impl Render for Host {
     fn render(&mut self, _: &mut Window, _: &mut gpui_kit::Context<Self>) -> impl IntoElement {
-        div().size_full().flex().child(div().w(px(420.)).h_full().flex().flex_col().child(self.0.clone())).child(div().flex_1())
+        let w = if self.1 { px(1200.) } else { px(420.) };
+        div().size_full().flex().child(div().w(w).h_full().flex().flex_col().child(self.0.clone())).child(div().flex_1())
     }
 }
 
@@ -30,6 +32,11 @@ fn panel_with(cx: &mut TestAppContext, name: &str, edits: usize) -> (AnyWindowHa
 
 /// Main with two versions named `versions`, `edits` changes before each.
 fn panel_versions(cx: &mut TestAppContext, name: &str, edits: usize, versions: [&str; 2]) -> (AnyWindowHandle, Entity<HistoryPanel>, Entity<DocModel>) {
+    history_view(cx, name, edits, versions, false)
+}
+
+/// [`panel_versions`] as the panel, or as the documents page's Versions and history page (`page`).
+fn history_view(cx: &mut TestAppContext, name: &str, edits: usize, versions: [&str; 2], page: bool) -> (AnyWindowHandle, Entity<HistoryPanel>, Entity<DocModel>) {
     cx.update(gpui_kit::init);
     let dir = std::env::temp_dir().join(format!("noshape-history-feel-{name}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -54,9 +61,9 @@ fn panel_versions(cx: &mut TestAppContext, name: &str, edits: usize, versions: [
         let mut view = None;
         let d = doc.clone();
         let (w, _) = crate::os_menu::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
-            let v = cx.new(|cx| HistoryPanel::new(d, window, cx));
+            let v = cx.new(|cx| if page { HistoryPanel::page(d, "versions".into(), std::rc::Rc::new(|_, _, _| {}), window, cx) } else { HistoryPanel::new(d, window, cx) });
             view = Some(v.clone());
-            cx.new(|_| Host(v))
+            cx.new(|_| Host(v, page))
         })
         .unwrap();
         (w, view.unwrap(), doc)
@@ -364,4 +371,37 @@ fn a_graph_nodes_tooltip_is_its_branch(cx: &mut TestAppContext) {
     draw(cx, window);
     click(cx, window, node.center(), 1);
     assert_eq!(cx.update(|cx| doc.read(cx).session.viewing_version()), None, "the node opens nothing");
+}
+
+/// Live 2435 (q2435-vh-30s, -click-start, -dblclick-start, -main-rclick, -row-menu): the documents page's Versions and
+/// history page arrives with Main selected and its •••; a click (or a double-click) on another row only selects it,
+/// opening nothing; a right-click shows no menu; a version's ••• lists Open · Open in new browser tab · Branch to
+/// create workspace… · Properties…; the legend is one row right under the table.
+#[gpui::test]
+fn the_versions_page_selects_on_click_and_acts_from_its_dots(cx: &mut TestAppContext) {
+    let (w, view, doc) = history_view(cx, "page", 1, ["V1", "V2"], true);
+    assert!(view.read_with(cx, |v, _| v.page_selected().is_some_and(|k| k.starts_with('w'))), "Main selected on arrival");
+    assert!(VisualTestContext::from_window(w, cx).debug_bounds("hist-page-title").is_some());
+    let (legend, last) = (bounds(cx, w, "hist-page-legend"), bounds(cx, w, "hist-row Start"));
+    let gap = f32::from(legend.top() - last.bottom());
+    assert!((0. ..60.).contains(&gap), "the legend right under the last row (live ~36 px), not at the page's foot: {gap}");
+    let main_dots = bounds(cx, w, "hist-page-more");
+    assert!(bounds(cx, w, "hist-row Main").contains(&main_dots.center()), "Main's ••• on its row");
+    let start = bounds(cx, w, "hist-row Start").center();
+    click(cx, w, start, 1);
+    draw(cx, w);
+    assert_eq!(view.read_with(cx, |v, _| v.page_selected().map(str::to_string)), Some("start".into()));
+    let v1 = bounds(cx, w, "hist-row V1").center();
+    click(cx, w, v1, 2);
+    draw(cx, w);
+    assert!(view.read_with(cx, |v, _| v.page_selected().is_some_and(|k| k.starts_with('v'))), "V1 selected");
+    assert!(doc.read_with(cx, |d, _| d.session.viewing.is_none()), "nothing opened");
+    let v1 = bounds(cx, w, "hist-row V1");
+    assert!(v1.contains(&bounds(cx, w, "hist-page-more").center()), "the ••• moved to V1");
+    VisualTestContext::from_window(w, cx).simulate_mouse_down(v1.center(), MouseButton::Right, Modifiers::default());
+    draw(cx, w);
+    assert!(!cx.update(|cx| crate::os_menu::is_open(cx)), "no right-click menu");
+    VisualTestContext::from_window(w, cx).simulate_click(bounds(cx, w, "hist-page-more").center(), Modifiers::default());
+    draw(cx, w);
+    assert_eq!(cx.update(|cx| crate::os_menu::open_labels(cx)), ["Open", "Open in new browser tab", "Branch to create workspace…", "Properties…"]);
 }

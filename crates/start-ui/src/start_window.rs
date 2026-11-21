@@ -393,6 +393,8 @@ pub struct StartView {
     selected: Option<PathBuf>,
     /// The document row under the pointer: its quick actions show (live docs-import-feel-1118).
     hovered_row: Option<PathBuf>,
+    /// A document's Versions and history page in place of the list (live 2435), from its row's menu.
+    page: Option<(PathBuf, AnyView)>,
     also: Vec<PathBuf>,
     also_of: Option<PathBuf>,
     /// Shift + click's range start.
@@ -629,6 +631,7 @@ impl StartView {
             query: String::new(),
             selected: None,
             hovered_row: None,
+            page: None,
             also: Vec::new(),
             also_of: None,
             anchor: None,
@@ -1220,11 +1223,24 @@ impl StartView {
         }
     }
 
-    fn open_history(&mut self, path: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
-        let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
-        match crate::start_hooks::open_document_history(path, gpu, cx) {
-            Ok(()) => self.force_rescan(cx),
+    /// Row › Versions and history: the document's own page in place of the list, no document opened (live 2435
+    /// "Versions and history of <doc>"); the logo goes back.
+    fn open_history(&mut self, path: PathBuf, name: String, window: &mut Window, cx: &mut Context<Self>) {
+        match crate::start_hooks::versions_page(path.clone(), name.clone(), window, cx) {
+            Ok(v) => {
+                self.page = Some((path, v));
+                window.set_window_title(&format!("Versions and history of {name}"));
+                cx.notify();
+            }
             Err(e) => Self::notify(window, cx, AlertKind::Error, format!("Could not open document: {e:#}")),
+        }
+    }
+
+    /// Back to the list from a Versions and history page.
+    fn close_page(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.page.take().is_some() {
+            window.set_window_title("Documents — Noshape");
+            cx.notify();
         }
     }
 
@@ -2966,7 +2982,7 @@ impl StartView {
             .item(item("Details", &view, &d, |t, d, _, cx| t.show_panel(d, DocPanel::Details, cx)))
             // The document itself, on its Versions and history panel (live: /documents/<id>/versionsAndHistory); the
             // strip's icon is the page's own panel.
-            .item(item("Versions and history", &view, &d, |t, d, w, cx| t.open_history(d.path, w, cx)))
+            .item(item("Versions and history", &view, &d, |t, d, w, cx| t.open_history(d.path, d.name, w, cx)))
             // The Details panel with its Document labels open, no dialog (live2 2351 (4)).
             .item(item("Labels…", &view, &d, |t, d, _, cx| {
                 t.details_labels_open = true;
@@ -3015,6 +3031,10 @@ impl StartView {
                             .flex_none()
                             .gap(px(5.))
                             .pl(px(8.))
+                            // The logo goes to the documents page (live: from a Versions and history page).
+                            .id("start-logo")
+                            .debug_selector(|| "start-logo".into())
+                            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_page(window, cx)))
                             .child(crate::assets::icon("noshape-logo", 22., cx))
                             .child(div().text_size(px(21.)).font_weight(FontWeight::LIGHT).text_color(pal.text_muted).child("Noshape")),
                     )
@@ -3023,6 +3043,8 @@ impl StartView {
                             h_flex()
                                 .w(px(390.))
                                 .h(px(28.))
+                                // A Versions and history page's top bar has no search (live 2435).
+                                .when(self.page.is_some(), |d| d.invisible())
                                 .child({
                                     let probe = self.adv_anchor.clone();
                                     // Live documents/23: italic placeholder, the advanced search ▾ at the right.
@@ -4728,7 +4750,10 @@ impl Render for StartView {
                 let focused = self.search.read(cx).focus_handle(cx).is_focused(window);
                 self.render_title_bar(focused, cx)
             })
-            .child(body.cached(StyleRefinement::default().w_full().flex_1().min_h_0()))
+            .map(|d| match &self.page {
+                Some((_, page)) => d.child(div().debug_selector(|| "versions-page".into()).w_full().flex_1().min_h_0().child(page.clone())),
+                None => d.child(body.cached(StyleRefinement::default().w_full().flex_1().min_h_0())),
+            })
             .child(self.render_footer())
             .children(self.shortcut_sheet.as_ref().map(|(s, _)| s.clone().into_any_element()))
             // The bell's panel under the top bar's right end (as in a document's window).
@@ -4781,6 +4806,11 @@ impl Render for StartView {
                 crate::ui_script::mark_message(div().absolute().top(px(8.)).left_0().right_0().flex().justify_center().child(bubble), || said)
             }))
     }
+}
+
+/// An error bubble on the documents page (a Versions and history page's Open that failed).
+pub fn page_error(window: &mut Window, cx: &mut App, message: String) {
+    StartView::notify(window, cx, AlertKind::Error, message)
 }
 
 /// Dragged rows: (path, name, folder).

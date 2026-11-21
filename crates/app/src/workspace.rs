@@ -1574,13 +1574,6 @@ impl Workspace {
         cx.notify();
     }
 
-    /// The Versions and history panel, opened if it isn't.
-    pub fn show_history(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.history.is_none() {
-            self.toggle_history(window, cx);
-        }
-    }
-
     /// The bubble shown over a tab without its own message display.
     #[cfg(test)]
     pub(crate) fn toast(&self) -> Option<&(crate::ui::AlertKind, String)> {
