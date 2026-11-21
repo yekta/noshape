@@ -135,7 +135,7 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
 Suite 1120-1447 on green 0a0b9a49 (qa-scratch/suites/1120-1447-0a0b9a49/models.log, `CHECK <model> feature <n>` lines, n 0-based in
 features.json; "valid" = OCCT's shape check, raw = faces/edges/vertices of the body as built). An invalid body poisons every later
 feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: the parity model alone, NOSHAPE_PARITY_VALIDITY=1.
-- [x] P1 **VALID-HGR-FOOT-OFFSET (dx)**: closed 11-20 23:33 (dx): gone since the Frame lands 00bc521e / 1d702422 (the suite ran 0a0b9a49, before them):
+- [x] P1 **VALID-HGR-FOOT-OFFSET (dx)**: verified qa 11-21 12:4x (release parity_models with NOSHAPE_PARITY_VALIDITY=1 on green 078794756, qa-scratch/valid/hgr1121: every part valid at every feature 0-51, 52/52 features match to the end); closed 11-20 23:33 (dx): gone since the Frame lands 00bc521e / 1d702422 (the suite ran 0a0b9a49, before them):
   on main + 3419bb6d no invalid body at any feature, 20 parts after Foot Offset as live, posts 15-20 faces. Was: c2-hgr-riser-weldment, first invalid at feature 39 "Foot Offset" (Move face): Parts 2, 4, 6
   and 9 (59/171/114, 69/199/132, 72/210/140, 93/283/186 at feature 38, all valid) become empty shapes (0/0/0, valid false) and stay so
   through feature 51 "Finish sheet metal model 1" (the lead's F50/51 are the tail of it). Live after Foot Offset: 20 parts, ours 11
