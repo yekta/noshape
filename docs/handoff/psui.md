@@ -94,7 +94,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
    c) Sent 22:5x: studios 8 (drw-centermark, drw-inspection-table-iso-scrolled, drw-revision-table-delete; not run:
    drw-quad-mid-snap, doc-folder-drag-to-all-tabs, docs-advanced-search-help, docs-folder-crumb, vs-ps-own-table-menu),
    asm 1 (asm-menu-instance-properties: step 2 dialog fields live 1 / ours 0).
-7. P0 (lead 00:0x, from studios): Routing curve Multiple's centre ball snaps as mate-connector placement (live ball-1119,
+7. LANDED 00c1edad 00:36 (2f9bb4ed). P0 (lead 00:0x, from studios): Routing curve Multiple's centre ball snaps as mate-connector placement (live ball-1119,
    asm-feel3-1118). Ours by the real pointer never snapped: the active field's pick filter masked faces, rehover dropped
    them, and the point was chosen nearest where the drag began (no PointerMove during tool drags). Now: faces + edges
    picked while the ball drags, the drag's position chooses, the 47.5 px square / centroid (edge: 15 px end / midpoint)
