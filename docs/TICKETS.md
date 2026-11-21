@@ -268,6 +268,16 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   rigid subassembly or a Fastened pair is one link with a `<visual>` per part (masses and inertias summed, no merged
   mesh) and the connector links fold into their parts. Ours: every part a link fixed to `base_link`, no joints,
   no inertia, no launch file, and the option merges one mesh.
+## qa, 2026-11-21 (ui-parity 1121-0923-07879475 + loop 1121-0935-92d02c14, rechecked on green 5b9feb71a, vibe2 one app)
+
+- [ ] P2 **UIP-THREAD-MESSAGE-TWICE (core)**: external-thread-chamfer-undercut step 5: live's message "Exact match for thread size not found."; ours
+  shows it twice ("…not found.\n…not found."), 7/11 states (11/11 on 11-20 23:08). Both runs and the recheck. The message is pushed by
+  model-core regen/features/hole.rs:951 and std; std 3132 embedded 08:18 (8631c5717) is the likely second copy.
+- [ ] P2 **UIP-COMPARE-HOVER-PART (studios)**: ver-compare-hover-part step 5: live selects the FACE, ours a FEATURE (5/6 states; 6/6 on 11-20 23:08).
+  Both runs and the recheck. Since 69571c882 (Versions and history › Compare) or 3f70f4f2f (Compare revisions).
+- 13 "no recording" scenarios of run 07879475 (the app exited silently) all ran in the loop's next run: not filed. rolled-back-row-menu
+  matches since psui 9ffded3f6.
+
 ## qa, 2026-11-21 (USER P0: combined hover × selection states; live hover-matrix-1121, scored in docs/parity/interaction-feel.md "Hover × selection")
 
 - [ ] P0 **FEEL-HOVER-POINT-ON-SELECTED-EDGE (psui, from the user)**: Part Studio, an edge selected, the pointer on a point of it (its midpoint):
