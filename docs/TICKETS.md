@@ -287,6 +287,29 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - 13 "no recording" scenarios of run 07879475 (the app exited silently) all ran in the loop's next run: not filed. rolled-back-row-menu
   matches since psui 9ffded3f6.
 
+## qa, 2026-11-21 20:5x (USER P0 sketch-tool walk 3, lead: every sketch tool, menus, shortcuts; green 2fb0ed1ac, vibe2 walk3/out-w3..w5)
+
+- [ ] P0 **FEEL-SKFILLET-FLOW (skasm)**: Sketch fillet (Shift+F) on a rectangle corner. (a) Hovering the corner already draws the
+  R0.5 preview arc; live only lights the corner point (sketch/110, 1933; behaviours "Sketch fillet": the arc comes on the click).
+  (b) After Enter (value box open) the hollow arrow manipulator stays drawn over the radius dimension; live drops it and shows the
+  R label being edited (1935). Crops qa-scratch/tickets/skfillet-flow-w3.png (top live 1933/1934/1935, bottom ours).
+- [ ] P0 **FEEL-POLYGON-SPINNER-DRIFT (skasm)**: Inscribed polygon, centre on the origin, 2nd click at (15, 0): the "◀ 6 ▶"
+  spinner then follows the pointer: moving down 15 mm gives 8 sides, moving to empty space above 36; with the pointer still it
+  stays 6. Live changes the count only with the arrows or typed digits (behaviours "Polygons", "Sketch polygon commits" 4).
+  qa-scratch/tickets/polygon-spinner-w3.png (top: pointer still; bottom: pointer moved).
+- [ ] P1 **S-TOOLBAR-BORDER (psui)**: the S shortcut toolbar has no border; live's has a 1 px #ccc border (175 × 62 with it,
+  sketch/38; behaviours "S key"). Place (pointer + 10, − 30), size, icons and shadow match.
+  qa-scratch/tickets/s-toolbar-border-w3.png (ours left, live right).
+- [ ] P1 **MENU-TOP-ROW-SECTION-GROUP (psui)**: the Top plane row's menu puts "Section view…" in the Hide group; live has it in
+  its own group after "Hide all planes" (live/psui/ctx-menus-1117/menus-a.json row-top-plane). qa-scratch/tickets/top-row-menu-w3.png.
+- Matched live (no ticket): every Part Studio menu (face, edge, vertex, empty, Extrude / Sketch / Top / part rows; Where used and
+  the sketch row's Section view are in live's 11-17 lists), every sketch menu (no tool, Line tool, a line, a dimension), the
+  Keyboard shortcuts sheet, corner / centre / aligned rectangles (one value boxed, one blue, as live 63/66), region hover and
+  select, trim click and drag, Use on a model edge, the sketch-fillet R0.5 inch default, Show constraints off by default.
+- Asked live (REQUESTS "qa 20:44"): lines on an axis drawn black, a chain through the origin dropping its segment up the y axis,
+  arc ends on the axes getting H / V, the circle's boxed Ø, the spline vanishing after a click, tangent arc / slot from a line
+  end on the origin making nothing, Shift+/ tab in a sketch.
+
 ## qa, 2026-11-21 (USER P0: combined hover × selection states; live hover-matrix-1121, scored in docs/parity/interaction-feel.md "Hover × selection")
 
 - [x] verified (qa 18:51, green 1118a1b6f, psui 1e44717c; ours qa-scratch/hm2/b1-1e44.png, mid-1e44.png) P0 **FEEL-HOVER-POINT-ON-SELECTED-EDGE (psui, from the user)**: Part Studio, an edge selected, the pointer on a point of it (its midpoint):
