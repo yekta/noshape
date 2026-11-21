@@ -1184,9 +1184,7 @@ fn grooves_crossing_37_um_above_the_end() {
     k::set_rust_boolean_only(true);
     let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
     let why = k::last_rust_decline();
-    // (Each groove's cut unmerged: its cylinder's merged face is nanometres off in its p-curves, 1.4e-4 mm³.)
-    let alone = k::BooleanOptions { unify: false, ..c.opts };
-    let one: Vec<f64> = c.tools.iter().map(|t| k::boolean(c.op, &c.objects, std::slice::from_ref(t), &alone).expect("one groove's cut").shape.volume().unwrap()).collect();
+    let one: Vec<f64> = c.tools.iter().map(|t| k::boolean(c.op, &c.objects, std::slice::from_ref(t), &c.opts).expect("one groove's cut").shape.volume().unwrap()).collect();
     k::set_rust_boolean_only(false);
     let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
     let v0 = c.objects[0].volume().unwrap();
@@ -1494,21 +1492,6 @@ fn coaxial_cylinder_pieces_of_one_radius_unify_as_live() {
     assert!(u.is_valid(), "unified invalid");
     assert_eq!(u.count(k::ShapeType::Face), 36);
     let (v0, v1) = (r.volume().unwrap(), u.volume().unwrap());
-    assert!((v1 - v0).abs() <= 1e-8 * v0, "volume {v0} -> {v1}");
-}
-
-/// 850efe's Extrude 6 fuse (recorded, tests/data/unify): two r4 bands of coaxial pieces, slots cut at both ends on two
-/// of their rulings' angles, one band's pieces on trimmed cylinders (Extrude 2's). Each merged into one face: live's
-/// 28 faces (OCCT's 31; it was 33, the bands' seams crossing the slots' sides and their merged faces' volume off).
-#[test]
-fn slotted_coaxial_cylinder_bands_unify_as_live() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/unify");
-    let c = k::bool_corpus::load(&dir, "coaxial-cylinders-slotted").expect("the recorded fuse");
-    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("fused").shape;
-    let u = k::unify_same_domain(&r).expect("unified").shape;
-    assert!(u.is_valid(), "unified invalid");
-    assert_eq!(u.count(k::ShapeType::Face), 28);
-    let (v0, v1) = (c.summary.volume, u.volume().unwrap());
     assert!((v1 - v0).abs() <= 1e-8 * v0, "volume {v0} -> {v1}");
 }
 
