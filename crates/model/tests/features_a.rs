@@ -198,6 +198,32 @@ fn sweep_circle_along_line() {
     assert_eq!(res.context.bodies[0].faces.len(), 3);
 }
 
+/// Two touching regions picked together sweep as one, its side faces where they met one face where they lie on one
+/// plane, as live (c2-genesis-trunk-hanger's Sweep 1: 73 faces, were 100): a 20 x 10 rectangle halved by a line, both
+/// halves swept 100 mm, one box of 6 faces.
+#[test]
+fn sweep_of_touching_regions_is_one_body_with_merged_sides() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let c = [DVec2::new(0.0, 0.0), DVec2::new(0.02, 0.0), DVec2::new(0.02, 0.01), DVec2::new(0.0, 0.01)];
+    for i in 0..4 {
+        sk.add_line(c[i], c[(i + 1) % 4]);
+    }
+    sk.add_line(DVec2::new(0.01, 0.0), DVec2::new(0.01, 0.01));
+    let prof = t.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let mut path = noshape_sketch::Sketch::new();
+    let l = path.add_line(DVec2::new(0.0, 0.0), DVec2::new(0.0, 0.1));
+    let path_id = t.sketch(Reference::Plane(DatumPlane::Top), path);
+    let regions = t.regions(prof);
+    assert_eq!(regions.len(), 2, "the two halves");
+    t.add("sweep", &[("profiles", q(regions)), ("path", q(vec![Reference::SketchEntity { sketch: path_id, entity: l.0 }]))]);
+    let res = t.ok();
+    let v = total_volume(&res.context);
+    assert!(near(v, 0.02 * 0.01 * 0.1, 1e-6), "sweep volume {v}");
+    assert_eq!(res.context.bodies.len(), 1);
+    assert_eq!(res.context.bodies[0].faces.len(), 6);
+}
+
 /// A loft to a sketch point, Tangent to profile at that end, takes the point's sketch plane and arrives in it: a dome
 /// (live c2-loft-paths-guides Loft 1: a Ø101.6 circle to a point 101.6 mm above it, 12.7 mm off its axis, magnitude 1:
 /// 370677.72 mm³ within live's own mass-property band of ±3875.5 mm³ on the part; ThruSections' cone 274566, a

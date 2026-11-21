@@ -760,6 +760,20 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
         };
         tools.push(NamedShape::new(shape, names));
     }
+    // Touching regions picked together are swept as one (`picked_regions`): its side faces split where the regions met
+    // are one face where they lie on one surface, as live's (c2-genesis-trunk-hanger's Sweep 1: regions A and B, 73
+    // faces; were 100).
+    let regions = refs.iter().filter(|r| matches!(r, Reference::SketchRegion { .. })).count();
+    if !thin && profiles.len() < regions {
+        for t in tools.iter_mut() {
+            let un = k::unify_same_domain(&t.shape)?;
+            if crate::regen::eval::unify_merged(&t.shape, &un.shape) {
+                let before = crate::regen::eval::names_for(&t.shape, t.names.faces.clone());
+                let names = ev.name_result(&[&before], &un.history, &un.shape, &BTreeMap::new(), None);
+                *t = NamedShape::new(un.shape, names);
+            }
+        }
+    }
     let op = ev.enum_("operationType").to_string();
     let scope = super::extrude::scope(ev);
     ev.apply_operation(tools, &op, scope, BodyKind::Solid)
