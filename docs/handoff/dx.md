@@ -24,23 +24,30 @@ Design (step 1; step 2, B-reps for selection, later):
 6. Tests: hit (same doc + build), miss after an edit, miss after a build change; the Part Studio shows the file's
    snapshot before its regeneration lands and swaps to an equal real display without a rebuild of its scene.
 
-## STATE 12:40 11-21 (read first after compaction)
+## STATE 13:11 11-21 (read first after compaction)
 - LANDED today: dx-urdf stack as 5bbec61b (OBJ / 3MF / glTF faceting, DXF explode notes, Draco, Parasolid 25-27.1 read,
   batch-2 cases, glTF per face + UVs, AGENT_API, draco-core notices); fast open 92d02c14 (display rows in the .noshape,
   one per tab) and f626b268 (assembly scene off the UI thread; rows read at open; test that the UI thread isn't blocked).
-- dx-open uncommitted (on f626b268's base): display_cache::load_for (the slot's row decoded on its own thread while the
-  key is computed; used only if it holds that key; test via load_keyed), key hash through a 64 KB BufWriter, assembly
-  open uses load_for. Running: vibex8 rb.sh bash dx-open-v.sh (release app + release tests + clippy; log
-  /root/dx-scratch/open-v.out; script in the worktree: delete before commit). Then re-time infento on vibex6:
-  `~/bin/slot timeout 1200 ~/agents/dx-keep/bin/openinf.sh <app> c` (app copied to ~/agents/dx-keep/open/noshape).
-  Before (step 2 binary, vibex6): opening document 165 ms, rows read 246, key 594, decoded 889, cached display in 947,
-  cached model frame 1116 ms (since process start). Target <= 0.5 s shaded (DECISIONS 11-21).
-- Speed batch 3 DONE (TICKETS "dx, 2026-11-21"): all at or under live but c2-rings-loft: SPEED-RINGS-SHELL (bool; Shell 1
-  fails after 18.9 s at 9.6 mm; live REQUESTS 12:39 for live's Shell 1 there).
-- Drawing rows 2/10 (duct, louver). Tried: view centre from the tight box: no change (bottle 0.0150 / housing -0.0269 in
-  shifts stay; the suite aligns views first, so shifts aren't the failures). rings-loft: live's centre mark at
-  (2.570, 6.317) is on a circle ours draws only 300..60 deg (live 3 arcs, full): the other two edges missing in ours ->
-  next to look at (Mac suite dir ~/noshape-host/dx-keep/exs-drw, log exs-drw.log; DXFs /root/dx-scratch/drw/rl-*.dxf).
+- dx-open uncommitted (on f626b268's base; script dx-open-v.sh in the worktree: delete before commit):
+  display_cache::load_for (the slot's row decoded while the key is computed, used only if it holds that key), the key
+  hash through a 64 KB BufWriter, and decode_early: the assembly registers its Snapshot decoder (main.rs ->
+  assembly_view::decode_cached_display_early) and prefetch(path, last-viewed tab) decodes that tab's row right after the
+  rows are read (display-rows thread); load_keyed takes it (take_early) and falls back to its own decode. Tests in
+  display_cache's a_document_keeps_its_display_for_its_content_and_build_only.
+  infento on vibex6 (ms since start): step 2 key 594 / decoded 889 / cached in 947 / frame 1116; with load_for key 356 /
+  decoded 464 / cached in 493 / frame 740. The frame's extra 250 ms is vibex6's software GPU (frames 1-2 render 150-170
+  ms each); the key is ~45 ms after the view asks (~311), the decode (~150 ms) was the long pole -> decode_early.
+  Running: vibex8 rb.sh bash dx-open-v.sh (/root/dx-scratch/open-v.out), then copy the app to vibex6
+  ~/agents/dx-keep/open/noshape and `~/bin/slot timeout 1200 ~/agents/dx-keep/bin/openinf.sh <app> c`; commit, land.
+- SPEED-RINGS-SHELL (bool, P1) has live's Shell 1 results (9313d85f4): OK at 8-10.4 mm, faces / volumes in TICKETS.
+- Drawing rows 2/10 (duct, louver). rings-loft: live's centre mark at (2.570, 6.317) is on a circle ours draws only
+  300..60 deg (live 3 arcs, full). Probe: dx-urdf parity.rs DXPROBE (uncommitted; dumps drawing_get to
+  ours-drawing-get.json) + dx-exr.sh (worktree root, uncommitted: rings-loft only, Mac ~/noshape-host/dx-keep/exs-rings).
+- View centres (live drawing-live.json boundingBoxPoints; /root/dx-scratch/vc/pads.py <doc>): live's position is the
+  centre of a box padded by 5% of its larger side; that box is the drawn one for duct, louver, rings Front and every
+  Isometric (ours matches there), larger in bottle Front/Right (+0.45 in model below, +0.30 in above: round inches, so
+  construction geometry or the split tool, not poles), housing Front/Right/Top and rings Right/Top. Not yet known what
+  live counts there; the suite aligns views first, so the DXF rows don't depend on it.
 - Mac: one active target (dx-urdf, 20 GB); dx-open's target removed after each run (lead 11-21).
 - Next: infento re-time -> lead; rings-loft circle; batch-2 leftovers (IGES-POSTPROC, Rhino 45 vs 46, duct's Rhino V6/V7
   + STEP-PRE after live's 17:20 rerun); fast-open step 3 (B-reps for selection) only when the lead says.
