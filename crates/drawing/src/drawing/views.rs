@@ -1598,7 +1598,7 @@ impl ViewGeometry {
         // Each arc's angular interval: arcs on one circle make it whole when together they go round it, not when their
         // spans add up to a turn (a wall's top and bottom rims seen from above are one arc twice: c2-variable-fillet-
         // faceblend's Top view, three centermarks for live's none).
-        let arcs: Vec<([f64; 2], f64, (f64, f64))> = self
+        let mut arcs: Vec<([f64; 2], f64, (f64, f64))> = self
             .model_edges
             .iter()
             .enumerate()
@@ -1614,9 +1614,28 @@ impl ViewGeometry {
                 _ => None,
             })
             .collect();
+        // Other curves whose projection is round (on a cylinder seen along its axis) go round it together too: c2-rings-loft's
+        // ring rims, ellipses where its slanted faces cut the ring, get live's centermark in the Top view.
+        let mut round: Vec<([f64; 2], f64, Option<PointRef>)> = Vec::new();
+        for (i, m) in self.model_edges.iter().enumerate().filter(|(i, _)| drawn[*i] && sharp[*i]) {
+            let (EdgeGeom::Other, Some([c, a, b])) = (&m.geom, m.conic) else { continue };
+            let r = a[0].hypot(a[1]);
+            if (b[0].hypot(b[1]) - r).abs() > r * 1e-9 || (a[0] * b[0] + a[1] * b[1]).abs() > r * r * 1e-9 {
+                continue;
+            }
+            for e in self.edges.iter().filter(|e| e.model == Some(i as u32) && e.visible && e.class != EdgeClass::Smooth && e.points.len() >= 3) {
+                let (p, n) = (&e.points, e.points.len() - 1);
+                let whole = (p[0][0] - p[n][0]).hypot(p[0][1] - p[n][1]) < 1e-9;
+                arcs.push((c, r, if whole { (0.0, std::f64::consts::TAU) } else { arc_interval(c, p[0], p[n / 2], p[n]) }));
+            }
+            if !round.iter().any(|(o, s, _)| (o[0] - c[0]).abs() < 1e-9 && (o[1] - c[1]).abs() < 1e-9 && (s - r).abs() < 1e-9) {
+                round.push((c, r, None));
+            }
+        }
         let same = |c: [f64; 2], r: f64, x: &([f64; 2], f64, (f64, f64))| (c[0] - x.0[0]).abs() < 1e-9 && (c[1] - x.0[1]).abs() < 1e-9 && (r - x.1).abs() < 1e-9;
         self.circles()
             .into_iter()
+            .chain(round)
             .filter(|(c, r, _)| angular_coverage(&arcs.iter().filter(|x| same(*c, *r, x)).map(|x| x.2).collect::<Vec<_>>()) >= std::f64::consts::TAU - 1e-6)
             .collect()
     }
@@ -4400,6 +4419,11 @@ mod tests {
         };
         let top = rims(DVec3::NEG_Z, DVec3::Y);
         assert!(!top.is_empty() && top.iter().all(|m| !m.freeform && m.conic.is_some_and(|c| c[0][0].hypot(c[0][1]) < 1e-9 && (c[1][0].hypot(c[1][1]) - 0.004).abs() < 1e-9)), "{:?}", top.iter().map(|m| m.conic).collect::<Vec<_>>());
+        // Together they go round the hole's circle: its centermark (live's c2-rings-loft ring rims in its Top view).
+        let g = project_bodies(ViewId(1), &pbs, &ViewFrame::new(DVec3::NEG_Z, DVec3::Y), true, &|_, _| true);
+        assert!(g.full_circles().iter().any(|(c, r, _)| c[0].hypot(c[1]) < 1e-9 && (r - 0.004).abs() < 1e-9), "{:?}", g.full_circles());
+        let side = project_bodies(ViewId(1), &pbs, &ViewFrame::new(DVec3::NEG_Y, DVec3::Z), true, &|_, _| true);
+        assert!(side.full_circles().iter().all(|(_, r, _)| (r - 0.004).abs() > 1e-9), "not seen from the side: {:?}", side.full_circles());
         let side = rims(DVec3::NEG_Y, DVec3::Z);
         assert!(!side.is_empty() && side.iter().all(|m| m.freeform && m.conic.is_none()));
     }

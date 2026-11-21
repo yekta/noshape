@@ -251,9 +251,10 @@ fn bmp24(w: u32, h: u32, rgb: &[u8]) -> Vec<u8> {
 /// How close (sheet mm) a polyline's points must be to a circle or ellipse
 /// to be written as one.
 const FIT_TOL: f64 = 1e-4;
-/// How far (sheet mm) a model edge's projected points may lie off its exact conic: 10 µm (HLR's points lie up to 1.3 µm
-/// off a drafted rim's ellipse, c2-housing-draft).
-const CONIC_TOL: f64 = 1e-2;
+/// How far (sheet mm) a model edge's projected points may lie off its exact conic: 30 µm (HLR's points lie up to 1.3 µm
+/// off a drafted rim's ellipse, c2-housing-draft; up to 18 µm off c2-rings-loft's slanted ring rims seen from the top,
+/// whose projections HLR approximates: two SPLINEs where live writes ARCs).
+const CONIC_TOL: f64 = 3e-2;
 
 /// A spline's vertices when exported as a polyline: one each `max_turn` radians of turn along `points`, and its ends.
 const SPLINE_POLYLINE_TURN: f64 = 3.5 * std::f64::consts::PI / 180.0;
