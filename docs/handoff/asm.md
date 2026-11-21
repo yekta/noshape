@@ -5,28 +5,33 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-21 02:2x UTC) — RESUME HERE
-- P0 evaluate-again (saved isaac doc): not part order (tie-break variants all ~750 ms). place_tree can't close a loop
-  (body 27: Ball + Fastened to bodies moved before it), so the 96-body group fell to a dense least_change (775 ms).
-  Fix, landing (land.sh 02:2x): solver.rs `place_blocks`, on place_tree's failure each biconnected block placed from
-  the fixed parts out (largest 33): Mac 765 -> 25 ms; on main a1e505b1d (bool's revert in) 23.9 ms, drag 5.3 ms/frame;
-  same mate status / DOF, poses within 0.32 mm of the old fallback; test
-  a_loop_placed_body_by_body_fails_is_solved_as_one_block. Against live (lead 00:4x): the saved doc is ~470 mm off live
-  under both fallbacks (broken references), so measured on the 27 parity assemblies (Mac probe, A = old fallback,
-  B = place_blocks): A = B on every model, every line; fresh isaac 118/120 placed as live (2 not inserted), no new
-  deviation; the only ones over 0.01 mm are suspension's 3 (0.48 / 4.9 / 12.4 mm, the same in A).
-- bool's 72fe51df1 lost 22 isaac mates (16 -> 38); reverted on main as 9f6ce35e. Recount on main: probe asm-base
-  rebased to a1e505b1d, recount.sh (Mac), log /root/asm-scratch/recount.log; tell bool the count.
-- Cross-level Relation LANDED as 7aa7394a. infento rmain: 162/167 200/204 64/64; Gear 2/3 still "Select two mates":
-  the export has no subAssemblyFeatures -> mate_name falls back to the level's defs (featureData.name), uncommitted in
-  the asm worktree, lands with the P0. Gear 1 waits on Revolute 10 ("Mate cannot resolve mate connectors.").
-- Scissor rmain 215/239 (rwtr 212): 3.3 mm parts fixed; the 24 not inserted are studio 0da59a's Sketch/Transform.
-- studios 23:1x (not checked in the app yet): the instance list's rows slice isn't redrawn after set_fixed in a test
-  window (fixed icon stays until window.refresh(); notify on AssemblyView / slices.rows doesn't help). Probe:
-  open_from_top with two fixed parts, set_fixed false/true, debug_bounds("fixed Part 1 <1>"). App check: Fix from the
-  graphics context menu without moving over the list.
-- Cleanup after the P0: asm-base worktree + vibex7 / Mac targets; ops-prof (vibex7, vibe2); vibe2 ops-main; vibex7 isaac copy;
-  Mac ~/noshape-host/asm-keep (isaac copy, models, tie/v/ab outs).
+## State (2026-11-21 05:14 UTC) — RESUME HERE
+- P0 evaluate-again LANDED 02:54 as ed0fcbec (place_blocks: saved isaac 765 -> 25 ms; A/B on 27 models no deviation
+  change; isaac recount back to 16 after bool's revert, bool told).
+- Suspension's 3 parts off live (0.48 / 4.9 / 12.4 mm): sub-level mates were never translated (the exports had no
+  subAssemblyFeatures; the slider-limit idea was wrong). live added `subAssemblyFeatures` to the 13 asm-* exports with
+  subassemblies (11-21 02:5x). Suite on them: vibex8 through ~/bin/slot (~/agents/asm-keep/subs-run.sh with the prebuilt ops-subs; out
+  vibex8 ~/agents/asm-keep/subs/<m>.out, docs saved ~/tmp/asm/subs-save; log /root/asm-scratch/subs.log). Then triage
+  each model against the earlier counts.
+- infento Gear 1: Revolute 10's connector `implicit:centroid:<edge>` aligned to face a3f7a1 (also Chamfer 3's) doesn't
+  resolve (eval.rs ~1826: face wire containing the edge -> centroid -> normal). Probe on the saved infento doc.
+- qa P1 SPEED-ASM-OPEN: scissor-lift 30.5 s / infento 42 s to solved (live 8-11 s), all in the first assembly_list.
+  Plan: regen_profile (NOSHAPE_PROFILE_DIR / _ONLY) on the saved docs for per-studio times vs the assembly_list wall
+  (studios prewarm side by side on threads).
+- assembly_transform on a mated instance (qa: scissor Top +2 mm moved 2, live's drag 132): held, NOT landed; patch
+  /root/asm-scratch/transform-carry.patch (drags it as the triad: solve_drag from the instance origin, rotation as
+  targets; fixed / flexible-sub instances keep the exact place). Its test mate_flip::moving_a_mated_part_carries_what_its_mates_hold
+  passes on the old code too: reproduce on the saved scissor doc (Top <1> +2 mm x, count moved) before landing.
+- qa P2 OP-MASS-FACE-SECTION: assembly_mass_properties `faces` (Face tab: area, perimeter, Lxx/Lxy/Lyy, Lzz) and
+  `reference` (connector: inertia and moments about it); e2e assembly_measure_and_mass_properties. The Part Studio
+  op (query_mass_properties) is the lead's to route.
+- Scissor 0da59a: live installed its Derived sources (9 studios + imports/574ddb5a….step, source.json extraStudios;
+  REQUESTS skasm 11-21 03:01). Live's own 0da59a has Derived "Plate" / "Battery Clip" in ERROR (Top Plate 0 parts):
+  compare its parts with 0da59a's live.jsonl, not 24.
+- studios 23:1x: the instance list's rows slice isn't redrawn after set_fixed in a test window (probe: open_from_top,
+  two fixed parts, set_fixed false/true, debug_bounds("fixed Part 1 <1>")).
+- Cleanup: asm-base worktree + vibex7 / Mac targets; ops-prof (vibex7, vibe2); vibe2 ops-main; vibex7 isaac copy; Mac
+  ~/noshape-host/asm-keep; vibex8 ~/agents/asm-keep/ops-subs after the suite.
 
 ## State (2026-11-20 18:50 UTC)
 

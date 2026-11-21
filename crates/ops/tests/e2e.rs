@@ -9821,6 +9821,20 @@ fn assembly_measure_and_mass_properties() {
     assert!((num(&mp["volume"]) - 16000.0).abs() < 1e-6, "{mp}");
     let one = call(&mut ctx, "assembly_mass_properties", json!({ "tab": "Assembly 1", "instances": ["Part 1 <1>"] }));
     assert!((num(&one["mass_kg"]) - 2.0).abs() < 1e-9, "{one}");
+    // About the Origin's connector: Izz 2 kg (40² + 20²) / 12 mm² + 2 kg (20² + 10²) mm² (parallel axes).
+    let about = call(&mut ctx, "assembly_mass_properties", json!({ "tab": "Assembly 1", "instances": ["Part 1 <1>"], "reference": { "origin": true } }));
+    assert!((num(&one["inertia"][2][2]) - 4000.0 / 12.0).abs() < 1e-6 && (num(&about["inertia"][2][2]) - (4000.0 / 12.0 + 1000.0)).abs() < 1e-6, "{one} {about}");
+    // The Face tab (qa OP-MASS-FACE-SECTION; live 851–854, mc1-mc3): the 40 × 20 top face about its centroid, then
+    // about the Origin's connector; faces on two planes are refused as live's red title says.
+    let top1 = json!({ "instance": "Part 1 <1>", "entity": top });
+    let f = call(&mut ctx, "assembly_mass_properties", json!({ "tab": "Assembly 1", "faces": [top1] }));
+    let got = |f: &Value| [num(&f["surface_area"]), num(&f["perimeter"]), num(&f["area_moments"]["Lxx"]), num(&f["area_moments"]["Lxy"]), num(&f["area_moments"]["Lyy"]), num(&f["Lzz"])];
+    let near = |a: [f64; 6], b: [f64; 6]| a.iter().zip(&b).all(|(x, y)| (x - y).abs() < 1e-6 * y.abs().max(1.0));
+    assert!(near(got(&f), [800.0, 120.0, 80000.0 / 3.0, 0.0, 320000.0 / 3.0, 400000.0 / 3.0]), "about the centroid: {f}");
+    let f = call(&mut ctx, "assembly_mass_properties", json!({ "tab": "Assembly 1", "faces": [top1], "reference": { "origin": true } }));
+    assert!(near(got(&f), [800.0, 120.0, 320000.0 / 3.0, 160000.0, 1280000.0 / 3.0, 1600000.0 / 3.0]), "about the Origin: {f}");
+    let e = try_call(&mut ctx, "assembly_mass_properties", json!({ "tab": "Assembly 1", "faces": [top1, { "instance": "Part 1 <2>", "entity": bottom }] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("faces"), "{e:?}");
     call(&mut ctx, "assembly_properties", json!({ "tab": "Assembly 1", "mass_override": 7.5 }));
     let mp = call(&mut ctx, "assembly_mass_properties", json!({ "tab": "Assembly 1" }));
     assert!((num(&mp["mass_kg"]) - 7.5).abs() < 1e-9 && mp["mass_overridden"] == true, "{mp}");

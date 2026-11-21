@@ -2846,6 +2846,7 @@ Examples:
 ```json
 {}
 {"instances": ["Part 1 <1>"]}
+{"faces": [{"instance": "Part 1 <1>", "entity": "face:…"}], "reference": {"origin": true}}
 ```
 
 | field | type | | description |
@@ -2853,6 +2854,8 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instances` | array of string |  | Top-level instances (name or id); default the whole assembly. |
+| `faces` | array of object |  | The Face tab: planar, coplanar faces [{instance, entity}] (an instance by name, id or "Sub <1> > Part <1>" path; a face id from assembly_entities); replies their surface area, perimeter, area moments Lxx / Lxy / Lyy and polar moment Lzz (length⁴) instead of the instances' values. |
+| `reference` | object |  | A mate connector, as assembly_mate's ends: inertia (and the Face tab's moments) about its origin, in its axes. |
 
 #### assembly_update_references
 

@@ -43,7 +43,13 @@ pub fn ops() -> Vec<Op> {
             verb: "mass_properties",
             summary: "Mass and section properties of an assembly or some of its instances",
             description: "Volume, surface area, and with a material (or density, or a mass override) on every part: mass, center of mass and inertia about the center of mass, as the Mass and section properties tool shows them. Parts' and subassemblies' mass overrides count; the whole assembly's own override replaces its mass (`mass_overridden`). Lengths in workspace units.",
-            fields: vec![doc_field(), asm_field(), opt("instances", json!({ "type": "array", "items": { "type": "string" } }), "Top-level instances (name or id); default the whole assembly.")],
+            fields: vec![
+                doc_field(),
+                asm_field(),
+                opt("instances", json!({ "type": "array", "items": { "type": "string" } }), "Top-level instances (name or id); default the whole assembly."),
+                opt("faces", json!({ "type": "array", "items": { "type": "object" } }), "The Face tab: planar, coplanar faces [{instance, entity}] (an instance by name, id or \"Sub <1> > Part <1>\" path; a face id from assembly_entities); replies their surface area, perimeter, area moments Lxx / Lxy / Lyy and polar moment Lzz (length⁴) instead of the instances' values."),
+                opt("reference", json!({ "type": "object" }), "A mate connector, as assembly_mate's ends: inertia (and the Face tab's moments) about its origin, in its axes."),
+            ],
             mutates: false,
             destructive: false,
             run: mass_properties,
@@ -942,7 +948,41 @@ fn mass_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(list) => list.iter().enumerate().map(|(i, v)| find_instance(&asm, v.as_str().unwrap_or_default(), &format!("instances[{i}]"))).collect::<Result<_, _>>()?,
         None => Vec::new(),
     };
+    let reference = a.get("reference").filter(|v| !v.is_null()).map(|v| parse_connector(&asm, od, tab, v, "reference")).transpose()?;
+    let mut faces = Vec::new();
+    for (i, e) in a.opt_array("faces")?.into_iter().flatten().enumerate() {
+        let field = format!("faces[{i}]");
+        let inst = e.get("instance").and_then(Value::as_str).ok_or_else(|| OpError::param(&format!("{field}.instance"), "an instance name or id"))?;
+        let path = super::find_occurrence(od.doc(), &asm, inst, &format!("{field}.instance"))?;
+        let r = crate::refs::parse(e.get("entity").ok_or_else(|| OpError::param(&format!("{field}.entity"), "a face id"))?).map_err(|err| err.with_param(format!("{field}.entity")))?;
+        if !matches!(r, noshape_model::reference::Reference::Face(_)) {
+            return Err(OpError::param(&format!("{field}.entity"), "a face id"));
+        }
+        faces.push((field, path, r));
+    }
     let result = solve(od, tab, &SolveOptions::default())?;
+    let frame = match &reference {
+        Some(c) => Some(result.connector_world(c, &units).ok_or_else(|| OpError::param("reference", "the mate connector can't be resolved"))?),
+        None => None,
+    };
+    if !faces.is_empty() {
+        let mut picks = Vec::new();
+        for (field, path, r) in faces {
+            let o = result.occurrences.iter().find(|o| o.path.starts_with(&path) && noshape_model::assembly::analysis::pick_exists(&result, &(o.path.clone(), r.clone()))).ok_or_else(|| OpError::param(&format!("{field}.entity"), "not a face of that instance"))?;
+            picks.push((o.path.clone(), r));
+        }
+        let f = noshape_model::assembly::analysis::face_section_properties(&result, &picks, frame.as_ref()).ok_or_else(|| OpError::param("faces", "Face selections are not coplanar"))?;
+        let k4 = k * k * k * k;
+        return Ok(json!({
+            "units": crate::ops::query::units_json(&units),
+            "surface_area": r6(f.area * k * k),
+            "perimeter": r6(f.perimeter * k),
+            "centroid": pt(f.centroid, k),
+            "area_moments": { "Lxx": r6(f.moments[0][0] * k4), "Lxy": r6(f.moments[0][1] * k4), "Lyy": r6(f.moments[1][1] * k4) },
+            "Lzz": r6(f.polar * k4),
+        })
+        .into());
+    }
     let densities = noshape_model::assembly::analysis::part_densities(od.doc(), &asm, &result);
     let density = |o: &noshape_model::assembly::eval::PartOccurrence| densities.get(&(o.path.clone(), o.body.clone())).copied().flatten();
     let overrides = noshape_model::assembly::analysis::part_overrides(od.doc(), &result);
@@ -956,7 +996,8 @@ fn mass_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             // Live2 mass-override-1119: the assembly's Mass override scales the inertia by itself over the computed
             // mass and keeps the centre.
             let scale = overridden.filter(|_| m.props.mass.is_some_and(|c| c > 0.0)).map_or(1.0, |o| o / mass);
-            let (c, i, f) = (m.props.center_of_mass, m.props.inertia * scale, k * k);
+            let about = |i: glam::DMat3| frame.as_ref().map_or(i, |fr| noshape_model::assembly::analysis::inertia_about_frame(i, mass, m.props.center_of_mass, fr));
+            let (c, i, f) = (m.props.center_of_mass, about(m.props.inertia) * scale, k * k);
             v["mass_kg"] = json!(r6(overridden.unwrap_or(mass)));
             v["mass_overridden"] = json!(overridden.is_some());
             v["center_of_mass"] = pt(c, k);

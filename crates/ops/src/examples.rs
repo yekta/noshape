@@ -256,7 +256,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("assembly_add_to_named_positions", &[r##"{"instance": "Assembly 2 <1>"}"##]),
     ("assembly_named_position_drivers", &[r##"{"drivers": [{"mate": "Revolute 1", "dof": "rz"}]}"##]),
     ("assembly_measure", &[r##"{"entities": [{"instance": "Part 1 <1>", "entity": "face:…"}, {"instance": "Part 1 <2>", "entity": "face:…"}]}"##]),
-    ("assembly_mass_properties", &[r##"{}"##, r##"{"instances": ["Part 1 <1>"]}"##]),
+    ("assembly_mass_properties", &[r##"{}"##, r##"{"instances": ["Part 1 <1>"]}"##, r##"{"faces": [{"instance": "Part 1 <1>", "entity": "face:…"}], "reference": {"origin": true}}"##]),
     ("assembly_update_references", &[r##"{}"##, r##"{"document": "library", "version": "V1"}"##]),
     ("assembly_reorder", &[r##"{"feature": "Revolute 2", "before": "Fastened 1"}"##]),
     ("assembly_mate_value", &[r##"{"mate": "Revolute 1", "dof": "rz", "value": "30 deg"}"##]),
