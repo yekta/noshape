@@ -272,16 +272,19 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
     let in_context = ev.bool("isInContext");
     let mut points: Vec<k::Shape> = Vec::new();
     // Mesh imports (STL, OBJ, PVZ; Onshape G22/G27): per part, its closed
-    // pieces make a mesh part; the open pieces of a part whose mesh doesn't
-    // close become surfaces grouped in a closed composite part.
-    let mut open_groups: Vec<Vec<k::Shape>> = Vec::new();
+    // pieces make a mesh part; the open pieces of a file's part whose mesh doesn't
+    // close become surfaces grouped in a closed composite part. A file without
+    // parts (STL) makes each open piece a surface of its own (live stl-split-1121:
+    // the duct's 9 "Surface N" sheets, no composite).
+    let mut open_groups: Vec<(Vec<k::Shape>, bool)> = Vec::new();
     for (s, part) in shapes {
         let s = if up { s.transformed(&k::Transform::Rotate { origin: DVec3::ZERO, axis: DVec3::X, angle: std::f64::consts::FRAC_PI_2 })? } else { s };
         let part = part.unwrap_or_default();
         let colored_faces: Vec<(k::Shape, [f32; 3])> = part.faces.iter().filter_map(|&(i, c)| Some((s.sub_shape(ShapeType::Face, i).ok()?, c))).collect();
         if s.is_mesh() {
             let children = s.children();
-            let pieces = if s.shape_type() == ShapeType::Compound && !children.is_empty() && children.iter().all(|c| c.shape_type() == ShapeType::Compound) { children } else { vec![s] };
+            let file_parts = s.shape_type() == ShapeType::Compound && !children.is_empty() && children.iter().all(|c| c.shape_type() == ShapeType::Compound);
+            let pieces = if file_parts { children } else { vec![s] };
             for piece in pieces {
                 // The file's part name (PVZ) goes to the part's solid; an OBJ zip's material colour too.
                 let solids = piece.solids();
@@ -294,8 +297,12 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
                     ShapeType::Compound => piece.children().into_iter().filter(|c| c.shape_type() == ShapeType::Shell).collect(),
                     _ => Vec::new(),
                 };
-                if !open.is_empty() {
-                    open_groups.push(open);
+                if file_parts {
+                    if !open.is_empty() {
+                        open_groups.push((open, true));
+                    }
+                } else {
+                    open_groups.extend(open.into_iter().map(|o| (vec![o], false)));
                 }
             }
             continue;
@@ -377,7 +384,7 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
             apply_look(ev, bi, &look, appearances);
         }
     }
-    for (gi, group) in open_groups.into_iter().enumerate() {
+    for (gi, (group, composite)) in open_groups.into_iter().enumerate() {
         let before = ev.ctx.bodies.len();
         for p in group {
             add(ev, p, BodyKind::Surface)?;
@@ -386,7 +393,9 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
         if idx.is_empty() {
             return Err(FeatureError::new("Part import failed."));
         }
-        super::refgeom::make_composite(ev, &idx, true, 30_000 + gi as u32)?;
+        if composite {
+            super::refgeom::make_composite(ev, &idx, true, 30_000 + gi as u32)?;
+        }
     }
     for v in points {
         let position = v.vertex_point()?;

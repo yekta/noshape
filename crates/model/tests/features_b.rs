@@ -1064,6 +1064,25 @@ fn import_foreign_mesh_parts() {
     assert!(info.closed && info.members.len() == 2 && comp.name == "Composite part 1", "{info:?} {}", comp.name);
 }
 
+/// An STL's open pieces are surfaces of their own, without a composite (live stl-split-1121: the duct's STL is 9
+/// "Surface N" sheets).
+#[test]
+fn an_stl_s_open_pieces_are_surfaces() {
+    let dir = std::env::temp_dir().join(format!("noshape-featb-stlopen-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("two.stl");
+    let tri = |z: f64| format!("facet normal 0 0 1\nouter loop\nvertex 0 0 {z}\nvertex 1 0 {z}\nvertex 0 1 {z}\nendloop\nendfacet\n");
+    std::fs::write(&path, format!("solid two\n{}{}endsolid two\n", tri(0.0), tri(1.0))).unwrap();
+    let mesh = noshape_kernel::read_mesh_bodies(&path, noshape_kernel::LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_dir_all(dir);
+    let brep = String::from_utf8(mesh.to_brep_bytes().unwrap()).unwrap();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let names: Vec<_> = r.display.bodies.iter().map(|b| (b.name.as_str(), b.kind, b.composite.is_some())).collect();
+    assert_eq!(names, [("Surface 1", BodyKind::Surface, false), ("Surface 2", BodyKind::Surface, false)]);
+}
+
 /// A Mate connector on a mesh part's node (asm-corexy's studios on their STL imports; live: "Failed to resolve mate
 /// connector origin." never, the node's point with the world axes, as a vertex's).
 #[test]
