@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-21 21:33 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-21 22:39 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## In flight (11-21 04:30 UTC)
@@ -14,7 +14,7 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - Handed to core 11-21 10:50: infento a3f7a1 Linear pattern 1's direction JMx = Chamfer 2's new edge on Extrude 1's
   ring (ours runs -y, live +y); and P0 c2-genesis-trunk-hanger 20 -> 12/73 = core's 18354ec79 (bisected; fixed by
   8631c5717, Mac 20/73 on that tree; main still 12/73 from a second cause core is bisecting).
-- LANDING (A/B green: suite 127 -> 129/188 docs, 1986 -> 1999 features, no doc worse; start-extrude 34/34,
+- QUEUED b3345866 + 6ef0420c (22:3x; A/B green: suite 127 -> 129/188 docs, 1986 -> 1999 features, no doc worse; start-extrude 34/34,
   overcut-dogbone 10/10; base ab6-base.out vibe2, new vibex7 ~/agents/skasm-keep/ab6-new.out):
   - parity.rs: ruled_piece_from_query (mutualtrim SWEPT_*), region_query_sketch hint + pieces rule (scissor
     b58244 Extrude 1 KICB 445 mm², 0139f2 Extrude 8 Sketch 6's regions); recheck sc-* in vibe2 ~/tmp/skasm/scm.
@@ -35,9 +35,14 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   - FEEL-SPLINE-PREVIEW-VANISHES: the cursor point equal to the last click isn't added to the preview fit.
   - FEEL-OFFSET-PREVIEW-LOOK (live 20:55 answer): end points drawn; hollow arrow's tail on the preview line; black
     dimension line + 2 filled 5 px arrowheads; "d" label always (in the gap from 13.5 px, else on the picked line
-    with the line run past it); hover: arrow #4674af/#9bb2cc, label tan #ccb396 edge #d99c3e. Open: the "—" glyph
-    with Show constraints off; arrowheads hidden on label hover. FEEL-POLYGON-SPINNER-DRIFT closed (live 10-27).
+    with the line run past it); hover: arrow #4674af/#9bb2cc, label tan #ccb396 edge #d99c3e, arrowheads hidden
+    (`offset_label_hovered`, set by the label's on_hover). Open: the tiny "—" tick by the tail (x4-2-z1-hovers). FEEL-POLYGON-SPINNER-DRIFT closed (live 10-27).
     FEEL-EXTEND-NO-EXTEND closed (two picks as live 2992); the stub's look unknown (live's (8) retake did nothing).
+  - FEEL-TEXT-BOX-PREVIEW (qa walk 4, in 6ef0420c): the Text tool draws only the dash-dot box between its two clicks and
+    4 corner points, no text, until ✓ (live sketch/132, 134). Live's box looked ~3.3:1 for 4:1 clicks: unconfirmed.
+- asm 11-21 22:0x: asm-scissor-lift fed22d (Top Openings 15.5 -> 23.0 mm, Sketch 32 PARALLEL left): not c721b3513
+  (draw-time inference only) nor 1d3541912's sketch-curve rule (A/B on vibe2 scm/sc-fed22d: same 28/60, 14.95 mm
+  both); its plane face query differs base vs main. Told asm (rerun after b3345866).
 - loft-paths-guides: Sketch 4 / 6 match now (16/29; first diff Loft 3 edges, Loft 4 ERROR: loft owner's).
 - hem-jog next: edges 56 vs 61 / vertices (live: 4 spline corner faces + mitre planes) and the flat "Collision".
 - Next after that (lead 11-21): the next item of "Next, in order"; sketch-solver parity rows if sheet metal has none.
