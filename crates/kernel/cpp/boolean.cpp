@@ -163,6 +163,7 @@
 #include <BRepTools_WireExplorer.hxx>
 #include <Geom_ConicalSurface.hxx>
 #include <BRepExtrema_SelfIntersection.hxx>
+#include <BRepExtrema_ShapeProximity.hxx>
 #include <TopoDS_Wire.hxx>
 #include <NCollection_IndexedDataMap.hxx>
 #include <functional>
@@ -8673,6 +8674,31 @@ void set_thread_cancel(size_t flag)
   t_cancel = reinterpret_cast<const std::atomic<bool>*>(flag);
 }
 
+// Whether tools `t` are one shape placed by the powers of one motion, in order (t[i] at R^i from t[0]: a circular or
+// linear pattern's instances), within `reach` over the first one's box `box`.
+static bool is_power_pattern(const std::vector<TopoDS_Shape>& t, const Bnd_Box& box, double reach)
+{
+  if (t.size() < 2 || box.IsVoid())
+    return false;
+  for (const TopoDS_Shape& s : t)
+    if (s.TShape() != t[0].TShape() || s.Orientation() != t[0].Orientation())
+      return false;
+  const gp_Trsf back = t[0].Location().Transformation().Inverted();
+  const gp_Trsf step = t[1].Location().Transformation().Multiplied(back);
+  double x0, y0, z0, x1, y1, z1;
+  box.Get(x0, y0, z0, x1, y1, z1);
+  for (size_t i = 2; i < t.size(); ++i)
+  {
+    const gp_Trsf at = t[i].Location().Transformation().Multiplied(back), want = step.Powered((int)i);
+    for (const double x : {x0, x1})
+      for (const double y : {y0, y1})
+        for (const double z : {z0, z1})
+          if (gp_Pnt(x, y, z).Transformed(at).Distance(gp_Pnt(x, y, z).Transformed(want)) > reach)
+            return false;
+  }
+  return true;
+}
+
 // Tools that can't touch each other, gathered into compounds: OCCT never
 // intersects the parts of one argument with each other, and most of a cut
 // with many tools is spent on tool pairs whose boxes meet but which are apart
@@ -8717,6 +8743,7 @@ static std::vector<TopoDS_Shape> group_disjoint(const std::vector<TopoDS_Shape>&
   // A pattern's instances share one shape, placed: meshed once (a mesh is kept in the shape's own frame), each
   // instance its placed copy (cf-surface-pattern's 85 spheres: their grouping 4.7 s -> 1.7 s).
   NCollection_DataMap<occ::handle<TopoDS_TShape>, TopoDS_Shape> meshed;
+  std::vector<TopoDS_Shape>                                     placed((size_t)n);
   for (int i = 0; i < n; ++i)
   {
     if (!close[(size_t)i])
@@ -8734,35 +8761,24 @@ static std::vector<TopoDS_Shape> group_disjoint(const std::vector<TopoDS_Shape>&
     for (TopExp_Explorer f(c, TopAbs_FACE); f.More(); f.Next())
       owner.Bind(f.Current(), i);
     bb.Add(copies, c);
+    placed[(size_t)i] = c;
   }
   std::vector<std::vector<char>> conflict((size_t)n, std::vector<char>((size_t)n, 0));
-  // (None meshed: no two can meet, one group.)
-  if (!owner.IsEmpty())
-  {
-    // On a thread of its own, so a cancel needn't wait for it (one OCCT call over every tool's mesh without a break
-    // hook: cf-surface-pattern's 85 tools, 0.6 s): the worker leaves it to finish alone.
-    struct Check
+  // On a thread of its own, so a cancel needn't wait for it (one OCCT call over every tool's mesh without a break
+  // hook: cf-surface-pattern's 85 tools, 0.6 s): the worker leaves it to finish alone. False if it failed.
+  const auto off_thread = [](std::function<bool()> work) {
+    struct Job
     {
-      std::mutex                                    m;
-      std::condition_variable                       cv;
-      bool                                          done = false, ok = false;
-      std::shared_ptr<BRepExtrema_SelfIntersection> si;
+      std::mutex              m;
+      std::condition_variable cv;
+      bool                    done = false, ok = false;
     };
-    auto job = std::make_shared<Check>();
-    try
-    {
-      job->si = std::make_shared<BRepExtrema_SelfIntersection>(copies, 2 * defl);
-    }
-    catch (const Standard_Failure&)
-    {
-      return t;
-    }
-    std::thread([job] {
+    auto job = std::make_shared<Job>();
+    std::thread([job, work = std::move(work)] {
       bool ok = false;
       try
       {
-        job->si->Perform();
-        ok = job->si->IsDone();
+        ok = work();
       }
       catch (...)
       {
@@ -8772,26 +8788,75 @@ static std::vector<TopoDS_Shape> group_disjoint(const std::vector<TopoDS_Shape>&
       job->done = true;
       job->cv.notify_all();
     }).detach();
+    std::unique_lock<std::mutex> l(job->m);
+    while (!job->cv.wait_for(l, std::chrono::milliseconds(5), [&] { return job->done; }))
     {
-      std::unique_lock<std::mutex> l(job->m);
-      while (!job->cv.wait_for(l, std::chrono::milliseconds(5), [&] { return job->done; }))
-      {
-        l.unlock();
-        fail_if_cancelled();
-        l.lock();
-      }
+      l.unlock();
+      fail_if_cancelled();
+      l.lock();
     }
-    if (!job->ok)
+    return job->ok;
+  };
+  // A pattern's instances placed by the powers of one motion (a circular or linear pattern): tools i and j meet as
+  // tools 0 and j - i do, so tool 0 alone is checked against the others (scissor-lift's 18 tooth gaps: every pair
+  // checked was 473 of the gear's 4000 ms).
+  if (is_power_pattern(t, boxes[0], 1e-3 * defl))
+  {
+    TopoDS_Compound others;
+    bb.MakeCompound(others);
+    for (int k = 1; k < n; ++k)
+      if (!placed[(size_t)k].IsNull() && !boxes[0].IsOut(boxes[(size_t)k]))
+        bb.Add(others, placed[(size_t)k]);
+    if (!placed[0].IsNull() && TopoDS_Iterator(others).More())
+    {
+      std::shared_ptr<BRepExtrema_ShapeProximity> sp;
+      try
+      {
+        sp = std::make_shared<BRepExtrema_ShapeProximity>(placed[0], others, 2 * defl);
+      }
+      catch (const Standard_Failure&)
+      {
+        return t;
+      }
+      if (!off_thread([sp] {
+            sp->Perform();
+            return sp->IsDone();
+          }))
+        return t;
+      std::vector<char> meets((size_t)n, 0);
+      for (NCollection_DataMap<int, TColStd_PackedMapOfInteger>::Iterator it(sp->OverlapSubShapes2()); it.More(); it.Next())
+        if (const int* k = owner.Seek(sp->GetSubShape2(it.Key())); k != nullptr && !it.Value().IsEmpty())
+          meets[(size_t)*k] = 1;
+      for (int i = 0; i < n; ++i)
+        for (int j = i + 1; j < n; ++j)
+          conflict[(size_t)i][(size_t)j] = conflict[(size_t)j][(size_t)i] = meets[(size_t)(j - i)];
+    }
+  }
+  // (None meshed: no two can meet, one group.)
+  else if (!owner.IsEmpty())
+  {
+    std::shared_ptr<BRepExtrema_SelfIntersection> si;
+    try
+    {
+      si = std::make_shared<BRepExtrema_SelfIntersection>(copies, 2 * defl);
+    }
+    catch (const Standard_Failure&)
+    {
+      return t;
+    }
+    if (!off_thread([si] {
+          si->Perform();
+          return si->IsDone();
+        }))
       return t;
     try
     {
-      const BRepExtrema_SelfIntersection& si = *job->si;
-      for (NCollection_DataMap<int, TColStd_PackedMapOfInteger>::Iterator it(si.OverlapElements()); it.More(); it.Next())
+      for (NCollection_DataMap<int, TColStd_PackedMapOfInteger>::Iterator it(si->OverlapElements()); it.More(); it.Next())
       {
-        const int* a = owner.Seek(si.GetSubShape(it.Key()));
+        const int* a = owner.Seek(si->GetSubShape(it.Key()));
         for (TColStd_PackedMapOfInteger::Iterator j(it.Value()); j.More(); j.Next())
         {
-          const int* b = owner.Seek(si.GetSubShape(j.Key()));
+          const int* b = owner.Seek(si->GetSubShape(j.Key()));
           if (a != nullptr && b != nullptr && *a != *b)
             conflict[(size_t)*a][(size_t)*b] = conflict[(size_t)*b][(size_t)*a] = 1;
         }

@@ -570,3 +570,25 @@ fn a_step_wider_than_ten_microns_somewhere_stays() {
     assert!(step.len() == 1 && (step[0] - 0.555).abs() < 1e-3, "{step:?}");
     assert!(u.is_valid());
 }
+
+/// A circular pattern's tools (one shape placed at each step: group_disjoint checks the first one against the rest):
+/// overlapping neighbours stay apart, neighbours apart share a group, and the cut is the one with each tool copied.
+#[test]
+fn a_patterns_tools_group_as_their_copies_do() {
+    let blank = make_cylinder(&Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 20.0, 10.0, 2.0 * PI).unwrap();
+    // (12 steps of 30 degrees: at r 15 they are 7.8 apart, so 12 wide teeth overlap their neighbours and 4 wide don't.)
+    for width in [12.0, 4.0] {
+        let tooth = make_box_corners(DVec3::new(15.0, -width / 2.0, -1.0), DVec3::new(25.0, width / 2.0, 11.0)).unwrap();
+        let at = |k: usize, copy: bool| transform(&tooth, &Transform::Rotate { origin: DVec3::ZERO, axis: DVec3::Z, angle: PI * k as f64 / 6.0 }, copy).unwrap().shape;
+        let placed: Vec<Shape> = (0..12).map(|k| at(k, false)).collect();
+        let copies: Vec<Shape> = (0..12).map(|k| at(k, true)).collect();
+        set_rust_boolean(Some(false));
+        let a = boolean(BooleanOp::Cut, std::slice::from_ref(&blank), &placed, &BooleanOptions::default()).unwrap().shape;
+        let b = boolean(BooleanOp::Cut, std::slice::from_ref(&blank), &copies, &BooleanOptions::default()).unwrap().shape;
+        set_rust_boolean(None);
+        assert!(a.is_valid() && b.is_valid(), "width {width}");
+        let (va, vb) = (a.volume().unwrap(), b.volume().unwrap());
+        assert!((va - vb).abs() < 1e-9 * vb, "width {width}: {va} vs {vb}");
+        assert_eq!(counts(&a), counts(&b), "width {width}");
+    }
+}
