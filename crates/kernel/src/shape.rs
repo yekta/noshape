@@ -401,6 +401,12 @@ impl Shape {
         Shape::from_res(ffi::fix_shape(self.raw(), tolerance))
     }
 
+    /// A copy with its tolerances set to `tolerance` (metres), raised only where its geometry needs more: undoes a
+    /// Boolean's tolerance growth on exact geometry.
+    pub fn tightened(&self, tolerance: f64) -> Result<Shape> {
+        Shape::from_res(ffi::tighten_tolerances(self.raw(), tolerance))
+    }
+
     /// Its swept faces (surfaces of linear extrusion, of revolution) that are planes, cylinders, cones, spheres or tori
     /// as those: a face swept from a neighbour's edge then unifies with it.
     pub fn with_elementary_surfaces(&self) -> Result<Shape> {

@@ -831,6 +831,7 @@ bool                         is_valid(const OcShape& s);
 bool                         faces_valid(const OcShape& s, rust::Slice<const uint32_t> faces);
 bool                         self_intersects(const OcShape& s);
 std::unique_ptr<OcShape>     fix_shape(const OcShape& s, double tolerance);
+std::unique_ptr<OcShape>     tighten_tolerances(const OcShape& s, double tolerance);
 std::unique_ptr<OcShape>     elementary_surfaces(const OcShape& s);
 std::unique_ptr<OcShape>     shape_seam_pieces_joined(const OcShape& s);
 std::unique_ptr<OcShape>     orient_faces_consistently(const OcShape& s);

@@ -2398,9 +2398,14 @@ fn exact_bend_face(f: &Shape, dir: DVec3, radius: f64) -> Option<Shape> {
 }
 
 /// A rolled bend: definition face `fi` thickened (`front` along its normal).
-/// Its offsets come from the face; its end caps from the face's edges there.
+/// Its offsets come from the face; its end caps from the face's edges there,
+/// their arcs exact circles (live's "Sheet metal arcs as bends": 4 circles).
 fn rolled_bend(topo: &Topo, fi: usize, face: &Shape, front: f64, back: f64, solids: &mut Vec<Shape>, pieces: &mut Vec<Piece>) -> FResult<()> {
-    let res = k::thicken_plain(face, front, back).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
+    // (A hem's corner trim leaves its face's edges 0.06 mm loose: the part's fuse then closes a 0.02 mm hem slot,
+    // c2-cov2-sm-hem-jog's R0.01 bends.)
+    let tight = face.tightened(1e-7).ok();
+    let face = tight.as_ref().unwrap_or(face);
+    let res = k::thicken(face, front, back).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
     let own: Vec<usize> = (0..topo.edges.len()).filter(|e| topo.edge_faces[*e].contains(&(fi as u32))).collect();
     for f in res.faces() {
         let from = match f.face_surface() {

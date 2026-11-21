@@ -76,6 +76,7 @@ extern "C" char etext;
 #include <TopoDS_Shell.hxx>
 #include <ShapeFix_Shape.hxx>
 #include <ShapeFix_Shell.hxx>
+#include <ShapeFix_ShapeTolerance.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Iterator.hxx>
@@ -2351,6 +2352,17 @@ std::unique_ptr<OcShape> fix_shape(const OcShape& s, double tolerance)
   }
   fix->Perform();
   return wrap(fix->Shape());
+}
+
+// A copy of the shape with its tolerances set to `tolerance`, then raised only where its curves and surfaces need it.
+std::unique_ptr<OcShape> tighten_tolerances(const OcShape& s, double tolerance)
+{
+  require_non_null(s.shape, "shape");
+  TopoDS_Shape out = BRepBuilderAPI_Copy(s.shape).Shape();
+  ShapeFix_ShapeTolerance().SetTolerance(out, tolerance);
+  BRepLib::SameParameter(out, tolerance, true);
+  BRepLib::UpdateTolerances(out, false);
+  return wrap(out);
 }
 
 // A part of several solids, or of a solid whose one shell is pieces meeting at no edge (live2 q-step-twopiece: one STEP

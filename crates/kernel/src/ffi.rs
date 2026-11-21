@@ -524,6 +524,7 @@ pub(crate) mod ffi {
         fn faces_valid(s: &OcShape, faces: &[u32]) -> Result<bool>;
         fn self_intersects(s: &OcShape) -> Result<bool>;
         fn fix_shape(s: &OcShape, tolerance: f64) -> Result<UniquePtr<OcShape>>;
+        fn tighten_tolerances(s: &OcShape, tolerance: f64) -> Result<UniquePtr<OcShape>>;
         fn elementary_surfaces(s: &OcShape) -> Result<UniquePtr<OcShape>>;
         fn shape_seam_pieces_joined(s: &OcShape) -> Result<UniquePtr<OcShape>>;
         fn orient_faces_consistently(s: &OcShape) -> Result<UniquePtr<OcShape>>;

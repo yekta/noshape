@@ -3044,6 +3044,9 @@ impl<'a> Translator<'a> {
         if let Some(r) = self.imprinted_vertex_from_query(text) {
             return r.map(|e| vec![e]);
         }
+        if let Some(r) = self.ruled_piece_from_query(text) {
+            return r.map(|e| vec![e]);
+        }
         if let Some(r) = self.region_from_query(text)? {
             return Ok(vec![r]);
         }
@@ -3512,13 +3515,21 @@ impl<'a> Translator<'a> {
         // The region bounded by exactly the face's own edges (the curves its vertices meet are named too, one level
         // down: c2-sm-exhaust-clamp's small circles touching a line and a ring, their disks, not the slivers beside).
         let own: std::collections::BTreeSet<String> = own_edges.iter().filter_map(|e| self.sketch_entities.get(&(sk.clone(), e.clone())).cloned()).collect();
+        // (A curve named for several of the face's edges, told apart by their TOPOLOGY, bounds it in as many pieces:
+        // asm-scissor-lift b582441a's KICB names three pieces of Plate 1's slot line, the plate's large region, not
+        // the sliver beside one piece.)
+        let pieces = |r: &Value, e: &str| r["boundary"].as_array().into_iter().flatten().filter(|b| b.as_str() == Some(e)).count();
+        let named_pieces = |e: &str| own_edges.iter().filter(|o| self.sketch_entities.get(&(sk.clone(), (*o).clone())).is_some_and(|x| x == e)).count();
         if !own.is_empty() && own.len() == own_edges.iter().collect::<std::collections::BTreeSet<_>>().len() && !derived {
-            let exact: Vec<&Value> = all.iter().filter(|r| r["boundary"].as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect::<std::collections::BTreeSet<_>>() == own).collect();
+            let exact: Vec<&Value> = all.iter().filter(|r| r["boundary"].as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect::<std::collections::BTreeSet<_>>() == own && own.iter().all(|e| pieces(r, e) >= named_pieces(e))).collect();
             if let [only] = exact.as_slice() {
                 return Ok(only["id"].as_str().map(whole));
             }
         }
         let mut bounded: Vec<Value> = all.iter().filter(|r| !named.is_empty() && named.iter().all(|e| r["boundary"].as_array().is_some_and(|b| b.iter().any(|x| x == e)))).cloned().collect();
+        if bounded.len() > 1 && bounded.iter().any(|r| own.iter().all(|e| pieces(r, e) >= named_pieces(e))) {
+            bounded.retain(|r| own.iter().all(|e| pieces(r, e) >= named_pieces(e)));
+        }
         if let [only] = bounded.as_slice() {
             return Ok(only["id"].as_str().map(whole));
         }
@@ -3903,6 +3914,76 @@ impl<'a> Translator<'a> {
         packed_strings(&tree, &mut strings);
         let sketches: Vec<&str> = strings.iter().filter_map(|s| s.strip_suffix(".wireOp")).collect();
         strings.windows(2).filter(|w| w[0] == "sketchEntityId").find_map(|w| sketches.iter().find_map(|sk| self.sketch_entities.get(&(sk.to_string(), w[1].clone())).cloned()))
+    }
+
+    /// A Ruled surface's piece (`SWEPT_BODY` / `SWEPT_FACE` / `SWEPT_EDGE` of `<feature>.….patch`), not what it was ruled
+    /// from: its part; the face ruled from a sketch edge; the edge ruled from the edge's start or end (c2-surf-intro-mutualtrim's
+    /// Ruled surface 3 and Mutual trim 1 on Ruled surface 1's, from Profile for Tail Fin's line).
+    fn ruled_piece_from_query(&mut self, text: &str) -> Option<Result<String, String>> {
+        let strings = packed_strings_of(text);
+        let name = ["SWEPT_BODY", "SWEPT_FACE", "SWEPT_EDGE"].into_iter().find(|n| strings.iter().any(|s| s == n))?;
+        let feature = strings.iter().find_map(|s| s.strip_suffix(".patch"))?.split('.').next()?.to_string();
+        let ours = self.feature_ids.get(&feature).cloned()?;
+        if name == "SWEPT_BODY" {
+            return Some(self.swept_body(&feature, None, &[], false));
+        }
+        let sk = strings.iter().find_map(|s| s.strip_suffix(".wireOp"))?.to_string();
+        let entity = strings.windows(2).find(|w| w[0] == "sketchEntityId").map(|w| w[1].clone())?;
+        let (curve, end) = match entity.rsplit_once('.') {
+            Some((c, "start")) => (c.to_string(), Some(false)),
+            Some((c, "end")) => (c.to_string(), Some(true)),
+            _ => (entity.clone(), None),
+        };
+        let poly = self.curve_of(&sk, &curve)?;
+        let [o, x, y] = *self.frames.get(&sk)?;
+        let world = |p: &[f64; 2]| -> [f64; 3] { [o[0] + p[0] * x[0] + p[1] * y[0], o[1] + p[0] * x[1] + p[1] * y[1], o[2] + p[0] * x[2] + p[1] * y[2]] };
+        let line: Vec<[f64; 3]> = poly.iter().map(world).collect();
+        let dist = |a: [f64; 3], b: [f64; 3]| (0..3).map(|i| (a[i] - b[i]).powi(2)).sum::<f64>().sqrt();
+        // Off the sampled curve (m).
+        let off = |p: [f64; 3]| {
+            line.windows(2)
+                .map(|w| {
+                    let d: Vec<f64> = (0..3).map(|i| w[1][i] - w[0][i]).collect();
+                    let len2: f64 = d.iter().map(|v| v * v).sum();
+                    let t = if len2 > 0.0 { ((0..3).map(|i| (p[i] - w[0][i]) * d[i]).sum::<f64>() / len2).clamp(0.0, 1.0) } else { 0.0 };
+                    dist(p, [w[0][0] + t * d[0], w[0][1] + t * d[1], w[0][2] + t * d[2]])
+                })
+                .fold(f64::MAX, f64::min)
+        };
+        let found = match self.call("query_entities", json!({ "kind": "edges", "created_by": ours, "limit": 10000 })) {
+            Ok(f) => f,
+            Err(e) => return Some(Err(e)),
+        };
+        let k = per_unit(&found["units"]);
+        let at = |e: &Value, key: &str| f3(&e[key]).map(|p| p.map(|c| c * k));
+        let edges: Vec<Value> = found["edges"].as_array().cloned().unwrap_or_default();
+        // The surface's edge along the curve (sampled arcs: within 0.01 mm).
+        let along: Vec<&Value> = edges.iter().filter(|e| at(e, "midpoint").is_some_and(|m| off(m) < 1e-5)).collect();
+        let id = |e: &Value| e["id"].as_str().map(str::to_string);
+        Some(match (name, end) {
+            ("SWEPT_EDGE", Some(end)) => {
+                let corner = if end { line[line.len() - 1] } else { line[0] };
+                edges
+                    .iter()
+                    .filter(|e| !along.iter().any(|a| a["id"] == e["id"]))
+                    .find(|e| ["start", "end"].iter().any(|key| at(e, key).is_some_and(|p| dist(p, corner) < 1e-7)))
+                    .and_then(id)
+                    .ok_or_else(|| format!("SWEPT_EDGE of {feature}: no edge of ours from {:?} mm", mm(corner)))
+            }
+            ("SWEPT_FACE", _) => {
+                let Some(edge) = along.first().and_then(|e| id(e)) else { return Some(Err(format!("SWEPT_FACE of {feature}: no edge of ours along {sk}'s {curve}"))) };
+                let faces = self.call("query_entities", json!({ "kind": "faces", "of": [edge], "limit": 10 }));
+                let made = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 10000 }));
+                match (faces, made) {
+                    (Ok(f), Ok(m)) => {
+                        let made: Vec<&Value> = m["faces"].as_array().into_iter().flatten().map(|f| &f["id"]).collect();
+                        f["faces"].as_array().into_iter().flatten().find(|f| made.contains(&&f["id"])).and_then(id).ok_or_else(|| format!("SWEPT_FACE of {feature}: no face of ours on {edge}"))
+                    }
+                    (Err(e), _) | (_, Err(e)) => Err(e),
+                }
+            }
+            _ => return None,
+        })
     }
 
     /// A sketch curve or point named by its Onshape id (packed
@@ -5038,10 +5119,25 @@ impl<'a> Translator<'a> {
         (!found.is_empty()).then_some(found)
     }
 
+    /// The sketch whose regions feature `k`'s region query with live's id `id` names (its `featureId`).
+    fn region_query_sketch(&self, k: usize, id: &str) -> Option<String> {
+        let f = self.features.get(k)?;
+        let queries = f["parameters"].as_array()?.iter().flat_map(|p| p["queries"].as_array().into_iter().flatten());
+        queries
+            .filter(|q| q["btType"].as_str().is_some_and(|t| t.starts_with("BTMIndividualSketchRegionQuery")))
+            .find(|q| q["deterministicIds"].as_array().is_some_and(|ids| ids.iter().any(|i| i == id)))
+            .and_then(|q| q["featureId"].as_str().map(str::to_string))
+    }
+
     /// The entity of ours at live's geometry of `id`.
     fn by_geometry(&mut self, k: usize, id: &str) -> Result<String, String> {
-        let r = self.refs[&(k, id.to_string())].clone();
+        let mut r = self.refs[&(k, id.to_string())].clone();
         let p = r.point.ok_or_else(|| format!("{id}: no point"))?;
+        // A region of the sketch the feature's region query names, when live's line doesn't say (asm-scissor-lift studio
+        // 0139f2's Extrude 8: Sketch 6's regions of the circles it projects, not Sketch 1's under them on the same plane).
+        if r.sketch_of.is_none() && (r.kind == "SKETCH_REGION" || r.sketch) {
+            r.sketch_of = self.region_query_sketch(k, id);
+        }
         let pick = |v: &Value, key: &str| v[key].as_array().and_then(|a| a.first()).and_then(|e| e["id"].as_str()).map(str::to_string);
         match r.kind.as_str() {
             "PLANE" if p.iter().all(|c| c.abs() < 1e-9) => {
@@ -5052,7 +5148,7 @@ impl<'a> Translator<'a> {
             // A face given as its plane (live's evPlane): ours on that plane, the nearest in area.
             "FACE" if r.plane_origin && let Some(f) = self.face_on_plane(&r) => Ok(f),
             // A sketch's region (refs.jsonl `bodyType` SKETCH): ours there, of its area.
-            "FACE" if r.sketch => self.region_at(p, r.measure, r.sketch_of.as_deref()),
+            "FACE" if r.sketch => self.region_at(p, r.measure, r.sketch_of.as_deref()).or_else(|e| if r.sketch_of.is_some() { self.region_at(p, r.measure, None) } else { Err(e) }),
             "FACE" | "PLANE" => {
                 let part = self.part_of(k, &r);
                 self.nearest("faces", &r, part.as_deref()).ok_or_else(|| format!("{id}: no face of ours at {:?} mm", mm(p)))
@@ -5110,7 +5206,7 @@ impl<'a> Translator<'a> {
                     .and_then(|b| b["id"].as_str().map(str::to_string))
                     .ok_or_else(|| format!("{id}: no part of ours"))
             }
-            "SKETCH_REGION" => self.region_at(p, r.measure, r.sketch_of.as_deref()),
+            "SKETCH_REGION" => self.region_at(p, r.measure, r.sketch_of.as_deref()).or_else(|e| if r.sketch_of.is_some() { self.region_at(p, r.measure, None) } else { Err(e) }),
             other => Err(format!("{id}: reference kind {other} not mapped")),
         }
     }
