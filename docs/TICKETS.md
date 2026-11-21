@@ -96,6 +96,12 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   "Section view…" after Export as DXF/DWG…. Live's Sketch 1 menu has none, before or after the roll; ours has none before the
   roll. Frame 1 below the bar matches live's Extrude 1 (Configure suppression only with a configuration, Add comment is cloud).
   Not judged: Hide other / all sketches (live's doc had two sketches, ours one). qa-scratch/walk2/g1c, g5c, g7c.png.
+- [ ] P1 **UIP-SKETCH-ROW-SECTION-VIEW (psui)**: ui-parity 1121-0923-07879475 (qa-scratch/suites/1121-0923-07879475-uip): 13 scenarios worse than
+  the 11-20 23:08 run, all at step 1, a plain right-click on Sketch 1's row with nothing selected: live (recordings 11-06) lists "Section view…"
+  at row 8 (9 in sketch-rows-*), ours "Suppress" (no Section view…). Since psui 7de5b3566 (05:08, live secmenu-1121: only while the sketch is
+  already selected). sketch-row-menu-{section-view,show,view-normal,edit-appearance,export-dxf,paste-into-sketch}, sketch-row-copy-paste-onto-front,
+  sketch-rows-{hide-all,hide-other,show-all}-sketches, feature-row-{rclick-sketch,roll-to-here}, rollback-then-{add-feature,new-sketch,roll-to-end}.
+  Wanted: one live answer. Either the recordings are re-recorded with live's current menu, or the plain right-click shows Section view… again.
 
 ## qa, 2026-11-21 (agent API gaps)
 - [ ] asm side verified green 3c87f195c (qa 11-21 06:2x, CLI walk2/src/massop.py, e07b0eb39): faces + reference about a world-aligned corner connector: area 800, perimeter 120, Lxx 106666.664, Lxy 160000, Lyy 426666.657, Lzz 533333.321 (the app's numbers; FACE-MOMENT-DIGITS); about the centroid 26666.664 / 0 / 106666.657; top + side faces refused "Face selections are not coplanar" (param faces). A bare vertex connector is still a face's frame (Lxx 0) until 969187e3. Open: the Part Studio op (query_mass_properties faces). P2 **OP-MASS-FACE-SECTION (asm; Part Studio side: lead to route)**: Mass and section properties › Face (area, perimeter,
