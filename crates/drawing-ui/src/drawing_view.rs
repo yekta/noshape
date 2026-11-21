@@ -411,6 +411,9 @@ pub struct DrawingEditor {
     pub insert_continuation: bool,
     pub hover_snap: Option<[f64; 2]>,
     pub selection: Vec<Sel>,
+    /// What Esc left lit of what the tool made, until the next press: live draws it hovered, not selected (a tab
+    /// round trip drops it: live drw-update-deleted-feature s9; a clicked one stays, drw-dim-tab-switch3).
+    pub esc_kept: Vec<Sel>,
     pub drag: Drag,
     pub cursor: [f64; 2],
     pub overlay: Overlay,
@@ -804,6 +807,7 @@ impl DrawingEditor {
             insert_continuation: false,
             hover_snap: None,
             selection: Vec::new(),
+            esc_kept: Vec::new(),
             drag: Drag::None,
             cursor: [0.0, 0.0],
             overlay: Overlay::default(),

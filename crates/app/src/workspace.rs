@@ -471,6 +471,9 @@ impl Workspace {
             self.recent.insert(0, prev);
             self.recent.truncate(16);
             crate::compare_mode::tab_opened(&self.doc, tab, cx);
+            if let Some(TabView::Drawing(d)) = self.views.get(&prev) {
+                d.update(cx, |d, cx| d.tab_left(cx));
+            }
         }
         self.active = Some(tab);
         self.note_viewed(cx);
@@ -2013,8 +2016,10 @@ impl Workspace {
                         };
                         // The active Drawing: Change to version… (live tab menu, after
                         // Copy to clipboard; not on an inactive Drawing tab): point
-                        // every view at a version of the document.
-                        let menu = if kind == "drawing" && active {
+                        // every view at a version of the document. Not while it has
+                        // only its Start (live REQUESTS studios 17:02 (e), drw-export-formats).
+                        let versioned = view.read(cx).doc.read(cx).session.store.list_versions().is_ok_and(|v| !v.is_empty());
+                        let menu = if kind == "drawing" && active && versioned {
                             let v12 = view.clone();
                             menu.item(I::new("Change to version…").icon_name("change-version").on_click(move |_, w, cx| v12.update(cx, |t, cx| t.change_drawing_version(id, w, cx)))).separator()
                         } else {

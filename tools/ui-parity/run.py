@@ -366,6 +366,7 @@ LIVE_BRAND = [
     ("Onshape default", "Noshape default"),
     ("Onshape controlled", "Noshape controlled"),
     ("Show Onshape drawing templates", "Show Noshape drawing templates"),
+    ("Import to Onshape", "Import to Noshape"),
 ]
 
 

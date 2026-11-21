@@ -51,18 +51,10 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
     package version) and B (the package's version, else the workspace), plain and flat #acdbf5 / #e67d5e for a changed
     part. Assembly / drawing rows show the same picture both ways (asked). Test
     `compare_revisions_opens_revision_a_and_b_under_the_row`.
-  - Live revtools-1121: top-level assembly row Where used… (`AssemblyViewEvent::WhereUsedAssembly` -> the rail's panel)
-    and, with workflows, Revision history… (hook `open_tab_revision_history`); Revision tools' Object type Part ·
-    Assembly · Drawing · Blob, empty result shows nothing. "Revision table properties..." kept (live's take reads ASCII
-    dots).
-  - Assembly "Viewing V1" bar: Reloaded swaps in a new toolbar slice (`toolbar_slice`): a cached slice reused since
-    its last paint takes no notify (GPUI tracks only entities drawn in the last frame). ui-test-support now puts each
-    test binary's settings under the run's NOSHAPE_CONFIG_DIR (release-ui's managed workflows leaked into
-    assembly-ui's menus in one rb.sh run). Release dialog: a revision it takes clears the last note.
 - LANDED cf9f4cc6 as a2a3382d (16:30): live rel-1121b (release dialog 1092 px, Compare revisions only with an earlier
   revision, `earlier_revision` / `comparable`) and search relevance (`noshape_ops::doc_library::search_order`, store
   `document_created`, `DocEntry::created`; bold whole words only).
-- NEXT LAND (x142 / x143 on vibex8): qa's interaction run 1121-0935 (uip.log, ours in uip/*.json), my areas:
+- LANDED 6ac15022 as 610fc78d (17:42): qa's interaction run 1121-0935 (uip.log, ours in uip/*.json), my areas:
   - inspection bubble (red-orange fill) reads EDGE of the view box holding it, whatever is selected (`area_inside`);
     Esc keeps a selected custom table (as a hole table); centerline picks and a hovered dimension's text read from
     recorder 2026-11-14.1 (`^`; 11-12.1 reads neither); a picked circle lights only what the view draws of it
@@ -72,9 +64,21 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
     one Esc longer: dialog blanked); drw-centermark-align's expect from live retake 996d6b8a (mark stays);
     ver-compare-hover-part (qa P2 UIP-COMPARE-HOVER-PART): the app reader's Compare override (ui_script.rs
     `comparing_state`) put the panel's row FEATURE over a graphics pick; now the row only when nothing is picked.
-  - Left: drw-styles-radial / drw-update-deleted-feature wait on REQUESTS 17:02 (dimension selected after Esc / tab
-    switch?); drw-centerline-circle-3-point-hole-centres is live's reader gap (asked for a re-take); 7 "not run"
-    (shard drop) to rerun on vibe2 with the r41 build.
+  - Verified on vibe2 (uip1121b, 27 scenarios): 284/298 states.
+- NEXT LAND (tests x150 on vibe2): picked edges summed per view (drw-max-min-fillet-arc s3); run.py maps "Import to
+  Onshape" (6 import scenarios); export selects marked by their label (drw-export-formats "Format"); a hover on a menu
+  row doesn't wheel it into view (`wheel_tries`, drw-note-insert-property s7); Note's colour swatch `button:Color` +
+  `ours_on` (drw-note-format-lists s14/s16); the pressed Detail shape clicked again = Esc (drw-detail-boundary-shapes
+  s3); a right-panel strip button clears the sheet hover, and with Styles open a selected dimension off the pointer
+  reads nothing (drw-styles-radial s12, live (c)); leaving a drawing tab drops what Esc left lit (`esc_kept`,
+  `tab_left`: drw-update-deleted-feature s9, live (a)/(b)).
+  - Live's answers 17:02 (a)-(e) (behaviours "studios (11-21 17:02)"): after Esc the made annotation is only HOVERED
+    (tan while the pointer rests there; black once it moves, nothing selected; the last crossed entity's grips stay).
+    Ours still selects it (`made_by_tool`): the real fix (Esc selects nothing, the reader reads a hovered annotation's
+    tan in a view's box since 11-14) needs a full drw-* suite run; it also fixes drw-max-min-fillet-arc s6 (live [],
+    its text and grips below Front) and drw-centerline-2-point-cylinder-axis s5 (live EDGE Front, centerline hovered).
+  - drw-export-formats: Change to version… only in documents with versions (live (e)); (f) re-takes of export-formats,
+    custom-table-cell, table-cell-menu running on lane 1. hole-centres: live's export lacks 3 point centerlines.
 - REQUESTS for live (11-21): 08:58 the drawing matrix's 40 most-used shown rows (six takes); 14:33 all answered.
 - Audit: #7–#10 done. interaction-feel's FS F2/F3 rows marked = (fixed c249e0ed9, qa verified).
 - Live fc-1121 drawing feel (behaviours "studios fc-1121"): (1) a dimension being placed shows the line to another's
@@ -82,10 +86,6 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
   double-click in the editor selects all; (5) a dragged box draws its picks selected (`box_preview`); (2), (4), (6)
   already as live (tests for (6)). Live's leftover grips after Esc and an empty window box kept after release are
   stale paint, not copied.
-- Drawing matrix: options compared in live's order (drawing_matrix.py `live_option_lists` / `ours_sequences`):
-  Drawing properties 101 → 22 shown, matrix 04:45: 1344 = / 456 shown of 1842; View simplification was None, Auto, …: now live's None, Absolute, Ratio to
-  studio, Ratio to part, Auto (test `the_view_simplification_list_is_in_lives_order`). REQUESTS fc-1121 (6) added:
-  a table hover-lit after Esc under a resting pointer (split s14-15).
 - Asm feel rows: none left untested in interaction-feel's asm tables.
 
 ## Next, in order

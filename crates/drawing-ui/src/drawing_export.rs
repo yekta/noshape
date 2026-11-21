@@ -48,10 +48,12 @@ impl DrawingEditor {
                 shown.borrow_mut().push(serde_json::json!({ "label": label, "kind": "select", "value": opts.get(cur).cloned().unwrap_or_default() }));
                 let st = st.clone();
                 // Live 1358-dk-export-default: labels 75 px apart (25 px from a select to the next label).
-                div().pt(px(6.5)).child(crate::os_ui::field_label(label)).child(div().pt(px(4.)).child(crate::os_ui::select_field(id, opts, cur, move |i, w, _| {
+                // Named by its label too, as live's runner finds it ("Format": live drw-export-formats).
+                let field = div().pt(px(4.)).child(crate::os_ui::select_field(id, opts, cur, move |i, w, _| {
                     set(&mut st.borrow_mut(), i);
                     w.refresh();
-                })))
+                }));
+                div().pt(px(6.5)).child(crate::os_ui::field_label(label)).child(crate::ui_script::mark(field, move || format!("dropdown:{label}")))
             };
             let check = |id: &'static str, label: &'static str, on: bool, set: fn(&mut ExportSettings, bool)| {
                 shown.borrow_mut().push(serde_json::json!({ "label": label, "kind": "checkbox", "value": on }));

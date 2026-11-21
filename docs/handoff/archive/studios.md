@@ -1296,3 +1296,19 @@ Next, in order:
   live paints a deleted table until the next click and its recorder reads that paint ("EDGE Top", behaviours retake
   2); run.py `deleted_paint_read` leaves ours uncompared there (whole night suite re-scored: only that scenario
   changes). Ours reads Front there: the pointer rests on Front where the menu's Delete row was.
+
+## 2026-11-21 (landed in 3f70f4f2)
+  - Live revtools-1121: top-level assembly row Where used… (`AssemblyViewEvent::WhereUsedAssembly` -> the rail's panel)
+    and, with workflows, Revision history… (hook `open_tab_revision_history`); Revision tools' Object type Part ·
+    Assembly · Drawing · Blob, empty result shows nothing. "Revision table properties..." kept (live's take reads ASCII
+    dots).
+  - Assembly "Viewing V1" bar: Reloaded swaps in a new toolbar slice (`toolbar_slice`): a cached slice reused since
+    its last paint takes no notify (GPUI tracks only entities drawn in the last frame). ui-test-support now puts each
+    test binary's settings under the run's NOSHAPE_CONFIG_DIR (release-ui's managed workflows leaked into
+    assembly-ui's menus in one rb.sh run). Release dialog: a revision it takes clears the last note.
+
+## Moved 2026-11-21 (drawing matrix order)
+- Drawing matrix: options compared in live's order (drawing_matrix.py `live_option_lists` / `ours_sequences`):
+  Drawing properties 101 → 22 shown, matrix 04:45: 1344 = / 456 shown of 1842; View simplification was None, Auto, …: now live's None, Absolute, Ratio to
+  studio, Ratio to part, Auto (test `the_view_simplification_list_is_in_lives_order`). REQUESTS fc-1121 (6) added:
+  a table hover-lit after Esc under a resting pointer (split s14-15).

@@ -3,7 +3,7 @@
  "about": "the active drawing tab › Change to version… (the Reference manager); Escape",
  "area": "studios",
  "source": "psui 11-09 (documents coverage)",
- "start": "block-drawing",
+ "start": "block-v1-drawing",
  "steps": [
   {
    "do": "rclick",

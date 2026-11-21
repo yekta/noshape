@@ -1267,6 +1267,23 @@ fn a_toolbar_tools_help_shows_after_3_s_under_the_toolbar(cx: &mut TestAppContex
     assert!(shown(cx).is_none(), "Undo has none");
 }
 
+/// The pressed boundary shape clicked again before anything is drawn un-presses it, as Esc: the panel asks for a
+/// closed profile; another click presses it again (live drw-detail-boundary-shapes s3).
+#[gpui::test]
+fn the_pressed_detail_shape_clicked_again_asks_for_a_closed_profile(cx: &mut TestAppContext) {
+    let (window, editor) = drawing(cx, "feel-detail-shape-toggle");
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Detail { parent: None, center: None, radius: None }, cx)));
+    draw(cx, window);
+    let state = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).detail_dlg.as_ref().map(|d| (d.shape, d.pick_region)));
+    assert_eq!(state(cx), Some((0, false)), "Circle pressed");
+    press(cx, window, "det-shape-0");
+    assert_eq!(state(cx), Some((0, true)), "un-pressed: Select closed profile");
+    press(cx, window, "det-shape-0");
+    assert_eq!(state(cx), Some((0, false)), "pressed again");
+    press(cx, window, "det-shape-1");
+    assert_eq!(state(cx), Some((1, false)), "Rectangle");
+}
+
 /// Live2 drw-detail-id-profile-tips (s7–s19): Edit detail… reads no tool and lights the detail's circle in its parent;
 /// the profile chip's × asks for a closed profile to pick ("Select closed profile", "No closed profile selected.", no
 /// tool, the parent no longer lit), and Esc then closes the panel.
@@ -3082,4 +3099,23 @@ fn a_max_min_pick_on_an_arc_lights_only_the_arc(cx: &mut TestAppContext) {
     draw(cx, window);
     let s = cx.update(|cx| editor.read(cx).ui_drawing_state(cx)["selection"].clone());
     assert_eq!(s, json!([]), "a quarter of an R4 arc: under 60 px");
+    // The right side's edge picked next: both picks' orange together pass 60 px (live s3).
+    let (a, b) = cx.update(|cx| {
+        let g = editor.read(cx).geoms.get(&front).cloned().expect("its geometry");
+        g.model_edges.iter().filter_map(|me| match me.geom {
+            EdgeGeom::Line { a, b } if (a[0] - b[0]).abs() < 1e-9 && (a[1] - b[1]).abs() > 1e-6 => Some((a, b)),
+            _ => None,
+        }).max_by(|x, y| x.0[0].total_cmp(&y.0[0])).expect("the right side")
+    });
+    let pt = |p: [f64; 2]| noshape_scene::drawing_tools::PickedPoint { view: front, p, r: None };
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        let Tool::Dimension { picks, .. } = &e.tool else { panic!("the tool") };
+        let mut picks = picks.clone();
+        picks.push(Pick::Line { a: pt(a), b: pt(b) });
+        e.tool = Tool::Dimension { kind: DimTool::MaxMin, picks };
+        e.redraw(cx);
+    }));
+    draw(cx, window);
+    let s = cx.update(|cx| editor.read(cx).ui_drawing_state(cx)["selection"].clone());
+    assert_eq!(s, json!([{ "kind": "EDGE", "owner": "Front" }]), "the arc and the side's 6 mm edge");
 }

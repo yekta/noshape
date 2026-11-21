@@ -2114,6 +2114,62 @@ fn a_selected_dimension_keeps_its_text_black_on_an_orange_box(cx: &mut TestAppCo
     assert!(boxed, "an orange box behind it");
 }
 
+/// Live drw-styles-radial s12-s13 (recorder 11-18.1): R.197 clicked, then Styles opened with the pointer on the panel:
+/// drawn selected (drw-dim-styles-open2) but nothing read; with the pointer on it, it reads as before.
+#[gpui::test]
+fn with_styles_open_a_selected_dimension_off_the_pointer_reads_nothing(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_scene::drawing_tools::Sel;
+    SUGGESTED.set(true);
+    DIMENSIONED.set(true);
+    let (window, editor) = drawing(cx, "dim-sel-styles");
+    DIMENSIONED.set(false);
+    real_sheet(cx, window, &editor);
+    let read = |cx: &mut TestAppContext, styles: bool, hovered: bool| {
+        cx.update(|cx| editor.update(cx, |e, cx| {
+            let sheet = e.current_sheet();
+            let b = e.built.as_ref().expect("built");
+            // A dimension whose selection reads in some view's box.
+            let lit = sheet.annotations.iter().filter(|a| a.kind.is_dimension()).find_map(|a| {
+                let pick = b.geometry.texts.iter().find(|t| b.picks.get(t.pick as usize) == Some(&PickTarget::Annotation(a.id)))?.pick;
+                Some((a.id, pick))
+            });
+            let (id, pick) = lit.expect("a dimension with text");
+            e.selection = vec![Sel::Annotation(id)];
+            e.hover = hovered.then_some(pick);
+            e.right_panel = styles.then_some(crate::drawing_panels::RightPanel::Styles);
+            e.ui_drawing_state(cx)["selection"].clone()
+        }))
+    };
+    let closed = read(cx, false, false);
+    assert_ne!(closed, json!([]), "the selected dimension reads in its view's box");
+    assert_eq!(read(cx, true, false), json!([]), "Styles open, the pointer on the panel");
+    assert_ne!(read(cx, true, true), json!([]), "Styles open, the pointer on it");
+}
+
+/// Live drw-update-deleted-feature s9: Ø.394 placed and Esc, a Part Studio tab and back: nothing lit (Esc left it
+/// hovered, not selected); drw-dim-tab-switch3: Ø.394 clicked, the same round trip keeps it selected.
+#[gpui::test]
+fn leaving_the_tab_drops_what_esc_left_lit_but_not_a_clicked_selection(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::Sel;
+    SUGGESTED.set(true);
+    DIMENSIONED.set(true);
+    let (window, editor) = drawing(cx, "dim-tab-left");
+    DIMENSIONED.set(false);
+    real_sheet(cx, window, &editor);
+    let left = |cx: &mut TestAppContext, esc: bool| {
+        cx.update(|cx| editor.update(cx, |e, cx| {
+            let id = e.current_sheet().annotations.iter().find(|a| a.kind.is_dimension()).map(|a| a.id).expect("a dimension");
+            e.selection = vec![Sel::Annotation(id)];
+            e.esc_kept = if esc { e.selection.clone() } else { Vec::new() };
+            e.tab_left(cx);
+            e.selection.len()
+        }))
+    };
+    assert_eq!(left(cx, true), 0, "what Esc left lit goes");
+    assert_eq!(left(cx, false), 1, "a clicked one stays");
+}
+
 /// Live drw-datum-empty-field s7-8: Backspace on the Datum tab's Label leaves the field without a tooltip and puts
 /// "This field cannot be empty" on the header; s22-23: an emptied Instance count is one instance, no error anywhere.
 #[gpui::test]

@@ -378,6 +378,12 @@ fn picked_files(step: &Value) -> Vec<PathBuf> {
 /// Where to press a control: its centre, or the middle of its visible part across when its centre is outside the clip
 /// of its scrolling containers (a documents row wider than the list in a narrow window: the Windows runner's 1028 px,
 /// whose rows' centres lay under the Details panel, UIS-RCLICK-WINDOWS).
+/// How often a step wheels its control into view. Not for a hover on a menu row: live's runner moves to the row
+/// where it is, under the list's fold too, and nothing lights (live drw-note-insert-property s7, "Total sheets").
+fn wheel_tries(what: &str, target: &Value) -> usize {
+    if what == "hover" && target.get("menu").is_some() { 0 } else { 16 }
+}
+
 fn visible_center(b: Bounds<Pixels>, clip: Option<Bounds<Pixels>>) -> Point<Pixels> {
     let c = b.center();
     let Some(clip) = clip else { return c };
@@ -626,7 +632,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                         // A control below its list's fold is wheeled into view first, as a browser's click scrolls to
                         // it (ver-show-more-changes: Show more changes… under the history's fold).
                         let name = control_name(&target).unwrap_or_default();
-                        for _ in 0..16 {
+                        for _ in 0..wheel_tries(what, &target) {
                             let Some(c) = noshape_app_core::ui_script::clip_of(&name).filter(|c| c.size.height > px(30.)) else { break };
                             if c.top() + px(10.) < at.y && at.y < c.bottom() - px(10.) {
                                 break;
@@ -1022,7 +1028,7 @@ pub fn start_page(cx: &mut App) {
                 found = find(&target, cx);
                 let (vw, vh) = w.update(cx, |_, window, _| (f32::from(window.viewport_size().width), f32::from(window.viewport_size().height))).unwrap_or((1919., 992.));
                 let name = control_name(&target).unwrap_or_default();
-                for _ in 0..16 {
+                for _ in 0..wheel_tries(what, &target) {
                     let Ok(at) = found else { break };
                     let y = f32::from(at.y);
                     let clip = noshape_app_core::ui_script::clip_of(&name).filter(|c| c.size.height > px(30.));

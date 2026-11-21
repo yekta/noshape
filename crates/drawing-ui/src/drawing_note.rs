@@ -285,7 +285,7 @@ impl DrawingEditor {
             Some([r, g, b]) => gpui_kit::rgb(((r as u32) << 16) | ((g as u32) << 8) | b as u32),
             None => gpui_kit::rgb(0x000000),
         };
-        let color = div().id("note-color").size(px(23.)).mx(px(1.)).bg(swatch).cursor_pointer().tooltip(crate::ui::tooltip("Color"));
+        let color = crate::ui_script::mark(div().id("note-color").size(px(23.)).mx(px(1.)).bg(swatch).cursor_pointer().tooltip(crate::ui::tooltip("Color")), || "button:Color".into());
         let mut spacing: Vec<Entry> = SPACINGS.iter().map(|&v| entry(&format!("{v:.1}"), None, (st.line_spacing - v).abs() < 1e-9, std::rc::Rc::new(move |s: &mut NoteStyle| s.line_spacing = v))).collect();
         spacing.push(None);
         spacing.push(entry(if st.space_before { "Remove space before paragraph" } else { "Add space before paragraph" }, None, false, std::rc::Rc::new(|s: &mut NoteStyle| s.space_before = !s.space_before)));

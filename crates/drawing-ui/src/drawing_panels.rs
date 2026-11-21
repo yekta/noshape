@@ -64,7 +64,10 @@ impl DrawingEditor {
         }
         self.panel_highlight = None;
         self.insp_table.hover = None;
-        cx.notify();
+        // The pointer is on the strip, off the sheet: what it hovered there is drawn plain again, a selected dimension
+        // in its selected look (live drw-dim-styles-open2: R.197's solid #cc925c box with Styles open).
+        self.hover = None;
+        self.redraw(cx);
     }
 
     pub fn render_panel_strip(&mut self, cx: &mut Context<Self>) -> AnyElement {

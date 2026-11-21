@@ -411,16 +411,24 @@ impl DrawingEditor {
                         selection.push(("EDGE".into(), self.ui_view_name(a.view)));
                     }
                 }
+                let mut edge_px: Vec<(ViewId, f64)> = Vec::new();
                 for p in picks {
                     match p {
                         // A picked point's disc (and the line from it to the pointer) in the 2 point and point to line
                         // tools (live drw-dimension-point-to-point-vertical s2-s3, -point-to-line-hole-centre s2).
                         Pick::Point(PickedPoint { view, .. }) if matches!(self.tool, Tool::Dimension { kind: DimTool::Point2 | DimTool::PointLine, .. }) => selection.push(("EDGE".into(), self.ui_view_name(*view))),
-                        // A picked edge's orange, read past 60 px as any lit edge (live: Front's R4 fillet arc and
-                        // 4 mm chamfer edge at 1:1 read nothing, drw-dimension-arc-length-fillet s1, -chamfer-placed s1).
-                        Pick::Line { a: PickedPoint { view, .. }, .. } | Pick::Circle { view, .. } | Pick::Arc { view, .. } | Pick::CircleAt { view, .. } if self.pick_lit_px(p) > 60.0 => selection.push(("EDGE".into(), self.ui_view_name(*view))),
+                        // Picked edges' orange, summed per view, read past 60 px as any lit line (live:
+                        // Front's R4 fillet arc alone reads nothing, with the short side beside it it does:
+                        // drw-max-min-fillet-arc s2-s3; the 4 mm chamfer edge alone, -chamfer-placed s1).
+                        Pick::Line { a: PickedPoint { view, .. }, .. } | Pick::Circle { view, .. } | Pick::Arc { view, .. } | Pick::CircleAt { view, .. } => match edge_px.iter_mut().find(|(v, _)| v == view) {
+                            Some((_, px)) => *px += self.pick_lit_px(p),
+                            None => edge_px.push((*view, self.pick_lit_px(p))),
+                        },
                         _ => {}
                     }
+                }
+                for (v, _) in edge_px.into_iter().filter(|(_, px)| *px > 60.0) {
+                    selection.push(("EDGE".into(), self.ui_view_name(v)));
                 }
             }
             // A centerline's picked points (a 2 point centerline's disc, a circle centerline's centre with its hole):
@@ -504,6 +512,10 @@ impl DrawingEditor {
             // A hovered note is drawn tan over its orange (live2 drw-leader-add-node s8: the pointer still on the leader
             // just added, nothing read); a hovered dimension keeps its orange (drw-dimension-angular s5).
             let tan = self.hover.and_then(|h| self.sel_of_pick(h)).filter(|s| matches!(s, Sel::Annotation(a) if sheet.annotations.iter().any(|x| x.id == *a && matches!(x.kind, AnnotationKind::Note { .. }))));
+            // With Styles open, a selected dimension the pointer isn't on reads nothing, though drawn selected (live
+            // drw-styles-radial s12-s13, recorder 11-18.1: R.197 clicked, then Styles; drw-dim-styles-open2 shows it).
+            let styles = self.right_panel == Some(crate::drawing_panels::RightPanel::Styles);
+            let unread_dim = |a: u64| styles && self.hover.and_then(|h| self.sel_of_pick(h)) != Some(Sel::Annotation(a)) && sheet.annotations.iter().any(|x| x.id == a && x.kind.is_dimension());
             let lit_as = |pick: u32, thin_ones: bool| {
                 let Some(p) = b.picks.get(pick as usize) else { return false };
                 self.selection.iter().any(|s| match (s, p) {
@@ -511,7 +523,7 @@ impl DrawingEditor {
                     // (One just placed reads nothing for recorders before 2026-11-18.1 (live2 drw-bom-table s2); see `placed`.)
                     (Sel::Table(a), PickTarget::Table(t)) => a == t && self.cell_sel.is_none_or(|c| c.table != *a) && self.placed_table != Some(*a),
                     (Sel::Hatch(a), PickTarget::Hatch(t)) => a == t,
-                    (Sel::Annotation(a), PickTarget::Annotation(t)) => a == t && thin(*a) == thin_ones && tan != Some(Sel::Annotation(*a)),
+                    (Sel::Annotation(a), PickTarget::Annotation(t)) => a == t && thin(*a) == thin_ones && tan != Some(Sel::Annotation(*a)) && !unread_dim(*a),
                     (Sel::AutoCentermark(v, k), PickTarget::AutoCentermark { view, center }) => thin_ones && v == view && k == center,
                     (Sel::Sketch(a), PickTarget::SketchEntity(t)) => a == t,
                     _ => false,

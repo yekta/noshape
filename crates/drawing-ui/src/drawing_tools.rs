@@ -350,6 +350,7 @@ impl DrawingEditor {
             // Onshape: Esc ends the tool and nothing stays selected (the
             // base view of a projected-view chain is no longer orange), but what a sketch tool or the maximum /
             // minimum dimension made.
+            self.esc_kept = made.clone();
             self.selection = made;
             self.set_preview(None, cx);
             self.redraw(cx);
@@ -363,6 +364,14 @@ impl DrawingEditor {
             return;
         }
         self.selection.clear();
+        self.redraw(cx);
+    }
+
+    /// The drawing's tab left: what Esc left lit goes, and nothing stays hovered.
+    pub fn tab_left(&mut self, cx: &mut Context<Self>) {
+        let kept = std::mem::take(&mut self.esc_kept);
+        self.selection.retain(|s| !kept.contains(s));
+        self.hover = None;
         self.redraw(cx);
     }
 
@@ -1374,6 +1383,7 @@ impl DrawingEditor {
 
     pub fn on_mouse_down(&mut self, e: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         self.glyph_selected = None;
+        self.esc_kept.clear();
         if self.placed_table.take().is_some() {
             cx.notify();
         }

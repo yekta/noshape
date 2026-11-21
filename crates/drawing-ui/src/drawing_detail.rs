@@ -392,6 +392,7 @@ impl DrawingEditor {
             // (Marked by its tooltip: live's runner aims at it by pixel, ours by name, `ours_on`.)
             let btn = div()
                 .id(SharedString::from(format!("det-shape-{i}")))
+                .debug_selector(move || format!("det-shape-{i}"))
                 .map(|d| crate::ui_script::mark(d, move || format!("button:{tip}")))
                 .size(px(30.))
                 .flex()
@@ -410,6 +411,11 @@ impl DrawingEditor {
                 continue;
             }
             tools = tools.child(btn.on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                // The pressed shape clicked again, nothing drawn yet: un-pressed, as Esc (live
+                // drw-detail-boundary-shapes s3: Circle clicked, "Select closed profile").
+                if on && this.detail_escape(cx) {
+                    return;
+                }
                 if let Some(d) = &mut this.detail_dlg {
                     d.shape = i as u8;
                     d.pts.clear();
