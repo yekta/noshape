@@ -823,7 +823,7 @@ real app (green build, Xvfb, one app): our screen at live's camera (the ui-parit
 same crop round the pointer after live's rest, compared by shape, size at 1x and sampled colours: = or ≠. psui fixes,
 qa re-scores the cells on each land. Our crops: qa-scratch/hm/ (walk kit vibe2 ~/agents/qa-keep/walk3).
 
-**Matched: 31 / 92** (18:26, batch 3 0 / 15: 28 / 77 on green 5b9feb71a; 4f2cb3ce's green adds the three midpoint approach cells (along the edge, from the
+**Matched: 39 / 92** (18:51: Part Studio 26 / 26 on green 1118a1b6f (psui's 1e44717c), batch 3 0 / 15 there too; sketch tables pending their re-run. Before, 18:26: 28 / 77 on green 5b9feb71a; 4f2cb3ce's green adds the three midpoint approach cells (along the edge, from the
 face, on a selected edge); batch 3 0 / 11 on 4f2cb3ce. Before psui's 1e44717c: Part Studio 18 / 26, sketch entities in the Part Studio 5 / 21,
 in sketch edit 8 / 25, Line-tool inference 0 / 5). Ours: live's document (block 40×30×20 + Sketch 2: point (60,25), line (60,5)–(90,5),
 arc c(75,15) r8 0.3..2.8 rad, circle c(100,20) r6), `f`, the same targets and states, a fresh app per cell; our fit matches live's camera
@@ -834,24 +834,24 @@ lit) are not scored: a hand always arrives along a path, and every continuous pa
 paths"); scored with a stepped approach instead. Not scored: the model's edge lines (live ≈2 px #2A343A anti-aliased, ours 1 px
 black), as ours draws at 1× MSAA on a software rasteriser by design.
 
-Part Studio, no tool (18 / 26 on 4f2cb3ce):
+Part Studio, no tool (26 / 26 on 1118a1b6f, psui's 1e44717c):
 
 | Target / state | Live | Ours | Status |
 |---|---|---|---|
 | vertex / none | — | — | = |
-| vertex / hovered | 11 px translucent light-orange disc, edges show through | ring with an opaque #FFD8AC centre | ≠ P0 FEEL-VERTEX-HOVER-SELECT-LOOK |
-| vertex / selected | the disc in orange #F6A612, edges through | yellow ring #FAC012 / #FFD65B | ≠ P0 FEEL-VERTEX-HOVER-SELECT-LOOK |
-| vertex / selected + hovered | = selected | = our selected | ≠ P0 FEEL-VERTEX-HOVER-SELECT-LOOK |
-| vertex / hovered, a face selected | = hovered | = our hovered | ≠ P0 FEEL-VERTEX-HOVER-SELECT-LOOK |
+| vertex / hovered | 11 px translucent light-orange disc, edges show through | the same on 1118a1b6f | = |
+| vertex / selected | the disc in orange #F6A612, edges through | the same on 1118a1b6f | = |
+| vertex / selected + hovered | = selected | the same on 1118a1b6f | = |
+| vertex / hovered, a face selected | = hovered | the same on 1118a1b6f | = |
 | edge / none | — | — | = |
-| edge / hovered (away from the midpoint) | 5 px band #FFC685 + a ≈7 px dark marker under the band | band + a ≈10 px opaque black ring over it | ≠ P0 FEEL-MIDPOINT-MARKER-OVER-BAND |
+| edge / hovered (away from the midpoint) | 5 px band #FFC685 + a ≈7 px dark marker under the band | the same on 1118a1b6f | = |
 | edge / selected | 5 px band #FFA90A | the same | = |
-| edge / selected + hovered | = selected + the marker under the band | black ring over the band | ≠ P0 FEEL-MIDPOINT-MARKER-OVER-BAND |
-| edge / hovered, a face selected | = hovered | = our hovered | ≠ P0 FEEL-MIDPOINT-MARKER-OVER-BAND |
+| edge / selected + hovered | = selected + the marker under the band | the same on 1118a1b6f | = |
+| edge / hovered, a face selected | = hovered | the same on 1118a1b6f | = |
 | midpoint / none | — | — | = |
 | midpoint / approached (2 px steps from the top or front face; live any continuous path) | only the point lit: light-orange ring #F6C285 / #FFD8AC, the edge black, from 0.2 s | the same on 4f2cb3ce (b1-midapp-front) | = |
 | midpoint / selected | yellow ring 12 px #F6BE15 / #FFD65B | the same | = |
-| midpoint / selected + hovered | light-orange ring, no band | band + yellow ring + black ring | ≠ P0 FEEL-MIDPOINT-ARRIVED-RING |
+| midpoint / selected + hovered | light-orange ring, no band | the same on 1118a1b6f | = |
 | midpoint / arrived along the edge | light-orange ring within 150 ms, band goes | the same on 4f2cb3ce | = |
 | midpoint / approached on a selected edge (along it, or from the face) | solid orange dot #FFB32E, soft halo, no outline | the same on 4f2cb3ce | = |
 | face / none | — | the same | = |
