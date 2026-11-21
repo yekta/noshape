@@ -1,12 +1,37 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-21 12:42 UTC (lead order 11-21: P0 trunk-hanger, then knife loft + infento chamfer sense, then THICKEN-DIRECT). Mac: builds + crate tests via NOSHAPE_RB_HOST=mac tools/tiers/rb.sh, single-model repros in ~/noshape-host/core-keep/models. Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-21 15:53 UTC (lead order 11-21: P0s done; knifehandle, infento chamfer re-land, THICKEN-DIRECT). Mac: builds + crate tests via NOSHAPE_RB_HOST=mac tools/tiers/rb.sh, single-model repros in ~/noshape-host/core-keep/models. Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
-## Now (11-21)
-- **Move boundary of a curved surface (MANUALBLEND-BOUNDARY1 part, queued 11-21 06:5x as 175c325c):** k::extend_face_at
+## Now (11-21 15:53 UTC)
+- **LANDED 11-21:** trunk-hanger P0 second cause 724b9cd2 (4a22b2966's ref dedupe made Sweep 1's [A,B,A] one union
+  profile; a united-region sweep now unifies its side faces: Sweep 1 73 faces, doc 20/73). Chamfer edge sense
+  bc6d41f13 REVERTED dc58aff9 (qa compat: cf-surface-pattern Chamfer 2 Ok -> Error, cli-draft-hang Chamfer 3's message;
+  the bisect c30ff0e4 SAME -> 6241cf34 DIFF; the non-fatal fallback 39b98642 did NOT fix qa's saved copy, only parity).
+  Revert = 0.4.64 on both (CLI userdocs.py on vibex7). Queued: fit spline + two-direction extrude 72fcae51.
+- **INFENTO-CHAMFER-SENSE (re-land):** the edge-sense pass must pass qa's saved copies, not only parity: vibex7
+  `python3 ~/tmp/core/ch/py/userdocs.py ~/qa-rel/0.4.64/noshape-cli 0.4.64 <our noshape-cli> x ~/qa/tickets/cli-draft-hang.noshape
+  ~/qa/corpus/cf-surface-pattern.noshape` (script core-cache/.kch3.sh) + asm-infento-subs (parity_assemblies, 157/167).
+  Unknown why the saved copy's Chamfer 2 fails while parity's passes: start there.
+- **KNIFEHANDLE (core-bis2, branch core-kh = main + 3 commits, NOT queued):** 1ca7cf105 guided loft; 7d0194a28 Mutual trim
+  behind_of + loft face outward + surface sweep wall direction (Mutual trim 1 Handle 1/1/1, Surface 2 1/1/0 as live);
+  acd07e321 Union of surfaces that close -> solid (std makeSolid; Boolean 1 solid 203250 mm3, live 205333). Blocker:
+  Fillet 1 (CONIC 1 mm rho 0.5 on the cap's closed edge) fails after 2.3 s on the Mac (live 204 ms): section blend
+  "rolling balls jump along the edge", then its 64-section closed loft is valid but the Boolean result is invalid.
+  Can't land while Fillet 1 costs 2.3 s (doc 1.1 -> 3.4 s). Geometry: cap box x max 10.47 vs live 16.52; Extend handle
+  1/1/1 vs live 1/2/3. Mac scripts .kmt3.sh (4 mutual-trim docs), .kfl.sh (Fillet 1 trace).
+- **Surf-intro (skasm's Jvx translator fix landed):** builder side mine: Boundary surface 1 WARNING "Boundary conditions
+  are not applied yet" (live OK), Fill 1 "continuity requirement might be too high", Mutual trim 1 "Select a surface.";
+  SURF-INTRO-OFFSET-END: Surface 1 edge at Jvx a B-spline 20.145 mm ending z 15.31, live a LINE 20.042 mm, z 15.21.
+- **Queue after:** THICKEN-DIRECT (below), Face blend 1 (+VALID-SURFLOFTS-LOFT1), MANUALBLEND-BOUNDARY1, dx's
+  EDGE-CENTRE-SEAM (P2: props_linear centre of a seam-crossing ellipse rim; probe vibex6 ~/agents/dx-keep/sr/rlmid.py),
+  live's 6 cov2 models (c2-cov2-*; error rules in behaviours "lead (11-21 13:59): coverage batch 2").
+- **THICKEN-DIRECT:** core-bis2's .thv.sh (vibex7) dumps every thicken input of the 20 thicken docs
+  (NOSHAPE_DUMP_ONLY=thicken) into ~/agents/core-keep/thdump/<doc>; then the direct builder (offset faces trimmed at
+  concave sharp edges, ruled walls, sewn; OCCT fallback; same faces/edges/volume as OCCT on every dump).
+- **MANUALBLEND-BOUNDARY1: Move boundary of a curved surface (MANUALBLEND-BOUNDARY1 part, queued 11-21 06:5x as 175c325c):** k::extend_face_at
   (GeomLib::ExtendSurfByLength past the picked edges' uv sides; refuses faces trimmed inside their surface).
   manualblend 11 -> 12/19, Move boundary 1/2 +879.46 mm2 (live +879.47). Boundary surface 1 still ERROR: its U arcs miss
   our V edges by ~0.06 mm. Suspect: Intersection curve 1's approximated end tangent 0.04 deg off n1 x n2 -> Plane 3 tilts
@@ -22,25 +47,7 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   sheet is downstream (Bridging curves on wrong geometry). Goes with the Face blend 1 item.
 - **SPEED-VALVE-CONFIG LANDED c17f6eaab.** Impeller Delete face 2 / Extrude 4 speed PARKED (lead 11-21): from feature 29
   our impeller is a wrong model (Halter, Extrude impellerraum 38 vs 59 faces); wait for blend's cascade fix.
-- **P0 TRUNK-HANGER (lead 11-21, skasm bisect): 18354ec79's region dedupe broke c2-genesis-trunk-hanger's Sweep 1**
-  (profiles A, B, A; live sweeps A twice; 20 -> 12/73). First cause fixed: LANDED c30ff0e4 (picked_regions as before,
-  EvalCtx::distinct_regions only for Extrude). A SECOND cause landed after 9612b4685 (9612b4685 + fix = 20/73 on vibex7;
-  main 12/73, Sweep 1 100/200/100 vs live 73/152/80). Left: f3f4d2334, a9c26c41c, c62392284, c17f6eaab, 43dc96575,
-  89b884427, 7d1b596f9. Bisect in core-th on vibex7 (/root/core-scratch/bis-run.sh <commits> -> bis.out).
-- **INFENTO-CHAMFER-SENSE: queued alone 11-21 (blend_edge_senses + kernel_robustness test).** asm-infento-subs on the Mac
-  with it: 157/167, no a3f7a1 feature differences (Extrude 3 / Chamfer 3 OK).
-- **KNIFEHANDLE-LOFT1 (core-bis2, branch core-thd, not queued):** k::loft_guided_multi (loft_guided.cpp): Handle 1/2/3 as
-  live, area -0.42 %; grid 12 per guide x 24 rows (Mutual trim 338 -> 180 ms). Loft must not land before Mutual trim /
-  Boolean 1 / Fillet 1 are right (now they build and fail: doc 0.7 -> 3.8 s on the Mac). Live normals
-  (live/core/q-knifehandle-normals-1121): Mutual trim keeps qSplitBy's BACK side on both bodies; live's Handle faces
-  OUTWARD (+z top, +y side; its profiles' loops run either way), Surface 2 = profile tangent x path (-x). Ours: Handle
-  faced inward. In core-bis2 (uncommitted): the loft face turned outward from the ring centre; mutual_trim keeps the
-  groups behind the other set (behind_of: sample points whose foot is inside a tool face, nearest the cut), larger-side
-  fallback. Checking on the 4 mutual-trim docs (Mac .kmt3.sh; workshop-mutualtrim must stay 8/8).
-- **THICKEN-DIRECT next:** core-bis2's .thv.sh (vibex7) dumps every thicken input of the 20 thicken docs
-  (NOSHAPE_DUMP_ONLY=thicken) into ~/agents/core-keep/thdump/<doc>; then the direct builder (offset faces trimmed at
-  concave sharp edges, ruled walls, sewn; OCCT fallback; same faces/edges/volume as OCCT on every dump).
-- Note: loft_guided.cpp was once corrupted by an empty-pattern replace (140 MB); recovered by de-interleaving.
+- **SUITE-IMPELLER-FILLET3, SUSPENSION-CIRCPAT1 -> blend (11-21).** Impeller Delete face 2 / Extrude 4 PARKED.
 
 ## In flight (11-20)
 - **LANDED 11-20:** singularities Sketch 2 P0 a2e7c966; fillet orientation d80c2c58 (then reverted, below); manualblend
