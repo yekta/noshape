@@ -65,6 +65,19 @@ pub fn arm_frame_milestone(what: impl Into<String>) {
     }
 }
 
+/// [`arm_frame_milestone`] the first time `what` happens in this process (the first hover lit after an open).
+pub fn arm_frame_milestone_once(what: &'static str) {
+    static DONE: OnceLock<Mutex<Vec<&'static str>>> = OnceLock::new();
+    if !enabled() {
+        return;
+    }
+    let mut done = DONE.get_or_init(Default::default).lock();
+    if !done.contains(&what) {
+        done.push(what);
+        arm_frame_milestone(what);
+    }
+}
+
 /// The milestones armed since the last frame was submitted.
 pub fn take_armed() -> Vec<String> {
     std::mem::take(&mut *armed().lock())

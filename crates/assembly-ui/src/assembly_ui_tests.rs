@@ -484,6 +484,45 @@ fn a_cached_assembly_stands_in_until_the_real_one_lands(cx: &mut TestAppContext)
     .unwrap();
     cx.run_until_parked();
     assert!(cx.update(|cx| view.read(cx).ui.cached_view && view.read(cx).render_regenerating_row().is_some()), "view-only, Regenerating… shown");
+    // Lead 11-21 (fast open step 4): a click on a part selects it at once; only a drag waits for the real model.
+    draw(cx, window);
+    fn press(v: &mut AssemblyView, at: glam::DVec2, to: Option<glam::DVec2>, w: &mut gpui_kit::Window, cx: &mut gpui_kit::Context<AssemblyView>) {
+        use crate::viewport::ViewportEvent;
+        use gpui_kit::Modifiers;
+        let vp = v.viewport.clone();
+        v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+        let up = to.unwrap_or(at);
+        if to.is_some() {
+            // (A drag starts past 2 px and 50 ms.)
+            std::thread::sleep(std::time::Duration::from_millis(60));
+            v.on_viewport_event(&vp, &ViewportEvent::ToolDrag { position: up }, w, cx);
+        }
+        v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: up, modifiers: Modifiers::default() }, w, cx);
+    }
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let id = instance(v, "Part 1 <1>", cx);
+            let (lo, hi) = v.result.instance_bounds(id).unwrap();
+            let at = v.viewport.read(cx).project((lo + hi) * 0.5).unwrap();
+            let placed = v.result.solved.placement(id);
+            v.message = None;
+            // (The pointer is over the part: lit.)
+            v.hover = v.raycast(at, &[], cx);
+            assert!(v.hover.is_some(), "the part under the pointer");
+            press(v, at, None, w, cx);
+            assert_eq!(v.selected, vec![id], "the clicked part selected on the cached model ({:?})", v.message);
+            assert!(v.message.is_none(), "no waiting for a click");
+            v.hover = v.raycast(at, &[], cx);
+            press(v, at, Some(at + glam::DVec2::new(20.0, 0.0)), w, cx);
+            assert_eq!(v.message.as_ref().map(|(_, m)| m.as_str()), Some(crate::display_cache::WAITING), "a drag waits");
+            assert!(v.drag.is_none(), "no drag on the cached model");
+            assert_eq!(v.result.solved.placement(id), placed, "nothing moved");
+            assert_eq!(v.selected, vec![id], "still selected");
+            v.clear_selection();
+            v.message = None;
+        })
+    })
+    .unwrap();
     // A mate waits, with feedback at once.
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_mate(MateType::Fastened, w, cx))).unwrap();
     let (opened, said) = cx.update(|cx| (view.read(cx).mate.is_some(), view.read(cx).message.as_ref().map(|(_, m)| m.clone())));

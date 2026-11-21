@@ -1248,6 +1248,9 @@ impl AssemblyView {
         self.built_key = Some((assembly_scene::occurrence_signature(&self.result), opts));
         let (prio, class) = (built.picks.priority_fn(), built.picks.class_fn());
         self.built = Some(built);
+        if self.ui.cached_view || self.ui.real_result_in {
+            noshape_render::perf::arm_frame_milestone_once("open: first picks in");
+        }
         self.viewport.update(cx, |vp, _| {
             vp.pick_priority = prio;
             vp.pick_class = class;
@@ -3324,6 +3327,9 @@ impl AssemblyView {
                 }
                 let changed = cap_changed || changed_overlay || t.as_ref().map(|t| (&t.path, &t.reference)) != self.hover.as_ref().map(|h| (&h.path, &h.reference));
                 self.hover = t;
+                if self.hover.is_some() {
+                    noshape_render::perf::arm_frame_milestone_once("open: first hover lit");
+                }
                 // The pointer on the background (it moved since the undo: a rebuilt scene's empty pick isn't one)
                 // ends the undone part's pause (live 2023): by a pick there, not a highlight a fast move cleared
                 // before its pick (a 5 mm jump over the same part: UIP-ASM-FASTENED-FLAKY).
@@ -3475,8 +3481,9 @@ impl AssemblyView {
                 if self.start_section_drag(*position, cx) {
                     return;
                 }
-                // Dragging moves instances through the solver: the real evaluation's.
-                if self.ui.cached_view && (self.manip_hover.is_some() || self.hover.is_some() || self.placing.is_some() || !self.selected.is_empty()) {
+                // Dragging moves instances through the solver: the real evaluation's. A press on a part still
+                // selects it on release (ToolDrag says to wait once it would drag).
+                if self.ui.cached_view && (self.manip_hover.is_some() || self.placing.is_some()) {
                     self.say_waiting(cx);
                     return;
                 }
@@ -3621,6 +3628,11 @@ impl AssemblyView {
                 let Some(d) = &self.drag else { return };
                 // Live drag-delay-1120: the first move past 2 px and 50 ms drags, taking the whole delta from the press.
                 if !d.started && position.distance(d.press) > 2.0 && d.pressed_at.elapsed() > std::time::Duration::from_millis(50) {
+                    if self.ui.cached_view {
+                        self.drag = None;
+                        self.say_waiting(cx);
+                        return;
+                    }
                     let (top, explode) = (d.top, d.explode);
                     self.drag.as_mut().unwrap().started = true;
                     // A fixed instance does not move (live 562: no-drop cursor and
@@ -3968,6 +3980,9 @@ impl AssemblyView {
                 target => self.select_target(target, additive, cx),
             }
             self.triad_at_click(position, cx);
+        }
+        if !self.selected.is_empty() {
+            noshape_render::perf::arm_frame_milestone_once("open: first selection drawn");
         }
         self.ui.scroll_to_selection = true;
     }

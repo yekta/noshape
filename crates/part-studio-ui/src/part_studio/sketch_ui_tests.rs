@@ -5579,7 +5579,7 @@ fn sketch_entity_menus_as_lives(cx: &mut TestAppContext) {
 /// regeneration replaces it with the same meshes and opens the dialog.
 #[gpui::test]
 fn a_cached_display_stands_in_until_the_identical_real_one_lands(cx: &mut TestAppContext) {
-    let (window, view, _top, _) = block_part(cx, "display-cache");
+    let (window, view, top, _) = block_part(cx, "display-cache");
     // The block's regeneration done, its refined display too (it would end the stand-in below).
     wait_until(cx, window, |cx| !view.read(cx).ui_busy());
     assert!(!cx.update(|cx| view.read(cx).ui_busy()), "the block's regeneration finished");
@@ -5606,6 +5606,29 @@ fn a_cached_display_stands_in_until_the_identical_real_one_lands(cx: &mut TestAp
     .unwrap();
     draw(cx, window);
     assert!(cx.update(|cx| view.read(cx).ui.cached_view && view.read(cx).render_regenerating_row().is_some()), "view-only, Regenerating… shown");
+    // Lead 11-21 (fast open step 4): a click on the part selects its face at once, with no waiting.
+    cx.update(|cx| view.update(cx, |v, _| {
+        v.selection.clear();
+        v.message = None;
+    }));
+    let lit = cx
+        .update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                let id = v.built.as_ref().and_then(|b| b.picks.ids_for(&top).first().copied()).expect("the top face's pick");
+                let vp = v.viewport.clone();
+                v.on_viewport_event(&vp, &ViewportEvent::Hover(Some(id)), w, cx);
+                let lit = v.hover.clone();
+                v.on_viewport_event(&vp, &ViewportEvent::Click { pick: Some(id), position: DVec2::new(575., 350.), modifiers: Modifiers::default() }, w, cx);
+                lit
+            })
+        })
+        .unwrap();
+    draw(cx, window);
+    let (picked, said) = cx.update(|cx| (view.read(cx).selection.clone(), view.read(cx).message.clone()));
+    assert_eq!(lit, Some(top.clone()), "the top face lit under the pointer");
+    assert_eq!(picked, vec![top.clone()], "the top face selected on the cached model ({said:?})");
+    assert!(said.is_none(), "no waiting for a click");
+    cx.update(|cx| view.update(cx, |v, _| v.selection.clear()));
     // A dialog waits, with feedback at once.
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
     draw(cx, window);
