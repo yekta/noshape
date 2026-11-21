@@ -20,14 +20,14 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   rows 16 ms, decoded 157, cached display 192, scene build 58 (was 298), model frame 1033, click -> drawn 249. Step 3's
   "342 ms" timed a frame WITHOUT the model.
 - CHECKING b51ca6b9 (queued 20:18): STEP "convert all surfaces to b-surfaces" (duct 38 B-surfaces; read back 41/47, was 40).
-- COMMIT NEXT (staged in dx-open): P3 SETLIB-IMAGES (ops images_library.rs, op documents_images_library,
-  sketch_insert_image `image`, select_item.rs Library ▾ "‹name› images"; tests ops --test prefs (passed), sketchtools feel
-  row "insert image / the user's images library"; run /root/dx-scratch/img/t2.out = UI test + clippy). Commit, land.
-- IN WORK (dx-open, unstaged): P3 DRW-VIEW-CENTRE. views.rs `Reach` (bodies' tight box + every >= half cylinder axis's
-  ends, `cylinder_axes_3d`), ViewGeometry.reach + `placed_origin(scale)` (axis reach 0.09 in / scale), build.rs
-  placement_of uses it; source_origin takes the scale. One 3D point per source, so aligned / section views stay aligned.
-  Test drawing tests::a_view_is_centred_on_its_box_with_the_axes_reach (demo plate + a rod out of +X). Then run drawing
-  --lib, ops --test all e2e:: (drawing changes need the ops e2e), drawing-ui; land.
+- QUEUED bbd56cd5 (21:03): P3 SETLIB-IMAGES (ops images_library.rs, op documents_images_library, sketch_insert_image
+  `image`, select_item.rs Library ▾ "‹name› images"); carries b51ca6b9.
+- COMMITTED d934ff40e (not queued): P3 DRW-VIEW-CENTRE (views.rs `Reach`: bodies' tight box + every >= half cylinder
+  axis 0.09 in past its faces; ViewGeometry.reach / placed_origin(scale); one 3D point per source). Green: drawing lib
+  265, drawing-ui 151, ops e2e 277, clippy drawing (Mac). Land after the A/B: /root/dx-scratch/vc/ab2.sh -> ab.out
+  (vibex8 ~/agents/dx-keep/bin/ops-vcA / ops-vcB, dx_perf::timed_big_drawings x2; delete both after). Then
+  vibex8 ~/agents/dx-keep/vcex.sh (duct + bottle exchange rows with ops-vcB) -> /root/dx-scratch/vc/vcex.out: expect
+  bottle Front / Right at live's y, STL rows 9 parts.
 - NEXT after: exchange leftovers (STL surface edges; bottle Front views 0.015 in low in DXF rows: recheck after
   DRW-VIEW-CENTRE).
 - REPORT at queue empty (<=5 lines): step 4 numbers + step-3 correction; Mac targets freed; duct 41/47; STL split
