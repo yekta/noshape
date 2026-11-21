@@ -720,6 +720,8 @@ pub struct SketchEditor {
     pub refusal: Option<String>,
     /// Curves of the offset being set up (preview, arrow and distance box).
     pub offset_pending: Option<Vec<EntityId>>,
+    /// The pointer is on the offset's distance label (set by the host): its arrowheads aren't drawn (live offset-look-1121).
+    pub offset_label_hovered: bool,
     /// An offset was made: later curve clicks repeat it with the same distance.
     offset_repeat: bool,
     pub conic_rho: f64,
@@ -1513,6 +1515,7 @@ impl SketchEditor {
             toast: None,
             refusal: None,
             offset_pending: None,
+            offset_label_hovered: false,
             offset_repeat: false,
             conic_rho: 0.5,
             text_string: "Default text".into(),
@@ -1640,6 +1643,7 @@ impl SketchEditor {
         self.text_clicks.clear();
         self.slot_session = None;
         self.offset_pending = None;
+        self.offset_label_hovered = false;
         self.offset_repeat = false;
         self.mirror_axis = None;
         // Extend's pending pick goes with the tool (live: Esc, selection 0).
@@ -6746,7 +6750,7 @@ impl SketchEditor {
                 let (px, far) = (self.world_per_px, mid + dir * self.offset_distance);
                 let back = if label.distance(mid) < px { mid - dir * px * 8.0 } else { mid };
                 wide.push((vec![back, far], [0, 0, 0, 255], 1.0));
-                for (tip, d) in [(mid, -dir), (far, dir)] {
+                for (tip, d) in [(mid, -dir), (far, dir)].into_iter().filter(|_| !self.offset_label_hovered) {
                     let base = tip - d * px * OFFSET_DIM_ARROW_PX;
                     for i in 0..=6 {
                         let t = i as f64 / 6.0 * 2.0 - 1.0;
@@ -11928,6 +11932,20 @@ mod tests {
         click(&mut ed, &mut d, v(0.02, 0.03));
         assert_eq!(count(&d, EntityKind::Line), 4);
         let _ = l1;
+    }
+
+    /// Live offset-look-1121 (3): the pointer on the distance label hides the dimension's two arrowheads, not its line.
+    #[test]
+    fn the_offset_label_hovered_hides_its_arrowheads() {
+        let (mut ed, mut d) = editor(Tool::Offset);
+        d.sketch.add_line(v(0.01, 0.01), v(0.03, 0.01));
+        click(&mut ed, &mut d, v(0.02, 0.01));
+        let black = |ed: &SketchEditor| ed.overlay(&d, &UnitPrefs::default()).0.segments.iter().filter(|s| s.color == [0, 0, 0, 255]).count();
+        let shown = black(&ed);
+        ed.offset_label_hovered = true;
+        assert_eq!(black(&ed), shown - 14, "2 arrowheads of 7 strokes go");
+        ed.set_tool(Tool::Select);
+        assert!(!ed.offset_label_hovered);
     }
 
     /// Live (behaviours "qa4 round 5 s1 follow-up 2" (3)-(4), qa4 OFF-SIDE,

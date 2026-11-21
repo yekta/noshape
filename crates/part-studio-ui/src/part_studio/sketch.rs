@@ -4920,6 +4920,15 @@ impl PartStudioView {
                     .cursor_pointer()
                     .whitespace_nowrap()
                     .occlude()
+                    .on_hover(cx.listener(|this, h: &bool, _, cx| {
+                        if let Some(ed) = &mut this.sketch
+                            && ed.offset_label_hovered != *h
+                        {
+                            ed.offset_label_hovered = *h;
+                            this.refresh_scene(false, cx);
+                            cx.notify();
+                        }
+                    }))
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open_offset_input(window, cx)))
                     .child(text)
