@@ -2134,19 +2134,8 @@ pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Refe
                 refs.push((implicit(on, Inference::Midpoint), None));
             }
         }
-        Reference::Vertex(n) => {
-            // A part vertex: primary axis normal to a planar face around it.
-            let face = bodies().find_map(|b| {
-                let &vi = b.find_vertices(n).first()?;
-                let ve = b.shape.vertex_edges().ok()?;
-                let ef = b.shape.edge_faces().ok()?;
-                let fi = ve.get(vi)?.iter().flat_map(|e| ef.get(*e as usize).into_iter().flatten()).copied().find(|f| {
-                    b.shape.sub_shape(noshape_kernel::ShapeType::Face, *f as usize).ok().and_then(|s| s.face_plane().ok()).flatten().is_some()
-                })?;
-                Some(Reference::Face((**b.faces.get(fi as usize)?).clone()))
-            });
-            refs.push((implicit(on, Inference::Vertex), face));
-        }
+        // A part vertex: the world axes (live: the vertex snap's connector is world-aligned, Z up, X along X).
+        Reference::Vertex(_) => refs.push((implicit(on, Inference::Vertex), None)),
         Reference::Origin => refs.push((implicit(on, Inference::Origin), None)),
         Reference::MateConnector { .. } => refs.push((on.clone(), None)),
         _ => {}

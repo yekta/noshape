@@ -4069,14 +4069,13 @@ fn inference_points_on_cones_spheres_arcs_and_vertices() {
         .expect("an arc edge");
     let pts = inference_candidates(&ra.context, Some(&ab), &arc, &units);
     assert_eq!(pts.len(), 4, "center, midpoint, two ends: {:?}", pts.iter().map(|p| p.frame.origin).collect::<Vec<_>>());
-    // N9: a block vertex — the point, Z normal to a planar face around it.
+    // N9: a block vertex — the point in the world axes (live behaviours "ui (10-26 b)": Z up, X along world X).
     let (bb, rb) = body_of(&mut ev, &f.doc, f.studios[3]);
     let blk = rb.context.bodies.iter().find(|b| b.id == bb).unwrap();
     let v = Reference::Vertex((*blk.vertices[0]).clone());
     let pts = inference_candidates(&rb.context, Some(&bb), &v, &units);
     assert_eq!(pts.len(), 1);
-    let z = pts[0].frame.z();
-    assert!([DVec3::X, DVec3::Y, DVec3::Z].iter().any(|a| z.cross(*a).length() < 1e-6), "Z normal to one of the corner's faces: {z:?}");
+    assert!((pts[0].frame.z() - DVec3::Z).length() < 1e-9 && (pts[0].frame.x() - DVec3::X).length() < 1e-9, "{:?}", pts[0].frame);
 }
 
 #[test]
