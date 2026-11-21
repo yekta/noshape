@@ -1012,6 +1012,32 @@ fn frame_trim_groups_and_face() {
 
 #[test]
 #[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn frame_side_edges_run_along_the_path() {
+    // std's sweep runs a straight member's long edges from the path's start to its end (an extrude's run back toward
+    // its sketch): c2-hgr-riser-weldment's Linear pattern 1 steps along one, opposite, up a post swept down.
+    for (from, to) in [((0.0, 0.0), (200.0, 0.0)), ((200.0, 0.0), (0.0, 0.0))] {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let ids = polyline(&mut sk, &[from, to], false);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        frame_on(&mut s, sid, &ids, "SHS 40x40x3", "MITER");
+        let r = s.ok();
+        let along = DVec3::new(to.0 - from.0, to.1 - from.1, 0.0).normalize();
+        let long: Vec<f64> = r.context.bodies[0]
+            .shape
+            .edges()
+            .iter()
+            .filter_map(|e| e.edge_info().ok())
+            .filter(|i| matches!(i.curve, noshape_kernel::Curve::Line { .. }) && (i.end - i.start).length() > mm(150.0))
+            .map(|i| (i.end - i.start).normalize().dot(along))
+            .collect();
+        assert!(long.len() >= 8, "long edges of the tube: {}", long.len());
+        assert!(long.iter().all(|d| *d > 1.0 - 1e-9), "path {from:?} -> {to:?}: senses {long:?}");
+    }
+}
+
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn frame_profiles_and_curved_path() {
     let mut s = Studio::new();
     let mut sk = noshape_sketch::Sketch::new();

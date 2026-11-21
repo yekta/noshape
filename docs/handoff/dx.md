@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-20 16:3x UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-20 23:55 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -9,40 +9,32 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
-## Now (22:3x 11-20): HGR (dx-land, landing) / EXCHANGE FIXES (dx-urdf)
-- LANDED: 00bc521e (22c7b5d4: frames grid / start x / mirror, End cap trims, hgr Front 13 -> 15/52, drawing b2-b3).
-- dx-land, queued (land.sh 22:3x), 3 commits: chamfer rule (saw-table 27/27; pm-chm vs pm-x1 per document: only
-  c2-sm-louver 36 -> 35, Sketch 9 frame origin x -676.03 vs live -708.49, no fillet/chamfer before it: not the chamfer
-  rule, from main or 22c7b5d4's frames: look at it); Measured variable Extend entities + any-frame in-feature connector
-  (hgr 15 -> 29/52); Frame trim FACE keeps std's KEEP_FRONT + the parity suite skips our composites when live's row
-  lists none (live's Part Studio rows are bodies; Cut list makes "Composite part 1") (hgr 29 -> 35/52).
-- hgr next difference: feature 35 Hole on "Inside Post": ours ERROR "None of the holes intersected a part." (18/48/32
-  vs live 20/52/32 after). Probe: /root/dx-scratch/bin/hgrparts.sh (vibex7 via rb.sh, dx-land; parts after features).
-- skasm's "riser 45 off" = their older pre-00bc521e A/B (7/52), not a drop (skasm 22:0x): closed.
-- dx-urdf (dx-exch), uncommitted, checks: clippy clean (fixed as_chunks), kernel export::iges 6 ok, ops lib import:: 3
-  ok, ops lib export:: 14 ok (all before the DXF spline / glyph change). Contents: glTF/GLB nodes as parts; flattened assembly STEP names _1 _2;
-  IGES compat write (trimmed, type 144) + sewn_closed read; individual-file zips "<tab> - <part>"; suite batches 1-4;
-  TICKETS EXCH-STL-MULTIPART-SHELLS (duct STL ambiguous, ours kept). NEW since: DXF "splines as polylines"
-  (SheetGeometry.splines_as_polylines set in ops drawing_export; 3D POLYLINE, vertex each 3.5 deg of turn, on the
-  edge's layer; live puts them on layer 0 = a shortcoming, say so in the report; 2 points -> LWPOLYLINE); exploded
-  text as glyph contours (font.rs glyph_rings / text_contours_font; SheetGeometry.glyph_lines -> closed LWPOLYLINE;
-  exploded_layers keep ANNOTATION_TEXT for duct's empty view labels); off-sheet filter remaps the sorted line lists.
-  Tests: cad_export free_form_model_edges_are_splines (extended), export exploded_glyphs_are_closed_lwpolylines. NOT
-  yet built: run drawing lib tests + full ops e2e (drawing change) + exo c on vibex8 (~/agents/dx-keep/exo.sh c).
-  TEMP: crates/ops/src/import.rs read_inputs has an eprintln!("DXTMP ...") at the foreign-read Err: REMOVE before commit.
-- Duct Parasolid v28 (live-opt-v28.x_t, schema SCH_2800000_28002 -> code 28000, no embedded schema) "failed to
-  translate"; 38.1 file reads 4 parts. Probe: vibex8 ~/agents/dx-keep/v28.sh via rb.sh (dx-urdf), log
-  /root/dx-scratch/v28b.log (waiting on a release noshape-cli build): read the DXTMP line, fix in kernel/cpp/xt_read.cpp
-  (version_types 28000 layouts). 21:2x: no DXTMP line printed, so the failure is at another failed_to_translate site in
-  read_inputs (lines ~699-741: x_t goes through a parts / zip path): add the print there.
-- textOption: REQUESTS asks live whether "true" = notes or all (live exploded all incl. title block); suite maps true
-  -> explode_notes until then.
-- skasm's "riser 45 off" = c2-hgr-riser-weldment from skasm's older pre-00bc521e A/B (7/52), not a drop (skasm 22:0x);
-  hgr stays mine.
-- d. (22:0x) Frame trim FACE keeps std's KEEP_FRONT (the tool's normal side; was the back): frames.rs frame_trim, test
-  frame_trim_groups_and_face expects the 50 mm front piece. Check hgr past feature 29 with it
-  (/root/dx-scratch/bin/hgrparts.sh on vibex7 lists our parts after named features).
-- Next: hgr feature after 20; then report to lead (<=5 lines) when the next land queues.
+## Now (23:55 11-20): HGR (dx-land) / EXCHANGE FIXES (dx-urdf)
+- LANDED: 00bc521e, 1d702422 (chamfer rule, Measured variable, Frame trim FACE: hgr 35/52).
+- c2-sm-louver 36 -> 35: the base of 6f709a64 gives 35 too, so it came from main (Sketch 9 frame origin x -676.03 vs
+  live -708.49); told skasm (louver Sketch 9 in its queue). Not mine.
+- dx-land 3419bb6d (commit, to land): parity translates a Frame's SWEPT_FACE (profile line -> planar side at its
+  offset) and HOLE_FACE "shaft" (the hole's bore): hgr Hole 3 35 -> 36/52. A/B over the 12 docs whose queries use
+  either: /root/dx-scratch/ab13.out (vibex7, ~/agents/dx-keep/ab13.sh: A this tree, B patch -R hole3.diff).
+- VALID-HGR-FOOT-OFFSET (qa P1): no repro on main + 3419bb6d (VALIDITY=1: no invalid body; 20 parts after Foot Offset
+  as live): closed in TICKETS (uncommitted, goes with the land). The suite ran 0a0b9a49, before the frame lands.
+- Frame side edges along the path (commit, to land with 3419bb6d): frames.rs along_path reverses a straight member's
+  side lines running against t0 (k::extrude's op_prism sweeps back toward the sketch, as live's Extrude; live's Frame
+  is opSweep). hgr Linear pattern 1 (Hole 3 x11 along the post's long edge, opposite) now steps up the post: hgr
+  36 -> 46/52. 3-way A/B on vibe2 (/root/dx-scratch/ab3.out, ~/agents/dx-keep/ab3.sh): 14 docs, no loss.
+  Test sheetmetal_frames::frame_side_edges_run_along_the_path (T2). Probe ~/agents/dx-keep/hgredge.sh <index>.
+- hgr next: feature 43 "Cut list 2": ours WARNING "1 selected part(s) are not frame parts and are not listed", live OK.
+- dx-exch e584b155 (land.sh 01:5x): glTF nodes as parts, flattened STEP names, IGES compat + sewn read, zips,
+  DXF splines as polylines (live puts them on layer 0: a shortcoming), exploded glyph outlines, Parasolid v28 read
+  (xt_schema.inc index_map_offset only at 30.1+). exo d (vibe2, prebuilt release binary, ~/agents/dx-keep/exo2.sh):
+  options in ours 34/50 -> 39/50, read back 40/62 -> 43/62, times 30/30. Mac clippy (7 crates), drawing 262 /
+  model-data 121 lib, full ops e2e 264 ok. Open rows: duct DXF-POLYALL lacks layer ANNOTATION_TEXT (live keeps it for
+  the empty view labels; exploded_layers isn't reached for them), DXF-POLY MTEXT vs live's LWPOLYLINE (textOption,
+  REQUESTS), housing IGES compat 36/80/45 vs 36/79/44, STL-YUP / multipart STL (ticket).
+  vibe2's ~/parity/exchange had no live-opt-* files: copied from vibex8 for duct + housing (01:2x).
+- live 11-21 00:0x: speed reference complete (10 Part Studios + Assemblies 1-5, behaviours "Speed reference (11-20)");
+  server-side only for drags (SwiftShader frames).
+- textOption: REQUESTS asks live whether "true" = notes or all; the suite maps true -> explode_notes until then.
 
 ## In flight: data exchange (lead 08:0x)
 Task: 10 corpus docs x every format + a drawing vs live's exports; re-import live's STEP / x_t; times vs live's.

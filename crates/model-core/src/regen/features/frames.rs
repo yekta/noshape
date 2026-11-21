@@ -648,6 +648,9 @@ pub fn frame(ev: &mut EvalCtx) -> FResult<()> {
             };
             let names = sweep_names(ev, &prof, &res, true, true);
             let mut cur = NamedShape::new(res.shape, names);
+            if s.line {
+                cur.shape = along_path(&cur.shape, s.t0)?;
+            }
             if !plan.cuts.is_empty() {
                 let mut tools = Vec::new();
                 for &(p, nrm, at_start) in &plan.cuts {
@@ -723,6 +726,20 @@ pub fn frame(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     Ok(())
+}
+
+/// A straight member's side edges running along its path, as std's sweep makes them (an extrude's run back toward the
+/// sketch): c2-hgr-riser-weldment's Linear pattern 1 steps up a post swept down, opposite its long edge.
+fn along_path(shape: &Shape, t0: DVec3) -> FResult<Shape> {
+    let flip: Vec<Shape> = shape
+        .edges()
+        .into_iter()
+        .filter(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, k::Curve::Line { .. }) && (i.end - i.start).normalize_or_zero().dot(t0) < -1.0 + 1e-9))
+        .collect();
+    if flip.is_empty() {
+        return Ok(shape.clone());
+    }
+    Ok(k::reverse_edge_curves(shape, &flip)?)
 }
 
 /// Largest solid of a result (with its face names).
