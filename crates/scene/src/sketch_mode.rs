@@ -761,6 +761,9 @@ pub struct SketchEditor {
     xf_scale_box: Option<DVec2>,
     /// The arrow last dragged and where its distance's box stays (live sk2-1121 transform: a box after the drag).
     xf_move_box: Option<(PatternHandle, DVec2)>,
+    /// An arrow's or the square's press: where, and the move then (the drag adds the pointer's travel since: live
+    /// sk2-1121 transform, a press on the Y shaft dragged 10 mm moved 9.9 mm).
+    xf_grab: Option<(DVec2, DVec2)>,
     /// A rotate / scale / arrow drag just ended: the view opens its value box for typing (live: its text selected).
     pub xf_released: Option<PatternHandle>,
     /// First fillet arc of the current fillet session (later fillets are equal to it).
@@ -1531,6 +1534,7 @@ impl SketchEditor {
             xf_scale: 1.0,
             xf_scale_box: None,
             xf_move_box: None,
+            xf_grab: None,
             xf_released: None,
             fillet_session: None,
             pending_corner: None,
@@ -1823,6 +1827,12 @@ impl SketchEditor {
         // ends on the line's start there).
         let on_origin = |i: &Inference| i.entity.is_some_and(|e| is_origin(sk, e));
         all.sort_by(|x, y| x.priority.cmp(&y.priority).then(x.distance.total_cmp(&y.distance)).then(on_origin(x).cmp(&on_origin(y))));
+        // A centre point arc's end takes no point or curve, only alignments: it sets the sweep alone (live
+        // cparc-end-1121: a point or a line's end, on its circle or off, gives VERTICAL to the centre, no COINCIDENT,
+        // the radius kept).
+        if self.tool == Tool::CenterArc && self.clicks.len() == 2 {
+            all.retain(|i| !matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Midpoint | InferenceKind::Center | InferenceKind::Quadrant | InferenceKind::OnCurve));
+        }
         if self.no_point_snap {
             all.retain(|i| i.kind != InferenceKind::Endpoint);
         }
@@ -2601,6 +2611,7 @@ impl SketchEditor {
                 PatternHandle::LinearSecondCount => Some((self.pattern_second_count, (p - c).dot(DVec2::from_angle(self.pattern_second_angle)))),
                 _ => None,
             });
+            self.xf_grab = matches!(h, PatternHandle::Move | PatternHandle::MoveX | PatternHandle::MoveY).then_some((p, self.xf_offset));
             self.drag = Some(DragState::Handle(h));
             return EditOutcome::redraw();
         }
@@ -5641,12 +5652,18 @@ impl SketchEditor {
             }
             PatternHandle::Move => {
                 let (u, v) = self.xf_axes();
-                self.xf_offset = p - (u + v) * px * (XF_SQUARE_PX.0 + XF_SQUARE_PX.1) * 0.5 - self.pattern_center;
+                self.xf_offset = match self.xf_grab {
+                    Some((at, from)) => from + (p - at),
+                    None => p - (u + v) * px * (XF_SQUARE_PX.0 + XF_SQUARE_PX.1) * 0.5 - self.pattern_center,
+                };
             }
             PatternHandle::MoveX | PatternHandle::MoveY => {
                 let (u, v) = self.xf_axes();
                 let a = if h == PatternHandle::MoveX { u } else { v };
-                let along = (p - a * px * (XF_ARROW_BASE_PX + XF_ARROW_HEAD_PX * 0.5) - self.pattern_center).dot(a);
+                let along = match self.xf_grab {
+                    Some((at, from)) => (from + (p - at)).dot(a),
+                    None => (p - a * px * (XF_ARROW_BASE_PX + XF_ARROW_HEAD_PX * 0.5) - self.pattern_center).dot(a),
+                };
                 self.xf_offset += a * (along - self.xf_offset.dot(a));
             }
             PatternHandle::Rotate => {
@@ -9802,6 +9819,17 @@ mod tests {
         assert!(label(&ed, &d).is_some() && !ed.pattern_value_labels(&d.sketch).iter().any(|x| x.0 == PatternHandle::MoveX), "the X arrow's not shown");
         ed.set_pattern_value(PatternHandle::MoveY, 0.005);
         assert!((ed.xf_offset - v(0.0, 0.005)).length() < 1e-12, "typed: 5 mm along Y: {:?}", ed.xf_offset);
+        // A press on the shaft, short of the head, dragged 40 px moves 40 px (sk2-1121 transform-drag-copy: 9.9 mm).
+        let (mut ed, mut d) = editor(Tool::Select);
+        ed.selection = vec![d.sketch.add_line(v(0.0, 0.0), v(0.01, 0.0))];
+        ed.set_tool(Tool::Transform);
+        ed.apply_preselection(&mut d);
+        let shaft = v(-2.0, 40.0) * px;
+        ed.tool_down(&mut d, shaft, None, false, false);
+        ed.tool_drag(&mut d, shaft + v(1.0, 20.0) * px);
+        ed.tool_drag(&mut d, shaft + v(1.0, 40.0) * px);
+        ed.tool_up(&mut d, shaft + v(1.0, 40.0) * px);
+        assert!((ed.xf_offset / px - v(0.0, 40.0)).length() < 1e-6, "the pointer's travel along Y: {:?}", ed.xf_offset / px);
     }
 
     /// live2's combined snaps (feel/combo.json, 0.2507 mm a pixel, mm here): a chain's next end where two zones cross
@@ -9993,6 +10021,27 @@ mod tests {
 
     /// Live sk2-1121 dim-circle-centres: a circle's centre picked by Dimension shows Construction active; a line's end
     /// (dim-hv-two-points) doesn't.
+    /// Live cparc-end-1121: a centre point arc's end clicked on a line's end, on its circle or a few pixels off, makes no
+    /// COINCIDENT (to the end or the line), only VERTICAL to the centre, and keeps the start click's radius.
+    #[test]
+    fn a_centre_point_arc_end_takes_no_point() {
+        for off in [0.0, 3.0 * PX] {
+            let (mut ed, mut d) = editor(Tool::CenterArc);
+            let l = d.sketch.add_line(v(0.03, -0.02 - off), v(0.0, -0.02 - off));
+            let end = d.sketch.endpoints(l).unwrap().1;
+            click(&mut ed, &mut d, v(0.0, 0.0));
+            click(&mut ed, &mut d, v(0.02, 0.0));
+            for a in [-0.4f64, -0.9, -1.4] {
+                ed.pointer_move(&mut d, DVec2::from_angle(a) * 0.02, false, false);
+            }
+            click(&mut ed, &mut d, v(0.0, -0.02 - off));
+            let Some(Curve2::Arc { radius, .. }) = d.sketch.entities().find(|e| e.kind() == EntityKind::Arc).and_then(|e| d.sketch.curve(e.id)) else { panic!() };
+            let on_line = d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Coincident { a, b } if [a, b].iter().any(|e| *e == end || *e == l)));
+            let vertical = d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Vertical { b: Some(_), .. }));
+            assert_eq!((on_line, vertical, (radius - 0.02).abs() < 1e-9), (false, true, true), "off {off}: radius {radius}");
+        }
+    }
+
     #[test]
     fn a_picked_circle_centre_shows_construction() {
         for centre in [true, false] {
