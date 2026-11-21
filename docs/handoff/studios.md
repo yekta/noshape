@@ -40,7 +40,7 @@ e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
   Fix (04:33): the test's `until` re-sends the resting pointer's move and asserts on timeout; 20 full-lib runs on
   vibex8 under load before re-enabling it (drop the #[ignore] after rebasing on dc2f3394).
 - Drawing matrix: options compared in live's order (drawing_matrix.py `live_option_lists` / `ours_sequences`):
-  Drawing properties 101 → 22 shown; View simplification was None, Auto, …: now live's None, Absolute, Ratio to
+  Drawing properties 101 → 22 shown, matrix 04:45: 1344 = / 456 shown of 1842; View simplification was None, Auto, …: now live's None, Absolute, Ratio to
   studio, Ratio to part, Auto (test `the_view_simplification_list_is_in_lives_order`). REQUESTS fc-1121 (6) added:
   a table hover-lit after Esc under a resting pointer (split s14-15).
 - Told asm 23:15: in a test window the instance list's rows slice isn't redrawn after a document edit (set_fixed
@@ -54,9 +54,9 @@ e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
 - Asm feel rows: none left untested in interaction-feel's asm tables.
 
 ## Next, in order
-1. Drawing matrix (11-21 03:36): 1235 = / 565 shown / 0 differs / 0 present-only / 0 missing of 1842. Every panel
-   was shot in pd/b1-b35 (tables, inspection / revision, section / detail included). The 565 shown are mostly
-   dropdown options (fonts, balloon shapes, standards: Drawing properties 101, Create Drawing 57, Title block 54,
+1. Drawing matrix (11-21 04:45): 1344 = / 456 shown / 0 differs / 0 present-only / 0 missing of 1842. Every panel
+   was shot in pd/b1-b35 (tables, inspection / revision, section / detail included). The 456 shown are mostly
+   dropdown options our takes don't list in order (fonts, balloon shapes, standards: Drawing properties 101, Create Drawing 57, Title block 54,
    Hole/thread callout 53, Note 52, Hole table 45, Styles 43): only a take opening each list would make them =.
    Regenerate: `drawing_matrix.py --run /root/studios-scratch/uip-merged --ours-menus /root/studios-scratch/menudump.json`
    (copy new take outputs into uip-merged first). drw-custom-table-split 13/16: after Esc live reads the table's paint
