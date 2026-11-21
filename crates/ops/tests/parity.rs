@@ -1013,18 +1013,14 @@ fn exchange_round_trip() {
             {
                 return Some(held_to_model(own.clone(), x, 2.0, ours, true));
             }
-            let key = match format {
-                "ACIS" if selfs[format].is_null() => "PARASOLID",
-                "OBJ" | "3MF" if selfs[format].is_null() => "STL",
-                f => f,
-            };
-            let own = (!selfs[key].is_null()).then(|| parts_from_live_import(&selfs[key], mesh(format)))?;
-            // (An OBJ's groups and a 3MF's objects are a part each at its full volume, where live's STL of the same
-            // parts joins or nests them (live meshcheck-1119: cf-sheet-metal-model-plus' enclosed part stays a part): the
-            // model's parts, within the STL's chord.)
-            if matches!(format, "OBJ" | "3MF") && key == "STL" && xt.as_ref().is_some_and(|x| x.len() != own.len()) {
+            // (No OBJ or 3MF of live's: the model's parts within Medium's chord. Not live's STL: that one was made at
+            // REST's 5° arcs, finer than any preset, and an STL joins or nests parts an OBJ's groups and a 3MF's
+            // objects keep apart, live meshcheck-1119.)
+            if matches!(format, "OBJ" | "3MF") && selfs[format].is_null() {
                 return model_mesh();
             }
+            let key = if format == "ACIS" && selfs[format].is_null() { "PARASOLID" } else { format };
+            let own = (!selfs[key].is_null()).then(|| parts_from_live_import(&selfs[key], mesh(format)))?;
             match &xt {
                 // (Live's import of ours: held to the model; where live's own import is off it, as close as that, a
                 // quarter more (live reads its own 32-tooth gear's STEP 9.7 mm³ over its model, ours 10.7; its IGES of
