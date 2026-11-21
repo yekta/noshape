@@ -3748,3 +3748,50 @@ State as of 2026-11-20 04:2x UTC. Rewritten, not appended (DECISIONS.md 11-15); 
 - The Mac's dx-main release target links a PRIVATE TKHLR (OCCT_ROOT=~/noshape-host/dx-keep/hlr/root, counters only
   with DXHLR=1); rebuild with the normal OCCT_ROOT for timings.
 
+
+## Moved from the handoff 11-21 18:3x (studio runs, other in flight)
+## Other in flight
+- config-parts: see "config-parts at live's 18:0x retake" below (the 11-17 vibe5 runs: archive).
+- driven-pattern 6/11: f6 Linear pattern 1 direction (ours -z, live +z): core's (11-17 06:35).
+- Landed: Hole internal bodies (8fd592298) and Plane feature planes before refs. corpus3 on main (vibex8 15:28,
+  ~/tmp/dx/corpus3-A.{log,sum,untr}; corpus3.sh <ops-main-1119>): 14/39 to the end, 436/638 features. Mine: surf-intro
+  boundary / fill / offset / ruled stop at 5 "Derived 1" (the derived source b7635b82… has no refs.jsonl: live's FS
+  evaluation refused on a linked version; REQUESTS 16:1x to live2) and mutualtrim's Derived 1 (source not fetched).
+  Others' (to the lead): lofts (wave-washer 6, paths-guides 16, surf-workshop-pipe 9 >2 profiles with guides,
+  surf-intro-simple 14), fills (surf-intro-examples 5, surf-workshop-fill 3), Move boundary non-planar (moveboundary 6),
+  surface split / sweep / mirror topology (britatap 4, cpcurves 9, singularities 2 Mirror 3: 2 parts for 1), sweep / loft
+  area tails (knifehandle 3, manualblend 11, workshop-loft 6, workshop-sweep 2), Boundary surface conditions (bridging 7),
+  parting-line Rib 1 (13), rib-wrap Wrap 1 (10), nuts Sweep 1 (14): core; mutualtrim Fillet 1 BOP (7): blend;
+  rocker-enclosure-sm Extrude 2 (8): skasm.
+- Second search (live, by sets): c2-parting-line-draft-tutorial 3/3; c2-parting-line-draft-parting-line 5/17, Draft 1
+  (PARTING_LINE TWO_SIDED 20/20°): core's fix queued (the ruled sheet runs past the curve's ends; 367243.7 mm³, live
+  367268.5): 9/17, next Extrude 2 surface 12113.30 mm² vs live 12115.66 (core's). c2-sm-hem-plus: sheetMetalStart / sheetMetalHem are custom (Feature Studios da39db76…,
+  e5262684…) not fetched + its Derived source: asked live. c2-sm-side-cuts-tab 7/18: Corner break 1 (FILLET r 21 on two corners 42 mm apart, a full round; vertices = live's
+  refs) fails in sheetmetal::corner_break: core (via blend). c2-sm-hem-plus 4/6 (custom features 2/2 with live's
+  studios): Derived 1 differs because its source's Offset surface 1 makes 3 bodies for live's one: core; live fixes its
+  "surface" bodyType in the derived lines.
+  Lofts: helix-sweep 4/4, lofted-basic 6/6; wave-washer 6/7 with the plane fix (Loft 1: a loft path with more than
+  two profiles, ours unsupported: core); paths-guides 4/29 (Loft 1 to a sketch point with TANGENT_TO_PROFILE: ours
+  "Only planar profiles…": core; save vibe5 ~/tmp/dx/savelf); driven-pattern refetch pending. 7 config-parts to come
+  (gears / bevels dropped: private studios).
+
+## Open: my studios (studio-alone runs, vibex7)
+- bjr-config 5d8bc1: 107/124 at Manufacture=false (23:42, live's retaken lines). First difference Extrude 55 "vanity
+  plate front" 369/955/601, live 365/943/593 (bool / core, parked). Kerf Compensation 1 is suppressed at false (as live);
+  Kerf compiles (live's 19:19 fetch); core's e138d597 redoes OCCT's empty metre offset in mm (their check: the true
+  case 3704.237 -> 3745.156). Hole 95 matches live at false (dx/q-hole95). Text 1 / 2 blocked (private import
+  403). Sheet metal model 1's REDG note is harmless (its first query, qSketchRegion, brings both regions; it builds).
+  Left: Sketch 39's in-feature cPoint, Decal 1's image.
+- infento 1dc32b: pulley = live through Fillet 5 (live's refs in studios/1dc32b….refs.jsonl, 15 lines, all hosts) and
+  Draft 1 (core, -1306.543 mm³). Chamfer 3: blend (blend-ch3-wip, waits on live's mirrored-body side rule); Fillet 3
+  after it.
+- infento 74d3d6: 9/127 with loose boxes; first difference Extrude 4 "Knurled disc" 6/11/6, live 4/4/0 (core's up-to
+  imprints, parked). Later: Sketch 15 (DIAMETER unsolved, constraints moved 49.98 mm, taken back).
+- Studio refs' boxes are live's loose ones (evBox3d tight=false; only lines with "tight" in `source` are tight): the
+  studio scripts run loosen.py (sets `looseBoxes`). The assembly suite matches studio parts by volume / centroid,
+  not boxes: nothing to change there.
+- General translator fix (open, mine): derivedFrom + ORIGINAL_DEPENDENCY queries resolve to the wrong type (1dc32b's
+  Chamfer 4 EDGE became a hole wall, Fillet 5's became regions; patched with live's refs). They resolve silently, so
+  find one through a first difference before working on it. A SWEPT_FACE / SWEPT_BODY of an opSweep has no named path
+  (only opExtrude / opRevolve): live's per-feature geometry maps them when present (5d8bc1 Shell 1 does).
+
