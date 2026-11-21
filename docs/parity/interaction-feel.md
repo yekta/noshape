@@ -936,6 +936,7 @@ Line tool inference, sketch edit (4 / 5 on 6be52caf4; live sk/inference-*-at):
 
 A feature dialog's selection field, the origin and a mate connector (batch 3; psui 11-21 19:5x: 15 / 15 by the cell tests
 `hover_matrix::b3_*`; qa 23:3x 4 / 15 on green 9f33d43 (cmp-b3psui); 0 / 15 on green 4f2cb3ce; the Fillet cells with an edge picked at live's 1.3 mm radius; live b3/, `_f` 1.2 s after arriving,
+`hover_matrix::b3_*`; 0 / 15 on green 4f2cb3ce; the Fillet cells with an edge picked at live's 1.3 mm radius; live b3/, `_f` 1.2 s after arriving,
 `_s` after the click; ours qa-scratch/hm2/b3-4f2c.png):
 
 | Cell | Live | Ours | Status |
@@ -955,6 +956,21 @@ A feature dialog's selection field, the origin and a mate connector (batch 3; ps
 | mate connector selected | fill #F6DA83, the same edges, the faces unchanged | the same: no owner tint, live's soft rim #1D3E52 | ≠ P0 FEEL-MC-LOOK: no owner tint now (=), the rim as hovered |
 | mate connector selected + hovered | = hovered | = our hovered | ≠ P0 FEEL-MC-LOOK (rim) |
 | mate connector hovered, the right face (an owner face) selected | = hovered: the selected face's fill plain #8DB0C5 while the pointer rests on the connector, #D9A235 again once it leaves (live b3/ps-mc-otherhover-r) | the same | ≠ P0 FEEL-MC-LOOK (rim); the face plain = live |
+| Fillet field, edge hovered | 5 px #FFC685 band, dark line through, no marker | the same (the lit lines drawn again over the preview's mix) | = (fixed psui, qa to verify) |
+| Fillet field, midpoint hovered | = the edge (no marker, no ring) | = our edge | = (fixed psui, qa to verify) |
+| Fillet field, face hovered | 2 px #FFC685 boundary | the same (drawn after the model before the feature, whose edges covered it) | = (fixed psui, qa to verify) |
+| Fillet field, vertex hovered | the top front edge lights (the field takes edges and faces) | the same: edges meeting under the pointer, the one most across the screen | = (fixed psui, qa to verify) |
+| Fillet field, edge picked | at live's 1.3 mm radius: the #FFA90A strip between two dark tangent lines; the radius manipulator, a white 1 px outlined arrow (shaft + hollow head, ~17–19 px) from the band into the material along the faces' inward bisector (live b3w) | the same arrow (0.8 × Extrude's, screen-sized), blue when hovered | = (fixed psui, qa to verify) |
+| Fillet field, picked edge hovered | = picked | = our picked | = (fixed psui, qa to verify) |
+| Fillet field, face hovered with an edge picked | the edge #FFA90A, the face boundary #FFC685 | the same | = (fixed psui, qa to verify) |
+| origin at the block's corner, hovered | the +x edge through it lights; the origin stays a black ring | the +x edge (the corner rule above) | = (fixed psui, qa to verify) |
+| origin, clicked | the +x edge selected | the +x edge selected | = (fixed psui, qa to verify) |
+| origin, selected + hovered | = selected | = our selected | = (fixed psui, qa to verify) |
+| origin hovered, the right face selected | = hovered | = our hovered | = (fixed psui, qa to verify) |
+| mate connector (top back right corner) hovered | disc fill #F4DF99, the owner face's edges #E1EC87 / #CDD975, the rim soft (darkest #1D3E52..#26465B) | the same | = (fixed psui, qa to verify) |
+| mate connector selected | fill #F6DA83, the same edges, the faces unchanged | the same: no owner tint, live's soft rim #1D3E52 | = (fixed psui, qa to verify) |
+| mate connector selected + hovered | = hovered | = our hovered | = (fixed psui, qa to verify) |
+| mate connector hovered, the right face (an owner face) selected | = hovered: the selected face's fill plain #8DB0C5 while the pointer rests on the connector, #D9A235 again once it leaves (live b3/ps-mc-otherhover-r) | the same | = (fixed psui, qa to verify) |
 
 An assembly (batch 4; qa 01:0x 12 / 20 on green 50772462b (asm 8eb92415, hm2/cmp-b4asm); 6 / 20 on green 6be52caf4; one Part 1 instance of the block with its mate connector at (40,30,20), after `f`:
 live 0.0506 mm/px, ours 0.0477 at 992 px (the same fit); live as2/ (lane 4, 20:11), ours qa-scratch/hm2/b4-score.png, cmp-b4/):
