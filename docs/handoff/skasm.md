@@ -35,10 +35,8 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   patch ~/agents/skasm-keep/extract-order.patch (local).
 - modify-joint Sketch 1 frame origin ours 50.33 vs live 120.02 (x): the flat's plane origin convention, open.
 - c2-hgr-riser-weldment: dx's (lead 11-20).
-- Rip 1 (c2-cov-sm-rip), PARKED (Rip is hidden in the UI): live no-op. The std rip splits the front wall diagonally
-  and we build the lower triangle as its own wall, so the bottom-front bend starts at x 3.45 with a slanted end
-  (diagonal crosses z 2.3 at x 5.75). Fix: build coplanar rip pieces as one wall (needs topology reindexing:
-  def_topo, pieces). A coplanar-rip filter in corner_rip / edge_rip lookups had no effect.
+- Rip 1 (c2-cov-sm-rip) 3 -> 5/5: host merge_coplanar_rips builds a wall split by a rip ending at real corners as one
+  face (the bends beside it square); not where the rip ends inside a straight run (louver's in-line walls stay pieces).
 - Tools: /root/skasm-scratch/pm.sh (ONLY=, SAVE=, build + run), pmrun.sh (TRACE run of the kept binary), smlist.txt
   (24 SM docs), CLI batch on saved docs: ~/tmp/skasm/saved (copy .noshape + -wal), hemq*.sh / jq.sh / jogq.sh.
 - Feel stack 4e51cce3 verified by qa (green f380b6928); P2 drawn_failed LANDED 8fd60c7a.

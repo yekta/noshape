@@ -613,6 +613,64 @@ impl Topo {
     }
 }
 
+/// Walls split by rips between coplanar pieces (a Rip across one wall) as one wall, as live (c2-cov-sm-rip: such a rip
+/// leaves the part as it was): the lowest piece's face becomes the whole wall, bounded by the pieces' own edges (so they
+/// stay definition edges), and the other pieces' edges are its. Returns the pieces merged away.
+fn merge_coplanar_rips(def: &Definition, topo: &mut Topo) -> std::collections::BTreeSet<usize> {
+    let mut merged = std::collections::BTreeSet::new();
+    let mut root: Vec<usize> = (0..topo.faces.len()).collect();
+    fn find(root: &mut [usize], i: usize) -> usize {
+        if root[i] != i {
+            root[i] = find(root, root[i]);
+        }
+        root[i]
+    }
+    for &e in def.rips.iter().filter(|&&e| e < topo.edges.len() && coplanar_rip(topo, e)) {
+        let [a, b] = topo.edge_faces[e][..] else { continue };
+        let (ra, rb) = (find(&mut root, a as usize), find(&mut root, b as usize));
+        root[ra.max(rb)] = ra.min(rb);
+    }
+    let mut groups: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for f in 0..topo.faces.len() {
+        groups.entry(find(&mut root, f)).or_default().push(f);
+    }
+    for (rep, members) in groups.into_iter().filter(|(_, m)| m.len() > 1) {
+        let inside = |e: usize| topo.edge_faces[e].len() == 2 && topo.edge_faces[e].iter().all(|f| members.contains(&(*f as usize)));
+        let mut edges = Vec::new();
+        let mut holes = Vec::new();
+        for &f in &members {
+            let Some(outer) = outer_wire(&topo.faces[f]) else { continue };
+            edges.extend(outer.edges().into_iter().filter(|e| topo.edge_of(e).is_some_and(|x| !inside(x))));
+            holes.extend(topo.faces[f].wires().into_iter().filter(|w| !w.is_same(&outer)));
+        }
+        // Not where a rip ends inside a straight run of the outline (walls in line, from collinear sketch lines): live
+        // keeps the ends of the walls and bends beside them in pieces there (c2-sm-louver's Louver).
+        let runs: Vec<(DVec3, DVec3)> = edges.iter().filter_map(|e| e.edge_info().ok()).filter(|i| matches!(i.curve, k::Curve::Line { .. })).map(|i| (i.start, i.end)).collect();
+        let in_run = |v: DVec3| {
+            let dirs: Vec<DVec3> = runs.iter().filter_map(|&(a, b)| if a.distance(v) < TOL { Some((b - a).normalize_or_zero()) } else if b.distance(v) < TOL { Some((a - b).normalize_or_zero()) } else { None }).collect();
+            dirs.iter().enumerate().any(|(i, d)| dirs[i + 1..].iter().any(|d2| d.dot(*d2) < -1.0 + 1e-9))
+        };
+        let rips_inside = (0..topo.edges.len()).filter(|&e| inside(e) && def.rips.contains(&e));
+        if rips_inside.flat_map(|e| [topo.edge_ends[e].0, topo.edge_ends[e].1]).any(in_run) {
+            continue;
+        }
+        let Ok((p, n)) = face_normal(&topo.faces[rep]) else { continue };
+        let Ok(Some(pl)) = topo.faces[rep].face_plane() else { continue };
+        let Ok(face) = k::make_wire(&edges).and_then(|w| k::make_face(&k::Plane::new(p, n, pl.x_dir), &w, &holes)) else { continue };
+        if outer_wire(&face).is_none_or(|w| w.edges().iter().any(|e| topo.edge_of(e).is_none())) {
+            continue;
+        }
+        topo.faces[rep] = face;
+        for ef in &mut topo.edge_faces {
+            for f in ef.iter_mut().filter(|f| members.contains(&(**f as usize))) {
+                *f = rep as u32;
+            }
+        }
+        merged.extend(members.into_iter().filter(|&f| f != rep));
+    }
+    merged
+}
+
 /// A face's outer loop (straight edges only), chained end to end.
 fn wall_loop(face: &Shape, topo: &Topo) -> FResult<Loop> {
     let wire = outer_wire(face).ok_or_else(|| fe("A sheet metal wall has no boundary"))?;
@@ -1521,7 +1579,8 @@ fn rolled_walls(def: &Definition, topo: &Topo) -> Vec<(usize, f64)> {
 
 /// The part solid of one definition sheet and the pieces its faces come from.
 fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
-    let topo = Topo::of(shape)?;
+    let mut topo = Topo::of(shape)?;
+    let merged = merge_coplanar_rips(def, &mut topo);
     let (front, back) = (def.front, def.back);
     if front + back <= TOL {
         return Err(fe("The sheet metal thickness must be positive"));
@@ -1564,7 +1623,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
     let mut exact: BTreeMap<usize, Shape> = BTreeMap::new();
     for (fi, face) in topo.faces.iter().enumerate() {
         stop_if_cancelled()?;
-        if face.face_plane().map_err(|e| fe(e.to_string()))?.is_none() {
+        if merged.contains(&fi) || face.face_plane().map_err(|e| fe(e.to_string()))?.is_none() {
             outlines.push(None);
             continue;
         }
@@ -1943,6 +2002,9 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
     for (fi, outline) in outlines.iter().enumerate() {
         stop_if_cancelled()?;
         let Some((l, n, pulled)) = outline else {
+            if merged.contains(&fi) {
+                continue;
+            }
             if plain.contains(&fi) {
                 wall_solid.insert(fi, solids.len());
                 plain_wall(&topo, fi, front, back, &mut solids, &mut pieces)?;

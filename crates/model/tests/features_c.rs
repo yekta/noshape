@@ -1131,6 +1131,30 @@ fn rip_diagonal_on_flat_plate_is_a_no_op() {
 }
 
 #[test]
+fn rip_diagonal_between_bends_leaves_the_part() {
+    // Live c2-cov-sm-rip: a corner-to-corner Rip across a wall between two bends leaves the part as it was (46 / 100 /
+    // 56, 30098.8156 mm3 before and after); the bends' ends stay square, not along the rip.
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let ids = polyline(&mut sk, &[(0.0, 30.0), (0.0, 0.0), (60.0, 0.0), (60.0, 30.0)], false);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    s.add("sheetMetalStart", move |p| {
+        p.set("process", en("EXTRUDE"));
+        p.set("sketchCurves", entities(sid, &ids));
+        p.set("depth", expr("40 mm"));
+        set_model(p, "2 mm", "3 mm");
+    });
+    let r = s.ok();
+    let (before, faces) = (volume(&r, 0), r.context.bodies[0].faces.len());
+    let (a, b) = (vertex_near(&r, DVec3::ZERO), vertex_near(&r, DVec3::new(mm(60.0), 0.0, mm(40.0))));
+    s.add("sheetMetalRip", move |p| p.set("vertices", ParamValue::Query(vec![a, b])));
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 1);
+    assert!(near(volume(&r, 0), before, 1e-15), "volume {} vs {before}", volume(&r, 0));
+    assert_eq!(r.context.bodies[0].faces.len(), faces);
+}
+
+#[test]
 fn recognize_refuses_a_finished_sheet_metal_part() {
     // Finish leaves the part's sheet metal attributes (std sheetMetalEnd only deactivates its model): std Recognize
     // refuses it.
