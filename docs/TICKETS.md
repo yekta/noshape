@@ -303,7 +303,8 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   (bottom ∥ top); left and bottom show their ∥. Live shows every constraint on the hovered line (top: ⊥, ⫽, —; behaviours
   "glyph linger" 11-17, live/psui/feel-1417/). qa-scratch/tickets/hover-glyphs-second-entity-w3.png (right, left, top, bottom).
 - [x] not a bug (qa 20:57: live's Extend is two picks, the curve then the boundary (behaviours "psui (2992)"); ours with the 2nd click
-  on x = 20 extends and adds a Coincident, as live. The stub after the pointer leaves waits on REQUESTS qa 20:44 (8)) P0 **FEEL-EXTEND-NO-EXTEND (skasm)**: Sketch fillet ▾ › Extend, line (-30, 10)→(-5, 10) and a vertical line x = 20
+  on x = 20 extends and adds a Coincident, as live. Live's (8) retake 11-21: Extend did nothing in 4 click variants (no preview, a yellow-green flash), against 2992's two-pick
+  extension; the stub's look stays unknown) P0 **FEEL-EXTEND-NO-EXTEND (skasm)**: Sketch fillet ▾ › Extend, line (-30, 10)→(-5, 10) and a vertical line x = 20
   (y -20..30). Hovering the line near its right end lights the line and the end point but draws no extension preview; the click
   **selects the line (yellow)** and nothing extends (2 lines, same constraints). After the pointer leaves, a light-blue stub runs
   from the end to the **y axis**, not to the line at x = 20. Help: "Extend: click the end of an entity to extend it to the next
@@ -326,7 +327,7 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   preview, and the arrow's tail starts on the preview line. qa-scratch/tickets/offset-preview-w3.png (live 123, 124; ours).
 - [ ] P0 **FEEL-HOVER-GLYPHS-IN-TOOL (psui)**: Show constraints off, Dimension tool (d) active, hovering a rectangle edge: ours
   shows its badges ("⊥ —"); live shows none, only the light-orange band (sketch/11). The same with Extend and Offset active.
-  qa-scratch/tickets/hover-glyphs-in-tool-w3.png (top live 11, bottom ours). Asked live which tools hide them (REQUESTS qa 20:44 (9)).
+  qa-scratch/tickets/hover-glyphs-in-tool-w3.png (top live 11, bottom ours). Live confirmed (qa 20:44 (9), behaviours "qa walk 3"): badges on hover only with no tool active.
 - [ ] P1 **S-TOOLBAR-BORDER (psui)**: the S shortcut toolbar has no border; live's has a 1 px #ccc border (175 × 62 with it,
   sketch/38; behaviours "S key"). Place (pointer + 10, − 30), size, icons and shadow match.
   qa-scratch/tickets/s-toolbar-border-w3.png (ours left, live right).
@@ -342,10 +343,8 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   label drags. Live's walk3-1121 answers matched: lines on an axis black with a blue free end, a 3-point arc's ends on the x axis
   (H H), the circle's boxed Ø kept after the commit, the shortcut sheet in a sketch (General tab); Extend's two picks; Shift+A mid-chain
   (Tangent arc, tangent + coincident) and Enter mid-chain (the boxed length placed as a dimension, one Esc exits; live 212–213).
-- Asked live (REQUESTS "qa 20:44"): lines on an axis drawn black, a chain through the origin dropping its segment up the y axis,
-  arc ends on the axes getting H / V, the circle's boxed Ø, the spline vanishing after a click, tangent arc / slot from a line
-  end on the origin making nothing, Shift+/ tab in a sketch, Extend's look, badges on hover with a tool active (9), a
-  rectangle region hovered away from its points (10: ours lights its whole outline).
+- Live answered all 10 (REQUESTS "qa 20:44", behaviours "qa walk 3", live/qa/walk3-1121/): 2, 5, 6 filed above; 1, 3 (centre arc C H V
+  too), 4, 7 and 10 (region hover: outline #ffc685, fill unchanged; ours the same) match; 9 confirms FEEL-HOVER-GLYPHS-IN-TOOL.
 
 ## qa, 2026-11-21 (USER P0: combined hover × selection states; live hover-matrix-1121, scored in docs/parity/interaction-feel.md "Hover × selection")
 
