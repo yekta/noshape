@@ -2010,7 +2010,7 @@ impl PartStudioView {
             self.ui.cap_hover = cap;
         }
         let shift = window.modifiers().shift;
-        if self.rehover(cx) | self.update_inference(shift, cx) | cap_changed {
+        if self.rehover(cx) | self.update_inference(shift, window, cx) | cap_changed {
             self.refresh_scene(false, cx);
         }
         self.schedule_midpoint_dwell(cx);
@@ -2381,7 +2381,7 @@ impl PartStudioView {
         match ev {
             ViewportEvent::PointerMove { position, modifiers } => {
                 self.ui.pointer = Some(*position);
-                if self.update_inference(modifiers.shift, cx) {
+                if self.update_inference(modifiers.shift, window, cx) {
                     self.refresh_scene(false, cx);
                 }
                 self.select_other_pointer(*position, cx);

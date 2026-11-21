@@ -4427,11 +4427,12 @@ fn a_mate_connector_picked_at_a_hovered_faces_corner(cx: &mut TestAppContext) {
         let p = b.mesh.indices[first as usize..(first + count) as usize].iter().map(|&k| b.mesh.positions[k as usize]).max_by(|a, c| (a[0] + a[1]).total_cmp(&(c[0] + c[1]))).unwrap();
         glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)
     });
-    view.update(cx, |v, cx| {
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
         v.ui.pointer = v.viewport.read(cx).project(corner);
         v.ui.hover_pick = Some(noshape_scene::builder::PickTarget { reference: top.clone(), kind: noshape_scene::builder::PickKind::Face, anchor: None });
-        v.update_inference(false, cx);
-    });
+        v.update_inference(false, w, cx);
+    }))
+    .unwrap();
     wait_until(cx, window, |cx| view.read(cx).inference_choice().is_some());
     let chosen = cx.update(|cx| view.read(cx).inference_choice().map(|p| p.frame.origin)).unwrap();
     assert!(chosen.distance(corner) < 1e-6, "{chosen} for the corner {corner}");

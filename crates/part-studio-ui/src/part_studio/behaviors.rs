@@ -1601,6 +1601,10 @@ impl PartStudioView {
         if self.sketch.is_some() {
             return None;
         }
+        // Multiple's dragged ball snaps to faces and edges, whatever the active field takes (live ball-1119).
+        if self.triad_ball_dragged() {
+            return Some(vec![PickKind::Face, PickKind::Edge]);
+        }
         if let Some(f) = self.active_field_filter(cx) {
             let dummy = Reference::Origin;
             return Some(
@@ -3187,7 +3191,9 @@ impl PartStudioView {
             (Some(t), Some(p)) if self.ui.alt_held && matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex) => self.pick_through_transparent(t, p, true, cx),
             (t, _) => t,
         };
-        self.ui.hover_pick = t.filter(|t| self.field_takes(t, cx) != Some(false));
+        // Multiple's dragged ball snaps to any face or edge, whatever the active field takes (live ball-1119).
+        let ball = |t: &PickTarget| self.triad_ball_dragged() && matches!(t.kind, PickKind::Face | PickKind::Edge) && !self.edit.as_ref().is_some_and(|e| made_by(&t.reference, e.dialog.read(cx).feature.id));
+        self.ui.hover_pick = t.filter(|t| ball(t) || self.field_takes(t, cx) != Some(false));
         self.update_hover(cx)
     }
 

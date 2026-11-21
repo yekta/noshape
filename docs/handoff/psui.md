@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-20 23:10 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-21 00:22 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -36,7 +36,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (23:10 UTC 11-20)
+## Now (00:22 UTC 11-21)
 
 1. LANDED: 6f48184a (FS notices compile off the UI thread; A/B 6 max prepaint 534 -> 28 ms on 850efe, 549 -> 37 on
    de4eff), 18809b4c (spinner on the executor clock), 1c6e56e4 + 5c3f3bb7 (revert of a5505f50). Worktrees psui-fsn,
@@ -94,6 +94,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
    c) Sent 22:5x: studios 8 (drw-centermark, drw-inspection-table-iso-scrolled, drw-revision-table-delete; not run:
    drw-quad-mid-snap, doc-folder-drag-to-all-tabs, docs-advanced-search-help, docs-folder-crumb, vs-ps-own-table-menu),
    asm 1 (asm-menu-instance-properties: step 2 dialog fields live 1 / ours 0).
+7. P0 (lead 00:0x, from studios): Routing curve Multiple's centre ball snaps as mate-connector placement (live ball-1119,
+   asm-feel3-1118). Ours by the real pointer never snapped: the active field's pick filter masked faces, rehover dropped
+   them, and the point was chosen nearest where the drag began (no PointerMove during tool drags). Now: faces + edges
+   picked while the ball drags, the drag's position chooses, the 47.5 px square / centroid (edge: 15 px end / midpoint)
+   rule in Part Studio inference (also the Mate connector feature), snap as the points arrive. Test (GPU pointer)
+   dialogs::the_ball_dragged_onto_a_face_reaches_its_corner_from_45_px_and_turns; part-studio-ui 357 ok on the Mac.
 4b. Flange handle vs live flange-handle-1120: the orange inside the heads is the selected edge seen through the hollow
    heads: nothing more to draw.
 5. Cleanup done 18:56 (vibex6 A/B binaries and hf/, vibex8 target/release).

@@ -421,14 +421,30 @@ impl PartStudioView {
     /// points follow it, translated, not turned; multiDx/Dy/Dz is its place from the Edit reference, else the origin
     /// (live2 routing-multi ball-a: the +X face's centre (80, 0, 5); ball-b: off the reference vertex by (10, 10, 0)).
     fn triad_ball_move(&mut self, d: &TriadDrag, position: DVec2, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(frame) = self.inference_choice().map(|p| p.frame) else {
+        // The point nearest the drag's pointer (the viewport sends no PointerMove while a tool drags).
+        self.ui.pointer = Some(position);
+        if self.update_inference(window.modifiers().shift, window, cx) {
+            self.refresh_scene(false, cx);
+        }
+        if !self.triad_ball_snap(d, window, cx) {
             self.set_triad_axes(&d.axes, cx);
             self.triad_move_points(d, position, window, cx);
-            return;
-        };
+        }
+    }
+
+    /// Snapped: the triad on the chosen point, in its frame; false with no point chosen.
+    fn triad_ball_snap(&mut self, d: &TriadDrag, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some(frame) = self.inference_choice().map(|p| p.frame) else { return false };
         let (x, z) = (frame.x(), frame.z());
         self.set_triad_axes(&[x, z.cross(x), z], cx);
         self.triad_apply_move(d, frame.origin - d.origin, window, cx);
+        true
+    }
+
+    /// The ball's snap once the hovered entity's points come back.
+    pub(super) fn triad_ball_snap_now(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(d) = self.ui.triad_drag.clone().filter(|d| d.handle == BALL && !d.points.is_empty()) else { return };
+        self.triad_ball_snap(&d, window, cx);
     }
 
     /// Whether Multiple's ball is being dragged (its inference points shown).
@@ -586,6 +602,7 @@ impl PartStudioView {
                 // Multiple's ball snaps to what is under the pointer (live2 routing-multi ball-a): keep picking.
                 if t.multi && handle == BALL {
                     self.viewport.update(cx, |v, _| v.tool_hover = true);
+                    self.sync_pick_filter(cx);
                 }
                 // A new drag drops the last one's box.
                 self.ui.triad_box = None;
@@ -630,6 +647,7 @@ impl PartStudioView {
                 if d.handle == BALL {
                     self.viewport.update(cx, |v, _| v.tool_hover = false);
                     self.ui.inference = None;
+                    self.sync_pick_filter(cx);
                 }
                 if t.multi || d.handle >= RING0 {
                     // An arrow or a ring that moved keeps its value box, its text selected (live2 rz-45-released).

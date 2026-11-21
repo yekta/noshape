@@ -3,6 +3,7 @@
 //! doesn't match yet is a gap; the test fails when a row's status moves either way.
 
 use super::*;
+use super::feel::{Pointer, gpu_pointer};
 use crate::part_studio::manipulators::{linear_step, snap_degrees};
 use gpui_kit::component::WindowExt as _;
 
@@ -1372,14 +1373,11 @@ fn a_routing_curves_multiple_ring_turns_only_the_triad_and_its_arrows_follow_the
     assert_eq!(kinds, vec!["ORIGIN"; 3], "the points keep their own reference");
 }
 
-/// Live2 routing-multi ball-a (11-19): Multiple's centre ball is a free move that snaps to the hovered face's
-/// inference points; on the block's +X face centre the triad lands there and takes the face's frame
-/// (multiRotationMatrix "[[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]"), the selected points move with it,
-/// translated, and multiDx/Dy/Dz is its place from the origin; no value box.
-#[gpui::test]
-fn a_routing_curves_multiple_ball_snaps_to_a_faces_inference_point(cx: &mut TestAppContext) {
+/// The block with a Routing curve in Multiple mode: three points at the origin, the 2nd moved 40 mm along X and the 3rd
+/// 40 mm along Y, both selected (the triad at their centre).
+fn routing_multi_two_selected(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>, Entity<crate::feature_dialog::FeatureDialog>) {
     use noshape_model::params::{ParamValue, ParamValues};
-    let (window, view) = block(cx, "dlg-routing-ball");
+    let (window, view) = block(cx, name);
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("routingCurve", w, cx))).unwrap();
     draw(cx, window);
     let item = || {
@@ -1412,36 +1410,60 @@ fn a_routing_curves_multiple_ball_snaps_to_a_faces_inference_point(cx: &mut Test
         event(cx, ViewportEvent::ToolDown { position, modifiers: Modifiers::default(), click_count: 1 });
         event(cx, ViewportEvent::ToolUp { position, modifiers: Modifiers::default() });
     }
-    let start = cx.update(|cx| view.read(cx).routing_triad(cx)).expect("the triad").origin;
-    let before = cx.update(|cx| view.read(cx).routing_points(cx));
-    // The block's +X face (every corner at the largest x) and its centre.
-    let (face, centre) = cx.update(|cx| {
+    (window, view, dialog)
+}
+
+/// The block's face whose outward normal is `normal` (every corner at the extreme along it) and its centre.
+fn block_face_centre(cx: &mut TestAppContext, view: &Entity<PartStudioView>, normal: glam::DVec3) -> (noshape_model::reference::Reference, glam::DVec3) {
+    cx.update(|cx| {
         let v = view.read(cx);
         let b = v.display.bodies.first().expect("the block");
         let corners = |i: usize| {
             let (first, count) = b.mesh.face_ranges[i];
             b.mesh.indices[first as usize..(first + count) as usize].iter().map(|&k| b.mesh.positions[k as usize]).map(|p| glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)).collect::<Vec<_>>()
         };
-        let max_x = (0..b.face_refs.len()).flat_map(corners).map(|p| p.x).fold(f64::MIN, f64::max);
-        let i = (0..b.face_refs.len()).find(|&i| corners(i).iter().all(|p| (p.x - max_x).abs() < 1e-9)).expect("the +X face");
+        let most = (0..b.face_refs.len()).flat_map(corners).map(|p| p.dot(normal)).fold(f64::MIN, f64::max);
+        let i = (0..b.face_refs.len()).find(|&i| corners(i).iter().all(|p| (p.dot(normal) - most).abs() < 1e-9)).expect("the face");
         let ps = corners(i);
         let (lo, hi) = ps.iter().fold((glam::DVec3::MAX, glam::DVec3::MIN), |(lo, hi), p| (lo.min(*p), hi.max(*p)));
         // (The mesh is f32; the block's sizes are whole mm: its exact centre is the mesh's to the micrometre.)
         (b.face_refs[i].clone(), ((lo + hi) * 0.5e6).round() * 1e-6)
-    });
+    })
+}
+
+/// Live2 routing-multi ball-a (11-19): Multiple's centre ball is a free move that snaps to the hovered face's
+/// inference points; on the block's +X face centre the triad lands there and takes the face's frame
+/// (multiRotationMatrix "[[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]"), the selected points move with it,
+/// translated, and multiDx/Dy/Dz is its place from the origin; no value box.
+#[gpui::test]
+fn a_routing_curves_multiple_ball_snaps_to_a_faces_inference_point(cx: &mut TestAppContext) {
+    use noshape_model::params::ParamValue;
+    let (window, view, dialog) = routing_multi_two_selected(cx, "dlg-routing-ball");
+    let at = |cx: &mut TestAppContext, w: glam::DVec3| cx.update(|cx| view.read(cx).viewport.read(cx).project(w)).expect("on screen");
+    let event = |cx: &mut TestAppContext, ev: ViewportEvent| {
+        let t = cx.update(|cx| view.read(cx).routing_triad(cx)).expect("Multiple mode's manipulator");
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.triad_event(t, &ev, w, cx))).unwrap();
+        draw(cx, window);
+    };
+    let start = cx.update(|cx| view.read(cx).routing_triad(cx)).expect("the triad").origin;
+    let before = cx.update(|cx| view.read(cx).routing_points(cx));
+    let (face, centre) = block_face_centre(cx, &view, glam::DVec3::X);
     let ball = at(cx, start);
     event(cx, ViewportEvent::ToolDown { position: ball, modifiers: Modifiers::default(), click_count: 1 });
     assert!(cx.update(|cx| view.read(cx).triad_ball_dragged() && view.read(cx).viewport.read(cx).tool_hover), "the ball grabbed, the graphics still picked");
     let target = at(cx, centre);
-    view.update(cx, |v, cx| {
-        v.ui.pointer = Some(target);
+    // As in the app: the viewport's pick of the face comes while the pointer the studio last heard of is the press on
+    // the ball (no PointerMove during a tool drag); the drag's own position chooses the point.
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.ui.pointer = Some(ball);
         v.ui.hover_pick = Some(noshape_scene::builder::PickTarget { reference: face.clone(), kind: noshape_scene::builder::PickKind::Face, anchor: None });
-        v.update_inference(false, cx);
-    });
+        v.update_inference(false, w, cx);
+    }))
+    .unwrap();
     wait_until(cx, window, |cx| view.read(cx).inference_choice().is_some());
-    let snapped = cx.update(|cx| view.read(cx).inference_choice().map(|p| p.frame.origin)).expect("a snap point");
-    assert!(snapped.distance(centre) < 1e-6, "the face centre chosen: {snapped} for {centre}");
     event(cx, ViewportEvent::ToolDrag { position: target });
+    let snapped = cx.update(|cx| view.read(cx).inference_choice().map(|p| p.frame.origin)).expect("a snap point");
+    assert!(snapped.distance(centre) < 1e-6, "the face centre chosen, nearest the drag's pointer: {snapped} for {centre}");
     let pts = cx.update(|cx| view.read(cx).routing_points(cx));
     let moved = centre - start;
     assert!((pts[1].1 - before[1].1).distance(moved) < 1e-8 && (pts[2].1 - before[2].1).distance(moved) < 1e-8 && pts[0].1 == before[0].1, "the selected points translated with the triad during the drag: {pts:?}, by {moved}");
@@ -1458,6 +1480,65 @@ fn a_routing_curves_multiple_ball_snaps_to_a_faces_inference_point(cx: &mut Test
     let values: Vec<f64> = d.iter().map(|t| noshape_units::evaluate_as(t, noshape_units::Dim::LENGTH, &units, &noshape_units::EmptyScope).map_or(f64::NAN, |q| q.value)).collect();
     assert!((0..3).all(|i| (values[i] - centre[i]).abs() < 1e-12), "multiDx/Dy/Dz: the triad's place from the origin: {d:?}, centre {centre}");
     assert!(cx.update(|cx| view.read(cx).ui.triad_box.is_none() && !view.read(cx).viewport.read(cx).tool_hover && view.read(cx).inference_choice().is_none()), "no value box; picking and the points end with the drag");
+}
+
+/// Live ball-1119 (studios, lead 11-21): dragged by the real pointer, Multiple's ball snaps as mate-connector placement
+/// (live asm-feel3-1118): over a face it takes the point within the 47.5 px square around the pointer, here the face's
+/// corner 45 px off, else the face's centroid, and the triad turns to that point's frame; as the GPU's pick and the
+/// points come, with no further move. (Ours took the point nearest where the drag began.)
+#[gpui::test]
+fn the_ball_dragged_onto_a_face_reaches_its_corner_from_45_px_and_turns(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view, _dialog) = routing_multi_two_selected(cx, "dlg-routing-ball-pointer");
+    let (_, centre) = block_face_centre(cx, &view, glam::DVec3::X);
+    // Looking at the +X face (30 x 10 mm, centre (40, 15, 5) mm), close enough that its other points are far from
+    // the corner's.
+    cx.update(|cx| view.read(cx).viewport.clone()).update(cx, |vp, cx| {
+        let size = vp.size();
+        vp.camera.set_view(noshape_render::StandardView::Right);
+        vp.camera.fit_sphere(centre, 0.014, size.x / size.y);
+        vp.request_frame(cx);
+    });
+    draw(cx, window);
+    let at = |cx: &mut TestAppContext, w: glam::DVec3| cx.update(|cx| view.read(cx).viewport.read(cx).project(w)).expect("on screen");
+    let mm = 1e-3;
+    let corner = centre + glam::DVec3::new(0.0, 15.0, 5.0) * mm;
+    let k = at(cx, corner);
+    let side = at(cx, corner - glam::DVec3::Z * 5.0 * mm).distance(k);
+    let size = cx.update(|cx| view.read(cx).viewport.read(cx).size());
+    assert!(side > 100.0, "zoomed in enough: 5 mm = {side:.1} px in a {size:?} viewport");
+    // 45 px into the face along its diagonal (32 px across and down: inside the square, clear of the edges' reach).
+    let inward = ((at(cx, centre) - k).normalize()) * 45.0;
+    let target = k + inward;
+    let start = cx.update(|cx| view.read(cx).routing_triad(cx)).expect("the triad").origin;
+    let ball = at(cx, start);
+    let pointer = Pointer::new(cx, window, &view);
+    pointer.move_to(cx, &view, ball);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_mouse_down(pointer.window_point(cx, ball), gpui_kit::MouseButton::Left, Modifiers::default());
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).triad_ball_dragged()), "the ball grabbed");
+    for i in 1..=12 {
+        let p = ball + (target - ball) * (i as f64 / 12.0);
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        vcx.simulate_mouse_move(pointer.window_point(cx, p), Some(gpui_kit::MouseButton::Left), Modifiers::default());
+        pointer.frames(cx, &view);
+    }
+    // The pointer rests there: the GPU's pick of the face comes (each move redrew the points), then its points.
+    let rest = std::time::Instant::now();
+    while cx.update(|cx| view.read(cx).inference_choice().is_none() || view.read(cx).ui_busy()) && rest.elapsed() < std::time::Duration::from_secs(15) {
+        pointer.frames(cx, &view);
+    }
+    let t = cx.update(|cx| view.read(cx).routing_triad(cx)).expect("the triad");
+    let chosen = cx.update(|cx| view.read(cx).inference_choice().map(|p| p.frame.origin));
+    let diag = cx.update(|cx| { let v = view.read(cx); format!("raw {:?} pick {:?} under {:?} tool_hover {} drag {} inference {}", v.ui.hover_raw.as_ref().map(|t| t.kind), v.ui.hover_pick.as_ref().map(|t| t.kind), v.viewport.read(cx).pick_under_pointer(), v.viewport.read(cx).tool_hover, v.triad_ball_dragged(), v.ui.inference.is_some()) });
+    assert!(t.origin.distance(corner) < 1e-8 && t.axes[2].distance(glam::DVec3::X) < 1e-9, "on the corner 45 px off the pointer, its Z the face normal: {t:?}, chosen {chosen:?}; {diag}");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_mouse_up(pointer.window_point(cx, target), gpui_kit::MouseButton::Left, Modifiers::default());
+    draw(cx, window);
+    let t = cx.update(|cx| view.read(cx).routing_triad(cx)).expect("the triad");
+    assert!(t.origin.distance(corner) < 1e-8 && t.axes[2].distance(glam::DVec3::X) < 1e-9, "released there: {t:?}");
 }
 
 /// Live2 ours-1118 pattern (p1audit skip-02..04): with Skip instances on, "Instances to skip" takes the instances' rings:
