@@ -74,7 +74,7 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   Not judged: Hide other / all sketches (live's doc had two sketches, ours one). qa-scratch/walk2/g1c, g5c, g7c.png.
 
 ## qa, 2026-11-21 (agent API gaps)
-- [ ] P2 **OP-MASS-FACE-SECTION (asm; Part Studio side: lead to route)**: Mass and section properties › Face (area, perimeter,
+- [ ] asm side verified green 3c87f195c (qa 11-21 06:2x, CLI walk2/src/massop.py, e07b0eb39): faces + reference about a world-aligned corner connector: area 800, perimeter 120, Lxx 106666.664, Lxy 160000, Lyy 426666.657, Lzz 533333.321 (the app's numbers; FACE-MOMENT-DIGITS); about the centroid 26666.664 / 0 / 106666.657; top + side faces refused "Face selections are not coplanar" (param faces). A bare vertex connector is still a face's frame (Lxx 0) until 969187e3. Open: the Part Studio op (query_mass_properties faces). P2 **OP-MASS-FACE-SECTION (asm; Part Studio side: lead to route)**: Mass and section properties › Face (area, perimeter,
   area moments Lxx / Lxy / Lyy / Lzz, optionally about "Mate connector for reference frame") has no op. assembly_mass_properties
   takes only `instances` (no faces, no `reference`). query_mass_properties takes `parts` and `reference` but no faces. So asm's
   8fda424fb (ASM-FACE-TAB-REFERENCE-FRAME, live mc1-mc3: Lxx 106666.667, Lxy 160000, Lyy 426666.667, Lzz 533333.333 mm⁴ about
