@@ -24,25 +24,26 @@ Design (step 1; step 2, B-reps for selection, later):
 6. Tests: hit (same doc + build), miss after an edit, miss after a build change; the Part Studio shows the file's
    snapshot before its regeneration lands and swaps to an equal real display without a rebuild of its scene.
 
-## STATE 10:49 11-21 (read first after compaction)
-- dx-urdf CHECKING a4cdc3da (queued 10:19): 214ce8e8 failed on THIRD-PARTY-NOTICES (draco-core); notices commit added. Stack: OBJ /
-  3MF / glTF faceting, DXF explode notes, Draco, Parasolid 25.0-27.1 read, batch-2 cases, glTF per face + UVs,
-  AGENT_API.md, notices.
-- Fast open LANDED 66adb7cc as 92d02c14 (display rows in the .noshape, one per tab; tests). infento (Assembly 1, vibex8 llvmpipe,
-  load 14, empty cache dir): cold 80.4 s; from the file's row cached display in 0.56 s, drawn 2.28 s (0.61 s scene
-  build ON the UI thread, 1.06 s llvmpipe). Lead approved 10:1x: scene build off the UI thread + read the row in
-  parallel with window creation + a test that the UI thread isn't blocked; asm OK'd assembly-ui (nothing in flight).
-- dx-open QUEUED (bg, 10:48) 98b6d31d: assembly_view rebuild_scene_in_background (cache Arc<Mutex>, scene_seq,
-  scene_task; retransform only with no build pending; picks off while pending; a sync rebuild that finds the cache held
-  goes behind it), test an_evaluations_scene_is_built_off_the_ui_thread; display_cache::prefetch(path) from
-  files::open_document_window (store meta_with_prefix; a store drops it), milestones "open: display key / decoded / rows
-  read". Mac assembly-ui 138 ok. Timing: vibex8 ~/agents/dx-keep/bin/openinf.sh <app> <tag> (log openinf.log).
-- Speed batch 3 (Part Studios 11-20 vs live's server column): vibex8 ~/agents/dx-keep/sr/sr3.sh (qa's speedref.py + nscli.py
-  copies, qa's 04:33 release cli/pmbin in ~/tmp/qa/srm3 = batches 1-2's build) -> sr/sr3.json, sr3.log.
-- dx-land uncommitted: formats.md batch-2 rows + this handoff: land docs-only after dx-urdf lands.
-- Mac: one active target (dx-urdf); dx-keep trimmed to 118 MB (lead 10:0x: 100 GB promise on the user's Mac).
-- Next: infento numbers to the lead; batch-2 leftovers (IGES-POSTPROC, Rhino 45 vs 46, duct's Rhino V6/V7 + STEP-PRE
-  after live's 17:20 rerun); step 2 of fast open (B-reps for selection) only when the lead says.
+## STATE 12:40 11-21 (read first after compaction)
+- LANDED today: dx-urdf stack as 5bbec61b (OBJ / 3MF / glTF faceting, DXF explode notes, Draco, Parasolid 25-27.1 read,
+  batch-2 cases, glTF per face + UVs, AGENT_API, draco-core notices); fast open 92d02c14 (display rows in the .noshape,
+  one per tab) and f626b268 (assembly scene off the UI thread; rows read at open; test that the UI thread isn't blocked).
+- dx-open uncommitted (on f626b268's base): display_cache::load_for (the slot's row decoded on its own thread while the
+  key is computed; used only if it holds that key; test via load_keyed), key hash through a 64 KB BufWriter, assembly
+  open uses load_for. Running: vibex8 rb.sh bash dx-open-v.sh (release app + release tests + clippy; log
+  /root/dx-scratch/open-v.out; script in the worktree: delete before commit). Then re-time infento on vibex6:
+  `~/bin/slot timeout 1200 ~/agents/dx-keep/bin/openinf.sh <app> c` (app copied to ~/agents/dx-keep/open/noshape).
+  Before (step 2 binary, vibex6): opening document 165 ms, rows read 246, key 594, decoded 889, cached display in 947,
+  cached model frame 1116 ms (since process start). Target <= 0.5 s shaded (DECISIONS 11-21).
+- Speed batch 3 DONE (TICKETS "dx, 2026-11-21"): all at or under live but c2-rings-loft: SPEED-RINGS-SHELL (bool; Shell 1
+  fails after 18.9 s at 9.6 mm; live REQUESTS 12:39 for live's Shell 1 there).
+- Drawing rows 2/10 (duct, louver). Tried: view centre from the tight box: no change (bottle 0.0150 / housing -0.0269 in
+  shifts stay; the suite aligns views first, so shifts aren't the failures). rings-loft: live's centre mark at
+  (2.570, 6.317) is on a circle ours draws only 300..60 deg (live 3 arcs, full): the other two edges missing in ours ->
+  next to look at (Mac suite dir ~/noshape-host/dx-keep/exs-drw, log exs-drw.log; DXFs /root/dx-scratch/drw/rl-*.dxf).
+- Mac: one active target (dx-urdf, 20 GB); dx-open's target removed after each run (lead 11-21).
+- Next: infento re-time -> lead; rings-loft circle; batch-2 leftovers (IGES-POSTPROC, Rhino 45 vs 46, duct's Rhino V6/V7
+  + STEP-PRE after live's 17:20 rerun); fast-open step 3 (B-reps for selection) only when the lead says.
 
 ## Exchange leftovers (11-21)
 - Drawing rows (2/10): bottle Front's lip arc 41.8..180 deg (live 90..180) and views 0.015 in low; hex iso circles as
