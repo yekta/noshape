@@ -312,11 +312,13 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   5 px, #FFA90A at both tangent lines and #DDA027..#FFAF25 between, the tangent lines #586E7B / #2C363C. Ours draws a 3 px #FFA90A
   line in the middle with the face colour showing on both sides up to darker tangent lines (#2E3A41 / #1F262B). The same with the
   picked edge hovered and with a face hovered.
-- [ ] P0 **FEEL-FILLET-ARROW-DRAG (psui)** (qa 23:3x, green 9f33d43, out-w6fa s8-fil-arrow-drag-*; live's numbers asked in REQUESTS qa
-  23:02): Fillet on the edge (40, 10, 10) at 5 mm, a 36 px press-drag on the arrow into the material sets Radius **34.03035 mm**,
-  and 36 px the other way sets **24.03035 mm**: both directions grow it, by far more than the pointer moved (about 3.4 px per mm
-  here), and the field shows the raw value (Extrude snaps to 0.1 mm). The title stays black and the preview stays the 5 mm round
-  though no 24 mm round fits a 10 mm block. A 2 px drag changes nothing (as live's dead zone).
+- [ ] P0 **FEEL-FILLET-ARROW-DRAG (psui)** (qa 23:3x, green 9f33d43, out-w6fa s8-fil-arrow-drag-*; live 23:48 behaviours "qa walk 6
+  manipulators", walk6-m*): Fillet on the edge (40, 10, 10) at 5 mm. Into the material (along the arrow) both grow the radius
+  without snapping (ours 36 px → 34.03035 mm, live 30 px → 34.04041 mm: =). **The other way (toward the edge and past it) live
+  SHRINKS it to a floor of 0.02414 mm (6 px → 0.24142, 12 px and more → 0.02414); ours GROWS it (36 px → 24.03035 mm).** After the
+  drag live redraws the preview at the new radius (34 mm: a big rounded top; 112 mm: red title, magenta preview, red edge); ours keeps
+  the 5 mm round drawn with the title black. Live leaves the focus where it was; ours moves it into Radius (as FEEL-FILLET-ARROW-CLICK).
+  The 2 px dead zone =.
 - [ ] P1 **FEEL-FILLET-ARROW-CLICK (psui)** (live 22:54 (4), walk6-4c-*): a plain click on the Fillet arrow does nothing to the
   feature in live (blue on hover, no flip, no change, no field focused: the focus leaves the dialog). Ours moves the focus into Radius.
 - Matched live (no ticket):
@@ -530,7 +532,7 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   (≈200 px of an 80 px crop) and draws a navy square at the ring's front; live's rim is soft olive #C2C187 / #CCC18C. Selected: ours
   also tints the owner faces green (#BED5A8 top, #AFC39C side); live leaves them #99C0D7 / #8EB1C6 and only fills the disc #F6DA83.
   Live b3/ps-mc-*; ours qa-scratch/hm2/b3y.png.
-- [x] P0 **FEEL-FILLET-MANIPULATOR (psui)** (fixed psui 11-21: live b3w's outlined arrow into the material, 0.8 × Extrude's; qa verified the look 23:3x, green 9f33d43: white outlined arrow, blue on hover; where it sits is asked in REQUESTS qa 23:02 (5): ours at the pick point): an edge picked in a new Fillet at 1.3 mm. Live: the radius manipulator is an open white
+- [x] P0 **FEEL-FILLET-MANIPULATOR (psui)** (fixed psui 11-21: live b3w's outlined arrow into the material, 0.8 × Extrude's; qa verified the look 23:3x, green 9f33d43: white outlined arrow, blue on hover; live 23:48: grey at rest, blue under the pointer; Shell has no manipulator in live either (=)): an edge picked in a new Fillet at 1.3 mm. Live: the radius manipulator is an open white
   arrow lying in the front face below the edge, pointing away from it; the band reads ≈6 px (over the round's shading). Ours: a filled
   white triangle with a dark rim sitting on the band, pointing up; the band ≈3 px between two black tangent lines. Live b3/
   dlg-edge-selected_s, dlg-edge-selhover_f, dlg-face-otherhover_f; ours qa-scratch/hm2/b3z.png (cells b3-dlg-*13*).
