@@ -178,6 +178,19 @@ pub fn bind_keys(cx: &mut App) {
 /// How near (px) the pointer brings a hovered face's connector to one of its inference dots, in x and in y (a square:
 /// live asm-feel3-1118 kept a dot at (25, 46) and (47, 40), lost it at (26, 48) and (49, 42)), and a hovered edge's to
 /// one of its ends (asm/feel-1117).
+/// The triad's centre ball dragged over a part: the face under the pointer, its inference points and the one the ball
+/// sits on (`triad_snap`).
+#[derive(Clone)]
+struct BallSnap {
+    path: Vec<InstanceId>,
+    entity: Reference,
+    marks: Vec<crate::scene_builder::InferenceMark>,
+    chosen: usize,
+}
+
+/// The centre ball's ring (px): a snapped point this near the pointer lets go of it (live triad-snap-1121: ~8 px).
+const BALL_RING_PX: f64 = 8.0;
+
 /// W's prompt while the zoom-window mode is armed (live keys-1118, as the Part Studio's).
 const ZOOM_WINDOW_PROMPT: &str = "Drag to create zoom bounding box.";
 const INFERENCE_PICK_RADIUS_PX: f64 = 47.5;
@@ -255,8 +268,10 @@ struct DragState {
     /// current displacement in that plane.
     grab0: DVec3,
     offset: DVec3,
-    /// Center (ball) drag: the manipulator frame being placed.
+    /// Center (ball) drag: the manipulator frame shown, the one at the pointer (taken on release) and the snap.
     triad_preview: Option<Frame>,
+    triad_free: Option<Frame>,
+    ball_snap: Option<BallSnap>,
     /// Explode step editing: the drag builds a step instead of moving instances.
     explode: bool,
     /// Free drag of a part of a flexible subassembly (the path of the child dragged, from the top-level instance;
@@ -1571,6 +1586,12 @@ impl AssemblyView {
             let (z, x) = (d.plane0.dir(), d.plane0.x);
             marks = s.dots.iter().map(|p| (*p, x, z)).chain([(s.point, x, z)]).map(Into::into).collect();
             chosen = Some(s.dots.len());
+        }
+        // The triad's ball snapped: the face's inference look and the connector glyph where the ball sits.
+        if let Some(s) = self.drag.as_ref().and_then(|d| d.ball_snap.as_ref()) {
+            h.hover_outline = Some((s.path.clone(), s.entity.clone()));
+            marks = s.marks.clone();
+            chosen = Some(s.chosen);
         }
         // Live 1851 / qa5 asm-041: white dots and the hovered connector's
         // glyph at screen size, as the Part Studio's (scene InferenceMarks).
@@ -3426,6 +3447,8 @@ impl AssemblyView {
                         grab0,
                         offset: DVec3::ZERO,
                         triad_preview: None,
+                        triad_free: None,
+                        ball_snap: None,
                         explode: self.explode_edit,
                         nested: None,
                         solved: None,
@@ -3502,6 +3525,8 @@ impl AssemblyView {
                     grab0: DVec3::ZERO,
                     offset: DVec3::ZERO,
                     triad_preview: None,
+                    triad_free: None,
+                    ball_snap: None,
                     explode: false,
                     nested,
                     solved: None,
@@ -3576,15 +3601,18 @@ impl AssemblyView {
                         d.pending = Some(pp + d.offset);
                     }
                     Some(ManipHandle::Center) => {
-                        // Reposition the manipulator itself (snapping to mate connectors).
-                        let frame = self.triad_snap(*position, cx).unwrap_or_else(|| {
-                            let (pp, n, g0) = (d.plane_point, d.plane_normal, d.grab0);
-                            let rot = self.manipulator(cx).map(|f| f.rotation).unwrap_or_default();
-                            let hit = self.ray_plane(*position, pp, n, cx).unwrap_or(g0);
-                            Frame::new(pp + (hit - g0), rot)
-                        });
+                        // The ball follows the pointer on the screen-parallel plane through it; over a part it sits on
+                        // the face's nearest inference point, the triad unturned, and the release leaves the triad at
+                        // the pointer (live triad-snap-1121).
+                        let (pp, n, g0) = (d.plane_point, d.plane_normal, d.grab0);
+                        let rot = self.manipulator(cx).map(|f| f.rotation).unwrap_or_default();
+                        let free = Frame::new(pp + (self.ray_plane(*position, pp, n, cx).unwrap_or(g0) - g0), rot);
+                        let snap = self.triad_snap(*position, cx);
+                        let shown = snap.as_ref().map_or(free, |s| Frame::new(s.marks[s.chosen].origin, rot));
                         if let Some(d) = self.drag.as_mut() {
-                            d.triad_preview = Some(frame);
+                            d.triad_preview = Some(shown);
+                            d.triad_free = Some(free);
+                            d.ball_snap = snap;
                         }
                         self.refresh_scene(false, cx);
                         cx.notify();
@@ -3629,7 +3657,7 @@ impl AssemblyView {
                 if d.handle == Some(ManipHandle::Center) {
                     // The manipulator keeps its new frame relative to the part.
                     if d.started
-                        && let Some(f) = d.triad_preview
+                        && let Some(f) = d.triad_free
                         && let Some(p) = self.result.solved.placement(d.ids[0])
                     {
                         self.triad = Some((d.ids.clone(), placement_to_frame(&p).inverse().mul(&f)));
@@ -3817,6 +3845,8 @@ impl AssemblyView {
             grab0: grab,
             offset: DVec3::ZERO,
             triad_preview: None,
+            triad_free: None,
+            ball_snap: None,
             explode: false,
             nested: None,
             solved: None,
@@ -4243,6 +4273,7 @@ impl AssemblyView {
         let btn = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &mut Context<Self>| {
             div()
                 .id(id)
+                .debug_selector(move || id.into())
                 .relative()
                 .w(px(33.))
                 .h(px(34.))

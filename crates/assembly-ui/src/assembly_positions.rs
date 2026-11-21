@@ -628,8 +628,9 @@ impl AssemblyView {
                                 .items_center()
                                 .text_size(px(13.33))
                                 .text_color(pal.text_muted)
+                                .debug_selector(|| "np-empty".into())
                                 .child(div().text_center().child("Add named positions to precisely locate parts and subassemblies. Create multiple positional variations of an assembly to capture mate positions and subassembly positions."))
-                                .child(div().id("np-learn").mt(px(4.)).font_weight(FontWeight::BOLD).text_color(rgb(0x094174)).underline().cursor_pointer().child("Learn more about assembly named positions.").on_click(|_, _, cx| noshape_app_core::help::open("Named positions", cx))),
+                                .child(div().id("np-learn").debug_selector(|| "np-learn".into()).mt(px(4.)).font_weight(FontWeight::BOLD).text_color(rgb(0x094174)).underline().cursor_pointer().child("Learn more about assembly named positions.").on_click(|_, _, cx| noshape_app_core::help::open("Named positions", cx))),
                         )
                     })
                     .when(drivers.is_empty() && asm.position_subs.is_empty() && !asm.named_positions.is_empty(), |d| {
@@ -663,6 +664,7 @@ impl AssemblyView {
                         h_flex().flex_1().justify_center().child(
                             div()
                                 .id("np-add")
+                                .debug_selector(|| "np-add".into())
                                 .h(px(27.))
                                 .px(px(10.))
                                 .flex()

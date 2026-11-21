@@ -735,6 +735,7 @@ impl AssemblyView {
                 .into_iter()
                 .collect();
             div()
+                .debug_selector(move || id.into())
                 .px(px(3.))
                 .pt(px(5.))
                 .child(os::query_box(SharedString::from(id.to_string()), label, active, rows).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -946,6 +947,7 @@ impl AssemblyView {
         };
         v_flex()
             .id("mc-dialog")
+            .debug_selector(|| "mc-dialog".into())
             .w(px(220.))
             .bg(pal.dialog_bg)
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
@@ -3912,6 +3914,11 @@ impl AssemblyView {
     /// drag holds the pointer and the pick buffer is not updated), skipping
     /// the instances in `exclude`.
     pub(super) fn raycast(&self, position: DVec2, exclude: &[InstanceId], cx: &App) -> Option<AsmPickTarget> {
+        self.raycast_hit(position, exclude, cx).map(|h| h.0)
+    }
+
+    /// [`Self::raycast`] with the point hit.
+    pub(super) fn raycast_hit(&self, position: DVec2, exclude: &[InstanceId], cx: &App) -> Option<(AsmPickTarget, DVec3)> {
         let (o, d) = self.viewport.read(cx).ray(position);
         let mut best: Option<(f64, AsmPickTarget)> = None;
         for (oi, occ) in self.result.occurrences.iter().enumerate() {
@@ -3942,7 +3949,8 @@ impl AssemblyView {
                 }
             }
         }
-        best.map(|b| b.1)
+        // (The occurrence's transform is rigid: the ray's parameter is the same in its frame.)
+        best.map(|(t, b)| (b, o + d * t))
     }
 
     /// [`model_hit`] over this view's shown occurrences, for the viewport's press (`capture_probe`).
@@ -3953,52 +3961,26 @@ impl AssemblyView {
 
     // ------------------------------------------------------------ triad manipulator
 
-    /// Snap frame for the manipulator center near the cursor: assembly and
-    /// Part Studio mate connectors, the origin, inference points of the face
-    /// under the cursor and its vertices.
-    pub(super) fn triad_snap(&self, position: DVec2, cx: &App) -> Option<Frame> {
-        let vp = self.viewport.read(cx);
-        let units = self.units(cx);
-        let exclude: Vec<InstanceId> = Vec::new();
-        let mut best: Option<(f64, Frame)> = None;
-        let mut consider = |f: Frame, bias: f64| {
-            if let Some(sp) = vp.project(f.origin) {
-                let d = sp.distance(position);
-                if d < 14.0 && best.as_ref().is_none_or(|(b, _)| d + bias < *b) {
-                    best = Some((d + bias, f));
-                }
-            }
-        };
-        consider(Frame::default(), 0.0);
-        for c in &self.result.connectors {
-            if let Some(f) = c.frame {
-                consider(f, 0.0);
-            }
+    /// The triad's centre ball dragged over a part (live triad-snap-1121): the face under the pointer, its inference
+    /// points and the one nearest the pointer's spot on it in 3D, at any distance on screen. None over the background,
+    /// and none while that point is under the pointer (within the ball's ring), where the ball follows the pointer.
+    pub(super) fn triad_snap(&self, position: DVec2, cx: &App) -> Option<super::BallSnap> {
+        let (hit, spot) = self.raycast_hit(position, &[], cx)?;
+        let o = self.result.occurrences.get(hit.occ)?;
+        let t = noshape_model::assembly::eval::matrix_frame(&o.transform);
+        let marks: Vec<crate::scene_builder::InferenceMark> = inference_candidates(&o.context, Some(&o.body), &hit.reference, &self.units(cx))
+            .iter()
+            .map(|p| {
+                let w = t.mul(&p.frame);
+                let corner = matches!(&p.reference, Reference::Implicit { inference: Inference::Vertex, .. });
+                crate::scene_builder::InferenceMark { origin: w.origin, x: w.x(), z: w.z(), corner }
+            })
+            .collect();
+        let chosen = (0..marks.len()).min_by(|a, b| marks[*a].origin.distance(spot).total_cmp(&marks[*b].origin.distance(spot)))?;
+        if self.viewport.read(cx).project(marks[chosen].origin).is_none_or(|s| s.distance(position) < super::BALL_RING_PX) {
+            return None;
         }
-        let mut seen = HashSet::new();
-        for o in &self.result.occurrences {
-            if o.hidden || !seen.insert(o.path.clone()) {
-                continue;
-            }
-            let t = noshape_model::assembly::eval::matrix_frame(&o.transform);
-            for c in &o.context.connectors {
-                consider(t.mul(&Frame::from_axes(c.origin, c.z, c.x)), 0.0);
-            }
-        }
-        if let Some(hit) = self.raycast(position, &exclude, cx)
-            && let Some(o) = self.result.occurrences.get(hit.occ)
-        {
-            let t = noshape_model::assembly::eval::matrix_frame(&o.transform);
-            for p in inference_candidates(&o.context, Some(&o.body), &hit.reference, &units) {
-                consider(t.mul(&p.frame), 1.0);
-            }
-            let rot = self.manipulator(cx).map(|f| f.rotation).unwrap_or_default();
-            for v in &o.mesh.vertices {
-                let w = o.transform.transform_point3(DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64));
-                consider(Frame::new(w, rot), 2.0);
-            }
-        }
-        best.map(|b| b.1)
+        Some(super::BallSnap { path: o.path.clone(), entity: hit.reference, marks, chosen })
     }
 
     pub(super) fn triad_action(&mut self, action: TriadAction, cx: &mut Context<Self>) {

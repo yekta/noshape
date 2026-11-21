@@ -1893,6 +1893,8 @@ fn triad_drag(v: &AssemblyView, handle: ManipHandle, value: f64, cx: &gpui_kit::
         grab0: f.origin,
         offset: glam::DVec3::ZERO,
         triad_preview: None,
+        triad_free: None,
+        ball_snap: None,
         explode: false,
         nested: None,
         solved: None,
@@ -3513,4 +3515,123 @@ fn a_snap_mode_drag_draws_no_line_or_box_to_its_target(cx: &mut TestAppContext) 
         })
     })
     .unwrap();
+}
+
+/// Live (behaviours "Revolute dialog", m, dom/assembly-mate-chip-connector-dialog): a filled Fastened's dialog reads
+/// the type ▾, the Mate connectors box with its two chips (the connector icon, ×) and ⇅ "Reorder items", ☐ Offset, then
+/// flip, reorient, ▶ and Solve in one row (Simulation connection is simulation: left out). ⇅ swaps the chips; a chip's
+/// icon opens the "Mate connector" panel right beside the dialog, whose ☑ Realign adds the Primary and Secondary axis
+/// entity fields; × empties the chip and leaves its box active.
+#[gpui::test]
+fn a_filled_mates_fields_and_its_chips_act_as_live(cx: &mut TestAppContext) {
+    let path = pattern_document(cx, "mate-fields");
+    let (window, view) = open_assembly_with_front(cx, &path);
+    let (pin, block) = cx
+        .update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                v.start_mate(MateType::Fastened, w, cx);
+                let (a, b) = (face_connector(v, "Part 2 <1>", false, cx), face_connector(v, "Part 1 <1>", true, cx));
+                let ids = (a.instance, b.instance);
+                v.deliver_connector(a, w, cx);
+                v.deliver_connector(b, w, cx);
+                ids
+            })
+        })
+        .unwrap();
+    draw(cx, window);
+    let bounds = |cx: &mut TestAppContext, s: &'static str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(s).unwrap_or_else(|| panic!("{s} not drawn"));
+    let dialog = bounds(cx, "mate-dialog");
+    let (kind, chips, offset) = (bounds(cx, "mate-type-field"), [bounds(cx, "mc-field-0"), bounds(cx, "mc-field-1")], bounds(cx, "mate-offset"));
+    assert!(kind.bottom() <= chips[0].top() && chips[0].bottom() <= chips[1].top() && chips[1].bottom() <= offset.top(), "type, the two chips, Offset, top down");
+    for f in 0..2 {
+        let (icon, x) = (bounds(cx, ["mc-edit-0", "mc-edit-1"][f]), bounds(cx, ["mc-clear-0", "mc-clear-1"][f]));
+        assert!(chips[f].contains(&icon.center()) && chips[f].contains(&x.center()) && icon.right() <= x.left(), "chip {f}: its connector icon, then ×");
+    }
+    let swap = bounds(cx, "mate-swap");
+    assert!(swap.center().y < chips[0].top() && swap.right() <= chips[0].right(), "⇅ in the box's header: {swap:?} over {:?}", chips[0]);
+    let row: Vec<_> = ["mate-flip", "mate-reorient", "mate-animate", "mate-solve"].into_iter().map(|s| bounds(cx, s)).collect();
+    assert!(row.iter().all(|b| b.top() >= offset.bottom() && b.bottom() <= dialog.bottom()), "the tools under Offset: {row:?}");
+    assert!(row.windows(2).all(|p| p[0].right() <= p[1].left() && (p[0].center().y - p[1].center().y).abs() <= px(3.)), "flip, reorient, ▶, Solve left to right: {row:?}");
+    let fields = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).mate.as_ref().map(|m| m.dialog.read(cx).slots().map(|s| s.map(|c| c.instance))).unwrap());
+    assert_eq!(fields(cx)[..2], [Some(pin), Some(block)]);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(swap.center(), gpui_kit::Modifiers::default());
+    draw(cx, window);
+    assert_eq!(fields(cx)[..2], [Some(block), Some(pin)], "⇅ swapped the chips");
+    // The first chip's icon: the Mate connector panel beside the dialog, its top level with the dialog's.
+    let icon = bounds(cx, "mc-edit-0").center();
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(icon, gpui_kit::Modifiers::default());
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| view.read(cx).mc.as_ref().map(|m| (m.for_mate, m.implicit))), Some((Some(0), true)), "the chip's own connector, implicit");
+    let (dialog, panel) = (bounds(cx, "mate-dialog"), bounds(cx, "mc-dialog"));
+    assert!((panel.left() - dialog.right() - px(1.)).abs() <= px(1.) && (panel.top() - dialog.top()).abs() <= px(1.), "beside the dialog: {dialog:?} {panel:?}");
+    let shown = |cx: &mut TestAppContext, s: &'static str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(s).is_some();
+    assert!(!shown(cx, "mcd-primary") && !shown(cx, "mcd-secondary"));
+    let realign = bounds(cx, "mcd-realign").center();
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(realign, gpui_kit::Modifiers::default());
+    draw(cx, window);
+    let (primary, secondary) = (bounds(cx, "mcd-primary"), bounds(cx, "mcd-secondary"));
+    assert!(bounds(cx, "mcd-realign").bottom() <= primary.top() && primary.bottom() <= secondary.top(), "☑ Realign, then the Primary and Secondary axis entities");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.close_mc(w, cx))).unwrap();
+    draw(cx, window);
+    let x = bounds(cx, "mc-clear-1").center();
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(x, gpui_kit::Modifiers::default());
+    draw(cx, window);
+    assert_eq!(fields(cx)[..2], [Some(block), None], "× emptied the second chip");
+    let box_active = cx.update(|cx| view.read(cx).mate.as_ref().unwrap().dialog.read(cx).ui_fields(cx)[1]["active"] == json!(true));
+    assert!(box_active, "its box stays active for the refill");
+}
+
+/// Live2 (REQUESTS 18:30, dom dialog-animate): Animate… opens with Playback type "Reciprocate ▾" (its menu Single,
+/// Reciprocate, Loop) and right beside it an icon button "Reverse playback" that turns the playback round, lit while on.
+#[gpui::test]
+fn the_animate_dialog_reads_reciprocate_and_its_icon_reverses_the_playback(cx: &mut TestAppContext) {
+    let path = pattern_document(cx, "anim-dialog");
+    {
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_open", json!({ "path": path.to_str().unwrap() }));
+        let face = |ctx: &mut Ctx, i: &str, z: i32| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "normal": [0, 0, z] }))["faces"][0]["id"].clone();
+        let (a, b) = (face(&mut ctx, "Part 2 <1>", -1), face(&mut ctx, "Part 1 <1>", 1));
+        call(&mut ctx, "assembly_mate", json!({ "type": "revolute", "a": { "instance": "Part 2 <1>", "entity": a }, "b": { "instance": "Part 1 <1>", "entity": b } }));
+    }
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_animation(w, cx))).unwrap();
+    draw(cx, window);
+    let playback = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).anim.as_ref().map(|a| (a.playback.label(), a.dir < 0.0)));
+    assert_eq!(playback(cx), Some(("Reciprocate", false)), "a new Animate reciprocates, forwards");
+    let bounds = |cx: &mut TestAppContext, s: &'static str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(s).unwrap_or_else(|| panic!("{s} not drawn"));
+    let (select, reverse) = (bounds(cx, "anim-playback"), bounds(cx, "anim-reverse"));
+    assert!(select.right() <= reverse.left() + px(1.) && (select.center().y - reverse.center().y).abs() <= px(3.), "Reverse playback right of the select: {select:?} {reverse:?}");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(select.center(), gpui_kit::Modifiers::default());
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| crate::os_menu::open_labels(cx)), ["Single", "Reciprocate", "Loop"]);
+    let row = bounds(cx, "menu:Reciprocate");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(row.center(), gpui_kit::Modifiers::default());
+    draw(cx, window);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(reverse.center(), gpui_kit::Modifiers::default());
+    draw(cx, window);
+    assert_eq!(playback(cx), Some(("Reciprocate", true)), "the icon reversed the playback");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(reverse.center(), gpui_kit::Modifiers::default());
+    draw(cx, window);
+    assert_eq!(playback(cx), Some(("Reciprocate", false)), "and back");
+}
+
+/// Live2 mates.json named_positions_panel (17:18): an assembly without named positions opens the panel on the how-to
+/// text, its "Learn more about assembly named positions." link under it and "Add named position" in the footer; a click
+/// there makes "Named position 1" and the how-to text goes.
+#[gpui::test]
+fn an_empty_named_positions_panel_says_what_they_are_and_adds_the_first(cx: &mut TestAppContext) {
+    let path = pattern_document(cx, "np-empty");
+    let (window, view) = open_assembly_with_front(cx, &path);
+    draw(cx, window);
+    let bounds = |cx: &mut TestAppContext, s: &'static str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(s);
+    let rail = bounds(cx, "rail-named").expect("the Named positions rail button");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(rail.center(), gpui_kit::Modifiers::default());
+    draw(cx, window);
+    let (text, learn, add) = (bounds(cx, "np-empty").expect("the how-to text"), bounds(cx, "np-learn").expect("its help link"), bounds(cx, "np-add").expect("Add named position"));
+    assert!(text.contains(&learn.center()) && learn.bottom() <= add.top(), "the link under the text, the button in the footer: {text:?} {learn:?} {add:?}");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(add.center(), gpui_kit::Modifiers::default());
+    draw(cx, window);
+    let names = cx.update(|cx| view.read(cx).assembly(cx).map(|a| a.named_positions.iter().map(|p| p.name.clone()).collect::<Vec<_>>()));
+    assert_eq!(names, Some(vec!["Named position 1".to_string()]));
+    assert!(bounds(cx, "np-empty").is_none() && bounds(cx, "np-learn").is_none(), "the how-to text gone with the first position");
 }

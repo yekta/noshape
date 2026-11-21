@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-21 00:48 UTC.
+Updated 2026-11-21 01:53 UTC.
 
 ## In flight
 
@@ -22,13 +22,17 @@ land. vibex8 02:00-04:00 is qa's quiet window. Never `git checkout <file>` over 
 e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
 - LANDED 66ecac0c, 347239f5 (23:36: T2 HLR 8-thread test + trace line; 6 asm feel tests), 44429dbc (00:21: 3 asm
   feel tests, revision-table test, centermark expect, run.py deleted_paint_read).
-- In flight (00:48): qa reopened COMPARE-COMMON-PARTS-MISSING (common parts tinted). Cause: the compare depth pass
-  drew every display level of each body, its bounding box in front of its faces (walk3/r: both sides' meshes
-  identical). Fix renderer.rs `level_shown` for the dn pass; test `offscreen::compare_reads_each_versions_shown_level_
-  not_its_box` (fails before: blue). Mate toolbar: clamped with the viewport's window origin while the pointer is
-  graphics-local (pushed right near the left edge), and its grip drag lost the move that started gpui's drag (+1 px
-  border): both fixed in `render_mate_hud` (drag from the press), told asm 00:3x; test `the_mate_
-  toolbar_stands_by_the_second_pick_and_its_grip_moves_it` (feel tests can draw the front layer: open_from_top_on).
+- LANDED b2000916 (01:48): compare mode's depth pass draws only the shown display level (qa reopened
+  COMPARE-COMMON-PARTS-MISSING; qa verified 02:0x on green 14d18cb74: all 6 parts grey); mate toolbar clamp + grip fixes; tests.
+- In flight (02:xx): the 4 asm feel rows tested (ui_tests: `a_filled_mates_fields_and_its_chips_act_as_live` (Fields +
+  Connector chip), `the_animate_dialog_reads_reciprocate_and_its_icon_reverses_the_playback`, `an_empty_named_
+  positions_panel_says_what_they_are_and_adds_the_first`; debug_selectors added on the elements). Simulation
+  connection is left out (simulation). Triad ball snap rewritten to live triad-snap-1121 (told asm 01:3x):
+  `triad_snap` = the face under the pointer's inference point nearest its 3D spot, no px reach, let go within 8 px
+  (BALL_RING_PX) and over background; the triad unturned; marks + glyph drawn; release at the free position
+  (DragState triad_free). Feel test `the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_at_the_pointer`;
+  Short press drop back at +60 px. Asked live (REQUESTS 11-21 01:40) for a release while snapped; live's (a) "never
+  snapped" run is not explained by the 8 px rule (lag?): recheck if live's answer differs. Edges' own look not drawn.
 - Told asm 23:15: in a test window the instance list's rows slice isn't redrawn after a document edit (set_fixed
   false/true: the fixed icon stays; a notify on the view or on slices.rows doesn't redraw it; window.refresh() does).
   Not checked in the app. Feel tests that change the list must build the state before opening (open_from_top_when).
@@ -37,11 +41,7 @@ e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
   live paints a deleted table until the next click and its recorder reads that paint ("EDGE Top", behaviours retake
   2); run.py `deleted_paint_read` leaves ours uncompared there (whole night suite re-scored: only that scenario
   changes). Ours reads Front there: the pointer rests on Front where the menu's Delete row was.
-- Asm feel rows (lead 23:28: Insert preview / Snap mode lines / Short press first; Drag feel skipped, live has no
-  server-side number): those 3 pass. Short press: live's ball snaps as connector placement in a Part Studio
-  (behaviours ball-1119: 50 px, turns to the face frame); ours 14 px unturned (`triad_snap`): smaller, not larger.
-  Assembly reach asked in REQUESTS 23:41; the test drops it in empty space until then. Next: Fields,
-  Connector chip, Animate…, Named positions empty (4 left once the toolbar test passes).
+- Asm feel rows: none left untested in interaction-feel's asm tables.
 - Then: re-shoot drw-custom-table-split + drw-datum-empty-field (start block-drawing-table-2parts), re-run the matrix.
 
 ## Next, in order

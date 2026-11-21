@@ -829,6 +829,7 @@ impl MateDialog {
             let bold = self.editing_field == Some(field);
             rows.push(
                 os::query_row(SharedString::from(format!("mc-field-{field}")), text.clone())
+                    .debug_selector(move || format!("mc-field-{field}"))
                     .on_hover(cx.listener(move |this, on: &bool, _, cx| {
                         let now = if *on { Some(field) } else { this.hovered_field.filter(|f| *f != field) };
                         if now != this.hovered_field {
@@ -844,6 +845,7 @@ impl MateDialog {
                         d.child(
                             div()
                                 .id(SharedString::from(format!("mc-edit-{field}")))
+                                .debug_selector(move || format!("mc-edit-{field}"))
                                 .tooltip(crate::ui::tooltip(edit_tip))
                                 // Live: `mate-connector-qlv-item`, 15 px.
                                 .child(crate::assets::icon("mate-connector-qlv-item", 15., cx))
@@ -857,6 +859,7 @@ impl MateDialog {
                         d.child(
                             div()
                                 .id(SharedString::from(format!("mc-clear-{field}")))
+                                .debug_selector(move || format!("mc-clear-{field}"))
                                 .tooltip(crate::ui::tooltip(format!("Delete {text_del}")))
                                 // Live: a 16.67 px "×" (#666), 5 px padding.
                                 .px(px(5.))
@@ -895,6 +898,7 @@ impl MateDialog {
                 d.child(
                     div()
                         .id("mate-swap")
+                        .debug_selector(|| "mate-swap".into())
                         .absolute()
                         .top(px(1.))
                         .right(px(5.))
@@ -930,7 +934,7 @@ impl Render for MateDialog {
             sel.set_translated(true);
             sel.set_items(types.iter().map(|mt| (SharedString::from(mt.name()), SharedString::from(crate::i18n::spec(mt.name())))).collect(), t.name())
         });
-        let type_field = div().id("mate-type-field").w(px(194.)).tooltip(crate::ui::tooltip("Mate type")).child(self.type_select.clone());
+        let type_field = div().id("mate-type-field").debug_selector(|| "mate-type-field".into()).w(px(194.)).tooltip(crate::ui::tooltip("Mate type")).child(self.type_select.clone());
         let (ox, oy, oz, orot) = offset_axes(t);
         let has_offset = ox || oy || oz || orot;
         let lkeys = limit_keys(t);
@@ -1062,6 +1066,7 @@ impl Render for MateDialog {
         let small_tool = |id: &'static str, icon: AnyElement, tip: &'static str, on: bool| {
             div()
                 .id(id)
+                .debug_selector(move || id.into())
                 .size(px(26.))
                 .flex()
                 .items_center()
@@ -1076,6 +1081,7 @@ impl Render for MateDialog {
         };
         v_flex()
             .id("mate-dialog")
+            .debug_selector(|| "mate-dialog".into())
             .key_context("FeatureDialog")
             .track_focus(&self.focus)
             .w(px(220.))
@@ -1204,6 +1210,7 @@ impl Render for MateDialog {
                                 d.child(
                                     div()
                                         .id("mate-animate")
+                                        .debug_selector(|| "mate-animate".into())
                                         .size(px(26.))
                                         .flex()
                                         .items_center()
@@ -1229,6 +1236,7 @@ impl Render for MateDialog {
                                 // `#aaa`, radius 3.5, 12.25 px.
                                 div()
                                     .id("mate-solve")
+                                    .debug_selector(|| "mate-solve".into())
                                     .h(px(21.))
                                     .px(px(10.))
                                     .flex()

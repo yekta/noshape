@@ -4061,6 +4061,7 @@ impl AssemblyView {
         let pb_label = pb.label();
         // Live: 110 px, the text 6 px in, an 8x4 #333 caret 6 px from the right.
         let playback = Button::new("anim-playback")
+            .debug_selector(|| "anim-playback".into())
             .ghost()
             .small()
             .w(px(110.))
@@ -4083,6 +4084,7 @@ impl AssemblyView {
         let icon_btn = |id: &'static str, icon: &'static str, tip: &'static str, on: bool| {
             div()
                 .id(id)
+                .debug_selector(move || id.into())
                 .size(px(26.))
                 .flex()
                 .items_center()

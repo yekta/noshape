@@ -1027,12 +1027,81 @@ fn a_short_press_selects_the_face_and_the_triads_ball_moves_only_the_triad(cx: &
     let at = triad(cx);
     assert!((at - on_part).length() < 2.0, "the triad at the click point: {at:?} for {on_part:?}");
     let before = cx.update(|cx| view.read(cx).result.instance_bounds(part).unwrap());
-    // Into empty space: near a face's dot live's ball snaps as connector placement does (Part Studio ball-1119: 50 px,
-    // turned to the face's frame); ours within 14 px, unturned (triad_snap). The assembly's reach is asked in REQUESTS 11-20.
-    let to = DVec2::new(40.0, 40.0);
+    // Live triad-snap-1121: the release leaves the triad at the pointer, snapped on the way or not.
+    let to = at + DVec2::new(60.0, 0.0);
     drag(cx, window, &view, at, to);
     let moved = triad(cx);
     assert!((moved - to).length() < 2.0, "the triad followed the ball: {moved:?} for {to:?}");
     let after = cx.update(|cx| view.read(cx).result.instance_bounds(part).unwrap());
     assert!((after.0 - before.0).length() < 1e-9 && (after.1 - before.1).length() < 1e-9, "the part stayed");
+}
+
+/// Live triad-snap-1121: the triad's centre ball dragged over a face sits on its inference point nearest the pointer's
+/// spot in 3D, however far on screen, the triad's arrows unturned; with that point under the pointer (within the ball's
+/// ~8 px ring), and over the background, it follows the pointer; the release leaves the triad at the pointer.
+#[gpui::test]
+fn the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_at_the_pointer(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "ball-snap", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
+    let on_part = (lo + hi) * 0.5 + DVec2::new((hi.x - lo.x) * 0.25, 0.0);
+    move_to(cx, window, &view, on_part);
+    wait_until(cx, window, &view, |v, _| v.hover.is_some());
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at_window(cx, &view, on_part), Modifiers::default());
+    wait_until(cx, window, &view, |v, _| !v.ui.entity_sel.is_empty());
+    settle(cx, window, &view);
+    let triad = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).manipulator(cx).expect("a triad"));
+    let start = triad(cx);
+    let at = cx.update(|cx| view.read(cx).viewport.read(cx).project(start.origin).unwrap());
+    // Part 2's top face: its centre, and a spot 30 % of the way from there to a corner (the centre still nearest).
+    let (centre, spot) = cx.update(|cx| {
+        let v = view.read(cx);
+        let id = v.assembly(cx).and_then(|a| a.instances.iter().find(|i| i.name == "Part 2 <1>")).unwrap().id;
+        let (lo, hi) = v.result.instance_bounds(id).unwrap();
+        let centre = glam::DVec3::new((lo.x + hi.x) * 0.5, (lo.y + hi.y) * 0.5, hi.z);
+        let vp = v.viewport.read(cx);
+        let (c, k) = (vp.project(centre).unwrap(), vp.project(glam::DVec3::new(lo.x, lo.y, hi.z)).unwrap());
+        (centre, c + (k - c) * 0.3)
+    });
+    let centre_px = cx.update(|cx| view.read(cx).viewport.read(cx).project(centre).unwrap());
+    assert!((spot - centre_px).length() > 20.0, "the spot well off the centre on screen: {spot:?} {centre_px:?}");
+    let w = at_window(cx, &view, at);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_down(w, MouseButton::Left, Modifiers::default());
+    let go = |cx: &mut TestAppContext, from: DVec2, to: DVec2| {
+        for k in 1..=8 {
+            let p = at_window(cx, &view, from + (to - from) * (f64::from(k) / 8.0));
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(p, Some(MouseButton::Left), Modifiers::default());
+            frames(cx, window, &view);
+        }
+    };
+    let ball = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let f = v.manipulator(cx).unwrap();
+            (f, v.viewport.read(cx).project(f.origin).unwrap(), v.drag.as_ref().is_some_and(|d| d.ball_snap.is_some()))
+        })
+    };
+    go(cx, at, spot);
+    let (f, _, snapped) = ball(cx);
+    assert!(snapped && (f.origin - centre).length() < 1e-6, "on the face's centre: {:?} for {centre:?}", f.origin);
+    assert!((f.rotation.dot(start.rotation)).abs() > 1.0 - 1e-9, "the triad unturned");
+    go(cx, spot, centre_px);
+    let (_, shown, snapped) = ball(cx);
+    assert!(!snapped && (shown - centre_px).length() < 2.0, "the point under the pointer: the ball follows it ({shown:?})");
+    go(cx, centre_px, spot);
+    assert!(ball(cx).2, "snapped again off the ring");
+    let background = DVec2::new(40.0, 40.0);
+    go(cx, spot, background);
+    let (_, shown, snapped) = ball(cx);
+    assert!(!snapped && (shown - background).length() < 2.0, "none over the background ({shown:?})");
+    go(cx, background, spot);
+    assert!(ball(cx).2);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(at_window(cx, &view, spot), MouseButton::Left, Modifiers::default());
+    settle(cx, window, &view);
+    let (_, left, _) = ball(cx);
+    assert!((left - spot).length() < 2.0, "released snapped, the triad at the pointer: {left:?} for {spot:?}");
 }
