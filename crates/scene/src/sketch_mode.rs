@@ -6451,6 +6451,11 @@ impl SketchEditor {
         };
         let circle_pts = |c: DVec2, r: f64, n: usize| -> Vec<DVec2> { (0..=n).map(|i| c + DVec2::from_angle(i as f64 / n as f64 * TAU) * r).collect() };
         let cursor = self.snapped().map(|s| s.0).filter(|_| !self.pointer_rests);
+        // The Text tool's box between its two corners: no text until ✓ (live sketch/132, 134).
+        let mut text_box = match self.text_clicks.as_slice() {
+            [a, b] if self.pending_text.is_some() => Some((a.pos, b.pos)),
+            _ => None,
+        };
         if let Some(c) = cursor {
             let anchors: Vec<DVec2> = self.clicks.iter().map(|k| k.pos).collect();
             match self.tool {
@@ -6689,18 +6694,9 @@ impl SketchEditor {
                         poly(&[o, o + DVec2::X * wdt, o + DVec2::new(wdt, h), o + DVec2::Y * h, o], preview_color, true);
                     }
                 }
-                Tool::Text => {
-                    let (origin, h) = self.pending_text.unwrap_or_else(|| match anchors.first() {
-                        Some(a) => self.text_box_from(*a, c),
-                        None => (c, self.text_height),
-                    });
-                    let text = if self.text_string.trim().is_empty() { "Text" } else { self.text_string.as_str() };
-                    let layout = noshape_sketch::text::layout_text(text, &self.text_font, self.text_bold, self.text_italic);
-                    let wdt = layout.width.max(0.3) * h;
-                    poly(&[origin, origin + DVec2::X * wdt, origin + DVec2::new(wdt, h), origin + DVec2::Y * h, origin], preview_color, true);
-                    for pl in layout.polylines(6) {
-                        let pts: Vec<DVec2> = pl.iter().map(|q| origin + *q * h).collect();
-                        poly(&pts, preview_color, false);
+                Tool::Text if self.pending_text.is_none() => {
+                    if let Some(a) = anchors.first() {
+                        text_box = Some((*a, c));
                     }
                 }
                 _ => {}
@@ -6710,6 +6706,13 @@ impl SketchEditor {
             let on_point = self.clicks.is_empty() && self.inference.as_ref().is_some_and(|i| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Midpoint | InferenceKind::Center | InferenceKind::Quadrant));
             if self.tool.draws() && !on_point && !(self.tool == Tool::Circle && !self.clicks.is_empty()) {
                 points.points.push(PointSprite { position: w(c), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
+            }
+        }
+        if let Some((a, b)) = text_box {
+            let corners = [a, DVec2::new(b.x, a.y), b, DVec2::new(a.x, b.y)];
+            dash_dot.push(corners.iter().chain(&corners[..1]).copied().collect());
+            for p in corners {
+                points.points.push(PointSprite { position: w(p), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
             }
         }
         // Use: preview of the projection of the hovered edges.
@@ -13564,6 +13567,23 @@ mod tests {
             let blue = lines.segments.iter().filter(|s| s.color == [68, 156, 205, 255]).count();
             let want = match ed.clicks.len() { 0 | 1 => 0, 2 => 1, _ => 5 };
             assert!(blue >= want, "after click {}: {blue} preview segments", ed.clicks.len());
+        }
+    }
+
+    /// Live sketch/132: with the Text dialog open only the dash-dot box and its 4 corner points, no text.
+    #[test]
+    fn the_text_box_is_drawn_without_its_text_while_the_dialog_is_open() {
+        let (mut ed, mut d) = editor(Tool::Text);
+        click(&mut ed, &mut d, v(-0.02, 0.0));
+        click(&mut ed, &mut d, v(0.02, 0.01));
+        assert!(ed.pending_text.is_some());
+        let (lines, points) = ed.overlay(&d, &UnitPrefs::default());
+        let blue: Vec<_> = lines.segments.iter().filter(|s| s.color == PREVIEW_COLOR).collect();
+        assert!(blue.len() > 8, "dash-dot pieces: {}", blue.len());
+        let on_box = |p: [f32; 3]| [(p[0] + 0.02).abs(), (p[0] - 0.02).abs(), p[1].abs(), (p[1] - 0.01).abs()].iter().any(|d| *d < 1e-6);
+        assert!(blue.iter().all(|s| on_box(s.a) && on_box(s.b) && s.style & LineSegment::DASHED == 0), "text strokes drawn");
+        for c in [v(-0.02, 0.0), v(0.02, 0.0), v(0.02, 0.01), v(-0.02, 0.01)] {
+            assert!(points.points.iter().any(|p| p.color == PREVIEW_COLOR && (p.position[0] as f64 - c.x).abs() < 1e-6 && (p.position[1] as f64 - c.y).abs() < 1e-6), "corner {c}");
         }
     }
 }
