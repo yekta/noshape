@@ -28,6 +28,10 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   in-drag server reply is 0.03-0.13 s), but it is a numeric move, not the app's drag. It moved 2 / 0 / 1 / 1 instances where
   live's drag moved 132 / 8 / 12 / 8, and the infento handlebar didn't move at all. The app's drag path needs its own
   measurement.
+- [ ] P2 **ASM-TRANSFORM-FOLLOWERS (asm, confirmed by asm 11-21 03:3x)**: assembly_transform only stores the placement and
+  re-solves from it. It does not hold the target the way the app's triad move does (SolveOptions.targets), so mated followers
+  don't come along. +2 mm in x moved 2 instances of asm-scissor-lift (live's drag: 132) and none of asm-infento-subs (live: 8).
+  Wanted: the op moves the same instances as the app.
 - SPEED-IMPELLER (P1, below) on the user action: editing Extrude 3 takes 24.7 s vs live's server 3.5-3.7 s (6.8x), undo 2.0 vs
   0.9-1.1 s, open 24.8 s; regen 23409 ms vs live 2773 (Fillet Flansch 5261 ms). bool's 908abe7b8 (the flange fuse) is not in
   this build; to recheck on the first green that has it.
