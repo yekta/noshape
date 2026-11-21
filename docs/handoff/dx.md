@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-21 16:11 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-21 17:50 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -13,33 +13,35 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 16:11 11-21 (read first)
-- LEAD 16:0x: do fast open step 4 now (selection while the stored display shows), measured on heavy docs at human
-  scale (first click / hover selects within a frame of being able to), then land. Report at queue empty or failed land.
-  live2 is gone: live owns both lanes (REQUESTS still works).
-- STEP 4 IN FLIGHT. Found: infento (Assembly 1, vibex8 ~/tmp/dx/openinf-b run 2): cached frame 2.3 s, real result 66 s
-  (fresh cache = another machine). Part Studio cached view only defers feature dialogs (cached_open.rs); picks come from
-  the display. Assembly cached view (assembly_open.rs Snapshot): occurrences keep face/edge/vertex refs, only
-  `context` (B-reps) is empty; assembly_view.rs ~3468 a mouse-down with hover / selection in cached_view says WAITING
-  and returns; the Click handler (~3360) has no cached check, so a click may already select. B-rep users: selection
-  readout (5661 edge_faces, 6182 mass), mate inference (3024), connectors, std hole picks. Plan: verify in the app
-  first, then let press / click select in the cached view (only a real drag waits), readouts fill when the real
-  result lands; core's result store (app-core result_store.rs, user cache) already brings B-reps on the same machine.
-  Probe: /root/dx-scratch/open4/openpick.sh (copied to vibex6 ~/agents/dx-keep; NEEDS infento + display rows for the
-  binary's build: it runs run 1 to write them): run 2 hovers/clicks mid cached window with screenshots, run 3 = same
-  machine (result store). Use on vibex8 too (infento at ~/agents/dx-keep/infento.noshape there; change D if busy).
-  Binary: release app of origin/main building on vibex8 from dx-urdf (log /root/dx-scratch/buildA.out; copies to
-  vibex8 ~/agents/dx-keep/noshape-A). Not started: any step 4 code.
-- STL SPLIT (live 16:0x, behaviours "dx (11-21 14:06)"): rule = drop duplicate triangles (same 3 corners), join only
-  across edges used by exactly two, 3+ split; verified in python on both files (/root/dx-scratch/stl/rule2.py: duct
-  9, bottle 148 with live's facet counts). C++ change in mesh_body.cpp mesh_bodies + test
-  mesh_pieces_split_where_more_than_two_triangles_meet (replaces closed_meshes_touching_along_edges_stay_two_solids)
-  UNCOMMITTED in worktree dx-main (branch dx-stl; patch /root/dx-scratch/stl/stl-split.patch). Test running on vibex8
-  (log /root/dx-scratch/stl/t1.out). Then: exchange suite STL rows (duct, bottle, others reading meshes), land.
-- VIEW BOX (live 16:0x, behaviours "dx (11-21 14:20)"): sketches/planes never count; side = drawn extent + 10 % of the
-  larger side, min 0.68 in (sheet); plus each cylindrical face's axis drawn 0.09 in (sheet) past the face's ends;
-  centermarks don't count. Where ours centres views: not found yet (crates/drawing views.rs update_bounds is the
-  drawn box; create.rs push_inserted_view). After STL and step 4.
+## STATE 17:50 11-21 (read first)
+- LANDED: STL split c497ac8c (duct 9 / bottle 148 surfaces as live; ours lists them as one composite part with 0 edges,
+  live has one closed edge per boundary loop: P3 note, not ticketed yet). Docs d4cb27b07 (SETLIB-IMAGES ticket follows
+  live: library only in sketch Insert image, name = noshape_store::local_user_name()), ac8324e90 (DRW-VIEW-CENTRE P3
+  ticket: live's view box rule; ours off <= 0.075 in; view box work parked there).
+- STEP 4 IN FLIGHT, worktree dx-open branch dx-open4 (commit bf8e5d80b + UNCOMMITTED follow-ups):
+  - committed: assembly cached view: a press on a part selects on release; only a drag (ToolDrag past 2 px / 50 ms)
+    or a triad / placing press says WAITING. Test a_cached_assembly_stands_in_until_the_real_one_lands extended (hover +
+    click selects, drag waits, nothing moves); verified it FAILS on the old code. Part Studio cached view already
+    selected: its test a_cached_display_stands_in_until_the_identical_real_one_lands now hovers + clicks the top face.
+  - uncommitted: perf.rs arm_frame_milestone_once; "open: cached/full model frame presented" now armed when the scene is
+    INSTALLED (AssemblyView::arm_model_frame, ui.scene_milestone) - the old arm timed a frame WITHOUT the model;
+    "open: first hover lit" once, "select: click drawn" every click; asm_scene.rs prepare_bodies (new meshes uploaded
+    on all cores, std::thread::scope); a perf log line in rebuild_scene_in_background (waited / cache lock / built ms).
+    Mac: assembly-ui ui_tests 94/94, noshape-scene all pass (before the perf log line).
+- MEASURED (vibex6, infento Assembly 1, run 2 = fresh cache = another machine, openpick2.sh): honest model frame
+  ~0.97-1.0 s (my step 3 "342 ms" timed a frame without the model: TELL THE LEAD, P1 target <= 0.5 s NOT met);
+  hover lights within a frame once the model is drawn; click -> drawn 232 ms in cached view, 125 ms after the full
+  model. prepare_bodies didn't visibly help. Suspect: AsmPickMap::push clones path + Reference per face/edge/vertex of
+  every occurrence into by_ref HashMap (asm_scene.rs ~38). Run s6 (with the build timing line) running on vibex6:
+  /root/dx-scratch/open4/s6.out (EXIT when done), app logs ~/tmp/dx/openpick-s6/run2.log there.
+- NEXT: read s6 timings; if build-bound, make the pick map cheap (lazy by_ref, or index by occurrence) and re-measure;
+  check why fullclick2/3 logged no "select: click drawn"; then commit, land (assembly-ui, scene, render crates), report
+  to the lead with the corrected numbers. Then: duct exchange rows (live 17:20 rerun done: Rhino V6/V7, STEP-PRE
+  Automatic / b-surfaces, 4 parts each, /root/parity/exchange/c2-duct-multipart/live-opt-*, live-opt-self.json).
+- Probe: /root/dx-scratch/open4/openpick2.sh (copy on vibex6 ~/agents/dx-keep; `bash openpick2.sh <binary> <tag>`):
+  run 1 writes rows, run 2 fresh cache hovers/clicks at (1000,560) once the cached model frame is up, 3 clicks after
+  the full model, run 3 = same machine; prints ms since start + click -> drawn. Binary vibex6 ~/agents/dx-keep/noshape-B.
+- Hosts: Mac dx-urdf removed (22 GB; ~/noshape-host 128 GB); vibex8 dx-urdf + dx-main targets removed.
 - My images (SETLIB-IMAGES): live answering next (REQUESTS dx 15:31).
 - LANDED today: 5bbec61b (exchange stack), fast open 92d02c14 / f626b268 / 28f6bf2c (step 3: the last-viewed tab's row
   decoded as soon as the rows are read; infento cached model frame 342 ms on vibex6, target <= 0.5 s met), drawing
