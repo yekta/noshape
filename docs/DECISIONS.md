@@ -172,3 +172,8 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   declined, where a fix shows 0 new differences on every corpus.
 - 11-18 (lead) Hosts: psui builds off vibex6 (the watcher's host) to vibe2; the Mac takes two build slots (12 cores);
   at most one suite, gate or timing pair at a time on an 8-core host (via ~/bin/slot).
+- 11-21 (lead) Exported files copy live's content, layers included (DXF/DWG spline polylines on layer 0 as live):
+  a layer or entity choice is behaviour, not a shortcoming. Deviate only where live's file is broken (wrong geometry,
+  unreadable).
+- 11-21 (lead) No kernel limit may change a result with the machine: time limits become work-step counts (blend
+  5942f962), the Boolean's memory limit is a flat 8 GB (3/4 of RAM below 11 GB; bool-mem).
