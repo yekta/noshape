@@ -13,40 +13,30 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 17:57 11-21 (read first)
+## STATE 18:21 11-21 (read first)
 - LANDED: STL split c497ac8c (duct 9 / bottle 148 surfaces as live; ours lists them as one composite part with 0 edges,
   live has one closed edge per boundary loop: P3 note, not ticketed yet). Docs d4cb27b07 (SETLIB-IMAGES ticket follows
   live: library only in sketch Insert image, name = noshape_store::local_user_name()), ac8324e90 (DRW-VIEW-CENTRE P3
   ticket: live's view box rule; ours off <= 0.075 in; view box work parked there).
-- STEP 4 IN FLIGHT, worktree dx-open branch dx-open4 (commit bf8e5d80b + UNCOMMITTED follow-ups):
-  - committed: assembly cached view: a press on a part selects on release; only a drag (ToolDrag past 2 px / 50 ms)
-    or a triad / placing press says WAITING. Test a_cached_assembly_stands_in_until_the_real_one_lands extended (hover +
-    click selects, drag waits, nothing moves); verified it FAILS on the old code. Part Studio cached view already
-    selected: its test a_cached_display_stands_in_until_the_identical_real_one_lands now hovers + clicks the top face.
-  - uncommitted: perf.rs arm_frame_milestone_once; "open: cached/full model frame presented" now armed when the scene is
-    INSTALLED (AssemblyView::arm_model_frame, ui.scene_milestone) - the old arm timed a frame WITHOUT the model;
-    "open: first hover lit" once, "select: click drawn" every click; asm_scene.rs prepare_bodies (new meshes uploaded
-    on all cores, std::thread::scope); a perf log line in rebuild_scene_in_background (waited / cache lock / built ms).
-    Mac: assembly-ui ui_tests 94/94, noshape-scene all pass (before the perf log line).
-- MEASURED s6 (vibex6, infento, run 2 = fresh cache): cached display in 0.52 s, scene build 0.69 s (cache lock 0),
-  scene set on the viewport 1.31 s, model frame presented 2.36 s: the last 1 s is llvmpipe (vibex6 has no GPU, the
-  regen saturates its 8 cores), not ours. The old "342 ms" timed a frame without the model: TELL THE LEAD (P1 <= 0.5 s
-  not met; cut the 0.69 s build and the 0.38 s row decode). Full-model click -> drawn 330 ms on llvmpipe.
-  fullclick2/3 had no log: the viewport REUSED a cached frame (frame_cache) and never logged armed milestones; fixed
-  uncommitted in app-core viewport.rs (log_milestones_up_to, also on the reused path).
-  s7 (running, /root/dx-scratch/open4/s7.out, EXIT at end): asm_scene.rs logs "bodies prepared in / picks in / all in".
-- NEXT: read s7; if picks dominate, make AsmPickMap cheap (lazy by_ref or index per occurrence); commit, land
-  (assembly-ui, scene, render, app-core), report. Then duct exchange rows: live's files copied to vibex6
-  ~/tmp/dx/exs-duct; build the ops test binary (dx-open), OPSBIN=<it> exch.sh x duct ~/tmp/dx/exs-duct (cases
-  RHINO-V6/V7, STEP-PRE-AUTO/BSURF already in parity.rs's table).
+- STEP 4 QUEUED a19a2e97 (dx-open4: bf8e5d80b click selects in the assembly's stored display, only a drag waits;
+  81d343526 AsmPickMap keeps id runs per occurrence (by_path) instead of a (path, ref) map per entity; open
+  milestones armed at scene install; reused frames log milestones). Mac: assembly-ui ui_tests 94/94, scene all, clippy.
+- MEASURED s8 (vibex6 infento run 2, fresh cache): rows 16 ms, decoded 157, cached display in 192, scene build 58 ms
+  (picks 208 -> 24 ms, all 298 -> 58), scene set 292 ms; model frame presented 1033 ms only because llvmpipe renders
+  that frame in ~600 ms (no GPU on vibex6). Click -> drawn 249 ms (llvmpipe). Later probe clicks hit the triad that
+  click 1 places at the click point (as live), so they select nothing: probe should click fresh spots.
+  Old step 3 "342 ms" timed a frame without the model: told in the report.
+- NEXT: report to the lead at queue empty; duct exchange rows running on vibex8 (/root/dx-scratch/open4/duct.out,
+  EXIT at end; script vibex8 ~/agents/dx-keep/duct.sh: release ops test binary from dx-open, then
+  NOSHAPE_PARITY_ONLY=c2-duct-multipart on ~/tmp/dx/exs-duct); rows RHINO-V6/V7, STEP-PRE-AUTO/BSURF.
 - Probe: /root/dx-scratch/open4/openpick2.sh (copy on vibex6 ~/agents/dx-keep; `bash openpick2.sh <binary> <tag>`):
   run 1 writes rows, run 2 fresh cache hovers/clicks at (1000,560) once the cached model frame is up, 3 clicks after
   the full model, run 3 = same machine; prints ms since start + click -> drawn. Binary vibex6 ~/agents/dx-keep/noshape-B.
 - Hosts: Mac dx-urdf removed (22 GB; ~/noshape-host 126 GB at 17:5x); vibex8 dx-urdf + dx-main targets removed.
 - LANDED today: 5bbec61b (exchange stack), fast open 92d02c14 / f626b268 / 28f6bf2c (step 3: the last-viewed tab's row
-  decoded as soon as the rows are read; infento cached model frame 342 ms on vibex6, target <= 0.5 s met), drawing
-  5c4bc11c (CONIC_TOL 30 um; rims round a view-axis cylinder get its centermark: rings-loft Top view as live). Nothing
-  queued. Reported to the lead 14:19.
+  decoded as soon as the rows are read; its "342 ms" was a frame without the model, see s8), drawing
+  5c4bc11c (CONIC_TOL 30 um; rims round a view-axis cylinder get its centermark: rings-loft Top view as live).
+  Reported to the lead 14:19.
 - rings-loft per feature matches live (Extrude 7 / Shell 2 rims); TICKETS EDGE-CENTRE-SEAM (core, sent 14:17): our edge
   centre (linear_properties) is off on a rim crossing its ellipse's seam. Probe vibex6 ~/agents/dx-keep/sr/rlmid.py ./cli
   ~/agents/dx-keep/sr/rl-saved.noshape ~/parity/models/c2-rings-loft/live.jsonl.
