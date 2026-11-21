@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-21 21:55 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-21 22:57 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -13,34 +13,51 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 21:55 11-21 (read first)
-- HOSTS (user 18:5x, corrected 19:2x, DECISIONS a16b39297): default builds on vibe2; the Mac only via its slot (RB_HOST=mac
-  waits), only when vibe2 is busy. No dx target on the Mac (dx-open 12 GB, dx-urdf 22 GB deleted 18:5x).
-- LANDED a19a2e97 as 62694171 (19:09): step 4 (AsmPickMap per occurrence, picks 208 -> 24 ms). infento vibex6 fresh cache:
-  rows 16 ms, decoded 157, cached display 192, scene build 58 (was 298), model frame 1033, click -> drawn 249. Step 3's
-  "342 ms" timed a frame WITHOUT the model.
-- CHECKING b51ca6b9 (queued 20:18): STEP "convert all surfaces to b-surfaces" (duct 38 B-surfaces; read back 41/47, was 40).
-- QUEUED bbd56cd5 (21:03): P3 SETLIB-IMAGES (ops images_library.rs, op documents_images_library, sketch_insert_image
-  `image`, select_item.rs Library ▾ "‹name› images"); carries b51ca6b9.
-- QUEUED e418ada0 (21:5x): P3 DRW-VIEW-CENTRE d934ff40e (views.rs `Reach`: bodies' tight box + every >= half cylinder
-  axis 0.09 in past its faces; one 3D point per source) + handoff; carries bbd56cd5 / b51ca6b9. A/B vibex8 (ab.out):
-  assembly views 4180 / 4389 A vs 4232 / 4850 B (B run 2 under load 15: its regenerations +40 % too), Part Studio
-  views 2168 / 2267 vs 2029 / 3276: no >= 2x. ops-vcA deleted; delete vibex8 ~/agents/dx-keep/bin/ops-vcB after vcex.
-- RUNNING vibex8 ~/agents/dx-keep/vcex.sh (duct + bottle exchange rows with ops-vcB) -> /root/dx-scratch/vc/vcex.out:
-  expect bottle Front / Right at live's y (2.2942..4.0842), STL rows 9 / 148 parts.
-- NEXT: queue empty after vcex. STL surface edges filed as TICKETS P3 STL-SURFACE-EDGES (kernel-wide: edges on mesh
-  faces). hex's 2 live ELLIPSEs are quarter arcs of a 0.5 mm circle whose rest live writes as polylines: HLR noise.
-- REPORT at queue empty (<=5 lines): step 4 numbers + step-3 correction; Mac targets freed; duct 41/47; STL split
-  c497ac8c; SETLIB-IMAGES; DRW-VIEW-CENTRE.
-- Probe: /root/dx-scratch/open4/openpick2.sh (vibex6 ~/agents/dx-keep); full run (no skip1) after any rebuild: rows
-  are keyed by build. Clicks repeated at one spot hit the triad: probe artifact.
-- TICKETS EDGE-CENTRE-SEAM (core, sent 14:17): our edge centre (linear_properties) is off on a rim crossing its ellipse's
-  seam. Probe vibex6 ~/agents/dx-keep/sr/rlmid.py ./cli ~/agents/dx-keep/sr/rl-saved.noshape ~/parity/models/c2-rings-loft/live.jsonl.
-- PARKED 15:4x: the housing compat IGES rim (36 / 80 / 45 vs live 36 / 79 / 44). OCCT's r 12.5 mm cylinder needs a seam
-  ending at the rim's top; live's Parasolid face has none. Only a counting rule would match; P3 note in formats.md. WIP
-  in /root/dx-scratch/igesseam-wip2.patch (changed no count).
-- Drawing rows 2/10 (duct, louver). Mac suite dirs ~/noshape-host/dx-keep/exs-drw (10 docs, `bash exx.sh exs-drw
-  exs-drw.log`), exs-rings. View centres: /root/dx-scratch/vc/pads.py <doc> (live drawing-live.json boundingBoxPoints).
+## STATE 22:57 11-21 (read first)
+TASK (user 21:5x, two speed items, both user-facing): (1) fast open honestly measured: open -> first frame WITH the model
+on infento, scissor, isaac, rings, 400-hole plate, vs live; target <= 0.5 s; close gaps >= 2x and >= 100 ms. (2) hover
+latency on heavy docs (qa: plate 353-487 ms, 1000-inst asm 560-750, 30-feature 150-245): profile, cut what's > ~100 ms.
+Builds on the Mac or vibex8 (vibe2 = land queue).
+- COMMITTED, NOT QUEUED (on top of e418ada0 + 9bfd6596f docs):
+  76d128b9c display_cache: key "<tag>.<content>.<build16>"; a doc row of the same content from ANOTHER build stands in
+    (load / load_keyed via `shows`, only if `same_layout`: decoded value re-encodes to the same bytes). Before: every
+    release missed the rows -> full regen on first open after each update. Test display_cache:: 4/4 (Mac).
+    BEFORE LANDING: verify on real docs that same_layout passes (StudioDisplay / assembly Snapshot may hold maps ->
+    always a miss = old behaviour, safe): build I on vibex8, open fo-H-* docs (rows written by noshape-H) with it.
+  860c7fb02 render prewarm: a software adapter prewarms 1x MSAA (built 4x first: ~100 ms render thread, unused).
+    Test a_software_rasteriser (Mac). Clippy app-core/render/model-core/model clean (Mac).
+  e16205d6e importing.rs: STL open pieces = separate surfaces, no composite (file parts PVZ/OBJ keep the closed
+    composite). Test features_b::an_stl_s_open_pieces_are_surfaces; features_b 68/68 (Mac).
+- QUEUED e418ada0 (21:53, #4): DRW-VIEW-CENTRE + handoff; carries bbd56cd5 (SETLIB-IMAGES), b51ca6b9 (STEP b-surf).
+- vcex (22:1x, ops-vcB): duct DXF + options match; bottle STILL 0.015 in off (Front/Right) -> DRW-VIEW-CENTRE's axes
+  rule doesn't move the bottle: cause unknown, reopen. STL rows "1 parts" = the composite -> fixed by e16205d6e.
+  Delete vibex8 ~/agents/dx-keep/bin/ops-vcB (A/B done). noshape-H (release app, 22:18) kept for A/B; delete after.
+- OPEN numbers (vibex8 llvmpipe, load 11-20, ms from launch; /root/dx-scratch/fo/openH.out, script fo/open3.sh,
+  logs vibex8 ~/tmp/dx/fo-H-<doc>/run{1,2,3}.log; run1 = no rows, run2 = rows + fresh cache, run3 = rows + same cache):
+  l30 3050 / 1606 / 1170; big-plate 2189 / 1800 / 1375; pins-1000 1737 / 1660 / 1509; rings 17153 / 1815 / 1337;
+  isaac full 135 s / cached 1118 / 2628 (full regen 164-191 s); scissor full 452 s / cached 1835 / 1771 (regen 312-402 s);
+  infento 34.7 s / 797 / 1023. Live (behaviours "Assemblies 1-5", 11-20): shaded 15-32 s (scissor 17-19, isaac 16-32,
+  infento 26). With rows we beat live 10-30x; over 0.5 s mostly from software GPU. Regen-to-editable is the real gap:
+  scissor 5-7 min vs live ~18 s, isaac 2.5-3 min (one scissor studio of 20 features 155 s: core's regen speed ->
+  report to lead; persisting B-reps = "step 4 B-reps" needs the lead's go).
+  Real GPU: perf.yml macOS jobs FAIL since 11-18 ("runner lost communication" in Benchmarks) -> tell lead. Last mac15
+  artifact (11-19, no rows): l30 379-1005, big-plate 816-1086, parts-1000 1133, NIST 1650-1789 (dx-scratch/perfrun/m15).
+  Breakdown l30 run3: GPU device+4x pipelines 372 ms, window after, session 408, cached display 420, frame 1 on llvmpipe
+  508 ms (incl. 1x pipelines 105). UI "ui stall ~150-300 ms (ui cpu ~30)" during first frames on Linux AND the mac
+  runner (Metal compile service / render-thread lock?): next lead to chase. decision needed (lead): run the app on the
+  Mac mini for real-GPU open/hover numbers (opens windows on the user's Mac)?
+- HOVER numbers (vibex8, frame log; /root/dx-scratch/fo/hovH.out, script fo/hov.sh <bin> <tag> <doc> <tab> x,y..):
+  plate 235-498 ms = move->pick asked 61-215 (Onshape's rule: fast move waits min(5 x avg pick, 250): our software pick
+  ~65-90 ms inflates it) + pick 65-90 + answer->present 152-277 (full re-render on llvmpipe + GPUI present ~60 ms each).
+  pins-1000 277-532 (2 x 2 s: two frames). l30 69-125 ms. Its 1.5 s "outliers" are a probe parse artifact (matched the
+  next round's move): lit at ~108 ms. Fix hov.sh: run dirs all named hov-H-a (basename a.noshape) -> use the tag.
+  Live (live 22:52, behaviours "qa 20:18 (1)", live/qa/walk2-1121/heavy-*.json; software GL Chrome): plate top face
+  42-53 ms, side 299-361; 1000-part PS face ~266, edge 0.74-2.0 s; 2000-inst asm 1.3-2.5 s (render-bound, no target).
+  Gap: plate top face ours ~350 vs 45 (both software). Real-GPU hover (perf.yml 11-04 pins-1000): p50 23-32 ms.
+  Levers: software pick cheaper (cull instances / per-face ranges outside the pick rect frustum; or pick ids in the
+  colour pass so picks are always "covered") -> also shrinks the 5x-avg wait; highlight without a full re-render.
+- NEXT: verify 76d128b9c on real docs (build I), land the 3 commits; report to lead (<= 5 lines): open table, isaac /
+  scissor regen gap (core), macOS perf.yml broken, Mac GUI decision; then the software pick cut.
 ## Exchange leftovers (11-21)
 - Drawing rows (2/10): bottle Front's lip arc 41.8..180 deg (live 90..180): Part 1 is one revolved solid (14 closed
   edges), the arc is the lip torus's outline; its inner 41.8..90 part should be hidden by the torus's near side, ours
