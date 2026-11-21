@@ -1490,6 +1490,48 @@ fn a_merge_takes_the_branchs_configured_values() {
     assert_eq!(got, ["25 mm", "45 mm"], "{c}");
 }
 
+/// history_merge with the Merge dialog's strategies (help "Merging"): both workspaces changed Part Studio 1, so it opens
+/// on Merge changes and a tab only the source created is replaced in; `tabs` keeps the current workspace's Part Studio 1
+/// instead; Merge changes on a tab one side created is refused; a version as the source.
+#[test]
+fn a_merge_takes_the_dialogs_strategies() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "merge-strategy.noshape");
+    let main = call(&mut ctx, "document_info", json!({}))["branch"].as_str().unwrap().to_string();
+    call(&mut ctx, "history_create_version", json!({ "name": "base" }));
+    call(&mut ctx, "history_create_branch", json!({ "name": "B1" }));
+    call(&mut ctx, "feature_edit", json!({ "feature": "Extrude 1", "params": { "depth": "30 mm" } }));
+    call(&mut ctx, "tab_create", json!({ "kind": "partstudio", "name": "Housing" }));
+    call(&mut ctx, "history_switch_branch", json!({ "branch": main }));
+    call(&mut ctx, "tab_activate", json!({ "tab": "Part Studio 1" }));
+    call(&mut ctx, "feature_rename", json!({ "feature": "Sketch 1", "name": "Outline" }));
+    let e = try_call(&mut ctx, "history_merge", json!({ "branch": "B1", "tabs": { "Housing": "merge" } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("tabs"), "{e:?}");
+    let e = try_call(&mut ctx, "history_merge", json!({ "branch": "B1", "version": "base" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("version"), "{e:?}");
+    let volume = |ctx: &mut Ctx| num(&call(ctx, "query_parts", json!({ "tab": "Part Studio 1" }))["parts"][0]["volume"]);
+    let kept = call(&mut ctx, "history_merge", json!({ "branch": "B1", "tabs": { "Part Studio 1": "keep" } }));
+    assert_eq!(kept["strategy"], "merge", "{kept}");
+    assert_eq!(kept["tabs"], json!([
+        { "tab": "Part Studio 1", "current": "Edited", "source": "Edited", "strategy": "keep" },
+        { "tab": "Housing", "current": "No changes", "source": "New tab", "strategy": "replace" },
+    ]), "{kept}");
+    assert!(call(&mut ctx, "document_info", json!({})).to_string().contains("Housing"));
+    let v = volume(&mut ctx);
+    assert!((v - (3200. - std::f64::consts::PI * 25.) * 20.).abs() < 1., "Main's 20 mm kept: {v}");
+    // B1 counts as merged after that, so B2 (the same edit, from base) shows Merge changes' own choice.
+    assert_eq!(call(&mut ctx, "history_merge", json!({ "branch": "B1" }))["up_to_date"], true);
+    call(&mut ctx, "history_create_branch", json!({ "name": "B2", "version": "base" }));
+    call(&mut ctx, "feature_edit", json!({ "feature": "Extrude 1", "params": { "depth": "30 mm" } }));
+    call(&mut ctx, "history_switch_branch", json!({ "branch": main }));
+    let merged = call(&mut ctx, "history_merge", json!({ "branch": "B2" }));
+    assert_eq!((merged["message"].as_str(), merged["tabs"][0]["strategy"].as_str()), (Some("Merged B2 into Main."), Some("merge")), "{merged}");
+    let v = volume(&mut ctx);
+    assert!((v - (3200. - std::f64::consts::PI * 25.) * 30.).abs() < 1., "B1's 30 mm merged in: {v}");
+    assert!(call(&mut ctx, "feature_list", json!({ "tab": "Part Studio 1" })).to_string().contains("Outline"), "Main's rename kept");
+    assert_eq!(call(&mut ctx, "history_merge", json!({ "version": "base" }))["up_to_date"], true);
+}
+
 /// A Variable Studio's Configuration panel through the config ops: a List
 /// input, a row, a configured Value, the configuration a Part Studio
 /// inserts the studio in, the row menu and Unconfigure.

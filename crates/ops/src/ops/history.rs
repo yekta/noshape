@@ -120,9 +120,15 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "history",
             verb: "merge",
-            summary: "Merge another branch into the current one",
-            description: "Part Studios merge feature by feature. Returns the app's notice (\"Merged B1 into Main.\") and `revert_to`: its \"Revert to before this merge\" is history_restore to that microversion.",
-            fields: vec![doc_field(), req("branch", s(), "Branch to merge from (name or id).")],
+            summary: "Merge another workspace or a version into the current one (Merge into current workspace…)",
+            description: "As the Merge dialog: the overall strategy (`strategy`) opens on what the dialog opens on (Merge changes when both workspaces changed something it can merge, Replace when only the source changed, else Keep); `tabs` sets a changed tab's own strategy. With Merge changes, a tab changed only in the source is replaced, one changed only in the current workspace kept, and a Part Studio or Assembly edited on both sides merges feature by feature. Returns the changed tabs with their strategies, the app's notice (\"Merged B1 into Main.\") and `revert_to`: its \"Revert to before this merge\" is history_restore to that microversion.",
+            fields: vec![
+                doc_field(),
+                opt("branch", s(), "Workspace to merge from (name or id)."),
+                opt("version", s(), "A version to merge from instead (name or id)."),
+                opt("strategy", json!({ "type": "string", "enum": ["keep", "merge", "replace"] }), "Overall merge strategy: Keep <current workspace>, Merge changes, Replace with <source>."),
+                opt("tabs", json!({ "type": "object", "additionalProperties": { "type": "string", "enum": ["keep", "merge", "replace"] } }), "Tab merge strategy per changed tab (by name): keep, merge (Part Studios and Assemblies edited on both sides) or replace."),
+            ],
             mutates: true,
             destructive: false,
             run: merge,
@@ -256,13 +262,62 @@ fn restore_branch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn merge(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use crate::merge_plan::{Change, Strategy};
     let od = ctx.doc(a.opt_str("doc")?)?;
-    let b = branch_id(od, a.str("branch")?)?;
+    let (from, from_branch, source) = match (a.opt_str("branch")?, a.opt_str("version")?) {
+        (Some(key), None) => {
+            let b = branch_id(od, key)?;
+            (od.session.store.head(b).map_err(io)?, Some(b), od.session.store.branch(b).map_err(io)?.name)
+        }
+        (None, Some(key)) => {
+            let v = version_info(od, key)?;
+            (v.microversion, None, v.name)
+        }
+        (Some(_), Some(_)) => return Err(OpError::param("version", "give a workspace (`branch`) or a version to merge from, not both")),
+        (None, None) => return Err(OpError::param("branch", "required: the workspace to merge from (or `version`)")),
+    };
+    let tabs = crate::merge_plan::merge_tabs(&od.session, from, false).map_err(|e| OpError::invalid(format!("{e:#}")).with_param(if from_branch.is_some() { "branch" } else { "version" }))?;
+    if od.session.is_protected() && tabs.changed.iter().any(|t| t.ours != Change::None) {
+        return Err(OpError::invalid(crate::merge_plan::PROTECTED_NOTICE).with_param("branch"));
+    }
+    let parse = |v: &str, param: &str| match v {
+        "keep" => Ok(Strategy::Keep),
+        "merge" => Ok(Strategy::Merge),
+        "replace" => Ok(Strategy::Replace),
+        other => Err(OpError::param(param, &format!("\"{other}\": keep, merge or replace"))),
+    };
+    let (opening, merge_offered) = tabs.opening();
+    let overall = match a.opt_str("strategy")? {
+        Some(v) => parse(v, "strategy")?,
+        None => opening,
+    };
+    if overall == Strategy::Merge && !merge_offered {
+        return Err(OpError::param("strategy", "Merge changes is offered only when both workspaces changed a Part Studio or Assembly: keep or replace"));
+    }
+    let mut chosen: Vec<Strategy> = tabs.changed.iter().map(|t| t.default_for(overall)).collect();
+    for (name, v) in a.object("tabs")?.into_iter().flatten() {
+        let Some(i) = tabs.changed.iter().position(|t| t.tab.name == *name) else {
+            let names: Vec<&str> = tabs.changed.iter().map(|t| t.tab.name.as_str()).collect();
+            return Err(OpError::param("tabs", &format!("\"{name}\" has no changes to merge; changed tabs: {}", names.join(", "))));
+        };
+        let st = parse(v.as_str().unwrap_or_default(), "tabs")?;
+        if !tabs.changed[i].options().contains(&st) {
+            return Err(OpError::param("tabs", &format!("\"{name}\": Merge changes is offered only for a Part Studio or Assembly edited in both workspaces: keep or replace")));
+        }
+        chosen[i] = st;
+    }
+    let picks: std::collections::HashMap<&str, noshape_store::MergePick> = tabs.changed.iter().zip(&chosen).map(|(t, s)| (t.blob.as_str(), s.pick())).collect();
     let before = od.session.head()?;
-    let out = od.session.merge_from(b)?;
-    let name = |id| od.session.store.branch(id).map(|x| x.name).unwrap_or_default();
-    let message = (!out.up_to_date).then(|| format!("Merged {} into {}.", name(b), name(od.session.branch)));
-    Ok(json!({ "microversion": out.microversion.to_string(), "conflicts": out.conflicts, "up_to_date": out.up_to_date, "message": message, "revert_to": (!out.up_to_date).then(|| before.to_string()) }).into())
+    let out = od.session.merge_picked(from, &source, from_branch, |n| picks.get(n).copied().unwrap_or(noshape_store::MergePick::Auto))?;
+    let target = od.session.store.branch(od.session.branch).map(|x| x.name).unwrap_or_default();
+    let message = (!out.up_to_date).then(|| format!("Merged {source} into {target}."));
+    let word = |s: &Strategy| match s {
+        Strategy::Keep => "keep",
+        Strategy::Merge => "merge",
+        Strategy::Replace => "replace",
+    };
+    let changed: Vec<serde_json::Value> = tabs.changed.iter().zip(&chosen).map(|(t, s)| json!({ "tab": t.tab.name, "current": t.ours.label(), "source": t.theirs.label(), "strategy": word(s) })).collect();
+    Ok(json!({ "microversion": out.microversion.to_string(), "conflicts": out.conflicts, "up_to_date": out.up_to_date, "strategy": word(&overall), "tabs": changed, "message": message, "revert_to": (!out.up_to_date).then(|| before.to_string()) }).into())
 }
 
 fn restore(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

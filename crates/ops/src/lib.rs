@@ -39,6 +39,7 @@ pub mod in_context;
 pub mod install;
 pub mod live;
 pub mod material_data;
+pub mod merge_plan;
 pub mod ops;
 pub mod parity;
 pub mod prefs;

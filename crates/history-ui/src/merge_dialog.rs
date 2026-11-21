@@ -21,10 +21,11 @@ use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::document::{Tab, TabContent};
+use noshape_model::document::TabContent;
+use noshape_ops::merge_plan::{Change, MergeTab, PROTECTED_NOTICE, Strategy};
 use noshape_store::{BranchId, MergePick, MicroversionId};
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 const W: f32 = 948.;
@@ -41,55 +42,10 @@ const BLUE: u32 = 0x1651b0;
 /// A tab whose strategy differs from the overall one.
 const DIFFERS: u32 = 0xfab601;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Strategy {
-    Keep,
-    Merge,
-    Replace,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Change {
-    None,
-    Edited,
-    New,
-    Deleted,
-}
-
-impl Change {
-    fn of(base: Option<&Vec<u8>>, side: Option<&Vec<u8>>) -> Self {
-        match (base, side) {
-            (None, None) => Change::None,
-            (None, Some(_)) => Change::New,
-            (Some(_), None) => Change::Deleted,
-            (Some(a), Some(b)) if a == b => Change::None,
-            _ => Change::Edited,
-        }
-    }
-
-    fn label(self) -> &'static str {
-        match self {
-            Change::None => "No changes",
-            Change::Edited => "Edited",
-            Change::New => "New tab",
-            Change::Deleted => "Deleted",
-        }
-    }
-}
-
 /// One tab in the table.
 struct Row {
-    /// Its blob name ("tab/<id>").
-    blob: String,
-    name: String,
+    t: MergeTab,
     icon: &'static str,
-    ours: Change,
-    theirs: Change,
-    /// "Merge changes from both" is offered: an edited Part Studio or
-    /// Assembly (help: not drawings, not created / deleted tabs).
-    mergeable: bool,
-    /// Changes in separate branches can't be merged for this tab type (ⓘ).
-    unmergeable_type: bool,
     /// Each side's last change to the tab (author, time): an Edited cell's tooltip.
     ours_last: Option<(String, i64)>,
     theirs_last: Option<(String, i64)>,
@@ -112,25 +68,6 @@ fn last_change(store: &noshape_store::Document, head: MicroversionId, base: Micr
         mv = parent;
     }
     None
-}
-
-impl Row {
-    fn options(&self) -> &'static [Strategy] {
-        if self.mergeable { &[Strategy::Keep, Strategy::Merge, Strategy::Replace] } else { &[Strategy::Keep, Strategy::Replace] }
-    }
-
-    /// The tab's strategy under the overall one (help merge-dialog-full-01:
-    /// with "Merge changes", a tab changed only in the source is replaced,
-    /// one changed only in the target kept).
-    fn default_for(&self, overall: Strategy) -> Strategy {
-        match overall {
-            // Help merge-dialog-full-01: merged when both sides edited it.
-            Strategy::Merge if self.mergeable && self.ours == Change::Edited && self.theirs == Change::Edited => Strategy::Merge,
-            Strategy::Merge if self.theirs != Change::None => Strategy::Replace,
-            Strategy::Merge => Strategy::Keep,
-            s => s,
-        }
-    }
 }
 
 struct Plan {
@@ -159,21 +96,8 @@ struct Plan {
 }
 
 impl Plan {
-    /// The overall strategy the dialog opens on and whether "Merge changes from both" is offered: it is when both
-    /// workspaces changed something (live session-studio-1119: B1 alone changed, only Keep and Replace); a target that
-    /// changed nothing opens on Replace, a restore too.
     fn opening(&self) -> (Strategy, bool) {
-        let target_changed = self.changed.iter().any(|r| r.ours != Change::None);
-        let source_changed = self.changed.iter().any(|r| r.theirs != Change::None);
-        let merge_offered = !self.restore && target_changed && source_changed && self.changed.iter().any(|r| r.mergeable);
-        let overall = if self.restore || (source_changed && !target_changed) {
-            Strategy::Replace
-        } else if merge_offered {
-            Strategy::Merge
-        } else {
-            Strategy::Keep
-        };
-        (overall, merge_offered)
+        noshape_ops::merge_plan::opening(self.restore, self.changed.iter().map(|r| &r.t))
     }
 }
 
@@ -203,55 +127,18 @@ fn plan(doc: &Entity<DocModel>, source: Side, source_name: String, restore: bool
         Side::Workspace(b) => (store.head(b)?, Some(b)),
         Side::Entry(mv) => (mv, None),
     };
-    // A restore compares the workspace with the entry itself: "Changes in Main" since then.
-    let base = if restore { from } else { store.merge_base(ours, from)?.ok_or_else(|| anyhow::anyhow!("These workspaces share no history."))? };
-    let (bb, ob, tb) = (store.read_all(base)?, store.read_all(ours)?, store.read_all(from)?);
-    let tab_of = |m: &BTreeMap<String, Vec<u8>>, n: &str| m.get(n).and_then(|b| serde_json::from_slice::<Tab>(b).ok());
-    // The target's tab order as its tab bar shows it (live 49-merge-dialog: Part Studio 1 / Variable Studio 1 /
-    // Assembly 1), then tabs only in the source.
-    let current = &s.doc;
-    let mut names: Vec<String> = current.ordered_tabs().iter().map(|t| noshape_model::document::Document::blob_name(t.id)).collect();
-    for n in bb.keys().chain(ob.keys()).chain(tb.keys()).filter(|n| n.starts_with("tab/")) {
-        if !names.contains(n) {
-            names.push(n.clone());
-        }
-    }
-    // The tabs using a Variable Studio changed on a side count as edited there too (live session-studio-1119: width
-    // changed in B1's Variable Studio 1, Part Studio 1 and Assembly 1 "Edited" in B1 as well).
-    let vs_users = |side: &BTreeMap<String, Vec<u8>>| -> Vec<String> {
-        current
-            .tabs
-            .iter()
-            .filter(|t| matches!(t.content, TabContent::VariableStudio(_)))
-            .filter(|t| {
-                let n = noshape_model::document::Document::blob_name(t.id);
-                Change::of(bb.get(&n), side.get(&n)) == Change::Edited
-            })
-            .flat_map(|t| current.tab_users(t.id))
-            .map(noshape_model::document::Document::blob_name)
-            .collect()
-    };
-    let (ours_vs, theirs_vs) = (vs_users(&ob), vs_users(&tb));
-    let via = |c: Change, users: &[String], n: &str| if c == Change::None && users.iter().any(|u| u == n) { Change::Edited } else { c };
-    let (mut changed, mut unchanged) = (Vec::new(), Vec::new());
-    for n in names {
-        let Some(tab) = tab_of(&ob, &n).or_else(|| tab_of(&tb, &n)).or_else(|| tab_of(&bb, &n)) else { continue };
-        let (oc, tc) = (via(Change::of(bb.get(&n), ob.get(&n)), &ours_vs, &n), via(Change::of(bb.get(&n), tb.get(&n)), &theirs_vs, &n));
-        let icon = tab_icon(&tab.content);
-        if oc == Change::None && tc == Change::None {
-            unchanged.push((tab.name, icon));
-            continue;
-        }
-        let drawing = matches!(tab.content, TabContent::Drawing(_));
-        let kind_merges = matches!(tab.content, TabContent::PartStudio(_) | TabContent::Assembly(_));
-        let both = oc == Change::Edited && tc == Change::Edited;
-        // Live (qa5 DOC2, mg-903): an edited Part Studio / Assembly offers
-        // "Merge changes from both" (not a created or deleted tab).
-        let edited_only = [oc, tc].iter().all(|c| matches!(c, Change::None | Change::Edited));
-        let last = |c: Change, head: MicroversionId| if c == Change::Edited { last_change(store, head, base, &n) } else { None };
-        let (ours_last, theirs_last) = (last(oc, ours), last(tc, from));
-        changed.push(Row { blob: n, name: tab.name, icon, ours: oc, theirs: tc, mergeable: kind_merges && edited_only && !restore, unmergeable_type: drawing && both, ours_last, theirs_last });
-    }
+    let tabs = noshape_ops::merge_plan::merge_tabs(s, from, restore)?;
+    let base = tabs.base;
+    let unchanged: Vec<(String, &'static str)> = tabs.unchanged.into_iter().map(|t| { let icon = tab_icon(&t.content); (t.name, icon) }).collect();
+    let changed: Vec<Row> = tabs
+        .changed
+        .into_iter()
+        .map(|t| {
+            let last = |c: Change, head: MicroversionId| if c == Change::Edited { last_change(store, head, base, &t.blob) } else { None };
+            let (ours_last, theirs_last) = (last(t.ours, ours), last(t.theirs, from));
+            Row { icon: tab_icon(&t.tab.content), t, ours_last, theirs_last }
+        })
+        .collect();
     let branch_name = |b: BranchId| store.branch(b).map(|x| x.name).unwrap_or_default();
     // Lanes as the graph orders branches: the default first, then by creation.
     let branches = store.list_branches()?;
@@ -271,7 +158,7 @@ fn plan(doc: &Entity<DocModel>, source: Side, source_name: String, restore: bool
         source_side: source,
         base,
         up_to_date: !restore && base == from,
-        protected_with_changes: s.is_protected() && changed.iter().any(|r| r.ours != Change::None),
+        protected_with_changes: s.is_protected() && changed.iter().any(|r| r.t.ours != Change::None),
         changed,
         unchanged,
     })
@@ -296,16 +183,14 @@ fn chip(name: &str, lane: usize, size: f32) -> Div {
 /// only when the source changed the tab, Replace only when the target did).
 fn strategy_icon(s: Strategy, row: &Row) -> &'static str {
     match s {
-        Strategy::Keep if row.theirs != Change::None => "merge-keep",
+        Strategy::Keep if row.t.theirs != Change::None => "merge-keep",
         Strategy::Keep => "merge-keep-plain",
         Strategy::Merge => "merge-both",
-        Strategy::Replace if row.ours != Change::None => "merge-replace",
+        Strategy::Replace if row.t.ours != Change::None => "merge-replace",
         Strategy::Replace => "merge-replace-plain",
     }
 }
 
-/// The merge dialog's warning when the target workspace is protected and has changes of its own.
-const PROTECTED_NOTICE: &str = "Workspace protection has been enabled. Merges are allowed only when the source workspace has all the changes from the protected workspace. Merge the protected workspace into the source workspace first and then retry.";
 
 fn changes_count(n: usize) -> String {
     if n == 1 { "1 change".into() } else { format!("{n} changes") }
@@ -353,13 +238,13 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
         let pal = p();
         let (plan, state) = (plan.clone(), state.clone());
         let st = state.borrow();
-        let effective = |r: &Row| st.per_tab.get(&r.blob).copied().unwrap_or_else(|| r.default_for(st.overall));
+        let effective = |r: &Row| st.per_tab.get(&r.t.blob).copied().unwrap_or_else(|| r.t.default_for(st.overall));
         // Something would change: a source change taken, unless the target
         // already has it.
         let updates = plan.changed.iter().any(|r| match effective(r) {
             Strategy::Keep => false,
             Strategy::Merge => true,
-            Strategy::Replace => r.theirs != Change::None || r.ours != Change::None,
+            Strategy::Replace => r.t.theirs != Change::None || r.t.ours != Change::None,
         });
         let can_merge = updates && !plan.protected_with_changes && (!plan.up_to_date || plan.changed.iter().any(|r| effective(r) == Strategy::Replace));
         let title = h_flex()
@@ -403,9 +288,9 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
             let count = match s {
                 Strategy::Keep if plan.restore => "No changes".to_string(),
                 Strategy::Replace if plan.restore => changes_count(plan.changed.len()),
-                Strategy::Keep => tabs_have_changes(plan.changed.iter().filter(|r| r.ours != Change::None).count()),
+                Strategy::Keep => tabs_have_changes(plan.changed.iter().filter(|r| r.t.ours != Change::None).count()),
                 Strategy::Merge => format!("Combine all changes to {} {}", plan.changed.len(), if plan.changed.len() == 1 { "tab" } else { "tabs" }),
-                Strategy::Replace => tabs_have_changes(plan.changed.iter().filter(|r| r.theirs != Change::None).count()),
+                Strategy::Replace => tabs_have_changes(plan.changed.iter().filter(|r| r.t.theirs != Change::None).count()),
             };
             // "Compare with base ↗": compare mode between the merge base and that side.
             let link = (s != Strategy::Merge && !plan.restore).then(|| {
@@ -474,8 +359,8 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
             let eff = effective(r);
             // Whether each side's change survives, None: the tab is gone.
             let exists = match eff {
-                Strategy::Keep => r.ours != Change::Deleted && !(r.ours == Change::None && r.theirs == Change::New),
-                Strategy::Replace => r.theirs != Change::Deleted && !(r.theirs == Change::None && r.ours == Change::New),
+                Strategy::Keep => r.t.ours != Change::Deleted && !(r.t.ours == Change::None && r.t.theirs == Change::New),
+                Strategy::Replace => r.t.theirs != Change::Deleted && !(r.t.theirs == Change::None && r.t.ours == Change::New),
                 Strategy::Merge => true,
             };
             let kept = |mine: bool| exists.then_some(match eff {
@@ -483,14 +368,14 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
                 Strategy::Replace => !mine,
                 Strategy::Merge => true,
             });
-            let differs = eff != r.default_for(st.overall);
+            let differs = eff != r.t.default_for(st.overall);
             let refused = plan.protected_with_changes;
-            let (state, blob, options) = (state.clone(), r.blob.clone(), r.options());
+            let (state, blob, options) = (state.clone(), r.t.blob.clone(), r.t.options());
             let icons: Vec<&'static str> = options.iter().map(|o| strategy_icon(*o, r)).collect();
             let plan2 = plan.clone();
             let probe: Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
             let probe2 = probe.clone();
-            let select_mark = format!("dropdown:{}", r.name);
+            let select_mark = format!("dropdown:{}", r.t.tab.name);
             let select = h_flex()
                 .id(SharedString::from(format!("merge-strategy-{i}")))
                 .map(|d| crate::ui_script::mark(d, || select_mark))
@@ -564,16 +449,16 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
                         .text_size(px(13.))
                         .text_color(pal.text)
                         .child(crate::assets::icon(r.icon, 18., cx))
-                        .child(div().min_w_0().truncate().child(crate::ui::user_text(r.name.clone())))
+                        .child(div().min_w_0().truncate().child(crate::ui::user_text(r.t.tab.name.clone())))
                         // Live (live2 11-12, ver-merge-drawing-info): an ⓘ whose tooltip says only "For this tab type,
                         // edits from separate branches cannot be merged."
-                        .when(r.unmergeable_type, |d| {
+                        .when(r.t.unmergeable_type, |d| {
                             const WHY: &str = "For this tab type, edits from separate branches cannot be merged.";
                             d.child(crate::ui_script::mark(div().id(SharedString::from(format!("merge-info-{i}"))), || format!("button:{WHY}")).flex_none().tooltip(crate::ui::tooltip(crate::i18n::tr(WHY))).child(crate::ui::glyph("info", 14., rgb(0x4d8ccf))))
                         }),
                 )
-                .child(change_cell(r.ours, kept(true), format!("merge-ours-{i}"), &r.ours_last))
-                .when(!plan.restore, |d| d.child(change_cell(r.theirs, kept(false), format!("merge-theirs-{i}"), &r.theirs_last)))
+                .child(change_cell(r.t.ours, kept(true), format!("merge-ours-{i}"), &r.ours_last))
+                .when(!plan.restore, |d| d.child(change_cell(r.t.theirs, kept(false), format!("merge-theirs-{i}"), &r.theirs_last)))
                 .child(select)
                 .into_any_element()
         });
@@ -671,7 +556,7 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
                 }
                 let st = state2.borrow();
                 if plan2.restore {
-                    let keep: Vec<String> = plan2.changed.iter().filter(|r| st.per_tab.get(&r.blob).copied().unwrap_or(st.overall) == Strategy::Keep).map(|r| r.blob.clone()).collect();
+                    let keep: Vec<String> = plan2.changed.iter().filter(|r| st.per_tab.get(&r.t.blob).copied().unwrap_or(st.overall) == Strategy::Keep).map(|r| r.t.blob.clone()).collect();
                     let r = doc.update(cx, |d, cx| -> anyhow::Result<()> {
                         d.session.restore_picked(plan2.from, |blob| keep.iter().any(|k| k == blob))?;
                         d.reloaded(cx);
@@ -682,18 +567,7 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
                     }
                     return true;
                 }
-                let picks: HashMap<String, MergePick> = plan2
-                    .changed
-                    .iter()
-                    .map(|r| {
-                        let s = st.per_tab.get(&r.blob).copied().unwrap_or_else(|| r.default_for(st.overall));
-                        (r.blob.clone(), match s {
-                            Strategy::Keep => MergePick::Ours,
-                            Strategy::Merge => MergePick::Auto,
-                            Strategy::Replace => MergePick::Theirs,
-                        })
-                    })
-                    .collect();
+                let picks: HashMap<String, MergePick> = plan2.changed.iter().map(|r| (r.t.blob.clone(), st.per_tab.get(&r.t.blob).copied().unwrap_or_else(|| r.t.default_for(st.overall)).pick())).collect();
                 let revert_doc = doc.clone();
                 let r = doc.update(cx, |d, cx| -> anyhow::Result<()> {
                     let before = d.session.head()?;
@@ -785,7 +659,7 @@ mod tests {
         let b1 = session.store.list_branches().unwrap().into_iter().find(|b| b.name == "B1").map(|b| b.id).unwrap_or_else(|| panic!("B1 in {b1}"));
         let doc = cx.update(|cx| cx.new(|_| crate::doc_model::DocModel::new(session)));
         let plan = cx.update(|cx| plan(&doc, Side::Workspace(b1), "B1".into(), false, cx)).unwrap();
-        let rows: Vec<(String, Change, Change)> = plan.changed.iter().map(|r| (r.name.clone(), r.ours, r.theirs)).collect();
+        let rows: Vec<(String, Change, Change)> = plan.changed.iter().map(|r| (r.t.tab.name.clone(), r.t.ours, r.t.theirs)).collect();
         for name in ["Part Studio 1", "Variable Studio 1", "Assembly 1"] {
             assert!(rows.iter().any(|r| r.0 == name && r.1 == Change::None && r.2 == Change::Edited), "{name} edited in B1 only: {rows:?}");
         }

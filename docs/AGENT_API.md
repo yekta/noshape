@@ -6309,9 +6309,9 @@ Examples:
 
 #### history_merge
 
-Merge another branch into the current one (edits the document (one undoable history entry)).
+Merge another workspace or a version into the current one (Merge into current workspace…) (edits the document (one undoable history entry)).
 
-Part Studios merge feature by feature. Returns the app's notice ("Merged B1 into Main.") and `revert_to`: its "Revert to before this merge" is history_restore to that microversion.
+As the Merge dialog: the overall strategy (`strategy`) opens on what the dialog opens on (Merge changes when both workspaces changed something it can merge, Replace when only the source changed, else Keep); `tabs` sets a changed tab's own strategy. With Merge changes, a tab changed only in the source is replaced, one changed only in the current workspace kept, and a Part Studio or Assembly edited on both sides merges feature by feature. Returns the changed tabs with their strategies, the app's notice ("Merged B1 into Main.") and `revert_to`: its "Revert to before this merge" is history_restore to that microversion.
 
 Examples:
 
@@ -6322,7 +6322,10 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `branch` | string | required | Branch to merge from (name or id). |
+| `branch` | string |  | Workspace to merge from (name or id). |
+| `version` | string |  | A version to merge from instead (name or id). |
+| `strategy` | one of `keep`, `merge`, `replace` |  | Overall merge strategy: Keep <current workspace>, Merge changes, Replace with <source>. |
+| `tabs` | object |  | Tab merge strategy per changed tab (by name): keep, merge (Part Studios and Assemblies edited on both sides) or replace. |
 
 #### history_restore
 
