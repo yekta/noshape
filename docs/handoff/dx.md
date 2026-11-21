@@ -9,28 +9,29 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
-## Now (02:55 11-21): HGR (dx-land) / EXCHANGE (dx-urdf)
+## Now (03:30 11-21): HGR (dx-land) / EXCHANGE (dx-urdf)
 - LANDED 3f5d8b6f + b4f52649 (dx-land): parity translates a Frame's SWEPT_FACE and a Hole's HOLE_FACE shaft (hgr
   Hole 3 35 -> 36/52); a straight Frame member's side edges run along its path (frames.rs along_path: op_prism sweeps
   back toward the sketch, live's Frame is opSweep): hgr 36 -> 46/52; VALID-HGR-FOOT-OFFSET closed. 3-way A/B on vibe2
   (/root/dx-scratch/ab3.out, ~/agents/dx-keep/ab3.sh): 14 docs, no loss. Probe ~/agents/dx-keep/hgredge.sh <index>.
 - c2-sm-louver 36 -> 35 came from main (Sketch 9 frame origin): skasm's.
 - LANDED 5aecd7e2: Cut list keeps a selected part that isn't a frame (hgr 46 -> 47/52).
-- dx-land commit (land.sh 02:5x): a std or custom feature's number reads a Variable feature's value (custom run.rs
+- LANDED 016c2ab0: a std or custom feature's number reads a Variable feature's value (custom run.rs
   took ev.ctx into the FS context before definition() evaluated the params: "Variable not found"): hgr 47 -> 52/52,
   matches to the end. A/B on the Mac (~/noshape-host/dx-keep/abvar.sh, /root/dx-scratch/abvar.out): 12 docs, the
   rest equal. Test custom_features::a_custom_features_length_reads_a_variable_features_value.
 - LANDED 04f5085d (dx-urdf exchange batch): glTF nodes as parts, flattened STEP names, IGES compat + sewn read, zips,
   DXF splines as polylines, exploded glyph outlines, Parasolid v28 read (exo d options 39/50, read back 43/62).
-- dx-urdf 3 commits (land.sh 02:5x): spline POLYLINEs + VERTEXes on layer 0 (lead 11-21: copy live's layers unless
+- LANDED 02ac91ea (dx-urdf, 3 commits): spline POLYLINEs + VERTEXes on layer 0 (lead 11-21: copy live's layers unless
   that loses geometry); exploded text keeps its layer in the table (duct polyall ANNOTATION_TEXT); IGES compat writes
   B-splines only (NurbsConvert, closed faces halved): housing's file reads back as the solid (was a sheet, area 1367 vs
-  1630 mm2); ours 45 faces / 51 loops vs live 46 / 52 (one face live halves that DivideClosed doesn't, as Rhino 45 vs
-  46). Mac drawing 263, ops e2e 272, kernel 550 ok; housing suite ~/noshape-host/dx-keep/exs-igc (exx.sh).
-- bool 11-21: c2-impeller-loft's Extrude "Bohrungssitz Ansaugflansch" fuse in our Boolean (queued 30efb247): recheck
-  impeller once it lands.
+  1630 mm2); queued f9fcc67e: a face of revolution over 180 degrees split too (ShapeDivideAngle pi):
+  housing's file has live's 46 / 52 / 104 (144 / 142 / 102). Read back 39/91/54 (live's file 36/80/45): our merge
+  (boolean.cpp merge_same_surface_faces) re-merges fewer of our halves: next. Mac drawing 263, ops e2e 272, kernel 550 ok; housing suite ~/noshape-host/dx-keep/exs-igc (exx.sh).
+- c2-impeller-loft on main 016c2ab0 (bool's fuse landed): 24 -> 27/48, first difference Fillet 3 (39/113/71 vs live
+  34/95/62: SUITE-IMPELLER-FILLET3, core/blend); regenerates in 12.2 s, live 2.8 s (Fillet 3 3.1 s). hgr 52/52 on main.
 - Open exchange rows: DXF-POLY MTEXT vs live's LWPOLYLINE (textOption, REQUESTS), housing IGES
-  compat import 36/80/45 vs 36/79/44 (read back 38/88/52), STL-YUP / multipart STL (ticket).
+  compat import 36/80/45 vs 36/79/44 (read back 39/91/54), STL-YUP / multipart STL (ticket).
 - live 11-21 00:0x: speed reference complete (10 Part Studios + Assemblies 1-5, behaviours "Speed reference (11-20)");
   server-side only for drags (SwiftShader frames).
 - textOption: REQUESTS asks live whether "true" = notes or all; the suite maps true -> explode_notes until then.
