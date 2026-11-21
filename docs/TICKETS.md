@@ -46,6 +46,14 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   face of 282.843 mm2 removed) fails in ours ("Could not shell part with selections.", 25.4 s); live OK in 20 ms, Part 2
   172908.326 mm3, 59 faces / 163 edges / 98 vertices. Ours before Shell 5 = live's (49 faces, 175798.2 mm3).
 
+## qa, 2026-11-21 (agent API gaps)
+- [ ] P2 **OP-MASS-FACE-SECTION (asm; Part Studio side: lead to route)**: Mass and section properties › Face (area, perimeter,
+  area moments Lxx / Lxy / Lyy / Lzz, optionally about "Mate connector for reference frame") has no op. assembly_mass_properties
+  takes only `instances` (no faces, no `reference`). query_mass_properties takes `parts` and `reference` but no faces. So asm's
+  8fda424fb (ASM-FACE-TAB-REFERENCE-FRAME, live mc1-mc3: Lxx 106666.667, Lxy 160000, Lyy 426666.667, Lzz 533333.333 mm⁴ about
+  a corner connector of a 40x20x10 block's top face) can only be checked in the app. AGENTS.md: everything the app does is an
+  op. Wanted: `faces` (and `reference` in the assembly) in both ops, giving the Face tab's numbers, with e2e tests.
+
 ## qa, 2026-11-21 (compat alerts on green 2407ded2)
 - [ ] P1 **KNIFEHANDLE-LOFT1 (core)**: c2-surf-workshop-knifehandle's Loft 1 (feature 24) fails on ours; live builds it OK, solid
   "Blade" 11 faces / 27 edges / 18 vertices, 10392.85 mm³ (parity corpus live.jsonl). Ours failed in 0.4.63 too ("Could not create
