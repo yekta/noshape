@@ -53,7 +53,7 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   "Loft guides with more than two profiles are not supported yet" (solid_a.rs, a noshape-only message: live has no error there).
   Wanted: the guided loft through more than two profiles as live. Repro: compat / parity model c2-surf-workshop-knifehandle. The
   wording change is accepted in qa's compat alerts so they stop repeating (qa 11-21 01:2x).
-- [ ] P0 **c2-sm-tablet-stand Sketch 3 (skasm, lead 11-21)**: Ok in 0.4.63, "Some external references are missing." on green
+- [x] verified (qa 11-21 04:01, green b3ece860 CLI on vibe2: c2-sm-tablet-stand SAME as 0.4.63, Sketch 3 Ok; fixed by core 503396456, opThicken and sheet metal without the exact rebuild) P0 **c2-sm-tablet-stand Sketch 3 (skasm, lead 11-21)**: Ok in 0.4.63, "Some external references are missing." on green
   2407ded2 (compat 01:05). Holds the 05:00 GO until fixed or explained (lead).
 
 ## qa, 2026-11-20 (model suite's validity check: invalid bodies)
