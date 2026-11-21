@@ -51,7 +51,7 @@
    "do": "click",
    "on": {
     "sketch_point": [
-     75,
+     64,
      0
     ]
    }
@@ -60,7 +60,7 @@
    "do": "click",
    "on": {
     "sketch_point": [
-     75,
+     85,
      -8
     ]
    }
