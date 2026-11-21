@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-20 23:42 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-21 05:53 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -18,13 +18,18 @@ op_boolean 666 ms; screws Sweep 1's sections_ahead 907 ms) and 850efe. End a tur
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
 ## In flight
-- Memory budget machine-independent (lead 11-21 P1; worktree/branch bool-mem): default flat 8 GB (was half the
-  RAM, 4-16 GB), 3/4 of RAM only under 11 GB; NOSHAPE_WORK_TRACE=1 prints each op's growth past 128 MB. Trace of the
-  16 gate corpora (vibe2 ~/tmp/bool/memtr/tr-*.txt): OCCT ops <= 0.3 GB, Rust ops < 128 MB; progress checks don't
-  follow memory (no work count). boolean_budget + bool_patterns ok (Mac). Gate queued on vibex7 after imp (unit
-  bool-mem-gate, /root/bool-scratch/mem-gate.sh, out chain-bool-mem.out) + knurls -> land, tell lead.
-  Aside: the vibe2 trace build's replays had 2 cases off their recordings (bool-corpus 2a5740b0d124e53d edges 18 was
-  21; gpf 49eaef95f9ced6bf volume 2e-11) on main + trace only: check whether main drifted.
+- Memory budget machine-independent (lead 11-21 P1): QUEUED 33b53875 (05:50; branch bool-mem): flat 8 GB (3/4 of RAM
+  under 11 GB); NOSHAPE_WORK_TRACE=1 prints growth past 128 MB; gate corpora <= 0.3 GB. Gate CHECK = main, knurls at the
+  default budget (vibex7) = main; lead told. After it lands: rm worktrees bool-mem, bool-mem-gate.
+  Aside: bool-corpus 2a5740b0d124e53d (edges 18 was 21) and gpf 49eaef95f9ced6bf off their recordings: check main drift.
+- IMPELLER speed P0 (blend 11-21, log /root/blend-scratch/logs/imp-prof-c44c0240d.out): Extrude Bohrungssitz 1511 ms vs
+  live 177 (op_boolean 1292), Remove Bohrung 364 vs 59, Shell Gehaeuse 150 vs 31. Mac recording
+  ~/noshape-host/bool-keep/imprec (22 cases), impsel = 8432b6b73fb1fb56 (cut, OCCT 946 ms), 6466e208ed35c9a4,
+  9717da1578778eaf (fuse 436 ms, "a face lost"). 8432/6466 decline in boolean.rs on_free's stretches_over branch
+  ("an edge on another argument's free-form face", the 3rd site): 8432's run (edge 6 on face 33, 0.3 mm spline) is 0.31 mm
+  off the face, projected() takes GREY*tol 0.07 mm but stretches_over took it at gap 0.9 mm (loose loft edges); 6466's
+  spline is on the face (3e-12) yet projected() fails (param jump?). Probe on bool-hat branch imp-speed (uncommitted
+  prints, never land). Then 65346691 / fbcf363f (OCCT-invalid 9-tool cases), cb63b85d (replays 20 faces vs recorded 16).
 - isaac P0: REVERT LANDED 9f6ce35e; asm: 16 failed mates again. Closed. RE-LAND branch bool-re (3139c1975, bool-hat
   worktree: the revert reverted): blend fixed checked_blend (a retry invalid at the part's scale with no neck: next step;
   their branch blend-fix, gate running 03:2x). Mac A/B (/root/bool-scratch/isaac-re.sh, out isaac-re.out; main + both):
