@@ -1227,8 +1227,14 @@ impl AssemblyView {
         self.scene_seq += 1;
         let seq = self.scene_seq;
         let (result, opts, cache, up) = (self.result.clone(), self.scene_options(cx), self.cache.clone(), self.gpu.uploader().clone());
+        let queued = std::time::Instant::now();
         let build = cx.background_spawn(async move {
-            let built = assembly_scene::build(&result, &opts, &mut cache.lock(), &up);
+            let start = std::time::Instant::now();
+            let mut cache = cache.lock();
+            let locked = std::time::Instant::now();
+            let built = assembly_scene::build(&result, &opts, &mut cache, &up);
+            let ms = |a: std::time::Instant, b: std::time::Instant| (b - a).as_secs_f64() * 1e3;
+            log::info!(target: "perf", "assembly scene: waited {:.0} ms to start, {:.0} ms for the cache, built in {:.0} ms", ms(queued, start), ms(start, locked), ms(locked, std::time::Instant::now()));
             (built, opts)
         });
         self.scene_task = Some(cx.spawn(async move |this, cx| {
@@ -1248,8 +1254,9 @@ impl AssemblyView {
         self.built_key = Some((assembly_scene::occurrence_signature(&self.result), opts));
         let (prio, class) = (built.picks.priority_fn(), built.picks.class_fn());
         self.built = Some(built);
-        if self.ui.cached_view || self.ui.real_result_in {
-            noshape_render::perf::arm_frame_milestone_once("open: first picks in");
+        // (The model's frame is the first with its scene: built in the background.)
+        if let Some(what) = self.ui.scene_milestone.take() {
+            noshape_render::perf::arm_frame_milestone(what);
         }
         self.viewport.update(cx, |vp, _| {
             vp.pick_priority = prio;
@@ -3981,9 +3988,7 @@ impl AssemblyView {
             }
             self.triad_at_click(position, cx);
         }
-        if !self.selected.is_empty() {
-            noshape_render::perf::arm_frame_milestone_once("open: first selection drawn");
-        }
+        noshape_render::perf::arm_frame_milestone("select: click drawn");
         self.ui.scroll_to_selection = true;
     }
 

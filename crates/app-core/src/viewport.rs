@@ -1103,6 +1103,15 @@ impl Viewport {
         h_.finish()
     }
 
+    /// `NOSHAPE_PERF`: the milestones armed for frames up to `seq`, logged as that frame shows (drawn or reused).
+    fn log_milestones_up_to(&mut self, seq: u64) {
+        while self.frame_milestones.front().is_some_and(|(s, _)| *s <= seq) {
+            for m in self.frame_milestones.pop_front().map(|f| f.1).unwrap_or_default() {
+                noshape_render::perf::milestone(&m);
+            }
+        }
+    }
+
     /// Show `image`, the one it replaces dropped from GPUI's atlas unless kept to show again.
     fn show_image(&mut self, image: Arc<RenderImage>) {
         if let Some(old) = self.image.replace(image)
@@ -1648,6 +1657,7 @@ impl Viewport {
             }
             self.last_presented = self.seq;
             self.show_image(entry.2);
+            self.log_milestones_up_to(self.seq);
             self.frames_presented += 1;
             self.frames_reused += 1;
             noshape_render::perf::record_ms("v.reused_frame_count", 1.0);
@@ -1777,11 +1787,7 @@ impl Viewport {
                 if noshape_render::perf::enabled() {
                     static FIRST: std::sync::Once = std::sync::Once::new();
                     FIRST.call_once(|| noshape_render::perf::milestone("first viewport frame presented"));
-                    while self.frame_milestones.front().is_some_and(|(s, _)| *s <= seq) {
-                        for m in self.frame_milestones.pop_front().map(|f| f.1).unwrap_or_default() {
-                            noshape_render::perf::milestone(&m);
-                        }
-                    }
+                    self.log_milestones_up_to(seq);
                     noshape_render::perf::record("v.frame_to_present", frame.rendered_at.elapsed());
                     self.presented_at = Some(Instant::now());
                 }

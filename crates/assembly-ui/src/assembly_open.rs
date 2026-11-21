@@ -289,10 +289,10 @@ impl AssemblyView {
             return;
         }
         noshape_render::perf::milestone("open: cached display in");
-        noshape_render::perf::arm_frame_milestone("open: cached model frame presented");
         self.ui.cached_view = true;
         self.ui.cache_key = Some(key);
         self.apply_result(Arc::new(result), window, cx);
+        self.arm_model_frame("open: cached model frame presented");
         cx.notify();
     }
 
@@ -377,13 +377,22 @@ impl AssemblyView {
         self.ui.cached_view.then(cache::regenerating_row)
     }
 
+    /// The first frame drawing the result just applied: its scene's, when that is being built in the background.
+    fn arm_model_frame(&mut self, what: &'static str) {
+        if self.scene_task.is_some() {
+            self.ui.scene_milestone = Some(what);
+        } else {
+            noshape_render::perf::arm_frame_milestone(what);
+        }
+    }
+
     /// The opened assembly's first evaluation is applied: its frame armed, the `open` script's quit scheduled.
     pub(super) fn note_open_result(&mut self, cx: &mut Context<Self>) {
         if !noshape_render::perf::enabled() || std::mem::replace(&mut self.ui.open_noted, true) {
             return;
         }
         noshape_render::perf::milestone(&format!("open: full display in (regen {:.1} ms)", self.result.eval_ms));
-        noshape_render::perf::arm_frame_milestone("open: full model frame presented");
+        self.arm_model_frame("open: full model frame presented");
         if std::env::var("NOSHAPE_PERF_SCRIPT").as_deref() != Ok("open") {
             return;
         }

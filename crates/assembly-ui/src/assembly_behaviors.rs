@@ -632,6 +632,8 @@ pub struct AsmUi {
     pub cache_checked: bool,
     pub cached_view: bool,
     pub real_result_in: bool,
+    /// NOSHAPE_PERF: the milestone of the first frame with the scene being built (open: … model frame presented).
+    pub scene_milestone: Option<&'static str>,
     /// Opening (live2 feedback.json documentLoad): when the first evaluation started, and the timer that shows the
     /// loading state after `display_cache::LOADING_DELAY`.
     pub opened_at: Option<std::time::Instant>,

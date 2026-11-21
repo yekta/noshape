@@ -31,7 +31,8 @@ pub struct AsmPickMap {
     targets: Vec<AsmPickTarget>,
     /// All face pick ids per top-level instance (whole-instance highlight).
     by_top: HashMap<noshape_model::assembly::InstanceId, Vec<u32>>,
-    by_ref: HashMap<(InstancePath, Reference), Vec<u32>>,
+    /// Each occurrence's pick ids (faces, edges and vertices: one run, first..=last) by its path.
+    by_path: HashMap<InstancePath, Vec<(u32, u32)>>,
 }
 
 impl AsmPickMap {
@@ -40,7 +41,6 @@ impl AsmPickMap {
         if t.kind == PickKind::Face {
             self.by_top.entry(t.path[0]).or_default().push(id);
         }
-        self.by_ref.entry((t.path.clone(), t.reference.clone())).or_default().push(id);
         self.targets.push(t);
         id
     }
@@ -56,24 +56,35 @@ impl AsmPickMap {
     pub fn faces_of(&self, top: noshape_model::assembly::InstanceId) -> &[u32] {
         self.by_top.get(&top).map(|v| v.as_slice()).unwrap_or(&[])
     }
-    pub fn ids_for(&self, path: &InstancePath, r: &Reference) -> &[u32] {
-        self.by_ref.get(&(path.clone(), r.clone())).map(|v| v.as_slice()).unwrap_or(&[])
+    /// The pick ids pushed since `first` belong to the occurrence at `path`.
+    fn close_occurrence(&mut self, path: &InstancePath, first: u32) {
+        let last = self.targets.len() as u32;
+        if last >= first {
+            self.by_path.entry(path.clone()).or_default().push((first, last));
+        }
+    }
+    /// The pick ids of the occurrence at `path` with their targets.
+    fn at_path<'a>(&'a self, path: &InstancePath) -> impl Iterator<Item = (u32, &'a AsmPickTarget)> + 'a {
+        self.by_path.get(path).into_iter().flatten().flat_map(|&(a, b)| a..=b).filter_map(|id| Some((id, self.get(id)?)))
+    }
+    pub fn ids_for<'a>(&'a self, path: &InstancePath, r: &'a Reference) -> impl Iterator<Item = u32> + 'a {
+        self.at_path(path).filter(move |(_, t)| t.reference == *r).map(|(id, _)| id)
     }
     /// Pick ids of one occurrence's faces.
     pub fn faces_at(&self, path: &InstancePath) -> Vec<u32> {
-        self.by_ref.iter().filter(|((p, r), _)| p == path && matches!(r, Reference::Face(_))).flat_map(|(_, v)| v.iter().copied()).collect()
+        self.at_path(path).filter(|(_, t)| matches!(t.reference, Reference::Face(_))).map(|(id, _)| id).collect()
     }
     /// Pick ids of an instance's edges.
     pub fn edges_of(&self, top: noshape_model::assembly::InstanceId) -> Vec<u32> {
-        self.by_ref.iter().filter(|((p, r), _)| p.first() == Some(&top) && matches!(r, Reference::Edge(_))).flat_map(|(_, v)| v.iter().copied()).collect()
+        let paths = self.by_path.keys().filter(|p| p.first() == Some(&top));
+        paths.flat_map(|p| self.at_path(p)).filter(|(_, t)| matches!(t.reference, Reference::Edge(_))).map(|(id, _)| id).collect()
     }
     /// Pick ids of the edges bounding a face (edge names hold their faces').
     pub fn boundary_ids(&self, path: &InstancePath, face: &Reference) -> Vec<u32> {
         let Reference::Face(n) = face else { return Vec::new() };
-        self.by_ref
-            .iter()
-            .filter(|((p, r), _)| p == path && matches!(r, Reference::Edge(noshape_model::reference::TopoName::Edge { faces, .. }) if faces.iter().any(|f| **f == *n)))
-            .flat_map(|(_, v)| v.iter().copied())
+        self.at_path(path)
+            .filter(|(_, t)| matches!(&t.reference, Reference::Edge(noshape_model::reference::TopoName::Edge { faces, .. }) if faces.iter().any(|f| **f == *n)))
+            .map(|(id, _)| id)
             .collect()
     }
     pub fn priority_fn(&self) -> Arc<dyn Fn(u32) -> i32 + Send + Sync> {
@@ -256,6 +267,10 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
     cache.bodies.retain(|_, (w, _)| w.strong_count() > 0);
     cache.tangent.retain(|_, (w, _)| w.strong_count() > 0);
     cache.hidden_edges.retain(|_, (w, _)| w.strong_count() > 0);
+    let t0 = std::time::Instant::now();
+    prepare_bodies(result, opts.software, cache, up);
+    let prepared = t0.elapsed();
+    let mut pick_time = std::time::Duration::ZERO;
     use crate::builder::{DisplayMode, TangentEdges};
     let mode = opts.display_mode;
     scene.no_occlusion = matches!(mode, DisplayMode::HiddenLine | DisplayMode::Translucent);
@@ -266,6 +281,7 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
             continue;
         }
         let mk = |r: &Reference, kind, anchor| AsmPickTarget { path: o.path.clone(), reference: r.clone(), kind, occ: oi, anchor };
+        let tp = std::time::Instant::now();
         let face_base = picks.targets.len() as u32;
         for r in &o.face_refs {
             picks.push(mk(r, PickKind::Face, None));
@@ -279,6 +295,8 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
             let a = o.mesh.vertices.get(i).map(|p| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64));
             picks.push(mk(r, PickKind::Vertex, a));
         }
+        picks.close_occurrence(&o.path, face_base + 1);
+        pick_time += tp.elapsed();
         let t = to_mat4(&o.transform);
         let first_instance = scene.instances.len();
         let mut color = o.color;
@@ -445,6 +463,7 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
         }
         spans.push(OccSpan { occ: oi, top: o.top(), start: first_instance, end: scene.instances.len(), lod: lod_at });
     }
+    log::info!(target: "perf", "assembly scene: bodies prepared in {} ms, {} picks in {} ms, all in {} ms", prepared.as_millis(), picks.len(), pick_time.as_millis(), t0.elapsed().as_millis());
     let static_instances = scene.instances.len();
     scene.states = vec![0; picks.len() + 1];
     let clip = |(n, d): &(DVec3, f64)| noshape_render::ClipPlane::new(n.as_vec3(), *d as f32);
@@ -463,6 +482,46 @@ pub fn display_levels(o: &PartOccurrence, software: bool) -> Vec<Arc<MeshBuffers
     let proxy = o.coarser.first().filter(|_| software).and_then(|m| m.proxy());
     let coarsest = proxy.into_iter().chain(o.coarser.first().cloned()).take(1);
     coarsest.chain(o.coarser.iter().skip(1).cloned()).chain(std::iter::once(o.mesh.clone())).collect()
+}
+
+/// The visible occurrences' meshes not yet uploaded, made on every core (infento's ~0.5 s one after another).
+fn prepare_bodies(result: &AssemblyResult, software: bool, cache: &mut AsmGpuCache, up: &Uploader) {
+    let mut seen = HashSet::new();
+    let todo: Vec<Arc<MeshBuffers>> = result
+        .occurrences
+        .iter()
+        .filter(|o| !o.hidden)
+        .flat_map(|o| display_levels(o, software))
+        .filter(|m| {
+            let key = Arc::as_ptr(m) as usize;
+            !cache.bodies.contains_key(&key) && seen.insert(key)
+        })
+        .collect();
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).min(todo.len());
+    if threads < 2 {
+        return;
+    }
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let made: Vec<(usize, CachedBody)> = std::thread::scope(|s| {
+        let workers: Vec<_> = (0..threads)
+            .map(|_| {
+                s.spawn(|| {
+                    let mut out = Vec::new();
+                    while let Some(m) = todo.get(next.fetch_add(1, std::sync::atomic::Ordering::Relaxed)) {
+                        out.push((Arc::as_ptr(m) as usize, upload_body(m, up)));
+                    }
+                    out
+                })
+            })
+            .collect();
+        workers.into_iter().flat_map(|w| w.join().unwrap_or_default()).collect()
+    });
+    let by_key: HashMap<usize, &Arc<MeshBuffers>> = todo.iter().map(|m| (Arc::as_ptr(m) as usize, m)).collect();
+    for (key, body) in made {
+        if let Some(m) = by_key.get(&key) {
+            cache.bodies.insert(key, (Arc::downgrade(m), Arc::new(body)));
+        }
+    }
 }
 
 fn upload_body(m: &MeshBuffers, up: &Uploader) -> CachedBody {
@@ -1012,7 +1071,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     let sel = theme::lin(theme::viewport::SELECTION);
     let hov = theme::lin(theme::viewport::PREHIGHLIGHT);
     let mut mark = |path: &InstancePath, r: &Reference, flag: u32, scene: &mut Scene| {
-        for &id in built.picks.ids_for(path, r) {
+        for id in built.picks.ids_for(path, r) {
             scene.add_flag(id, flag);
             if let Some(t) = built.picks.get(id)
                 && t.kind == PickKind::Vertex
@@ -1031,7 +1090,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         mark(p, r, state::HOVER, &mut scene);
     }
     for (p, r) in &h.query_entities {
-        for &id in built.picks.ids_for(p, r) {
+        for id in built.picks.ids_for(p, r) {
             scene.add_flag(id, state::QUERY);
         }
     }
