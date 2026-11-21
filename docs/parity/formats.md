@@ -40,19 +40,19 @@ Every option live shows has an `export_parts` / `import_files` parameter: no for
 | all | Options: Download; Download and store file in a new tab; Store file in a new tab | `options` | full | e2e |
 | all | Export unique parts as individual files (off) | `individual` | full | STEP-SPLIT, STL-SPLIT: zip entries as live's |
 | all | Include hidden instances in export (off) | `include_hidden` | full | HIDDEN-EXCLUDED / -INCLUDED |
-| PARASOLID | Version (38.1, 38.1 … 25.0; Use latest version) | `version` | partial | 28.0 full; 25.0, 33.x and x_b untested; cf-hose-routing's hoses read back with 14 edges / 4 vertices (live 12 / 0) |
+| PARASOLID | Version (38.1, 38.1 … 25.0; Use latest version) | `version` | partial | 25.0, 28.0, 33.1 full on housing + duct (25.0 to 27.1 files read since their LIMIT nodes have no term_use); live has no x_b option; cf-hose-routing's hoses read back with 14 edges / 4 vertices (live 12 / 0) |
 | ACIS | – | – | partial | live.sat imports on 21 of 22 documents; c2-extension-spring area +0.01 %: tolerant edges' plane pcurves approximated by the healing (fix in progress) |
 | STEP | Version (AP242; AP214, AP203) | `version` | full | AP203 (CONFIG_CONTROL_DESIGN), AP214 |
-| STEP | Preprocessing (None; Automatic, Remove small entities only basic / advanced, … and convert all surfaces to b-surfaces) | `preprocessing` | untested | |
+| STEP | Preprocessing (None; Automatic, Remove small entities only basic / advanced, … and convert all surfaces to b-surfaces) | `preprocessing` | partial | Automatic full on housing (live's file as None's); b-surfaces not converted: live's file has every surface a B-spline and closed faces in halves (46 faces, 118 edges), ours writes the exact surfaces (OCCT's angle split / revolution / B-spline conversion broke the housing: parked); duct waits on live's 17:20 rerun |
 | STEP | Use custom units for export (off) | `units` | full | STEP-INCH (CONVERSION_BASED_UNIT('INCH')) |
 | STEP | Include derived tolerances in export (on) | `derived_tolerances` | untested | e2e only |
 | STEP | Use custom annotation text height for MBD export (off; 4 mm) | `mbd_text_height` | untested | e2e only |
 | IGES | Use compatibility mode for surfaces and curves (off) | `iges_compatibility` | partial | entity counts as live's (46 / 52 / 104 on the housing); ours reads our housing file back with 39 faces (live 36): 2 split faces left unmerged |
-| PVZ | Group composite parts into a single part file (on) | `group_composites` | untested | |
-| JT | – | – | untested | no live JT file yet |
-| RHINO | Version (8; 7 … 2; Use latest version) | `version` | partial | v5 / v8 import as live's; ours read back with 45 faces on the housing (live 46); v2, v4, v6, v7 untested |
-| GLTF / GLB | Resolution (Medium; Coarse, Fine, Custom: distance / angular tolerance, max chord length) | `resolution`, `distance_tolerance`, `angular_tolerance`, `max_chord_length` | partial | Medium full; Coarse / Fine untested; ours meshes as OBJ / 3MF (below) |
-| GLTF / GLB | Compress (off) | `compress` | missing | live writes KHR_draco_mesh_compression (live-opt-compress.glb / .gltf, batch 2); ours writes the file uncompressed and can't read live's compressed files |
+| PVZ | Group composite parts into a single part file (on) | `group_composites` | full | both of live's files alike (35429 bytes); ours imports them as live on duct; housing: live's import is an empty sheet (its mesh isn't closed), ours keeps the mesh as sheets |
+| JT | – | – | full | live.jt imports and reads back as live's on housing + duct |
+| RHINO | Version (8; 7 … 2; Use latest version) | `version` | partial | V2, V4, V5, V6, V7, V8 import as live's (V6 / V7 duct wait on live's rerun); ours read back with 45 faces on the housing (live 46) |
+| GLTF / GLB | Resolution (Medium; Coarse, Fine, Custom: distance / angular tolerance, max chord length) | `resolution`, `distance_tolerance`, `angular_tolerance`, `max_chord_length` | partial | live's Coarse / Fine / Compress files import as live on housing + duct; ours read back match except housing Coarse's area (+0.07 %, as OBJ / 3MF Coarse); ours meshes as OBJ / 3MF (below) |
+| GLTF / GLB | Compress (off) | `compress` | full | Draco meshes (KHR_draco_mesh_compression, lossless, a buffer per face) as live-opt-compress.glb / .gltf (dx-urdf, draco-core 2.3); the import reads live's compressed files. The layout is live's: a primitive per face with TEXCOORD_0 (the face's u, v over 0..1), materials per colour named r_g_b_0.000000_0.000000; live's PTC_onshape_metadata node extension isn't written |
 | OBJ | Resolution (Medium; as glTF) | as glTF | partial | facets as STL without its minimum facet width (dx-urdf f5cfb364): housing Coarse / Medium / Fine 1132 / 2156 / 5710 triangles (live 1258 / 2340 / 6188); rings-loft 20746 (live 26760): coarser on B-spline / cone faces |
 | 3MF | Resolution (Medium; as glTF) | as glTF | partial | as OBJ |
 | STL | STL Format (Binary; Text) | `stl_text` | full | STL-TEXT-INCH |
@@ -69,8 +69,8 @@ Every option live shows has an `export_parts` / `import_files` parameter: no for
 | all | Orient imported models with Y Axis Up (off) | `y_up` | full | YUP rows |
 | all | Create a composite part when importing multiple or non-solid bodies (off) | `composite` | untested | e2e only |
 | STEP, Parasolid, IGES | Join adjacent surfaces (off) | `join` | full | IGES-COMPAT-JOIN |
-| Parasolid | Import material density (off) | `density` | untested | |
-| IGES | IGES postprocessing (off) | `iges_postprocessing` | untested | |
+| Parasolid | Import material density (off) | `density` | full | PARASOLID-DENSITY imports as live on housing + duct |
+| IGES | IGES postprocessing (off) | `iges_postprocessing` | partial | live's compatibility-mode file with it: ours 36 / 80 / 45 faces / edges / vertices, live 36 / 79 / 44 (as without it) |
 | STL | Units (Millimeter) | `mesh_unit` | partial | a multi-part STL: c2-duct-multipart reads as 2 parts (live 4) |
 | OBJ | Units (Meter) | `mesh_unit` | full | OBJ-*-OBJ |
 | DXF, PNG, PDF, CSV | no dialog: a file tab after the active tab | as live | full | e2e |

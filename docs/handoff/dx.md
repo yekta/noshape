@@ -9,27 +9,42 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
-## Now (05:20 11-21): EXCHANGE (dx-urdf)
-- LANDED f42d3736 (docs): docs/parity/formats.md "Translator options audit": every format / option live offers, ours
-  full / partial / untested; no format or option missing (3MF, OBJ, ACIS, glTF all have ops, e2e and suite rows).
-- QUEUED (land.sh 05:15, dx-urdf, 3 commits): 3912e394 drawing DXF / DWG "Explode into polylines (notes)" explodes
-  every text (DXF-POLY rows match on duct + housing); f5cfb364 OBJ / 3MF / glTF / GLB facet with STL's faceter without
-  its minimum facet width (housing 3MF Coarse / Medium / Fine 1132 / 2156 / 5710 tris, live 1258 / 2340 / 6188, were
-  2160 / 4332 / 11512; test obj_and_3mf_presets_facet_as_onshapes); 0b69ee32 suite: an OBJ / 3MF with no live file
-  held to the model, not live's 5-degree STL. Mac: ops e2e 273 ok, clippy clean. Suite run 3 (exs-full3.log): 63 rows
-  off live (run 1 62, run 2 71); new off: rings-loft OBJ / 3MF area -0.108 % (ours 20746 tris, live 26760: coarser on
-  its B-spline / cone faces), sm-louver OBJ.
-- ACIS (c2-extension-spring area 600.7855, live 600.7224, band to 600.7827): the two side planes 150.4149 mm2 each;
-  the SAT's own 3D curves give 150.3934 (/root/dx-scratch/bin/satarea.py file.sat <face>), our edges' lengths equal
-  them. Cause: tolerant edges (0.0325 mm: 3D cubic vs quadratic pcurve) -> heal_import's SameParameter approximates the
-  plane pcurves. Fix in progress: plane faces' pcurves as exact projections after healing (sat_read.cpp).
-- glTF: our `compress` is stored but writes nothing; live writes KHR_draco_mesh_compression (live-opt-compress.glb /
-  .gltf) and we can't read those files (POSITION accessors without a bufferView). Plan: draco-core 2.3.3 (pure Rust,
-  Apache-2.0, dep bytemuck) to read and write. Live's glTF: a primitive per face with TEXCOORD_0, ours one per part.
-- live batch 2 (behaviours "Exchange option coverage, batch 2"): 17 cases on housing, 13 on duct (Rhino V6 / V7, STEP
-  preprocessing on duct rerun 17:20 UTC). Next: add them to parity.rs OPTION_FILES (JT, PVZ, GLB Coarse / Fine /
-  Compress, GLTF-COMPRESS, Parasolid 25 / 33.1, Rhino V2 / V4 / V6 / V7, STEP-PRE-AUTO / BSURF, IGES-POSTPROC,
-  PARASOLID-DENSITY) with markers (SCH_2500000, "3D Geometry File Format       60", no PLANE( in BSURF).
+## Next P1 (lead 11-21 06:50): fast open of heavy documents (infento 56 s, live 8-11 s, target <= 0.5 s shaded)
+Design (step 1; step 2, B-reps for selection, later):
+1. Exists today: app-core display_cache + part-studio-ui cached_open (and assembly_open, drawing_open) show a tab's last
+   display at once and swap in the real result (scene built first: no jump). But it lives in the user cache dir, keyed
+   with the executable's size + mtime: every new build, every other machine and every copied file misses (infento).
+2. Move it into the .noshape: meta rows `display:<tag>` (no schema bump; older releases still open the file), tag =
+   hash(kind, tab, configuration, level), value = MAGIC + key + zstd(bincode snapshot). One row per tag: replaced on save.
+3. Key = blake3(the whole document JSON, the tag's inputs, build id); build id = version + git commit + OCCT patch set
+   (portable; a dirty dev build adds the exe stamp). Any edit, configuration or build change = a different key = unused.
+4. Write: where the dir cache is written today (first full display, then 2 s after edits pause), on a background
+   thread through its own writable store handle (as start_thumbnail's store_to_file); the dir cache stays as fallback.
+5. Read: on open, in the background, the document's row first (read-only handle), then the dir; key mismatch = miss.
+6. Tests: hit (same doc + build), miss after an edit, miss after a build change; the Part Studio shows the file's
+   snapshot before its regeneration lands and swaps to an equal real display without a rebuild of its scene.
+
+## STATE 10:49 11-21 (read first after compaction)
+- dx-urdf CHECKING a4cdc3da (queued 10:19): 214ce8e8 failed on THIRD-PARTY-NOTICES (draco-core); notices commit added. Stack: OBJ /
+  3MF / glTF faceting, DXF explode notes, Draco, Parasolid 25.0-27.1 read, batch-2 cases, glTF per face + UVs,
+  AGENT_API.md, notices.
+- Fast open LANDED 66adb7cc as 92d02c14 (display rows in the .noshape, one per tab; tests). infento (Assembly 1, vibex8 llvmpipe,
+  load 14, empty cache dir): cold 80.4 s; from the file's row cached display in 0.56 s, drawn 2.28 s (0.61 s scene
+  build ON the UI thread, 1.06 s llvmpipe). Lead approved 10:1x: scene build off the UI thread + read the row in
+  parallel with window creation + a test that the UI thread isn't blocked; asm OK'd assembly-ui (nothing in flight).
+- dx-open QUEUED (bg, 10:48) 98b6d31d: assembly_view rebuild_scene_in_background (cache Arc<Mutex>, scene_seq,
+  scene_task; retransform only with no build pending; picks off while pending; a sync rebuild that finds the cache held
+  goes behind it), test an_evaluations_scene_is_built_off_the_ui_thread; display_cache::prefetch(path) from
+  files::open_document_window (store meta_with_prefix; a store drops it), milestones "open: display key / decoded / rows
+  read". Mac assembly-ui 138 ok. Timing: vibex8 ~/agents/dx-keep/bin/openinf.sh <app> <tag> (log openinf.log).
+- Speed batch 3 (Part Studios 11-20 vs live's server column): vibex8 ~/agents/dx-keep/sr/sr3.sh (qa's speedref.py + nscli.py
+  copies, qa's 04:33 release cli/pmbin in ~/tmp/qa/srm3 = batches 1-2's build) -> sr/sr3.json, sr3.log.
+- dx-land uncommitted: formats.md batch-2 rows + this handoff: land docs-only after dx-urdf lands.
+- Mac: one active target (dx-urdf); dx-keep trimmed to 118 MB (lead 10:0x: 100 GB promise on the user's Mac).
+- Next: infento numbers to the lead; batch-2 leftovers (IGES-POSTPROC, Rhino 45 vs 46, duct's Rhino V6/V7 + STEP-PRE
+  after live's 17:20 rerun); step 2 of fast open (B-reps for selection) only when the lead says.
+
+## Exchange leftovers (11-21)
 - Drawing rows (2/10): bottle Front's lip arc 41.8..180 deg (live 90..180) and views 0.015 in low; hex iso circles as
   LWPOLYLINE (live ELLIPSE); faceblend ELLIPSE vs SPLINE; the rest hidden-line geometry. Files /root/dx-scratch/drw.
 - Open: multipart STL import 2 parts (live 4/9), housing IGES compat read-back 39 vs 36 faces, Rhino 45 vs 46.
