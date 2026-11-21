@@ -445,14 +445,25 @@ pub fn extend_surface(ev: &mut EvalCtx) -> FResult<()> {
             return crate::regen::eval::err_at(&["entities"], "No boundary edges found to move.");
         }
         let faces = b.shape.faces();
-        if faces.len() != 1 || faces[0].face_plane()?.is_none() {
-            return err("Move boundary currently supports single planar surfaces only (all boundary edges moved)");
+        if faces.len() != 1 {
+            return err("Move boundary currently supports single-face surfaces only");
         }
         let face = &faces[0];
-        let outer = face.wires().into_iter().next().ok_or_else(|| crate::regen::eval::FeatureError::at(&["entities"], "No boundary edges found to move."))?;
         // A kernel failure reads as Onshape's EXTEND_FAILED ("Unable to move
         // selected entities."), not the kernel's own text (qa5 SF5).
         let failed = |_| FeatureError::new(crate::regen::custom_features::error_text("EXTEND_FAILED"));
+        // A curved surface: carried on along itself past the picked edges' sides (c2-surf-workshop-manualblend's Move
+        // boundary 1 and 2: a swept tube 25 mm longer at each end, +879.5 mm² as live).
+        if face.face_plane()?.is_none() {
+            if target.is_some() || d <= 0.0 {
+                return err("Move boundary currently supports Blind outward moves of curved surfaces only");
+            }
+            let chosen: Vec<Shape> = if whole.contains(&bi) { Vec::new() } else { picked[&bi].iter().filter_map(|&ei| b.shape.sub_shape(ShapeType::Edge, ei).ok()).collect() };
+            let new_face = k::extend_face_at(face, &chosen, d).map_err(failed)?;
+            ev.ctx.bodies[bi] = Arc::new(Body::new(b.id.clone(), b.name.clone(), b.kind, new_face, vec![b.faces[0].clone()], b.color, ev.feature));
+            continue;
+        }
+        let outer = face.wires().into_iter().next().ok_or_else(|| crate::regen::eval::FeatureError::at(&["entities"], "No boundary edges found to move."))?;
         // Only some edges picked (qa5 SF5: one edge of a 40 × 20 fill, 10 mm:
         // only that edge moves, 1000 mm²): the picked straight edges move out
         // in the plane, their neighbours run on to meet them.

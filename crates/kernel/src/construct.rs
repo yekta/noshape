@@ -254,6 +254,13 @@ pub fn extend_face(face: &Shape, len: f64) -> Result<Shape> {
     Shape::from_res(ffi::extend_face(face.raw(), len))
 }
 
+/// A face bounded by its surface's sides carried on `len` past the sides `edges` lie on (none: every side not closed
+/// round), tangent to it (Move boundary of a curved surface: c2-surf-workshop-manualblend's tube, 25 mm at an end).
+pub fn extend_face_at(face: &Shape, edges: &[Shape], len: f64) -> Result<Shape> {
+    let l = vec_to_list(edges);
+    Shape::from_res(ffi::extend_face_at(face.raw(), &l, len))
+}
+
 /// A B-spline `face`'s whole surface carried past only the sides `points` lie beyond, each by what its farthest point
 /// needs (a quarter more) plus `margin`: a face a blend runs onto, extended to trim it (a long extension of every side
 /// of a dense B-spline makes a surface OCCT's intersections fail on).

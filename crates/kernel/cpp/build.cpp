@@ -82,6 +82,7 @@
 #include <gp_Circ.hxx>
 #include <gp_Elips.hxx>
 #include <gp_Lin2d.hxx>
+#include <GeomAPI_ProjectPointOnCurve.hxx>
 
 #include <numeric>
 
@@ -1426,6 +1427,84 @@ std::unique_ptr<OcShape> extend_face(const OcShape& on, double len)
       fail_op("could not build the extended face");
     out = mk.Face();
   }
+  if (f.Orientation() == TopAbs_REVERSED)
+    out.Reverse();
+  return wrap(out);
+}
+
+std::unique_ptr<OcShape> extend_face_at(const OcShape& on, const OcShapeList& edges, double len)
+{
+  const TopoDS_Face& f = as_face(on.shape, "face");
+  if (!(len > 0))
+    fail_invalid("the extension must be positive");
+  double u0, u1, v0, v1;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  occ::handle<Geom_Surface> s = BRep_Tool::Surface(f);
+  if (const auto t = occ::down_cast<Geom_RectangularTrimmedSurface>(s); !t.IsNull())
+    s = t->BasisSurface();
+  occ::handle<Geom_BSplineSurface> bs = occ::down_cast<Geom_BSplineSurface>(s->Copy());
+  if (bs.IsNull())
+    bs = GeomConvert::SurfaceToBSplineSurface(new Geom_RectangularTrimmedSurface(s, u0, u1, v0, v1));
+  else
+  {
+    double a0, a1, b0, b1;
+    bs->Bounds(a0, a1, b0, b1);
+    if (!bs->IsUPeriodic() && (u0 > a0 + 1e-9 || u1 < a1 - 1e-9))
+      bs->Segment(u0, u1, b0, b1), bs->Bounds(a0, a1, b0, b1);
+    if (!bs->IsVPeriodic() && (v0 > b0 + 1e-9 || v1 < b1 - 1e-9))
+      bs->Segment(a0, a1, v0, v1);
+  }
+  double a0, a1, b0, b1;
+  bs->Bounds(a0, a1, b0, b1);
+  const bool closed[2] = {bs->IsUPeriodic() || bs->IsUClosed(), bs->IsVPeriodic() || bs->IsVClosed()};
+  // The side (0, 1: first / last U; 2, 3: V) an edge lies along, -1 for none.
+  const auto side_of = [&](const TopoDS_Edge& e) {
+    BRepAdaptor_Curve c(e);
+    const double      tol = std::max(1e-6, 10 * BRep_Tool::Tolerance(e));
+    for (int k = 0; k < 4; ++k)
+    {
+      if (closed[k / 2])
+        continue;
+      const occ::handle<Geom_Curve> iso = k < 2 ? bs->UIso(k == 0 ? a0 : a1) : bs->VIso(k == 2 ? b0 : b1);
+      bool                          on  = true;
+      for (const double w : {0.1, 0.5, 0.9})
+      {
+        GeomAPI_ProjectPointOnCurve pr(c.Value(c.FirstParameter() + w * (c.LastParameter() - c.FirstParameter())), iso);
+        on = on && pr.NbPoints() > 0 && pr.LowerDistance() < tol;
+      }
+      if (on)
+        return k;
+    }
+    return -1;
+  };
+  // (Only a face bounded by its surface's sides: a trimmed one would lose its trim.)
+  bool sides[4] = {false, false, false, false};
+  for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+    if (BRep_Tool::Degenerated(e) || BRep_Tool::IsClosed(e, f))
+      continue;
+    const int k = side_of(e);
+    if (k < 0)
+      fail_invalid("the face is trimmed inside its surface");
+    if (edges.items.empty())
+      sides[k] = true;
+  }
+  for (const TopoDS_Shape& x : edges.items)
+  {
+    const int k = x.ShapeType() == TopAbs_EDGE ? side_of(TopoDS::Edge(x)) : -1;
+    if (k < 0)
+      fail_invalid("an edge isn't on the face's boundary");
+    sides[k] = true;
+  }
+  occ::handle<Geom_BoundedSurface> b = bs;
+  for (int k = 0; k < 4; ++k)
+    if (sides[k])
+      GeomLib::ExtendSurfByLength(b, len, 1, k < 2, k % 2 == 1);
+  BRepBuilderAPI_MakeFace mk(b, 1e-7);
+  if (!mk.IsDone())
+    fail_op("could not build the extended face");
+  TopoDS_Face out = mk.Face();
   if (f.Orientation() == TopAbs_REVERSED)
     out.Reverse();
   return wrap(out);

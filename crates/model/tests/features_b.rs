@@ -2011,6 +2011,52 @@ fn move_boundary_of_one_edge_moves_only_it() {
     assert!(near(bb.min.y, -0.005, 1e-9) && near(bb.max.y, 0.05, 1e-9) && near(bb.min.x, 0.0, 1e-9) && near(bb.max.x, 0.1, 1e-9), "{bb:?}");
 }
 
+/// Move boundary of a curved surface carries it on along itself (c2-surf-workshop-manualblend's Move boundary 1 and 2: a
+/// swept tube 25 mm longer at an end): a cylinder's sheet (R20, 40 mm) 5 mm on past its top edge, then 5 mm past both.
+#[test]
+fn move_boundary_of_a_cylinder_sheet_lengthens_it() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::ZERO, 0.02);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    s.extrude_largest(sid, "40 mm");
+    let r = s.ok();
+    let side = r.context.bodies[0].faces.iter().find(|n| matches!(&***n, TopoName::Face { role: Role::Side(_), .. })).unwrap();
+    let side = Reference::Face((**side).clone());
+    let off = s.add("offsetSurface", move |p| {
+        p.set("surfacesAndFaces", ParamValue::Query(vec![side]));
+        p.set("offset", expr("0 mm"));
+    });
+    let r = s.ok();
+    let sf = r.context.bodies.iter().position(|b| b.id.feature == off).unwrap();
+    let b = &r.context.bodies[sf];
+    let top = b.shape.edges().iter().position(|e| e.endpoints().is_ok_and(|(a, c)| near(a.z, 0.04, 1e-9) && near(c.z, 0.04, 1e-9)));
+    let top = Reference::Edge((*b.edges[top.unwrap()]).clone());
+    let body = Reference::Body(b.id.clone());
+    s.add("extendSurface", move |p| {
+        p.set("entities", ParamValue::Query(vec![top]));
+        p.set("extendDistance", expr("5 mm"));
+    });
+    for (whole, h, z0) in [(false, 0.045, 0.0), (true, 0.055, -0.005)] {
+        if whole {
+            let body = body.clone();
+            s.add("extendSurface", move |p| {
+                p.set("entities", ParamValue::Query(vec![body]));
+                p.set("extendDistance", expr("5 mm"));
+            });
+        }
+        let r = s.ok();
+        let sf = r.context.bodies.iter().position(|b| b.id.feature == off).unwrap();
+        let shape = &r.context.bodies[sf].shape;
+        assert!(shape.is_valid());
+        assert_eq!(shape.faces().len(), 1);
+        let a = surface_area(&r, sf);
+        assert!(near(a, 2.0 * PI * 0.02 * h, 1e-8), "area {a}");
+        let bb = shape.bounding_box(true).unwrap();
+        assert!(near(bb.min.z, z0, 1e-7) && near(bb.max.z, z0 + h, 1e-7) && near(bb.max.x, 0.02, 1e-7), "{bb:?}");
+    }
+}
+
 /// qa5 SF6: Move boundary on the straight edge of a planar surface between
 /// two arcs (40 mm chords, 10 mm sagitta, 30 mm apart: 1200 mm²), 10 mm out:
 /// the arcs run on along their tangents (live's default, Maintain curvature
