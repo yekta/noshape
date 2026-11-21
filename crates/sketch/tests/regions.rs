@@ -299,3 +299,61 @@ fn a_splines_handle_arms_are_lines() {
     let removed = sk.remove_entities(&[s]);
     assert!(removed.contains(&a0) && removed.contains(&a1) && sk.entity(h0).is_none());
 }
+
+/// A triangle of a 10 mm line from the origin, Use'd when `used`, and two plain lines, the last ending `gap` beyond
+/// the first line's start (live use-rule's test); `copy`: the triangle on a circular pattern's copy of that line.
+fn triangle_on_line(gap: f64, used: bool, copy: bool) -> Sketch {
+    let mut sk = Sketch::new();
+    let (a, b) = (sk.add_point(v(0.0, 0.0)), sk.add_point(v(0.01, 0.0)));
+    let mut base = sk.add_entity(Geometry::Line { start: a, end: b }, false, used).unwrap();
+    if copy {
+        let groups = sk.circular_pattern_groups(&[base], v(0.0, -0.02), 2, 2.0 * PI).unwrap();
+        base = *groups[0].iter().find(|e| sk.entity(**e).is_some_and(|x| x.kind() == EntityKind::Line)).unwrap();
+    }
+    let c = sk.curve(base).unwrap();
+    let (s, e) = (c.start_point(), c.end_point());
+    let apex = (s + e) * 0.5 + (e - s).perp() * 0.8;
+    sk.add_line(e, apex);
+    sk.add_line(apex, s - (e - s).normalize() * gap);
+    sk
+}
+
+/// A plain end joins a Use'd curve's end (or a circular pattern copy's of one) within 20 µm, plain ends only within
+/// 0.2 µm (live 11-21 use-rule: 19.71 µm joined, 20.49 not; asm-infento a3f7a1 Sketch 1's teeth, 9.16 µm).
+#[test]
+fn ends_join_a_used_curves_end_within_20_um() {
+    for copy in [false, true] {
+        let r = triangle_on_line(19.7e-6, true, copy).regions();
+        assert_eq!(r.len(), 1, "copy {copy}");
+        assert_close(r[0].area(), 0.5 * 0.01 * 0.008, 1e-12);
+        let segs = &r[0].outer.segments;
+        for (k, s) in segs.iter().enumerate() {
+            assert!((s.end() - segs[(k + 1) % segs.len()].start()).length() < 1e-12, "the loop is open after segment {k}");
+        }
+        assert!(triangle_on_line(20.5e-6, true, copy).regions().is_empty(), "copy {copy}");
+    }
+    assert!(triangle_on_line(9.16e-6, false, false).regions().is_empty());
+}
+
+/// A 10 mm square of fixed lines, sharing its corner points (a text outline's contour) or each with its own (Use'd),
+/// and a plain diagonal from one corner stopping 9.2 µm short of the opposite one.
+fn square_and_short_diagonal(shared: bool) -> Sketch {
+    let mut sk = Sketch::new();
+    let q = [v(0.0, 0.0), v(0.01, 0.0), v(0.01, 0.01), v(0.0, 0.01)];
+    let pt = |sk: &mut Sketch, k: usize| sk.add_entity(Geometry::Point { pos: q[k % 4] }, false, true).unwrap();
+    let corners: Vec<_> = (0..4).map(|k| pt(&mut sk, k)).collect();
+    for k in 0..4 {
+        let (a, b) = if shared { (corners[k], corners[(k + 1) % 4]) } else { (pt(&mut sk, k), pt(&mut sk, k + 1)) };
+        sk.add_entity(Geometry::Line { start: a, end: b }, false, true).unwrap();
+    }
+    sk.add_line(q[0], q[2] - DVec2::splat(6.5e-6));
+    sk
+}
+
+/// A text outline is fixed geometry but not a Use'd curve: its curves share their end points along a contour and
+/// reach no farther than plain ends (PEM nuts' marking text lost 3 planar faces when they did).
+#[test]
+fn fixed_curves_sharing_their_ends_reach_as_plain_ones() {
+    assert_eq!(square_and_short_diagonal(true).regions().len(), 1);
+    assert_eq!(square_and_short_diagonal(false).regions().len(), 2);
+}

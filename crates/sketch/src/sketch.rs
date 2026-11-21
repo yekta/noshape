@@ -236,7 +236,7 @@ impl Sketch {
 
     /// Adds an entity with validated references.
     pub fn add_entity(&mut self, geometry: Geometry, construction: bool, external: bool) -> Result<EntityId> {
-        let probe = Entity { id: EntityId(u32::MAX), geometry, construction, external, reference_only: false, handle_of: None, held_direction: None, clockwise: false };
+        let probe = Entity { id: EntityId(u32::MAX), geometry, construction, external, reference_only: false, handle_of: None, held_direction: None, clockwise: false, use_copy: false };
         for r in probe.point_refs() {
             if self.kind(r) != Some(EntityKind::Point) {
                 return Err(SketchError::InvalidGeometry(format!("{r} is not a point")));
@@ -318,7 +318,7 @@ impl Sketch {
                 continue;
             }
             let id = self.alloc_entity();
-            self.entities.insert(id, Entity { id, geometry: Geometry::Line { start: at, end: tip }, construction: true, external: false, reference_only: false, handle_of: Some(curve), held_direction: None, clockwise: false });
+            self.entities.insert(id, Entity { id, geometry: Geometry::Line { start: at, end: tip }, construction: true, external: false, reference_only: false, handle_of: Some(curve), held_direction: None, clockwise: false, use_copy: false });
         }
         self.touch();
     }
@@ -365,7 +365,7 @@ impl Sketch {
         if id.0 < self.next_entity || self.entities.contains_key(&id) {
             return Err(SketchError::InvalidGeometry(format!("entity id {id} is already allocated")));
         }
-        let probe = Entity { id, geometry, construction, external, reference_only: false, handle_of: None, held_direction: None, clockwise: false };
+        let probe = Entity { id, geometry, construction, external, reference_only: false, handle_of: None, held_direction: None, clockwise: false, use_copy: false };
         for r in probe.point_refs() {
             if self.kind(r) != Some(EntityKind::Point) {
                 return Err(SketchError::InvalidGeometry(format!("{r} is not a point")));
@@ -397,7 +397,7 @@ impl Sketch {
         keep.sort_by_key(|e| (self.kind(*e) != Some(EntityKind::Point), e.0));
         for id in &keep {
             if let Some(e) = self.entity(*id) {
-                out.entities.insert(*id, Entity { external: false, reference_only: false, ..e.clone() });
+                out.entities.insert(*id, Entity { external: false, reference_only: false, use_copy: false, ..e.clone() });
             }
         }
         out.next_entity = keep.iter().map(|e| e.0 + 1).max().unwrap_or(0);
@@ -428,7 +428,7 @@ impl Sketch {
         // (A pasted spline brings its own handle arms; the copied ones' constraints go to those.)
         for e in other.entities.values().filter(|e| e.kind() != EntityKind::Point && e.handle_of.is_none()) {
             let mut g = e.geometry.clone();
-            let mut probe = Entity { id: e.id, geometry: g.clone(), construction: e.construction, external: false, reference_only: false, handle_of: None, held_direction: None, clockwise: false };
+            let mut probe = Entity { id: e.id, geometry: g.clone(), construction: e.construction, external: false, reference_only: false, handle_of: None, held_direction: None, clockwise: false, use_copy: false };
             for p in e.point_refs() {
                 if let Some(n) = map.get(&p) {
                     probe.replace_point(p, *n);

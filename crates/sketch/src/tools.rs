@@ -898,6 +898,7 @@ impl Sketch {
             let t = Transform::Rotate { center, angle: step * k as f64 };
             let mut res = EditResult::default();
             let (points, entities) = self.copy_entities(ids, &move |p| t.apply(p), &move |v| t.apply_vec(v), false, &|_| false, &mut res)?;
+            let _ = self.mark_use_copies(&entities);
             if let Some(center) = center_id {
                 for (seed, inst) in points {
                     self.add_c(&mut res, ConstraintKind::CircularPatternLink { seed, inst, center, angle: step * k as f64 });
@@ -914,6 +915,20 @@ impl Sketch {
             out.push(res.created);
         }
         Ok(out)
+    }
+
+    /// Flags each (seed, copy) pair's copy [`Entity::use_copy`] when its seed is Use'd or such a copy: a circular
+    /// pattern's copies reach other ends as the Use'd curve does (live 11-21 use-rule). Whether any flag changed.
+    pub fn mark_use_copies(&mut self, pairs: &[(EntityId, EntityId)]) -> bool {
+        let mut changed = false;
+        for &(seed, copy) in pairs {
+            let from_use = self.entity(seed).is_some_and(|e| e.use_copy) || self.is_used_curve(seed);
+            if let Some(e) = self.entity_mut(copy).filter(|e| e.kind() != EntityKind::Point && e.use_copy != from_use) {
+                e.use_copy = from_use;
+                changed = true;
+            }
+        }
+        changed
     }
 
     /// Transforms entities in place (external geometry is not moved). Fix

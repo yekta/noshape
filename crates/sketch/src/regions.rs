@@ -449,6 +449,98 @@ struct Edge {
     t1: f64,
     v0: usize,
     v1: usize,
+    /// An end moved onto a Use'd end ([`join_use_ends`]): a line runs between its vertices.
+    snapped: bool,
+}
+
+/// A Use'd curve's end (or a pattern copy's of one) joins the nearest other curve end closer than this, as live's
+/// regions (live 11-21 use-rule: 19.71 µm joined, 20.49 not, at any edge length, place or side; plain ends only within
+/// 0.2 µm; asm-infento a3f7a1 Sketch 1's teeth copies 9.16 µm apart close its ring).
+const USE_END_REACH: f64 = 2e-5;
+
+/// Joins Use'd ends to the ends near them ([`USE_END_REACH`]); `reach`: each curve's ends reach so. The end of a curve
+/// other than a line is kept (a line's end moves onto it), else the Use'd one.
+fn join_use_ends(edges: &mut [Edge], verts: &[DVec2], curves: &[(EntityId, Curve2)], reach: &[bool]) {
+    if !reach.iter().any(|r| *r) {
+        return;
+    }
+    let mut first: Vec<Option<usize>> = vec![None; curves.len()];
+    let mut last: Vec<Option<usize>> = vec![None; curves.len()];
+    for (k, e) in edges.iter().enumerate() {
+        if curves[e.curve].1.is_periodic() {
+            continue;
+        }
+        if first[e.curve].is_none_or(|f| e.t0 < edges[f].t0) {
+            first[e.curve] = Some(k);
+        }
+        if last[e.curve].is_none_or(|l| e.t1 > edges[l].t1) {
+            last[e.curve] = Some(k);
+        }
+    }
+    let ends: Vec<(usize, usize)> = (0..curves.len())
+        .flat_map(|c| [first[c].map(|k| (edges[k].v0, c)), last[c].map(|k| (edges[k].v1, c))])
+        .flatten()
+        .collect();
+    let mut uf: Vec<usize> = (0..verts.len()).collect();
+    fn root(p: &mut [usize], mut i: usize) -> usize {
+        while p[i] != i {
+            p[i] = p[p[i]];
+            i = p[i];
+        }
+        i
+    }
+    for &(v, c) in ends.iter().filter(|(_, c)| reach[*c]) {
+        let near = ends.iter().filter(|&&(w, d)| d != c && w != v).map(|&(w, _)| ((verts[w] - verts[v]).length(), w)).filter(|(d, _)| *d < USE_END_REACH);
+        if let Some((_, w)) = near.min_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1))) {
+            let (rv, rw) = (root(&mut uf, v), root(&mut uf, w));
+            uf[rv.max(rw)] = rv.min(rw);
+        }
+    }
+    let rank = |c: usize| match (matches!(curves[c].1, Curve2::Line { .. }), reach[c]) {
+        (false, _) => 0,
+        (true, true) => 1,
+        (true, false) => 2,
+    };
+    let mut keep: std::collections::HashMap<usize, (usize, usize)> = std::collections::HashMap::new();
+    for &(v, c) in &ends {
+        let r = root(&mut uf, v);
+        let k = keep.entry(r).or_insert((v, rank(c)));
+        if rank(c) < k.1 {
+            *k = (v, rank(c));
+        }
+    }
+    for e in edges.iter_mut() {
+        let mut to = |v: usize| keep.get(&root(&mut uf, v)).map_or(v, |k| k.0);
+        let (v0, v1) = (to(e.v0), to(e.v1));
+        e.snapped = v0 != e.v0 || v1 != e.v1;
+        (e.v0, e.v1) = (v0, v1);
+    }
+}
+
+/// Whose ends reach as a Use'd curve's ([`USE_END_REACH`]): Use'd curves and their pattern copies. A text outline is
+/// fixed too, but each of its ends is another outline curve's (a Use'd curve's points are its own).
+fn use_reach(sk: &Sketch, curves: &[(EntityId, Curve2)]) -> Vec<bool> {
+    let fixed = |id: &EntityId| sk.entity(*id).filter(|e| e.external || e.use_copy);
+    if !curves.iter().any(|(id, _)| fixed(id).is_some()) {
+        return vec![false; curves.len()];
+    }
+    let mut ends: std::collections::HashMap<EntityId, u32> = std::collections::HashMap::new();
+    for (a, b) in sk.entities().filter(|e| e.external).filter_map(|e| e.endpoints()) {
+        *ends.entry(a).or_default() += 1;
+        *ends.entry(b).or_default() += 1;
+    }
+    let shared = |(a, b): (EntityId, EntityId)| [a, b].iter().all(|p| ends.get(p).copied().unwrap_or(0) > 1 + u32::from(a == b));
+    curves.iter().map(|(id, _)| fixed(id).is_some_and(|e| e.use_copy || !e.endpoints().is_some_and(shared))).collect()
+}
+
+impl Sketch {
+    /// A Use'd curve: fixed, with end points of its own (see [`use_reach`]; a text outline's are its neighbours').
+    pub(crate) fn is_used_curve(&self, id: EntityId) -> bool {
+        let Some(e) = self.entity(id).filter(|e| e.external && e.kind() != EntityKind::Point) else { return false };
+        let Some((a, b)) = e.endpoints() else { return true };
+        let ends_another = |p: EntityId| self.entities().any(|o| o.id != id && o.external && o.endpoints().is_some_and(|(x, y)| x == p || y == p));
+        !(ends_another(a) && ends_another(b))
+    }
 }
 
 fn tolerance(boxes: &[BBox]) -> f64 {
@@ -522,7 +614,7 @@ static CROSSINGS: ExactMemo<Vec<(f64, f64)>> = std::sync::LazyLock::new(Default:
 /// Pairs kept at most (cleared when full).
 const CROSSINGS_KEPT: usize = 200_000;
 
-fn build_edges(curves: &[(EntityId, Curve2)], boxes: &[BBox], tol: f64) -> (Vec<Edge>, Vec<DVec2>) {
+fn build_edges(curves: &[(EntityId, Curve2)], boxes: &[BBox], tol: f64, reach: &[bool]) -> (Vec<Edge>, Vec<DVec2>) {
     let n = curves.len();
     let prep: Vec<Prepared> = curves.iter().zip(boxes).map(|((_, c), b)| Prepared::with_bbox(c, *b)).collect();
     let bbs: Vec<BBox> = prep.iter().map(|g| g.bbox.expanded(tol)).collect();
@@ -644,8 +736,10 @@ fn build_edges(curves: &[(EntityId, Curve2)], boxes: &[BBox], tol: f64) -> (Vec<
             continue;
         }
         mids.push(mid);
-        edges.push(Edge { curve: i, t0, t1, v0, v1 });
+        edges.push(Edge { curve: i, t0, t1, v0, v1, snapped: false });
     }
+    join_use_ends(&mut edges, &pos, curves, reach);
+    edges.retain(|e| !(e.snapped && e.v0 == e.v1));
     (edges, pos)
 }
 
@@ -664,7 +758,8 @@ impl Arrangement {
         // Each curve's box once (a spline's is a tessellation).
         let boxes: Vec<BBox> = curves.iter().map(|(_, c)| c.bbox()).collect();
         let tol = tolerance(&boxes);
-        let (edges, verts) = build_edges(&curves, &boxes, tol);
+        let reach = use_reach(sk, &curves);
+        let (edges, verts) = build_edges(&curves, &boxes, tol, &reach);
         let sizes = boxes.iter().map(|b| b.size().max_element()).collect();
         Arrangement { curves, sizes, edges, verts }
     }
@@ -679,7 +774,14 @@ impl Arrangement {
         let e = &self.edges[h / 2];
         let (id, c) = &self.curves[e.curve];
         let fwd = h.is_multiple_of(2);
-        (segment_of(c, e.t0, e.t1, fwd), SegmentSource { entity: *id, forward: fwd })
+        let seg = match c {
+            Curve2::Line { .. } if e.snapped => {
+                let (a, b) = self.he_verts(h);
+                ProfileSegment::Line { a: self.verts[a], b: self.verts[b] }
+            }
+            _ => segment_of(c, e.t0, e.t1, fwd),
+        };
+        (seg, SegmentSource { entity: *id, forward: fwd })
     }
 
     /// Outgoing direction angle and signed curvature of a half-edge.

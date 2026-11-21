@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-21 07:22 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-21 10:52 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## In flight (11-21 04:30 UTC)
@@ -8,22 +8,16 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   Recognize 6/6. SM 25 docs (Mac): 22/24 docs, 291/295 features.
 - QUEUED ca26da57 (06:43): hem-plus Offset surface 1 (Mac-only; OCCT's joined offset fails in metres on the Mac,
   op_offset_shape retries in millimetres: Mac 6/6, other offset docs unchanged; g++-13 build clean on vibex8).
-- P1 (lead 11-21, from asm): sketch regions over tiny gaps, infento a3f7a1 Sketch 1 (ours 1645.904 + 317.591 mm²,
-  live 905.898 + 740.006 + 317.591: our toothed loop is open at 24 gaps). Facts: live joins unconstrained free ends
-  only within 0.2 µm, any scale (REQUESTS 06:44 row, live 11-21). Our gaps are the circular pattern's instances: the
-  Use-line copy ends 9.159 µm short of the fillet-arc copy's end, collinear with the arc's tangent (the line's end
-  0.042 µm off the arc's circle); in the seed a 9.2 µm stub line (not a pattern seed) joins them. Live's feature has
-  no coincidence there either; live's region drops the seed's 9.2 µm stubs (shortest region edge 0.4286 mm). So
-  neither "coincident ends join" nor a distance rule explains it. Coincident-join attempt set aside:
-  ~/agents/skasm-keep/gap-coincident.patch (vibe local; did not change infento). Live 07:26: plain tangent-collinear / sideways 9.16-50 µm gaps don't close; a 9.2 µm stub stays a region
-  edge; infento's sketch copied with its constraints closes (also without the stubs), its solved edges reposted
-  without constraints don't: the closure comes from the constraint / pattern solve. REQUESTS 2026-11-21 07:27 row: which
-  constraint group closes it, and the FS-solved gap ends. Live 07:28: ONLY removing the 7 Use (PROJECTED) constraints opens
-  the ring (pattern / tangent / parallel / coincidents don't); FS-solved ends still 9.161 µm apart. Guess under test
-  (REQUESTS 2026-11-21 07:29): a Use'd curve's ends carry the imported STEP edge's vertex tolerance. Was: follow-up row 07:22 (live:
-  the tangent-collinear 9.16 µm case, a sideways one, a 9.2 µm stub in a rectangle, 20 / 50 µm). Our saved doc:
-  mac ~/noshape-host/tmp-skasm/saved2 (the studio is tab "2c9baaa07ea1fd5475c4b299"), our sketch_get in
-  skasm-scratch/gap/sk1.json; reduced corpus copy mac ~/noshape-host/tmp-skasm/gapm (asm.sh): delete both after.
+- LANDING (P1, lead 11-21 from asm; 2ce81c32 failed the queue: text outlines are fixed too, PEM nuts lost 3 planes; now
+  only fixed curves with ends of their own reach): sketch regions over tiny gaps. RULE (live 11-21 07:37, REQUESTS
+  use-rule.json): an end joins a Use'd curve's end, or a sketch circular-pattern copy's of one, within ~20 µm (19.71
+  yes / 20.49 no); plain ends only within 0.2 µm. Untested in live: linear-pattern / mirror copies of Use'd curves,
+  pattern copies of plain lines. Ours: Entity.use_copy, regions.rs USE_END_REACH / join_use_ends. Full parity 1879 =.
+- Handed to core 11-21 10:50: infento a3f7a1 Linear pattern 1's direction JMx = Chamfer 2's new edge on Extrude 1's
+  ring (ours runs -y, live +y); and P0 c2-genesis-trunk-hanger 20 -> 12/73 = core's 18354ec79 (bisected).
+- Queued (psui 11-21, one live take sk2-1121 sketch-split-at-crossing): a line drawn through a held line's midpoint
+  (crossing it) infers PERPENDICULAR in live, ours VERTICAL; off-midpoint crossings stay VERTICAL (behaviours 45906).
+  Extend square_at_mid (crates/sketch inference.rs). After the fan-loft.
 - Next after that (lead 11-21): the next item of "Next, in order"; sketch-solver parity rows if sheet metal has none.
 - LANDING: forms 21/21 (c2-sheet-metal-forms 10 -> 21/21; Mac A/B vs 97df380f1: 108 -> 109/174 docs, 1779 -> 1790
   features, no other doc changed): Sketch 3 connector at live's frame; Form 4 fuse skipped when adds add nothing;
@@ -45,7 +39,10 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   201.4963). Ours: every bend ends square, the base runs past L1 to y 202.785. Data: skasm-scratch/loft/apex.py,
   ours-all.out. PARKED (lead 11-21 06:30): don't guess from one sample; live REQUESTS P3 row skasm 11-21 06:27 (fans of
   3 / 5 bends). Samples IN (live 11-21 06:56): live/skasm/sm-loft-fans-1121/<name>/{live.jsonl,features.json}: loft-basic
-  with chordal tol 0.1 in (3 bends), 0.035 (5), 0.022 (6); Plane 1 at 4 in: 0.05 (4), 0.1 (3). Read the apex rule after the P1.
+  with chordal tol 0.1 in (3 bends), 0.035 (5), 0.022 (6); Plane 1 at 4 in: 0.05 (4), 0.1 (3). RULE (all 6 samples,
+  skasm-scratch/loft/fans2.py): the loft's bends in profile order (from the profiles' start), bend floor(n/2) ends
+  square; the others at its apex end slanted (splines). At 4 in bend 0 fans from the line's start, the rest from its
+  end: the index still counts all n. Ours: build_part (custom host/sheetmetal.rs) ends every bend square. IN FLIGHT 11-21.
 - Debug std: throw a custom regenError message (FS println goes to notices, not stderr); restore edited files with a
   fresh mtime (rb.sh rsync keeps the old one and cargo skips the rebuild). NOSHAPE_FS_TRACE=1 names the throw's line.
 - LANDED 6d80df66: Unfold unrolls only its bend, Refold puts back the held side (unfold-refold 6/6, 212/295).

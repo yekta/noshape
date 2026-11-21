@@ -103,6 +103,9 @@ pub struct Entity {
     /// counter-clockwise.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub clockwise: bool,
+    /// A sketch pattern's copy of a Use'd curve: its ends reach other ends as a Use'd curve's do (regions).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub use_copy: bool,
 }
 
 /// A held-direction line shorter than this (m) has no direction of its own: it keeps [`Entity::held_direction`].

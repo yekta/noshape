@@ -416,16 +416,25 @@ pub(crate) fn link_sketch_pattern(ctx: &mut Ctx, args: &Value) -> Result<(), OpE
     let list = |v: &Value, t: &mut SketchTarget| -> Result<Vec<EntityId>, OpError> {
         v.as_array().ok_or_else(|| OpError::param("instances", "lists of entity ids"))?.iter().map(|e| parse_entity(e, t, false, false)).collect()
     };
+    let mut marked = false;
     let made = if let Some(instances) = args["circular"].as_array() {
         let groups = instances.iter().map(|g| list(g, &mut t)).collect::<Result<Vec<_>, _>>()?;
         let center = parse_entity(args.get("center").ok_or_else(|| OpError::param("center", "required"))?, &mut t, false, false)?;
+        // Copies of Use'd seeds reach as Use'd ends do, linked or not (asm-infento a3f7a1 Sketch 1's teeth: unlinked).
+        let pairs: Vec<(EntityId, EntityId)> = groups.iter().skip(1).flat_map(|g| groups[0].iter().copied().zip(g.iter().copied())).collect();
+        marked = t.data.sketch.mark_use_copies(&pairs);
         sm::link_circular_pattern(&mut t.data, &groups, center, args["full"].as_bool().unwrap_or(true))
     } else {
         let rows = args["grid"].as_array().ok_or_else(|| OpError::param("grid", "required (or circular)"))?;
         let grid = rows.iter().map(|r| r.as_array().ok_or_else(|| OpError::param("grid", "rows of instances"))?.iter().map(|g| list(g, &mut t)).collect::<Result<Vec<_>, _>>()).collect::<Result<Vec<_>, _>>()?;
         sm::link_linear_pattern_grid(&mut t.data, &grid)
     };
-    made.ok_or_else(|| OpError::invalid("the instances aren't copies of the seeds"))?;
+    if made.is_none() {
+        if marked {
+            commit(od, t)?;
+        }
+        return Err(OpError::invalid("the instances aren't copies of the seeds"));
+    }
     t.data.sketch.solve();
     commit(od, t)
 }
