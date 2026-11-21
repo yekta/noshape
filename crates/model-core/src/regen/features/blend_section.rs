@@ -828,8 +828,13 @@ fn closed_run_on(shape: &Shape, ef: &[Vec<u32>], tools: Vec<RunOnTool>, scale: f
                 let hs: Vec<_> = met.iter().map(|&(_, i)| { let (f, l) = (&body_faces[i], legacy.clone()); sc.spawn(move || k::with_kernel_legacy(l, || touches(f, run))) }).collect();
                 hs.into_iter().map(|h| h.join().unwrap_or(false)).collect()
             });
-            let mut met: Vec<(f64, usize)> = met.into_iter().zip(touching).filter_map(|(m, t)| t.then_some(m)).collect();
-            met.sort_by(|a, b| a.0.total_cmp(&b.0));
+            let met: Vec<(f64, usize)> = met.into_iter().zip(touching).filter_map(|(m, t)| t.then_some(m)).collect();
+            // (A face at the edge's end before the faces past it: the shell's outer face, as wide as its inner one, cut
+            // c2-impeller-loft's Fillet 3 rounds through the wall to it; live's end on the inner one.)
+            let at_end = |i: usize| body_faces[i].vertices().iter().any(|v| v.vertex_point().is_ok_and(|p| (p - *q).length() <= scale * 1e-6));
+            let mut met: Vec<(bool, f64, usize)> = met.into_iter().map(|(r, i)| (!at_end(i), r, i)).collect();
+            met.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
+            let met: Vec<(f64, usize)> = met.into_iter().map(|(_, r, i)| (r, i)).collect();
             let points = points_of(run);
             for (n, &(_, i)) in met.iter().enumerate() {
                 if piece_reach(piece_box, *q, *out) < tip {
