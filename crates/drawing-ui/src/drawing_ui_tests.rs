@@ -788,6 +788,27 @@ fn the_view_simplification_list_is_in_lives_order(cx: &mut TestAppContext) {
     assert_eq!(labels, Some(["None", "Absolute", "Ratio to studio", "Ratio to part", "Auto"].map(String::from).to_vec()));
 }
 
+/// Live note-opts-1119 (border/z*.png; dom drawing-titleblock-dblclick's select): a flag note's Border size lists Tight
+/// fit, then 1 to 5 Characters.
+#[gpui::test]
+fn a_flag_notes_border_sizes_are_lives(cx: &mut TestAppContext) {
+    let (window, editor) = drawing(cx, "note-flag-sizes");
+    real_sheet(cx, window, &editor);
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+        e.open_note_panel(None, [100.0, 100.0], w, cx);
+        if let Some(crate::drawing_view::Panel::Note { input, style, .. }) = &mut e.panel {
+            input.update(cx, |s, cx| s.set_value("A", w, cx));
+            style.list = noshape_model::drawing::note::NoteList::Numbers;
+            style.flags = vec![0];
+        }
+    }))
+    .unwrap();
+    draw(cx, window);
+    press(cx, window, "note-flag-size");
+    let labels = cx.update(|cx| noshape_app_core::os_ui::open_dropdown_labels("note-flag-size-dd", cx));
+    assert_eq!(labels, Some(["Tight fit", "1 Character", "2 Characters", "3 Characters", "4 Characters", "5 Characters"].map(String::from).to_vec()));
+}
+
 /// Live2 tables_live2_1013 (dw4-resized): dragging a BOM's inner border moves that border only (the left column
 /// widens, the right one narrows, the total stays); a general table's grows the column on the fixed corner's side
 /// (live 1613 (b)).
@@ -1857,6 +1878,52 @@ fn custom_table_add_takes_a_configured_studios_configuration(cx: &mut TestAppCon
     press(cx, window, &format!("dr-ch-ps-{studio}"));
     let config = cx.update(|cx| editor.read(cx).custom_tables.dlg.as_ref().map(|d| (d.studio, d.config.0.get(&input).cloned())));
     assert_eq!(config, Some((Some(studio), Some(large))), "the studio at Size Large");
+}
+
+/// Live cfgtbl-1121: a configured studio's custom table has Change configuration... between Split custom table below
+/// and Copy; its panel opens on the table's value, and Reset to default + ✓ stores the default's value (kept when the
+/// default changes later, (c)).
+#[gpui::test]
+fn a_custom_tables_change_configuration_stores_the_values(cx: &mut TestAppContext) {
+    use noshape_model::drawing::{Table, TableKind};
+    SETUP.set(Some(|ctx, _| {
+        call(ctx, "config_add_input", json!({ "tab": "Part Studio 1", "kind": "list", "name": "Size" }));
+        call(ctx, "config_add_option", json!({ "tab": "Part Studio 1", "input": "Size", "name": "Large" }));
+    }));
+    let (window, editor) = drawing(cx, "ct-change-config");
+    real_sheet(cx, window, &editor);
+    let (input, small, large) = cx.update(|cx| editor.update(cx, |e, cx| {
+        let doc = &e.doc.read(cx).session.doc;
+        let tab = doc.ordered_tabs().into_iter().find(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_))).unwrap();
+        let noshape_model::TabContent::PartStudio(ps) = &tab.content else { unreachable!() };
+        let i = ps.configuration.inputs.first().expect("Size").clone();
+        let noshape_model::configuration::ConfigInputKind::List { options, default } = &i.kind else { panic!("a list") };
+        let large = options.iter().find(|o| o.name == "Large").expect("Large").id.clone();
+        let mut config = noshape_model::configuration::ConfigValues::default();
+        config.0.insert(i.id.clone(), large.clone());
+        let kind = noshape_scene::drawing_tools::custom_table_kind(tab.id, None, tab.id, "t".into(), None, false, config);
+        let sheet = e.sheet;
+        e.drawing.sheets[sheet].tables.push(Table::new(9101, kind, [200.0, 150.0]));
+        (i.id.clone(), default.clone(), large)
+    }));
+    draw(cx, window);
+    let labels: Vec<String> = cx.update(|cx| editor.read(cx).table_entries(9101, cx).into_iter().filter_map(|m| match m {
+        MenuEntry::Item { label, .. } => Some(label.to_string()),
+        _ => None,
+    }).collect());
+    let at = |l: &str| labels.iter().position(|x| x == l).unwrap_or_else(|| panic!("{l} in {labels:?}"));
+    // (No cells evaluated here, so no Split custom table below row above it.)
+    assert_eq!(at("Copy") - at("Change configuration..."), 1, "{labels:?}");
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_table_change_config(9101, w, cx))).unwrap();
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| editor.read(cx).change_config.as_ref().and_then(|d| d.values.0.get(&input).cloned())), Some(large), "opens on the table's");
+    pick(cx, window, "change-config-menu", "Reset to default");
+    press(cx, window, "change-config-ok");
+    let stored = cx.update(|cx| match &editor.read(cx).current_sheet().table(9101).map(|t| &t.kind) {
+        Some(TableKind::Custom { config, .. }) => config.0.get(&input).cloned(),
+        _ => None,
+    });
+    assert_eq!(stored, Some(small), "the default's value, stored");
 }
 
 /// Live cfg-choosers-1120 (iv-*): in Insert view's chooser a configured studio's row is 31 px with the configuration

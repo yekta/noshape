@@ -443,6 +443,12 @@ impl VariableStudioView {
         self.select_cell(&to, window, cx);
     }
 
+    /// The column of the cell being edited, or of the selected cell holding the keyboard: its header turns grey.
+    fn active_column(&self, window: &Window) -> Option<usize> {
+        let key = self.cell_editing.clone().or_else(|| self.cell_selected.clone().filter(|_| self.cell_has_keyboard(window)))?;
+        ["n", "t", "e", "d"].iter().position(|c| key.strip_prefix(c).is_some_and(|i| !i.is_empty() && i.bytes().all(|b| b.is_ascii_digit())))
+    }
+
     /// A table cell (not one being typed in) has the keyboard.
     fn cell_has_keyboard(&self, window: &Window) -> bool {
         self.cell_focus.values().any(|f| f.is_focused(window))
@@ -1518,6 +1524,7 @@ impl VariableStudioView {
         // In a panel the title row spans the panel (live, part-studio/77).
         let in_panel = self.host.is_some();
         let own_tab = !in_panel;
+        let active = self.active_column(window);
         let table = v_flex()
             .relative()
             .when(!in_panel, |d| d.w(px((0..4).map(col_w).sum::<f32>() + 1.)))
@@ -1646,6 +1653,7 @@ impl VariableStudioView {
                         .children(["Name", "Variable type", "Value", "Description"].into_iter().enumerate().map(|(c, h)| {
                             let dragging = self.col_drag.is_some_and(|d| d.0 == c);
                             cell_div(c)
+                                .bg(if active == Some(c) { pal.table_header_focus } else { pal.table_header })
                                 .map(|d| crate::ui_script::mark(d, move || format!("var_header:{h}")))
                                 .justify_center()
                                 .relative()

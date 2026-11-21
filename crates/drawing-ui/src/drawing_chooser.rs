@@ -372,11 +372,7 @@ impl DrawingEditor {
     /// A configured studio's configuration buttons (live cfg-choosers-1120): "Set to last viewed configuration" and
     /// its ▾ (Set to last viewed | Reset to default).
     fn config_buttons(&self, id: TabId, cx: &mut Context<Self>) -> AnyElement {
-        use crate::os_ui::OsDropdownExt as _;
-        use gpui_kit::component::button::{Button, ButtonVariants as _};
-        let line = gpui_kit::rgb(0xaaaaaa);
-        let ed = cx.entity();
-        let set = move |this: &mut Self, last: bool, cx: &mut Context<Self>| {
+        let set = move |this: &mut Self, last: bool, _: &mut Window, cx: &mut Context<Self>| {
             let config = if last { crate::drawing_hooks::last_viewed_config(id) } else { Some(ConfigValues::default()) };
             if let Some(c) = config {
                 this.chooser.studio_config.insert(id, c);
@@ -386,6 +382,18 @@ impl DrawingEditor {
             }
             cx.notify();
         };
+        self.config_button_pair(format!("dr-ch-cfg-last-{id}"), format!("dr-ch-cfg-menu-{id}"), set, cx)
+    }
+
+    /// The configuration icon and its ▾ (Set to last viewed | Reset to default), 57 px wide (live cfg-choosers-1120,
+    /// cfgtbl-1121 d1): `set(last)` on either.
+    pub(crate) fn config_button_pair(&self, last_id: String, menu_id: String, set: impl Fn(&mut Self, bool, &mut Window, &mut Context<Self>) + Clone + 'static, cx: &mut Context<Self>) -> AnyElement {
+        use crate::os_ui::OsDropdownExt as _;
+        use gpui_kit::component::button::{Button, ButtonVariants as _};
+        let line = gpui_kit::rgb(0xaaaaaa);
+        let ed = cx.entity();
+        let (s1, s2) = (set.clone(), set);
+        let menu_sel = menu_id.clone();
         h_flex()
             .w(px(57.))
             .h(px(30.))
@@ -395,8 +403,8 @@ impl DrawingEditor {
             .border_color(line)
             .child(
                 div()
-                    .id(SharedString::from(format!("dr-ch-cfg-last-{id}")))
-                    .debug_selector(move || format!("dr-ch-cfg-last-{id}"))
+                    .id(SharedString::from(last_id.clone()))
+                    .debug_selector(move || last_id.clone())
                     .w(px(35.))
                     .h_full()
                     .flex()
@@ -406,23 +414,23 @@ impl DrawingEditor {
                     .border_color(line)
                     .tooltip(crate::ui::tooltip("Set to last viewed configuration"))
                     .child(crate::assets::icon("configuration", 20., cx))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                         cx.stop_propagation();
-                        set(this, true, cx);
+                        s1(this, true, window, cx);
                     })),
             )
             .child(
-                div().on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation()).child(
-                    Button::new(SharedString::from(format!("dr-ch-cfg-menu-{id}")))
+                div().debug_selector(move || menu_sel.clone()).on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation()).child(
+                    Button::new(SharedString::from(menu_id.clone()))
                         .ghost()
                         .w(px(20.))
                         .h(px(28.))
                         .rounded(px(0.))
                         .child(crate::ui::glyph("ui-caret-down", 10., gpui_kit::rgb(0x000000)))
-                        .os_dropdown_menu(SharedString::from(format!("dr-ch-cfg-menu-{id}-dd")), true, move |menu, _, _| {
-                            let (e1, e2) = (ed.clone(), ed.clone());
-                            menu.item(crate::os_menu::OsMenuItem::new("Set to last viewed").on_click(move |_, _, cx| e1.update(cx, |t, cx| set(t, true, cx))))
-                                .item(crate::os_menu::OsMenuItem::new("Reset to default").on_click(move |_, _, cx| e2.update(cx, |t, cx| set(t, false, cx))))
+                        .os_dropdown_menu(SharedString::from(format!("{menu_id}-dd")), true, move |menu, _, _| {
+                            let (e1, e2, a, b) = (ed.clone(), ed.clone(), s2.clone(), s2.clone());
+                            menu.item(crate::os_menu::OsMenuItem::new("Set to last viewed").on_click(move |_, w, cx| e1.update(cx, |t, cx| a(t, true, w, cx))))
+                                .item(crate::os_menu::OsMenuItem::new("Reset to default").on_click(move |_, w, cx| e2.update(cx, |t, cx| b(t, false, w, cx))))
                         }),
                 ),
             )

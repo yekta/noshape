@@ -448,7 +448,7 @@ impl DrawingEditor {
             text.text("Note").options(font_names);
             // A table cell's panel has no Flag notes row (live 743–750).
             if !cell {
-                text.text("Flag notes").options(shapes.iter().flatten().map(|e| e.0.clone())).options(sizes_names(4));
+                text.text("Flag notes").options(shapes.iter().flatten().map(|e| e.0.clone())).options((0..=5).map(size_name));
             }
             let old = crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Note" }), text.0);
             // Live's recorder since 2026-11-15.1 reads its controls (live2 drw-note-move-to-title-block 11-15); the
@@ -506,19 +506,25 @@ impl DrawingEditor {
                     // (Live's reader takes the Flag notes checkbox for a second Text height, its value "on".)
                     { "label": "Text height", "kind": "combo", "value": "on" },
                     { "label": "Border shape", "kind": "select", "value": shape_label.clone() },
-                    { "label": "Border size", "kind": "select", "value": format!("{} Character{}", st.flag_chars, if st.flag_chars > 1 { "s" } else { "" }) },
+                    { "label": "Border size", "kind": "select", "value": size_name(st.flag_chars) },
                 ],
                 "old": old,
                 "texts": ["Color"],
             })
         });
-        let sizes: Vec<Entry> = (1..=4u8).map(|n| entry(&format!("{n} Character{}", if n > 1 { "s" } else { "" }), None, st.flag_chars == n, std::rc::Rc::new(move |s: &mut NoteStyle| s.flag_chars = n))).collect();
-        fn sizes_names(n: u8) -> Vec<String> {
-            (1..=n).map(|n| format!("{n} Character{}", if n > 1 { "s" } else { "" })).collect()
+        let sizes: Vec<Entry> = (0..=5u8).map(|n| entry(&size_name(n), None, st.flag_chars == n, std::rc::Rc::new(move |s: &mut NoteStyle| s.flag_chars = n))).collect();
+        // Live's Border size (behaviours note-opts-1119, border/z*.png): Tight fit, then 1 to 5 characters.
+        fn size_name(n: u8) -> String {
+            match n {
+                0 => "Tight fit".into(),
+                1 => "1 Character".into(),
+                n => format!("{n} Characters"),
+            }
         }
         let flag_select = |id: &'static str, w: f32, label: String| {
             div()
                 .id(id)
+                .debug_selector(move || id.to_string())
                 .w(px(w))
                 .h(px(26.))
                 .pl(px(6.))
@@ -548,7 +554,7 @@ impl DrawingEditor {
             }, cx)
         }));
         let shape_sel = flag_select("note-flag-shape", 166., shape_label);
-        let size_sel = flag_select("note-flag-size", 105., format!("{} Character{}", st.flag_chars, if st.flag_chars > 1 { "s" } else { "" }));
+        let size_sel = flag_select("note-flag-size", 105., size_name(st.flag_chars));
         let row4 = h_flex()
             .h(px(28.))
             .child(div().w(px(85.)).pl(px(4.)).text_size(px(12.)).when(item.is_none(), |d| d.opacity(0.5)).child(flag_box))

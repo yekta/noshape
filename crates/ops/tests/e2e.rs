@@ -4647,8 +4647,13 @@ fn drawing_custom_table_from_a_feature_studio() {
     assert!(t["rows"][0][1].as_str().unwrap().parse::<u32>().unwrap() >= 7, "{t}");
     let r = call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "id": id, "bottom_to_top": true }));
     assert!(table(&r, id)["configuration"].is_object(), "kept");
+    // null: the default's values as they are now, kept when the default changes later (live cfgtbl-1121 (c)).
     let r = call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "id": id, "configuration": null }));
-    assert!(table(&r, id).get("configuration").is_none(), "the default");
+    let small = table(&r, id)["configuration"].clone();
+    assert!(small.as_object().is_some_and(|c| c.len() == 1 && c.values().all(|v| *v != large)), "the default's: {small}");
+    call(&mut ctx, "config_edit_option", json!({ "tab": "Part Studio 1", "input": "Size", "option": "Large", "set_default": true }));
+    let r = call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "id": id, "bottom_to_top": false }));
+    assert_eq!(table(&r, id)["configuration"], small, "kept after the default changed");
     let e = try_call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "id": id, "configuration": { "Colour": "Red" } })).unwrap_err();
     assert!(e.param.as_deref() == Some("configuration") && e.message.contains("Size"), "{e:?}");
 }

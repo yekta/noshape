@@ -101,9 +101,9 @@ fn a_typed_run_undoes_in_one_step(cx: &mut TestAppContext) {
 }
 
 /// Live tools-1119: a new error's squiggle and gutter marker show ~900 ms after the last key (858–946), never while
-/// typing; the key fixing it clears it 275 ms after (fsvs-feel-1118).
+/// typing; the key fixing it clears it ~600 ms after (fv-1121 recheck: the underline 582–757 ms, the gutter 658–783).
 #[gpui::test]
-fn a_new_error_shows_800_ms_after_the_last_key_and_its_fix_clears_at_275_ms(cx: &mut TestAppContext) {
+fn a_new_error_shows_800_ms_after_the_last_key_and_its_fix_clears_at_580_ms(cx: &mut TestAppContext) {
     cx.update(gpui_kit::init);
     let dir = std::env::temp_dir().join(format!("noshape-ui-fs-check-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -161,12 +161,12 @@ fn a_new_error_shows_800_ms_after_the_last_key_and_its_fix_clears_at_275_ms(cx: 
     for k in ["backspace", "backspace", "backspace"] {
         type_key(cx, window, k);
     }
-    for _ in 0..25 {
+    for _ in 0..55 {
         pause(cx, window, 10);
     }
-    assert!(error(cx), "still showing 250 ms after the fix");
+    assert!(error(cx), "still showing 550 ms after the fix");
     pause(cx, window, 50);
-    assert!(!error(cx), "gone 300 ms after the fix");
+    assert!(!error(cx), "gone 600 ms after the fix");
     assert_eq!(squiggles(cx), clean, "the squiggle too");
     let _ = (doc, tab);
     let _ = std::fs::remove_dir_all(&dir);

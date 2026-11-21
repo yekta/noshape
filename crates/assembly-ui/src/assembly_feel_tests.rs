@@ -1100,7 +1100,17 @@ fn the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point(cx: 
         let t = std::time::Instant::now();
         let mut k = 0.0;
         while !cx.update(|cx| view.read(cx).drag.as_ref().is_some_and(|d| d.ball_snap.is_some() == snapped)) {
-            assert!(t.elapsed() < std::time::Duration::from_secs(60), "snapped {snapped} at {to:?}: {:?}", ball(cx).0.origin);
+            if t.elapsed() >= std::time::Duration::from_secs(60) {
+                // What the snap sees there now: the ray's hit, the chosen mark and its distance on screen, the meshes.
+                let why = cx.update(|cx| {
+                    let v = view.read(cx);
+                    let hit = v.raycast_hit(to, &[], cx).map(|(h, s)| (h.path, h.reference, s));
+                    let snap = v.triad_snap(to, cx).map(|s| (s.chosen, s.marks.len(), s.marks[s.chosen].origin));
+                    let meshes: Vec<usize> = v.result.occurrences.iter().map(|o| o.mesh.indices.len()).collect();
+                    format!("hit {hit:?}; snap {snap:?}; meshes {meshes:?}; drag {:?}", v.drag.as_ref().map(|d| d.ball_snap.is_some()))
+                });
+                panic!("snapped {snapped} at {to:?}: {:?}; {why}", ball(cx).0.origin);
+            }
             k = 0.5 - k;
             let p = at_window(cx, &view, to + DVec2::new(k, 0.0));
             gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(p, Some(MouseButton::Left), Modifiers::default());

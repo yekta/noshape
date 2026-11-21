@@ -3,7 +3,7 @@
 //! creates, renames and edits them. The inline "Create variable" popup of a
 //! numeric field creates them too.
 
-use crate::configuration::FS_KEYWORDS;
+use crate::configuration::{ConfigValues, FS_KEYWORDS};
 use crate::params::ParamValue;
 use crate::partstudio::{Feature, PartStudio};
 use crate::reference::FeatureId;
@@ -38,8 +38,14 @@ pub enum NameError {
 
 /// A FeatureScript identifier that isn't a reserved word.
 pub fn is_identifier(s: &str) -> bool {
+    identifier_shaped(s) && !FS_KEYWORDS.contains(&s)
+}
+
+/// A letter or underscore, then letters, digits or underscores; reserved words included (an existing `#do` or `#type`
+/// is listed, edited and referenced: live c2-config-parts-screws, qa VARIABLE-KEYWORD-NAMES).
+fn identifier_shaped(s: &str) -> bool {
     let mut c = s.chars();
-    c.next().is_some_and(|f| f.is_ascii_alphabetic() || f == '_') && c.all(|x| x.is_ascii_alphanumeric() || x == '_') && !FS_KEYWORDS.contains(&s)
+    c.next().is_some_and(|f| f.is_ascii_alphabetic() || f == '_') && c.all(|x| x.is_ascii_alphanumeric() || x == '_')
 }
 
 /// The value parameter of a variable type.
@@ -83,14 +89,14 @@ fn value_text(f: &Feature, kind: &str) -> String {
 }
 
 /// The table's rows, in feature order (Help: Variable features whose name
-/// isn't a FeatureScript identifier don't appear).
+/// isn't shaped as a FeatureScript identifier don't appear; reserved words do).
 pub fn rows(ps: &PartStudio) -> Vec<VarRow> {
     ps.features
         .iter()
         .filter(|f| f.type_id == "assignVariable")
         .filter_map(|f| {
             let name = f.params.text("name").trim().trim_start_matches('#').to_string();
-            is_identifier(&name).then(|| {
+            identifier_shaped(&name).then(|| {
                 let kind = kind_of(f);
                 let (description, description_expr) = match f.params.get("description") {
                     Some(ParamValue::Expr(e)) => (e.text.clone(), true),
@@ -108,6 +114,28 @@ pub fn rows(ps: &PartStudio) -> Vec<VarRow> {
 pub fn active_rows(ps: &PartStudio) -> Vec<VarRow> {
     let end = ps.rollback.unwrap_or(usize::MAX);
     rows(ps).into_iter().filter(|r| ps.index_of(r.feature).is_some_and(|i| i < end)).collect()
+}
+
+/// The rows in a configuration: a configured variable shows that configuration's value (live speed reference 11-20:
+/// c2-config-parts-screws' #do reads and edits M4's 4 mm).
+pub fn rows_in(ps: &PartStudio, values: &ConfigValues) -> Vec<VarRow> {
+    configured_values(ps, rows(ps), values)
+}
+
+/// [`active_rows`] in a configuration ([`rows_in`]).
+pub fn active_rows_in(ps: &PartStudio, values: &ConfigValues) -> Vec<VarRow> {
+    configured_values(ps, active_rows(ps), values)
+}
+
+fn configured_values(ps: &PartStudio, mut rows: Vec<VarRow>, values: &ConfigValues) -> Vec<VarRow> {
+    for r in &mut rows {
+        if let Some(f) = ps.features.iter().find(|f| f.id == r.feature)
+            && ps.configuration.configured.iter().any(|c| c.feature == r.feature)
+        {
+            r.value = value_text(&ps.configuration.for_editing(f, values), &r.kind);
+        }
+    }
+    rows
 }
 
 /// The add row's name: a taken one gets `_0`, `_1`, … (live: `height` when
@@ -288,6 +316,18 @@ pub fn set_value(ps: &mut PartStudio, feature: FeatureId, value: &str, units: &U
     }
 }
 
+/// The Value cell in a configuration: a configured variable's value goes to that configuration's row, as its dialog's.
+pub fn set_value_in(ps: &mut PartStudio, feature: FeatureId, value: &str, units: &UnitPrefs, values: &ConfigValues) {
+    let Some(base) = ps.features.iter().find(|f| f.id == feature).cloned() else { return };
+    let mut edited = ps.configuration.for_editing(&base, values);
+    let kind = kind_of(&edited);
+    set_value_param(&mut edited, &kind, &with_workspace_unit(&kind, value, units));
+    ps.configuration.store_edit(&base, &mut edited, values);
+    if let Some(f) = ps.features.iter_mut().find(|f| f.id == feature) {
+        *f = edited;
+    }
+}
+
 /// A value committed in a Variable table (Part Studio or Variable Studio):
 /// a bare number in a `LENGTH` / `ANGLE` variable gets the workspace unit
 /// (live qa4 10-20 13:30: `5` + Enter → `5 mm`); anything else is kept.
@@ -391,6 +431,39 @@ mod tests {
 
     fn studio() -> PartStudio {
         PartStudio::default()
+    }
+
+    /// qa VARIABLE-KEYWORD-NAMES (live c2-config-parts-screws): an existing `#do` / `#type` is listed (and so edited and
+    /// found by name) as live's; a new variable still can't take a reserved word.
+    #[test]
+    fn keyword_named_variables_are_listed() {
+        let mut ps = studio();
+        for (name, value) in [("do", "4 mm"), ("type", "1"), ("p", "0.7 mm")] {
+            let id = create(&mut ps, "tmp", "LENGTH", value, "", None, &mm()).unwrap();
+            ps.feature_mut(id).unwrap().params.set("name", ParamValue::Text(name.into()));
+        }
+        assert_eq!(rows(&ps).into_iter().map(|r| r.name).collect::<Vec<_>>(), ["do", "type", "p"]);
+        assert_eq!(create(&mut ps, "while", "LENGTH", "1 mm", "", None, &mm()), Err(NameError::Invalid));
+    }
+
+    /// Live speed reference 11-20 (c2-config-parts-screws' #do, M4 = 4 mm): a configured variable's Value cell reads
+    /// and edits the shown configuration's value; the other configuration and the feature's own value stay.
+    #[test]
+    fn a_configured_variables_cell_edits_the_shown_configuration() {
+        use crate::configuration::{ConfigInput, ConfigInputKind, ConfiguredParam, ListOption};
+        let mut ps = studio();
+        let id = create(&mut ps, "d", "LENGTH", "3 mm", "", None, &mm()).unwrap();
+        let options = ["M4", "M5"].map(|n| ListOption { id: n.into(), name: n.into() }).to_vec();
+        ps.configuration.inputs.push(ConfigInput { id: "Size".into(), name: "Size".into(), kind: ConfigInputKind::List { options, default: "M4".into() }, visible_when: None, excluded: false });
+        let mm_of = |t: &str| ParamValue::Expr(ExprValue::new(t));
+        ps.configuration.configured.push(ConfiguredParam { input: "Size".into(), feature: id, param: "lengthValue".into(), values: [("M4".to_string(), mm_of("4 mm")), ("M5".to_string(), mm_of("5 mm"))].into() });
+        let m = |o: &str| ConfigValues([("Size".to_string(), o.to_string())].into());
+        assert_eq!(rows_in(&ps, &m("M4"))[0].value, "4 mm");
+        assert_eq!(rows_in(&ps, &m("M5"))[0].value, "5 mm");
+        set_value_in(&mut ps, id, "4.5", &mm(), &m("M4"));
+        assert_eq!(rows_in(&ps, &m("M4"))[0].value, format!("4.5 {}", mm().length.symbol()));
+        assert_eq!(rows_in(&ps, &m("M5"))[0].value, "5 mm", "M5 kept");
+        assert_eq!(rows(&ps)[0].value, "3 mm", "the feature's own value kept");
     }
 
     fn mm() -> UnitPrefs {

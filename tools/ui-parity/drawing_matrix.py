@@ -138,14 +138,16 @@ def ours_sequences(run_dir):
         except (ValueError, OSError):
             continue
         for s in steps:
-            d = (s.get("state") or {}).get("dialog")
-            if not isinstance(d, dict) or not isinstance(d.get("title"), str):
-                continue
-            if isinstance(d.get("text"), list):
-                pool[d["title"]].append([norm(t) for t in d["text"] if isinstance(t, str)])
-            for f in d.get("fields") or []:
-                if isinstance(f, dict) and isinstance(f.get("options"), list):
-                    pool[d["title"]].append([norm(o) for o in f["options"] if isinstance(o, str)])
+            top = (s.get("state") or {}).get("dialog")
+            # (The Note panel's reading nests its texts under "old": a cell-format dialog over a drawing-panel.)
+            for d in [top, top.get("old")] if isinstance(top, dict) else []:
+                if not isinstance(d, dict) or not isinstance(d.get("title"), str):
+                    continue
+                if isinstance(d.get("text"), list):
+                    pool[d["title"]].append([norm(t) for t in d["text"] if isinstance(t, str)])
+                for f in d.get("fields") or []:
+                    if isinstance(f, dict) and isinstance(f.get("options"), list):
+                        pool[d["title"]].append([norm(o) for o in f["options"] if isinstance(o, str)])
     return pool
 
 

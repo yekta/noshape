@@ -273,11 +273,13 @@ impl DrawingEditor {
         if !matches!(t.kind, TableKind::General { .. }) {
             out.extend(self.split_entries(t, cell));
         }
-        // Live request 1638 (b): a configured Part Studio's cut list.
-        if let TableKind::CutList { view, .. } = t.kind
-            && let Some((key, _)) = noshape_model::drawing::views::view_source(sheet, view)
-            && self.reference_configurable(key.tab, cx)
-        {
+        // Live request 1638 (b): a configured Part Studio's cut list; a custom table of one (live cfgtbl-1121 (b)).
+        let configured = match t.kind {
+            TableKind::CutList { view, .. } => noshape_model::drawing::views::view_source(sheet, view).map(|(key, _)| key.tab),
+            TableKind::Custom { studio, version: None, .. } => Some(studio),
+            _ => None,
+        };
+        if configured.is_some_and(|tab| self.reference_configurable(tab, cx)) {
             out.push(MenuEntry::item("Change configuration...", move |t, w, cx| t.open_table_change_config(id, w, cx)));
         }
         // (A hole table has no Copy: live's hole table menus, 11-15.)
@@ -387,6 +389,7 @@ impl DrawingEditor {
     /// dialog's dropdown.
     pub(crate) fn pick_studio(&mut self, tab: TabId, version: Option<String>, config: ConfigValues, name: String, cx: &mut Context<Self>) {
         let external = version.as_deref().and_then(crate::derived::ExternalRef::parse).map(|_| name);
+        let config = if version.is_none() { self.frozen_config(tab, &config, cx) } else { config };
         if let Some(d) = &mut self.custom_tables.dlg {
             d.studio = Some(tab);
             d.version = version;
@@ -412,6 +415,10 @@ impl DrawingEditor {
         let ink = gpui_kit::rgb(0x333333);
         let ed = cx.entity();
         let editing = d.table.is_some();
+        let config_text = match d.studio {
+            Some(s) if editing && d.external.is_none() => self.config_summary(s, &d.config, cx),
+            _ => String::new(),
+        };
         let mine = ct::my_tables();
         let (ws, doc_name, ws_name) = {
             let doc = self.doc.read(cx);
@@ -560,7 +567,11 @@ impl DrawingEditor {
             if editing {
                 let chosen = d.chosen.as_ref();
                 text.texts(["Document:".into(), doc_name.clone(), "Workspace:".into(), ws_name.clone()]);
-                text.texts(["Custom table:".into(), chosen.map(|t| t.display.clone()).unwrap_or_default(), "Feature Studio:".into(), chosen.map(|t| t.fs_name.clone()).unwrap_or_default()]);
+                text.texts(["Custom table:".into(), chosen.map(|t| t.display.clone()).unwrap_or_default()]);
+                if !config_text.is_empty() {
+                    text.texts(["Configurations".to_string(), config_text.clone()]);
+                }
+                text.texts(["Feature Studio:".into(), chosen.map(|t| t.fs_name.clone()).unwrap_or_default()]);
                 text.texts(chosen.and_then(|t| t.version_label.clone()));
                 text.texts(["Sheet".into(), self.current_sheet().name.clone()]);
             } else {
@@ -637,6 +648,8 @@ impl DrawingEditor {
                 // "Custom table: [Part Studio icon] FS sizes" — the table's
                 // name, linking to its Part Studio (live drawing/271).
                 .child(row("Custom table:", link("ct-props-studio", "part-studio", chosen.as_ref().map(|t| t.display.clone()).unwrap_or_default(), d.studio, tab_name(d.studio))))
+                // A configured studio's values as text (live cfgtbl-1121 c2-props: "Configurations  Size: Large").
+                .when(!config_text.is_empty(), |v| v.child(row("Configurations", div().text_size(px(13.)).child(config_text.clone()).into_any_element())))
                 .child(row("Feature Studio:", link("ct-props-fs", "feature-studio", chosen.as_ref().map(|t| t.fs_name.clone()).unwrap_or_default(), fs_tab, tab_name(fs_tab))))
                 .when_some(chosen.and_then(|t| t.version_label), |v, label| v.child(row("", h_flex().gap(px(4.)).child(crate::ui::glyph("version", 14., ink)).child(div().text_size(px(13.)).child(label)).into_any_element())))
                 .child(row("Sheet", div().text_size(px(13.)).child(self.current_sheet().name.clone()).into_any_element()));

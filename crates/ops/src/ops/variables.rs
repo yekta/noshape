@@ -520,9 +520,10 @@ fn reply(od: &mut OpenDoc, tab: TabId, repaired: Vec<String>) -> Result<OpOutput
 fn list_value(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
     let units = od.doc().settings.units;
     let r = od.regenerate(tab, None)?;
+    let config = od.current_config(tab)?;
     let ps = doc::studio(od.doc(), tab)?;
     let shown = |q: &noshape_units::Quantity| noshape_units::format_quantity_exact(*q, &units);
-    let rows: Vec<Value> = vt::rows(ps)
+    let rows: Vec<Value> = vt::rows_in(ps, &config)
         .into_iter()
         .map(|row| {
             let mut v = json!({ "name": format!("#{}", row.name), "feature": row.feature.to_string(), "kind": row.kind, "expression": row.value, "description": row.description });
@@ -699,8 +700,9 @@ fn set(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     if let Some(v) = a.get("value") {
         let v = value_text(v)?;
+        let config = od.current_config(tab)?;
         all.extend(edit_table(od, tab, "Edit variable", |ps| {
-            vt::set_value(ps, id, &v, &units);
+            vt::set_value_in(ps, id, &v, &units, &config);
             Ok(())
         })?.1);
     }

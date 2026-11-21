@@ -82,7 +82,7 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   a corner connector of a 40x20x10 block's top face) can only be checked in the app. AGENTS.md: everything the app does is an
   op. Wanted: `faces` (and `reference` in the assembly) in both ops, giving the Face tab's numbers, with e2e tests.
 
-- [ ] P1 **VARIABLE-KEYWORD-NAMES (studios, lead 11-21)**: c2-config-parts-screws has 24 Variable features in live and in ours, but
+- [x] P1 **VARIABLE-KEYWORD-NAMES (studios, lead 11-21)**: FIXED studios 11-21: the table lists keyword-named variables (24 rows on the repro, #do and #type included), variable_set {variable: "do"} edits it, and a configured variable's cell reads and edits the shown configuration's value (the repro's #do 4 → 5 mm evaluates 5 mm); a new variable still can't take a keyword. c2-config-parts-screws has 24 Variable features in live and in ours, but
   ours lists only 22 in the Part Studio's variable table (variable_set's list: #p, #fh, … #size). The two missing are #do and
   #type, the only names that are FeatureScript keywords. Live edits #do (configured, M4 = 4 mm: behaviours "Speed reference
   (11-20)"); ours answers "no variable `do`". Wanted: variables named do / type (any keyword live accepts) listed, editable and

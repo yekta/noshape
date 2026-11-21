@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-21 05:09 UTC.
+Updated 2026-11-21 06:09 UTC.
 
 ## In flight
 
@@ -20,25 +20,19 @@ tools/ui-parity to vibe2:agents/studios/src first). Crate tests on vibex7 / vibe
 11-20 21:xx: a hung test held a vibex8 slot 43 min). `touch` edited files before rb.sh. Full ops e2e before a drawing
 land. vibex8 02:00-04:00 is qa's quiet window. Never `git checkout <file>` over uncommitted work (21:20 it wiped the
 e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
-- LANDED 66ecac0c, 347239f5 (23:36: T2 HLR 8-thread test + trace line; 6 asm feel tests), 44429dbc (00:21: 3 asm
-  feel tests, revision-table test, centermark expect, run.py deleted_paint_read).
-- LANDED b2000916 (01:48): compare mode's depth pass draws only the shown display level (qa reopened
-  COMPARE-COMMON-PARTS-MISSING; qa verified 02:0x on green 14d18cb74: all 6 parts grey); mate toolbar clamp + grip fixes; tests.
-- QUEUED 4094e4ef (02:27): the 4 asm feel rows tested (ui_tests: `a_filled_mates_fields_and_its_chips_act_as_live` (Fields +
-  Connector chip), `the_animate_dialog_reads_reciprocate_and_its_icon_reverses_the_playback`, `an_empty_named_
-  positions_panel_says_what_they_are_and_adds_the_first`; debug_selectors added on the elements). Simulation
-  connection is left out (simulation). Triad ball snap rewritten to live triad-snap-1121 (told asm 01:3x):
-  `triad_snap` = the face under the pointer's inference point nearest its 3D spot, no px reach, let go within 8 px
-  (BALL_RING_PX) and over background; the triad unturned; marks + glyph drawn; the release leaves
-  the triad where the ball is: on the snapped point (live 01:40 follow-up, fixed after 4094e4ef) or at the pointer.
-  Feel test `the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point`; Short press drop back at
-  +60 px. Live's (a) "never snapped" run is not explained by the 8 px rule (lag?). Edges' own look not drawn.
-- 7d64e534 (triad snapped release + psui fc-1120 Version compare) FAILED 03:35 on the ball-snap test (also skasm's
-  f992d0d7). LANDED dc2f3394 as d5d0ad96 (04:47): that test T2 (kept T2 here after the rebase). Cause: the
-  viewport drops a move to where the pointer already is, and on a loaded host the face's inference points can come
-  after the open, so the one move at the spot found no snap. Fix 1 (re-send the move) failed 1 of 4 runs; fix 2
-  (05:09) waits for `triad_snap(spot)` before pressing and stirs the re-sent move 0.5 px. 20 full-lib runs on vibex8
-  (bin/x84.sh, log x92.log): if 20/20, drop the #[ignore] and land.
+- LANDED through 8e66e885 (05:34, as 090b40b5): triad ball snap (live triad-snap-1121), its snapped release,
+  psui fc-1120 Version compare, fc-1121 drawing feel, the drawing matrix's option order.
+- Ball-snap feel test `the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point` stays T2 (lead P0:
+  20/20 under load before un-ignoring). Fix 2 (wait for `triad_snap(spot)` before pressing, stir the re-sent move
+  0.5 px) passed 19/20 at load ~13 (run 12: "snapped true" timed out in `until`). The `until` timeout now panics
+  with the raycast hit, triad_snap's pick, marks and mesh counts: run 20x `--include-ignored` (bin/x84.sh) on vibex8,
+  read the diagnostics, fix the cause.
+- Next land (in the branch, tests running 06:09): qa P1 VARIABLE-KEYWORD-NAMES (`variable_table::rows` lists
+  keyword-named variables such as #do / #type; create / rename still refuse keywords; checked on qa's repro: 24
+  rows; a configured variable's cell edits the shown configuration's value, `rows_in` / `set_value_in`); custom table configuration (Next 2);
+  Note Border size Tight fit + 1-5 Characters; version graph node tooltip = branch name, node click opens nothing;
+  Tab › Rename Esc keeps the name; FS fixed-error clear 580 ms (live fv-1121 recheck 582-783 ms); VS focused cell's
+  column header #d7d7d7 (dark #666666 guessed: REQUESTS 06:09); interaction-feel "fv-1121" section.
 - Live fc-1121 drawing feel (behaviours "studios fc-1121"): (1) a dimension being placed shows the line to another's
   x / y without snapping (still held on a + mark, live2 rad-note); (3) caret at the click (`note_caret_at`), a
   double-click in the editor selects all; (5) a dragged box draws its picks selected (`box_preview`); (2), (4), (6)
@@ -59,7 +53,8 @@ e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
 - Asm feel rows: none left untested in interaction-feel's asm tables.
 
 ## Next, in order
-1. Drawing matrix (11-21 04:45): 1344 = / 456 shown / 0 differs / 0 present-only / 0 missing of 1842. Every panel
+1. Drawing matrix (11-21 05:21): 1419 = / 381 shown / 0 differs / 0 present-only / 0 missing of 1842 (05:21: the Note
+   panel's nested reading counted; its Border size gained Tight fit and 5 Characters). Every panel
    was shot in pd/b1-b35 (tables, inspection / revision, section / detail included). The 456 shown are mostly
    dropdown options our takes don't list in order (fonts, balloon shapes, standards: Drawing properties 101, Create Drawing 57, Title block 54,
    Hole/thread callout 53, Note 52, Hole table 45, Styles 43): only a take opening each list would make them =.
@@ -68,8 +63,10 @@ e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
    under the resting pointer, ours nothing (reader emulation, left).
    Live is capturing a drawing feel batch for me (lead 03:3x: dimension snap/reach, view drag/alignment, note caret,
    view-edge hover timing, box select): take its rows as they arrive.
-2. Live cfg-choosers-1120 left open: whether a custom table's cells take the picked configuration (live's studio
-   has Small = Large). Insert view takes the default configuration, as live's (iv-10: "Size: Small").
+2. Custom table configuration (live cfgtbl-1121, 05:3x): the cells take the value picked in Add (unlike Insert view); the
+   table stores every input's value (Reset to default writes the default's values at that time); Change configuration...
+   between Split custom table below and Copy; properties row "Configurations  Size: Large"; the change panel's studio row
+   has the configuration icon + ▾ (Set to last viewed / Reset to default). In the branch (app + drawing_custom_table op).
 3. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)

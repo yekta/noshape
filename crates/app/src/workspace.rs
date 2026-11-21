@@ -847,7 +847,7 @@ impl Workspace {
     }
 
     /// Tab › Rename: edit the name in the tab; Enter or leaving commits.
-    fn start_tab_rename(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn start_tab_rename(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
         use gpui_kit::component::input::{InputEvent, InputState};
         let d = &self.doc.read(cx).session.doc;
         let name = d.tab(tab).map(|t| t.name.clone()).or_else(|| d.folder(tab).map(|f| f.name.clone())).unwrap_or_default();
@@ -876,6 +876,17 @@ impl Workspace {
             s.select_all(window, cx);
         });
         self.renaming_tab = Some((tab, st, sub));
+        cx.notify();
+    }
+
+    /// Esc in a tab's name field keeps the name: the field goes before its blur would rename (live fv-1121 (3)).
+    fn tab_rename_escape(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if ev.keystroke.key != "escape" {
+            return;
+        }
+        cx.stop_propagation();
+        self.renaming_tab = None;
+        window.focus(&self.focus, cx);
         cx.notify();
     }
 
@@ -1881,7 +1892,7 @@ impl Workspace {
                         // Tab › Rename / double-click: the name becomes a field.
                         // A 1 px rgb(22,81,176) square border, no focus ring, 4 px nearer the icon than the name (live2
                         // doc-feel-1119 L11, recheck-1119).
-                        Some((_, st, _)) => div().ml(px(-4.)).w(px(157.)).h(px(21.)).border_1().border_color(gpui_kit::rgb(0x1651b0)).bg(gpui_kit::rgb(0xffffff)).child(gpui_kit::component::input::Input::new(st).appearance(false).h(px(19.)).text_size(px(14.)).px(px(2.)).text_color(pal.text)).into_any_element(),
+                        Some((_, st, _)) => div().ml(px(-4.)).w(px(157.)).h(px(21.)).border_1().border_color(gpui_kit::rgb(0x1651b0)).bg(gpui_kit::rgb(0xffffff)).on_key_down(cx.listener(Self::tab_rename_escape)).child(gpui_kit::component::input::Input::new(st).appearance(false).h(px(19.)).text_size(px(14.)).px(px(2.)).text_color(pal.text)).into_any_element(),
                         None => div().min_w_0().truncate().when(compare_off, |d| d.opacity(0.5)).child(crate::ui::user_text(name)).into_any_element(),
                     })
                     .children(compare_dot.map(|dot| div().flex_none().ml(px(3.)).when(compare_off, |d| d.opacity(0.55)).child(dot)))

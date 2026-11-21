@@ -32,9 +32,19 @@ pub const PANEL_W: f32 = 380.;
 const GRAPH_W: f32 = 140.;
 const ROW_H: f32 = 50.;
 
-/// A row's graph column: a click there opens nothing (live2 studios.json versionsPanel).
-fn graph_column(key: &str) -> Stateful<Div> {
-    div().id(SharedString::from(format!("hist-graph-{key}"))).w(px(GRAPH_W + 5.)).h_full().flex_none().cursor_default().on_click(|_, _, cx| cx.stop_propagation())
+/// A row's graph column: a click there opens nothing (live2 studios.json versionsPanel). Its node (centre `node`
+/// in the column) shows its branch's name in a tooltip, nothing else (live fv-1121 (4): "Main", 45-61 ms after the move).
+fn graph_column(key: &str, node: (f32, f32), branch: SharedString) -> Stateful<Div> {
+    let sel = format!("hist-node-{key}");
+    div()
+        .id(SharedString::from(format!("hist-graph-{key}")))
+        .relative()
+        .w(px(GRAPH_W + 5.))
+        .h_full()
+        .flex_none()
+        .cursor_default()
+        .on_click(|_, _, cx| cx.stop_propagation())
+        .child(div().id(SharedString::from(sel.clone())).debug_selector(move || sel.clone()).absolute().left(px(node.0 - 6.)).top(px(node.1 - 6.)).size(px(12.)).tooltip(crate::ui::tooltip(branch)))
 }
 const CHANGE_H: f32 = 30.;
 
@@ -1149,6 +1159,8 @@ impl Render for HistoryPanel {
         let total_h = y;
         let nl = lanes.len().max(1) as f32;
         let lane_x = move |l: usize| GRAPH_W / 2. - 7. * (nl - 1.) + 14. * l as f32;
+        let lane_names: Vec<SharedString> = lanes.iter().map(|b| graph.branches.iter().find(|x| x.id == *b).map(|x| SharedString::from(x.name.clone())).unwrap_or_default()).collect();
+        let lane_name = |l: usize| lane_names.get(l).cloned().unwrap_or_default();
         // Graph geometry: per lane, the node span; branches curve into their
         // parent lane above the row they were created from.
         let mut segs: Vec<(usize, f32, f32)> = Vec::new();
@@ -1457,7 +1469,7 @@ impl Render for HistoryPanel {
                     // Live history-feel-1117 g-03: change rows are grey, the name only, its author and time in the
                     // tooltip.
                     .tooltip(crate::ui::user_tooltip(format!("{}: Change by {} at {}", r.name, r.author, history_time(r.time))))
-                    .child(graph_column(&r.key))
+                    .child(graph_column(&r.key, (lane_x(r.lane), 13.), lane_name(r.lane)))
                     .child(div().w(px(115.)).flex_none().truncate().child(crate::ui::user_text(r.name.clone())))
             } else {
                 let changes = r.changes.len();
@@ -1513,7 +1525,7 @@ impl Render for HistoryPanel {
                         RowKind::Version => crate::ui::with_described_side_tooltip(d, format!("Open version {}", r.name), (!r.description.trim().is_empty()).then(|| r.description.clone().into()), crate::ui::VERSION_TIP_DELAY),
                         _ => d.tip(format!("Open version {}", r.name), crate::ui::TipSide::Right),
                     })
-                    .child(graph_column(&r.key))
+                    .child(graph_column(&r.key, (lane_x(r.lane), 8.), lane_name(r.lane)))
                     .child(
                         v_flex()
                             .w(px(115.))

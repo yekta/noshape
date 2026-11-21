@@ -582,7 +582,7 @@ impl PartStudioView {
         // The Part Studio's own variables are its Variable features (Help
         // PartStudio__variable_table); every cell edits them.
         // Only the variables before the rollback bar (live 10-20 o).
-        let var_rows = self.studio(cx).map(noshape_model::variable_table::active_rows).unwrap_or_default();
+        let var_rows = self.studio(cx).map(|s| noshape_model::variable_table::active_rows_in(s, &self.current_config(s))).unwrap_or_default();
         let count = var_rows.len();
         // Configure is offered only with a List or Checkbox input (live 1717).
         let configurable = self.studio(cx).is_some_and(|s| s.configuration.inputs.iter().any(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })));
@@ -652,7 +652,8 @@ impl PartStudioView {
             self.panel_checks.insert(format!("pvar-name-{fid}"), valid_variable_name);
             let value_st = self.cell_input(format!("pvar-value-{fid}"), r.value.clone(), window, cx, move |this, v, cx| {
                 let units = this.doc.read(cx).session.doc.settings.units;
-                this.edit_config("Edit variable", cx, |ps| noshape_model::variable_table::set_value(ps, fid, &v, &units));
+                let config = this.studio(cx).map(|s| this.current_config(s)).unwrap_or_default();
+                this.edit_config("Edit variable", cx, |ps| noshape_model::variable_table::set_value_in(ps, fid, &v, &units, &config));
                 this.config_dirty(cx);
             });
             // An expression Description (live 652–656) shows a string

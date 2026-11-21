@@ -64,6 +64,17 @@ impl DrawingEditor {
             .join(", ")
     }
 
+    /// Every input's value, the defaults' as they are now (a custom table keeps them when the default changes later:
+    /// live cfgtbl-1121 (c)).
+    pub fn frozen_config(&self, tab: TabId, values: &ConfigValues, cx: &App) -> ConfigValues {
+        let mut out = match self.doc.read(cx).session.doc.tab(tab).map(|t| &t.content) {
+            Some(TabContent::PartStudio(ps)) => ps.configuration.defaults(),
+            _ => ConfigValues::default(),
+        };
+        out.0.extend(values.0.clone());
+        out
+    }
+
     /// Whether the reference's Part Studio has configuration inputs.
     pub fn reference_configurable(&self, tab: TabId, cx: &App) -> bool {
         matches!(self.doc.read(cx).session.doc.tab(tab).map(|t| &t.content), Some(TabContent::PartStudio(ps)) if !ps.configuration.inputs.is_empty())
@@ -74,11 +85,17 @@ impl DrawingEditor {
     pub fn open_table_change_config(&mut self, table: u64, window: &mut Window, cx: &mut Context<Self>) {
         let sheet = self.current_sheet();
         let Some(t) = sheet.table(table) else { return };
-        let Some(key) = noshape_model::drawing::views::table_source(sheet, t) else { return };
-        let part = t.view().and_then(|v| noshape_model::drawing::views::view_source(sheet, v)).and_then(|(_, p)| p);
-        self.open_change_config(key.tab, part, window, cx);
+        let (tab, config, part) = match &t.kind {
+            // A custom table's own configuration (live cfgtbl-1121 (b)).
+            noshape_model::drawing::TableKind::Custom { studio, config, .. } => (*studio, config.clone(), None),
+            _ => {
+                let Some(key) = noshape_model::drawing::views::table_source(sheet, t) else { return };
+                (key.tab, key.config, t.view().and_then(|v| noshape_model::drawing::views::view_source(sheet, v)).and_then(|(_, p)| p))
+            }
+        };
+        self.open_change_config(tab, part, window, cx);
         if let Some(d) = &mut self.change_config {
-            d.values = key.config;
+            d.values = config;
             d.table = Some(table);
         }
         // The variable / text fields show the table's values.
@@ -124,11 +141,14 @@ impl DrawingEditor {
             let (tab, part) = (d.tab, d.part);
             match d.table {
                 // Only the table changes; the views keep theirs (live 1638 (b)).
-                Some(id) => self.edit_table(id, "Change configuration", cx, move |t| {
-                    if let noshape_model::drawing::TableKind::CutList { config, .. } = &mut t.kind {
-                        *config = Some(values);
-                    }
-                }),
+                Some(id) => {
+                    let frozen = self.frozen_config(tab, &values, cx);
+                    self.edit_table(id, "Change configuration", cx, move |t| match &mut t.kind {
+                        noshape_model::drawing::TableKind::CutList { config, .. } => *config = Some(values),
+                        noshape_model::drawing::TableKind::Custom { config, .. } => *config = frozen,
+                        _ => {}
+                    })
+                }
                 None => {
                     let defaults = match self.doc.read(cx).session.doc.tab(tab).map(|t| &t.content) {
                         Some(TabContent::PartStudio(ps)) => ps.configuration.defaults(),
@@ -163,6 +183,21 @@ impl DrawingEditor {
     }
 
     pub fn render_change_config(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let tab = self.change_config.as_ref()?.tab;
+        // The studio row's configuration icon and ▾: Set to last viewed / Reset to default, the default's values as they
+        // are now (live cfgtbl-1121 d1-d3).
+        let set = move |this: &mut Self, last: bool, window: &mut Window, cx: &mut Context<Self>| {
+            let values = if last { crate::drawing_hooks::last_viewed_config(tab) } else { Some(this.frozen_config(tab, &ConfigValues::default(), cx)) };
+            let (Some(values), Some(d)) = (values, this.change_config.as_mut()) else { return };
+            d.values = values.clone();
+            for (id, st) in d.fields.clone() {
+                if let Some(v) = values.0.get(&id).cloned() {
+                    st.update(cx, |i, cx| i.set_value(v, window, cx));
+                }
+            }
+            cx.notify();
+        };
+        let pair = self.config_button_pair("change-config-last".into(), "change-config-menu".into(), set, cx);
         let d = self.change_config.as_ref()?;
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);
@@ -261,6 +296,7 @@ impl DrawingEditor {
                         .child(
                             div()
                                 .id("change-config-ok")
+                                .debug_selector(|| "change-config-ok".into())
                                 .w(px(28.))
                                 .h(px(27.))
                                 .flex()
@@ -275,7 +311,7 @@ impl DrawingEditor {
                 )
                 .child(div().px(px(10.)).pt(px(6.)).text_size(px(13.)).child(document))
                 .child(h_flex().px(px(10.)).gap(px(4.)).text_size(px(11.)).text_color(grey).child(crate::ui::glyph("branch", 12., grey)).child(branch))
-                .child(h_flex().h(px(30.)).mt(px(6.)).px(px(10.)).border_t_1().border_color(gpui_kit::rgb(0xe5e5e5)).child(div().flex_1().text_color(grey).child(studio)).child(crate::ui::glyph("part-studio", 16., grey)))
+                .child(h_flex().h(px(36.)).mt(px(6.)).px(px(10.)).border_t_1().border_color(gpui_kit::rgb(0xe5e5e5)).child(div().flex_1().text_color(grey).child(studio)).child(pair))
                 .children(rows)
                 .child(
                     v_flex()

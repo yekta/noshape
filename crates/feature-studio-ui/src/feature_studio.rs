@@ -103,9 +103,9 @@ pub fn bind_keys(cx: &mut App) {
 /// Pause after the last keystroke before the text is saved (not committed).
 const SAVE_DELAY: Duration = Duration::from_millis(700);
 
-/// Pause after the last keystroke before the typed text is checked: a fixed error's squiggle goes then (live
-/// fsvs-feel-1118: 275 ms median after the Backspace).
-const CHECK_DELAY: Duration = Duration::from_millis(275);
+/// Pause after the last keystroke before the typed text is checked: a fixed error's squiggle goes then (live fv-1121
+/// recheck: the underline 582–757 ms after the Backspace, the gutter mark 658–783; ours draws ~95 ms after the timer).
+const CHECK_DELAY: Duration = Duration::from_millis(580);
 
 /// Pause after the last keystroke before a new error shows, never while typing (live tools-1119: the gutter marker and
 /// squiggle 858–946 ms after "x" typed alone on a line; ours draws ~95 ms after the timer).

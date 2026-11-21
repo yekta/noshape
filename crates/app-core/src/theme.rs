@@ -80,6 +80,8 @@ pub struct Palette {
     /// Table header cells (`--os-background-septenary`: light #eaeaea like
     /// hovers, but #555 in dark; live dk-928).
     pub table_header: Rgba,
+    /// The column header over the focused or edited cell (live fv-1121 vs1-click: #d7d7d7).
+    pub table_header_focus: Rgba,
     /// `--os-background-senary`: white, #1c1c1c in dark. Table data cells and
     /// the open panel's strip button (live dk-928, dk-929, dk-961).
     pub bg_senary: Rgba,
@@ -162,6 +164,7 @@ pub const PALETTE: Palette = Palette {
     accent_soft: rgb_const(0xb2ddf6),
     row_hover: rgb_const(0xdef1fb),
     table_header: rgb_const(0xeaeaea),
+    table_header_focus: rgb_const(0xd7d7d7),
     bg_senary: rgb_const(0xffffff),
     strip_inactive: rgb_const(0xeaeaea),
     button_disabled: rgb_const(0xa2b9df),
@@ -246,6 +249,7 @@ pub const PALETTE_DARK: Palette = Palette {
     accent_soft: rgb_const(0x134e96),
     row_hover: rgb_const(0x0a4780),
     table_header: rgb_const(0x555555),
+    table_header_focus: rgb_const(0x666666),
     bg_senary: rgb_const(0x1c1c1c),
     strip_inactive: rgb_const(0x1c1c1c),
     button_disabled: rgb_const(0x283f65),

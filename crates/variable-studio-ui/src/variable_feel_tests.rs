@@ -250,6 +250,25 @@ fn a_double_clicked_value_edits_all_selected_esc_reverts_a_click_away_commits(cx
     assert_eq!(state(cx).0, None, "a second single click on the selected cell edits it");
 }
 
+/// Live fv-1121 vs1-click / vs3-enter: the column header over the focused cell turns grey, and stays grey while it's
+/// edited; no header is grey once nothing in the table has the keyboard.
+#[gpui::test]
+fn the_focused_cells_column_header_turns_grey(cx: &mut TestAppContext) {
+    let (window, view) = studio(cx, "header-focus");
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    let active = |cx: &mut TestAppContext| cx.update_window(window, |_, w, cx| view.read(cx).active_column(w)).unwrap();
+    assert_eq!(active(cx), None, "nothing focused");
+    let at = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("vs-val-0").expect("the value cell").center();
+    click_at(cx, window, at, 1);
+    assert_eq!(active(cx), Some(2), "a click on w's value: the Value header");
+    keys(cx, window, &["enter"]);
+    assert_eq!(cx.update(|cx| view.read(cx).cell_editing.clone()), Some("e0".into()), "Enter edits it");
+    assert_eq!(active(cx), Some(2), "still the Value header while edited");
+    keys(cx, window, &["escape", "left"]);
+    assert_eq!(active(cx), Some(1), "the left arrow: the Variable type header");
+    assert_eq!(crate::theme::p().table_header_focus, gpui_kit::rgb(0xd7d7d7), "live's grey");
+}
+
 /// Live feel cov-1120 V2: "#" in a Value cell lists only the variables above its row, with no "New variable…".
 #[gpui::test]
 fn the_value_cells_hash_list_holds_the_variables_above_only(cx: &mut TestAppContext) {

@@ -343,3 +343,18 @@ fn a_feature_only_in_the_base_reads_does_not_exist_in_target_beside_its_paramete
     assert!(missing(cx).is_none(), "deselected");
     cx.update(|cx| crate::compare_mode::stop(&doc, cx));
 }
+
+/// Live fv-1121 (4): hovering a version graph node tooltips its branch ("Main"), not the row's "Open version …"; a
+/// click on it opens nothing.
+#[gpui::test]
+fn a_graph_nodes_tooltip_is_its_branch(cx: &mut TestAppContext) {
+    let (window, _view, doc) = panel(cx, "node-tip");
+    let node = bounds(cx, window, "hist-node-start");
+    crate::ui_script::clear_tooltip();
+    VisualTestContext::from_window(window, cx).simulate_mouse_move(node.center(), None, Modifiers::default());
+    cx.executor().advance_clock(std::time::Duration::from_millis(800));
+    draw(cx, window);
+    assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Main"));
+    click(cx, window, node.center(), 1);
+    assert_eq!(cx.update(|cx| doc.read(cx).session.viewing_version()), None, "the node opens nothing");
+}

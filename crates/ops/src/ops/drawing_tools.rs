@@ -2497,14 +2497,14 @@ fn custom_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let bottom_to_top = a.bool_or("bottom_to_top", old_btt)?;
     let corner = enum_arg(a, "corner", &CORNERS, old.as_ref().map_or(TableCorner::TopRight, |o| o.1))?;
     let kept = if old_studio == Some(studio) && old_version == version { old_config } else { Default::default() };
+    let inputs = inputs.unwrap_or_else(|| match doc.tab(studio).map(|t| &t.content) {
+        Some(TabContent::PartStudio(ps)) => ps.configuration.inputs.clone(),
+        _ => Vec::new(),
+    });
     let config = match a.value.get("configuration") {
         None => kept,
         Some(Value::Null) => Default::default(),
         Some(Value::Object(m)) => {
-            let inputs = inputs.unwrap_or_else(|| match doc.tab(studio).map(|t| &t.content) {
-                Some(TabContent::PartStudio(ps)) => ps.configuration.inputs.clone(),
-                _ => Vec::new(),
-            });
             if inputs.is_empty() {
                 return Err(OpError::param("configuration", "the Part Studio has no configuration"));
             }
@@ -2512,7 +2512,11 @@ fn custom_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         Some(_) => return Err(OpError::param("configuration", "an object {input: value}, or null")),
     };
-    let kind = dt::custom_table_kind(studio, version, fs, name, fs_version, bottom_to_top, config);
+    // The table keeps every input's value, the default's as it is now: a later default doesn't change it (live
+    // cfgtbl-1121 (c)).
+    let mut frozen = noshape_model::configuration::Configuration { inputs, ..Default::default() }.defaults();
+    frozen.0.extend(config.0);
+    let kind = dt::custom_table_kind(studio, version, fs, name, fs_version, bottom_to_top, frozen);
     let sheet = t.sheet;
     let (id, description) = match edit {
         Some(id) => {

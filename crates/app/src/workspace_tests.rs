@@ -413,6 +413,26 @@ fn a_double_click_on_a_tab_only_activates_it(cx: &mut TestAppContext) {
     assert_eq!(ws.read_with(cx, |ws, _| (ws.active, ws.tab_drag_and_rename().1)), (Some(a), None), "A active, not renaming");
 }
 
+/// Live fv-1121 (3): Tab › Rename's field; Esc closes it and keeps the name, typed over or not.
+#[gpui::test]
+fn esc_in_a_tab_rename_keeps_the_name(cx: &mut TestAppContext) {
+    let (w, ws, [_, a, ..]) = workspace(cx, "tab-rename-esc");
+    let name = |cx: &mut TestAppContext| ws.read_with(cx, |ws, cx| ws.doc.read(cx).session.doc.tab(a).map(|t| t.name.clone()));
+    let before = name(cx);
+    for typed in ["", "x"] {
+        cx.update_window(w, |_, window, cx| ws.update(cx, |ws, cx| ws.start_tab_rename(a, window, cx))).unwrap();
+        draw(cx, w);
+        let mut vcx = VisualTestContext::from_window(w, cx);
+        if !typed.is_empty() {
+            vcx.simulate_input(typed);
+        }
+        vcx.simulate_keystrokes("escape");
+        draw(cx, w);
+        assert_eq!(ws.read_with(cx, |ws, _| ws.tab_drag_and_rename().1), None, "{typed:?}: the field closed");
+        assert_eq!(name(cx), before, "{typed:?}: the name kept");
+    }
+}
+
 /// Live rq 2403: Ctrl+click or Shift+click on a tab opens it in a new window; this window keeps its tab.
 #[gpui::test]
 fn ctrl_or_shift_click_on_a_tab_opens_it_in_a_new_window(cx: &mut TestAppContext) {
