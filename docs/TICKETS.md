@@ -302,6 +302,18 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   only the constraints it is the first entity of. Right edge: nothing (its left ∥ right is missing); top: "⊥ —" without ∥
   (bottom ∥ top); left and bottom show their ∥. Live shows every constraint on the hovered line (top: ⊥, ⫽, —; behaviours
   "glyph linger" 11-17, live/psui/feel-1417/). qa-scratch/tickets/hover-glyphs-second-entity-w3.png (right, left, top, bottom).
+- [ ] P0 **FEEL-EXTEND-NO-EXTEND (skasm)**: Sketch fillet ▾ › Extend, line (-30, 10)→(-5, 10) and a vertical line x = 20
+  (y -20..30). Hovering the line near its right end lights the line and the end point but draws no extension preview; the click
+  **selects the line (yellow)** and nothing extends (2 lines, same constraints). After the pointer leaves, a light-blue stub runs
+  from the end to the **y axis**, not to the line at x = 20. Help: "Extend: click the end of an entity to extend it to the next
+  boundary". qa-scratch/tickets/extend-w3.png (hover, after click, pointer away). Live asked for the exact look (REQUESTS qa 20:44 (8)).
+- [ ] P0 **FEEL-OFFSET-PREVIEW-LOOK (skasm)**: Offset (O), click a rectangle edge: our light-blue preview line has no end
+  points and no **0.25** dimension between the two lines, and the hollow arrow floats ~10 px past the preview line. Live
+  (sketch/123–124): the preview has its two light-blue end points, a "0.25" dimension with an arrow from the picked line to the
+  preview, and the arrow's tail starts on the preview line. qa-scratch/tickets/offset-preview-w3.png (live 123, 124; ours).
+- [ ] P0 **FEEL-HOVER-GLYPHS-IN-TOOL (psui)**: Show constraints off, Dimension tool (d) active, hovering a rectangle edge: ours
+  shows its badges ("⊥ —"); live shows none, only the light-orange band (sketch/11). The same with Extend and Offset active.
+  qa-scratch/tickets/hover-glyphs-in-tool-w3.png (top live 11, bottom ours). Asked live which tools hide them (REQUESTS qa 20:44 (9)).
 - [ ] P1 **S-TOOLBAR-BORDER (psui)**: the S shortcut toolbar has no border; live's has a 1 px #ccc border (175 × 62 with it,
   sketch/38; behaviours "S key"). Place (pointer + 10, − 30), size, icons and shadow match.
   qa-scratch/tickets/s-toolbar-border-w3.png (ours left, live right).
@@ -310,10 +322,14 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - Matched live (no ticket): every Part Studio menu (face, edge, vertex, empty, Extrude / Sketch / Top / part rows; Where used and
   the sketch row's Section view are in live's 11-17 lists), every sketch menu (no tool, Line tool, a line, a dimension), the
   Keyboard shortcuts sheet, corner / centre / aligned rectangles (one value boxed, one blue, as live 63/66), region hover and
-  select, trim click and drag, Use on a model edge, the sketch-fillet R0.5 inch default, Show constraints off by default.
+  select, trim click and drag, Use on a model edge, the sketch-fillet R0.5 inch default, Show constraints off by default,
+  mirror, 3-point circle and ellipse, sketch chamfer (point lit on hover, two 0.25 dimensions), off-origin tangent arc and slot
+  (Ø0.5), dimensions (placing, the value box at full precision "2.369231 in" selected, typing + Enter, double-click to re-edit,
+  a hovered dimension gold with a tan label; live 11–15, 141), Q on a selected line (dash-dot, region fill dropped).
 - Asked live (REQUESTS "qa 20:44"): lines on an axis drawn black, a chain through the origin dropping its segment up the y axis,
   arc ends on the axes getting H / V, the circle's boxed Ø, the spline vanishing after a click, tangent arc / slot from a line
-  end on the origin making nothing, Shift+/ tab in a sketch.
+  end on the origin making nothing, Shift+/ tab in a sketch, Extend's look, badges on hover with a tool active (9), a
+  rectangle region hovered away from its points (10: ours lights its whole outline).
 
 ## qa, 2026-11-21 (USER P0: combined hover × selection states; live hover-matrix-1121, scored in docs/parity/interaction-feel.md "Hover × selection")
 
