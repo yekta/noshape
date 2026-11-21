@@ -5234,6 +5234,12 @@ fn drawing_export_formats_and_options() {
     assert_eq!(e.param.as_deref(), Some("version"), "{e:?}");
     // The inspection list: a CSV with the panel's columns.
     call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "A", "position": [30, 30] }));
+    // DXF Text: Explode into polylines (notes) explodes every text, the title block's too, as Explode all (live dx 19:47).
+    for (text, mtext) in [("export_as_text", true), ("explode_notes", false)] {
+        call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "DXF", "file": dxf.to_str().unwrap(), "text": text }));
+        let out = String::from_utf8_lossy(&std::fs::read(&dxf).unwrap()).replace("\r\n", "\n");
+        assert_eq!(out.contains("\nMTEXT\n") || out.contains("\nTEXT\n"), mtext, "{text}");
+    }
     let csv = scratch("insp.csv");
     call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "Inspection list", "file": csv.to_str().unwrap() }));
     assert!(!std::fs::read_to_string(&csv).unwrap().is_empty());

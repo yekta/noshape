@@ -373,22 +373,22 @@ pub fn export_files(drawing: &Drawing, sheets: &[usize], s: &ExportSettings, sou
     let mut pages = Vec::new();
     for &i in sheets {
         let built = render_sheet_with(&drawing, i, sources, cache, true, info).ok_or("nothing to export")?;
-        // Explode notes: all notes' texts (Text › Explode into
-        // polylines (notes)), else the notes marked Explode.
-        let all_notes = f.cad() && s.text == 1;
+        // The notes marked Explode (Text › Export as text).
         let sheet = &drawing.sheets[i];
         let explode: Vec<usize> = built
             .geometry
             .texts
             .iter()
             .enumerate()
-            .filter(|(_, t)| matches!(built.picks.get(t.pick as usize), Some(noshape_model::drawing::build::PickTarget::Annotation(id)) if sheet.annotations.iter().any(|a| a.id == *id && matches!(&a.kind, AnnotationKind::Note { style, .. } if all_notes || style.explode))))
+            .filter(|(_, t)| matches!(built.picks.get(t.pick as usize), Some(noshape_model::drawing::build::PickTarget::Annotation(id)) if sheet.annotations.iter().any(|a| a.id == *id && matches!(&a.kind, AnnotationKind::Note { style, .. } if style.explode))))
             .map(|(k, _)| k)
             .collect();
         let picture = f == DrawingFormat::Svg || f.raster();
         let opts = ExportOptions {
             // SVG and rasters: text as outlines (live: no <text> in the SVG).
-            explode_all: (f == DrawingFormat::Pdf && s.text == 0) || (f.cad() && s.text == 2) || picture,
+            // DWG / DXF Explode into polylines (notes) explodes every text as Explode all (live dx 19:47: 0 MTEXT,
+            // the title block's too).
+            explode_all: (f == DrawingFormat::Pdf && s.text == 0) || (f.cad() && s.text >= 1) || picture,
             strokes: f.cad(),
             explode,
             underline_overrides: s.overridden == 0,

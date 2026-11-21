@@ -184,7 +184,7 @@ pub fn ops() -> Vec<Op> {
                 opt("version", s(), "The format's Version (e.g. \"1.7\", \"2018\", \"Release 14\")."),
                 opt("sheets", s(), "DWG / DXF: \"all\" (default), \"current\" or a range \"1-3, 5\" (PDF: every sheet; DWT: the first two; SVG and rasters: the active sheet)."),
                 opt("overridden_dimensions", json!({ "type": "string", "enum": ["show_underlines", "hide_underlines"], "default": "show_underlines" }), "Overridden dimensions."),
-                opt("text", json!({ "type": "string", "enum": ["normal", "selectable", "export_as_text", "explode_notes", "explode_all"] }), "PDF Text (normal / selectable) or DWG / DXF / DWT Text (export_as_text / explode_notes / explode_all)."),
+                opt("text", json!({ "type": "string", "enum": ["normal", "selectable", "export_as_text", "explode_notes", "explode_all"] }), "PDF Text (normal / selectable) or DWG / DXF / DWT Text (export_as_text / explode_notes / explode_all; explode_notes explodes every text as explode_all, as live does)."),
                 opt("color", json!({ "type": "string", "enum": ["color", "black_and_white", "grayscale"] }), "PDF Color (default color; only PDF has it)."),
                 opt("units", json!({ "type": "string", "enum": crate::drawing_export::UNITS.iter().map(|u| u.0).collect::<Vec<_>>() }), "DWG / DXF Units (default \"Use drawing units\")."),
                 opt("splines_as_polylines", json!({ "type": "boolean" }), "Export splines as polylines."),
