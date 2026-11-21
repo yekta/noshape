@@ -294,6 +294,28 @@ fn teeth_cut_by_copies_of_the_whole_rim_as_occt() {
     assert!((ours.area().unwrap() - occt.area().unwrap()).abs() <= 1e-12, "area");
 }
 
+/// Three copies of one tool in the same place (an extrude of overlaid copies of one sketch region: the infento
+/// assembly's Extrude 42, five sprockets fused): cut as one tool, each copy's sub-shapes with the first's history.
+#[test]
+fn copies_of_a_tool_in_one_place_cut_as_one() {
+    let _ = k::set_working_scale(1000.0);
+    let plate = k::make_box_corners(DVec3::ZERO, DVec3::new(0.04, 0.03, 0.005)).unwrap();
+    let pin = || k::make_cylinder(&z_frame(DVec3::new(0.02, 0.015, -0.001)), 0.004, 0.007, TAU).unwrap();
+    let cut = |tools: &[k::Shape]| k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&plate), tools, &k::BooleanOptions::default()).unwrap();
+    let (one, three) = (cut(&[pin()]), cut(&[pin(), pin(), pin()]));
+    assert_eq!(three.shape.count(k::ShapeType::Face), one.shape.count(k::ShapeType::Face));
+    assert!((three.shape.volume().unwrap() - one.shape.volume().unwrap()).abs() <= 1e-15);
+    let of = |r: &k::OpResult, arg: u32| {
+        let mut v: Vec<String> = r.history.records.iter().filter(|h| h.arg == arg).map(|h| format!("{:?}{} {:?} {:?}{}", h.input_kind, h.input_index, h.relation, h.output_kind, h.output_index)).collect();
+        v.sort();
+        v
+    };
+    assert!(!of(&one, 1).is_empty());
+    for arg in 1..4 {
+        assert_eq!(of(&three, arg), of(&one, 1), "tool {arg}");
+    }
+}
+
 /// A result's history records, each output by where it lies (a face by its centroid and area, an edge by its ends
 /// and length, a vertex by its point: none by a curve's parameters), grouped by what they say.
 fn placed_records(r: &k::OpResult) -> std::collections::BTreeMap<String, Vec<Vec<f64>>> {

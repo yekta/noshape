@@ -183,9 +183,95 @@ pub(crate) fn occt_bop_settings() {
     });
 }
 
+/// For each tool, the earlier tool it is a copy of in the same place, with its sub-shapes (vertices, edges, faces) as
+/// that one's indices: matched by their boxes, each to one alone; else None.
+fn copies_of_earlier(tools: &[Shape]) -> Vec<Option<(usize, [Vec<u32>; 3])>> {
+    const KINDS: [crate::ShapeType; 3] = [crate::ShapeType::Vertex, crate::ShapeType::Edge, crate::ShapeType::Face];
+    let near = |a: &crate::geom::BoundingBox, b: &crate::geom::BoundingBox| (a.min - b.min).abs().max_element() <= 1e-9 && (a.max - b.max).abs().max_element() <= 1e-9;
+    let mut out = vec![None; tools.len()];
+    if tools.len() < 2 {
+        return out;
+    }
+    let boxes: Vec<Option<crate::geom::BoundingBox>> = tools.iter().map(|t| t.bounding_box(false).ok()).collect();
+    // (Their sub-shapes' boxes, of those whose box another's matches.)
+    let mut subs: Vec<Option<[Vec<crate::geom::BoundingBox>; 3]>> = vec![None; tools.len()];
+    let sub_boxes = |i: usize, subs: &mut [Option<[Vec<crate::geom::BoundingBox>; 3]>]| {
+        if subs[i].is_none() {
+            subs[i] = Some(KINDS.map(|k| tools[i].sub_shapes(k).iter().filter_map(|x| x.bounding_box(false).ok()).collect()));
+        }
+    };
+    for j in 1..tools.len() {
+        let Some(bj) = &boxes[j] else { continue };
+        for i in 0..j {
+            if out[i].is_some() || !boxes[i].as_ref().is_some_and(|bi| near(bi, bj)) {
+                continue;
+            }
+            sub_boxes(i, &mut subs);
+            sub_boxes(j, &mut subs);
+            let (Some(si), Some(sj)) = (&subs[i], &subs[j]) else { continue };
+            // (Each of the earlier one's sub-shapes to the later one's at its place, that one alone there.)
+            let matched: Option<Vec<Vec<u32>>> = (0..3)
+                .map(|k| {
+                    if si[k].len() != sj[k].len() || si[k].len() != tools[i].count(KINDS[k]) || sj[k].len() != tools[j].count(KINDS[k]) {
+                        return None;
+                    }
+                    let mut used = vec![false; sj[k].len()];
+                    si[k].iter()
+                        .map(|b| {
+                            let mut at = sj[k].iter().enumerate().filter(|(_, c)| near(b, c)).map(|(q, _)| q);
+                            let q = at.next()?;
+                            (at.next().is_none() && !std::mem::replace(&mut used[q], true)).then_some(q as u32)
+                        })
+                        .collect()
+                })
+                .collect();
+            if let Some(m) = matched
+                && let Ok([v, e, f]) = <[Vec<u32>; 3]>::try_from(m)
+            {
+                out[j] = Some((i, [v, e, f]));
+                break;
+            }
+        }
+    }
+    out
+}
+
 fn boolean_once(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &BooleanOptions) -> Result<OpResult> {
     require_nonempty(objects, "boolean objects")?;
     require_nonempty(tools, "boolean tools")?;
+    // Tools that are copies of an earlier one in the same place (an extrude of five overlaid copies of one region: the
+    // infento assembly's Extrude 42, OCCT 5.5 s on its five sprockets on the Mac, 0.75 on one): left out, each given
+    // the earlier one's history.
+    let copies = copies_of_earlier(tools);
+    if copies.iter().any(Option::is_some) {
+        let kept: Vec<usize> = (0..tools.len()).filter(|&i| copies[i].is_none()).collect();
+        let fewer: Vec<Shape> = kept.iter().map(|&i| tools[i].clone()).collect();
+        let mut r = boolean_once(op, objects, &fewer, opts)?;
+        let n = objects.len() as u32;
+        for h in &mut r.history.records {
+            if h.arg >= n {
+                h.arg = n + kept[(h.arg - n) as usize] as u32;
+            }
+        }
+        let mut more = Vec::new();
+        for (j, c) in copies.iter().enumerate() {
+            let Some((i, map)) = c else { continue };
+            for h in r.history.records.iter().filter(|h| h.arg == n + *i as u32) {
+                // (A solid, shell or wire: the copy's own where each has one alone.)
+                let q = match h.input_kind {
+                    crate::ShapeType::Vertex => map[0].get(h.input_index as usize).copied(),
+                    crate::ShapeType::Edge => map[1].get(h.input_index as usize).copied(),
+                    crate::ShapeType::Face => map[2].get(h.input_index as usize).copied(),
+                    k => (tools[*i].count(k) == 1 && tools[j].count(k) == 1).then_some(h.input_index),
+                };
+                if let Some(q) = q {
+                    more.push(crate::history::HistoryRecord { arg: n + j as u32, input_index: q, ..*h });
+                }
+            }
+        }
+        r.history.records.extend(more);
+        return Ok(r);
+    }
     let code = match op {
         BooleanOp::Fuse => 0,
         BooleanOp::Cut => 1,
