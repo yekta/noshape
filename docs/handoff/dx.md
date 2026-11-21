@@ -24,7 +24,7 @@ Design (step 1; step 2, B-reps for selection, later):
 6. Tests: hit (same doc + build), miss after an edit, miss after a build change; the Part Studio shows the file's
    snapshot before its regeneration lands and swaps to an equal real display without a rebuild of its scene.
 
-## STATE 13:11 11-21 (read first after compaction)
+## STATE 13:45 11-21 (read first after compaction)
 - LANDED today: dx-urdf stack as 5bbec61b (OBJ / 3MF / glTF faceting, DXF explode notes, Draco, Parasolid 25-27.1 read,
   batch-2 cases, glTF per face + UVs, AGENT_API, draco-core notices); fast open 92d02c14 (display rows in the .noshape,
   one per tab) and f626b268 (assembly scene off the UI thread; rows read at open; test that the UI thread isn't blocked).
@@ -34,15 +34,19 @@ Design (step 1; step 2, B-reps for selection, later):
   assembly_view::decode_cached_display_early) and prefetch(path, last-viewed tab) decodes that tab's row right after the
   rows are read (display-rows thread); load_keyed takes it (take_early) and falls back to its own decode. Tests in
   display_cache's a_document_keeps_its_display_for_its_content_and_build_only.
-  infento on vibex6 (ms since start): step 2 key 594 / decoded 889 / cached in 947 / frame 1116; with load_for key 356 /
-  decoded 464 / cached in 493 / frame 740. The frame's extra 250 ms is vibex6's software GPU (frames 1-2 render 150-170
-  ms each); the key is ~45 ms after the view asks (~311), the decode (~150 ms) was the long pole -> decode_early.
-  Running: vibex8 rb.sh bash dx-open-v.sh (/root/dx-scratch/open-v.out), then copy the app to vibex6
-  ~/agents/dx-keep/open/noshape and `~/bin/slot timeout 1200 ~/agents/dx-keep/bin/openinf.sh <app> c`; commit, land.
+  infento on vibex6 (ms since start, run 2 = rows from the file): step 2 key 594 / decoded 889 / cached in 947 / frame
+  1116; load_for 356 / 464 / 493 / 740; with decode_early key 135 = decoded 135 / cached in 169 / cached model frame
+  342 (target <= 0.5 s met). vibex8 rb.sh bash dx-open-v.sh running the assembly-ui `cached` tests + clippy
+  (/root/dx-scratch/open-v.out); then delete dx-open-v.sh, commit, land.
 - SPEED-RINGS-SHELL (bool, P1) has live's Shell 1 results (9313d85f4): OK at 8-10.4 mm, faces / volumes in TICKETS.
-- Drawing rows 2/10 (duct, louver). rings-loft: live's centre mark at (2.570, 6.317) is on a circle ours draws only
-  300..60 deg (live 3 arcs, full). Probe: dx-urdf parity.rs DXPROBE (uncommitted; dumps drawing_get to
-  ours-drawing-get.json) + dx-exr.sh (worktree root, uncommitted: rings-loft only, Mac ~/noshape-host/dx-keep/exs-rings).
+- Drawing rows 2/10 (duct, louver). rings-loft's Top-view circle at (2.570, 6.317) r 0.2017 in is drawn whole by ours
+  (drawing_get: 4 edges 0-60 / 60-180 / 180-300 / 300-0): ours ARC, SPLINE, SPLINE, ARC (the splines up to 0.003 in
+  off the circle), live 3 ARCs 60-180 / 180-300 / 300-60 + its centre mark. Model: live's Extrude 7 rims, 6 edges of
+  24.3 mm at z +-5.8 on r 10.25 round (34.93, 0); ours ellipse arcs of 26.68 mm at z +-5.44, the one at 0 deg split
+  differently (vibex6 ~/agents/dx-keep/sr/rlcyl.py ./cli ~/tmp/dx/sr3/saved/c2-rings-loft.noshape). views.rs:2823
+  already draws a curve on a view-axis cylinder as its circle: so ours has no such cylinder face there. Next: compare
+  that ring per feature (Extrude 7, Shell 2) with live.jsonl, then ticket the owner. Probe patch
+  /root/dx-scratch/dxprobe2.patch (DXPROBE dumps drawing_get), Mac suite dir ~/noshape-host/dx-keep/exs-rings.
 - View centres (live drawing-live.json boundingBoxPoints; /root/dx-scratch/vc/pads.py <doc>): live's position is the
   centre of a box padded by 5% of its larger side; that box is the drawn one for duct, louver, rings Front and every
   Isometric (ours matches there), larger in bottle Front/Right (+0.45 in model below, +0.30 in above: round inches, so
