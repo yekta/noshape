@@ -61,14 +61,23 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   gives the x = 40 face's frame (Z = +X, X = +Y, Y = +Z); in the app, hovering that corner in Mass and section properties ›
   Mate connector for reference frame snaps a frame with Z along −X, Y down. So the Face tab about a corner connector reads
   Lxx ≈ 0, Lyy = Lzz 106666.664 where live reads 106666.667 / 160000 / 426666.667 / 533333.333 (with world axes ours matches).
-- [ ] P2 **INSERT-OTHER-DOC-GRAPH-MARKS (asm)**: Insert › Other documents › an opened document (live parity-open-1120/ob,
+- [x] verified green 5b840ddf0 (qa 11-21 09:2x, vibe2, qa-scratch/walk2/g5c, g6c.png, leg-cmp.png; asm b2bbaf7d1: two-row legend Workspace · Version / Release candidate · Release, OBS-REL-1 a solid ▲; Part Studios filter row (Parts / Sketches, expand-all) and Part Studio 1 expanded; residuals INSERT-GRAPH-RESIDUALS) P2 **INSERT-OTHER-DOC-GRAPH-MARKS (asm)**: Insert › Other documents › an opened document (live parity-open-1120/ob,
   ob-pre-1/2.png). Version graph: live's legend has two rows, "Workspace · Version" and "Release candidate · Release"
   (pin icons), and the release version OBS-REL-1 has a solid ▲. Ours has one legend row ("○ Workspace ● Version") and
   OBS-REL-1 is a plain dot. Part Studios list: live shows the filter row (Parts / Sketches icons, expand-all at the right)
   and Part Studio 1 expanded to Part 1. Ours has no filter row, and the studios are collapsed.
-- [ ] P3 **FACE-MOMENT-DIGITS (asm)**: Face tab, the 40x20 top face: about its centroid ours reads Lxx 26666.664,
+- [x] verified green 5b840ddf0 (qa 11-21 09:1x, vibe2 walk2/f5c, f6c.png + CLI walk2/src/massop.py; asm b2bbaf7d1: about the centroid 26666.667 / 106666.667 / 133333.333, about the corner 106666.667 / 160000 / 426666.667 / 533333.333 in the app; CLI 26666.666667 etc.; residual FACE-MOMENT-LXY-ZERO) P3 **FACE-MOMENT-DIGITS (asm)**: Face tab, the 40x20 top face: about its centroid ours reads Lxx 26666.664,
   Lyy 106666.657, Lzz 133333.321; about the corner, 106666.664 / 426666.657 / 533333.321. Live (exact for a plane) reads
   ….667 / ….667 / ….333: our integration is off by up to 0.012 mm⁴ on a flat rectangle.
+- [ ] P3 **FACE-MOMENT-LXY-ZERO (asm)**: Face tab, the 40x20 top face about its centroid: ours (green 5b840ddf0, after b2bbaf7d1)
+  shows Lxy = Lyx **-7.941e-11**; live shows **0** (behaviours "Face tab": Lxy 0, Lyx 0). The CLI's assembly_mass_properties gives 0.0.
+  Wanted: the app's product of inertia reads 0 for a symmetric face, as live and the CLI (qa-scratch/walk2/f5c.png).
+- [ ] P3 **INSERT-GRAPH-RESIDUALS (asm)**: Insert › Other documents › Rel's version graph and list (green 5b840ddf0 vs live
+  parity-open-1120/ob/ob-pre-1/2.png; qa-scratch/walk2/leg-cmp.png, tree-cmp.png). Live: the Release candidate / Release legend
+  glyphs are pins (△ / ▲ on a short stem, like the Workspace / Version pins), ours plain triangles; live's graph line and nodes
+  are heavier (≈2 px line, larger dots); live's first version Start has a root tick (⊥) under its dot, ours none; live hides the
+  "Inserted: 0" footer while the graph shows, ours keeps it; live's studio row expands with a chevron ⌄, ours a filled ▾;
+  live's "N changes since the last version." banner puts "Create a version in …" left-aligned after a blank line, ours centred.
 
 - [x] verified green 665560c83 (qa 11-21 06:5x, vibe2, qa-scratch/walk2/e1c, e2c.png: rolled under Sketch 1, its menu is live's with no Section view…; Frame 1 below the bar unchanged) P3 **ROLLBACK-ABOVE-BAR-SECTION-VIEW (psui)**: fixed psui 11-21 06:09 (a pick from a row's menu leaves nothing selected behind it, only a dismissed sketch row's menu does; list_feel "menu / rolled back under Sketch 1" picks Roll to here), to verify. green 70795e7e3 (9790d27d7), live dm/rollback-menus.json. With the bar rolled
 - [ ] P3 **ROLLBACK-ABOVE-BAR-SECTION-VIEW (psui)**: fixed psui 11-21 06:09 (a pick from a row's menu leaves nothing selected behind it, only a dismissed sketch row's menu does; list_feel "menu / rolled back under Sketch 1" picks Roll to here), to verify. green 70795e7e3 (9790d27d7), live dm/rollback-menus.json. With the bar rolled
