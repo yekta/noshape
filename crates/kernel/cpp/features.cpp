@@ -5046,9 +5046,10 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
       fail_op("the loft can't follow the path");
     along   = true;
     natural = allow_natural && !ruled && !closed;
-    // (Centripetal: by section spacing the side ran back behind the first profile, c2-loft-paths-guides' Loft 3 0.96 mm
-    // past its start cap, and its fuse with Mirror 1's copy dropped the loft.)
-    ts.SetParType(Approx_Centripetal);
+    // natural_loft rebuilds the surface through the sections, which it finds at even steps of v (iso-parametric); the
+    // approximation it replaced ran 0.7 mm past c2-loft-paths-guides' Loft 3's end profile, into the slot it ends on (37
+    // edges, live 33). Centripetal when it stays: by section spacing the side ran back behind the first profile.
+    ts.SetParType(natural ? Approx_IsoParametric : Approx_Centripetal);
     // Round a ring the unsmoothed surface overshoots between its sections (four rectangles round a circle: 14 % over
     // the swept volume): smoothed, unless natural_loft rebuilds it below (its sections at even steps of v).
     if (closed && allow_natural && !ruled)
@@ -5070,7 +5071,7 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
   // natural_loft, makes ThruSections smooth it.
   std::vector<TopoDS_Wire> smooth = wires;
   int                      drop   = -1;
-  if (natural && n == 2)
+  if (natural && wires.size() == 2) // (a path's sections are more already)
   {
     GProp_GProps g0, g1;
     BRepGProp::LinearProperties(wires[0], g0);
