@@ -3402,3 +3402,20 @@ fn a_threads_helical_land_stays_in_strips_on_unify() {
 fn impeller_seats_on_its_free_form_wall_fuse_as_occt() {
     valid_as_occt("23c0c38476a63ecf", 1e-7);
 }
+
+/// c2-impeller-loft's Chamfer Stevenrohr Halterung cut (recorded): OCCT built a section edge's curve on the free-form
+/// wall 0.2 mm off it and raised the edge's tolerance to 2.1e-4 (inputs 1.2e-5), every later Boolean on the part
+/// slower. Projected again from the edge: the result as tight as its inputs, valid, its volume kept.
+#[test]
+fn a_section_edges_curve_off_a_free_form_face_is_projected_again() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "cc3caf4644ba152b").expect("the recorded cut");
+    let loosest = c.objects.iter().chain(&c.tools).map(|s| s.max_edge_tolerance()).fold(0.0, f64::max);
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's");
+    k::set_rust_boolean(None);
+    assert!(o.shape.is_valid());
+    assert!(o.shape.max_edge_tolerance() <= 2.0 * loosest, "{:e} m, inputs {loosest:e}", o.shape.max_edge_tolerance());
+    assert!((o.shape.volume().unwrap() - c.summary.volume).abs() <= 1e-9 * c.summary.volume);
+}

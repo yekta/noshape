@@ -136,6 +136,9 @@
 #include <math_Vector.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <ShapeFix_Edge.hxx>
+#include <ShapeAnalysis_Edge.hxx>
+#include <BRep_TEdge.hxx>
+#include <BRep_TVertex.hxx>
 #include <Geom_Ellipse.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <BRep_Builder.hxx>
@@ -8928,6 +8931,116 @@ bool union_lost_a_body(const std::vector<TopoDS_Shape>& inputs, const TopoDS_Sha
   return volume_of(r) < 0.95 * big;
 }
 
+// New edges on a free-form face whose curve on a face misses them by more than 0.1 mm and 10 times the inputs' loosest
+// edge, OCCT's tolerance raised to cover it (c2-impeller-loft's Fillet 3 cut: inputs 2.2e-4, a section's curve on the
+// loft 2.55 mm off, every later Boolean on that body slow): projected again from the 3D curve, the edge and its new
+// vertices tightened to match. (Not analytic faces' sections nor closer ones: OCCT's curves within its tolerance
+// there, the volume moved off OCCT's, a valve handle's cone cut by 2e-7.)
+void mend_loose_sections(const TopoDS_Shape& res, const std::vector<TopoDS_Shape>& inputs)
+{
+  ShapeIMap old;
+  double    loose = 0;
+  for (const TopoDS_Shape& x : inputs)
+  {
+    TopExp::MapShapes(x, TopAbs_EDGE, old);
+    TopExp::MapShapes(x, TopAbs_VERTEX, old);
+  }
+  for (int i = 1; i <= old.Extent(); ++i)
+    if (old(i).ShapeType() == TopAbs_EDGE)
+      loose = std::max(loose, BRep_Tool::Tolerance(TopoDS::Edge(old(i))));
+  const double cap = 10 * std::max(loose, Precision::Confusion());
+  ShapeAncMap ef;
+  TopExp::MapShapesAndUniqueAncestors(res, TopAbs_EDGE, TopAbs_FACE, ef);
+  BRep_Builder bb;
+  ShapeIMap    mended;
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(ef.FindKey(i));
+    if (old.Contains(e) || BRep_Tool::Tolerance(e) <= cap || BRep_Tool::Degenerated(e) || !BRep_Tool::IsGeometric(e))
+      continue;
+    bool seam = false, free = false;
+    for (const TopoDS_Shape& f : ef(i))
+    {
+      seam = seam || BRep_Tool::IsClosed(e, TopoDS::Face(f));
+      free = free || BRepAdaptor_Surface(TopoDS::Face(f), false).GetType() >= GeomAbs_BezierSurface;
+    }
+    if (seam || !free)
+      continue;
+    ShapeAnalysis_Edge sae;
+    double             before = 0;
+    for (const TopoDS_Shape& f : ef(i))
+    {
+      double dev = 0;
+      sae.CheckSameParameter(e, TopoDS::Face(f), dev);
+      before = std::max(before, dev);
+    }
+    if (before <= std::max(cap, 1e-4))
+      continue;
+    // (Each face's curve, kept to put back.)
+    std::vector<std::pair<TopoDS_Face, occ::handle<Geom2d_Curve>>> was;
+    double                                                      f0 = 0, l0 = 0;
+    for (const TopoDS_Shape& f : ef(i))
+      was.emplace_back(TopoDS::Face(f), BRep_Tool::CurveOnSurface(e, TopoDS::Face(f), f0, l0));
+    const double tol = BRep_Tool::Tolerance(e);
+    double       after = 0;
+    bool         ok    = true;
+    for (const auto& [f, c] : was)
+    {
+      ShapeFix_Edge sfe;
+      // (Taken off directly: ShapeFix's FixRemovePCurve keeps one that meets the edge's ends, as these do.)
+      bb.UpdateEdge(e, occ::handle<Geom2d_Curve>(), f, tol);
+      ok = ok && sfe.FixAddPCurve(e, f, false, std::max(loose, Precision::Confusion())) && !sfe.Status(ShapeExtend_FAIL);
+      double dev = 0;
+      if (ok)
+        sae.CheckSameParameter(e, f, dev);
+      after = std::max(after, dev);
+    }
+    if (!ok || after >= 0.5 * before)
+    {
+      for (const auto& [f, c] : was)
+        if (!c.IsNull())
+          bb.UpdateEdge(e, c, f, tol);
+      continue;
+    }
+    occ::handle<BRep_TEdge>::DownCast(e.TShape())->Tolerance(std::max({1.05 * after, loose, Precision::Confusion()}));
+    mended.Add(e);
+  }
+  if (mended.IsEmpty())
+    return;
+  // Their vertices: as tight as their edges and their curves' ends allow.
+  ShapeAncMap ve;
+  TopExp::MapShapesAndUniqueAncestors(res, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  for (int i = 1; i <= ve.Extent(); ++i)
+  {
+    const TopoDS_Vertex& v = TopoDS::Vertex(ve.FindKey(i));
+    if (old.Contains(v) || std::none_of(ve(i).begin(), ve(i).end(), [&](const TopoDS_Shape& e) { return mended.Contains(e); }))
+      continue;
+    const gp_Pnt p    = BRep_Tool::Pnt(v);
+    double       need = Precision::Confusion();
+    for (const TopoDS_Shape& x : ve(i))
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(x);
+      need                 = std::max(need, BRep_Tool::Tolerance(e));
+      if (BRep_Tool::Degenerated(e))
+        continue;
+      const BRepAdaptor_Curve c(e);
+      for (const double t : {c.FirstParameter(), c.LastParameter()})
+        need = std::max(need, 1.05 * p.Distance(c.Value(t)));
+      const int k = ef.FindIndex(e);
+      if (k == 0)
+        continue;
+      for (const TopoDS_Shape& f : ef(k))
+      {
+        const BRepAdaptor_Curve cf(e, TopoDS::Face(f));
+        for (const double t : {cf.FirstParameter(), cf.LastParameter()})
+          need = std::max(need, 1.05 * p.Distance(cf.Value(t)));
+      }
+    }
+    if (need < BRep_Tool::Tolerance(v))
+      occ::handle<BRep_TVertex>::DownCast(v.TShape())->Tolerance(need);
+  }
+}
+
 bool all_solids(const std::vector<TopoDS_Shape>& l)
 {
   for (const TopoDS_Shape& x : l)
@@ -10228,6 +10341,10 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     }
     if (!mended)
       fail_op("boolean failed: the union lost one of its parts");
+  }
+  {
+    const KernelTimer timer("boolean.mend");
+    mend_loose_sections(res, inputs);
   }
   if (opts.unify)
   {
