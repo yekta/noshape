@@ -361,6 +361,11 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   dlg-edge-selected_s, dlg-edge-selhover_f, dlg-face-otherhover_f; ours qa-scratch/hm2/b3z.png (cells b3-dlg-*13*).
   Both: qa 18:26, green 4f2cb3ce. Checked too: a second new Fillet opens with the radius typed in the first (2 mm), as live (per user
   or per document is not captured yet).
+- [ ] P0 **FEEL-SKETCH-REGION-FILL-AFTER-DRAG (psui)**: user walk. In Sketch 2 (block doc: point (60,25), line (60,5)-(90,5), arc, circle
+  c(100,20) r6), drag the free point (60,25) to (64,28), or the line up 4 mm, with no tool: the circle's shaded region (#E4E7EA) goes
+  white and stays white 0.8, 3 and 9 s after the release (nothing else changed). Before the drag it is shaded. Live shades closed
+  regions in sketch edit throughout (asked live to confirm after a drag). Ours qa-scratch/hm2/out-walk2/w-drag-point-long (04 vs
+  05-10), drags2.png; qa 19:54, green 6be52caf4 (kit qa-scratch/hm2/walk, run.sh on vibe2 :481).
 
 ## psui, 2026-11-20 (live's feel coverage cov-1120; docs/parity/interaction-feel.md "cov-1120")
 - [x] done (studios 11-20: c249e0ed9 / f29e6eb2; the same rows as qa's FEEL-FS-* below, verified 07:0x on green 0bc7e772e) **P1 FS-WHEEL-72PX [studios]**: a wheel notch scrolls the Feature Studio's code 72 px in live (Ace: 4.5 lines of
