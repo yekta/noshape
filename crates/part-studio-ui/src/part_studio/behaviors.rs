@@ -1317,18 +1317,19 @@ impl PartStudioView {
                     _ => vec![r.clone()],
                 }
             }
-            // Rested on the edge itself, its midpoint the target: the edge stays lit (live 1981 c1-rest2s).
-            Some(Reference::Implicit { .. }) if self.midpoint_rest_edge().is_some() => self.midpoint_rest_edge().into_iter().cloned().collect(),
+            // Landed straight on the midpoint (the dwell snapped it): the edge stays lit (live hover-matrix-1121).
+            Some(Reference::Implicit { .. }) if self.midpoint_landed_edge().is_some() => self.midpoint_landed_edge().into_iter().cloned().collect(),
             Some(r) => vec![r.clone()],
             None => Vec::new(),
         }
     }
 
-    /// The edge whose midpoint is the hover target while the pointer still rests on the edge itself (the dwell's snap),
-    /// not over a face beside it.
-    pub(super) fn midpoint_rest_edge(&self) -> Option<&Reference> {
+    /// The edge whose midpoint the dwell made the target with the pointer still where it landed on the edge (live
+    /// hover-matrix-1121 "midpoint, pointer lands on it": the edge's band and a dark ring marker, also after 3 s). Arriving
+    /// along the edge after its marker showed lights the point alone instead.
+    pub(super) fn midpoint_landed_edge(&self) -> Option<&Reference> {
         let Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) = &self.hover else { return None };
-        self.ui.hover_pick.as_ref().is_some_and(|t| t.reference == **on).then_some(&**on)
+        (self.ui.pointer == self.ui.midpoint_armed_at && self.ui.hover_pick.as_ref().is_some_and(|t| t.reference == **on)).then_some(&**on)
     }
 
     /// Features related to the current selection (Onshape cross-highlight:
@@ -3984,14 +3985,16 @@ impl PartStudioView {
             // Not for Select other's highlight: it isn't a pick under the
             // pointer (Onshape suppresses mouse-move picking while it's open).
             Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) if self.sketch.is_none() && self.ui.select_other.is_none() => {
+                // Arrived along the edge: only the point lights, as the hovered marker, on a selected edge with a solid
+                // orange centre (user 11-21 shots hover-point*). Landed on it: the lit edge keeps a ~7 px dark ring
+                // filled pale orange, #ffbc40 on a selected edge (live hover-matrix-1121 mid-hovered, mid-jumped-onto-selected-edge).
+                let on_selected = self.selection.contains(on);
                 match self.edge_midpoint(on) {
-                    // Rested on the edge (live 1981 c1-rest2s, qa EDGE-MIDPOINT-REST-LOOK): the lit edge keeps its
-                    // highlight and the marker is a ~7 px dark ring filled pale orange.
-                    Some(m) if self.midpoint_rest_edge().is_some() => {
-                        points.push(sprite(m, 0xffd3a0, 6.0, 0));
+                    Some(m) if self.midpoint_landed_edge().is_some() => {
+                        points.push(sprite(m, if on_selected { 0xffbc40 } else { 0xffd3a0 }, 6.0, 0));
                         points.push(sprite(m, 0x000000, 7.0, PointSprite::RING));
                     }
-                    Some(m) => marker(&mut points, m, crate::theme::viewport::POINT_HOVER),
+                    Some(m) => marker(&mut points, m, if on_selected { crate::theme::viewport::POINT_HOVER_ON_SELECTED } else { crate::theme::viewport::POINT_HOVER }),
                     None => {}
                 }
             }
@@ -4044,8 +4047,8 @@ impl PartStudioView {
     /// marker, over the adjacent faces too (orange marker, the edge loses
     /// its highlight); arriving straight on the midpoint gives the edge, and
     /// resting there the midpoint after a short dwell (live 1954: a click
-    /// after a still rest picks the midpoint point, even 8 px off; 1981: the
-    /// edge stays lit then, [`Self::midpoint_rest_edge`]).
+    /// after a still rest picks the midpoint point, even 8 px off; the edge
+    /// stays lit then, [`Self::midpoint_landed_edge`]).
     /// Not in sketch mode, nor with a field that takes no points.
     pub(super) fn update_hover(&mut self, cx: &App) -> bool {
         let raw = self.ui.hover_pick.as_ref().map(|t| t.reference.clone());

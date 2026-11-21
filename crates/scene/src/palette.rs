@@ -47,6 +47,9 @@ pub mod viewport {
     /// selected (live selection/08, part-studio/qa4-r5-s9-6d, 6e).
     pub const POINT_HOVER: [u32; 3] = [0xf8c488, 0xc49a6a, 0xffd8ac];
     pub const POINT_SELECTED: [u32; 3] = [0xfac012, 0xc4960b, 0xffd65b];
+    /// A point hovered on a selected edge: the hovered marker with a solid orange centre (user 11-21 shot,
+    /// hover-point-on-selected-edge: centre (255, 179, 46)).
+    pub const POINT_HOVER_ON_SELECTED: [u32; 3] = [0xf8c488, 0xc49a6a, 0xffb32e];
     /// Bodies a feature creates and an Add's tool, while its dialog is open:
     /// opaque in the preview blend's model with the feature (shaded with
     /// the preview lighting), mixed at 0.7 over the model before it; live

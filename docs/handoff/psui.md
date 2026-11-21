@@ -36,7 +36,19 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (15:26 UTC 11-21)
+## Now (16:47 UTC 11-21)
+
+USER P0 (lead 16:4x, DECISIONS 11-21 hover/select looks): an edge midpoint arrived at along the edge lights only the
+point (never its edge) with the hovered marker (POINT_HOVER; on a selected edge POINT_HOVER_ON_SELECTED, centre #ffb32e);
+landed straight on it (the dwell snap, pointer where it armed) the edge stays lit with the dark-ring marker
+(`midpoint_landed_edge`; live hover-matrix-1121 batch 1).
+Tests: a_hovered_edge_midpoint_lights_the_point_or_keeps_the_edge_as_live, a_hovered_edge_midpoints_marker_has_lives_pixels (GPU pixels vs
+the user's live row). NEXT: the hover x selection matrix (live/psui/hover-matrix-1121, Part Studio edges/vertices/faces
+batch first): one test per cell, report cells matching / total at each land. Live answers to fold in after: Section
+view… IS listed above the rolled-back bar (rollmenu-move-1121: drop the at_bar exception + list matrix row); no
+plane-face height cut-off (front-cutoff-1121: nearest face along the ray; ours already).
+
+### Earlier today
 
 LANDED c2e4094c as 9ffded3f 14:13 (3dd4f04b's circle-rims + ellipse rule, parity ellipse labels, plane-face rule,
 Section view… back on a sketch row's plain right-click; qa verified the 15 UIP-SKETCH-ROW-SECTION-VIEW scenarios on

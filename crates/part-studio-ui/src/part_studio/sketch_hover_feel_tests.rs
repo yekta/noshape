@@ -985,3 +985,69 @@ fn an_ellipse_picked_for_a_dimension_takes_no_plane_face(cx: &mut TestAppContext
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
+
+/// The pixels across a point marker's middle row, drawn alone at a device pixel ratio of 2 (as the user's shots), from
+/// its centre out to `reach` px.
+fn marker_row(sprites: &[noshape_render::PointSprite], reach: i32) -> Vec<[u8; 3]> {
+    use noshape_render::{Camera, Drawable, Instance, PointData, RenderParams, Renderer, Scene, StandardView, Style};
+    let mut r = Renderer::new().expect("a renderer");
+    let points = PointData { points: sprites.iter().map(|p| noshape_render::PointSprite { position: [0.0; 3], ..*p }).collect() };
+    let scene = Scene { instances: vec![Instance::new(Drawable::Points(r.upload_points(&points))).per_primitive_color()], ..Default::default() };
+    let mut cam = Camera::default();
+    cam.set_view(StandardView::Front);
+    cam.fit_sphere(glam::DVec3::ZERO, 0.03, 1.0);
+    let size = 96u32;
+    let f = r.render(RenderParams { scene: &scene, camera: &cam, width: size, height: size, device_pixel_ratio: 2.0, style: &Style::default(), pick: false }).expect("a frame");
+    let (w, c) = (f.width as i32, (f.width / 2) as i32);
+    let mid = (f.height / 2) as i32;
+    (0..=reach).map(|dx| {
+        let i = ((mid * w + c + dx) * 4) as usize;
+        [f.bgra[i + 2], f.bgra[i + 1], f.bgra[i]]
+    }).collect()
+}
+
+/// User 11-21 (hover-point / hover-point-on-selected-edge shots, 2x): an edge midpoint arrived at along the edge is an
+/// opaque orange marker with no dark outline: a light centre (#ffd8ac; on a selected edge solid orange #ffb32e) about 3 px out, a
+/// darker ring at about 5 px, the orange disc at 9-10 px, nothing past 12 px.
+#[gpui::test]
+fn a_hovered_edge_midpoints_marker_has_lives_pixels(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (_window, view, _top, _) = block_part(cx, "edge-mid-pixels");
+    let edge = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+        b.edge_refs.iter().find(|e| v.edge_midpoint(e).is_some()).expect("an edge with ends").clone()
+    });
+    // Live's row through the marker's centre, px 0..=12 out (hover-point-onshape.png, the left half mirrored).
+    let live_plain: [[u8; 3]; 13] = [
+        [255, 216, 172], [255, 216, 172], [255, 216, 172], [249, 210, 165], [201, 160, 114], [192, 149, 100], [203, 158, 106],
+        [217, 169, 114], [237, 186, 128], [247, 193, 132], [249, 194, 132], [157, 140, 120], [115, 115, 115],
+    ];
+    let mut wrong = Vec::new();
+    for selected in [false, true] {
+        let sprites = view.update(cx, |v, cx| {
+            v.selection = if selected { vec![edge.clone()] } else { Vec::new() };
+            // Arrived along the edge (moved on since the edge armed its midpoint).
+            v.ui.midpoint_armed_at = Some(glam::DVec2::new(100.0, 100.0));
+            v.ui.pointer = Some(glam::DVec2::new(103.0, 101.0));
+            v.hover = Some(Reference::Implicit { on: Box::new(edge.clone()), inference: noshape_model::reference::Inference::Midpoint });
+            v.midpoint_sprites(cx)
+        });
+        let row = marker_row(&sprites, 12);
+        eprintln!("marker row (selected {selected}): {row:?}");
+        let near = |a: [u8; 3], b: [u8; 3], tol: i32| a.iter().zip(b).all(|(x, y)| (*x as i32 - y as i32).abs() <= tol);
+        let centre = if selected { [255, 179, 46] } else { live_plain[0] };
+        for (dx, want, tol) in [(0, centre, 12), (1, centre, 12), (5, live_plain[5], 30), (9, live_plain[9], 24)] {
+            if !near(row[dx], want, tol) {
+                wrong.push(format!("selected {selected}: {dx} px out {:?}, live {want:?}", row[dx]));
+            }
+        }
+        if let Some((dx, p)) = row.iter().enumerate().find(|(_, p)| p.iter().all(|c| *c < 60)) {
+            wrong.push(format!("selected {selected}: a dark outline pixel {p:?} {dx} px out (live has none)"));
+        }
+        if near(row[12], live_plain[9], 30) {
+            wrong.push(format!("selected {selected}: still orange 12 px out {:?}", row[12]));
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}

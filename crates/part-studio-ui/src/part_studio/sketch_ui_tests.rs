@@ -3861,12 +3861,13 @@ fn an_edge_midpoint_lights_up_its_feature(cx: &mut TestAppContext) {
     assert!(cx.update(|cx| view.read(cx).related_features(cx).contains(&maker)));
 }
 
-/// qa EDGE-MIDPOINT-REST-LOOK (live 1981 c1-rest2s): rested on a part edge's midpoint (the dwell made the midpoint the
-/// target, the pointer still on the edge) the whole edge stays lit and the marker is a ~7 px dark ring filled pale
-/// orange; moved off onto the face beside it (still in the midpoint's window) the edge goes dark and the orange disc
-/// marks the target (qa4-r5-s9-6d).
+/// A part edge's midpoint hovered (live hover-matrix-1121, user 11-21 shots hover-point*): arrived along the edge after
+/// its marker showed, only the point lights (never the edge), as the hovered point marker (an 11 px disc, a darker
+/// ring, a light centre; solid orange #ffb32e on a selected edge), on the edge or off it on the face beside it;
+/// landed straight on it (the dwell's snap, the pointer where it armed the edge) the edge stays lit with a ~7 px dark
+/// ring filled #ffd3a0 (#ffbc40 on a selected edge).
 #[gpui::test]
-fn a_rested_edge_midpoint_keeps_the_edge_lit_with_a_filled_ring(cx: &mut TestAppContext) {
+fn a_hovered_edge_midpoint_lights_the_point_or_keeps_the_edge_as_live(cx: &mut TestAppContext) {
     let (_window, view, top, _) = block_part(cx, "edge-mid-rest");
     let (edge, on_edge, on_face) = cx.update(|cx| {
         let v = view.read(cx);
@@ -3876,21 +3877,32 @@ fn a_rested_edge_midpoint_keeps_the_edge_lit_with_a_filled_ring(cx: &mut TestApp
         let target = |r: &Reference| picks.ids_for(r).first().and_then(|id| picks.get(*id).cloned()).expect("its pick");
         (e.clone(), target(&e), target(&top))
     });
-    let look = |cx: &mut TestAppContext, pick: &crate::scene_builder::PickTarget| {
+    let look = |cx: &mut TestAppContext, pick: &crate::scene_builder::PickTarget, selected: bool, landed: bool| {
         view.update(cx, |v, cx| {
+            v.selection = if selected { vec![edge.clone()] } else { Vec::new() };
             v.ui.hover_pick = Some(pick.clone());
+            v.ui.midpoint_armed_at = Some(glam::DVec2::new(100.0, 100.0));
+            v.ui.pointer = Some(if landed { glam::DVec2::new(100.0, 100.0) } else { glam::DVec2::new(103.0, 101.0) });
             v.hover = Some(Reference::Implicit { on: Box::new(edge.clone()), inference: noshape_model::reference::Inference::Midpoint });
             let lit = v.highlighted_hover(cx);
             let marker: Vec<(u32, f32, bool)> = v.midpoint_sprites(cx).iter().map(|p| (u32::from_be_bytes([0, p.color[0], p.color[1], p.color[2]]), p.size, p.style & noshape_render::PointSprite::RING != 0)).collect();
             (lit, marker)
         })
     };
-    let (lit, marker) = look(cx, &on_edge);
-    assert_eq!(lit, vec![edge.clone()], "rested on the edge: the edge stays lit");
-    assert_eq!(marker, vec![(0xffd3a0, 6.0, false), (0x000000, 7.0, true)], "rested on the edge: a dark ring filled pale orange");
-    let (lit, marker) = look(cx, &on_face);
-    assert!(!lit.contains(&edge), "off the edge, in the window: the edge dark ({lit:?})");
-    assert_eq!(marker.len(), 3, "off the edge: the orange target disc ({marker:?})");
+    let [disc, ring, centre] = crate::theme::viewport::POINT_HOVER;
+    for (pick, at) in [(&on_edge, "arrived on the edge"), (&on_face, "arrived on the face beside it")] {
+        let (lit, marker) = look(cx, pick, false, false);
+        assert!(!lit.contains(&edge), "{at}: the edge stays dark ({lit:?})");
+        assert_eq!(marker, vec![(disc, 11.0, false), (ring, 8.0, true), (centre, 5.0, false)], "{at}: the hovered point marker");
+    }
+    let (lit, marker) = look(cx, &on_edge, true, false);
+    assert!(!lit.contains(&edge), "arrived on a selected edge: not lit by the hover ({lit:?})");
+    assert_eq!(marker.last(), Some(&(0xffb32e, 5.0, false)), "arrived on a selected edge: a solid orange centre ({marker:?})");
+    let (lit, marker) = look(cx, &on_edge, false, true);
+    assert_eq!(lit, vec![edge.clone()], "landed: the edge stays lit");
+    assert_eq!(marker, vec![(0xffd3a0, 6.0, false), (0x000000, 7.0, true)], "landed: a dark ring filled pale orange");
+    let (_, marker) = look(cx, &on_edge, true, true);
+    assert_eq!(marker.first(), Some(&(0xffbc40, 6.0, false)), "landed on a selected edge: an orange fill ({marker:?})");
 }
 
 /// A new Extrude on a part's face previews as Add from the first preview: it waits for std's editing logic (which
