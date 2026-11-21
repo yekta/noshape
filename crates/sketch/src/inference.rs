@@ -438,15 +438,20 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
             // A woken line the new line starts on (its midpoint or a point inside it): live2 "feel (sketch)" (1)
             // infers perpendicular only from a line the start is on, never to one elsewhere, and parallel never.
             let starts_on = |w: EntityId| sk.curve(w).is_some_and(|c| c.closest(a).2 <= 1e-9 * (1.0 + a.length()));
-            // Started at a held line's midpoint, square to it: Perpendicular to it (live sketch-line-from-midpoint, retaken
-            // 11-19 16:4x). Across it, both ends clear, or started on it off the midpoint: Vertical, as a free one (live
-            // sketch-tools-1119 cross; the 11-19 retakes of sketch-trim-key / -undo-trim).
+            // Started at a held line's midpoint, or crossing it there, square to it: Perpendicular to it (live
+            // sketch-line-from-midpoint, retaken 11-19 16:4x; psui sk2-1121 split-at-crossing, 0.08 mm off the midpoint).
+            // Across it elsewhere, both ends clear, or started on it off the midpoint: Vertical, as a free one (live
+            // sketch-tools-1119 cross, 20 mm off; the 11-19 retakes of sketch-trim-key / -undo-trim).
             let square_at_mid = |horizontal: bool| {
+                let along = if horizontal { DVec2::X } else { DVec2::Y };
+                let reach = (cursor - a).dot(along);
                 sk.entities().map(|e| e.id).find(|&w| {
                     let Some(Curve2::Line { a: la, b: lb }) = sk.curve(w) else { return false };
-                    let t = (lb - la).normalize_or_zero();
+                    let (t, mid) = ((lb - la).normalize_or_zero(), (la + lb) * 0.5);
+                    let at = (mid - a).dot(along) / reach;
+                    let through = at > 0.0 && at < 1.0 && in_point(mid - a - along * (mid - a).dot(along), r_mid);
                     !excluded(sk, ctx, w)
-                        && ((la + lb) * 0.5 - a).length() <= 1e-9 * (1.0 + a.length())
+                        && ((mid - a).length() <= 1e-9 * (1.0 + a.length()) || through)
                         && if horizontal { t.y.abs() > 1.0 - 1e-12 } else { t.x.abs() > 1.0 - 1e-12 }
                         && direction_held(sk, w)
                 })
@@ -602,10 +607,10 @@ mod tests {
         DVec2::new(x, y)
     }
 
-    /// A line square to a held line (the Line tool's Horizontal): started on it off its midpoint, drawn across it or
-    /// going on from its end as a chain, Vertical, as on a free line (live sketch-tools-1119, its cross retake, the
-    /// 11-19 trim retakes, live2's sketch-line-chain variants 11-19 17:xx); started at its midpoint, Perpendicular to it
-    /// (live sketch-line-from-midpoint).
+    /// A line square to a held line (the Line tool's Horizontal): started on it off its midpoint, drawn across it
+    /// elsewhere or going on from its end as a chain, Vertical, as on a free line (live sketch-tools-1119, its cross
+    /// retake, the 11-19 trim retakes, live2's sketch-line-chain variants 11-19 17:xx); started at its midpoint or
+    /// crossing it there, Perpendicular to it (live sketch-line-from-midpoint; psui sk2-1121 split-at-crossing).
     #[test]
     fn square_to_a_held_line_is_perpendicular_only_from_its_midpoint() {
         let mut sk = Sketch::new();
@@ -627,13 +632,22 @@ mod tests {
         let r = infer(&sk, v(4.01, 1.5), &ctx).into_iter().next().unwrap();
         assert_eq!((r.kind, r.constraints.clone()), (InferenceKind::Vertical, vec![AutoConstraint::VerticalLine]));
         assert!((r.position.x - 4.0).abs() < 1e-12);
-        // Across it, woken on the way or not, through its midpoint too: Vertical.
+        // Across it off the midpoint, woken on the way or not: Vertical. Through its midpoint (within a midpoint's reach):
+        // Perpendicular; a free line's: Vertical; one short of the midpoint: Vertical.
         let across = InferenceContext { tool: SketchTool::Line, anchor: Some(v(1.0, -1.0)), snap_radius: 0.05, woken: vec![held], ..Default::default() };
         assert_eq!(infer(&sk, v(1.01, 1.0), &across)[0].constraints, vec![AutoConstraint::VerticalLine]);
         let unwoken = InferenceContext { woken: Vec::new(), ..across.clone() };
         assert_eq!(infer(&sk, v(1.01, 1.0), &unwoken)[0].kind, InferenceKind::Vertical);
-        let mid = InferenceContext { anchor: Some(v(2.0, -1.0)), ..across };
-        assert_eq!(infer(&sk, v(2.01, 1.0), &mid)[0].constraints, vec![AutoConstraint::VerticalLine]);
+        for x in [2.0, 1.98] {
+            let mid = InferenceContext { anchor: Some(v(x, -1.0)), ..across.clone() };
+            assert_eq!(infer(&sk, v(x + 0.01, 1.0), &mid)[0].constraints, vec![AutoConstraint::PerpendicularTo(held)], "{x}");
+        }
+        let wide = InferenceContext { anchor: Some(v(1.9, -1.0)), ..across.clone() };
+        assert_eq!(infer(&sk, v(1.91, 1.0), &wide)[0].constraints, vec![AutoConstraint::VerticalLine]);
+        let free_mid = InferenceContext { anchor: Some(v(2.0, 1.0)), ..across.clone() };
+        assert_eq!(infer(&sk, v(2.01, 3.0), &free_mid)[0].constraints, vec![AutoConstraint::VerticalLine]);
+        let short = InferenceContext { anchor: Some(v(2.0, -1.0)), ..across };
+        assert_eq!(infer(&sk, v(2.01, -0.5), &short)[0].constraints, vec![AutoConstraint::VerticalLine]);
     }
 
     #[test]
