@@ -6192,7 +6192,9 @@ Examples:
 
 #### history_create_version
 
-Create a named version of the current state (edits the document (one undoable history entry)).
+Create a named version of the current state, or of a history entry (Create version here…) (edits the document (one undoable history entry)).
+
+As the Create version dialog: `name` is required, at most 256 characters. `at` makes the version at a history entry (an `id` from history_list) instead of the workspace's latest state. `publish` ticks "Publish FeatureScript" (offered when the document has a Feature Studio, and for a history entry).
 
 Examples:
 
@@ -6205,6 +6207,8 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `name` | string | required | Version name ("V1"). |
 | `description` | string |  | Description. |
+| `at` | string |  | A history entry's microversion id (history_list): Create version here… |
+| `publish` | boolean |  | Publish FeatureScript: the version's Feature Studios become available to other documents. |
 
 #### history_version_properties
 

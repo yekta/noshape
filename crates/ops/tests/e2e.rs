@@ -1532,6 +1532,31 @@ fn a_merge_takes_the_dialogs_strategies() {
     assert_eq!(call(&mut ctx, "history_merge", json!({ "version": "base" }))["up_to_date"], true);
 }
 
+/// history_create_version as its dialog: a version at an earlier history entry (Create version here…), published; the
+/// name's limits in the dialog's words; Publish refused where the dialog doesn't offer it.
+#[test]
+fn create_version_here_and_publish() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "version-here.noshape");
+    let h = call(&mut ctx, "history_list", json!({}));
+    let earlier = h["history"][1]["id"].as_str().unwrap_or_else(|| panic!("{h}")).to_string();
+    let v = call(&mut ctx, "history_create_version", json!({ "name": "Early", "at": earlier, "publish": true }));
+    assert_eq!(v["published"], true, "{v}");
+    let h = call(&mut ctx, "history_list", json!({}));
+    assert!(h["versions"].as_array().unwrap().iter().any(|x| x["name"] == "Early" && x["microversion"] == earlier.as_str()), "{h}");
+    for (args, param) in [
+        (json!({ "name": " " }), "name"),
+        (json!({ "name": "x".repeat(257) }), "name"),
+        (json!({ "name": "V2", "at": "nope" }), "at"),
+        (json!({ "name": "V2", "publish": true }), "publish"),
+    ] {
+        let e = try_call(&mut ctx, "history_create_version", args.clone()).unwrap_err();
+        assert_eq!(e.param.as_deref(), Some(param), "{args}: {e:?}");
+    }
+    let e = try_call(&mut ctx, "history_create_version", json!({ "name": "" })).unwrap_err();
+    assert_eq!(e.message, "Name is required and cannot exceed 256 characters.", "{e:?}");
+}
+
 /// A Variable Studio's Configuration panel through the config ops: a List
 /// input, a row, a configured Value, the configuration a Part Studio
 /// inserts the studio in, the row menu and Unconfigure.

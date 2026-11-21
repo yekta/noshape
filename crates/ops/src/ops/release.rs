@@ -317,10 +317,10 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         return Err(OpError::param("notes", "Required field must not be empty."));
     }
     if settings.no_creator_approver && !approvers.is_empty() {
-        return Err(OpError::param("approvers", "Company settings don't allow the creator as an approver"));
+        return Err(OpError::param("approvers", "Company settings: Do not allow creator as approver (the creator isn't offered as an approver)"));
     }
     if settings.require_approver && approvers.is_empty() {
-        return Err(OpError::param("approvers", "Company settings require an approver"));
+        return Err(OpError::param("approvers", "A field required by one or more actions is empty: Submit requires Approvers"));
     }
     // The dialog's checks.
     let mut issues = log.validate(&items);

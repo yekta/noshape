@@ -50,9 +50,15 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "history",
             verb: "create_version",
-            summary: "Create a named version of the current state",
-            description: "",
-            fields: vec![doc_field(), req("name", s(), "Version name (\"V1\")."), opt("description", s(), "Description.")],
+            summary: "Create a named version of the current state, or of a history entry (Create version here…)",
+            description: "As the Create version dialog: `name` is required, at most 256 characters. `at` makes the version at a history entry (an `id` from history_list) instead of the workspace's latest state. `publish` ticks \"Publish FeatureScript\" (offered when the document has a Feature Studio, and for a history entry).",
+            fields: vec![
+                doc_field(),
+                req("name", s(), "Version name (\"V1\")."),
+                opt("description", s(), "Description."),
+                opt("at", s(), "A history entry's microversion id (history_list): Create version here…"),
+                opt("publish", json!({ "type": "boolean" }), "Publish FeatureScript: the version's Feature Studios become available to other documents."),
+            ],
             mutates: true,
             destructive: false,
             run: create_version,
@@ -201,8 +207,32 @@ fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 fn create_version(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
-    let v = od.session.create_version(a.str("name")?, a.opt_str("description")?.unwrap_or(""))?;
-    Ok(json!({ "version": v.to_string(), "name": a.str("name")? }).into())
+    let name = a.str("name")?.trim();
+    if name.is_empty() || name.chars().count() > 256 {
+        return Err(OpError::param("name", "Name is required and cannot exceed 256 characters."));
+    }
+    let at = match a.opt_str("at")? {
+        Some(key) => {
+            let mv: noshape_store::MicroversionId = key.parse().map_err(|_| OpError::param("at", &format!("\"{key}\" isn't a history entry's id (history_list)")))?;
+            od.session.store.microversion(mv).map_err(|_| OpError::not_found(format!("no history entry `{key}` in this document")).with_param("at"))?;
+            Some(mv)
+        }
+        None => None,
+    };
+    let publish = a.bool_or("publish", false)?;
+    let has_fs = od.session.doc.tabs.iter().any(|t| matches!(t.content, noshape_model::document::TabContent::FeatureStudio(_)));
+    if publish && at.is_none() && !has_fs {
+        return Err(OpError::param("publish", "Publish FeatureScript is offered only when the document has a Feature Studio"));
+    }
+    let description = a.opt_str("description")?.unwrap_or("");
+    let v = match at {
+        Some(mv) => od.session.store.create_version(mv, name, description).map_err(io)?,
+        None => od.session.create_version(name, description)?,
+    };
+    if publish {
+        od.session.store.set_meta(&format!("{}{v}", crate::versions::PUBLISHED_FS_KEY), Some(b"1")).map_err(io)?;
+    }
+    Ok(json!({ "version": v.to_string(), "name": name, "published": publish }).into())
 }
 
 pub(super) fn branch_id(od: &crate::OpenDoc, key: &str) -> Result<noshape_store::BranchId, OpError> {

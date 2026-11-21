@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-21 09:52 UTC.
+Updated 2026-11-21 10:14 UTC.
 
 ## In flight
 
@@ -20,24 +20,20 @@ tools/ui-parity to vibe2:agents/studios/src first). Crate tests on vibex7 / vibe
 11-20 21:xx: a hung test held a vibex8 slot 43 min). `touch -c` edited files before rb.sh. Full ops e2e before a
 drawing land. vibex8 02:00-04:00 is qa's quiet window. Never `git checkout <file>` over uncommitted work: WIP-commit
 or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `git apply --3way`).
-- LANDED 092af642 (09:18, as 69273482): triad ball test 20/20 under load (un-ignored), node hover, dark headers,
-  the Part Studio Variable table panel's focused header and value chip.
-- QUEUED eabacbef (09:3x): lead 11-21 audit of the documents page / versions / release (docs/parity/
-  documents-versions.md): row hover icons in view, sort up/down/default, Enter leaves the trash modal open, "No
-  revision history found.", Restore deleted workspaces with Name / Deleted by / Deleted at (store `BranchInfo::
-  deleted_at`: `branches.deleted` holds the deletion time in ms, 1 = older files; no schema bump).
-- Committed, to land after eabacbef: 3730a047 the documents page's Versions and history page (live 2435:
-  `HistoryPanel::page`, start-ui `StartView::page` in place of the list, hook `start_hooks::versions_page`, app
-  `files::versions_page`; legend right under the rows; shot on vibe2 matches q2435-vh-30s); 3c1810c3 the deleted-
-  workspace bubble 30 s (`NoticeLink::stays`, set per `info_with_link` caller). Parity rows 89 / 106 = (BRAND-IN-UI-TEXT).
-- In the tree (testing x119, vibex7): audit #10's documents op gap: `documents_list` gains place "created", `search`,
-  `documents_sort` (+ `reverse`), rows with owner / modified_by; e2e `documents_page`; AGENT_API.md regenerated on the
-  host (scp vibex7:tmp/studios/AGENT_API.md back).
+- LANDED eabacbef (09:53, as a2fe2c5c): the audit's first fixes. LANDED 420d7f79 (10:12, as f33264f9): the documents
+  page's Versions and history page (live 2435: `HistoryPanel::page`, start-ui `StartView::page`, hook
+  `start_hooks::versions_page`, app `files::versions_page`), the deleted-workspace bubble 30 s (`NoticeLink::stays`),
+  documents_list Created by me / `search` / `documents_sort`.
+- Committed, not landed: 4e394074 history_merge `strategy` / `tabs` / `version` + protected refusal; the Merge
+  dialog's tab table moved to ops `merge_plan` (dialog uses it; ver-merge-* / ver-flow-* / restore scenarios 12/12
+  match on vibe2).
+- In the tree (x123, vibex7): history_create_version `at` / `publish` / the name's limits (e2e
+  `create_version_here_and_publish`); release_create approver errors in the dialog's words. AGENT_API.md from
+  vibex7:tmp/studios/AGENT_API.md after the coverage run.
 - REQUESTS for live (11-21): 08:58 the drawing matrix's 40 most-used shown rows (six takes); 09:12 documents /
   versions gaps (11 items + 09:33 the page's workspace / version ••• menus). Take their rows as they land.
-- Audit next: #7 Start row Properties… / Publish FeatureScript… (take asked), #8 Compare revisions (take asked), #9
-  search relevance, rename while open, #10 op gaps (history_merge strategy,
-  create_version at / publish, approver error words).
+- Audit next (all wait on live's 09:12 takes): #7 Start row Properties… / Publish FeatureScript…, #8 Compare
+  revisions + the Export button's tooltip, #9 search relevance and rename while open. #10 done.
 - Live fc-1121 drawing feel (behaviours "studios fc-1121"): (1) a dimension being placed shows the line to another's
   x / y without snapping (still held on a + mark, live2 rad-note); (3) caret at the click (`note_caret_at`), a
   double-click in the editor selects all; (5) a dragged box draws its picks selected (`box_preview`); (2), (4), (6)
