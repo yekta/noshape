@@ -58,6 +58,7 @@
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
 #include <algorithm>
+#include <cstdlib>
 #include <functional>
 #include <cmath>
 #include <vector>
@@ -1992,6 +1993,297 @@ std::unique_ptr<OcShape> loft_to_point(const OcShape& profile, P3 apex, const Oc
     }
   }
   return wrap(simplest_face(grid, 1e-6 * (1 + std::sqrt(box.SquareExtent()))));
+}
+
+namespace {
+// v -> arc length along a guide through its meets (v_i, s_i), increasing: monotone cubic Hermite (Fritsch-Carlson),
+// so the guide runs smoothly through every station.
+struct Pchip
+{
+  std::vector<double> x, y, m;
+  Pchip(std::vector<double> xs, std::vector<double> ys) : x(std::move(xs)), y(std::move(ys)), m(x.size(), 0.0)
+  {
+    const size_t        n = x.size();
+    std::vector<double> d(n - 1);
+    for (size_t i = 0; i + 1 < n; ++i)
+      d[i] = (y[i + 1] - y[i]) / (x[i + 1] - x[i]);
+    m[0]     = d[0];
+    m[n - 1] = d[n - 2];
+    for (size_t i = 1; i + 1 < n; ++i)
+    {
+      const double h0 = x[i] - x[i - 1], h1 = x[i + 1] - x[i], w0 = 2 * h1 + h0, w1 = h1 + 2 * h0;
+      m[i]            = d[i - 1] * d[i] <= 0 ? 0.0 : (w0 + w1) / (w0 / d[i - 1] + w1 / d[i]);
+    }
+  }
+  double operator()(double t) const
+  {
+    const size_t k = (size_t)(std::upper_bound(x.begin(), x.end(), t) - x.begin());
+    const size_t i = std::min(x.size() - 2, k == 0 ? 0 : k - 1);
+    const double h = x[i + 1] - x[i], s = (t - x[i]) / h;
+    const double h00 = 2 * s * s * s - 3 * s * s + 1, h10 = s * s * s - 2 * s * s + s, h01 = -2 * s * s * s + 3 * s * s, h11 = s * s * s - s * s;
+    return h00 * y[i] + h10 * h * m[i] + h01 * y[i + 1] + h11 * h * m[i + 1];
+  }
+};
+} // namespace
+
+// A surface loft through closed profiles in order (a point may end it at either side) along two guides or more that
+// meet every one (c2-surf-workshop-knifehandle's Loft 1: P1..P6 to the tip between two side curves; live one face
+// through every profile and guide to 1 µm). Each profile runs from guide 0 by arc length between the guides' meets,
+// the guides' nodes at their mean share of the loop; the skin interpolates the profiles cubically across stations (the
+// guides' mean share of their length between the end profiles); each guide's difference from the skin along its node
+// fades across u by periodic cubic Hermite tents, zero on every profile.
+std::unique_ptr<OcShape> loft_guided_multi(const OcShapeList& profiles, const OcShapeList& guides_in)
+{
+  const KernelTimer timer("loft_guided_multi");
+  const size_t      n = profiles.items.size(), m = guides_in.items.size();
+  if (n < 2 || m < 2)
+    fail_invalid("loft_guided_multi: needs two profiles and two guides at least");
+  Bnd_Box box;
+  for (const TopoDS_Shape& p : profiles.items)
+    BRepBndLib::Add(p, box);
+  const double tol = 1e-5 * (1 + std::sqrt(box.SquareExtent()));
+  // Stations: a loop or a point.
+  std::vector<std::unique_ptr<Loop>> loops(n);
+  std::vector<gp_Pnt>                points(n);
+  for (size_t i = 0; i < n; ++i)
+  {
+    const TopoDS_Shape& p = profiles.items[i];
+    if (p.ShapeType() == TopAbs_VERTEX)
+    {
+      if (i != 0 && i + 1 != n)
+        fail_invalid("loft: a point profile must be first or last");
+      points[i] = BRep_Tool::Pnt(TopoDS::Vertex(p));
+      continue;
+    }
+    loops[i] = std::make_unique<Loop>(outer_wire(p));
+    if (!loops[i]->c->IsClosed() && loops[i]->c->Value(loops[i]->t0).Distance(loops[i]->c->Value(loops[i]->t1)) > tol)
+      fail_invalid("loft_guided_multi: profiles must be closed");
+  }
+  // Each guide's meets: arc length along it and the point.
+  std::vector<std::unique_ptr<Adaptor3d_Curve>> gc;
+  std::vector<std::vector<double>>              gs(m, std::vector<double>(n));
+  std::vector<std::vector<gp_Pnt>>              gp(m, std::vector<gp_Pnt>(n));
+  std::vector<double>                           glen(m);
+  for (size_t j = 0; j < m; ++j)
+  {
+    gc.push_back(guide_curve(guides_in.items[j]));
+    const Adaptor3d_Curve& g = *gc.back();
+    glen[j]                  = GCPnts_AbscissaPoint::Length(g);
+    for (size_t i = 0; i < n; ++i)
+    {
+      double t = g.FirstParameter();
+      gp_Pnt at;
+      if (loops[i])
+      {
+        if (meet(g, *loops[i]->c, loops[i]->wire, tol, t, at) > tol)
+          fail_op("All guides should intersect each profile boundary.");
+      }
+      else
+      {
+        Extrema_ExtPC x(points[i], g);
+        double        best = 1e300;
+        if (x.IsDone())
+          for (int k = 1; k <= x.NbExt(); ++k)
+            if (x.SquareDistance(k) < best)
+              best = x.SquareDistance(k), t = x.Point(k).Parameter();
+        for (const double e : {g.FirstParameter(), g.LastParameter()})
+          if (points[i].SquareDistance(g.Value(e)) < best)
+            best = points[i].SquareDistance(g.Value(e)), t = e;
+        if (std::sqrt(best) > tol)
+          fail_op("All guides should intersect each profile boundary.");
+        at = points[i];
+      }
+      gs[j][i] = GCPnts_AbscissaPoint::Length(g, g.FirstParameter(), t);
+      gp[j][i] = at;
+    }
+    // Along the guide in the profiles' order, either way.
+    const bool up = gs[j][n - 1] > gs[j][0];
+    for (size_t i = 0; i + 1 < n; ++i)
+      if ((gs[j][i + 1] - gs[j][i]) * (up ? 1 : -1) <= tol)
+        fail_op("loft_guided_multi: a guide doesn't run through the profiles in order");
+  }
+  // Stations' v: chord length between the profiles' centres (live's knifehandle area within 0.5 %; the guides' share
+  // of their runs 0.7 % off).
+  std::vector<gp_XYZ> centre(n);
+  for (size_t i = 0; i < n; ++i)
+  {
+    if (!loops[i])
+    {
+      centre[i] = points[i].XYZ();
+      continue;
+    }
+    gp_XYZ sum(0, 0, 0);
+    for (int q = 0; q < 64; ++q)
+      sum += loops[i]->at(loops[i]->len * q / 64).XYZ();
+    centre[i] = sum / 64;
+  }
+  std::vector<double> v(n, 0.0);
+  for (size_t i = 1; i < n; ++i)
+    v[i] = v[i - 1] + (centre[i] - centre[i - 1]).Modulus();
+  if (!(v[n - 1] > tol))
+    fail_op("loft_guided_multi: the profiles lie on one another");
+  for (size_t i = 0; i < n; ++i)
+    v[i] /= v[n - 1];
+  std::vector<Pchip> gmap;
+  for (size_t j = 0; j < m; ++j)
+    gmap.emplace_back(v, gs[j]);
+  auto guide_at = [&](size_t j, double t) {
+    const Adaptor3d_Curve& g = *gc[j];
+    GCPnts_AbscissaPoint   ap(g, gmap[j](t), g.FirstParameter());
+    if (!ap.IsDone())
+      fail_op("loft: arc length on a guide failed");
+    return g.Value(ap.Parameter());
+  };
+  // Loops' direction: each loop's turning vector (its area normal) the first loop's way.
+  auto turning = [](const Loop& l) {
+    gp_XYZ       a(0, 0, 0);
+    const int    k = 128;
+    const gp_Pnt c0 = l.at(0);
+    for (int q = 1; q + 1 <= k; ++q)
+      a += (l.at(l.len * q / k).XYZ() - c0.XYZ()).Crossed(l.at(l.len * (q + 1) / k).XYZ() - c0.XYZ());
+    return a;
+  };
+  size_t first = n;
+  for (size_t i = 0; i < n && first == n; ++i)
+    if (loops[i])
+      first = i;
+  const gp_XYZ        ref = turning(*loops[first]);
+  std::vector<int>    dir(n, 1);
+  std::vector<std::vector<double>> abs_(n, std::vector<double>(m, 0.0));
+  for (size_t i = 0; i < n; ++i)
+  {
+    if (!loops[i])
+      continue;
+    dir[i] = turning(*loops[i]).Dot(ref) < 0 ? -1 : 1;
+    for (size_t j = 0; j < m; ++j)
+    {
+      double d;
+      abs_[i][j] = loops[i]->abscissa(gp[j][i], d);
+    }
+  }
+  // Guides by their order round the first loop from guide 0; every loop must have them in that order.
+  auto share = [&](size_t i, size_t j) {
+    const Loop&  l = *loops[i];
+    const double f = dir[i] > 0 ? forward(abs_[i][0], abs_[i][j], l.len) : forward(abs_[i][j], abs_[i][0], l.len);
+    return f / l.len;
+  };
+  std::vector<size_t> order(m);
+  for (size_t j = 0; j < m; ++j)
+    order[j] = j;
+  std::sort(order.begin() + 1, order.end(), [&](size_t a, size_t b) { return share(first, a) < share(first, b); });
+  std::vector<double> nodes(m + 1, 0.0);
+  for (size_t k = 1; k < m; ++k)
+  {
+    double sum = 0;
+    int    cnt = 0;
+    for (size_t i = 0; i < n; ++i)
+      if (loops[i])
+      {
+        if (k > 1 && share(i, order[k]) <= share(i, order[k - 1]))
+          fail_op("loft_guided_multi: the guides cross between profiles");
+        sum += share(i, order[k]);
+        ++cnt;
+      }
+    nodes[k] = sum / cnt;
+  }
+  nodes[m] = 1.0;
+  // A loop's point at u: between the guides' meets by arc length.
+  auto loop_at = [&](size_t i, double u) {
+    if (!loops[i])
+      return points[i];
+    const Loop& l = *loops[i];
+    size_t      k = 0;
+    while (k + 1 < m && u >= nodes[k + 1])
+      ++k;
+    const double sa = share(i, order[k]), sb = k + 1 < m ? share(i, order[k + 1]) : 1.0;
+    const double f  = sa + (sb - sa) * (u - nodes[k]) / (nodes[k + 1] - nodes[k]);
+    return l.at(abs_[i][0] + dir[i] * f * l.len);
+  };
+  // The skin's column at u: a cubic through the stations.
+  auto column = [&](double u) {
+    occ::handle<NCollection_HArray1<gp_Pnt>> pts = new NCollection_HArray1<gp_Pnt>(1, (int)n);
+    occ::handle<NCollection_HArray1<double>> par = new NCollection_HArray1<double>(1, (int)n);
+    for (size_t i = 0; i < n; ++i)
+    {
+      pts->SetValue((int)i + 1, loop_at(i, u));
+      par->SetValue((int)i + 1, v[i]);
+    }
+    GeomAPI_Interpolate in(pts, par, false, 1e-12);
+    in.Perform();
+    if (!in.IsDone())
+      fail_op("loft: interpolation through the profiles failed");
+    return in.Curve();
+  };
+  std::vector<occ::handle<Geom_BSplineCurve>> at_nodes;
+  for (size_t k = 0; k < m; ++k)
+    at_nodes.push_back(column(nodes[k]));
+  // A u-periodic surface (Parasolid's) through the grid: rows round the profiles, the first not repeated.
+  const int                  nu = 24 * (int)m, nv = std::max(48, 12 * (int)n);
+  NCollection_Array2<gp_Pnt> grid(1, nu, 1, nv + 1);
+  for (int a = 0; a < nu; ++a)
+  {
+    const double                         u  = (double)a / nu;
+    const occ::handle<Geom_BSplineCurve> cu = column(u);
+    std::vector<double>                  w  = hermite_tents(nodes, u);
+    w[0] += w[m];
+    for (int b = 0; b <= nv; ++b)
+    {
+      const double t = (double)b / nv;
+      gp_XYZ       p = cu->Value(t).XYZ();
+      for (size_t k = 0; k < m; ++k)
+        if (w[k] != 0)
+          p += w[k] * (guide_at(order[k], t).XYZ() - at_nodes[k]->Value(t).XYZ());
+      grid(a + 1, b + 1) = gp_Pnt(p);
+    }
+  }
+  GeomAPI_PointsToBSplineSurface fit;
+  fit.Interpolate(grid, Approx_IsoParametric, true);
+  if (!fit.IsDone())
+    fail_op("loft: guided face interpolation failed");
+  BRepBuilderAPI_MakeFace mf(fit.Surface(), 1e-7);
+  if (!mf.IsDone())
+    fail_op("loft: guided face failed");
+  // The end profiles' boundaries split where the other guides meet them (live: P1's two edges between its guide
+  // points); the seam runs through guide 0's.
+  const TopoDS_Face face = mf.Face();
+  ShapeList         tools;
+  for (const size_t i : {(size_t)0, n - 1})
+    if (loops[i])
+      for (size_t k = 1; k < m; ++k)
+      {
+        double best = 1e100;
+        gp_Pnt on;
+        for (TopExp_Explorer x(face, TopAbs_EDGE); x.More(); x.Next())
+        {
+          const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+          if (BRep_Tool::Degenerated(e) || BRep_Tool::IsClosed(e, face))
+            continue;
+          double                        f, l;
+          const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l);
+          if (c.IsNull())
+            continue;
+          GeomAPI_ProjectPointOnCurve pp(gp[order[k]][i], c, f, l);
+          if (pp.NbPoints() > 0 && pp.LowerDistance() < best)
+          {
+            best = pp.LowerDistance();
+            on   = pp.NearestPoint();
+          }
+        }
+        if (best < tol * 100)
+          tools.Append(BRepBuilderAPI_MakeVertex(on).Vertex());
+      }
+  if (tools.IsEmpty())
+    return wrap(face);
+  ShapeList args;
+  args.Append(face);
+  BRepAlgoAPI_Splitter sp;
+  sp.SetArguments(args);
+  sp.SetTools(tools);
+  sp.Build();
+  if (!sp.HasErrors())
+    for (TopExp_Explorer x(sp.Shape(), TopAbs_FACE); x.More(); x.Next())
+      return wrap(x.Current());
+  return wrap(face);
 }
 
 } // namespace noshape

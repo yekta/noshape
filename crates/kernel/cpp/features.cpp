@@ -5425,6 +5425,13 @@ static OpOut thicken(const OcShape& s, double t1, double t2, bool exact_step)
     if (pinched_free_form(TopoDS::Face(x.Current())))
       fail_op("thicken: a face pinched to a point has no normal there");
   require_non_null(s.shape, "shape");
+  if (std::getenv("NOSHAPE_DUMP_OPS"))
+  {
+    std::ostringstream p;
+    p.precision(17);
+    p << "thicken " << t1 << " " << t2 << (exact_step ? " exact" : " plain");
+    dump_op("thicken", s.shape, {}, p.str());
+  }
   const double total = t1 + t2;
   if (!(std::abs(total) > 1e-9))
     fail_invalid("thicken: total thickness must be non-zero");
