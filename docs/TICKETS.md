@@ -313,7 +313,9 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   (live/qa/walk3-1121/walk3-2-chain-origin.json, c2–c4). A segment drawn alone from the origin works; ours out-w5/s5-chain-origin-*.
 - [ ] P0 **FEEL-TANGENT-ARC-AT-ORIGIN (skasm)**: line (-30, 0) → origin, Tangent arc clicked at the origin, then at (15, 12):
   ours makes nothing (1 line). Live makes the arc, tangent, with a Coincident (walk3-6a-tangent-arc-origin.json, preview / c2).
-  Off the origin ours works (s5-tarc-off-origin).
+  Off the origin ours works (s5-tarc-off-origin). The same for **Slot**: clicking the line at the origin selects nothing and Enter
+  makes nothing (s5-slot-origin-enter); live makes the slot (2 arcs, 3 lines incl. the picked one; walk3-6b c1 / enter). Likely
+  one cause: at a line end on the origin, the origin wins the pick over the line.
 - [ ] P0 **FEEL-SPLINE-PREVIEW-VANISHES (skasm)**: Spline, clicks at (-20, 0), (0, 10), (20, 0) with the pointer kept still:
   after the 2nd and 3rd clicks ours shows only the last point; live keeps the spline through every placed point
   (walk3-5-spline-still c2still / c3still). qa-scratch/tickets/spline-live-w3.png (live c1, c2still, c3still, moved),
