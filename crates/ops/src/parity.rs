@@ -10474,8 +10474,11 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 names.push(ours.get(&(level.clone(), id.clone()))?.clone());
                 level = element_of.get(&(level, id.clone()))?.clone();
             }
+            // (By the level's /features, else its definition's: infento's export has no subAssemblyFeatures.)
             let at = levels.iter().find(|l| l.element == level)?;
-            names.push(at.features.iter().find(|m| m["featureId"] == q["featureId"])?["name"].as_str()?.to_string());
+            let name = at.features.iter().find(|m| m["featureId"] == q["featureId"]).map(|m| &m["name"]);
+            let name = name.or_else(|| at.defs.iter().find(|m| m["id"] == q["featureId"]).map(|m| &m["featureData"]["name"]))?;
+            names.push(name.as_str()?.to_string());
             Some(names.join(" > "))
         };
         let mates: Vec<String> = par("matesQuery").and_then(|p| p["queries"].as_array()).into_iter().flatten().filter_map(mate_name).collect();

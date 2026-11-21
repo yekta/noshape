@@ -1886,6 +1886,68 @@ fn place_tree(p: &Problem, poses: &mut Vec<Frame>, order: &[(usize, Vec<usize>)]
     Some(iterations)
 }
 
+/// The group's mates by biconnected block ([`term_blocks`]), placed from the fixed parts out, each block's bodies not
+/// yet placed together (Levenberg-Marquardt, then the least change from their start): for a loop [`place_tree`] can't
+/// close one body at a time (a saved isaac-ball, whose parts' renumbering moved its mates: its 96 bodies' dense solve
+/// took 0.8 s, its biggest loop has 33). The blocks follow from the mates alone, whatever the bodies' order. None as
+/// for [`tree_order`], or when a block can't hold its mates.
+fn place_blocks(p: &Problem, poses: &mut Vec<Frame>, free: &[usize], anchors: &[DVec3], scale: f64) -> Option<usize> {
+    let ix: HashMap<usize, usize> = free.iter().enumerate().map(|(k, &b)| (b, k)).collect();
+    let term_block = term_blocks(p);
+    // Per block: its mates, its free bodies, and whether it holds to a fixed part.
+    let mut blocks: Vec<(Vec<usize>, Vec<usize>, bool)> = Vec::new();
+    for (t, term) in p.terms.iter().enumerate() {
+        let Term::Mate(i) = *term else { return None };
+        let m = &p.mates[i];
+        if !m.extra.is_empty() || m.follow.is_some() || [m.a, m.b].iter().any(|&b| p.driven.is_driven.get(b).copied().unwrap_or(false) || !p.driven.dependents.get(b).is_none_or(|d| d.is_empty())) {
+            return None;
+        }
+        let (Some(&k), true) = (term_block[t].first(), [m.a, m.b].iter().all(|b| ix.contains_key(b) || p.bodies[*b].fixed)) else { return None };
+        if blocks.len() <= k {
+            blocks.resize_with(k + 1, Default::default);
+        }
+        let block = &mut blocks[k];
+        block.0.push(i);
+        for b in [m.a, m.b] {
+            if ix.contains_key(&b) {
+                block.1.push(b);
+            } else {
+                block.2 = true;
+            }
+        }
+    }
+    for b in &mut blocks {
+        b.1.sort_unstable();
+        b.1.dedup();
+    }
+    let bound = 1e-5 * scale.max(1.0);
+    let (mut placed, mut done) = (vec![false; free.len()], vec![false; blocks.len()]);
+    let mut iterations = 0;
+    let mut buf = Vec::new();
+    // A block is next once it holds to a fixed part or a placed body (one of its bodies: the rest hang from it).
+    while let Some(k) = (0..blocks.len()).find(|&k| !done[k] && (blocks[k].2 || blocks[k].1.iter().any(|b| placed[ix[b]]))) {
+        done[k] = true;
+        let (ms, bodies, _) = &blocks[k];
+        let todo: Vec<usize> = bodies.iter().copied().filter(|b| !placed[ix[b]]).collect();
+        let sub = Problem { bodies: p.bodies, mates: p.mates, relations: p.relations, drags: p.drags, driven: p.driven, terms: ms.iter().map(|&i| Term::Mate(i)).collect(), scale };
+        iterations = iterations.max(levenberg_marquardt(&sub, poses, &todo, scale, false));
+        if todo.iter().any(|&b| poses[b] != p.bodies[b].pose) {
+            let at: Vec<DVec3> = todo.iter().map(|b| anchors[ix[b]]).collect();
+            least_change(&sub, poses, &todo, scale, &at);
+        }
+        if ms.iter().any(|&i| {
+            let (r, nan) = residual_max(poses, &p.mates[i], &mut buf);
+            nan || r >= bound
+        }) {
+            return None;
+        }
+        for b in todo {
+            placed[ix[&b]] = true;
+        }
+    }
+    placed.iter().all(|&x| x).then_some(iterations)
+}
+
 /// A group's solve: its free bodies' new poses, the iterations, and when it
 /// can't hold its mates ([`group_conflict`]) the mates in error, with
 /// whether each already failed before the solve.
@@ -2070,8 +2132,13 @@ fn solve_driven(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[So
                 // from its parent alone (live 1763: the instance whose geometry
                 // changed absorbs the change, the rest stay), and a stack's
                 // small solves in place of one dense one.
+                // (A loop it can't close body by body: its blocks, each loop solved on its own.)
                 let tree = if dragged { None } else { tree_order(&problem, start, free) };
-                let iterations = match tree.and_then(|order| place_tree(&problem, &mut local, &order, free, &anchors, scale)) {
+                let placed = tree.and_then(|order| place_tree(&problem, &mut local, &order, free, &anchors, scale)).or_else(|| {
+                    local.clone_from(start);
+                    if dragged { None } else { place_blocks(&problem, &mut local, free, &anchors, scale) }
+                });
+                let iterations = match placed {
                     Some(iterations) => iterations,
                     None => {
                         local.clone_from(start);
@@ -3304,5 +3371,38 @@ mod tests {
         times.sort_by(f64::total_cmp);
         println!("linkage {n}: median {:.1} ms, worst {:.1} ms", times[times.len() / 2], times[times.len() - 1]);
         assert!(times[times.len() / 2] <= 300.0, "a drag step takes {:.0} ms", times[times.len() / 2]);
+    }
+
+    /// A loop [`place_tree`] can't close body by body (a saved isaac-ball): Q slides on the ground (a redundant
+    /// Parallel makes it placed early), P is Fastened to the ground 1 mm off, X is Fastened to P with a Ball to Q.
+    /// Placed in turn, P moves back and X can't follow it and stay on Q; as one block, Q slides back with them.
+    #[test]
+    fn a_loop_placed_body_by_body_fails_is_solved_as_one_block() {
+        let o = |x: f64, y: f64| Frame::new(DVec3::new(x, y, 0.0), DQuat::IDENTITY);
+        let along_x = Frame::from_axes(DVec3::ZERO, DVec3::X, DVec3::Y);
+        // (A mate's connectors face each other.)
+        let facing = |f: Frame| Frame::from_axes(f.origin, -f.z(), f.x());
+        let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::new(0.001, 0.0, 0.0), false), body(DVec3::new(0.001, 0.02, 0.0), false), body(DVec3::new(0.001, 0.0, 0.0), false)];
+        let mates = vec![
+            mate(MateType::Slider, 0, along_x, 1, facing(along_x)),
+            mate(MateType::Parallel, 0, along_x, 1, facing(along_x)),
+            mate(MateType::Fastened, 0, o(0.0, 0.02), 2, facing(Frame::default())),
+            mate(MateType::Fastened, 2, o(0.0, -0.02), 3, facing(Frame::default())),
+            mate(MateType::Ball, 3, Frame::default(), 1, Frame::default()),
+        ];
+        let driven = Driven::new(&bodies, &mates);
+        let (groups, _) = group_terms(&bodies, &mates, &[], &[], true, &driven);
+        let (free, terms) = &groups[0];
+        let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+        let problem = Problem { bodies: &bodies, mates: &mates, relations: &[], drags: &[], driven: &driven, terms: terms.clone(), scale: 0.02 };
+        let anchors: Vec<DVec3> = free.iter().map(|&b| anchor(&problem, b)).collect();
+        let order = tree_order(&problem, &poses, free).expect("a tree order");
+        assert!(place_tree(&problem, &mut poses.clone(), &order, free, &anchors, 0.02).is_none(), "placed body by body");
+        let mut placed = poses.clone();
+        assert!(place_blocks(&problem, &mut placed, free, &anchors, 0.02).is_some(), "placed by block");
+        assert!(placed[1..].iter().all(|p| p.origin.length() < 0.021 && p.origin.x.abs() < 1e-7), "{:?}", &placed[1..]);
+        let r = solve_with(&mut bodies, &mates, &[], &[], false);
+        assert!(r.converged && r.mate_ok.iter().all(|ok| *ok), "{:?}", r.mate_ok);
+        assert!(bodies[1..].iter().all(|b| b.pose.origin.x.abs() < 1e-7), "{:?}", bodies.iter().map(|b| b.pose.origin).collect::<Vec<_>>());
     }
 }

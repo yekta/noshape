@@ -5,21 +5,28 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-20 21:35 UTC) — RESUME HERE
-- P0 evaluate-again: bisect's first bad = 83423fa52 (skasm's revert of de9d6a523 drawing-order extrude parts): 2799 ms
-  vs 48 ms at c1dbf3f03 (v0.4.62 2.8 s too: de9d6a523 is what made it fast). skasm's redo landed as 4593326e1. Lead
-  (21:3x): time isaac on main fa1973ec3; ~48 ms => P0 closed (record it); ~2.8 s => bisect de9d6a523..4593326e1's redo
-  and tell skasm. Running: systemd asm-main-fa19 (/root/asm-scratch/main-fa19.sh, log main-fa19.log: ops-main from
-  asm-base (detached at fa1973ec3) built on vibex7, isaac-speed on vibe2, then suite1 rmain scissor-lift + infento).
-  Scissor: compare rmain with rwtr (212/239 18/26: 3 sub parts off 3.3 mm, Rail Base / Aluminium Tube / 608 <2>).
-- Cross-level Relation (approved): QUEUED to land 22:2x (clippy + assembly lib + ops tests green on vibex8); was tested by systemd asm-xrel-test (xrel-test.sh, log
-  xrel-test.log, vibex8: clippy model-data/assembly/ops/assembly-ui, assembly lib, e2e::a_relation_reaches_..., ops
-  relation + assembl, model-data lib, UPDATE_DOCS coverage -> scp docs/AGENT_API.md back from vibex8 worktree).
-  model-data `Relation.mate_paths` + `own_mates()` / `reaches_into()`; assembly eval `relation_mate` (flex_mates synth
-  id); ops features.rs `relation_mate` ("Sub <1> > Revolute 2"); translator parity.rs relations take a query's `path`
-  (added after the test run started: touch parity.rs, rerun clippy ops). Then infento A/B for Gear 2/3, land.
-- Landed today: 55749fd6, 61e3da3ef / b0c61c982 docs. Cleanup after: asm-base / asm-wb worktrees + targets; vibe2
-  A/B binaries (ops-wb, ops-wtr, ops-bisect, ops-main, asm-keep/bin copies); vibex7 ~/tmp/asm/ops-bisect + isaac copy.
+## State (2026-11-21 02:2x UTC) — RESUME HERE
+- P0 evaluate-again (saved isaac doc): not part order (tie-break variants all ~750 ms). place_tree can't close a loop
+  (body 27: Ball + Fastened to bodies moved before it), so the 96-body group fell to a dense least_change (775 ms).
+  Fix, landing (land.sh 02:2x): solver.rs `place_blocks`, on place_tree's failure each biconnected block placed from
+  the fixed parts out (largest 33): Mac 765 -> 25 ms; on main a1e505b1d (bool's revert in) 23.9 ms, drag 5.3 ms/frame;
+  same mate status / DOF, poses within 0.32 mm of the old fallback; test
+  a_loop_placed_body_by_body_fails_is_solved_as_one_block. Against live (lead 00:4x): the saved doc is ~470 mm off live
+  under both fallbacks (broken references), so measured on the 27 parity assemblies (Mac probe, A = old fallback,
+  B = place_blocks): A = B on every model, every line; fresh isaac 118/120 placed as live (2 not inserted), no new
+  deviation; the only ones over 0.01 mm are suspension's 3 (0.48 / 4.9 / 12.4 mm, the same in A).
+- bool's 72fe51df1 lost 22 isaac mates (16 -> 38); reverted on main as 9f6ce35e. Recount on main: probe asm-base
+  rebased to a1e505b1d, recount.sh (Mac), log /root/asm-scratch/recount.log; tell bool the count.
+- Cross-level Relation LANDED as 7aa7394a. infento rmain: 162/167 200/204 64/64; Gear 2/3 still "Select two mates":
+  the export has no subAssemblyFeatures -> mate_name falls back to the level's defs (featureData.name), uncommitted in
+  the asm worktree, lands with the P0. Gear 1 waits on Revolute 10 ("Mate cannot resolve mate connectors.").
+- Scissor rmain 215/239 (rwtr 212): 3.3 mm parts fixed; the 24 not inserted are studio 0da59a's Sketch/Transform.
+- studios 23:1x (not checked in the app yet): the instance list's rows slice isn't redrawn after set_fixed in a test
+  window (fixed icon stays until window.refresh(); notify on AssemblyView / slices.rows doesn't help). Probe:
+  open_from_top with two fixed parts, set_fixed false/true, debug_bounds("fixed Part 1 <1>"). App check: Fix from the
+  graphics context menu without moving over the list.
+- Cleanup after the P0: asm-base worktree + vibex7 / Mac targets; ops-prof (vibex7, vibe2); vibe2 ops-main; vibex7 isaac copy;
+  Mac ~/noshape-host/asm-keep (isaac copy, models, tie/v/ab outs).
 
 ## State (2026-11-20 18:50 UTC)
 
