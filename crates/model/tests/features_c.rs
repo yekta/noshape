@@ -1131,8 +1131,9 @@ fn rip_diagonal_on_flat_plate_is_a_no_op() {
 }
 
 #[test]
-fn recognize_rebuilds_sheet_metal_model() {
-    // An L bracket made as sheet metal, finished, then recognized again.
+fn recognize_refuses_a_finished_sheet_metal_part() {
+    // Finish leaves the part's sheet metal attributes (std sheetMetalEnd only deactivates its model): std Recognize
+    // refuses it.
     let mut s = Studio::new();
     let mut sk = noshape_sketch::Sketch::new();
     let ids = polyline(&mut sk, &[(0.0, 0.0), (50.0, 0.0), (50.0, 30.0)], false);
@@ -1143,26 +1144,38 @@ fn recognize_rebuilds_sheet_metal_model() {
         p.set("depth", expr("20 mm"));
         set_model(p, "2 mm", "3 mm");
     });
-    // Finish needs its parts (live: "Select one or more sheet metal parts.").
     let part = Reference::Body(s.ok().context.bodies[0].id.clone());
     s.add("sheetMetalEnd", move |p| p.set("sheetMetalParts", ParamValue::Query(vec![part])));
-    let r = s.ok();
-    let expected = flat(&r, 0).size();
-    let before = volume(&r, 0);
-    let id = r.context.bodies[0].id.clone();
+    let id = s.ok().context.bodies[0].id.clone();
+    s.add("sheetMetalRecognize", move |p| p.set("bodies", q(Reference::Body(id))));
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "This feature cannot be used on sheet metal parts.".to_string()));
+}
+
+#[test]
+fn recognize_bends_a_sharp_corner_at_its_radius() {
+    // Live c2-cov-sm-recognize: a sharp L (60 x 40, 2 mm, 50 deep) recognized at radius 2 mm bends its corner: inner
+    // radius 2, outer 4, 14 faces, 9671.238898 mm3.
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (60.0, 0.0), (60.0, 2.0), (2.0, 2.0), (2.0, 40.0), (0.0, 40.0)], true);
+    let a = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let region = s.region(a);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("50 mm"));
+    });
+    let id = s.ok().context.bodies[0].id.clone();
     s.add("sheetMetalRecognize", move |p| {
         p.set("bodies", q(Reference::Body(id)));
-        p.set("kFactor", expr("0.45"));
+        p.set("radius", expr("2 mm"));
     });
     let r = s.ok();
     assert_eq!(r.context.bodies.len(), 1);
-    // The same L: one bend, inner radius 3 and outer 5 (thickness 2), same volume.
+    assert_eq!(r.context.bodies[0].shape.faces().len(), 14);
     let mut radii = cylinder_radii(&r, 0);
     radii.sort_by(f64::total_cmp);
-    assert!(radii.len() == 2 && near(radii[0], mm(3.0), 1e-9) && near(radii[1], mm(5.0), 1e-9), "{radii:?}");
-    assert!(near(volume(&r, 0), before, 1e-12), "volume {} vs {before}", volume(&r, 0));
-    let got = flat(&r, 0).size();
-    assert!(near(got.x.max(got.y), expected.x.max(expected.y), 1e-7), "recognized flat {got:?} vs {expected:?}");
+    assert!(radii.len() == 2 && near(radii[0], mm(2.0), 1e-9) && near(radii[1], mm(4.0), 1e-9), "{radii:?}");
+    assert!(near(volume(&r, 0), 9671.238898e-9, 1e-14), "volume {}", volume(&r, 0));
 }
 
 #[test]

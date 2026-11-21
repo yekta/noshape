@@ -357,6 +357,7 @@ std_features! {
     bend_relief => "sheetMetalBendRelief.fs", "sheetMetalBendRelief";
     corner_break => "sheetMetalCornerBreak.fs", "sheetMetalCornerBreak";
     rip => "sheetMetalRip.fs", "sheetMetalRip";
+    recognize => "sheetMetalStart.fs", "sheetMetalRecognize";
     // Tag (std tag.fs): its form / frame attributes are what std Form and Frame import.
     tag => "tag.fs", "tag";
     pcb_start => "pcbStart.fs", "pcbStart";

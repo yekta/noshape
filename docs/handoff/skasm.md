@@ -7,6 +7,9 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   live -708.49 mm (y, z, axes match); it's my louver Sketch 9 item.
 
 ## In flight (11-21 03:20 UTC)
+- Recognize via std (sheetMetalStart.fs's sheetMetalRecognize; std_route `recognize`): c2-cov-sm-recognize 4 -> 6/6
+  (live bends a sharp L's corner at the radius: 14 faces, 9671.238898 mm3). Std refuses a finished SM part ("This
+  feature cannot be used on sheet metal parts.": Finish keeps its attributes). Extrude 1 already matched on main.
 - LANDING: forms 21/21 (c2-sheet-metal-forms 10 -> 21/21; Mac A/B vs 97df380f1: 108 -> 109/174 docs, 1779 -> 1790
   features, no other doc changed): Sketch 3 connector at live's frame; Form 4 fuse skipped when adds add nothing;
   Form 5 region_from_query derived branch; lance bends meeting at asin(1 - h/(rmi+rme)) with no wall, the lance
