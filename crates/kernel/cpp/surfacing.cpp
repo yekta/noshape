@@ -443,7 +443,9 @@ OpOut op_wrap_faces(const OcShapeList& faces, const DevSurf& src_d, const DevSur
       if ((int)i != outer_index)
         mf.Add(wires[i]);
     TopoDS_Face nf = mf.Face();
-    BRepLib::BuildCurves3d(nf);
+    // At the wrap's tolerance: the default 1e-5 left 10 µm edges, 118 µm once thickened, wider than a 0.1 mm wall
+    // (c2-wrap-text-cylinders' Wrap 1: glyphs lost in the fuse).
+    BRepLib::BuildCurves3d(nf, tol);
     ShapeFix_Face fix(nf);
     fix.FixOrientationMode() = 0;
     fix.Perform();

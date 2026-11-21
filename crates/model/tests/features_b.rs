@@ -1796,6 +1796,43 @@ fn boundary_one_u_one_v_as_live() {
     assert_eq!(msg.as_deref(), Some("Could not extract boundary profiles matching at end points."));
 }
 
+/// Two U profiles meeting at a point and one V profile across their other ends: a three-sided sheet, 1/3/3 and valid
+/// (live c2-surfaces-lofts-projected's Boundary surface 1: 1/3/3, 259.97 mm2; it was a fill of the three, invalid).
+#[test]
+fn boundary_of_two_u_meeting_and_one_v_is_three_sided() {
+    let mut s = Studio::new();
+    let mut one = |a: (f64, f64), b: (f64, f64)| {
+        let mut sk = noshape_sketch::Sketch::new();
+        let l = sk.add_line(DVec2::new(a.0, a.1), DVec2::new(b.0, b.1)).0;
+        (s.sketch(Reference::Plane(DatumPlane::Top), sk), l)
+    };
+    let us = [one((0.0, 0.0), (0.04, 0.0)), one((0.0, 0.0), (0.0, 0.02))];
+    let vs = [one((0.04, 0.0), (0.0, 0.02))];
+    s.add("boundarySurface", move |p| {
+        let rows = |list: &[(FeatureId, u32)], ents: &str, cond: &str| {
+            ParamValue::Array(
+                list.iter()
+                    .map(|(sk, e)| {
+                        let mut v = ParamValues::default();
+                        v.set(ents, ParamValue::Query(vec![Reference::SketchEntity { sketch: *sk, entity: *e }]));
+                        v.set(cond, ParamValue::Enum("DEFAULT".into()));
+                        v
+                    })
+                    .collect(),
+            )
+        };
+        p.set("uProfilesArray", rows(&us, "uProfileEntities", "uCondition"));
+        p.set("vProfilesArray", rows(&vs, "vProfileEntities", "vCondition"));
+    });
+    let r = s.ok();
+    let i = r.context.bodies.iter().position(|b| b.kind == BodyKind::Surface).unwrap();
+    let sh = &r.context.bodies[i].shape;
+    assert!(sh.is_valid());
+    let t = sh.shown_topology().unwrap();
+    assert_eq!((sh.faces().len(), t.edge_count(), t.vertices.iter().filter(|v| **v).count()), (1, 3, 3));
+    assert!(near(surface_area(&r, i), 0.04 * 0.02 / 2.0, 1e-9), "{}", surface_area(&r, i));
+}
+
 /// Live (suite truth 11-18, c2-surf-workshop-bezier's "Boundary surface - Bézier"): two U profiles without conditions
 /// are ruled to each other point for point along their curves (straight across), 5516.5878 mm2; a Bézier of degree 5
 /// on Front, a spline through 4 points on Top.

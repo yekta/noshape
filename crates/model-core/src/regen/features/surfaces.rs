@@ -780,8 +780,16 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
         // sweeps along the V one; its other two sides are the profiles moved
         // to each other's far end.
         let mut all: Vec<Shape> = u.iter().chain(v.iter()).flatten().cloned().collect();
+        let meet_at_end = |a: &[Shape], b: &[Shape]| match (chain_ends(a), chain_ends(b)) {
+            (Some(ea), Some(eb)) => [ea.0, ea.1].iter().any(|p| [eb.0, eb.1].iter().any(|q| p.distance(*q) < 1e-7)),
+            _ => false,
+        };
         let mut sides: Option<[Vec<Shape>; 4]> = match (u.as_slice(), v.as_slice()) {
             ([u0, u1], [v0, v1]) => Some([u0.clone(), u1.clone(), v0.clone(), v1.clone()]),
+            // Two profiles meeting at an end and one across their other ends: a three-sided patch, its fourth side the
+            // point where the two meet (c2-surfaces-lofts-projected's Boundary surface 1: live 1/3/3, 259.97 mm2).
+            ([u0, u1], [v0]) if meet_at_end(u0, u1) => Some([u0.clone(), u1.clone(), v0.clone(), Vec::new()]),
+            ([u0], [v0, v1]) if meet_at_end(v0, v1) => Some([u0.clone(), Vec::new(), v0.clone(), v1.clone()]),
             _ => None,
         };
         if let ([pu], [pv]) = (u.as_slice(), v.as_slice()) {
@@ -800,7 +808,12 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
             Some(Ok(r)) => r.shape,
             _ => {
                 let boundary: Vec<k::FillEdge> = all.into_iter().map(|e| k::FillEdge { edge: e, support: None, continuity: k::Continuity::Position }).collect();
-                k::fill_surface(&boundary, &[]).map_err(|_| FeatureError::new(BSURF_FAILED))?.shape
+                // (Profiles that don't close a boundary (two parallel U and one V) fill to an invalid sheet: refused.)
+                let r = k::fill_surface(&boundary, &[]).map_err(|_| FeatureError::new(BSURF_FAILED))?.shape;
+                if !r.is_valid() {
+                    return err(BSURF_FAILED);
+                }
+                r
             }
         }
     } else {

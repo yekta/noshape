@@ -746,6 +746,49 @@ fn wrap_manipulators_as_std() {
     assert!((shift - direction * mm(3.0)).length() < 1e-7, "moved {shift:?} for {direction:?}");
 }
 
+/// A curved region wrapped 0.1 mm thick and added (c2-wrap-text-cylinders' Wrap 1): its curves within 1e-7 of the
+/// cylinder (OCCT's default 1e-5 grew to 0.12 mm once thickened, wider than the wall, and the fuse lost the glyphs),
+/// the wall on the cylinder's surface: one valid part, the disc's top and side added.
+#[test]
+fn a_thin_wrap_of_a_curved_region_adds_it() {
+    let mut s = Studio::new();
+    let c = circle_sketch(&mut s, 20.0);
+    let rc = s.region(c);
+    s.add("extrude", move |p| {
+        p.set("entities", q(rc));
+        p.set("depth", expr("60 mm"));
+        p.set("symmetric", ParamValue::Bool(true));
+    });
+    let pl = s.add("cPlane", |p| {
+        p.set("entities", q(Reference::Plane(DatumPlane::Right)));
+        p.set("offset", expr("20 mm"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::new(mm(-6.0), 0.0), mm(4.0));
+    let sid = s.sketch(Reference::FeaturePlane(pl), sk);
+    let region = s.region(sid);
+    let r = s.ok();
+    let v0 = volume(&r, 0);
+    let target = cylinder_face(&r, 0);
+    s.add("wrap", move |p| {
+        p.set("resultType", en("SOLID"));
+        p.set("operationType", en("ADD"));
+        p.set("defaultScope", ParamValue::Bool(true));
+        p.set("source", q(region));
+        p.set("destination", q(target));
+        p.set("thickness", expr("0.1 mm"));
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 1, "added to the cylinder");
+    let b = &r.context.bodies[0].shape;
+    assert!(b.is_valid(), "wrapped part invalid");
+    assert_eq!(b.count(noshape_kernel::ShapeType::Face), 5);
+    assert!(b.max_edge_tolerance() <= 1e-6, "edge tolerance {}", b.max_edge_tolerance());
+    // The disc's area over the 20 mm radius, swept 0.1 mm out: area * ((R+t)^2 - R^2) / (2 R).
+    let added = PI * mm(4.0).powi(2) * (mm(20.1).powi(2) - mm(20.0).powi(2)) / (2.0 * mm(20.0));
+    assert!(near(volume(&r, 0) - v0, added, added * 1e-4), "wrap added {} vs {added}", volume(&r, 0) - v0);
+}
+
 #[test]
 fn wrap_surface_solid_and_split() {
     let (mut s, region) = cylinder_and_tool();

@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-20 22:15 UTC (lead order 13:1x: screws fix (landed), dx items, then parting-line Drafts speed; NO MAC until the lead says (user: left alone till 18:05)). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-21 02:08 UTC (lead order 13:1x: screws fix (landed), dx items, then parting-line Drafts speed; NO MAC until the lead says (user: left alone till 18:05)). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
@@ -33,31 +33,30 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   prism's seam splits the section; join across seams); frames = dx (7aac1279c fixed the path query).
 - **LANDED 16:01 core-bis as 6d8e63f8** (fit spline one end, loft to point Coons, Normal to profile, pinched thicken,
   flat fan): singularities 5 -> 8/15. Target removed. screws Sweep 1 valid on main (bool: closed).
-- **core-rp (in flight, uncommitted, rebased on main 20:15; builds on vibex6, .opt6.sh):** option models all match
-  except loft-continuity (live asked 19:32), pattern-skip-centred (asked 19:29), fillet-partial-asym (parked),
-  sweep-twist-scale (4.8e-3 mm3 of 3600). Done + verified (vibex6 21:34): Split 2 by own face, Rib 2 unified, Projected
-  curve TWO_SKETCHES joined (concat_edges); legacy hole, Draft parting edges, thread chamfer/undercut via std. In flight:
-  Thin Loft 2 matches live (thin.rs normal_wall_loops + straighten; test engine thin_loft_of_a_tapered_square).
-  Thicken 1 matches (4 circles, 8 lines): elementary_offsets + analytic edges; edge_on_curve keeps a seam's two
-  pcurves each in its old period; the volume check integrates both accurately, 1e-5 (OCCT's offset is ~5e-6 off).
-  3 rebuilds on B-spline offsets still NotClosed (kept unconverted). Doc now 3/45: Face blend 1 "Cannot attach"
-  (sides on Thicken's 2 parts; live joins them into 1 part, 14 faces): not the conversion (part check), next.
-  Thread chamfer: External thread 1 matches; opChamfer gated at FS 1646 (left-face rule before, native
-  detail::distance_one_faces after; 3 live opChamfer tests + thread pass).
-  External thread 2 (M8 undercut): 1205.39 mm3 as live (move_face: a face beside an unmoved one on its own cylinder ->
-  offset_by_booleans); left: 2 B-spline edges vs live 4 circles (doc 5/6).
-  Replace face 1: vertex/edge counts match (INTERNAL face vertices not shown); left: 11 other / 7 sphere faces
-  vs live 10 / 8, 19 mm3.
-  Debug stripped 22:15 (to-land diff: /root/core-scratch/rp-toland.diff). Suite pair vibex6 (~/tmp/core/g/run-{base,rp}.log):
-  106 -> 115/174 docs, 1723 -> 1781 features, 17 docs up, none down, invalid 9 = 9. 7 docs ~2x slower but rp ran
-  beside the gate; A/B (~/tmp/core/ab7.sh, x2) is noise except projected-curve-enclose 97/157 -> 254/362 ms: Mutual
-  trim 1 46 -> 174 ms on new input (Projected curve 1 now as live). thin_sweep_as_live (x86 "Error regenerating."): op_thicken's
-  analytic conversion only for plane/cylinder sheets. Gate: g13 + clippy clean, kernel/model/custom on the Mac (.mac.sh).
-  On top, set aside (NOT in the land): /root/core-scratch/fb-on-top-detail_a.diff (+ FBDBG to strip) and
-  fb-on-top-test.rs (features_c, after FB6): face_blend fuses two solid sides' parts first; Face blend 1 -> 14 faces as
-  live; its 2 blend faces stay rational B-splines (u6 v2; parallel-axis cylinders, live cylinders): SurfToAna gap?
-  Next: Face blend 1 across parts, body-draft-naming Fillet 1 (live 6 B-curve edges, ours 2), genesis snap-holes
-  (live ellipses), Fill 1, sweep twist.
+- **LANDED (queued 03:02) 199faacf, core-th: release P0 c2-sm-tablet-stand** Sketch 3 "Some external references are
+  missing." (skasm): f9ad07b50's exact thicken rebuild gave the SM part's vertices no history. k::thicken_plain (no
+  rebuild) for opThicken + both sheetmetal.rs; native Thicken / thin loft keep it. skasm compat SAME as 0.4.63. Root
+  fix later: map the old vertices to the rebuilt ones in exact_hist, then use the rebuild everywhere again.
+- **qa validity P1s (core-rp, "no invalid bodies from Battery Remove's unify...", landing 11-21 ~03:30):** LORA: op_unify
+  keeps a valid shape as it came when a face it merged is invalid (T1 core a_unify_that_would_leave_an_invalid_face_keeps
+  _the_shape, data/lora-battery-cut.bin); the check runs on all threads, planar_valid first (cf-drive-train-generator:
+  unify.check 685 ms serial, 380 parallel; with planar_valid the doc 2.4 s vs main 2.0-2.3, live 4.2). SURFLOFTS: bsurf 2U meeting + 1V =
+  3-sided Coons (op_coons point side), an invalid fill is BSURF_FAILED (rest: upstream Curve 7/8 lines vs live "other").
+  WRAP1: op_wrap_faces BuildCurves3d at tol (1e-5 -> 1e-7; thickened 118 um > 0.1 mm wall), walls from the target
+  surface (into 0): Wrap 1 = live counts / volume / area, valid (types: 6 lines vs live's other). Suite pair vibex6:
+  118 -> 119 / 174 docs, 1840 -> 1848 features, none worse (c2-rib-wrap 10 -> 18). OPEN (P2, mine): a thin wrapped r3
+  disc fuse loses the cylinder in OCCT (cut -> 0 volume, common empty); recording /root/core-scratch/wrap-disc-fuse-lost.bin
+  (parts[0] objects, parts[1] tools; tool 1 fails alone).
+- **KNIFEHANDLE-LOFT1 (qa P1 11-21, in progress):** Loft 1 = SURFACE through P1 (2 splines), P2-P6 ellipses, a point
+  (tip 188.575), 2 guides (side profile splines; guide 1 runs on to x=0); live Handle 1/2/3, 21477.23 mm2, box x
+  13.09..188.58, y +-19.958, z -39.98..13.80. Work: /root/core-scratch/gordon3.diff (k::loft_gordon = OCCT 8
+  GeomFill_Gordon + GORDONDBG). Found: P4's ellipse (x 117.98) misses guide 1 by 8.77 mm and guide 2 by 2.91 mm, as in
+  live's own stored sketch (its PIERCE on KTRB at parameter 1 = the guide's END, z -36.651; the guide crosses x 117.98
+  at z -27.80). So live lofts with a profile off its guides; Gordon refuses (ContactDiscovery). Gordon without P4
+  throws Standard_OutOfRange on the point profile. Next: Gordon over P1..P6 minus P4 with guides trimmed to P1..P6 and
+  the apex closed apart (or a guided ThruSections), compare area with 21477.23 mm2.
+- core-rp's 11-20 batch LANDED 00:10 as f9ad07b5 (details archived 11-21 02:08). Face blend on top:
+  /root/core-scratch/fb-on-top-detail_a.diff + fb-on-top-test.rs (FBDBG to strip).
 - **live data-management batch 1 (19:00):** cov-dm-config (5 configurations, configured suppression) and cov-dm-vs
   (VS -> VS -> Part Studio, inch units, w change). Importer already reads configured suppression + VS references;
   suite checks one configuration. Asked live 18:57 (REQUESTS) for c2-dm-config / c2-dm-vs dirs + configurations.json
@@ -69,9 +68,6 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
 - **Lead 11-19:** cpcurves Sweep 5's 8/9/2 (live splits the R16 circle into a CIRCLE arc + an OTHER curve) is live's
   representation, a known difference, not a target. Build hosts: the lowest 1-min load of vibex7/vibex8/vibe2 each
   time (DECISIONS a67911bef); private docs on vibex7 only.
-- **LANDED 11-19:** Hole from the part leaves material above its start whole 7bf5efe3 (qa P1 session-ps2-1119; qa asked
-  to verify); surface sweep of an open profile faces profile tangent x path direction + fit spline end along an edge
-  82c035b7a (cpcurves fit spline 4, Sweep 8, Split 8, Split 5 errors gone; qa asked to re-save its stale corpus file).
 - **LANDED 11-19:** loft sections of different edge counts refused 82d75f4a5 (P0); Thicken one-sided intersection join
   7dd227351 (split 12/12; singularities corpus exact); Routing curve multiDx/Dy/Dz/RotationMatrix aeb0cc0a7 (live2 audit
   row 4; psui told: the multi triad / toggle-points manipulators are UI + host manipulator kinds).
@@ -188,9 +184,8 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-00. qa P1 invalid bodies (TICKETS "qa, 2026-11-20", suite 1120-1447 on 0a0b9a49, NOSHAPE_PARITY_VALIDITY=1, 0-based
-   CHECK lines in qa-scratch/suites/1120-1447-0a0b9a49/models.log): LORA-BATTERY-REMOVE (f41, Base invalid + 4 extra
-   7.6 mm³ parts), SURFLOFTS-BOUNDARY-SURFACE (f39, Surface 4 one face / 1 edge, 68 vs 259.97 mm²), WRAP-TEXT-WRAP1 (f4).
+00. After the validity land: TICKETS rows, tell qa + lead. Then KNIFEHANDLE-LOFT1 (P1, In flight); then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
+   174 ms): speed ticket if >=100 ms and >=2x live's (lead 23:5x); then the thin wrapped-disc fuse (P2, In flight).
 0. Impeller P0 (In flight): land Extrude impellerraum's split walls after the pair, then Delete face 2 on our input and
    the local rebuild, re-timed on the Mac vs 12 ms; then the In-flight queue 1-7.
 1. Wave-washer ring (In flight; live2's sections capture), then singularities Loft with bad singularity / Loft 3. Then: Fill G0 = intro-examples' Fill 1 (live's fitted 14x18 surface),

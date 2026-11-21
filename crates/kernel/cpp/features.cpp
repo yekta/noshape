@@ -13306,9 +13306,34 @@ OpOut op_coons(const OcShapeList& edges, rust::Slice<const uint32_t> counts)
         fail_invalid("Coons side counts exceed the edges");
       es.push_back(as_edge(edges.items[at], "Coons side edge"));
     }
-    side.push_back(coons_side(es));
-    if (side.back().IsNull())
+    side.push_back(n == 0 ? nullptr : coons_side(es));
+    if (n > 0 && side.back().IsNull())
       fail_op("Coons patch: a side isn't one non-rational curve");
+  }
+  // A side of no edges is the point where its two neighbours meet (a three-sided patch: c2-surfaces-lofts-projected's
+  // Boundary surface 1 of two U profiles meeting at a point and one V profile).
+  for (size_t k = 0; k < 4; ++k)
+  {
+    if (!side[k].IsNull())
+      continue;
+    const occ::handle<Geom_BSplineCurve>& a = side[k < 2 ? 2 : 0];
+    const occ::handle<Geom_BSplineCurve>& b = side[k < 2 ? 3 : 1];
+    if (a.IsNull() || b.IsNull())
+      fail_invalid("a Coons patch has at most one point side");
+    std::optional<gp_Pnt> corner;
+    for (const gp_Pnt& p : {a->StartPoint(), a->EndPoint()})
+      if (p.Distance(b->StartPoint()) < 1e-6 || p.Distance(b->EndPoint()) < 1e-6)
+        corner = p;
+    if (!corner)
+      fail_op("Coons patch: the sides don't meet at four corners");
+    NCollection_Array1<gp_Pnt> poles(1, 2);
+    poles.Init(*corner);
+    NCollection_Array1<double> knots(1, 2);
+    knots(1) = 0.0;
+    knots(2) = 1.0;
+    NCollection_Array1<int> mults(1, 2);
+    mults.Init(2);
+    side[k] = new Geom_BSplineCurve(poles, knots, mults, 1);
   }
   occ::handle<Geom_BSplineCurve>& u0 = side[0];
   occ::handle<Geom_BSplineCurve>& u1 = side[1];

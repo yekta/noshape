@@ -4625,6 +4625,9 @@ skasm meanwhile; I'll list what I change here before landing.
   edge directions, minus 426922541 both still Error); blend bisects from 73470cff. Nothing for me.
 
 ## Moved 11-20 22:25
+- **LANDED 11-19:** Hole from the part leaves material above its start whole 7bf5efe3 (qa P1 session-ps2-1119; qa asked
+  to verify); surface sweep of an open profile faces profile tangent x path direction + fit spline end along an edge
+  82c035b7a (cpcurves fit spline 4, Sweep 8, Split 8, Split 5 errors gone; qa asked to re-save its stale corpus file).
 - **LANDED 11-19:** pattern P1 6a8e411d (qa verified session-1118 = live); surface stack fc162641 -> ec1882ba (7
   commits: Up to next to surfaces, Boundary Coons/ruled + exact sketch splines, Split sheet pieces + surface Extrude
   Add, surface Sweep path cut at its profile's plane, sketch region direction, loft section race, thin Sweep wall side;
@@ -4638,3 +4641,31 @@ skasm meanwhile; I'll list what I change here before landing.
   manualblend's tube against its sketch's normal, cpcurves' along it: both outward); cpcurves' 1227.58 mm3 part and Split
   5's Info gone, Delete face 2 = live; left: edge counts from Sweep 5's split circle (known). 30-doc subset clean
   (core-scratch gls3.log). T1 features_c::a_surface_swept_from_a_circle_faces_out_of_its_tube.
+
+## Moved 11-21 02:08
+- **core-rp (in flight, uncommitted, rebased on main 20:15; builds on vibex6, .opt6.sh):** option models all match
+  except loft-continuity (live asked 19:32), pattern-skip-centred (asked 19:29), fillet-partial-asym (parked),
+  sweep-twist-scale (4.8e-3 mm3 of 3600). Done + verified (vibex6 21:34): Split 2 by own face, Rib 2 unified, Projected
+  curve TWO_SKETCHES joined (concat_edges); legacy hole, Draft parting edges, thread chamfer/undercut via std. In flight:
+  Thin Loft 2 matches live (thin.rs normal_wall_loops + straighten; test engine thin_loft_of_a_tapered_square).
+  Thicken 1 matches (4 circles, 8 lines): elementary_offsets + analytic edges; edge_on_curve keeps a seam's two
+  pcurves each in its old period; the volume check integrates both accurately, 1e-5 (OCCT's offset is ~5e-6 off).
+  3 rebuilds on B-spline offsets still NotClosed (kept unconverted). Doc now 3/45: Face blend 1 "Cannot attach"
+  (sides on Thicken's 2 parts; live joins them into 1 part, 14 faces): not the conversion (part check), next.
+  Thread chamfer: External thread 1 matches; opChamfer gated at FS 1646 (left-face rule before, native
+  detail::distance_one_faces after; 3 live opChamfer tests + thread pass).
+  External thread 2 (M8 undercut): 1205.39 mm3 as live (move_face: a face beside an unmoved one on its own cylinder ->
+  offset_by_booleans); left: 2 B-spline edges vs live 4 circles (doc 5/6).
+  Replace face 1: vertex/edge counts match (INTERNAL face vertices not shown); left: 11 other / 7 sphere faces
+  vs live 10 / 8, 19 mm3.
+  Debug stripped 22:15 (to-land diff: /root/core-scratch/rp-toland.diff). Suite pair vibex6 (~/tmp/core/g/run-{base,rp}.log):
+  106 -> 115/174 docs, 1723 -> 1781 features, 17 docs up, none down, invalid 9 = 9. 7 docs ~2x slower but rp ran
+  beside the gate; A/B (~/tmp/core/ab7.sh, x2) is noise except projected-curve-enclose 97/157 -> 254/362 ms: Mutual
+  trim 1 46 -> 174 ms on new input (Projected curve 1 now as live). thin_sweep_as_live (x86 "Error regenerating."): op_thicken's
+  analytic conversion only for plane/cylinder sheets. Gate: g13 + clippy clean, kernel/model/custom on the Mac (.mac.sh).
+  QUEUED 23:47 as 6dbeea5c (1 commit; merge.rs conflict: main already had merge_configuration_from_source, kept main's).
+  On top again, uncommitted (FBDBG in detail_a.rs to strip; test a_face_blend_across_overlapping_parts_joins_them
+  after FB6): face_blend fuses two solid sides' parts first; Face blend 1 -> 14 faces as
+  live; its 2 blend faces stay rational B-splines (u6 v2; parallel-axis cylinders, live cylinders): SurfToAna gap?
+  Next: Face blend 1 across parts, body-draft-naming Fillet 1 (live 6 B-curve edges, ours 2), genesis snap-holes
+  (live ellipses), Fill 1, sweep twist.

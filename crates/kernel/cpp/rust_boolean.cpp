@@ -6529,7 +6529,7 @@ rust::Vec<uint32_t> brep_occt_moved(rust::Slice<const uint32_t> ids, uint32_t a_
 // outer wire the face's way round and the others inside it the other way, none inside another. An arc as chords no
 // farther off it than a thousandth of its radius, two edges' chords apart by more than the tolerance and their sags.
 // False where it can't tell (another curve, a wire not explored whole, edges all but touching).
-static bool planar_valid(const TopoDS_Face& f)
+bool planar_valid(const TopoDS_Face& f)
 {
   TopLoc_Location                 loc;
   const occ::handle<Geom_Plane>   pl = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(f, loc));

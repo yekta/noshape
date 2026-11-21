@@ -12406,6 +12406,39 @@ OpOut op_unify(const OcShape& s)
     hist  = HHist();
     clean = false;
   }
+  // A face the unify made or re-bounded (new, or with an edge new to the shape) that isn't valid on its own: nothing
+  // merged, the shape as it came (c2-lora-enclosure-ribs' Battery Remove: a plane of 28 edges invalid, the cut valid).
+  // An invalid shape merges as USD does (an_invalid_fuse_result_unifies_as_usd).
+  if (!res.IsSame(s.shape))
+  {
+    const KernelTimer check("unify.check");
+    ShapeIMap         had_f, had_e;
+    TopExp::MapShapes(s.shape, TopAbs_FACE, had_f);
+    TopExp::MapShapes(s.shape, TopAbs_EDGE, had_e);
+    std::vector<TopoDS_Shape> changed;
+    for (TopExp_Explorer x(res, TopAbs_FACE); x.More(); x.Next())
+    {
+      bool is = !had_f.Contains(x.Current());
+      for (TopExp_Explorer e(x.Current(), TopAbs_EDGE); e.More() && !is; e.Next())
+        is = !had_e.Contains(e.Current());
+      if (is)
+        changed.push_back(x.Current());
+    }
+    // (On all threads: cf-drive-train-generator's 14 unifies checked 0.7 s of faces one by one.)
+    std::atomic<bool> ok{true};
+    BudgetHold        hold;
+    OSD_Parallel::For(0, static_cast<int>(changed.size()), [&](int i) {
+      const TopoDS_Face& f = TopoDS::Face(changed[static_cast<size_t>(i)]);
+      if (ok.load(std::memory_order_relaxed) && !planar_valid(f) && !BRepCheck_Analyzer(f).IsValid())
+        ok.store(false, std::memory_order_relaxed);
+    });
+    if (!ok.load() && BRepCheck_Analyzer(s.shape).IsValid())
+    {
+      res   = s.shape;
+      hist  = HHist();
+      clean = false;
+    }
+  }
   std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("unify.result");
   OpOut        r     = make_result({s.shape}, res, hist.get(), &srcs);
   r.shape->myUnifyClean = clean;

@@ -116,6 +116,9 @@ bool bop_parallel();
 // `r` valid where it differs from `input`: its faces not the input's in full,
 // the whole shape for closure and orientation (features.cpp).
 bool valid_changed(const TopoDS_Shape& input, const TopoDS_Shape& r);
+// Planar face `f`, its edges lines and arcs, valid as BRepCheck's wire and face checks have it; false where it can't
+// tell (rust_boolean.cpp).
+bool planar_valid(const TopoDS_Face& f);
 // The face, edge and vertex maps of `s` in one walk, as three
 // TopExp::MapShapes make them (each first occurrence, depth first; a
 // sub-shape met again isn't walked again) (common.cpp).

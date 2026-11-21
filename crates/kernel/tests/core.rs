@@ -1389,3 +1389,17 @@ fn a_face_with_an_edge_replaced_by_a_run_keeps_its_other_boundaries() {
     assert_eq!((f.wires().len(), f.edges().len()), (3, side.edges().len() + 1), "side's edges {}", side.edges().len());
     assert!(close(f.area().unwrap(), side.area().unwrap(), 1e-9), "{} vs {}", f.area().unwrap(), side.area().unwrap());
 }
+
+/// c2-lora-enclosure-ribs' Battery Remove: the cut is valid (its main solid 178 faces), but merging its same-domain faces
+/// left a plane of 28 edges invalid; the unify then keeps the cut as it came.
+#[test]
+fn a_unify_that_would_leave_an_invalid_face_keeps_the_shape() {
+    let inputs = Shape::from_bin_bytes(include_bytes!("data/lora-battery-cut.bin")).unwrap();
+    let parts = inputs.children();
+    let (objects, tools) = (parts[0].children(), parts[1].children());
+    let cut = boolean(BooleanOp::Cut, &objects, &tools, &BooleanOptions { parallel: true, ..Default::default() }).unwrap();
+    assert!(cut.shape.is_valid());
+    let u = unify_same_domain(&cut.shape).unwrap();
+    assert!(u.shape.is_valid());
+    assert!(close(volume_properties(&u.shape).unwrap().mass * 1e9, 13590.5611, 1e-6));
+}
