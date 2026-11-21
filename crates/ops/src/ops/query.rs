@@ -398,13 +398,15 @@ fn edge_json(b: &Body, i: usize, k: f64, names: &dyn Fn(Option<noshape_model::re
 }
 
 /// An edge shown as one with other pieces ([`noshape_kernel::ShownTopology::joined`]): its length theirs together, its
-/// ends the run's.
-fn joined_json(b: &Body, i: usize, shown: &noshape_kernel::ShownTopology, k: f64, v: &mut Value) {
+/// ends the run's, its midpoint their centre by length (a rim across a cylinder's seam: EDGE-CENTRE-SEAM, c2-rings-loft's
+/// rims crossing 0 deg were centred on their 0-60 deg piece). The midpoint, where it moved.
+fn joined_json(b: &Body, i: usize, shown: &noshape_kernel::ShownTopology, k: f64, v: &mut Value) -> Option<DVec3> {
     let pieces: Vec<usize> = (0..shown.joined.len()).filter(|&j| shown.joined[j] == i).collect();
     if pieces.len() < 2 {
-        return;
+        return None;
     }
-    let infos: Vec<noshape_kernel::EdgeInfo> = pieces.iter().filter_map(|&j| b.shape.sub_shape(ShapeType::Edge, j).ok()?.edge_info().ok()).collect();
+    let edges: Vec<noshape_kernel::Shape> = pieces.iter().filter_map(|&j| b.shape.sub_shape(ShapeType::Edge, j).ok()).collect();
+    let infos: Vec<noshape_kernel::EdgeInfo> = edges.iter().filter_map(|e| e.edge_info().ok()).collect();
     v["length"] = json!(r6(infos.iter().map(|e| e.length).sum::<f64>() * k));
     // The run's ends: the end points no other piece has.
     let tol = 1e-9 * infos.iter().map(|e| e.length).sum::<f64>().max(1e-9);
@@ -416,6 +418,14 @@ fn joined_json(b: &Body, i: usize, shown: &noshape_kernel::ShownTopology, k: f64
     } else if free.is_empty() {
         v["closed"] = json!(true);
     }
+    let props: Vec<noshape_kernel::MassProperties> = edges.iter().filter_map(|e| noshape_kernel::linear_properties(e).ok()).collect();
+    let mass: f64 = props.iter().map(|p| p.mass).sum();
+    if props.len() != edges.len() || mass <= 0.0 {
+        return None;
+    }
+    let mid = props.iter().map(|p| p.center * p.mass).sum::<DVec3>() / mass;
+    v["midpoint"] = pt(mid, k);
+    Some(mid)
 }
 
 pub(crate) fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
@@ -556,7 +566,7 @@ pub(crate) fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                         continue;
                     }
                     let Some((mut v, m, ck)) = edge_json(b, i, k, &names) else { continue };
-                    joined_json(b, i, &shown, k, &mut v);
+                    let m = joined_json(b, i, &shown, k, &mut v).unwrap_or(m);
                     if curve.is_some_and(|c| c != ck) {
                         continue;
                     }

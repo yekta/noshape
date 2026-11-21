@@ -11053,3 +11053,30 @@ fn a_region_replicated_onto_another_view_keeps_its_place_in_the_view_box() {
         assert!((num(&pos[1]) - (back + num(&src_pos[1]) - a[1])).abs() < 0.01, "above Top's back edge {back} (front {front_edge}) as above Front's top edge {}: {pos} vs {src_pos}", a[1]);
     }
 }
+
+/// EDGE-CENTRE-SEAM (c2-rings-loft's rims across 0 deg): an edge shown as one over pieces OCCT splits at a cylinder's
+/// seam has its midpoint at the pieces' centre by length, not at its first piece's. A Ø20 rod notched across +x by
+/// an 8 mm wide pocket at mid-height: the notch's two arcs sit symmetric about y = 0, their centroid r·sin(a)/a out.
+#[test]
+fn a_seam_crossing_edge_is_centred_on_all_its_pieces() {
+    let mut ctx = Ctx::new();
+    let path = scratch("seam-crossing-midpoint.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "circle", "points": [[0, 0], [10, 0]] }));
+    let rod = call(&mut ctx, "sketch_get", json!({ "sketch": "Sketch 1" }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [rod], "depth": "20 mm", "symmetric": true } }));
+    call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 2", "tool": "corner_rectangle", "points": [[5, -4], [15, 4]] }));
+    let regions = call(&mut ctx, "sketch_get", json!({ "sketch": "Sketch 2" }))["regions"].clone();
+    let notch: Vec<String> = regions.as_array().unwrap().iter().map(|r| r["id"].as_str().unwrap().to_string()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": notch, "depth": "10 mm", "symmetric": true, "operationType": "REMOVE" } }));
+    let edges = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "circle" }));
+    let arcs: Vec<&Value> = edges["edges"].as_array().unwrap().iter().filter(|e| (num(&e["length"]) - 20.0 * 0.4f64.asin()).abs() < 1e-3).collect();
+    assert_eq!(arcs.len(), 2, "{edges}");
+    let centroid = 10.0 * 0.4 / 0.4f64.asin();
+    for a in arcs {
+        let m = &a["midpoint"];
+        assert!(num(&m[1]).abs() < 1e-6 && (num(&m[0]) - centroid).abs() < 1e-4, "{a}");
+    }
+}
