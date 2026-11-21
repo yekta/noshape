@@ -28,7 +28,7 @@ pub fn ops() -> Vec<Op> {
             group: "sheetmetal",
             verb: "table",
             summary: "The sheet metal table: a model's bends (radius, angle, direction, K factor) and other joints",
-            description: "The \"Sheet metal table and flat view\" panel: the sheet metal models (the Sheet metal context select), and for `model` its Bends rows in the table's order (name as \"Bend A\" / \"Hem B\", radius, angle, Up / Down from the flat pattern's bend lines, K factor, the bend's face ids) and its Other joints rows (name, style); `flat_faces`: the planar faces of its parts' flats where live lays them out (fixed face on z = 0; part \"Flat pattern of <part>\", area, normal, offset along it), whose ids a sketch can take as its plane (sketch_create: a sketch on the flat, shown only in the flat view).",
+            description: "The \"Sheet metal table and flat view\" panel: the sheet metal models (the Sheet metal context select), and for `model` its Bends rows in the table's order (name as \"Bend A\" / \"Hem B\", radius, angle, Up / Down from the flat pattern's bend lines, K factor, the bend's face ids) and its Other joints rows (name, style); `flat_faces`: the planar faces of its parts' flats where live lays them out (fixed face on z = 0; part \"Flat pattern of <part>\", area, normal, offset along it, centre: where a sketch on it has its origin), whose ids a sketch can take as its plane (sketch_create: a sketch on the flat, shown only in the flat view).",
             fields: vec![doc_field(), tab_field(), model_field()],
             mutates: false,
             destructive: false,
@@ -210,7 +210,10 @@ fn table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 let pl = f.face_plane().ok().flatten()?;
                 let id = refs::to_id(&noshape_model::reference::Reference::Face(noshape_model::sheetmetal::flat_face_name(&b.id, i)));
                 let n = pl.unit_normal();
-                Some(json!({ "id": id, "part": format!("Flat pattern of {part}"), "area": sm::plain(f.area().unwrap_or(0.0) * k * k), "normal": [sm::plain(n.x), sm::plain(n.y), sm::plain(n.z)], "offset": sm::plain(pl.origin.dot(n) * k) }))
+                // Where a sketch on it has its origin (the middle of the face's box on its plane).
+                let [u0, u1, v0, v1] = f.uv_bounds().ok()?;
+                let c = f.point_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).ok()? * k;
+                Some(json!({ "id": id, "part": format!("Flat pattern of {part}"), "area": sm::plain(f.area().unwrap_or(0.0) * k * k), "normal": [sm::plain(n.x), sm::plain(n.y), sm::plain(n.z)], "offset": sm::plain(pl.origin.dot(n) * k), "centre": [sm::plain(c.x), sm::plain(c.y), sm::plain(c.z)] }))
             })
         })
         .collect();

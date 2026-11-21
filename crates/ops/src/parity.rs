@@ -5214,9 +5214,14 @@ impl<'a> Translator<'a> {
                 if dot < 1.0 - 1e-6 || (off * k - at).abs() > 1e-7 {
                     continue;
                 }
-                let off_area = r.measure.map_or(0.0, |m| (area * k * k - m).abs());
-                if best.as_ref().is_none_or(|b| off_area < b.0) {
-                    best = f["id"].as_str().map(|id| (off_area, id.to_string()));
+                // Live's area, else live's sketch origin: the middle of its face (c2-sm-modify-joint's Sketch 1 on the
+                // chamfer's flat face, not the top wall's beside it).
+                let off = match r.measure {
+                    Some(m) => (area * k * k - m).abs(),
+                    None => (0..3).filter_map(|i| Some((num(&f["centre"][i])? * k - o[i]).powi(2))).sum::<f64>().sqrt(),
+                };
+                if best.as_ref().is_none_or(|b| off < b.0) {
+                    best = f["id"].as_str().map(|id| (off, id.to_string()));
                 }
             }
         }

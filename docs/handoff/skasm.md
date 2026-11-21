@@ -1,15 +1,15 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-20 23:11 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-21 04:30 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-- dx 11-20 23:20: c2-sm-louver 36 -> 35/36 is from main (base b3c0dc59f), Sketch 9 frame origin x -676.03 vs
-  live -708.49 mm (y, z, axes match); it's my louver Sketch 9 item.
-
-## In flight (11-21 03:20 UTC)
-- Recognize via std (sheetMetalStart.fs's sheetMetalRecognize; std_route `recognize`): c2-cov-sm-recognize 4 -> 6/6
-  (live bends a sharp L's corner at the radius: 14 faces, 9671.238898 mm3). Std refuses a finished SM part ("This
-  feature cannot be used on sheet metal parts.": Finish keeps its attributes). Extrude 1 already matched on main.
+## In flight (11-21 04:30 UTC)
+- Flat-face sketches (louver Sketch 9 x -676.03 vs live -708.49; modify-joint Sketch 1 x 50.33 vs 120.02): the
+  translator took the wrong coplanar flat face. sheetmetal_table's flat_faces now give `centre` (the sketch origin, the
+  face's uv middle); parity's flat_face_on_plane_of picks the one nearest live's origin when live gives no area.
+  LANDING: louver 36/36, modify-joint 11/11; SM 25-doc Mac run 22/24 docs, 291/295 features (was 259). Left: loft
+  apex, hem-plus Offset surface 1 (area 17967.26 vs 18073.07). mac-ff.sh regenerates AGENT_API.md (Mac skasm-keep).
+- LANDED 6a4ac440: Recognize via std (c2-cov-sm-recognize 4 -> 6/6). QUEUED 52771f9e: Rip 1 (below).
 - LANDING: forms 21/21 (c2-sheet-metal-forms 10 -> 21/21; Mac A/B vs 97df380f1: 108 -> 109/174 docs, 1779 -> 1790
   features, no other doc changed): Sketch 3 connector at live's frame; Form 4 fuse skipped when adds add nothing;
   Form 5 region_from_query derived branch; lance bends meeting at asin(1 - h/(rmi+rme)) with no wall, the lance
@@ -33,7 +33,6 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   depth + R tan(a/2) in (live 8.3 mm). 201 -> 209/295.
 - Rejected: extract surface's faces in body order (hem-flange SM model 2 7 -> 4/8, frames BUTT/BUTT2 swap);
   patch ~/agents/skasm-keep/extract-order.patch (local).
-- modify-joint Sketch 1 frame origin ours 50.33 vs live 120.02 (x): the flat's plane origin convention, open.
 - c2-hgr-riser-weldment: dx's (lead 11-20).
 - Rip 1 (c2-cov-sm-rip) 3 -> 5/5: host merge_coplanar_rips builds a wall split by a rip ending at real corners as one
   face (the bends beside it square); not where the rip ends inside a straight run (louver's in-line walls stay pieces).
