@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-21 01:53 UTC.
+Updated 2026-11-21 04:33 UTC.
 
 ## In flight
 
@@ -33,12 +33,16 @@ e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
   the triad where the ball is: on the snapped point (live 01:40 follow-up, fixed after 4094e4ef) or at the pointer.
   Feel test `the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point`; Short press drop back at
   +60 px. Live's (a) "never snapped" run is not explained by the 8 px rule (lag?). Edges' own look not drawn.
-- In flight (03:16): live's 01:40 answer: released snapped, the triad stays on the snapped point (release uses the
-  preview again, triad_free gone; ball test waits for each snap state: it flaked once in the 20-test batch). psui
-  fc-1120 Version compare: no hover in compare (apply_hover_pick), a click selects the face (live: the face, not the
-  part: the cylinder's top stayed blue) and its feature row (hook compare_select → compare_mode::select_feature), the
-  missing side reads "Feature does not exist in target." / "base." (the base wording assumed); tests in
-  measure_feel_tests + history feel_tests; ver-compare-hover-part "about" fixed.
+- 7d64e534 (triad snapped release + psui fc-1120 Version compare) + 00e962afe (split keeps selection, matrix 03:36)
+  FAILED 03:35 on the ball-snap test (it also failed skasm's f992d0d7). Cause: wait_until times out silently (60 s);
+  on a loaded host the move at the spot found no snap (state not ready), no later move came, the ball sat at the
+  free point. QUEUED dc2f3394 (04:09, own branch studios-t2-ballsnap off main): the test T2 so the queue unblocks.
+  Fix (04:33): the test's `until` re-sends the resting pointer's move and asserts on timeout; 20 full-lib runs on
+  vibex8 under load before re-enabling it (drop the #[ignore] after rebasing on dc2f3394).
+- Drawing matrix: options compared in live's order (drawing_matrix.py `live_option_lists` / `ours_sequences`):
+  Drawing properties 101 → 22 shown; View simplification was None, Auto, …: now live's None, Absolute, Ratio to
+  studio, Ratio to part, Auto (test `the_view_simplification_list_is_in_lives_order`). REQUESTS fc-1121 (6) added:
+  a table hover-lit after Esc under a resting pointer (split s14-15).
 - Told asm 23:15: in a test window the instance list's rows slice isn't redrawn after a document edit (set_fixed
   false/true: the fixed icon stays; a notify on the view or on slices.rows doesn't redraw it; window.refresh() does).
   Not checked in the app. Feel tests that change the list must build the state before opening (open_from_top_when).

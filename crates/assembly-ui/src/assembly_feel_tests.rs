@@ -1091,27 +1091,36 @@ fn the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point(cx: 
             (f, v.viewport.read(cx).project(f.origin).unwrap(), v.drag.as_ref().is_some_and(|d| d.ball_snap.is_some()))
         })
     };
-    // (Each check waits for the last move to be taken: a loaded host lags a frame.)
-    let until = |cx: &mut TestAppContext, snapped: bool| wait_until(cx, window, &view, |v, _| v.drag.as_ref().is_some_and(|d| d.ball_snap.is_some() == snapped));
+    // (Each check waits for the move to be taken, the pointer resting there: on a loaded host the assembly's result
+    // can land after the last move, and a resting pointer's next move snaps.)
+    let until = |cx: &mut TestAppContext, to: DVec2, snapped: bool| {
+        let t = std::time::Instant::now();
+        while !cx.update(|cx| view.read(cx).drag.as_ref().is_some_and(|d| d.ball_snap.is_some() == snapped)) {
+            assert!(t.elapsed() < std::time::Duration::from_secs(60), "snapped {snapped} at {to:?}: {:?}", ball(cx).0.origin);
+            let p = at_window(cx, &view, to);
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(p, Some(MouseButton::Left), Modifiers::default());
+            frames(cx, window, &view);
+        }
+    };
     go(cx, at, spot);
-    until(cx, true);
+    until(cx, spot, true);
     let (f, _, snapped) = ball(cx);
     assert!(snapped && (f.origin - centre).length() < 1e-6, "on the face's centre: {:?} for {centre:?}", f.origin);
     assert!((f.rotation.dot(start.rotation)).abs() > 1.0 - 1e-9, "the triad unturned");
     go(cx, spot, centre_px);
-    until(cx, false);
+    until(cx, centre_px, false);
     let (_, shown, snapped) = ball(cx);
     assert!(!snapped && (shown - centre_px).length() < 2.0, "the point under the pointer: the ball follows it ({shown:?})");
     go(cx, centre_px, spot);
-    until(cx, true);
+    until(cx, spot, true);
     assert!(ball(cx).2, "snapped again off the ring");
     let background = DVec2::new(40.0, 40.0);
     go(cx, spot, background);
-    until(cx, false);
+    until(cx, background, false);
     let (_, shown, snapped) = ball(cx);
     assert!(!snapped && (shown - background).length() < 2.0, "none over the background ({shown:?})");
     go(cx, background, spot);
-    until(cx, true);
+    until(cx, spot, true);
     assert!(ball(cx).2);
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(at_window(cx, &view, spot), MouseButton::Left, Modifiers::default());
     settle(cx, window, &view);
