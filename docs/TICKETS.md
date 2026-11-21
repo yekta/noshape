@@ -287,7 +287,7 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - 13 "no recording" scenarios of run 07879475 (the app exited silently) all ran in the loop's next run: not filed. rolled-back-row-menu
   matches since psui 9ffded3f6.
 
-## qa, 2026-11-21 22:0x (USER P0 walk 5, lead: right-click menus vs live ctx-menus-1117 item lists; green 2fb0ed1ac, walk3/gen7.py, out-w7, compare hm2/walk5/cmp-menus.py)
+## qa, 2026-11-21 21:4x (USER P0 walk 5, lead: right-click menus vs live ctx-menus-1117 item lists; green 2fb0ed1ac, walk3/gen7.py, out-w7, compare hm2/walk5/cmp-menus.py)
 
 Same model as live (block 40x30x10, Fillet 1 2 mm, Sketch 2 line (60,10)-(90,10)), same pick points. 14 of 25 match exactly:
 face, face-selected, two-faces, edge, vertex, empty, part-selected-graphics, rows Sketch 1 / Extrude 1 / Fillet 1 / two features /
@@ -308,7 +308,7 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   **Curve/surface analysis…**, **Zoom to selection** and **Align view with vertical axis**; live (11-17) has none of them. The top
   face (20,15,10): ours lacks **Section view…** and **View normal to** and adds **Curve/surface analysis…** (live sk-model-face).
   (Live's older sketch/204, a sketch on a part face, did show Use etc. on an edge: the set depends on the sketch plane.)
-- Open with live (REQUESTS qa 22:0x): sk-empty and sk-tool-line-active. Live's (75, 40) pick lands on the Top plane (plane menu);
+- Open with live (REQUESTS qa 21:50): sk-empty and sk-tool-line-active. Live's (75, 40) pick lands on the Top plane (plane menu);
   ours is empty space, because our default planes only cover the block while live's evidently also cover Sketch 2
   (qa-scratch/tickets/menus-plane-w5.png top).
 
