@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-21 15:27 UTC (account move: a fresh dx takes over from here). Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-21 15:44 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -13,7 +13,7 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 15:27 11-21 (read first)
+## STATE 15:44 11-21 (read first)
 - LANDED today: 5bbec61b (exchange stack), fast open 92d02c14 / f626b268 / 28f6bf2c (step 3: the last-viewed tab's row
   decoded as soon as the rows are read; infento cached model frame 342 ms on vibex6, target <= 0.5 s met), drawing
   5c4bc11c (CONIC_TOL 30 um; rims round a view-axis cylinder get its centermark: rings-loft Top view as live). Nothing
@@ -21,25 +21,13 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
 - rings-loft per feature matches live (Extrude 7 / Shell 2 rims); TICKETS EDGE-CENTRE-SEAM (core, sent 14:17): our edge
   centre (linear_properties) is off on a rim crossing its ellipse's seam. Probe vibex6 ~/agents/dx-keep/sr/rlmid.py ./cli
   ~/agents/dx-keep/sr/rl-saved.noshape ~/parity/models/c2-rings-loft/live.jsonl.
-- IN FLIGHT (dx-urdf, UNCOMMITTED, on 74df2f144; full diff saved /root/dx-scratch/igesseam-wip.patch): housing compat
-  IGES (Mac ~/noshape-host/dx-keep/exs-igc/c2-housing-draft/live-opt-compat.igs) reads 36 / 80 / 45 faces / edges /
-  vertices, live 36 / 79 / 44. Found: the r=12.5 mm inner wall (cylinder, all edges B-splines in compat mode) has its
-  seam from z=5 down to (12.5, 0, 3.25), the top of the side hole (r 1.25 round x at z 2), so the hole's top rim stays two
-  2.1652 mm pieces (the 4.33 mm "rim"); join_loop_pieces needs 2-edge vertices. Real change so far (keep):
-  boolean.cpp `round_about(e, ca, circ)` (a closed edge on a circle round the cylinder's axis, B-spline included) used
-  for band ends in move_seams_off_holes, seam_to_vertex and band_seam_to (replacing `.Circle()`), and a `seamed` stage
-  in merge_same_surface_faces (periodic: move_seams_off_holes + join_loop_pieces, its history in the face map). Result
-  so far: one other seam moved, a 39.69+39.69 pair joined, the counts still 80 / 45 (r=12.5 wall: seam_to_vertex
-  returns null before its candidates: the `joint` test fails at the seam's vertex (12.5, 0, 3.25)). Last trace
-  (DXJT lines, joint's ds / others / same face / sin) running: Mac log ~/noshape-host/dx-keep/join2.log, fetch with
-  `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh bash -c 'gzip -c ~/noshape-host/dx-keep/join2.log | base64'` (base64 -d |
-  gunzip). Next: see why joint fails there, then whether a candidate vertex passes (the near ones at (12.44, +-1.23,
-  1.80) can't: a vertical seam from there crosses the hole's arc). If nothing can, it is a P3 note in formats.md.
-  Before any commit: delete every `getenv("DXJOIN")` block in boolean.cpp, the `mod dxprobe` test at the end of
-  crates/kernel/src/io.rs, dx-join.sh, dx-join2.sh and dxsr/ (copies in /root/dx-scratch/); then kernel lib tests + the
-  exchange suite (Mac exx.sh) + bool's gate (crates/kernel boolean.cpp change: MEMORY brep/bool gate rules apply).
-  Run: `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh bash dx-join2.sh` (builds release noshape-cli in dx-urdf's Mac target,
-  imports the IGES via dxsr/impprobe.py with DXJOIN=1).
+- PARKED 15:4x: the housing compat IGES rim (36 / 80 / 45 vs live 36 / 79 / 44). Cause: OCCT's r 12.5 mm cylinder needs
+  a seam, which ends at the rim's top (12.5, 0, 3.25); with the joint test loosened to G1 sin 1e-4 (the IGES pieces meet
+  at 6.6e-6) no other vertex of the wall's loop can take it (a seam up from the hole's lower corners crosses the rim).
+  Live's Parasolid face has no seam. Only a counting rule would match; P3 note in formats.md. Whole WIP (round_about,
+  the seamed stage, t_joint_sin, DXJOIN traces) in /root/dx-scratch/igesseam-wip2.patch, probe scripts there too;
+  it changed no count, so nothing landed. dx-urdf is clean on main (branch dx-exch).
+- REQUESTS dx 15:31 (live2): where a set "My images" library shows in Insert image (TICKETS SETLIB-IMAGES, P3).
 - SPEED-RINGS-SHELL (bool, P1) has live's Shell 1 results (9313d85f4): OK at 8-10.4 mm, faces / volumes in TICKETS.
 - Drawing rows 2/10 (duct, louver); rings-loft's Top-view circle done (5c4bc11c). Mac suite dirs
   ~/noshape-host/dx-keep/exs-drw (10 docs, `bash exx.sh exs-drw exs-drw.log`), exs-rings.
@@ -49,7 +37,7 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   construction geometry or the split tool, not poles), housing Front/Right/Top and rings Right/Top. Not yet known what
   live counts there; the suite aligns views first, so the DXF rows don't depend on it.
 - Mac: one active target (dx-urdf, 20 GB); dx-open's target removed after each run (lead 11-21).
-- Next: the housing IGES rim (STATE); duct's Rhino V6/V7 + STEP-PRE after live's 17:20 UTC rerun; STL split and view
+- Next: SETLIB-IMAGES when live2 answers; duct's Rhino V6/V7 + STEP-PRE after live's 17:20 UTC rerun; STL split and view
   centres when live answers (REQUESTS dx 11-21 14:06 / 14:20); fast open step 4 (B-reps for selection) only when the
   lead says. vibex8 ~/agents/dx-open/target removed (landed).
 
