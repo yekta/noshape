@@ -481,6 +481,23 @@ fn rows() -> Vec<Row> {
             let rows = l.menu(cx);
             expect((rows.iter().any(|r| r == "Unconfigure suppression"), rows.iter().any(|r| r == "Configure suppression")), (false, true), &format!("Extrude 2's rows {rows:?}"))
         } },
+        Row { id: "menu / after a sketch's menu", live: "Section view… only with a sketch or plane selected: none on Extrude 1 with nothing selected; after a right-click on Sketch 2 and Esc (nothing shown selected) Extrude 1's own menu has it after Add selection to folder… (live psui 11-20 19:11, dm/secview.json)", gap: false, check: |l, cx| {
+            l.right_click(cx, "feature:Extrude 1");
+            let rows = l.menu(cx);
+            expect(rows.iter().any(|r| r == "Section view…"), false, &format!("nothing selected: rows {rows:?}"))?;
+            l.keys(cx, "escape");
+            l.right_click(cx, "feature:Sketch 2");
+            l.keys(cx, "escape");
+            l.right_click(cx, "feature:Extrude 1");
+            let rows = l.menu(cx);
+            let after = rows.iter().position(|r| r == "Add selection to folder…").and_then(|k| rows.get(k + 1)).cloned();
+            expect((after.as_deref(), l.selected(cx)), (Some("Section view…"), Vec::new()), &format!("after Sketch 2's menu: rows {rows:?}"))?;
+            l.keys(cx, "escape");
+            l.click(cx, "feature:Extrude 1", NONE);
+            l.right_click(cx, "feature:Extrude 1");
+            let rows = l.menu(cx);
+            expect(rows.iter().any(|r| r == "Section view…"), false, &format!("after a click: rows {rows:?}"))
+        } },
         Row { id: "menu / a feature and a part, on the part", live: "the one-part menu without Copy Part 2", gap: false, check: |l, cx| {
             l.click(cx, "feature:Extrude 1", NONE);
             l.click(cx, "part:Part 2", NONE);

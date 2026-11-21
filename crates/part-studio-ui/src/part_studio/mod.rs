@@ -6637,6 +6637,11 @@ impl PartStudioView {
                 })));
             }
             m = m.separator().item(folder);
+            // Live (behaviours "psui (11-20 19:11)"): a sketch row right-clicked, its menu closed, leaves the sketch
+            // selected unshown; the other rows' menus offer Section view… after Add selection to folder….
+            if let Some(sid) = view.read(cx).ui.menu_left.filter(|&s| s != id && !is_sketch) {
+                m = m.item(item("Section view…", Box::new(move |this, w, cx| this.section_through_all(&[Reference::Sketch(sid)], w, cx))).icon_name("menu-section-view"));
+            }
             if hideable {
                 m = m.separator().item(item(if hidden { "Show" } else { "Hide" }, Box::new(move |this, _, cx| {
                     let t: Vec<Reference> = targets(this).into_iter().map(Reference::Feature).collect();
@@ -7495,7 +7500,10 @@ impl Render for PartStudioView {
         self.ensure_filter_input(window, cx);
         self.ensure_config_box_inputs(window, cx);
         // A feature row's context menu closed: drop its highlight.
-        if self.ui.list_menu.is_some() && !crate::os_menu::is_open(cx) {
+        if let Some(id) = self.ui.list_menu
+            && !crate::os_menu::is_open(cx)
+        {
+            self.ui.menu_left = self.row_ctx.sketches.contains(&id).then_some(id);
             self.ui.list_menu = None;
             self.refresh_scene(false, cx);
         }
@@ -7522,8 +7530,15 @@ impl Render for PartStudioView {
             .relative()
             .key_context(if in_sketch { "PartStudio Sketch" } else { "PartStudio" })
             .track_focus(&self.focus)
-            .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| {
+            .capture_any_mouse_down(cx.listener(|this, e: &MouseDownEvent, window, cx| {
                 this.ui.panel_check_focus = None;
+                if e.button == MouseButton::Left {
+                    this.ui.menu_left = None;
+                    // A click that closes a row's menu leaves nothing selected behind it.
+                    if this.ui.list_menu.take().is_some() {
+                        this.refresh_scene(false, cx);
+                    }
+                }
                 // Keep keyboard shortcuts working after clicking the viewport or lists,
                 // without stealing focus from an input that just took it.
                 // (The tool search closes itself on clicks outside it.)

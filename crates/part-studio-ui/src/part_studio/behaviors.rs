@@ -721,6 +721,9 @@ pub struct UiState {
     /// Feature whose list context menu is open: its row and geometry stay
     /// highlighted (live menus/rmb-ps-featurelist-fillet.png).
     pub list_menu: Option<FeatureId>,
+    /// A sketch row whose menu closed with no left click since: live keeps the sketch selected, unshown, and other
+    /// rows' own menus offer Section view… through it (behaviours "psui (11-20 19:11)").
+    pub menu_left: Option<FeatureId>,
     /// Part whose Parts-list row menu is open: its eye hidden meanwhile (live2 nav-feel-1119).
     pub part_menu: Option<noshape_model::BodyId>,
     /// Dialog picks the preview consumed (a fillet's edges), drawn from the
@@ -1078,6 +1081,7 @@ impl UiState {
             row_sketches: Default::default(),
             menu_target: None,
             list_menu: None,
+            menu_left: None,
             part_menu: None,
             consumed_lines: None,
             shown_dims: None,
