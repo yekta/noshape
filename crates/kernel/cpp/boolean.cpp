@@ -9608,6 +9608,17 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
         }
         if (!done)
           done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, false, scaled_inputs);
+        // (Its cutters all at once taken for a non-manifold result where one at a time they aren't: c2-valve-config's
+        // drafted holes, one of them through a notch's wall; OCCT's cut there loses an edge live keeps.)
+        if (!done && !one_by_one && op == 1 && a.size() == 1 && t.size() >= 2 && t.size() <= 16 && opts.glue == 0 &&
+            rust_last_decline() == "a non-manifold result")
+        {
+          const KernelTimer one("boolean.rust.one_by_one");
+          rs         = srcs;
+          own.clear();
+          done       = rust_cut_one_by_one(a[0], t, opts, out, h);
+          one_by_one = done;
+        }
       }
     }
     if (done)

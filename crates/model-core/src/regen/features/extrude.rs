@@ -279,6 +279,18 @@ pub fn next_parts(ev: &EvalCtx) -> FResult<k::Shape> {
     Ok(k::Shape::compound(&solids))
 }
 
+/// How far along `dir` the parts reach past `profile`, with a tenth of their size to spare: a drafted Through all's
+/// length (the model's extent, 2 m at least, flared c2-valve-config's drafted holes into cones a metre wide, meeting
+/// below its disc, and their cut took one at a time). None where no part lies ahead.
+fn reach(ev: &EvalCtx, profile: &k::Shape, dir: DVec3) -> Option<f64> {
+    let (a, b) = ev.ctx.bounds()?;
+    let p = profile.bounding_box(false).ok()?;
+    let dir = dir.normalize_or_zero();
+    let corners = |lo: DVec3, hi: DVec3| (0..8).map(move |i| DVec3::new(if i & 1 == 0 { lo.x } else { hi.x }, if i & 2 == 0 { lo.y } else { hi.y }, if i & 4 == 0 { lo.z } else { hi.z }).dot(dir));
+    let far = corners(a, b).fold(f64::MIN, f64::max) - corners(p.min, p.max).fold(f64::MAX, f64::min);
+    (far > 0.0).then(|| far + 0.1 * (b - a).length())
+}
+
 /// One extrusion of `profile` from its plane along `dir` to `end`.
 fn one_side(profile: &k::Shape, dir: DVec3, end: End, draft: f64) -> FResult<k::OpResult> {
     Ok(match end {
@@ -327,6 +339,15 @@ fn extrude_profile(ev: &EvalCtx, p: &Profile, dir: DVec3) -> FResult<NamedShape>
     }
     let profile = if start_shift.length() > 0.0 { p.shape.translated(start_shift)? } else { p.shape.clone() };
     let named = |res: k::OpResult| NamedShape::new(res.shape.clone(), sweep_names(ev, p, &res, true, true));
+    // (A cut's or intersect's only: a New or Add body keeps its whole length.)
+    let cuts = matches!(ev.seed_op.as_deref().unwrap_or(ev.enum_("operationType")), "REMOVE" | "INTERSECT");
+    let end = match end {
+        End::Distance(d) if cuts && bound == "THROUGH_ALL" && draft != 0.0 => {
+            let r = if symmetric { reach(ev, &profile, dir).zip(reach(ev, &profile, -dir)).map(|(a, b)| 2.0 * a.max(b)) } else { reach(ev, &profile, dir) };
+            End::Distance(r.map_or(d, |r| r.min(d)))
+        }
+        e => e,
+    };
 
     // std splits a drafted symmetric extrude at the profile plane and drafts
     // both halves away from it.
@@ -353,6 +374,10 @@ fn extrude_profile(ev: &EvalCtx, p: &Profile, dir: DVec3) -> FResult<NamedShape>
             if ev.bool("secondDirectionDraftPullDirection") { a } else { -a }
         } else {
             0.0
+        };
+        let end2 = match end2 {
+            End::Distance(d) if cuts && bound2 == "THROUGH_ALL" && draft2 != 0.0 => End::Distance(reach(ev, &profile, d2).map_or(d, |r| r.min(d))),
+            e => e,
         };
         (end, d2, end2, draft2)
     };

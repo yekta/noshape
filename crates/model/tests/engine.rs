@@ -203,6 +203,29 @@ fn a_region_picked_twice_extrudes_once() {
     assert!(near(total_volume(&res.context), 0.02 * 0.01 * 0.005, 1e-9));
 }
 
+/// A drafted Through all cut patterned with Reapply (c2-valve-config's Circular pattern 1): each hole is the cone's
+/// frustum through the block (its cutters reach just past the part, not 2 m on, where they flared into each other).
+#[test]
+fn reapplied_drafted_through_all_holes() {
+    let mut t = T::new();
+    let (_, cut) = pocket_setup(&mut t);
+    t.set(cut, "endBound", en("THROUGH_ALL"));
+    t.set(cut, "hasDraft", b(true));
+    t.set(cut, "draftAngle", e("10 deg"));
+    feature_pattern(&mut t, vec![cut], "4", true);
+    let res = t.ok();
+    assert_eq!(res.context.bodies.len(), 1);
+    assert!(res.context.bodies[0].shape.is_valid());
+    // Radius 3 mm at the top, 10 mm down at 10 deg (narrowing or widening).
+    let frustum = |s: f64| {
+        let (r0, h) = (0.003, 0.01);
+        let r1 = r0 + s * h * 10f64.to_radians().tan();
+        PI * h * (r0 * r0 + r0 * r1 + r1 * r1) / 3.0
+    };
+    let removed = BLOCK_V - total_volume(&res.context);
+    assert!(near(removed, 4.0 * frustum(1.0), 1e-6) || near(removed, 4.0 * frustum(-1.0), 1e-6), "{removed}");
+}
+
 #[test]
 fn reapplied_pocket_pattern_follows_seed_edits() {
     let mut t = T::new();

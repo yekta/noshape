@@ -1383,10 +1383,12 @@ fn seed_tool(ev: &EvalCtx, f: FeatureId) -> Option<Shape> {
     let eval_fn = super::evaluator(&seed.type_id)?;
     let tmp = FeatureId(mix(&[ev.feature.0, f.0, u64::from(u32::MAX)]) | (1 << 62));
     let mut params = crate::regen::eval::expand_query_variables(&seed.params, &ev.ctx).unwrap_or_else(|| seed.params.clone());
+    let seed_op = Some(params.enum_("operationType").to_string());
     params.set("operationType", crate::params::ParamValue::Enum("NEW".into()));
     let mut sub = EvalCtx::new(tmp, &seed.name, &params, ev.units, ev.ctx.clone(), ev.outer_vars);
     sub.features = ev.features;
     sub.scratch = true;
+    sub.seed_op = seed_op;
     sub.cancel = ev.cancel.clone();
     eval_fn(&mut sub).ok()?;
     let made: Vec<Shape> = sub.ctx.bodies.iter().filter(|b| b.id.feature == tmp).map(|b| b.shape.clone()).collect();
@@ -2090,6 +2092,7 @@ fn reapply_as_tools(ev: &mut EvalCtx, seeds: &[&EffectiveFeature], ops: &[Option
             let mut sub = EvalCtx::new(tmp, &seed.name, &params, units, scratch, outer_vars);
             sub.features = features;
             sub.scratch = true;
+            sub.seed_op = ops[si].clone();
             sub.cancel = cancel.clone();
             sub.xform = Some(total);
             sub.custom = custom.clone();

@@ -218,6 +218,8 @@ pub struct EvalCtx<'a> {
     /// distance to every part, per instance; user bug 10-24, a second fin
     /// pattern under a plate already carrying 400 fins).
     pub scratch: bool,
+    /// The seed's own operation (`operationType`) while a pattern evaluates it as New for its tool.
+    pub seed_op: Option<String>,
     /// Its tool's touched parts wanted ([`super::RegenOptions::touch_probe`]).
     pub probe_touched: bool,
 }
@@ -403,7 +405,7 @@ impl<'a> EvalCtx<'a> {
     /// A context for evaluating one feature (no feature list, no pattern
     /// transform, not editing a sketch).
     pub fn new(feature: FeatureId, name: &'a str, params: &'a ParamValues, units: &'a UnitPrefs, ctx: Context, outer_vars: &'a BTreeMap<String, Quantity>) -> Self {
-        EvalCtx { aliases: Default::default(), feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), manipulators: Vec::new(), touched: Vec::new(), error_shapes: Vec::new(), error_bodies: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), editing_sketch: None, derived: None, features: Features::default(), xform: None, custom: None, custom_type: None, cancel: None, scratch: false, probe_touched: false }
+        EvalCtx { aliases: Default::default(), feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), manipulators: Vec::new(), touched: Vec::new(), error_shapes: Vec::new(), error_bodies: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), editing_sketch: None, derived: None, features: Features::default(), xform: None, custom: None, custom_type: None, cancel: None, scratch: false, seed_op: None, probe_touched: false }
     }
 
     /// Puts the merged faces' other names noted while naming into the context's bodies (before the context is handed
