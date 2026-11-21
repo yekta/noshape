@@ -36,9 +36,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (04:06 UTC 11-21)
+## Now (05:35 UTC 11-21)
 
-QUEUED 3714e6ce 04:05: the whole fc-1120 batch (item 6 b) + CUTLIST-WHEEL-SIDEWAYS + rollback-bar row menus
+3714e6ce FAILED 04:40 (row_keys test: the sketch under the bar now shown, not only drawn); fixed forward,
+LANDED a071525a as 7de5b356 05:33 with live's Section view rule: the whole fc-1120 batch (item 6 b) + CUTLIST-WHEEL-SIDEWAYS + rollback-bar row menus
 (menu_left now any sketch row, also rolled back). Tests green on vibex6: sketch 202, scene sketch_mode 166,
 part-studio-ui list/sketch_hover/cut_list 41, ops studio:: 5, clippy. On land: tell qa (CUTLIST to verify).
 
@@ -122,7 +123,8 @@ part-studio-ui list/sketch_hover/cut_list 41, ops studio:: 5, clippy. On land: t
    (behaviours "psui 11-21 04:12", secmenu-1121): only while the selection already holds a planar item (plane, sketch,
    planar face), the same sketch included (its own right-click + Esc, or a row click). Ours now: a sketch row's
    Section view… only when it was selected before (menu_left or selected_features); list row "menu / one sketch".
-   "After" uip rerun of the 33 (ps-names.txt) on the batch's tree: vibex8 ~/tmp/psui/ps6, log /root/psui-scratch/ps6.log.
+   "After" uip rerun of the 33 (ps-names.txt) on the batch's tree (vibex8 ~/tmp/psui/ps6, log /root/psui-scratch/ps6.log,
+   05:2x): 33/33 scenarios, 308/308 states (before 29/33, 300/308).
    Mac: incremental dirs got emptied mid-build twice (11-21 02:4x, 03:1x): runs use CARGO_INCREMENTAL=0.
    c) Sent 22:5x: studios 8 (drw-centermark, drw-inspection-table-iso-scrolled, drw-revision-table-delete; not run:
    drw-quad-mid-snap, doc-folder-drag-to-all-tabs, docs-advanced-search-help, docs-folder-crumb, vs-ps-own-table-menu),
