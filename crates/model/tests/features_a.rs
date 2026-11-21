@@ -402,6 +402,30 @@ fn a_surface_extrude_makes_one_surface_per_chain_of_curves() {
     assert_eq!(faces, vec![1, 4], "a surface for the arc and one for the rectangle");
 }
 
+/// std boolean.fs: a Union of surfaces makes a solid where they close (makeSolid; live c2-surf-workshop-knifehandle's
+/// Boolean 1): two hemispheres revolved apart are one solid sphere.
+#[test]
+fn a_union_of_surfaces_that_close_is_a_solid() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let axis = sk.add_line(DVec2::new(0.0, -0.02), DVec2::new(0.0, 0.02));
+    let top = sk.add_arc(DVec2::ZERO, DVec2::new(0.01, 0.0), DVec2::new(0.0, 0.01));
+    let bottom = sk.add_arc(DVec2::ZERO, DVec2::new(0.0, -0.01), DVec2::new(0.01, 0.0));
+    let s = t.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let ent = |entity| Reference::SketchEntity { sketch: s, entity };
+    let halves: Vec<FeatureId> = [top, bottom]
+        .into_iter()
+        .map(|arc| t.add("revolve", &[("bodyType", en("SURFACE")), ("surfaceEntities", q(vec![ent(arc.0)])), ("axis", q(vec![ent(axis.0)])), ("revolveType", en("FULL"))]))
+        .collect();
+    t.add("booleanBodies", &[("operationType", en("UNION")), ("tools", q(halves.iter().map(|&f| body_ref(&BodyId { feature: f, index: 0 })).collect()))]);
+    let res = t.ok();
+    assert_eq!(res.context.bodies.len(), 1, "one part");
+    let b = &res.context.bodies[0];
+    assert_eq!(b.kind, noshape_model::display::BodyKind::Solid);
+    let v = 4.0 / 3.0 * std::f64::consts::PI * 1e-6;
+    assert!((b.shape.volume().unwrap() - v).abs() < 1e-6 * v, "{} vs {v}", b.shape.volume().unwrap());
+}
+
 /// std Loft (loft.fs): a connection on edges sits at each edge's connectionEdgeParameters (std's editing logic puts a
 /// new pick at 0.5, its connection manipulator "connection,edge" moves it along the edge's tangent), and, as live
 /// 1810, adds no vertex, edge or face: between parallel edges the side face stays a plane (the frustum, 7000 mm³, 6

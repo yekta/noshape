@@ -42,7 +42,13 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
             // ☑ Keep tools: the union is a new part and the tools stay as they were (live, asm-hand-drill-pinslot's
             // studio 9fbc05: three parts after it, the union 3605.4 mm³ and both gears unchanged; as Intersect's).
             let kept = ev.bool("keepTools").then(|| ev.ctx.bodies.clone());
+            let surfaces: Vec<_> = picked.iter().filter_map(|&i| ev.ctx.bodies.get(i)).filter(|b| b.kind == crate::display::BodyKind::Surface).map(|b| b.id.clone()).collect();
             ev.fuse_targets(&picked, Vec::new(), &k::BooleanOptions::default())?;
+            // Surfaces united: a solid where they close, as std's makeSolid (c2-surf-workshop-knifehandle's Boolean 1: the
+            // Handle and its end cap one solid part, as live).
+            if surfaces.len() == picked.len() {
+                super::bshared::close_surfaces(ev, &surfaces)?;
+            }
             if let Some(saved) = kept
                 && ev.ctx.bodies.len() < before
             {
