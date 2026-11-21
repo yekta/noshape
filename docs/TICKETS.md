@@ -342,7 +342,7 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - [ ] P0 **FEEL-FIELD-VERTEX-EDGE (psui)**: in the Fillet field, the pointer on the block's top front right corner lights the top
   front edge in live (the field takes edges and faces, the same id as hovering that edge); ours lights the vertical edge.
   Live b3/dlg-vertex-hover_f.
-- [ ] P0 **FEEL-FIELD-PICK-PREVIEW (psui)**: 1.2 s after picking an edge in the Fillet field, live shows the #FFA90A band and the
+- [x] withdrawn (qa 18:3x: live's dialog had the account's last-used 1.3 mm radius, a 4.6 px preview at this zoom; ours 5 mm, the first-use default; re-scored at 1.3 mm) ~~P0 **FEEL-FIELD-PICK-PREVIEW (psui)**~~: 1.2 s after picking an edge in the Fillet field, live shows the #FFA90A band and the
   radius manipulator with the edge still sharp; ours also draws the rounded preview (tangent lines, the shaded round). Also with
   the picked edge hovered and with a face hovered. Live b3/dlg-edge-selected_s, dlg-edge-selhover_f, dlg-face-otherhover_f (asked
   live when its preview appears).

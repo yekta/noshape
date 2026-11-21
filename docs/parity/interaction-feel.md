@@ -942,9 +942,9 @@ A feature dialog's selection field and the origin (batch 3; 0 / 11 on green 4f2c
 | Fillet field, midpoint hovered | = the edge (no marker, no ring) | = our edge | ≠ P0 FEEL-FIELD-HOVER-DIM |
 | Fillet field, face hovered | 2 px #FFC685 boundary | boundary muted #B28A5D | ≠ P0 FEEL-FIELD-HOVER-DIM |
 | Fillet field, vertex hovered | the top front edge lights (the field takes edges and faces) | the vertical edge lights, muted | ≠ P0 FEEL-FIELD-VERTEX-EDGE, FEEL-FIELD-HOVER-DIM |
-| Fillet field, edge picked | #FFA90A band + the radius manipulator, the edge still sharp | band + manipulator + the rounded preview drawn | ≠ P0 FEEL-FIELD-PICK-PREVIEW |
-| Fillet field, picked edge hovered | = picked | = our picked | ≠ P0 FEEL-FIELD-PICK-PREVIEW |
-| Fillet field, face hovered with an edge picked | the edge #FFA90A, the face boundary #FFC685 | preview drawn, boundary muted | ≠ P0 FEEL-FIELD-PICK-PREVIEW, FEEL-FIELD-HOVER-DIM |
+| Fillet field, edge picked | #FFA90A band + the radius manipulator + the preview at live's 1.3 mm radius (4.6 px) | at 1.3 mm: pending | – |
+| Fillet field, picked edge hovered | = picked | at 1.3 mm: pending | – |
+| Fillet field, face hovered with an edge picked | the edge #FFA90A, the face boundary #FFC685 | boundary muted | ≠ P0 FEEL-FIELD-HOVER-DIM |
 | origin at the block's corner, hovered | the +x edge through it lights; the origin stays a black ring | the vertical edge lights, with its black midpoint marker | ≠ P0 FEEL-ORIGIN-HOVER-EDGE |
 | origin, clicked | the +x edge selected | the vertical edge selected | ≠ P0 FEEL-ORIGIN-HOVER-EDGE |
 | origin, selected + hovered | = selected | = our selected | ≠ P0 FEEL-ORIGIN-HOVER-EDGE |
