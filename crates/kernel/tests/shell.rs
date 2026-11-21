@@ -1698,6 +1698,25 @@ fn a_ring_thinner_than_its_wall_shells_as_live() {
     assert!((a - 1086.4116).abs() < 1.0, "{a} mm²");
 }
 
+/// The same Shell with Extrude 1 at 9.6 and 10.4 mm (our Fillet 1's 21-face input there; live's has 17): the fillet's
+/// tangent edges end on the removed band (split corners on a removed wall, 10-55 µm bridges), an offset curve crosses
+/// onto a tangent neighbour 2.3 µm off its edge, and the bore band's pieces cross where its parameter wraps. Built
+/// directly, valid, every wall 1 mm within 3 µm (measured), 51 faces.
+#[test]
+fn a_ring_with_a_deeper_band_shells_directly() {
+    for (depth, want) in [("9.6", 587.5996), ("10.4", 635.1738)] {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("tests/data/shell/rings-loft-shell1-{depth}-input.brep"));
+        let s = read_brep(&path).unwrap();
+        let faces = s.faces();
+        assert_eq!(faces.len(), 21, "{depth} mm");
+        let r = shell_solid(&s, &[faces[2].clone(), faces[13].clone()], 1e-3, ShellSide::Inside, ShellMethod::Quadrics).unwrap().shape;
+        assert!(r.is_valid(), "{depth} mm");
+        let v = vol(&r) * 1e9;
+        assert_eq!(r.count(ShapeType::Face), 51, "{depth} mm: {v} mm³");
+        assert!((v / want - 1.0).abs() < 1e-4, "{depth} mm: {v} mm³");
+    }
+}
+
 /// c2-impeller-loft's Shell Gehäuse (3 mm inward, both planar faces removed) on live's loft (REQUESTS 2228: two
 /// B-spline faces from a circle to a D, the inlet's tangent to the D's plane at x = 10): live's 6 faces, 16 edges and
 /// 12 vertices. The inlet's wall runs on past its edge until it meets the opening's plane (its own polynomials curl

@@ -5990,11 +5990,13 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
     }
     else if (fs.size() == 4 && es.size() == 4 && std::count_if(es.begin(), es.end(), [&](int e) { return tangent[(size_t)e] != 0; }) == 2
              && std::none_of(es.begin(), es.end(), [&](int e) { return seam[(size_t)e] != 0 || group[(size_t)e] != 0; })
-             && std::all_of(fs.begin(), fs.end(), [&](int f) { return kept[(size_t)f] != 0; }))
+             && std::count_if(fs.begin(), fs.end(), [&](int f) { return kept[(size_t)f] == 0; }) <= 1)
     {
       // Two tangent edges on one face (the hinge) and a wall across (Shell 4: a ramp tangent to a fillet tangent to
       // the top, ending on a round wall): the offsets meet in two corners, each tangent edge's where it meets the
       // wall's offset, and the cavity has an edge between them on the hinge's and the wall's offsets (Parasolid's).
+      // (A removed wall alike, its offset itself: c2-rings-loft's Shell 1 with Extrude 1 at 9.6 mm, its fillet's
+      // tangent edges ending on the removed face.)
       SplitCorner sp{};
       sp.v = i;
       sp.e1 = sp.e2 = sp.w1 = sp.w2 = -1;
@@ -6020,6 +6022,8 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
       }
       if (sp.wall < 0 || sp.w1 < 0 || sp.w2 < 0 || find(i) != i)
         return no("a corner of four faces not two tangent edges and a wall");
+      if (!kept[(size_t)sp.hinge] || !kept[(size_t)x1] || !kept[(size_t)x2])
+        return no("a corner of two tangent edges on a removed face");
       if (const char* why = tangent_corner(sp.e1, efi[(size_t)sp.e1][0], sp.wall, x))
         return no(why);
       if (const char* why = tangent_corner(sp.e2, efi[(size_t)sp.e2][0], sp.wall, sp.pb))
@@ -6135,6 +6139,21 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
     pts[(size_t)i] = x;
   }
   lap("corners");
+  // A tangent edge whose two corners are one: its offset is a point there (c2-rings-loft's Shell 1 at Extrude 1 9.6 mm,
+  // the loft's inner edge ending a wall's thickness above the removed base: its wall's offset touches the base there,
+  // live one edge fewer). It goes, its corners one vertex.
+  for (int i = 1; i <= ne; ++i)
+  {
+    if (!tangent[(size_t)i] || gone[(size_t)i] || seam[(size_t)i] || cseam[(size_t)i] || group[(size_t)i] != 0 || degen[(size_t)i])
+      continue;
+    TopoDS_Vertex a, b;
+    TopExp::Vertices(TopoDS::Edge(edges(i)), a, b);
+    const int ia = find(verts.FindIndex(a)), ib = find(verts.FindIndex(b));
+    if (ia == ib || vsplit[(size_t)ia] >= 0 || vsplit[(size_t)ib] >= 0 || gp_Pnt(pts[(size_t)ia]).Distance(gp_Pnt(pts[(size_t)ib])) > 1e3 * tol)
+      continue;
+    gone[(size_t)i]   = 1;
+    vrep[(size_t)ib] = ia;
+  }
   // The edges' offsets.
   BRep_Builder               bld;
   std::vector<TopoDS_Vertex> vx(nv + 1);
@@ -6908,14 +6927,17 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
     }
     GeomAPI_IntSS           is(sf[(size_t)sp.hinge].off, sf[(size_t)sp.wall].off, 1e-9 * size);
     occ::handle<Geom_Curve> c;
-    double                  u0 = 0, u1 = 0;
+    double                  u0 = 0, u1 = 0, off = 0;
+    // (Within OCCT's confusion: the intersection's fit 9e-8 off a 55 µm bridge's end, c2-rings-loft's Shell 1.)
+    const double within = std::max(1e3 * tol, Precision::Confusion());
     for (int k = 1; is.IsDone() && k <= is.NbLines() && c.IsNull(); ++k)
     {
       occ::handle<Geom_Curve>     cand = is.Line(k);
       GeomAPI_ProjectPointOnCurve pa(A, cand), pb(B, cand);
-      if (pa.NbPoints() == 0 || pb.NbPoints() == 0 || pa.LowerDistance() > 1e3 * tol || pb.LowerDistance() > 1e3 * tol)
+      if (pa.NbPoints() == 0 || pb.NbPoints() == 0 || pa.LowerDistance() > within || pb.LowerDistance() > within)
         continue;
-      u0 = pa.LowerDistanceParameter();
+      off = std::max(pa.LowerDistance(), pb.LowerDistance());
+      u0  = pa.LowerDistanceParameter();
       u1 = pb.LowerDistanceParameter();
       if (cand->IsPeriodic())
       {
@@ -6931,8 +6953,30 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
       }
       c = cand;
     }
+    if (c.IsNull() && A.Distance(B) > 10 * tol)
+    {
+      // A short bridge the intersection splits between two curves (Shell 1 at 10.4 mm, 10 µm): straight, where that
+      // lies on both offsets.
+      bool on = true;
+      for (const double w : {0.25, 0.5, 0.75})
+      {
+        const gp_XYZ p = A.XYZ() + (B.XYZ() - A.XYZ()) * w;
+        on = on && std::abs(quad::eval(sf[(size_t)sp.hinge], p)) <= within && std::abs(quad::eval(sf[(size_t)sp.wall], p)) <= within;
+      }
+      if (on)
+      {
+        c  = new Geom_Line(A, gp_Dir(gp_Vec(A, B)));
+        u0 = 0;
+        u1 = A.Distance(B);
+      }
+    }
     if (c.IsNull())
       return no("a split corner's edge not found");
+    if (off > 1e3 * tol)
+    {
+      bld.UpdateVertex(vx[(size_t)sp.v], 1.05 * off);
+      bld.UpdateVertex(sp.vb, 1.05 * off);
+    }
     BRepBuilderAPI_MakeEdge mk(c, vx[(size_t)sp.v], sp.vb, u0, u1);
     if (!mk.IsDone())
       return no("a split corner's edge failed");
@@ -6972,6 +7016,47 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
     for (const TopoDS_Edge& pe : pieces[i])
       h_rim_edges.emplace_back(edges(i), pe);
   }
+  // A split corner's edge on a face (surface g): projected, a whole number of periods on to start where its first
+  // corner's edge `by` ends on the face. (Not projected, a short bridge on a free-form offset (c2-rings-loft's Shell 1
+  // at 9.6 mm, 55 µm): straight between its ends' feet, the edge as tolerant as that is off it.)
+  auto bridge_curve = [&](const SplitCorner& sp, const TopoDS_Face& face, const occ::handle<Geom_Surface>& g, const TopoDS_Edge& by) {
+    double                          f0, f1, b0, b1;
+    const occ::handle<Geom2d_Curve> pby = BRep_Tool::CurveOnSurface(by, face, f0, f1);
+    const occ::handle<Geom_Curve>   c3  = BRep_Tool::Curve(sp.bridge, b0, b1);
+    if (pby.IsNull() || c3.IsNull())
+      return false;
+    occ::handle<Geom2d_Curve> pc   = GeomProjLib::Curve2d(c3, b0, b1, g);
+    double                    wide = 1e3 * tol;
+    if (pc.IsNull())
+    {
+      ShapeAnalysis_Surface        sas(g);
+      const gp_Pnt2d               q0 = sas.ValueOfUV(c3->Value(b0), 1e3 * tol), q1 = sas.NextValueOfUV(q0, c3->Value(b1), 1e3 * tol);
+      NCollection_Array1<gp_Pnt2d> poles(1, 2);
+      NCollection_Array1<double>   knots(1, 2);
+      NCollection_Array1<int>      mults(1, 2);
+      poles(1) = q0, poles(2) = q1, knots(1) = b0, knots(2) = b1, mults(1) = mults(2) = 2;
+      pc = new Geom2d_BSplineCurve(poles, knots, mults, 1);
+      for (int p = 0; p <= 8; ++p)
+      {
+        const double   u  = b0 + (b1 - b0) * p / 8;
+        const gp_Pnt2d uv = pc->Value(u);
+        wide              = std::max(wide, 1.5 * g->Value(uv.X(), uv.Y()).Distance(c3->Value(u)));
+      }
+      if (wide > 0.1 * c3->Value(b0).Distance(c3->Value(b1)))
+        return false;
+    }
+    const gp_Pnt2d at = pby->Value(TopExp::FirstVertex(by).IsSame(vx[(size_t)sp.v]) ? f0 : f1), p = pc->Value(b0);
+    const double   du = g->IsUPeriodic() ? std::round((at.X() - p.X()) / g->UPeriod()) * g->UPeriod() : 0;
+    const double   dv = g->IsVPeriodic() ? std::round((at.Y() - p.Y()) / g->VPeriod()) * g->VPeriod() : 0;
+    if (du != 0 || dv != 0)
+      pc = occ::down_cast<Geom2d_Curve>(pc->Translated(gp_Vec2d(du, dv)));
+    bld.UpdateEdge(sp.bridge, pc, face, wide);
+    bld.Range(sp.bridge, face, b0, b1);
+    if (wide > 1e3 * tol)
+      for (TopExp_Explorer x(sp.bridge, TopAbs_VERTEX); x.More(); x.Next())
+        bld.UpdateVertex(TopoDS::Vertex(x.Current()), std::max(BRep_Tool::Tolerance(TopoDS::Vertex(x.Current())), wide));
+    return true;
+  };
   lap("edges");
   bool ok_wires = true;
   auto offset_wire = [&](const TopoDS_Shape& w) {
@@ -7354,23 +7439,8 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
         {
           if (sp.hinge != i && sp.wall != i)
             continue;
-          // A split corner's edge: projected, a whole number of periods on to start where its first corner's edge
-          // ends on the face.
-          const TopoDS_Edge&              by = ex[(size_t)(sp.hinge == i ? sp.e1 : sp.w1)];
-          double                          f0, f1, b0, b1;
-          const occ::handle<Geom2d_Curve> pby = BRep_Tool::CurveOnSurface(by, of, f0, f1);
-          const occ::handle<Geom_Curve>   c3  = BRep_Tool::Curve(sp.bridge, b0, b1);
-          occ::handle<Geom2d_Curve>       pc  = c3.IsNull() ? nullptr : GeomProjLib::Curve2d(c3, b0, b1, sf[(size_t)i].off);
-          if (pby.IsNull() || pc.IsNull())
+          if (!bridge_curve(sp, of, sf[(size_t)i].off, ex[(size_t)(sp.hinge == i ? sp.e1 : sp.w1)]))
             return no("a split corner's edge's curve on its face failed");
-          const gp_Pnt2d at = pby->Value(TopExp::FirstVertex(by).IsSame(vx[(size_t)sp.v]) ? f0 : f1), p = pc->Value(b0);
-          const occ::handle<Geom_Surface>& g = sf[(size_t)i].off;
-          const double du = g->IsUPeriodic() ? std::round((at.X() - p.X()) / g->UPeriod()) * g->UPeriod() : 0;
-          const double dv = g->IsVPeriodic() ? std::round((at.Y() - p.Y()) / g->VPeriod()) * g->VPeriod() : 0;
-          if (du != 0 || dv != 0)
-            pc = occ::down_cast<Geom2d_Curve>(pc->Translated(gp_Vec2d(du, dv)));
-          bld.UpdateEdge(sp.bridge, pc, of, 1e3 * tol);
-          bld.Range(sp.bridge, of, b0, b1);
         }
       }
       const TopoDS_Face inner = TopoDS::Face(of.Oriented(outward ? f.Orientation() : TopAbs::Reverse(f.Orientation())));
@@ -7589,6 +7659,11 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
             if (!quad::add_pcurve(ex[(size_t)k], rim, TopoDS::Edge(edges(k).Oriented(TopAbs_FORWARD)), ff, false, 1e3 * tol))
               return no("an offset edge's curve on a removed face failed");
           }
+        // (A removed wall's split corners: their edges on it too.)
+        if (sf[(size_t)i].kind != GeomAbs_Plane)
+          for (const SplitCorner& sp : splits)
+            if (!sp.rim && sp.wall == i && !bridge_curve(sp, rim, BRep_Tool::Surface(ff), ex[(size_t)sp.w1]))
+              return no("a split corner's edge's curve on a removed face failed");
         const TopoDS_Face r = TopoDS::Face(rim.Oriented(f.Orientation()));
         bld.Add(shell, r);
         h->AddModified(f, r);
@@ -8317,7 +8392,9 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
                     P.sag = std::max(P.sag, (c3->Value(c0 + (c1 - c0) * (k + 0.5) / 64).XYZ() - 0.5 * (P.pts[(size_t)k] + P.pts[(size_t)k + 1])).Modulus());
                   pl = env.lines.emplace(E.TShape().get(), std::move(P)).first;
                 }
-                const double reach = std::max(10 * BRep_Tool::Tolerance(E), 1e-3 * thickness);
+                // (An edge to a tangent neighbour lies where two nearly tangent offsets meet: a little apart across it.)
+                const bool   tangent_to = smooth.count({std::min(o, oj), std::max(o, oj)}) > 0;
+                const double reach      = std::max(10 * BRep_Tool::Tolerance(E), (tangent_to ? 1e-2 : 1e-3) * thickness);
                 double       dmin  = 1e300;
                 size_t       kmin  = 0;
                 for (size_t k = 0; k + 1 < pl->second.pts.size(); ++k)
@@ -8956,6 +9033,43 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
                 }
               }
             }
+        }
+      }
+      // On a periodic surface each loop's curves a whole period on where they don't follow on from the one before (new
+      // edges' curves fall either side of where the parameter wraps: c2-rings-loft's bore band at 9.6 mm).
+      for (size_t li = 0; li < loops.size(); ++li)
+      {
+        const TopoDS_Face&              Fl = on_fb.count(li) ? Fb : Ff;
+        const occ::handle<Geom_Surface> Sl = BRep_Tool::Surface(Fl);
+        if (!Sl->IsUPeriodic() && !Sl->IsVPeriodic())
+          continue;
+        auto ends = [&](const TopoDS_Edge& e, gp_Pnt2d& a, gp_Pnt2d& z) {
+          double                          e0, e1;
+          const occ::handle<Geom2d_Curve> ce = BRep_Tool::CurveOnSurface(e, Fl, e0, e1);
+          if (ce.IsNull())
+            return false;
+          const bool rev = e.Orientation() == TopAbs_REVERSED;
+          a = ce->Value(rev ? e1 : e0), z = ce->Value(rev ? e0 : e1);
+          return true;
+        };
+        gp_Pnt2d a, z, last;
+        if (loops[li].empty() || !ends(loops[li][0], a, last))
+          continue;
+        for (size_t k = 1; k < loops[li].size(); ++k)
+        {
+          const TopoDS_Edge& e = loops[li][k];
+          if (!ends(e, a, z))
+            break;
+          const double du = Sl->IsUPeriodic() ? std::round((last.X() - a.X()) / Sl->UPeriod()) * Sl->UPeriod() : 0;
+          const double dv = Sl->IsVPeriodic() ? std::round((last.Y() - a.Y()) / Sl->VPeriod()) * Sl->VPeriod() : 0;
+          last = gp_Pnt2d(z.X() + du, z.Y() + dv);
+          if ((du == 0 && dv == 0) || BRep_Tool::IsClosed(e, Fl))
+            continue;
+          const TopoDS_Edge               ef = TopoDS::Edge(e.Oriented(TopAbs_FORWARD));
+          double                          e0, e1;
+          const occ::handle<Geom2d_Curve> ce = BRep_Tool::CurveOnSurface(ef, Fl, e0, e1);
+          bld.UpdateEdge(ef, occ::down_cast<Geom2d_Curve>(ce->Translated(gp_Vec2d(du, dv))), Fl, BRep_Tool::Tolerance(ef));
+          bld.Range(ef, Fl, e0, e1);
         }
       }
       // Outer loops (going round anticlockwise in the face's parameters) and the holes inside them.
