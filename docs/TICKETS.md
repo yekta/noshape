@@ -51,6 +51,9 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
 - [ ] P2 **SHELL5-AFTER-SHELL3 (bool)**: Shell 5 (Part 2, 3 mm inward, a Shell 3 face of 1475.653 mm2 and a Linear pattern 2
   face of 282.843 mm2 removed) fails in ours ("Could not shell part with selections.", 25.4 s); live OK in 20 ms, Part 2
   172908.326 mm3, 59 faces / 163 edges / 98 vertices. Ours before Shell 5 = live's (49 faces, 175798.2 mm3).
+- [x] verified green 9612b4685 (qa 11-21 07:0x, CLI on a copy of cli-shell-hang-pre, /root/qa-scratch/shell3/s3l.py: Part 3 after Shell 3 = 60 faces / 161 edges / 97 vertices, 183072.287 mm3; fixed by f724d647 ("Shell's wall at a concave edge between a cylinder and a plane")) P2 **SHELL3-PART3-CONE-FACE (bool)**: live Part 3 after Shell 3 is 59 faces / 183072.272 mm3;
+  ours had 141 faces (SHELL-AFTER-WELD-FILLET follow-up); now 60 (one cone face in two, the 0.015 mm3 within live's band). Shell 3 and Shell 5 stay
+  open above (this run, not a quiet window: Shell 3 17.1 s, Shell 5 Error in 34.8 s).
 
 ## qa, 2026-11-21 (asm P2 walk, green b3ece860, vibe2; evidence /root/qa-scratch/walk2)
 - [x] verified green 665560c83 (qa 11-21 06:4x, 9c6d96bbf: assembly_mate_connector on the bare corner vertex and the app's corner snap in the Face tab's reference field are world-aligned (Z up, X along world X): 106666.664 / 160000 / 426666.657 / 533333.321 mm⁴, as live but FACE-MOMENT-DIGITS; a connector made before the fix keeps its stored frame; walk2/n6z, n7c.png, src/massop.py) P2 **ASM-VERTEX-CONNECTOR-WORLD-AXES (asm)**: live: a vertex's implicit mate connector is world-aligned (behaviours.md
