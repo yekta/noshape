@@ -113,7 +113,7 @@ over a plain 2 s wait, and 0, 1, 0, 1 after (live2 drw-centermark-align; drw-cen
 placed). Where a wait changes live's count, the take's centermarks aren't compared (run.py `centermarks_unread`), and
 ours is checked against its own expected count instead, an `expect` entry per step:
 
-    "expect": [{"after": 3, "centermarks": 0, "live": "dx q-centermark: the Single mark placed on the automatic one goes on Esc"}]
+    "expect": [{"after": 3, "centermarks": 1, "live": "live retake 996d6b8a: the Single mark placed on the automatic one stays after Esc"}]
 
 A miss fails the take ("expect differs").
 

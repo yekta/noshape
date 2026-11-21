@@ -2982,3 +2982,104 @@ fn a_right_clicked_revision_table_reads_in_tops_box_not_fronts(cx: &mut TestAppC
     let s = read(cx);
     assert_eq!(s, json!([{ "kind": "EDGE", "owner": "Top" }]), "its orange read in Top's box alone");
 }
+
+/// ui-parity drw-inspection-diameter s13-s14: an inspection item's red-orange bubble inside Top's box reads EDGE Top
+/// with nothing selected (live: Esc in the Inspection table left Top lit); above the box (drw-inspection-item: 1.575's
+/// over Front) or with inspection items hidden, nothing.
+#[gpui::test]
+fn an_inspection_bubble_in_a_views_box_reads_lit_with_nothing_selected(cx: &mut TestAppContext) {
+    use noshape_model::drawing::{Annotation, AnnotationKind};
+    START.set(Some("block-drawing"));
+    let (window, editor) = drawing(cx, "feel-inspection-bubble");
+    real_sheet(cx, window, &editor);
+    let read = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).ui_drawing_state(cx)["selection"].clone());
+    let top = cx.update(|cx| { let e = editor.read(cx); e.current_sheet().views.iter().map(|v| v.id).find(|v| e.ui_view_name(*v) == "Top") }).expect("Top");
+    let (centre, above) = cx.update(|cx| {
+        let pl = editor.read(cx).placement(top).expect("placed");
+        ([(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0], [(pl.min[0] + pl.max[0]) / 2.0, pl.max[1] + 30.0])
+    });
+    let put = |cx: &mut TestAppContext, at: [f64; 2]| {
+        cx.update(|cx| editor.update(cx, |e, cx| {
+            let sheet = e.sheet;
+            e.edit("Note", cx, |d| {
+                let s = &mut d.sheets[sheet];
+                s.annotations.retain(|a| !matches!(a.kind, AnnotationKind::Note { .. }));
+                let id = s.next_annotation_id();
+                s.annotations.push(Annotation { id, kind: AnnotationKind::Note { text: "N".into(), height_mm: 3.0, style: Default::default() }, position: at, inspection: Some(1), ..Default::default() });
+            });
+            e.selection.clear();
+        }));
+        draw(cx, window);
+    };
+    put(cx, centre);
+    assert_eq!(read(cx), json!([{ "kind": "EDGE", "owner": "Top" }]), "the bubble in Top's box");
+    cx.update(|cx| editor.update(cx, |e, cx| e.edit("Hide", cx, |d| d.props.hide_inspection = true)));
+    draw(cx, window);
+    assert_eq!(read(cx), json!([]), "hidden: no bubble");
+    cx.update(|cx| editor.update(cx, |e, cx| e.edit("Show", cx, |d| d.props.hide_inspection = false)));
+    put(cx, above);
+    assert_eq!(read(cx), json!([]), "above the box: nothing");
+}
+
+/// Live drw-custom-table-split s15 ("Escape doesn't clear the selection"), drw-custom-table-cell s21: a selected custom
+/// table stays selected through Esc.
+#[gpui::test]
+fn esc_keeps_a_selected_custom_table(cx: &mut TestAppContext) {
+    use noshape_model::drawing::Table;
+    let (window, editor) = drawing(cx, "feel-custom-table-esc");
+    real_sheet(cx, window, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        let doc = &e.doc.read(cx).session.doc;
+        let tab = doc.ordered_tabs().into_iter().find(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_))).unwrap().id;
+        let kind = noshape_scene::drawing_tools::custom_table_kind(tab, None, tab, "t".into(), None, false, Default::default());
+        let sheet = e.sheet;
+        e.drawing.sheets[sheet].tables.push(Table::new(9102, kind, [200.0, 150.0]));
+        e.selection = vec![Sel::Table(9102)];
+    }));
+    draw(cx, window);
+    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+    assert_eq!(cx.update(|cx| editor.read(cx).selection.clone()), vec![Sel::Table(9102)], "still selected");
+}
+
+/// ui-parity drw-centerline-2-point s2 (recorder 11-07: nothing) and -cylinder-axis s2 (11-18.1: EDGE Front): a 2 point
+/// centerline's first point reads EDGE of its view for the recorders from 11-14 on.
+#[gpui::test]
+fn a_centerlines_first_point_reads_for_the_newer_recorders(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::PickedPoint;
+    START.set(Some("block-drawing"));
+    let (window, editor) = drawing(cx, "feel-centerline-first");
+    real_sheet(cx, window, &editor);
+    let top = cx.update(|cx| { let e = editor.read(cx); e.current_sheet().views.iter().map(|v| v.id).find(|v| e.ui_view_name(*v) == "Top") }).expect("Top");
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Centerline { first: Some(PickedPoint { view: top, p: [0.0, 0.0], r: None }) }, cx)));
+    draw(cx, window);
+    let s = cx.update(|cx| editor.read(cx).ui_drawing_state(cx)["selection"].clone());
+    assert_eq!(s, json!([{ "kind": "EDGE", "owner": "Top", "since": "2026-11-14.1" }]));
+}
+
+/// ui-parity drw-max-min-fillet-arc s2: Maximum / minimum takes Front's R4 fillet arc as its circle, but only the quarter
+/// arc drawn lights (at live's 0.255 mm a pixel: under the reader's 60 px, nothing read; the whole circle would be).
+#[gpui::test]
+fn a_max_min_pick_on_an_arc_lights_only_the_arc(cx: &mut TestAppContext) {
+    use noshape_model::drawing::views::EdgeGeom;
+    use noshape_scene::drawing_tools::{DimTool, Pick};
+    START.set(Some("chamfer-fillet-block-drawing"));
+    let (window, editor) = drawing(cx, "feel-maxmin-arc");
+    real_sheet(cx, window, &editor);
+    let (front, center, radius) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let front = e.current_sheet().views.iter().map(|v| v.id).find(|v| e.ui_view_name(*v) == "Front").expect("Front");
+        let g = e.geoms.get(&front).expect("its geometry");
+        let (c, r) = g.model_edges.iter().find_map(|me| match me.geom {
+            EdgeGeom::Circle { center, radius, face_on: true, .. } => Some((center, radius)),
+            _ => None,
+        }).expect("the fillet's arc");
+        (front, c, r)
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        e.zoom = 1.0 / 0.25539;
+        e.set_tool(Tool::Dimension { kind: DimTool::MaxMin, picks: vec![Pick::CircleAt { view: front, center, radius, r: None, at: [center[0] + radius, center[1]] }] }, cx);
+    }));
+    draw(cx, window);
+    let s = cx.update(|cx| editor.read(cx).ui_drawing_state(cx)["selection"].clone());
+    assert_eq!(s, json!([]), "a quarter of an R4 arc: under 60 px");
+}

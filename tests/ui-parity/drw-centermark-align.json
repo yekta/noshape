@@ -67,17 +67,17 @@
   {
    "after": 2,
    "centermarks": 1,
-   "live": "dx q-centermark: a Single mark placed on a hole's automatic centermark shows while picked and goes on Esc (the automatic one isn't an annotation)"
+   "live": "live retake 996d6b8a (11-20, drw-centermark): a Single mark placed on a hole's automatic centermark replaces it and stays after Esc (was dx q-centermark: goes on Esc); Align centermark and its Esc keep it"
   },
   {
    "after": 3,
-   "centermarks": 0,
-   "live": "dx q-centermark: a Single mark placed on a hole's automatic centermark shows while picked and goes on Esc (the automatic one isn't an annotation)"
+   "centermarks": 1,
+   "live": "live retake 996d6b8a (11-20, drw-centermark): a Single mark placed on a hole's automatic centermark replaces it and stays after Esc (was dx q-centermark: goes on Esc); Align centermark and its Esc keep it"
   },
   {
    "after": 8,
-   "centermarks": 0,
-   "live": "dx q-centermark: a Single mark placed on a hole's automatic centermark shows while picked and goes on Esc (the automatic one isn't an annotation)"
+   "centermarks": 1,
+   "live": "live retake 996d6b8a (11-20, drw-centermark): a Single mark placed on a hole's automatic centermark replaces it and stays after Esc (was dx q-centermark: goes on Esc); Align centermark and its Esc keep it"
   }
  ]
 }

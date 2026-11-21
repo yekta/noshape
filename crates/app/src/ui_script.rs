@@ -1235,22 +1235,29 @@ pub(crate) fn window_state(w: &mut Workspace, window: &mut Window, cx: &mut Cont
         if let Some(f) = w.ui_rename_focus(window, cx) {
             s["focus"] = f;
         }
-        // Comparing: the compare panel stands in for the feature list, and no part is listed (live ver-compare-*).
-        if !s["document"]["compare"].is_null() && s["features"].is_object() {
-            s["features"] = json!({ "rows": [], "rollbackAfter": null });
-            s["parts"] = json!([]);
-            // The feature picked in the compare panel is the selection, as live's.
-            let picked = s["document"]["compare"]["selected"].take();
-            if let Some(name) = picked.as_str() {
-                s["selection"] = json!({ "count": 1, "items": [{ "kind": "FEATURE", "owner": name }] });
-            }
-        }
+        comparing_state(&mut s);
         // The window's alerts and toasts when the studio has no message of its own (live reads every alert).
         if s["message"].is_null() {
             s["message"] = json!(noshape_app_core::ui_script::window_message(window.window_handle().window_id()));
         }
     }
     s
+}
+
+/// Comparing: the compare panel stands in for the feature list, and no part is listed (live ver-compare-*). The feature
+/// picked in the compare panel is the selection, as live's; a face clicked in the graphics (which picks its feature's row
+/// too) stays the selection (live ver-compare-hover-part s5: FACE of Part 2).
+fn comparing_state(s: &mut Value) {
+    if s["document"]["compare"].is_null() || !s["features"].is_object() {
+        return;
+    }
+    s["features"] = json!({ "rows": [], "rollbackAfter": null });
+    s["parts"] = json!([]);
+    let picked = s["document"]["compare"]["selected"].take();
+    let graphics = s["selection"]["count"].as_u64().is_some_and(|n| n > 0);
+    if let Some(name) = picked.as_str().filter(|_| !graphics) {
+        s["selection"] = json!({ "count": 1, "items": [{ "kind": "FEATURE", "owner": name }] });
+    }
 }
 
 /// [`with_input_focus_in`] in the window the driver runs in.
@@ -1379,3 +1386,23 @@ impl CurrentWorkspace {
     }
 }
 
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    /// ver-compare-*: comparing, the compare panel's picked row is the selection (a row clicked in the panel); a face
+    /// clicked in the graphics stays the selection though its row is picked too (live ver-compare-hover-part s5).
+    #[test]
+    fn comparing_reads_the_panels_row_unless_the_graphics_have_a_pick() {
+        let state = |items: serde_json::Value| json!({ "document": { "compare": { "selected": "Extrude 2" } }, "features": { "rows": [{ "name": "Extrude 2" }] }, "parts": [{ "name": "Part 2" }], "selection": { "count": items.as_array().map_or(0, Vec::len), "items": items } });
+        let mut row = state(json!([]));
+        super::comparing_state(&mut row);
+        assert_eq!(row["selection"], json!({ "count": 1, "items": [{ "kind": "FEATURE", "owner": "Extrude 2" }] }), "a row picked in the panel");
+        assert_eq!((row["features"]["rows"].clone(), row["parts"].clone()), (json!([]), json!([])), "no list, no parts");
+        let face = json!([{ "kind": "FACE", "owner": "Part 2" }]);
+        let mut clicked = state(face.clone());
+        super::comparing_state(&mut clicked);
+        assert_eq!(clicked["selection"], json!({ "count": 1, "items": face }), "the face clicked in the graphics");
+    }
+}

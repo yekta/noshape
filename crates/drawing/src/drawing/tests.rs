@@ -5864,3 +5864,24 @@ fn a_failed_view_is_computed_once_until_its_inputs_change() {
     let good = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
     assert!(good.error.is_none() && !good.edges.is_empty(), "the part back: drawn ({:?})", good.error);
 }
+
+/// Live drw-dimension-arc-length-fillet s3 (shot -4): an arc length's value sits on its dimension arc, centred where the
+/// click put the arc, not 4 mm beyond it.
+#[test]
+fn an_arc_length_value_sits_on_its_dimension_arc() {
+    let drawing = Drawing::default();
+    let env = sheet::PlainEnv { drawing: &drawing, scale: 1000.0 };
+    let mut s = Sheet::default();
+    // An R4 quarter arc about (4, 6) mm from 90° to 180°, its dimension arc 12 mm out (16 mm from the centre).
+    let h = 0.004 * std::f64::consts::FRAC_1_SQRT_2;
+    let kind = AnnotationKind::ArcLengthDimension { view: ViewId(1), center: [0.004, 0.006], radius: 0.004, a: [0.004, 0.010], b: [0.0, 0.006], mid: [0.004 - h, 0.006 + h], offset: 12.0 };
+    s.annotations.push(Annotation { id: 1, kind, position: [0.0; 2], ..Default::default() });
+    let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+    g.add_annotations(&s, &env);
+    let pts: Vec<[f64; 2]> = g.texts.iter().flat_map(font::text_box).collect();
+    assert!(!pts.is_empty(), "its value");
+    let (lo, hi) = pts.iter().fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), p| ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]));
+    let c = [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0];
+    let r = (c[0] - 4.0).hypot(c[1] - 6.0);
+    assert!((r - 16.0).abs() < 1.0, "the value's centre {c:?} is {r} mm from the arc's centre, its dimension arc at 16");
+}

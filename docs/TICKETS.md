@@ -273,8 +273,9 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - [ ] P2 **UIP-THREAD-MESSAGE-TWICE (core)**: external-thread-chamfer-undercut step 5: live's message "Exact match for thread size not found."; ours
   shows it twice ("…not found.\n…not found."), 7/11 states (11/11 on 11-20 23:08). Both runs and the recheck. The message is pushed by
   model-core regen/features/hole.rs:951 and std; std 3132 embedded 08:18 (8631c5717) is the likely second copy.
-- [ ] P2 **UIP-COMPARE-HOVER-PART (studios)**: ver-compare-hover-part step 5: live selects the FACE, ours a FEATURE (5/6 states; 6/6 on 11-20 23:08).
-  Both runs and the recheck. Since 69571c882 (Versions and history › Compare) or 3f70f4f2f (Compare revisions).
+- [x] P2 **UIP-COMPARE-HOVER-PART (studios)**: ver-compare-hover-part step 5: live selects the FACE, ours a FEATURE (5/6 states; 6/6 on 11-20 23:08).
+  Both runs and the recheck. Since 69571c882 (Versions and history › Compare) or 3f70f4f2f (Compare revisions). Fixed (studios): the app
+  reader's Compare state read the panel's row over a graphics pick (ui_script.rs `comparing_state`).
 - 13 "no recording" scenarios of run 07879475 (the app exited silently) all ran in the loop's next run: not filed. rolled-back-row-menu
   matches since psui 9ffded3f6.
 

@@ -2345,9 +2345,11 @@ impl SheetGeometry {
                         let s = if (k == 0) == (sweep > 0.0) { -1.0 } else { 1.0 };
                         self.arrow(tip, [-st * s, ct * s], 3.0);
                     }
+                    // The value on the dimension arc, where the click put it (live drw-dimension-arc-length-fillet s3:
+                    // .247 centred on the click, its arc through it).
                     let tm = a0 + sweep / 2.0;
                     let t = env.text(a, radius * sweep.abs(), false, "⌒");
-                    self.dim_label([c[0] + (rr + 4.0) * tm.cos(), c[1] + (rr + 4.0) * tm.sin()], 0.0, 0.5, true, &t, dh, pick);
+                    self.dim_label([c[0] + rr * tm.cos(), c[1] + rr * tm.sin()], 0.0, 0.5, true, &t, dh, pick);
                 }
                 AnnotationKind::OrdinateGroup { view, origin, points, horizontal, shifts, knees } => {
                     for p in std::iter::once(origin).chain(points.iter()) {

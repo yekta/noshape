@@ -125,7 +125,17 @@ impl DrawingEditor {
                 let (p, q) = (pl.to_sheet(a.p), pl.to_sheet(b.p));
                 (p[0] - q[0]).hypot(p[1] - q[1])
             }
-            Pick::Circle { radius, .. } | Pick::CircleAt { radius, .. } => pl.len_to_sheet(std::f64::consts::TAU * radius),
+            // What the view draws of the circle: an arc picked as its circle (Maximum / minimum) lights only the arc
+            // (live drw-max-min-fillet-arc s2: Front's R4 fillet read nothing, as in drw-dimension-arc-length-fillet).
+            Pick::Circle { view, center, radius, .. } | Pick::CircleAt { view, center, radius, .. } => {
+                use noshape_model::drawing::views::EdgeGeom;
+                let on = |c: [f64; 2], r: f64| (c[0] - center[0]).hypot(c[1] - center[1]) < 1e-9 && (r - radius).abs() < 1e-9;
+                let drawn: f64 = self.geoms.get(view).map(|g| {
+                    let circles: Vec<u32> = g.model_edges.iter().enumerate().filter(|(_, me)| matches!(me.geom, EdgeGeom::Circle { center: c, radius: r, face_on: true, .. } if on(c, r))).map(|(i, _)| i as u32).collect();
+                    g.edges.iter().filter(|d| d.model.is_some_and(|m| circles.contains(&m))).map(|d| d.points.windows(2).map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])).sum::<f64>()).sum()
+                }).unwrap_or_default();
+                pl.len_to_sheet(if drawn > 0.0 { drawn } else { std::f64::consts::TAU * radius })
+            }
             Pick::Arc { center, radius, a, b, mid, .. } => {
                 let at = |p: [f64; 2]| (p[1] - center[1]).atan2(p[0] - center[0]);
                 let from_a = |p: [f64; 2]| (at(p) - at(a.p)).rem_euclid(std::f64::consts::TAU);
@@ -414,9 +424,10 @@ impl DrawingEditor {
                 }
             }
             // A centerline's picked points (a 2 point centerline's disc, a circle centerline's centre with its hole):
-            // live drw-centerline-2-point-cylinder-axis s1, drw-centerline-circle-2-point-small-hole-centres s1.
-            Tool::Centerline { first: Some(PickedPoint { view, .. }) } => selection.push(("EDGE".into(), self.ui_view_name(*view))),
-            Tool::CircleCenterline { points, .. } if !points.is_empty() => selection.push(("EDGE".into(), self.ui_view_name(points[0].view))),
+            // live drw-centerline-2-point-cylinder-axis s1, drw-centerline-circle-2-point-small-hole-centres s1 (11-18.1);
+            // the 11-07 recorders read nothing (drw-centerline-2-point s2, -circle-2-point s2, -circle-3-point s2-s3): `^`.
+            Tool::Centerline { first: Some(PickedPoint { view, .. }) } => selection.push(("EDGE^".into(), self.ui_view_name(*view))),
+            Tool::CircleCenterline { points, .. } if !points.is_empty() => selection.push(("EDGE^".into(), self.ui_view_name(points[0].view))),
             // A datum target's anchor picked on a view: its edge lit until the target is placed (live2
             // drw-datum-target-hide-dim 11-15, step 3). Recorders before 2026-11-15.1 didn't read it ("EDGE+": marked
             // `new` for the runner).
@@ -527,8 +538,9 @@ impl DrawingEditor {
                 // Since the 11-15 recorder a hovered selected dimension reads in full (live drw-styles-radial s3, s9:
                 // EDGE Top with the pointer on R.197; the 11-06 drw-dimension-radius s3 read nothing): `hover_px`.
                 let mut hover_px = 0.0;
-                // A hovered selected dimension's text: read since the 11-08 recorders (live drw-dimension-angular s5,
-                // 11-14), not by the 11-07 one (drw-dimension-diameter s3, Ø.394 under the pointer after Escape).
+                // A hovered selected dimension's text: read since the 11-14 recorders (live drw-dimension-angular s5,
+                // 11-14.12), not by the 11-07 or 11-12.1 ones (drw-dimension-diameter s3, drw-update-deleted-feature s4:
+                // Ø.394 under the pointer after Escape).
                 let mut hover_text = 0.0;
                 for l in b.geometry.lines.iter().filter(|l| (lit(l.pick) && !callout_lines.contains(&l.pick)) || selected_view(l.pick, v.id)) {
                     let hovered = self.hover.is_some_and(|h| self.sel_of_pick(h).is_some_and(|s| self.picks_of(s).contains(&l.pick)));
@@ -617,6 +629,19 @@ impl DrawingEditor {
                 selection.push(("EDGE+".into(), self.ui_view_name(v)));
             }
         }
+        // An inspection item's red-orange bubble counts as selection colour inside its view's box, whatever is selected
+        // (live drw-inspection-diameter s13-s14: Ø.394's bubble in Top, nothing selected; drw-inspection-item: 1.575's
+        // above Front's box, nothing read).
+        if let Some(b) = self.built.as_ref() {
+            let bubbles: Vec<&[[f64; 2]]> = b.geometry.colors.iter().filter(|c| c.rgb == noshape_model::drawing::sheet::INSPECTION_FILL).flat_map(|c| b.geometry.fills[c.fills.clone()].iter().map(|f| f.points.as_slice())).collect();
+            for v in sheet.views.iter().filter(|_| !bubbles.is_empty()) {
+                let Some(pl) = self.placement(v.id) else { continue };
+                let area: f64 = bubbles.iter().map(|p| area_inside(p, pl.min, pl.max)).sum();
+                if area * self.zoom * self.zoom > 60.0 {
+                    selection.push(("EDGE".into(), self.ui_view_name(v.id)));
+                }
+            }
+        }
         // Align views: the view being aligned reads framed while the target is picked, and with the target (under
         // the pointer) after, until the pointer moves; the 11-15 recorder reads them, older ones didn't (live2
         // drw-view-align-horizontally s3-s4, drw-view-align-vertically).
@@ -653,7 +678,7 @@ impl DrawingEditor {
             .into_iter()
             .map(|(k, o)| match (k.strip_suffix('+'), k.strip_suffix('-')) {
                 _ if k.ends_with('*') => json!({ "kind": k.trim_end_matches('*'), "owner": o, "since": "2026-11-18.1" }),
-                _ if k.ends_with('^') => json!({ "kind": k.trim_end_matches('^'), "owner": o, "since": "2026-11-08.1" }),
+                _ if k.ends_with('^') => json!({ "kind": k.trim_end_matches('^'), "owner": o, "since": "2026-11-14.1" }),
                 (Some(k), _) => json!({ "kind": k, "owner": o, "new": true }),
                 (_, Some(k)) => json!({ "kind": k, "owner": o, "old": true }),
                 _ => json!({ "kind": k, "owner": o }),
@@ -900,6 +925,30 @@ fn mm(p: [i64; 2]) -> [f64; 2] {
     [p[0] as f64 / 10.0, p[1] as f64 / 10.0]
 }
 
+/// The area of polygon `p` inside the box `min`-`max` (Sutherland-Hodgman clipping, then the shoelace).
+fn area_inside(p: &[[f64; 2]], min: [f64; 2], max: [f64; 2]) -> f64 {
+    let mut poly = p.to_vec();
+    for (k, bound, keep_below) in [(0, min[0], false), (0, max[0], true), (1, min[1], false), (1, max[1], true)] {
+        let inside = |q: &[f64; 2]| if keep_below { q[k] <= bound } else { q[k] >= bound };
+        let mut out = Vec::with_capacity(poly.len() + 4);
+        for (i, a) in poly.iter().enumerate() {
+            let b = &poly[(i + 1) % poly.len()];
+            if inside(a) {
+                out.push(*a);
+            }
+            if inside(a) != inside(b) {
+                let t = (bound - a[k]) / (b[k] - a[k]);
+                out.push([a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]);
+            }
+        }
+        poly = out;
+        if poly.is_empty() {
+            return 0.0;
+        }
+    }
+    (0..poly.len()).map(|i| { let (a, b) = (poly[i], poly[(i + 1) % poly.len()]); a[0] * b[1] - b[0] * a[1] }).sum::<f64>().abs() / 2.0
+}
+
 /// The length of segment `a`-`b` inside the box `min`-`max` (Liang-Barsky clipping).
 fn clipped_len(a: [f64; 2], b: [f64; 2], min: [f64; 2], max: [f64; 2]) -> f64 {
     let d = [b[0] - a[0], b[1] - a[1]];
@@ -923,7 +972,16 @@ fn clipped_len(a: [f64; 2], b: [f64; 2], min: [f64; 2], max: [f64; 2]) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{clipped_len, data_value};
+    use super::{area_inside, clipped_len, data_value};
+
+    #[test]
+    fn a_fill_counts_its_area_inside_the_box() {
+        let (min, max) = ([0.0, 0.0], [10.0, 4.0]);
+        let square = |x: f64, y: f64| [[x, y], [x + 2.0, y], [x + 2.0, y + 2.0], [x, y + 2.0]];
+        assert_eq!(area_inside(&square(1.0, 1.0), min, max), 4.0, "all inside");
+        assert_eq!(area_inside(&square(9.0, 3.0), min, max), 1.0, "over a corner");
+        assert_eq!(area_inside(&square(1.0, 6.0), min, max), 0.0, "above the box (drw-inspection-item: 1.575's bubble over Front)");
+    }
 
     #[test]
     fn a_segment_counts_its_length_inside_the_box() {

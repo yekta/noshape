@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-21 15:54 UTC.
+Updated 2026-11-21 17:04 UTC.
 
 ## In flight
 
@@ -59,13 +59,22 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
     its last paint takes no notify (GPUI tracks only entities drawn in the last frame). ui-test-support now puts each
     test binary's settings under the run's NOSHAPE_CONFIG_DIR (release-ui's managed workflows leaked into
     assembly-ui's menus in one rb.sh run). Release dialog: a revision it takes clears the last note.
-- NEXT LAND (x139 on vibex8): live rel-1121b (14:33 answers): the release dialog fixed 1092 px (items 281, columns 225,
-  list 319; Add Items 1092 wide, left 400, no lone tab row); Compare revisions only on part / assembly rows with an
-  earlier revision (`earlier_revision`, `comparable`), an assembly shows the placeholder cube, a property-only change
-  plain white line drawings; a released review has no Edit properties. Search relevance (audit #9): no header sort ->
-  `noshape_ops::doc_library::search_order` (equal names by when made = store `document_created`, `DocEntry::created`;
-  then newest to the minute, then name), page + documents_list; bold whole words only. asm-root-menu re-records
-  (f95cf1bd) match our menu (Create task… / Add comment are cloud).
+- LANDED cf9f4cc6 as a2a3382d (16:30): live rel-1121b (release dialog 1092 px, Compare revisions only with an earlier
+  revision, `earlier_revision` / `comparable`) and search relevance (`noshape_ops::doc_library::search_order`, store
+  `document_created`, `DocEntry::created`; bold whole words only).
+- NEXT LAND (x142 / x143 on vibex8): qa's interaction run 1121-0935 (uip.log, ours in uip/*.json), my areas:
+  - inspection bubble (red-orange fill) reads EDGE of the view box holding it, whatever is selected (`area_inside`);
+    Esc keeps a selected custom table (as a hole table); centerline picks and a hovered dimension's text read from
+    recorder 2026-11-14.1 (`^`; 11-12.1 reads neither); a picked circle lights only what the view draws of it
+    (max/min on a fillet arc); os_menu's first-paint hover ignores rows scrolled out of view (Note panel lists);
+    Edge to edge centerline treats a cylinder's seam as a silhouette (app + ops); an arc length's value sits on its
+    dimension arc (model-data sheet.rs); run.py: CDP's Esc under a native <select> closes live's panel (ours keeps it
+    one Esc longer: dialog blanked); drw-centermark-align's expect from live retake 996d6b8a (mark stays);
+    ver-compare-hover-part (qa P2 UIP-COMPARE-HOVER-PART): the app reader's Compare override (ui_script.rs
+    `comparing_state`) put the panel's row FEATURE over a graphics pick; now the row only when nothing is picked.
+  - Left: drw-styles-radial / drw-update-deleted-feature wait on REQUESTS 17:02 (dimension selected after Esc / tab
+    switch?); drw-centerline-circle-3-point-hole-centres is live's reader gap (asked for a re-take); 7 "not run"
+    (shard drop) to rerun on vibe2 with the r41 build.
 - REQUESTS for live (11-21): 08:58 the drawing matrix's 40 most-used shown rows (six takes); 14:33 all answered.
 - Audit: #7–#10 done. interaction-feel's FS F2/F3 rows marked = (fixed c249e0ed9, qa verified).
 - Live fc-1121 drawing feel (behaviours "studios fc-1121"): (1) a dimension being placed shows the line to another's
@@ -77,7 +86,6 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
   Drawing properties 101 → 22 shown, matrix 04:45: 1344 = / 456 shown of 1842; View simplification was None, Auto, …: now live's None, Absolute, Ratio to
   studio, Ratio to part, Auto (test `the_view_simplification_list_is_in_lives_order`). REQUESTS fc-1121 (6) added:
   a table hover-lit after Esc under a resting pointer (split s14-15).
-- Cached slices: a notify reaches one only if the last frame drew it (not reused): replace the slice to force it.
 - Asm feel rows: none left untested in interaction-feel's asm tables.
 
 ## Next, in order
@@ -87,10 +95,7 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
    dropdown options our takes don't list in order (fonts, balloon shapes, standards: Drawing properties 101, Create Drawing 57, Title block 54,
    Hole/thread callout 53, Note 52, Hole table 45, Styles 43): only a take opening each list would make them =.
    Regenerate: `drawing_matrix.py --run /root/studios-scratch/uip-merged --ours-menus /root/studios-scratch/menudump.json`
-   (copy new take outputs into uip-merged first). drw-custom-table-split 13/16: after Esc live reads the table's paint
-   under the resting pointer, ours nothing (reader emulation, left).
-   Live is capturing a drawing feel batch for me (lead 03:3x: dimension snap/reach, view drag/alignment, note caret,
-   view-edge hover timing, box select): take its rows as they arrive.
+   (copy new take outputs into uip-merged first).
 2. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
@@ -114,8 +119,6 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
   autocomplete Enter inserts, Tab closes + inserts a tab, Esc keeps text; FS errors while typing (<0.5 s) red x at
   gutter line 1 + squiggle, Ctrl/Cmd+S commits, Commit pales, a fixed error greys ~150 ms, gone ~500 ms. VSFEEL bubble:
   centred over the cell (done 11-18).
-- qa HISTFEEL "sticky hover" (mm.png): the tint there is #b2ddf6, the viewed change's selection (live selects it too),
-  not the #def1fb hover: no change.
 - live documents / Import / Derived + Insert (live/studios/docs-import-feel-1118/): search on Enter only; sort A-Z,
   Z-A, default; row hover icons; double-click opens; inline Rename; Delete -> "Send to trash" (Enter nothing, Esc
   closes) + toast with Restore; New document Enter creates. Import: "CAD Imports" tab ~1.8 s, the Part Studio tab

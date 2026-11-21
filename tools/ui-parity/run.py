@@ -1337,7 +1337,7 @@ def compare(live, ours, whole_document=True):
             frame_late[f"step {s.get('step')}"] = clicked
     free_clicks = any(isinstance((st.get("do") or {}).get("on"), dict) and "sketch_point" in st["do"]["on"] for st in steps)
     plane_normal = sketch_plane_normal(steps)
-    native_open = False
+    native_open = native_esc = False
     for name, a, b, failed, t, step in pairs:
         pixel = pixel_on_plane((a or {}).get("camera"), plane_normal) if free_clicks else None
         if failed:
@@ -1447,7 +1447,13 @@ def compare(live, ours, whole_document=True):
         # (And through the waits after it.)
         on = ((step or {}).get("on") or {}) if isinstance(step, dict) else {}
         if isinstance(step, dict) and step.get("do") != "wait":
+            # CDP's Escape under a drawing panel's open native <select> reaches the page: live's panel closes with its
+            # popup (live2 drw-sheet-properties-iso s6); a user's first Esc closes only the list, as ours does, so ours'
+            # panel left open then reads closed (and through the waits after it).
+            native_esc = native_open and step.get("do") == "key" and step.get("key") == "Escape"
             native_open = step.get("do") == "click" and "dropdown" in on and "pick" not in on
+        if native_esc and isinstance(a, dict) and a.get("dialog") is None and isinstance(b, dict) and (b.get("dialog") or {}).get("kind") == "drawing-panel":
+            b = dict(b, dialog=None)
         if native_open and a.get("list") is None and (a.get("dialog") or {}).get("kind") in ("drawing-panel", "cell-format"):
             b["list"] = None
         # A feature-style panel whose header live's recorder doesn't read (Insert Variable Studio: `title` null, so

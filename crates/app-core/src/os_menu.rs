@@ -764,8 +764,10 @@ impl Render for OsMenu {
                             let me = me.clone();
                             d.child(
                                 canvas(
+                                    // (Only where the row shows: a scrolled list's rows below its fold aren't under the
+                                    // pointer, live drw-note-panel-dropdowns s34: none lit over Insert drawing property.)
                                     move |bounds, window, cx| {
-                                        if bounds.contains(&window.mouse_position()) {
+                                        if bounds.intersect(&window.content_mask().bounds).contains(&window.mouse_position()) {
                                             let me = me.clone();
                                             cx.defer(move |cx| {
                                                 let _ = me.update(cx, |m, cx| {

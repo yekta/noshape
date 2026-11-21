@@ -355,9 +355,10 @@ impl DrawingEditor {
             self.redraw(cx);
             return;
         }
-        // A selected hole table stays selected (live2 drw-hole-table-rmb s18, -split s16: its frame still read lit).
+        // A selected hole or custom table stays selected (live2 drw-hole-table-rmb s18, -split s16: its frame still read
+        // lit; live drw-custom-table-split s15: "Escape doesn't clear the selection").
         let sheet = self.current_sheet();
-        let hole = |s: &Sel| matches!(s, Sel::Table(id) if sheet.table(*id).is_some_and(|t| matches!(t.kind, TableKind::Hole { .. })));
+        let hole = |s: &Sel| matches!(s, Sel::Table(id) if sheet.table(*id).is_some_and(|t| matches!(t.kind, TableKind::Hole { .. } | TableKind::Custom { .. })));
         if !self.selection.is_empty() && self.selection.iter().all(hole) {
             return;
         }
@@ -1238,9 +1239,10 @@ impl DrawingEditor {
                     self.status = Some("Select a straight edge".into());
                     return;
                 };
-                // A cylinder's silhouette (a drawn line with no model edge) gives its axis at once, each pick another
-                // (live drw-centerline-edge-to-edge-cylinder: annotations 1, then 2); a plate's edges take two picks.
-                if self.hovered_edge().is_none()
+                // A cylinder's silhouette (a drawn line with no model edge, or its seam: not an edge in Onshape) gives
+                // its axis at once, each pick another (live drw-centerline-edge-to-edge-cylinder: annotations 1, then 2,
+                // the first pick on the seam's side); a plate's edges take two picks.
+                if self.hovered_edge().is_none_or(|(_, me)| me.seam)
                     && let Some([Pick::Line { a: a1, b: b1 }, Pick::Line { a: a2, b: b2 }]) = self.pk().silhouette_pair().as_deref()
                 {
                     let (p, q) = dt::edge_pair_centerline(a1.p, b1.p, a2.p, b2.p);

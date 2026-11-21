@@ -2070,6 +2070,17 @@ fn drawing_lists_silhouettes() {
     let centre = [(num(&b["min"][0]) + num(&b["max"][0])) / 2.0, (num(&b["min"][1]) + num(&b["max"][1])) / 2.0];
     let axis = [(mids[0][0] + mids[1][0]) / 2.0, (mids[0][1] + mids[1][1]) / 2.0];
     assert!((centre[0] - axis[0]).abs() < 1e-6 || (centre[1] - axis[1]).abs() < 1e-6, "{b} {axis:?}");
+    // On the other side view's seam (drawn as a silhouette, not an edge in Onshape): the axis too (live
+    // drw-centerline-edge-to-edge-cylinder s2, the first pick on Front's x -10).
+    let seam = g["views"].as_array().unwrap().iter().find_map(|v| {
+        let sil: Vec<[f64; 2]> = v["edges"].as_array().cloned().unwrap_or_default().into_iter().filter(|e| e["type"] == "silhouette" && e["a"].is_array()).map(|e| [(num(&e["a"][0]) + num(&e["b"][0])) / 2.0, (num(&e["a"][1]) + num(&e["b"][1])) / 2.0]).collect();
+        let [m] = sil[..] else { return None };
+        let c = [(num(&v["bounds"]["min"][0]) + num(&v["bounds"]["max"][0])) / 2.0, (num(&v["bounds"]["min"][1]) + num(&v["bounds"]["max"][1])) / 2.0];
+        Some([2.0 * c[0] - m[0], 2.0 * c[1] - m[1]])
+    }).expect("a side view with its seam on one side");
+    let n = g["annotations"].as_array().unwrap().len();
+    call(&mut ctx, "drawing_centerline", json!({ "drawing": tab, "kind": "edge_to_edge", "picks": [seam] }));
+    assert_eq!(call(&mut ctx, "drawing_get", json!({ "drawing": tab }))["annotations"].as_array().unwrap().len(), n + 1, "one pick on the seam: its axis");
 }
 
 /// A new drawing knows the document state its views come from, so a model

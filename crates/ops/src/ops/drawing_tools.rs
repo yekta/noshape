@@ -1391,7 +1391,7 @@ fn centerline(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             // A cylinder's silhouette alone: its axis (live drw-centerline-edge-to-edge-cylinder).
             let pk = t.m.pick(&tool, &[], cs[0]);
             if cs.len() == 1
-                && pk.hovered_edge().is_none()
+                && pk.hovered_edge().is_none_or(|(_, me)| me.seam)
                 && let Some([Pick::Line { a: a1, b: b1 }, Pick::Line { a: a2, b: b2 }]) = pk.silhouette_pair().as_deref()
             {
                 let (p, q) = dt::edge_pair_centerline(a1.p, b1.p, a2.p, b2.p);

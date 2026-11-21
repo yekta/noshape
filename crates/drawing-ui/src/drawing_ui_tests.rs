@@ -768,6 +768,11 @@ fn the_note_insert_lists_are_lives_size(cx: &mut TestAppContext) {
         let (outer_w, outer_h) = (f32::from(b.size.width) + 2.0, f32::from(b.size.height) + 2.0);
         assert!(outer_h <= 341.5, "{list}: {outer_h} px tall");
         assert!((w..w + 30.0).contains(&outer_w), "{list}: {outer_w} px wide");
+        // The pointer still on the button lights no row, not one scrolled out of view over it (live
+        // drw-note-panel-dropdowns s34, drw-note-insert-drawing-property s3: highlighted -1).
+        draw(cx, window);
+        let lit = cx.update(|cx| noshape_app_core::os_menu::ui_state(cx).map(|s| s["highlighted"].clone()));
+        assert_eq!(lit, Some(serde_json::Value::Null), "{list}: no row lit under the resting pointer");
         gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
         draw(cx, window);
     }
