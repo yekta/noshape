@@ -34,7 +34,7 @@ const ROW_H: f32 = 50.;
 
 /// A row's graph column: a click there opens nothing (live2 studios.json versionsPanel). Its node (centre `node`
 /// in the column) shows its branch's name in a tooltip, nothing else (live fv-1121 (4): "Main", 45-61 ms after the move).
-fn graph_column(key: &str, node: (f32, f32), branch: SharedString) -> Stateful<Div> {
+fn graph_column(key: &str, node: (f32, f32), branch: SharedString, on_hover: impl Fn(&bool, &mut Window, &mut App) + 'static) -> Stateful<Div> {
     let sel = format!("hist-node-{key}");
     div()
         .id(SharedString::from(format!("hist-graph-{key}")))
@@ -44,7 +44,7 @@ fn graph_column(key: &str, node: (f32, f32), branch: SharedString) -> Stateful<D
         .flex_none()
         .cursor_default()
         .on_click(|_, _, cx| cx.stop_propagation())
-        .child(div().id(SharedString::from(sel.clone())).debug_selector(move || sel.clone()).absolute().left(px(node.0 - 6.)).top(px(node.1 - 6.)).size(px(12.)).tooltip(crate::ui::tooltip(branch)))
+        .child(div().id(SharedString::from(sel.clone())).debug_selector(move || sel.clone()).absolute().left(px(node.0 - 6.)).top(px(node.1 - 6.)).size(px(12.)).on_hover(on_hover).tooltip(crate::ui::tooltip(branch)))
 }
 const CHANGE_H: f32 = 30.;
 
@@ -104,6 +104,9 @@ struct Row {
 
 pub struct HistoryPanel {
     doc: Entity<DocModel>,
+    /// The row whose graph node is under the pointer: the node tooltips its branch and the row isn't tinted (live
+    /// fv-1121).
+    node_hover: Option<String>,
     graph: Option<Rc<VersionGraph>>,
     /// The file's change stamp the graph was read at.
     graph_stamp: Option<(u64, i64)>,
@@ -185,6 +188,7 @@ impl HistoryPanel {
             doc,
             graph: None,
             graph_stamp: None,
+            node_hover: None,
             rows: None,
             opening: None,
             releases: None,
@@ -1161,6 +1165,19 @@ impl Render for HistoryPanel {
         let lane_x = move |l: usize| GRAPH_W / 2. - 7. * (nl - 1.) + 14. * l as f32;
         let lane_names: Vec<SharedString> = lanes.iter().map(|b| graph.branches.iter().find(|x| x.id == *b).map(|x| SharedString::from(x.name.clone())).unwrap_or_default()).collect();
         let lane_name = |l: usize| lane_names.get(l).cloned().unwrap_or_default();
+        let me = cx.entity().downgrade();
+        let node_hover = |key: String| {
+            let me = me.clone();
+            move |hovered: &bool, _: &mut Window, cx: &mut App| {
+                let _ = me.update(cx, |this, cx| {
+                    let now = hovered.then(|| key.clone());
+                    if this.node_hover != now && (*hovered || this.node_hover.as_deref() == Some(key.as_str())) {
+                        this.node_hover = now;
+                        cx.notify();
+                    }
+                });
+            }
+        };
         // Graph geometry: per lane, the node span; branches curve into their
         // parent lane above the row they were created from.
         let mut segs: Vec<(usize, f32, f32)> = Vec::new();
@@ -1465,11 +1482,11 @@ impl Render for HistoryPanel {
                         d.bg(rgb(fill)).border_l(px(3.)).border_color(rgb(bar))
                     })
                     .when(picked, |d| d.bg(rgb(crate::compare_mode::BASE_ROW)))
-                    .when(!selected && compare_side.is_none(), |d| d.hover(|d| d.bg(crate::theme::themed(0xdef1fb, 0x666666))))
+                    .when(!selected && compare_side.is_none() && self.node_hover.as_deref() != Some(r.key.as_str()), |d| d.hover(|d| d.bg(crate::theme::themed(0xdef1fb, 0x666666))))
                     // Live history-feel-1117 g-03: change rows are grey, the name only, its author and time in the
                     // tooltip.
                     .tooltip(crate::ui::user_tooltip(format!("{}: Change by {} at {}", r.name, r.author, history_time(r.time))))
-                    .child(graph_column(&r.key, (lane_x(r.lane), 13.), lane_name(r.lane)))
+                    .child(graph_column(&r.key, (lane_x(r.lane), 13.), lane_name(r.lane), node_hover(r.key.clone())))
                     .child(div().w(px(115.)).flex_none().truncate().child(crate::ui::user_text(r.name.clone())))
             } else {
                 let changes = r.changes.len();
@@ -1517,7 +1534,7 @@ impl Render for HistoryPanel {
                         d.bg(rgb(fill)).border_l(px(3.)).border_color(rgb(bar))
                     })
                     .when(picked, |d| d.bg(rgb(crate::compare_mode::BASE_ROW)))
-                    .when(!selected && compare_side.is_none(), |d| d.hover(|d| d.bg(crate::theme::themed(0xdef1fb, 0x666666))))
+                    .when(!selected && compare_side.is_none() && self.node_hover.as_deref() != Some(r.key.as_str()), |d| d.hover(|d| d.bg(crate::theme::themed(0xdef1fb, 0x666666))))
                     // Beside the panel's right edge, not under the pointer (qa HISTFEEL-CHANGE-TOOLTIP); a version's after
                     // 2.27 s with its description under the title (live2 doc-feel-1119 L31).
                     .map(|d| match r.kind {
@@ -1525,7 +1542,7 @@ impl Render for HistoryPanel {
                         RowKind::Version => crate::ui::with_described_side_tooltip(d, format!("Open version {}", r.name), (!r.description.trim().is_empty()).then(|| r.description.clone().into()), crate::ui::VERSION_TIP_DELAY),
                         _ => d.tip(format!("Open version {}", r.name), crate::ui::TipSide::Right),
                     })
-                    .child(graph_column(&r.key, (lane_x(r.lane), 8.), lane_name(r.lane)))
+                    .child(graph_column(&r.key, (lane_x(r.lane), 8.), lane_name(r.lane), node_hover(r.key.clone())))
                     .child(
                         v_flex()
                             .w(px(115.))

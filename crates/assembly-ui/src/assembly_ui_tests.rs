@@ -1894,6 +1894,7 @@ fn triad_drag(v: &AssemblyView, handle: ManipHandle, value: f64, cx: &gpui_kit::
         offset: glam::DVec3::ZERO,
         triad_preview: None,
         ball_snap: None,
+        ball_at: None,
         explode: false,
         nested: None,
         solved: None,

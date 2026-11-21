@@ -1267,9 +1267,9 @@ impl VariableStudioView {
                                 }))
                             })
                             .child(cell_input(&expr))
-                            // (26 px, 2 px above the cell, its right 46 px in from the cell's: live vs2-hash.)
+                            // (26 px, 2 px above the cell, its right 46 px in from the cell's: live vs2-hash; light #d0dbe5, dark #4b5761: fv-1121 dark.)
                             .when(!old_value.is_empty(), |d| {
-                                d.child(div().debug_selector(|| "vs-old-value".into()).absolute().top(px(-30.)).right(px(45.)).h(px(26.)).px(px(5.)).flex().items_center().bg(rgb(0xd0dbe5)).text_color(rgb(0x333333)).text_size(px(11.)).font_weight(FontWeight::BOLD).whitespace_nowrap().child(old_value.clone()))
+                                d.child(div().debug_selector(|| "vs-old-value".into()).absolute().top(px(-30.)).right(px(45.)).h(px(26.)).px(px(5.)).flex().items_center().bg(pal.tooltip).text_color(pal.text).text_size(px(11.)).font_weight(FontWeight::BOLD).whitespace_nowrap().child(old_value.clone()))
                             })
                             .children(list),
                     )

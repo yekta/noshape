@@ -3680,6 +3680,25 @@ fn a_variable_expression_shows_its_result_until_edited(cx: &mut TestAppContext) 
     assert!(vcx.debug_bounds("pvar-result-3").is_none(), "editing: the expression");
 }
 
+/// Live fv-1121 dark: an edited Value cell greys its column's header (#d7d7d7 light, #333333 dark) and shows its
+/// value in a chip over the row above, as a Variable Studio's.
+#[gpui::test]
+fn an_edited_value_greys_its_header_and_shows_its_value_above(cx: &mut TestAppContext) {
+    let (window, view, _) = rib_variables(cx, "vt-focus-head");
+    let column = |cx: &mut TestAppContext| cx.update_window(window, |_, w, cx| view.read(cx).focused_var_column(w, cx)).unwrap();
+    assert_eq!(column(cx), None);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    assert!(vcx.debug_bounds("pvar-old-value").is_none(), "no chip at rest");
+    let cell = vcx.debug_bounds("pvar-result-3").expect("depth's result over its cell");
+    vcx.simulate_click(cell.center(), Modifiers::default());
+    draw(cx, window);
+    assert_eq!(column(cx), Some(2), "the Value column");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let chip = vcx.debug_bounds("pvar-old-value").expect("the value's chip");
+    assert!(chip.bottom() <= cell.top() && chip.top() >= cell.top() - px(34.), "over the row above: {chip:?} {cell:?}");
+    assert_eq!(crate::theme::p().table_header_focus, gpui_kit::rgb(0xd7d7d7));
+}
+
 /// The user's 11-02: `#ri` in a Value cell lists the variables above it that match, with their values; ↓ and Enter
 /// insert one and commit the cell (live 11-02); Esc closes the list.
 #[gpui::test]

@@ -107,6 +107,13 @@ impl PartStudioView {
     }
 
     /// A text cell bound to a stable key; `commit` runs on Enter/blur.
+    /// The Variable table column whose Name, Value or Description cell has the keyboard.
+    pub(super) fn focused_var_column(&self, window: &Window, cx: &App) -> Option<usize> {
+        self.panel_inputs.iter().filter(|(_, (st, _))| st.read(cx).focus_handle(cx).is_focused(window)).find_map(|(k, _)| {
+            [("pvar-name-", 0), ("pvar-value-", 2), ("pvar-desc-", 3)].into_iter().find(|(p, _)| k.starts_with(p)).map(|(_, c)| c)
+        })
+    }
+
     pub(super) fn cell_input(&mut self, key: String, value: String, window: &mut Window, cx: &mut Context<Self>, commit: impl Fn(&mut Self, String, &mut Context<Self>) + 'static) -> Entity<InputState> {
         let commit: CellCommit = std::rc::Rc::new(commit);
         // The newest closure (it captures the current ids).
@@ -535,7 +542,9 @@ impl PartStudioView {
                     crate::os_menu::open(e.position(), menu, window, cx);
                 })
             });
-        // Live (164): only the header cells are gray, not the rest of the row.
+        // Live (164): only the header cells are gray, not the rest of the row; a focused cell's column's darker
+        // (live fv-1121 dark: #d7d7d7 / #333333).
+        let active = self.focused_var_column(window, cx);
         let header_cells: Vec<AnyElement> = ["Name", "Variable type", "Value", "Description"]
             .into_iter()
             .enumerate()
@@ -544,7 +553,7 @@ impl PartStudioView {
                 cell(h.into(), true, ws[c])
                     .map(|d| crate::ui_script::mark(d, move || format!("var_header:{h}")))
                     .text_size(px(14.))
-                    .bg(pal.table_header)
+                    .bg(if active == Some(c) { pal.table_header_focus } else { pal.table_header })
                     .relative()
                     // Live: a 5 px col-resize handle inside the cell's right edge, grey while hovered or dragged.
                     .child(
@@ -711,7 +720,9 @@ impl PartStudioView {
                 let focused = value_st.read(cx).focus_handle(cx).is_focused(window);
                 let failed = self.display.feature_state(fid).is_some_and(|s| s.status == noshape_model::display::FeatureStatus::Error);
                 let text = value_st.read(cx).value().to_string();
-                let result = self.display.variables.get(&r.name).map(|q| shown_value(*q, &units)).filter(|v| !failed && !focused && *v != text);
+                let value_now = self.display.variables.get(&r.name).map(|q| shown_value(*q, &units)).filter(|_| !failed);
+                let result = value_now.clone().filter(|v| !focused && *v != text);
+                let badge = focused.then(|| value_now.unwrap_or_else(|| r.value.clone())).filter(|v| !v.is_empty());
                 let fill = if failed { gpui_kit::rgb(0xf9ebec) } else { crate::theme::p().bg_senary };
                 let st = value_st.clone();
                 let completion = self.ui.cell_completion.as_ref().filter(|c| c.key == key).map(|c| {
@@ -751,6 +762,10 @@ impl PartStudioView {
                                     });
                                 }),
                         )
+                    })
+                    // While edited: its value in a chip over the row above (or the header), as a Variable Studio's.
+                    .when_some(badge, |d, v| {
+                        d.child(div().debug_selector(|| "pvar-old-value".into()).absolute().top(px(-30.)).right(px(45.)).h(px(26.)).px(px(5.)).flex().items_center().bg(pal.tooltip).text_color(pal.text).text_size(px(11.)).font_weight(FontWeight::BOLD).whitespace_nowrap().child(v))
                     })
                     .when(failed, |d| d.tooltip(crate::ui::tooltip("Error regenerating.")))
                     .children(completion)

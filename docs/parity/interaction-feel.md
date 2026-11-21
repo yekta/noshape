@@ -1835,8 +1835,9 @@ Evidence: live/studios/fv-1121/ (times.json, recheck/); behaviours "studios fv-1
 | FS autocomplete in a function body | open 294–382 ms after the key; Enter inserts the snippet, Tab doesn't accept, Esc keeps the text | 230 ms; the same keys | `the_completion_list_shows_230_ms_after_the_key` | = |
 | VS double-click on a cell | edits with the whole text selected (Value 2/3, Name 3/3; CDP's dblclick never opens it) | the same | variable_feel_tests `a_double_clicked_value_edits_all_selected_esc_reverts_a_click_away_commits` | = |
 | VS a focused or edited cell | its column header #d7d7d7 (others #eaeaea) | no header change | variable_feel_tests `the_focused_cells_column_header_turns_grey` | = (studios 11-21) |
+| VS / Part Studio Variable table, dark; the panel | dark: headers #555555, the focused cell's #333333; the Part Studio's Variable table panel greys its focused section's header the same in both themes; an edited value's chip over the row above (or the header) light #d0dbe5, dark #4b5761 (live fv-1121 dark) | dark #666666; the panel no header change and no chip; the chip #d0dbe5 in dark too | sketch_ui_tests `an_edited_value_greys_its_header_and_shows_its_value_above` | = (studios 11-21) |
 | Tab › Rename, Esc | the field closes, the old name kept | the field stayed open | workspace_tests `esc_in_a_tab_rename_keeps_the_name` | = (studios 11-21) |
-| Version graph node hover / click | a tooltip with the branch name ("Main"); a click does nothing | the row's "Open version …"; a click opened it | history_feel_tests `a_graph_nodes_tooltip_is_its_branch` | = (studios 11-21) |
+| Version graph node hover / click | a tooltip with the branch name ("Main"), its row not tinted; a click does nothing | the row's "Open version …" and tint; a click opened it | history_feel_tests `a_graph_nodes_tooltip_is_its_branch` | = (studios 11-21) |
 | Version graph row hover / click | tinted rgb(222,241,251), "Open version V2"; a click opens it | the same | history panel tests | = |
 
 ## Fix queue (biggest feel impact first)

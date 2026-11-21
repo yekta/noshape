@@ -1045,7 +1045,6 @@ fn a_short_press_selects_the_face_and_the_triads_ball_moves_only_the_triad(cx: &
 /// spot in 3D, however far on screen, the triad's arrows unturned; with that point under the pointer (within the ball's
 /// ~8 px ring), and over the background, it follows the pointer; released snapped, the triad stays on the point.
 #[gpui::test]
-#[ignore = "T2: flaky in the land queue's full assembly-ui run (the ball sits off the face's snap point); studios fixing"]
 fn the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
     let path = document(cx, "ball-snap", |ctx| {
@@ -1079,8 +1078,11 @@ fn the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point(cx: 
     wait_until(cx, window, &view, |v, cx| v.triad_snap(spot, cx).is_some());
     assert!(cx.update(|cx| view.read(cx).triad_snap(spot, cx).is_some()), "the face's points under the spot");
     let w = at_window(cx, &view, at);
+    // (The press takes the handle the GPU pick last hovered: on a loaded host that comes frames after the move.)
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(w, None, Modifiers::default());
+    wait_until(cx, window, &view, |v, _| v.manip_hover == Some(crate::assembly_scene::ManipHandle::Center));
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_down(w, MouseButton::Left, Modifiers::default());
-    let go = |cx: &mut TestAppContext, from: DVec2, to: DVec2| {
+    let go =|cx: &mut TestAppContext, from: DVec2, to: DVec2| {
         for k in 1..=8 {
             let p = at_window(cx, &view, from + (to - from) * (f64::from(k) / 8.0));
             gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(p, Some(MouseButton::Left), Modifiers::default());
@@ -1094,9 +1096,9 @@ fn the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point(cx: 
             (f, v.viewport.read(cx).project(f.origin).unwrap(), v.drag.as_ref().is_some_and(|d| d.ball_snap.is_some()))
         })
     };
-    // (Each check waits for the move to be taken, the pointer resting there and stirring half a pixel: the viewport
-    // drops a move to where the pointer already is.)
-    let until = |cx: &mut TestAppContext, to: DVec2, snapped: bool| {
+    // (Each check waits for the move to be taken, the pointer resting there and stirring a pixel: a move to where the
+    // pointer already is is dropped.)
+    let until = |cx: &mut TestAppContext, step: &str, to: DVec2, snapped: bool| {
         let t = std::time::Instant::now();
         let mut k = 0.0;
         while !cx.update(|cx| view.read(cx).drag.as_ref().is_some_and(|d| d.ball_snap.is_some() == snapped)) {
@@ -1107,35 +1109,35 @@ fn the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point(cx: 
                     let hit = v.raycast_hit(to, &[], cx).map(|(h, s)| (h.path, h.reference, s));
                     let snap = v.triad_snap(to, cx).map(|s| (s.chosen, s.marks.len(), s.marks[s.chosen].origin));
                     let meshes: Vec<usize> = v.result.occurrences.iter().map(|o| o.mesh.indices.len()).collect();
-                    format!("hit {hit:?}; snap {snap:?}; meshes {meshes:?}; drag {:?}", v.drag.as_ref().map(|d| d.ball_snap.is_some()))
+                    format!("hit {hit:?}; snap {snap:?}; meshes {meshes:?}; drag {:?}", v.drag.as_ref().map(|d| (d.ball_snap.is_some(), d.started, d.ball_at)))
                 });
-                panic!("snapped {snapped} at {to:?}: {:?}; {why}", ball(cx).0.origin);
+                panic!("{step}: snapped {snapped} at {to:?}: {:?}; {why}", ball(cx).0.origin);
             }
-            k = 0.5 - k;
+            k = 1.0 - k;
             let p = at_window(cx, &view, to + DVec2::new(k, 0.0));
             gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(p, Some(MouseButton::Left), Modifiers::default());
             frames(cx, window, &view);
         }
     };
     go(cx, at, spot);
-    until(cx, spot, true);
+    until(cx, "check 1", spot, true);
     let (f, _, snapped) = ball(cx);
     assert!(snapped && (f.origin - centre).length() < 1e-6, "on the face's centre: {:?} for {centre:?}", f.origin);
     assert!((f.rotation.dot(start.rotation)).abs() > 1.0 - 1e-9, "the triad unturned");
     go(cx, spot, centre_px);
-    until(cx, centre_px, false);
+    until(cx, "check 2", centre_px, false);
     let (_, shown, snapped) = ball(cx);
     assert!(!snapped && (shown - centre_px).length() < 2.0, "the point under the pointer: the ball follows it ({shown:?})");
     go(cx, centre_px, spot);
-    until(cx, spot, true);
+    until(cx, "check 3", spot, true);
     assert!(ball(cx).2, "snapped again off the ring");
     let background = DVec2::new(40.0, 40.0);
     go(cx, spot, background);
-    until(cx, background, false);
+    until(cx, "check 4", background, false);
     let (_, shown, snapped) = ball(cx);
     assert!(!snapped && (shown - background).length() < 2.0, "none over the background ({shown:?})");
     go(cx, background, spot);
-    until(cx, spot, true);
+    until(cx, "check 5", spot, true);
     assert!(ball(cx).2);
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(at_window(cx, &view, spot), MouseButton::Left, Modifiers::default());
     settle(cx, window, &view);

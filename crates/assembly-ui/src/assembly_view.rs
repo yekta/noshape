@@ -271,6 +271,8 @@ struct DragState {
     /// Center (ball) drag: the manipulator frame shown, the one at the pointer (taken on release) and the snap.
     triad_preview: Option<Frame>,
     ball_snap: Option<BallSnap>,
+    /// Where the pointer last moved the ball: a new result (the faces' inference points) snaps it again there.
+    ball_at: Option<DVec2>,
     /// Explode step editing: the drag builds a step instead of moving instances.
     explode: bool,
     /// Free drag of a part of a flexible subassembly (the path of the child dragged, from the top-level instance;
@@ -1051,6 +1053,25 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// The triad's centre ball dragged to `position`: it follows the pointer on the screen-parallel plane through it;
+    /// over a part it sits on the face's nearest inference point, the triad unturned; the release leaves the triad where
+    /// the ball is (live triad-snap-1121).
+    fn move_ball(&mut self, position: DVec2, cx: &mut Context<Self>) {
+        let Some(d) = &self.drag else { return };
+        let (pp, n, g0) = (d.plane_point, d.plane_normal, d.grab0);
+        let rot = self.manipulator(cx).map(|f| f.rotation).unwrap_or_default();
+        let free = Frame::new(pp + (self.ray_plane(position, pp, n, cx).unwrap_or(g0) - g0), rot);
+        let snap = self.triad_snap(position, cx);
+        let shown = snap.as_ref().map_or(free, |s| Frame::new(s.marks[s.chosen].origin, rot));
+        if let Some(d) = self.drag.as_mut() {
+            d.triad_preview = Some(shown);
+            d.ball_snap = snap;
+            d.ball_at = Some(position);
+        }
+        self.refresh_scene(false, cx);
+        cx.notify();
+    }
+
     /// The opening assembly's loading message (live2 feedback.json documentLoad, as a Part Studio's): "Loading studio
     /// data…" until its first evaluation (or its cached result) is in, after a moment.
     pub(crate) fn loading_message(&self) -> Option<&'static str> {
@@ -1063,6 +1084,9 @@ impl AssemblyView {
     fn apply_result(&mut self, result: Arc<AssemblyResult>, _window: &mut Window, cx: &mut Context<Self>) {
         self.result = result;
         self.infer = None;
+        if let Some(at) = self.drag.as_ref().filter(|d| d.started && d.handle == Some(ManipHandle::Center)).and_then(|d| d.ball_at) {
+            self.move_ball(at, cx);
+        }
         // The readout follows the new geometry, and picks of parts that are
         // gone (undone in their Part Studio) drop out (qa4 round 5 s4).
         let result = self.result.clone();
@@ -3447,6 +3471,7 @@ impl AssemblyView {
                         offset: DVec3::ZERO,
                         triad_preview: None,
                         ball_snap: None,
+                        ball_at: None,
                         explode: self.explode_edit,
                         nested: None,
                         solved: None,
@@ -3524,6 +3549,7 @@ impl AssemblyView {
                     offset: DVec3::ZERO,
                     triad_preview: None,
                     ball_snap: None,
+                    ball_at: None,
                     explode: false,
                     nested,
                     solved: None,
@@ -3598,20 +3624,7 @@ impl AssemblyView {
                         d.pending = Some(pp + d.offset);
                     }
                     Some(ManipHandle::Center) => {
-                        // The ball follows the pointer on the screen-parallel plane through it; over a part it sits on
-                        // the face's nearest inference point, the triad unturned; the release leaves the triad where the
-                        // ball is (live triad-snap-1121).
-                        let (pp, n, g0) = (d.plane_point, d.plane_normal, d.grab0);
-                        let rot = self.manipulator(cx).map(|f| f.rotation).unwrap_or_default();
-                        let free = Frame::new(pp + (self.ray_plane(*position, pp, n, cx).unwrap_or(g0) - g0), rot);
-                        let snap = self.triad_snap(*position, cx);
-                        let shown = snap.as_ref().map_or(free, |s| Frame::new(s.marks[s.chosen].origin, rot));
-                        if let Some(d) = self.drag.as_mut() {
-                            d.triad_preview = Some(shown);
-                            d.ball_snap = snap;
-                        }
-                        self.refresh_scene(false, cx);
-                        cx.notify();
+                        self.move_ball(*position, cx);
                         return;
                     }
                     None => {
@@ -3842,6 +3855,7 @@ impl AssemblyView {
             offset: DVec3::ZERO,
             triad_preview: None,
             ball_snap: None,
+            ball_at: None,
             explode: false,
             nested: None,
             solved: None,

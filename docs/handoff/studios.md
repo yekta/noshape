@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-21 06:09 UTC.
+Updated 2026-11-21 08:41 UTC.
 
 ## In flight
 
@@ -22,17 +22,16 @@ land. vibex8 02:00-04:00 is qa's quiet window. Never `git checkout <file>` over 
 e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
 - LANDED through 8e66e885 (05:34, as 090b40b5): triad ball snap (live triad-snap-1121), its snapped release,
   psui fc-1120 Version compare, fc-1121 drawing feel, the drawing matrix's option order.
-- Ball-snap feel test `the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point` stays T2 (lead P0:
-  20/20 under load before un-ignoring). Fix 2 (wait for `triad_snap(spot)` before pressing, stir the re-sent move
-  0.5 px) passed 19/20 at load ~13 (run 12: "snapped true" timed out in `until`). The `until` timeout now panics
-  with the raycast hit, triad_snap's pick, marks and mesh counts: run 20x `--include-ignored` (bin/x84.sh) on vibex8,
-  read the diagnostics, fix the cause.
-- Next land (in the branch, tests running 06:09): qa P1 VARIABLE-KEYWORD-NAMES (`variable_table::rows` lists
-  keyword-named variables such as #do / #type; create / rename still refuse keywords; checked on qa's repro: 24
-  rows; a configured variable's cell edits the shown configuration's value, `rows_in` / `set_value_in`); custom table configuration (Next 2);
-  Note Border size Tight fit + 1-5 Characters; version graph node tooltip = branch name, node click opens nothing;
-  Tab › Rename Esc keeps the name; FS fixed-error clear 580 ms (live fv-1121 recheck 582-783 ms); VS focused cell's
-  column header #d7d7d7 (dark #666666 guessed: REQUESTS 06:09); interaction-feel "fv-1121" section.
+- Ball-snap feel test `the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point` (lead P0: 20/20
+  under load on vibex8 before un-ignoring). x103 17/20: the drag's snap stale after a new result: fixed by `move_ball`
+  + `DragState::ball_at` (a new result during a centre drag snaps the ball again at the last pointer spot). x104 19/20:
+  the press came before the GPU hover pick named the ball, so the part was dragged: the test now hovers the ball and
+  waits for `manip_hover == Center` before pressing. x106 (20x, vibex8 under load) 20/20 at 08:50: un-ignored (T1).
+- In the branch: version graph node hover leaves its row untinted (fv-1121); live fv-1121 dark: focused column header
+  #333333 in dark, the Part Studio Variable table panel greys its focused column's header and shows the edited
+  value's chip (theme `tooltip`: #d0dbe5 / #4b5761) as the Variable Studio does.
+- LANDED e3de7e78 (07:01, as 2e7b8371): qa VARIABLE-KEYWORD-NAMES (+ configured variable cells), custom table
+  configuration, Note Border sizes, fv-1121 fixes (node tooltip, tab rename Esc, FS clear 580 ms, VS header grey).
 - Live fc-1121 drawing feel (behaviours "studios fc-1121"): (1) a dimension being placed shows the line to another's
   x / y without snapping (still held on a + mark, live2 rad-note); (3) caret at the click (`note_caret_at`), a
   double-click in the editor selects all; (5) a dragged box draws its picks selected (`box_preview`); (2), (4), (6)

@@ -249,7 +249,7 @@ pub const PALETTE_DARK: Palette = Palette {
     accent_soft: rgb_const(0x134e96),
     row_hover: rgb_const(0x0a4780),
     table_header: rgb_const(0x555555),
-    table_header_focus: rgb_const(0x666666),
+    table_header_focus: rgb_const(0x333333),
     bg_senary: rgb_const(0x1c1c1c),
     strip_inactive: rgb_const(0x1c1c1c),
     button_disabled: rgb_const(0x283f65),
