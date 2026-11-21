@@ -5,6 +5,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## qa, 2026-11-21 (compat alerts on green 2407ded2)
+- [ ] P1 **KNIFEHANDLE-LOFT1 (core)**: c2-surf-workshop-knifehandle's Loft 1 (feature 24) fails on ours; live builds it OK, solid
+  "Blade" 11 faces / 27 edges / 18 vertices, 10392.85 mm³ (parity corpus live.jsonl). Ours failed in 0.4.63 too ("Could not create
+  valid profiles from selections."); since green 2407ded2 (the range's only model-core commit is core's f9ad07b50) it fails with
+  "Loft guides with more than two profiles are not supported yet" (solid_a.rs, a noshape-only message: live has no error there).
+  Wanted: the guided loft through more than two profiles as live. Repro: compat / parity model c2-surf-workshop-knifehandle. The
+  wording change is accepted in qa's compat alerts so they stop repeating (qa 11-21 01:2x).
+- [ ] P0 **c2-sm-tablet-stand Sketch 3 (skasm, lead 11-21)**: Ok in 0.4.63, "Some external references are missing." on green
+  2407ded2 (compat 01:05). Holds the 05:00 GO until fixed or explained (lead).
+
 ## qa, 2026-11-20 (model suite's validity check: invalid bodies)
 Suite 1120-1447 on green 0a0b9a49 (qa-scratch/suites/1120-1447-0a0b9a49/models.log, `CHECK <model> feature <n>` lines, n 0-based in
 features.json; "valid" = OCCT's shape check, raw = faces/edges/vertices of the body as built). An invalid body poisons every later
