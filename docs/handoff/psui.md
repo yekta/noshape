@@ -80,11 +80,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
    - REQUESTS 19:11 answered (live 11-21 01:0x): a feature row's own menu has "Section view…" only while a sketch or
      plane is selected; a sketch row's right-click + Esc leaves the sketch selected unshown. Ours: UiState.menu_left
      (set when a sketch row's menu closes, cleared by any left click), list matrix row "menu / after a sketch's menu".
-     Committed 7cb01f0a 01:2x (landing). FEEL-FLANGE-EDGE-BEHIND-WALL: qa reopened 00:2x, then could not reproduce
+     LANDED 14d18cb7 01:48 (fe009731). FEEL-FLANGE-EDGE-BEHIND-WALL: qa reopened 00:2x, then could not reproduce
      (4 runs, 9/9 points bright), ticked; its pixel test on qa's model lands with it (no code change).
    - sketch-dimension-variable retaken by live (ca2c8aff; clicks (64,0) pick, (85,-8) place; step 9 value box focus,
-     step 10 autocomplete [#width, New variable…], end 30 = #width): ours in ~/tmp/psui/ps4 on vibex8 (log
-     /root/psui-scratch/ps4.log).
+     step 10 autocomplete [#width, New variable…], end 30 = #width): ours matches it, 12/12 states (ps5, vibex8, 01:5x,
+     with ca2c8aff's files while it was still queued). So all 33 Part Studio uip scenarios match.
    - Sheet metal titleState errors (bend-alignment-hold-line, hem-in-place-closed, bend/jog-new-edit-reedit,
      bend-angle-align-to-geometry) are skasm's features.
 6. NOW (lead 22:3x) a) night suite 1120-night-ui-a06ec927 (2145/2172; 26 listed in uip.log): its 14 Part Studio ones
