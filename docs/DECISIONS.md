@@ -186,3 +186,6 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   snap glyphs) × owner state (none, hovered, selected, selected + hovered, another selected, in a selection field) ×
   context (Part Studio, sketch, assembly); live captures each cell, psui matches it with a test per cell, qa scores it
   in the interaction feel suite and walks the app as a user.
+- 11-21 (user) The user's Mac is not a build host: one slot of 2 jobs there, only for checks that must run on macOS.
+  Builds, tests, replays and A/Bs go to the vibe hosts by tools/tiers/rb-hosts; vibe2 (16 cores) takes 3 agent build
+  slots of 4 jobs besides the land queue. Older rulings sending agents' builds to the Mac are void.
