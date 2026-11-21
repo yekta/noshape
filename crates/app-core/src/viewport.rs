@@ -1883,6 +1883,11 @@ impl Viewport {
         }
     }
 
+    /// The geometry given to [`Self::set_camera_geometry`].
+    pub fn camera_geometry(&self) -> Vec<Arc<dyn noshape_render::camera_geometry::CameraGeometry>> {
+        self.camera_geometry.clone()
+    }
+
     /// Geometry that depends on the camera (screen-sized drag handles, heads
     /// facing the viewer): built by the render thread for every frame from
     /// that frame's camera, so camera moves need nothing from the UI.

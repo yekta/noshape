@@ -1896,8 +1896,8 @@ pub enum ConnectorLook {
 /// size, live behaviours "icons2 (10-26) plane and mate connector hover"):
 /// a ring between 12.5 and 18 px in the connector's XY plane and the wedge
 /// between +X and +Y filled (white at rest, MATE_CONNECTOR_PRE_SELECTED /
-/// SELECTED amber hovered / selected), outlined (dark at rest, navy
-/// `MATE_CONNECTOR_STROKE` lit), a blue Z axis up from the centre and short
+/// SELECTED amber hovered / selected), outlined in a soft navy
+/// `MATE_CONNECTOR_STROKE`, a blue Z axis up from the centre and short
 /// red X / green Y ticks outside the ring.
 pub struct ConnectorGlyphs {
     items: Vec<(DVec3, DVec3, DVec3, DVec3, ConnectorLook)>,
@@ -1932,8 +1932,9 @@ const MC_RIM_PX: f32 = 1.3;
 const MC_FILL_REST: ([u8; 3], f32) = ([255, 255, 255], 0.8);
 const MC_FILL_HOVER: ([u8; 3], f32) = ([255, 194, 14], 0.4);
 const MC_FILL_SELECTED: ([u8; 3], f32) = ([255, 194, 14], 0.5);
-const MC_RIM_REST: [u8; 4] = [40, 44, 46, 255];
-const MC_RIM_LIT: [u8; 4] = [0, 40, 71, 255];
+/// The rim, the same in every state: live's darkest rim pixels (hover-matrix b3/ps-mc-*: #1d3e52..#26465b at rest, hovered
+/// and selected; its MATE_CONNECTOR_STROKE #002847 drawn soft).
+const MC_RIM: [u8; 4] = [29, 62, 82, 255];
 
 impl noshape_render::camera_geometry::CameraGeometry for ConnectorGlyphs {
     fn key(&self) -> Option<u64> {
@@ -1991,7 +1992,7 @@ impl noshape_render::camera_geometry::CameraGeometry for ConnectorGlyphs {
             // Outline: outer circle, the inner circle outside the wedge, the
             // wedge's two sides.
             let fade = |[r, g, b, a]: [u8; 4]| [r, g, b, (f32::from(a) * self.opacity).round() as u8];
-            let rim = fade(if look == ConnectorLook::Rest { MC_RIM_REST } else { MC_RIM_LIT });
+            let rim = fade(MC_RIM);
             let mut l = LineData::default();
             let outer: Vec<[f32; 3]> = (0..=n).map(|k| f(at(ro, ang(k)))).collect();
             let inner: Vec<[f32; 3]> = (n / 4..=n).map(|k| f(at(ri, ang(k)))).collect();

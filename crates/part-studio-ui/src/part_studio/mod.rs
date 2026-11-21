@@ -1506,6 +1506,14 @@ impl PartStudioView {
         manip.extend(mc_glyphs.map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>));
         manip.extend(self.inference_marks().filter(|_| self.inference_applies(cx)).map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>));
         extra.extend(mc_owners);
+        // While the pointer rests on a connector its owner part's faces show the owner look, a selected one's fill plain,
+        // selected again once the pointer leaves (live hover-matrix b3/ps-mc-otherhover-r).
+        if let Some(r @ Reference::MateConnector { .. }) = &single_hover
+            && let Some(owner) = self.connector_owner(r, cx)
+            && let Some(b) = self.display.body(&owner)
+        {
+            selection.retain(|s| !b.face_refs.contains(s));
+        }
         self.viewport.update(cx, |vp, cx| vp.set_camera_geometry(manip, cx));
         let changed = self.changed_picks(&selection);
         extra.extend(self.consumed_picks_overlay(&selection, &accent, &changed));
@@ -1629,7 +1637,6 @@ impl PartStudioView {
         if let Some(slot) = self.ui.cap_hover.and_then(|k| scene.clip_hovered.get_mut(k)) {
             *slot = true;
         }
-        self.tint_selected_owners(&mut scene, &selection, cx);
         self.ghost_outline_only(&mut scene, built);
         // with_highlights' overlays, then the extra ones (see the preview's POST tags).
         let (highlights_end, extra_end) = (scene.instances.len() - extra_len, scene.instances.len());
@@ -1803,33 +1810,27 @@ impl PartStudioView {
                     inst.compare = noshape_render::scene::compare::POST;
                 }
             }
-            // Live flange-handle-1120 (qa psui5): a picked edge stays bright orange where the preview's new walls cover
-            // it: the model's edge lines holding one drawn again, only their lit lines, over the mix.
-            let lit = |id: usize| scene.states.get(id).is_some_and(|s| s & (noshape_render::state::SELECTED | noshape_render::state::QUERY) != 0);
-            if (1..scene.states.len()).any(lit) {
-                let mut bases: Vec<u32> = scene.instances[..built.static_instances].iter().filter(|i| i.pickable).map(|i| i.pick_base).collect();
-                bases.sort_unstable();
-                let again: Vec<noshape_render::Instance> = scene.instances[..built.static_instances]
-                    .iter()
-                    .filter(|i| i.pickable && !i.pick_only && !i.back_silhouette && matches!(i.drawable, noshape_render::Drawable::Lines(_)))
-                    .filter(|i| {
-                        let next = bases.iter().copied().find(|&b| b > i.pick_base).map_or(scene.states.len(), |b| b as usize + 1);
-                        (i.pick_base as usize + 1..next.min(scene.states.len())).any(lit)
-                    })
-                    .map(|i| {
-                        let mut i = i.clone().unpickable().selected_only();
-                        i.compare = noshape_render::scene::compare::POST;
-                        i
-                    })
-                    .collect();
-                scene.instances.extend(again);
-            }
             scene.instances.extend(base.scene.instances[..base.static_instances].iter().cloned().map(|mut i| {
                 i.pickable = false;
                 // Past any highlight state.
                 i.pick_base = 1 << 30;
                 i
             }));
+            // Live flange-handle-1120 (qa psui5): a picked edge stays bright orange where the preview's new walls cover
+            // it: the model's edge lines holding one drawn again, only their lit lines, over the mix. A hovered edge or
+            // face boundary too (live hover-matrix b3/dlg-*-hover: the plain #ffc685 band in a Fillet field).
+            // Always, whatever is lit now: a hover changes only the states, not these instances (the shader keeps the lit lines).
+            // After the model before the feature, whose edges at rest would cover a lit face's 2 px boundary in its frame.
+            let again: Vec<noshape_render::Instance> = scene.instances[..built.static_instances]
+                .iter()
+                .filter(|i| i.pickable && !i.pick_only && !i.back_silhouette && matches!(i.drawable, noshape_render::Drawable::Lines(_)))
+                .map(|i| {
+                    let mut i = i.clone().unpickable().selected_only();
+                    i.compare = noshape_render::scene::compare::POST;
+                    i
+                })
+                .collect();
+            scene.instances.extend(again);
             scene.preview_mix = Some(self.ui.preview_opacity);
         }
         // Versions and history › Compare: both sides (crate::compare_graphics).

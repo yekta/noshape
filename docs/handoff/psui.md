@@ -1,13 +1,13 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-21 17:25 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-21 20:25 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
 
 - Worktree /root/projects/noshape-wt/psui, branch agent/psui. Commit as yekta (AGENTS.md), subject "psui: …".
-- Builds and crate tests on the Mac (lead 11-20 23:10): plain `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh bash -c "$(cat
-  script)"` (headless, ~/noshape-host only, 2 slots shared with bool/blend/core); vibex8 when it is busy. ~/bin/slot
+- Builds and crate tests on vibe2 (user 11-21): `NOSHAPE_RB_HOST=vibe2 tools/tiers/rb.sh bash -c "$(cat script)"`,
+  CARGO_INCREMENTAL=0; `git diff --name-only origin/main | xargs touch -c` first. ~/bin/slot
   only for suites, gates, timing pairs (DECISIONS 9e5b481d4). Scripts in /root/psui-scratch/run*.sh. The GPUI dialog matrix is
   `dialogs::the_dialogs_matrix_matches_live` (rows filter: DIALOG_ROW=…).
 - Scenario / app runs: vibex6, at most 3 app instances (shared with studios). Heavy runs (scenario shards) through
@@ -36,30 +36,26 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (18:48 UTC 11-21) — USER P0: hover × selection look matrix (DECISIONS 11-21)
+## Now (20:2x UTC 11-21) — USER P0: hover × selection look matrix (DECISIONS 11-21)
 
-1e44717c LANDED as 5b7743f97 (batch 1 27/27). Batch 2 (qa's six FEEL-SKETCH tickets) COMMITTED + land.sh 18:5x
-("psui: sketch entities hovered and selected as live …"; check `tools/tiers/land.sh --status`). Batch 2 46/50 vs live-b2
-(the 4 misses = PS linemid/arc hovered, live's CDP-jump look, ruled not to match). Length label (sk-line-tool-length)
-viewed: in-plane along the line as live sk/inference-horiz-to-point-before.
-What batch 2 changed: update_hover raw_edge takes SketchCurves; midpoint_band_piece sketch colour (scene::builder::
-sketch_curve_color); shaders LineOut.under (curve colour 22 % through the band core); fs_point lit sketch point = disc over
-rest ring 30 %; PS centres 4 px dot, lit >= 11 px; snap_square in plane units; mid-draw lit = inference entity;
-sketch_mode preview_value_direction + sketch.rs preview_length_in_plane (text_fill mesh 9 px #449ccd).
-NEXT: qa batch 3 P0s (TICKETS; pictures qa-scratch/hm2/b3-4f2c.png, b3y.png, b3z.png; qa 0/15 on 4f2cb3ce; qa's scenario
-specs qa-scratch/hm2/gen2/b3-*.json; live crops onshape-research/live/psui/hover-matrix-1121/b3/):
-  FEEL-FIELD-HOVER-DIM (Fillet field hover band has a dark middle / muted; suspect the dialog preview body's own black
-  edges drawn over the band, or Highlighting.dialog), FEEL-FIELD-VERTEX-EDGE (corner in the Fillet field: live the
-  top-front x edge, ours the vertical), FEEL-ORIGIN-HOVER-EDGE (origin at the block corner: live the +x edge, ours the
-  vertical + its marker; renderer pick_reaching ties by coverage then lower id; both live picks are the longest-on-screen
-  x edge), FEEL-MC-LOOK (MC rim soft olive not navy #002847 + square; selected: no green owner-face tint),
-  FEEL-FILLET-MANIPULATOR (open white arrow in the front face pointing away from the edge). Batch 3 cells need a mate
-  connector at (40,30,20) in matrix_studio. Then batch 4 (assembly, live as/). Score kit: rsync
-  mac:noshape-host/agents/psui/hm1/ to /root/psui-scratch/hm/oursN; `python3 /root/psui-scratch/hm/compare.py oursN
-  live-b1c|live-b2 sxsN`. Crops run: run-hm6.sh (touch -c changed files first: a stale Mac binary skipped a dump once).
-Mac disk: keep ~/noshape-host/agents/psui/target <= 10 GB (lead 18:4x): trim incremental + old binaries after runs.
-Later: drop `at_bar` (Section view… above a rolled-back bar) + list matrix row; full1 sketch-constraint-refusals (49) /
-sketch-entity-copy-paste (12) (vibex8 ~/agents/psui-keep/full1).
+LANDED: 1e44717c as 5b7743f97 (batch 1), ee4c1f6a as 6be52caf (batch 2; qa 50/51, matrix 76/92). Builds on vibe2
+(rb.sh default; the Mac: one 4-job nice-19 slot, DECISIONS a16b39297, macOS-only checks).
+BATCH 3 (in tree, landing next; crops 20/21 by compare.py before the MC owner-face fix, the 21st is that fix):
+- FIELD-HOVER-DIM: mod.rs always adds the lit-lines-again POST instances over a preview (hover changes only states),
+  after the base model's instances (its edges at rest covered a face's 2 px boundary). shaders.wgsl selected_only += HOVER.
+- FIELD-VERTEX-EDGE / ORIGIN-HOVER-EDGE: renderer pick_reaching: edges meeting under the pointer (nearest <= 2 px, others
+  within 1 px of it) -> the one most across the screen (pixel spans).
+- MC-LOOK: MC_RIM opaque live's darkest #1d3e52; no owner tint; hovered MC hides its owner part's faces' selection
+  (live b3/ps-mc-otherhover-r).
+- FILLET-MANIPULATOR: Arrow.small, 0.8 x Extrude's arrow along the inward bisector (live b3w).
+- Test crops now include camera geometry (viewport.camera_geometry() + renderer::SYNC_TARGET pub).
+- 15 b3_* cell tests (hover_matrix_tests.rs); thresholds checked against live's crops.
+QUEUE after batch 3: FEEL-SKETCH-REGION-FILL-AFTER-DRAG (P0, qa user walk: dragging a sketch point/line with no tool drops
+the circle region's #E4E7EA shading for good; qa-scratch/hm2 drags2.png); FEEL-SELECT-OTHER-LOOK (P0: no #FFC20E dot,
+list border #D7D7D7, no scrollbar; live uip/select-other-row-click-3.png); BAND-MIDDLE inf-on-line (the line lit by the
+Line tool's inference must show blue through, live #C79A95, ours opaque #ECB78A); then batch 4 (assembly, live as/).
+Score kit: run-hm7.sh (vibe2 crops ~/tmp/psui/hm3 + cells), compare.py oursN live-b1c|live-b2|live-b3 sxsN.
+Later: drop `at_bar` + list matrix row; full1 sketch-constraint-refusals (49) / sketch-entity-copy-paste (12).
 
 ### Earlier today
 

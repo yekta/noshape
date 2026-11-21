@@ -480,28 +480,29 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   plane (slanted, small, light blue, beside the line's middle). Ours writes it upright in screen space, larger, over the line's start.
   Live sk/inference-horiz-to-point-at, inference-vertical-at; ours qa-scratch/hm2/inf-zoom.png, inf-v.png.
   All six: qa 18:0x, green 5b9feb71a, live's document and camera (kit qa-scratch/hm2/gen2); scored in interaction-feel.md.
-- [ ] P0 **FEEL-FIELD-HOVER-DIM (psui)**: with a feature dialog's selection field active (Fillet 1, shift+f), our hover is drawn
+- [x] P0 **FEEL-FIELD-HOVER-DIM (psui)** (fixed psui 11-21: the lit lines are always drawn again over a preview's mix, after the model before the feature; qa to verify): with a feature dialog's selection field active (Fillet 1, shift+f), our hover is drawn
   muted: the edge band #D1B088 / #E0C49E, a face's boundary #B28A5D. Live draws the normal hover: 5 px #FFC685 band with the dark
   line through it (no midpoint marker), a face's 2 px #FFC685 boundary. Live b3/dlg-edge-hover_f, dlg-mid-hover_f, dlg-face-hover_f.
   (qa 20:23, batch 5: the same muted look in Extrude's "Faces and sketch regions" field (face, edge) and the Plane field
   (face, edge; the Plane edge's dark midpoint ring is right); live b5/b5-{extrude,plane}-{face,edge}_f, ours qa-scratch/hm2/cmp-b5.)
 - [ ] P0 **FEEL-FIELD-VERTEX-EDGE (psui)**: in the Fillet field, the pointer on the block's top front right corner lights the top
+- [x] P0 **FEEL-FIELD-VERTEX-EDGE (psui)** (fixed psui 11-21: edges meeting under the pointer, the one most across the screen; qa to verify): in the Fillet field, the pointer on the block's top front right corner lights the top
   front edge in live (the field takes edges and faces, the same id as hovering that edge); ours lights the vertical edge.
   Live b3/dlg-vertex-hover_f.
 - [x] withdrawn (qa 18:2x: live's dialog had the account's last-used 1.3 mm radius, a 4.6 px preview at this zoom; ours 5 mm, the first-use default; re-scored at 1.3 mm) ~~P0 **FEEL-FIELD-PICK-PREVIEW (psui)**~~: 1.2 s after picking an edge in the Fillet field, live shows the #FFA90A band and the
   radius manipulator with the edge still sharp; ours also draws the rounded preview (tangent lines, the shaded round). Also with
   the picked edge hovered and with a face hovered. Live b3/dlg-edge-selected_s, dlg-edge-selhover_f, dlg-face-otherhover_f (asked
   live when its preview appears).
-- [ ] P0 **FEEL-ORIGIN-HOVER-EDGE (psui)**: the pointer on the origin at the block's corner. Live lights the +x edge through it (5 px
+- [x] P0 **FEEL-ORIGIN-HOVER-EDGE (psui)** (fixed psui 11-21: the same corner rule; qa to verify): the pointer on the origin at the block's corner. Live lights the +x edge through it (5 px
   #FFC685), the origin glyph stays a black ring, and a click selects that edge. Ours lights the vertical edge, with its black midpoint
   marker, and a click selects the vertical edge. Also selected + hovered and with the right face selected. Live b3/ps-origin-*.
   The four: qa 18:17, green 4f2cb3ce, live's camera (kit qa-scratch/hm2/gen2 b3-*); ours qa-scratch/hm2/b3-4f2c.png.
-- [ ] P0 **FEEL-MC-LOOK (psui)**: a mate connector on the block's top back right corner, hovered: the disc fill and the owner face's
+- [x] P0 **FEEL-MC-LOOK (psui)** (fixed psui 11-21: the soft rim, no owner tint, and while hovered its owner's selected faces drawn plain as live's ps-mc-otherhover-r; qa to verify): a mate connector on the block's top back right corner, hovered: the disc fill and the owner face's
   yellow-green edges match live (#F4DF99, #E1EC87 / #CDD975), but ours outlines the ring and disc with a crisp 1 px navy #002847
   (≈200 px of an 80 px crop) and draws a navy square at the ring's front; live's rim is soft olive #C2C187 / #CCC18C. Selected: ours
   also tints the owner faces green (#BED5A8 top, #AFC39C side); live leaves them #99C0D7 / #8EB1C6 and only fills the disc #F6DA83.
   Live b3/ps-mc-*; ours qa-scratch/hm2/b3y.png.
-- [ ] P0 **FEEL-FILLET-MANIPULATOR (psui)**: an edge picked in a new Fillet at 1.3 mm. Live: the radius manipulator is an open white
+- [x] P0 **FEEL-FILLET-MANIPULATOR (psui)** (fixed psui 11-21: live b3w's outlined arrow into the material, 0.8 × Extrude's; qa to verify): an edge picked in a new Fillet at 1.3 mm. Live: the radius manipulator is an open white
   arrow lying in the front face below the edge, pointing away from it; the band reads ≈6 px (over the round's shading). Ours: a filled
   white triangle with a dark rim sitting on the band, pointing up; the band ≈3 px between two black tangent lines. Live b3/
   dlg-edge-selected_s, dlg-edge-selhover_f, dlg-face-otherhover_f; ours qa-scratch/hm2/b3z.png (cells b3-dlg-*13*).

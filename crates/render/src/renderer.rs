@@ -90,8 +90,8 @@ const MAX_PRESENT_TEXTURES: usize = 6;
 pub const PRESENT_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 /// Targets kept alive before the least recently used one is evicted.
 const MAX_TARGETS: usize = 8;
-/// Target id used by the synchronous [`Renderer::render`].
-const SYNC_TARGET: u64 = u64::MAX;
+/// Target id used by the synchronous [`Renderer::render`] (its camera geometry: [`Renderer::set_camera_geometry`]).
+pub const SYNC_TARGET: u64 = u64::MAX;
 
 const MAP_PENDING: u8 = 0;
 const MAP_OK: u8 = 1;
@@ -378,8 +378,10 @@ impl PickBuffer {
         // Its drawn pixels' centres within r of the pointer (live measures from the drawn edge pixel).
         let edge_reach2 = edge_reach * edge_reach;
         let reach = edge_reach.max(radius);
-        // (id, its priority, pixels hit, nearest squared distance); a few ids under the pointer.
+        // (id, its priority, pixels hit, nearest squared distance); a few ids under the pointer. Each one's pixels' extent
+        // across and down (dx, dy min and max).
         let mut hits: Vec<(u32, i32, u32, i32)> = Vec::new();
+        let mut spans: Vec<[i32; 4]> = Vec::new();
         for dy in -reach..=reach {
             for dx in -reach..=reach {
                 let Some(id) = self.id_at(x + dx, y + dy) else { continue };
@@ -391,16 +393,19 @@ impl PickBuffer {
                     continue;
                 }
                 let d2 = dx * dx + dy * dy;
-                match hits.iter_mut().find(|h| h.0 == id) {
-                    Some(h) => {
-                        h.2 += 1;
-                        h.3 = h.3.min(d2);
+                match hits.iter().position(|h| h.0 == id) {
+                    Some(k) => {
+                        hits[k].2 += 1;
+                        hits[k].3 = hits[k].3.min(d2);
+                        let s = &mut spans[k];
+                        *s = [s[0].min(dx), s[1].max(dx), s[2].min(dy), s[3].max(dy)];
                     }
                     None => {
                         // `i32::MIN`: never picked (filtered out by the caller).
                         let p = priority(id);
                         if p != i32::MIN {
                             hits.push((id, p, 1, d2));
+                            spans.push([dx, dx, dy, dy]);
                         }
                     }
                 }
@@ -413,9 +418,23 @@ impl PickBuffer {
             let distance = if half_diagonal > 0.0 { f64::from(h.3).sqrt() / half_diagonal } else { 0.0 };
             (1.0 + distance) * (1.0 - coverage)
         };
+        let best = hits.iter().enumerate().max_by(|(_, a), (_, b)| a.1.cmp(&b.1).then_with(|| score(b).total_cmp(&score(a))).then_with(|| b.0.cmp(&a.0)))?;
+        if !far(best.1.0) || best.1.3 > 4 {
+            return Some(best.1.0);
+        }
+        // Edges meeting under the pointer (the nearest at most 2 px off, the others within a pixel of it): the one
+        // running most nearly across the screen (live hover-matrix b3: at the block's corners, the origin and a Fillet
+        // field's vertex, live lights the edge along x, never the upright one).
+        let near = |h: &(u32, i32, u32, i32)| far(h.0) && h.1 == best.1.1 && (f64::from(h.3).sqrt() - f64::from(best.1.3).sqrt()).abs() <= 1.0;
+        let across = |k: usize| {
+            let s = spans[k];
+            f64::from(s[1] - s[0]) / f64::from(s[1] - s[0] + s[3] - s[2]).max(1.0)
+        };
         hits.iter()
-            .max_by(|a, b| a.1.cmp(&b.1).then_with(|| score(b).total_cmp(&score(a))).then_with(|| b.0.cmp(&a.0)))
-            .map(|h| h.0)
+            .enumerate()
+            .filter(|(_, h)| near(h))
+            .max_by(|(i, a), (j, b)| across(*i).total_cmp(&across(*j)).then_with(|| score(b).total_cmp(&score(a))).then_with(|| b.0.cmp(&a.0)))
+            .map(|(_, h)| h.0)
     }
 
     /// Distinct non-zero ids inside a frame-pixel rectangle `[x0, x1) x [y0, y1)`

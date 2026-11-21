@@ -27,6 +27,11 @@ pub(super) struct Matrix {
 
 /// Live's matrix document in a rendering test window at a device pixel ratio of 1, with live's camera.
 pub(super) fn matrix_studio(cx: &mut TestAppContext, name: &str) -> Matrix {
+    matrix_studio_with(cx, name, false)
+}
+
+/// [`matrix_studio`], with batch 3's Mate connector 1 on the block's top back right corner when `connector`.
+pub(super) fn matrix_studio_with(cx: &mut TestAppContext, name: &str, connector: bool) -> Matrix {
     RENDERING.set(true);
     let start = serde_json::json!({ "units": "mm", "features": [
         { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
@@ -39,6 +44,11 @@ pub(super) fn matrix_studio(cx: &mut TestAppContext, name: &str) -> Matrix {
             { "circle": [[100, 20], [106, 20]] }
         ] }
     ] });
+    let mut start = start;
+    if connector {
+        let mc = serde_json::json!({ "type": "mateConnector", "name": "Mate connector 1", "params": { "originQuery": ["vertex through [40, 30, 20]"] } });
+        start["features"].as_array_mut().expect("features").push(mc);
+    }
     let (window, view) = part_studio_from(cx, name, Some(start));
     cx.update_window(window, |_, w, _| w.set_scale_factor(1.0)).unwrap();
     draw(cx, window);
@@ -94,13 +104,15 @@ impl Matrix {
     /// The frame as drawn now, 80 × 80 px centred on `at` (row-major RGB).
     pub fn crop(&self, cx: &mut TestAppContext, at: DVec2) -> Vec<[u8; 3]> {
         self.pointer.frames(cx, &self.view);
-        let (scene, camera, style, size) = cx.update(|cx| {
+        let (scene, camera, style, size, geometry) = cx.update(|cx| {
             let vp = self.view.read(cx).viewport.read(cx);
             let (_, scene, camera, style) = vp.print_source();
-            (scene, camera, style, vp.size())
+            (scene, camera, style, vp.size(), vp.camera_geometry())
         });
         let (w, h) = (size.x as u32, size.y as u32);
         let mut r = noshape_render::Renderer::new().expect("a renderer");
+        // Mate connector glyphs and manipulators are built per frame from the camera.
+        r.set_camera_geometry(noshape_render::renderer::SYNC_TARGET, geometry);
         let f = r.render(noshape_render::RenderParams { scene: &scene, camera: &camera, width: w, height: h, device_pixel_ratio: 1.0, style: &style, pick: false }).expect("a frame");
         let (x0, y0) = (at.x as i32 - 40, at.y as i32 - 40);
         let mut out = Vec::with_capacity(6400);
@@ -205,6 +217,69 @@ fn part_studio_hover_matrix_crops(cx: &mut TestAppContext) {
         m.pointer.move_to(cx, &m.view, from + (to - from) * (k as f64 / 10.0));
     }
     dump("sk-line-tool-length", &m.crop(cx, (from + to) * 0.5));
+}
+
+/// Batch 3 (live b3/): the origin at the block's corner, Mate connector 1, and Fillet 1's selection field (radius 1.3 mm,
+/// as live's), each in its states; crops for live's.
+#[gpui::test]
+fn part_studio_hover_matrix_b3_crops(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio_with(cx, "hover-matrix-b3", true);
+    wait_until(cx, m.window, |cx| !m.view.read(cx).display.connectors.is_empty());
+    let other = m.screen(cx, [40., 15., 10.]);
+    let hovered = |cx: &mut TestAppContext, m: &Matrix| cx.update(|cx| format!("{:?}", m.view.read(cx).hover));
+    for (name, at) in [("ps-origin", [0., 0., 0.]), ("ps-mc", [40., 30., 20.])] {
+        let p = m.screen(cx, at);
+        m.reset(cx);
+        dump(&format!("{name}-none"), &m.crop(cx, p));
+        approach(cx, &m, p);
+        eprintln!("b3 {name} hovered: {}", hovered(cx, &m));
+        dump(&format!("{name}-hovered"), &m.crop(cx, p));
+        m.pointer.click(cx, &m.view, p);
+        m.park(cx);
+        dump(&format!("{name}-selected"), &m.crop(cx, p));
+        approach(cx, &m, p);
+        dump(&format!("{name}-selected-hovered"), &m.crop(cx, p));
+        m.reset(cx);
+        m.pointer.move_to(cx, &m.view, other);
+        m.pointer.click(cx, &m.view, other);
+        m.park(cx);
+        approach(cx, &m, p);
+        dump(&format!("{name}-hovered-other-selected"), &m.crop(cx, p));
+    }
+    let open_fillet = |cx: &mut TestAppContext, m: &Matrix| {
+        m.reset(cx);
+        cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
+        draw(cx, m.window);
+        let dialog = cx.update(|cx| m.view.read(cx).edit.as_ref().map(|e| e.dialog.clone())).expect("the Fillet dialog");
+        cx.update_window(m.window, |_, w, cx| dialog.update(cx, |d, cx| d.set_expr_text("radius", "1.3 mm", w, cx))).unwrap();
+        m.park(cx);
+    };
+    let close = |cx: &mut TestAppContext, m: &Matrix| {
+        cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
+        wait_until(cx, m.window, |cx| m.view.read(cx).edit.is_none() && !m.view.read(cx).ui_busy());
+    };
+    let edge = m.screen(cx, [10., 0., 20.]);
+    for (name, at) in [("dlg-edge", [10., 0., 20.]), ("dlg-mid", [20., 0., 20.]), ("dlg-vertex", [40., 0., 20.]), ("dlg-face", [12., 12., 20.])] {
+        let p = m.screen(cx, at);
+        open_fillet(cx, &m);
+        dump(&format!("{name}-none"), &m.crop(cx, p));
+        approach(cx, &m, p);
+        eprintln!("b3 {name} hovered: {}", hovered(cx, &m));
+        dump(&format!("{name}-hovered"), &m.crop(cx, p));
+        close(cx, &m);
+    }
+    open_fillet(cx, &m);
+    m.pointer.move_to(cx, &m.view, edge);
+    m.pointer.click(cx, &m.view, edge);
+    m.park(cx);
+    dump("dlg-edge-selected", &m.crop(cx, edge));
+    approach(cx, &m, edge);
+    dump("dlg-edge-selected-hovered", &m.crop(cx, edge));
+    let face = m.screen(cx, [12., 12., 20.]);
+    approach(cx, &m, face);
+    dump("dlg-face-hovered-other-selected", &m.crop(cx, face));
+    close(cx, &m);
 }
 
 /// Sketch 2's targets (live index.md batch 2): its point, the line off its middle, the line's midpoint, the arc at 1.5 rad
@@ -557,4 +632,229 @@ cells! {
     sk_arc_selected: SK_ARC, State::Selected => edit |c| {
         assert!(shows(&c, 0xffa90a, 3.0) && shows(&c, 0xc88536, 2.0));
     }
+}
+
+/// A batch 3 cell (live b3/): the matrix with Mate connector 1, Fillet 1 open at live's 1.3 mm when `dialog`, `target` in
+/// `state` (the other selection: the right face, in the Fillet field the top front edge); the matrix and its crop.
+fn b3_cell(cx: &mut TestAppContext, dialog: bool, target: [f64; 3], state: State) -> (Matrix, Vec<[u8; 3]>) {
+    let m = matrix_studio_with(cx, "hover-matrix-b3-cell", true);
+    wait_until(cx, m.window, |cx| !m.view.read(cx).display.connectors.is_empty());
+    if dialog {
+        cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
+        draw(cx, m.window);
+        let d = cx.update(|cx| m.view.read(cx).edit.as_ref().map(|e| e.dialog.clone())).expect("the Fillet dialog");
+        cx.update_window(m.window, |_, w, cx| d.update(cx, |d, cx| d.set_expr_text("radius", "1.3 mm", w, cx))).unwrap();
+        m.park(cx);
+    }
+    let p = m.screen(cx, target);
+    match state {
+        State::Hovered => approach(cx, &m, p),
+        State::Selected | State::SelectedHovered => {
+            approach(cx, &m, p);
+            m.pointer.click(cx, &m.view, p);
+            m.park(cx);
+            if state == State::SelectedHovered {
+                approach(cx, &m, p);
+            }
+        }
+        State::HoveredOtherSelected => {
+            let other = m.screen(cx, if dialog { EDGE } else { [40., 15., 10.] });
+            m.pointer.move_to(cx, &m.view, other);
+            m.pointer.click(cx, &m.view, other);
+            m.park(cx);
+            approach(cx, &m, p);
+        }
+        _ => m.park(cx),
+    }
+    let crop = m.crop(cx, p);
+    (m, crop)
+}
+
+/// Whether `rgb` (within 24, 2 px either way: a selected band's pure rows are 1 px) runs along the crop from its centre in
+/// direction `d` (screen px), 6 to 20 px out.
+fn runs_along(crop: &[[u8; 3]], d: DVec2, rgb: u32) -> bool {
+    let d = d.normalize();
+    (6..=20).filter(|&k| {
+        let q = DVec2::new(40.0, 40.0) + d * k as f64;
+        (-2..=2).flat_map(|dy| (-2..=2).map(move |dx| (dx, dy))).any(|(dx, dy)| {
+            let (x, y) = (q.x.round() as i32 + dx, q.y.round() as i32 + dy);
+            (0..80).contains(&x) && (0..80).contains(&y) && close(crop[(y * 80 + x) as usize], rgb, 24)
+        })
+    })
+    .count()
+        >= 10
+}
+
+/// The screen direction of a world step `d` (mm) at `at`.
+fn screen_dir(cx: &mut TestAppContext, m: &Matrix, at: [f64; 3], d: [f64; 3]) -> DVec2 {
+    m.screen(cx, [at[0] + d[0], at[1] + d[1], at[2] + d[2]]) - m.screen(cx, at)
+}
+
+const ORIGIN: [f64; 3] = [0., 0., 0.];
+const CONNECTOR: [f64; 3] = [40., 30., 20.];
+
+// The origin at the block's corner (live b3/ps-origin-*): the +x edge through it lights and takes the click (5 px
+// #ffc685 band, #ffa90a selected); the vertical edge stays black.
+#[gpui::test]
+fn b3_origin_hovered(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (m, c) = b3_cell(cx, false, ORIGIN, State::Hovered);
+    dump("cell-b3_origin_hovered", &c);
+    let (x, z) = (screen_dir(cx, &m, ORIGIN, [5., 0., 0.]), screen_dir(cx, &m, ORIGIN, [0., 0., 5.]));
+    assert!(runs_along(&c, x, 0xffc685) && !runs_along(&c, z, 0xffc685));
+}
+
+#[gpui::test]
+fn b3_origin_selected(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (m, c) = b3_cell(cx, false, ORIGIN, State::Selected);
+    dump("cell-b3_origin_selected", &c);
+    let (x, z) = (screen_dir(cx, &m, ORIGIN, [5., 0., 0.]), screen_dir(cx, &m, ORIGIN, [0., 0., 5.]));
+    assert!(runs_along(&c, x, 0xffa90a) && !runs_along(&c, z, 0xffa90a));
+}
+
+#[gpui::test]
+fn b3_origin_selected_hovered(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (m, c) = b3_cell(cx, false, ORIGIN, State::SelectedHovered);
+    dump("cell-b3_origin_selected_hovered", &c);
+    let (x, z) = (screen_dir(cx, &m, ORIGIN, [5., 0., 0.]), screen_dir(cx, &m, ORIGIN, [0., 0., 5.]));
+    assert!(runs_along(&c, x, 0xffa90a) && !runs_along(&c, z, 0xffa90a) && !runs_along(&c, z, 0xffc685));
+}
+
+#[gpui::test]
+fn b3_origin_hovered_other_selected(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (m, c) = b3_cell(cx, false, ORIGIN, State::HoveredOtherSelected);
+    dump("cell-b3_origin_hovered_other_selected", &c);
+    let (x, z) = (screen_dir(cx, &m, ORIGIN, [5., 0., 0.]), screen_dir(cx, &m, ORIGIN, [0., 0., 5.]));
+    assert!(runs_along(&c, x, 0xffc685) && !runs_along(&c, z, 0xffc685));
+}
+
+/// Crisp navy rim pixels (#002847 within 12): live's rim is soft, its darkest #1e4461..#26465b.
+fn crisp_navy(crop: &[[u8; 3]]) -> usize {
+    crop.iter().filter(|c| close(**c, 0x002847, 12)).count()
+}
+
+// Mate connector 1 (live b3/ps-mc-*): hovered, the disc's wedge #f4df99 over the background and its ring #c2c187 over
+// the face, a soft navy rim, the owner's edges yellow-green #e1ec87; selected #f6da83 / #ccc173 and the owner's faces
+// as they are.
+#[gpui::test]
+fn b3_connector_hovered(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (_m, c) = b3_cell(cx, false, CONNECTOR, State::Hovered);
+    dump("cell-b3_connector_hovered", &c);
+    assert!(shows(&c, 0xf4df99, 16.0) && shows(&c, 0xe1ec87, 30.0) && crisp_navy(&c) == 0, "{} crisp navy px", crisp_navy(&c));
+}
+
+#[gpui::test]
+fn b3_connector_selected(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (_m, c) = b3_cell(cx, false, CONNECTOR, State::Selected);
+    dump("cell-b3_connector_selected", &c);
+    // (Our old owner tint: the whole top face #bed5a8, ~1000 px; the owner edges' blend with the face gives a few.)
+    assert!(shows(&c, 0xccc173, 16.0) && count(&c, 0xbed5a8) < 300 && shows(&c, 0x99c0d7, 40.0) && crisp_navy(&c) == 0);
+}
+
+#[gpui::test]
+fn b3_connector_selected_hovered(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (_m, c) = b3_cell(cx, false, CONNECTOR, State::SelectedHovered);
+    dump("cell-b3_connector_selected_hovered", &c);
+    assert!(shows(&c, 0xccc173, 16.0) && count(&c, 0xbed5a8) < 300);
+}
+
+#[gpui::test]
+fn b3_connector_hovered_other_selected(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (_m, c) = b3_cell(cx, false, CONNECTOR, State::HoveredOtherSelected);
+    dump("cell-b3_connector_hovered_other_selected", &c);
+    // The selected right face is one of the owner's: its fill plain while the connector is hovered (live
+    // ps-mc-otherhover-r, #d9a235 before and after, #8db0c5 on the connector).
+    assert!(shows(&c, 0xf4df99, 16.0) && crisp_navy(&c) == 0 && count(&c, 0xd9a235) < 30, "{} selected fill px", count(&c, 0xd9a235));
+}
+
+/// Pixels of `rgb` (within 24) anywhere in the crop.
+fn count(crop: &[[u8; 3]], rgb: u32) -> usize {
+    crop.iter().filter(|c| close(**c, rgb, 24)).count()
+}
+
+// Fillet 1's field (live b3/dlg-*): the plain hover look over the dialog's preview (the 5 px #ffc685 band, its middle
+// rows darker where the edge shows through, no midpoint marker; a face's #ffc685 boundary, never the muted #b28a5d);
+// a corner lights the top front edge.
+#[gpui::test]
+fn b3_field_edge_hovered(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (_m, c) = b3_cell(cx, true, EDGE, State::Hovered);
+    dump("cell-b3_field_edge_hovered", &c);
+    assert!(shows(&c, 0xffc685, 3.0) && dark(&c, 6.0) < 4);
+}
+
+#[gpui::test]
+fn b3_field_midpoint_hovered(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (_m, c) = b3_cell(cx, true, MID, State::Hovered);
+    dump("cell-b3_field_midpoint_hovered", &c);
+    assert!(shows(&c, 0xffc685, 3.0) && dark(&c, 6.0) < 4);
+}
+
+#[gpui::test]
+fn b3_field_vertex_hovered(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (m, c) = b3_cell(cx, true, VERTEX, State::Hovered);
+    dump("cell-b3_field_vertex_hovered", &c);
+    let (x, z) = (screen_dir(cx, &m, VERTEX, [-5., 0., 0.]), screen_dir(cx, &m, VERTEX, [0., 0., -5.]));
+    assert!(runs_along(&c, x, 0xffc685) && !runs_along(&c, z, 0xffc685));
+}
+
+#[gpui::test]
+fn b3_field_face_hovered(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (_m, c) = b3_cell(cx, true, FACE, State::Hovered);
+    dump("cell-b3_field_face_hovered", &c);
+    assert!(count(&c, 0xffc685) > 200 && count(&c, 0xb28a5d) < 20, "{} #ffc685, {} #b28a5d", count(&c, 0xffc685), count(&c, 0xb28a5d));
+}
+
+/// White pixels of the radius arrow down-right of the edge's midpoint (live b3w: it points into the material from the
+/// band), and above the band where ours stood upright.
+fn arrow_px(cx: &mut TestAppContext, m: &Matrix, crop: &[[u8; 3]]) -> (usize, usize) {
+    let mid = m.screen(cx, MID) - m.screen(cx, EDGE) + DVec2::new(40.0, 40.0);
+    let into = screen_dir(cx, m, MID, [0., 0.707, -0.707]).normalize();
+    let (mut ahead, mut behind) = (0, 0);
+    for (i, c) in crop.iter().enumerate() {
+        let t = (DVec2::new((i % 80) as f64, (i / 80) as f64) - mid).dot(into);
+        if c.iter().all(|&v| v > 235) && (DVec2::new((i % 80) as f64, (i / 80) as f64) - mid).length() < 26.0 {
+            if t > 2.0 { ahead += 1 } else if t < -3.0 { behind += 1 }
+        }
+    }
+    (ahead, behind)
+}
+
+#[gpui::test]
+fn b3_field_edge_picked(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (m, c) = b3_cell(cx, true, EDGE, State::Selected);
+    dump("cell-b3_field_edge_picked", &c);
+    let (ahead, behind) = arrow_px(cx, &m, &c);
+    assert!(shows(&c, 0xffa90a, 3.0) && ahead >= 8 && behind == 0, "arrow px ahead {ahead}, behind {behind}");
+}
+
+#[gpui::test]
+fn b3_field_edge_picked_hovered(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (m, c) = b3_cell(cx, true, EDGE, State::SelectedHovered);
+    dump("cell-b3_field_edge_picked_hovered", &c);
+    let (ahead, behind) = arrow_px(cx, &m, &c);
+    assert!(shows(&c, 0xffa90a, 3.0) && !shows(&c, 0xffc685, 3.0) && ahead >= 8 && behind == 0, "arrow px ahead {ahead}, behind {behind}");
+}
+
+#[gpui::test]
+fn b3_field_face_hovered_edge_picked(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (m, c) = b3_cell(cx, true, FACE, State::HoveredOtherSelected);
+    dump("cell-b3_field_face_hovered_edge_picked", &c);
+    let edge = m.screen(cx, EDGE) - m.screen(cx, FACE) + DVec2::new(40.0, 40.0);
+    let picked = (edge.y as usize - 2..=edge.y as usize + 2).any(|y| close(c[y * 80 + edge.x as usize], 0xffa90a, 24));
+    // (#b28a5d: the muted boundary gave ~80; the preview's tangent line beside the band blends to a few, live 9.)
+    assert!(picked && count(&c, 0xffc685) > 150 && count(&c, 0xb28a5d) < 50, "{} #ffc685, {} #b28a5d", count(&c, 0xffc685), count(&c, 0xb28a5d));
 }
