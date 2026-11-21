@@ -1481,6 +1481,19 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
   build at load 24, re-check on a release build in the quiet window. Not run: Sketch 3's region (our two-blocks start has no
   Sketch 3), the view cube click.
 
+## Release blockers for the 2026-11-21 05:00 release (qa 04:3x: GO on green b3ece860 vs v0.4.63)
+- Must carry: core's 503396456 (c2-sm-tablet-stand Sketch 3, lead's hold; P0 verified 04:01 on b3ece860: SAME as 0.4.63), in b3ece860.
+  Lands after b3ece860 go in the 17:00 cut (lead).
+- Pre-release on b3ece860 (qa-scratch/prerel/cut05-b3ece860.txt, vibe2): hat8, hat15, hat15b and the dock regenerate the same as v0.4.63,
+  and are the same after the variable edits. App open at 90 s: 0 px differ on all four.
+- Compat ran on aa09396f (the loop's green at 04:05): b3ece860 plus docs and one product change, dx 616412d63 (IGES export only:
+  kernel io.cpp + its test), so it stands for b3ece860. User documents and qa's authored documents are the same as v0.4.63.
+- Known, not blocking (ticket and corpus documents): better than v0.4.63: cli-shell-hang-pre Shell 3, crash957 Chamfer 3, rust-zero
+  Fillet 1, cli-fillet-segv Chamfer 2 and c2-surf-intro-simple Loft 1 are Error -> Ok. Worse: cli-shell-hang-pre Shell 5 is
+  Warning -> Error (P2 SHELL5-AFTER-SHELL3, bool; live OK). Wording or count only, accepted: crash957 Fillet 2, rust-zero Fillet 2,
+  knifehandle Loft 1 (P1 KNIFEHANDLE-LOFT1, core). Parts only: c2-surf-workshop-singularities (known, with core).
+  hat15 vs v0.4.43: the usual Fan Riser 45094.52 -> 45100.35 mm³.
+
 ## Release blockers for the 2026-11-20 17:00 release (qa 15:4x: GO on green 18809b4c1 vs v0.4.62)
 - Must carry, all in 18809b4c1: bool's Gyro fix 593b072ac, bool's revert 61295b96f, core's FILLET-ORIENT fix aa5682636, psui's revert
   1c6e56e4, psui's spinner test fix 18809b4c1. Pre-release (qa-scratch/prerel/cut17-18809b4c.txt, vibe2): hats SAME regenerated and after
