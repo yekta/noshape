@@ -195,8 +195,9 @@ fn a_cached_sheet_stands_in_until_the_real_one_is_complete(cx: &mut TestAppConte
     assert!(cx.update(|cx| editor.read(cx).real_sheet_in()) && real.placements.len() >= 3, "the suggested views computed");
     let dir = std::env::temp_dir().join(format!("noshape-drawing-cache-ui-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    crate::drawing_open::store_sheet(&dir, "k", &real).unwrap();
-    let cached = crate::drawing_open::load_sheet(&dir, "k").expect("the cached sheet");
+    let shelf = crate::display_cache::Shelf::dir(&dir);
+    crate::drawing_open::store_sheet(&shelf, "k", &real).unwrap();
+    let cached = crate::drawing_open::load_sheet(&shelf, "k").expect("the cached sheet");
     let _ = std::fs::remove_dir_all(&dir);
     let lines = |b: &noshape_model::drawing::build::BuiltSheet| b.geometry.lines.iter().map(|l| (l.points.clone(), l.pick)).collect::<Vec<_>>();
     assert_eq!(lines(&cached), lines(&real), "cached as it was");

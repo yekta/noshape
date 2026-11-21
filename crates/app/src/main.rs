@@ -448,7 +448,7 @@ fn main() {
     }
     // A reopened tab shows its cached display at once (lead 11-06); not under the ui-parity driver.
     if std::env::var_os("NOSHAPE_UI_SCRIPT").is_none() {
-        noshape_app_core::display_cache::enable();
+        noshape_app_core::display_cache::enable(option_env!("NOSHAPE_COMMIT"));
     }
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,naga=warn,wgpu=warn,zbus=warn,tracing=warn")).init();
     // Initializes the GPU on a background thread; the first use waits for it.

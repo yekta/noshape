@@ -40,16 +40,16 @@ pub(crate) struct CachedOpen {
 }
 
 fn key(doc: &noshape_model::Document, tab: TabId, sheet: usize) -> Option<String> {
-    cache::key(doc, &("drawing", tab, sheet))
+    cache::key(doc, &("drawing", tab, sheet), &())
 }
 
 /// A sheet's build in the cache: as JSON (its sheet data's serde attributes need a self-describing format).
-pub(crate) fn store_sheet(dir: &std::path::Path, key: &str, built: &BuiltSheet) -> std::io::Result<()> {
-    cache::store(dir, key, &serde_json::to_vec(built).map_err(std::io::Error::other)?)
+pub(crate) fn store_sheet(shelf: &cache::Shelf, key: &str, built: &BuiltSheet) -> std::io::Result<()> {
+    cache::store(shelf, key, &serde_json::to_vec(built).map_err(std::io::Error::other)?)
 }
 
-pub(crate) fn load_sheet(dir: &std::path::Path, key: &str) -> Option<BuiltSheet> {
-    serde_json::from_slice(&cache::load::<Vec<u8>>(dir, key)?).ok()
+pub(crate) fn load_sheet(shelf: &cache::Shelf, key: &str) -> Option<BuiltSheet> {
+    serde_json::from_slice(&cache::load::<Vec<u8>>(shelf, key)?).ok()
 }
 
 impl DrawingEditor {
@@ -64,9 +64,10 @@ impl DrawingEditor {
             return;
         }
         let (doc, tab, sheet) = (self.doc.read(cx).session.doc.clone(), self.tab, self.sheet);
+        let shelf = cache::Shelf::app(&self.doc.read(cx).session.path);
         let load = cx.background_spawn(async move {
             let key = key(&doc, tab, sheet)?;
-            let built = load_sheet(&cache::default_dir(), &key)?;
+            let built = load_sheet(&shelf, &key)?;
             Some((key, built))
         });
         self.cached_open.task = Some(cx.spawn(async move |this, cx| {
@@ -152,17 +153,18 @@ impl DrawingEditor {
 
     fn schedule_sheet_save(&mut self, si: usize, built: BuiltSheet, cx: &mut Context<Self>) {
         let wait = if self.cached_open.key.is_none() { Duration::ZERO } else { SAVE_AFTER };
-        let (doc, tab, known) = (self.doc.read(cx).session.doc.clone(), self.tab, self.cached_open.key.clone());
+        let (doc, tab) = (self.doc.read(cx).session.doc.clone(), self.tab);
+        let shelf = cache::Shelf::app(&self.doc.read(cx).session.path);
         self.cached_open.save_task = Some(cx.spawn(async move |this, cx| {
             cx.background_executor().timer(wait).await;
             let saved = cx
                 .background_spawn(async move {
                     let key = key(&doc, tab, si)?;
-                    let dir = cache::default_dir();
-                    if known.as_ref() == Some(&key) || cache::contains(&dir, &key) {
+                    // (Already in both places; one shown from the cache directory alone gets its document row now.)
+                    if cache::contains(&shelf, &key) {
                         return Some(key);
                     }
-                    store_sheet(&dir, &key, &built).ok()?;
+                    store_sheet(&shelf, &key, &built).ok()?;
                     Some(key)
                 })
                 .await;

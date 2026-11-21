@@ -19,12 +19,17 @@ const SAVE_AFTER: Duration = Duration::from_secs(2);
 
 /// The key of a display's coarse (preview) level.
 fn coarse_key(key: &str) -> String {
-    format!("{key}-coarse")
+    crate::display_cache::variant(key, "coarse")
 }
 
 impl PartStudioView {
     fn cache_key_inputs(&self, cx: &App) -> (noshape_model::Document, noshape_model::document::TabId, noshape_model::configuration::ConfigValues, bool) {
         (self.doc.read(cx).session.doc.clone(), self.tab, self.config_values.clone(), self.ui.high_quality_seen)
+    }
+
+    /// Where its displays are kept: the cache directory and the document's file.
+    fn cache_shelf(&self, cx: &App) -> display_cache::Shelf {
+        display_cache::Shelf::app(&self.doc.read(cx).session.path)
     }
 
     /// On the studio's first regeneration: its cached display, if there is one, shown until the real one lands.
@@ -33,21 +38,21 @@ impl PartStudioView {
             return;
         }
         let (doc, tab, config, fine) = self.cache_key_inputs(cx);
+        let shelf = self.cache_shelf(cx);
         // The coarse display first (a fraction of the refined one's triangles: drawn at once), then the refined one.
         let first = cx.background_spawn(async move {
             let key = display_cache::key(&doc, tab, &config, fine)?;
-            let dir = display_cache::default_dir();
-            let coarse = display_cache::load(&dir, &coarse_key(&key));
-            Some((key, coarse))
+            let coarse = display_cache::load(&shelf, &coarse_key(&key));
+            Some((key, coarse, shelf))
         });
         self.ui.cache_task = Some(cx.spawn_in(window, async move |this, cx| {
-            let Some((key, coarse)) = first.await else { return };
+            let Some((key, coarse, shelf)) = first.await else { return };
             let had_coarse = coarse.is_some();
             if let Some(display) = coarse {
                 let key = key.clone();
                 let _ = this.update_in(cx, |this: &mut Self, window, cx| this.show_cached_display(key, display, window, cx));
             }
-            let full = cx.background_spawn(async move { display_cache::load(&display_cache::default_dir(), &key).map(|d| (key, d)) }).await;
+            let full = cx.background_spawn(async move { display_cache::load(&shelf, &key).map(|d| (key, d)) }).await;
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 this.ui.cache_task = None;
                 // Over the coarse cached one, or alone when there was none; never over the real model.
@@ -116,20 +121,20 @@ impl PartStudioView {
                     return None;
                 }
                 let coarse = this.ui.preview_for_cache.as_ref().filter(|(s, _)| *s == seq).map(|(_, d)| d.clone());
-                Some((this.cache_key_inputs(cx), this.display.clone(), coarse, this.ui.cache_key.clone()))
+                Some((this.cache_key_inputs(cx), this.cache_shelf(cx), this.display.clone(), coarse, this.ui.cache_key.clone()))
             });
-            let Ok(Some(((doc, tab, config, fine), display, coarse, known))) = job else { return };
+            let Ok(Some(((doc, tab, config, fine), shelf, display, coarse, known))) = job else { return };
             let saved = cx
                 .background_spawn(async move {
                     let key = display_cache::key(&doc, tab, &config, fine)?;
-                    if known.as_ref() == Some(&key) {
+                    // (Shown from the cache directory alone: the document gets its row now.)
+                    if known.as_ref() == Some(&key) && crate::display_cache::contains(&shelf, &key) {
                         return Some(key);
                     }
-                    let dir = display_cache::default_dir();
                     if let Some(coarse) = &coarse {
-                        display_cache::store(&dir, &coarse_key(&key), coarse).ok()?;
+                        display_cache::store(&shelf, &coarse_key(&key), coarse).ok()?;
                     }
-                    display_cache::store(&dir, &key, &display).ok()?;
+                    display_cache::store(&shelf, &key, &display).ok()?;
                     Some(key)
                 })
                 .await;

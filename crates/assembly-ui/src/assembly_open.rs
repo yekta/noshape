@@ -249,7 +249,7 @@ impl Snapshot {
 /// The cache key of the assembly as evaluated (its configuration applied) with its exploded view.
 fn key(doc: &noshape_model::Document, tab: TabId, asm: &Assembly, explode: Option<usize>) -> Option<String> {
     // ("assembly2": flexible children by path since 11-18.)
-    cache::key(doc, &("assembly2", tab, asm, explode))
+    cache::key(doc, &("assembly2", tab), &(asm, explode))
 }
 
 impl AssemblyView {
@@ -259,9 +259,10 @@ impl AssemblyView {
             return;
         }
         let (doc, tab, asm, explode) = (self.doc.read(cx).session.doc.clone(), self.tab, asm.clone(), self.explode);
+        let shelf = cache::Shelf::app(&self.doc.read(cx).session.path);
         let load = cx.background_spawn(async move {
             let key = key(&doc, tab, &asm, explode)?;
-            let snap: Snapshot = cache::load(&cache::default_dir(), &key)?;
+            let snap: Snapshot = cache::load(&shelf, &key)?;
             Some((key, snap.result()?))
         });
         self.ui.cache_task = Some(cx.spawn_in(window, async move |this, cx| {
@@ -339,17 +340,17 @@ impl AssemblyView {
                     return None;
                 }
                 let (asm, _) = this.effective(cx)?;
-                Some((this.doc.read(cx).session.doc.clone(), this.tab, asm, this.explode, this.result.clone(), this.ui.cache_key.clone()))
+                Some((this.doc.read(cx).session.doc.clone(), cache::Shelf::app(&this.doc.read(cx).session.path), this.tab, asm, this.explode, this.result.clone()))
             });
-            let Ok(Some((doc, tab, asm, explode, result, known))) = job else { return };
+            let Ok(Some((doc, shelf, tab, asm, explode, result))) = job else { return };
             let saved = cx
                 .background_spawn(async move {
                     let key = key(&doc, tab, &asm, explode)?;
-                    let dir = cache::default_dir();
-                    if known.as_ref() == Some(&key) || cache::contains(&dir, &key) {
+                    // (Already in both places; one shown from the cache directory alone gets its document row now.)
+                    if cache::contains(&shelf, &key) {
                         return Some(key);
                     }
-                    cache::store(&dir, &key, &Snapshot::of(&result)).ok()?;
+                    cache::store(&shelf, &key, &Snapshot::of(&result)).ok()?;
                     Some(key)
                 })
                 .await;
@@ -396,8 +397,9 @@ impl AssemblyView {
 /// Tests: `r` written to the cache in `dir` and read back.
 #[cfg(test)]
 pub(super) fn cache_round_trip(r: &AssemblyResult, dir: &std::path::Path) -> Option<AssemblyResult> {
-    cache::store(dir, "k", &Snapshot::of(r)).ok()?;
-    cache::load::<Snapshot>(dir, "k")?.result()
+    let shelf = cache::Shelf::dir(dir);
+    cache::store(&shelf, "k", &Snapshot::of(r)).ok()?;
+    cache::load::<Snapshot>(&shelf, "k")?.result()
 }
 
 #[cfg(test)]
@@ -438,8 +440,8 @@ mod tests {
         let snap = Snapshot::of(&r);
         assert_eq!(snap.meshes.len(), 1);
         let dir = std::env::temp_dir().join(format!("noshape-asm-snapshot-{}", std::process::id()));
-        cache::store(&dir, "k", &snap).unwrap();
-        let back: Snapshot = cache::load(&dir, "k").unwrap();
+        cache::store(&cache::Shelf::dir(&dir), "k", &snap).unwrap();
+        let back: Snapshot = cache::load(&cache::Shelf::dir(&dir), "k").unwrap();
         let _ = std::fs::remove_dir_all(&dir);
         let r2 = back.result().unwrap();
         assert_eq!(r2.occurrences.len(), 3);

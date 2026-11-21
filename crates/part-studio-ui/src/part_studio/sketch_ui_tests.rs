@@ -5586,8 +5586,8 @@ fn a_cached_display_stands_in_until_the_identical_real_one_lands(cx: &mut TestAp
     assert!(!real.bodies.is_empty(), "the block's part");
     let dir = std::env::temp_dir().join(format!("noshape-display-cache-ui-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    super::super::display_cache::store(&dir, "k", &real).unwrap();
-    let cached = super::super::display_cache::load(&dir, "k").expect("the cached display");
+    super::super::display_cache::store(&super::super::display_cache::Shelf::dir(&dir), "k", &real).unwrap();
+    let cached = super::super::display_cache::load(&super::super::display_cache::Shelf::dir(&dir), "k").expect("the cached display");
     assert_eq!(meshes(&cached), meshes(&real), "cached as it was");
     assert_eq!((cached.planes.len(), cached.sketches.len()), (real.planes.len(), real.sketches.len()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -5628,8 +5628,8 @@ fn the_swap_from_the_cached_display_to_the_real_one_changes_no_scene(cx: &mut Te
     let real = cx.update(|cx| view.read(cx).display.clone());
     let dir = std::env::temp_dir().join(format!("noshape-display-cache-scenes-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    super::super::display_cache::store(&dir, "k", &real).unwrap();
-    let cached = super::super::display_cache::load(&dir, "k").expect("the cached display");
+    super::super::display_cache::store(&super::super::display_cache::Shelf::dir(&dir), "k", &real).unwrap();
+    let cached = super::super::display_cache::load(&super::super::display_cache::Shelf::dir(&dir), "k").expect("the cached display");
     let _ = std::fs::remove_dir_all(&dir);
     let vp = cx.update(|cx| view.read(cx).viewport.clone());
     let model = cx.update(|cx| vp.read(cx).frame_signature());
@@ -5677,8 +5677,8 @@ fn the_swap_from_the_cached_display_to_the_real_one_changes_no_frame(cx: &mut Te
     let real = cx.update(|cx| view.read(cx).display.clone());
     let dir = std::env::temp_dir().join(format!("noshape-display-cache-frames-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    super::super::display_cache::store(&dir, "k", &real).unwrap();
-    let cached = super::super::display_cache::load(&dir, "k").expect("the cached display");
+    super::super::display_cache::store(&super::super::display_cache::Shelf::dir(&dir), "k", &real).unwrap();
+    let cached = super::super::display_cache::load(&super::super::display_cache::Shelf::dir(&dir), "k").expect("the cached display");
     let _ = std::fs::remove_dir_all(&dir);
     let vp = cx.update(|cx| view.read(cx).viewport.clone());
     let pixels = |i: &std::sync::Arc<gpui_kit::RenderImage>| i.as_bytes(0).map(|b| b.to_vec()).unwrap_or_default();
