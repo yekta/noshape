@@ -25,20 +25,23 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   bool-mem-gate, /root/bool-scratch/mem-gate.sh, out chain-bool-mem.out) + knurls -> land, tell lead.
   Aside: the vibe2 trace build's replays had 2 cases off their recordings (bool-corpus 2a5740b0d124e53d edges 18 was
   21; gpf 49eaef95f9ced6bf volume 2e-11) on main + trace only: check whether main drifted.
-- isaac P0: REVERT LANDED 9f6ce35e; asm recounted on a1e505b1d: 16 failed mates (was 38). Closed. Re-land of the
-  coaxial merge (72fe51df1; its slack volume check lets Extrude 7 merge as live, 21 faces) waits on blend (told 03:15):
-  Fillet 4 (R1 full circle on the merged r22.5 cylinder, dumps Mac ~/noshape-host/bool-keep/isaacm/dump-{main,rv}, both
-  valid inputs) goes the scaled path; checked_blend's `if (r4.IsNull()) return {r3, h2};` ignores as_is, so a result
-  with a 1e-10 m edge (tol 1e-7; BRepCheck SelfIntersectingWire) is returned as Ok. rv's input crashes the fillet (an
-  error, Part 1 kept). Probes (PROBE_CHECK in common.cpp is_valid, checked_blend returns, crash_inputs probe_*) are
-  uncommitted on bool-hat isaac-bis: never land. Then re-land, test both isaac studios + 850efe Extrude 6. Worktree
-  bool-rv: rm.
+- isaac P0: REVERT LANDED 9f6ce35e; asm: 16 failed mates again. Closed. RE-LAND branch bool-re (3139c1975, bool-hat
+  worktree: the revert reverted): blend fixed checked_blend (a retry invalid at the part's scale with no neck: next step;
+  their branch blend-fix, gate running 03:2x). Mac A/B (/root/bool-scratch/isaac-re.sh, out isaac-re.out; main + both):
+  isaac-00f1 48/103, de4e 48/90 features match (main 14 each), first diff Extrude 24, regen 5.1 s (main 9.0 s). NEXT:
+  after blend's sha lands, gate bool-re (+ knurls), check 850efe Extrude 6 = 33 faces, land, tell asm to recount mates.
+  Probes: bool-hat branch isaac-bis "WIP probes (never land)"; isaac-re = test branch (blend's diff copied): never land.
 - COMPAT-CRASH957-CHAMFER3: LANDED 43c2644a (20:10), qa verified on green 00bc521e and ticked it. Closed.
 - 850efe Extrude 6: LANDED 06dcd168 as 9c70297b (23:22); knurls run apart on vibex8 = main (only timings differ). Knurls
   for every gate (lead 22:5x; no host has 48 GB): /root/bool-scratch/kn-run.sh <host> <dir> with k-main / k-br (the gate
   trees' all-96c035059fc28abb) in ~/tmp/bool/<dir>, OCCT side from vibex8 ~/agents/bool-keep/knocc (11-12 cache); report
   each gate's corpora. Worktree + host copies removed.
 - impeller Extrude: LANDED 908abe7b8.
+- SHELL-HANG-SPEED (P1) + SHELL5-AFTER-SHELL3 (P2), TICKETS bool 11-21: qa's cli-shell-hang-pre (vibex7
+  ~/qa/tickets/cli-shell-hang-pre.noshape; copy vibe2 ~/tmp/bool/sh5.noshape): ours Shell 3 12.8 s (live 40 ms), Shell 5
+  (Part 2, 3 mm, faces 1475.653 mm2 Shell 3 / 282.843 mm2 Linear pattern 2) fails in 25.4 s, live OK 20 ms 172908.326 mm3
+  59/163/98 (live/bool/shell5-1121.json; live rebuilds cov-shellq with sq.js). NEXT after the gates: dump both shells
+  (NOSHAPE_DUMP_OPS), profile Shell 3, find why Shell 5 fails. bool-p3 changes Part 3 after Shell 3.
 - SHELL-AFTER-WELD-FILLET (worktree/branch bool-sh3w, a4cfa07d3 on main 55749fd6f): 407bb5cf6's
   without_inverted_slivers alone + T1 a_weld_fillet_part_shells_to_one_solid_without_its_inverted_sliver
   (tests/data/shell/weld-fillet-part3-input.brep = qa doc's Part 3 before Shell 3). shell:: 33 ok; the T1 fails on main.
