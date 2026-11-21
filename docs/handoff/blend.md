@@ -1,31 +1,31 @@
 # Blends (agent "blend"): current state
 
-Updated 11-21 08:04 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-21 09:40 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-21 08:04, thread on the Hello account)
+## Now (11-21 09:40, thread on the Hello account)
 
 - Landed a9c26c41c isaac Fillet 4 (bool told).
-- 1. Impeller P0. Profile (Mac, ours vs live ms): Fillet 3 3336/107, Fillet Ansaugflansch 1619/321, Extrude
-  Bohrungssitz 1583/177 (bool: op_boolean 1288), Fillet Flansch 950/67, Delete face 2 786/12 (core: op_defeature),
-  Fillet Bohrungssitz 454/246, Chamfer Halterung 442/20, Fillet 4 380/102, Remove Bohrung 365/59 (bool). Reported.
-  - Fillet 3 geometry is mine again (core: 9c9f29267's merge is right; the stop cylinder is one face, as live's 33).
-    Ours 39/114/72, 71034.42 mm3; live 34/99/66, 71091.18 mm3. Live capture live/blend/q-imp-f3/: R3 conic rho 0.5
-    on the rib's two tip edges (x 1.5..60.97); the R9.473 tip strip (303.58 mm2) is consumed; 2 SPLINE faces
-    (177.23 mm2 each) meet in a straight ridge at y 0, z -43.902, x 5..60.013; plane x 5, the two 6.18 mm2 chamfer
-    splines (-> 12.68), the rib walls (840.5 -> 603.6) and the main face change. Ours: closed_run_on (split-16..25 +
-    unify-26). Body dumps: blend-speed NOSHAPE_BODYDUMP (regen/mod.rs probe) -> logs/bd.out (zz_faces).
-  - Fillet 3 speed (Mac 2.4 s): closed_run_on 936 ms (corner phase 473, touches ~240), Cut 1188 ms (bool's pcurve
-    fix: body tolerance 2.2e-4 -> 2.55e-3 in the Cut). After the geometry.
-  - Deferred overflow check: worktree blend-ovfd (uncommitted; strip TMPR). Timing bin/ovfd-test.sh ->
-    logs/imp-ovfd.out (vibex8 slot). Then gate, land.
-  - Retry skip (fillets only, stop when 1e-7 doesn't build; ~0.75 s Mac): suite TMPR: 50 first-failed fillets never
-    built later except 2 valid at 1e-7; chamfers do need 1e-5 (2 cases); kernel test blends_that_consume_faces wants
-    1e-5 for the L bracket. Waits on logs/retry-meas-ud.out (blend-retrymeas unit).
+- 1. Impeller P0 (lead: Fillet 3 geometry + speed first, then SUSPENSION-CIRCPAT1).
+  - Gating worktree blend-f3end (branch blend-f3end, 2 commits on d7e7a5c20): 3fbe62ee2 run-on end face first (Fillet 3's
+    far end ended on the shell's outer face through the wall: 39/114/72 -> 34/93/60, live 34/95/62; volume matches on
+    bool's ce09aaef1 pcurve fix, 71097.26) + 8cfad4e39 deferred overflow check. bin/gatef3e.sh (unit blend-gatef3e):
+    g13, kernel/model, suite pair vibex8 -> suite-f3e.cmp, then userdocs (after retry-meas.done) -> ud-f3e.log. Land if
+    only the impeller differs.
+  - Fillet 3's last 2 edges/2 vertices: live splits the bevel's x 5 edge where it crosses from JeG's own surface into its
+    extension (live/blend/q-imp-f3/bevel.json); ours lies on the chamfer ring's 192-pole surface. Option parked:
+    blend-scratch/notes-f3.md.
+  - Every differing feature (NOSHAPE_PARITY_DIFFERING=1): f29 Halter ERROR, then f31 Extrude impellerraum 38 vs 59
+    faces, Move face 1/2, Delete face 2, Fillet Ansaugflansch ERROR, 10 parts vs 1. Speed numbers from f29 on are on a
+    wrong model (lead told). Next: Halter (live/blend/q-imp-halter: R2 on Fillet 3's near-end edges Jfp/Jfd/Jft/Jfh,
+    rounds run on along JfV to the wall and past x 5 to x 7). Mac run bin/f3diff-mac.sh (ce09aaef1 + f3geo.patch,
+    BLEND_DEBUG) -> logs/f3diff.out.
+  - Fillet 3 speed (Mac 3.1 s): trace bin/f3t5-mac.sh (f3geo-time.patch) -> logs/f3t5.out; corner phase + Cut.
+  - Retry skip: waits on logs/retry-meas-ud.out (blend-retrymeas unit).
 - 2. SUSPENSION-CIRCPAT1 (P1, next): asm-suspension 805e29 Fillet 3 (R2.5, 17 edges) fails. Live
   live/blend/q-susp-knuckle-f3/: 53/98/46, 393486.60 mm3, 25 faces (17 torus, 8 OTHER): at each front cusp a 3-sided
   29.602 mm2 patch between the R40 round (torus 42.5/2.5, running to a point), the root round (57.5/2.5) and the boss
