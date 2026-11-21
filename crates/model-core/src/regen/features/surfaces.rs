@@ -360,7 +360,15 @@ pub fn fill(ev: &mut EvalCtx) -> FResult<()> {
     // Onshape's FILL_SURFACE_FAIL text, not the kernel's (qa5 SF5). Tangency the corners can't all meet (live 1739
     // FI2: G1 to a box's four walls) builds tangent as far as they allow, with live's warning.
     let fail = || FeatureError::new(crate::regen::custom_features::error_text("FILL_SURFACE_FAIL"));
-    let res = match k::fill_surface_guided(&boundary, &points, &curves) {
+    // Curvature OCCT's plate can't hold (c2-surf-intro-fill's Fill 1: G2 to an extrude's cap edge, live OK): tangent.
+    let first = k::fill_surface_guided(&boundary, &points, &curves).or_else(|e| {
+        if !boundary.iter().any(|b| b.continuity == k::Continuity::Curvature) {
+            return Err(e);
+        }
+        boundary.iter_mut().filter(|b| b.continuity == k::Continuity::Curvature).for_each(|b| b.continuity = k::Continuity::Tangent);
+        k::fill_surface_guided(&boundary, &points, &curves)
+    });
+    let res = match first {
         Ok(r) => r,
         Err(_) if points.is_empty() && curves.is_empty() && boundary.iter().all(|b| b.continuity == k::Continuity::Tangent && b.support.is_some()) => {
             let loose: Vec<k::FillEdge> = boundary.iter().map(|b| k::FillEdge { continuity: k::Continuity::TangentLoose, ..b.clone() }).collect();
@@ -782,7 +790,30 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
     if !u.is_empty() && !v.is_empty() && u.iter().any(|pu| v.iter().any(|pv| meets_mid(pu, pv) && meets_mid(pv, pu))) {
         return err(BSURF_ENDS);
     }
-    if (cu || cv) && !u.is_empty() && !v.is_empty() {
+    // Matched rows' edges held tangent (or in curvature) to their reference faces, else to the faces they bound.
+    let mut held: Vec<k::FillEdge> = Vec::new();
+    let mut unheld = false;
+    for (array, ents, cond, reference) in [("uProfilesArray", "uProfileEntities", "uCondition", "uReference"), ("vProfilesArray", "vProfileEntities", "vCondition", "vReference")] {
+        for item in ev.params.array(array) {
+            let continuity = match item.enum_(cond) {
+                "" | "DEFAULT" => continue,
+                "MATCH_TANGENT" => k::Continuity::Tangent,
+                "MATCH_CURVATURE" => k::Continuity::Curvature,
+                _ => {
+                    unheld = true;
+                    continue;
+                }
+            };
+            let faces: Vec<Shape> = ev.resolve_faces(item.query(reference)).iter().map(|&(bi, fi)| ev.face_shape(bi, fi)).collect::<FResult<_>>()?;
+            for e in curve_edges(ev, item.query(ents))? {
+                match faces.iter().find(|f| f.index_of(&e, ShapeType::Edge).is_some()).cloned().or_else(|| adjacent_face(ev, &e)) {
+                    Some(support) => held.push(k::FillEdge { edge: e, support: Some(support), continuity }),
+                    None => unheld = true,
+                }
+            }
+        }
+    }
+    if (cu || cv) && !u.is_empty() && !v.is_empty() && unheld {
         ev.warnings.push("Boundary conditions are not applied yet; profiles are matched by position".into());
     }
     let shape = if !u.is_empty() && !v.is_empty() {
@@ -818,13 +849,22 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
         match sides.as_ref().filter(|_| !cu && !cv).map(k::coons_surface) {
             Some(Ok(r)) => r.shape,
             _ => {
-                let boundary: Vec<k::FillEdge> = all.into_iter().map(|e| k::FillEdge { edge: e, support: None, continuity: k::Continuity::Position }).collect();
+                let at = |e: &Shape| held.iter().find(|h| h.edge.is_same(e)).cloned().unwrap_or(k::FillEdge { edge: e.clone(), support: None, continuity: k::Continuity::Position });
+                let boundary: Vec<k::FillEdge> = all.iter().map(at).collect();
+                let free: Vec<k::FillEdge> = all.into_iter().map(|e| k::FillEdge { edge: e, support: None, continuity: k::Continuity::Position }).collect();
                 // (Profiles that don't close a boundary (two parallel U and one V) fill to an invalid sheet: refused.)
-                let r = k::fill_surface(&boundary, &[]).map_err(|_| FeatureError::new(BSURF_FAILED))?.shape;
-                if !r.is_valid() {
-                    return err(BSURF_FAILED);
+                let valid = |b: &[k::FillEdge]| k::fill_surface(b, &[]).ok().map(|r| r.shape).filter(|r| r.is_valid());
+                match valid(&boundary) {
+                    Some(r) => r,
+                    None if !held.is_empty() => {
+                        let r = valid(&free).ok_or_else(|| FeatureError::new(BSURF_FAILED))?;
+                        if !ev.warnings.iter().any(|w| w.starts_with("Boundary conditions are not applied")) {
+                            ev.warnings.push("Boundary conditions are not applied yet; profiles are matched by position".into());
+                        }
+                        r
+                    }
+                    None => return err(BSURF_FAILED),
                 }
-                r
             }
         }
     } else {

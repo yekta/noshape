@@ -5,16 +5,26 @@ docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loa
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
-## Now (11-21 15:53 UTC)
-- **LANDED 11-21:** trunk-hanger P0 second cause 724b9cd2 (4a22b2966's ref dedupe made Sweep 1's [A,B,A] one union
-  profile; a united-region sweep now unifies its side faces: Sweep 1 73 faces, doc 20/73). Chamfer edge sense
-  bc6d41f13 REVERTED dc58aff9 (qa compat: cf-surface-pattern Chamfer 2 Ok -> Error, cli-draft-hang Chamfer 3's message;
-  the bisect c30ff0e4 SAME -> 6241cf34 DIFF; the non-fatal fallback 39b98642 did NOT fix qa's saved copy, only parity).
-  Revert = 0.4.64 on both (CLI userdocs.py on vibex7). Queued: fit spline + two-direction extrude 72fcae51.
-- **INFENTO-CHAMFER-SENSE (re-land):** the edge-sense pass must pass qa's saved copies, not only parity: vibex7
-  `python3 ~/tmp/core/ch/py/userdocs.py ~/qa-rel/0.4.64/noshape-cli 0.4.64 <our noshape-cli> x ~/qa/tickets/cli-draft-hang.noshape
-  ~/qa/corpus/cf-surface-pattern.noshape` (script core-cache/.kch3.sh) + asm-infento-subs (parity_assemblies, 157/167).
-  Unknown why the saved copy's Chamfer 2 fails while parity's passes: start there.
+## Now (11-21 16:55 UTC)
+- **LANDED 11-21:** trunk-hanger P0 724b9cd2; chamfer edge sense bc6d41f13 REVERTED dc58aff9; fit spline both ends
+  349ebdae9 + two-direction surface extrude ec2e52f99. QUEUED 928231bc: UIP-THREAD-MESSAGE-TWICE (qa P2: External thread
+  with chamfer/undercut said "Exact match for thread size not found." twice, hole.rs + std 3132; now once).
+- **INFENTO-CHAMFER-SENSE (re-land), cause found:** in qa's saved cf-surface-pattern, Sketch 7 (between Chamfer 1 and
+  2) holds a 9.144 mm square by Offset constraints to model edges; the offset's side is signed by each projected edge's
+  direction, so Chamfer 1's turned edges moved it to 15.24 mm and Chamfer 2's OCCT chamfer failed (parity's translated
+  sketch has no saved direction, so it passed). Fix on core-cache branch core-chs (= main + revert of the revert +
+  sketch.rs update_external: a projected line keeps its saved direction when the new projection runs the other way).
+  Verify: core-cache/.kch8.sh (vibex7: userdocs.py vs 0.4.64 on cli-draft-hang + cf-surface-pattern, must be SAME), then
+  asm-infento-subs (157/167, a3f7a1 Linear pattern 1 +y). Remove the CHDBG / NOSHAPE_NOSENSE debug before landing.
+- **In flight on core-th (uncommitted):** surf-intro Fill 1: G2 edge OCCT's plate can't hold falls back to tangent
+  (test oracle_p1::fill_tangent_to_four_walls_... now G1 and G2); Boundary surface MATCH_TANGENT/MATCH_CURVATURE rows
+  filled tangent to uReference/vReference (warning only for other conditions or when that fill fails); EDGE-CENTRE-SEAM:
+  ops query.rs joined edge's midpoint = length-weighted centre of its pieces (was the first piece's), test
+  e2e::a_seam_crossing_edge_is_centred_on_all_its_pieces (Mac .kt3.sh). Then commit + land.
+- **Fit-spline bulge (surf-intro, 3D fit spline 1 starts x 32.70 vs live 33.94):** not the fit spline: Tail Fin's
+  UP_TO_VERTEX goes to Offset surface 1's edge end (z 15.31 vs live 15.21, SURF-INTRO-OFFSET-END). Offset 0 is a plain
+  copy, so the edge (B-spline 20.145 mm, live LINE 20.042) comes from the derived studio b7635b82 (lofts + projected
+  curves + Fillet 1 of a car body). Next: find which derived feature makes that edge.
 - **KNIFEHANDLE: Fillet 1 -> blend (lead 11-21 16:00); branch origin/core-knifehandle (acd07e321), NOT to land until
   Fillet 1 builds at live's time.** Commits on main b6edc9e2c: 1ca7cf105 guided loft (Handle 1/2/3); 7d0194a28 Mutual trim
   behind_of + loft face outward + surface sweep wall direction (Mutual trim 1: Handle 1/1/1, Surface 2 1/1/0 as live);

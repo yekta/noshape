@@ -156,28 +156,31 @@ fn edges(r: &RegenResult, at: &[DVec3]) -> ParamValue {
 /// Live 1739 FI2 (FILL-G1-DOME): a Fill G1 to a shelled box's four outer walls can't be tangent at the corners (two
 /// perpendicular walls): live builds it with the warning, a dome 4327.5641 mm² up to z 42.97 (42.615 at its centre),
 /// tangent to the walls along their middles (live 1805). Ours: the same warning and a dome of 4302 mm² up to z 42.615,
-/// vertical along the edges' middles.
+/// vertical along the edges' middles. Curvature the plate can't hold (c2-surf-intro-fill's Fill 1, G2 to an extrude's
+/// cap edge: live OK) is met as tangency: G2 to the walls builds the same dome.
 #[test]
 fn fill_tangent_to_four_walls_builds_with_a_warning_as_live() {
-    let mut s = on_block("shell", |p, r| {
-        p.set("entities", q(face_at(r, TOP)));
-        p.set("thickness", mm(2.0));
-    });
-    let r = s.regen();
-    s.add("fill", |p| {
-        let mut row = ParamValues::default();
-        row.set("entities", edges(&r, &[FRONT_TOP, BACK_TOP, LEFT_TOP, RIGHT_TOP]));
-        row.set("continuity", en("G1"));
-        row.set("adjacentFaces", ParamValue::Query(SIDES.iter().map(|x| face_at(&r, *x)).collect()));
-        p.set("edges", ParamValue::Array(vec![row]));
-    });
-    let r = s.regen();
-    let st = r.display.features.last().unwrap();
-    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Warning, Some("Could not meet tangency constraints at highlighted points.")));
-    let sheet = r.context.bodies.iter().find(|b| b.kind == BodyKind::Surface).expect("the fill");
-    let area = sheet.shape.area().unwrap() * 1e6;
-    let top = sheet.shape.bounding_box(false).unwrap().max.z * 1e3;
-    assert!((area - 4327.5641).abs() < 0.01 * 4327.5641 && (top - 42.969).abs() < 0.5, "{area} mm², up to z {top}");
+    for continuity in ["G1", "G2"] {
+        let mut s = on_block("shell", |p, r| {
+            p.set("entities", q(face_at(r, TOP)));
+            p.set("thickness", mm(2.0));
+        });
+        let r = s.regen();
+        s.add("fill", |p| {
+            let mut row = ParamValues::default();
+            row.set("entities", edges(&r, &[FRONT_TOP, BACK_TOP, LEFT_TOP, RIGHT_TOP]));
+            row.set("continuity", en(continuity));
+            row.set("adjacentFaces", ParamValue::Query(SIDES.iter().map(|x| face_at(&r, *x)).collect()));
+            p.set("edges", ParamValue::Array(vec![row]));
+        });
+        let r = s.regen();
+        let st = r.display.features.last().unwrap();
+        assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Warning, Some("Could not meet tangency constraints at highlighted points.")), "{continuity}");
+        let sheet = r.context.bodies.iter().find(|b| b.kind == BodyKind::Surface).expect("the fill");
+        let area = sheet.shape.area().unwrap() * 1e6;
+        let top = sheet.shape.bounding_box(false).unwrap().max.z * 1e3;
+        assert!((area - 4327.5641).abs() < 0.01 * 4327.5641 && (top - 42.969).abs() < 0.5, "{continuity}: {area} mm², up to z {top}");
+    }
 }
 
 /// Live 1796 (audit FL7): Width control fillets one unbranched chain of edges per part, open or closed, else "Edges
