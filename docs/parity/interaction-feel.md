@@ -822,11 +822,42 @@ real app (green build, Xvfb, one app): our screen at live's camera (the ui-parit
 same crop round the pointer after live's rest, compared by shape, size at 1x and sampled colours: = or ≠. psui fixes,
 qa re-scores the cells on each land. Our crops: qa-scratch/hm/ (walk kit vibe2 ~/agents/qa-keep/walk3).
 
-**Matched: 0 / 1** (11-21 16:5x, green 5b9feb71a; the rest when live's cells land)
+**Matched: 15 / 28** (17:1x, green 5b9feb71a; live batch 1, Part Studio with no tool). Ours: the same block (40×30×20,
+Top at the origin) and targets, a fresh app per cell, `f` then live's moves (ui-script hovers, 1.25 s rest; parked 0.8 s after a
+click), 80×80 crops round the target: qa-scratch/hm2/cmp-{1,2,3}.png (live / ours alternate), kit qa-scratch/hm2/gen (gen.py,
+run.sh on vibe2, crop.sh). Our fit is 0.2754 mm/px against live's 0.2845 (3%; markers are drawn in pixels). Not scored: the model's
+edge lines (live ≈2 px #2A343A anti-aliased, ours 1 px black), as ours draws at 1× MSAA on a software rasteriser by design.
 
-| Cell (context / hover target / selection) | Live | Ours | Status |
+| Cell (Part Studio, no tool: target / state) | Live | Ours | Status |
 |---|---|---|---|
-| Part Studio, no tool / an edge's midpoint / that edge selected | a solid orange dot with a soft orange halo (user shot, lead-scratch/user-shots/) | a cream dot with a black ring, as on an unselected edge (hm/B.png B1) | ≠ P0 FEEL-HOVER-POINT-ON-SELECTED-EDGE |
+| vertex / none | — | — | = |
+| vertex / hovered | 11 px translucent light-orange disc, edges show through | ring with an opaque #FFD8AC centre | ≠ P0 FEEL-VERTEX-HOVER-SELECT-LOOK |
+| vertex / selected | the disc in orange #F6A612, edges through | yellow ring #FAC012 / #FFD65B | ≠ P0 FEEL-VERTEX-HOVER-SELECT-LOOK |
+| vertex / selected + hovered | = selected | = our selected | ≠ P0 FEEL-VERTEX-HOVER-SELECT-LOOK |
+| vertex / hovered, a face selected | = hovered | = our hovered | ≠ P0 FEEL-VERTEX-HOVER-SELECT-LOOK |
+| edge / none | — | — | = |
+| edge / hovered | 5 px band #FFC685 + midpoint marker under the band | band + opaque black ring over it | ≠ P0 FEEL-MIDPOINT-MARKER-OVER-BAND |
+| edge / selected | 5 px band #FFA90A | the same | = |
+| edge / selected + hovered | = selected + marker under the band | black ring over the band | ≠ P0 FEEL-MIDPOINT-MARKER-OVER-BAND |
+| edge / hovered, a face selected | = hovered | = our hovered | ≠ P0 FEEL-MIDPOINT-MARKER-OVER-BAND |
+| midpoint / none | — | — | = |
+| midpoint / pointer lands on it | edge band + dark marker under it; the point never lights (2.9 s) | band + black ring over it; never lights | ≠ P0 FEEL-MIDPOINT-MARKER-OVER-BAND |
+| midpoint / selected | yellow ring 12 px #F6BE15 / #FFD65B | the same | = |
+| midpoint / selected + hovered | light-orange ring #F6C285 / #FFD8AC, no band | band + yellow ring + black ring | ≠ P0 FEEL-MIDPOINT-ARRIVED-RING |
+| midpoint / hovered, a face selected | = hovered | = our hovered | ≠ P0 FEEL-MIDPOINT-MARKER-OVER-BAND |
+| midpoint / arrived along the edge | light-orange ring within 150 ms, band goes | band + black ring stay | ≠ P0 FEEL-MIDPOINT-ARRIVED-RING |
+| midpoint / arrived along a selected edge | solid orange dot #FFB32E, soft halo, no outline | band + black ring | ≠ P0 FEEL-HOVER-POINT-ON-SELECTED-EDGE |
+| midpoint / jumped onto a selected edge | band + marker under it | black ring over the band | ≠ P0 FEEL-MIDPOINT-MARKER-OVER-BAND |
+| face / none | — | the same | = |
+| face / hovered | 2 px #FFC685 boundary, fill unchanged | the same | = |
+| face / selected | fill #E4AA38 + 2 px #FFA90A boundary | the same | = |
+| face / selected + hovered | = selected | the same | = |
+| face / hovered, a face selected | = hovered | the same | = |
+| plane / none | — | the same | = |
+| plane / hovered | outline only, interior unchanged | the same | = |
+| plane / selected | fill #FACF7D, edge #FFA90A | the same | = |
+| plane / selected + hovered | = selected | the same | = |
+| plane / hovered, a face selected | = hovered | the same | = |
 
 ## Captures 11-17 / 11-18 (audit: one row per feel finding)
 

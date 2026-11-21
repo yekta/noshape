@@ -283,6 +283,24 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - [ ] P0 **FEEL-HOVER-POINT-ON-SELECTED-EDGE (psui, from the user)**: Part Studio, an edge selected, the pointer on a point of it (its midpoint):
   live draws a solid orange dot with a soft orange halo; ours a cream dot with a black ring, as on an unselected edge (user shots
   lead-scratch/user-shots/hover-point-on-selected-edge-{noshape,onshape}.png; copies qa-scratch/hm/). psui fixing (lead 11-21 16:3x).
+  Live's matrix confirms it (hover-matrix-1121/ps/mid-arrived-on-selected-edge: centre #FFB32E, halo into the #FFA90A band, no
+  dark outline); ours there: band + black ring (row 40: …C99123 000000 B79773 FFD3A0…). qa 17:1x, green 5b9feb71a.
+- [ ] P0 **FEEL-VERTEX-HOVER-SELECT-LOOK (psui)**: a model vertex, live hover-matrix-1121/ps/vertex-*: hovered = an 11 px translucent
+  light-orange disc (rim #F6C285, the edges meeting there show through, centre ≈#C19F76); selected = the same disc in orange
+  (#F6A612 rim, centre ≈#C18B22, edges through); selected + hovered = selected; hovered with another face selected = hovered.
+  Ours: hovered a ring with an opaque light centre (#F8C488 rim, centre #FFD8AC: the midpoint's arrived-ring look), selected the
+  yellow midpoint ring (#FAC012 rim, #FFD65B centre), so 4 of the 5 vertex cells differ. Side by side: qa-scratch/hm2/cmp-1.png
+  (top row; live / ours alternate). qa 17:1x, green 5b9feb71a, live's block and camera (gen kit qa-scratch/hm2/gen).
+- [ ] P0 **FEEL-MIDPOINT-MARKER-OVER-BAND (psui)**: the dark marker at a hovered edge's midpoint. Live draws it under the 5 px hover
+  band: dark only at its two sides along the edge, 15 px darker than luma 80 in the 21×21 round it (8 near-black), its centre
+  #FFD3A0. Ours draws an opaque black ring over the band: 22 px dark (11 black). 6 cells differ: edge hovered / selected + hovered /
+  hovered with a face selected, midpoint hovered / hovered with a face selected, a selected edge's midpoint jumped onto
+  (live ps/edge-*, mid-hovered*, mid-jumped-onto-selected-edge; ours qa-scratch/hm2/cmp-1.png row 2, cmp-2.png).
+- [ ] P0 **FEEL-MIDPOINT-ARRIVED-RING (psui)**: (a) the pointer arriving on the midpoint along the edge while the marker shows (8 steps):
+  live lights the point within 150 ms, a light-orange ring (rim #F6C285, inner #C49867, centre #FFD8AC), and the edge's band goes;
+  ours keeps the band and the black marker. (b) A selected midpoint hovered: live the same light-orange ring in place of the yellow
+  one, no band; ours band + the yellow ring + the black marker. Live: a pointer landing straight on the midpoint never lights it,
+  also after 2.9 s; ours the same (=). Live ps/mid-arrived-along-edge, mid-selected-hovered; ours qa-scratch/hm2/cmp-2.png.
 
 ## psui, 2026-11-20 (live's feel coverage cov-1120; docs/parity/interaction-feel.md "cov-1120")
 - [x] done (studios 11-20: c249e0ed9 / f29e6eb2; the same rows as qa's FEEL-FS-* below, verified 07:0x on green 0bc7e772e) **P1 FS-WHEEL-72PX [studios]**: a wheel notch scrolls the Feature Studio's code 72 px in live (Ace: 4.5 lines of
