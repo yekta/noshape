@@ -36,7 +36,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (03:38 UTC 11-21)
+## Now (04:06 UTC 11-21)
+
+QUEUED 3714e6ce 04:05: the whole fc-1120 batch (item 6 b) + CUTLIST-WHEEL-SIDEWAYS + rollback-bar row menus
+(menu_left now any sketch row, also rolled back). Tests green on vibex6: sketch 202, scene sketch_mode 166,
+part-studio-ui list/sketch_hover/cut_list 41, ops studio:: 5, clippy. On land: tell qa (CUTLIST to verify).
+
 
 1. LANDED: 6f48184a (FS notices compile off the UI thread; A/B 6 max prepaint 534 -> 28 ms on 850efe, 549 -> 37 on
    de4eff), 18809b4c (spinner on the executor clock), 1c6e56e4 + 5c3f3bb7 (revert of a5505f50). Worktrees psui-fsn,
