@@ -9,35 +9,25 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
-## Next P1 (lead 11-21 06:50): fast open of heavy documents (infento 56 s, live 8-11 s, target <= 0.5 s shaded)
-Design (step 1; step 2, B-reps for selection, later):
-1. Exists today: app-core display_cache + part-studio-ui cached_open (and assembly_open, drawing_open) show a tab's last
-   display at once and swap in the real result (scene built first: no jump). But it lives in the user cache dir, keyed
-   with the executable's size + mtime: every new build, every other machine and every copied file misses (infento).
-2. Move it into the .noshape: meta rows `display:<tag>` (no schema bump; older releases still open the file), tag =
-   hash(kind, tab, configuration, level), value = MAGIC + key + zstd(bincode snapshot). One row per tag: replaced on save.
-3. Key = blake3(the whole document JSON, the tag's inputs, build id); build id = version + git commit + OCCT patch set
-   (portable; a dirty dev build adds the exe stamp). Any edit, configuration or build change = a different key = unused.
-4. Write: where the dir cache is written today (first full display, then 2 s after edits pause), on a background
-   thread through its own writable store handle (as start_thumbnail's store_to_file); the dir cache stays as fallback.
-5. Read: on open, in the background, the document's row first (read-only handle), then the dir; key mismatch = miss.
-6. Tests: hit (same doc + build), miss after an edit, miss after a build change; the Part Studio shows the file's
-   snapshot before its regeneration lands and swaps to an equal real display without a rebuild of its scene.
+## Fast open (lead 11-21 06:50, P1: infento <= 0.5 s shaded)
+Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
+build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 13:45 11-21 (read first after compaction)
+## STATE 14:17 11-21 (read first after compaction)
 - LANDED today: dx-urdf stack as 5bbec61b (OBJ / 3MF / glTF faceting, DXF explode notes, Draco, Parasolid 25-27.1 read,
   batch-2 cases, glTF per face + UVs, AGENT_API, draco-core notices); fast open 92d02c14 (display rows in the .noshape,
   one per tab) and f626b268 (assembly scene off the UI thread; rows read at open; test that the UI thread isn't blocked).
-- dx-open uncommitted (on f626b268's base; script dx-open-v.sh in the worktree: delete before commit):
-  display_cache::load_for (the slot's row decoded while the key is computed, used only if it holds that key), the key
-  hash through a 64 KB BufWriter, and decode_early: the assembly registers its Snapshot decoder (main.rs ->
-  assembly_view::decode_cached_display_early) and prefetch(path, last-viewed tab) decodes that tab's row right after the
-  rows are read (display-rows thread); load_keyed takes it (take_early) and falls back to its own decode. Tests in
-  display_cache's a_document_keeps_its_display_for_its_content_and_build_only.
-  infento on vibex6 (ms since start, run 2 = rows from the file): step 2 key 594 / decoded 889 / cached in 947 / frame
-  1116; load_for 356 / 464 / 493 / 740; with decode_early key 135 = decoded 135 / cached in 169 / cached model frame
-  342 (target <= 0.5 s met). vibex8 rb.sh bash dx-open-v.sh running the assembly-ui `cached` tests + clippy
-  (/root/dx-scratch/open-v.out); then delete dx-open-v.sh, commit, land.
+- QUEUED: fast open step 3 40094138 (dx-open: the last-viewed tab's row decoded with the studio's registered decoder as
+  soon as the rows are read, display_cache::decode_early / load_for / take_early; key hash buffered). infento on vibex6,
+  run 2: cached model frame 342 ms (was 1116; target <= 0.5 s met). Drawing 74df2f14 (dx-urdf: CONIC_TOL 30 um, ring
+  rims round a view-axis cylinder get its centermark in full_circles): Mac exs-drw rows as before except rings-loft's
+  CENTERMARKS row gone; ops e2e 276/276.
+- rings-loft per feature matches live (Extrude 7, Shell 2 rims: counts, lengths, live's midPoints on our curves); our
+  edge centre is off on rims crossing the ellipse's seam: TICKETS EDGE-CENTRE-SEAM (core, sent; 28d58d209). Probe vibex6
+  ~/agents/dx-keep/sr/rlmid.py ./cli ~/agents/dx-keep/sr/rl-saved.noshape ~/parity/models/c2-rings-loft/live.jsonl.
+- In progress: housing compat IGES rim (80 / 45 edges / vertices vs live's 79 / 44). Hypothesis: merge_same_surface_faces
+  returns as_is when no faces merge, so join_loop_pieces never runs. Probe (uncommitted in dx-urdf, DELETE before any
+  commit: DXJOIN prints in boolean.cpp, dxprobe test in kernel io.rs, dx-join.sh) -> /root/dx-scratch/join.out.
 - SPEED-RINGS-SHELL (bool, P1) has live's Shell 1 results (9313d85f4): OK at 8-10.4 mm, faces / volumes in TICKETS.
 - Drawing rows 2/10 (duct, louver). rings-loft's Top-view circle at (2.570, 6.317) r 0.2017 in is drawn whole by ours
   (drawing_get: 4 edges 0-60 / 60-180 / 180-300 / 300-0): ours ARC, SPLINE, SPLINE, ARC (the splines up to 0.003 in
@@ -53,8 +43,8 @@ Design (step 1; step 2, B-reps for selection, later):
   construction geometry or the split tool, not poles), housing Front/Right/Top and rings Right/Top. Not yet known what
   live counts there; the suite aligns views first, so the DXF rows don't depend on it.
 - Mac: one active target (dx-urdf, 20 GB); dx-open's target removed after each run (lead 11-21).
-- Next: infento re-time -> lead; rings-loft circle; batch-2 leftovers (IGES-POSTPROC, Rhino 45 vs 46, duct's Rhino V6/V7
-  + STEP-PRE after live's 17:20 rerun); fast-open step 3 (B-reps for selection) only when the lead says.
+- Next: the housing IGES rim (above); duct's Rhino V6/V7 + STEP-PRE after live's 17:20 rerun; STL split and view centres
+  when live answers (REQUESTS dx 11-21 14:06 / 14:20).
 
 ## Exchange leftovers (11-21)
 - Drawing rows (2/10): bottle Front's lip arc 41.8..180 deg (live 90..180) and views 0.015 in low; hex iso circles as
