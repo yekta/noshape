@@ -1,15 +1,16 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-21 04:30 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-21 06:28 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## In flight (11-21 04:30 UTC)
-- Flat-face sketches (louver Sketch 9 x -676.03 vs live -708.49; modify-joint Sketch 1 x 50.33 vs 120.02): the
-  translator took the wrong coplanar flat face. sheetmetal_table's flat_faces now give `centre` (the sketch origin, the
-  face's uv middle); parity's flat_face_on_plane_of picks the one nearest live's origin when live gives no area.
-  LANDING: louver 36/36, modify-joint 11/11; SM 25-doc Mac run 22/24 docs, 291/295 features (was 259). Left: loft
-  apex, hem-plus Offset surface 1 (area 17967.26 vs 18073.07). mac-ff.sh regenerates AGENT_API.md (Mac skasm-keep).
-- LANDED 6a4ac440: Recognize via std (c2-cov-sm-recognize 4 -> 6/6). QUEUED 52771f9e: Rip 1 (below).
+- LANDED 0f86a0f8: flat-face sketches (louver 36/36, modify-joint 11/11) + Rip 1 (c2-cov-sm-rip 5/5); 6a4ac440
+  Recognize 6/6. SM 25 docs (Mac): 22/24 docs, 291/295 features.
+- hem-plus Offset surface 1: Mac-only (Linux 6/6): OCCT's joined offset (PerformByJoin) fails on the Mac's last digits
+  and falls back to each face alone (not extended). op_offset_shape retries in millimetres first: Mac 6/6; other
+  offset docs unchanged (replace-face 6/8, surf-intro boundary/fill/mutualtrim/offset/ruled 8/12, 8/13, 8/17, 6/8,
+  8/14, cf-sheet-metal-hem 6/6). Committed 1cb74771; g++-13 kernel build on vibex8 (task started 06:15), then land.
+- Next after that land (lead 11-21): the next item of "Next, in order"; sketch-solver parity rows if sheet metal has none.
 - LANDING: forms 21/21 (c2-sheet-metal-forms 10 -> 21/21; Mac A/B vs 97df380f1: 108 -> 109/174 docs, 1779 -> 1790
   features, no other doc changed): Sketch 3 connector at live's frame; Form 4 fuse skipped when adds add nothing;
   Form 5 region_from_query derived branch; lance bends meeting at asin(1 - h/(rmi+rme)) with no wall, the lance
@@ -23,9 +24,13 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - LANDED af717ef2: std Jog's two bends (c2-sm-jog-panel 5 -> 12/12; full parity 1723 -> 1730/2315, no other doc).
 - LANDED 381554f1: Hem 1 (c2-sm-hem-flange) keeps "Sheet metal model cannot be unfolded." (219 -> 222/295).
 - LANDED 9f5250bf: SM loft profiles with different corner counts walk the least total fold (host/loft.rs).
-- Loft apex PARKED (c2-sm-loft-basic 38 vs 40 faces, +4.2 mm3): where 4 bends meet live makes 9 small faces (3 spline
-  bend ends JY+ / JYC / JYK, bend 3's ends planar square to its axis, small planes at each wall's apex end, a 0.03 mm2
-  spline KYCB); the base ends in a vertical cut (0, 202.166) -> (1.359, 201.497). Parasolid's own rule; small payoff.
+- Loft apex (c2-sm-loft-basic 38 vs 40 faces, +4.2 mm3), re-checked 11-21 04:50: live's 4-bend fan apex (RECTANGLE
+  three-corner style) = the middle bend (2 of 0..3) ends in a plane square to its axis 3.357 mm from L1, walls JS/JT
+  cut on that same plane; bends 0, 1, 3 end in slanted splines from their start on one wall to the other (bend 0:
+  1.4355 along on the base, 3.26 on JQ); the base's free edge runs to L1 exactly, then a vertical cut to (1.3588,
+  201.4963). Ours: every bend ends square, the base runs past L1 to y 202.785. Data: skasm-scratch/loft/apex.py,
+  ours-all.out. PARKED (lead 11-21 06:30): don't guess from one sample; live REQUESTS P3 row skasm 11-21 06:27 (fans of
+  3 / 5 bends), taken after live's feel and speed batches.
 - Debug std: throw a custom regenError message (FS println goes to notices, not stderr); restore edited files with a
   fresh mtime (rb.sh rsync keeps the old one and cargo skips the rebuild). NOSHAPE_FS_TRACE=1 names the throw's line.
 - LANDED 6d80df66: Unfold unrolls only its bend, Refold puts back the held side (unfold-refold 6/6, 212/295).

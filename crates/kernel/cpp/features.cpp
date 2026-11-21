@@ -12440,6 +12440,37 @@ OpOut op_offset_shape(const OcShape& s, double offset, uint8_t join)
     HHist h = history_of(args, mk);
     return make_result(args, mk.Shape(), h.get());
   }
+  // Again in millimetres before the faces are offset each on its own (c2-sm-hem-plus Offset surface 1: a hem's 9
+  // faces, whose joined offset failed in metres; live extends them to meet).
+  if (join == 1)
+  {
+    gp_Trsf up, down;
+    up.SetScale(gp_Pnt(0, 0, 0), 1000.0);
+    down.SetScale(gp_Pnt(0, 0, 0), 1e-3);
+    BRepBuilderAPI_Transform      big(s.shape, up, true);
+    BRepOffsetAPI_MakeOffsetShape mm;
+    bool                          mm_ok = false;
+    try
+    {
+      mm.PerformByJoin(big.Shape(), 1000.0 * offset, 1e-3, BRepOffset_Skin, false, false, GeomAbs_Intersection);
+      mm_ok = mm.IsDone() && !mm.Shape().IsNull() && TopExp_Explorer(mm.Shape(), TopAbs_FACE).More();
+    }
+    catch (const Standard_Failure&)
+    {
+      mm_ok = false;
+    }
+    if (mm_ok)
+    {
+      BRepBuilderAPI_Transform back(mm.Shape(), down, true);
+      if (back.IsDone())
+      {
+        HHist h = history_of(args, big);
+        merge_into(h, history_of({big.Shape()}, mm));
+        merge_into(h, history_of({mm.Shape()}, back));
+        return make_result(args, back.Shape(), h.get());
+      }
+    }
+  }
   BRepOffsetAPI_MakeOffsetShape simple;
   simple.PerformBySimple(s.shape, offset);
   if (!simple.IsDone())
