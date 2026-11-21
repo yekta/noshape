@@ -69,7 +69,7 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
 - [x] verified green 5b840ddf0 (qa 11-21 08:5x, vibe2 walk2/f5c, f6c.png + CLI walk2/src/massop.py; asm b2bbaf7d1: about the centroid 26666.667 / 106666.667 / 133333.333, about the corner 106666.667 / 160000 / 426666.667 / 533333.333 in the app; CLI 26666.666667 etc.; residual FACE-MOMENT-LXY-ZERO) P3 **FACE-MOMENT-DIGITS (asm)**: Face tab, the 40x20 top face: about its centroid ours reads Lxx 26666.664,
   Lyy 106666.657, Lzz 133333.321; about the corner, 106666.664 / 426666.657 / 533333.321. Live (exact for a plane) reads
   ….667 / ….667 / ….333: our integration is off by up to 0.012 mm⁴ on a flat rectangle.
-- [ ] P3 **FACE-MOMENT-LXY-ZERO (asm)**: Face tab, the 40x20 top face about its centroid: ours (green 5b840ddf0, after b2bbaf7d1)
+- [x] verified green 4a22b2966 (qa 11-21 10:5x, vibe2 walk2 A2, qa-scratch/walk2/lxy-4a22b296.png: Lxy 0, Lyx 0; Lxx 26666.667, Lyy 106666.667, Lzz 133333.333 as live) P3 **FACE-MOMENT-LXY-ZERO (asm)**: Face tab, the 40x20 top face about its centroid: ours (green 5b840ddf0, after b2bbaf7d1)
   shows Lxy = Lyx **-7.941e-11**; live shows **0** (behaviours "Face tab": Lxy 0, Lyx 0). The CLI's assembly_mass_properties gives 0.0.
   Wanted: the app's product of inertia reads 0 for a symmetric face, as live and the CLI (qa-scratch/walk2/f5c.png).
 - [ ] P3 **INSERT-GRAPH-RESIDUALS (asm)**: Insert › Other documents › Rel's version graph and list (green 5b840ddf0 vs live
