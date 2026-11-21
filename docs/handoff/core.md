@@ -1,38 +1,40 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-21 18:51 UTC. Mac: NO builds/tests/replays/A-Bs (user order 11-21; one 2-job slot for macOS-only checks; my Mac targets deleted); rb.sh picks the host from tools/tiers/rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
-docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
-NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
-/opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
+Updated 11-21 21:16 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
+(vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
-## Now (11-21 18:51 UTC)
+## Now (11-21 21:16 UTC)
 - **LANDED 11-21:** trunk-hanger 724b9cd2; fit spline ends 349ebdae9 + two-direction surface extrude ec2e52f99;
   UIP-THREAD-MESSAGE-TWICE 02ccb4ef; EDGE-CENTRE-SEAM + surf-intro Fill 1 / Boundary surface 1 dc6e16ff.
-- **CHAMFER EDGE-SENSE RE-LAND (core-cache, committed 44a490744 on top of the revert's revert, not queued):** lead's
-  conditions: qa's user docs SAME and cli-draft-hang's Chamfer 3 in live's words; land after asm-infento-subs 157/167.
-  Fixes: sketch.rs update_external keeps a projected line's saved way (cf-surface-pattern Sketch 7); detail.rs defers a
-  body failing for no named reason (cli-draft-hang Chamfer 3 "Distance of chamfer on face too large."); sketch
-  regions.rs find_region_in: a key whose curves all turned round finds its region when unique (c2-fan-blade-sweep
-  Sketch 6 on Chamfer 2's face: imprinted face-edge keys flipped, Extrude 9 took a neighbour, 93 vs live 83 faces).
-  First compat (before the regions fix): only fan-blade new; after it fan-blade/cli-draft-hang/cf-surface-pattern SAME.
-  Running (vibex7, core-cache/.kall.sh): infento parity (log ~/tmp/core/ch/kinf.log, a3f7a1 Linear pattern 1 +y), then
-  the full compat (~/agents/core-keep/kcompat.sh -> ~/tmp/core/ch/compat.txt; compare with qa's latest main run in
-  /root/qa-scratch/compat/). Then land, tell qa + lead.
-- **SCISSOR DERIVED COST (asm's P0 ask, core-th uncommitted):** Regenerator lending (DerivedProvider
-  lend/return_regenerator; AssemblyEvaluator::studio/prewarm lend DocStudios' Regenerator for default-config studios).
-  Same-base A/B on vibex7 assembly_list: base 77.8/96.6 s, lend 87.8/90.0 s, outputs identical: NO GAIN. Probe build
-  (.ksc2.sh, temporary RTRACE/NOSHAPE_NOLEND lines to remove) counts regenerations per studio with/without lending.
-  Earlier serial per-tab measure: ~70 of 172 s duplicate Derived regeneration (tab views' OpenDoc.regens vs DocStudios
-  cache); failing chain Fillet 13 18 s x2, Spur Gears 11+16 s. Report the split to asm.
-- **KNIFEHANDLE (back from blend 11-21 18:4x):** Fillet 1 fails because its input is wrong: Extend handle (extendSurface
-  BLIND 20 mm, curved face) gives 1/1/1, live 1/2/3; Boolean 1 Handle 203250 vs live 205332 mm3. Cause suspected:
-  k::extend_face_at rebuilds the face from the whole extended surface (BRepBuilderAPI_MakeFace) and loses the loft's
-  boundary (Loft 1 is 1/2/3 as live). Branch core-kh in core-bis2 (= origin/core-knifehandle); .kkh.sh runs its parity.
-- **SURF-INTRO-OFFSET-END:** the edge is the car body's (derived b7635b82) rear end where Fillet 1 (R 0.6 in) meets
-  the lofted side: our spring line 0.1 mm off. Upstream: Loft 1 (two open projected curves, no guides, ThruSections)
-  12748.85 vs live 12749.86 mm2; Loft 2-4 about -2 mm2; Fillet 1 removes 3575.2 vs live 3578.3. Every surf-intro model's
-  first difference (Tail fin area) follows from it. Next: pair the two profiles by arc length (Open in
-  loft_guided.cpp) vs parameter and compare Loft 1's area. Scripts vibex7 ~/agents/core-keep/sib (dv.py, ar.py, ed2.py).
+- **QUEUED 45fb8d24 (core-cache): chamfer edge-sense re-land** (projected line keeps its way; a body failing for no
+  named reason waits; a region key whose curves turned round still names its region). Full compat vs 0.4.64 = qa's
+  6be52caf run (user docs ALL-SAME; same 3 ticket + 4 corpus DIFFs; impeller Part 1 96100.36 -> 96068.64, accepted by
+  qa); infento 157/167. qa adds the TICKETS row after a green carries it. If it fails: fix forward.
+- **QUEUED 8061866b (core-bis2, branch core-kh, 4 commits): knifehandle** guided loft through >2 profiles (one face),
+  Mutual trim pieces, Union of surfaces closing to a solid (makeSolid), Move boundary keeps a moved side's edge ends
+  (BRepAlgoAPI_Splitter at the carried vertices) + natural column ends in loft_guided_multi. Extend handle 1/2/3,
+  24144.7 mm2 (live 24143.0); Loft 1 21458.3 (live 21469.9); Handle after Boolean 1 204640 mm3 (live 205332.7). Rest:
+  sketch P4's ellipse minor radius 15.952 vs live 16.6299 (under-defined; sent to skasm). Blend picks up Fillet 1 after.
+  Probe tools: vibex7 ~/agents/core-keep/kh (ev.py live surface sampler, save/), ~/tmp/core/khm.py (per-feature parts).
+- **ISAAC-BALL REOPEN NAMING: closed 11-21 21:10.** asm's repro came from their pre-rebase branch (ops-mc2, before
+  89180ec5e); a main 626941712 session stores Extrude 6's split face as ordinal 0 (= scratch) and reopens Ok. asm agreed.
+- **THICKEN-DIRECT (core-bis2, uncommitted, on top of core-kh):** crates/kernel/cpp/thicken_direct.cpp, called from
+  features.cpp thicken()'s one-sided sharp-edge path before OCCT's intersection join (NOSHAPE_THICKEN_OCCT=1 forces OCCT;
+  remove before landing or keep for A/B?). Offsets per face (planes translated, else Geom_OffsetSurface); vertex images by
+  Newton (one face: offset point; 3 faces: triple point; sharp edge to the free boundary: crossing in the walls' common
+  plane, else bail); sharp edges marched in the edge's normal planes (Newton, adaptive 16..256 samples checked at
+  midpoints), free-edge rails = the pcurve on the offset; walls BRepFill::Face (planar when coplanar), sewn, solid,
+  UnifySameDomain (coplanar walls one face). c2-surf-workshop-split Thicken 1: 11/24/16, 14590.40 mm3, 10661.05 mm2 in
+  ~25 ms; live 11/24/16, 14589.80, 10661.06, 29 ms; OCCT 12/26/16, 14536.51, 230-420 ms. T1 test
+  a_sheet_with_sharp_edges_thickens_with_its_offsets_meeting (plate + square hole + walls, 3768 mm3, 15 faces).
+  Temporary in core.rs: probe_thicken (remove). A/B over the 18 thicken docs: .kab.sh (vibex7). Then land.
+- **SURF-INTRO-OFFSET-END:** live (behaviours "core (11-21 20:33) surf-intro", dom/core-surfintro-loft1.txt): Loft 1 pairs
+  its profiles BY PARAMETER (as ours), ruled 3x1, 120x2 CPs, knots doubled at 1/64. So our 1 mm2 gap is the profiles'
+  own parametrisation (live's projected curves: 64 spans, doubled knots); compare ours with the dump next.
+  Ours: Loft 1 12748.85 vs live 12749.86 mm2 (car body, derived b7635b82); scripts vibex7 ~/agents/core-keep/sib (ar.py
+  areas per feature, dv.py, ed2.py).
+- **SCISSOR DERIVED COST: reported to asm; lending dropped (no gain; patch /root/core-scratch/lend-probes.patch).**
 - **Surf-intro Mutual trim 1 / Ruled surface 3 -> skasm (sent 11-21):** translator gives the sketch entity for Ruled
   surface 1's SWEPT_EDGE/FACE/BODY of edge Ao0Xs1GgygP800; repro vibex7 ~/agents/core-keep/mt.
 - Surf-intro builder side still mine: Boundary surface 1 WARNING (live OK), Fill 1 continuity.
@@ -58,7 +60,7 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   sheet is downstream (Bridging curves on wrong geometry). Goes with the Face blend 1 item.
 - **SPEED-VALVE-CONFIG LANDED c17f6eaab.** Impeller Delete face 2 / Extrude 4 speed PARKED (lead 11-21): from feature 29
   our impeller is a wrong model (Halter, Extrude impellerraum 38 vs 59 faces); wait for blend's cascade fix.
-- **SUITE-IMPELLER-FILLET3, SUSPENSION-CIRCPAT1 -> blend (11-21).** Impeller Delete face 2 / Extrude 4 PARKED.
+
 
 ## In flight (11-20)
 - **LANDED 11-20:** singularities Sketch 2 P0 a2e7c966; fillet orientation d80c2c58 (then reverted, below); manualblend
