@@ -297,11 +297,18 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - [ ] P0 **FEEL-MANIP-DEAD-ZONE (psui)**: a 2 px press-drag on the Extrude arrow sets Depth 25 → 25.6 mm. Live: nothing for the
   first 2–3 px, then at 3–4 px the value jumps to the full distance from the press (same 11-13 capture). interaction-feel lists it as
   not yet in the matrix.
-- [ ] P0 **DRW-BORDER-LIT (studios)**, look to confirm with live (REQUESTS qa 22:20): block-drawing, the sheet's inner border line
-  (x ≈ 9.6 mm). Hovering it draws the line tan with square grips at its ends, like a sketch line. A press-drag starting on it
-  leaves it orange with grips after the release and after the pointer leaves, while the drawing's selection is empty. (A box
-  select started there selected nothing.) The border is the template's format, not a selectable entity in live as far as we know.
-  qa-scratch/tickets/drw-border-lit-w6.png (click+hover, after the drag, after the pointer leaves, hover).
+- [ ] P0 **DRW-BORDER-DRAG (studios)** (live answered 22:54, behaviours "qa walk 6", qa/walk6-1121/walk6-5-border-*): block-drawing,
+  the sheet's left inner border line (x ≈ 9.6 mm). Hover (tan, grips), click and the selected look once the pointer leaves (orange,
+  grips) match live. **A press-drag from it 50 mm right moves the line in live**, where it stays selected. Ours leaves it in place
+  (selected-looking), and the ui-script state lists nothing selected. qa-scratch/tickets/drw-border-lit-w6.png (ours).
+- [ ] P0 **FEEL-PREVIEW-HOVER-LIT (psui)** (live 22:54 (2), walk6-2-preview-hover-*): Extrude 2 open with its 25 mm preview. Resting
+  on the translucent preview's front face lights nothing in live. Ours draws that face's outline thin orange (s8-ext-arrow-click 03,
+  the pointer still on the picked top face inside the preview).
+- [ ] P0 **FEEL-SHELL-RECLICK-REMOVED-FACE (psui)** (live 22:54 (3), walk6-3-shell-reclick-*): Shell with the top face in "Faces
+  to remove", click where the top face was. Live takes it out of the field: the field empties, the title turns red, the preview is
+  the solid block again, and the inner floor isn't added. Ours leaves the field as it was (s8-shl-reclick-face).
+- [ ] P1 **FEEL-FILLET-ARROW-CLICK (psui)** (live 22:54 (4), walk6-4c-*): a plain click on the Fillet arrow does nothing to the
+  feature in live (blue on hover, no flip, no change, no field focused: the focus leaves the dialog). Ours moves the focus into Radius.
 - Matched live (no ticket):
   - Extrude: Tab order (Depth → ± → Direction, Starting offset, Symmetric, Draft, Second end position, Merge with all → Merge scope),
     Shift+Tab (flip → End type → faces field), and Esc in a field (typed value reverted) then Esc again to cancel. Enter applies with
@@ -317,9 +324,21 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
     dragged view back. Insert view: Front placed, then the projected ghost. A left-to-right box over the sheet picks all four views.
   - Document tabs: drag reorders, a double-click only switches (no rename, live fc-1121 (3)), menus of the active and an inactive
     Part Studio tab match live's lists, and the hover card shows.
-- Asked live (REQUESTS qa 22:20): ✓ clicked straight after typing a value (ours and live's 11-09 recording both leave the dialog
-  open), hovering the translucent Extrude preview (ours lights its front face's outline), re-clicking Shell's removed face, and a
-  plain click on the Fillet arrow (ours focuses Radius).
+- Live 22:54 (1): ✓ clicked straight after typing a value applies it and leaves the dialog open, as ours does.
+- [ ] P0 **SPEED-HEAVY-HOVER (psui)** (live answered 20:18 (1) at 22:52: behaviours "qa 20:18 (1)", qa/walk2-1121/heavy-*.json).
+  Ours at 22:5x on green 68589d432, same method (hl.py: a hand-like pointer, ms to the first changed frame; ours llvmpipe on Xvfb,
+  live SwiftShader):
+  - The 806-face hole plate's top face: ours **330–373 ms**, live **42–53 ms** (frame 65–77), so about 5x and +280 ms. Side face:
+    ours 336–381 ms, live 299–361 ms (=).
+  - A Front plane border on the same plate also takes 307–352 ms, so every hover redraw there costs about 330 ms (live's frames are
+    17–24 ms): the plate's frame is the slow part, not the pick.
+  - 1000 parts (parts-1000), a pin's side face: ours **646–871 ms**, live **265–270 ms** (about 3x, +400 ms). The plane border there
+    takes 325–609 ms, so about 350 ms of the face time is the pick.
+  - An edge: ours 536–619 ms, live 736–1995 ms (ours faster).
+  - The 1000-instance assembly: ours 560–750 ms, live 1.28–2.48 s (live is render-bound there).
+  Both are software GL, so psui decides whether a GPU machine shows the same (per-frame CPU work on a big part, the face pick on
+  1000 bodies).
+
 
 ## qa, 2026-11-21 21:4x (USER P0 walk 5, lead: right-click menus vs live ctx-menus-1117 item lists; green 2fb0ed1ac, walk3/gen7.py, out-w7, compare hm2/walk5/cmp-menus.py)
 
