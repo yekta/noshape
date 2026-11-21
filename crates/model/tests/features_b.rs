@@ -1576,13 +1576,15 @@ fn offset_curve_move_boundary_mutual_trim() {
     let r = s.ok();
     assert_eq!(r.context.bodies.len(), 1);
     let a = surface_area(&r, 0);
-    // Front keeps x in [0.02, 0.05] (0.03 x 0.03), the other keeps y in [0, 0.03].
-    let front_y = r.context.bodies[0].shape.bounding_box(true).unwrap();
-    assert!(near(a, 0.03 * 0.03 * 2.0, 1e-8), "trimmed area {a} {front_y:?}");
+    // std keeps each surface's pieces behind the other (qSplitBy's back body): Front's behind the x = 20 mm fill
+    // (normal +x), x in [0, 0.02] (0.02 x 0.03); the other's behind Front (normal -y), y in [0, 0.03] (0.03 x 0.03).
+    let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(near(a, 0.02 * 0.03 + 0.03 * 0.03, 1e-8), "trimmed area {a} {bb:?}");
+    assert!(near(bb.max.x, 0.02, 1e-7) && near(bb.min.y, 0.0, 1e-7) && near(bb.max.y, 0.03, 1e-7), "{bb:?}");
 
     // Sets (std mutualTrim.fs "First set of surfaces"): two parallel fills
     // against one crossing fill, not merged: both of the first set keep their
-    // larger side (x in [0.02, 0.05]), the crossing one is cut by both.
+    // side behind it (x in [0, 0.02]), the crossing one is cut by both.
     let mut s = Studio::new();
     let front = |s: &mut Studio, plane: Reference| {
         let mut a = noshape_sketch::Sketch::new();
@@ -1622,7 +1624,7 @@ fn offset_curve_move_boundary_mutual_trim() {
     let r = s.ok();
     assert_eq!(r.context.bodies.len(), 3);
     let areas: Vec<f64> = (0..3).map(|i| surface_area(&r, i)).collect();
-    assert_eq!(areas.iter().filter(|a| near(**a, 0.03 * 0.03, 1e-8)).count(), 2, "first set trimmed to 30 x 30 mm each: {areas:?}");
+    assert_eq!(areas.iter().filter(|a| near(**a, 0.02 * 0.03, 1e-8)).count(), 2, "first set trimmed to 20 x 30 mm each: {areas:?}");
 }
 
 /// Split part by the part's own planar face, Use trimmed off (c2-body-draft-naming's Split 2 at a box's top under a
