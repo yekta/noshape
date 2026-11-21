@@ -21,7 +21,7 @@ pub fn ops() -> Vec<Op> {
             fields: vec![
                 opt("folder", s(), "A folder to list (a path; a bare name is in the documents folder)."),
                 opt("place", json!({ "type": "string", "enum": ["owned", "recent", "created", "trash"] }), "Owned by me (default), Recently opened, Created by me or the Trash."),
-                opt("search", s(), "The search box: only the documents whose name holds this text (any case)."),
+                opt("search", s(), "The search box: only the documents whose name holds this text (any case). Without documents_sort they are listed as the page lists a search: names equal to the text first (the earlier made first), then the others newest first."),
                 opt("documents_sort", json!({ "type": "string", "enum": ["modified", "name", "modified_by"] }), "The documents' order, as a click on the list's column header: Modified (newest first), Name (A → Z) or Modified by (A → Z); Owned by doesn't sort, nor does any header in Recently opened. Without it Owned by me lists them by name, Recently opened most recent first."),
                 opt("reverse", json!({ "type": "boolean" }), "The column header's second click: the documents_sort order reversed."),
                 opt("label", s(), "Only the documents with this label."),
@@ -295,6 +295,7 @@ struct DocRow {
     path: PathBuf,
     name: String,
     modified: Option<i64>,
+    created: i64,
     description: String,
     owner: String,
     modified_by: String,
@@ -304,8 +305,9 @@ fn doc_row(p: &Path) -> DocRow {
     let doc = noshape_store::Document::open_read_only(p).ok();
     let meta = doc.as_ref().and_then(|d| d.meta().ok());
     let (owner, modified_by) = doc.as_ref().and_then(|d| d.owner_and_last_author().ok()).unwrap_or_default();
+    let created = doc.as_ref().and_then(|d| d.created().ok()).unwrap_or_default();
     let name = meta.as_ref().map(|m| m.name.clone()).filter(|n| !n.is_empty()).unwrap_or_else(|| p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
-    DocRow { path: p.to_path_buf(), name, modified: meta.as_ref().map(|m| m.modified), description: meta.map(|m| m.description).unwrap_or_default(), owner, modified_by }
+    DocRow { path: p.to_path_buf(), name, modified: meta.as_ref().map(|m| m.modified), created, description: meta.map(|m| m.description).unwrap_or_default(), owner, modified_by }
 }
 
 fn doc_json(p: &Path, labels: &lib::Labels) -> Value {
@@ -340,10 +342,15 @@ fn documents_under(dir: &Path, out: &mut Vec<PathBuf>) {
 /// The page's search box and column sort over a place's documents.
 fn shown_docs(paths: Vec<PathBuf>, a: &Args, labels: &lib::Labels) -> Result<Vec<Value>, OpError> {
     let mut rows: Vec<DocRow> = paths.iter().map(|p| doc_row(p)).collect();
-    if let Some(q) = a.opt_str("search")?.map(|q| q.trim().to_lowercase()).filter(|q| !q.is_empty()) {
-        rows.retain(|r| r.name.to_lowercase().contains(&q));
+    let search = a.opt_str("search")?.map(|q| q.trim().to_lowercase()).filter(|q| !q.is_empty());
+    if let Some(q) = &search {
+        rows.retain(|r| r.name.to_lowercase().contains(q));
     }
-    if let Some(key) = a.opt_str("documents_sort")? {
+    let sort = a.opt_str("documents_sort")?;
+    if let (Some(q), None) = (&search, sort) {
+        rows.sort_by_cached_key(|r| lib::search_order(&r.name, q, r.created, r.modified.unwrap_or_default()));
+    }
+    if let Some(key) = sort {
         let text = |t: &str| t.to_lowercase();
         match key {
             "modified" => rows.sort_by_key(|r| std::cmp::Reverse(r.modified)),

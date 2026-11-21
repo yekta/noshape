@@ -35,6 +35,7 @@ fn page(cx: &mut TestAppContext) -> (AnyWindowHandle, Entity<StartView>) {
             path: folders[i % 50].join(format!("Bracket assembly {i:04}.noshape")),
             name: format!("Bracket assembly {i:04}"),
             modified: 1_760_000_000_000 + i as i64 * 60_000,
+            created: 0,
             modified_by: "me".into(),
             owner: "me".into(),
             description: format!("Revision {} of the mounting bracket", i % 7),

@@ -20,6 +20,7 @@ struct Cached {
     stamp: (Option<SystemTime>, Option<SystemTime>, u64),
     name: String,
     modified: i64,
+    created: i64,
     modified_by: String,
     owner: String,
     description: String,
@@ -135,6 +136,7 @@ impl Library {
             docs.push(DocEntry {
                 name: cached.name.clone(),
                 modified: cached.modified,
+                created: cached.created,
                 modified_by: cached.modified_by.clone(),
                 owner: cached.owner.clone(),
                 description: cached.description.clone(),
@@ -164,6 +166,7 @@ struct MetaRead {
     description: String,
     workspace: String,
     modified: i64,
+    created: i64,
     owner: String,
     modified_by: String,
     thumbnail: Option<Vec<u8>>,
@@ -178,7 +181,7 @@ fn read_meta(path: &Path) -> anyhow::Result<MetaRead> {
         let doc = noshape_store::Document::open_read_only(path)?;
         let (meta, (owner, modified_by)) = (doc.meta()?, doc.owner_and_last_author()?);
         let workspace = doc.list_branches()?.into_iter().next().map(|b| b.name).unwrap_or_default();
-        return Ok(MetaRead { name: meta.name, description: meta.description, workspace, modified: meta.modified, owner, modified_by, thumbnail: meta.thumbnail });
+        return Ok(MetaRead { name: meta.name, description: meta.description, workspace, modified: meta.modified, created: doc.created()?, owner, modified_by, thumbnail: meta.thumbnail });
     }
     use rusqlite::{Connection, OpenFlags, OptionalExtension as _};
     let mut uri = url_escape(&path.to_string_lossy());
@@ -193,7 +196,7 @@ fn read_meta(path: &Path) -> anyhow::Result<MetaRead> {
     let text = |v: Option<Vec<u8>>| v.map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default();
     let (owner, modified_by) = noshape_store::owner_and_last_author(&conn)?;
     let workspace: String = conn.query_row("SELECT name FROM branches WHERE is_default = 1 LIMIT 1", [], |r| r.get(0)).optional()?.unwrap_or_default();
-    Ok(MetaRead { name: text(get("name")?), description: text(get("description")?), workspace, modified: text(get("modified")?).parse().unwrap_or(0), owner, modified_by, thumbnail: get("thumbnail")? })
+    Ok(MetaRead { name: text(get("name")?), description: text(get("description")?), workspace, modified: text(get("modified")?).parse().unwrap_or(0), created: noshape_store::document_created(&conn)?, owner, modified_by, thumbnail: get("thumbnail")? })
 }
 
 /// A document file's thumbnail (Reference manager rows).
@@ -221,6 +224,7 @@ fn read_entry(path: &Path, stamp: (Option<SystemTime>, Option<SystemTime>, u64),
             stamp,
             name: if meta.name.trim().is_empty() { stem } else { meta.name },
             modified: if meta.modified > 0 { meta.modified } else { fallback_ms },
+            created: meta.created,
             modified_by: meta.modified_by,
             owner: meta.owner,
             description: meta.description,
@@ -230,7 +234,7 @@ fn read_entry(path: &Path, stamp: (Option<SystemTime>, Option<SystemTime>, u64),
         },
         Err(e) => {
             log::warn!("cannot read {}: {e}", path.display());
-            Cached { stamp, name: stem, modified: fallback_ms, modified_by: String::new(), owner: String::new(), description: String::new(), workspace: String::new(), thumbnail: None, broken: true }
+            Cached { stamp, name: stem, modified: fallback_ms, created: 0, modified_by: String::new(), owner: String::new(), description: String::new(), workspace: String::new(), thumbnail: None, broken: true }
         }
     }
 }

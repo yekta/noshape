@@ -166,7 +166,8 @@ pub fn open_add_obsolete_items(doc: Entity<DocModel>, existing: Vec<ReleaseItem>
 
 fn open_add_dialog(doc: Entity<DocModel>, obsolete: bool, existing: Vec<ReleaseItem>, on_add: impl Fn(Vec<ReleaseItem>, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
     let view = cx.new(|cx| AddItemsDialog::new(doc, obsolete, existing, on_add, window, cx));
-    window.open_dialog(cx, move |dialog, _, _| release_modal(dialog).w(px(860.)).child(view.clone()));
+    // Live rel-1121b rl-b-add: 1092 × 629 px, as the Release candidate dialog.
+    window.open_dialog(cx, move |dialog, _, _| release_modal(dialog).w(px(RC_DEFAULT.0)).child(view.clone()));
 }
 
 impl AddItemsDialog {
@@ -663,12 +664,11 @@ impl Render for AddItemsDialog {
                 }))
         };
         let kind_tabs = h_flex().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).children(ADD_KINDS.iter().enumerate().map(|(i, (l, _))| tab_button(i, l, cx)).collect::<Vec<_>>());
-        let mut left = v_flex().w(px(404.)).h_full().border_r_1().border_color(gpui_kit::rgb(0xdddddd));
-        // Release management › "Allow adding items from other documents".
+        let mut left = v_flex().w(px(400.)).h_full().border_r_1().border_color(gpui_kit::rgb(0xdddddd));
+        // Release management › "Allow adding items from other documents"; off, the document's title row comes first
+        // (live rel-1121b rl-b-add).
         if !self.obsolete && release_settings().allow_other_documents {
             left = left.child(h_flex().child(doc_tab("add-current-doc", "Current document", !self.other, false, cx)).child(doc_tab("add-other-docs", "Other documents", self.other, true, cx)));
-        } else {
-            left = left.child(h_flex().child(div().w(px(200.)).py(px(6.)).text_size(px(13.)).text_center().text_color(pal.emphasis).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent).child("Current document")));
         }
         if self.other && self.source.is_none() {
             left = left.child(div().id("add-browser").flex_1().overflow_y_scroll().child(self.render_browser(cx)));
@@ -691,7 +691,7 @@ impl Render for AddItemsDialog {
             .child(h_flex().h(px(56.)).px(px(10.)).child(div().text_size(px(20.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(title)))
             .child(
                 h_flex()
-                    .h(px(416.))
+                    .h(px(510.))
                     .border_t_1()
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xdddddd))
@@ -700,7 +700,7 @@ impl Render for AddItemsDialog {
             )
             .child(
                 h_flex()
-                    .h(px(58.))
+                    .h(px(61.))
                     .px(px(12.))
                     .gap_2()
                     .justify_end()
@@ -1000,6 +1000,8 @@ pub struct ReleaseDialog {
     thumbs_started: bool,
     /// Rows whose Compare revisions is open (review), by `release_thumbs::key`.
     compares: std::collections::HashMap<String, CompareRow>,
+    /// A review's rows with Compare revisions (a part or an assembly with an earlier revision), by item key.
+    comparable: std::collections::HashSet<String>,
     /// The recorded package (review, draft): its audit log.
     package: Option<Package>,
     /// When the dialog created its candidate (ms since the epoch).
@@ -1073,7 +1075,11 @@ impl ReleaseDialog {
             }
         }));
         let dependents = dependents_of(doc.read(cx), rows.iter().map(|r| &r.item));
-        Self { doc, mode, applied: false, rows, dependents, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, approvers: Vec::new(), observers: Vec::new(), people_menu: None, candidate: None, comments: Vec::new(), comments_view: false, props_view: None, comment_input, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, compares: Default::default(), package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, folded: Default::default(), drawings_included: false, _subs: subs }
+        let mut this = Self { doc, mode, applied: false, rows, dependents, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, approvers: Vec::new(), observers: Vec::new(), people_menu: None, candidate: None, comments: Vec::new(), comments_view: false, props_view: None, comment_input, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, compares: Default::default(), comparable: Default::default(), package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, folded: Default::default(), drawings_included: false, _subs: subs };
+        if mode == Mode::Review {
+            this.find_comparable(cx);
+        }
+        this
     }
 
     /// A Revision field typed in (it is the user's now) or left (a value it can't take becomes the proposed one).
@@ -1306,7 +1312,10 @@ impl ReleaseDialog {
             }
         }));
         let (size, inset) = compare_layout(RC_SIZE.with(|c| c.get()).0 - col_item());
+        // An assembly shows the placeholder cube either way (live rel-1121b cmp-asm).
+        let assembly = item.kind == ItemKind::Assembly;
         let side = |n: usize| {
+            let placeholder = assembly.then(|| crate::assets::icon("tab-card-empty-assembly", (size * 115. / COMPARE_PX).round(), cx));
             let picture = c.pictures.as_ref().and_then(|p| if on { p.differences[n].clone() } else { p.plain[n].clone() });
             v_flex()
                 .items_center()
@@ -1320,6 +1329,10 @@ impl ReleaseDialog {
                         .border_1()
                         .border_color(gpui_kit::rgb(0xd0dbe5))
                         .bg(gpui_kit::rgb(0xffffff))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .children(placeholder)
                         .children(picture.map(|im| img(ImageSource::Render(im)).size_full().object_fit(ObjectFit::Contain))),
                 )
         };
@@ -1337,6 +1350,12 @@ impl ReleaseDialog {
 
     /// Compare revisions (review rows, live docver-1121): opens under the row, the item at its released revision (A) and
     /// at this one (B); a second click closes it.
+    /// The review's rows that offer Compare revisions (read once: the log is the store's).
+    fn find_comparable(&mut self, cx: &App) {
+        let log = release_log(self.doc.read(cx));
+        self.comparable = self.rows.iter().filter(|r| earlier_revision(&log, &r.item).is_some()).map(|r| crate::release_thumbs::key(&r.item)).collect();
+    }
+
     fn toggle_compare(&mut self, item: &ReleaseItem, cx: &mut Context<Self>) {
         let key = crate::release_thumbs::key(item);
         if self.compares.remove(&key).is_some() {
@@ -1346,11 +1365,8 @@ impl ReleaseDialog {
         let (docs, labels) = {
             let session = &self.doc.read(cx).session;
             let log = release_log(self.doc.read(cx));
-            let entries = log.revisions(&item.part_number);
-            let earlier = match entries.iter().position(|e| e.revision == item.revision) {
-                Some(at) => at.checked_sub(1).and_then(|at| entries.get(at)),
-                None => entries.last(),
-            };
+            let earlier = earlier_revision(&log, item);
+            let earlier = earlier.as_ref();
             let at_version = |v: Option<&String>| v.and_then(|v| session.document_at_version(v).ok().flatten());
             let linked = item.document.is_some();
             let a = earlier.filter(|_| !linked).and_then(|e| at_version(log.packages.get(e.release).and_then(|p| p.version.as_ref())));
@@ -1359,7 +1375,7 @@ impl ReleaseDialog {
         };
         self.compares.insert(key.clone(), CompareRow { labels, ..Default::default() });
         cx.notify();
-        if !cx.has_global::<crate::gpu::GpuGlobal>() {
+        if item.kind != ItemKind::Part || !cx.has_global::<crate::gpu::GpuGlobal>() {
             return;
         }
         let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
@@ -1846,6 +1862,19 @@ struct CompareRow {
 /// Compare revisions' pictures: live's 337 px squares (1 px border included), 41 px apart, centred under the columns
 /// (40 px in from their sides in live's 1090 px dialog); smaller when the columns are narrower.
 const COMPARE_PX: f32 = 337.;
+
+/// The revision a review row's Compare revisions sets against it (live rel-1121b): the part number's one before the
+/// row's (its last for a candidate's row). Drawings and first releases have none.
+fn earlier_revision(log: &ReleaseLog, item: &ReleaseItem) -> Option<noshape_model::release::RevisionEntry> {
+    if !matches!(item.kind, ItemKind::Part | ItemKind::Assembly) || item.part_number.is_empty() {
+        return None;
+    }
+    let mut entries = log.revisions(&item.part_number);
+    match entries.iter().position(|e| e.revision == item.revision) {
+        Some(at) => at.checked_sub(1).map(|at| entries.swap_remove(at)),
+        None => entries.pop(),
+    }
+}
 const COMPARE_GAP: f32 = 41.;
 
 /// The pictures' side and the space before the first under columns `columns` px wide (the list's scrollbar left out).
@@ -1854,9 +1883,8 @@ fn compare_layout(columns: f32) -> (f32, f32) {
     (size, ((columns - 14. - 2. * size - COMPARE_GAP) / 2.).max(0.).floor())
 }
 
-/// Items table columns (Help image savedraftbutton-relcandidatedialog,
-/// scaled to the 820 px dialog) and its grid lines.
-const COL_ITEM: f32 = 270.;
+/// Items table columns (live rel-1121b dlg-widths: the items pane 281 px, then 225 px each) and its grid lines.
+const COL_ITEM: f32 = 281.;
 
 thread_local! {
     /// The item column's width: [`COL_ITEM`] until its splitter is dragged (live release.json 1_resize: ew-resize
@@ -1867,9 +1895,9 @@ thread_local! {
 fn col_item() -> f32 {
     RC_ITEM_W.with(|c| c.get())
 }
-const COL_REVISION: f32 = 140.;
-const COL_STATE: f32 = 140.;
-const COL_PART_NUMBER: f32 = 150.;
+const COL_REVISION: f32 = 225.;
+const COL_STATE: f32 = 225.;
+const COL_PART_NUMBER: f32 = 225.;
 const GRID: u32 = 0xdddddd;
 /// Live's tooltip on Submit and the footer's ? without approvers, "Submit" and "Approvers" bold.
 const SUBMIT_REQUIRES_APPROVERS: &str = "Submit requires Approvers";
@@ -2295,7 +2323,7 @@ impl Render for ReleaseDialog {
                             )
                         }),
                 )
-                .child(div().w(px(COL_REVISION)).flex_none().flex().justify_end().px(px(10.)).child(div().w(px(64.)).map(|d| { let n = row.item.name.clone(); crate::ui_script::mark(d, move || format!("field:Revision:{n}")) }).child(field(&row.revision, row_issues.iter().any(|x| matches!(x, Issue::BlankRevision | Issue::InvalidRevision | Issue::RevisionTooLow { .. })), editing && !row.item.not_revision_managed, reverted))))
+                .child(div().w(px(COL_REVISION)).flex_none().flex().justify_end().px(px(11.)).child(div().w(px(117.)).map(|d| { let n = row.item.name.clone(); crate::ui_script::mark(d, move || format!("field:Revision:{n}")) }).child(field(&row.revision, row_issues.iter().any(|x| matches!(x, Issue::BlankRevision | Issue::InvalidRevision | Issue::RevisionTooLow { .. })), editing && !row.item.not_revision_managed, reverted))))
                 .child(h_flex().w(px(COL_STATE)).flex_none().px(px(10.)).gap(px(6.)).child(state).when(since.is_some_and(|s| !(s == SinceRelease::MetadataChanged && policy_new_revision)), |d| {
                     d.child(
                         boxed(SharedString::from(format!("rel-revert-{i}")), "undo", if reverted { "Use the workspace item" } else { "Revert to last revision" }, cx)
@@ -2303,7 +2331,7 @@ impl Render for ReleaseDialog {
                             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.set_reverted(i, !reverted, window, cx))),
                     )
                 }))
-                .child(div().w(px(COL_PART_NUMBER)).flex_none().px(px(10.)).map(|d| { let n = row.item.name.clone(); crate::ui_script::mark(d, move || format!("field:Part number:{n}")) }).child(field(&row.part_number, missing || row_issues.contains(&Issue::DuplicatePartNumber), pn_modified, reverted).when(self.seq_parts && editing && !reverted, |d| {
+                .child(div().w(px(COL_PART_NUMBER)).flex_none().px(px(11.)).map(|d| { let n = row.item.name.clone(); crate::ui_script::mark(d, move || format!("field:Part number:{n}")) }).child(field(&row.part_number, missing || row_issues.contains(&Issue::DuplicatePartNumber), pn_modified, reverted).when(self.seq_parts && editing && !reverted, |d| {
                     // The field's # ("Generate next part number"), greyed once
                     // the item has a number.
                     let empty = pn.trim().is_empty();
@@ -2330,22 +2358,24 @@ impl Render for ReleaseDialog {
                         .flex_1()
                         .px(px(10.))
                         .gap(px(6.))
-                        .child({
+                        // Live rel-1121b: a released package's review has no Edit properties.
+                        .when(!(self.mode == Mode::Review && self.candidate.is_none()), |d| {
                             let item = row.item.clone();
                             let me = cx.entity();
                             // A row from a version (another document's or this
                             // one's): that version, in a window of its own.
                             let doc_path = self.doc.read(cx).session.path.clone();
-                            boxed(SharedString::from(format!("rel-props-{i}")), "properties", "Edit properties", cx).on_click(move |_, window, cx| {
+                            d.child(boxed(SharedString::from(format!("rel-props-{i}")), "properties", "Edit properties", cx).on_click(move |_, window, cx| {
                                 if item.document.is_some() {
                                     add_source::run_linked(&item, &doc_path, add_source::LinkedAction::Properties, cx);
                                     return;
                                 }
                                 me.update(cx, |this, cx| this.edit_item_properties(i, item.clone(), window, cx));
-                            })
+                            }))
                         })
-                        // Live docver-1121: a review row's Compare revisions sits between them.
-                        .when(self.mode == Mode::Review, |d| {
+                        // Live docver-1121 / rel-1121b: a review row's Compare revisions sits between them, on a part
+                        // or an assembly with an earlier revision.
+                        .when(self.mode == Mode::Review && self.comparable.contains(&crate::release_thumbs::key(&row.item)), |d| {
                             let item = row.item.clone();
                             let open = self.compares.contains_key(&crate::release_thumbs::key(&item));
                             d.child(boxed(SharedString::from(format!("rel-compare-{i}")), "compare", "Compare revisions", cx).debug_selector(move || format!("rel-compare-{i}")).when(open, |d| d.bg(gpui_kit::rgb(0xeaeaea))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.toggle_compare(&item, cx))))
@@ -3000,8 +3030,9 @@ fn release_modal(dialog: gpui_kit::component::dialog::Dialog) -> gpui_kit::compo
 }
 
 /// The Release candidate dialog's width and its item list's height (live release.json 1_resize: the dialog resizes
-/// from its edges and corner, re-centred; the list / form split drags). Kept for the session.
-const RC_DEFAULT: (f32, f32) = (820., 212.);
+/// from its edges and corner, re-centred; the list / form split drags). Kept for the session. It opens 1092 px wide
+/// with a 319 px list at every window width (live rel-1121b dlg-widths).
+const RC_DEFAULT: (f32, f32) = (1092., 319.);
 const RC_MIN: (f32, f32) = (680., 80.);
 thread_local! {
     static RC_SIZE: std::cell::Cell<(f32, f32)> = const { std::cell::Cell::new(RC_DEFAULT) };

@@ -1289,3 +1289,10 @@ Next, in order:
   a_custom_features_dialog_is_generated_and_fails_as_live). ✓ disabled while the error names a field, click / Enter
   do nothing: ours (live2 11-19 03:26 corrected its 11-18 note).
   FS save -> Part Studio regenerates, an open dialog keeps its labels: ours already (tested).
+
+## 2026-11-21 15:54 UTC (moved from the handoff)
+- Night ui-parity 8 (psui 1120-night-ui-a06ec927): 8/8 with this branch (23:46). drw-centermark: the scenario's expect
+  said the mark goes on Esc (old dx capture); live retake 996d6b8a keeps it: expect updated. drw-revision-table-delete:
+  live paints a deleted table until the next click and its recorder reads that paint ("EDGE Top", behaviours retake
+  2); run.py `deleted_paint_read` leaves ours uncompared there (whole night suite re-scored: only that scenario
+  changes). Ours reads Front there: the pointer rests on Front where the menu's Delete row was.

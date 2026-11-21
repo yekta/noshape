@@ -117,6 +117,7 @@ RT revision table, CW customized release workflow; BUNDLE the client's strings. 
 | Part Studio row expands to its parts; picks shown at right with red × | image | RD:477-562 | – | = |
 | Add / Cancel with tooltips | BUNDLE "Add selected items to Release" / "Cancel adding items and resume editing Release" | RD:654-660 | – | = |
 | Current document / Other documents (only with "Allow adding items from other documents") | RMS | RD:615-619 | – | = |
+| Size; the setting off | live rel-1121b rl-b-add: 1092 × 629 px, left pane 400 px; without other documents no tab row, the document's title row first | `open_add_dialog` at the Release candidate's width, body 510 px; the lone "Current document" tab dropped (studios 11-21) | – | = |
 | Linked item shows version icon | live 11-20 (parity-open-1120 rl1): an assembly's Release… lists the part it links from another document's V1 as a local one (thumbnail, part icon, "Part", no version icon); the help's icon (add-item-version2) is an item added from another version | assembly Release… lists linked parts (ops release::tab_items, at their version); the version icon only on items added from another version, not those an assembly brings in (release_dialog) | e2e a_linked_parts_properties_save_into_its_version | = |
 
 ## 3. Review / approve / reject / drafts

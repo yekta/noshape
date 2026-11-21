@@ -1461,6 +1461,10 @@ impl Document {
         Ok(owner_and_last_author(self.conn()?)?)
     }
 
+    pub fn created(&self) -> Result<Timestamp> {
+        Ok(document_created(self.conn()?)?)
+    }
+
     pub fn set_name(&mut self, name: &str) -> Result<()> {
         self.set_meta("name", Some(name.as_bytes()))
     }
@@ -1522,6 +1526,11 @@ pub fn owner_and_last_author(conn: &Connection) -> rusqlite::Result<(String, Str
             .map(Option::unwrap_or_default)
     };
     Ok((q("ASC")?, q("DESC")?))
+}
+
+/// When the document was made: its first microversion's time (0 if it has none).
+pub fn document_created(conn: &Connection) -> rusqlite::Result<Timestamp> {
+    conn.query_row("SELECT created FROM microversions ORDER BY seq ASC LIMIT 1", [], |r| r.get(0)).optional().map(Option::unwrap_or_default)
 }
 
 /// SQLite's write-ahead log and shared-memory index next to `path`.

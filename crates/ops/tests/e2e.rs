@@ -6027,6 +6027,9 @@ fn documents_page() {
     assert!(!mine["documents"][0]["owner"].as_str().unwrap().is_empty() && mine["documents"][0]["owner"] == mine["documents"][0]["modified_by"], "{mine}");
     let z = call(&mut ctx, "documents_list", json!({ "folder": "Fixtures", "search": "bracket", "documents_sort": "name", "reverse": true }));
     assert_eq!(names(&z), ["Bracket v2 - Copy", "Bracket v2"], "{z}");
+    // Without a column sort, a name equal to the search comes first (live rel-1121b), the newer copy after it.
+    let s = call(&mut ctx, "documents_list", json!({ "folder": "Fixtures", "search": "Bracket V2" }));
+    assert_eq!(names(&s), ["Bracket v2", "Bracket v2 - Copy"], "{s}");
     for args in [json!({ "documents_sort": "size" }), json!({ "documents_sort": "owned_by" }), json!({ "place": "recent", "documents_sort": "name" })] {
         let e = try_call(&mut ctx, "documents_list", args.clone()).unwrap_err();
         assert_eq!(e.param.as_deref(), Some("documents_sort"), "{args}: {e:?}");

@@ -48,7 +48,7 @@ fn page(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<StartVi
     let docs: Vec<DocEntry> = ["A", "B", "C", "D", "E"]
         .iter()
         .enumerate()
-        .map(|(i, n)| DocEntry { path: dir.join(format!("{n}.noshape")), name: (*n).into(), modified: 1_760_000_000_000 - i as i64 * 60_000, modified_by: "me".into(), owner: "me".into(), description: String::new(), workspace: "Main".into(), thumbnail: None, recent_rank: None, broken: false, trashed: false })
+        .map(|(i, n)| DocEntry { path: dir.join(format!("{n}.noshape")), name: (*n).into(), modified: 1_760_000_000_000 - i as i64 * 60_000, created: 0, modified_by: "me".into(), owner: "me".into(), description: String::new(), workspace: "Main".into(), thumbnail: None, recent_rank: None, broken: false, trashed: false })
         .collect();
     let mut view = None;
     let (window, _) = cx

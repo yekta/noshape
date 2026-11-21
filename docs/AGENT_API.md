@@ -785,7 +785,7 @@ Examples:
 |---|---|---|---|
 | `folder` | string |  | A folder to list (a path; a bare name is in the documents folder). |
 | `place` | one of `owned`, `recent`, `created`, `trash` |  | Owned by me (default), Recently opened, Created by me or the Trash. |
-| `search` | string |  | The search box: only the documents whose name holds this text (any case). |
+| `search` | string |  | The search box: only the documents whose name holds this text (any case). Without documents_sort they are listed as the page lists a search: names equal to the text first (the earlier made first), then the others newest first. |
 | `documents_sort` | one of `modified`, `name`, `modified_by` |  | The documents' order, as a click on the list's column header: Modified (newest first), Name (A → Z) or Modified by (A → Z); Owned by doesn't sort, nor does any header in Recently opened. Without it Owned by me lists them by name, Recently opened most recent first. |
 | `reverse` | boolean |  | The column header's second click: the documents_sort order reversed. |
 | `label` | string |  | Only the documents with this label. |

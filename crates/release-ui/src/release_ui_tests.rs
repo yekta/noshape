@@ -4,6 +4,7 @@ use super::{Mode, ReleaseDialog, tab_items};
 use crate::doc_model::DocModel;
 use gpui_kit::{AnyWindowHandle, AppContext as _, Bounds, Entity, IntoElement, ParentElement as _, Point, Render, Styled as _, TestAppContext, Window, WindowBounds, WindowOptions, div, px, size};
 use noshape_model::document::TabId;
+use noshape_model::release::{ItemKind, ReleaseItem};
 use serde_json::json;
 
 struct Root(Entity<ReleaseDialog>);
@@ -353,6 +354,16 @@ fn compare_revisions_opens_revision_a_and_b_under_the_row(cx: &mut TestAppContex
         gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(b.center(), gpui_kit::Modifiers::default());
         draw(cx, window);
     };
+    // Live rel-1121b: only a part or an assembly with an earlier revision offers it (not a drawing, not a first release).
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let log = super::release_log(v.doc.read(cx));
+        let item = v.rows[0].item.clone();
+        assert_eq!(super::earlier_revision(&log, &item).map(|e| e.revision), Some("A".to_string()));
+        let drawing = ReleaseItem { kind: ItemKind::Drawing, ..item.clone() };
+        let first = ReleaseItem { part_number: "P-101".into(), ..item };
+        assert!(super::earlier_revision(&log, &drawing).is_none() && super::earlier_revision(&log, &first).is_none());
+    });
     let row_bottom = bounds(cx, "rel-compare-0").expect("the review row's Compare revisions").bottom();
     assert!(bounds(cx, "rel-compare-a-0").is_none(), "closed at first");
     click(cx, "rel-compare-0");

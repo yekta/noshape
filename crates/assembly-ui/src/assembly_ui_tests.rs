@@ -2300,6 +2300,7 @@ fn other_documents_sort_by_their_menu_and_remember_it(cx: &mut TestAppContext) {
         path: std::path::PathBuf::from(format!("/nowhere/{name}.noshape")),
         name: name.into(),
         modified,
+        created: 0,
         modified_by: by.into(),
         owner: by.into(),
         description: String::new(),

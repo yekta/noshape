@@ -800,6 +800,10 @@ impl StartView {
             .filter(|d| self.adv_matches(d))
             .filter(|d| q.is_empty() || d.name.to_lowercase().contains(&q) || d.path.file_name().is_some_and(|n| n.to_string_lossy().to_lowercase().contains(&q)))
             .collect();
+        if !q.is_empty() && self.sort_cleared {
+            v.sort_by_cached_key(|d| noshape_ops::doc_library::search_order(&d.name, &q, d.created, d.modified));
+            return v;
+        }
         match self.sort {
             SortKey::Name => v.sort_by_cached_key(|d| d.name.to_lowercase()),
             SortKey::Modified => v.sort_by_key(|d| d.modified),
@@ -5659,8 +5663,14 @@ fn bold_match(name: &str, query: &str) -> Vec<(std::ops::Range<usize>, Highlight
     if lower.len() != name.len() {
         return Vec::new();
     }
+    // Only a whole word is bold: "Gearing" for "gear" isn't (live rel-1121b).
     let q = q.to_lowercase();
-    lower.find(&q).map(|i| vec![(i..i + q.len(), HighlightStyle { font_weight: Some(FontWeight::BOLD), ..Default::default() })]).unwrap_or_default()
+    let word = |c: Option<char>| c.is_some_and(char::is_alphanumeric);
+    lower
+        .match_indices(&q)
+        .find(|(i, _)| !word(lower[..*i].chars().next_back()) && !word(lower[i + q.len()..].chars().next()))
+        .map(|(i, _)| vec![(i..i + q.len(), HighlightStyle { font_weight: Some(FontWeight::BOLD), ..Default::default() })])
+        .unwrap_or_default()
 }
 
 /// A column header's ⋮ menu items ("-" a separator; live2 doc-feel-1119 L40–L44, ag-grid's): Sort ascending /
@@ -5753,7 +5763,7 @@ mod tests {
         super::feel_tests::register_test_hooks();
         let dir = std::env::temp_dir().join(format!("noshape-start-pins-{}", std::process::id()));
         let docs: Vec<DocEntry> = (0..5)
-            .map(|i| DocEntry { path: dir.join(format!("Doc {i}.noshape")), name: format!("Doc {i}"), modified: 1_760_000_000_000 + i * 60_000, modified_by: "me".into(), owner: "me".into(), description: "d".into(), workspace: "Main".into(), thumbnail: None, recent_rank: None, broken: false, trashed: false })
+            .map(|i| DocEntry { path: dir.join(format!("Doc {i}.noshape")), name: format!("Doc {i}"), modified: 1_760_000_000_000 + i * 60_000, created: 0, modified_by: "me".into(), owner: "me".into(), description: "d".into(), workspace: "Main".into(), thumbnail: None, recent_rank: None, broken: false, trashed: false })
             .collect();
         let mut view = None;
         let (window, _) = cx
@@ -5880,11 +5890,25 @@ mod tests {
         assert_eq!(pinned_order(&cols, &[(Col::OwnedBy, Pin::Left), (Col::Modified, Pin::Right)]), [Col::OwnedBy, Col::ModifiedBy, Col::Modified]);
     }
 
-    /// Live2 doc-feel-1119 L08: a search's match is bold in the names, any case.
+    /// Live rel-1121b ("gear" in a folder): names equal to the text first, the earlier made first; then newest first,
+    /// then by name (spur gear below Gearing notes, made the same minute).
+    #[test]
+    fn a_search_lists_equal_names_first_then_the_newest() {
+        let t = 1_763_737_260_000;
+        let mut docs = [("spur gear", 6, t), ("Gearing notes", 5, t), ("gear", 2, t + 1_000), ("gear box", 4, t), ("zz gear", 7, t + 120_000), ("a gear", 3, t), ("Gear", 1, t)];
+        docs.sort_by_cached_key(|(n, c, m)| noshape_ops::doc_library::search_order(n, "gear ", *c, *m));
+        let names: Vec<_> = docs.iter().map(|d| (d.0, d.1)).collect();
+        assert_eq!(names, [("Gear", 1), ("gear", 2), ("zz gear", 7), ("a gear", 3), ("gear box", 4), ("Gearing notes", 5), ("spur gear", 6)]);
+    }
+
+    /// Live2 doc-feel-1119 L08, rel-1121b: a search's match is bold in the names, any case, a whole word only.
     #[test]
     fn a_searchs_match_is_bold_in_the_names() {
         let spans = |name: &str, q: &str| bold_match(name, q).into_iter().map(|(r, _)| r).collect::<Vec<_>>();
-        assert_eq!(spans("uip Bracket", "brack"), vec![4..9]);
+        assert_eq!(spans("uip Bracket", "bracket"), vec![4..11]);
+        assert_eq!(spans("a gear", "GEAR"), vec![2..6]);
+        assert_eq!(spans("Gearing notes", "gear"), Vec::<std::ops::Range<usize>>::new());
+        assert_eq!(spans("gears and gear", "gear"), vec![10..14]);
         assert_eq!(spans("uip Bracket", "  "), Vec::<std::ops::Range<usize>>::new());
         assert_eq!(spans("uip Bracket", "plate"), Vec::<std::ops::Range<usize>>::new());
     }

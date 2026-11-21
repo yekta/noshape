@@ -7,6 +7,13 @@ use std::path::{Path, PathBuf};
 /// A document file's extension.
 pub const EXT: &str = "noshape";
 
+/// A search's order while no column sorts (live rel-1121b, "gear"): names equal to the text first, the earlier made
+/// first; then the others newest first (to the minute), then by name.
+pub fn search_order(name: &str, query: &str, created: i64, modified: i64) -> (bool, i64, String) {
+    let lower = name.trim().to_lowercase();
+    if lower == query.trim().to_lowercase() { (false, created, lower) } else { (true, -modified.div_euclid(60_000), lower) }
+}
+
 /// The SQLite write-ahead log beside a document.
 pub fn wal_path(p: &Path) -> PathBuf {
     let mut s = p.as_os_str().to_os_string();

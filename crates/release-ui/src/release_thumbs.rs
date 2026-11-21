@@ -74,8 +74,8 @@ pub struct Compared {
     pub differences: [Option<Arc<RenderImage>>; 2],
 }
 
-/// Render `item` in `docs` (the documents at revision A and at B; None: nothing to show) as `size` px squares. A part
-/// whose shape differs between the two is drawn unlit in [`COMPARE_A`] / [`COMPARE_B`] in the differences pictures.
+/// Render part `item` in `docs` (the documents at revision A and at B; None: nothing to show) as `size` px squares.
+/// The differences pictures are drawn unlit: in [`COMPARE_A`] / [`COMPARE_B`] when its shape differs, else white.
 pub async fn compare(docs: [Option<Document>; 2], item: ReleaseItem, size: u32, gpu: crate::gpu::Gpu) -> Compared {
     let part_display = |doc: &Document| -> Option<noshape_model::display::StudioDisplay> {
         let tab = doc.tab(item.tab)?;
@@ -96,15 +96,8 @@ pub async fn compare(docs: [Option<Document>; 2], item: ReleaseItem, size: u32, 
         _ => true,
     };
     let mut out = Compared::default();
-    for (side, doc) in docs.iter().enumerate() {
-        let Some(doc) = doc else { continue };
-        let Some(display) = &shapes[side] else {
-            // An assembly or a drawing: the same picture either way.
-            let one = render(doc.clone(), Default::default(), vec![item.clone()], gpu.clone()).await.into_iter().next().map(|(_, im)| im);
-            out.plain[side] = one.clone();
-            out.differences[side] = one;
-            continue;
-        };
+    for (side, display) in shapes.iter().enumerate() {
+        let Some(display) = display else { continue };
         let opts = crate::scene_builder::SceneOptions { show_planes: false, show_sketches: false, show_origin: false, ..Default::default() };
         let picture = |display: &noshape_model::display::StudioDisplay, flat: Option<u32>| {
             let mut display = display.clone();
@@ -123,7 +116,13 @@ pub async fn compare(docs: [Option<Document>; 2], item: ReleaseItem, size: u32, 
             }
             scene
         };
-        let flat = differs.then_some(if side == 0 { COMPARE_A } else { COMPARE_B });
+        // Live rel-1121b: a changed part is filled whole, the older side light blue, the newer red-orange; one whose
+        // properties alone changed becomes a plain white line drawing on both sides.
+        let flat = Some(match (differs, side) {
+            (false, _) => 0xffffff,
+            (true, 0) => COMPARE_A,
+            (true, _) => COMPARE_B,
+        });
         for (scene, slot) in [(picture(display, None), &mut out.plain[side]), (picture(display, flat), &mut out.differences[side])] {
             let Some((lo, hi)) = scene.bounds() else { continue };
             let camera = crate::start_thumbnail::fit_camera(lo.as_dvec3(), hi.as_dvec3(), 1.0);

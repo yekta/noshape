@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-21 15:22 UTC.
+Updated 2026-11-21 15:54 UTC.
 
 ## In flight
 
@@ -25,7 +25,7 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
   `start_hooks::versions_page`, app `files::versions_page`), the deleted-workspace bubble 30 s (`NoticeLink::stays`),
   documents_list Created by me / `search` / `documents_sort`.
 - LANDED a2074bb2 as 301b1895 (11:19): history_merge strategies + merge_plan; history_create_version at/publish.
-- LANDING (13:58): speed pass + live docver-1121 rows + drawing takes + Start version (x129/x130 on vibex7):
+- LANDED 04361993 as 3f70f4f2 (16:08): speed pass + live docver-1121 rows + drawing takes + Start version (x129/x130 on vibex7):
   - Speed pass: NO gap >=100 ms and >=2x live. 1000-part drawing: open 19-31 ms, all views 2.7-4.9 s (live 3.7-4.0 s a
     view), Update click 62-85 ms (two sheet assemblies ~20 ms each on the UI thread; bench now holds it to <100 ms, not a
     frame; possible later cleanup: one assembly per click), views remade 47-83 ms (live 6.4 s); FS marker ~0.8 s (live
@@ -50,7 +50,7 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
     `render_compare`, `CompareRow`, `compare_layout`); release_thumbs::compare renders A (the previous revision's
     package version) and B (the package's version, else the workspace), plain and flat #acdbf5 / #e67d5e for a changed
     part. Assembly / drawing rows show the same picture both ways (asked). Test
-    `compare_revisions_opens_revision_a_and_b_under_the_row`. Pictures shrink to fit our 820 px dialog (live 1090).
+    `compare_revisions_opens_revision_a_and_b_under_the_row`.
   - Live revtools-1121: top-level assembly row Where used… (`AssemblyViewEvent::WhereUsedAssembly` -> the rail's panel)
     and, with workflows, Revision history… (hook `open_tab_revision_history`); Revision tools' Object type Part ·
     Assembly · Drawing · Blob, empty result shows nothing. "Revision table properties..." kept (live's take reads ASCII
@@ -59,11 +59,15 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
     its last paint takes no notify (GPUI tracks only entities drawn in the last frame). ui-test-support now puts each
     test binary's settings under the run's NOSHAPE_CONFIG_DIR (release-ui's managed workflows leaked into
     assembly-ui's menus in one rb.sh run). Release dialog: a revision it takes clears the last note.
-- NEXT: the dialog's width (live 1090 px at 1920, columns 280/225/225/225: REQUESTS 14:33 asks how it scales), then
-  live's answers to 14:33 (Compare on other rows, search relevance for audit #9).
-- REQUESTS for live (11-21): 08:58 the drawing matrix's 40 most-used shown rows (six takes); 14:33 release dialog
-  width, Compare revisions on other rows, search relevance, asm-root-menu re-records (8 takes from the Free account).
-- Audit: #7 done (Start version), #8 done for part rows, #9 rename done, search relevance waits on live 14:33. #10 done.
+- NEXT LAND (x139 on vibex8): live rel-1121b (14:33 answers): the release dialog fixed 1092 px (items 281, columns 225,
+  list 319; Add Items 1092 wide, left 400, no lone tab row); Compare revisions only on part / assembly rows with an
+  earlier revision (`earlier_revision`, `comparable`), an assembly shows the placeholder cube, a property-only change
+  plain white line drawings; a released review has no Edit properties. Search relevance (audit #9): no header sort ->
+  `noshape_ops::doc_library::search_order` (equal names by when made = store `document_created`, `DocEntry::created`;
+  then newest to the minute, then name), page + documents_list; bold whole words only. asm-root-menu re-records
+  (f95cf1bd) match our menu (Create task… / Add comment are cloud).
+- REQUESTS for live (11-21): 08:58 the drawing matrix's 40 most-used shown rows (six takes); 14:33 all answered.
+- Audit: #7–#10 done. interaction-feel's FS F2/F3 rows marked = (fixed c249e0ed9, qa verified).
 - Live fc-1121 drawing feel (behaviours "studios fc-1121"): (1) a dimension being placed shows the line to another's
   x / y without snapping (still held on a + mark, live2 rad-note); (3) caret at the click (`note_caret_at`), a
   double-click in the editor selects all; (5) a dragged box draws its picks selected (`box_preview`); (2), (4), (6)
@@ -74,11 +78,6 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
   studio, Ratio to part, Auto (test `the_view_simplification_list_is_in_lives_order`). REQUESTS fc-1121 (6) added:
   a table hover-lit after Esc under a resting pointer (split s14-15).
 - Cached slices: a notify reaches one only if the last frame drew it (not reused): replace the slice to force it.
-- Night ui-parity 8 (psui 1120-night-ui-a06ec927): 8/8 with this branch (23:46). drw-centermark: the scenario's expect
-  said the mark goes on Esc (old dx capture); live retake 996d6b8a keeps it: expect updated. drw-revision-table-delete:
-  live paints a deleted table until the next click and its recorder reads that paint ("EDGE Top", behaviours retake
-  2); run.py `deleted_paint_read` leaves ours uncompared there (whole night suite re-scored: only that scenario
-  changes). Ours reads Front there: the pointer rests on Front where the menu's Delete row was.
 - Asm feel rows: none left untested in interaction-feel's asm tables.
 
 ## Next, in order
@@ -100,9 +99,7 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
   one click on a BOM cell selects it and opens the Cell panel (sizes + formats + a greyed Override), a double-click the
   same (live cferr-bomclk-1118 (b)); Split BOM table below puts the second part 3 mm under the first, same x and width.
   A placed BOM stays selected (live2 bomsel-1118; the recorder can't read tables, and reads no EDGE under a just-placed
-  one, so ours doesn't count it until the next press, `placed_table`): local. live2 is adding a TABLE kind to the
-  recorder and retaking the seven drw-bom-* + drw-note-editor (type → ✓): then drop `placed_table`'s reader rule and
-  report the table as live's new kind. The "︿" is the isometric part's corner, not a control
+  one, so ours doesn't count it until the next press, `placed_table`): local. the recorder's TABLE kind is read (ours `TABLE` since 2026-11-18.1, drawing_ui_state.rs). The "︿" is the isometric part's corner, not a control
   (live2). Update from
   this workspace enabling ~3 s late is live's server latency, not a target. Custom feature ✓ with a field error:
   live (a) confirms ours (pale, Enter no-op; no field named: ✓ commits).
@@ -148,8 +145,8 @@ into notes.
 ## Open (no owner action possible yet)
 - live's drw-hole-callout-palette retake (23:03, q-hcp-shots/record.json) has the same states as the take: kept;
   the take matches.
-- Assembly "?" rows: a list row's tooltip (live2 ~70 ms), a selected instance's outline through other parts in
-  explode mode, a Revolute-constrained drag's grab point.
+- P0 FEEL-DRW-WHEEL-ZOOM-SLOW waits on qa's quiet re-time (the bench's zoom frame is under a frame; qa's hover in the
+  same app was as slow: the host).
 - Release gap list: all done (Release all configurations…, the outdated associated drawing: 11-18).
 
 ## How to run

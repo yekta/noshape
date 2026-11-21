@@ -14,6 +14,8 @@ pub struct DocEntry {
     pub name: String,
     /// Last change (unix ms): the store's `modified`, else the file mtime.
     pub modified: i64,
+    /// When it was made (unix ms, its first change; 0 if unknown).
+    pub created: i64,
     /// Author of the latest change ("Modified by").
     pub modified_by: String,
     /// Author of the first change ("Owned by").
