@@ -61,6 +61,13 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   op. Wanted: `faces` (and `reference` in the assembly) in both ops, giving the Face tab's numbers, with e2e tests.
 
 ## qa, 2026-11-21 (compat alerts on green 2407ded2)
+- [ ] P1 **MANUALBLEND-BOUNDARY1 (core, lead 11-21 05:1x)**: c2-surf-workshop-manualblend's Boundary surface 1 (feature 18)
+  builds on live: status OK, Surface 3 a sheet of 1 face, 2 edges and 2 vertices, 1593.76 mm². In 0.4.63 ours gave a Warning
+  ("Boundary conditions are not applied yet; profiles are matched by position") with Surface 3 at 2 faces / 2 edges / 1 vertex.
+  Since green c44c0240 (compat 05:14) it fails: "Could not create boundary surface with given information. Check profile order,
+  intersections or end conditions." The range's only model-core change is core's 3bbeb6096 (an invalid Boundary fill now
+  fails). Wanted: live's valid 1-face surface, not an error. Repro: compat / parity model c2-surf-workshop-manualblend; live
+  parts in its live.jsonl, row 18.
 - [ ] P1 **KNIFEHANDLE-LOFT1 (core)**: c2-surf-workshop-knifehandle's Loft 1 (feature 24) fails on ours; live builds it OK, solid
   "Blade" 11 faces / 27 edges / 18 vertices, 10392.85 mm³ (parity corpus live.jsonl). Ours failed in 0.4.63 too ("Could not create
   valid profiles from selections."); since green 2407ded2 (the range's only model-core commit is core's f9ad07b50) it fails with
