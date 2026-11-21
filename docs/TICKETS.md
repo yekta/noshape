@@ -12,8 +12,10 @@ Ours is at or under live on every edit, undo and roll except c2-rings-loft (belo
 0.01-0.9 s (live 0.08-2.7). Script: vibex6 ~/agents/dx-keep/sr/sr3.sh (qa's speedref.py), results sr/sr3.json.
 - [ ] P1 **SPEED-RINGS-SHELL (bool)**: c2-rings-loft, Extrude 1 at 8.8 / 9.6 / 10.4 mm (live's +10/20/30 % edit): the edit takes
   11.5 / 29.4 / 25.1 s vs live's server 2.46-2.82 s (4-10x); open 4.0 s. Shell 1 fails ("Error") after 18.9 s at 9.6 mm, the
-  other features <= 0.31 s each. Wanted: Shell 1 as live after the edit (live's result there not captured yet: a live2 request), and
-  a failing Shell that gives up fast. Probe: vibex6 ~/agents/dx-keep/sr/rlprobe.py <cli> <saved doc> "9.6 mm".
+  other features <= 0.31 s each. Live (behaviours "dx (11-21 13:02)", live/dx/rings-shell-1121): Shell 1 OK at 8 / 8.8 / 9.6 /
+  10.4 mm; after it 44 faces, 521.793 / 568.750 mm3 at 8.8 / 9.6, 36 faces, 732.479 mm3 at 10.4 (a second 6-face body of 1103.593
+  mm3 throughout); the studio ~2.2 s per edit. Wanted: Shell 1 succeeding with those faces and volumes, in live's time or less.
+  Probe: vibex6 ~/agents/dx-keep/sr/rlprobe.py <cli> <saved doc> "9.6 mm".
 
 ## qa, 2026-11-21 (x86 speed, 02:00-04:00 quiet window, vibex8 release build of green f9ad07b50)
 Model suite 02:00-02:14 alone on vibex8 (load 0.1-1.4): 118/174 documents, 1840/2315 features. Gaps counted at >= 2x and >= 100 ms
