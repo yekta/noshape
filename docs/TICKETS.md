@@ -366,6 +366,33 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   white and stays white 0.8, 3 and 9 s after the release (nothing else changed). Before the drag it is shaded. Live shades closed
   regions in sketch edit throughout (asked live to confirm after a drag). Ours qa-scratch/hm2/out-walk2/w-drag-point-long (04 vs
   05-10), drags2.png; qa 19:54, green 6be52caf4 (kit qa-scratch/hm2/walk, run.sh on vibe2 :481).
+- [ ] P0 **FEEL-ASM-PS-MC-MISSING (asm)**: hover matrix batch 4. The block's Part Studio mate connector "Mate connector 1" (origin
+  the vertex (40,30,20), made by the start's feature_add with only originQuery) is not drawn in the assembly (one Part 1 instance),
+  so it can't be hovered or picked: the pointer on it lights the corner vertex. Live draws the part's connector there (disc, ring,
+  axes; hovered fill #FFE79F, selected #FFE187, owner edges #DAB46B..#E9C177). If ours only drops it for a connector with no owner
+  part, the default owner (the part it sits on) is the gap. Live psui/hover-matrix-1121/as2/as2-mc-*; ours qa-scratch/hm2/cmp-b4,
+  b4-score.png row 5 (qa 20:18, green 6be52caf4, kit qa-scratch/hm2/gen2 gen-as.py).
+- [ ] P0 **FEEL-ASM-MANIPULATOR-RING (asm)**: batch 4. With a vertex, edge or face selected in the assembly, the move manipulator's
+  centre is a hollow white ring in live (the orange pick shows inside it); hovered, the same hollow ring turns blue
+  #6087BD..#85A3D0. Ours: a filled white disc in a grey ring, hovered a white disc in a bright blue ring; on a selected edge a white
+  dashed line runs along the edge right of the ring (live none). 8 cells; b4-score.png rows 1-4, columns 3-6.
+- [ ] P0 **FEEL-ASM-VERTEX-LOOK (asm)**: batch 4. A vertex hovered in the assembly: live an ~11 px see-through disc
+  #F0C28C..#F8C58A with the edges showing through (as in the Part Studio, which we match); ours an ~7 px opaque disc. Also with
+  another face selected. b4-score.png row 1, columns 1-2 and 7-8.
+- [ ] P0 **FEEL-ASM-MATE-VERTEX (asm)**: user walk 2. Fastened mate, first field active, pointer on Part 2's corner (80,0,10)
+  (two-blocks): live shows only the inferred connector's white ellipse disc with a #FFC685 rim on the vertex, no triad (live
+  feel/3d-asm/fastened-vertex-snap.png, fastened-near-vertex.png; hover-matrix b5/b5-fastened-vertex_f). Ours draws a filled light
+  orange disc plus the full connector triad (ring, X/Y/Z) there. Faces and edges match live (centroid / midpoint triad, white
+  dots). Ours qa-scratch/hm2/w2c/vv.png, out-w2/w2-as-fast-vertex (qa 20:18, green 2fb0ed1ac, kit qa-scratch/hm2/walk2).
+- [ ] P0 **FEEL-ASM-DRAG-LIT (asm)**: user walk 2, real pointer (xdotool). Dragging free Part 2 by its top face (two-blocks): ours
+  keeps the hover look on the moving part for the whole drag (the #FFC20E silhouette and the face's #FFC685 boundary). Live: "the
+  hover highlight is off for the whole drag; after release the entity under the pointer lights again" (behaviours "feel (3D):
+  assembly", feel/3d-asm/free-during-drag.png: no outline). Ours qa-scratch/hl/dr.png (before / mid-drag / released), green
+  2fb0ed1ac.
+- [ ] P0 **FEEL-SELECT-OTHER-LOOK (psui)**: user walk 2. Block, pointer on the top face, ` (Select other), a row hovered: ours draws a
+  ~9 px #FFC20E dot on the face where Select other was asked, and the hovered list gets a blue border and a scrollbar. Live: no
+  dot, the list border stays #D7D7D7, no scrollbar (live uip/select-other-row-click-3.png). Rows, bold hover row, the lit face and
+  the dialog's place match. Ours qa-scratch/hm2/w2c/so.png, out-w2/w2-selother-face/04 (green 2fb0ed1ac).
 
 ## psui, 2026-11-20 (live's feel coverage cov-1120; docs/parity/interaction-feel.md "cov-1120")
 - [x] done (studios 11-20: c249e0ed9 / f29e6eb2; the same rows as qa's FEEL-FS-* below, verified 07:0x on green 0bc7e772e) **P1 FS-WHEEL-72PX [studios]**: a wheel notch scrolls the Feature Studio's code 72 px in live (Ace: 4.5 lines of
