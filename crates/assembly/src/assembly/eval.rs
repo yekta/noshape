@@ -456,6 +456,29 @@ pub fn asm_connector_offset(c: &AsmMateConnector, units: &UnitPrefs) -> Frame {
     f.mul(&Frame::new(t, DQuat::from_axis_angle(axis, ang)))
 }
 
+/// A connector's frame `f` on its origin entity with its Between entities and Realign picks applied; `other` gives
+/// another entity's frame in the same coordinates (an error when it is on another instance).
+fn connector_picks(c: &AsmMateConnector, mut f: Frame, other: impl Fn(&MateConnectorRef) -> Result<Frame, String>) -> Result<Frame, String> {
+    if let Some(b) = &c.between {
+        f.origin = (f.origin + other(b)?.origin) * 0.5;
+    }
+    if let Some(p) = &c.primary_axis {
+        let z = other(p)?.z();
+        let x = f.x() - z * z.dot(f.x());
+        let x = if x.length_squared() < 1e-12 { z.any_orthonormal_vector() } else { x.normalize() };
+        f = Frame::from_axes(f.origin, z, x);
+    }
+    if let Some(s) = &c.secondary_axis {
+        let d = other(s)?.z();
+        let x = d - f.z() * f.z().dot(d);
+        if x.length_squared() < 1e-12 {
+            return Err("Failed to resolve mate connector. Secondary axis conflicts with primary axis.".into());
+        }
+        f = Frame::from_axes(f.origin, f.z(), x.normalize());
+    }
+    Ok(f)
+}
+
 /// The Move offset of an implicit connector (identity when it has none).
 pub fn implicit_move(c: &MateConnectorRef, units: &UnitPrefs) -> Frame {
     let Some(m) = c.moved.as_deref().filter(|m| !m.off) else { return Frame::default() };
@@ -3192,24 +3215,7 @@ impl AssemblyEvaluator {
                     }
                     Ok(g)
                 };
-                let mut f = f;
-                if let Some(b) = &mc.between {
-                    f.origin = (f.origin + other(b)?.origin) * 0.5;
-                }
-                if let Some(p) = &mc.primary_axis {
-                    let z = other(p)?.z();
-                    let x = f.x() - z * z.dot(f.x());
-                    let x = if x.length_squared() < 1e-12 { z.any_orthonormal_vector() } else { x.normalize() };
-                    f = Frame::from_axes(f.origin, z, x);
-                }
-                if let Some(s) = &mc.secondary_axis {
-                    let d = other(s)?.z();
-                    let x = d - f.z() * f.z().dot(d);
-                    if x.length_squared() < 1e-12 {
-                        return Err("Failed to resolve mate connector. Secondary axis conflicts with primary axis.".into());
-                    }
-                    f = Frame::from_axes(f.origin, f.z(), x.normalize());
-                }
+                let f = connector_picks(mc, f, other)?;
                 Ok((owner, f))
             }) {
                 Ok((owner, f)) => {
@@ -3358,7 +3364,13 @@ impl AssemblyEvaluator {
                 let (b, mut f) = match c.connector {
                     Some(id) => {
                         let mc = sub.connectors.iter().find(|x| x.id == id && !x.suppressed).ok_or("Mate connector was deleted or is suppressed")?;
-                        let (b, mut f) = entity(&mc.on)?;
+                        let (b, f) = entity(&mc.on)?;
+                        // (Its Between entities and Realign picks as in the subassembly's own solve: asm-suspension's
+                        // Lower Control Arm, halfway between its slot's faces, 47.5 mm off without.)
+                        let mut f = connector_picks(mc, f, |r| match entity(r)? {
+                            (o, g) if o == b => Ok(g),
+                            _ => Err("Select entities of the same instance".into()),
+                        })?;
                         if mc.on.flip {
                             f = f.mul(&Frame::new(DVec3::ZERO, DQuat::from_rotation_x(std::f64::consts::PI)));
                         }

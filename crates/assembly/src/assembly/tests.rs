@@ -2528,7 +2528,8 @@ fn face_section_properties_like_live() {
     // Exact, as live's three decimals (qa FACE-MOMENT-DIGITS: the f32 mesh read 26666.664 / 106666.657).
     let near = |x: f64, want: f64| (x - want).abs() < 5e-4;
     assert!(near(m[0], 26666.667) && near(m[1], 106666.667), "{m:?}");
-    assert!(near(s.polar / mm4, 133333.333) && (s.moments[0][1] / mm4).abs() < 1e-2, "{} {}", s.polar / mm4, s.moments[0][1] / mm4);
+    // Lxy exactly 0, as live (qa FACE-MOMENT-LXY-ZERO: the app read -7.941e-11).
+    assert!(near(s.polar / mm4, 133333.333) && s.moments[0][1] == 0.0, "{} {}", s.polar / mm4, s.moments[0][1] / mm4);
     assert!((s.centroid - DVec3::new(0.02, 0.01, 0.01)).length() < 1e-9);
     // About a connector on the corner (40, 20, 10) in world axes (live mc1-mc3): the parallel axis values, the product
     // +A·dx·dy; area and perimeter unchanged.
@@ -3345,6 +3346,39 @@ fn mate_connector_between_entities_and_realign() {
     c.secondary_axis = Some(on(&side));
     let res = ev.evaluate(&f.doc, &asm_with(c), &SolveOptions::default(), None);
     assert!(res.connector_frame(MateId(5)).is_none());
+}
+
+/// A flexible subassembly's Between entities connector solved from the parent: halfway, as in the subassembly
+/// (asm-suspension's Lower Control Arm, 47.5 mm off when its own solve dropped the second entity).
+#[test]
+fn a_flexible_subassembly_keeps_its_between_entities_connector() {
+    let mut f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    // Block 2's middle (between its top and bottom) fastened to block 1's top, the Z axes opposed: block 2 turned over
+    // with its origin 15 mm up (20 mm with its top's centroid alone).
+    let mut mc = AsmMateConnector::new(MateId(11), "Mate connector 1".into(), conn(2, top.clone(), Inference::Centroid));
+    mc.between = Some(MateConnectorRef::on(InstanceId(2), vec![], bottom));
+    let sub = Assembly {
+        instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.0, 0.0, 0.03), false)],
+        connectors: vec![mc],
+        mates: vec![mate(10, MateType::Fastened, MateConnectorRef::assembly_connector(MateId(11), InstanceId(2)), conn(1, top, Inference::Centroid))],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &sub, &SolveOptions::default(), None);
+    assert!(res.mates[0].ok, "{:?}", res.mates[0].message);
+    let z = DVec3::from(res.solved.placement(InstanceId(2)).unwrap().translation).z;
+    assert!((z - 0.015).abs() < 1e-6, "in the subassembly: {z}");
+    let sub_tab = f.doc.add_tab("Sub", TabContent::Assembly(Box::new(sub)));
+    let mut sub_inst = Instance::new(InstanceId(5), "Sub <1>".into(), InstanceSource::Assembly { assembly: sub_tab, config: ConfigValues::default() }, Placement { translation: [0.0, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] });
+    sub_inst.lock = SubassemblyLock::Flexible;
+    let asm = Assembly { instances: vec![part_instance(1, "Base <1>", f.studios[0], body, DVec3::new(0.0, 0.0, -0.01), true), sub_inst], ..Default::default() };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.prepared.flexible.contains(&InstanceId(5)));
+    let z = res.solved.nested_world(&[InstanceId(5), InstanceId(2)]).unwrap().origin.z;
+    assert!((z - 0.015).abs() < 1e-6, "in the parent: {z}");
 }
 
 /// A planar side face of the block (normal horizontal).

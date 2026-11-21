@@ -1093,6 +1093,8 @@ pub fn face_section_properties(result: &AssemblyResult, faces: &[(InstancePath, 
     });
     let s = glam::DMat3::IDENTITY * ((j.x_axis.x + j.y_axis.y + j.z_axis.z) * 0.5) - j;
     let (ixx, iyy, ixy) = (y.dot(s * y), x.dot(s * x), x.dot(s * y));
+    // (Rounding noise is 0, as live: a rectangle about its centroid read Lxy -7.941e-11 mm⁴, qa FACE-MOMENT-LXY-ZERO.)
+    let ixy = if ixy.abs() <= 1e-9 * (ixx.abs() + iyy.abs()) { 0.0 } else { ixy };
     Some(FaceSection { area, perimeter, centroid, moments: [[ixx, ixy], [ixy, iyy]], polar: ixx + iyy })
 }
 

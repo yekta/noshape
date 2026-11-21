@@ -5148,6 +5148,60 @@ fn a_connector_at_lives_point_takes_its_own_parts_entity() {
     assert_eq!((r.mates_matching, r.mates), (2, 2), "{r:?}");
 }
 
+/// Live's Between entities mate connector (asm-suspension's Lower Control Arm Mate connector 1): halfway between a
+/// block's bottom front edge's midpoint and its top back edge's, so a Revolute holds the other block's bottom edge
+/// there, 5 mm back and 10 mm up (on the first edge alone it sat 11 mm off live).
+#[test]
+fn a_between_entities_connector_is_halfway_between_its_two_entities() {
+    let line = |id: &str, (x0, y0): (f64, f64), (x1, y1): (f64, f64)| {
+        let l = ((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0)).sqrt();
+        json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "isConstruction": false, "startParam": 0.0, "endParam": l,
+            "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": x0, "pntY": y0, "dirX": (x1 - x0) / l, "dirY": (y1 - y0) / l } })
+    };
+    let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+          "entities": [line("r0", (0.0, 0.0), (0.02, 0.0)), line("r1", (0.02, 0.0), (0.02, 0.01)), line("r2", (0.02, 0.01), (0.0, 0.01)), line("r3", (0.0, 0.01), (0.0, 0.0))],
+          "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualCreatedByQuery-137", "featureId": "FS1", "entityType": "FACE" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "20 mm" }] }
+    ] });
+    let parts = json!([{ "partId": "JHD", "name": "Part 1" }]);
+    let edge = |instance: &str, at: [f64; 3], inference: Option<&str>| {
+        let mut q = json!({ "btType": "BTMInferenceQueryWithOccurrence-1083", "path": [instance], "entityQuery": format!("query=qContainsPoint(qEverything(EntityType.EDGE), vector({}, {}, {}) * millimeter);", at[0], at[1], at[2]) });
+        if let Some(i) = inference {
+            q["inferenceType"] = json!(i);
+        }
+        q
+    };
+    let between = json!({ "btType": "BTMMateConnector-66", "featureType": "mateConnector", "featureId": "MC1", "name": "Mate connector 1", "parameters": [
+        { "btType": "BTMParameterEnum-145", "parameterId": "originType", "value": "BETWEEN_ENTITIES" },
+        { "btType": "BTMParameterQueryWithOccurrenceList-67", "parameterId": "originQuery", "queries": [edge("IA", [10.0, 0.0, 0.0], Some("MID_POINT"))] },
+        { "btType": "BTMParameterQueryWithOccurrenceList-67", "parameterId": "originAdditionalQuery", "queries": [edge("IA", [10.0, 10.0, 20.0], None)] }] });
+    let mid = json!({ "btType": "BTMMateConnector-66", "featureId": "MB", "implicit": true, "parameters": [
+        { "btType": "BTMParameterQueryWithOccurrenceList-67", "parameterId": "originQuery", "queries": [edge("IB", [10.0, 0.0, 0.0], Some("MID_POINT"))] }] });
+    let cs = |instance: &str, o: [f64; 3]| json!({ "matedOccurrence": [instance], "mateConnectorCS": { "origin": o, "xAxis": [0.0, 1.0, 0.0], "yAxis": [0.0, 0.0, 1.0], "zAxis": [1.0, 0.0, 0.0] } });
+    let asm = json!({
+        "rootAssembly": {
+            "instances": [{ "id": "IA", "name": "Part 1 <1>", "type": "Part", "partId": "JHD", "elementId": "E1" }, { "id": "IB", "name": "Part 1 <2>", "type": "Part", "partId": "JHD", "elementId": "E1" }],
+            "occurrences": [
+                { "path": ["IA"], "fixed": true, "transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] },
+                { "path": ["IB"], "fixed": false, "transform": [1, 0, 0, 0, 0, 1, 0, 0.005, 0, 0, 1, 0.01, 0, 0, 0, 1] }],
+            "features": [{ "id": "M1", "featureData": { "matedEntities": [cs("IA", [0.01, 0.005, 0.01]), cs("IB", [0.01, 0.0, 0.0])] } }] },
+        "features": { "features": [between, { "btType": "BTMMate-64", "featureId": "M1", "name": "Revolute 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "mateType", "value": "REVOLUTE" },
+            { "btType": "BTMParameterQueryWithOccurrenceList-67", "parameterId": "mateConnectorsQuery", "queries": [{ "featureId": "MC1" }, { "featureId": "MB" }] }],
+            "mateConnectors": [mid] }],
+          "featureStates": { "M1": { "featureStatus": "OK" } } } });
+    let mut ctx = Ctx::new();
+    let r = rebuild_assembly(&mut ctx, &scratch("between-entities-connector.noshape"), &asm, &[("E1".into(), studio, parts)]);
+    assert!(r.untranslated.is_empty() && r.differences.is_empty(), "{r:?}");
+    assert_eq!((r.occurrences_matching, r.occurrences, r.mates_matching, r.mates), (2, 2, 1, 1), "{r:?}");
+}
+
 #[test]
 fn a_subassembly_is_rebuilt_as_lives() {
     let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [

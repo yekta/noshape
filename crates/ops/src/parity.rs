@@ -2420,7 +2420,13 @@ impl<'a> Translator<'a> {
                             if per_query && texts[n].contains("importOp") && texts[n].contains("IMPORT") && !found.is_empty() {
                                 self.import_bodies.insert(texts[n].clone(), found.clone());
                             }
-                            ids.extend(found)
+                            // (Once each, as live's union: asm-infento-subs 1dc32b's Extrude 42 named the five pieces of a
+                            // split cap that read as one face of ours, five identical prisms fused, 20 s.)
+                            for e in found {
+                                if !ids.contains(&e) {
+                                    ids.push(e);
+                                }
+                            }
                         }
                         Err(e) => missed.push(match q["deterministicIds"].as_array().filter(|a| !a.is_empty()) {
                             Some(d) => format!("{} ({})", e, d.iter().filter_map(Value::as_str).collect::<Vec<_>>().join(", ")),
@@ -9422,6 +9428,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     // A connector's own Flip primary axis, secondary axis and Move (live's mateConnector parameters; asm-infento-subs'
     // Fastened 18, 20 mm along X): its mate end's flip, reorient and move, and the move's translation (m).
     let mut connector_own: HashMap<Key, (Value, glam::DVec3)> = HashMap::new();
+    // Live's Between entities connectors (ours: an assembly mate connector, see below).
+    let mut betweens: HashSet<Key> = HashSet::new();
     for l in &levels {
         for f in &l.features {
             let all = std::iter::once(*f).chain(f["mateConnectors"].as_array().into_iter().flatten());
@@ -9433,6 +9441,15 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     connectors.insert((l.element.clone(), id.to_string()), (path_of(&q["path"]), q["inferenceType"].as_str().unwrap_or("").to_string(), query));
                     if let Some(own) = connector_params(mc) {
                         connector_own.insert((l.element.clone(), id.to_string()), own);
+                    }
+                    // Between entities: halfway to the second query's point (asm-suspension's Lower Control Arm
+                    // Mate connector 1, between its bore's two rims), found as "<id>/between".
+                    let between = mc["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"] == "originType" && p["value"] == "BETWEEN_ENTITIES");
+                    let second = mc["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "originAdditionalQuery").and_then(|p| p["queries"].as_array()).and_then(|q| q.first());
+                    if let Some(q) = second.filter(|_| between) {
+                        let query = json!({ "queryString": q["entityQuery"], "deterministicIds": q["deterministicIds"], "second": q["secondDeterministicId"] });
+                        connectors.insert((l.element.clone(), format!("{id}/between")), (path_of(&q["path"]), q["inferenceType"].as_str().unwrap_or("").to_string(), query));
+                        betweens.insert((l.element.clone(), id.to_string()));
                     }
                 }
             }
@@ -9476,7 +9493,10 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                         }
                         _ => o,
                     };
-                    connector_origins.insert(key, base);
+                    // (Not a Between entities one's: live's point is the midpoint, on neither entity.)
+                    if !betweens.contains(&key) {
+                        connector_origins.insert(key, base);
+                    }
                 }
                 if let (Some(id), Some(z)) = (q["featureId"].as_str(), f3(&e["mateConnectorCS"]["zAxis"])) {
                     connector_z.insert((l.element.clone(), id.to_string()), z);
@@ -10171,7 +10191,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         };
         // Its own mate connectors on the assembly origin ("Assembly XZ plane": Origin's ORIGIN_X / Y / Z, Z along that
         // axis; their X left ours, the Planar mates using them don't turn about it).
-        let mut origin_connectors: HashMap<String, String> = HashMap::new();
+        let mut level_connectors: HashMap<String, String> = HashMap::new();
         // (Also one a mate holds, its own "Origin" pick: asm-keyboard-pattern's Fastened 1.)
         let held = l.features.iter().flat_map(|f| f["mateConnectors"].as_array().into_iter().flatten().map(move |m| (m, *f)));
         for (f, owner) in l.features.iter().filter(|f| f["featureType"] == "mateConnector").map(|f| (*f, *f)).chain(held) {
@@ -10188,8 +10208,78 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             }
             match placer.call("assembly_mate_connector", args) {
                 Ok(_) => {
-                    origin_connectors.insert(id.to_string(), name.to_string());
+                    level_connectors.insert(id.to_string(), name.to_string());
                 }
+                Err(e) => res.untranslated.push(format!("{name}: {e}")),
+            }
+        }
+        // Live's Between entities connectors: assembly mate connectors of ours (a mate end holds one entity), its own
+        // flip and move kept; the mates then name them.
+        let held = l.features.iter().flat_map(|f| f["mateConnectors"].as_array().into_iter().flatten().map(move |m| (m, *f)));
+        for (f, owner) in l.features.iter().filter(|f| f["featureType"] == "mateConnector").map(|f| (*f, *f)).chain(held) {
+            let Some(id) = f["featureId"].as_str() else { continue };
+            let key = (l.element.clone(), id.to_string());
+            if !betweens.contains(&key) {
+                continue;
+            }
+            let end = |k: &Key| -> Option<Value> {
+                let (path, inf, _) = connectors.get(k)?;
+                let mut c = json!({ "instance": path_names(path)?, "entity": entities.get(k)? });
+                if let Some(i) = inference(inf) {
+                    c["inference"] = json!(i);
+                }
+                Some(c)
+            };
+            let held_name = format!("Mate connector of {}", owner["name"].as_str().unwrap_or(id));
+            let name = f["name"].as_str().filter(|_| f["featureType"] == "mateConnector").unwrap_or(&held_name);
+            let (Some(on), Some(between)) = (end(&key), end(&(l.element.clone(), format!("{id}/between")))) else {
+                res.untranslated.push(format!("{name}: Between entities: its entities not translated"));
+                continue;
+            };
+            let mut args = json!({ "tab": l.tab, "on": on, "between": between, "name": name });
+            if let Some((own, _)) = connector_own.get(&key) {
+                for (k, v) in own.as_object().into_iter().flatten() {
+                    let k = match k.as_str() {
+                        "flip" => "flip_primary",
+                        "move" => "offset",
+                        k => k,
+                    };
+                    args[k] = v.clone();
+                }
+            }
+            // (Its Z in the kernel's sense of the circle: turned to live's, as a mate end's below.)
+            if args.get("flip_primary").is_none()
+                && let Some(z) = connector_z.get(&key).map(|z| glam::DVec3::from(*z))
+                && let Some((ours, _)) = placer.connector_frame_local(&l.tab, &args["on"])
+                && ours.dot(z) < -0.999
+            {
+                args["flip_primary"] = json!(true);
+            }
+            match placer.call("assembly_mate_connector", args) {
+                Ok(_) => {
+                    level_connectors.insert(id.to_string(), name.to_string());
+                }
+                Err(e) => res.untranslated.push(format!("{name}: {e}")),
+            }
+        }
+        // Its groups before the mates, the parts held as inserted (asm-suspension's Sub a57340: the Pin, bushings and
+        // mounts one rigid group the Lower Control Arm turns about).
+        for f in l.features.iter().filter(|f| f["featureType"] == "mateGroup") {
+            let name = f["name"].as_str().unwrap_or("").to_string();
+            let queries = f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "occurrencesQuery").and_then(|p| p["queries"].as_array());
+            let Some(instances) = queries.into_iter().flatten().map(|q| path_names(&path_of(&q["path"]))).collect::<Option<Vec<String>>>() else {
+                res.untranslated.push(format!("{name}: an instance not translated"));
+                continue;
+            };
+            trace(&format!("group {name:?} in {}: {instances:?}", l.tab));
+            let tab = l.tab.clone();
+            match placer.call("assembly_group", json!({ "tab": tab, "instances": instances })) {
+                Ok(v) if f["suppressed"] == true => {
+                    if let Err(e) = placer.call("assembly_set_feature_state", json!({ "tab": tab, "features": [v["name"]], "suppressed": true })) {
+                        res.untranslated.push(format!("{name}: suppressed: {e}"));
+                    }
+                }
+                Ok(_) => {}
                 Err(e) => res.untranslated.push(format!("{name}: {e}")),
             }
         }
@@ -10220,7 +10310,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             for q in &picks {
                 let end = (|| {
                     let id = q["featureId"].as_str()?;
-                    if let Some(name) = origin_connectors.get(id) {
+                    if let Some(name) = level_connectors.get(id) {
                         return Some((json!({ "connector": name }), String::new(), None, None));
                     }
                     let path = connectors.get(&(l.element.clone(), id.to_string())).map_or_else(|| path_of(&q["path"]), |c| c.0.clone());

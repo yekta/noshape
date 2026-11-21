@@ -5,40 +5,28 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-21 06:45 UTC) — RESUME HERE
-- P2 OP-MASS-FACE-SECTION LANDED 05:57 as e07b0eb3. Between entities translator fix (suspension Lower Control Arm
-  Revolute 1) set aside as /root/asm-scratch/between.patch while the vertex fix lands: re-apply with git apply.
-- P0 evaluate-again LANDED 02:54 as ed0fcbec (place_blocks: saved isaac 765 -> 25 ms; A/B on 27 models no deviation
-  change; isaac recount back to 16 after bool's revert, bool told).
-- Suspension's 3 parts off live (0.48 / 4.9 / 12.4 mm): sub-level mates were never translated (the exports had no
-  subAssemblyFeatures; the slider-limit idea was wrong). live added `subAssemblyFeatures` to the 13 asm-* exports with
-  subassemblies (11-21 02:5x). Suite on them: vibex8 through ~/bin/slot (~/agents/asm-keep/subs-run.sh with the prebuilt ops-subs; out
-  vibex8 ~/agents/asm-keep/subs/<m>.out, docs saved ~/tmp/asm/subs-save; log /root/asm-scratch/subs.log). Then triage
-  each model against the earlier counts.
-- infento Gear 1: Revolute 10's connector `implicit:centroid:<edge>` aligned to face a3f7a1 (also Chamfer 3's) doesn't
-  resolve (eval.rs ~1826: face wire containing the edge -> centroid -> normal). Probe on the saved infento doc.
-- qa P1 SPEED-ASM-OPEN: scissor-lift 30.5 s / infento 42 s to solved (live 8-11 s), all in the first assembly_list.
-  Plan: regen_profile (NOSHAPE_PROFILE_DIR / _ONLY) on the saved docs for per-studio times vs the assembly_list wall
-  (studios prewarm side by side on threads).
-- assembly_transform on a mated instance (qa: scissor Top +2 mm moved 2, live's drag 132): held, NOT landed; patch
-  /root/asm-scratch/transform-carry.patch (drags it as the triad: solve_drag from the instance origin, rotation as
-  targets; fixed / flexible-sub instances keep the exact place). Its test mate_flip::moving_a_mated_part_carries_what_its_mates_hold
-  passes on the old code too: reproduce on the saved scissor doc (Top <1> +2 mm x, count moved) before landing.
-- qa P2 OP-MASS-FACE-SECTION: assembly_mass_properties `faces` (Face tab: area, perimeter, Lxx/Lxy/Lyy, Lzz) and
-  `reference` (connector: inertia and moments about it); e2e assembly_measure_and_mass_properties. The Part Studio
-  op (query_mass_properties) is the lead's to route.
-- qa 11-21 05:5x (TICKETS "qa, 2026-11-21 (asm P2 walk…)"): P2 ASM-VERTEX-CONNECTOR-WORLD-AXES LANDED 06:22 as 9c6d96bb
-  (a bare vertex's inference point is world-aligned, behaviours 16596; a face's corner dots keep the face's frame).
-  Queued 06:4x: P3 FACE-MOMENT-DIGITS (Face tab from OCCT's exact surface integrals, not the f32 mesh) and P2
-  INSERT-OTHER-DOC-GRAPH-MARKS (legend's 2 rows, ▲/△ on released/candidate versions, Parts/Sketches/rigid row, studios
-  open by default; an other document's sketches aren't listed yet: Sketches alone shows the studios only).
-- Scissor 0da59a: live installed its Derived sources (9 studios + imports/574ddb5a….step, source.json extraStudios;
-  REQUESTS skasm 11-21 03:01). Live's own 0da59a has Derived "Plate" / "Battery Clip" in ERROR (Top Plate 0 parts):
-  compare its parts with 0da59a's live.jsonl, not 24.
-- studios 23:1x: the instance list's rows slice isn't redrawn after set_fixed in a test window (probe: open_from_top,
-  two fixed parts, set_fixed false/true, debug_bounds("fixed Part 1 <1>")).
-- Cleanup: asm-base worktree + vibex7 / Mac targets; ops-prof (vibex7, vibe2); vibe2 ops-main; vibex7 isaac copy; Mac
-  ~/noshape-host/asm-keep; vibex8 ~/agents/asm-keep/ops-subs after the suite.
+## State (2026-11-21 09:46 UTC) — RESUME HERE
+- Landing now: Between-entities connectors + mate groups + query dedupe (parity.rs), a flexible subassembly's
+  connectors keep Between / Realign in the parent's solve (eval.rs `connector_picks`; asm-suspension's Lower / Upper
+  Control Arm were 47.5 / 37.5 mm off: the sub tab alone was right, the root's flex solve dropped `between`), Face
+  tab Lxy rounding noise 0 (qa FACE-MOMENT-LXY-ZERO). 7aa080fc landed as b2bbaf7d, qa verified both tickets.
+- Held, uncommitted: /root/asm-scratch/transform-carry.patch (assembly_transform on a mated instance, qa: scissor
+  Top +2 mm moved 2, live's drag 132); re-apply after the land (`git apply`), verify on a saved scissor doc.
+- Scissor can't finish: chain 2 (vibex7) killed by earlyoom at 924 s, ops-bt RSS 22.8 GB (hosts are 29 GB). Vs
+  11-20 08:24 (scissor-comp.out, 1009 s total): more studios now (0139f2, 03a9e5, 0c2c42, 2d82a0 new), Studio
+  0da59a 10 s -> 349 s, 2d82a0 184 s. Next: profile 0da59a (NOSHAPE_KERNEL_PROFILE) and find what holds memory.
+  0da59a: live's own Derived "Plate" / "Battery Clip" are in ERROR (Top Plate 0 parts).
+- Suspension: rerun with the fix pending (expect 23+/28). Remaining: Studio 805e29 regen (Knuckle, Fillet 3/4,
+  routed) -> Ball 1/2, Cap/Cup parts -> root Fastened 1 / Cup distance.
+- infento 157/167. Revolute 10 / Gear 1: Studio a3f7a1 Sketch 1's 9 µm gaps (crates/sketch regions, routed).
+  Sub-mate offsets (Sub bdf7bf halfClutch 4.6 mm, b63c40 / dfc972 flanges): needs a traced run. Extrude 42's five
+  live faces are SPLIT pieces of one cap told apart by TOPOLOGY: deduped now; proper piece resolution is a follow-up.
+- SPEED-ASM-OPEN: stored display cache -> dx (P1); Circular pattern 4 fixed by bool (bool-mend 56bb5c47b); Extrude
+  42's 5 identical tools were the translator's duplicates (deduped; bool adds a coincident-tool dedupe too).
+- bjr-config 133/137: Sub c1e15f Fastened 3/4 "cannot resolve" (live OK): trace next.
+- vibex7 chain 2 (subs-run2.sh): corexy 62/62; keyboard-pattern and the rest queued; log ~/agents/asm-keep/subs2.log.
+- Cleanup: Mac ~/noshape-host/asm-keep emptied 11-21 (lead: Mac total over 100 GB; keep only agents/asm). Left:
+  asm-base worktree, vibex7 ops-subs / inf-probe, vibex8 ops-subs, ~/tmp/asm/q copies, infento-saved.noshape (bool).
 
 ## State (2026-11-20 18:50 UTC)
 
