@@ -308,6 +308,12 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   **Curve/surface analysis…**, **Zoom to selection** and **Align view with vertical axis**; live (11-17) has none of them. The top
   face (20,15,10): ours lacks **Section view…** and **View normal to** and adds **Curve/surface analysis…** (live sk-model-face).
   (Live's older sketch/204, a sketch on a part face, did show Use etc. on an edge: the set depends on the sketch plane.)
+- [ ] P1 **KEYS-SHEET-DETAILS (psui)**: the shortcut sheet's 7 tabs match live (live/shortcuts/02-tab-*) row for row, except: Part
+  Studio's "select rollback bar" is a bordered keycap in live (plain text in ours), and Drawing's "Copy annotation" has no lock in
+  live (ours shows one). qa-scratch/tickets/keys-sheet-w5.png (Part Studio, Drawing; live left).
+- Assembly menus match live's dom/context-menus-assembly.txt: empty space, the instance row, Origin, the top row (Where used… in
+  place of 11-17's Release… follows live's later workflows-on capture, behaviours 46297), and the Mate features header (no menu,
+  as live). (The sheet's tabs and the assembly list headers are not ui-script targets: pixel clicks, and instance:<name>.)
 - Open with live (REQUESTS qa 21:50): sk-empty and sk-tool-line-active. Live's (75, 40) pick lands on the Top plane (plane menu);
   ours is empty space, because our default planes only cover the block while live's evidently also cover Sketch 2
   (qa-scratch/tickets/menus-plane-w5.png top).
