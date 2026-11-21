@@ -790,6 +790,9 @@ struct DrawLists {
     over_transparent: Vec<usize>,
     /// Color pass only: translucent meshes drawn after the lines and points.
     over_lines: Vec<usize>,
+    /// Color pass only: lines drawn after the points, then points after those ([`Instance::over_lines`]).
+    lines_over_points: Vec<usize>,
+    points_over_lines: Vec<usize>,
     /// Color pass only: Translucent mode's parts (their front faces blended).
     front_only: Vec<usize>,
     /// Color pass: `opaque` split in runs drawn without (`true`) or with
@@ -1046,6 +1049,8 @@ impl DrawLists {
         self.reflective.clear();
         self.over_transparent.clear();
         self.over_lines.clear();
+        self.lines_over_points.clear();
+        self.points_over_lines.clear();
         self.front_only.clear();
         self.on_top.clear();
         self.lines.clear();
@@ -1218,7 +1223,17 @@ impl DrawLists {
                 }
                 Drawable::Lines(_) if inst.hidden_only && inst.see_through_self => self.lines_hidden_self.push(i),
                 Drawable::Lines(_) if inst.hidden_only => self.lines_hidden.push(i),
+                Drawable::Lines(_) if inst.over_lines => {
+                    if !pick {
+                        self.lines_over_points.push(i);
+                    }
+                }
                 Drawable::Points(_) if inst.hidden_only => self.points_hidden.push(i),
+                Drawable::Points(_) if inst.over_lines => {
+                    if !pick {
+                        self.points_over_lines.push(i);
+                    }
+                }
                 Drawable::Lines(_) => self.lines.push(i),
                 Drawable::Points(_) => self.points.push(i),
             }
@@ -1247,8 +1262,8 @@ impl DrawLists {
         }
         self.order_solid(scene, pick);
         let inst = &scene.instances;
-        let Self { opaque, transparent, pick_priority, images, images_faded, reflective, over_transparent, over_lines, front_only, on_top, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden, lines_hidden_self, slots, slot_of, .. } = self;
-        let all = [opaque, transparent, pick_priority, reflective, over_transparent, over_lines, front_only, on_top, images, images_faded, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden, lines_hidden_self];
+        let Self { opaque, transparent, pick_priority, images, images_faded, reflective, over_transparent, over_lines, lines_over_points, points_over_lines, front_only, on_top, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden, lines_hidden_self, slots, slot_of, .. } = self;
+        let all = [opaque, transparent, pick_priority, reflective, over_transparent, over_lines, lines_over_points, points_over_lines, front_only, on_top, images, images_faded, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden, lines_hidden_self];
         slots.clear();
         slot_of.clear();
         slot_of.resize(inst.len(), u32::MAX);
@@ -1546,6 +1561,8 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
             None => draw(pass, &lists.silhouettes, &pipelines.silhouette),
         }
         draw(pass, &lists.points, &pipelines.point);
+        draw(pass, &lists.lines_over_points, &pipelines.line);
+        draw(pass, &lists.points_over_lines, &pipelines.point);
         draw(pass, &lists.over_lines, &pipelines.mesh_transparent);
         // Outlined see-through parts, last (their depth would hide what
         // is behind them).

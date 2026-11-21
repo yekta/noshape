@@ -164,12 +164,12 @@ fn a_shown_sketchs_line_and_point_reach_outside_sketch_mode_as_live(cx: &mut Tes
             }
         }
     }
-    // On a line's middle, resting past the midpoint's dwell: still the line, no tool being open (live2 rr/ln.png).
+    // On a line's middle, resting there: still the line, no tool being open (live2 rr/ln.png).
     let (id, a, b) = lines[0];
     let mid = (a + b) * 0.5;
     pointer.move_to(cx, &view, mid + (b - a).perp().normalize() * 3.0);
     pointer.move_to(cx, &view, mid);
-    std::thread::sleep(crate::part_studio::behaviors::MIDPOINT_DWELL + std::time::Duration::from_millis(100));
+    std::thread::sleep(std::time::Duration::from_millis(160));
     pointer.frames(cx, &view);
     let got = hovered(cx, &view);
     if !is_line(&got, id) {
@@ -1027,9 +1027,6 @@ fn a_hovered_edge_midpoints_marker_has_lives_pixels(cx: &mut TestAppContext) {
     for selected in [false, true] {
         let sprites = view.update(cx, |v, cx| {
             v.selection = if selected { vec![edge.clone()] } else { Vec::new() };
-            // Arrived along the edge (moved on since the edge armed its midpoint).
-            v.ui.midpoint_armed_at = Some(glam::DVec2::new(100.0, 100.0));
-            v.ui.pointer = Some(glam::DVec2::new(103.0, 101.0));
             v.hover = Some(Reference::Implicit { on: Box::new(edge.clone()), inference: noshape_model::reference::Inference::Midpoint });
             v.midpoint_sprites(cx)
         });

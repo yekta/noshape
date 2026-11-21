@@ -2015,7 +2015,6 @@ impl PartStudioView {
         if self.rehover(cx) | self.update_inference(shift, window, cx) | cap_changed {
             self.refresh_scene(false, cx);
         }
-        self.schedule_midpoint_dwell(cx);
     }
 
     fn on_viewport_event(&mut self, vp: &Entity<Viewport>, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) {
@@ -2411,7 +2410,6 @@ impl PartStudioView {
                 if self.sketch.is_none() && self.ui.select_other.is_none() && self.hover.is_some() && (self.ui.midpoint_armed.is_some() || self.ui.hover_pick.as_ref().is_some_and(|t| matches!(t.kind, PickKind::Edge | PickKind::SketchCurve))) && self.update_hover(cx) {
                     self.refresh_scene(false, cx);
                 }
-                self.schedule_midpoint_dwell(cx);
                 // Hovering a manipulator arrow outlines it (Onshape).
                 let on_manip = vp.read(cx).manipulator_index_at(*position);
                 if on_manip != self.ui.manip_hover {

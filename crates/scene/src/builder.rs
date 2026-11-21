@@ -1505,10 +1505,12 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                         if flag == state::ERROR {
                             overlay_pts.points.push(PointSprite { position: p, color: lin_to_u8(sel_color), pick_id: 0, size: 8.0, style: LineSegment::ON_TOP, _pad: 0 });
                         } else {
-                            // Live (selection/08): the point marker.
-                            let cols = if flag == state::HOVER { theme::viewport::POINT_HOVER } else { theme::viewport::POINT_SELECTED };
-                            for (c, size, style) in [(cols[0], 11.0, 0), (cols[1], 8.0, PointSprite::RING), (cols[2], 5.0, 0)] {
-                                overlay_pts.points.push(PointSprite { position: p, color: lin_to_u8(theme::lin(c)), pick_id: 0, size, style: LineSegment::ON_TOP | style, _pad: 0 });
+                            // Live hover-matrix-1121 (vertex-hovered, -selected): an 11 px disc of the hover / selection
+                            // colour, see-through (the edges meeting there show through it) inside an opaque rim.
+                            let c = if flag == state::HOVER { hov_color } else { sel_color };
+                            let rgb = lin_to_u8(c);
+                            for (alpha, style) in [(184, 0), (190, PointSprite::RING)] {
+                                overlay_pts.points.push(PointSprite { position: p, color: [rgb[0], rgb[1], rgb[2], alpha], pick_id: 0, size: 11.0, style: LineSegment::ON_TOP | style, _pad: 0 });
                             }
                         }
                     }

@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-21 00:22 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-21 17:25 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -36,17 +36,35 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (16:47 UTC 11-21)
+## Now (17:40 UTC 11-21) — USER P0: hover × selection look matrix (DECISIONS 11-21)
 
-USER P0 (lead 16:4x, DECISIONS 11-21 hover/select looks): an edge midpoint arrived at along the edge lights only the
-point (never its edge) with the hovered marker (POINT_HOVER; on a selected edge POINT_HOVER_ON_SELECTED, centre #ffb32e);
-landed straight on it (the dwell snap, pointer where it armed) the edge stays lit with the dark-ring marker
-(`midpoint_landed_edge`; live hover-matrix-1121 batch 1).
-Tests: a_hovered_edge_midpoint_lights_the_point_or_keeps_the_edge_as_live, a_hovered_edge_midpoints_marker_has_lives_pixels (GPU pixels vs
-the user's live row). NEXT: the hover x selection matrix (live/psui/hover-matrix-1121, Part Studio edges/vertices/faces
-batch first): one test per cell, report cells matching / total at each land. Live answers to fold in after: Section
-view… IS listed above the rolled-back bar (rollmenu-move-1121: drop the at_bar exception + list matrix row); no
-plane-face height cut-off (front-cutoff-1121: nearest face along the ray; ours already).
+LANDED 4f2cb3ce 17:22 (point-only marker arrived along the edge; POINT_HOVER_ON_SELECTED #ffb32e).
+FINAL (live mid-paths + lead, 17:3x): EVERY approach lights only the midpoint ring (#f6c285 / #c49867 / #ffd8ac), edge
+black, from the first frame in the 9 px square; on a selected edge the #ffb32e dot. Band + dark marker only came from a
+single-event CDP jump: don't match it. live/psui/hover-matrix-1121/ps/mid-paths/, index "Midpoint approach paths".
+IN TREE, uncommitted (testing on the Mac, run-hm3.sh = full part-studio-ui lib + clippy part-studio-ui/render/scene):
+- behaviors.rs: update_hover snaps whenever the pointer is in the hovered (or armed) edge's midpoint window
+  (midpoint_hover_step(armed, on_edge, in_window)); REMOVED MIDPOINT_DWELL, midpoint_armed_at/_since,
+  midpoint_dwell_task, schedule_midpoint_dwell, midpoint_landed_edge (+ ui_hover_settling only hover_pending).
+- marker under the band (FEEL-MIDPOINT-MARKER-OVER-BAND): midpoint_overlay splits the black RING sprites (layer 22)
+  from a band piece (`midpoint_band_piece`: ±6 px of the hovered part edge, its own pick id, CORE|ON_TOP, so the
+  shader draws the real band) drawn after the points; other sprites after it. Renderer: Instance::over_lines on Lines
+  -> new list lines_over_points (after points), on Points -> points_over_lines (after those).
+- builder.rs vertex disc: live's 11 px see-through disc (alpha 184 + 190 RING rim), qa FEEL-VERTEX-HOVER-SELECT-LOOK.
+- hover_matrix_tests.rs (mod hover_matrix in sketch_ui_tests.rs): live's block + camera; `cells!` = one GPU test per
+  cell (vertex/edge/mid/face × hovered/selected/sel+hov/other-selected, mid arrived, on selected edge, 6 paths at
+  0/180/±90/45/135°) probing live's colours near the target; part_studio_hover_matrix_crops dumps PPMs
+  (NOSHAPE_HOVER_MATRIX_DUMP). Score: scp mac:noshape-host/agents/psui/hm1/*.ppm -> /root/psui-scratch/hm/oursN,
+  `python3 /root/psui-scratch/hm/compare.py <ours> /root/onshape-research/live/psui/hover-matrix-1121/ps <sxs>`
+  (per-target shift ≤3 px from the -none crop, 1 px neighbourhood, TOL 40, PASS 0.8). Pre-change run: 26/27
+  (pixel-exact 13/27); the miss was mid-selected-hovered (fixed: any approach snaps). qa's kit: /root/qa-scratch/hm2.
+- docs/parity/interaction-feel.md rows "Edge midpoint target", "…its look", new "A vertex hovered / selected".
+NEXT: land all of it (tell lead + qa the commit and matrix N/M); batch 2 (sketch, live index "Batch 2": point disc
+#fec788 / #feab11, sketch line band + midpoint marker outside sketch, none in sketch edit; region dot) as cells; then
+assembly / mate connector / origin / dialog field when live has them. Then: drop `at_bar` (Section view… above a
+rolled-back bar, live rollmenu-move-1121) + list matrix row; sketch-constraint-refusals (step 49) and
+sketch-entity-copy-paste (step 12) in full1 (vibex8 ~/agents/psui-keep/full1, 227/233).
+skasm 17:3x: reverted its crossing rule (fab3198d); trim takes back to VERTICAL; split-at-crossing awaits live 17:28.
 
 ### Earlier today
 

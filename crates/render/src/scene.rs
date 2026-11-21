@@ -317,7 +317,7 @@ pub struct Instance {
     /// translucent meshes and previews (picked sketch regions).
     pub over_transparent: bool,
     /// Translucent meshes drawn after the lines and points (color pass): a
-    /// drawing's release watermark lies over the ink.
+    /// drawing's release watermark lies over the ink. Lines: after the points, and points after those (a lit edge's band over its midpoint's ring, a fill over the band).
     pub over_lines: bool,
     /// A see-through part of the Translucent display mode: only its front faces blend over the image (Onshape culls
     /// the back faces).
@@ -483,7 +483,7 @@ impl Instance {
         self.over_transparent = true;
         self
     }
-    /// Draw a translucent mesh after the lines and points ([`Instance::over_lines`]).
+    /// Draw a translucent mesh after the lines and points, lines after the points, points after those ([`Instance::over_lines`]).
     pub fn over_lines(mut self) -> Self {
         self.over_lines = true;
         self
