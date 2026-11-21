@@ -6487,9 +6487,18 @@ impl PartStudioView {
             });
             // Onshape's feature context menu (live capture order); commands act
             // on every selected feature when the clicked one is selected.
+            // A pick leaves nothing selected behind the menu, a dismissed sketch row's menu does (live rollback-menus 11-21:
+            // Sketch 1's menu after its own Roll to here has no Section view…).
             let item = |label: &str, f: ViewAction| {
                 let v = view.clone();
-                crate::os_menu::OsMenuItem::new(label.to_string()).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
+                crate::os_menu::OsMenuItem::new(label.to_string()).on_click(move |_, w, cx| {
+                    v.update(cx, |this, cx| {
+                        this.ui.list_menu = None;
+                        this.ui.menu_left = None;
+                        f(this, w, cx);
+                        this.refresh_scene(false, cx);
+                    })
+                })
             };
             // Live (ui-parity feature-row-rclick-other-selected): right-clicking a row outside the selection
             // keeps the selection and the menu acts on it and the row.

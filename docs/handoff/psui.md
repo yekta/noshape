@@ -36,7 +36,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (05:48 UTC 11-21)
+## Now (06:09 UTC 11-21)
+
+qa 06:0x: CUTLIST-WHEEL-SIDEWAYS verified. ROLLBACK-ABOVE-BAR-SECTION-VIEW fixed 06:09 (row-menu pick clears menu_left);
+part-studio-ui lib 363 ok on the Mac. e90fee1e (empty dialogs as std) queued 05:5x.
 
 8. NOW (lead 05:3x) a) Sketch tool coverage: every one of the 55 sketch tools has >= 1 uip scenario with a live take
    (coverage.py; per tool: /root/psui-scratch/sk/tools.json, union 169 in sk/names.txt; 18 tools have one). Missing:

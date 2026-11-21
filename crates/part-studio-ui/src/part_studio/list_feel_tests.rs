@@ -499,7 +499,7 @@ fn rows() -> Vec<Row> {
             let rows = l.menu(cx);
             expect((rows.iter().any(|r| r == "Unconfigure suppression"), rows.iter().any(|r| r == "Configure suppression")), (false, true), &format!("Extrude 2's rows {rows:?}"))
         } },
-        Row { id: "menu / rolled back under Sketch 1", live: "Sketch 1 › Roll to here: Sketch 1 keeps its full menu, Hide | Hide other sketches | Hide all sketches and Roll to end in place of Roll to here; every row below the bar: Rename | Add selection to folder… | Section view… (a sketch: Hide other sketches | Hide all sketches) | Suppress | Dynamic suppression | (Un)configure suppression | Roll to here | Roll to end | Delete (live rollback-menus 11-21; Add comment: cloud)", gap: false, check: |l, cx| {
+        Row { id: "menu / rolled back under Sketch 1", live: "Sketch 1 › Roll to here: Sketch 1 keeps its full menu (no Section view…), Hide | Hide other sketches | Hide all sketches and Roll to end in place of Roll to here; every row below the bar: Rename | Add selection to folder… | Section view… (a sketch: Hide other sketches | Hide all sketches) | Suppress | Dynamic suppression | (Un)configure suppression | Roll to here | Roll to end | Delete (live rollback-menus 11-21; Add comment: cloud)", gap: false, check: |l, cx| {
             l.view.update(cx, |v, cx| {
                 let fid = v.studio(cx).and_then(|s| s.features.iter().find(|f| f.name == "Extrude 2").map(|f| f.id)).expect("Extrude 2");
                 v.edit_config("configure", cx, |ps| {
@@ -508,8 +508,9 @@ fn rows() -> Vec<Row> {
                 });
             });
             l.right_click(cx, "feature:Sketch 1");
-            l.keys(cx, "escape");
-            l.view.update(cx, |v, cx| v.set_rollback(Some(1), cx));
+            let k = l.menu(cx).iter().position(|r| r == "Roll to here").expect("Roll to here");
+            l.keys(cx, &vec!["down"; k + 1].join(" "));
+            l.keys(cx, "enter");
             draw(cx, l.window);
             expect(l.rolled_to(cx).as_deref(), Some("Sketch 1"), "the bar under")?;
             let menu = |cx: &mut TestAppContext, row: &str| {
@@ -520,7 +521,9 @@ fn rows() -> Vec<Row> {
             };
             let sketch1 = menu(cx, "Sketch 1");
             let hides = sketch1.iter().position(|r| r == "Add selection to folder…").map(|k| sketch1[k + 1..].iter().take(3).cloned().collect::<Vec<_>>());
-            expect((hides, sketch1.iter().any(|r| r == "Roll to end"), sketch1.iter().any(|r| r == "Roll to here"), sketch1.iter().any(|r| r == "Edit…")), (Some(names(&["Hide", "Hide other sketches", "Hide all sketches"])), true, false, true), &format!("Sketch 1's rows {sketch1:?}"))?;
+            // qa ROLLBACK-ABOVE-BAR-SECTION-VIEW: no Section view… after its own Roll to here.
+            let flags = |r: &str| sketch1.iter().any(|x| x == r);
+            expect((hides, flags("Roll to end"), flags("Roll to here"), flags("Edit…"), flags("Section view…")), (Some(names(&["Hide", "Hide other sketches", "Hide all sketches"])), true, false, true, false), &format!("Sketch 1's rows {sketch1:?}"))?;
             let tail = |configure: &str| names(&["Suppress", "Dynamic suppression", configure, "Roll to here", "Roll to end", "Delete"]);
             let short = |middle: &[&str], configure: &str| names(&["Rename", "Add selection to folder…"]).into_iter().chain(names(middle)).chain(tail(configure)).collect::<Vec<_>>();
             expect(menu(cx, "Extrude 1"), short(&["Section view…"], "Configure suppression"), "Extrude 1")?;
