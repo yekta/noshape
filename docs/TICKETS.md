@@ -304,7 +304,7 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   eef639d7, spot round 2 rows 1-8)
 
 ## qa, 2026-11-19
-- [ ] (answered by live 11-20 19:0x, behaviours "TICKETS answers that waited on live2": the state before Shell 3 (green CLI on a copy) imported into live shells OK, Shell 3's two faces at 5 mm, so Shell 3 should succeed; bool told by live) P2 SHELL-AFTER-WELD-FILLET (bool, lead 11-19; qa 2026-11-19 12:38 UTC) qa's fuzz ticket document cli-shell-hang-pre
+- [x] verified (qa 11-21 03:2x, green 14d18cb74 CLI on vibe2, a copy of cli-shell-hang-pre: Shell 3 Ok (0.4.62: "Could not shell part with selections."), Part 2 47 -> 49 faces, Part 3 29 -> 141 faces; fixed by 93cb9b6c3; Shell 3 still 12.8 s in both, and Shell 5 after it now Errors "Could not shell part with selections." in 25.4 s (0.4.62: Warning, 1 missing selection, 0.3 s), live not captured past Shell 3) (answered by live 11-20 19:0x, behaviours "TICKETS answers that waited on live2": the state before Shell 3 (green CLI on a copy) imported into live shells OK, Shell 3's two faces at 5 mm, so Shell 3 should succeed; bool told by live) P2 SHELL-AFTER-WELD-FILLET (bool, lead 11-19; qa 2026-11-19 12:38 UTC) qa's fuzz ticket document cli-shell-hang-pre
   (vibex7 ~/qa/tickets/cli-shell-hang-pre.noshape): since blend 92c8595b0 its Fillet 1 builds (v0.4.60: "Failed to fillet
   selections."), and Shell 3 on the filleted part now fails with "Could not shell part with selections." (Shell 5 then
   "1 missing selection"). v0.4.60's Ok Shell 3 shelled the unfilleted part. Question: should Shell 3 succeed on the filleted
