@@ -119,6 +119,7 @@ pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Do
             return Ok(());
         }
     noshape_render::perf::milestone("opening document");
+    noshape_app_core::display_cache::prefetch(&path);
     // The store opens off the UI thread while the window already shows (live2 documentLoad's steps).
     let prefetched = take_prefetched(&path);
     let p = path.clone();

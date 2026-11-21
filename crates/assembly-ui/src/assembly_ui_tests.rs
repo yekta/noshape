@@ -504,6 +504,56 @@ fn a_cached_assembly_stands_in_until_the_real_one_lands(cx: &mut TestAppContext)
     assert_eq!(occs(&after), occs(&real), "the evaluated assembly is the cached one");
 }
 
+/// Lead 11-21 (fast open; no blocking work on the UI thread): an evaluation's scene is built off the UI thread
+/// (infento's took 0.6 s on it). When a result is applied the previous scene stays drawn, without its picks, until the
+/// new one is built; of two results in a row only the last one's scene is installed.
+#[gpui::test]
+fn an_evaluations_scene_is_built_off_the_ui_thread(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "scene-off-ui");
+    for _ in 0..600 {
+        if cx.update(|cx| view.read(cx).ui.real_result_in && view.read(cx).scene_task.is_none()) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        cx.run_until_parked();
+    }
+    assert!(cx.update(|cx| view.read(cx).ui.real_result_in && view.read(cx).scene_task.is_none()), "the assembly evaluated, its scene in");
+    let real = cx.update(|cx| view.read(cx).result.clone());
+    let sig = crate::assembly_scene::occurrence_signature(&real);
+    let fewer = std::sync::Arc::new({
+        let mut r = (*real).clone();
+        r.occurrences.truncate(2);
+        r
+    });
+    let pickable = cx.update(|cx| (0..256).find(|i| view.read(cx).pick(Some(*i)).is_some())).expect("a pickable occurrence");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.apply_result(fewer.clone(), w, cx);
+            assert!(v.scene_task.is_some(), "the new scene is built in the background, not in the call");
+            assert_eq!(v.built_key.as_ref().map(|k| k.0.clone()), Some(sig.clone()), "the previous scene stays meanwhile");
+            assert!(v.pick(Some(pickable)).is_none(), "without the previous scene's picks");
+            v.apply_result(real.clone(), w, cx);
+        })
+    })
+    .unwrap();
+    cx.run_until_parked();
+    let (pending, built) = cx.update(|cx| (view.read(cx).scene_task.is_some(), view.read(cx).built_key.as_ref().map(|k| k.0.clone())));
+    assert!(!pending, "the scene is in");
+    assert_eq!(built, Some(sig), "the last result's scene, not the one it replaced");
+    assert!(cx.update(|cx| view.read(cx).pick(Some(pickable)).is_some()), "its picks back");
+    // A display change while a background build holds the cache doesn't wait for it on the UI thread.
+    view.update(cx, |v, cx| {
+        let cache = v.cache.clone();
+        let held = cache.lock();
+        v.rebuild_scene(true, cx);
+        assert!(v.scene_task.is_some(), "queued behind the build holding the cache");
+        drop(held);
+    });
+    cx.run_until_parked();
+    assert!(cx.update(|cx| view.read(cx).scene_task.is_none() && view.read(cx).pick(Some(pickable)).is_some()), "then built");
+}
+
 
 fn draw(cx: &mut TestAppContext, window: AnyWindowHandle) {
     cx.update_window(window, |_, w, cx| w.draw(cx).clear(cx)).unwrap();
@@ -3489,7 +3539,7 @@ fn a_snap_mode_drag_draws_its_part_as_a_03_ghost(cx: &mut TestAppContext) {
             let source = face_connector(v, "Part 2 <1>", true, cx);
             v.snap_drag = Some(super::SnapDrag { top: pin, press: glam::DVec2::ZERO, started: true, sources: vec![source], source_ix: 0, target: None, start: Default::default(), grab: glam::DVec3::ZERO, normal: glam::DVec3::Z, off_parts: false });
             let opts = v.scene_options(cx);
-            let built = crate::assembly_scene::build(&v.result, &opts, &mut v.cache, v.gpu.uploader());
+            let built = crate::assembly_scene::build(&v.result, &opts, &mut v.cache.lock(), v.gpu.uploader());
             let alphas = |top: bool| -> Vec<f32> {
                 built.spans.iter().filter(|s| (s.top == pin) == top).flat_map(|s| built.scene.instances[s.start..s.end].iter().map(|i| i.color[3])).collect()
             };

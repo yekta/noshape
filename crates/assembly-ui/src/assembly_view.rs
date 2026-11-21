@@ -504,7 +504,11 @@ pub struct AssemblyView {
     built: Option<AsmBuilt>,
     /// What `built` was built from: its occurrences' signature and the options.
     built_key: Option<(Vec<u64>, AsmSceneOptions)>,
-    cache: AsmGpuCache,
+    cache: Arc<Mutex<AsmGpuCache>>,
+    /// Bumped by every scene build: a background build that finishes after a newer one is dropped.
+    scene_seq: u64,
+    /// A scene being built off the UI thread (an evaluation's, the cached open's); `built` is the previous one.
+    scene_task: Option<Task<()>>,
     eval_seq: u64,
     eval_task: Option<Task<()>>,
     catalog: Catalog,
@@ -739,7 +743,9 @@ impl AssemblyView {
             result: Arc::new(AssemblyResult::default()),
             built: None,
             built_key: None,
-            cache: AsmGpuCache::default(),
+            cache: Default::default(),
+            scene_seq: 0,
+            scene_task: None,
             eval_seq: 0,
             eval_task: None,
             catalog: Catalog::default(),
@@ -1108,10 +1114,10 @@ impl AssemblyView {
         // built scene follows them (pins-assembly-1000: a rebuild was ~17 ms
         // on the UI thread).
         let same = self.built_key.as_ref().is_some_and(|(sig, opts)| *sig == assembly_scene::occurrence_signature(&self.result) && opts.same_display(&self.scene_options(cx)));
-        if same && self.built.as_mut().is_some_and(|b| assembly_scene::retransform(b, &self.result)) {
+        if same && self.scene_task.is_none() && self.built.as_mut().is_some_and(|b| assembly_scene::retransform(b, &self.result)) {
             self.refresh_scene(true, cx);
         } else {
-            self.rebuild_scene(true, cx);
+            self.rebuild_scene_in_background(cx);
         }
         if !self.fitted_once && let Some(bounds) = self.result.bounds() {
             self.fitted_once = true;
@@ -1194,7 +1200,39 @@ impl AssemblyView {
 
     fn rebuild_scene(&mut self, geometry_changed: bool, cx: &mut Context<Self>) {
         let opts = self.scene_options(cx);
-        let built = assembly_scene::build(&self.result, &opts, &mut self.cache, self.gpu.uploader());
+        // (Never waits on a background build holding the cache: it goes behind it instead.)
+        let Some(mut cache) = self.cache.try_lock() else { return self.rebuild_scene_in_background(cx) };
+        let built = assembly_scene::build(&self.result, &opts, &mut cache, self.gpu.uploader());
+        drop(cache);
+        self.scene_seq += 1;
+        self.scene_task = None;
+        self.install_scene(built, opts, geometry_changed, cx);
+    }
+
+    /// A new evaluation's scene, built off the UI thread (infento's took 0.6 s); the previous one stays drawn, without
+    /// picks, until it is in.
+    fn rebuild_scene_in_background(&mut self, cx: &mut Context<Self>) {
+        self.scene_seq += 1;
+        let seq = self.scene_seq;
+        let (result, opts, cache, up) = (self.result.clone(), self.scene_options(cx), self.cache.clone(), self.gpu.uploader().clone());
+        let build = cx.background_spawn(async move {
+            let built = assembly_scene::build(&result, &opts, &mut cache.lock(), &up);
+            (built, opts)
+        });
+        self.scene_task = Some(cx.spawn(async move |this, cx| {
+            let (built, opts) = build.await;
+            let _ = this.update(cx, |this: &mut Self, cx| {
+                if this.scene_seq != seq {
+                    return;
+                }
+                this.scene_task = None;
+                this.install_scene(built, opts, true, cx);
+                cx.notify();
+            });
+        }));
+    }
+
+    fn install_scene(&mut self, built: AsmBuilt, opts: AsmSceneOptions, geometry_changed: bool, cx: &mut Context<Self>) {
         self.built_key = Some((assembly_scene::occurrence_signature(&self.result), opts));
         let (prio, class) = (built.picks.priority_fn(), built.picks.class_fn());
         self.built = Some(built);
@@ -1211,7 +1249,7 @@ impl AssemblyView {
     /// placements (no rebuild of picks and instances; 1000 pins rebuilt
     /// every frame cost ~20 ms), or a rebuild when the occurrences changed.
     fn move_scene(&mut self, cx: &mut Context<Self>) {
-        let moved = self.built.as_mut().is_some_and(|b| assembly_scene::retransform(b, &self.result));
+        let moved = self.scene_task.is_none() && self.built.as_mut().is_some_and(|b| assembly_scene::retransform(b, &self.result));
         if moved {
             self.refresh_scene(true, cx);
         } else {
@@ -2916,11 +2954,12 @@ impl AssemblyView {
     // ------------------------------------------------------------ viewport events
 
     fn pick(&self, id: Option<u32>) -> Option<AsmPickTarget> {
-        id.and_then(|id| self.built.as_ref()?.picks.get(id).cloned())
+        // (Not from the previous scene while the new result's is built: its occurrences may be gone.)
+        id.filter(|_| self.scene_task.is_none()).and_then(|id| self.built.as_ref()?.picks.get(id).cloned())
     }
 
     fn overlay(&self, id: Option<u32>) -> Option<OverlayPick> {
-        id.and_then(|id| self.built.as_ref().and_then(|b| assembly_scene::overlay_pick(b, id)))
+        id.filter(|_| self.scene_task.is_none()).and_then(|id| self.built.as_ref().and_then(|b| assembly_scene::overlay_pick(b, id)))
     }
 
     /// What viewport clicks currently feed (a dialog's connector field, snap mode...).

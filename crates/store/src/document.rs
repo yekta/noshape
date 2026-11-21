@@ -1393,6 +1393,13 @@ impl Document {
             .optional()?)
     }
 
+    /// The metadata values whose keys start with `prefix`.
+    pub fn meta_with_prefix(&self, prefix: &str) -> Result<Vec<(String, Vec<u8>)>> {
+        let mut stmt = self.conn()?.prepare_cached("SELECT key, value FROM meta WHERE substr(key, 1, length(?1)) = ?1")?;
+        let rows = stmt.query_map([prefix], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
     /// Sets (or with `None`, removes) a raw metadata value. Metadata is not
     /// versioned.
     pub fn set_meta(&mut self, key: &str, value: Option<&[u8]>) -> Result<()> {

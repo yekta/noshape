@@ -10,7 +10,7 @@ use gpui_kit::*;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
@@ -118,10 +118,47 @@ fn path(dir: &Path, key: &str) -> PathBuf {
     dir.join(format!("{key}.display"))
 }
 
+/// A document's display rows by meta key, read when it was opened.
+type Rows = std::collections::HashMap<String, Vec<u8>>;
+
+fn prefetched() -> &'static parking_lot::Mutex<std::collections::HashMap<PathBuf, Arc<OnceLock<Rows>>>> {
+    static P: OnceLock<parking_lot::Mutex<std::collections::HashMap<PathBuf, Arc<OnceLock<Rows>>>>> = OnceLock::new();
+    P.get_or_init(Default::default)
+}
+
+/// Reads `doc`'s display rows on a thread of their own as the document opens, alongside its session and window (the
+/// open's first lookup then waits on this read instead of starting its own).
+pub fn prefetch(doc: &Path) {
+    if enabled() {
+        prefetch_rows(doc);
+    }
+}
+
+fn prefetch_rows(doc: &Path) {
+    if !doc.exists() {
+        return;
+    }
+    let cell = Arc::new(OnceLock::new());
+    prefetched().lock().insert(doc.to_path_buf(), cell.clone());
+    let path = doc.to_path_buf();
+    let read = move || {
+        let rows = noshape_store::Document::open_read_only(&path).and_then(|d| d.meta_with_prefix(META)).unwrap_or_default();
+        let _ = cell.set(rows.into_iter().collect());
+        noshape_render::perf::milestone("open: display rows read");
+    };
+    if std::thread::Builder::new().name("display-rows".into()).spawn(read).is_err() {
+        prefetched().lock().remove(doc);
+    }
+}
+
 /// A document's row of `key`: the key, a newline, then the snapshot.
 fn doc_row(doc: &Path, key: &str) -> Option<Vec<u8>> {
-    let d = noshape_store::Document::open_read_only(doc).ok()?;
-    let row = d.get_meta(&format!("{META}{}", tag(key))).ok()??;
+    let meta = format!("{META}{}", tag(key));
+    let early = prefetched().lock().get(doc).cloned();
+    let row = match early {
+        Some(cell) => cell.wait().get(&meta).cloned()?,
+        None => noshape_store::Document::open_read_only(doc).ok()?.get_meta(&meta).ok()??,
+    };
     let body = row.strip_prefix(key.as_bytes())?.strip_prefix(b"\n")?;
     Some(body.to_vec())
 }
@@ -152,6 +189,7 @@ pub fn store<T: Serialize>(shelf: &Shelf, key: &str, value: &T) -> std::io::Resu
     let mut bytes = MAGIC.to_vec();
     bytes.extend(zstd::encode_all(raw.as_slice(), 1)?);
     if let Some(doc) = &shelf.doc {
+        prefetched().lock().remove(doc);
         let mut row = Vec::with_capacity(key.len() + 1 + bytes.len());
         row.extend_from_slice(key.as_bytes());
         row.push(b'\n');
@@ -361,6 +399,14 @@ mod tests {
         assert_eq!(config2.split_once('.').unwrap().0, k.split_once('.').unwrap().0, "one row per tab");
         assert_ne!(config2, k);
         assert_eq!(load::<Vec<u32>>(&elsewhere, &config2), None);
+        // Read as the document opens: the same answers; a save drops the early read (its rows changed).
+        super::prefetch_rows(&file);
+        assert_eq!(load::<Vec<u32>>(&elsewhere, &k), Some(vec![7; 3]), "from the early read");
+        assert_eq!(load::<Vec<u32>>(&elsewhere, &config2), None);
+        store(&here, &config2, &vec![9u32]).unwrap();
+        assert!(!super::prefetched().lock().contains_key(&file), "a save drops the early read");
+        assert_eq!(load::<Vec<u32>>(&elsewhere, &config2), Some(vec![9]));
+        store(&here, &k, &vec![7u32; 3]).unwrap();
         // A miss after an edit.
         doc.tabs[0].name.push_str(" (renamed)");
         let edited = key_for(&doc, &("part studio", tab), &"config", &build).unwrap();

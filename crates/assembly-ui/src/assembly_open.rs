@@ -262,7 +262,9 @@ impl AssemblyView {
         let shelf = cache::Shelf::app(&self.doc.read(cx).session.path);
         let load = cx.background_spawn(async move {
             let key = key(&doc, tab, &asm, explode)?;
+            noshape_render::perf::milestone("open: display key");
             let snap: Snapshot = cache::load(&shelf, &key)?;
+            noshape_render::perf::milestone("open: display decoded");
             Some((key, snap.result()?))
         });
         self.ui.cache_task = Some(cx.spawn_in(window, async move |this, cx| {
