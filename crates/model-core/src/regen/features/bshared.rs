@@ -311,6 +311,30 @@ fn face_duplicates(f: &Shape, g: &Shape) -> bool {
     seen > 0
 }
 
+/// The surfaces `ids` sewn into solids where together they enclose a volume (std boolean.fs: a union of surfaces with
+/// makeSolid); the first keeps its id, name and colour.
+pub fn close_surfaces(ev: &mut EvalCtx, ids: &[BodyId]) -> FResult<()> {
+    let at: Vec<usize> = (0..ev.ctx.bodies.len()).filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Surface && ids.contains(&ev.ctx.bodies[i].id)).collect();
+    let Some(&pos) = at.first() else { return Ok(()) };
+    let shapes: Vec<Shape> = at.iter().map(|&i| ev.ctx.bodies[i].shape.clone()).collect();
+    let Ok(res) = k::sew_closing(&shapes, 1e-6) else { return Ok(()) };
+    if !encloses_all(&res.shape) {
+        return Ok(());
+    }
+    let args: Vec<ShapeNames> = at.iter().map(|&i| ev.ctx.bodies[i].shape_names()).collect();
+    let arg_refs: Vec<&ShapeNames> = args.iter().collect();
+    let names = ev.name_result(&arg_refs, &res.history, &res.shape, &BTreeMap::new(), None);
+    let first = ev.ctx.bodies[pos].clone();
+    let gone: Vec<BodyId> = at.iter().map(|&i| ev.ctx.bodies[i].id.clone()).collect();
+    ev.ctx.bodies.retain(|b| !gone.contains(&b.id));
+    for (j, p) in split_solids(&res.shape, &names, Some(ev.feature)).into_iter().enumerate() {
+        let (id, name) = if j == 0 { (first.id.clone(), first.name.clone()) } else { (BodyId { feature: ev.feature, index: 30_000 + j as u32 }, ev.ctx.alloc_part_name(BodyKind::Solid)) };
+        let at = (pos + j).min(ev.ctx.bodies.len());
+        ev.ctx.bodies.insert(at, Arc::new(Body::new(id, name, BodyKind::Solid, p.shape, p.names.faces, first.color, ev.feature)));
+    }
+    Ok(())
+}
+
 /// Whether a sew's result is solids enclosing volume, with every face in one.
 fn encloses_all(shape: &Shape) -> bool {
     let solids = shape.solids();
