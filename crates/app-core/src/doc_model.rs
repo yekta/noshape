@@ -108,6 +108,8 @@ pub struct NoticeLink {
     pub notice: String,
     pub label: SharedString,
     pub run: NoticeAction,
+    /// How long the info bubble stays when left alone.
+    pub stays: std::time::Duration,
 }
 
 impl DocModel {
@@ -120,15 +122,16 @@ impl DocModel {
         Self { session, studio_cache, assemblies, pending: PendingEdit::default(), pending_preview: false, client_step: None, window_snapshot: None, undo_held: false, comparing: false, notice_link: None }
     }
 
-    /// An info notice with a link after it ([`notice_bubble`] draws it in whichever view shows the notice).
-    pub fn info_with_link(&mut self, notice: String, label: &str, run: impl Fn(&mut Window, &mut App) + 'static, cx: &mut Context<Self>) {
-        self.notice_link = Some(NoticeLink { notice: notice.clone(), label: SharedString::from(label.to_string()), run: std::rc::Rc::new(run) });
+    /// An info notice with a link after it ([`notice_bubble`] draws it in whichever view shows the notice), gone after
+    /// `stays_secs`.
+    pub fn info_with_link(&mut self, notice: String, label: &str, stays_secs: u64, run: impl Fn(&mut Window, &mut App) + 'static, cx: &mut Context<Self>) {
+        self.notice_link = Some(NoticeLink { notice: notice.clone(), label: SharedString::from(label.to_string()), run: std::rc::Rc::new(run), stays: std::time::Duration::from_secs(stays_secs) });
         cx.emit(DocEvent::Info(notice));
     }
 
     /// An error notice (red, stays until ×) with a link after it.
     pub fn error_with_link(&mut self, notice: String, label: &str, run: impl Fn(&mut Window, &mut App) + 'static, cx: &mut Context<Self>) {
-        self.notice_link = Some(NoticeLink { notice: notice.clone(), label: SharedString::from(label.to_string()), run: std::rc::Rc::new(run) });
+        self.notice_link = Some(NoticeLink { notice: notice.clone(), label: SharedString::from(label.to_string()), run: std::rc::Rc::new(run), stays: std::time::Duration::MAX });
         cx.emit(DocEvent::Error(notice));
     }
 

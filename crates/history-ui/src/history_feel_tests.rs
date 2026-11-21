@@ -230,7 +230,7 @@ fn a_long_row_name_ends_at_the_name_column(cx: &mut TestAppContext) {
 }
 
 /// Live ws-1118: the default workspace's row has no Delete; the current non-default one's has, and deleting it lands
-/// viewing the version it was branched from, with "Deleted workspace B1." and its Restore link.
+/// viewing the version it was branched from, with "Deleted workspace B1." and its Restore link for ~30 s.
 #[gpui::test]
 fn deleting_the_workspace_you_are_in_lands_on_its_version(cx: &mut TestAppContext) {
     let (window, view, doc) = panel(cx, "delete-current");
@@ -261,10 +261,10 @@ fn deleting_the_workspace_you_are_in_lands_on_its_version(cx: &mut TestAppContex
     cx.run_until_parked();
     let (viewing, link) = cx.update(|cx| {
         let d = doc.read(cx);
-        (d.session.viewing_version(), d.notice_link("Deleted workspace B1.").map(|l| l.label.to_string()))
+        (d.session.viewing_version(), d.notice_link("Deleted workspace B1.").map(|l| (l.label.to_string(), l.stays.as_secs())))
     });
     assert_eq!(viewing.as_deref(), Some("V1"), "viewing V1");
-    assert_eq!(link.as_deref(), Some("Restore"));
+    assert_eq!(link, Some(("Restore".into(), 30)), "its Restore link, the bubble gone after 30 s (live: 30.8 s)");
 }
 
 /// Live ws-1118 b2: the Branch dialog refuses an empty name or one over 256 characters (its red line, Create off).

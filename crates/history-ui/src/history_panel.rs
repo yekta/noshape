@@ -579,7 +579,8 @@ impl HistoryPanel {
                 // Live ws-1118: "Deleted workspace B2. Restore" either way (the one you were in lands on its version).
                 let doc = self.doc.clone();
                 self.doc.update(cx, |d, cx| {
-                    d.info_with_link(format!("Deleted workspace {name}."), "Restore", move |_, cx| {
+                    // Live ws-1118: gone at 30.8 s.
+                    d.info_with_link(format!("Deleted workspace {name}."), "Restore", 30, move |_, cx| {
                         let r = doc.update(cx, |d, cx| -> anyhow::Result<()> {
                             d.session.store.restore_branch(b)?;
                             d.reloaded(cx);

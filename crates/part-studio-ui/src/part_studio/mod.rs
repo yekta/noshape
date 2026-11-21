@@ -6871,10 +6871,10 @@ impl PartStudioView {
             let dialogs = msg == NO_SKETCH_PLANE_BUBBLE || self.ui.dialog_info.as_ref() == Some(&msg);
             if st == FeatureStatus::Info && !dialogs && self.ui.message_timed.as_ref() != Some(&key) {
                 self.ui.message_timed = Some(key.clone());
-                // A notice with a link stays longer (live 2351: the Merge toast ≈ 35 s).
-                let secs = if self.doc.read(cx).notice_link(&msg).is_some() { 35 } else { 5 };
+                // A notice with a link stays as long as it says (live 2351: Merge ≈ 35 s; ws-1118: Deleted workspace ≈ 30 s).
+                let stays = self.doc.read(cx).notice_link(&msg).map_or(Duration::from_secs(5), |l| l.stays);
                 cx.spawn(async move |this, cx| {
-                    cx.background_executor().timer(Duration::from_secs(secs)).await;
+                    cx.background_executor().timer(stays).await;
                     let _ = this.update(cx, |this, cx| {
                         if this.message.as_ref() == Some(&key) {
                             this.message = None;

@@ -380,7 +380,7 @@ pub(crate) fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after
                 };
                 match failed {
                     true => doc.error_with_link(notice, "Open document", open, cx),
-                    false => doc.info_with_link(notice, "Open document", open, cx),
+                    false => doc.info_with_link(notice, "Open document", 35, open, cx),
                 }
             });
         });

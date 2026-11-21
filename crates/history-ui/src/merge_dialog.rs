@@ -701,7 +701,7 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
                     d.reloaded(cx);
                     // Live 2351: "Merged B1 into Main. Revert to before this merge", which restores at once.
                     if !out.up_to_date {
-                        d.info_with_link(format!("Merged {} into {}.", plan2.source, plan2.target), "Revert to before this merge", move |_, cx| revert(&revert_doc, before, cx), cx);
+                        d.info_with_link(format!("Merged {} into {}.", plan2.source, plan2.target), "Revert to before this merge", 35, move |_, cx| revert(&revert_doc, before, cx), cx);
                     }
                     Ok(())
                 });

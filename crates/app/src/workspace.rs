@@ -147,10 +147,10 @@ impl Workspace {
                 // An info bubble hides by itself after ≈4.4 s (live TOAST-AUTOHIDE); an error stays until ×.
                 if info {
                     let msg = msg.clone();
-                    // A notice with a link stays longer (live 2351: the Merge toast ≈ 35 s).
-                    let ms = if this.doc.read(cx).notice_link(&msg).is_some() { 35_000 } else { 4400 };
+                    // A notice with a link stays as long as it says (live 2351: Merge ≈ 35 s; ws-1118: Deleted workspace ≈ 30 s).
+                    let stays = this.doc.read(cx).notice_link(&msg).map_or(std::time::Duration::from_millis(4400), |l| l.stays);
                     cx.spawn(async move |this, cx| {
-                        cx.background_executor().timer(std::time::Duration::from_millis(ms)).await;
+                        cx.background_executor().timer(stays).await;
                         let _ = this.update(cx, |this, cx| {
                             if this.toast.as_ref().is_some_and(|(_, m)| *m == msg) {
                                 this.toast = None;
@@ -1366,7 +1366,7 @@ impl Workspace {
             if let Some((id, file)) = last.clone() {
                 doc.update(cx, |d, cx| {
                     let me = cx.entity().downgrade();
-                    d.info_with_link(format!("{file} has been imported."), "Open document", move |_, cx| {
+                    d.info_with_link(format!("{file} has been imported."), "Open document", 35, move |_, cx| {
                         let _ = me.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Ui(noshape_ops::UiRequest::ActivateTab(id))));
                     }, cx);
                 });
