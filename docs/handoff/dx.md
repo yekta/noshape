@@ -27,7 +27,9 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
   B-splines only (NurbsConvert, closed faces halved): housing's file reads back as the solid (was a sheet, area 1367 vs
   1630 mm2); queued f9fcc67e: a face of revolution over 180 degrees split too (ShapeDivideAngle pi):
   housing's file has live's 46 / 52 / 104 (144 / 142 / 102). Read back 39/91/54 (live's file 36/80/45): our merge
-  (boolean.cpp merge_same_surface_faces) re-merges fewer of our halves: next. Mac drawing 263, ops e2e 272, kernel 550 ok; housing suite ~/noshape-host/dx-keep/exs-igc (exx.sh).
+  (boolean.cpp merge_same_surface_faces) leaves 2 pairs: the full cone z 4-5 (halves at y=0 as
+  live's, recognized alike to 1e-9) and the cylinder r13 z 0-1.5; suspect the sew / pcurves of our halves, not the split
+  (probe: a kernel test printing read_iges_parts faces' face_surface / area; files /root/dx-scratch/igc). Mac drawing 263, ops e2e 272, kernel 550 ok; housing suite ~/noshape-host/dx-keep/exs-igc (exx.sh).
 - c2-impeller-loft on main 016c2ab0 (bool's fuse landed): 24 -> 27/48, first difference Fillet 3 (39/113/71 vs live
   34/95/62: SUITE-IMPELLER-FILLET3, core/blend); regenerates in 12.2 s, live 2.8 s (Fillet 3 3.1 s). hgr 52/52 on main.
 - Open exchange rows: DXF-POLY MTEXT vs live's LWPOLYLINE (textOption, REQUESTS), housing IGES
