@@ -1,19 +1,23 @@
 {
  "scenario": "drw-custom-table-insert",
- "recorded": "2026-11-08T05:33:09.471Z",
+ "recorded": "2026-11-21T20:24:32.532Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "e42989067f52a3914172e485",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "f9b18b5a3212f021e9cc90f2",
   "start": "block-drawing-table",
-  "startElement": "392bca590892e6ffb484a34b",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -41,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (2)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -51,6 +55,10 @@
     {
      "name": "Front",
      "kind": "base",
+     "position": [
+      81,
+      81
+     ],
      "parent": null,
      "scale": "1:1",
      "brokenOut": 0
@@ -58,6 +66,10 @@
     {
      "name": "Isometric",
      "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -65,6 +77,10 @@
     {
      "name": "Right",
      "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -72,13 +88,30 @@
     {
      "name": "Top",
      "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
     }
    ],
    "annotations": [],
-   "selection": []
+   "selection": [],
+   "viewport": {
+    "sheet_px": [
+     432,
+     110,
+     1526,
+     955
+    ],
+    "sheet_mm": [
+     279.4,
+     215.9
+    ],
+    "mmPerPixel": 0.25539
+   }
   }
  },
  "steps": [
@@ -106,12 +139,26 @@
      "text": [
       "Custom table",
       "Add",
-      "start block Copy 1",
       "Insert",
       "Order",
-      "Top to bottom",
-      "Bottom to top",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Use existing Part Studio",
+       "kind": "select",
+       "value": "start block Copy 6"
+      },
+      {
+       "label": "Use existing custom table",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
      ]
     },
     "dialogs": [],
@@ -134,7 +181,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -144,6 +191,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -151,6 +202,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -158,6 +213,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -165,16 +224,33 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 243551
+   "t": 232488
   },
   {
    "step": 2,
@@ -195,12 +271,26 @@
      "text": [
       "Custom table",
       "Add",
-      "start block Copy 1",
       "Insert",
       "Order",
-      "Top to bottom",
-      "Bottom to top",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Use existing Part Studio",
+       "kind": "select",
+       "value": "start block Copy 6"
+      },
+      {
+       "label": "Use existing custom table",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
      ]
     },
     "dialogs": [],
@@ -223,7 +313,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -233,6 +323,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -240,6 +334,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -247,6 +345,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -254,16 +356,33 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 258687
+   "t": 258313
   },
   {
    "step": 3,
@@ -275,8 +394,8 @@
    },
    "ok": true,
    "at": [
-    157,
-    150
+    145,
+    149
    ],
    "state": {
     "focus": {
@@ -289,216 +408,26 @@
      "text": [
       "Custom table",
       "Add",
-      "start block Copy 1",
       "Insert",
       "Order",
-      "Top to bottom",
-      "Bottom to top",
       "Select fixed corner"
-     ]
-    },
-    "dialogs": [],
-    "panels": [
-     {
-      "id": "_OSINSERTCUSTOMTABLE_BROWSE_TABLE",
-      "title": "Select a custom table",
-      "text": "Select a custom table",
-      "inputs": []
-     }
-    ],
-    "list": null,
-    "selection": {
-     "count": 0,
-     "items": []
-    },
-    "features": {
-     "rows": [],
-     "rollbackAfter": null
-    },
-    "parts": [],
-    "undo": {
-     "undo": false,
-     "redo": false
-    },
-    "message": null,
-    "tooltip": null,
-    "sketch": null,
-    "drawing": {
-     "tab": "Part 1 Drawing 1",
-     "sheet": "Sheet1",
-     "sheets": [
-      "Sheet1"
      ],
-     "tool": "Custom table",
-     "views": [
+     "fields": [
       {
-       "name": "Front",
-       "kind": "base",
-       "parent": null,
-       "scale": "1:1",
-       "brokenOut": 0
+       "label": "Use existing Part Studio",
+       "kind": "select",
+       "value": "start block Copy 6"
       },
       {
-       "name": "Isometric",
-       "kind": "isometric",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
+       "label": "Use existing custom table",
+       "kind": "select",
+       "value": ""
       },
       {
-       "name": "Right",
-       "kind": "projected",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Top",
-       "kind": "projected",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
       }
-     ],
-     "annotations": [],
-     "selection": []
-    }
-   },
-   "t": 273239
-  },
-  {
-   "step": 4,
-   "do": {
-    "do": "click",
-    "on": {
-     "dropdown": "Select a custom table"
-    }
-   },
-   "ok": true,
-   "at": [
-    440,
-    129
-   ],
-   "state": {
-    "focus": {
-     "kind": "field",
-     "tag": "div",
-     "label": null
-    },
-    "dialog": {
-     "kind": "drawing-panel",
-     "title": "Custom table",
-     "text": [
-      "Custom table",
-      "Add",
-      "start block Copy 1",
-      "Insert",
-      "Order",
-      "Top to bottom",
-      "Bottom to top",
-      "Select fixed corner"
-     ]
-    },
-    "dialogs": [],
-    "panels": [
-     {
-      "id": "_OSINSERTCUSTOMTABLE_BROWSE_TABLE",
-      "title": "Select a custom table",
-      "text": "Select a custom table / Fs / FS sizes / My custom tables / Fs / FS sizes / Workspace custom tables / Pf / Part faces / Done",
-      "inputs": []
-     }
-    ],
-    "list": null,
-    "selection": {
-     "count": 0,
-     "items": []
-    },
-    "features": {
-     "rows": [],
-     "rollbackAfter": null
-    },
-    "parts": [],
-    "undo": {
-     "undo": false,
-     "redo": false
-    },
-    "message": null,
-    "tooltip": null,
-    "sketch": null,
-    "drawing": {
-     "tab": "Part 1 Drawing 1",
-     "sheet": "Sheet1",
-     "sheets": [
-      "Sheet1"
-     ],
-     "tool": "Custom table",
-     "views": [
-      {
-       "name": "Front",
-       "kind": "base",
-       "parent": null,
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Isometric",
-       "kind": "isometric",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Right",
-       "kind": "projected",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Top",
-       "kind": "projected",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      }
-     ],
-     "annotations": [],
-     "selection": []
-    }
-   },
-   "t": 288024
-  },
-  {
-   "step": 5,
-   "do": {
-    "do": "click",
-    "on": {
-     "list_row": "Part faces"
-    }
-   },
-   "ok": true,
-   "at": [
-    450,
-    241
-   ],
-   "state": {
-    "focus": {
-     "kind": "field",
-     "tag": "div",
-     "label": null
-    },
-    "dialog": {
-     "kind": "drawing-panel",
-     "title": "Custom table",
-     "text": [
-      "Custom table",
-      "Add",
-      "start block Copy 1",
-      "Insert",
-      "Order",
-      "Top to bottom",
-      "Bottom to top",
-      "Select fixed corner"
      ]
     },
     "dialogs": [],
@@ -528,7 +457,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -538,6 +467,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -545,6 +478,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -552,6 +489,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -559,16 +500,330 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       282,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.2246
+     }
     }
    },
-   "t": 302906
+   "t": 284675
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Select a custom table"
+    }
+   },
+   "ok": true,
+   "at": [
+    440,
+    129
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": null
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Custom table",
+     "text": [
+      "Custom table",
+      "Add",
+      "Insert",
+      "Order",
+      "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Use existing Part Studio",
+       "kind": "select",
+       "value": "start block Copy 6"
+      },
+      {
+       "label": "Use existing custom table",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "_OSINSERTCUSTOMTABLE_BROWSE_TABLE",
+      "title": "Select a custom table",
+      "text": "Select a custom table / Pf / Part faces / Workspace custom tables / Pf / Part faces / Done",
+      "inputs": []
+     }
+    ],
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "Part faces"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1 (2)",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Custom table",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       282,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.2246
+     }
+    }
+   },
+   "t": 311187
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "list_row": "Part faces"
+    }
+   },
+   "ok": true,
+   "at": [
+    450,
+    185
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": null
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Custom table",
+     "text": [
+      "Custom table",
+      "Add",
+      "Insert",
+      "Order",
+      "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Use existing Part Studio",
+       "kind": "select",
+       "value": "start block Copy 6"
+      },
+      {
+       "label": "Use existing custom table",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "_OSINSERTCUSTOMTABLE_BROWSE_TABLE",
+      "title": "Select a custom table",
+      "text": "Select a custom table / Pf / Part faces / Done",
+      "inputs": []
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1 (2)",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Custom table",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       282,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.2246
+     }
+    }
+   },
+   "t": 338268
   },
   {
    "step": 6,
@@ -594,13 +849,26 @@
      "text": [
       "Custom table",
       "Add",
-      "start block Copy 1",
       "Insert",
-      "Part faces",
       "Order",
-      "Top to bottom",
-      "Bottom to top",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Use existing Part Studio",
+       "kind": "select",
+       "value": "start block Copy 6"
+      },
+      {
+       "label": "Use existing custom table",
+       "kind": "select",
+       "value": "Part faces"
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
      ]
     },
     "dialogs": [],
@@ -623,7 +891,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -633,6 +901,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -640,6 +912,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -647,6 +923,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -654,16 +934,33 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 318703
+   "t": 363940
   },
   {
    "step": 7,
@@ -684,13 +981,26 @@
      "text": [
       "Custom table",
       "Add",
-      "start block Copy 1",
       "Insert",
-      "Part faces",
       "Order",
-      "Top to bottom",
-      "Bottom to top",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Use existing Part Studio",
+       "kind": "select",
+       "value": "start block Copy 6"
+      },
+      {
+       "label": "Use existing custom table",
+       "kind": "select",
+       "value": "Part faces"
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
      ]
     },
     "dialogs": [],
@@ -713,7 +1023,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -723,6 +1033,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -730,6 +1044,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -737,6 +1055,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -744,16 +1066,33 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 333702
+   "t": 391454
   },
   {
    "step": 8,
@@ -797,7 +1136,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -807,6 +1146,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -814,6 +1157,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -821,6 +1168,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -828,16 +1179,47 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
       }
      ],
-     "annotations": [],
-     "selection": []
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "{Part} {Faces} {Part 1} {6}",
+       "position": [
+        124.4,
+        143
+       ]
+      }
+     ],
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Top"
+      }
+     ],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 351146
+   "t": 419021
   },
   {
    "step": 9,
@@ -880,7 +1262,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -890,6 +1272,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -897,6 +1283,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -904,6 +1294,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -911,16 +1305,47 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
       }
      ],
-     "annotations": [],
-     "selection": []
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "{Part} {Faces} {Part 1} {6}",
+       "position": [
+        124.4,
+        143
+       ]
+      }
+     ],
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Top"
+      }
+     ],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 367144
+   "t": 445862
   }
  ]
 }
