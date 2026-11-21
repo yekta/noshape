@@ -36,10 +36,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (10:53 UTC 11-21)
+## Now (11:01 UTC 11-21)
 
 LANDED 4553fc38 10:28 (sk batch + empty-feature errors + Routing curve buttons), 0cd43606 10:52 (Construction readout),
-70ab4b581 10:53 (dialog table, docs). Reported to lead 10:53 (decision needed: Variable conversionFactor 0 vs 1).
+70ab4b581 10:53 (dialog table, docs). QUEUED 17848cd1 11:01: Variable conversionFactor default 0 as live (lead decision;
+std variable.fs reads it only with useConversionFactor; custom_features::variable_from_import test both ways).
 Running: sk12c rerun of the 21 takes on vibex8 (psui-shards.sh -> ~/agents/psui-keep/sk12c).
 
 sk-1 + sk-2 (21 takes, in tests/ui-parity with f90a1ef9). Rerun sk12b (vibex8, copy /root/psui-scratch/sk/sk12b):
@@ -49,8 +50,7 @@ middle cuts at the midpoint + MIDPOINT of its ends (live geo-list6); an ellipse 
 DIMENSION_FAILED (dim-ellipse-axes); tests in scene sketch_mode + sketch_ui_tests. Open: transform-drag-copy (live's
 arrow drag leaves the box focused "9.9 mm"; ours no focus: arrow hit in iso view?), circle-rims step 22 (our click on
 circle 1's rim at (-5, 0) picks nothing), split-at-crossing step 11 (live PERPENDICULAR: the line crosses the
-held line at its midpoint; crates/sketch square_at_mid, sent to skasm 10:1x), circle-centres "Construction" tool readout while a construction point is picked,
-cparc end off-circle (REQUESTS 08:40). Shots of 3 takes: vibex8 ~/agents/psui-keep/bin/shots.sh (frames every 0.4 s)
+held line at its midpoint; crates/sketch square_at_mid, sent to skasm 10:1x), cparc end off-circle (REQUESTS 08:40). Shots of 3 takes: vibex8 ~/agents/psui-keep/bin/shots.sh (frames every 0.4 s)
 -> ~/agents/psui-keep/shots (waiting on slot).
 
 qa P1 FEEL-ROW-DBLCLICK-DISTANCE: closed by qa (xev-measured gaps on vibe2: 80 px opens to ~380 ms, not ~420, as one spot).
@@ -67,7 +67,7 @@ host builtin) -> core with the suite gate. Hole V2 diameter is in 3112 too (lega
    them (psui-shards.sh on vibex8), fix the differences, most-used first. skasm: tell before a crates/sketch or
    sketch_mode fix.
    b) Feature dialog audit DONE 10:46: docs/parity/feature-dialogs.md regenerated on green 4553fc38a against live's
-   dlg-1121 specs (std 3132) and empty errors: 80/86 specs, 85/87 errors; the rest explained there (Hole = std skew).
+   dlg-1121 specs (std 3132) and empty errors: 81/86 specs, 85/87 errors; the rest explained there (Hole = std skew).
    Scripts /root/psui-scratch/dlg/ (specdiff.py, empty_errors.py, gen_table.py). Open: Variable conversionFactor.
 
 
