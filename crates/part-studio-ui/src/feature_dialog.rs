@@ -2887,34 +2887,51 @@ impl FeatureDialog {
                     })
                     .into_any_element()
             }
-            // std `isButton` (Routing curve's Process, Reset triad): a button
-            // like an array's Add; a click runs the editing logic with it.
+            // std `isButton` (Routing curve's Process, Reset triad): a click runs the editing logic with it. Live
+            // routing-btns-1121: 29 px high, 3 px margins, radius 5.25, 14 px #666 on white, #aaa border; two
+            // DISPLAY_SHORT ones (Previous / Next) share the row, 6 px apart.
             ParamKind::Bool { .. } if s.hints.has(Hints::BUTTON) => {
                 let pal = crate::theme::p();
-                let id = s.id.to_string();
-                div()
-                    .id(SharedString::from(format!("btn-{path}")))
-                    .w_full()
-                    .h(px(30.))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .rounded(px(3.))
-                    .border_1()
-                    .border_color(gpui_kit::rgb(0xaaaaaa))
-                    .bg(pal.panel)
-                    .hover(|d| d.bg(pal.panel_hover))
-                    .cursor_pointer()
-                    .text_size(px(14.))
-                    .text_color(pal.text)
-                    .child(crate::ui::spec_text(s.label))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        this.clicked_button = Some(id.clone());
-                        this.dirty = true;
-                        cx.emit(DialogEvent::Changed);
-                        cx.notify();
-                    }))
-                    .into_any_element()
+                let button = |spec: &'static ParamSpec, path: String, cx: &mut Context<Self>| {
+                    let id = spec.id.to_string();
+                    let sel = format!("btn-{path}");
+                    div()
+                        .id(SharedString::from(sel.clone()))
+                        .debug_selector(move || sel)
+                        .flex_1()
+                        .h(px(29.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded(px(5.25))
+                        .border_1()
+                        .border_color(gpui_kit::rgb(0xaaaaaa))
+                        .bg(pal.panel)
+                        .hover(|d| d.bg(pal.panel_hover))
+                        .cursor_pointer()
+                        .text_size(px(14.))
+                        .text_color(pal.text_muted)
+                        .child(crate::ui::spec_text(spec.label))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            if let Some(step) = [("previousPoint", -1), ("nextPoint", 1)].iter().find(|b| b.0 == id).map(|b| b.1) {
+                                this.step_routing_point(step, cx);
+                                return;
+                            }
+                            this.clicked_button = Some(id.clone());
+                            this.dirty = true;
+                            cx.emit(DialogEvent::Changed);
+                            cx.notify();
+                        }))
+                };
+                let second = companion.filter(|c| c.hints.has(Hints::BUTTON)).map(|c| {
+                    let cpath = match prefix {
+                        None => c.id.to_string(),
+                        Some((arr, idx)) => item_path(arr, idx, c.id),
+                    };
+                    button(c, cpath, cx)
+                });
+                let first = button(s, path.to_string(), cx);
+                h_flex().w_full().px(px(1.)).py(px(3.)).gap(px(6.)).child(first).children(second).into_any_element()
             }
             ParamKind::Bool { .. } if s.hints.has(Hints::GROUP_LABEL) => {
                 // A plain collapsible group title (live variable.fs "Axis
@@ -4424,6 +4441,17 @@ fn param_icon(feature: &str, param: &str) -> Option<&'static str> {
 impl FeatureDialog {
     /// The items of an array's box that show: all, except Routing curve's Single mode, only the active point
     /// (live 1722; a click on a point in the graphics switches it).
+    /// Routing curve's Previous / Next (std 3132 `previousPoint` / `nextPoint`): the active point steps, wrapping round.
+    fn step_routing_point(&mut self, step: i64, cx: &mut Context<Self>) {
+        let count = self.feature.params.array("points").len() as i64;
+        if count == 0 {
+            return;
+        }
+        let at = self.feature.params.expr("pointIndex").and_then(|x| x.cached.map(|q| q.value).or_else(|| x.text.trim().parse().ok())).map_or(0, |v| v.max(0.0) as i64);
+        let next = (at + step).rem_euclid(count);
+        self.set_value("pointIndex", ParamValue::Expr(noshape_units::ExprValue::new(next.to_string())), cx);
+    }
+
     pub(crate) fn shown_items(&self, arr: &str, items: usize) -> Vec<usize> {
         if self.feature.type_id == "routingCurve" && arr == "points" && self.feature.params.is("pointsEditType", "SINGLE") {
             if items == 0 {

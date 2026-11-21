@@ -1236,6 +1236,56 @@ fn a_routing_curves_multiple_triad_moves_the_selected_points(cx: &mut TestAppCon
     assert_eq!(cx.update(|cx| view.read(cx).routing_selected(cx)), vec![2], "point 1 deselected");
 }
 
+/// std 3132 routingCurve.fs: Single mode's Previous / Next, side by side under Point edit type, step the active
+/// point and wrap round (pointIndex (i ± 1 + n) % n); the points box shows the new one.
+#[gpui::test]
+fn a_routing_curves_previous_and_next_step_the_active_point(cx: &mut TestAppContext) {
+    use noshape_model::params::{ParamValue, ParamValues};
+    let (window, view) = block(cx, "dlg-routing-next");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("routingCurve", w, cx))).unwrap();
+    draw(cx, window);
+    let item = || {
+        let mut it = ParamValues::default();
+        it.set("referenceType", ParamValue::Enum("ORIGIN".into()));
+        it
+    };
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Routing curve dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| d.set_value("points", ParamValue::Array(vec![item(), item(), item()]), cx)));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    // std's logic makes the last point added the active one; live's take starts on Point 0.
+    cx.update(|cx| dialog.update(cx, |d, cx| d.set_value("pointIndex", ParamValue::Expr(noshape_units::ExprValue::new("0".to_string())), cx)));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let at = |cx: &mut TestAppContext, sel: &'static str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(sel).unwrap_or_else(|| panic!("no {sel}"));
+    // Live routing-btns-1121 (dialog 220 px at x 246): Previous at 249 and Next at 359, each 104 x 29.
+    let (prev, next) = (at(cx, "btn-previousPoint"), at(cx, "btn-nextPoint"));
+    let dlg = at(cx, "feature-dialog");
+    let geom = |b: Bounds<gpui_kit::Pixels>| (f32::from(b.origin.x - dlg.origin.x).round(), f32::from(b.size.width).round(), f32::from(b.size.height).round());
+    assert!(prev.origin.y == next.origin.y, "one row: {prev:?} {next:?}");
+    assert_eq!((geom(prev), geom(next)), ((3., 104., 29.), (113., 104., 29.)), "live's x / width / height in a 220 px dialog (width {:?})", dlg.size.width);
+    let active = |cx: &mut TestAppContext| cx.update(|cx| dialog.read(cx).shown_items("points", 3));
+    assert_eq!(active(cx), vec![0], "the first point to start");
+    let mut steps = Vec::new();
+    for sel in ["btn-nextPoint", "btn-nextPoint", "btn-nextPoint", "btn-previousPoint"] {
+        let b = at(cx, sel);
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(b.center(), Modifiers::default());
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        draw(cx, window);
+        steps.push(active(cx)[0]);
+    }
+    assert_eq!(steps, vec![1, 2, 0, 2], "Next twice, Next wraps to the first, Previous wraps to the last");
+    // Segments' Orthogonal path shares the row the same way (std orthoPrevious / orthoNext).
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.set_value("step", ParamValue::Enum("SEGMENTS".into()), cx);
+        d.set_value("segmentEditType", ParamValue::Enum("ORTHOGONAL".into()), cx);
+    }));
+    draw(cx, window);
+    let (prev, next, confirm) = (at(cx, "btn-orthoPrevious"), at(cx, "btn-orthoNext"), at(cx, "btn-confirmOrthoPath"));
+    assert!(prev.origin.y == next.origin.y, "Orthogonal's Previous / Next on one row: {prev:?} {next:?}");
+    assert_eq!((geom(prev), geom(next), geom(confirm)), ((3., 104., 29.), (113., 104., 29.), (3., 214., 29.)), "live's Orthogonal path rows");
+    assert_eq!(f32::from(confirm.origin.y - prev.origin.y).round(), 35., "live: Confirm 35 px under Previous");
+}
+
 /// Live sel-feel (P0): a double-click on a part edge in the graphics selects it, then the second click deselects it;
 /// no chain or loop is added.
 #[gpui::test]

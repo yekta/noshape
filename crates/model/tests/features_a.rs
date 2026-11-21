@@ -1982,6 +1982,14 @@ fn empty_features_say_what_live_says() {
     }
 }
 
+/// Import's Unit list in std's `LengthUnitNames` order, Meter by default (live dlg-1121 featurespecs).
+#[test]
+fn import_units_in_std_order() {
+    let unit = noshape_model::features::get("importForeign").and_then(|t| t.param("unit")).expect("unit");
+    let noshape_model::params::ParamKind::Enum { options, default } = &unit.kind else { panic!("enum") };
+    assert_eq!((options.iter().map(|o| o.0).collect::<Vec<_>>(), *default), (vec!["Centimeter", "Foot", "Inch", "Millimeter", "Meter", "Yard"], "Meter"));
+}
+
 // ------------------------------------------------------------------ direct edit
 
 #[test]

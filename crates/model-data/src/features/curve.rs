@@ -344,11 +344,8 @@ pub fn edit_curve() -> FeatureType {
     FeatureType::new("editCurve", "Edit curve", Category::Curve, p).describe("Approximate, elevate, planarize or edit control points of a curve")
 }
 
-/// Routing curve's CSV units in std's order (routingCurve.fs `LengthUnitNames`).
-const CSV_UNIT_NAMES: &[(&str, &str)] = &[("Centimeter", "Centimeter"), ("Foot", "Foot"), ("Inch", "Inch"), ("Millimeter", "Millimeter"), ("Meter", "Meter"), ("Yard", "Yard")];
-
-pub const LENGTH_UNIT_NAMES: &[(&str, &str)] =
-    &[("Meter", "Meter"), ("Centimeter", "Centimeter"), ("Millimeter", "Millimeter"), ("Inch", "Inch"), ("Foot", "Foot"), ("Yard", "Yard")];
+/// Length units in std's order (routingCurve.fs and importForeign.fs `LengthUnitNames`; live dlg-1121).
+pub const LENGTH_UNIT_NAMES: &[(&str, &str)] = &[("Centimeter", "Centimeter"), ("Foot", "Foot"), ("Inch", "Inch"), ("Millimeter", "Millimeter"), ("Meter", "Meter"), ("Yard", "Yard")];
 
 pub fn routing_curve() -> FeatureType {
     let spline = |v: &ParamValues| v.is("curveType", "INTERPOLATED_SPLINE");
@@ -378,7 +375,7 @@ pub fn routing_curve() -> FeatureType {
         ParamSpec::num("samples", "Number of samples", NumSpec::integer(5, 2, 50)).hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CURVE")),
         ParamSpec::reference("inputData", "Table", crate::params::ReferenceKind::Csv).hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CSV")),
         ParamSpec::num("startColumn", "Data start column (0,1,2,.)", NumSpec::integer(0, 0, 100_000)).hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CSV")),
-        ParamSpec::enum_("csvUnit", "Unit", CSV_UNIT_NAMES).default_enum("Meter").hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CSV")),
+        ParamSpec::enum_("csvUnit", "Unit", LENGTH_UNIT_NAMES).default_enum("Meter").hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CSV")),
         ParamSpec::bool("overwritePoints", "Overwrite points", true).hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CURVE") || input(v, "CSV")),
         // std's buttons: a click runs its editing logic (`clickedButton`).
         ParamSpec::bool("processInputs", "Process", false).hints(Hints::BUTTON | Hints::UNCONFIGURABLE).visible(move |v| input(v, "CURVE") || input(v, "CSV")),
@@ -396,6 +393,9 @@ pub fn routing_curve() -> FeatureType {
         hidden(ParamSpec::num("multiDz", "Multi Z offset", ZERO_DEFAULT_LENGTH)),
         hidden(ParamSpec::text("multiRotationMatrix", "Multi rotation matrix", "")),
         hidden(ParamSpec::num("pointIndex", "Selected point", NumSpec::integer(0, 0, 10_000))),
+        // std 3132: Single mode's active point steps back / on, wrapping round.
+        ParamSpec::bool("previousPoint", "Previous", false).hints(Hints::BUTTON | Hints::UNCONFIGURABLE | Hints::DISPLAY_SHORT | Hints::FIRST_IN_ROW).visible(single),
+        ParamSpec::bool("nextPoint", "Next", false).hints(Hints::BUTTON | Hints::UNCONFIGURABLE | Hints::DISPLAY_SHORT).visible(single),
         // Item visibility below only sees the item's own values; the
         // polyline/spline-only fields are therefore always shown in items.
         ParamSpec::array(

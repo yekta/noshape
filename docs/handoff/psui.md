@@ -36,28 +36,35 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (06:24 UTC 11-21)
+## Now (07:29 UTC 11-21)
 
-Queued: e90fee1e + eb0508cd (empty dialogs as std; ROLLBACK-ABOVE-BAR-SECTION-VIEW, part-studio-ui lib 363 ok).
-qa 06:0x: CUTLIST-WHEEL-SIDEWAYS verified; ROLLBACK-ABOVE-BAR-SECTION-VIEW "to verify" after land.
+Queued: 724a4f2b (empty features as live dlg-1121) and the next commit: Import / CSV unit list in std's order (Meter
+kept as default); Routing curve Single mode's Previous / Next (std 3132; pointIndex stepped natively with wrap, no FS
+run, so it works on std 3112 too); a std button row's DISPLAY_SHORT companion is drawn (Orthogonal path's Next was
+never shown); buttons as live routing-btns-1121 (104 x 29, 6 px apart, 3 px in, radius 5.25, #666). Tests:
+features_a import_units_in_std_order, dialogs_feel a_routing_curves_previous_and_next_step_the_active_point.
+
+sk-1 + sk-2 (21 takes, live 07:21): scenarios from /root/live2-scratch/scen, recordings /root/parity/ui/live; set
+aside in /root/psui-scratch/sk/pending (+ live/) to copy into tests/ui-parity when landing fixes. Run on vibex8:
+~/agents/psui-keep/sk12 (names sk12-names.txt).
+
+std 3132 vs 3112 (reported to lead 06:5x): our crates/featurescript/std is exactly 3112; 14 files / 181 lines differ
+(live/std-3132, live/std-3132-vs-3112.diff, stddiff.py in psui-scratch/std). Geometry ones (SM pattern collapsed
+walls V3128, hole error tool axes on start plane, 7/8"-14 UNF tap drill 0.8125, thin extrude @setThinWallOneSided
+host builtin) -> core with the suite gate. Hole V2 diameter is in 3112 too (legacy V2 holes only): no gap.
 
 8. NOW (lead 05:3x) a) Sketch tool coverage: all 55 sketch tools have >= 1 uip take (coverage.py; per tool
    /root/psui-scratch/sk/tools.json, union 169 in sk/names.txt). The 169 on main (vibex8 06:2x): 169/169, 1946/1946
-   states. sk-1 (10 dimension kinds) asked 05:36: live 06:2x has 7 takes good, parallel-lines / circle-rims /
-   circle-centres miss a pick (live checking). sk-2 (10 second takes for the thin tools) asked 05:49, recording.
-   When they land in tests/ui-parity: run them (psui-shards.sh on vibex8), fix the differences, most-used first.
-   skasm: tell before a crates/sketch or sketch_mode fix.
+   states. sk-1 (10 dimension kinds): live has 7 takes good, parallel-lines / circle-rims / circle-centres miss a
+   pick (live checking). sk-2 (10 second takes for the thin tools) recording. When they land in tests/ui-parity: run
+   them (psui-shards.sh on vibex8), fix the differences, most-used first. skasm: tell before a crates/sketch or
+   sketch_mode fix.
    b) Feature dialog audit: docs/parity/feature-dialogs.md; scripts /root/psui-scratch/dlg/ (specdiff.py <bin> <out>
-   [<live specs>] reads both dump formats; empty_errors.py <bin> <out>; gen_table.py <specdiff> <ours-empty> [<live
-   empty-errors>]). Live dlg-1 06:2x: live/psui/dlg-1121/ (featurespecs std 3132, empty-errors.json, title tooltips
-   "<name> did not regenerate properly: <msg>", red #aa252d: ours equal). 76 / 86 empty errors matched; fixed (in tree,
-   Mac test running): Derived mirror "Failed to recreate derived objects." on partStudio, Name entity "Invalid input
-   selections." on entity, Recognize "Cannot resolve entities." on bodies, Import "Parasolid data import failed.",
-   faulty fields Variable name / Point "edge"; test features_a empty_features_say_what_live_says. Frame not a diff (ours
-   starts on 8020 1001 as live's UI; REST skips the library default). Spec 3132: Hole V2 diameter fields and Routing
-   curve previous/nextPoint are std 3132 additions (ours 3112); Import appearances / unit order, Recognize 25 mm
-   thickness / gap (hidden internal feature; kept), Variable conversionFactor 0, Jog / Tag order: to judge. After the
-   land: empty_errors.py with /root/green/noshape, gen_table.py with live's errors -> the table, land docs.
+   [<live specs>]; empty_errors.py <bin> <out>; gen_table.py <specdiff> <ours-empty> [<live empty-errors>]). Live
+   dlg-1: live/psui/dlg-1121/. All 10 empty-error diffs fixed (31161180 + 724a4f2b) or not diffs (Frame: REST skips
+   the library default; live UI = ours). Kept: Import appearances on (live UI), Recognize 25 mm (hidden). Jog / Tag
+   order: mutually exclusive fields, not visible. Variable conversionFactor: to judge. After 724a4f2b lands:
+   empty_errors.py with /root/green/noshape, gen_table.py with live's errors -> the table, land docs.
 
 
 3714e6ce FAILED 04:40 (row_keys test: the sketch under the bar now shown, not only drawn); fixed forward,
