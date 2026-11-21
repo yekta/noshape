@@ -1333,6 +1333,14 @@ fn fs_point(i: PointOut) -> @location(0) vec4<f32> {
         let k = select(0.3, 0.1, (i.style & 256u) != 0u) * clamp(rest - d + 0.5, 0.0, 1.0);
         rgb = srgb_to_linear(mix(linear_to_srgb(rgb), linear_to_srgb(i.base), k));
     }
+    // Style bit 512: a stroked ring, see-through inside 0.66 of the radius, its middle mixed 88 % toward white (bit
+    // 1024: 28 %) between rims of the colour (the move manipulator's centre, live hover-matrix-1121 as2).
+    if ((i.style & 512u) != 0u) {
+        let inner = 0.66 * i.rpx;
+        cov = cov * clamp(d - inner + 0.5, 0.0, 1.0);
+        let core = clamp(1.0 - abs(d - 0.5 * (inner + i.rpx)) / (0.75 * g.viewport.z), 0.0, 1.0);
+        rgb = mix(rgb, vec3<f32>(1.0), select(0.88, 0.28, (i.style & 1024u) != 0u) * core);
+    }
     // Style bit 16: a ring only, see-through inside (live midpoint markers:
     // a 9 px ring with a 1.75 px stroke, inner radius 0.6).
     if ((i.style & 16u) != 0u) { cov = cov * clamp(d - 0.61 * i.rpx + 0.5, 0.0, 1.0); }

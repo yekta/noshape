@@ -570,6 +570,9 @@ pub struct Highlights {
     /// rest (live asm/feel-1117 c-a-rowhover; the Part Studio's hovered part).
     pub hover_tops: Vec<noshape_model::assembly::InstanceId>,
     pub hover_entity: Option<(InstancePath, Reference)>,
+    /// A hovered vertex under a mate field's white corner mark: its disc depth-tested, the mark over its middle (live
+    /// hover-matrix-1121 b5-fastened-vertex).
+    pub hover_vertex_open: bool,
     pub selected_entities: Vec<(InstancePath, Reference)>,
     pub triads: Vec<Triad>,
     /// Inference dots (world positions).
@@ -600,10 +603,9 @@ pub struct Highlights {
     pub origin: Option<(f64, bool)>,
     /// The origin as a triad (picking it as a mate connector's origin); else the Part Studio's ring with a dot.
     pub origin_triad: bool,
-    /// Pickable assembly mate connector triads: (frame, size, highlighted).
-    /// Assembly mate connectors: frame, size, highlighted, opacity (the
-    /// connector dialog's preview slider fades the edited one).
-    pub connectors: Vec<(Frame, f64, bool, f32)>,
+    /// Pickable mate connectors (the assembly's, then its parts' own): frame, size, look, opacity (the connector
+    /// dialog's preview slider fades the edited one).
+    pub connectors: Vec<(Frame, f64, crate::builder::ConnectorLook, f32)>,
     /// Mate glyph lines (between connector origins).
     pub mate_lines: Vec<(DVec3, DVec3, bool)>,
     /// Pickable mate indicators: (connector frame, highlighted, state), drawn flat in the connector's XY plane like
@@ -1078,8 +1080,11 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
                 && let (Some(a), Some(o)) = (t.anchor, result.occurrences.get(t.occ))
             {
                 let w = o.transform.transform_point3(a);
-                let c = if flag == state::HOVER { hov } else { sel };
-                pts.points.push(PointSprite { position: w.as_vec3().into(), color: lin_to_u8(c), pick_id: 0, size: 8.0, style: LineSegment::ON_TOP, _pad: 0 });
+                // As the Part Studio's (qa FEEL-ASM-VERTEX-LOOK).
+                let disc = crate::builder::vertex_disc(w.as_vec3().into(), lin_to_u8(if flag == state::HOVER { hov } else { sel }));
+                // Under a mate field's corner mark: depth-tested, so the mark (nearer) covers its middle.
+                let under = flag == state::HOVER && h.hover_vertex_open;
+                pts.points.extend(disc.map(|p| PointSprite { style: if under { p.style & !LineSegment::ON_TOP } else { p.style }, ..p }));
             }
         }
     };
@@ -1245,6 +1250,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         const EDGE: [u8; 4] = [0x96, 0x9d, 0xa3, 255];
         const CORE: [u8; 4] = [0xf7, 0xf7, 0xf8, 255];
         const HOVER: [u8; 4] = [0x3e, 0x94, 0xff, 255];
+        const CENTER_HOVER: [u8; 4] = [0x60, 0x87, 0xbd, 255];
         const EXPLODE_CORE: [u8; 4] = [0xcd, 0xd0, 0xd3, 255];
         // While a handle is dragged the others fade to a faint grey (live manip-feel-1118 m9).
         const FAINT: u8 = 60;
@@ -1309,11 +1315,10 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         let cid = overlay_id(built, OverlayPick::Manip(ManipHandle::Center));
         let chl = *hovered == Some(ManipHandle::Center);
         let o: [f32; 3] = p3(f.origin);
-        let white = if h.manip_dragging { [255, 255, 255, FAINT] } else { [255, 255, 255, 255] };
-        op.points.push(PointSprite { position: o, color: if chl { HOVER } else { edge }, pick_id: cid, size: 17.0, style: LineSegment::ON_TOP, _pad: 0 });
-        op.points.push(PointSprite { position: o, color: core, pick_id: cid, size: 12.0, style: LineSegment::ON_TOP, _pad: 0 });
-        op.points.push(PointSprite { position: o, color: if chl { HOVER } else { edge }, pick_id: cid, size: 9.0, style: LineSegment::ON_TOP, _pad: 0 });
-        op.points.push(PointSprite { position: o, color: white, pick_id: cid, size: 7.0, style: LineSegment::ON_TOP, _pad: 0 });
+        // Live hover-matrix-1121 as2 (qa FEEL-ASM-MANIPULATOR-RING): a hollow ring, ~18 px, the pick showing through
+        // its ~12 px middle; hovered the same ring blue (#6087bd..#85a3d0).
+        let (color, style) = if chl { (CENTER_HOVER, PointSprite::STROKE_RING | PointSprite::SOFT_CORE) } else { (edge, PointSprite::STROKE_RING) };
+        op.points.push(PointSprite { position: o, color, pick_id: cid, size: 18.0, style: LineSegment::ON_TOP | style, _pad: 0 });
         scene.set_state(cid, 0);
     }
     if let Some((o, dir, size, rotation)) = h.step_arrow

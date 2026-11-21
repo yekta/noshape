@@ -19,7 +19,7 @@ use crate::os_menu::OsContextMenuExt as _;
 use crate::doc_model::{DocEvent, DocModel};
 use crate::gpu::Gpu;
 use crate::navigation::{self as nav, RotateDir};
-use crate::scene_builder::PickKind;
+use crate::scene_builder::{ConnectorLook, PickKind};
 use crate::theme::{p, with_alpha};
 use crate::viewport::{Viewport, ViewportEvent};
 use glam::{DVec2, DVec3};
@@ -240,6 +240,9 @@ mod ui_tests;
 #[cfg(test)]
 #[path = "assembly_feel_tests.rs"]
 mod feel_tests;
+#[cfg(test)]
+#[path = "assembly_hover_matrix_tests.rs"]
+mod hover_matrix_tests;
 pub use toolbar::{AsmToolbarPrefs, shortcut_catalog};
 pub use open::decode_cached_display_early;
 pub use standard_content::*;
@@ -469,6 +472,14 @@ pub fn explode_drag_round(v: f64, units: &noshape_units::UnitPrefs) -> f64 {
     (v / step).round() * step
 }
 
+/// A pickable mate connector drawn over the graphics: the assembly's own, or one of a part's Part Studio (its
+/// occurrence's path and the connector).
+#[derive(Clone)]
+enum OverlayConnector {
+    Assembly(MateId),
+    Part((noshape_model::assembly::eval::InstancePath, Reference)),
+}
+
 #[derive(Clone, Copy, PartialEq)]
 enum SidePanel {
     Bom,
@@ -523,7 +534,7 @@ pub struct AssemblyView {
     manip_hover: Option<ManipHandle>,
     hover_overlay: Option<OverlayPick>,
     /// Assembly connector ids in overlay pick order.
-    overlay_connectors: Vec<MateId>,
+    overlay_connectors: Vec<OverlayConnector>,
     overlay_sig: Vec<f64>,
     pointer: DVec2,
     /// Inference candidates (body coordinates) for the hovered entity, and the chosen index.
@@ -1366,7 +1377,9 @@ impl AssemblyView {
         // (Picking a mate connector shows its own hover look, below.) An instance on the pointer from Insert lights
         // nothing under it (live feel/mates insert-preview-follows-pointer.png), unless Snap mode looks for a face.
         let placing_free = (self.placing.is_some() && self.snap.is_none()) || self.ui.placed_at == Some(self.pointer);
-        if let Some(t) = self.hover.as_ref().filter(|_| !placing_free)
+        // Live (behaviours "feel (3D): assembly", FEEL-ASM-DRAG-LIT): nothing lit while an instance is dragged.
+        let dragging = self.drag.as_ref().is_some_and(|d| d.started && d.handle.is_none());
+        if let Some(t) = self.hover.as_ref().filter(|_| !placing_free && !dragging)
             && matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex)
             && self.pick_mode(cx) != Some(PickMode::Inference)
         {
@@ -1510,9 +1523,29 @@ impl AssemblyView {
                 {
                     let i = overlay_connectors.len();
                     let hl = hovered_overlay == Some(OverlayPick::Connector(i)) || editing_mc == Some(c.id) || self.selected_mate == Some(c.id);
-                    h.connectors.push((f, size * 0.9, hl, 1.0));
-                    overlay_connectors.push(c.id);
+                    h.connectors.push((f, size * 0.9, if hl { ConnectorLook::Hovered } else { ConnectorLook::Rest }, 1.0));
+                    overlay_connectors.push(OverlayConnector::Assembly(c.id));
                 }
+            }
+        }
+        // A part's own Part Studio mate connectors, on the part that owns them (live hover-matrix-1121 as2, qa
+        // FEEL-ASM-PS-MC-MISSING): hovered, the part outlined too; clicked, selected as its entity.
+        let mut seen = HashSet::new();
+        for o in &self.result.occurrences {
+            if o.hidden || !seen.insert(o.path.clone()) {
+                continue;
+            }
+            let t = noshape_model::assembly::eval::matrix_frame(&o.transform);
+            for c in o.context.connectors.iter().filter(|c| o.context.connector_owners.iter().any(|(r, b)| *r == c.reference && *b == o.body)) {
+                let i = overlay_connectors.len();
+                let key = (o.path.clone(), c.reference.clone());
+                let hl = hovered_overlay == Some(OverlayPick::Connector(i));
+                let look = if self.ui.entity_sel.contains(&key) { ConnectorLook::Selected } else if hl { ConnectorLook::Hovered } else { ConnectorLook::Rest };
+                if hl {
+                    h.hover_part = Some(o.path.clone());
+                }
+                h.connectors.push((t.mul(&Frame::from_axes(c.origin, c.z, c.x)), size * 0.9, look, 1.0));
+                overlay_connectors.push(OverlayConnector::Part(key));
             }
         }
         self.overlay_connectors = overlay_connectors;
@@ -1654,7 +1687,10 @@ impl AssemblyView {
                     crate::scene_builder::InferenceMark { origin: w.origin, x: w.x(), z: w.z(), corner }
                 })
                 .collect();
-            chosen = self.infer_choice;
+            // A vertex's own point: its white corner mark over the vertex's hover disc, no connector glyph (live
+            // hover-matrix-1121 b5-fastened-vertex, qa FEEL-ASM-MATE-VERTEX).
+            chosen = self.infer_choice.filter(|_| !matches!(entity, Reference::Vertex(_)));
+            h.hover_vertex_open = matches!(entity, Reference::Vertex(_));
         }
         // A dragged section base on geometry: the snapped entity in orange
         // and the mate-connector glyph at the point (live: unsnapped, the
@@ -1741,9 +1777,8 @@ impl AssemblyView {
             crate::scene_builder::ConnectorGlyphs::faded(first_pick.iter().map(|f| (f.origin, f.x(), f.z(), crate::scene_builder::ConnectorLook::Rest, 0)), FIRST_PICK_OPACITY) as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>
         });
         let connector_glyphs: Option<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = (!h.connectors.is_empty()).then(|| {
-            let items = h.connectors.iter().enumerate().map(|(i, (f, _, hl, _))| {
-                let look = if *hl { crate::scene_builder::ConnectorLook::Hovered } else { crate::scene_builder::ConnectorLook::Rest };
-                (f.origin, f.x(), f.z(), look, assembly_scene::overlay_id(built, OverlayPick::Connector(i)))
+            let items = h.connectors.iter().enumerate().map(|(i, (f, _, look, _))| {
+                (f.origin, f.x(), f.z(), *look, assembly_scene::overlay_id(built, OverlayPick::Connector(i)))
             });
             crate::scene_builder::ConnectorGlyphs::picked(items) as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>
         });
@@ -1774,6 +1809,11 @@ impl AssemblyView {
         // Zoom to fit: the visible instances (the scene's bounds lag a new
         // insert: qa5 A1 cropped the first part), clear of the dialog.
         let (fit_bounds, fit_inset) = (self.result.bounds(), if self.ui.left_open { 220.0 + 2.0 * 12.0 } else { 0.0 });
+        let camera_geometry: Vec<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = marks.into_iter().chain(connector_glyphs).chain(first_pick).chain(mate_glyphs).chain(screen_triads).collect();
+        #[cfg(test)]
+        {
+            self.ui.camera_geometry = camera_geometry.clone();
+        }
         self.viewport.update(cx, |vp, cx| {
             (vp.fit_bounds, vp.fit_inset_left) = (fit_bounds, fit_inset);
             vp.selection_count = count;
@@ -1782,7 +1822,7 @@ impl AssemblyView {
             } else {
                 snapping.then_some(crate::cursor::AppCursor::SnapMate)
             };
-            vp.set_camera_geometry(marks.into_iter().chain(connector_glyphs).chain(first_pick).chain(mate_glyphs).chain(screen_triads).collect(), cx);
+            vp.set_camera_geometry(camera_geometry, cx);
             vp.set_scene(Arc::new(scene), geometry_changed, cx)
         });
     }
@@ -3114,11 +3154,7 @@ impl AssemblyView {
     fn chosen_connector(&mut self, pick: Option<u32>, cx: &mut Context<Self>) -> Option<MateConnectorRef> {
         match self.overlay(pick) {
             Some(OverlayPick::Origin) => return Some(MateConnectorRef::origin()),
-            Some(OverlayPick::Connector(i)) => {
-                let id = *self.overlay_connectors.get(i)?;
-                let c = self.result.connectors.iter().find(|c| c.id == id)?;
-                return Some(MateConnectorRef::assembly_connector(c.id, c.owner));
-            }
+            Some(OverlayPick::Connector(i)) => return self.overlay_connector_ref(i),
             Some(OverlayPick::Manip(_)) | Some(OverlayPick::Mate(_)) | Some(OverlayPick::Section(_)) => return None,
             None => {}
         }
@@ -3301,12 +3337,47 @@ impl AssemblyView {
                     self.selected.clear();
                 }
             }
-            OverlayPick::Connector(i) => {
-                self.selected_mate = self.overlay_connectors.get(i).copied();
-                self.selected.clear();
-            }
+            OverlayPick::Connector(i) => match self.overlay_connectors.get(i).cloned() {
+                Some(OverlayConnector::Assembly(id)) => {
+                    self.selected_mate = Some(id);
+                    self.selected.clear();
+                }
+                // A part's connector: its entity, the move manipulator at its origin (live as2 mc-selected).
+                Some(OverlayConnector::Part((path, reference))) => {
+                    let Some(occ) = self.result.occurrences.iter().position(|o| o.path == path) else { return };
+                    let at = self.connector_world_origin(i);
+                    self.ui.entity_sel.clear();
+                    self.selected.clear();
+                    self.select_entity(AsmPickTarget { path, reference, kind: PickKind::Connector, occ, anchor: None }, false);
+                    if let (Some(at), [top]) = (at, &self.selected[..])
+                        && let Some(p) = self.result.solved.placement(*top)
+                    {
+                        self.triad = Some((vec![*top], placement_to_frame(&p).inverse().mul(&Frame::new(at, glam::DQuat::IDENTITY))));
+                    }
+                }
+                None => {}
+            },
             _ => {}
         }
+    }
+
+    /// The mate connector reference of the `i`th pickable connector.
+    pub(super) fn overlay_connector_ref(&self, i: usize) -> Option<MateConnectorRef> {
+        match self.overlay_connectors.get(i)? {
+            OverlayConnector::Assembly(id) => {
+                let c = self.result.connectors.iter().find(|c| c.id == *id)?;
+                Some(MateConnectorRef::assembly_connector(c.id, c.owner))
+            }
+            OverlayConnector::Part((path, reference)) => Some(MateConnectorRef::on(path[0], path[1..].to_vec(), reference.clone())),
+        }
+    }
+
+    /// Where the `i`th pickable part connector's origin is now (world).
+    fn connector_world_origin(&self, i: usize) -> Option<glam::DVec3> {
+        let OverlayConnector::Part((path, reference)) = self.overlay_connectors.get(i)? else { return None };
+        let o = self.result.occurrences.iter().find(|o| o.path == *path)?;
+        let c = o.context.connectors.iter().find(|c| c.reference == *reference)?;
+        Some(o.transform.transform_point3(c.origin))
     }
 
     fn on_viewport_event(&mut self, _: &Entity<Viewport>, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) {

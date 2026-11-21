@@ -320,6 +320,9 @@ pub struct AsmUi {
     pub placed_at: Option<glam::DVec2>,
     /// The drawn inference marks and their key (the viewport resends only a new one).
     pub inference_marks: Option<(Vec<u64>, std::sync::Arc<crate::scene_builder::InferenceMarks>)>,
+    /// The screen-size geometry last given to the viewport (a test's crop draws it).
+    #[cfg(test)]
+    pub camera_geometry: Vec<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>>,
     /// Make transparent (Shift+T): instances drawn transparent.
     pub transparent: Option<noshape_model::assembly::OccurrenceSet>,
     /// S shortcut toolbar position (viewport-local).

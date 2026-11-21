@@ -1512,13 +1512,8 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                         if flag == state::ERROR {
                             overlay_pts.points.push(PointSprite { position: p, color: lin_to_u8(sel_color), pick_id: 0, size: 8.0, style: LineSegment::ON_TOP, _pad: 0 });
                         } else {
-                            // Live hover-matrix-1121 (vertex-hovered, -selected): an 11 px disc of the hover / selection
-                            // colour, see-through (the edges meeting there show through it) inside an opaque rim.
                             let c = if flag == state::HOVER { hov_color } else { sel_color };
-                            let rgb = lin_to_u8(c);
-                            for (alpha, style) in [(184, 0), (190, PointSprite::RING)] {
-                                overlay_pts.points.push(PointSprite { position: p, color: [rgb[0], rgb[1], rgb[2], alpha], pick_id: 0, size: 11.0, style: LineSegment::ON_TOP | style, _pad: 0 });
-                            }
+                            overlay_pts.points.extend(vertex_disc(p, lin_to_u8(c)));
                         }
                     }
                 }
@@ -1768,6 +1763,13 @@ pub fn query_region(display: &StudioDisplay, r: &Reference, up: &Uploader) -> Op
     Some(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([k[0], k[1], k[2], 0.7]).unpickable().ignore_clip().layer(8).unlit().over_transparent())
 }
 
+/// A hovered or selected vertex (live hover-matrix-1121, vertex-hovered / -selected), in the Part Studio and the
+/// assembly alike: an 11 px disc of the colour, see-through (the edges meeting there show through it) inside an opaque
+/// rim.
+pub(crate) fn vertex_disc(position: [f32; 3], rgb: [u8; 4]) -> [PointSprite; 2] {
+    [(184, 0), (190, PointSprite::RING)].map(|(alpha, style)| PointSprite { position, color: [rgb[0], rgb[1], rgb[2], alpha], pick_id: 0, size: 11.0, style: LineSegment::ON_TOP | style, _pad: 0 })
+}
+
 /// Create selection's result faces (live part-studio/387): see-through
 /// yellow-green over the part, which leaves them out (`state::HIDDEN`), so
 /// what lies behind them shows (a hole's walls). Not pickable (the hidden
@@ -1985,7 +1987,7 @@ impl noshape_render::camera_geometry::CameraGeometry for ConnectorGlyphs {
                 ConnectorLook::Selected => MC_FILL_SELECTED,
             };
             let c = theme::lin(u32::from(rgb[0]) << 16 | u32::from(rgb[1]) << 8 | u32::from(rgb[2]));
-            out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([c[0], c[1], c[2], alpha * self.opacity]).unlit().unpickable().ignore_clip().on_top().layer(30));
+            out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([c[0], c[1], c[2], alpha * self.opacity]).unlit().unpickable().pick_through().ignore_clip().on_top().layer(30));
             if let Some(&pick) = self.picks.get(i).filter(|p| **p != 0) {
                 out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&pick_disc(o, x, y, z, ro, pick)))).pick_only().ignore_clip().on_top().layer(30));
             }
@@ -2148,7 +2150,7 @@ impl noshape_render::camera_geometry::CameraGeometry for InferenceMarks {
         m.normals = vec![[0.0, 0.0, 1.0]; n];
         m.pick_ids = vec![0; n];
         let white = theme::lin(0xfdfdfd);
-        out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([white[0], white[1], white[2], 1.0]).unlit().unpickable().ignore_clip().layer(22));
+        out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([white[0], white[1], white[2], 1.0]).unlit().unpickable().pick_through().ignore_clip().layer(22));
         out.push(Instance::new(Drawable::Lines(up.upload_lines(&rim))).per_primitive_color().unpickable().ignore_clip().layer(22));
         out
     }

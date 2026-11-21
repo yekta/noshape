@@ -4051,11 +4051,7 @@ impl AssemblyView {
     pub(super) fn connector_from_hover(&mut self, cx: &mut Context<Self>) -> Option<MateConnectorRef> {
         match self.hover_overlay {
             Some(OverlayPick::Origin) => return Some(MateConnectorRef::origin()),
-            Some(OverlayPick::Connector(i)) => {
-                let id = *self.overlay_connectors.get(i)?;
-                let c = self.result.connectors.iter().find(|c| c.id == id)?;
-                return Some(MateConnectorRef::assembly_connector(c.id, c.owner));
-            }
+            Some(OverlayPick::Connector(i)) => return self.overlay_connector_ref(i),
             _ => {}
         }
         let target = self.hover.clone()?;

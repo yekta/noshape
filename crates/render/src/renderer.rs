@@ -1166,7 +1166,7 @@ impl DrawLists {
             if pick {
                 // Images are never picked (their box lines are) and don't
                 // occlude picks either.
-                if matches!(inst.drawable, Drawable::Image(_)) || (!inst.pickable && !matches!(inst.drawable, Drawable::Mesh(_))) {
+                if matches!(inst.drawable, Drawable::Image(_)) || inst.pick_through || (!inst.pickable && !matches!(inst.drawable, Drawable::Mesh(_))) {
                     continue;
                 }
             } else if inst.pick_only {

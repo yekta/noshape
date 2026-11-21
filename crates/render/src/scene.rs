@@ -194,6 +194,11 @@ impl PointSprite {
     pub const SKETCH_POINT: u32 = 128;
     /// With [`Self::SKETCH_POINT`]: a centre, its colour 10 % through.
     pub const CENTER: u32 = 256;
+    /// A stroked ring (the move manipulator's centre, live hover-matrix-1121 as2: ~18 px, see-through inside ~12 px):
+    /// rims of the colour, its middle white.
+    pub const STROKE_RING: u32 = 512;
+    /// With [`Self::STROKE_RING`]: the middle only lighter than the rims (hovered: blue throughout).
+    pub const SOFT_CORE: u32 = 1024;
 }
 
 /// The axis-aligned bounds of `it` (`None` when empty).
@@ -332,6 +337,9 @@ pub struct Instance {
     /// Only rendered into the pick buffer (invisible but selectable), e.g.
     /// B-rep vertices and sketch regions; highlights are drawn separately.
     pub pick_only: bool,
+    /// Left out of the pick pass: an overlay that never hides a pick under it (the mate inference dots and the
+    /// chosen connector's glyph over a vertex).
+    pub pick_through: bool,
     /// Picked like a see-through mesh: drawn first in the pick pass and
     /// without depth writes, so what lies behind it wins (a datum plane's
     /// border, as its fill: seen edge-on its near side would hide the
@@ -453,6 +461,7 @@ impl Instance {
             closed: false,
             on_top: false,
             pick_only: false,
+            pick_through: false,
             pick_behind: false,
             pick_solid: false,
             pick_base: 0,
@@ -532,6 +541,11 @@ impl Instance {
     }
     pub fn pick_only(mut self) -> Self {
         self.pick_only = true;
+        self
+    }
+    /// See [`Instance::pick_through`].
+    pub fn pick_through(mut self) -> Self {
+        self.pick_through = true;
         self
     }
     /// See [`Instance::pick_behind`].
@@ -1056,6 +1070,7 @@ impl Scene {
                     && a.outline_through == b.outline_through
                     && a.layer == b.layer
                     && a.pick_only == b.pick_only
+                    && a.pick_through == b.pick_through
                     && a.pick_base == b.pick_base
                     && a.compare == b.compare
             })

@@ -16,7 +16,7 @@ fn call(ctx: &mut Ctx, tool: &str, args: Value) -> Value {
 }
 
 /// The GPU lock, once a GPU's pick is known to come back (psui's part-studio feel tests' check).
-fn gpu_pointer() -> Option<parking_lot::MutexGuard<'static, ()>> {
+pub(super) fn gpu_pointer() -> Option<parking_lot::MutexGuard<'static, ()>> {
     let lock = noshape_ops::doc::gpu_lock();
     if let Err(e) = Gpu::headless_rendering() {
         eprintln!("asm feel: GPU pointer tests skipped: {e}");
@@ -132,12 +132,12 @@ fn mated_blocks(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity
     (window, view)
 }
 
-fn draw(cx: &mut TestAppContext, window: AnyWindowHandle) {
+pub(super) fn draw(cx: &mut TestAppContext, window: AnyWindowHandle) {
     cx.update_window(window, |_, w, cx| w.draw(cx).clear(cx)).unwrap();
     cx.run_until_parked();
 }
 
-fn frames(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>) {
+pub(super) fn frames(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>) {
     for _ in 0..5 {
         let vp = cx.update(|cx| view.read(cx).viewport.clone());
         cx.update(|cx| vp.update(cx, |v, cx| v.request_frame(cx)));
@@ -148,7 +148,7 @@ fn frames(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<Assemb
     }
 }
 
-fn wait_until(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>, done: impl Fn(&AssemblyView, &gpui_kit::App) -> bool) {
+pub(super) fn wait_until(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>, done: impl Fn(&AssemblyView, &gpui_kit::App) -> bool) {
     let t = std::time::Instant::now();
     while !cx.update(|cx| done(view.read(cx), cx)) && t.elapsed() < std::time::Duration::from_secs(60) {
         frames(cx, window, view);
@@ -156,7 +156,7 @@ fn wait_until(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<As
 }
 
 /// Lets the pointer's picks come back and the scene show them.
-fn settle(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>) {
+pub(super) fn settle(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>) {
     let t = std::time::Instant::now();
     frames(cx, window, view);
     while cx.update(|cx| {
@@ -170,12 +170,12 @@ fn settle(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<Assemb
 }
 
 /// A viewport-local point in window coordinates.
-fn at_window(cx: &mut TestAppContext, view: &Entity<AssemblyView>, at: DVec2) -> Point<gpui_kit::Pixels> {
+pub(super) fn at_window(cx: &mut TestAppContext, view: &Entity<AssemblyView>, at: DVec2) -> Point<gpui_kit::Pixels> {
     let origin = cx.update(|cx| view.read(cx).viewport.read(cx).origin());
     gpui_kit::point(origin.x + px(at.x as f32), origin.y + px(at.y as f32))
 }
 
-fn move_to(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>, at: DVec2) {
+pub(super) fn move_to(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>, at: DVec2) {
     let w = at_window(cx, view, at);
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(w, None, Modifiers::default());
     settle(cx, window, view);
@@ -304,6 +304,42 @@ fn a_dragged_free_instance_takes_the_whole_move_from_the_press(cx: &mut TestAppC
     wait_until(cx, window, &view, |v, _| v.drag.is_none());
     let moved = centre(cx) - from;
     assert!((moved - DVec2::new(100.0, 0.0)).length() < 0.5, "a 100 px drag moves the part 100 px: {moved:?}");
+}
+
+/// Live behaviours "feel (3D): assembly" (qa FEEL-ASM-DRAG-LIT, feel/3d-asm/free-during-drag.png): a free part dragged by
+/// its face shows no hover look for the whole drag; after the release the face under the pointer lights again.
+#[gpui::test]
+fn a_dragged_part_shows_no_hover_until_released(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "drag-unlit", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+        call(ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>", "Part 2 <1>"], "fixed": false }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    let (lo, hi) = screen_box(cx, &view, "Part 2 <1>");
+    let from = (lo + hi) * 0.5;
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| {
+        let scene = view.read(cx).viewport.read(cx).scene();
+        scene.hover_outline
+    });
+    move_to(cx, window, &view, from);
+    assert!(lit(cx), "the face under the pointer lit before the press");
+    let w = at_window(cx, &view, from);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_down(w, MouseButton::Left, Modifiers::default());
+    for k in 1..=6 {
+        let p = at_window(cx, &view, from + DVec2::new(10.0 * f64::from(k), 0.0));
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(p, Some(MouseButton::Left), Modifiers::default());
+        frames(cx, window, &view);
+    }
+    assert!(cx.update(|cx| view.read(cx).drag.as_ref().is_some_and(|d| d.started)), "dragging");
+    assert!(!lit(cx), "nothing lit while the part is dragged");
+    let w = at_window(cx, &view, from + DVec2::new(60.0, 0.0));
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(w, MouseButton::Left, Modifiers::default());
+    settle(cx, window, &view);
+    wait_until(cx, window, &view, |v, _| v.drag.is_none());
+    settle(cx, window, &view);
+    assert!(lit(cx), "released: the face under the pointer lights again");
 }
 
 /// live2 asm-feel (3b): in a subassembly, hovering one part outlines only that part (the pre-selection is its face with
@@ -773,7 +809,10 @@ fn a_mate_connector_reaches_as_live_and_wins_over_its_vertex(cx: &mut TestAppCon
     let origins: Vec<DVec2> = cx.update(|cx| {
         let v = view.read(cx);
         let ids = v.overlay_connectors.clone();
-        ids.iter().map(|id| v.result.connectors.iter().find(|c| c.id == *id).and_then(|c| c.frame).map(|f| v.viewport.read(cx).project(f.origin).unwrap()).unwrap()).collect()
+        ids.iter().map(|o| {
+            let super::OverlayConnector::Assembly(id) = o else { panic!("an assembly connector") };
+            v.result.connectors.iter().find(|c| c.id == *id).and_then(|c| c.frame).map(|f| v.viewport.read(cx).project(f.origin).unwrap()).unwrap()
+        }).collect()
     });
     // Our reach (scanned in 1 px steps): 22 right, 23 left, 15 up and down on both; live's 16–21 down on a vertex is a
     // Part Studio's hold (an assembly has none, live reach-1118).

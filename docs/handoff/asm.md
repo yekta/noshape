@@ -5,25 +5,23 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-21 19:35 UTC) — RESUME HERE
-- Lead order 18:2x: suspension and infento reruns on today's main, then welding's flexible-sub solve. Builds on
-  vibex8 (rb-hosts); the Mac only through its one nice-19 slot (DECISIONS a16b39297). My Mac target deleted.
-- Running on main d5c8c1e79 (binary ops-main on vibe2 and vibex8 ~/agents/asm-keep): vibe2 scissor then suspension
-  (mc/scissor-main.out, mc/suspension-main.out), then a welding save run (mc/welding-save.out, doc to ~/tmp/asm/save);
-  vibex8 infento 7200 s (mc/infento-main.out; onerun-t.sh takes a 4th timeout arg).
-- transform-carry HELD (/root/asm-scratch/transform-carry.patch, out of the worktree): mate_flip 10/10. Scissor with it
-  (ops-tc, vibe2 mc/scissor-tc.out): 207/239, 13/34 (run 5: 16/34), 60/87, 26:32 / 10.8 GB. +3 Cylindrical 1,
-  Revolute 1/2; -6 Fastened 1/8/14/15/19/25 "cannot resolve mate connectors": suspect main (ecd8394b3 joined-edge
-  midpoints in query.rs), not the patch; scissor-main.out decides. CLI drag on a scissor copy: Top <1> +2 mm carries
-  Top - Side 2; fully mated Base - Right stays.
+## State (2026-11-21 21:23 UTC) — RESUME HERE
+- P0 batch 4 (qa hover matrix, assembly): PS-MC-MISSING, MANIPULATOR-RING, VERTEX-LOOK, MATE-VERTEX, DRAG-LIT fixed;
+  assembly_hover_matrix_tests.rs 21/21 (20 cells + Fastened corner), feel_tests 21/21. Open: the white dashed line
+  along a selected edge (live seems to depth-test the triad's X shaft against the part). Render: `Instance::pick_through`
+  (overlay out of the pick pass: inference dots, connector glyph fill); asm Highlights.hover_vertex_open.
+- Then (lead 18:2x): suspension and infento reruns on today's main, then welding's flexible-sub solve. Builds on vibex8.
+- suite-main (vibex7, main d5c8c1e79): scissor 205/239 10/24 58/87, suspension 23/28 8/8 21/21, welding 41/81 28/28
+  29/29; 15 "cannot resolve mate connectors" (scissor F2/3/4/28/34, Rev 11, subs 09e22d/6ed9b2/cad26f; suspension
+  d986b3 Ball 1/2; welding e23695 F4). Different set from the tc run (F1/8/14/15/19/25): find out whether resolution is
+  nondeterministic before routing (own 4a22b2966 or core ecd8394b3). Notes /root/asm-scratch/notes-1121.md.
+- transform-carry HELD (/root/asm-scratch/transform-carry.patch): scissor with it 207/239 13/34; decide after the above.
+- infento-main on vibex8 (mc/infento-main.out, 7200 s) running.
 - Welding (ab1120e run, 28/28 mates as live, 49/81 occ): Sub 0eadef <1..4> whole subs turned on their free top-level
   Revolute 5-8 (0.3 rad, ~85 mm), Sub e23695 <4> 0.6 rad, <1..3> 1e-3 rad. Mate ends at live's. Solve path: eval.rs
   prepare_subassembly starts the sub's own solve from per-occurrence `nested` places, `in_sub` = that solve, top-level
   starts there. Next: open the saved welding doc, assembly_list, see whether a solve from the stored places drifts.
-- isaac a04711 NOT a Boolean: the saved doc reopened gives Sketch 8 "Select a sketch plane" (in the parity session it
-  is OK; first session difference is Extrude 14). Split ordinal of Extrude 6's face split by Extrude 9 is 1 built
-  step by step, 0 from scratch -> core (repro vibex8 ~/tmp/asm/q/isaac-split-repro.noshape); bool told to drop it.
-  The parity suite never reopens: a save + reopen check would catch these.
+- isaac Sketch 8 reopen: closed by core (fixed by 89180ec5e; my repro was a pre-land branch binary).
 - Scissor fillets (blend 19:1x): 2d82a0 Fillet 13 blend's (fix building). 9cbb0e Fillet 23 (Upper Triangle after
   Boolean 3: ours 160/352/186 92358 mm3, live 158/325/165 61977) and 665cf3 Fillet 4 (Top Cover after Boolean 1: ours
   98/228/130 3515, live 42/87/42 7110) are wrong inputs: mine to bisect (665cf3 derives 0139f2: skasm's region bug;
