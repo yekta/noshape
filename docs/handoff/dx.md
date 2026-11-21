@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-21 20:46 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-21 21:55 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -13,7 +13,7 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 21:0x 11-21 (read first)
+## STATE 21:55 11-21 (read first)
 - HOSTS (user 18:5x, corrected 19:2x, DECISIONS a16b39297): default builds on vibe2; the Mac only via its slot (RB_HOST=mac
   waits), only when vibe2 is busy. No dx target on the Mac (dx-open 12 GB, dx-urdf 22 GB deleted 18:5x).
 - LANDED a19a2e97 as 62694171 (19:09): step 4 (AsmPickMap per occurrence, picks 208 -> 24 ms). infento vibex6 fresh cache:
@@ -22,14 +22,14 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
 - CHECKING b51ca6b9 (queued 20:18): STEP "convert all surfaces to b-surfaces" (duct 38 B-surfaces; read back 41/47, was 40).
 - QUEUED bbd56cd5 (21:03): P3 SETLIB-IMAGES (ops images_library.rs, op documents_images_library, sketch_insert_image
   `image`, select_item.rs Library ▾ "‹name› images"); carries b51ca6b9.
-- COMMITTED d934ff40e (not queued): P3 DRW-VIEW-CENTRE (views.rs `Reach`: bodies' tight box + every >= half cylinder
-  axis 0.09 in past its faces; ViewGeometry.reach / placed_origin(scale); one 3D point per source). Green: drawing lib
-  265, drawing-ui 151, ops e2e 277, clippy drawing (Mac). Land after the A/B: /root/dx-scratch/vc/ab2.sh -> ab.out
-  (vibex8 ~/agents/dx-keep/bin/ops-vcA / ops-vcB, dx_perf::timed_big_drawings x2; delete both after). Then
-  vibex8 ~/agents/dx-keep/vcex.sh (duct + bottle exchange rows with ops-vcB) -> /root/dx-scratch/vc/vcex.out: expect
-  bottle Front / Right at live's y, STL rows 9 parts.
-- NEXT after: exchange leftovers (STL surface edges; bottle Front views 0.015 in low in DXF rows: recheck after
-  DRW-VIEW-CENTRE).
+- QUEUED e418ada0 (21:5x): P3 DRW-VIEW-CENTRE d934ff40e (views.rs `Reach`: bodies' tight box + every >= half cylinder
+  axis 0.09 in past its faces; one 3D point per source) + handoff; carries bbd56cd5 / b51ca6b9. A/B vibex8 (ab.out):
+  assembly views 4180 / 4389 A vs 4232 / 4850 B (B run 2 under load 15: its regenerations +40 % too), Part Studio
+  views 2168 / 2267 vs 2029 / 3276: no >= 2x. ops-vcA deleted; delete vibex8 ~/agents/dx-keep/bin/ops-vcB after vcex.
+- RUNNING vibex8 ~/agents/dx-keep/vcex.sh (duct + bottle exchange rows with ops-vcB) -> /root/dx-scratch/vc/vcex.out:
+  expect bottle Front / Right at live's y (2.2942..4.0842), STL rows 9 / 148 parts.
+- NEXT: queue empty after vcex. STL surface edges filed as TICKETS P3 STL-SURFACE-EDGES (kernel-wide: edges on mesh
+  faces). hex's 2 live ELLIPSEs are quarter arcs of a 0.5 mm circle whose rest live writes as polylines: HLR noise.
 - REPORT at queue empty (<=5 lines): step 4 numbers + step-3 correction; Mac targets freed; duct 41/47; STL split
   c497ac8c; SETLIB-IMAGES; DRW-VIEW-CENTRE.
 - Probe: /root/dx-scratch/open4/openpick2.sh (vibex6 ~/agents/dx-keep); full run (no skip1) after any rebuild: rows
