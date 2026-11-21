@@ -1,23 +1,23 @@
 {
  "scenario": "drw-export-formats",
- "recorded": "2026-11-21T11:24:15.115Z",
+ "recorded": "2026-11-21T21:41:07.122Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
   "viewport": [
    1919,
-   992
+   1079
   ],
   "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "060c0461ca301a2c112f155e",
-  "workspace": "96663039d748842f7c25efc6",
-  "element": "746cae8c6cad44e43b417783",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "324df72a8575dc9937366630",
   "start": "block-drawing",
-  "startElement": "d0643b8ab31b96fd21acb45e",
-  "runner": "live2 .nstate-uip-4.json"
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -45,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1 (1)",
+   "tab": "Part 1 Drawing 1 (6)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -101,16 +101,16 @@
    "selection": [],
    "viewport": {
     "sheet_px": [
-     432,
-     110,
-     1526,
-     955
+     378,
+     113,
+     1580,
+     1042
     ],
     "sheet_mm": [
      279.4,
      215.9
     ],
-    "mmPerPixel": 0.25539
+    "mmPerPixel": 0.23245
    }
   }
  },
@@ -125,8 +125,8 @@
    },
    "ok": true,
    "at": [
-    973,
-    976
+    1097,
+    1063
    ],
    "state": {
     "focus": {
@@ -169,7 +169,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1 (6)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -225,20 +225,20 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       432,
-       110,
-       1526,
-       955
+       378,
+       113,
+       1580,
+       1042
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25539
+      "mmPerPixel": 0.23245
      }
     }
    },
-   "t": 234216
+   "t": 228769
   },
   {
    "step": 2,
@@ -250,13 +250,13 @@
    },
    "ok": true,
    "at": [
-    1004,
-    928
+    1128,
+    1015
    ],
    "state": {
     "focus": {
      "kind": "other",
-     "tag": "iframe"
+     "tag": "div"
     },
     "dialog": {
      "kind": "modal",
@@ -270,17 +270,12 @@
       {
        "label": "Format",
        "kind": "select",
-       "value": "DXF"
+       "value": "PDF"
       },
       {
        "label": "Version",
        "kind": "select",
-       "value": "Release 14"
-      },
-      {
-       "label": "Sheets",
-       "kind": "select",
-       "value": "All sheets"
+       "value": "1.5"
       },
       {
        "label": "Overridden dimensions",
@@ -290,12 +285,12 @@
       {
        "label": "Text",
        "kind": "select",
-       "value": "Explode all into polylines"
+       "value": "Normal"
       },
       {
-       "label": "Units",
+       "label": "Color",
        "kind": "select",
-       "value": "Use drawing units"
+       "value": "Color"
       },
       {
        "label": "Options",
@@ -303,22 +298,7 @@
        "value": "Download"
       },
       {
-       "label": "Export splines as polylines",
-       "kind": "checkbox",
-       "value": false
-      },
-      {
-       "label": "Set z-height to zero and normals to positive",
-       "kind": "checkbox",
-       "value": true
-      },
-      {
        "label": "Hide inspection items",
-       "kind": "checkbox",
-       "value": false
-      },
-      {
-       "label": "Exclude off-sheet content",
        "kind": "checkbox",
        "value": false
       }
@@ -327,7 +307,7 @@
       "Export",
       "Cancel"
      ],
-     "text": "File name View export rules Format PDF DWG DXF DWT SVG PNG JPEG TIFF Inspection list Drawing definition list In the exported file, dimensions added to a view with a scale different from the active sheet may be out of scale. Version Release 11-12 Release 13 Release 14 2000 2004 2007 2010 2013 2018 Model space only Sheets All sheets Current sheet Overridden dimensions Show underlines Hide underlines Text Export as text Explode into polylines (notes) Explode all into polylines Units Use drawing uni"
+     "text": "File name View export rules Format PDF DWG DXF DWT SVG PNG JPEG TIFF Inspection list Drawing definition list Version 1.4 1.5 1.6 1.7 Overridden dimensions Show underlines Hide underlines Text Normal Selectable Color Color Black and white Grayscale Options Download Download and store file in a new tab Email with file download link Store file in a new tab Hide inspection items"
     },
     "dialogs": [],
     "panels": null,
@@ -418,7 +398,7 @@
      }
     }
    },
-   "t": 276129
+   "t": 267172
   },
   {
    "step": 3,
@@ -431,7 +411,7 @@
    "state": {
     "focus": {
      "kind": "other",
-     "tag": "iframe"
+     "tag": "div"
     },
     "dialog": {
      "kind": "modal",
@@ -445,17 +425,12 @@
       {
        "label": "Format",
        "kind": "select",
-       "value": "DXF"
+       "value": "PDF"
       },
       {
        "label": "Version",
        "kind": "select",
-       "value": "Release 14"
-      },
-      {
-       "label": "Sheets",
-       "kind": "select",
-       "value": "All sheets"
+       "value": "1.5"
       },
       {
        "label": "Overridden dimensions",
@@ -465,12 +440,12 @@
       {
        "label": "Text",
        "kind": "select",
-       "value": "Explode all into polylines"
+       "value": "Normal"
       },
       {
-       "label": "Units",
+       "label": "Color",
        "kind": "select",
-       "value": "Use drawing units"
+       "value": "Color"
       },
       {
        "label": "Options",
@@ -478,22 +453,7 @@
        "value": "Download"
       },
       {
-       "label": "Export splines as polylines",
-       "kind": "checkbox",
-       "value": false
-      },
-      {
-       "label": "Set z-height to zero and normals to positive",
-       "kind": "checkbox",
-       "value": true
-      },
-      {
        "label": "Hide inspection items",
-       "kind": "checkbox",
-       "value": false
-      },
-      {
-       "label": "Exclude off-sheet content",
        "kind": "checkbox",
        "value": false
       }
@@ -502,7 +462,7 @@
       "Export",
       "Cancel"
      ],
-     "text": "File name View export rules Format PDF DWG DXF DWT SVG PNG JPEG TIFF Inspection list Drawing definition list In the exported file, dimensions added to a view with a scale different from the active sheet may be out of scale. Version Release 11-12 Release 13 Release 14 2000 2004 2007 2010 2013 2018 Model space only Sheets All sheets Current sheet Overridden dimensions Show underlines Hide underlines Text Export as text Explode into polylines (notes) Explode all into polylines Units Use drawing uni"
+     "text": "File name View export rules Format PDF DWG DXF DWT SVG PNG JPEG TIFF Inspection list Drawing definition list Version 1.4 1.5 1.6 1.7 Overridden dimensions Show underlines Hide underlines Text Normal Selectable Color Color Black and white Grayscale Options Download Download and store file in a new tab Email with file download link Store file in a new tab Hide inspection items"
     },
     "dialogs": [],
     "panels": null,
@@ -593,7 +553,7 @@
      }
     }
    },
-   "t": 304251
+   "t": 296067
   },
   {
    "step": 4,
@@ -606,14 +566,14 @@
    },
    "ok": true,
    "at": [
-    943,
+    950,
     202
    ],
    "via": "native select: option picked by its label",
    "state": {
     "focus": {
      "kind": "other",
-     "tag": "iframe"
+     "tag": "div"
     },
     "dialog": {
      "kind": "modal",
@@ -775,7 +735,7 @@
      }
     }
    },
-   "t": 319926
+   "t": 311887
   },
   {
    "step": 5,
@@ -788,7 +748,7 @@
    "state": {
     "focus": {
      "kind": "other",
-     "tag": "iframe"
+     "tag": "div"
     },
     "dialog": {
      "kind": "modal",
@@ -950,7 +910,7 @@
      }
     }
    },
-   "t": 347312
+   "t": 338932
   },
   {
    "step": 6,
@@ -969,7 +929,7 @@
     "focus": {
      "kind": "other",
      "tag": "select",
-     "text": "object:1447",
+     "text": "object:1326",
      "selection": [
       null,
       null
@@ -1136,7 +1096,7 @@
      }
     }
    },
-   "t": 363744
+   "t": 354624
   },
   {
    "step": 7,
@@ -1150,7 +1110,7 @@
     "focus": {
      "kind": "other",
      "tag": "select",
-     "text": "object:1447",
+     "text": "object:1326",
      "selection": [
       null,
       null
@@ -1317,7 +1277,7 @@
      }
     }
    },
-   "t": 390858
+   "t": 380439
   },
   {
    "step": 8,
@@ -1478,7 +1438,7 @@
      }
     }
    },
-   "t": 406572
+   "t": 396012
   },
   {
    "step": 9,
@@ -1632,7 +1592,7 @@
      }
     }
    },
-   "t": 433731
+   "t": 423056
   },
   {
    "step": 10,
@@ -1729,20 +1689,20 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       432,
-       110,
-       1526,
-       955
+       378,
+       113,
+       1580,
+       1042
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25539
+      "mmPerPixel": 0.23245
      }
     }
    },
-   "t": 460571
+   "t": 448166
   },
   {
    "step": 11,
@@ -1834,20 +1794,20 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       432,
-       110,
-       1526,
-       955
+       378,
+       113,
+       1580,
+       1042
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25539
+      "mmPerPixel": 0.23245
      }
     }
    },
-   "t": 488501
+   "t": 473653
   }
  ]
 }
