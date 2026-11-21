@@ -2340,3 +2340,20 @@ selection, measure, section view; then P2 assembly and drawing passes; verify th
    01:05: an empty shard ran ALL scenarios (psui-vk's shard 1, killed) and its Xvfb kept uip.lock (now 7>&-).
    Disk: local root 96 % at 21:37; qa-scratch trimmed 20 -> 12 GB (old suite app copies, rel/k v0.4.4x-5x). Tools: bin/uip-rerun.sh
    needs ABSOLUTE names paths; bin/uip-rerun-0461.sh = same on the 0.4.61 app; systemd-run units have no cwd.
+
+## 11-21 16:5x moved from the handoff
+00d. 05:00 cut GO (2a43b78b) -> v0.4.62 (published, lead 08:1x). 09:2x: studios 9/10, asm DEAD-ZONE verified, MATE-PREVIEW-COLOUR
+   reopened; SAVED-DOC-REFS-LOST (skasm revert 83423fa5) verified 5ca8588b0; dx 0036 snap-hook DXF verified b2b0cf9a9 (bin/snapdxf.py on
+   vibex7: saved suite doc -> drawing placed as live -> DXF 2018 -> dxfdiff). Seat lip: Ok in every release (not a ticket). OPEN:
+   - car Fillet 1 verified b05f1c014 (Derived 1 matches in 5 surf-intro docs); next diff P2 SUITE-INTRO-TAILFIN-INTERSECTED -> skasm.
+   - Verified: asm DRAG-START, CHAMFER-ASYM, skasm 4e51cce3 (9453f8650), psui 37741d38 (7f6c5e1ae) and a21e5b8f (698df935f).
+   - New model index: debug run 1120-1028-4e51cce3-models (bin/models-now.sh, vibex7 alone, 29 min incl. build): 99/152, 1505/2051;
+     SCORE re-baselined 8b2a688ba; owners' rows SUITE-NEW-INDEX-1120-* + P1 SUITE-IMPELLER-FILLET3 (core: load/order dependent) 7066344c1.
+     Release run (unit qa-models-rel, qa-speed worktree, vibex7) -> suites/1120-1206-f689de1b-models-rel: the index row comes from it
+     (models-report + 0407's other areas). qa-suites.sh / suites-models.sh now default QA_SPEED_PROFILE=release (dx/lead 12:0x).
+   - Night 11-21 (vibex8 release build of f9ad07b50, quiet 01:40-03:21): suite 02:00-02:14, speedref.py + speedref_asm.py -> nightly/pm-1121;
+     tickets SPEED-SPLIT-THICKEN (P0 core 7dd227351), MUTUALTRIM (blend), VALVE-CONFIG (core), ASM-OPEN + ASM-TRANSFORM-FOLLOWERS (asm).
+     Still to time in the next window: screws (#do), surfaces-lofts-projected, opt-mirror-pattern-ops (bin/speedref-rerun.sh); impeller after 908abe7b8.
+     05:00 cut 11-21: GO 04:3x on b3ece860 (prerel/cut05-b3ece860.txt all SAME, 0 px; compat on aa09396f = + dx IGES export only).
+     cut-hold.txt empty; prerel-need (sha a prerel waits for) = 503396456: clear or replace it per cut.
+   - Seat lip: a47534be5 (Ok in 0.4.43-0.4.61 + green; vibex7 ~/agents/qa-keep/seatlip-hat8-1120.txt).
