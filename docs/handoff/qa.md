@@ -103,11 +103,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
      SCORE re-baselined 8b2a688ba; owners' rows SUITE-NEW-INDEX-1120-* + P1 SUITE-IMPELLER-FILLET3 (core: load/order dependent) 7066344c1.
      Release run (unit qa-models-rel, qa-speed worktree, vibex7) -> suites/1120-1206-f689de1b-models-rel: the index row comes from it
      (models-report + 0407's other areas). qa-suites.sh / suites-models.sh now default QA_SPEED_PROFILE=release (dx/lead 12:0x).
-   - qa-nightpm-1121 (bin/nightpm.sh): release build on vibex8 (qa-night worktree; outside the slot since 00:5x: 4 others' jobs queued),
-     ~/.slot-quiet 01:40 to the end (only SLOT_QUIET_OK starts), model suite at 02:00, then speedref.py (PS 1-10) + speedref_asm.py (Asm 1-5)
-     -> nightly/pm-1121. 05:00 cut: lead's hold on tablet-stand Sketch 3 (skasm P0) in qa-scratch/cut-hold.txt -> cut-verdict HOLD; drop the line when fixed/explained.
-     17:00 cut: GO 15:4x on 18809b4c (prerel/cut17-18809b4c.txt: hats SAME, dock = accepted B Govde; known: rust-zero F1, crash957 Ch3 P1
-     bool). Hat open px (163-448): b76561076 variable row text + 24 plane-plane edges B-spline -> line; bisect 19:49: blend b749ad59e (fillet edges between analytic faces rebuilt exact), intended.
+   - Night 11-21 (vibex8 release build of f9ad07b50, quiet 01:40-03:21): suite 02:00-02:14, speedref.py + speedref_asm.py -> nightly/pm-1121;
+     tickets SPEED-SPLIT-THICKEN (P0 core 7dd227351), MUTUALTRIM (blend), VALVE-CONFIG (core), ASM-OPEN + ASM-TRANSFORM-FOLLOWERS (asm).
+     Still to time in the next window: screws (#do), surfaces-lofts-projected, opt-mirror-pattern-ops (bin/speedref-rerun.sh); impeller after 908abe7b8.
+     05:00 cut 11-21: GO 04:3x on b3ece860 (prerel/cut05-b3ece860.txt all SAME, 0 px; compat on aa09396f = + dx IGES export only).
+     cut-hold.txt empty; prerel-need (sha a prerel waits for) = 503396456: clear or replace it per cut.
    - Seat lip: a47534be5 (Ok in 0.4.43-0.4.61 + green; vibex7 ~/agents/qa-keep/seatlip-hat8-1120.txt).
 00a. **05:00 cut HELD (lead 04:0x) until a green has core's 2f4f3bc5 (singularities Sketch 2; Mirror 2 is as live, accepted in
    compat/accepted.txt; 2f4f's subject added to cut-must.txt).** Unit qa-prerel-2f4f (bin/prerel-when.sh "<subject>" cut0500): when
