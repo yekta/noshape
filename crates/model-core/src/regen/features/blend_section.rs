@@ -276,13 +276,27 @@ fn chain_ordered(shape: &Shape, edges: &[usize], own_ends: bool) -> FResult<Vec<
             _ => Some(p),
         })
     };
+    // The free end of the first edge's run behind its start (a closed run: its start): a later chain starts there,
+    // through its first edge as that edge runs (asm-scissor-lift's Fillet 13: a wall's outline began at a corner,
+    // its edges before it a run of their own).
+    let behind = |left: &[(usize, Shape, DVec3, DVec3, f64)]| {
+        let (mut p, mut used) = (left[0].2, vec![0]);
+        while let Some((j, it)) = left.iter().enumerate().find(|(j, it)| !used.contains(j) && (near(it.2, p) || near(it.3, p))) {
+            used.push(j);
+            p = if near(it.2, p) { it.3 } else { it.2 };
+        }
+        let free = left.iter().flat_map(|it| [it.2, it.3]).filter(|q| near(*q, p)).count() == 1;
+        if free { p } else { left[0].2 }
+    };
     let mut start = first_free(&items);
     let mut out = Vec::new();
     let mut left = items;
     while !left.is_empty() {
-        let at = match start.filter(|s| !own_ends || left.iter().any(|it| near(it.2, *s) || near(it.3, *s))) {
+        let at = match start.filter(|s| left.iter().any(|it| near(it.2, *s) || near(it.3, *s))) {
             Some(s) => s,
-            None => first_free(&left).unwrap_or(left[0].2),
+            None if own_ends => first_free(&left).unwrap_or(left[0].2),
+            None if out.is_empty() => start.unwrap_or(left[0].2),
+            None => behind(&left),
         };
         let pos = left.iter().position(|it| near(it.2, at) || near(it.3, at)).unwrap_or(0);
         let (index, shape, a, b, length) = left.remove(pos);
@@ -1345,6 +1359,21 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
             if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
                 eprintln!("section blend: held pieces {pieces:?}");
             }
+        } else if spec.reference.is_none() && chain.windows(2).any(|w| (w[0].end - w[1].start).length() > 1e-9) {
+            // Edges in separate runs (both walls of a slab picked): one loft per run, never one across the gap between
+            // them (asm-scissor-lift's Fillet 13: a loft jumping between the two walls' outlines, 23 s of Boolean).
+            pieces.clear();
+            let (mut acc, mut from, mut first) = (0.0f64, 0.0f64, 0usize);
+            for (ci, c) in chain.iter().enumerate() {
+                acc += c.length;
+                if ci + 1 == chain.len() || (c.end - chain[ci + 1].start).length() > 1e-9 {
+                    let (a, b) = (from.max(lo), acc.min(hi));
+                    if b > a {
+                        pieces.push((a, b, first));
+                    }
+                    (from, first) = (acc, ci + 1);
+                }
+            }
         } else if spec.reference.is_some() && !whole && chain.len() > 1 {
             pieces.clear();
             let mut acc = 0.0f64;
@@ -1383,6 +1412,11 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                     false => spec.clone(),
                 };
                 let (face, e3, cv) = section(p, &fr, &here, side1_first)?;
+                // (One loft can't cut and add: a run turning from convex to concave through faces meeting tangent is
+                // refused before its Boolean (asm-scissor-lift's Fillet 13: 18.9 s to an invalid result).)
+                if k > 0 && cv != convex {
+                    return Err(fail("the round turns from convex to concave along the edges"));
+                }
                 convex = cv;
                 // (Its corner: the edge's point, or out in the air for a chamfer as sections.)
                 let corner = e3[0].edge_info()?.start;
@@ -5034,8 +5068,32 @@ fn canal_corner(shape: &Shape, names: &[Name], r: f64, scale: f64) -> FResult<Op
 
 #[cfg(test)]
 mod tests {
-    use super::{Support, plane_cylinder_contacts, rolling_ball};
+    use super::{Support, chain, plane_cylinder_contacts, rolling_ball};
     use glam::DVec3;
+    use noshape_kernel::{self as k, Shape, ShapeType};
+
+    /// Two walls' outlines picked whole (asm-scissor-lift's Fillet 13): the second outline's edges listed from a corner
+    /// in its middle still run as one piece from its free end, each edge in its own direction.
+    #[test]
+    fn a_later_run_listed_from_its_middle_starts_at_its_free_end() {
+        let p = DVec3::new;
+        let a = [p(0.0, 0.0, 0.0), p(0.0, 0.0, 1.0), p(1.0, 0.0, 1.0), p(1.0, 0.0, 0.0)];
+        let b = [p(0.0, 5.0, 0.0), p(0.0, 5.0, 1.0), p(1.0, 5.0, 1.0), p(1.0, 5.0, 0.0)];
+        let lines: Vec<Shape> = [a, b].iter().flat_map(|w| w.windows(2).map(|s| k::make_line(s[0], s[1]).unwrap()).collect::<Vec<_>>()).collect();
+        let body = Shape::compound(&lines);
+        let index = |s: DVec3, e: DVec3| {
+            (0..body.count(ShapeType::Edge))
+                .find(|&i| body.sub_shape(ShapeType::Edge, i).unwrap().edge_info().is_ok_and(|f| (f.start - s).length() < 1e-12 && (f.end - e).length() < 1e-12))
+                .unwrap()
+        };
+        let (a0, a1, a2) = (index(a[0], a[1]), index(a[1], a[2]), index(a[2], a[3]));
+        let (b0, b1, b2) = (index(b[0], b[1]), index(b[1], b[2]), index(b[2], b[3]));
+        let out = chain(&body, &[a0, a1, a2, b1, b2, b0]).unwrap();
+        assert_eq!(out.iter().map(|c| c.index).collect::<Vec<_>>(), [a0, a1, a2, b0, b1, b2]);
+        assert!(out.iter().all(|c| c.forward));
+        let gaps = out.windows(2).filter(|w| (w[0].end - w[1].start).length() > 1e-9).count();
+        assert_eq!(gaps, 1, "the second outline split into runs");
+    }
 
     /// Live c2-hunting-knife's Fillet 3 (mm): the 0.5 ball between the bottom plane and the R3 cove, and its contacts'
     /// ellipses: Kj1B on the plane 3.502620 x 3.5, KjtB on the cove 3.003056 x 3 (and the top's Jj1 3.513369, Jjt
