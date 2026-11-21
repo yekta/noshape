@@ -100,6 +100,12 @@ impl DrawingEditor {
     }
 
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
+        // The Note color panel: Esc closes it alone, wherever the keyboard is (live drw-note-format-lists s22,
+        // drw-note-swatch-twice s16-later).
+        if self.note_color.is_some() {
+            self.close_note_color(false, cx);
+            return;
+        }
         // A BOM table just placed stays selected through Esc (live2 bomsel-1118).
         if self.placed_table.is_some_and(|id| self.selection == [Sel::Table(id)]) {
             return;
@@ -159,8 +165,12 @@ impl DrawingEditor {
         }
         // Picked cells: Esc closes their Cell panel and drops them (live2 drw-revision-cell-format); a panel over it
         // (Resize…) goes first (drw-revision-cell-resize).
+        // (A custom table stays selected: live drw-custom-table-cell s15, its frame still read lit.)
         if self.panel.is_none() && self.cell_sel.take().is_some() {
-            self.selection.clear();
+            let sheet = self.current_sheet();
+            let custom = |s: &Sel| matches!(s, Sel::Table(id) if sheet.table(*id).is_some_and(|t| matches!(t.kind, TableKind::Custom { .. })));
+            let kept: Vec<Sel> = self.selection.iter().filter(|s| custom(s)).cloned().collect();
+            self.selection = kept;
             cx.notify();
             return;
         }
@@ -366,7 +376,10 @@ impl DrawingEditor {
         if !self.selection.is_empty() && self.selection.iter().all(hole) {
             return;
         }
-        self.selection.clear();
+        // A clicked annotation Esc deselects stays drawn lit under the pointer, as one a tool made (live drw-styles-radial
+        // s16: 0.394 clicked, Esc, still read).
+        let deselected = self.selection.drain(..).filter(|s| matches!(s, Sel::Annotation(_)));
+        self.esc_kept.extend(deselected);
         self.redraw(cx);
     }
 
@@ -394,6 +407,7 @@ impl DrawingEditor {
             // (And a hole callout: live2 drw-hcallout-override s7, its text read lit in Top after Esc.)
             // (And a note committed with ✓: live2 drw-tools-1119 rad-note, its grips after Esc.)
             Tool::Dimension { kind: DimTool::MaxMin | DimTool::Angle | DimTool::Angle3 | DimTool::Radius | DimTool::Diameter, .. } | Tool::HoleCallout { .. } => sheet.annotations.iter().filter(|a| a.id > annotations).map(|a| Sel::Annotation(a.id)).collect(),
+            Tool::Centerline { .. } => sheet.annotations.iter().filter(|a| a.id > annotations && matches!(a.kind, AnnotationKind::Centerline { .. })).map(|a| Sel::Annotation(a.id)).collect(),
             Tool::Note => sheet.annotations.iter().filter(|a| a.id > annotations && matches!(a.kind, AnnotationKind::Note { .. })).map(|a| Sel::Annotation(a.id)).collect(),
             _ => Vec::new(),
         }

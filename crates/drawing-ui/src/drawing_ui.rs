@@ -180,6 +180,7 @@ impl DrawingEditor {
                 .bg(pal.dialog_bg)
                 .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(gpui_kit::rgb(0x333333))
+                .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| this.note_color_press_outside(window, cx)))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())

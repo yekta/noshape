@@ -382,6 +382,16 @@ impl DrawingEditor {
             selection.push(("EDGE-".into(), self.ui_view_name(*p)));
             selection.push(("VIEW+".into(), self.ui_view_name(*p)));
         }
+        // A 2 point centerline Esc left: still drawn lit once the pointer is off (live drw-centerline-2-point-cylinder-axis
+        // s5, 11-20; edge to edge and circle ones aren't, -edge-to-edge-cylinder s5, -circle-2-point-small-hole-centres s5).
+        if matches!(self.tool, Tool::Select) {
+            for s in &self.esc_kept {
+                let Sel::Annotation(id) = s else { continue };
+                if let Some(AnnotationKind::Centerline { view, .. }) = self.current_sheet().annotations.iter().find(|a| a.id == *id).map(|a| &a.kind) {
+                    selection.push(("EDGE^".into(), self.ui_view_name(*view)));
+                }
+            }
+        }
         // A dimension's picked edges and a closed broken-out profile are drawn picked (live: drw-dimension-*,
         // drw-broken-out-section).
         match &self.tool {
@@ -516,10 +526,11 @@ impl DrawingEditor {
             // drw-styles-radial s12-s13, recorder 11-18.1: R.197 clicked, then Styles; drw-dim-styles-open2 shows it).
             let styles = self.right_panel == Some(crate::drawing_panels::RightPanel::Styles);
             let unread_dim = |a: u64| styles && self.hover.and_then(|h| self.sel_of_pick(h)) != Some(Sel::Annotation(a)) && sheet.annotations.iter().any(|x| x.id == a && x.kind.is_dimension());
-            // A hovered annotation, a note's but, is read as its selection is (tan: live drw-styles-radial s4, s8,
-            // drw-centerline-2-point-cylinder-axis s5: what Esc left under the resting pointer, REQUESTS 17:02 (a), (d)).
+            // What Esc left lit (`esc_kept`: a tool made it or it was clicked), hovered under the resting pointer, a note's
+            // but, is read as its selection is (live drw-dimension-angular s5, drw-hcallout-override s7, drw-styles-radial
+            // s16); a dimension Esc didn't keep reads nothing there (drw-dimension-line-to-line s5).
             let hovered_ann = self.hover.and_then(|h| self.sel_of_pick(h)).and_then(|s| match s {
-                Sel::Annotation(a) if !sheet.annotations.iter().any(|x| x.id == a && matches!(x.kind, AnnotationKind::Note { .. })) => Some(a),
+                Sel::Annotation(a) if self.esc_kept.contains(&s) && !sheet.annotations.iter().any(|x| x.id == a && matches!(x.kind, AnnotationKind::Note { .. })) => Some(a),
                 _ => None,
             });
             let lit_as = |pick: u32, thin_ones: bool| {

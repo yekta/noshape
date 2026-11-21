@@ -1007,6 +1007,35 @@ fn the_note_colour_panel_opens_with_its_hex_selected(cx: &mut TestAppContext) {
     draw(cx, window);
     let focus = cx.update_window(window, |_, w, cx| editor.read(cx).note_color_focus(w, cx)).unwrap();
     assert_eq!(focus, Some(json!({ "kind": "field", "label": null, "text": "000000", "selection": [0, 6], "all": true })));
+
+    // Live drw-note-swatch-twice s16: the second click lands in the open panel, the keyboard with the panel; a press on
+    // the Note panel off it (Flag notes) leaves the page with it, the panel open; Esc closes the colour panel only.
+    let focus = |cx: &mut TestAppContext| cx.update_window(window, |_, w, cx| editor.read(cx).note_color_focus(w, cx)).unwrap();
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_note_color(w, cx))).unwrap();
+    draw(cx, window);
+    assert_eq!(focus(cx), Some(json!({ "kind": "field", "label": null })));
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.note_color_press_outside(w, cx))).unwrap();
+    draw(cx, window);
+    assert_eq!(focus(cx), None);
+    assert!(cx.update(|cx| editor.read(cx).note_color.is_some()), "the colour panel stays open");
+    // (s22: Esc then, the keyboard off the panel, closes it alone too.)
+    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+    let (color, note) = cx.update(|cx| {
+        let e = editor.read(cx);
+        (e.note_color.is_some(), matches!(e.panel, Some(crate::drawing_view::Panel::Note { .. })))
+    });
+    assert!(!color && note, "Esc off the panel closed the colour panel ({color}), left the Note panel ({note})");
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_note_color(w, cx))).unwrap();
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_note_color(w, cx))).unwrap();
+    draw(cx, window);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    draw(cx, window);
+    let (color, note) = cx.update(|cx| {
+        let e = editor.read(cx);
+        (e.note_color.is_some(), matches!(e.panel, Some(crate::drawing_view::Panel::Note { .. })))
+    });
+    assert!(!color && note, "Esc closed the colour panel ({color}) and left the Note panel ({note})");
 }
 
 /// Live2 drw-revision-table-properties: Esc closes a revision table's properties and drops its selection.
@@ -2253,6 +2282,82 @@ fn esc_leaves_the_placed_dimension_hovered_not_selected(cx: &mut TestAppContext)
         assert_eq!(hovered(e), None, "moved off");
         assert!(e.esc_kept.contains(&Sel::Annotation(id)), "its grips kept until something else is hovered");
     });
+}
+
+/// Live drw-centerline-2-point-cylinder-axis s5: Esc after a 2 point centerline reads its view lit (11-14.1 recorders
+/// on); drw-dimension-line-to-line s5: Esc after a line to line dimension, the pointer resting on it, reads nothing.
+#[gpui::test]
+fn esc_after_a_2_point_centerline_reads_it_lit_but_not_a_line_to_line_dimension(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_model::drawing::{Annotation, AnnotationKind};
+    use noshape_scene::drawing_tools::{DimTool, Tool};
+    SUGGESTED.set(true);
+    DIMENSIONED.set(true);
+    let (window, editor) = drawing(cx, "centerline-esc");
+    DIMENSIONED.set(false);
+    real_sheet(cx, window, &editor);
+    let read = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).ui_drawing_state(cx)["selection"].clone());
+    let dim = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let b = e.built.as_ref().expect("built");
+            let (id, on) = e.current_sheet().annotations.iter().filter(|a| a.kind.is_dimension()).find_map(|a| {
+                let l = b.geometry.lines.iter().find(|l| b.picks.get(l.pick as usize) == Some(&PickTarget::Annotation(a.id)) && l.points.len() >= 2)?;
+                Some((a.id, [(l.points[0][0] + l.points[1][0]) / 2.0, (l.points[0][1] + l.points[1][1]) / 2.0]))
+            }).expect("a dimension with a line");
+            e.tool_start = (0, id - 1);
+            e.tool = Tool::Dimension { kind: DimTool::LineLine, picks: Vec::new() };
+            e.cursor = on;
+            e.cancel(cx);
+            id
+        })
+    });
+    draw(cx, window);
+    let hovered = cx.update(|cx| editor.read(cx).hover.and_then(|h| editor.read(cx).sel_of_pick(h)));
+    assert_eq!(hovered, Some(noshape_scene::drawing_tools::Sel::Annotation(dim)), "hovered under the resting pointer");
+    assert_eq!(read(cx), json!([]), "a line to line dimension isn't kept");
+    cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let view = e.current_sheet().views[0].id;
+            let id = e.current_sheet().next_annotation_id();
+            e.tool_start = (0, id - 1);
+            let a = Annotation { id, kind: AnnotationKind::Centerline { view, a: [0.0, 0.0], b: [0.0, 0.04] }, ..Default::default() };
+            e.edit_sheet("Centerline", cx, |s| s.annotations.push(a));
+            e.tool = Tool::Centerline { first: None };
+            e.cancel(cx);
+        })
+    });
+    draw(cx, window);
+    let sel = read(cx);
+    assert_eq!(sel.as_array().map(|s| s.len()), Some(1), "{sel}");
+    assert_eq!(sel[0]["kind"], "EDGE");
+    assert_eq!(sel[0]["since"], "2026-11-14.1");
+}
+
+/// Live drw-custom-table-cell s15: Esc with a custom table's cell picked drops the cell and keeps the table selected.
+#[gpui::test]
+fn esc_with_a_custom_tables_cell_picked_keeps_the_table(cx: &mut TestAppContext) {
+    use noshape_model::document::TabId;
+    use noshape_model::drawing::{Table, TableKind};
+    use noshape_scene::drawing_tools::Sel;
+    let (window, editor) = drawing(cx, "custom-cell-esc");
+    let id = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let id = e.current_sheet().next_table_id();
+            let kind = TableKind::Custom { studio: TabId(1), version: None, fs: TabId(2), name: "partFaces".into(), fs_version: None, bottom_to_top: false, config: Default::default() };
+            e.edit_sheet("Custom table", cx, |s| s.tables.push(Table::new(id, kind, [300.0, 200.0])));
+            e.selection = vec![Sel::Table(id)];
+            e.cell_sel = Some(crate::drawing_cells::CellSel { table: id, a: (1, 0), b: (1, 0) });
+            e.cancel(cx);
+            id
+        })
+    });
+    draw(cx, window);
+    let (cells, sel) = cx.update(|cx| {
+        let e = editor.read(cx);
+        (e.cell_sel.is_some(), e.selection.clone())
+    });
+    assert!(!cells, "the cell dropped");
+    assert_eq!(sel, vec![Sel::Table(id)]);
 }
 
 /// Live drw-update-deleted-feature s9: Ø.394 placed and Esc, a Part Studio tab and back: nothing lit (Esc left it

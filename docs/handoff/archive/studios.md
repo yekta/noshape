@@ -1324,3 +1324,14 @@ Next, in order:
 ## Moved 2026-11-21 21:20 (feel rows, done)
 - live2 document level (live/feel/doc-level-1117/): tab switch order (URL, old list / canvas gone at once, toolbar,
   list, 3D last; no spinner); undo / redo as ours; regen spinner is psui's.
+
+## Moved 2026-11-21 22:37 (feel row, done)
+- live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell
+  #e2e2e2, tan frame; 37ecb60c); the BOM row's part tan in the views and its callouts blue were ours already. Local:
+  one click on a BOM cell selects it and opens the Cell panel (sizes + formats + a greyed Override), a double-click the
+  same (live cferr-bomclk-1118 (b)); Split BOM table below puts the second part 3 mm under the first, same x and width.
+  A placed BOM stays selected (live2 bomsel-1118; the recorder can't read tables, and reads no EDGE under a just-placed
+  one, so ours doesn't count it until the next press, `placed_table`): local. the recorder's TABLE kind is read (ours `TABLE` since 2026-11-18.1, drawing_ui_state.rs). The "︿" is the isometric part's corner, not a control
+  (live2). Update from
+  this workspace enabling ~3 s late is live's server latency, not a target. Custom feature ✓ with a field error:
+  live (a) confirms ours (pale, Enter no-op; no field named: ✓ commits).

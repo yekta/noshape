@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-21 21:20 UTC.
+Updated 2026-11-21 22:37 UTC.
 
 ## In flight
 
@@ -72,24 +72,26 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
   s3); a right-panel strip button clears the sheet hover, and with Styles open a selected dimension off the pointer
   reads nothing (drw-styles-radial s12, live (c)); leaving a drawing tab drops what Esc left lit (`esc_kept`,
   `tab_left`: drw-update-deleted-feature s9, live (a)/(b)).
-  - LANDED e591ac9a as 21da2808 (20:32) holds the above. IN WORK (uncommitted, x153 green): Esc after a tool selects no
-    annotation; what it made is hovered under the resting pointer (`update_hover` in `cancel`), black once the pointer
-    moves; `esc_kept` keeps only its grips for live's reader (stale paint, not drawn) until another hover, a press,
-    a tool or leaving the tab; the reader reads a hovered non-note annotation as a lit one. Run r48 on vibex7 (slot):
-    the 46 affected drw-* scenarios, baseline (uip1121e) then the rework (uip1121f); land if f >= e. r45 (84 of
-    my scenarios, main's e591ac9a binary) runs on vibe2 into uip1121d.
-  - drw-max-min-fillet-arc s6 (live [] after Esc): ours starts the side's extension line at the perpendicular's foot
-    (40, 6), so 12 mm of extension lines lie in Front's box (~94 px read); live starts it at the side's end nearest
-    the dimension line (40, 0): only the left one's 6 mm (~47 px). IN WORK (x154): MaxMinDimension.b_edge (resolved
-    edge ends, not saved; set by build.rs and pending.rs), sheet.rs `ext_from_edge` moves that line's start.
-  - IN WORK too: Note colour panel opens with its hex focused + selected, `note_color_focus` reads it as a field
-    (note-format-lists s14; s16 waits on REQUESTS (j)); run.py drops Change to version… in pre-Pro takes (5
-    drw-export-* matched in r45's re-compare); styles-radial s14 test `with_styles_open_a_clicked_dimension_reads`
-    (x156). r49 (vibe2): app from this tree + the 11 affected scenarios into uip1121g, then commit + ops e2e + land.
-  - Live (f): Export opens on the account's last-used format (ours remembers it too; drw-export-formats' take opened
-    on DXF from an earlier export: artefact). A placed custom table IS listed under annotations (uncommitted: listed,
-    run.py strips live's MTEXT braces); live re-takes cell/split/table-cell-menu land as 0eccd76a; (h) done
-    (1336af80: insert/delete/properties list it; the other three place no table); (g) re-recorded, landing as 648646fa; (i) drw-export-formats after a PDF export, (j) swatch twice: next on lane 1.
+  - LANDED e591ac9a as 21da2808 (20:32) holds the above. COMMITTED 7038164b0 (rebased, ops e2e 277/277 on vibex8,
+    not landed): Esc leaves what a tool made hovered, not selected (`update_hover` in `cancel`; `esc_kept` keeps only
+    its grips for live's reader until another hover, a press, a tool or leaving the tab); a placed custom table listed;
+    max/min to an edge: `MaxMinDimension.b_edge` (resolved, not saved) + sheet.rs `ext_from_edge` start that extension
+    line at the edge's end (drw-max-min-fillet-arc s6); Note colour panel opens with its hex focused + selected
+    (`note_color_focus`, note-format-lists s14); run.py drops Change to version… in pre-Pro takes.
+  - r49 (vibe2, uip1121g): 5 dimension scenarios regressed (a hovered annotation read as selected). COMMITTED fix on
+    top: a hovered annotation reads lit only if Esc left it (`esc_kept`: a tool made it, or Esc in Select deselected
+    it: styles-radial s16); Esc after a 2 point centerline keeps it, read EDGE^ (cylinder-axis s5); Esc with a custom
+    table's cells picked keeps the table; the Note color panel sits over the swatch (top 46, live s14), a press in it
+    off its fields keeps the keyboard there (field, no text), a press elsewhere in the Note panel hands it back, the
+    swatch clicked again keeps it open, Esc closes it alone (live (j): note-format-lists s16-s22 all match).
+    x160/x161 (vibex7): 23/26 + 19/20; left: custom-table-cell s15 (live keeps the table lit after Esc closes the
+    cell menu + Cell dialog; ours reads nothing: not from this batch, next), table-cell-menu s3 (live reads the
+    Insert click's focus as a field in one 11-21 take and "other" in two others: live timing, left). x162 (vibex7):
+    151 drw-* scenarios into uip1121l before landing both commits.
+  - Waiting on live: (k) 3 point circle centerline at hole centres listed [] by the 11-18.1 reader
+    (drw-centerline-circle-3-point-hole-centres s4, ours 1); qa's (5) for P0 DRW-BORDER-LIT (frame lines are
+    selectable alone when formats are unlocked, behaviours "(2)": the lit look is live's, ours lacks the mid grip;
+    open: hover look, press-drag); (i) drw-export-formats on PDF (df57f52f) and (g) 648646fa queued: re-run on main.
 ## Next, in order
 1. Drawing matrix (11-21 05:21): 1419 = / 381 shown / 0 differs / 0 present-only / 0 missing of 1842 (05:21: the Note
    panel's nested reading counted; its Border size gained Tight fit and 5 Characters). Every panel
@@ -101,15 +103,6 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
 2. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
-- live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell
-  #e2e2e2, tan frame; 37ecb60c); the BOM row's part tan in the views and its callouts blue were ours already. Local:
-  one click on a BOM cell selects it and opens the Cell panel (sizes + formats + a greyed Override), a double-click the
-  same (live cferr-bomclk-1118 (b)); Split BOM table below puts the second part 3 mm under the first, same x and width.
-  A placed BOM stays selected (live2 bomsel-1118; the recorder can't read tables, and reads no EDGE under a just-placed
-  one, so ours doesn't count it until the next press, `placed_table`): local. the recorder's TABLE kind is read (ours `TABLE` since 2026-11-18.1, drawing_ui_state.rs). The "︿" is the isometric part's corner, not a control
-  (live2). Update from
-  this workspace enabling ~3 s late is live's server latency, not a target. Custom feature ✓ with a field error:
-  live (a) confirms ours (pale, Enter no-op; no field named: ✓ commits).
 - live2 drawing tables (behaviours "studios (lead 11-18 ~03:36, feel): drawing tables", live/studios/tables-1118/):
   (1) hovering a BOM row shades it darker grey and draws its part tan in every view; a selected table has a small "︿"
   chevron centred under it. (2) the BOM tool places on one click (no ✓), panel closes, table stays selected. (3)

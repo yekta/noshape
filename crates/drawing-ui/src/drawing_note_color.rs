@@ -7,7 +7,7 @@
 
 use crate::drawing_view::*;
 use crate::theme::p;
-use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::input::{Escape, Input, InputEvent, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -43,6 +43,8 @@ pub struct NoteColorDlg {
     pub mix: crate::color_mixer::MixerState,
     hex: Entity<InputState>,
     rgb: [Entity<InputState>; 3],
+    /// The panel itself: a press inside it off its fields takes the focus there (live drw-note-swatch-twice s16).
+    focus: FocusHandle,
     _subs: Vec<Subscription>,
 }
 
@@ -60,6 +62,11 @@ impl DrawingEditor {
     /// Open the Note color panel on the note's colour.
     pub fn open_note_color(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(c) = self.note_color_now() else { return };
+        if let Some(d) = &self.note_color {
+            window.focus(&d.focus, cx);
+            cx.notify();
+            return;
+        }
         let hex = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(format!("{:06X}", join(c))));
         let rgb = [0, 1, 2].map(|i| cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(c[i].to_string())));
         let mut subs = vec![cx.subscribe_in(&hex, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
@@ -85,13 +92,18 @@ impl DrawingEditor {
             s.focus(window, cx);
             s.select_all(window, cx);
         });
-        self.note_color = Some(NoteColorDlg { color: c, orig: c, mixer: false, mix: crate::color_mixer::MixerState::from_rgb(c), hex, rgb, _subs: subs });
+        self.note_color = Some(NoteColorDlg { color: c, orig: c, mixer: false, mix: crate::color_mixer::MixerState::from_rgb(c), hex, rgb, focus: cx.focus_handle(), _subs: subs });
         cx.notify();
     }
 
-    /// The Note color panel's hex field holding the keyboard, as live's recorder reads it: a field.
+    /// The Note color panel's hex field or the panel itself holding the keyboard, as live's recorder reads it: a
+    /// field (the panel: a div, no text; live drw-note-swatch-twice s16).
     pub fn note_color_focus(&self, window: &Window, cx: &App) -> Option<serde_json::Value> {
-        let st = self.note_color.as_ref()?.hex.read(cx);
+        let d = self.note_color.as_ref()?;
+        if d.focus.is_focused(window) {
+            return Some(serde_json::json!({ "kind": "field", "label": null }));
+        }
+        let st = d.hex.read(cx);
         if !st.focus_handle(cx).is_focused(window) {
             return None;
         }
@@ -113,7 +125,7 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    fn close_note_color(&mut self, ok: bool, cx: &mut Context<Self>) {
+    pub(crate) fn close_note_color(&mut self, ok: bool, cx: &mut Context<Self>) {
         let Some(d) = self.note_color.take() else { return };
         if ok {
             // Black is the ink (no colour override).
@@ -125,6 +137,15 @@ impl DrawingEditor {
             }
         }
         cx.notify();
+    }
+
+    /// A press in the Note panel off the colour panel: the keyboard leaves the colour panel, which stays open (live
+    /// drw-note-swatch-twice: Flag notes clicked, focus on the page).
+    pub fn note_color_press_outside(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(d) = &self.note_color else { return };
+        if d.focus.contains_focused(window, cx) {
+            window.focus(&self.focus, cx);
+        }
     }
 
     /// The panel, positioned under the Note panel's colour button.
@@ -226,9 +247,30 @@ impl DrawingEditor {
             v_flex()
                 .id("dr-note-color")
                 .absolute()
-                // Under the colour button (B I U S: 4 × 32 px in).
+                // Over the colour button (B I U S: 4 × 32 px in; live drw-note-swatch-twice s14: 46 px under the
+                // Note panel's top, so a second click on the button lands in it).
                 .left(px(132.))
-                .top(px(97.))
+                .top(px(46.))
+                .track_focus(&d.focus)
+                // (Before a field's own press: a press off the fields leaves the keyboard with the panel.)
+                .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                    if let Some(d) = &this.note_color {
+                        window.focus(&d.focus, cx);
+                    }
+                }))
+                // Esc closes the colour panel only (live drw-note-swatch-twice s16-later), its field's Escape too.
+                .capture_action(cx.listener(|this, _: &Escape, window, cx| {
+                    this.close_note_color(false, cx);
+                    window.focus(&this.focus, cx);
+                    cx.stop_propagation();
+                }))
+                .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                    if e.keystroke.key == "escape" {
+                        this.close_note_color(false, cx);
+                        window.focus(&this.focus, cx);
+                        cx.stop_propagation();
+                    }
+                }))
                 .w(px(220.))
                 .bg(pal.dialog_bg)
                 .shadow(crate::drawing_chrome::dialog_shadow())
