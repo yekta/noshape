@@ -302,12 +302,23 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   only the constraints it is the first entity of. Right edge: nothing (its left ∥ right is missing); top: "⊥ —" without ∥
   (bottom ∥ top); left and bottom show their ∥. Live shows every constraint on the hovered line (top: ⊥, ⫽, —; behaviours
   "glyph linger" 11-17, live/psui/feel-1417/). qa-scratch/tickets/hover-glyphs-second-entity-w3.png (right, left, top, bottom).
-- [ ] P0 **FEEL-EXTEND-NO-EXTEND (skasm)**: Sketch fillet ▾ › Extend, line (-30, 10)→(-5, 10) and a vertical line x = 20
+- [x] not a bug (qa 20:57: live's Extend is two picks, the curve then the boundary (behaviours "psui (2992)"); ours with the 2nd click
+  on x = 20 extends and adds a Coincident, as live. The stub after the pointer leaves waits on REQUESTS qa 20:44 (8)) P0 **FEEL-EXTEND-NO-EXTEND (skasm)**: Sketch fillet ▾ › Extend, line (-30, 10)→(-5, 10) and a vertical line x = 20
   (y -20..30). Hovering the line near its right end lights the line and the end point but draws no extension preview; the click
   **selects the line (yellow)** and nothing extends (2 lines, same constraints). After the pointer leaves, a light-blue stub runs
   from the end to the **y axis**, not to the line at x = 20. Help: "Extend: click the end of an entity to extend it to the next
   boundary". qa-scratch/tickets/extend-w3.png (hover, after click, pointer away). Live asked for the exact look (REQUESTS qa 20:44 (8)).
-- [ ] P0 **FEEL-OFFSET-PREVIEW-LOOK (skasm)**: Offset (O), click a rectangle edge: our light-blue preview line has no end
+- [ ] P0 **FEEL-CHAIN-ORIGIN-DROP (skasm)**: one Line chain (-30, 0) → origin → (0, 20) → (-30, 20): ours drops the segment
+  from the origin (after the click at (0, 20): 1 line; the same going diagonally or down). Live keeps it: 3 lines, C C C H H V
+  (live/qa/walk3-1121/walk3-2-chain-origin.json, c2–c4). A segment drawn alone from the origin works; ours out-w5/s5-chain-origin-*.
+- [ ] P0 **FEEL-TANGENT-ARC-AT-ORIGIN (skasm)**: line (-30, 0) → origin, Tangent arc clicked at the origin, then at (15, 12):
+  ours makes nothing (1 line). Live makes the arc, tangent, with a Coincident (walk3-6a-tangent-arc-origin.json, preview / c2).
+  Off the origin ours works (s5-tarc-off-origin).
+- [ ] P0 **FEEL-SPLINE-PREVIEW-VANISHES (skasm)**: Spline, clicks at (-20, 0), (0, 10), (20, 0) with the pointer kept still:
+  after the 2nd and 3rd clicks ours shows only the last point; live keeps the spline through every placed point
+  (walk3-5-spline-still c2still / c3still). qa-scratch/tickets/spline-live-w3.png (live c1, c2still, c3still, moved),
+  spline-ours-w3.png (ours after clicks 1–3).
+- [ ] P0 **FEEL-OFFSET-PREVIEW-LOOK (skasm; end points fixed locally 20:56, the 0.25 dimension and arrow gap asked in REQUESTS skasm 20:55)**: Offset (O), click a rectangle edge: our light-blue preview line has no end
   points and no **0.25** dimension between the two lines, and the hollow arrow floats ~10 px past the preview line. Live
   (sketch/123–124): the preview has its two light-blue end points, a "0.25" dimension with an arrow from the picked line to the
   preview, and the arrow's tail starts on the preview line. qa-scratch/tickets/offset-preview-w3.png (live 123, 124; ours).
@@ -325,7 +336,9 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   select, trim click and drag, Use on a model edge, the sketch-fillet R0.5 inch default, Show constraints off by default,
   mirror, 3-point circle and ellipse, sketch chamfer (point lit on hover, two 0.25 dimensions), off-origin tangent arc and slot
   (Ø0.5), dimensions (placing, the value box at full precision "2.369231 in" selected, typing + Enter, double-click to re-edit,
-  a hovered dimension gold with a tan label; live 11–15, 141), Q on a selected line (dash-dot, region fill dropped).
+  a hovered dimension gold with a tan label; live 11–15, 141), Q on a selected line (dash-dot, region fill dropped), dimension
+  label drags. Live's walk3-1121 answers matched: lines on an axis black with a blue free end, a 3-point arc's ends on the x axis
+  (H H), the circle's boxed Ø kept after the commit, the shortcut sheet in a sketch (General tab).
 - Asked live (REQUESTS "qa 20:44"): lines on an axis drawn black, a chain through the origin dropping its segment up the y axis,
   arc ends on the axes getting H / V, the circle's boxed Ø, the spline vanishing after a click, tangent arc / slot from a line
   end on the origin making nothing, Shift+/ tab in a sketch, Extend's look, badges on hover with a tool active (9), a
