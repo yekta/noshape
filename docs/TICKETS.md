@@ -102,6 +102,7 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   already selected). sketch-row-menu-{section-view,show,view-normal,edit-appearance,export-dxf,paste-into-sketch}, sketch-row-copy-paste-onto-front,
   sketch-rows-{hide-all,hide-other,show-all}-sketches, feature-row-{rclick-sketch,roll-to-here}, rollback-then-{add-feature,new-sketch,roll-to-end}.
   Wanted: one live answer. Either the recordings are re-recorded with live's current menu, or the plain right-click shows Section view… again.
+  psui 13:2x: live asked (REQUESTS 13:27, P1) to re-record sketch-row-menu-show + feature-row-rclick-sketch as is; if they list Section view… ours brings it back on the plain right-click, else the 15 takes are re-recorded; ours unchanged till then.
 
 ## qa, 2026-11-21 (agent API gaps)
 - [ ] asm side verified green 3c87f195c (qa 11-21 06:2x, CLI walk2/src/massop.py, e07b0eb39): faces + reference about a world-aligned corner connector: area 800, perimeter 120, Lxx 106666.664, Lxy 160000, Lyy 426666.657, Lzz 533333.321 (the app's numbers; FACE-MOMENT-DIGITS); about the centroid 26666.664 / 0 / 106666.657; top + side faces refused "Face selections are not coplanar" (param faces). A bare vertex connector is still a face's frame (Lxx 0) until 969187e3. Open: the Part Studio op (query_mass_properties faces). P2 **OP-MASS-FACE-SECTION (asm; Part Studio side: lead to route)**: Mass and section properties › Face (area, perimeter,
