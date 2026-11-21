@@ -82,6 +82,22 @@ impl DrawingEditor {
     /// an arrowhead or an attachment point inside (a crossing box with that point too); a crossing box takes a view when it
     /// meets its frame.
     pub fn select_in_box(&mut self, a: [f64; 2], b: [f64; 2], add: bool, cx: &mut Context<Self>) {
+        let picked = self.box_picks(a, b);
+        if !add {
+            self.selection.clear();
+        }
+        for s in picked {
+            if !self.selection.contains(&s) {
+                self.selection.push(s);
+            }
+        }
+        self.box_preview.clear();
+        self.cell_sel = None;
+        self.redraw(cx);
+    }
+
+    /// What a box select from `a` to `b` picks (select_in_box), also drawn while it is dragged (live fc-1121 (5)).
+    pub(crate) fn box_picks(&self, a: [f64; 2], b: [f64; 2]) -> Vec<Sel> {
         use noshape_model::drawing::font::text_box;
         let (lo, hi) = ([a[0].min(b[0]), a[1].min(b[1])], [a[0].max(b[0]), a[1].max(b[1])]);
         let crossing = b[0] < a[0];
@@ -92,8 +108,8 @@ impl DrawingEditor {
             true => pts.iter().any(|p| inside(*p)) || pts.windows(2).any(|w| segment_meets_box(w[0], w[1], lo, hi)),
         };
         let frame = self.tol_mm(BOX_VIEW_FRAME_PX);
-        let picked: Vec<Sel> = {
-            let Some(built) = &self.built else { return };
+        {
+            let Some(built) = &self.built else { return Vec::new() };
             let pk = self.pk();
             let sheet = self.current_sheet();
             let dimension = |sel: &Sel| match sel {
@@ -148,17 +164,7 @@ impl DrawingEditor {
                 note(Sel::View(pl.id), ok, false);
             }
             all_in.into_iter().filter(|x| x.1).map(|x| x.0).collect()
-        };
-        if !add {
-            self.selection.clear();
         }
-        for s in picked {
-            if !self.selection.contains(&s) {
-                self.selection.push(s);
-            }
-        }
-        self.cell_sel = None;
-        self.redraw(cx);
     }
 
     /// The box of a box select being dragged: Onshape's window box left to right (#1651B0 at 20 %, its border at

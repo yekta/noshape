@@ -322,6 +322,48 @@ fn a_box_takes_a_view_by_a_whole_edge_or_by_crossing_its_frame(cx: &mut TestAppC
     }
 }
 
+/// Live fc-1121 (5): while a box select is dragged, what it would pick is already drawn selected (a crossing box past a
+/// view's corner: the view's orange frame); the release selects it.
+#[gpui::test]
+fn a_dragged_box_shows_what_it_picks_before_the_release(cx: &mut TestAppContext) {
+    use crate::drawing_view::Drag;
+    use gpui_kit::{MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent};
+    use noshape_scene::drawing_tools::Sel;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "box-preview");
+    real_sheet(cx, window, &editor);
+    let (pl, zoom) = cx.update(|cx| {
+        let e = editor.read(cx);
+        (e.built.as_ref().map(|b| b.placements[0]).expect("a view"), e.zoom)
+    });
+    let at = |cx: &mut TestAppContext, d: f64| {
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let l = e.sheet_to_local([pl.max[0] + d / zoom, pl.max[1] + d / zoom]);
+            e.bounds.origin + Point::new(px(l[0] as f32), px(l[1] as f32))
+        })
+    };
+    let (from, to) = (at(cx, 30.0), at(cx, 4.0));
+    let buttons = Some(MouseButton::Left);
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+        e.on_mouse_move(&MouseMoveEvent { position: from, pressed_button: None, modifiers: Modifiers::default() }, w, cx);
+        assert!(e.hover.is_none(), "the box starts on the empty sheet");
+        e.on_mouse_down(&MouseDownEvent { button: MouseButton::Left, position: from, modifiers: Modifiers::default(), click_count: 1, first_mouse: false }, w, cx);
+        for k in 1..=4 {
+            let position = from + (to - from) * (k as f32 / 4.0);
+            e.on_mouse_move(&MouseMoveEvent { position, pressed_button: buttons, modifiers: Modifiers::default() }, w, cx);
+        }
+        assert!(matches!(e.drag, Drag::SelectBox { .. }), "a box");
+        assert!(e.selection.is_empty(), "nothing selected yet");
+        assert_eq!(e.box_preview, vec![Sel::View(pl.id)], "the view it crosses, previewed");
+        assert!(e.view_frames().contains(&(pl.id, crate::drawing_view::DRAWING_SELECTED)), "drawn in the selected orange");
+        e.on_mouse_up(&MouseUpEvent { button: MouseButton::Left, position: to, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+        assert_eq!(e.selection, vec![Sel::View(pl.id)]);
+        assert!(e.box_preview.is_empty());
+    }))
+    .unwrap();
+}
+
 /// Live2 box-select-rule (11-16): left to right a box takes a dimension holding its whole text, an arrowhead or an
 /// attachment point, not an extension line's foot alone; right to left it takes it when it touches it.
 #[gpui::test]

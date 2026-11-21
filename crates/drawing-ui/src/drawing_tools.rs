@@ -1564,7 +1564,16 @@ impl DrawingEditor {
                 self.set_preview(Some(dr), cx);
             }
             Drag::SelectCells { .. } => self.update_preview(cx),
-            Drag::SelectBox { .. } => cx.notify(),
+            // What the box would pick is lit while it is dragged (live fc-1121 (5)); Shift+drag picks none.
+            Drag::SelectBox { start } => {
+                let picks = if e.modifiers.shift { Vec::new() } else { self.box_picks(start, self.cursor) };
+                if picks != self.box_preview {
+                    self.box_preview = picks;
+                    self.redraw(cx);
+                } else {
+                    cx.notify();
+                }
+            }
             Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveBreak { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::ResizeDetailCircle { .. } | Drag::MoveDetailLabel { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } => {
                 let drag = self.drag.clone();
                 self.extra_drag_move(&drag, cx);
@@ -1867,6 +1876,21 @@ impl DrawingEditor {
         }
         let best = |axis: usize| pts.iter().filter(|p| (p[axis] - c[axis]).abs() <= tol).min_by(|a, b| (a[axis] - c[axis]).abs().total_cmp(&(b[axis] - c[axis]).abs())).copied();
         let (bx, by) = (best(0), best(1));
+        // A dimension being placed: held on another dimension's + mark within reach (live2 rad-note), else only the
+        // line to another's x or y shows (live fc-1121 (1): within ~7 px, no snap).
+        if matches!(self.tool, Tool::Dimension { .. }) {
+            if let Some(m) = self.dimension_pick_marks().into_iter().filter(|m| len(sub(*m, c)) <= tol).min_by(|a, b| len(sub(*a, c)).total_cmp(&len(sub(*b, c)))) {
+                self.cursor = m;
+                return;
+            }
+            if let Some(p) = bx {
+                self.infer_lines.push((p, [p[0], c[1]]));
+            }
+            if let Some(p) = by {
+                self.infer_lines.push((p, [c[0], p[1]]));
+            }
+            return;
+        }
         let mut snapped = c;
         if let Some(p) = bx {
             snapped[0] = p[0];
@@ -1959,7 +1983,7 @@ impl DrawingEditor {
             Drag::SelectCells { id, start } => self.select_cells_in(id, start, self.cursor, cx),
             // A box adds to the selection; Shift+drag makes none (live2 feel/drawing.json F3).
             Drag::SelectBox { start } if !e.modifiers.shift => self.select_in_box(start, self.cursor, true, cx),
-            Drag::SelectBox { .. } => {}
+            Drag::SelectBox { .. } => self.box_preview.clear(),
             Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveBreak { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::ResizeDetailCircle { .. } | Drag::MoveDetailLabel { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } | Drag::LeaderBend { .. } | Drag::LeaderEnd { .. } | Drag::LeaderNode { .. } => {
                 let name = match drag {
                     Drag::LeaderBend { .. } | Drag::LeaderEnd { .. } | Drag::LeaderNode { .. } => "Move by grip",

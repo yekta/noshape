@@ -614,6 +614,8 @@ pub struct DrawingEditor {
     /// A title block field edited in place: its cell's text is hidden.
     pub inplace_field: Option<String>,
     pub panel_highlight: Option<Sel>,
+    /// What the box select being dragged would pick, drawn selected (live fc-1121 (5)).
+    pub box_preview: Vec<Sel>,
     /// The edge the Edge condition symbol tool's first click picked, drawn selected until its next click (live
     /// drw-edge-condition; Weld symbol's isn't). See [`Self::lit_tool_edge`].
     pub tool_edge: Option<Sel>,
@@ -908,6 +910,7 @@ impl DrawingEditor {
             inplace_cell: None,
             inplace_field: None,
             panel_highlight: None,
+            box_preview: Vec::new(),
             tool_edge: None,
             tool_points: Vec::new(),
             tool_start: (0, 0),
@@ -1725,7 +1728,8 @@ impl DrawingEditor {
             // drw-styles-radial s10): drawn by push_annotation_look, not tinted.
             let cur = &self.drawing.sheets[self.sheet];
             let dims: Vec<Sel> = self.selection.iter().copied().filter(|s| !placing && matches!(s, Sel::Annotation(id) if dragged != Some(*id) && cur.annotations.iter().any(|a| a.id == *id && a.kind.is_dimension()))).collect();
-            for s in self.selection.iter().chain(self.panel_highlight.iter()).chain(self.lit_tool_edge().iter()).filter(|s| !matches!(s, Sel::ViewLabel(_) | Sel::Table(_) | Sel::CutLine(_)) && !(placing && matches!(s, Sel::Annotation(_))) && dragged.is_none_or(|d| **s != Sel::Annotation(d)) && !dims.contains(s)) {
+            let boxed = self.box_preview.iter().filter(|_| matches!(self.drag, Drag::SelectBox { .. }));
+            for s in self.selection.iter().chain(self.panel_highlight.iter()).chain(self.lit_tool_edge().iter()).chain(boxed).filter(|s| !matches!(s, Sel::ViewLabel(_) | Sel::Table(_) | Sel::CutLine(_)) && !(placing && matches!(s, Sel::Annotation(_))) && dragged.is_none_or(|d| **s != Sel::Annotation(d)) && !dims.contains(s)) {
                 for p in self.picks_of(*s).into_iter().filter(|p| !datums.contains(p)) {
                     scene.add_flag(p, state::SELECTED);
                 }
@@ -1967,9 +1971,11 @@ impl DrawingEditor {
         // A hovered cutting line frames its section view light blue (live2 drw-tools-1119 sl.png).
         let colour = if select && self.hovered_cut_line().is_some() { 0x90cef1 } else { DRAWING_HOVER };
         let mut frames: Vec<(ViewId, u32)> = hovered.map(|v| (v, colour)).into_iter().collect();
-        for s in &self.selection {
+        let boxed = self.box_preview.iter().filter(|_| matches!(self.drag, Drag::SelectBox { .. }));
+        for s in self.selection.iter().chain(boxed) {
             if let Sel::View(v) = s
                 && Some(*v) != hovered
+                && !frames.iter().any(|f| f.0 == *v)
             {
                 frames.push((*v, DRAWING_SELECTED));
             }

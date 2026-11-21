@@ -285,6 +285,44 @@ fn placing_a_note_lines_up_with_another_within_8_px(cx: &mut TestAppContext) {
     }
 }
 
+/// Live fc-1121 (1): placing a dimension, a pink dotted line to another annotation's line shows within ~7 px of it, but
+/// the dimension doesn't snap onto it (a note does, above).
+#[gpui::test]
+fn placing_a_dimension_shows_the_alignment_line_without_snapping(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::DimTool;
+    SUGGESTED.set(true);
+    SETUP.set(Some(|ctx, dw| {
+        call(ctx, "drawing_note", json!({ "drawing": dw, "text": "NOTE", "position": [30, 40] }));
+    }));
+    let (window, editor) = drawing(cx, "feel-dim-cue");
+    real_sheet(cx, window, &editor);
+    let (note, zoom, mid) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let a = e.current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Note { .. })).expect("the note");
+        let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+        let len = |p: &[[f64; 2]]| (p[1][0] - p[0][0]).hypot(p[1][1] - p[0][1]);
+        let edge = g.edges.iter().filter(|x| x.visible && x.points.len() == 2).max_by(|a, b| len(&a.points).total_cmp(&len(&b.points))).expect("a straight edge");
+        let (p, q) = (pl.to_sheet(edge.points[0]), pl.to_sheet(edge.points[1]));
+        (a.position, e.zoom, [(p[0] + q[0]) / 2.0, (p[1] + q[1]) / 2.0])
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)));
+    draw(cx, window);
+    click_at(cx, window, &editor, mid, Modifiers::default());
+    assert!(cx.update(|cx| editor.read(cx).pending_annotation().is_some()), "a dimension being placed");
+    for (off, cue) in [(5.0, true), (12.0, false)] {
+        let s = [mid[0] + 3.0, note[1] + off / zoom];
+        VisualTestContext::from_window(window, cx).simulate_mouse_move(at_window(cx, &editor, s), None, Modifiers::default());
+        draw(cx, window);
+        let (shown, y) = cx.update(|cx| {
+            let e = editor.read(cx);
+            (e.infer_lines.iter().any(|(from, to)| (from[1] - note[1]).abs() < 1e-9 && (to[1] - note[1]).abs() < 1e-9), e.cursor[1])
+        });
+        assert_eq!(shown, cue, "{off} px off the note's line: the alignment line");
+        assert!((y - s[1]).abs() < 1e-3, "{off} px off: the pointer not moved onto it ({y} for {})", s[1]);
+    }
+}
+
 /// qa 11-19 walk: after a Table's ✓ its placement's alignment line and ✕ went on being drawn, the pointer elsewhere.
 #[gpui::test]
 fn a_tables_alignment_line_goes_with_its_check_mark(cx: &mut TestAppContext) {
