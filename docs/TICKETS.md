@@ -340,7 +340,8 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   (Ø0.5), dimensions (placing, the value box at full precision "2.369231 in" selected, typing + Enter, double-click to re-edit,
   a hovered dimension gold with a tan label; live 11–15, 141), Q on a selected line (dash-dot, region fill dropped), dimension
   label drags. Live's walk3-1121 answers matched: lines on an axis black with a blue free end, a 3-point arc's ends on the x axis
-  (H H), the circle's boxed Ø kept after the commit, the shortcut sheet in a sketch (General tab).
+  (H H), the circle's boxed Ø kept after the commit, the shortcut sheet in a sketch (General tab); Extend's two picks; Shift+A mid-chain
+  (Tangent arc, tangent + coincident) and Enter mid-chain (the boxed length placed as a dimension, one Esc exits; live 212–213).
 - Asked live (REQUESTS "qa 20:44"): lines on an axis drawn black, a chain through the origin dropping its segment up the y axis,
   arc ends on the axes getting H / V, the circle's boxed Ø, the spline vanishing after a click, tangent arc / slot from a line
   end on the origin making nothing, Shift+/ tab in a sketch, Extend's look, badges on hover with a tool active (9), a
