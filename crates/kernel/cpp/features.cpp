@@ -6065,6 +6065,10 @@ std::pair<TopoDS_Shape, HHist> checked_blend(const TopoDS_Shape& input, const Bl
           const bool         as_is = valid_unscaled(r3);
           HHist              hc    = h2;
           const TopoDS_Shape r4    = necks_cut(input, r3, width, hc);
+          // (Nothing to cut and invalid at the part's scale: a retry's hair of an edge, below the part's tolerance,
+          // crossing its wire (isaac's Fillet 4, a 1e-10 m edge): the next step.)
+          if (r4.IsNull() && !as_is)
+            continue;
           if (r4.IsNull())
             return {r3, h2};
           if (as_is)
