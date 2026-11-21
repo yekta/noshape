@@ -823,7 +823,8 @@ real app (green build, Xvfb, one app): our screen at live's camera (the ui-parit
 same crop round the pointer after live's rest, compared by shape, size at 1x and sampled colours: = or ≠. psui fixes,
 qa re-scores the cells on each land. Our crops: qa-scratch/hm/ (walk kit vibe2 ~/agents/qa-keep/walk3).
 
-**Matched: 28 / 77** (18:0x, green 5b9feb71a, before psui's 4f2cb3ce: Part Studio 15 / 26, sketch entities in the Part Studio 5 / 21,
+**Matched: 31 / 88** (18:17: 28 / 77 on green 5b9feb71a; 4f2cb3ce's green adds the three midpoint approach cells (along the edge, from the
+face, on a selected edge); batch 3 0 / 11 on 4f2cb3ce. Before psui's 1e44717c: Part Studio 18 / 26, sketch entities in the Part Studio 5 / 21,
 in sketch edit 8 / 25, Line-tool inference 0 / 5). Ours: live's document (block 40×30×20 + Sketch 2: point (60,25), line (60,5)–(90,5),
 arc c(75,15) r8 0.3..2.8 rad, circle c(100,20) r6), `f`, the same targets and states, a fresh app per cell; our fit matches live's camera
 to the pixel (the point at (1261, 520), live (1262, 520)). 80×80 crops round the target (inference 120×120): qa-scratch/hm2/
@@ -833,7 +834,7 @@ lit) are not scored: a hand always arrives along a path, and every continuous pa
 paths"); scored with a stepped approach instead. Not scored: the model's edge lines (live ≈2 px #2A343A anti-aliased, ours 1 px
 black), as ours draws at 1× MSAA on a software rasteriser by design.
 
-Part Studio, no tool (15 / 26):
+Part Studio, no tool (18 / 26 on 4f2cb3ce):
 
 | Target / state | Live | Ours | Status |
 |---|---|---|---|
@@ -848,11 +849,11 @@ Part Studio, no tool (15 / 26):
 | edge / selected + hovered | = selected + the marker under the band | black ring over the band | ≠ P0 FEEL-MIDPOINT-MARKER-OVER-BAND |
 | edge / hovered, a face selected | = hovered | = our hovered | ≠ P0 FEEL-MIDPOINT-MARKER-OVER-BAND |
 | midpoint / none | — | — | = |
-| midpoint / approached (2 px steps from the top or front face; live any continuous path) | only the point lit: light-orange ring #F6C285 / #FFD8AC, the edge black, from 0.2 s | band + black ring (b1-midapp-face / -front) | ≠ P0 FEEL-MIDPOINT-ARRIVED-RING |
+| midpoint / approached (2 px steps from the top or front face; live any continuous path) | only the point lit: light-orange ring #F6C285 / #FFD8AC, the edge black, from 0.2 s | the same on 4f2cb3ce (b1-midapp-front) | = |
 | midpoint / selected | yellow ring 12 px #F6BE15 / #FFD65B | the same | = |
 | midpoint / selected + hovered | light-orange ring, no band | band + yellow ring + black ring | ≠ P0 FEEL-MIDPOINT-ARRIVED-RING |
-| midpoint / arrived along the edge | light-orange ring within 150 ms, band goes | band + black ring stay | ≠ P0 FEEL-MIDPOINT-ARRIVED-RING |
-| midpoint / approached on a selected edge (along it, or from the face) | solid orange dot #FFB32E, soft halo, no outline | band + black ring | ≠ P0 FEEL-HOVER-POINT-ON-SELECTED-EDGE |
+| midpoint / arrived along the edge | light-orange ring within 150 ms, band goes | the same on 4f2cb3ce | = |
+| midpoint / approached on a selected edge (along it, or from the face) | solid orange dot #FFB32E, soft halo, no outline | the same on 4f2cb3ce | = |
 | face / none | — | the same | = |
 | face / hovered | 2 px #FFC685 boundary, fill unchanged | the same | = |
 | face / selected | fill #E4AA38 + 2 px #FFA90A boundary | the same | = |
@@ -931,6 +932,23 @@ Line tool inference, sketch edit (0 / 5; live sk/inference-*-at):
 | … onto the point | the point lit (light-orange disc) inside the in-plane #FFCC34 square; coincident cursor | point not lit, screen-aligned square; cursor = | ≠ P0 FEEL-SKETCH-INFERENCE-MARKER |
 | … onto the line away from its midpoint | line lit, blue through; coincident cursor | line lit opaque; cursor = | ≠ P0 FEEL-SKETCH-BAND-MIDDLE |
 
+
+A feature dialog's selection field and the origin (batch 3; 0 / 11 on green 4f2cb3ce; live b3/, `_f` 1.2 s after arriving,
+`_s` after the click; ours qa-scratch/hm2/b3-4f2c.png):
+
+| Cell | Live | Ours | Status |
+|---|---|---|---|
+| Fillet field, edge hovered | 5 px #FFC685 band, dark line through, no marker | no marker; band muted #D1B088 / #E0C49E | ≠ P0 FEEL-FIELD-HOVER-DIM |
+| Fillet field, midpoint hovered | = the edge (no marker, no ring) | = our edge | ≠ P0 FEEL-FIELD-HOVER-DIM |
+| Fillet field, face hovered | 2 px #FFC685 boundary | boundary muted #B28A5D | ≠ P0 FEEL-FIELD-HOVER-DIM |
+| Fillet field, vertex hovered | the top front edge lights (the field takes edges and faces) | the vertical edge lights, muted | ≠ P0 FEEL-FIELD-VERTEX-EDGE, FEEL-FIELD-HOVER-DIM |
+| Fillet field, edge picked | #FFA90A band + the radius manipulator, the edge still sharp | band + manipulator + the rounded preview drawn | ≠ P0 FEEL-FIELD-PICK-PREVIEW |
+| Fillet field, picked edge hovered | = picked | = our picked | ≠ P0 FEEL-FIELD-PICK-PREVIEW |
+| Fillet field, face hovered with an edge picked | the edge #FFA90A, the face boundary #FFC685 | preview drawn, boundary muted | ≠ P0 FEEL-FIELD-PICK-PREVIEW, FEEL-FIELD-HOVER-DIM |
+| origin at the block's corner, hovered | the +x edge through it lights; the origin stays a black ring | the vertical edge lights, with its black midpoint marker | ≠ P0 FEEL-ORIGIN-HOVER-EDGE |
+| origin, clicked | the +x edge selected | the vertical edge selected | ≠ P0 FEEL-ORIGIN-HOVER-EDGE |
+| origin, selected + hovered | = selected | = our selected | ≠ P0 FEEL-ORIGIN-HOVER-EDGE |
+| origin hovered, the right face selected | = hovered | = our hovered | ≠ P0 FEEL-ORIGIN-HOVER-EDGE |
 
 ## Captures 11-17 / 11-18 (audit: one row per feel finding)
 

@@ -278,7 +278,7 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   no inertia, no launch file, and the option merges one mesh.
 ## qa, 2026-11-21 (ui-parity 1121-0923-07879475 + loop 1121-0935-92d02c14, rechecked on green 5b9feb71a, vibe2 one app)
 
-- [ ] P2 **UIP-THREAD-MESSAGE-TWICE (core)**: external-thread-chamfer-undercut step 5: live's message "Exact match for thread size not found."; ours
+- [x] verified (qa 18:17, green 02ccb4ef7: 11/11 states match) P2 **UIP-THREAD-MESSAGE-TWICE (core)**: external-thread-chamfer-undercut step 5: live's message "Exact match for thread size not found."; ours
   shows it twice ("…not found.\n…not found."), 7/11 states (11/11 on 11-20 23:08). Both runs and the recheck. The message is pushed by
   model-core regen/features/hole.rs:951 and std; std 3132 embedded 08:18 (8631c5717) is the likely second copy.
 - [x] P2 **UIP-COMPARE-HOVER-PART (studios)**: ver-compare-hover-part step 5: live selects the FACE, ours a FEATURE (5/6 states; 6/6 on 11-20 23:08).
@@ -336,6 +336,20 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   plane (slanted, small, light blue, beside the line's middle). Ours writes it upright in screen space, larger, over the line's start.
   Live sk/inference-horiz-to-point-at, inference-vertical-at; ours qa-scratch/hm2/inf-zoom.png, inf-v.png.
   All six: qa 18:0x, green 5b9feb71a, live's document and camera (kit qa-scratch/hm2/gen2); scored in interaction-feel.md.
+- [ ] P0 **FEEL-FIELD-HOVER-DIM (psui)**: with a feature dialog's selection field active (Fillet 1, shift+f), our hover is drawn
+  muted: the edge band #D1B088 / #E0C49E, a face's boundary #B28A5D. Live draws the normal hover: 5 px #FFC685 band with the dark
+  line through it (no midpoint marker), a face's 2 px #FFC685 boundary. Live b3/dlg-edge-hover_f, dlg-mid-hover_f, dlg-face-hover_f.
+- [ ] P0 **FEEL-FIELD-VERTEX-EDGE (psui)**: in the Fillet field, the pointer on the block's top front right corner lights the top
+  front edge in live (the field takes edges and faces, the same id as hovering that edge); ours lights the vertical edge.
+  Live b3/dlg-vertex-hover_f.
+- [ ] P0 **FEEL-FIELD-PICK-PREVIEW (psui)**: 1.2 s after picking an edge in the Fillet field, live shows the #FFA90A band and the
+  radius manipulator with the edge still sharp; ours also draws the rounded preview (tangent lines, the shaded round). Also with
+  the picked edge hovered and with a face hovered. Live b3/dlg-edge-selected_s, dlg-edge-selhover_f, dlg-face-otherhover_f (asked
+  live when its preview appears).
+- [ ] P0 **FEEL-ORIGIN-HOVER-EDGE (psui)**: the pointer on the origin at the block's corner. Live lights the +x edge through it (5 px
+  #FFC685), the origin glyph stays a black ring, and a click selects that edge. Ours lights the vertical edge, with its black midpoint
+  marker, and a click selects the vertical edge. Also selected + hovered and with the right face selected. Live b3/ps-origin-*.
+  The four: qa 18:17, green 4f2cb3ce, live's camera (kit qa-scratch/hm2/gen2 b3-*); ours qa-scratch/hm2/b3-4f2c.png.
 
 ## psui, 2026-11-20 (live's feel coverage cov-1120; docs/parity/interaction-feel.md "cov-1120")
 - [x] done (studios 11-20: c249e0ed9 / f29e6eb2; the same rows as qa's FEEL-FS-* below, verified 07:0x on green 0bc7e772e) **P1 FS-WHEEL-72PX [studios]**: a wheel notch scrolls the Feature Studio's code 72 px in live (Ace: 4.5 lines of
