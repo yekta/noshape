@@ -5343,19 +5343,17 @@ impl PartStudioView {
         // A model face: Section view… and, planar, View normal to; no Curve/surface analysis… (live ctx-menus-1117 sk-model-face).
         let model_face = model_ref.clone().filter(|r| matches!(r, Reference::Face(_)));
         let planar_model_face = model_face.clone().filter(|r| self.frame_of_ref(r).is_some());
-        // A plane under the cursor (live ui-parity sketch-empty-rclick-menu: the Front plane behind the sketch).
-        // Not the sketch's own plane: right-clicking it is empty space.
-        let sketch_frame = self.sketch.as_ref().map(|e| e.frame);
-        let own_plane = |r: &Reference| {
-            let (Some(a), Some(b)) = (self.frame_of_ref(r), sketch_frame) else { return false };
-            a.normal.dot(b.normal).abs() > 1.0 - 1e-9 && (a.origin - b.origin).dot(b.normal).abs() < 1e-9
-        };
+        // A plane under the cursor (live ui-parity sketch-empty-rclick-menu: the Front plane behind the sketch). The
+        // sketch's own plane never hovers, yet with nothing else there it takes the right-click and is lit while the
+        // menu is open (live qa walk 5 b-rclick-75-40, ctx-menus-1117 sk-empty, sk-tool-line-active).
+        let own_plane = self.hover.is_none().then(|| self.own_plane_under_pointer(cx)).flatten();
         // While a spline is drawn no plane is lit (live2 11-17 tools-planes), yet its menu is the plane's under the
         // pointer (live sketch-spline-menu-confirm: Hide Front plane): the pick there.
         let drawing = self.sketch.as_ref().is_some_and(|s| s.tool.draws());
         let picked = || self.ui.sketch_gpu_hover.filter(|_| drawing).and_then(|(_, id)| self.built.as_ref()?.picks.get(id?).map(|t| t.reference.clone()));
-        let plane_ref = self.hover.clone().or_else(picked).filter(|r| hovered.is_none() && dim.is_none() && matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }) && !own_plane(r));
+        let plane_ref = self.hover.clone().or_else(picked).or_else(|| own_plane.clone()).filter(|r| hovered.is_none() && dim.is_none() && matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }));
         let plane_name = plane_ref.as_ref().map(|r| self.labeler(cx)(r)).unwrap_or_default();
+        let lit_plane = own_plane.filter(|r| plane_ref.as_ref() == Some(r));
         let sketch_name = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.name.clone()).unwrap_or_else(|| "sketch".into());
         let this_sketch = self.sketch.as_ref().map(|e| e.feature);
         let Some(ed) = &mut self.sketch else { return };
@@ -5543,7 +5541,7 @@ impl PartStudioView {
                 }
                 return m;
             }
-            if let Some(r) = plane_ref.clone().filter(|_| n == 0 && !tool_active) {
+            if let Some(r) = plane_ref.clone().filter(|_| n == 0) {
                 let (rh, ro, rs, rz, rn, rf) = (r.clone(), r.clone(), r.clone(), r.clone(), r.clone(), r);
                 if has_clip {
                     m = m.item(item("Paste sketch entities", Box::new(|this, w, cx| this.paste_sketch_entities(false, w, cx))));
@@ -5743,8 +5741,21 @@ impl PartStudioView {
         let sub = cx.subscribe(&menu, |this: &mut Self, _, _: &DismissEvent, cx| this.close_context_menu(cx));
         menu.update(cx, |m, cx| window.focus(&m.focus_handle(cx), cx));
         self.context_menu = Some((position, menu, sub));
+        self.ui.menu_target = lit_plane;
         self.refresh_scene(false, cx);
         cx.notify();
+    }
+
+    /// The open sketch's own shown plane under the pointer, inside its square.
+    fn own_plane_under_pointer(&self, cx: &App) -> Option<Reference> {
+        let ed = self.sketch.as_ref()?;
+        let vp = self.viewport.read(cx);
+        let (origin, dir) = vp.ray(vp.pointer_position());
+        let at = ed.frame.intersect_ray(origin, dir)?;
+        self.display.planes.iter().find(|q| {
+            let l = at - q.frame.origin;
+            !q.hidden && self.is_own_sketch_plane(&q.reference, cx) && (l.dot(q.frame.x) - q.center.x).abs() <= q.half_width && (l.dot(q.frame.y) - q.center.y).abs() <= q.half_height
+        }).map(|q| q.reference.clone())
     }
 
     /// Sketch keyboard actions on the view root.

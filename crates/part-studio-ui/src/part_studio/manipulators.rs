@@ -756,9 +756,11 @@ impl PartStudioView {
             }
             ViewportEvent::ToolDrag { position, .. } => {
                 let Some(m) = self.manip_drag else { return false };
-                // Fillet's handle does nothing for the first 5 px (live manip-1118b), as the section arrow (below).
-                if a.small {
-                    if self.ui.arrow_press.is_some_and(|q| q.distance(*position) < 5.0) {
+                // Fillet's handle does nothing for the first 5 px (live manip-1118b), as the section arrow (below); a length
+                // arrow for the first 3, then takes the full distance from the press (live feel/dialogs.json "Start").
+                let dead = if a.small { 5.0 } else { ARROW_DEAD_PX };
+                if a.param != super::section::SECTION_PARAM {
+                    if self.ui.arrow_press.is_some_and(|q| q.distance(*position) < dead) {
                         return true;
                     }
                     self.ui.arrow_press = None;
@@ -809,7 +811,7 @@ impl PartStudioView {
                 // less than std's BLEND_BOUNDS 0.01 mm (0.02414 mm of radius on a square edge).
                 let fillet = self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.type_id == "fillet");
                 let len = if fillet {
-                    len.abs().max(1e-5 / a.scale)
+                    len.max(1e-5 / a.scale)
                 } else if window.modifiers().shift {
                     len.abs()
                 } else {
@@ -825,8 +827,11 @@ impl PartStudioView {
                             dlg.feature.params.set(f, ParamValue::Bool(!cur));
                         }
                         dlg.set_expr_text(a.param, &text, window, cx);
-                        // Live: the field shows the value selected while dragging.
-                        dlg.focus_field_selected(a.param, window, cx);
+                        // Live: the field shows the value selected while dragging; Fillet's leaves the focus where it
+                        // was (live walk6-m, qa FEEL-FILLET-ARROW-DRAG).
+                        if !fillet {
+                            dlg.focus_field_selected(a.param, window, cx);
+                        }
                     });
                 }
                 self.ui.manip_last_text = Some(text);
@@ -841,6 +846,13 @@ impl PartStudioView {
             ViewportEvent::ToolUp { .. } => {
                 let clicked = self.manip_drag.is_some_and(|m| m.delta == 0.0);
                 if !a.param.is_empty() && !(clicked && a.flip.is_some()) {
+                    // A plain click on an arrow with no flip changes nothing and focuses no field (live walk6-4c, Fillet); a Fillet drag
+                    // leaves the focus where it was (walk6-m).
+                    let fillet = self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.type_id == "fillet");
+                    if clicked || fillet {
+                        self.manip_drag = None;
+                        return true;
+                    }
                     return self.end_manip_drag(a.param, window, cx);
                 }
                 self.manip_drag = None;
@@ -1070,10 +1082,15 @@ impl PartStudioView {
                 let (o, d) = ray(self, *position, cx);
                 let t = Self::axis_param(&a, o, d).unwrap_or(a.length);
                 self.manip_drag = Some(ManipDrag { grab_offset: t - a.length, which, delta: 0.0, typed: false });
+                self.ui.arrow_press = Some(*position);
                 true
             }
             ViewportEvent::ToolDrag { position, .. } => {
                 let Some(md) = self.manip_drag else { return false };
+                if self.ui.arrow_press.is_some_and(|q| q.distance(*position) < ARROW_DEAD_PX) {
+                    return true;
+                }
+                self.ui.arrow_press = None;
                 self.manip_drag = Some(ManipDrag { delta: 1.0, ..md });
                 let M::Linear { min, max, .. } = m else { return true };
                 let (o, d) = ray(self, *position, cx);
@@ -1278,6 +1295,10 @@ impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
 /// A handle's stroke colours and widths (outline, core): idle a white core
 /// in a grey halo, hovered the halo blue, dragged one solid blue stroke
 /// (live psb 10-24: arrows and arcs alike).
+/// A length arrow's drag does nothing until the pointer is this far from the press (live feel/dialogs.json: nothing at
+/// 2-3 px, the full distance at 3-4).
+const ARROW_DEAD_PX: f64 = 3.0;
+
 fn handle_style(hover: bool, dragging: bool) -> ([u8; 4], [u8; 4], f32, f32) {
     // Idle: live "psui (2026-10-27, P2) interaction 6.2" measured the halo
     // at #6A767D 0.75 (145–158 over white, darker than a face over one); hovered

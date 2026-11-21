@@ -907,6 +907,87 @@ fn a_model_face_right_clicked_in_a_sketch_has_lives_menu(cx: &mut TestAppContext
     assert_eq!(rows, live);
 }
 
+// Sketch 2 (on Top) edited, a right-click on Top's square where nothing else is (live qa walk 5 b-rclick-75-40,
+// ctx-menus-1117 sk-empty and sk-tool-line-active, Add comment left out; qa MENU-SK-SKETCH-PLANE): unlit at rest, it
+// gives the Top plane's menu and is lit while that is open; with the Line tool, Escape line first.
+#[gpui::test]
+fn the_sketchs_own_plane_right_clicked_gives_its_menu(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "sk-own-plane-menu");
+    m.edit_sketch(cx);
+    let p = m.screen(cx, [75., 40., 0.]);
+    let plane = ["Confirm Sketch 2", "Hide Top plane", "Hide other planes", "Hide all planes", "Section view…", "Clear selection", "Select", "Select other…", "Zoom to fit", "Zoom to selection", "View normal to", "View normal to sketch plane"];
+    let mut wrong = Vec::new();
+    for (tool, first) in [(Tool::Select, None), (Tool::Line, Some("Escape line"))] {
+        cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.activate_tool(tool, w, cx))).unwrap();
+        approach(cx, &m, p);
+        if let Some(h) = cx.update(|cx| m.view.read(cx).hover.clone()) {
+            wrong.push(format!("{tool:?}: {h:?} lit at rest"));
+        }
+        m.pointer.right_click(cx, &m.view, p);
+        let rows: Vec<String> = cx.update(|cx| m.view.read(cx).context_menu.as_ref().map(|(_, menu, _)| menu.read(cx).labels()).unwrap_or_default());
+        let rows: Vec<&str> = rows.iter().map(String::as_str).filter(|l| *l != "———").collect();
+        let want: Vec<&str> = first.into_iter().chain(plane).collect();
+        if rows != want {
+            wrong.push(format!("{tool:?}: {rows:?}"));
+        }
+        let lit = cx.update(|cx| m.view.read(cx).ui.menu_target.clone());
+        if lit != Some(Reference::Plane(DatumPlane::Top)) {
+            wrong.push(format!("{tool:?}: {lit:?} lit under the menu"));
+        }
+        m.view.update(cx, |v, cx| v.close_context_menu(cx));
+        m.park(cx);
+    }
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
+
+// A new Extrude on the block's top face, its 25 mm preview over the block (live walk6-2 preview-hover, qa
+// FEEL-PREVIEW-HOVER-LIT): the preview's front face lights nothing where the block wasn't; the block's own front face
+// below lights.
+#[gpui::test]
+fn an_extrudes_preview_face_lights_nothing(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "preview-hover");
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    let p = m.screen(cx, FACE);
+    approach(cx, &m, p);
+    m.pointer.click(cx, &m.view, p);
+    wait_until(cx, m.window, |cx| m.view.read(cx).ui.preview_before.is_some() && !m.view.read(cx).ui_busy());
+    let hover_at = |cx: &mut TestAppContext, mm: [f64; 3]| {
+        m.park(cx);
+        let q = m.screen(cx, mm);
+        approach(cx, &m, q);
+        cx.update(|cx| m.view.read(cx).hover.clone())
+    };
+    let on_preview = hover_at(cx, [20., 0., 32.]);
+    assert_eq!(on_preview, None, "on the preview's front face");
+    let on_block = hover_at(cx, [20., 0., 8.]);
+    assert!(matches!(on_block, Some(Reference::Face(_))), "on the block's front face: {on_block:?}");
+}
+
+// Shell 1 with the block's top face in Faces to remove, its centre clicked again (live walk6-3 shell-reclick, qa
+// FEEL-SHELL-RECLICK-REMOVED-FACE): resting there lights nothing new, the click takes the face out of the field.
+#[gpui::test]
+fn a_shells_removed_face_clicked_again_leaves_the_field(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "shell-reclick");
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_feature("shell", w, cx))).unwrap();
+    let p = m.screen(cx, FACE);
+    approach(cx, &m, p);
+    m.pointer.click(cx, &m.view, p);
+    let faces = |cx: &mut TestAppContext| cx.update(|cx| m.view.read(cx).edit.as_ref().map(|e| e.dialog.read(cx).feature.params.query("entities").len()));
+    assert_eq!(faces(cx), Some(1), "the top face in the field");
+    wait_until(cx, m.window, |cx| m.view.read(cx).ui.preview_before.is_some() && !m.view.read(cx).ui_busy());
+    m.park(cx);
+    let parked = m.crop(cx, p);
+    approach(cx, &m, p);
+    let rest = m.crop(cx, p);
+    let changed = parked.iter().zip(&rest).filter(|(a, b)| !close(**a, u32::from_be_bytes([0, b[0], b[1], b[2]]), 8)).count();
+    assert!(changed < 20, "{changed} px changed resting on the removed face");
+    m.pointer.click(cx, &m.view, p);
+    assert_eq!(faces(cx), Some(0), "the field after the click");
+}
+
 // The line the Line tool's snap lands on (live sk/inference-on-line-at, qa FEEL-SKETCH-BAND-MIDDLE inf-on-line): lit as
 // hovered, the blue line through the band's middle (live #c79a95), not an opaque #ecb78a / #ffc685 line.
 #[gpui::test]

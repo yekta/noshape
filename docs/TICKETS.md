@@ -503,30 +503,30 @@ for a wheel notch, F, Shift+5 / 7 and a cube click, against live's 340–1800 ms
 
 ## qa, 2026-11-21 22:2x (USER P0 walk 6, lead: feature dialogs, drawings, document tabs as a user uses them; green e1f14b57b, vibe2 hm2/walk6/gen8.py, out-w8, out-w8b)
 
-- [ ] P0 **FEEL-EXTRUDE-DRAG-PREVIEW (psui)**: block, top face, Shift+E, drag the depth arrow up 66 px: Depth reads 44.1 mm (0.1 mm
+- [x] P0 **FEEL-EXTRUDE-DRAG-PREVIEW (psui)**: block, top face, Shift+E, drag the depth arrow up 66 px: Depth reads 44.1 mm (0.1 mm
   steps, as live), but the preview is broken. The new top face floats at 44 mm with no walls under it, and the 25 mm box below is drawn
   in part blue, still so 2.3 s after release and after the pointer leaves. Typing 40 with Enter or Tab draws the 40 mm box correctly,
   and a drag past 0 (flipped, 10.9 mm) draws correctly too. Live: the preview follows the drag (a request every 0.35–0.55 s, the last
-  ≤ 0.25 s after the pointer stops; behaviours "feel (feature dialogs)" 11-13). qa-scratch/tickets/extrude-drag-preview-w6.png (at release, +1.5 s, pointer away).
-- [ ] P0 **FEEL-MANIP-DEAD-ZONE (psui)**: a 2 px press-drag on the Extrude arrow sets Depth 25 → 25.6 mm. Live: nothing for the
+  ≤ 0.25 s after the pointer stops; behaviours "feel (feature dialogs)" 11-13). qa-scratch/tickets/extrude-drag-preview-w6.png (at release, +1.5 s, pointer away). psui 11-21 23:5x: the dragged value reaches the preview (field baseline), dialogs matrix row.
+- [x] P0 **FEEL-MANIP-DEAD-ZONE (psui)**: a 2 px press-drag on the Extrude arrow sets Depth 25 → 25.6 mm. Live: nothing for the
   first 2–3 px, then at 3–4 px the value jumps to the full distance from the press (same 11-13 capture). interaction-feel lists it as
-  not yet in the matrix.
+  not yet in the matrix. psui 11-21 23:5x: 3 px dead zone (ARROW_DEAD_PX), dialogs matrix row.
 - [ ] P0 **DRW-BORDER-DRAG (studios)** (live answered 22:54, behaviours "qa walk 6", qa/walk6-1121/walk6-5-border-*): block-drawing,
   the sheet's left inner border line (x ≈ 9.6 mm). Hover (tan, grips), click and the selected look once the pointer leaves (orange,
   grips) match live. **A press-drag from it 50 mm right moves the line in live**, where it stays selected. Ours leaves it in place
   (selected-looking), and the ui-script state lists nothing selected. qa-scratch/tickets/drw-border-lit-w6.png (ours).
-- [ ] P0 **FEEL-PREVIEW-HOVER-LIT (psui)** (live 22:54 (2), walk6-2-preview-hover-*): Extrude 2 open with its 25 mm preview. Resting
+- [x] P0 **FEEL-PREVIEW-HOVER-LIT (psui)** (live 22:54 (2), walk6-2-preview-hover-*): Extrude 2 open with its 25 mm preview. Resting
   on the translucent preview's front face lights nothing in live. Ours draws that face's outline thin orange (s8-ext-arrow-click 03,
-  the pointer still on the picked top face inside the preview).
-- [ ] P0 **FEEL-SHELL-RECLICK-REMOVED-FACE (psui)** (live 22:54 (3), walk6-3-shell-reclick-*): Shell with the top face in "Faces
+  the pointer still on the picked top face inside the preview). psui 11-21 23:5x: hover follows the model before the feature; hover matrix test.
+- [x] P0 **FEEL-SHELL-RECLICK-REMOVED-FACE (psui)** (live 22:54 (3), walk6-3-shell-reclick-*): Shell with the top face in "Faces
   to remove", click where the top face was. Live takes it out of the field: the field empties, the title turns red, the preview is
-  the solid block again, and the inner floor isn't added. Ours leaves the field as it was (s8-shl-reclick-face).
+  the solid block again, and the inner floor isn't added. Ours leaves the field as it was (s8-shl-reclick-face). psui 11-21 23:5x: the click takes it out of the field; hover matrix test.
 - [ ] P0 **FEEL-FILLET-PICKED-STRIP (psui)** (qa 23:3x, green 9f33d43, batch 3 cells dlg-edge-selected13 / selhover13 /
   face-otherhover13, hm2/cmp-b3psui): an edge picked in Fillet at live's 1.3 mm. Live fills the round between its two tangent lines:
   5 px, #FFA90A at both tangent lines and #DDA027..#FFAF25 between, the tangent lines #586E7B / #2C363C. Ours draws a 3 px #FFA90A
   line in the middle with the face colour showing on both sides up to darker tangent lines (#2E3A41 / #1F262B). The same with the
   picked edge hovered and with a face hovered.
-- [ ] P0 **FEEL-FILLET-ARROW-DRAG (psui)** (qa 23:3x, green 9f33d43, out-w6fa s8-fil-arrow-drag-*; live 23:48 behaviours "qa walk 6
+- [x] P0 **FEEL-FILLET-ARROW-DRAG (psui)** (qa 23:3x, green 9f33d43, out-w6fa s8-fil-arrow-drag-*; live 23:48 behaviours "qa walk 6
   manipulators", walk6-m*): Fillet on the edge (40, 10, 10) at 5 mm. Into the material (along the arrow) both grow the radius
   without snapping (ours 36 px → 34.03035 mm, live 30 px → 34.04041 mm: =). **The other way (toward the edge and past it) live
   SHRINKS it to a floor of 0.02414 mm (6 px → 0.24142, 12 px and more → 0.02414); ours GROWS it (36 px → 24.03035 mm).** After the
@@ -538,6 +538,9 @@ for a wheel notch, F, Shift+5 / 7 and a cube click, against live's 340–1800 ms
   Picks at (40, 5, 10) and (40, 25, 10) give pixel-identical frames in ours, as in live.
 - [ ] P1 **FEEL-FILLET-ARROW-CLICK (psui)** (live 22:54 (4), walk6-4c-*): a plain click on the Fillet arrow does nothing to the
   feature in live (blue on hover, no flip, no change, no field focused: the focus leaves the dialog). Ours moves the focus into Radius.
+  The 2 px dead zone =. psui 11-22 00:0x: toward the edge it shrinks to 0.02414 mm, the preview follows (field baseline), the focus stays; dialogs matrix row.
+- [x] P1 **FEEL-FILLET-ARROW-CLICK (psui)** (live 22:54 (4), walk6-4c-*): a plain click on the Fillet arrow does nothing to the
+  feature in live (blue on hover, no flip, no change, no field focused: the focus leaves the dialog). Ours moves the focus into Radius. psui 11-21 23:5x: a click changes nothing, no field focused; dialogs matrix row.
 - Matched live (no ticket):
   - Extrude: Tab order (Depth → ± → Direction, Starting offset, Symmetric, Draft, Second end position, Merge with all → Merge scope),
     Shift+Tab (flip → End type → faces field), and Esc in a field (typed value reverted) then Esc again to cancel. Enter applies with
@@ -604,12 +607,12 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
 - Assembly menus match live's dom/context-menus-assembly.txt: empty space, the instance row, Origin, the top row (Where used… in
   place of 11-17's Release… follows live's later workflows-on capture, behaviours 46297), and the Mate features header (no menu,
   as live). (The sheet's tabs and the assembly list headers are not ui-script targets: pixel clicks, and instance:<name>.)
-- [ ] P0 **MENU-SK-SKETCH-PLANE (psui)** (live answered qa 21:50 at 22:19, behaviours "qa walk 5"): the default planes don't
+- [x] P0 **MENU-SK-SKETCH-PLANE (psui)** (live answered qa 21:50 at 22:19, behaviours "qa walk 5"): the default planes don't
   grow for a sketch (±76 mm squares for this block, same as ours), but in sketch edit the larger pale "Sketch 2" plane is a pick
   target. Right-click at (75, 40) in Sketch 2 (sk-empty; also with the Line tool active, sk-tool-line-active) gives live's **Top plane**
   menu: Confirm Sketch 2 | Hide Top plane · Hide other planes · Hide all planes · Section view… | Clear selection · Select ▸ ·
   Select other… | Zoom to fit · Zoom to selection · View normal to · View normal to sketch plane, with the default-size Top plane
-  outlined orange. Ours gives the empty-space menu (Copy sketch, Show all, Curve/surface analysis…). qa-scratch/tickets/sk-plane-menu-w5.png (live, ours).
+  outlined orange. Ours gives the empty-space menu (Copy sketch, Show all, Curve/surface analysis…). qa-scratch/tickets/sk-plane-menu-w5.png (live, ours). psui 11-21 23:5x: own plane's menu, Escape line first with a tool, lit under the menu; hover matrix test.
 - 22:1x re-pick off the edge midpoint, at (10, 0, 10) (psui: our pick at (20, 0, 10) took the midpoint, live's one-event jump the
   edge): face-and-edge now matches live (19 items), so MENU-FACE-AND-EDGE is not a bug. On a real edge, ps-edge and sk-model-edge
   show items live's 1117 lists lack (Fillet…, Chamfer…, Zoom to selection…), and our midpoint menu had matched live's "edge" exactly.

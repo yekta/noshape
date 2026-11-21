@@ -802,6 +802,9 @@ impl FeatureDialog {
     pub fn set_expr_text(&mut self, path: &str, text: &str, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(st) = self.inputs.get(path).cloned() {
             st.update(cx, |s, cx| s.set_value(text.to_string(), window, cx));
+            // Applied, not typed: the preview takes it (qa FEEL-EXTRUDE-DRAG-PREVIEW: a dragged arrow's value stayed
+            // behind the field's last applied one).
+            self.baselines.insert(path.to_string(), text.to_string());
         }
         self.parse_errors.remove(path);
         self.set_value(path, ParamValue::Expr(noshape_units::ExprValue::new(text)), cx);

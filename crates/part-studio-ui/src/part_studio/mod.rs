@@ -2011,6 +2011,7 @@ impl PartStudioView {
         let id = id.filter(|_| !vp.read(cx).box_drag());
         // Versions and history › Compare lights nothing under the pointer (live fc-1120 (10)).
         let id = id.filter(|_| crate::part_studio_hooks::compare_blend(&self.doc, cx).is_none());
+        let id = id.filter(|id| !self.preview_hides(*id, vp, cx));
         let gpu = id;
         let id = self.shown_sketch_hover_id(id, cx);
         self.ui.shown_sketch_gpu_hover = self.sketch.is_none().then_some((gpu, id));
@@ -2025,6 +2026,63 @@ impl PartStudioView {
         if self.rehover(cx) | self.update_inference(shift, window, cx) | cap_changed {
             self.refresh_scene(false, cx);
         }
+    }
+
+    /// While a feature previews the pointer lights what the model before it has there (live walk6-2, qa
+    /// FEEL-PREVIEW-HOVER-LIT): not a face the preview made, nor a face it changed where that face wasn't, nor (nothing
+    /// new) a changed face the dialog holds (walk6-3: Shell's removed face).
+    fn preview_hides(&self, id: u32, vp: &Entity<Viewport>, cx: &App) -> bool {
+        let (Some(e), Some(_)) = (&self.edit, &self.ui.preview_before) else { return false };
+        let Some(r) = self.built.as_ref().and_then(|b| b.picks.get(id)).map(|t| t.reference.clone()).filter(|r| matches!(r, Reference::Face(_))) else { return false };
+        let dialog = e.dialog.read(cx);
+        if behaviors::made_by(&r, dialog.feature.id) {
+            return true;
+        }
+        if self.changed_picks(std::slice::from_ref(&r)).is_empty() {
+            return false;
+        }
+        if dialog.selected_refs().contains(&r) {
+            return true;
+        }
+        let v = vp.read(cx);
+        let (o, d) = v.ray(v.pointer_position());
+        !self.before_face_hit(&r, o, d)
+    }
+
+    /// A click whose pick is the open feature's own preview (or nothing) where a changed face the dialog holds was:
+    /// that face, so the click takes it out of the field (live walk6-3: Shell's removed face clicked again, qa
+    /// FEEL-SHELL-RECLICK-REMOVED-FACE).
+    fn held_face_under(&self, position: glam::DVec2, cx: &App) -> Option<scene_builder::PickTarget> {
+        let e = self.edit.as_ref()?;
+        let held: Vec<Reference> = e.dialog.read(cx).selected_refs().into_iter().filter(|r| matches!(r, Reference::Face(_))).collect();
+        let changed = self.changed_picks(&held);
+        let (o, d) = self.viewport.read(cx).ray(position);
+        let r = changed.into_iter().find(|r| self.before_face_hit(r, o, d))?;
+        Some(scene_builder::PickTarget { reference: r, kind: PickKind::Face, anchor: None })
+    }
+
+    /// Whether the ray from `o` along `d` meets face `r` as the model before the previewed feature has it.
+    fn before_face_hit(&self, r: &Reference, o: glam::DVec3, d: glam::DVec3) -> bool {
+        let Some(before) = &self.ui.preview_before else { return false };
+        let hit = |a: glam::DVec3, b: glam::DVec3, c: glam::DVec3| {
+            let (e1, e2) = (b - a, c - a);
+            let p = d.cross(e2);
+            let det = e1.dot(p);
+            if det.abs() < 1e-18 {
+                return false;
+            }
+            let t = o - a;
+            let u = t.dot(p) / det;
+            let q = t.cross(e1);
+            let w = d.dot(q) / det;
+            u >= 0.0 && w >= 0.0 && u + w <= 1.0 && e2.dot(q) / det > 0.0
+        };
+        before.bodies.iter().filter(|b| !b.hidden).any(|b| {
+            let Some(fi) = b.face_refs.iter().position(|f| f == r) else { return false };
+            let Some(idx) = b.mesh.face_ranges.get(fi).and_then(|&(first, n)| b.mesh.indices.get(first as usize..(first + n) as usize)) else { return false };
+            let p = |i: u32| b.mesh.positions.get(i as usize).map(|p| glam::Vec3::from(*p).as_dvec3());
+            idx.as_chunks::<3>().0.iter().any(|t| matches!((p(t[0]), p(t[1]), p(t[2])), (Some(a), Some(b), Some(c)) if hit(a, b, c)))
+        })
     }
 
     fn on_viewport_event(&mut self, vp: &Entity<Viewport>, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) {
@@ -2546,6 +2604,11 @@ impl PartStudioView {
                         Some(scene_builder::PickTarget { reference: r.clone(), kind: PickKind::Vertex, anchor: self.edge_midpoint(on) })
                     }
                     _ => target,
+                };
+                let own = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
+                let target = match target {
+                    Some(t) if !own.is_some_and(|f| behaviors::made_by(&t.reference, f)) => Some(t),
+                    t => self.held_face_under(*position, cx).or(t),
                 };
                 let (now, os_double) = self.viewport.update(cx, |vp, _| (vp.now(), vp.take_click_count() >= 2));
                 let dbl = target.as_ref().is_some_and(|t| self.edit.is_none() && self.is_double_click(&t.reference, now, os_double));

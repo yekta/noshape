@@ -5504,7 +5504,7 @@ fn cancel_a_slow_preview_opened_before_the_last_edit_was_shown(cx: &mut TestAppC
 }
 
 /// Live (ui-parity sketch-empty-rclick-menu): in a sketch on Top, a right-click where the Front plane is under the
-/// pointer gives the plane's rows; the sketch's own plane is empty space.
+/// pointer gives the plane's rows; the sketch's own plane gives its own (live qa walk 5 b-rclick-75-40).
 #[gpui::test]
 fn a_plane_behind_the_sketch_gets_its_menu(cx: &mut TestAppContext) {
     let (window, view) = sketch_with(cx, "sketch-plane-menu", Tool::Select);
@@ -5528,7 +5528,7 @@ fn a_plane_behind_the_sketch_gets_its_menu(cx: &mut TestAppContext) {
     ];
     assert_eq!(labels_over(cx, DatumPlane::Front), want);
     let own = labels_over(cx, DatumPlane::Top);
-    assert!(!own.iter().any(|l| l.starts_with("Hide ")), "{own:?}");
+    assert_eq!(own[2], "Hide Top plane", "{own:?}");
 }
 
 /// Live 11-17 ctx-menus-1117 (menus-sk.json): the sketch's right-click menus on a line, on its end, on a line and its

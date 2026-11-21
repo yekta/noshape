@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-21 22:00 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-21 23:58 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -36,52 +36,38 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (20:50 UTC 11-21) — USER P0: hover × selection look matrix (DECISIONS 11-21)
+## Now (23:58 UTC 11-21): USER P0, the hover × selection look matrix + qa's walk tickets
 
-LANDED: batch 1 (5b7743f97), batch 2 ee4c1f6a as 6be52caf (qa 50/51, matrix 76/92). CHECKING: batch 3 666d9c47 (15/15
-b3 cells, 21/21 crops vs live b3); qa's watcher re-scores it on green. Builds on vibe2 (Mac = one 4-job nice-19 slot).
-IN TREE (uncommitted; full part-studio-ui lib run in flight on vibe2, log ~/tmp/psui/sk.log, synced before items 3-6):
-1. FEEL-SKETCH-REGION-FILL-AFTER-DRAG: sketch.rs sync_sketch_dragging rebuild_scene (fill lives in the built scene).
-   Test glyphs_and_the_region_fill_go_while_geometry_is_dragged checks the layer-9 fill mesh: PASSES.
-2. FEEL-SELECT-OTHER-LOOK: no #FFC20E point (select_other_overlay, SelectOther.point gone), grey border, no scrollbar.
-   Test hover_matrix_tests select_other_draws_no_point_where_it_was_asked.
-3. BAND-MIDDLE inf-on-line: sketch_mode.rs (skasm told) overlay no longer draws the snap's related curves as an opaque
-   4 px polyline; SketchEditor::inference_lit() lists them; mod.rs marks their picks HOVER after with_highlights. Test
-   hover_matrix_tests the_line_a_snap_lands_on_is_lit_as_hovered.
-4. P0 FEEL-HOVER-GLYPHS-SECOND-ENTITY (qa walk 3): SketchEditor::focus_glyphs() adds, with Show constraints off, a glyph
-   on a hovered / lingering / selected curve for each of its constraints drawn on the other curve. sketch.rs uses it.
-   Test sketch_glyph_feel_tests a_hovered_line_shows_all_its_constraints.
-5. P1 MENU-TOP-ROW-SECTION-GROUP: mod.rs default_geometry_menu separator before Section view…; list matrix row checks
-   groups (menu_grouped).
-6. P1 S-TOOLBAR-BORDER: behaviors.rs render_mini_toolbar 1 px #ccc border, px 3.5, rows gap 0 (175 × 62). Test
-   sketch_ui_tests the_s_toolbar_is_175_by_62_at_the_pointer.
-7. P0 FEEL-HOVER-GLYPHS-IN-TOOL (qa 20:5x): sketch.rs glyph filter: hover / linger badges only with Tool::Select (live
-   sketch/11; confirmed by live, behaviours "qa walk 3" 9). Test
-   sketch_glyph_feel_tests a_tool_hides_a_hovered_lines_glyphs.
-8. P0 FEEL-PLANE-LIT-WHILE-DIMENSIONING (qa 21:1x): sketch.rs dimension_skips_plane() (the click's old skip_plane);
-   highlighted_hover returns nothing for such a plane. Test: a_dimension_placed_over_the_plane_its_line_lies_in_opens_its_box.
-9. P0 FEEL-LINE-SNAP-MODEL-LOOK (qa 21:1x): sketch_mode overlay: no 6 px cursor point before the first click when the
-   snap lands on a point; snap_icons adds "horizontal" / "vertical" (display only) for a model point on the sketch's
-   axes. Test sketch_mode a_model_vertex_snapped_to_before_the_first_click_shows_no_cursor_point.
-10. qa walk 5 menus (21:4x, TICKETS "21:4x walk 5"):
-   MENU-PLANE-GRAPHICS: menus.rs a default plane in the graphics gets the viewport menu (New sketch…, Offset plane…, Size to
-   Part Studio | Hide X plane … Section view… | [Clear selection] Select ▸, Select other… | Zoom fit/sel, View normal to);
-   the 11-12 plane-graphics-rclick-menu take clicked the list row (x=89). Test every_kind_of_plane_right_clicked_….
-   MENU-SKETCH-IN-PS: mod.rs ContextMenu: a hovered midpoint of a shown sketch line keeps the line target (at_midpoint menu).
-   Test hover_matrix a_sketch_lines_lit_midpoint_right_clicked_gives_the_lines_menu (Pointer::right_click new).
-   MENU-SK-HIDE-SKETCHES: sketch.rs Hide other / all sketches with no other sketch shown; sketch_entity_menus_as_lives.
-   MENU-SK-MODEL-ENTITY face: Section view…, View normal to, no Curve/surface analysis…; test a_model_face_right_clicked_….
-   Edge (20,0,10) is the edge's MIDPOINT: live's single-event jump kept the edge (interaction-feel row 45), ours lights the
-   midpoint at once, so face-and-edge selected a POINT (its menu). Not changed: REQUESTS psui 21:58 asks live (1) sketch
-   edge menu off/on the midpoint by hand path, (2) PS hand path click there. Tell qa: move the pick off the midpoint.
-RUNS: full scene + part-studio-ui lib PASSED 21:50 (445 + 199) before items 8-10. Items 8-9 tests running (t89.log),
-then the item-10 tests, commit all, land.sh. 666d9c47 re-checked apart (red batch).
-interaction-feel rows done; TICKETS after the rebase: walk-3 rows, BAND-MIDDLE, PLANE-LIT, LINE-SNAP, walk-5 menus (4 of 5).
-NEXT: tell lead + qa (matrix score, fixed tickets).
-ASM SPLIT agreed 20:4x: all of batch 4 is asm's (manipulator ring in scene/asm_scene.rs, vertex disc builder/shader
-edits already asm's, the rest assembly-side). asm rebases on 666d9c47 and drops its viewport getter.
+LANDED: batch 1 (5b7743f97), batch 2 (6be52caf), batch 3 666d9c47 as f411d924 (22:45; qa re-score 4/15, matrix 94/125).
+CHECKING: 6e5e17c8 (walks 3-5 + menus). Open there: sk-model-edge + ps-edge menus (REQUESTS psui 21:58: is live's
+1117 'edge' menu the midpoint's?).
+LANDING NOW (qa walk 6, TICKETS "qa, 2026-11-21 22:2x"), tests green on vibe2 (full lib 449+200; then the 5 new tests,
+the dialogs matrix and the b3 cells after the last edits):
+- FEEL-MANIP-DEAD-ZONE: ARROW_DEAD_PX 3 (built-in and std arrows).
+- FEEL-EXTRUDE-DRAG-PREVIEW: feature_dialog set_expr_text updates the field's baseline (the preview used the old one).
+- MENU-SK-SKETCH-PLANE: sketch.rs own_plane_under_pointer (a ray to the own plane's square); its menu, Escape line
+  first with a tool; ui.menu_target lights it.
+- FEEL-PREVIEW-HOVER-LIT: mod.rs preview_hides: a preview-made face, a changed face beyond where it was (CPU ray against
+  ui.preview_before), or a changed face the dialog holds, lights nothing.
+- FEEL-SHELL-RECLICK-REMOVED-FACE: mod.rs held_face_under: a click on the preview's own geometry / nothing takes a
+  held changed face the ray meets as it was (the GPU pick never reached the khaki fill).
+- FEEL-FILLET-ARROW-CLICK (P1): a click on an arrow with no flip changes nothing and focuses no field.
+- FEEL-FILLET-ARROW-DRAG (live 23:48: rate =): toward the edge the radius falls to 0.02414 mm (was len.abs()); a Fillet
+  drag leaves the focus where it was; the stuck 5 mm preview was the baseline bug above.
+NEXT (qa's batch 3 re-score 23:4x): P0 FEEL-ORIGIN-HOVER-EDGE reopened (all 4 origin cells light/select the vertical
+edge, live +x); FEEL-MC-LOOK partly (crisp 1 px navy rim + navy square at the ring's front; disc centre white, live lit
+yellow-green); P0 FEEL-FILLET-PICKED-STRIP (at 1.3 mm live fills the round between its tangent lines, 5 px #FFA90A at
+both, #DDA027..#FFAF25 between; ours a 3 px line). Crops qa-scratch/hm2/cmp-b3psui, qa-scratch/tmp/w6m/.
+SPEED-HEAVY-HOVER (P0, measured 23:2x, local Xvfb :397, scripts /root/psui-scratch/hh: run.sh, var.sh, stages.py,
+prof.sh): the plate (116,812 triangles) on llvmpipe: hover to light 450-600 ms, debug = release (stripped release
+copy /root/psui-scratch/noshape-rel from dx-open). Per hover: pick 130-220 ms (already scissored to a 96 px margin,
+so per-vertex), frame 160-190 ms, window composite 40-90 ms; half resolution cuts the frame ~40 %, no lines changes
+little; 63 % of CPU in llvmpipe's JIT shaders. Matches 11-20's pick_bench finding (the shaded mesh pass is the cost).
+Reported to the lead as "decision needed": DECISIONS 11-16 judges speed on the Mac; options for software GL are a coarse
+mesh there (Part Studio bodies have no coarser levels unless viewing in high quality) or a CPU pick.
 Score kit: run-hm7.sh (vibe2 crops ~/tmp/psui/hm3 + b3 cells), compare.py oursN live-b1c|live-b2|live-b3 sxsN.
 Later: drop `at_bar` + list matrix row; full1 sketch-constraint-refusals (49) / sketch-entity-copy-paste (12).
+Local disk at 99 % (23:0x): lead told; my scratch trimmed (cli-*, rel/, tab/).
 
 ### Earlier today
 
