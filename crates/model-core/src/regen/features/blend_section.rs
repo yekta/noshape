@@ -1609,7 +1609,11 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     // (A conic round's ball tools run on past a free end of the chain, over the part's end: built directly they leave
     // it open, so they go to closed_run_on first; the build failed there in 140 ms of c2-impeller-loft's Fillet 3.)
     let near_end = |a: DVec3, b: DVec3| (a - b).length() < scale * 1e-9;
-    let free_end = chain.iter().any(|c| [c.start, c.end].iter().any(|&q| chain.iter().filter(|o| near_end(o.start, q) || near_end(o.end, q)).count() == 1));
+    // (A closed edge's ends are its own: not free.)
+    let free_end = chain.iter().any(|c| [c.start, c.end].iter().any(|&q| chain.iter().map(|o| near_end(o.start, q) as usize + near_end(o.end, q) as usize).sum::<usize>() == 1));
+    // (Closed edges have nothing to run on past: declined directly, their rounds go to the Boolean (c2-rings-loft's
+    // Fillet 1, two bore ellipses: one round each, as live).)
+    let all_closed = chain.iter().all(|c| near_end(c.start, c.end));
     let conic_run_on = ball && matches!(spec.section, Section::Conic(_)) && free_end && direct.is_none();
     if (ball || ranges.iter().any(|r| r.2)) && adds.is_empty() && !cuts.is_empty() && !conic_run_on {
         let tools: Vec<Shape> = cuts.iter().map(|t| t.shape.clone()).collect();
@@ -1629,7 +1633,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                 }
                 // (A rolling ball's sides only approximate its curved faces: a boolean by them leaves slivers. Run on past a
                 // free end, they're trimmed below and built directly again.)
-                if ball && !matches!(spec.section, Section::Conic(_)) && !free_end {
+                if ball && !matches!(spec.section, Section::Conic(_)) && !free_end && !all_closed {
                     return Err(fail("the rolling balls' direct build declined"));
                 }
             }
@@ -1643,7 +1647,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     // again (asm-welding-config's Fillet 5: R 0.1 in round a plate's outline whose ends run under a tube's rim).
     let joined_refaced = refaced.len();
     let circular = !matches!(spec.section, Section::Conic(_));
-    if ball && (!circular || (adds.is_empty() && !cuts.is_empty())) {
+    if ball && (!circular || (adds.is_empty() && !cuts.is_empty())) && !all_closed {
         let near = |a: DVec3, b: DVec3| (a - b).length() < scale * 1e-9;
         let mut trimmed = Vec::new();
         let mut running = Vec::new();
@@ -1725,7 +1729,18 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
             if tools.is_empty() {
                 continue;
             }
-            let (s, n) = bool_named(ev, op, &named, &tools)?;
+            let (mut s, mut n) = bool_named(ev, op, &named, &tools)?;
+            // (Closed rounds crossing at a thin wall's bottom: OCCT's cut can leave the part as it was (c2-rings-loft's
+            // Fillet 1 at Extrude 1 depth 10.4 mm); again with a tolerance of a 200th of the radius.)
+            let unchanged = |s: &Shape| (named.shape.volume().unwrap_or(0.0) - s.volume().unwrap_or(0.0)).abs() < 1e-3 * tools.iter().map(|t| t.shape.volume().unwrap_or(0.0)).sum::<f64>();
+            if all_closed && op == k::BooleanOp::Cut && unchanged(&s) {
+                let shapes: Vec<Shape> = tools.iter().map(|t| t.shape.clone()).collect();
+                let res = k::boolean(op, std::slice::from_ref(&named.shape), &shapes, &k::BooleanOptions { fuzzy: 5e-3 * spec.r1.max(spec.r2), ..Default::default() })?;
+                let mut args: Vec<&crate::naming::ShapeNames> = vec![&named.names];
+                args.extend(tools.iter().map(|t| &t.names));
+                n = ev.name_result(&args, &res.history, &res.shape, &BTreeMap::new(), None);
+                s = res.shape;
+            }
             named = NamedShape::new(s, n);
         }
     }
@@ -2256,7 +2271,16 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
         // (A section per 0.1 rad of turn: the knife's R3.5 tip within 1e-6 mm of its balls.)
         let n = ((turn / 0.1).ceil() as usize).clamp(8, 240);
         let (mut secs, mut starts, mut centres): (Vec<Shape>, Vec<DVec3>, Vec<DVec3>) = (Vec::new(), Vec::new(), Vec::new());
-        let mut guess = at(0.0)?.0 + e.inward * r;
+        // (A closed edge's first station is a quarter round from its start: the ball guessed there from the supports'
+        // normals, not the edge's middle's (c2-rings-loft's Fillet 1 at 9.6 mm: a bore's ellipse, the guess on its axis).)
+        let mut guess = match closed {
+            true => {
+                let p = at(0.25)?.0;
+                let (n0, n1) = (e.sup[0].foot(p)?.1, e.sup[1].foot(p)?.1);
+                p + (n0 + n1).normalize_or(e.inward) * r
+            }
+            false => at(0.0)?.0 + e.inward * r,
+        };
         for k in 0..if closed { n } else { n + 1 } {
             halt()?;
             let f = if closed { (k as f64 / n as f64 + 0.25).fract() } else { k as f64 / n as f64 };

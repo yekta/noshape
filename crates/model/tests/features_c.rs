@@ -4230,6 +4230,52 @@ fn ring_rims_round_and_notch_arcs_chamfer_as_live() {
     assert!((703.105..708.601).contains(&v), "{v} (live 705.853)");
 }
 
+/// c2-rings-loft's Fillet 1 and Chamfer 1 with Extrude 1 9.6 mm deep, its ring as built (live's numbers): R2 on the
+/// bore's two closed rims where the slanted sides cut it, the sides 1 mm apart at the bottom: one round per rim, the two
+/// meeting there, and the bore one face (OCCT made three pieces of each round and kept more of the bore).
+#[test]
+fn ring_rims_round_one_face_each_where_they_meet_at_the_bottom() {
+    let ellipses = |r: &RegenResult, minor_mm: f64| -> Vec<Reference> {
+        let b = &r.context.bodies[0];
+        b.shape
+            .edges()
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| matches!(e.edge_info().unwrap().curve, noshape_kernel::Curve::Ellipse { minor_radius, .. } if near(minor_radius, mm(minor_mm), 1e-6)))
+            .map(|(i, _)| Reference::Edge((*b.edges[i]).clone()))
+            .collect()
+    };
+    let brep = include_str!("data/rings-loft-ring-9_6.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 1);
+    let rims = ellipses(&r, 10.25);
+    assert_eq!(rims.len(), 2);
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(rims));
+        p.set("radius", expr("2 mm"));
+    });
+    let r = s.ok();
+    let arcs = ellipses(&r, 3.137394);
+    assert_eq!(arcs.len(), 4);
+    s.add("chamfer", move |p| {
+        p.set("entities", ParamValue::Query(arcs));
+        p.set("width", expr("1 mm"));
+    });
+    let r = s.ok();
+    let body = &r.context.bodies[0].shape;
+    assert!(body.is_valid());
+    let faces = body.faces();
+    let areas = |pick: &dyn Fn(&noshape_kernel::Surface) -> bool| -> Vec<f64> { faces.iter().filter(|f| f.face_surface().is_ok_and(|s| pick(&s))).map(|f| f.area().unwrap() * 1e6).collect() };
+    let bore = areas(&|s| matches!(s, noshape_kernel::Surface::Cylinder { radius, .. } if near(*radius, mm(10.25), 1e-6)));
+    let (rounds, chamfers): (Vec<f64>, Vec<f64>) = areas(&|s| matches!(s, noshape_kernel::Surface::BSpline { .. })).into_iter().partition(|a| *a > 100.0);
+    assert_eq!(faces.len(), 17);
+    assert!(bore.len() == 1 && (bore[0] - 153.624).abs() < 0.01, "bore {bore:?} (live 153.624)");
+    assert!(rounds.len() == 2 && rounds.iter().all(|a| (a - 171.817).abs() < 0.01), "rounds {rounds:?} (live 171.817)");
+    assert!(chamfers.len() == 4 && chamfers.iter().all(|a| (a - 9.797).abs() < 0.01), "chamfers {chamfers:?} (live 9.797)");
+}
+
 /// A helical sweep cut into a cylinder: (the rod, the groove's helix over `turns` from the rod's base circle, the
 /// regenerated result). The groove starts below the base (it opens there) and ends inside the rod.
 fn helical_cut(outer: f64, inner: Option<f64>, profile: &[(f64, f64)], turns: &str, height: &str) -> (Studio, RegenResult) {
