@@ -88,7 +88,7 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   panel's bottom (16 px, the table's visible width; 18 px while the pointer is over it) whenever the table's own bottom is
   out of view (osc-sticky-scroll-component). Ours (config_panel.rs): the header scrolls away; the sideways scrollbar is
   only at the table's bottom. Evidence: releases/rn-1222-1223/st2.json, st7.json, sticky-h-*.png, sticky-800.png.
-- [ ] P2 **CUTLIST-WHEEL-SIDEWAYS (psui)** (qa 11-21 00:2x, green 16046fa3a vibe2, walk1.md): in the Cut list, a mouse wheel over the rows scrolls the table sideways instead of scrolling the panel down (wider-than-panel table; live's wheel scrolls down, the sideways bar only by drag / shift-wheel).
+- [ ] P2 **CUTLIST-WHEEL-SIDEWAYS (psui)** (qa 11-21 00:2x, green 16046fa3a vibe2, walk1.md): in the Cut list, a mouse wheel over the rows scrolls the table sideways instead of scrolling the panel down (wider-than-panel table). Live's wheel there not yet captured: live to confirm.
 - [x] (dx 11-20: b7c2c4e8a, e2e test) P2 **URDF-RIGID-SUBASM-SINGLE-LINK (dx)**: Onshape 1.223 "merging subassemblies into a single body in URDF export".
   Live 05:42, assembly Export › URDF: Geometry format, STL Format, Resolution, Options, ☐ "Export rigid subassemblies as a
   single link", ☐ Include hidden instances in export. Ours' URDF export has no such option. Evidence:
