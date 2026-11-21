@@ -6270,7 +6270,7 @@ impl AssemblyView {
             .flex_none()
             // Live 610–611: no count on Other documents' category list (612:
             // shown again once a document is open).
-            .when(!(self.ui.insert_source == 1 && self.ui.insert_other_doc.is_none()) && self.ui.insert_source != 2, |d| d.child(h_flex().h(px(22.)).pr(px(4.)).justify_end().text_size(px(13.33)).font_weight(FontWeight::SEMIBOLD).child(format!("Inserted: {inserted}"))))
+            .when(!(self.ui.insert_source == 1 && self.ui.insert_other_doc.as_ref().is_none_or(|d| d.graph)) && self.ui.insert_source != 2, |d| d.child(h_flex().debug_selector(|| "ins-inserted".into()).h(px(22.)).pr(px(4.)).justify_end().text_size(px(13.33)).font_weight(FontWeight::SEMIBOLD).child(format!("Inserted: {inserted}"))))
             .when(self.ui.insert_source == 1 && self.ui.insert_other_doc.is_none(), |d| d.child(div().h(px(22.))))
             .child(
                 h_flex()

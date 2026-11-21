@@ -2731,8 +2731,11 @@ fn an_other_documents_released_items_leave_out_obsoleted_revisions(cx: &mut Test
     let released = cx.update(|cx| view.read(cx).ui.insert_other_doc.as_ref().unwrap().released.iter().map(|r| (r.name.clone(), r.part_number.clone(), r.revision.clone())).collect::<Vec<_>>());
     assert_eq!(released, vec![("Part 1".to_string(), "OBS-PN-1".to_string(), "A".to_string())], "Part 2's obsoleted revision left out");
     assert!(listed(cx, "Part 1") && !listed(cx, "Part 2"));
+    assert!(shown(cx, "ins-inserted".into()), "Inserted: 0 under the list");
     click(cx, "ins-other-graph");
     assert!(!listed(cx, "Part 1"), "the Version graph instead");
+    // (Live parity-open-1120 ob-pre-2: no "Inserted: 0" under the graph; Start on a root tick.)
+    assert!(!shown(cx, "ins-inserted".into()) && shown(cx, "ins-other-root".into()));
     let graph = cx.update(|cx| view.read(cx).ui.insert_other_doc.as_ref().map(|d| d.versions.iter().map(|v| v.label.clone()).zip(d.marks.clone()).collect::<Vec<_>>()).unwrap());
     assert_eq!(graph, vec![("R1".to_string(), 1), ("Start".to_string(), 0)], "R1 on a release ▲");
     assert!(shown(cx, "ins-other-v-0".into()));

@@ -72,7 +72,7 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
 - [x] verified green 4a22b2966 (qa 11-21 10:5x, vibe2 walk2 A2, qa-scratch/walk2/lxy-4a22b296.png: Lxy 0, Lyx 0; Lxx 26666.667, Lyy 106666.667, Lzz 133333.333 as live) P3 **FACE-MOMENT-LXY-ZERO (asm)**: Face tab, the 40x20 top face about its centroid: ours (green 5b840ddf0, after b2bbaf7d1)
   shows Lxy = Lyx **-7.941e-11**; live shows **0** (behaviours "Face tab": Lxy 0, Lyx 0). The CLI's assembly_mass_properties gives 0.0.
   Wanted: the app's product of inertia reads 0 for a symmetric face, as live and the CLI (qa-scratch/walk2/f5c.png).
-- [ ] P3 **INSERT-GRAPH-RESIDUALS (asm)**: Insert › Other documents › Rel's version graph and list (green 5b840ddf0 vs live
+- [ ] fixed asm 11-21 (to verify; pin legend glyphs, 2 px line, 14 / 10 px nodes, Start on a 12 px root tick, no "Inserted: 0" under the graph, ⌄ / › chevrons, the banner link a blank line down. It stays centred: live's long link starts 44 px into a 584 px box, centred, as ours) P3 **INSERT-GRAPH-RESIDUALS (asm)**: Insert › Other documents › Rel's version graph and list (green 5b840ddf0 vs live
   parity-open-1120/ob/ob-pre-1/2.png; qa-scratch/walk2/leg-cmp.png, tree-cmp.png). Live: the Release candidate / Release legend
   glyphs are pins (△ / ▲ on a short stem, like the Workspace / Version pins), ours plain triangles; live's graph line and nodes
   are heavier (≈2 px line, larger dots); live's first version Start has a root tick (⊥) under its dot, ours none; live hides the

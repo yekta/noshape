@@ -5079,20 +5079,21 @@ impl AssemblyView {
             );
             if d.graph {
                 // Version graph: the legend's two rows (Workspace · Version, Release candidate · Release), then Main
-                // (not selectable) and the versions, a release's on a solid ▲ (live 613, 618; parity-open-1120 ob-pre-2).
+                // (not selectable) and the versions, a release's on a solid ▲ (live 613, 618; parity-open-1120 ob-pre-2):
+                // a 2 px line, the first version's dot over a root tick.
                 let legend_row = |a: (&'static str, &'static str), b: (&'static str, &'static str), cx: &App| {
                     let item = |(icon, label): (&'static str, &'static str), cx: &App| h_flex().gap(px(2.)).child(crate::assets::icon(&icon_path(icon), 16., cx)).child(label);
                     h_flex().h(px(40.)).pl(px(4.)).gap(px(4.)).text_size(px(11.)).text_color(pal.text).border_b_1().border_color(rgb(0xeeeeee)).child(item(a, cx)).child(item(b, cx))
                 };
                 col = col
                     .child(legend_row(("legend-workspace", "Workspace"), ("legend-version", "Version"), cx))
-                    .child(legend_row(("legend-release-candidate", "Release candidate"), ("legend-release", "Release"), cx));
-                let node = |hollow: bool, last: bool, mark: u8| {
+                    .child(legend_row(("legend-release-candidate-pin", "Release candidate"), ("legend-release-pin", "Release"), cx));
+                let node = |hollow: bool, last: bool, root: bool, mark: u8| {
                     let dot = match mark {
                         // A candidate's △ white inside, over the line.
                         3 => div().relative().size(px(14.)).child(div().absolute().child(crate::ui::glyph("legend-release", 14., rgb(0xffffff)))).child(div().absolute().child(crate::ui::glyph("legend-release-candidate", 14., blue))),
                         1 | 2 => div().child(crate::ui::glyph("legend-release", 14., blue)),
-                        _ => div().size(px(if hollow { 13. } else { 9. })).rounded_full().border_1().border_color(blue).bg(if hollow { rgb(0xffffff) } else { blue }),
+                        _ => div().size(px(if hollow { 14. } else { 10. })).rounded_full().border_2().border_color(blue).bg(if hollow { rgb(0xffffff) } else { blue }),
                     };
                     div()
                         .w(px(140.))
@@ -5101,10 +5102,11 @@ impl AssemblyView {
                         .flex()
                         .items_center()
                         .justify_center()
-                        .child(div().absolute().left(px(69.5)).w(px(1.5)).top(px(if hollow { 18. } else { 0. })).bottom(px(if last { 18. } else { 0. })).bg(blue))
+                        .child(div().absolute().left(px(69.)).w(px(2.)).top(px(if hollow { 18. } else { 0. })).bottom(px(if root { 11. } else if last { 18. } else { 0. })).bg(blue))
+                        .when(root, |d| d.child(div().debug_selector(|| "ins-other-root".into()).absolute().left(px(64.)).w(px(12.)).top(px(25.)).h(px(2.)).bg(blue)))
                         .child(dot)
                 };
-                col = col.child(h_flex().h(px(36.)).child(node(true, d.versions.is_empty(), 0)).child(div().flex_1().text_size(px(13.33)).italic().text_color(rgb(0x999999)).child("Main")));
+                col = col.child(h_flex().h(px(36.)).child(node(true, d.versions.is_empty(), false, 0)).child(div().flex_1().text_size(px(13.33)).italic().text_color(rgb(0x999999)).child("Main")));
                 let n = d.versions.len();
                 for (i, v) in d.versions.iter().enumerate() {
                     let on = i == d.version;
@@ -5116,7 +5118,7 @@ impl AssemblyView {
                             .when(on, |r| r.bg(rgb(0xb2ddf6)))
                             .when(!on, |r| r.hover(|r| r.bg(pal.panel_hover)))
                             .debug_selector(move || format!("ins-other-v-{i}"))
-                            .child(node(false, i + 1 == n, d.marks.get(i).copied().unwrap_or(0)))
+                            .child(node(false, i + 1 == n, i + 1 == n, d.marks.get(i).copied().unwrap_or(0)))
                             .child(div().flex_1().text_size(px(13.33)).text_color(pal.text).child(crate::ui::user_text(v.label.clone())))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 if let Some(d) = &mut this.ui.insert_other_doc {
@@ -5219,8 +5221,8 @@ impl AssemblyView {
                         .child(
                             div()
                                 .id("ins-other-create-link")
-                                .pt(px(4.))
-                                .pb(px(2.))
+                                .pt(px(24.))
+                                .pb(px(3.))
                                 .flex()
                                 .justify_center()
                                 .font_weight(FontWeight::SEMIBOLD)
@@ -5281,7 +5283,7 @@ impl AssemblyView {
                 let t2 = t.clone();
                 let expander = div()
                     .id(SharedString::from(format!("ins-other-x-{t}")))
-                    .child(crate::ui::glyph(if open { "chevron-down" } else { "chevron-right" }, 12., pal.text_muted))
+                    .child(crate::ui::glyph(if open { "ui-chevron-down" } else { "ui-chevron-right" }, 10., pal.text))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         cx.stop_propagation();
                         this.expand_other_studio(t2.clone(), cx);
