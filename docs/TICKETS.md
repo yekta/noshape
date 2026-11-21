@@ -339,6 +339,8 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - [ ] P0 **FEEL-FIELD-HOVER-DIM (psui)**: with a feature dialog's selection field active (Fillet 1, shift+f), our hover is drawn
   muted: the edge band #D1B088 / #E0C49E, a face's boundary #B28A5D. Live draws the normal hover: 5 px #FFC685 band with the dark
   line through it (no midpoint marker), a face's 2 px #FFC685 boundary. Live b3/dlg-edge-hover_f, dlg-mid-hover_f, dlg-face-hover_f.
+  (qa 20:23, batch 5: the same muted look in Extrude's "Faces and sketch regions" field (face, edge) and the Plane field
+  (face, edge; the Plane edge's dark midpoint ring is right); live b5/b5-{extrude,plane}-{face,edge}_f, ours qa-scratch/hm2/cmp-b5.)
 - [ ] P0 **FEEL-FIELD-VERTEX-EDGE (psui)**: in the Fillet field, the pointer on the block's top front right corner lights the top
   front edge in live (the field takes edges and faces, the same id as hovering that edge); ours lights the vertical edge.
   Live b3/dlg-vertex-hover_f.

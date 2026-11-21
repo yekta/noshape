@@ -824,7 +824,7 @@ real app (green build, Xvfb, one app): our screen at live's camera (the ui-parit
 same crop round the pointer after live's rest, compared by shape, size at 1x and sampled colours: = or ≠. psui fixes,
 qa re-scores the cells on each land. Our crops: qa-scratch/hm/ (walk kit vibe2 ~/agents/qa-keep/walk3).
 
-**Matched: 82 / 112** (20:18: batch 4, the assembly, 6 / 20 on green 6be52caf4 (live as2/, lane 4); batch 5 (13 cells) running. 19:57: batch 2 50 / 51 on green 6be52caf4 (psui's ee4c1f6a); Part Studio 26 / 26 and batch 3 0 / 15 unchanged. Before, 39 / 92 at 18:51: Part Studio 26 / 26 on green 1118a1b6f (psui's 1e44717c), batch 3 0 / 15 there too; sketch tables pending their re-run. Before, 18:26: 28 / 77 on green 5b9feb71a; 4f2cb3ce's green adds the three midpoint approach cells (along the edge, from the
+**Matched: 90 / 125** (20:23: batch 5, other fields and the Dimension tool, 8 / 13 on green 6be52caf4. 20:18: batch 4, the assembly, 6 / 20 (live as2/, lane 4). 19:57: batch 2 50 / 51 on green 6be52caf4 (psui's ee4c1f6a); Part Studio 26 / 26 and batch 3 0 / 15 unchanged. Before, 39 / 92 at 18:51: Part Studio 26 / 26 on green 1118a1b6f (psui's 1e44717c), batch 3 0 / 15 there too; sketch tables pending their re-run. Before, 18:26: 28 / 77 on green 5b9feb71a; 4f2cb3ce's green adds the three midpoint approach cells (along the edge, from the
 face, on a selected edge); batch 3 0 / 11 on 4f2cb3ce. Before psui's 1e44717c: Part Studio 18 / 26, sketch entities in the Part Studio 5 / 21,
 in sketch edit 8 / 25, Line-tool inference 0 / 5). Ours: live's document (block 40×30×20 + Sketch 2: point (60,25), line (60,5)–(90,5),
 arc c(75,15) r8 0.3..2.8 rad, circle c(100,20) r6), `f`, the same targets and states, a fresh app per cell; our fit matches live's camera
@@ -967,6 +967,20 @@ live 0.0506 mm/px, ours 0.0477 at 992 px (the same fit); live as2/ (lane 4, 20:1
 | vertex / edge / midpoint / face selected | the move manipulator's centre a hollow white ring (the orange pick shows inside) | a filled white disc in a grey ring; along a selected edge a white dashed line | ≠ P0 FEEL-ASM-MANIPULATOR-RING |
 | vertex / edge / midpoint / face selected + hovered | the hollow ring turns blue #6087BD..#85A3D0 | a white disc in a bright blue ring | ≠ P0 FEEL-ASM-MANIPULATOR-RING |
 | mate connector hovered / selected / selected + hovered / hovered with the right face selected | the part's connector drawn (disc, ring, axes); lit #FFE79F, selected #FFE187, owner edges #DAB46B..#E9C177; the right face stays selected | no connector drawn: the corner's vertex lights instead | ≠ P0 FEEL-ASM-PS-MC-MISSING |
+
+Other selection fields and the Dimension tool (batch 5; 8 / 13 on green 6be52caf4; block doc after `f`, the field active; live b5/ (lane 4,
+20:13), ours qa-scratch/hm2/b5-score.png, cmp-b5/):
+
+| Cell | Live | Ours | Status |
+|---|---|---|---|
+| Extrude field, a sketch region hovered | the region's boundary #FFC685, the fill unchanged | the same | = |
+| Extrude field, face / edge hovered | 2 px #FFC685 boundary / 5 px #FFC685 band | muted thin boundary / band | ≠ P0 FEEL-FIELD-HOVER-DIM |
+| Plane field, edge hovered | 5 px #FFC685 band plus a dark ring at the edge's midpoint | the ring the same; the band muted | ≠ P0 FEEL-FIELD-HOVER-DIM |
+| Plane field, face hovered | 2 px #FFC685 boundary | muted | ≠ P0 FEEL-FIELD-HOVER-DIM |
+| Plane field, vertex hovered | ~11 px see-through disc | the same | = |
+| Fastened field, edge / face hovered | the band / nothing in the crop | the same | = |
+| Fastened field, vertex hovered | a white disc with a #FFC685 rim, no triad | a filled disc and the full connector triad | ≠ P0 FEEL-ASM-MATE-VERTEX |
+| Dimension tool: line, its midpoint, a point, the circle | the #FFC685 band with the blue curve's darker line through, no midpoint marker; the point's ring fills #FFD8AC | the same | = |
 
 ## Captures 11-17 / 11-18 (audit: one row per feel finding)
 
