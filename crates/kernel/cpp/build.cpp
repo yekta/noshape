@@ -42,6 +42,7 @@
 #include <TopAbs.hxx>
 #include <Bnd_Box.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepAlgoAPI_Splitter.hxx>
 #include <Precision.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepAdaptor_Curve.hxx>
@@ -1437,6 +1438,13 @@ std::unique_ptr<OcShape> extend_face_at(const OcShape& on, const OcShapeList& ed
   const TopoDS_Face& f = as_face(on.shape, "face");
   if (!(len > 0))
     fail_invalid("the extension must be positive");
+  if (std::getenv("NOSHAPE_DUMP_OPS") != nullptr)
+  {
+    std::ostringstream p;
+    p.precision(17);
+    p << "extend_face_at len " << len;
+    dump_op("extend_face_at", f, std::vector<TopoDS_Shape>(edges.items.begin(), edges.items.end()), p.str());
+  }
   double u0, u1, v0, v1;
   BRepTools::UVBounds(f, u0, u1, v0, v1);
   occ::handle<Geom_Surface> s = BRep_Tool::Surface(f);
@@ -1497,6 +1505,31 @@ std::unique_ptr<OcShape> extend_face_at(const OcShape& on, const OcShapeList& ed
       fail_invalid("an edge isn't on the face's boundary");
     sides[k] = true;
   }
+  // The vertices along the moved sides, to split the new sides where their edges' ends moved to.
+  std::vector<std::pair<int, gp_Pnt>> ends;
+  for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+    if (BRep_Tool::Degenerated(e) || BRep_Tool::IsClosed(e, f))
+      continue;
+    const int k = side_of(e);
+    if (k < 0 || !sides[k])
+      continue;
+    // (Not a corner: where the side meets another one.)
+    for (TopExp_Explorer v(e, TopAbs_VERTEX); v.More(); v.Next())
+    {
+      const gp_Pnt               p = BRep_Tool::Pnt(TopoDS::Vertex(v.Current()));
+      GeomAPI_ProjectPointOnSurf pr(p, bs);
+      if (pr.NbPoints() == 0)
+        continue;
+      double pu, pv;
+      pr.LowerDistanceParameters(pu, pv);
+      const bool corner = k < 2 ? !closed[1] && (std::abs(pv - b0) < 1e-6 * (1 + b1 - b0) || std::abs(pv - b1) < 1e-6 * (1 + b1 - b0))
+                                : !closed[0] && (std::abs(pu - a0) < 1e-6 * (1 + a1 - a0) || std::abs(pu - a1) < 1e-6 * (1 + a1 - a0));
+      if (!corner)
+        ends.emplace_back(k, p);
+    }
+  }
   occ::handle<Geom_BoundedSurface> b = bs;
   for (int k = 0; k < 4; ++k)
     if (sides[k])
@@ -1505,6 +1538,43 @@ std::unique_ptr<OcShape> extend_face_at(const OcShape& on, const OcShapeList& ed
   if (!mk.IsDone())
     fail_op("could not build the extended face");
   TopoDS_Face out = mk.Face();
+  // Each end carried along the surface to the new side (c2-surf-workshop-knifehandle's Extend handle: the cap's two
+  // edges stay two, 1 face 2 edges 3 vertices as live); one already a vertex of the new face (a seam's) is left.
+  double c0, c1, d0, d1;
+  b->Bounds(c0, c1, d0, d1);
+  const double tol = 1e-6;
+  ShapeList    tools;
+  for (const auto& [k, p] : ends)
+  {
+    GeomAPI_ProjectPointOnSurf pr(p, b);
+    if (pr.NbPoints() == 0)
+      continue;
+    double u, v;
+    pr.LowerDistanceParameters(u, v);
+    const gp_Pnt q     = k < 2 ? b->Value(k == 0 ? c0 : c1, v) : b->Value(u, k == 2 ? d0 : d1);
+    bool         known = false;
+    for (TopExp_Explorer x(out, TopAbs_VERTEX); x.More() && !known; x.Next())
+      known = BRep_Tool::Pnt(TopoDS::Vertex(x.Current())).Distance(q) < 10 * tol;
+    for (ShapeList::Iterator it(tools); it.More() && !known; it.Next())
+      known = BRep_Tool::Pnt(TopoDS::Vertex(it.Value())).Distance(q) < 10 * tol;
+    if (!known)
+      tools.Append(BRepBuilderAPI_MakeVertex(q).Vertex());
+  }
+  if (!tools.IsEmpty())
+  {
+    ShapeList args;
+    args.Append(out);
+    BRepAlgoAPI_Splitter sp;
+    sp.SetArguments(args);
+    sp.SetTools(tools);
+    sp.Build();
+    if (!sp.HasErrors())
+      for (TopExp_Explorer x(sp.Shape(), TopAbs_FACE); x.More(); x.Next())
+      {
+        out = TopoDS::Face(x.Current());
+        break;
+      }
+  }
   if (f.Orientation() == TopAbs_REVERSED)
     out.Reverse();
   return wrap(out);

@@ -1146,6 +1146,31 @@ fn a_guided_surface_loft_through_more_profiles_is_one_face() {
     }
 }
 
+/// That loft's first circle (its two edges) moved 5 mm on along the face (c2-surf-workshop-knifehandle's Extend handle):
+/// still two edges there, their ends carried along with them, 1/2/3 as live, where ours made the new end one edge.
+#[test]
+fn a_moved_boundary_keeps_its_edges_ends() {
+    let stations = [(0.0, 10.0), (10.0, 9.0), (20.0, 6.0)];
+    let mut profiles: Vec<Shape> = stations.iter().map(|&(z, r)| make_wire(&[make_circle(DVec3::new(0.0, 0.0, z), DVec3::Z, r).unwrap()]).unwrap()).collect();
+    let apex = DVec3::new(0.0, 0.0, 30.0);
+    profiles.push(make_vertex(apex).unwrap());
+    let guides = [1.0, -1.0].map(|side: f64| {
+        let mut pts: Vec<DVec3> = stations.iter().map(|&(z, r)| DVec3::new(side * r, 0.0, z)).collect();
+        pts.push(apex);
+        make_interpolated_spline(&pts, &[], false).unwrap()
+    });
+    let s = loft_guided_multi(&profiles, &guides).unwrap();
+    let face = s.faces()[0].clone();
+    let on_rim = |e: &Shape| e.edge_info().is_ok_and(|i| i.length > 1.0 && e.point_at(0.5 * (i.first_param + i.last_param)).is_ok_and(|p| p.z.abs() < 1e-6));
+    let rim: Vec<Shape> = face.edges().into_iter().filter(on_rim).collect();
+    assert_eq!(rim.len(), 2, "the first circle's two edges");
+    let moved = extend_face_at(&face, &rim, 5.0).unwrap();
+    assert!(moved.is_valid());
+    let shown = moved.shown_topology().unwrap();
+    assert_eq!((shown.face_count(), shown.edge_count(), shown.vertex_count()), (1, 2, 3), "faces / edges / vertices shown");
+    assert!(moved.area().unwrap() > face.area().unwrap() + 5.0 * 2.0 * PI * 10.0 * 0.9, "moved on about 5 mm round the rim");
+}
+
 /// A circle of two arcs (R12, at z 30) with straight guides at y ±10 → ±12 from the profile below, all times `k`
 /// (1e-3: metres, as the app models; its sewing tolerance is 1 µm there).
 fn loft_to_two_arcs(bottom: &Shape, k: f64) -> Shape {

@@ -2038,6 +2038,12 @@ std::unique_ptr<OcShape> loft_guided_multi(const OcShapeList& profiles, const Oc
   const size_t      n = profiles.items.size(), m = guides_in.items.size();
   if (n < 2 || m < 2)
     fail_invalid("loft_guided_multi: needs two profiles and two guides at least");
+  if (std::getenv("NOSHAPE_DUMP_OPS") != nullptr)
+  {
+    std::vector<TopoDS_Shape> all(profiles.items.begin(), profiles.items.end());
+    all.insert(all.end(), guides_in.items.begin(), guides_in.items.end());
+    dump_op("loft_guided_multi", compound_of(all), {}, std::to_string(n) + " profiles, then " + std::to_string(m) + " guides");
+  }
   Bnd_Box box;
   for (const TopoDS_Shape& p : profiles.items)
     BRepBndLib::Add(p, box);
@@ -2209,6 +2215,35 @@ std::unique_ptr<OcShape> loft_guided_multi(const OcShapeList& profiles, const Oc
       par->SetValue((int)i + 1, v[i]);
     }
     GeomAPI_Interpolate in(pts, par, false, 1e-12);
+    // Natural ends (no bend at the end profiles, as live's: knifehandle's Handle within 0.2 mm of live's next to P1
+    // and the apex, where OCCT's free ends were 1.2 mm off and Extend handle's 20 mm added 2737 mm², live 2673).
+    if (n > 2)
+    {
+      const int           N = (int)n;
+      std::vector<gp_XYZ> y(N), r(N, gp_XYZ(0, 0, 0)), M(N, gp_XYZ(0, 0, 0));
+      std::vector<double> h(N - 1), dg(N, 1.0);
+      for (int i = 0; i < N; ++i)
+        y[i] = pts->Value(i + 1).XYZ();
+      for (int i = 0; i + 1 < N; ++i)
+        h[i] = v[i + 1] - v[i];
+      // The second derivatives at the inner profiles (tridiagonal, by elimination; zero at both ends).
+      for (int i = 1; i + 1 < N; ++i)
+      {
+        dg[i] = 2 * (h[i - 1] + h[i]);
+        r[i]  = ((y[i + 1] - y[i]) / h[i] - (y[i] - y[i - 1]) / h[i - 1]) * 6.0;
+        if (i > 1)
+        {
+          const double w = h[i - 1] / dg[i - 1];
+          dg[i] -= w * h[i - 1];
+          r[i] -= r[i - 1] * w;
+        }
+      }
+      for (int i = N - 2; i >= 1; --i)
+        M[i] = (r[i] - (i + 2 < N ? M[i + 1] * h[i] : gp_XYZ(0, 0, 0))) / dg[i];
+      const gp_XYZ t0 = (y[1] - y[0]) / h[0] - M[1] * (h[0] / 6.0);
+      const gp_XYZ t1 = (y[N - 1] - y[N - 2]) / h[N - 2] + M[N - 2] * (h[N - 2] / 6.0);
+      in.Load(gp_Vec(t0), gp_Vec(t1), false);
+    }
     in.Perform();
     if (!in.IsDone())
       fail_op("loft: interpolation through the profiles failed");
