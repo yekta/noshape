@@ -149,6 +149,9 @@ fn face_csys(ev: &EvalCtx, face: &Shape, inference: &str, secondary: &[Reference
                         None => o + a * (c - o).dot(a),
                     }
                 }
+                // Where the lines along the secondary edge's two ends meet: a rounded corner's sharp (live
+                // c2-cov2-mate-connector-inference: a 5 mm round's arc on the top face, the box's corner).
+                "VIRTUAL_SHARP" if sec_edge.as_ref().and_then(virtual_sharp).is_some() => sec_edge.as_ref().and_then(virtual_sharp).unwrap_or_default(),
                 "MID_POINT" | "CENTER" | "LOOP_CENTER" if sec_edge.is_some() => {
                     let e = sec_edge.clone().unwrap_or_default();
                     let c = edge_csys(&e, if inference == "MID_POINT" { "MID_POINT" } else { "CENTER" })?;
@@ -175,6 +178,19 @@ fn face_csys(ev: &EvalCtx, face: &Shape, inference: &str, secondary: &[Reference
             }
         }
     }
+}
+
+/// The point where the lines tangent to `edge` at its two ends meet (none when they are parallel or skew).
+fn virtual_sharp(edge: &Shape) -> Option<DVec3> {
+    let info = edge.edge_info().ok()?;
+    let (t0, t1) = (edge.tangent_at(info.first_param).ok()?.try_normalize()?, edge.tangent_at(info.last_param).ok()?.try_normalize()?);
+    let (p0, p1) = (info.start, info.end);
+    let n = t0.cross(t1);
+    if n.length_squared() < 1e-12 || (p1 - p0).dot(n).abs() > 1e-9 {
+        return None;
+    }
+    let s = (p1 - p0).cross(t1).dot(n) / n.length_squared();
+    Some(p0 + t0 * s)
 }
 
 /// Centroid of the inner loop (wire of `face`) containing `edge`.

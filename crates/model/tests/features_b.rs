@@ -135,6 +135,38 @@ fn mate_connector_on_a_cylinder_takes_world_x() {
     }
 }
 
+/// A Virtual sharp mate connector on a face with a rounded corner's arc as its secondary: at the corner the arc
+/// rounds, where the lines along its ends meet (live c2-cov2-mate-connector-inference's MC virtual sharp: (240, 30, 20)
+/// on a 5 mm round, the face's centroid before).
+#[test]
+fn a_virtual_sharp_mate_connector_is_at_the_rounded_corner() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p: Vec<_> = [(0.0, 0.0), (0.04, 0.0), (0.04, 0.015), (0.035, 0.02), (0.0, 0.02)].iter().map(|&(x, y)| sk.add_point(DVec2::new(x, y))).collect();
+    let c = sk.add_point(DVec2::new(0.035, 0.015));
+    sk.add_line_between(p[0], p[1]).unwrap();
+    sk.add_line_between(p[1], p[2]).unwrap();
+    sk.add_arc_between(c, p[2], p[3]).unwrap();
+    sk.add_line_between(p[3], p[4]).unwrap();
+    sk.add_line_between(p[4], p[0]).unwrap();
+    let id = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    s.extrude_largest(id, "10 mm");
+    let r = s.ok();
+    let top = top_face(&r);
+    let b = &r.context.bodies[0];
+    let arc = b.shape.edges().iter().position(|e| matches!(e.edge_curve(), Ok(noshape_kernel::Curve::Circle { .. })) && e.endpoints().is_ok_and(|(a, _)| (a.z - 0.01).abs() < 1e-9)).expect("the top arc");
+    let arc = Reference::Edge((*b.edges[arc]).clone());
+    s.add("mateConnector", |p| {
+        p.set("originQuery", ParamValue::Query(vec![top]));
+        p.set("entityInferenceType", ParamValue::Enum("VIRTUAL_SHARP".into()));
+        p.set("secondaryOriginQuery", ParamValue::Query(vec![arc]));
+    });
+    let r = s.ok();
+    let c = &r.context.connectors[0];
+    assert!(vnear(c.origin, DVec3::new(0.04, 0.02, 0.01)), "origin {:?}", c.origin);
+    assert!(vnear(c.z, DVec3::Z), "z {:?}", c.z);
+}
+
 #[test]
 fn mate_connector_on_face_with_offset_drives_plane_and_sketch() {
     let mut s = block();

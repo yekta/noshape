@@ -5,28 +5,36 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-21 09:46 UTC) — RESUME HERE
-- Landing now: Between-entities connectors + mate groups + query dedupe (parity.rs), a flexible subassembly's
-  connectors keep Between / Realign in the parent's solve (eval.rs `connector_picks`; asm-suspension's Lower / Upper
-  Control Arm were 47.5 / 37.5 mm off: the sub tab alone was right, the root's flex solve dropped `between`), Face
-  tab Lxy rounding noise 0 (qa FACE-MOMENT-LXY-ZERO). 7aa080fc landed as b2bbaf7d, qa verified both tickets.
-- Held, uncommitted: /root/asm-scratch/transform-carry.patch (assembly_transform on a mated instance, qa: scissor
-  Top +2 mm moved 2, live's drag 132); re-apply after the land (`git apply`), verify on a saved scissor doc.
-- Scissor can't finish: chain 2 (vibex7) killed by earlyoom at 924 s, ops-bt RSS 22.8 GB (hosts are 29 GB). Vs
-  11-20 08:24 (scissor-comp.out, 1009 s total): more studios now (0139f2, 03a9e5, 0c2c42, 2d82a0 new), Studio
-  0da59a 10 s -> 349 s, 2d82a0 184 s. Next: profile 0da59a (NOSHAPE_KERNEL_PROFILE) and find what holds memory.
-  0da59a: live's own Derived "Plate" / "Battery Clip" are in ERROR (Top Plate 0 parts).
-- Suspension: rerun with the fix pending (expect 23+/28). Remaining: Studio 805e29 regen (Knuckle, Fillet 3/4,
-  routed) -> Ball 1/2, Cap/Cup parts -> root Fastened 1 / Cup distance.
-- infento 157/167. Revolute 10 / Gear 1: Studio a3f7a1 Sketch 1's 9 µm gaps (crates/sketch regions, routed).
-  Sub-mate offsets (Sub bdf7bf halfClutch 4.6 mm, b63c40 / dfc972 flanges): needs a traced run. Extrude 42's five
-  live faces are SPLIT pieces of one cap told apart by TOPOLOGY: deduped now; proper piece resolution is a follow-up.
-- SPEED-ASM-OPEN: stored display cache -> dx (P1); Circular pattern 4 fixed by bool (bool-mend 56bb5c47b); Extrude
-  42's 5 identical tools were the translator's duplicates (deduped; bool adds a coincident-tool dedupe too).
-- bjr-config 133/137: Sub c1e15f Fastened 3/4 "cannot resolve" (live OK): trace next.
-- vibex7 chain 2 (subs-run2.sh): corexy 62/62; keyboard-pattern and the rest queued; log ~/agents/asm-keep/subs2.log.
-- Cleanup: Mac ~/noshape-host/asm-keep emptied 11-21 (lead: Mac total over 100 GB; keep only agents/asm). Left:
-  asm-base worktree, vibex7 ops-subs / inf-probe, vibex8 ops-subs, ~/tmp/asm/q copies, infento-saved.noshape (bool).
+## State (2026-11-21 17:07 UTC) — RESUME HERE
+- Landed today: d5b89d4d as 4a22b296 (Between / Realign in a flexible sub's parent solve, Lxy 0), 5658c8fc as
+  4c701d14 (Insert › Other documents graph residuals).
+- P0 scissor (asm-scissor-lift 10 s -> 349 s / 18-22 GB): fix landing 17:1x. Causes: (1) my 42f934e10 rebuilt each
+  Derived's whole source chain in every studio (0c2c42 feature 6 4.3 -> 37 s); (2) tests/parity.rs' `named` loop
+  copied every same-corpus source (with its own sources) into each studio's derivedSources: 8.8 GB before the first
+  feature, earlyoom at 18 GB; (3) new data: Plate (0da59a) derives 2d82a0 (178 features, fetched 11-21 04:33), which
+  derives 9cbb0e. Fix: `derived_built` shared by the assembly's Translators and nested sources (once each), studios
+  ordered sources-first (`current_derived_elements`), the assembly's own tab reused as a source (`source_parts`) when
+  a Derived takes it as it is now (`e…::m…`) and it has no configuration; one taken at a version (`d…::v…::e…`,
+  97ad5f's Derived 1 of 264eb3: the reused tab gave other bodies, Linear pattern 1 hung) keys `<element>@version`, a
+  tab of its own (`derived_key`). vibe2: run 4 (no reuse) 38:25 / 11.5 GB, run 5 (fix) 22:20 / 11.1 GB, both
+  207/239, 16/34 mates (34 on today's data), 60/87 BOM; 2d82a0 differences 51 -> 13, all 352 -> 313 (the reused tab has live's refs).
+- Deep per-occurrence placement `>= 2` reverted (welding 41/81 either way). Welding: our top-level solve turns
+  flexible sub instances on free DOFs off live's (Sub 0eadef, e23695); e23695 Fastened 4 "cannot resolve". Solver.
+- Landing with it: parity.rs (tests) compares live's connectors.json via query_datums (c2-cov2-mate-connector-
+  inference 21/22 -> VIRTUAL_SHARP in refgeom.rs `virtual_sharp`, test features_b
+  a_virtual_sharp_mate_connector_is_at_the_rounded_corner). transform-carry (ops/assembly.rs, mate_flip.rs) HELD,
+  out of the worktree: /root/asm-scratch/transform-carry.patch (git apply after the land).
+- NEXT isaac Studio a04711 (blend sent back): Sketch 10 untranslated (solve moved 4.8e15 mm), sketches 5/8/9 external
+  refs unmapped (Sketch 9 Jpc/JpV/JpU, Sketch 10 J3Q/J1B/JpN/JyM: "no live geometry"; the studio has context.jsonl,
+  no refs.jsonl), Extrude 14 "no geometry change" (live Part 2 5480 -> 6256.4 mm³ at index 23). Save run (ops-mc2)
+  -> vibe2 ~/tmp/asm/save/asm-isaac-ball.noshape: copy to a 700 dir, delete features from 23 on, query_parts vs live
+  (index 22: Part 1 1789.9, Part 2 5480.0, Part 3 667.4 mm³). Mates before: 126/129, BOM 60/62.
+- Then: xdev-subs / pinslot reruns (vibex7 ops-mc, before 146/266 and 24/42), suspension rerun, infento traced rerun
+  (sub-mate offsets bdf7bf 4.6 mm, b63c40 8.33 / 7.2 mm, dfc972 1.56 mm). bjr Sub c1e15f Fastened 3/4, pinslot
+  Revolute 5, tvc 41/43, keyboard BOM 15/16.
+- Cleanup: asm-base worktree, vibex7 ops-bis / ops-1120 / ops-bt / ops-mc, vibex8 ops-main / ops-subs / ops-mc,
+  vibe2 ops-mc / ops-mc2 / ab1120e-*.out / mc/*.out + rss logs / ~/tmp/asm/ab-1120e.sh, ~/tmp/asm pm / pm2 / q copies.
+  Mac target pruned 17:0x (25 -> 12 GB).
 
 ## State (2026-11-20 18:50 UTC)
 

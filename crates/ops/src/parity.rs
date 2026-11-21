@@ -1474,12 +1474,13 @@ impl<'a> Translator<'a> {
         let studio = f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "partStudio").cloned().unwrap_or(Value::Null);
         let namespace = studio["namespace"].as_str().unwrap_or("");
         let element = namespace.split("::").find_map(|s| s.strip_prefix('e')).ok_or_else(|| format!("Derived mirror: no source element in {namespace:?}"))?.to_string();
-        if !self.derived_built.contains_key(&element) {
+        let key = derived_key(namespace, &element);
+        if !self.derived_built.contains_key(&key) {
             let built = self.derived_source(&element, problems)?;
-            self.derived_built.insert(element.clone(), built);
+            self.derived_built.insert(key.clone(), built);
         }
         let mut params = Map::new();
-        params.insert("partStudio".into(), json!(self.derived_built[&element].0));
+        params.insert("partStudio".into(), json!(self.derived_built[&key].0));
         Ok(("derivedMirror".into(), params))
     }
 
@@ -1499,11 +1500,12 @@ impl<'a> Translator<'a> {
             return Ok(("importDerived".into(), Map::new()));
         }
         let element = namespace.split("::").find_map(|s| s.strip_prefix('e')).ok_or_else(|| format!("Derived: no source element in {namespace:?}"))?.to_string();
-        if !self.derived_built.contains_key(&element) {
+        let key = derived_key(namespace, &element);
+        if !self.derived_built.contains_key(&key) {
             let built = self.derived_source(&element, problems)?;
-            self.derived_built.insert(element.clone(), built);
+            self.derived_built.insert(key.clone(), built);
         }
-        let (tab, parts) = self.derived_built[&element].clone();
+        let (tab, parts) = self.derived_built[&key].clone();
         let mut ours = Vec::new();
         let part_query = if studio.is_null() { param("parts") } else { studio["partQuery"].clone() };
         for q in part_query["queries"].as_array().into_iter().flatten() {
@@ -1599,6 +1601,8 @@ impl<'a> Translator<'a> {
         for (e, src) in &self.derived_sources {
             t.derived_sources.entry(e.clone()).or_insert_with(|| src.clone());
         }
+        // (Sources already built, once each down the chains.)
+        t.derived_built = self.derived_built.clone();
         for k in 0..t.len() {
             let step = t.step(k);
             if step.ours.is_none() {
@@ -1608,15 +1612,27 @@ impl<'a> Translator<'a> {
             }
         }
         problems.extend(t.finish().into_iter().map(|p| format!("its source: {p}")));
+        for (e, b) in std::mem::take(&mut t.derived_built) {
+            self.derived_built.entry(e).or_insert(b);
+        }
         let tab = t.tab.clone().ok_or("Derived: the source's tab")?;
+        let parts = t.source_parts(&lines, &doc)?;
+        problems.extend(t.notes.iter().map(|n| format!("its source: {n}")));
+        self.custom_failures.extend(t.custom_failures.iter().cloned());
+        Ok((tab, parts))
+    }
+
+    /// This studio as a Derived's source: live's part ids at its end (`lines`, live's per-feature lines) → ours, and
+    /// its sketches' (`sketch:<live feature id>`) → their sketch bodies.
+    fn source_parts(&mut self, lines: &[Value], doc: &Value) -> Result<HashMap<String, String>, String> {
         let last = lines.iter().rfind(|l| l.get("index").is_some()).cloned().unwrap_or(Value::Null);
         let mut parts = HashMap::new();
         // By live's geometry for the part, else by its name (ours are named as Onshape's).
-        let named = t.call("query_parts", json!({}))?;
+        let named = self.call("query_parts", json!({}))?;
         for p in last["parts"].as_array().into_iter().flatten() {
             let Some(id) = p["partId"].as_str() else { continue };
             let by_name = || named["parts"].as_array().into_iter().flatten().find(|o| o["name"] == p["name"]).and_then(|o| o["id"].as_str()).map(str::to_string);
-            match t.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": [id] })).ok().as_deref() {
+            match self.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": [id] })).ok().as_deref() {
                 Some([one]) => {
                     parts.insert(id.to_string(), one.clone());
                 }
@@ -1629,13 +1645,11 @@ impl<'a> Translator<'a> {
         }
         // Its sketches, by live's feature id (`sketch:<id>`): ours as a Derived picks one, its sketch body.
         for f in doc["features"].as_array().into_iter().flatten().filter(|f| f["featureType"] == "newSketch") {
-            if let Some(ours) = f["featureId"].as_str().and_then(|o| t.feature_ids.get(o)) {
+            if let Some(ours) = f["featureId"].as_str().and_then(|o| self.feature_ids.get(o)) {
                 parts.insert(format!("sketch:{}", f["featureId"].as_str().unwrap_or("")), format!("body:{ours}.{}", u32::MAX));
             }
         }
-        problems.extend(t.notes.iter().map(|n| format!("its source: {n}")));
-        self.custom_failures.extend(t.custom_failures.iter().cloned());
-        Ok((tab, parts))
+        Ok(parts)
     }
 
     /// Sketch entity `e` of sketch `oid` moved to live's solved geometry
@@ -9265,6 +9279,25 @@ fn fetched_derived_sources(studio: &Value, element: &str, studios: &[(String, Va
     out
 }
 
+/// A Derived source's key among those built: its element, or `<element>@version` when taken at a version
+/// (`d…::v…::e…`), never the assembly's own tab of it.
+fn derived_key(namespace: &str, element: &str) -> String {
+    if namespace.starts_with('e') { element.to_string() } else { format!("{element}@version") }
+}
+
+/// The Part Studios a studio's Derived and Derived mirror features take as they are now (`e…::m…`, not at a version).
+fn current_derived_elements(studio: &Value) -> Vec<String> {
+    studio["features"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|f| f["featureType"] == "importDerived" || f["featureType"] == "derivedMirror")
+        .flat_map(|f| f["parameters"].as_array().into_iter().flatten())
+        .filter(|p| p["parameterId"] == "buildFunction" || p["parameterId"] == "partStudio")
+        .filter_map(|p| p["namespace"].as_str()?.strip_prefix('e')?.split("::").next().map(str::to_string))
+        .collect()
+}
+
 /// The Part Studios a studio's Derived and Derived mirror features take (their elements).
 fn derived_elements(studio: &Value) -> Vec<String> {
     studio["features"]
@@ -9565,6 +9598,27 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         .collect();
     let mut ordered: Vec<&(String, Value, Value)> = studios.iter().collect();
     ordered.sort_by_key(|(e, _, _)| !sources.contains(e));
+    // A studio another's Derived takes as it is now (not at a version) before that one, its tab then that Derived's
+    // source (asm-scissor-lift's 0da59a: Plate derives 2d82a0, 150 s, HC05 0c2c42).
+    let derives: HashMap<&str, Vec<String>> = studios.iter().map(|(e, s, _)| (e.as_str(), current_derived_elements(s))).collect();
+    let derived_from: HashSet<String> = derives.values().flatten().cloned().collect();
+    fn sources_first<'a>(s: &'a (String, Value, Value), all: &[&'a (String, Value, Value)], derives: &HashMap<&str, Vec<String>>, seen: &mut HashSet<String>, out: &mut Vec<&'a (String, Value, Value)>) {
+        if !seen.insert(s.0.clone()) {
+            return;
+        }
+        for d in derives.get(s.0.as_str()).into_iter().flatten() {
+            if let Some(src) = all.iter().find(|o| o.0 == *d) {
+                sources_first(src, all, derives, seen, out);
+            }
+        }
+        out.push(s);
+    }
+    let mut topo = Vec::new();
+    let mut seen = HashSet::new();
+    for s in &ordered {
+        sources_first(s, &ordered, &derives, &mut seen, &mut topo);
+    }
+    let ordered = topo;
     let mut built: HashMap<String, (String, HashMap<String, String>)> = HashMap::new();
     let defaults: HashMap<String, HashMap<String, Value>> = studios
         .iter()
@@ -9572,6 +9626,10 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         .map(|(e, s, _)| (e.clone(), s["configuration"]["configurationParameters"].as_array().into_iter().flatten().filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].clone()))).collect()))
         .collect();
     let mut shared_sources: HashMap<String, Arc<Value>> = HashMap::new();
+    // Derived sources built once for the whole assembly (asm-scissor-lift: six studios derive 9cbb0e, 100 s each;
+    // 0da59a's HC05 derives 0c2c42, whose Derived 1 derives 665cf3, built again down each chain: 0da59a 10 -> 349 s).
+    // One at a version is a tab of its own, not the assembly's (97ad5f's Derived 1 of 264eb3: other bodies).
+    let mut derived_built: HashMap<String, (String, HashMap<String, String>)> = HashMap::new();
     for (element, studio, parts) in ordered {
         let name = format!("Studio {}", &element[..element.len().min(6)]);
         // The studio's part ids in creation order (see Translator::part_order).
@@ -9631,6 +9689,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         };
         t.other_studios = built.clone();
         t.other_defaults = defaults.clone();
+        t.derived_built = std::mem::take(&mut derived_built);
         for (e, src) in fetched_derived_sources(studio, element, studios, &mut shared_sources) {
             t.derived_sources.entry(e).or_insert(src);
         }
@@ -9650,6 +9709,17 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         }
         res.untranslated.extend(t.finish().into_iter().map(|p| format!("{name}: {p}")));
         res.untranslated.extend(t.notes.iter().map(|n| format!("{name}: {n}")));
+        derived_built = std::mem::take(&mut t.derived_built);
+        // (Not one built in a configuration of an instance's.)
+        if derived_from.contains(element) && !derived_built.contains_key(element) && studio["configuration"]["configurationParameters"].as_array().is_none_or(|p| p.is_empty()) {
+            match (t.tab.clone(), t.source_parts(studio["live"].as_array().map(Vec::as_slice).unwrap_or_default(), studio)) {
+                (Some(tab), Ok(parts)) => {
+                    derived_built.insert(element.clone(), (tab, parts));
+                }
+                (_, Err(e)) => res.untranslated.push(format!("{name} as a Derived's source: {e}")),
+                (None, _) => {}
+            }
+        }
         // (An Import's Part Studio is a tab of its own.)
         if sources.contains(element)
             && let Some(tab) = &t.tab

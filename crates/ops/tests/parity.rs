@@ -474,6 +474,7 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
     let mut reached: Vec<String> = Vec::new();
     let mut banded: HashMap<String, (f64, [f64; 2])> = HashMap::new();
     let live_last = live.iter().filter_map(|l| l["index"].as_u64()).max();
+    let (mut matched, mut first_k) = (std::collections::HashSet::new(), None);
     for k in 0..t.len() {
         let step = t.step(k);
         noshape_ops::parity::trace_live_pattern(&step.name, &step.feature_type, live, k);
@@ -551,7 +552,9 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         if diff.is_empty() {
             res.matching += 1;
             res.custom_matching += usize::from(step.custom);
+            matched.insert(k);
         } else if res.first.is_none() {
+            first_k = Some(k);
             let kind = if failed_run {
                 "custom feature failed to run"
             } else if step.custom && step.ours.is_none() {
@@ -562,6 +565,50 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
                 step.feature_type.as_str()
             };
             res.first = Some(format!("feature {k} \"{}\" ({kind}): {}", step.name, diff.join("; ")));
+        }
+    }
+    // A mate connector feature matches where live's connector is at the end of the list: its origin within 0.001 mm,
+    // its axes within 1e-6.
+    if let Some(live_mc) = features["liveConnectors"].as_object().filter(|m| !m.is_empty())
+        && let Ok(d) = t.call("query_datums", json!({}))
+    {
+        let mm = match d["units"]["length"].as_str() {
+            Some("m") => 1000.0,
+            Some("cm") => 10.0,
+            Some("in") => 25.4,
+            Some("ft") => 304.8,
+            Some("yd") => 914.4,
+            Some("um") => 0.001,
+            _ => 1.0,
+        };
+        let v3 = |v: &Value, k: f64| Some(glam::DVec3::new(v[0].as_f64()? * k, v[1].as_f64()? * k, v[2].as_f64()? * k));
+        let mut off: Vec<(usize, String)> = Vec::new();
+        for c in live_mc.values() {
+            let Some(name) = c["name"].as_str() else { continue };
+            let Some(k) = reached.iter().position(|n| n == name) else { continue };
+            let (Some(lo), Some(lx), Some(lz)) = (v3(&c["origin_mm"], 1.0), v3(&c["x"], 1.0), v3(&c["z"], 1.0)) else { continue };
+            let ours = d["mate_connectors"].as_array().into_iter().flatten().find(|m| m["name"] == name).and_then(|m| Some((v3(&m["origin"], mm)?, v3(&m["x"], 1.0)?, v3(&m["z"], 1.0)?)));
+            let why = match ours {
+                None => "mate connector not built".to_string(),
+                Some((o, x, z)) if o.distance(lo) > 1e-3 || x.dot(lx) < 1.0 - 1e-6 || z.dot(lz) < 1.0 - 1e-6 => {
+                    let f = |p: glam::DVec3| format!("({:.3}, {:.3}, {:.3})", p.x, p.y, p.z);
+                    format!("mate connector at {} z {} x {}, live {} z {} x {}", f(o), f(z), f(x), f(lo), f(lz), f(lx))
+                }
+                Some(_) => continue,
+            };
+            off.push((k, why));
+        }
+        off.sort();
+        for (k, why) in off {
+            let name = &reached[k];
+            res.differing.push(format!("feature {k} \"{name}\": {why}"));
+            if matched.remove(&k) {
+                res.matching -= 1;
+            }
+            if first_k.is_none_or(|f| k < f) {
+                first_k = Some(k);
+                res.first = Some(format!("feature {k} \"{name}\" (mateConnector): {why}"));
+            }
         }
     }
     // Live's regeneration time of each feature, by our feature id.
@@ -665,6 +712,11 @@ pub(crate) fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
     let sketches = std::fs::read_dir(dir).into_iter().flatten().flatten().map(|e| e.path()).find(|p| p.file_name().is_some_and(|n| n.to_string_lossy().ends_with("sketches.json")));
     if let Some(sk) = sketches.and_then(|p| std::fs::read_to_string(p).ok()).and_then(|t| serde_json::from_str::<Value>(&t).ok()) {
         features["sketchBodies"] = sk;
+    }
+    // Live's mate connectors at the end of the list (live 11-21 13:59, evMateConnector: `{ "connectors": { feature id:
+    // { name, origin_mm, x, z } } }`), compared with ours.
+    if let Some(c) = std::fs::read_to_string(dir.join("connectors.json")).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()) {
+        features["liveConnectors"] = c["connectors"].clone();
     }
     if let Ok(t) = std::fs::read_to_string(dir.join("context.jsonl")) {
         features["contextEntities"] = t.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).collect();
@@ -4611,22 +4663,8 @@ fn parity_assemblies() {
             studios.push((element.to_string(), features, parts));
         }
         studios.sort_by(|a, b| a.0.cmp(&b.0));
-        // A Derived from another Part Studio of the same document (its namespace `e<element>::m…` as for another
-        // document's, live 08:37: asm-robot-relations' Derived 1 from "Rail Pieces"): that studio of the corpus.
-        let named: Vec<(usize, String)> = studios
-            .iter()
-            .enumerate()
-            .flat_map(|(i, (_, f, _))| {
-                f["features"].as_array().into_iter().flatten().filter(|x| x["featureType"] == "importDerived").flat_map(|x| x["parameters"].as_array().into_iter().flatten()).filter_map(|p| p["namespace"].as_str()).filter_map(|ns| ns.split("::").find_map(|s| s.strip_prefix('e'))).map(move |e| (i, e.to_string()))
-            })
-            .collect();
-        for (i, e) in named {
-            if studios[i].1["derivedSources"].get(e.as_str()).is_some() {
-                continue;
-            }
-            let Some(src) = studios.iter().find(|(el, ..)| *el == e).map(|(_, f, _)| json!({ "doc": f, "live": f["live"].clone(), "refs": "" })) else { continue };
-            studios[i].1["derivedSources"][e.as_str()] = src;
-        }
+        // (A Derived from another Part Studio of the same corpus: `fetched_derived_sources` gives it that studio, once for
+        // all; copied into each studio here, with its own sources, asm-scissor-lift took 18 GB before its first feature.)
         let mut ctx = Ctx::new();
         let path = scratch(&format!("asm-{name}"));
         let r = rebuild_assembly(&mut ctx, &path, &asm, &studios);
