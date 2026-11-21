@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-21 02:08 UTC (lead order 13:1x: screws fix (landed), dx items, then parting-line Drafts speed; NO MAC until the lead says (user: left alone till 18:05)). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-21 04:48 UTC (lead order 11-21: thicken trim, SPEED-VALVE-CONFIG, KNIFEHANDLE, then the direct thicken ticket). Mac: builds + crate tests via NOSHAPE_RB_HOST=mac tools/tiers/rb.sh, single-model repros in ~/noshape-host/core-keep/models. Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
@@ -37,16 +37,21 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   missing." (skasm): f9ad07b50's exact thicken rebuild gave the SM part's vertices no history. k::thicken_plain (no
   rebuild) for opThicken + both sheetmetal.rs; native Thicken / thin loft keep it. skasm compat SAME as 0.4.63. Root
   fix later: map the old vertices to the rebuilt ones in exact_hist, then use the rebuild everywhere again.
-- **qa validity P1s (core-rp, "no invalid bodies from Battery Remove's unify...", landing 11-21 ~03:30):** LORA: op_unify
-  keeps a valid shape as it came when a face it merged is invalid (T1 core a_unify_that_would_leave_an_invalid_face_keeps
-  _the_shape, data/lora-battery-cut.bin); the check runs on all threads, planar_valid first (cf-drive-train-generator:
-  unify.check 685 ms serial, 380 parallel; with planar_valid the doc 2.4 s vs main 2.0-2.3, live 4.2). SURFLOFTS: bsurf 2U meeting + 1V =
-  3-sided Coons (op_coons point side), an invalid fill is BSURF_FAILED (rest: upstream Curve 7/8 lines vs live "other").
-  WRAP1: op_wrap_faces BuildCurves3d at tol (1e-5 -> 1e-7; thickened 118 um > 0.1 mm wall), walls from the target
-  surface (into 0): Wrap 1 = live counts / volume / area, valid (types: 6 lines vs live's other). Suite pair vibex6:
+- **LANDED 04:15 1a106f47 as 3bbeb609: qa validity P1s** (LORA unify keeps a valid shape; SURFLOFTS 3-sided Coons;
+  WRAP1 BuildCurves3d at 1e-7, walls from the target surface). Suite pair vibex6:
   118 -> 119 / 174 docs, 1840 -> 1848 features, none worse (c2-rib-wrap 10 -> 18). OPEN (P2, mine): a thin wrapped r3
   disc fuse loses the cylinder in OCCT (cut -> 0 volume, common empty); recording /root/core-scratch/wrap-disc-fuse-lost.bin
   (parts[0] objects, parts[1] tools; tool 1 fails alone).
+- **SPEED-SPLIT-THICKEN (P0, core-trim queued 11-21):** c2-surf-workshop-split Thicken 1 (Mac: offset 100 ms, ours doc
+  202 ms vs live 112). Trim: the sharp path's volume computed once while orienting (-11 ms). Real fix = DIRECT THICKEN
+  (lead 11-21, own ticket, after VALVE + KNIFEHANDLE): offset faces on Geom_OffsetSurface, concave sharp edges trimmed by
+  GeomAPI_IntSS (2-6 ms an edge), seams by IntCS, ruled walls, sew; only sheets whose sharp edges are concave loops,
+  OCCT fallback; lands on the same faces / edges / volume as OCCT on every thicken in suite + corpora, a test per case.
+- **SPEED-VALVE-CONFIG (P0, core-th):** Circular pattern 1 (Mac 98-102 ms vs live 67; x86 201): a drafted Through all
+  REMOVE ran 2 m (model_extent's floor), its cones met below the 150 mm disc -> rust_cut_one_by_one (7 x ~12 ms).
+  Fix: extrude.rs reach() = the parts' extent along the direction + 10% for a drafted Through all cut / intersect
+  (EvalCtx::seed_op carries the seed's operation into a pattern's New evaluation); T1 engine
+  reapplied_drafted_through_all_holes. Mac timing + crate tests running.
 - **KNIFEHANDLE-LOFT1 (qa P1 11-21, in progress):** Loft 1 = SURFACE through P1 (2 splines), P2-P6 ellipses, a point
   (tip 188.575), 2 guides (side profile splines; guide 1 runs on to x=0); live Handle 1/2/3, 21477.23 mm2, box x
   13.09..188.58, y +-19.958, z -39.98..13.80. Work: /root/core-scratch/gordon3.diff (k::loft_gordon = OCCT 8
@@ -184,7 +189,7 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-00. After the validity land: TICKETS rows, tell qa + lead. Then KNIFEHANDLE-LOFT1 (P1, In flight); then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
+00. SPEED-VALVE-CONFIG land; then KNIFEHANDLE-LOFT1 (P1, In flight); then DIRECT THICKEN (own ticket); then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
    174 ms): speed ticket if >=100 ms and >=2x live's (lead 23:5x); then the thin wrapped-disc fuse (P2, In flight).
 0. Impeller P0 (In flight): land Extrude impellerraum's split walls after the pair, then Delete face 2 on our input and
    the local rebuild, re-timed on the Mac vs 12 ms; then the In-flight queue 1-7.

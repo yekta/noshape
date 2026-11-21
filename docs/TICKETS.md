@@ -14,6 +14,12 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   It was 56-124 ms in 0.4.60 and 407-756 ms in 0.4.61 (the same alternating run, nightly/models-1120.jsonl), so this is a
   regression. Cause: core 7dd227351 ("Thicken of a sheet whose faces meet at an angle … c2-surf-workshop-split's Thicken 1"),
   the only Thicken change between them. Wanted: that shape at no more than 2x of live (<= ~220 ms) with its parts kept.
+  core 11-21: OCCT's intersection-join offset is 100 ms of it (Mac; two full Inter3D passes); the result's volume is now computed
+  once (-11 ms). The rest goes with THICKEN-DIRECT.
+- [ ] P1 **THICKEN-DIRECT (core)**: build a sheet's thicken directly (offset surfaces trimmed at concave sharp edges by their
+  intersection curves, ruled walls, sewn) where its sharp edges are concave loops, OCCT's offset as the fallback (lead 11-21:
+  after SPEED-VALVE-CONFIG and KNIFEHANDLE-LOFT1). Lands on correctness: the same faces, edges and volume as OCCT's result
+  on every thicken in the model suite and corpora, plus a test per case.
 - [ ] P1 **SPEED-MUTUALTRIM-FILLET1 (blend)**: c2-surf-workshop-mutualtrim 384 ms vs live 76 (5.1x); Fillet 1 takes 308 ms. Not a
   regression: Fillet 1 failed until 0.4.61 (Error -> Ok), so this is its first cost.
 - [ ] P2 **FILLET-FAIL-SLOW (blend)**: cli-draft-hang2 (qa fuzz document, no live copy) Fillet 2 fails after 14.1 s. A

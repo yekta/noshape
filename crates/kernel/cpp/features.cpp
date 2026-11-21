@@ -5237,30 +5237,39 @@ static int solid_count_of(const TopoDS_Shape& s)
 }
 
 // Reverse solids whose signed volume is negative (inside-out results).
-static TopoDS_Shape orient_solids_outward(const TopoDS_Shape& s)
+static TopoDS_Shape orient_solids_outward(const TopoDS_Shape& s, double* volume = nullptr)
 {
   auto signed_volume = [](const TopoDS_Shape& x) {
     GProp_GProps g;
     BRepGProp::VolumeProperties(x, g);
     return g.Mass();
   };
+  double total = 0;
+  auto   out   = [&](const TopoDS_Shape& r) {
+    if (volume != nullptr)
+      *volume = total;
+    return r;
+  };
   if (s.IsNull())
-    return s;
+    return out(s);
   if (s.ShapeType() == TopAbs_SOLID)
-    return signed_volume(s) < 0 ? s.Reversed() : s;
-  bool any_negative = false;
-  for (TopExp_Explorer e(s, TopAbs_SOLID); e.More(); e.Next())
-    if (signed_volume(e.Current()) < 0)
-      any_negative = true;
-  if (!any_negative)
-    return s;
+  {
+    const double v = signed_volume(s);
+    total          = std::abs(v);
+    return out(v < 0 ? s.Reversed() : s);
+  }
   std::vector<TopoDS_Shape> parts;
+  bool                      any_negative = false;
   for (TopExp_Explorer e(s, TopAbs_SOLID); e.More(); e.Next())
   {
-    const TopoDS_Shape& so = e.Current();
-    parts.push_back(signed_volume(so) < 0 ? so.Reversed() : so);
+    const double v = signed_volume(e.Current());
+    total += std::abs(v);
+    any_negative = any_negative || v < 0;
+    parts.push_back(v < 0 ? e.Current().Reversed() : e.Current());
   }
-  return parts.size() == 1 ? parts[0] : compound_of(parts);
+  if (!any_negative)
+    return out(s);
+  return out(parts.size() == 1 ? parts[0] : compound_of(parts));
 }
 
 // A free-form face pinched to a point (a degenerated edge): Parasolid fails its thicken, the normal there with no one
@@ -5499,8 +5508,11 @@ static OpOut thicken(const OcShape& s, double t1, double t2, bool exact_step)
       mo.MakeOffsetShape();
       if (mo.IsDone() && solid_count_of(mo.Shape()) > 0 && BRepCheck_Analyzer(mo.Shape()).IsValid())
       {
-        const TopoDS_Shape r = orient_solids_outward(mo.Shape());
-        if (volume_props(r).Mass() > 0)
+        // (Its volume from the orienting: a second pass over a free-form solid cost 11 ms of c2-surf-workshop-split's
+        // Thicken 1.)
+        double             volume = 0;
+        const TopoDS_Shape r      = orient_solids_outward(mo.Shape(), &volume);
+        if (volume > 0)
           return make_result({c.shape}, r, history_of({c.shape}, mo).get());
       }
     }
