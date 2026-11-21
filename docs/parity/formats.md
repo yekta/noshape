@@ -17,6 +17,67 @@ types and views 10 of them. noshape stores all 13 as file tabs and views:
 
 `import_files` stores any non-CAD file as a file tab, as the app's + › Import… does.
 
+## Translator options audit (2026-11-21 03:46 UTC)
+
+Live's Export and Import dialogs, format by format, each option against ours. Live's lists and defaults come from
+live/feel/importexport.json (export_live2_1730: Part Studio PARASOLID, ACIS, STEP, IGES, PVZ, JT, RHINO, GLTF, GLB,
+OBJ, 3MF, STL; Assembly the same with URDF and without RHINO). Evidence is `parity::exchange_round_trip` on the 22
+exchange documents (Mac run 03:40): live's option files imported by ours, and ours with the same options read back
+and compared with the model. Score: live's option exports in ours 39/50, ours with options read back 44/62.
+
+Every option live shows has an `export_parts` / `import_files` parameter: no format and no option is missing.
+- **full**: live's file and ours with the option match;
+- **partial**: a row still differs (the gap is named);
+- **untested**: the op has it, but there is no live file with the option yet (asked for in live/REQUESTS.md, dx
+  2026-11-21 03:30).
+
+### Export
+
+| Format | Live option (default; choices) | Ours (`export_parts`) | Status | Evidence / gap |
+|---|---|---|---|---|
+| all | File name (the tab's) | `file` | full | e2e |
+| all | Export models oriented Y axis up (off) | `y_up` | full | STL-YUP, OBJ-YUP-OBJ import as live's |
+| all | Options: Download; Download and store file in a new tab; Store file in a new tab | `options` | full | e2e |
+| all | Export unique parts as individual files (off) | `individual` | full | STEP-SPLIT, STL-SPLIT: zip entries as live's |
+| all | Include hidden instances in export (off) | `include_hidden` | full | HIDDEN-EXCLUDED / -INCLUDED |
+| PARASOLID | Version (38.1, 38.1 … 25.0; Use latest version) | `version` | partial | 28.0 full; 25.0, 33.x and x_b untested; cf-hose-routing's hoses read back with 14 edges / 4 vertices (live 12 / 0) |
+| ACIS | – | – | full | live.sat imports on 21 of 22 documents (c2-extension-spring's spring area +0.01 %) |
+| STEP | Version (AP242; AP214, AP203) | `version` | full | AP203 (CONFIG_CONTROL_DESIGN), AP214 |
+| STEP | Preprocessing (None; Automatic, Remove small entities only basic / advanced, … and convert all surfaces to b-surfaces) | `preprocessing` | untested | |
+| STEP | Use custom units for export (off) | `units` | full | STEP-INCH (CONVERSION_BASED_UNIT('INCH')) |
+| STEP | Include derived tolerances in export (on) | `derived_tolerances` | untested | e2e only |
+| STEP | Use custom annotation text height for MBD export (off; 4 mm) | `mbd_text_height` | untested | e2e only |
+| IGES | Use compatibility mode for surfaces and curves (off) | `iges_compatibility` | partial | entity counts as live's (46 / 52 / 104 on the housing); ours reads our housing file back with 39 faces (live 36): 2 split faces left unmerged |
+| PVZ | Group composite parts into a single part file (on) | `group_composites` | untested | |
+| JT | – | – | untested | no live JT file yet |
+| RHINO | Version (8; 7 … 2; Use latest version) | `version` | partial | v5 / v8 import as live's; ours read back with 45 faces on the housing (live 46); v2, v4, v6, v7 untested |
+| GLTF / GLB | Resolution (Medium; Coarse, Fine, Custom: distance / angular tolerance, max chord length) | `resolution`, `distance_tolerance`, `angular_tolerance`, `max_chord_length` | partial | Medium full; Coarse / Fine untested; ours meshes as OBJ / 3MF (below) |
+| GLTF / GLB | Compress (off) | `compress` | untested | |
+| OBJ | Resolution (Medium; as glTF) | as glTF | partial | live's files import as live's; ours is denser than live's: housing Coarse 2106 triangles (live 1258), Fine 10256 (6188) |
+| 3MF | Resolution (Medium; as glTF) | as glTF | partial | as OBJ; housing Coarse reads back +0.065 % area |
+| STL | STL Format (Binary; Text) | `stl_text` | full | STL-TEXT-INCH |
+| STL | Units (Millimeter; Centimeter, Foot, Inch, Meter, Yard) | `units` | full | STL-CM, STL-FT, STL-TEXT-INCH |
+| STL | Resolution (Medium; Coarse, Fine, Custom: chordal tolerance, angular deviation, minimum facet width) | `resolution`, `chordal_tolerance`, `angular_deviation`, `min_facet_width` | partial | housing Coarse full; Fine / Custom read back up to +0.02 % area; Coarse 678 triangles (live 924) |
+| URDF (Assembly) | Geometry format (STL; GLTF, GLB, OBJ), Export rigid subassemblies as a single link | `geometry_format`, `rigid_subassemblies_single_link` | full | live's URDF file (URDF-LIVE-FILE-SHAPE) |
+
+### Import
+
+| Format | Live option (default) | Ours (`import_files`) | Status | Evidence / gap |
+|---|---|---|---|---|
+| all CAD | Import to this document / Combine to a single Part Studio | `combine` | partial | STEP-FLAT / -NOFLAT full; ASM-STEP-FLAT: our flattened parts lack live's names (Arm_1, Pin_1 …) |
+| STEP, Parasolid, IGES, OBJ | Import appearances (on) | `appearances` | full | colours on every exchange document |
+| all | Orient imported models with Y Axis Up (off) | `y_up` | full | YUP rows |
+| all | Create a composite part when importing multiple or non-solid bodies (off) | `composite` | untested | e2e only |
+| STEP, Parasolid, IGES | Join adjacent surfaces (off) | `join` | full | IGES-COMPAT-JOIN |
+| Parasolid | Import material density (off) | `density` | untested | |
+| IGES | IGES postprocessing (off) | `iges_postprocessing` | untested | |
+| STL | Units (Millimeter) | `mesh_unit` | partial | a multi-part STL: c2-duct-multipart reads as 2 parts (live 4) |
+| OBJ | Units (Meter) | `mesh_unit` | full | OBJ-*-OBJ |
+| DXF, PNG, PDF, CSV | no dialog: a file tab after the active tab | as live | full | e2e |
+
+Next, in the lead's order (3MF, OBJ, ACIS, glTF, then the rest): the OBJ / 3MF / glTF meshes at live's density, then
+the multi-part STL import, ACIS's spring, the Rhino face count, the IGES compatibility read-back.
+
 ## Live's own big files (request 1755, 11-02)
 
 `dx_perf::timed_live_big_samples` imports live's samples (live/samples/dx-big, in `NOSHAPE_LIVE_BIG`). Ours is the
