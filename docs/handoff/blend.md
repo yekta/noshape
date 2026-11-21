@@ -1,31 +1,29 @@
 # Blends (agent "blend"): current state
 
-Updated 11-21 09:40 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-21 14:56 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-21 09:40, thread on the Hello account)
+## Now (11-21 14:56, thread on the Hello account)
 
 - Landed a9c26c41c isaac Fillet 4 (bool told).
-- 1. Impeller P0 (lead: Fillet 3 geometry + speed first, then SUSPENSION-CIRCPAT1).
-  - Gating worktree blend-f3end (branch blend-f3end, 2 commits on d7e7a5c20): 3fbe62ee2 run-on end face first (Fillet 3's
-    far end ended on the shell's outer face through the wall: 39/114/72 -> 34/93/60, live 34/95/62; volume matches on
-    bool's ce09aaef1 pcurve fix, 71097.26) + 8cfad4e39 deferred overflow check. bin/gatef3e.sh (unit blend-gatef3e):
-    g13, kernel/model, suite pair vibex8 -> suite-f3e.cmp, then userdocs (after retry-meas.done) -> ud-f3e.log. Land if
-    only the impeller differs.
-  - Fillet 3's last 2 edges/2 vertices: live splits the bevel's x 5 edge where it crosses from JeG's own surface into its
-    extension (live/blend/q-imp-f3/bevel.json); ours lies on the chamfer ring's 192-pole surface. Option parked:
-    blend-scratch/notes-f3.md.
-  - Every differing feature (NOSHAPE_PARITY_DIFFERING=1): f29 Halter ERROR, then f31 Extrude impellerraum 38 vs 59
-    faces, Move face 1/2, Delete face 2, Fillet Ansaugflansch ERROR, 10 parts vs 1. Speed numbers from f29 on are on a
-    wrong model (lead told). Next: Halter (live/blend/q-imp-halter: R2 on Fillet 3's near-end edges Jfp/Jfd/Jft/Jfh,
-    rounds run on along JfV to the wall and past x 5 to x 7). Mac run bin/f3diff-mac.sh (ce09aaef1 + f3geo.patch,
-    BLEND_DEBUG) -> logs/f3diff.out.
-  - Fillet 3 speed (Mac 3.1 s): trace bin/f3t5-mac.sh (f3geo-time.patch) -> logs/f3t5.out; corner phase + Cut.
-  - Retry skip: waits on logs/retry-meas-ud.out (blend-retrymeas unit).
+- 1. Impeller P0 (lead: Halter, then Fillet 3's speed, then SUSPENSION-CIRCPAT1).
+  - Landing blend-f3end (11-21 14:56): run-on end face first among exact ties each cutting across (welding Fillet 5 kept),
+    deferred overflow check. No-op on main (suite only new docs, userdocs ALL-SAME); with bool's mend (ce09aaef1) it keeps
+    Fillet 3 at 34/93/60, 71097.26 (live 34/95/62, 71096.12) where main would go 39/114/72.
+  - Halter (f29): worktree blend-halter3 = f3end + ce09aaef1 + corner_run WIP (7248eb349) + tighten_new_vertices (Fillet 3's
+    tip vertices 2.6e-3 -> 6e-6) + corner trim (a fill's run past a corner kept only inside the neighbouring round, live's
+    convex ridges). Probe bin/zzh3.sh (features_c::zz_halter on vibex7 in29.brep) -> logs/zzh4.out. Before the trim: x 5
+    fills 6.59 mm3 each, tip fills 3.47; all ~20 mm3 vs live +2.4694; tip fills' Fuse broken (add 2 alone loses the body,
+    add 3 adds more than its volume: lofted sides near-coincident with the B-spline supports?). Next: fills from (tool
+    pushed in - body), keeping the cells on the round face. 87 s per run (live: feature fast).
+  - Halter input differs upstream: our tip x 0.957, live 0.097 (live's chamfer extension after Fillet 3 12.67 mm2, ours
+    12.49); the bevel (192x2, v linear across x 5.175..1.325) holds the tip line at x 1.5025 (probe zz_bevel_ext, blend-speed).
+  - Fillet 3 speed (Mac 3.1 s, live 107): op_boolean 640, min_distance 389 (touches), bounding_box 298, split 226 ms.
+  - asm isaac-ball Studio a04711 Chamfer 1 / Fillet 1: upstream first (Extrude 14 Info, Sketch 10 untranslated); asm told.
 - 2. SUSPENSION-CIRCPAT1 (P1, next): asm-suspension 805e29 Fillet 3 (R2.5, 17 edges) fails. Live
   live/blend/q-susp-knuckle-f3/: 53/98/46, 393486.60 mm3, 25 faces (17 torus, 8 OTHER): at each front cusp a 3-sided
   29.602 mm2 patch between the R40 round (torus 42.5/2.5, running to a point), the root round (57.5/2.5) and the boss
