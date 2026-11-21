@@ -96,7 +96,7 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   "Section view…" after Export as DXF/DWG…. Live's Sketch 1 menu has none, before or after the roll; ours has none before the
   roll. Frame 1 below the bar matches live's Extrude 1 (Configure suppression only with a configuration, Add comment is cloud).
   Not judged: Hide other / all sketches (live's doc had two sketches, ours one). qa-scratch/walk2/g1c, g5c, g7c.png.
-- [ ] P1 **UIP-SKETCH-ROW-SECTION-VIEW (psui)**: ui-parity 1121-0923-07879475 (qa-scratch/suites/1121-0923-07879475-uip): 13 scenarios worse than
+- [ ] P1 **UIP-SKETCH-ROW-SECTION-VIEW (psui)**: ui-parity 1121-0923-07879475 (qa-scratch/suites/1121-0923-07879475-uip): 15 scenarios worse than
   the 11-20 23:08 run, all at step 1, a plain right-click on Sketch 1's row with nothing selected: live (recordings 11-06) lists "Section view…"
   at row 8 (9 in sketch-rows-*), ours "Suppress" (no Section view…). Since psui 7de5b3566 (05:08, live secmenu-1121: only while the sketch is
   already selected). sketch-row-menu-{section-view,show,view-normal,edit-appearance,export-dxf,paste-into-sketch}, sketch-row-copy-paste-onto-front,
