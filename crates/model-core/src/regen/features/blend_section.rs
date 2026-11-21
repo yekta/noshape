@@ -828,22 +828,37 @@ fn closed_run_on(shape: &Shape, ef: &[Vec<u32>], tools: Vec<RunOnTool>, scale: f
                 let hs: Vec<_> = met.iter().map(|&(_, i)| { let (f, l) = (&body_faces[i], legacy.clone()); sc.spawn(move || k::with_kernel_legacy(l, || touches(f, run))) }).collect();
                 hs.into_iter().map(|h| h.join().unwrap_or(false)).collect()
             });
-            let met: Vec<(f64, usize)> = met.into_iter().zip(touching).filter_map(|(m, t)| t.then_some(m)).collect();
-            // (A face at the edge's end before the faces past it: the shell's outer face, as wide as its inner one, cut
-            // c2-impeller-loft's Fillet 3 rounds through the wall to it; live's end on the inner one.)
-            let at_end = |i: usize| body_faces[i].vertices().iter().any(|v| v.vertex_point().is_ok_and(|p| (p - *q).length() <= scale * 1e-6));
-            let mut met: Vec<(bool, f64, usize)> = met.into_iter().map(|(r, i)| (!at_end(i), r, i)).collect();
-            met.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
-            let met: Vec<(f64, usize)> = met.into_iter().map(|(_, r, i)| (r, i)).collect();
+            let mut met: Vec<(f64, usize)> = met.into_iter().zip(touching).filter_map(|(m, t)| t.then_some(m)).collect();
+            met.sort_by(|a, b| a.0.total_cmp(&b.0));
             let points = points_of(run);
+            let cut_by = |piece: &Shape, i: usize| -> FResult<(Shape, Vec<Shape>)> {
+                let f = &body_faces[i];
+                let wall = if matches!(f.face_surface()?, k::Surface::BSpline { .. }) { k::extend_face_part_over(f, &points, 0.05 * t.len)? } else { k::extend_face(f, 2.0 * t.len)? };
+                let cells = k::split(std::slice::from_ref(piece), std::slice::from_ref(&wall), &k::BooleanOptions::default())?.shape.solids();
+                Ok((wall, cells))
+            };
+            // (Of the faces met first, reaching exactly as far and each cutting the piece across, one at the edge's end
+            // first: the shell's outer face, as wide as its inner one, cut c2-impeller-loft's Fillet 3 rounds through the
+            // wall to it; live's end on the inner one. Welding Fillet 5's tube rim, met 0.1 um before the plate's side at the
+            // end, stays first.)
+            let at_end = |i: usize| body_faces[i].vertices().iter().any(|v| v.vertex_point().is_ok_and(|p| (p - *q).length() <= scale * 1e-6));
+            let ties = met.iter().take_while(|m| m.0 - met[0].0 <= scale * 1e-9).count();
+            if ties > 1 && met[..ties].iter().any(|m| at_end(m.1)) {
+                let mut across = true;
+                for m in &met[..ties] {
+                    across = across && cut_by(&piece, m.1)?.1.len() > 1;
+                }
+                if across {
+                    met[..ties].sort_by_key(|m| !at_end(m.1));
+                }
+            }
             for (n, &(_, i)) in met.iter().enumerate() {
                 if piece_reach(piece_box, *q, *out) < tip {
                     break;
                 }
                 let f = &body_faces[i];
                 let free_form = !matches!(f.face_surface()?, k::Surface::Plane(_) | k::Surface::Cylinder { .. } | k::Surface::Cone { .. } | k::Surface::Sphere { .. } | k::Surface::Torus { .. });
-                let wall = if matches!(f.face_surface()?, k::Surface::BSpline { .. }) { k::extend_face_part_over(f, &points, 0.05 * t.len)? } else { k::extend_face(f, 2.0 * t.len)? };
-                let cells = k::split(std::slice::from_ref(&piece), std::slice::from_ref(&wall), &k::BooleanOptions::default())?.shape.solids();
+                let (wall, cells) = cut_by(&piece, i)?;
                 if n == 0 && cells.len() == 1 {
                     // A face its run-on meets first that doesn't cut it across: a corner, with that face's neighbours
                     // that border a support.
