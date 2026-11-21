@@ -3291,7 +3291,8 @@ impl Renderer {
     /// (shader compilation otherwise delays it).
     pub fn prewarm(&mut self, msaa: u32) {
         let _t = perf::scope("r.prewarm_pipelines");
-        let msaa = msaa_of(&Style { msaa, ..Style::default() });
+        // (A software rasteriser draws without MSAA: its 4x set was 100 ms of the render thread's start, unused.)
+        let msaa = msaa_of(&Style { msaa, software: self.is_software(), ..Style::default() });
         // The first frame's ambient occlusion pass and overlay (labels, view
         // cube) too, compiled alongside the pipelines.
         let device = self.device.clone();
