@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-21 04:33 UTC.
+Updated 2026-11-21 05:09 UTC.
 
 ## In flight
 
@@ -33,12 +33,17 @@ e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
   the triad where the ball is: on the snapped point (live 01:40 follow-up, fixed after 4094e4ef) or at the pointer.
   Feel test `the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point`; Short press drop back at
   +60 px. Live's (a) "never snapped" run is not explained by the 8 px rule (lag?). Edges' own look not drawn.
-- 7d64e534 (triad snapped release + psui fc-1120 Version compare) + 00e962afe (split keeps selection, matrix 03:36)
-  FAILED 03:35 on the ball-snap test (it also failed skasm's f992d0d7). Cause: wait_until times out silently (60 s);
-  on a loaded host the move at the spot found no snap (state not ready), no later move came, the ball sat at the
-  free point. QUEUED dc2f3394 (04:09, own branch studios-t2-ballsnap off main): the test T2 so the queue unblocks.
-  Fix (04:33): the test's `until` re-sends the resting pointer's move and asserts on timeout; 20 full-lib runs on
-  vibex8 under load before re-enabling it (drop the #[ignore] after rebasing on dc2f3394).
+- 7d64e534 (triad snapped release + psui fc-1120 Version compare) FAILED 03:35 on the ball-snap test (also skasm's
+  f992d0d7). LANDED dc2f3394 as d5d0ad96 (04:47): that test T2 (kept T2 here after the rebase). Cause: the
+  viewport drops a move to where the pointer already is, and on a loaded host the face's inference points can come
+  after the open, so the one move at the spot found no snap. Fix 1 (re-send the move) failed 1 of 4 runs; fix 2
+  (05:09) waits for `triad_snap(spot)` before pressing and stirs the re-sent move 0.5 px. 20 full-lib runs on vibex8
+  (bin/x84.sh, log x92.log): if 20/20, drop the #[ignore] and land.
+- Live fc-1121 drawing feel (behaviours "studios fc-1121"): (1) a dimension being placed shows the line to another's
+  x / y without snapping (still held on a + mark, live2 rad-note); (3) caret at the click (`note_caret_at`), a
+  double-click in the editor selects all; (5) a dragged box draws its picks selected (`box_preview`); (2), (4), (6)
+  already as live (tests for (6)). Live's leftover grips after Esc and an empty window box kept after release are
+  stale paint, not copied.
 - Drawing matrix: options compared in live's order (drawing_matrix.py `live_option_lists` / `ours_sequences`):
   Drawing properties 101 → 22 shown, matrix 04:45: 1344 = / 456 shown of 1842; View simplification was None, Auto, …: now live's None, Absolute, Ratio to
   studio, Ratio to part, Auto (test `the_view_simplification_list_is_in_lives_order`). REQUESTS fc-1121 (6) added:
