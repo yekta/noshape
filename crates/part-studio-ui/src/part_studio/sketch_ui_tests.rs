@@ -1305,7 +1305,8 @@ fn row_keys_leave_the_feature_and_the_bar(cx: &mut TestAppContext) {
     assert_eq!(rollback(cx), Some(1), "above Extrude 1");
     // The sketch the bar now sits under shows, though it is hidden (live: behaviours request 1844).
     let sketch = cx.update(|cx| view.read(cx).studio(cx).unwrap().features[0].clone());
-    assert!(sketch.hidden, "the extruded sketch starts hidden");
+    // (Its auto-hide counts only consumers above the bar: live rollback-menus 11-21, its row's menu has Hide.)
+    assert!(!sketch.hidden, "the extruded sketch shown with its Extrude rolled back");
     wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.sketches.iter().any(|s| s.feature == sketch.id));
     assert!(cx.update(|cx| view.read(cx).display.sketches.iter().all(|s| !s.hidden)), "drawn");
     let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();

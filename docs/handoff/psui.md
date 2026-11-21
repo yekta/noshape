@@ -118,7 +118,11 @@ part-studio-ui list/sketch_hover/cut_list 41, ops studio:: 5, clippy. On land: t
    wheel_the_table. FEEL-ROW-MENU-ROLL-TO-HERE (live 03:15, dm/rollback-menus.json): rows below the bar get Section
    view… (menu_left) / a sketch's Hide other + all sketches and (Un)configure suppression; a shown sketch with other
    sketches: Hide, Hide other sketches, Hide all sketches; list row "menu / rolled back under Sketch 1". Open: live's
-   sketch menus in cov-dm-config have no Section view… before Suppress, ours (keys-1118) do: rule unknown.
+   sketch menus in cov-dm-config have no Section view… before Suppress, ours (keys-1118) do: live answered 04:5x
+   (behaviours "psui 11-21 04:12", secmenu-1121): only while the selection already holds a planar item (plane, sketch,
+   planar face), the same sketch included (its own right-click + Esc, or a row click). Ours now: a sketch row's
+   Section view… only when it was selected before (menu_left or selected_features); list row "menu / one sketch".
+   "After" uip rerun of the 33 (ps-names.txt) on the batch's tree: vibex8 ~/tmp/psui/ps6, log /root/psui-scratch/ps6.log.
    Mac: incremental dirs got emptied mid-build twice (11-21 02:4x, 03:1x): runs use CARGO_INCREMENTAL=0.
    c) Sent 22:5x: studios 8 (drw-centermark, drw-inspection-table-iso-scrolled, drw-revision-table-delete; not run:
    drw-quad-mid-snap, doc-folder-drag-to-all-tabs, docs-advanced-search-help, docs-folder-crumb, vs-ps-own-table-menu),
