@@ -186,6 +186,6 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   snap glyphs) × owner state (none, hovered, selected, selected + hovered, another selected, in a selection field) ×
   context (Part Studio, sketch, assembly); live captures each cell, psui matches it with a test per cell, qa scores it
   in the interaction feel suite and walks the app as a user.
-- 11-21 (user) Use the user's Mac, never overload it: one build slot of 4 jobs at nice 19 (a third of its cores); anyone
+- 11-21 (user) Use the user's Mac up to half of it: two build slots of 3 jobs at nice 19 (6 of 12 cores); anyone
   may use it (NOSHAPE_RB_HOST=mac) and waits for the slot. Default routing (tools/tiers/rb-hosts) is the vibe hosts;
   vibe2 (16 cores) takes 3 agent build slots of 4 jobs besides the land queue. Older rulings giving the Mac 2 slots are void.
