@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-21 18:04 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-21 21:33 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## In flight (11-21 04:30 UTC)
@@ -14,10 +14,32 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - Handed to core 11-21 10:50: infento a3f7a1 Linear pattern 1's direction JMx = Chamfer 2's new edge on Extrude 1's
   ring (ours runs -y, live +y); and P0 c2-genesis-trunk-hanger 20 -> 12/73 = core's 18354ec79 (bisected; fixed by
   8631c5717, Mac 20/73 on that tree; main still 12/73 from a second cause core is bisecting).
-- REVERTED 11-21 (9098307d's crossing rule): a line drawn through a held line's midpoint is VERTICAL in four takes
-  (sketch-trim, -trim-drag, -trim-key, -undo-trim; psui full1 on faf11d89) but PERPENDICULAR in sk2-1121
-  split-at-crossing, the same lines as trim-key at ~2 px/mm instead of ~3.7. Live REQUESTS row asks for a retake that
-  separates zoom / Show constraints; rule again once it says which.
+- LANDING (A/B green: suite 127 -> 129/188 docs, 1986 -> 1999 features, no doc worse; start-extrude 34/34,
+  overcut-dogbone 10/10; base ab6-base.out vibe2, new vibex7 ~/agents/skasm-keep/ab6-new.out):
+  - parity.rs: ruled_piece_from_query (mutualtrim SWEPT_*), region_query_sketch hint + pieces rule (scissor
+    b58244 Extrude 1 KICB 445 mm², 0139f2 Extrude 8 Sketch 6's regions); recheck sc-* in vibe2 ~/tmp/skasm/scm.
+  - sheetmetal.rs rolled_bend: k::thicken (exact; start-extrude 29 -> 34/34) on the face `tightened(1e-7)` (new
+    kernel Shape::tightened / tighten_tolerances: the hem corner trim leaves 6e-5 m edges, the fuse closed the 0.02 mm
+    R0.01 hem slot; hem-jog Part 1 27 -> 29 faces, 18904.9 -> 18842.05 mm³, live 18842.62; edges 56 vs 61, flat
+    "Collision" INFO left). SM docs otherwise unchanged (23/27). Curved-rip experiment dropped (no effect).
+  - equations.rs PointOnEllipse scaled by b as a constant (core 11-21: knifehandle P4's free minor radius moved
+    16.63 -> 15.95); test constraints_more::ellipse_held_at_its_major_ends_keeps_its_minor_radius.
+  - inference.rs Perpendicular reach (live "Reach brackets" 11-21, 13 takes): start within 22.5 px of the held line
+    (infinite) or 30 px of its midpoint -> Perpendicular; on it off the midpoint / chain from its end: Vertical.
+  - kernel common.cpp tighten_tolerances (ShapeFix_ShapeTolerance + SameParameter + UpdateTolerances on a copy).
+  - scissor single-docs (vibe2, base -> new2): 0139f2 13 -> 17/36 (Extrude 8 matches); b58244 norefs 2 -> 6/106.
+- Sketch-tool feel P0s (qa walk 3, TICKETS 11-21 20:5x), in the same land, scene tests green (203):
+  - FEEL-SKFILLET-FLOW: no arc on a hovered corner; the arrow / "R" leader only while pending (`fillet_handle`).
+  - FEEL-CHAIN-ORIGIN-DROP: a Line chain goes on through the Origin (not "closed"); FEEL-TANGENT-ARC-AT-ORIGIN: an
+    own point on the Origin wins over the Origin inference; Slot takes a hovered end point's one curve.
+  - FEEL-SPLINE-PREVIEW-VANISHES: the cursor point equal to the last click isn't added to the preview fit.
+  - FEEL-OFFSET-PREVIEW-LOOK (live 20:55 answer): end points drawn; hollow arrow's tail on the preview line; black
+    dimension line + 2 filled 5 px arrowheads; "d" label always (in the gap from 13.5 px, else on the picked line
+    with the line run past it); hover: arrow #4674af/#9bb2cc, label tan #ccb396 edge #d99c3e. Open: the "—" glyph
+    with Show constraints off; arrowheads hidden on label hover. FEEL-POLYGON-SPINNER-DRIFT closed (live 10-27).
+    FEEL-EXTEND-NO-EXTEND closed (two picks as live 2992); the stub's look unknown (live's (8) retake did nothing).
+- loft-paths-guides: Sketch 4 / 6 match now (16/29; first diff Loft 3 edges, Loft 4 ERROR: loft owner's).
+- hem-jog next: edges 56 vs 61 / vertices (live: 4 spline corner faces + mitre planes) and the flat "Collision".
 - Next after that (lead 11-21): the next item of "Next, in order"; sketch-solver parity rows if sheet metal has none.
 - LANDING: forms 21/21 (c2-sheet-metal-forms 10 -> 21/21; Mac A/B vs 97df380f1: 108 -> 109/174 docs, 1779 -> 1790
   features, no other doc changed): Sketch 3 connector at live's frame; Form 4 fuse skipped when adds add nothing;
@@ -95,15 +117,24 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
    within 5 % (live's part first): surf-intro Boundary surface 1 builds (boundary conditions WARNING is core's).
 00e. LANDED 8ac743df (Corner+Joint): SIZED_ROUND corner relief under its bend-allowance square warns
    SHEET_METAL_CORNER_UNDER_SIZED, not cut; the translator truncates a selection over the dialog's limit.
-00f. LANDING 11-21 (Mac A/B 1976 -> 1990/2680, no doc worse): Bounds::trim with a solid start (start-extrude 19 ->
+00f. LANDED 1d354191 11-21 (Mac A/B 1976 -> 1990/2680, no doc worse): Bounds::trim with a solid start (start-extrude 19 ->
    29/34); one bend's end at rips = BEND_END (corner-break 20 -> 23/37); frame trim by a surface body (frame 16 ->
    17/23); edge-on circle Use (loft-paths-guides Sketch 4) and a constraint's non-part edge = an earlier sketch's
    line (Sketch 6); a part edge between two definition faces with no joint = their shared definition edge (hem-jog's
    TANGENT side); opPattern of a sketch body by a scale scales its geometry (std Hem's arc copy: hem-jog builds, INFO
    flat collision, 27/52/27 vs live 29/61/34).
    Next: corner-break model F convert of a filleted box (live 3 parts; ours "cannot be built"); start-extrude "arcs as
-   bends" (2 bend-end arcs not circles); frame Trim group 66 vs 64 edges, End cap signal 11, gusset on +y (live -y);
+   bends" (2 bend-end arcs not circles: rolled_bend's thicken_plain leaves the r 11.5 offset's end edges B-splines;
+   503396456 took the exact rebuild off sheet metal for tablet-stand's vertex refs: try k::thicken in rolled_bend only); frame Trim group 66 vs 64 edges, End cap signal 11, gusset on +y (live -y);
    hem-jog flat collision. Loft 3 (37 vs 33 edges) is core's (TICKETS LOFT3-EDGES).
+00g. A/B 11-21 18:50 (core's asks): asm-scissor-lift (asm P0) and c2-surf-intro-mutualtrim, parity.rs only.
+   Studio 0139f2 Extrude 8: region_at tied Sketch 1's regions with Sketch 6's projected ones (same plane, point, area);
+   by_geometry now takes the sketch the region query names. b582441a Extrude 1 KICB (as a Derived source, no refs):
+   region_from_query's exact-boundary rule took a sliver beside one of three named pieces of the slot line; a region
+   must have as many pieces of each named curve. mutualtrim: SWEPT_* of a Ruled surface (`<f>.….patch`) = its part,
+   its face on the curve, its edge from the curve's start / end (ruled_piece_from_query), not the sketch edge.
+   Plus curved rips with no pull (corner-break model F). A/B on vibe2: skasm-scratch/ab6.sh (~/tmp/skasm/scm/sc-<doc>:
+   studio copies + refs.jsonl, mode 700, delete after). Default builds on vibe2; the Mac only via its one 4-job nice-19 slot (DECISIONS a16b39297).
 0. USER P0 feel: rows of docs/parity/interaction-feel.md in my areas are "=" now; Hover timing is psui's.
 0b. DONE 11-21 13:35: sketch-line-from-midpoint / sketch-bezier-polygon / sketch-spline-handle-arm match with the camera
    (3/3, 40/40 states, green 6241cf347 on vibe2; skasm-scratch/bin/uipg.sh); the 7 asm takes are asm's.
