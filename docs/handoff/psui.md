@@ -36,17 +36,20 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (07:29 UTC 11-21)
+## Now (08:46 UTC 11-21)
 
-Queued: 724a4f2b (empty features as live dlg-1121) and the next commit: Import / CSV unit list in std's order (Meter
-kept as default); Routing curve Single mode's Previous / Next (std 3132; pointIndex stepped natively with wrap, no FS
-run, so it works on std 3112 too); a std button row's DISPLAY_SHORT companion is drawn (Orthogonal path's Next was
-never shown); buttons as live routing-btns-1121 (104 x 29, 6 px apart, 3 px in, radius 5.25, #666). Tests:
-features_a import_units_in_std_order, dialogs_feel a_routing_curves_previous_and_next_step_the_active_point.
+Queued: 4dbaaee1 (checking 08:25) carrying 724a4f2b: empty features as live dlg-1121; Import / CSV unit list in std's
+order; Routing curve Previous / Next (std 3132, stepped natively with wrap; buttons as live routing-btns-1121).
 
-sk-1 + sk-2 (21 takes, live 07:21): scenarios from /root/live2-scratch/scen, recordings /root/parity/ui/live; set
-aside in /root/psui-scratch/sk/pending (+ live/) to copy into tests/ui-parity when landing fixes. Run on vibex8:
-~/agents/psui-keep/sk12 (names sk12-names.txt).
+sk-1 + sk-2 (21 takes, live 07:21): scenarios + recordings in tests/ui-parity with the sk fixes commit (queued 09:2x).
+First run vibex8 ~/agents/psui-keep/sk12: 7/21, 300/344 (copy /root/psui-scratch/sk/sk12; stepdiff.py <repo> <live>
+<ours>). Fixed (scene 195 / sketch UI 311 green on the Mac): Show constraints checkbox marked (5 takes stopped there);
+no "Sides: n" message; run.py sorts dimensions (live lists them in model map order); an Origin pick doesn't relate the
+sketch; Transform arrows leave a distance box (+72, -48 px) that opens for typing, Esc closes only it; a dragged point
+takes nothing on a curve it lay on at the drag's start (polygon side midpoint); a sketch point on the Origin is
+inferred before the Origin (3pt circle). Rerun sk12b on vibex8 (built before the last two): stepdiff the rest, most
+used first. Asked live (REQUESTS 08:40): centre point arc end on a point off its circle (cparc-clockwise-onto-point:
+live VERTICAL, no COINCIDENT). Then the dialog table (item 8 b).
 
 std 3132 vs 3112 (reported to lead 06:5x): our crates/featurescript/std is exactly 3112; 14 files / 181 lines differ
 (live/std-3132, live/std-3132-vs-3112.diff, stddiff.py in psui-scratch/std). Geometry ones (SM pattern collapsed

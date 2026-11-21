@@ -1,0 +1,118 @@
+{
+ "name": "sketch-transform-drag-copy",
+ "about": "live 11-21 sk-2: Transform has no dialog / Copy toggle in live; drag the y arrow 10 mm",
+ "area": "psui",
+ "source": "psui sk-2 (REQUESTS 11-21 05:49)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     10,
+     0
+    ]
+   },
+   "ms": 400
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Transform"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     -0.5,
+     11
+    ]
+   },
+   "ms": 600
+  },
+  {
+   "do": "shot",
+   "name": "hov"
+  },
+  {
+   "do": "drag",
+   "from": {
+    "sketch_point": [
+     -0.5,
+     11
+    ]
+   },
+   "to": {
+    "sketch_point": [
+     -0.5,
+     21
+    ]
+   }
+  },
+  {
+   "do": "shot",
+   "name": "drag"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "shot",
+   "name": "end"
+  }
+ ],
+ "expect": "recorded by live 11-21 (sk-2 fixes); the sketch stays open"
+}

@@ -287,9 +287,13 @@ enum OptKind {
 /// Unit of an on-canvas pattern / transform value (`None`: an instance count).
 /// A Transform value box's text (live editing-gaps4): the rotation in degrees ("20 deg"), the scale factor to 8
 /// decimals ("1.28916351").
-fn transform_value_text(h: crate::sketch_mode::PatternHandle, v: f64) -> String {
-    if h == crate::sketch_mode::PatternHandle::Scale {
+fn transform_value_text(h: crate::sketch_mode::PatternHandle, v: f64, units: &noshape_units::UnitPrefs) -> String {
+    use crate::sketch_mode::PatternHandle as H;
+    if h == H::Scale {
         return format!("{v:.8}");
+    }
+    if matches!(h, H::MoveX | H::MoveY) {
+        return noshape_units::format_quantity(Quantity::new(v, Dim::LENGTH), units);
     }
     let deg = v.to_degrees();
     if (deg - deg.round()).abs() < 1e-9 { format!("{} deg", deg.round()) } else { format!("{} deg", (deg * 1e4).round() / 1e4) }
@@ -298,7 +302,7 @@ fn transform_value_text(h: crate::sketch_mode::PatternHandle, v: f64) -> String 
 fn pattern_value_dim(h: crate::sketch_mode::PatternHandle) -> Option<Dim> {
     use crate::sketch_mode::PatternHandle as H;
     match h {
-        H::LinearStep | H::LinearSecondStep => Some(Dim::LENGTH),
+        H::LinearStep | H::LinearSecondStep | H::MoveX | H::MoveY => Some(Dim::LENGTH),
         H::CircularAngle | H::Rotate => Some(Dim::ANGLE),
         H::Scale => Some(Dim::UNITLESS),
         _ => None,
@@ -1471,10 +1475,17 @@ impl PartStudioView {
                 if self.sketch.as_ref().map(|ed| ed.model_selection.len()) != model_before {
                     self.refresh_scene(false, cx);
                 }
-                // A rotate / scale drag's value box is left open for typing, its text selected (live editing-gaps4).
+                // A rotate / scale / arrow drag's value box is left open for typing, its text selected (live
+                // editing-gaps4, sk2-1121 transform).
                 if let Some(h) = self.sketch.as_mut().and_then(|ed| ed.xf_released.take()) {
-                    let v = self.sketch.as_ref().map_or(0.0, |ed| if h == crate::sketch_mode::PatternHandle::Rotate { ed.xf_angle } else { ed.xf_scale });
-                    self.open_count_edit(h, transform_value_text(h, v), window, cx);
+                    use crate::sketch_mode::PatternHandle as H;
+                    let v = self.sketch.as_ref().map_or(0.0, |ed| match h {
+                        H::Rotate => ed.xf_angle,
+                        H::MoveX | H::MoveY => ed.xf_move_value(h),
+                        _ => ed.xf_scale,
+                    });
+                    let units = self.doc.read(cx).session.doc.settings.units;
+                    self.open_count_edit(h, transform_value_text(h, v, &units), window, cx);
                 }
                 true
             }
@@ -2070,8 +2081,8 @@ impl PartStudioView {
             }
             ed.polygon_typed.push(c);
             if let Ok(n) = ed.polygon_typed.parse::<usize>() {
+                // Live sk-2 (sketch-polygon-sides-typed): the canvas spinner shows it, no message.
                 ed.polygon_sides = n.clamp(3, 50);
-                ed.message = Some(format!("Sides: {}", ed.polygon_sides));
             }
             self.refresh_scene(false, cx);
             cx.notify();
@@ -2458,6 +2469,7 @@ impl PartStudioView {
                 // Live: the dialog's checkbox rows (box 4 px in from the edge).
                 crate::ui::os_checkbox(id, label, on)
                     .ml(px(-2.))
+                    .map(|d| crate::ui_script::mark(d, move || format!("checkbox:{label}")))
                     .on_click(move |_, _, cx| {
                         view.update(cx, |this, cx| {
                             match &mut this.sketch {
@@ -3815,17 +3827,29 @@ impl PartStudioView {
         }
         for (h, at, d) in ed.pattern_value_labels(&data.sketch) {
             let Some((x, y)) = project(at) else { continue };
-            // The Transform's rotation and scale: Onshape's quantity input, 75 × 26 px (live editing-gaps4).
-            let transform = matches!(h, crate::sketch_mode::PatternHandle::Rotate | crate::sketch_mode::PatternHandle::Scale);
+            // The Transform's rotation, scale and arrow distance: Onshape's quantity input, 75 × 26 px (live
+            // editing-gaps4); Esc closes it and the tool stays (live sk2-1121 transform).
+            use crate::sketch_mode::PatternHandle as H;
+            let transform = matches!(h, H::Rotate | H::Scale | H::MoveX | H::MoveY);
             if let Some((eh, st)) = &count_edit
                 && *eh == h
             {
                 let w = if transform { 75. } else { 80. };
-                out.push(div().absolute().left(px(x - w * 0.5)).top(px(y - 13.)).w(px(w)).occlude().child(Input::new(st).xsmall()).into_any_element());
+                let mut boxed = div().absolute().left(px(x - w * 0.5)).top(px(y - 13.)).w(px(w)).occlude().child(Input::new(st).xsmall());
+                if transform {
+                    boxed = boxed.key_context("SketchEntry").on_action(cx.listener(|this, _: &SketchEntryCancel, window, cx| {
+                        if let Some(ui) = this.ui_mut() {
+                            ui.count_edit = None;
+                        }
+                        window.focus(&this.focus, cx);
+                        cx.notify();
+                    }));
+                }
+                out.push(boxed.into_any_element());
                 continue;
             }
             if transform {
-                let text = transform_value_text(h, d);
+                let text = transform_value_text(h, d, &units);
                 out.push(
                     div()
                         .id(SharedString::from(format!("sk-xf-{h:?}")))
@@ -3847,7 +3871,7 @@ impl PartStudioView {
                         .occlude()
                         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                         .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.open_count_edit(h, text.clone(), window, cx)))
-                        .child(transform_value_text(h, d))
+                        .child(transform_value_text(h, d, &units))
                         .into_any_element(),
                 );
                 continue;

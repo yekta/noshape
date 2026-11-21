@@ -1,0 +1,84 @@
+{
+ "name": "sketch-dim-to-origin",
+ "about": "the origin to a line's end (10,10), text placed below-right",
+ "area": "psui",
+ "source": "psui sk-1 (REQUESTS 11-21 05:36)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     40,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "origin": true
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     5,
+     -5
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ],
+ "expect": [
+  {
+   "live": "recorded by live 11-21 (sk-1); the sketch stays open"
+  }
+ ]
+}

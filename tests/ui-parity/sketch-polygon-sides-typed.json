@@ -1,0 +1,76 @@
+{
+ "name": "sketch-polygon-sides-typed",
+ "about": "an inscribed polygon with 5 typed while placing",
+ "area": "psui",
+ "source": "psui sk-2 (REQUESTS 11-21 05:49)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Inscribed polygon"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     20,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "type",
+   "text": "5"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "shot",
+   "name": "end"
+  }
+ ],
+ "expect": [
+  {
+   "live": "recorded by live 11-21 (sk-2); the sketch stays open"
+  }
+ ]
+}

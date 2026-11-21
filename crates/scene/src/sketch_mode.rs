@@ -673,6 +673,8 @@ pub struct SketchEditor {
     drag: Option<DragState>,
     /// The sketch as a geometry drag found it: each step solves from it.
     drag_origin: Option<Sketch>,
+    /// Curves a dragged point lay on when its drag began: its drop takes nothing on them.
+    drag_held: Vec<EntityId>,
     box_end: Option<DVec2>,
     /// Ctrl held during the box selection: it removes from the selection.
     pub box_remove: bool,
@@ -757,7 +759,9 @@ pub struct SketchEditor {
     pub xf_scale: f64,
     /// Where the scale factor's box stays once its drag ends (live editing-gaps4: where the pointer left it).
     xf_scale_box: Option<DVec2>,
-    /// A rotate / scale drag just ended: the view opens its value box for typing (live: its text selected).
+    /// The arrow last dragged and where its distance's box stays (live sk2-1121 transform: a box after the drag).
+    xf_move_box: Option<(PatternHandle, DVec2)>,
+    /// A rotate / scale / arrow drag just ended: the view opens its value box for typing (live: its text selected).
     pub xf_released: Option<PatternHandle>,
     /// First fillet arc of the current fillet session (later fillets are equal to it).
     fillet_session: Option<EntityId>,
@@ -1034,6 +1038,9 @@ const XF_SCALE_HALF_W_PX: f64 = 16.0;
 const XF_ROTATE_BOX_FROM_POINTER: (f64, f64) = (60.5, 16.0);
 const XF_ROTATE_BOX_AFTER: (f64, f64) = (162.5, 87.0);
 const XF_SCALE_BOX_FROM_POINTER: (f64, f64) = (45.5, -47.0);
+/// An arrow's distance box from the pointer, during its drag and where the drag leaves it (live sk2-1121
+/// transform-2-after-drag: up and right of the arrow's head).
+const XF_MOVE_BOX_FROM_POINTER: (f64, f64) = (72.0, -48.0);
 const XF_SCALE_BOX_AFTER: (f64, f64) = (138.5, 46.0);
 /// The line shader's dash-dot period (`fs_line`, style 4) in pixels.
 const DASH_DOT_PERIOD_PX: f64 = 16.0;
@@ -1469,6 +1476,7 @@ impl SketchEditor {
             glyph_row_at: None,
             drag: None,
             drag_origin: None,
+            drag_held: Vec::new(),
             box_end: None,
             box_remove: false,
             drag_snap: None,
@@ -1522,6 +1530,7 @@ impl SketchEditor {
             xf_angle: 0.0,
             xf_scale: 1.0,
             xf_scale_box: None,
+            xf_move_box: None,
             xf_released: None,
             fillet_session: None,
             pending_corner: None,
@@ -1733,6 +1742,7 @@ impl SketchEditor {
             self.xf_angle = 0.0;
             self.xf_scale = 1.0;
             self.xf_scale_box = None;
+            self.xf_move_box = None;
             self.set_tool(Tool::Select);
             return true;
         }
@@ -1809,6 +1819,10 @@ impl SketchEditor {
             screen: self.screen_metric(),
         };
         let mut all = noshape_sketch::infer(sk, p, &ctx);
+        // A sketch point on the Origin is taken before the Origin (live sk2-1121 3pt-circle-on-points: the circle
+        // ends on the line's start there).
+        let on_origin = |i: &Inference| i.entity.is_some_and(|e| is_origin(sk, e));
+        all.sort_by(|x, y| x.priority.cmp(&y.priority).then(x.distance.total_cmp(&y.distance)).then(on_origin(x).cmp(&on_origin(y))));
         if self.no_point_snap {
             all.retain(|i| i.kind != InferenceKind::Endpoint);
         }
@@ -2086,10 +2100,7 @@ impl SketchEditor {
             let (ctr, rim) = (self.clicks[0].pos, self.clicks[1].pos);
             let delta = ((p - ctr).length() - (rim - ctr).length()) / (self.world_per_px * 10.0);
             let n = (self.polygon_base_sides as f64 + delta.floor()).clamp(3.0, 50.0) as usize;
-            if n != self.polygon_sides {
-                self.polygon_sides = n;
-                self.message = Some(format!("Sides: {n}"));
-            }
+            self.polygon_sides = n;
         }
         if self.tool == Tool::CenterArc && self.clicks.len() == 2 {
             let c = self.clicks[0].pos;
@@ -4536,6 +4547,11 @@ impl SketchEditor {
                 // redoing it (qa SKETCH-DRAG-BIG: 30–50 ms per step on 1000
                 // entities).
                 self.drag_origin = data.sketch.begin_drag(&[(handle, p)]).then(|| data.sketch.clone());
+                let sk = &data.sketch;
+                self.drag_held = match handle {
+                    DragHandle::Point(id) => sk.point(id).map_or(Vec::new(), |q| sk.entities().filter(|e| e.id != id && sk.curve(e.id).is_some_and(|c| c.distance(q) < 1e-9)).map(|e| e.id).collect()),
+                    DragHandle::Entity { .. } => Vec::new(),
+                };
                 // A drag aligns only with points it snaps onto itself.
                 self.woken.clear();
                 self.woken_mids.clear();
@@ -4780,7 +4796,9 @@ impl SketchEditor {
         if in_point(pos, r_point).is_some() && !sk.entity(id).is_some_and(|e| e.external) {
             return Some((noshape_sketch::ORIGIN, DVec2::ZERO, Drop::Merge));
         }
-        let curves = || sk.entities().filter(|e| e.kind() != EntityKind::Point && !users.contains(&e.id) && !e.point_refs().contains(&id));
+        // Nor a curve the point was on when the drag began (live sk2-1121 polygon-corner-drag: an inscribed polygon's
+        // side midpoint takes no MIDPOINT on its side or COINCIDENT on its circle on release).
+        let curves = || sk.entities().filter(|e| e.kind() != EntityKind::Point && !users.contains(&e.id) && !e.point_refs().contains(&id) && !self.drag_held.contains(&e.id));
         // Live (audit 1969): by a line's midpoint the drop takes it (MIDPOINT).
         let mid = curves()
             .filter_map(|e| {
@@ -4909,10 +4927,14 @@ impl SketchEditor {
         }
         self.press = None;
         self.drag_origin = None;
-        if let Some(DragState::Handle(h @ (PatternHandle::Rotate | PatternHandle::Scale))) = &self.drag {
+        self.drag_held.clear();
+        if let Some(DragState::Handle(h @ (PatternHandle::Rotate | PatternHandle::Scale | PatternHandle::MoveX | PatternHandle::MoveY))) = &self.drag {
             self.xf_released = Some(*h);
             if *h == PatternHandle::Scale {
                 self.xf_scale_box = self.cursor.map(|c| c + DVec2::new(XF_SCALE_BOX_FROM_POINTER.0, XF_SCALE_BOX_FROM_POINTER.1) * self.world_per_px);
+            }
+            if matches!(h, PatternHandle::MoveX | PatternHandle::MoveY) {
+                self.xf_move_box = self.cursor.map(|c| (*h, c + DVec2::new(XF_MOVE_BOX_FROM_POINTER.0, XF_MOVE_BOX_FROM_POINTER.1) * self.world_per_px));
             }
         }
         let out = match self.drag.take() {
@@ -5211,6 +5233,7 @@ impl SketchEditor {
                     self.xf_angle = 0.0;
                     self.xf_scale = 1.0;
                     self.xf_scale_box = None;
+                    self.xf_move_box = None;
                 }
                 self.selection.clear();
                 EditOutcome::changed()
@@ -5413,6 +5436,15 @@ impl SketchEditor {
                     };
                     out.push((PatternHandle::Scale, at, self.xf_scale));
                 }
+                for h in [PatternHandle::MoveX, PatternHandle::MoveY] {
+                    let at = match self.cursor.filter(|_| dragging(h)) {
+                        Some(c) => Some(c + off(XF_MOVE_BOX_FROM_POINTER)),
+                        None => self.xf_move_box.filter(|b| b.0 == h).map(|b| b.1),
+                    };
+                    if let Some(at) = at {
+                        out.push((h, at, self.xf_move_value(h)));
+                    }
+                }
             }
             _ => {}
         }
@@ -5431,8 +5463,23 @@ impl SketchEditor {
             PatternHandle::CircularAngle if v.abs() > 1e-9 => self.circular_angle = -v.clamp(-TAU, TAU),
             PatternHandle::Rotate => self.xf_angle = v,
             PatternHandle::Scale if v > 0.0 => self.xf_scale = v,
+            PatternHandle::MoveX | PatternHandle::MoveY => {
+                let a = self.xf_move_axis(h);
+                self.xf_offset += a * (v - self.xf_offset.dot(a));
+            }
             _ => {}
         }
+    }
+
+    /// The Transform arrow's direction (X or Y of the manipulator).
+    fn xf_move_axis(&self, h: PatternHandle) -> DVec2 {
+        let (u, v) = self.xf_axes();
+        if h == PatternHandle::MoveX { u } else { v }
+    }
+
+    /// How far the selection has moved along a Transform arrow.
+    pub fn xf_move_value(&self, h: PatternHandle) -> f64 {
+        self.xf_offset.dot(self.xf_move_axis(h))
     }
 
     /// Set a pattern direction's instance count (typed into its `Nx` label).
@@ -9697,6 +9744,32 @@ mod tests {
         assert!(near(ed.xf_offset / px, v(50., 0.)) && near((ed.pattern_center + ed.xf_offset) / 1e-3, v(5., 5.)), "the ring moves the triad only");
     }
 
+    /// Live sk2-1121 transform: an arrow's drag shows the distance moved in a box up and right of the pointer, which
+    /// stays where the drag left it and opens for typing; a typed distance sets the move along that arrow.
+    #[test]
+    fn transform_arrow_drag_leaves_its_distance_box() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let l = d.sketch.add_line(v(0.0, 0.0), v(0.01, 0.0));
+        ed.selection = vec![l];
+        ed.set_tool(Tool::Transform);
+        ed.apply_preselection(&mut d);
+        let px = ed.world_per_px;
+        let head = ed.pattern_handles(&d.sketch).into_iter().find(|x| x.0 == PatternHandle::MoveY).unwrap().1;
+        let to = head + v(0.0, 40.0) * px;
+        ed.tool_down(&mut d, head, None, false, false);
+        ed.tool_drag(&mut d, to);
+        let label = |ed: &SketchEditor, d: &SketchData| ed.pattern_value_labels(&d.sketch).into_iter().find(|x| x.0 == PatternHandle::MoveY);
+        let (_, at, shown) = label(&ed, &d).expect("the box during the drag");
+        assert!((at - (to + v(72.0, -48.0) * px)).length() < 1e-9 && (shown / px - 40.0).abs() < 1e-6, "{at:?} {shown}");
+        ed.tool_up(&mut d, to);
+        assert_eq!(ed.xf_released, Some(PatternHandle::MoveY), "the view opens it for typing");
+        let (_, kept, _) = label(&ed, &d).expect("the box after the drag");
+        assert!((kept - at).length() < 1e-9, "where the drag left it");
+        assert!(label(&ed, &d).is_some() && !ed.pattern_value_labels(&d.sketch).iter().any(|x| x.0 == PatternHandle::MoveX), "the X arrow's not shown");
+        ed.set_pattern_value(PatternHandle::MoveY, 0.005);
+        assert!((ed.xf_offset - v(0.0, 0.005)).length() < 1e-12, "typed: 5 mm along Y: {:?}", ed.xf_offset);
+    }
+
     /// live2's combined snaps (feel/combo.json, 0.2507 mm a pixel, mm here): a chain's next end where two zones cross
     /// near the pointer takes both constraints; of several crossings the nearest the pointer.
     #[test]
@@ -9972,6 +10045,21 @@ mod tests {
             assert!(ed.delete_constraint(&mut data, link));
             assert!(!data.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::CircularPatternLink { .. })), "{tool:?}: the whole pattern goes");
         }
+    }
+
+    /// Live sk2-1121 polygon-corner-drag: the inscribed polygon's side midpoint dragged off and released keeps its one
+    /// MIDPOINT (none added on its own side).
+    #[test]
+    fn a_dragged_polygon_side_midpoint_adds_no_second_midpoint() {
+        let (mut ed, mut data) = editor(Tool::Polygon);
+        click(&mut ed, &mut data, v(0.0, 0.0));
+        click(&mut ed, &mut data, v(0.02, 0.0));
+        assert!(ed.finish_polygon(&mut data).changed);
+        let mids = |d: &SketchData| d.sketch.constraints().filter(|c| matches!(c.kind, ConstraintKind::Midpoint { .. })).count();
+        let before = (mids(&data), data.sketch.constraints().count());
+        ed.set_tool(Tool::Select);
+        drag(&mut ed, &mut data, v(0.02, 0.0), v(0.025, 0.005));
+        assert_eq!((mids(&data), data.sketch.constraints().count()), before, "no constraint added on release");
     }
 
     #[test]
@@ -12882,6 +12970,22 @@ mod tests {
         assert_eq!(cons.len(), 3);
         let on = d.sketch.constraints().filter(|c| matches!(c.kind, ConstraintKind::Coincident { a, .. } if cons.contains(&a))).count();
         assert_eq!(on, 3);
+    }
+
+    /// Live sk2-1121 3pt-circle-on-points: a circle through a line's ends, the first at the Origin, passes through the
+    /// line's own start (no point of its own there): one construction point, four coincidents and the horizontal.
+    #[test]
+    fn a_three_point_circle_on_a_line_start_at_the_origin_takes_the_start() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        click(&mut ed, &mut d, v(0.03, 0.0));
+        ed.set_tool(Tool::ThreePointCircle);
+        for p in [v(0.0, 0.0), v(0.03, 0.0), v(0.015, 0.01)] {
+            click(&mut ed, &mut d, p);
+        }
+        let cons = d.sketch.entities().filter(|e| e.kind() == EntityKind::Point && e.construction && !e.external).count();
+        let coincident = d.sketch.constraints().filter(|c| matches!(c.kind, ConstraintKind::Coincident { .. })).count();
+        assert_eq!((count(&d, EntityKind::Circle), cons, coincident), (1, 1, 4), "(circles, construction points, coincidents)");
     }
 
     #[test]

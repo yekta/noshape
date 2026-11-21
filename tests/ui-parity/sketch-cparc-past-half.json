@@ -1,0 +1,93 @@
+{
+ "name": "sketch-cparc-past-half",
+ "about": "a centre point arc swept on past 180 degrees (rests at 90/180/270), placed at 315",
+ "area": "psui",
+ "source": "psui sk-2 (REQUESTS 11-21 05:49)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Center point arc"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     0,
+     20
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     -20,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     0,
+     -20
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     14,
+     -14
+    ]
+   }
+  },
+  {
+   "do": "shot",
+   "name": "end"
+  }
+ ],
+ "expect": [
+  {
+   "live": "recorded by live 11-21 (sk-2); the sketch stays open"
+  }
+ ]
+}

@@ -1391,7 +1391,12 @@ impl PartStudioView {
             let source = |e: &noshape_sketch::EntityId| data.as_ref().and_then(|d| d.external_refs.get(&e.0).cloned());
             taken_from = ed.selection.iter().filter_map(source).collect();
             let own = ed.selection.iter().any(|e| source(e).is_none());
-            if own || !ed.selected_regions.is_empty() || (ed.tool == crate::sketch_mode::Tool::Dimension && !ed.tool_picks().is_empty()) {
+            // The Dimension tool's picks, but the Origin (live sketch-dim-to-origin: it lights nothing).
+            let dim_picks = if ed.tool == crate::sketch_mode::Tool::Dimension { ed.tool_picks() } else { Vec::new() };
+            let origin = |e: &noshape_sketch::EntityId| {
+                data.as_ref().and_then(|d| d.sketch.entity(*e)).is_some_and(|x| x.external && x.reference_only && matches!(x.geometry, noshape_sketch::Geometry::Point { pos } if pos.length() < 1e-12))
+            };
+            if own || !ed.selected_regions.is_empty() || dim_picks.iter().any(|e| !origin(e)) {
                 out.insert(ed.feature);
             }
         }

@@ -1,0 +1,153 @@
+{
+ "name": "sketch-dim-angle-quadrants",
+ "about": "an angle between two lines from the origin, the pointer moved through the four quadrants before placing",
+ "area": "psui",
+ "source": "psui sk-1 (REQUESTS 11-21 05:36)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     20
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     15,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     15,
+     5
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     -5,
+     10
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     -10,
+     -5
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     10,
+     -10
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     -10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ],
+ "expect": [
+  {
+   "live": "recorded by live 11-21 (sk-1); the sketch stays open"
+  }
+ ]
+}

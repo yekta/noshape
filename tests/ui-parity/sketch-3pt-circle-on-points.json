@@ -1,0 +1,117 @@
+{
+ "name": "sketch-3pt-circle-on-points",
+ "about": "a 3 point circle through a line's two ends and a third point",
+ "area": "psui",
+ "source": "psui sk-2 (REQUESTS 11-21 05:49)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "3 point circle"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   },
+   "ms": 400
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   },
+   "ms": 400
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "shot",
+   "name": "end"
+  }
+ ],
+ "expect": [
+  {
+   "live": "recorded by live 11-21 (sk-2); the sketch stays open"
+  }
+ ]
+}

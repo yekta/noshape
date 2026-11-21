@@ -1,0 +1,93 @@
+{
+ "name": "sketch-chamfer-typed",
+ "about": "a corner rectangle's corner chamfered with 5 typed",
+ "area": "psui",
+ "source": "psui sk-2 (REQUESTS 11-21 05:49)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "g"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     20
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch chamfer"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     30,
+     20
+    ]
+   },
+   "ms": 400
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     20
+    ]
+   }
+  },
+  {
+   "do": "type",
+   "text": "5"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "shot",
+   "name": "end"
+  }
+ ],
+ "expect": [
+  {
+   "live": "recorded by live 11-21 (sk-2); the sketch stays open"
+  }
+ ]
+}

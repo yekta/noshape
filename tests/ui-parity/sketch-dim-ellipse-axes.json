@@ -1,0 +1,145 @@
+{
+ "name": "sketch-dim-ellipse-axes",
+ "about": "an ellipse (major 30 on x, minor 15) dimensioned at its major then its minor rim (a 700 ms rest on each pick: SwiftShader picks are slow) [live 11-21: Show constraints unticked first; the badges sit on the pick points]",
+ "area": "psui",
+ "source": "psui sk-1 (REQUESTS 11-21 05:36)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Show constraints"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Ellipse"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     15
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     40,
+     5
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     0,
+     15
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     15
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     5,
+     25
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ],
+ "expect": [
+  {
+   "live": "recorded by live 11-21 (sk-1); the sketch stays open"
+  }
+ ]
+}

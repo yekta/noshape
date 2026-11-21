@@ -629,6 +629,11 @@ def drawn_sizes(a, b):
     da = ((a or {}).get("sketch") or {}).get("dimensions")
     db = ((b or {}).get("sketch") or {}).get("dimensions")
     if isinstance(da, list) and isinstance(db, list):
+        # Live lists them in its model's map order (sketch-dim-hv-two-points, sketch-dim-arc-length: the newest
+        # first), nothing the user sees: both sides by kind, then value, the driven ones (no value) last.
+        order = lambda x: (str(x.get("kind")), not isinstance(x.get("value"), (int, float)), x.get("value") if isinstance(x.get("value"), (int, float)) else 0)
+        da.sort(key=order)
+        db.sort(key=order)
         for x, y in zip(da, db):
             if x.get("kind") == y.get("kind") and isinstance(x.get("value"), (int, float)) and isinstance(y.get("value"), (int, float)) and close(x["value"], y["value"]):
                 y["value"] = x["value"]
