@@ -937,6 +937,7 @@ pub fn external_thread(ev: &mut EvalCtx) -> FResult<()> {
         return crate::regen::eval::err_at(&["threadDepth"], "Error regenerating: a parameter is out of range.");
     }
     // std externalThread.fs checkNonMatchingSize: the standard's size nearest the cylinder, against the chosen one.
+    let mut info = None;
     if let Some(r) = radius {
         let d = 2.0 * r;
         let minor = ht::table_values(ht::TABLE_EXTERNAL_THREAD, &path).and_then(|v| v.minor_diameter).unwrap_or(0.0);
@@ -946,17 +947,23 @@ pub fn external_thread(ev: &mut EvalCtx) -> FResult<()> {
                 return err("Minor diameter cannot exceed cylinder diameter.");
             }
             if other {
-                ev.infos.push("Non-matching thread size selected.".into());
+                info = Some("Non-matching thread size selected.");
             } else if (size - d).abs() > THREAD_TOL {
-                ev.infos.push("Exact match for thread size not found.".into());
+                info = Some("Exact match for thread size not found.");
             }
         }
     }
     // A chamfer or an undercut: std's (opChamfer at the selected end, the shaft split and its far piece offset in;
-    // c2-cov-external-thread: live 5 faces with a 0.5 mm chamfer, 5 with a 6.5 x 3 mm undercut).
+    // c2-cov-external-thread: live 5 faces with a 0.5 mm chamfer, 5 with a 6.5 x 3 mm undercut). Std's own check reports
+    // the size once (ui-parity external-thread-chamfer-undercut showed it twice).
     if (ev.bool("addChamfer") || ev.bool("addUndercut")) && crate::regen::custom_features::host().is_some() {
-        return crate::regen::custom_features::evaluate_std(ev, "externalThread.fs", "externalThread");
+        crate::regen::custom_features::evaluate_std(ev, "externalThread.fs", "externalThread")?;
+        if let Some(info) = info.filter(|i| !ev.infos.iter().any(|x| x == i)) {
+            ev.infos.push(info.into());
+        }
+        return Ok(());
     }
+    ev.infos.extend(info.map(String::from));
     if ev.is("depthType", "Blind") && !ev.bool("addUndercut") && ev.bool("splitFace") {
         let depth = ev.length("threadDepth")?;
         for (id, center, axis, r, fi) in threads {

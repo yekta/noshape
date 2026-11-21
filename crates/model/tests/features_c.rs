@@ -5617,16 +5617,19 @@ fn a_surfaces_round_between_its_trimmed_halves_stays_a_surface_as_live() {
 
 /// Live c2-cov-external-thread: a thread's chamfer and undercut are std's. A Ø6.35 × 30 mm rod, ANSI 1/4-20 Blind
 /// 12 mm with a 0.5 mm × 30° chamfer at its top: 5 faces / 4 edges, 946.1501 mm³; a Ø8 × 25 mm rod, ISO M8 Up to
-/// next with a 6.5 × 3 mm undercut: 5 faces / 4 edges, 1205.3898 mm³.
+/// next with a 6.5 × 3 mm undercut: 5 faces / 4 edges, 1205.3898 mm³. On a Ø6.2 rod the 1/4 thread's size is no
+/// exact match, said once (ui-parity external-thread-chamfer-undercut: our check and std's each said it).
 #[test]
 fn an_external_threads_chamfer_and_undercut_cut_the_rod() {
-    // (rod radius mm, height, standard, thread parameters, live mm³)
-    type Case<'a> = (f64, &'a str, [&'a str; 2], &'a [(&'a str, ParamValue)], f64);
-    let cases: [Case; 2] = [
-        (3.175, "30 mm", ["ANSI", "1/4"], &[("depthType", en("Blind")), ("threadDepth", expr("12 mm")), ("addChamfer", ParamValue::Bool(true)), ("chamferWidth", expr("0.5 mm")), ("chamferAngle", expr("30 deg"))], 946.1501126534241),
-        (4.0, "25 mm", ["ISO", "M8"], &[("depthType", en("UpToNext")), ("addUndercut", ParamValue::Bool(true)), ("undercutDiameter", expr("6.5 mm")), ("undercutLength", expr("3 mm"))], 1205.389831274235),
+    // (rod radius mm, height, standard, thread parameters, live mm³, message)
+    type Case<'a> = (f64, &'a str, [&'a str; 2], &'a [(&'a str, ParamValue)], Option<f64>, &'a str);
+    let chamfer = [("depthType", en("Blind")), ("threadDepth", expr("12 mm")), ("addChamfer", ParamValue::Bool(true)), ("chamferWidth", expr("0.5 mm")), ("chamferAngle", expr("30 deg"))];
+    let cases: [Case; 3] = [
+        (3.175, "30 mm", ["ANSI", "1/4"], &chamfer, Some(946.1501126534241), ""),
+        (4.0, "25 mm", ["ISO", "M8"], &[("depthType", en("UpToNext")), ("addUndercut", ParamValue::Bool(true)), ("undercutDiameter", expr("6.5 mm")), ("undercutLength", expr("3 mm"))], Some(1205.389831274235), ""),
+        (3.1, "30 mm", ["ANSI", "1/4"], &chamfer, None, "Exact match for thread size not found."),
     ];
-    for (r, h, standard, set, live) in cases {
+    for (r, h, standard, set, live, said) in cases {
         let mut s = Studio::new();
         let mut sk = noshape_sketch::Sketch::new();
         sk.add_circle(DVec2::ZERO, mm(r));
@@ -5648,9 +5651,12 @@ fn an_external_threads_chamfer_and_undercut_cut_the_rod() {
         });
         let (status, message) = s.last_status();
         assert_ne!(status, FeatureStatus::Error, "{standard:?}: {message}");
+        assert_eq!(message, said, "{standard:?} on Ø{}", 2.0 * r);
         let res = s.regen();
         let b = &res.context.bodies[0];
         assert_eq!((b.shape.faces().len(), b.shape.shown_topology().unwrap().edge_count()), (5, 4), "{standard:?}");
-        assert!(near(volume(&res, 0) * 1e9, live, 1e-3), "{standard:?}: {} mm³, live {live}", volume(&res, 0) * 1e9);
+        if let Some(live) = live {
+            assert!(near(volume(&res, 0) * 1e9, live, 1e-3), "{standard:?}: {} mm³, live {live}", volume(&res, 0) * 1e9);
+        }
     }
 }
