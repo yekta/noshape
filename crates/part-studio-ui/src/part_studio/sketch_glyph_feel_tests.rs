@@ -222,7 +222,7 @@ fn a_lines_glyph_row_is_20_px_boxes_22_px_apart_20_5_px_off_its_middle(cx: &mut 
 }
 
 /// Live fc-1120 (2) (psui recheck 02:44): while a rectangle's corner is dragged no glyph shows, Show constraints on, and
-/// the regions lose their grey fill; both come back on release.
+/// the regions lose their grey fill; both come back on release (the fill too: qa FEEL-SKETCH-REGION-FILL-AFTER-DRAG).
 #[gpui::test]
 fn glyphs_and_the_region_fill_go_while_geometry_is_dragged(cx: &mut TestAppContext) {
     let (window, view) = sketch_with(cx, "glyph-drag-hidden", Tool::CornerRect);
@@ -243,7 +243,12 @@ fn glyphs_and_the_region_fill_go_while_geometry_is_dragged(cx: &mut TestAppConte
         });
         let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
         let glyphs = selectors.into_iter().filter(|s| vcx.debug_bounds(s).is_some()).count();
-        (glyphs, cx.update(|cx| view.read(cx).opts.sketch_dragging))
+        // The regions' grey fill in the scene drawn (an invisible pick-only mesh while dragging).
+        let filled = cx.update(|cx| {
+            let scene = view.read(cx).viewport.read(cx).print_source().1;
+            scene.instances.iter().any(|i| i.layer == 9 && !i.pick_only && i.color[3] > 0.0 && matches!(i.drawable, noshape_render::Drawable::Mesh(_)))
+        });
+        (glyphs, !filled)
     };
     let at_rest = shown(cx);
     let event = |ev: ViewportEvent, cx: &mut TestAppContext| {
@@ -265,4 +270,111 @@ fn glyphs_and_the_region_fill_go_while_geometry_is_dragged(cx: &mut TestAppConte
     assert!(at_rest.0 > 0 && !at_rest.1, "at rest: {at_rest:?} (glyphs shown, regions unfilled)");
     assert_eq!(dragging, (0, true), "(glyphs shown, regions unfilled) while the corner is dragged");
     assert_eq!(released, (at_rest.0, false), "(glyphs shown, regions unfilled) after the release");
+}
+
+/// Live sketch-tool walk 3 (qa FEEL-HOVER-GLYPHS-SECOND-ENTITY), Show constraints off: each hovered edge of a rectangle
+/// shows a glyph for every constraint it takes part in, also those drawn on the other line with Show constraints on (the
+/// top ⊥ ⫽ —, the right edge its own).
+#[gpui::test]
+fn a_hovered_line_shows_all_its_constraints(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "glyph-second-entity", Tool::CornerRect);
+    click(cx, window, &view, (450., 300.));
+    click(cx, window, &view, (750., 420.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    // Each edge and the constraints with a glyph it takes part in.
+    let edges = cx.update(|cx| {
+        let v = view.read(cx);
+        let ed = v.sketch.as_ref().expect("sketch mode");
+        let data = v.sketch_data(cx).expect("sketch data");
+        let glyphs = ed.constraint_glyphs(&data);
+        data.sketch
+            .entities()
+            .filter(|e| matches!(data.sketch.curve(e.id), Some(noshape_sketch::Curve2::Line { .. })))
+            .map(|e| {
+                let mine: Vec<_> = glyphs.iter().filter(|g| !g.on_point && data.sketch.constraint(g.constraint).is_some_and(|c| c.kind.entities().contains(&e.id))).map(|g| g.constraint).collect();
+                (e.id, mine)
+            })
+            .collect::<Vec<_>>()
+    });
+    assert_eq!(edges.len(), 4, "a rectangle");
+    assert!(edges.iter().any(|(line, mine)| cx.update(|cx| {
+        let glyphs = view.read(cx).sketch.as_ref().unwrap().constraint_glyphs(&view.read(cx).sketch_data(cx).unwrap());
+        mine.iter().any(|c| !glyphs.iter().any(|g| g.constraint == *c && g.entity == *line))
+    })), "some edge's constraint is drawn on another line with Show constraints on");
+    let pointer = Pointer::new(cx, window, &view);
+    for (line, mine) in edges {
+        pointer.move_to(cx, &view, DVec2::new(30.0, 30.0));
+        cx.executor().advance_clock(GLYPH_LINGER + std::time::Duration::from_millis(50));
+        cx.run_until_parked();
+        // (Read after the clock moved: the new sketch's view turns normal to its plane meanwhile.)
+        let on = along_line(cx, &view, line);
+        pointer.move_to(cx, &view, on);
+        assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().hover), Some(line), "the line lit");
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        let missing: Vec<_> = mine.iter().filter(|c| vcx.debug_bounds(Box::leak(format!("glyph-{}-{}", c.0, line.0).into_boxed_str())).is_none()).collect();
+        assert!(missing.is_empty(), "line {line:?}: constraints {missing:?} of {mine:?} not shown");
+    }
+}
+
+/// Live sketch/11 (qa FEEL-HOVER-GLYPHS-IN-TOOL), Show constraints off: with the Dimension, Extend or Offset tool active
+/// a hovered rectangle edge shows only its band, no glyphs.
+#[gpui::test]
+fn a_tool_hides_a_hovered_lines_glyphs(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "glyph-in-tool", Tool::CornerRect);
+    click(cx, window, &view, (450., 300.));
+    click(cx, window, &view, (750., 420.));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    // The top edge (highest in the sketch) and its glyphs' selectors.
+    let (line, selectors) = cx.update(|cx| {
+        let v = view.read(cx);
+        let ed = v.sketch.as_ref().expect("sketch mode");
+        let data = v.sketch_data(cx).expect("sketch data");
+        let id = data
+            .sketch
+            .entities()
+            .filter_map(|e| match data.sketch.curve(e.id) {
+                Some(noshape_sketch::Curve2::Line { a, b }) => Some((e.id, a.y + b.y)),
+                _ => None,
+            })
+            .max_by(|x, y| x.1.total_cmp(&y.1))
+            .expect("a line")
+            .0;
+        let sel: Vec<&'static str> = ed.focus_glyphs(&data, ed.constraint_glyphs(&data), &[id]).iter().filter(|g| g.entity == id).map(|g| &*Box::leak(format!("glyph-{}-{}", g.constraint.0, g.entity.0).into_boxed_str())).collect();
+        (id, sel)
+    });
+    assert!(!selectors.is_empty(), "the top edge has constraints");
+    let pointer = Pointer::new(cx, window, &view);
+    for tool in [Tool::Select, Tool::Dimension, Tool::Extend, Tool::Offset] {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(tool, w, cx))).unwrap();
+        pointer.move_to(cx, &view, DVec2::new(30.0, 30.0));
+        cx.executor().advance_clock(GLYPH_LINGER + std::time::Duration::from_millis(50));
+        cx.run_until_parked();
+        let on = along_line(cx, &view, line);
+        pointer.move_to(cx, &view, on);
+        assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().hover), Some(line), "{tool:?}: the line lit");
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        let shown = selectors.iter().filter(|s| vcx.debug_bounds(s).is_some()).count();
+        if tool == Tool::Select {
+            assert_eq!(shown, selectors.len(), "no tool: the hovered line's glyphs");
+        } else {
+            assert_eq!(shown, 0, "{tool:?}: no glyphs on the hovered line");
+        }
+    }
+}
+
+/// 40 % along line `line` on screen, as the view is now (a rectangle's short side is ~38 px: clear of its corners'
+/// reach).
+fn along_line(cx: &mut TestAppContext, view: &Entity<PartStudioView>, line: noshape_sketch::EntityId) -> DVec2 {
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let ed = v.sketch.as_ref().expect("sketch mode");
+        let data = v.sketch_data(cx).expect("sketch data");
+        let Some(noshape_sketch::Curve2::Line { a, b }) = data.sketch.curve(line) else { panic!("a line") };
+        v.viewport.read(cx).project(ed.frame.to_world(a + (b - a) * 0.4)).expect("on screen")
+    })
 }

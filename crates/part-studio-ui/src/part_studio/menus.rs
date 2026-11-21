@@ -290,16 +290,17 @@ impl PartStudioView {
                         m = m.item(item("Align view with vertical axis", Box::new(move |this, _, cx| this.align_view_vertical(&ra, cx))));
                     }
                 }
-                // A default plane: its feature list row's menu (live ui-parity plane-graphics-rclick-menu).
-                (Some(r @ Reference::Plane(_)), Some(PickKind::Plane)) => {
-                    m = super::default_geometry_menu(m, &v, r, false, target_selected, cx);
-                }
-                // Feature planes.
+                // Planes. A default plane's adds Size to Part Studio and has no Rename or Show dependencies… (live
+                // ctx-menus-1117 plane-top-graphics; its row's menu is the list's).
                 (Some(r), Some(PickKind::Plane)) => {
                     if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
                         m = m.item(item(&format!("Edit {name}…"), Box::new(move |this, w, cx| this.edit_feature(id, w, cx)))).separator();
                     }
                     m = m.item(tool("New sketch…", "sketch", "sketch", &r)).item(tool("Offset plane…", "plane", "cPlane", &r));
+                    if matches!(r, Reference::Plane(_)) {
+                        let rz = r.clone();
+                        m = m.item(item("Size to Part Studio", Box::new(move |this, _, cx| this.size_plane_to_studio(rz.clone(), cx))));
+                    }
                     if paste_sketch {
                         let rp = r.clone();
                         m = m.item(item("Paste sketch", Box::new(move |this, _, cx| this.paste_sketch_onto(rp.clone(), cx))));
@@ -315,6 +316,14 @@ impl PartStudioView {
                         .item(item("Hide all planes", Box::new(|this, _, cx| this.hide_planes(None, cx))))
                         .item(icon_item("Section view…", "menu-section-view", Box::new(move |this, w, cx| this.section_through(rs.clone(), w, cx))))
                         .separator();
+                    if has_selection {
+                        m = m.item(item("Clear selection", Box::new(|this, _, cx| {
+                            this.selection.clear();
+                            this.selected_features.clear();
+                            this.refresh_scene(false, cx);
+                            cx.notify();
+                        })));
+                    }
                     m = select_menu(m, &r, PickKind::Plane, window, cx).separator().item(zoom_fit()).item(zoom_sel(&r)).item(normal_to(&r));
                 }
                 // Sketch regions, curves and points (live: region and curve menus).

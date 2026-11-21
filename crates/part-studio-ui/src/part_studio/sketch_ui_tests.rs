@@ -1528,7 +1528,8 @@ fn a_dimension_placed_under_a_line_in_iso_opens_its_box(cx: &mut TestAppContext)
 
 /// Live (ui-parity sketch-dimension-variable, qa SKETCH-DIM-PLACE-CLICK-SELECTS): on Top a rectangle's bottom line lies
 /// in the Front plane; with it picked, a placement click 8 mm under it, over the Front plane, places its dimension (the
-/// box open for "#width"), not a second pick of the plane the line lies in. The pick alone reads its Length, as live's.
+/// box open for "#width"), not a second pick of the plane the line lies in, which doesn't light while placing. The pick
+/// alone reads its Length, as live's.
 #[gpui::test]
 fn a_dimension_placed_over_the_plane_its_line_lies_in_opens_its_box(cx: &mut TestAppContext) {
     let (window, view) = sketch_with(cx, "dim-place-own-trace", Tool::CornerRect);
@@ -1550,6 +1551,8 @@ fn a_dimension_placed_over_the_plane_its_line_lies_in_opens_its_box(cx: &mut Tes
             let (vp, at) = (v.viewport.clone(), DVec2::new(place.0, place.1));
             v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: at, modifiers: Modifiers::default() }, w, cx);
             v.hover = Some(Reference::Plane(DatumPlane::Front));
+            // Placing over it, the plane doesn't light (live qa walk 1 w3-placing, qa FEEL-PLANE-LIT-WHILE-DIMENSIONING).
+            assert!(v.highlighted_hover(cx).is_empty(), "the Front plane lit while the dimension is placed over it");
             v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
             v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: at, modifiers: Modifiers::default() }, w, cx);
         });
@@ -5529,7 +5532,8 @@ fn a_plane_behind_the_sketch_gets_its_menu(cx: &mut TestAppContext) {
 }
 
 /// Live 11-17 ctx-menus-1117 (menus-sk.json): the sketch's right-click menus on a line, on its end, on a line and its
-/// end selected, with Line drawing (Add comment, a cloud item, left out).
+/// end selected, with Line drawing (Add comment, a cloud item, left out). Hide other / all sketches with no other sketch
+/// shown (qa MENU-SK-HIDE-SKETCHES).
 #[gpui::test]
 fn sketch_entity_menus_as_lives(cx: &mut TestAppContext) {
     let (window, view) = sketch_with(cx, "sketch-entity-menus", Tool::Line);
@@ -5559,13 +5563,13 @@ fn sketch_entity_menus_as_lives(cx: &mut TestAppContext) {
         cx.update(|cx| view.update(cx, |v, cx| v.close_context_menu(cx)));
         labels.into_iter().filter(|l| l != "———").collect::<Vec<_>>()
     };
-    let line_menu = ["Confirm Sketch 1", "Copy sketch entities", "Transform sketch entities", "Construction", "Extrude…", "Revolve…", "Curve/surface analysis…", "Clear selection", "Select", "Select other…", "Zoom to fit", "Zoom to selection", "View normal to sketch plane", "Align view with vertical axis", "Delete sketch entity"];
+    let line_menu = ["Confirm Sketch 1", "Copy sketch entities", "Transform sketch entities", "Construction", "Extrude…", "Revolve…", "Hide other sketches", "Hide all sketches", "Curve/surface analysis…", "Clear selection", "Select", "Select other…", "Zoom to fit", "Zoom to selection", "View normal to sketch plane", "Align view with vertical axis", "Delete sketch entity"];
     let mut wrong = Vec::new();
     for (what, got, want) in [
         ("a line", menu(cx, line, vec![], Tool::Select), line_menu.to_vec()),
         ("a selected line", menu(cx, line, vec![line], Tool::Select), line_menu.to_vec()),
-        ("a line's end", menu(cx, end, vec![], Tool::Select), vec!["Confirm Sketch 1", "Clear selection", "Select", "Select other…", "Zoom to fit", "View normal to sketch plane", "Delete sketch entity"]),
-        ("a line and its end", menu(cx, line, vec![line, end], Tool::Select), vec!["Confirm Sketch 1", "Copy sketch entities", "Transform sketch entities", "Curve/surface analysis…", "Clear selection", "Select", "Select other…", "Zoom to fit", "Zoom to selection", "View normal to sketch plane", "Delete 2 sketch entities"]),
+        ("a line's end", menu(cx, end, vec![], Tool::Select), vec!["Confirm Sketch 1", "Hide other sketches", "Hide all sketches", "Clear selection", "Select", "Select other…", "Zoom to fit", "View normal to sketch plane", "Delete sketch entity"]),
+        ("a line and its end", menu(cx, line, vec![line, end], Tool::Select), vec!["Confirm Sketch 1", "Copy sketch entities", "Transform sketch entities", "Hide other sketches", "Hide all sketches", "Curve/surface analysis…", "Clear selection", "Select", "Select other…", "Zoom to fit", "Zoom to selection", "View normal to sketch plane", "Delete 2 sketch entities"]),
     ] {
         if got != want.iter().map(|s| s.to_string()).collect::<Vec<_>>() {
             wrong.push(format!("{what}: ours {got:?}"));
@@ -6327,10 +6331,10 @@ fn extrude_on_a_flat_region_opens_the_flat_form(cx: &mut TestAppContext) {
     assert_eq!((domain.as_str(), shown), ("FLAT", vec!["flatOperationType", "entities"]));
 }
 
-/// Every kind of plane right-clicked in the graphics, unselected and selected: Top, Front and Right (the feature list
-/// row's menu, ui-parity plane-graphics-rclick-menu) and a Plane feature's. The menu is built while the view is being
-/// updated: the default planes' read the view for their selection there and crashed the app (v0.4.46, 2347771e).
-/// Selected, a default plane's adds Clear selection (live PLANE-MENU-SELECTED).
+/// Every kind of plane right-clicked in the graphics, unselected and selected: Top, Front and Right and a Plane
+/// feature's. The menu is built while the view is being updated: the default planes' read the view for their selection
+/// there and crashed the app (v0.4.46, 2347771e). Selected, it adds Clear selection (live PLANE-MENU-SELECTED). A default
+/// plane's is the viewport's, not its row's (live ctx-menus-1117 plane-top-graphics, qa MENU-PLANE-GRAPHICS).
 #[gpui::test]
 fn every_kind_of_plane_right_clicked_in_the_graphics_opens_its_menu(cx: &mut TestAppContext) {
     let (window, view) = part_studio(cx, "plane-graphics-menu");
@@ -6361,8 +6365,16 @@ fn every_kind_of_plane_right_clicked_in_the_graphics_opens_its_menu(cx: &mut Tes
             cx.update_window(window, |_, _, cx| view.update(cx, |v, _| v.selection = if selected { vec![r.clone()] } else { Vec::new() })).unwrap();
             let rows = menu(cx, r);
             assert!(rows.iter().any(|l| l == "New sketch…") && rows.iter().any(|l| l == "Offset plane…"), "{r:?} selected {selected}: {rows:?}");
-            if matches!(r, Reference::Plane(_)) {
+            if let Reference::Plane(p) = r {
                 assert_eq!(rows.iter().any(|l| l == "Clear selection"), selected, "{r:?} selected {selected}: {rows:?}");
+                let name = format!("{p:?}");
+                let mut want = vec!["New sketch…", "Offset plane…", "Size to Part Studio", "———", "Hide {name} plane", "Hide other planes", "Hide all planes", "Section view…", "———"];
+                if selected {
+                    want.push("Clear selection");
+                }
+                want.extend(["Select", "Select other…", "———", "Zoom to fit", "Zoom to selection", "View normal to"]);
+                let want: Vec<String> = want.iter().map(|l| l.replace("{name}", &name)).collect();
+                assert_eq!(rows, want, "{r:?} selected {selected}");
             }
         }
     }
@@ -7706,4 +7718,22 @@ fn a_cut_list_wheel_scrolls_the_panel_and_a_sideways_wheel_the_table(cx: &mut Te
         vec![(true, false), (true, false), (false, true), (false, false), (false, false)],
         "(panel scrolled, table scrolled sideways) after a wheel over a row, the header, a sideways wheel over a row, a wheel and a sideways wheel over the footer"
     );
+}
+
+/// The S toolbar in a sketch (live behaviours "S key", sketch/38; qa S-TOOLBAR-BORDER): 175 × 62 with its 1 px border,
+/// left at the pointer + 10, top at the pointer − 30.
+#[gpui::test]
+fn the_s_toolbar_is_175_by_62_at_the_pointer(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "s-toolbar", Tool::Select);
+    view.update(cx, |v, cx| {
+        v.ui.pointer = Some(DVec2::new(300.0, 200.0));
+        v.toggle_mini_toolbar(cx);
+    });
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let b = vcx.debug_bounds("mini-toolbar").expect("the S toolbar");
+    let vp = cx.update(|cx| view.read(cx).viewport.read(cx).origin());
+    let (w, h) = (f32::from(b.size.width), f32::from(b.size.height));
+    let (x, y) = (f32::from(b.origin.x - vp.x), f32::from(b.origin.y - vp.y));
+    assert!((w - 175.0).abs() < 0.6 && (h - 62.0).abs() < 0.6 && (x - 310.0).abs() < 0.6 && (y - 170.0).abs() < 0.6, "{w} × {h} at ({x}, {y}) in the viewport");
 }

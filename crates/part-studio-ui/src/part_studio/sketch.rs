@@ -508,7 +508,8 @@ impl PartStudioView {
         let dragging = self.sketch.as_ref().is_some_and(|ed| ed.geometry_dragging());
         if self.opts.sketch_dragging != dragging {
             self.opts.sketch_dragging = dragging;
-            self.refresh_scene(false, cx);
+            // The fill is in the built scene (qa FEEL-SKETCH-REGION-FILL-AFTER-DRAG: a refresh left it off after the release).
+            self.rebuild_scene(cx);
         }
     }
 
@@ -1392,14 +1393,7 @@ impl PartStudioView {
                 // Dimensions and constraints to planes, model edges / vertices and
                 // other sketches: a linked external reference entity stands in.
                 let tool_now = self.sketch.as_ref().map(|s| s.tool);
-                // Live (ui-parity sketch-circle-dimension): with a circle picked, a click over a plane places
-                // its dimension; with a line or point picked another plane is picked (sketch-fully-defined: a
-                // line, then the Right plane: a distance to it), never the sketch's own.
-                let picks = self.sketch.as_ref().filter(|_| tool_now == Some(Tool::Dimension)).map(|s| s.tool_picks()).unwrap_or_default();
-                let round_pick = self.sketch_data(cx).is_some_and(|d| picks.iter().any(|e| matches!(d.sketch.kind(*e), Some(noshape_sketch::EntityKind::Circle | noshape_sketch::EntityKind::Arc))));
-                let plane_area = |r: &Reference| matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. });
-                // Nor a plane the picked lines lie in (qa SKETCH-DIM-PLACE-CLICK-SELECTS: on Top, the bottom line in Front).
-                let skip_plane = |r: &Reference| !picks.is_empty() && plane_area(r) && (round_pick || self.is_own_sketch_plane(r, cx) || self.plane_holds_lines(r, &picks, cx));
+                let skip_plane = |r: &Reference| self.dimension_skips_plane(r, cx);
                 // Offset on a model face (live q-off): its outer loop, offset as one chain.
                 if hovered.is_none()
                     && tool_now == Some(Tool::Offset)
@@ -1716,6 +1710,22 @@ impl PartStudioView {
     }
 
     /// The plane or face the edited sketch lies on (or a plane coincident with it).
+    /// Whether the Dimension tool, with entities picked, places its dimension over plane `r` rather than picking it,
+    /// so the plane doesn't light either (live qa walk 1 w3-placing: nothing lit while placing over Front; qa
+    /// FEEL-PLANE-LIT-WHILE-DIMENSIONING). Live (ui-parity sketch-circle-dimension): with a circle picked, a click over
+    /// a plane places its dimension; with a line or point picked another plane is picked (sketch-fully-defined: a line,
+    /// then the Right plane: a distance to it), never the sketch's own nor one the picked lines lie in (qa
+    /// SKETCH-DIM-PLACE-CLICK-SELECTS: on Top, the bottom line in Front).
+    pub(super) fn dimension_skips_plane(&self, r: &Reference, cx: &App) -> bool {
+        let Some(ed) = self.sketch.as_ref().filter(|s| s.tool == Tool::Dimension) else { return false };
+        let picks = ed.tool_picks();
+        if picks.is_empty() || !matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }) {
+            return false;
+        }
+        let round_pick = self.sketch_data(cx).is_some_and(|d| picks.iter().any(|e| matches!(d.sketch.kind(*e), Some(noshape_sketch::EntityKind::Circle | noshape_sketch::EntityKind::Arc))));
+        round_pick || self.is_own_sketch_plane(r, cx) || self.plane_holds_lines(r, &picks, cx)
+    }
+
     fn is_own_sketch_plane(&self, r: &Reference, cx: &App) -> bool {
         let Some(ed) = self.sketch.as_ref() else { return false };
         let own = self.edit.as_ref().and_then(|e| e.dialog.read(cx).feature.params.query("sketchPlane").first().cloned());
@@ -4438,6 +4448,15 @@ impl PartStudioView {
             .map(|(e, _)| *e)
             .chain(ed.glyph_entity.map(|(e, _)| e).filter(|e| row_hovered(*e)))
             .collect();
+        // Hover badges with no tool only; a tool active leaves the band alone (live sketch/11, behaviours "qa walk 3" 9).
+        let recent = if ed.tool == Tool::Select { recent } else { Vec::new() };
+        let hovered = ed.hover.filter(|_| ed.tool == Tool::Select);
+        let all = if show_all {
+            all
+        } else {
+            let focus: Vec<noshape_sketch::EntityId> = hovered.into_iter().chain(recent.iter().copied()).chain(ed.selection.iter().copied()).collect();
+            ed.focus_glyphs(&data, all, &focus)
+        };
         // None while geometry is dragged, Show constraints on or not (live fc-1120 (2): back on release).
         let dragging = ed.geometry_dragging();
         let glyphs: Vec<_> = all
@@ -4445,7 +4464,7 @@ impl PartStudioView {
             .filter(|_| !dragging)
             .filter(|g| {
                 show_all
-                    || ed.hover == Some(g.entity)
+                    || hovered == Some(g.entity)
                     || recent.contains(&g.entity)
                     || ed.selection.contains(&g.entity)
                     || ed.selected_constraints.contains(&g.constraint)
@@ -4489,7 +4508,7 @@ impl PartStudioView {
                 }
                 None => {
                     // A hovered line's row (Show constraints off) at the pointer's spot on it.
-                    let hover_row = !show_all && !g.on_point && !ed.selection.contains(&g.entity) && (ed.hover == Some(g.entity) || recent.contains(&g.entity) || !ed.selected_constraints.contains(&g.constraint));
+                    let hover_row = !show_all && !g.on_point && !ed.selection.contains(&g.entity) && (hovered == Some(g.entity) || recent.contains(&g.entity) || !ed.selected_constraints.contains(&g.constraint));
                     let at = match (self.ui.glyph_row_places.get(&g.entity), data.sketch.curve(g.entity)) {
                         (Some(&p), Some(noshape_sketch::Curve2::Line { a, b })) if hover_row && (b - a).length_squared() > 0.0 => a + (b - a) * ((p - a).dot(b - a) / (b - a).length_squared()).clamp(0.0, 1.0),
                         _ => g.anchor,
@@ -5273,7 +5292,7 @@ impl PartStudioView {
         // Live (shortcuts-sk-1118): nothing under the pointer opens the box with "(No selections found)".
         if cands.is_empty() {
             if let Some(at) = self.ui.pointer {
-                self.ui.select_other = Some(super::behaviors::SelectOther { hits: Vec::new(), index: None, at, point: None, in_zone: true, moved_out: false, scroll: ScrollHandle::new() });
+                self.ui.select_other = Some(super::behaviors::SelectOther { hits: Vec::new(), index: None, at, in_zone: true, moved_out: false, scroll: ScrollHandle::new() });
                 cx.notify();
             }
             return;
@@ -5321,6 +5340,9 @@ impl PartStudioView {
         let model_ref = self.hover.clone().filter(|_| model_edge);
         let model_body = model_ref.as_ref().and_then(|r| self.display.bodies.iter().find(|b| b.face_refs.contains(r) || b.edge_refs.contains(r)).map(|b| (b.id.clone(), b.name.clone())));
         let linear_model_edge = model_ref.as_ref().filter(|r| self.linear_edge_direction(r).is_some()).cloned();
+        // A model face: Section view… and, planar, View normal to; no Curve/surface analysis… (live ctx-menus-1117 sk-model-face).
+        let model_face = model_ref.clone().filter(|r| matches!(r, Reference::Face(_)));
+        let planar_model_face = model_face.clone().filter(|r| self.frame_of_ref(r).is_some());
         // A plane under the cursor (live ui-parity sketch-empty-rclick-menu: the Front plane behind the sketch).
         // Not the sketch's own plane: right-clicking it is empty space.
         let sketch_frame = self.sketch.as_ref().map(|e| e.frame);
@@ -5335,9 +5357,7 @@ impl PartStudioView {
         let plane_ref = self.hover.clone().or_else(picked).filter(|r| hovered.is_none() && dim.is_none() && matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }) && !own_plane(r));
         let plane_name = plane_ref.as_ref().map(|r| self.labeler(cx)(r)).unwrap_or_default();
         let sketch_name = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.name.clone()).unwrap_or_else(|| "sketch".into());
-        // Other sketches shown (live: Hide other sketches / Hide all sketches).
         let this_sketch = self.sketch.as_ref().map(|e| e.feature);
-        let other_sketches = self.display.sketches.iter().any(|s| !s.hidden && Some(s.feature) != this_sketch);
         let Some(ed) = &mut self.sketch else { return };
         // The menu acts on the selection and the entity under the cursor, which joins the selection only when an item
         // runs (live ui-parity sketch-entity-copy-paste: the right-click and Copy sketch entities select nothing).
@@ -5448,7 +5468,9 @@ impl PartStudioView {
                         this.set_part_hidden(&b1, true, cx);
                         this.hover = None;
                     })));
-                    m = m.item(item("Curve/surface analysis…", Box::new(|this, w, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))));
+                    if model_face.is_none() {
+                        m = m.item(item("Curve/surface analysis…", Box::new(|this, w, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))));
+                    }
                     m = m.item(item("Isolate…", Box::new(move |this, w, cx| {
                         let previous = std::mem::replace(&mut this.selection, vec![Reference::Body(b2.clone())]);
                         this.hover = None;
@@ -5461,6 +5483,9 @@ impl PartStudioView {
                         this.isolate(super::behaviors::IsolateMode::Transparent, w, cx);
                         this.selection = previous;
                     })));
+                    if let Some(f) = model_face.clone() {
+                        m = m.item(item("Section view…", Box::new(move |this, w, cx| this.section_through(f.clone(), w, cx))).icon_name("menu-section-view"));
+                    }
                 } else {
                     m = m.item(item("Curve/surface analysis…", Box::new(|this, w, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))));
                 }
@@ -5498,6 +5523,13 @@ impl PartStudioView {
                     m = m.item(item("Zoom to selection", Box::new(move |this, _, cx| {
                         let previous = std::mem::replace(&mut this.selection, vec![r.clone()]);
                         this.zoom_to_selection(cx);
+                        this.selection = previous;
+                    })));
+                }
+                if let Some(f) = planar_model_face.clone() {
+                    m = m.item(item("View normal to", Box::new(move |this, _, cx| {
+                        let previous = std::mem::replace(&mut this.selection, vec![f.clone()]);
+                        this.view_normal(cx);
                         this.selection = previous;
                     })));
                 }
@@ -5618,7 +5650,8 @@ impl PartStudioView {
             if n == 0 {
                 m = m.item(item("Show all", Box::new(|this, _, cx| this.show_everything(cx))));
             }
-            if n > 0 && !tool_active && other_sketches {
+            // Also with no other sketch shown (live ctx-menus-1117 sk-line*, qa MENU-SK-HIDE-SKETCHES).
+            if n > 0 && !tool_active {
                 m = m.item(item("Hide other sketches", Box::new(move |this, _, cx| this.hide_sketches(this_sketch, cx)))).item(item("Hide all sketches", Box::new(|this, _, cx| this.hide_sketches(None, cx))));
             }
             if !tool_active && (n == 0 || curves_selected) {

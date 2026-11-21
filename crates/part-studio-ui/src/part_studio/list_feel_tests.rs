@@ -166,6 +166,14 @@ impl List {
         rows.into_iter().filter(|s| s != "———").collect()
     }
 
+    /// The open context menu's rows, separators as "———".
+    fn menu_grouped(&self, cx: &mut TestAppContext) -> Vec<String> {
+        cx.update(|cx| {
+            let graphics = self.view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels());
+            graphics.unwrap_or_else(|| crate::os_menu::open_labels(cx))
+        })
+    }
+
     /// The pointer onto a row from the graphics, then `ms` of the clock.
     fn hover(&self, cx: &mut TestAppContext, row: &str, ms: u64) {
         let (from, at) = (self.canvas(cx), self.at(cx, row));
@@ -592,9 +600,9 @@ fn rows() -> Vec<Row> {
             let ok = pos("Show").zip(pos("Show all parts")).zip(pos("Isolate…")).is_some_and(|((a, b), c)| b == a + 1 && c == b + 1) && pos("Hide other parts").is_none();
             expect(ok, true, &format!("rows {menu:?}"))
         } },
-        Row { id: "menu / the Top plane row", live: "Rename | New sketch… | Offset plane… | Size to Part Studio | Hide | Hide other planes | Hide all planes | Section view… | Zoom to selection | View normal to | Show dependencies… (Add comment: cloud; live ctx-menus-1117 row-top-plane)", gap: false, check: |l, cx| {
+        Row { id: "menu / the Top plane row", live: "Rename | New sketch…, Offset plane…, Size to Part Studio | Hide, Hide other planes, Hide all planes | Section view… | Zoom to selection, View normal to | Show dependencies… (Add comment: cloud; live ctx-menus-1117 row-top-plane, qa MENU-TOP-ROW-SECTION-GROUP)", gap: false, check: |l, cx| {
             l.right_click(cx, "feature:Top");
-            expect(l.menu(cx), names(&["Rename", "New sketch…", "Offset plane…", "Size to Part Studio", "Hide", "Hide other planes", "Hide all planes", "Section view…", "Zoom to selection", "View normal to", "Show dependencies…"]), "rows")
+            expect(l.menu_grouped(cx), names(&["Rename", "———", "New sketch…", "Offset plane…", "Size to Part Studio", "———", "Hide", "Hide other planes", "Hide all planes", "———", "Section view…", "———", "Zoom to selection", "View normal to", "———", "Show dependencies…"]), "rows")
         } },
         Row { id: "menu / the Top row's Section view… opens on Top", live: "a floating 'Section view' dialog, Exclude / Include, 'Section plane 1 (Top)' already in Section planes, Items to exclude empty; the arrow's shaft starts at its ring on the origin (live cov-1120 R9, sv1-open.png)", gap: false, check: |l, cx| {
             l.right_click(cx, "feature:Top");

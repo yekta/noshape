@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-21 20:25 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-21 22:00 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -36,25 +36,51 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (20:2x UTC 11-21) — USER P0: hover × selection look matrix (DECISIONS 11-21)
+## Now (20:50 UTC 11-21) — USER P0: hover × selection look matrix (DECISIONS 11-21)
 
-LANDED: 1e44717c as 5b7743f97 (batch 1), ee4c1f6a as 6be52caf (batch 2; qa 50/51, matrix 76/92). Builds on vibe2
-(rb.sh default; the Mac: one 4-job nice-19 slot, DECISIONS a16b39297, macOS-only checks).
-BATCH 3 (in tree, landing next; crops 20/21 by compare.py before the MC owner-face fix, the 21st is that fix):
-- FIELD-HOVER-DIM: mod.rs always adds the lit-lines-again POST instances over a preview (hover changes only states),
-  after the base model's instances (its edges at rest covered a face's 2 px boundary). shaders.wgsl selected_only += HOVER.
-- FIELD-VERTEX-EDGE / ORIGIN-HOVER-EDGE: renderer pick_reaching: edges meeting under the pointer (nearest <= 2 px, others
-  within 1 px of it) -> the one most across the screen (pixel spans).
-- MC-LOOK: MC_RIM opaque live's darkest #1d3e52; no owner tint; hovered MC hides its owner part's faces' selection
-  (live b3/ps-mc-otherhover-r).
-- FILLET-MANIPULATOR: Arrow.small, 0.8 x Extrude's arrow along the inward bisector (live b3w).
-- Test crops now include camera geometry (viewport.camera_geometry() + renderer::SYNC_TARGET pub).
-- 15 b3_* cell tests (hover_matrix_tests.rs); thresholds checked against live's crops.
-QUEUE after batch 3: FEEL-SKETCH-REGION-FILL-AFTER-DRAG (P0, qa user walk: dragging a sketch point/line with no tool drops
-the circle region's #E4E7EA shading for good; qa-scratch/hm2 drags2.png); FEEL-SELECT-OTHER-LOOK (P0: no #FFC20E dot,
-list border #D7D7D7, no scrollbar; live uip/select-other-row-click-3.png); BAND-MIDDLE inf-on-line (the line lit by the
-Line tool's inference must show blue through, live #C79A95, ours opaque #ECB78A); then batch 4 (assembly, live as/).
-Score kit: run-hm7.sh (vibe2 crops ~/tmp/psui/hm3 + cells), compare.py oursN live-b1c|live-b2|live-b3 sxsN.
+LANDED: batch 1 (5b7743f97), batch 2 ee4c1f6a as 6be52caf (qa 50/51, matrix 76/92). CHECKING: batch 3 666d9c47 (15/15
+b3 cells, 21/21 crops vs live b3); qa's watcher re-scores it on green. Builds on vibe2 (Mac = one 4-job nice-19 slot).
+IN TREE (uncommitted; full part-studio-ui lib run in flight on vibe2, log ~/tmp/psui/sk.log, synced before items 3-6):
+1. FEEL-SKETCH-REGION-FILL-AFTER-DRAG: sketch.rs sync_sketch_dragging rebuild_scene (fill lives in the built scene).
+   Test glyphs_and_the_region_fill_go_while_geometry_is_dragged checks the layer-9 fill mesh: PASSES.
+2. FEEL-SELECT-OTHER-LOOK: no #FFC20E point (select_other_overlay, SelectOther.point gone), grey border, no scrollbar.
+   Test hover_matrix_tests select_other_draws_no_point_where_it_was_asked.
+3. BAND-MIDDLE inf-on-line: sketch_mode.rs (skasm told) overlay no longer draws the snap's related curves as an opaque
+   4 px polyline; SketchEditor::inference_lit() lists them; mod.rs marks their picks HOVER after with_highlights. Test
+   hover_matrix_tests the_line_a_snap_lands_on_is_lit_as_hovered.
+4. P0 FEEL-HOVER-GLYPHS-SECOND-ENTITY (qa walk 3): SketchEditor::focus_glyphs() adds, with Show constraints off, a glyph
+   on a hovered / lingering / selected curve for each of its constraints drawn on the other curve. sketch.rs uses it.
+   Test sketch_glyph_feel_tests a_hovered_line_shows_all_its_constraints.
+5. P1 MENU-TOP-ROW-SECTION-GROUP: mod.rs default_geometry_menu separator before Section view…; list matrix row checks
+   groups (menu_grouped).
+6. P1 S-TOOLBAR-BORDER: behaviors.rs render_mini_toolbar 1 px #ccc border, px 3.5, rows gap 0 (175 × 62). Test
+   sketch_ui_tests the_s_toolbar_is_175_by_62_at_the_pointer.
+7. P0 FEEL-HOVER-GLYPHS-IN-TOOL (qa 20:5x): sketch.rs glyph filter: hover / linger badges only with Tool::Select (live
+   sketch/11; confirmed by live, behaviours "qa walk 3" 9). Test
+   sketch_glyph_feel_tests a_tool_hides_a_hovered_lines_glyphs.
+8. P0 FEEL-PLANE-LIT-WHILE-DIMENSIONING (qa 21:1x): sketch.rs dimension_skips_plane() (the click's old skip_plane);
+   highlighted_hover returns nothing for such a plane. Test: a_dimension_placed_over_the_plane_its_line_lies_in_opens_its_box.
+9. P0 FEEL-LINE-SNAP-MODEL-LOOK (qa 21:1x): sketch_mode overlay: no 6 px cursor point before the first click when the
+   snap lands on a point; snap_icons adds "horizontal" / "vertical" (display only) for a model point on the sketch's
+   axes. Test sketch_mode a_model_vertex_snapped_to_before_the_first_click_shows_no_cursor_point.
+10. qa walk 5 menus (21:4x, TICKETS "21:4x walk 5"):
+   MENU-PLANE-GRAPHICS: menus.rs a default plane in the graphics gets the viewport menu (New sketch…, Offset plane…, Size to
+   Part Studio | Hide X plane … Section view… | [Clear selection] Select ▸, Select other… | Zoom fit/sel, View normal to);
+   the 11-12 plane-graphics-rclick-menu take clicked the list row (x=89). Test every_kind_of_plane_right_clicked_….
+   MENU-SKETCH-IN-PS: mod.rs ContextMenu: a hovered midpoint of a shown sketch line keeps the line target (at_midpoint menu).
+   Test hover_matrix a_sketch_lines_lit_midpoint_right_clicked_gives_the_lines_menu (Pointer::right_click new).
+   MENU-SK-HIDE-SKETCHES: sketch.rs Hide other / all sketches with no other sketch shown; sketch_entity_menus_as_lives.
+   MENU-SK-MODEL-ENTITY face: Section view…, View normal to, no Curve/surface analysis…; test a_model_face_right_clicked_….
+   Edge (20,0,10) is the edge's MIDPOINT: live's single-event jump kept the edge (interaction-feel row 45), ours lights the
+   midpoint at once, so face-and-edge selected a POINT (its menu). Not changed: REQUESTS psui 21:58 asks live (1) sketch
+   edge menu off/on the midpoint by hand path, (2) PS hand path click there. Tell qa: move the pick off the midpoint.
+RUNS: full scene + part-studio-ui lib PASSED 21:50 (445 + 199) before items 8-10. Items 8-9 tests running (t89.log),
+then the item-10 tests, commit all, land.sh. 666d9c47 re-checked apart (red batch).
+interaction-feel rows done; TICKETS after the rebase: walk-3 rows, BAND-MIDDLE, PLANE-LIT, LINE-SNAP, walk-5 menus (4 of 5).
+NEXT: tell lead + qa (matrix score, fixed tickets).
+ASM SPLIT agreed 20:4x: all of batch 4 is asm's (manipulator ring in scene/asm_scene.rs, vertex disc builder/shader
+edits already asm's, the rest assembly-side). asm rebases on 666d9c47 and drops its viewport getter.
+Score kit: run-hm7.sh (vibe2 crops ~/tmp/psui/hm3 + b3 cells), compare.py oursN live-b1c|live-b2|live-b3 sxsN.
 Later: drop `at_bar` + list matrix row; full1 sketch-constraint-refusals (49) / sketch-entity-copy-paste (12).
 
 ### Earlier today

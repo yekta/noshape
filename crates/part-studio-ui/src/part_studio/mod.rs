@@ -1518,7 +1518,6 @@ impl PartStudioView {
         let changed = self.changed_picks(&selection);
         extra.extend(self.consumed_picks_overlay(&selection, &accent, &changed));
         selection.retain(|r| !changed.contains(r));
-        extra.extend(self.select_other_overlay());
         extra.extend(self.measure_overlay());
         if !on_handle {
             extra.extend(self.midpoint_overlay(cx));
@@ -1638,6 +1637,16 @@ impl PartStudioView {
             *slot = true;
         }
         self.ghost_outline_only(&mut scene, built);
+        // The curves a sketch tool's snap relates to light as hovered (live hover-matrix-1121 sk/inference-on-line-at).
+        if let Some(ed) = &self.sketch
+            && let Some(data) = self.sketch_data(cx)
+        {
+            for e in ed.inference_lit(&data.sketch) {
+                for &id in built.picks.ids_for(&Reference::SketchEntity { sketch: ed.feature, entity: e.0 }) {
+                    scene.add_flag(id, noshape_render::state::HOVER);
+                }
+            }
+        }
         // with_highlights' overlays, then the extra ones (see the preview's POST tags).
         let (highlights_end, extra_end) = (scene.instances.len() - extra_len, scene.instances.len());
         // A selected Decal row tints its image like a selected face (live).
@@ -2613,9 +2622,12 @@ impl PartStudioView {
                     return;
                 }
                 let target = pick.and_then(|id| self.built.as_ref()?.picks.get(id).cloned());
-                // The pointer rested on an edge's midpoint: the menu is the point's (live 1954: a vertex's rows).
+                // The pointer rested on an edge's midpoint: the menu is the point's (live 1954: a vertex's rows). A shown
+                // sketch line's stays the line's, at its midpoint (live ctx-menus-1117 sketch2-line-graphics).
                 let target = match (&self.hover, target) {
-                    (Some(r @ Reference::Implicit { on, .. }), Some(t)) if **on == t.reference => Some(scene_builder::PickTarget { reference: r.clone(), kind: PickKind::Vertex, anchor: self.edge_midpoint(on) }),
+                    (Some(r @ Reference::Implicit { on, .. }), Some(t)) if **on == t.reference && !matches!(**on, Reference::SketchEntity { .. }) => {
+                        Some(scene_builder::PickTarget { reference: r.clone(), kind: PickKind::Vertex, anchor: self.edge_midpoint(on) })
+                    }
                     (_, t) => t,
                 };
                 self.open_context_menu(target, *position, window, cx);
@@ -8335,7 +8347,7 @@ pub(super) fn drop_off_thread<T: Send + 'static>(x: T, cx: &App) {
 pub(super) fn default_geometry_menu(menu: crate::os_menu::OsMenu, view: &Entity<PartStudioView>, r: Reference, hidden: bool, selected: bool, cx: &App) -> crate::os_menu::OsMenu {
     // Onshape (live): plane rows: Rename | New sketch…,
     // Offset plane…, Size to Part Studio | Hide, Hide other
-    // planes, Hide all planes | Zoom to selection, View
+    // planes, Hide all planes | Section view… | Zoom to selection, View
     // normal to | Show dependencies…; the origin: Rename |
     // Hide | Show dependencies….
     let is_plane = matches!(r, Reference::Plane(_));
@@ -8384,9 +8396,9 @@ pub(super) fn default_geometry_menu(menu: crate::os_menu::OsMenu, view: &Entity<
             m.item(crate::os_menu::OsMenuItem::new("Hide other planes").on_click(move |_, _, cx| vo.update(cx, |this, cx| this.hide_planes(Some(&ro), cx))))
                 .item(crate::os_menu::OsMenuItem::new("Hide all planes").on_click(move |_, _, cx| va.update(cx, |this, cx| this.hide_planes(None, cx))))
         };
-        // Live (ui-parity plane-row-rclick-menu): selected or not.
+        // Live (ui-parity plane-row-rclick-menu): selected or not, in its own group (ctx-menus-1117 row-top-plane).
         let (vx, rx) = (view.clone(), r.clone());
-        m = m.item(crate::os_menu::OsMenuItem::new("Section view…").icon_name("menu-section-view").on_click(move |_, w, cx| vx.update(cx, |this, cx| this.section_through(rx.clone(), w, cx))));
+        m = m.separator().item(crate::os_menu::OsMenuItem::new("Section view…").icon_name("menu-section-view").on_click(move |_, w, cx| vx.update(cx, |this, cx| this.section_through(rx.clone(), w, cx))));
         m = m
             .separator()
             .item(crate::os_menu::OsMenuItem::new("Zoom to selection").on_click(move |_, _, cx| {

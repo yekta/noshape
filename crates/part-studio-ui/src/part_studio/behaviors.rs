@@ -128,9 +128,6 @@ pub struct SelectOther {
     pub index: Option<usize>,
     /// Viewport-local point it was opened for: the click zone's centre.
     pub at: DVec2,
-    /// Where the ray met the nearest entity: a yellow point while the
-    /// pointer is out of the click zone (SELECT_OTHER_POINT_*).
-    pub point: Option<glam::DVec3>,
     pub in_zone: bool,
     pub moved_out: bool,
     pub scroll: ScrollHandle,
@@ -1292,6 +1289,7 @@ impl PartStudioView {
             return vec![Reference::SketchEntity { sketch: ed.feature, entity: e.0 }];
         }
         match &self.hover {
+            Some(r) if self.dimension_skips_plane(r, cx) => Vec::new(),
             Some(r @ Reference::Body(_)) => vec![r.clone()],
             // Else mid-draw the open sketch's entity under the pointer isn't recoloured.
             Some(Reference::SketchEntity { sketch, .. }) if self.sketch.as_ref().is_some_and(|ed| ed.feature == *sketch && ed.mid_draw()) => Vec::new(),
@@ -3439,9 +3437,8 @@ impl PartStudioView {
         cx.notify();
     }
 
-    /// Select other… from a context menu: nothing highlighted yet, the
-    /// point it was opened for marked (Onshape startSelectOther with an
-    /// event).
+    /// Select other… from a context menu: nothing highlighted yet (Onshape
+    /// startSelectOther with an event).
     pub(super) fn select_other_from_menu(&mut self, cx: &mut Context<Self>) {
         self.start_select_other(true, false, cx);
     }
@@ -3464,7 +3461,6 @@ impl PartStudioView {
         found.extend(interaction::planes_along_ray(&self.display, origin, dir));
         found.sort_by(|a, b| a.depth.total_cmp(&b.depth));
         found.truncate(SELECT_OTHER_MAX);
-        let point = found.first().map(|h| origin + dir.normalize_or_zero() * h.depth);
         // Live: each part follows its nearest face ("Face of Extrude 1",
         // "Part 1", "Face of Extrude 1" behind it).
         let mut hits: Vec<Reference> = Vec::new();
@@ -3487,7 +3483,7 @@ impl PartStudioView {
         if let Some(i) = index {
             scroll.scroll_to_item(i);
         }
-        self.ui.select_other = Some(SelectOther { hits, index, at, point, in_zone: !from_menu, moved_out: false, scroll });
+        self.ui.select_other = Some(SelectOther { hits, index, at, in_zone: !from_menu, moved_out: false, scroll });
         self.refresh_scene(false, cx);
         cx.notify();
     }
@@ -3539,21 +3535,13 @@ impl PartStudioView {
         self.pick(PickTarget { reference: r, kind, anchor: None }, cx);
     }
 
-    /// The yellow point the list was opened for, while the pointer is out of
-    /// the click zone (SELECT_OTHER_POINT_COLOR rgb(255,194,14), size 9).
-    pub(super) fn select_other_overlay(&self) -> Option<noshape_render::Instance> {
-        let so = self.ui.select_other.as_ref().filter(|so| !so.in_zone)?;
-        let p = so.point?.as_vec3();
-        let pts = noshape_render::PointData { points: vec![noshape_render::PointSprite { position: p.into(), color: [255, 194, 14, 255], pick_id: 0, size: 9.0, style: noshape_render::LineSegment::ON_TOP, _pad: 0 }] };
-        Some(noshape_render::Instance::new(noshape_render::Drawable::Points(self.gpu.uploader().upload_points(&pts))).per_primitive_color().unpickable().ignore_clip().layer(20))
-    }
-
     /// Live (sketch/230–231, dom/select-other-popup.txt): a 220 px dialog
     /// 100 px right of and 25 px above the pointer, kept in the graphics
     /// area: "Select other" (13 px / 500) and the red ✕; the list in a 1 px
-    /// #d7d7d7 box (blue under the pointer), 24 px rows of 13.33 px names,
-    /// every second row 35 % white, the highlighted one bold, a slim
-    /// scrollbar while the pointer is on it; the "?" row.
+    /// #d7d7d7 box (also under the pointer, no scrollbar: live
+    /// uip/select-other-row-click-3), 24 px rows of 13.33 px names, every
+    /// second row 35 % white, the highlighted one bold; the "?" row. No
+    /// point drawn where it was asked (qa FEEL-SELECT-OTHER-LOOK).
     pub(super) fn render_select_other(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let so = self.ui.select_other.as_ref()?;
         let pal = p();
@@ -3616,14 +3604,6 @@ impl PartStudioView {
                     .into_any_element(),
             );
         }
-        // The slim scrollbar: 7 px, #333 at 40 %, while the pointer is on the list.
-        let (offset, max) = (f32::from(so.scroll.offset().y), f32::from(so.scroll.max_offset().y));
-        let view_h = 90.;
-        let thumb = (max > 0.5).then(|| {
-            let h = (view_h * view_h / (view_h + max)).max(20.);
-            let y = (-offset / max) * (view_h - h);
-            div().absolute().right(px(1.)).top(px(y)).w(px(7.)).h(px(h)).rounded(px(7.)).bg(gpui_kit::rgb(0x333333)).opacity(0.).group_hover("so-list", |d| d.opacity(0.4))
-        });
         let close = cx.listener(|this, _: &ClickEvent, _, cx| {
             this.ui.select_other = None;
             this.hover = None;
@@ -3654,16 +3634,13 @@ impl PartStudioView {
                 .child(
                     div()
                         .id("so-list")
-                        .group("so-list")
                         .relative()
                         .h(px(list_h))
                         .flex_none()
                         .border_1()
                         .border_color(pal.border)
                         .rounded(px(2.))
-                        .hover(|d| d.border_color(gpui_kit::rgb(0x1651b0)))
-                        .child(v_flex().id("so-rows").size_full().overflow_y_scroll().track_scroll(&so.scroll).children(rows))
-                        .children(thumb),
+                        .child(v_flex().id("so-rows").size_full().overflow_y_scroll().track_scroll(&so.scroll).children(rows)),
                 )
                 // Live: 6 px under the list, the help row: its "?" 14 px, 4 px from the right.
                 .child(h_flex().h(px(28.)).flex_none().items_start().justify_end().pt(px(10.)).pr(px(4.)).child(crate::ui::glyph("help-dot", 14., crate::theme::help_dot(0xa0a0a0))))
@@ -4086,8 +4063,8 @@ impl PartStudioView {
     /// the assembly's: live dom/assembly-shortcut-toolbar.json, behaviours
     /// "S key", qa5 STB1): left = cursor x + 10, top = cursor y − 30; 30 px
     /// tools (20 px icons, radius 3, hover `#eaeaea`) at a 34 px pitch, five
-    /// per row, rows 1 px apart, 4.5 px side padding (175 px wide); on
-    /// rgba(255,255,255,.95) with no border, square corners, a 0 5 10 shadow
+    /// per row, rows touching, 3.5 px side padding inside a 1 px #ccc border
+    /// (175 × 62); on rgba(255,255,255,.95), square corners, a 0 5 10 shadow
     /// and no tooltips.
     pub(super) fn render_mini_toolbar(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let at = self.ui.mini_toolbar?;
@@ -4184,7 +4161,7 @@ impl PartStudioView {
                 );
             }
         }
-        let mut rows = v_flex().gap(px(1.));
+        let mut rows = v_flex();
         let mut buttons = buttons.into_iter().peekable();
         while buttons.peek().is_some() {
             rows = rows.child(h_flex().gap(px(4.)).children(buttons.by_ref().take(5)));
@@ -4192,11 +4169,15 @@ impl PartStudioView {
         Some(
             div()
                 .id("mini-toolbar")
+                .debug_selector(|| "mini-toolbar".into())
                 .occlude()
                 .absolute()
                 .left(px(at.x as f32 + 10.))
                 .top(px((at.y as f32 - 30.).max(0.)))
-                .px(px(4.5))
+                // Live (behaviours "S key", sketch/38): 175 × 62 with its 1 px #ccc border, two rows of 30 px buttons.
+                .px(px(3.5))
+                .border_1()
+                .border_color(rgb(0xcccccc))
                 .bg(hsla(0., 0., 1., 0.95))
                 .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
                 .child(rows)

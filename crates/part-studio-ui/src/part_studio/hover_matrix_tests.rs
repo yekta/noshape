@@ -858,3 +858,79 @@ fn b3_field_face_hovered_edge_picked(cx: &mut TestAppContext) {
     // (#b28a5d: the muted boundary gave ~80; the preview's tangent line beside the band blends to a few, live 9.)
     assert!(picked && count(&c, 0xffc685) > 150 && count(&c, 0xb28a5d) < 50, "{} #ffc685, {} #b28a5d", count(&c, 0xffc685), count(&c, 0xb28a5d));
 }
+
+// Select other on the top face (live uip/select-other-row-click-1..4, qa FEEL-SELECT-OTHER-LOOK): no point is drawn where
+// it was asked, also once the pointer has left the click zone.
+#[gpui::test]
+fn select_other_draws_no_point_where_it_was_asked(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "select-other-no-point");
+    let p = m.screen(cx, FACE);
+    approach(cx, &m, p);
+    m.view.update(cx, |v, cx| v.select_other(false, cx));
+    draw(cx, m.window);
+    assert!(cx.update(|cx| m.view.read(cx).ui.select_other.is_some()), "the Select other list is open");
+    m.pointer.move_to(cx, &m.view, p + DVec2::new(60.0, 60.0));
+    let c = m.crop(cx, p);
+    dump("cell-select_other_no_point", &c);
+    assert_eq!(count(&c, 0xffc20e), 0, "#ffc20e px at the asked point");
+}
+
+// A shown sketch's line right-clicked on its lit midpoint in the Part Studio: the line's menu at its midpoint, not a
+// model point's (live ctx-menus-1117 sketch2-line-graphics, Add comment left out; qa MENU-SKETCH-IN-PS).
+#[gpui::test]
+fn a_sketch_lines_lit_midpoint_right_clicked_gives_the_lines_menu(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "sketch-linemid-menu");
+    let p = m.screen(cx, SK_LINEMID);
+    approach(cx, &m, p);
+    assert!(cx.update(|cx| matches!(m.view.read(cx).hover, Some(Reference::Implicit { .. }))), "the midpoint lit");
+    m.pointer.right_click(cx, &m.view, p);
+    let rows = cx.update(|cx| m.view.read(cx).context_menu.as_ref().map(|(_, menu, _)| menu.read(cx).labels()).unwrap_or_default());
+    let live = ["Edit Sketch 2…", "Show dimensions", "Show dependencies of Sketch 2…", "———", "Hide", "Hide other sketches", "Hide all sketches", "———", "Create Drawing of Sketch 2…", "———", "Select", "Select other…", "———", "Zoom to fit", "———", "Delete Sketch 2", "———", "Edit sketch appearance…"];
+    assert_eq!(rows, live);
+}
+
+// Sketch 2 (on Top) edited, the block's top face right-clicked (live's on its own 10 mm block): Section view… and View normal to, no Curve/surface
+// analysis… (live ctx-menus-1117 sk-model-face, Add comment left out; qa MENU-SK-MODEL-ENTITY).
+#[gpui::test]
+fn a_model_face_right_clicked_in_a_sketch_has_lives_menu(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "sk-model-face-menu");
+    m.edit_sketch(cx);
+    let p = m.screen(cx, FACE);
+    approach(cx, &m, p);
+    m.pointer.right_click(cx, &m.view, p);
+    let rows: Vec<String> = cx.update(|cx| m.view.read(cx).context_menu.as_ref().map(|(_, menu, _)| menu.read(cx).labels()).unwrap_or_default());
+    let rows: Vec<&str> = rows.iter().map(String::as_str).filter(|l| *l != "———").collect();
+    let live = ["Confirm Sketch 2", "Use", "Hide Part 1", "Isolate…", "Make transparent…", "Section view…", "Clear selection", "Select", "Select other…", "Zoom to fit", "Zoom to selection", "View normal to", "View normal to sketch plane"];
+    assert_eq!(rows, live);
+}
+
+// The line the Line tool's snap lands on (live sk/inference-on-line-at, qa FEEL-SKETCH-BAND-MIDDLE inf-on-line): lit as
+// hovered, the blue line through the band's middle (live #c79a95), not an opaque #ecb78a / #ffc685 line.
+#[gpui::test]
+fn the_line_a_snap_lands_on_is_lit_as_hovered(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "inference-on-line");
+    m.edit_sketch(cx);
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+    let start = m.screen(cx, [45., -10., 0.]);
+    m.pointer.move_to(cx, &m.view, start);
+    m.pointer.click(cx, &m.view, start);
+    let p = m.screen(cx, SK_LINE);
+    approach(cx, &m, p);
+    let lit = cx.update(|cx| m.view.read(cx).sketch.as_ref().is_some_and(|ed| !ed.inference_lit(&m.view.read(cx).sketch_data(cx).expect("sketch data").sketch).is_empty()));
+    assert!(lit, "the snap lands on the line");
+    let c = m.crop(cx, p);
+    dump("cell-inference_on_line", &c);
+    // Along the line 8 to 14 mm on from the pointer, clear of the rubber band and the cursor's glyphs.
+    let (mut through, mut opaque) = (0, 0);
+    for k in 0..=12 {
+        let q = m.screen(cx, [SK_LINE[0] + 8.0 + 0.5 * k as f64, 5., 0.]) - p + DVec2::new(40.0, 40.0);
+        let col = (q.y as usize - 1..=q.y as usize + 1).map(|y| c[y * 80 + q.x as usize]);
+        through += col.clone().any(|c| close(c, 0xc79a95, 20)) as usize;
+        opaque += col.filter(|c| close(*c, 0xecb78a, 12)).count();
+    }
+    assert!(through >= 8 && opaque == 0, "{through} of 13 samples blue through, {opaque} px #ecb78a");
+}

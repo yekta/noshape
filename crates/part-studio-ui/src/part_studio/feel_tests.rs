@@ -91,6 +91,15 @@ impl Pointer {
         gpui_kit::VisualTestContext::from_window(self.window, cx).simulate_click(win, Modifiers::default());
         self.settle(cx, view);
     }
+
+    /// Right-clicks there and lets the menu's pick come back.
+    pub(super) fn right_click(&self, cx: &mut TestAppContext, view: &Entity<PartStudioView>, at: DVec2) {
+        let position = self.window_point(cx, at);
+        let mut vcx = gpui_kit::VisualTestContext::from_window(self.window, cx);
+        vcx.simulate_mouse_down(position, gpui_kit::MouseButton::Right, Modifiers::default());
+        vcx.simulate_mouse_up(position, gpui_kit::MouseButton::Right, Modifiers::default());
+        self.settle(cx, view);
+    }
 }
 
 /// The test window at a device pixel ratio, redrawn.

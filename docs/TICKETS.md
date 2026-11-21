@@ -389,19 +389,19 @@ for a wheel notch, F, Shift+5 / 7 and a cube click, against live's 340–1800 ms
 Same model as live (block 40x30x10, Fillet 1 2 mm, Sketch 2 line (60,10)-(90,10)), same pick points. 14 of 25 match exactly:
 face, face-selected, two-faces, edge, vertex, empty, part-selected-graphics, rows Sketch 1 / Extrude 1 / Fillet 1 / two features /
 Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
-- [ ] P0 **MENU-PLANE-GRAPHICS (psui)**: right-click a default plane in the graphics: ours gives the feature-list row menu (Rename,
+- [x] fixed (psui 11-21 22:3x: viewport plane menu (the 11-12 take clicked the list row)) P0 **MENU-PLANE-GRAPHICS (psui)**: right-click a default plane in the graphics: ours gives the feature-list row menu (Rename,
   Hide, Show dependencies…, no Select ▸ / Select other… / Zoom to fit). Live's viewport plane menu: New sketch… · Offset plane… · Size
   to Part Studio | Hide Front plane · Hide other planes · Hide all planes · Section view… | Select ▸ · Select other… | Zoom to fit ·
   Zoom to selection · View normal to (ctx-menus-1117 plane-top-graphics; behaviours 13874, 37913). qa-scratch/tickets/menus-plane-w5.png (bottom).
 - [x] P0 **MENU-FACE-AND-EDGE (psui)** (not a bug: our pick took the edge's midpoint; matches off it, 22:1x): a face and an edge selected, right-click the edge: ours lacks **Section view…**, **Zoom to
   selection** and **Add appearance to face…** (live face-and-edge; the rest matches in order).
-- [ ] P0 **MENU-SKETCH-IN-PS (psui)**: right-click Sketch 2's line in the Part Studio graphics: ours Edit Sketch 2… · Show
+- [x] fixed (psui 11-21 22:3x: the line's midpoint menu) P0 **MENU-SKETCH-IN-PS (psui)**: right-click Sketch 2's line in the Part Studio graphics: ours Edit Sketch 2… · Show
   dependencies… · Select · Select other… · Zoom to fit · Delete Sketch 2. Live also has **Show dimensions**, **Hide**, **Hide other
   sketches**, **Hide all sketches**, **Create Drawing of Sketch 2…** and **Edit sketch appearance…** (sketch2-line-graphics).
-- [ ] P0 **MENU-SK-HIDE-SKETCHES (psui)**: in sketch edit, a sketch line's menu (hovered, selected, with its end point, or on the
+- [x] fixed (psui 11-21 22:3x: also with no other sketch shown) P0 **MENU-SK-HIDE-SKETCHES (psui)**: in sketch edit, a sketch line's menu (hovered, selected, with its end point, or on the
   end) lacks **Hide other sketches** and **Hide all sketches** (after Revolve…); live sk-line, sk-line-selected, sk-line-and-end,
   sk-line-end. Everything else matches.
-- [ ] P0 **MENU-SK-MODEL-ENTITY (psui)**: in a Top-plane sketch, right-click the block's top front edge (20,0,10): ours adds **Use**,
+- [ ] (psui 11-21 22:3x: the face fixed (Section view…, View normal to, no Curve/surface analysis…); the edge waits on live REQUESTS psui 21:58) P0 **MENU-SK-MODEL-ENTITY (psui)**: in a Top-plane sketch, right-click the block's top front edge (20,0,10): ours adds **Use**,
   **Curve/surface analysis…**, **Zoom to selection** and **Align view with vertical axis**; live (11-17) has none of them. The top
   face (20,15,10): ours lacks **Section view…** and **View normal to** and adds **Curve/surface analysis…** (live sk-model-face).
   (Live's older sketch/204, a sketch on a part face, did show Use etc. on an edge: the set depends on the sketch plane.)
@@ -446,7 +446,7 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   spinner then follows the pointer: moving down 15 mm gives 8 sides, moving to empty space above 36; with the pointer still it
   stays 6. Live changes the count only with the arrows or typed digits (behaviours "Polygons", "Sketch polygon commits" 4).
   qa-scratch/tickets/polygon-spinner-w3.png (top: pointer still; bottom: pointer moved).
-- [ ] P0 **FEEL-HOVER-GLYPHS-SECOND-ENTITY (psui)**: Show constraints off, a corner rectangle, no tool: hovering a line shows
+- [x] fixed (psui 11-21 22:3x: a focused line shows the glyphs drawn on the other line) P0 **FEEL-HOVER-GLYPHS-SECOND-ENTITY (psui)**: Show constraints off, a corner rectangle, no tool: hovering a line shows
   only the constraints it is the first entity of. Right edge: nothing (its left ∥ right is missing); top: "⊥ —" without ∥
   (bottom ∥ top); left and bottom show their ∥. Live shows every constraint on the hovered line (top: ⊥, ⫽, —; behaviours
   "glyph linger" 11-17, live/psui/feel-1417/). qa-scratch/tickets/hover-glyphs-second-entity-w3.png (right, left, top, bottom).
@@ -473,13 +473,13 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   points and no **0.25** dimension between the two lines, and the hollow arrow floats ~10 px past the preview line. Live
   (sketch/123–124): the preview has its two light-blue end points, a "0.25" dimension with an arrow from the picked line to the
   preview, and the arrow's tail starts on the preview line. qa-scratch/tickets/offset-preview-w3.png (live 123, 124; ours).
-- [ ] P0 **FEEL-HOVER-GLYPHS-IN-TOOL (psui)**: Show constraints off, Dimension tool (d) active, hovering a rectangle edge: ours
+- [x] fixed (psui 11-21 22:3x: badges only with no tool) P0 **FEEL-HOVER-GLYPHS-IN-TOOL (psui)**: Show constraints off, Dimension tool (d) active, hovering a rectangle edge: ours
   shows its badges ("⊥ —"); live shows none, only the light-orange band (sketch/11). The same with Extend and Offset active.
   qa-scratch/tickets/hover-glyphs-in-tool-w3.png (top live 11, bottom ours). Live confirmed (qa 20:44 (9), behaviours "qa walk 3"): badges on hover only with no tool active.
-- [ ] P1 **S-TOOLBAR-BORDER (psui)**: the S shortcut toolbar has no border; live's has a 1 px #ccc border (175 × 62 with it,
+- [x] fixed (psui 11-21 22:3x: 1 px #ccc, 175 x 62) P1 **S-TOOLBAR-BORDER (psui)**: the S shortcut toolbar has no border; live's has a 1 px #ccc border (175 × 62 with it,
   sketch/38; behaviours "S key"). Place (pointer + 10, − 30), size, icons and shadow match.
   qa-scratch/tickets/s-toolbar-border-w3.png (ours left, live right).
-- [ ] P1 **MENU-TOP-ROW-SECTION-GROUP (psui)**: the Top plane row's menu puts "Section view…" in the Hide group; live has it in
+- [x] fixed (psui 11-21 22:3x: own group) P1 **MENU-TOP-ROW-SECTION-GROUP (psui)**: the Top plane row's menu puts "Section view…" in the Hide group; live has it in
   its own group after "Hide all planes" (live/psui/ctx-menus-1117/menus-a.json row-top-plane). qa-scratch/tickets/top-row-menu-w3.png.
 - Matched live (no ticket): every Part Studio menu (face, edge, vertex, empty, Extrude / Sketch / Top / part rows; Where used and
   the sketch row's Section view are in live's 11-17 lists), every sketch menu (no tool, Line tool, a line, a dimension), the
@@ -521,7 +521,7 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   the edge, 90°, ±45°, 135°, 1–2 px steps) lights only the point (light-orange ring, the edge black), already at 0.2 s. Ours on
   5b9feb71a, approached in 2 px steps from the top or the front face: band + black ring (qa-scratch/hm2/midapp.png). So the jump
   case must not be kept apart: psui's 4f2cb3ce subject says it keeps the edge lit when landed straight on (re-scored on its green).
-- [ ] (qa 19:57, green 6be52caf4: 33 of the 34 cells now blend as live, e.g. sketch edit hovered #C79B95 vs live #C79A95; still open: the line the Line tool's inference lights (inf-on-line) is opaque, #ECB78A / #FFC685 with no blue through, live #C79A95) P0 **FEEL-SKETCH-BAND-MIDDLE (psui)**: a hovered or selected sketch curve. Live blends the band with the curve's own colour: in the
+- [x] fixed (psui 11-21 22:3x: inf-on-line lit as hovered, the blue through the band) (qa 19:57, green 6be52caf4: 33 of the 34 cells now blend as live, e.g. sketch edit hovered #C79B95 vs live #C79A95; still open: the line the Line tool's inference lights (inf-on-line) is opaque, #ECB78A / #FFC685 with no blue through, live #C79A95) P0 **FEEL-SKETCH-BAND-MIDDLE (psui)**: a hovered or selected sketch curve. Live blends the band with the curve's own colour: in the
   Part Studio (grey curve) the middle reads #F2C694 hovered / #F2B034 selected; in sketch edit (blue curve) #C89C96 / #C88536,
   the blue showing through. Ours darkens the middle: #D2A674 / #D29015 in the Part Studio, #CA9F6D / #CA890D in sketch edit, no blue.
   Lines, arcs, the circle; 17 cells (live hover-matrix-1121 ps/sketch-*, sk/*; ours qa-scratch/hm2/b2-ps.png, b2-sk.png).
@@ -579,16 +579,16 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   dlg-edge-selected_s, dlg-edge-selhover_f, dlg-face-otherhover_f; ours qa-scratch/hm2/b3z.png (cells b3-dlg-*13*).
   Both: qa 18:26, green 4f2cb3ce. Checked too: a second new Fillet opens with the radius typed in the first (2 mm), as live (per user
   or per document is not captured yet).
-- [ ] P0 **FEEL-SKETCH-REGION-FILL-AFTER-DRAG (psui)**: user walk. In Sketch 2 (block doc: point (60,25), line (60,5)-(90,5), arc, circle
+- [x] fixed psui (the release rebuilds the scene; test checks the drawn fill), qa to verify. P0 **FEEL-SKETCH-REGION-FILL-AFTER-DRAG (psui)**: user walk. In Sketch 2 (block doc: point (60,25), line (60,5)-(90,5), arc, circle
   c(100,20) r6), drag the free point (60,25) to (64,28), or the line up 4 mm, with no tool: the circle's shaded region (#E4E7EA) goes
   white and stays white 0.8, 3 and 9 s after the release (nothing else changed). Before the drag it is shaded. Live shades closed
   regions in sketch edit throughout (live confirmed 21:1x: shaded at 0 s and 3 s after the point drag, hover-matrix-1121/walk/w1-*). Ours qa-scratch/hm2/out-walk2/w-drag-point-long (04 vs
   05-10), drags2.png; qa 19:54, green 6be52caf4 (kit qa-scratch/hm2/walk, run.sh on vibe2 :481).
-- [ ] P0 **FEEL-PLANE-LIT-WHILE-DIMENSIONING (psui)**: user walk. Sketch 2 on Front (block doc), Dimension tool, pick the line
+- [x] fixed (psui 11-21 22:3x: the plane the click would skip stays dark) P0 **FEEL-PLANE-LIT-WHILE-DIMENSIONING (psui)**: user walk. Sketch 2 on Front (block doc), Dimension tool, pick the line
   (66,5), move to about (74,-6) to place it, the pointer over the Front plane: ours lights the plane's edge orange while placing;
   live lights nothing (hover-matrix-1121/walk/w3-placing.png, w3-front-wide.png). qa-scratch/tickets/plane-lit-dimensioning-w1.png
   (live left, ours right); ours out-walk/w-dim-line-placing.
-- [ ] P0 **FEEL-LINE-SNAP-MODEL-LOOK (psui)**: user walk. Line tool, before the first click, pointer 0.5 mm from the block's
+- [x] fixed (psui 11-21 22:3x: no cursor point on a snapped point before the first click; "—" / "|" on the axes) P0 **FEEL-LINE-SNAP-MODEL-LOOK (psui)**: user walk. Line tool, before the first click, pointer 0.5 mm from the block's
   vertex (40,0,0) or 0.3 mm from the bottom front edge's midpoint (20,0,0), sketch on Front. (a) Ours draws a **blue point inside
   the snap marker** on both; live has none: the vertex is an orange disc in the yellow snap square, the midpoint an empty yellow
   box on the edge band. (b) At the vertex live shows **two glyphs, × and —** (the vertex lies on the sketch's horizontal axis);
@@ -619,7 +619,7 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   hover highlight is off for the whole drag; after release the entity under the pointer lights again" (behaviours "feel (3D):
   assembly", feel/3d-asm/free-during-drag.png: no outline). Ours qa-scratch/hl/dr.png (before / mid-drag / released), green
   2fb0ed1ac.
-- [ ] P0 **FEEL-SELECT-OTHER-LOOK (psui)**: user walk 2. Block, pointer on the top face, ` (Select other), a row hovered: ours draws a
+- [x] fixed psui (no point, grey border, no scrollbar; pixel test), qa to verify. P0 **FEEL-SELECT-OTHER-LOOK (psui)**: user walk 2. Block, pointer on the top face, ` (Select other), a row hovered: ours draws a
   ~9 px #FFC20E dot on the face where Select other was asked, and the hovered list gets a blue border and a scrollbar. Live: no
   dot, the list border stays #D7D7D7, no scrollbar (live uip/select-other-row-click-3.png). Rows, bold hover row, the lit face and
   the dialog's place match. Ours qa-scratch/hm2/w2c/so.png, out-w2/w2-selother-face/04 (green 2fb0ed1ac).

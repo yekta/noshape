@@ -2054,7 +2054,17 @@ impl SketchEditor {
             };
         }
         let Some(inf) = &self.inference else { return Vec::new() };
-        inference_icons(inf, matches!(self.external_snap, Some(ExternalSnap::Edge { midpoint: false, .. })))
+        let mut icons = inference_icons(inf, matches!(self.external_snap, Some(ExternalSnap::Edge { midpoint: false, .. })));
+        // A model point snapped to that lies on the sketch's horizontal or vertical axis shows that alignment too
+        // (live qa walk 1 w4-vertex: × and —; qa FEEL-LINE-SNAP-MODEL-LOOK). The click links the point; nothing more.
+        if let Some(ExternalSnap::Vertex { position, .. } | ExternalSnap::Centre { position, .. } | ExternalSnap::Edge { position, midpoint: true, .. }) = &self.external_snap {
+            for (on_axis, icon) in [(position.y.abs() < 1e-9, "horizontal"), (position.x.abs() < 1e-9, "vertical")] {
+                if on_axis && !icons.contains(&icon) {
+                    icons.push(icon);
+                }
+            }
+        }
+        icons
     }
 
     /// Geometry is being dragged (past the press): live hides the glyphs and the regions' fill until the release.
@@ -5963,6 +5973,30 @@ impl SketchEditor {
         out
     }
 
+    /// `glyphs` for Show constraints off: a curve in `focus` (hovered, lingering, selected) shows every constraint it
+    /// takes part in, also those drawn once on the other curve (live sketch-tool walk 3: a rectangle's top shows ⊥ ⫽ —,
+    /// its right edge its own; qa FEEL-HOVER-GLYPHS-SECOND-ENTITY). Such a glyph is added on the focused curve, in the
+    /// constraint's place in the list.
+    pub fn focus_glyphs(&self, data: &SketchData, glyphs: Vec<GlyphInfo>, focus: &[EntityId]) -> Vec<GlyphInfo> {
+        let sk = &data.sketch;
+        let mut out: Vec<GlyphInfo> = Vec::with_capacity(glyphs.len());
+        for g in &glyphs {
+            out.push(g.clone());
+            if g.on_point || focus.contains(&g.entity) {
+                continue;
+            }
+            let Some(c) = sk.constraint(g.constraint) else { continue };
+            for f in c.kind.entities().into_iter().filter(|f| focus.contains(f) && !is_point(sk, *f)) {
+                if glyphs.iter().chain(out.iter()).any(|h| h.constraint == g.constraint && h.entity == f) {
+                    continue;
+                }
+                let Some(anchor) = glyph_anchor(sk, f) else { continue };
+                out.push(GlyphInfo { entity: f, anchor, on_point: false, offset: None, ..g.clone() });
+            }
+        }
+        out
+    }
+
     // ------------------------------------------------------------ editing commands
 
     /// Copy sketch entities: the selection (with internal constraints) as
@@ -6651,7 +6685,10 @@ impl SketchEditor {
                 }
                 _ => {}
             }
-            if self.tool.draws() && !(self.tool == Tool::Circle && !self.clicks.is_empty()) {
+            // (Not on a point the snap lands on before the first click: the lit point and the snap square show alone,
+            // live sketch/54, qa walk 1 w4-vertex, w4-mid; qa FEEL-LINE-SNAP-MODEL-LOOK.)
+            let on_point = self.clicks.is_empty() && self.inference.as_ref().is_some_and(|i| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Midpoint | InferenceKind::Center | InferenceKind::Quadrant));
+            if self.tool.draws() && !on_point && !(self.tool == Tool::Circle && !self.clicks.is_empty()) {
                 points.points.push(PointSprite { position: w(c), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
             }
         }
@@ -7066,25 +7103,6 @@ impl SketchEditor {
                 lines.push_polyline(&pts3, [0x90, 0x90, 0x90, 255], 0, 1.0, on_top | LineSegment::DASHED);
             }
         }
-        // The curves the snap relates to are highlighted orange: a parallel / perpendicular / tangent's reference and
-        // a curve the end lands on, both for a combined snap (live2 combo perpLine: the last segment and the line).
-        if let Some(inf) = &self.inference {
-            let reference = inf.entity.filter(|_| matches!(inf.kind, InferenceKind::Parallel | InferenceKind::Perpendicular | InferenceKind::Tangent));
-            let related = inf.constraints.iter().filter_map(|c| match c {
-                AutoConstraint::OnCurve(e) | AutoConstraint::PerpendicularTo(e) | AutoConstraint::ParallelTo(e) | AutoConstraint::TangentTo(e) => Some(*e),
-                _ => None,
-            });
-            let mut lit: Vec<EntityId> = Vec::new();
-            for e in reference.into_iter().chain(related) {
-                if !lit.contains(&e) && data.sketch.entity(e).is_some_and(|x| x.kind() != EntityKind::Point) {
-                    lit.push(e);
-                }
-            }
-            for e in lit {
-                let pts3: Vec<[f32; 3]> = data.sketch.tessellate(e, self.world_per_px * 0.5).iter().map(|p| w(*p)).collect();
-                lines.push_polyline(&pts3, crate::palette::rgb8(crate::palette::viewport::PREHIGHLIGHT), 0, 4.0, on_top);
-            }
-        }
         // The guide to each point an alignment refers to (live2 combo perpAlign: a direction and an alignment show
         // the rubber band's dash and the guide); otherwise the guide to the inference's reference (a direction
         // inference of the line being drawn shows as its dash instead).
@@ -7223,6 +7241,25 @@ impl SketchEditor {
     /// tool's first entity).
     pub fn tool_picks(&self) -> Vec<EntityId> {
         self.picks.iter().map(|p| p.0).collect()
+    }
+
+    /// The curves the snap relates to, lit as hovered (the caller marks them): a parallel / perpendicular / tangent's
+    /// reference and a curve the end lands on, both for a combined snap (live2 combo perpLine: the last segment and the
+    /// line; live hover-matrix-1121 sk/inference-on-line-at: the hovered band, the blue line through it).
+    pub fn inference_lit(&self, sk: &Sketch) -> Vec<EntityId> {
+        let Some(inf) = &self.inference else { return Vec::new() };
+        let reference = inf.entity.filter(|_| matches!(inf.kind, InferenceKind::Parallel | InferenceKind::Perpendicular | InferenceKind::Tangent));
+        let related = inf.constraints.iter().filter_map(|c| match c {
+            AutoConstraint::OnCurve(e) | AutoConstraint::PerpendicularTo(e) | AutoConstraint::ParallelTo(e) | AutoConstraint::TangentTo(e) => Some(*e),
+            _ => None,
+        });
+        let mut lit: Vec<EntityId> = Vec::new();
+        for e in reference.into_iter().chain(related) {
+            if !lit.contains(&e) && sk.entity(e).is_some_and(|x| x.kind() != EntityKind::Point) {
+                lit.push(e);
+            }
+        }
+        lit
     }
 
     pub fn picked(&self, data: Option<&SketchData>) -> Vec<EntityId> {
@@ -12223,6 +12260,26 @@ mod tests {
         assert!(at(&mut ed, &mut d, 6.0), "6 px: lit");
         assert!(at(&mut ed, &mut d, 7.8), "7.8 px: held");
         assert!(!at(&mut ed, &mut d, 9.0), "9 px: let go");
+    }
+
+    /// qa FEEL-LINE-SNAP-MODEL-LOOK (live qa walk 1 w4-vertex, w4-mid): the Line tool before its first click on a model
+    /// vertex lying on the sketch's horizontal axis shows × and —, and no blue point at the pointer (the lit vertex and
+    /// the snap square alone); off the axes × alone. Away from any snap the point shows.
+    #[test]
+    fn a_model_vertex_snapped_to_before_the_first_click_shows_no_cursor_point() {
+        let vertex = noshape_model::reference::Reference::SketchEntity { sketch: FeatureId(9), entity: 3 };
+        let units = UnitPrefs::default();
+        let cursor_points = |ed: &SketchEditor, d: &SketchData| ed.overlay(d, &units).1.points.iter().filter(|p| p.size == 6.0).count();
+        for (at, icons) in [(v(0.04, 0.0), vec!["coincident", "horizontal"]), (v(0.04, 0.012), vec!["coincident"])] {
+            let (mut ed, mut d) = editor(Tool::Line);
+            ed.pointer_move(&mut d, at, false, false);
+            ed.apply_external_snap(ExternalSnap::Vertex { position: at, reference: vertex.clone() });
+            assert_eq!(ed.snap_icons(), icons, "at {at:?}");
+            assert_eq!(cursor_points(&ed, &d), 0, "no point at the pointer on the vertex at {at:?}");
+        }
+        let (mut ed, mut d) = editor(Tool::Line);
+        ed.pointer_move(&mut d, v(0.03, 0.017), false, false);
+        assert_eq!(cursor_points(&ed, &d), 1, "the point at the pointer, no snap");
     }
 
     /// qa 11-17 SKSNAP-ALIGN-WOKEN-POINT (live 11-17 sketch-snap-1117 row 2): another sketch's point rested on (an
