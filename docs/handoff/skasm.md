@@ -15,7 +15,10 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   0.042 µm off the arc's circle); in the seed a 9.2 µm stub line (not a pattern seed) joins them. Live's feature has
   no coincidence there either; live's region drops the seed's 9.2 µm stubs (shortest region edge 0.4286 mm). So
   neither "coincident ends join" nor a distance rule explains it. Coincident-join attempt set aside:
-  ~/agents/skasm-keep/gap-coincident.patch (vibe local; did not change infento). Follow-up REQUESTS row 07:22 (live:
+  ~/agents/skasm-keep/gap-coincident.patch (vibe local; did not change infento). Live 07:26: plain tangent-collinear / sideways 9.16-50 µm gaps don't close; a 9.2 µm stub stays a region
+  edge; infento's sketch copied with its constraints closes (also without the stubs), its solved edges reposted
+  without constraints don't: the closure comes from the constraint / pattern solve. REQUESTS 2026-11-21 07:27 row: which
+  constraint group closes it, and the FS-solved gap ends. Was: follow-up REQUESTS row 07:22 (live:
   the tangent-collinear 9.16 µm case, a sideways one, a 9.2 µm stub in a rectangle, 20 / 50 µm). Our saved doc:
   mac ~/noshape-host/tmp-skasm/saved2 (the studio is tab "2c9baaa07ea1fd5475c4b299"), our sketch_get in
   skasm-scratch/gap/sk1.json; reduced corpus copy mac ~/noshape-host/tmp-skasm/gapm (asm.sh): delete both after.
