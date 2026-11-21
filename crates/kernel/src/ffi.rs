@@ -696,6 +696,7 @@ pub(crate) mod ffi {
         fn blend_raw_returned() -> bool;
         fn crash_inside_kernel(kind: u8) -> Result<()>;
         fn op_thicken(s: &OcShape, t1: f64, t2: f64) -> Result<OpOut>;
+        fn op_thicken_plain(s: &OcShape, t1: f64, t2: f64) -> Result<OpOut>;
         fn op_shell(solid: &OcShape, faces: &OcShapeList, thickness: f64, join: u8)
         -> Result<OpOut>;
         fn op_shell_solid(solid: &OcShape, faces: &OcShapeList, thickness: f64, outward: bool, method: u8) -> Result<OpOut>;

@@ -959,6 +959,7 @@ double working_scale();
 // 2 std::terminate, 3 a loop under a 0.3 s budget (Linux).
 void  crash_inside_kernel(uint8_t kind);
 OpOut op_thicken(const OcShape& s, double t1, double t2);
+OpOut op_thicken_plain(const OcShape& s, double t1, double t2);
 OpOut op_shell(const OcShape& solid, const OcShapeList& faces, double thickness, uint8_t join);
 OpOut op_shell_solid(const OcShape& solid, const OcShapeList& faces, double thickness, bool outward,
                      uint8_t method);

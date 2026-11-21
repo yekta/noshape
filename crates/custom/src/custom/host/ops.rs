@@ -1484,7 +1484,7 @@ fn op_thicken(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
         let mut tools = Vec::new();
         for s in shapes {
-            let mut res = k::thicken(&s, t1, t2)?;
+            let mut res = k::thicken_plain(&s, t1, t2)?;
             // The sides along a many-face sheet's boundary: one face per plane (cf-belt's end rings, live 22 faces).
             let caps = if s.faces().len() > 1 {
                 res.shape = k::unify_same_domain(&res.shape)?.shape;

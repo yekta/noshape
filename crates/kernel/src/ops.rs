@@ -352,6 +352,12 @@ pub fn thicken(shape: &Shape, t1: f64, t2: f64) -> Result<OpResult> {
     op(ffi::op_thicken(shape.raw(), t1, t2))
 }
 
+/// [`thicken`] without rebuilding a plane / cylinder sheet's offsets as exact lines and circles: every vertex keeps
+/// its history (FeatureScript's opThicken and sheet metal: c2-sm-tablet-stand's Sketch 3 references).
+pub fn thicken_plain(shape: &Shape, t1: f64, t2: f64) -> Result<OpResult> {
+    op(ffi::op_thicken_plain(shape.raw(), t1, t2))
+}
+
 /// Which side of the original surface the shell wall is built on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ShellSide {

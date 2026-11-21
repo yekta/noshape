@@ -422,7 +422,7 @@ fn thicken(ev: &mut EvalCtx, t: f64) -> FResult<()> {
                 let face = ev.face_shape(bi, fi)?;
                 let src = ev.ctx.bodies[bi].faces[fi].clone();
                 let (t1, t2) = if flip { (0.0, t) } else { (t, 0.0) };
-                let res = k::thicken(&face, t1, t2)?;
+                let res = k::thicken_plain(&face, t1, t2)?;
                 let names = super::bshared::names_from_sources(ev, &res.history, &res.shape, 0, std::slice::from_ref(&src), |s| Role::Offset(s.clone()));
                 tools.push(NamedShape::new(res.shape, names));
             }
@@ -523,7 +523,7 @@ fn convert(ev: &mut EvalCtx, t: f64) -> FResult<()> {
             }
             BodyKind::Surface => {
                 let (t1, t2) = if flip { (0.0, t) } else { (t, 0.0) };
-                let res = k::thicken(&body.shape, t1, t2)?;
+                let res = k::thicken_plain(&body.shape, t1, t2)?;
                 let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), Some(&|n| Role::Offset(n.clone())));
                 (res.shape, names)
             }

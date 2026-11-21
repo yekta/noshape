@@ -5410,7 +5410,7 @@ static void elementary_offsets(TopoDS_Shape& r, HHist& h)
 }
 } // namespace
 
-OpOut op_thicken(const OcShape& s, double t1, double t2)
+static OpOut thicken(const OcShape& s, double t1, double t2, bool exact_step)
 {
   for (TopExp_Explorer x(s.shape, TopAbs_FACE); x.More(); x.Next())
     if (pinched_free_form(TopoDS::Face(x.Current())))
@@ -5529,7 +5529,9 @@ OpOut op_thicken(const OcShape& s, double t1, double t2)
   TopoDS_Shape r = orient_solids_outward(mk.Shape());
   // (Its offset edges approximated: lines and circles where they are, as live's (c2-surfaces-lofts-projected's
   // Thicken 1 of two cylinder strips); kept only if the solid stays as it was, outward and its volume. Only for a
-  // sheet of planes and cylinders: on free-form ones the checks' accurate volumes are slow (thin_sweep_as_live).)
+  // sheet of planes and cylinders: on free-form ones the checks' accurate volumes are slow (thin_sweep_as_live). Not
+  // for opThicken or sheet metal: the rebuilt edges' vertices have no history (c2-sm-tablet-stand's Sketch 3 lost
+  // two vertices of the part).)
   bool elementary = true;
   for (TopExp_Explorer x(s.shape, TopAbs_FACE); x.More() && elementary; x.Next())
   {
@@ -5538,7 +5540,7 @@ OpOut op_thicken(const OcShape& s, double t1, double t2)
   }
   TopoDS_Shape exact = r;
   HHist        exact_hist;
-  if (elementary)
+  if (elementary && exact_step)
   {
     elementary_offsets(exact, exact_hist);
     analytic_blend_faces(base, exact, exact_hist);
@@ -5557,6 +5559,16 @@ OpOut op_thicken(const OcShape& s, double t1, double t2)
     }
   }
   return make_result(args, r, hist.get());
+}
+
+OpOut op_thicken(const OcShape& s, double t1, double t2)
+{
+  return thicken(s, t1, t2, true);
+}
+
+OpOut op_thicken_plain(const OcShape& s, double t1, double t2)
+{
+  return thicken(s, t1, t2, false);
 }
 
 OpOut op_shell(const OcShape& solid_in, const OcShapeList& faces_in, double thickness, uint8_t join)

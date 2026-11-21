@@ -1832,7 +1832,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         });
         let mut bend = match fillet_bends.get(&e) {
             Some(f) => {
-                let bend = k::thicken(f, front, back).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
+                let bend = k::thicken_plain(f, front, back).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
                 // A curved wall's bend also stops where its flat wall's pulled side does (live 2055: Flange 1's bend
                 // pulls the sloped wall back to x −11, and the curved bend stops there).
                 if t0 > TOL || t1 < b.len - TOL { span_cut(&bend, b.start + b.dir * t0, b.dir, t1 - t0)? } else { bend }
@@ -2333,7 +2333,7 @@ fn exact_bend_face(f: &Shape, dir: DVec3, radius: f64) -> Option<Shape> {
 /// A rolled bend: definition face `fi` thickened (`front` along its normal).
 /// Its offsets come from the face; its end caps from the face's edges there.
 fn rolled_bend(topo: &Topo, fi: usize, face: &Shape, front: f64, back: f64, solids: &mut Vec<Shape>, pieces: &mut Vec<Piece>) -> FResult<()> {
-    let res = k::thicken(face, front, back).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
+    let res = k::thicken_plain(face, front, back).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
     let own: Vec<usize> = (0..topo.edges.len()).filter(|e| topo.edge_faces[*e].contains(&(fi as u32))).collect();
     for f in res.faces() {
         let from = match f.face_surface() {
