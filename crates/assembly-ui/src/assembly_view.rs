@@ -76,9 +76,9 @@ struct Catalog {
     assemblies: Vec<(TabId, String)>,
 }
 
-/// The floating mate toolbar being moved by its handle (grab offset).
+/// The floating mate toolbar being moved by its handle (`AsmUi::hud_grab`: the press and the anchor then).
 #[derive(Clone)]
-pub struct HudDrag(pub Arc<Mutex<Point<Pixels>>>);
+pub struct HudDrag(pub Arc<Mutex<(Point<Pixels>, DVec2)>>);
 
 struct HudDragGhost;
 
@@ -5715,17 +5715,17 @@ impl AssemblyView {
                 }
                 menu
             });
-        let grab = self.ui.hud_grab.clone();
+        let (grab, press) = (self.ui.hud_grab.clone(), self.ui.hud_grab.clone());
         let (d2, d3, d4) = (dialog.clone(), dialog.clone(), dialog);
         // Live2 (REQUESTS 18:20, mate-toolbar-flip-q.png): the 310×51 panel's top left ~12 px right of and 14 px
-        // below the second pick, kept inside the graphics area (pushed in from the right edge, live 93).
-        let (o, size) = { let vp = self.viewport.read(cx); (vp.origin(), vp.size()) };
-        let (bx, by) = (f64::from(f32::from(o.x)), f64::from(f32::from(o.y)));
-        let (bw, bh) = (size.x, size.y);
-        let x = (at.x + 12.).min(bx + bw - 310. - 10.).max(bx + 4.);
-        let y = (at.y + 14.).min(by + bh - 51. - 4.).max(by + 4.);
+        // below the second pick, kept inside the graphics area (pushed in from the right edge, live 93). `at` and the
+        // toolbar's place are both the graphics area's own coordinates.
+        let size = self.viewport.read(cx).size();
+        let x = (at.x + 12.).min(size.x - 310. - 10.).max(4.);
+        let y = (at.y + 14.).min(size.y - 51. - 4.).max(4.);
         div()
             .id("mate-hud")
+            .debug_selector(|| "mate-hud".into())
             .absolute()
             .left(px(x as f32))
             .top(px(y as f32))
@@ -5736,14 +5736,14 @@ impl AssemblyView {
             .rounded(px(3.))
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            // It follows the pointer from the press (gpui starts a drag only past its threshold).
             .on_drag_move(cx.listener(|this, e: &DragMoveEvent<HudDrag>, _, cx| {
-                let g = *e.drag(cx).0.lock();
-                let delta = e.event.position - e.bounds.origin - g;
+                let (press, start) = *e.drag(cx).0.lock();
+                let moved = e.event.position - press;
                 if let Some(s) = &mut this.mate
                     && let Some(h) = &mut s.hud
                 {
-                    h.x += f32::from(delta.x) as f64;
-                    h.y += f32::from(delta.y) as f64;
+                    *h = start + DVec2::new(f64::from(f32::from(moved.x)), f64::from(f32::from(moved.y)));
                     cx.notify();
                 }
             }))
@@ -5751,6 +5751,7 @@ impl AssemblyView {
                 // Drag handle header.
                 div()
                     .id("mate-hud-drag")
+                    .debug_selector(|| "mate-hud-drag".into())
                     .h(px(12.))
                     .flex()
                     .items_center()
@@ -5762,10 +5763,9 @@ impl AssemblyView {
                     .line_height(px(11.))
                     .text_color(pal.text)
                     .child("◻◻◻")
-                    .on_drag(HudDrag(grab), |d, offset, _, cx| {
-                        *d.0.lock() = offset;
-                        cx.new(|_| HudDragGhost)
-                    }),
+                    // The anchor of the toolbar where it stands (inside the graphics), so it moves at once.
+                    .on_mouse_down(MouseButton::Left, move |e, _, _| *press.lock() = (e.position, DVec2::new(x - 12., y - 14.)))
+                    .on_drag(HudDrag(grab), |_, _, _, cx| cx.new(|_| HudDragGhost)),
             )
             .child(
                 h_flex()

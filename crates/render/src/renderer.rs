@@ -954,6 +954,12 @@ impl DrawLists {
         id > 0 && self.boxes.get(id as usize - 1).copied().unwrap_or(false)
     }
 
+    /// Whether `inst` is its body's level this pass: its box only when the box replaces the body, one level of its
+    /// edges, one display level.
+    fn level_shown(&self, inst: &Instance) -> bool {
+        inst.lod_box == self.boxed(inst.body) && (inst.line_lod == 0 || inst.line_lod == self.line_level(inst.body)) && (inst.mesh_lod == 0 || inst.mesh_lod - 1 == self.mesh_level(inst.body))
+    }
+
     /// Leave out what the style's [`Detail`] turns off (their slots stay
     /// assigned, unused).
     fn apply_detail(&mut self, detail: &Detail) {
@@ -1130,7 +1136,7 @@ impl DrawLists {
             }
             // A body's box instead of the body, never both; one level of
             // its edges (the full ones when picking).
-            if inst.lod_box != self.boxed(inst.body) || (inst.line_lod > 0 && inst.line_lod != self.line_level(inst.body)) || (inst.mesh_lod > 0 && inst.mesh_lod - 1 != self.mesh_level(inst.body)) {
+            if !self.level_shown(inst) {
                 continue;
             }
             if pick {
@@ -3347,8 +3353,13 @@ impl Renderer {
             over.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), (width, height, dpr), false, &mut self.mesh_lod_memory);
             over.apply_detail(&req.style.detail);
             let bind_over = self.prepare_slots(SLOTS_COMPARE_OVER, &over.slots);
-            let faces = [crate::scene::compare::BASE, crate::scene::compare::TARGET]
-                .map(|v| req.scene.instances.iter().enumerate().filter(|(_, i)| comparing && i.compare == v && !i.pick_only && i.color[3] >= 1.0 && matches!(i.drawable, Drawable::Mesh(_))).map(|(k, _)| k as u32).collect::<Vec<u32>>());
+            // Each version's faces as the frame draws them: one display level per body, its box only where the box
+            // replaces it (every level at once put a body's box in front of its own faces: qa
+            // COMPARE-COMMON-PARTS-MISSING, common parts tinted), no silhouettes.
+            let faces = [crate::scene::compare::BASE, crate::scene::compare::TARGET].map(|v| {
+                let shown = |i: &Instance| comparing && i.compare == v && !i.pick_only && !i.back_silhouette && i.color[3] >= 1.0 && matches!(i.drawable, Drawable::Mesh(_)) && over.level_shown(i);
+                req.scene.instances.iter().enumerate().filter(|(_, i)| shown(i)).map(|(k, _)| k as u32).collect::<Vec<u32>>()
+            });
             let bind_faces = [self.prepare_slots(SLOTS_COMPARE_BASE, &faces[0]), self.prepare_slots(SLOTS_COMPARE_TARGET, &faces[1])];
             (over, bind_over, faces, bind_faces)
         });

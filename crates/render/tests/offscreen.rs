@@ -2122,6 +2122,46 @@ fn compare_blend_follows_onshape() {
     assert!(near(shots[1].1, [half[0], half[1], half[2]], 6.0), "target-only at 0.25: {:?}, want {half:?}", shots[1].1);
 }
 
+/// qa COMPARE-COMMON-PARTS-MISSING: a body the same in both versions is lit "same" (grey) all over, though its lowest
+/// level of detail (its bounding box, drawn only in its place) stands in front of its faces: each version's depth is
+/// of the level the frame draws. Here a slab with a post: the box's top is the post's, over the slab's top.
+#[test]
+fn compare_reads_each_versions_shown_level_not_its_box() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let slab = r.upload_mesh(&primitives::box_mesh([-0.02, -0.01, 0.0], [0.02, 0.01, 0.005], 1));
+    let post = r.upload_mesh(&primitives::box_mesh([0.014, -0.004, 0.005], [0.02, 0.004, 0.02], 10));
+    let unit = r.upload_mesh(&lod_box_mesh());
+    let blue = [0.45f32, 0.6, 0.75, 1.0];
+    let mut scene = Scene::default();
+    for layer in [compare::BASE, compare::TARGET] {
+        for m in [&slab, &post] {
+            let mut i = Instance::new(Drawable::Mesh(m.clone())).with_color(blue).compare_layer(layer);
+            i.body = 1;
+            scene.instances.push(i);
+        }
+        scene.instances.push(Instance::lod_box(unit.clone(), 1, (glam::Vec3::new(-0.02, -0.01, 0.0), glam::Vec3::new(0.02, 0.01, 0.02)), blue).compare_layer(layer));
+    }
+    let mut cam = Camera { rotation: Camera::look_rotation(glam::DVec3::new(0.0, 0.6, -1.0).normalize(), glam::DVec3::Z), projection: Projection::Orthographic, ..Default::default() };
+    let (w, h) = (400u32, 300u32);
+    cam.fit_box(glam::DVec3::new(-0.025, -0.012, 0.0), glam::DVec3::new(0.025, 0.012, 0.02), w as f64 / h as f64);
+    let at = cam.project(glam::DVec3::new(-0.01, 0.0, 0.005), glam::DVec2::new(w as f64, h as f64), 0.05).unwrap();
+    for blend in [0.0f32, 1.0] {
+        let mut s = scene.clone();
+        s.compare = Some(Compare { blend });
+        let f = r.render(RenderParams { scene: &s, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+        let o = ((at.y as u32 * w + at.x as u32) * 4) as usize;
+        let c = [f.bgra[o + 2] as f32, f.bgra[o + 1] as f32, f.bgra[o] as f32];
+        assert!((c[0] - c[2]).abs() < 4.0, "blend {blend}: the slab's top, in both versions, lit grey: {c:?}");
+    }
+}
+
 /// A feature dialog's preview (live previewBlend, `Scene::preview_mix`):
 /// the model before the feature (BASE: a box) under the model with it
 /// (TARGET: the box moved and a second box), mixed by the slider's alpha.

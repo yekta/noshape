@@ -75,9 +75,9 @@ fn open_assembly(cx: &mut TestAppContext, path: &std::path::Path) -> (AnyWindowH
 }
 
 /// The workspace's drawing of an assembly tab: the view, and its front layer (the left dialogs) over it.
-struct FrontHost {
-    view: Entity<AssemblyView>,
-    front: gpui_kit::AnyView,
+pub(super) struct FrontHost {
+    pub(super) view: Entity<AssemblyView>,
+    pub(super) front: gpui_kit::AnyView,
 }
 
 impl gpui_kit::Render for FrontHost {

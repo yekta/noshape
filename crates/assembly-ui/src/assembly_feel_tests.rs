@@ -69,6 +69,11 @@ fn open_from_top(cx: &mut TestAppContext, path: &std::path::Path, occurrences: u
 
 /// [`open_from_top`] once the assembly is built and `ready` holds.
 fn open_from_top_when(cx: &mut TestAppContext, path: &std::path::Path, ready: impl Fn(&AssemblyView) -> bool) -> (AnyWindowHandle, Entity<AssemblyView>) {
+    open_from_top_on(cx, path, false, ready)
+}
+
+/// [`open_from_top_when`], with the front layer (the left dialogs and the mate toolbar) drawn over the view when `front`.
+fn open_from_top_on(cx: &mut TestAppContext, path: &std::path::Path, front: bool, ready: impl Fn(&AssemblyView) -> bool) -> (AnyWindowHandle, Entity<AssemblyView>) {
     let session = crate::session::Session::open(path).unwrap();
     let tab = session.doc.tabs.iter().find(|t| t.name == "Assembly 1").unwrap().id;
     let gpu = Gpu::headless_rendering().unwrap();
@@ -79,7 +84,8 @@ fn open_from_top_when(cx: &mut TestAppContext, path: &std::path::Path, ready: im
         let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
             let v = cx.new(|cx| AssemblyView::new(doc, tab, gpu, window, cx));
             view = Some(v.clone());
-            v
+            let front: gpui_kit::AnyView = if front { v.update(cx, |v, cx| v.front_host(cx).0) } else { cx.new(|_| gpui_kit::EmptyView).into() };
+            cx.new(|_| super::ui_tests::FrontHost { view: v, front })
         })
         .unwrap();
         (w, view.unwrap())
@@ -667,6 +673,73 @@ fn a_mate_dialogs_dots_are_white_and_the_first_pick_outlines_its_instance(cx: &m
         let selected = (1..scene.states.len() as u32).filter(|id| scene.states[*id as usize] & picked == picked && built.picks.get(*id).is_some_and(|t| t.kind == crate::scene_builder::PickKind::Face)).count();
         assert_eq!(selected, 1, "the picked face filled the picks' yellow (live feel cov-1120 A2), not a selection's amber");
     });
+}
+
+/// Interaction-feel "Toolbar's place" and "Toolbar's grip" (live2 REQUESTS 18:20, place-1118): the mate toolbar's top
+/// left stands 12 px right of and 14 px below the second pick, near the graphics' left edge too; a drag on its grip
+/// moves it with the pointer, it stays where released, and Escape twice still cancels the mate.
+#[gpui::test]
+fn the_mate_toolbar_stands_by_the_second_pick_and_its_grip_moves_it(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "mate-toolbar", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    });
+    let (window, view) = open_from_top_on(cx, &path, true, |v| v.result.occurrences.len() == 2);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            // The parts in the graphics' left third, so the second pick is near its left edge.
+            let (lo, hi) = v.result.bounds().unwrap();
+            v.viewport.update(cx, |vp, cx| {
+                let s = vp.size();
+                vp.camera.fit_sphere((lo + hi) * 0.5 + glam::DVec3::X * (hi.x - lo.x) * 1.2, (hi - lo).length() * 1.2, s.x / s.y);
+                vp.request_frame(cx);
+            });
+            v.start_mate(noshape_model::assembly::MateType::Fastened, w, cx);
+        })
+    })
+    .unwrap();
+    settle(cx, window, &view);
+    let pick = |cx: &mut TestAppContext, name: &str| {
+        let (lo, hi) = screen_box(cx, &view, name);
+        let at = (lo + hi) * 0.5;
+        move_to(cx, window, &view, at);
+        let w = at_window(cx, &view, at);
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(w, Modifiers::default());
+        settle(cx, window, &view);
+        at
+    };
+    pick(cx, "Part 2 <1>");
+    let second = pick(cx, "Part 1 <1>");
+    wait_until(cx, window, &view, |v, cx| v.mate.as_ref().is_some_and(|m| m.hud.is_some() && m.dialog.read(cx).connectors_complete()));
+    draw(cx, window);
+    let origin = cx.update(|cx| view.read(cx).viewport.read(cx).origin());
+    assert!(second.x + 12.0 < f64::from(f32::from(origin.x)), "the second pick {second:?} nearer the graphics' left edge than its window x {:?}", origin.x);
+    let hud = |cx: &mut TestAppContext| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("mate-hud").expect("the mate toolbar").origin;
+    let placed = hud(cx);
+    let want = at_window(cx, &view, second + DVec2::new(12.0, 14.0));
+    assert!((placed.x - want.x).abs() <= px(1.) && (placed.y - want.y).abs() <= px(1.), "the toolbar at {placed:?}, 12 right of and 14 below the pick: {want:?}");
+    // Its grip: dragged (+150, +100), it follows and stays.
+    let grip = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("mate-hud-drag").expect("the toolbar's grip").center();
+    let by = gpui_kit::point(px(150.), px(100.));
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_mouse_down(grip, MouseButton::Left, Modifiers::default());
+    for k in 1..=10 {
+        let t = k as f32 / 10.0;
+        vcx.simulate_mouse_move(gpui_kit::point(grip.x + by.x * t, grip.y + by.y * t), Some(MouseButton::Left), Modifiers::default());
+    }
+    vcx.simulate_mouse_up(grip + by, MouseButton::Left, Modifiers::default());
+    draw(cx, window);
+    let moved = hud(cx);
+    assert!((moved.x - placed.x - by.x).abs() <= px(1.) && (moved.y - placed.y - by.y).abs() <= px(1.), "the toolbar moved with the grip: {placed:?} → {moved:?}");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_mouse_move(grip + by + gpui_kit::point(px(200.), px(0.)), None, Modifiers::default());
+    draw(cx, window);
+    assert_eq!(hud(cx), moved, "it stays where released");
+    for _ in 0..2 {
+        press(cx, window, &view, crate::actions::Cancel);
+    }
+    assert!(cx.update(|cx| view.read(cx).mate.is_none() && view.read(cx).result.mates.is_empty()), "Escape twice cancels the mate");
 }
 
 /// Live reach-1118 (feel 3D): a mate connector lights 22–23 px across and 14–15 px down from its origin on a top

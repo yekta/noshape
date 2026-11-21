@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-20 23:46 UTC.
+Updated 2026-11-21 00:48 UTC.
 
 ## In flight
 
@@ -20,13 +20,15 @@ tools/ui-parity to vibe2:agents/studios/src first). Crate tests on vibex7 / vibe
 11-20 21:xx: a hung test held a vibex8 slot 43 min). `touch` edited files before rb.sh. Full ops e2e before a drawing
 land. vibex8 02:00-04:00 is qa's quiet window. Never `git checkout <file>` over uncommitted work (21:20 it wiped the
 e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
-- LANDED 1efc6dad as 4bdda20e (23:09): the 96c5ff9f fix-forward (a Variable Studio's own configuration variables in
-  its table's scope; explode feel tests in the front host) with the P0 19:18 diagnostics and live dm batches 1-2.
-- QUEUED 347239f5 (23:18), 2 commits: T2 `hlr::exact_hlr_on_8_threads_gives_the_single_threads_answer` + a
-  NOSHAPE_WORK_TRACE "load failed" line (g++-13 clean; 0 load failures, 0 differing answers in 1,800 + 2,000 exact
-  HLRs, 6 HLR threads beside 2 re-meshing: no mutex, retry kept; if the fixture's views printout catches the 19:18
-  empty view again, P1 again); 6 asm feel tests (Camera menu, Suppressed mate, Failed mate's marks, Graphics → list
-  (2), Implicit over an edge, Snap mode ghost).
+- LANDED 66ecac0c, 347239f5 (23:36: T2 HLR 8-thread test + trace line; 6 asm feel tests), 44429dbc (00:21: 3 asm
+  feel tests, revision-table test, centermark expect, run.py deleted_paint_read).
+- In flight (00:48): qa reopened COMPARE-COMMON-PARTS-MISSING (common parts tinted). Cause: the compare depth pass
+  drew every display level of each body, its bounding box in front of its faces (walk3/r: both sides' meshes
+  identical). Fix renderer.rs `level_shown` for the dn pass; test `offscreen::compare_reads_each_versions_shown_level_
+  not_its_box` (fails before: blue). Mate toolbar: clamped with the viewport's window origin while the pointer is
+  graphics-local (pushed right near the left edge), and its grip drag lost the move that started gpui's drag (+1 px
+  border): both fixed in `render_mate_hud` (drag from the press), told asm 00:3x; test `the_mate_
+  toolbar_stands_by_the_second_pick_and_its_grip_moves_it` (feel tests can draw the front layer: open_from_top_on).
 - Told asm 23:15: in a test window the instance list's rows slice isn't redrawn after a document edit (set_fixed
   false/true: the fixed icon stays; a notify on the view or on slices.rows doesn't redraw it; window.refresh() does).
   Not checked in the app. Feel tests that change the list must build the state before opening (open_from_top_when).
@@ -39,7 +41,7 @@ e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
   server-side number): those 3 pass. Short press: live's ball snaps as connector placement in a Part Studio
   (behaviours ball-1119: 50 px, turns to the face frame); ours 14 px unturned (`triad_snap`): smaller, not larger.
   Assembly reach asked in REQUESTS 23:41; the test drops it in empty space until then. Next: Fields,
-  Toolbar's place / grip, Connector chip, Animate…, Named positions empty (6 left).
+  Connector chip, Animate…, Named positions empty (4 left once the toolbar test passes).
 - Then: re-shoot drw-custom-table-split + drw-datum-empty-field (start block-drawing-table-2parts), re-run the matrix.
 
 ## Next, in order

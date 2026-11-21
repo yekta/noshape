@@ -430,8 +430,8 @@ pub struct AsmUi {
     pub insert_collapsed: HashSet<TabId>,
     /// Triad handle clicked (selected): right-clicking it opens its menu.
     pub manip_selected: Option<ManipHandle>,
-    /// Grab offset while the floating mate toolbar is dragged.
-    pub hud_grab: Arc<Mutex<Point<Pixels>>>,
+    /// The floating mate toolbar's grip press: the pointer there (window) and the toolbar's anchor then.
+    pub hud_grab: Arc<Mutex<(Point<Pixels>, glam::DVec2)>>,
     /// Insert dialog thumbnails.
     pub thumbs: super::thumbs::InsertThumbs,
     /// Show center of mass: (instances, empty = whole assembly; world point).

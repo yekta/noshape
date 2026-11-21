@@ -201,8 +201,8 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | After the second pick | the part jumps to its mated place, no animation | the same | GPUI `a_new_mates_preview_moves_the_first_pick_alone_and_its_group_after_the_check` (the jump; no animation: no test) | = |
 | Mate axes | X/Y/Z 50 px at the connector (screen size) | the same (`ScreenTriads`, camera geometry) | `mate_axes_stay_50_px_at_any_zoom` | = |
 | Floating toolbar | grip, type, flip, reorient, Solve, ✓, ✗ | the same (`render_mate_hud`) | ui-parity asm-fastened-two-faces | = |
-| Toolbar's place | top left ~12 px right of and 14 px below the second pick (live2 18:20) | the same (`render_mate_hud`) | – | = |
-| Toolbar's grip (live2 place-1118) | a press-drag on the top grip moves the toolbar with the pointer; it stays where released; Esc ×2 still cancels the mate | the same (green 548d795fb, pin-block: dragged (−300, +400), stayed, Esc ×2 cancelled) | – | = |
+| Toolbar's place | top left ~12 px right of and 14 px below the second pick (live2 18:20) | the same (`render_mate_hud`) | `the_mate_toolbar_stands_by_the_second_pick_and_its_grip_moves_it` (near the graphics' left edge too: was pushed right there, clamped in window coordinates; fixed 11-21) | = |
+| Toolbar's grip (live2 place-1118) | a press-drag on the top grip moves the toolbar with the pointer; it stays where released; Esc ×2 still cancels the mate | the same (green 548d795fb, pin-block: dragged (−300, +400), stayed, Esc ×2 cancelled) | `the_mate_toolbar_stands_by_the_second_pick_and_its_grip_moves_it` (it trailed the pointer by the move that started the drag; fixed 11-21) | = |
 | Type switch | connectors, Offset, flip and reorient kept; the name follows the type; offset fields follow it | the same (`set_type`, `offset_axes`) | GPUI `a_new_mates_type_switch_takes_that_types_next_name` (offsets: no test) | = |
 | Connector chip | Click to edit: the Mate connector sub-dialog beside (Realign adds the axis fields) | the same | – | = |
 | ▶ preview | 90 frames out and back from the mate's zero (a turn, ¼ of the view's width) | the same (asm 43736c55, e9941770) | asm's tests | = |
