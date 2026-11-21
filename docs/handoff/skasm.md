@@ -14,9 +14,10 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - Handed to core 11-21 10:50: infento a3f7a1 Linear pattern 1's direction JMx = Chamfer 2's new edge on Extrude 1's
   ring (ours runs -y, live +y); and P0 c2-genesis-trunk-hanger 20 -> 12/73 = core's 18354ec79 (bisected; fixed by
   8631c5717, Mac 20/73 on that tree; main still 12/73 from a second cause core is bisecting).
-- Queued (psui 11-21, one live take sk2-1121 sketch-split-at-crossing): a line drawn through a held line's midpoint
-  (crossing it) infers PERPENDICULAR in live, ours VERTICAL; off-midpoint crossings stay VERTICAL (behaviours 45906).
-  LANDING 11-21: square_at_mid also takes a line crossing the midpoint within a midpoint's reach.
+- REVERTED 11-21 (9098307d's crossing rule): a line drawn through a held line's midpoint is VERTICAL in four takes
+  (sketch-trim, -trim-drag, -trim-key, -undo-trim; psui full1 on faf11d89) but PERPENDICULAR in sk2-1121
+  split-at-crossing, the same lines as trim-key at ~2 px/mm instead of ~3.7. Live REQUESTS row asks for a retake that
+  separates zoom / Show constraints; rule again once it says which.
 - Next after that (lead 11-21): the next item of "Next, in order"; sketch-solver parity rows if sheet metal has none.
 - LANDING: forms 21/21 (c2-sheet-metal-forms 10 -> 21/21; Mac A/B vs 97df380f1: 108 -> 109/174 docs, 1779 -> 1790
   features, no other doc changed): Sketch 3 connector at live's frame; Form 4 fuse skipped when adds add nothing;
