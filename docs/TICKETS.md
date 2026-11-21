@@ -297,6 +297,10 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   spinner then follows the pointer: moving down 15 mm gives 8 sides, moving to empty space above 36; with the pointer still it
   stays 6. Live changes the count only with the arrows or typed digits (behaviours "Polygons", "Sketch polygon commits" 4).
   qa-scratch/tickets/polygon-spinner-w3.png (top: pointer still; bottom: pointer moved).
+- [ ] P0 **FEEL-HOVER-GLYPHS-SECOND-ENTITY (psui)**: Show constraints off, a corner rectangle, no tool: hovering a line shows
+  only the constraints it is the first entity of. Right edge: nothing (its left ∥ right is missing); top: "⊥ —" without ∥
+  (bottom ∥ top); left and bottom show their ∥. Live shows every constraint on the hovered line (top: ⊥, ⫽, —; behaviours
+  "glyph linger" 11-17, live/psui/feel-1417/). qa-scratch/tickets/hover-glyphs-second-entity-w3.png (right, left, top, bottom).
 - [ ] P1 **S-TOOLBAR-BORDER (psui)**: the S shortcut toolbar has no border; live's has a 1 px #ccc border (175 × 62 with it,
   sketch/38; behaviours "S key"). Place (pointer + 10, − 30), size, icons and shadow match.
   qa-scratch/tickets/s-toolbar-border-w3.png (ours left, live right).
