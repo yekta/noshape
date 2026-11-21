@@ -591,15 +591,18 @@ fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
             if width { k::fillet_checked(shape, &shapes, &radii) } else { k::with_blend_split_raw(|| k::fillet_checked(shape, &shapes, &radii)) }
         };
         let on_extended = std::cell::Cell::new(false);
-        let occt = || match extended.as_ref().map(on) {
-            Some(Ok(r)) => {
-                on_extended.set(true);
-                Ok(r)
-            }
-            _ => {
-                on_extended.set(false);
-                on(&body.shape)
-            }
+        // (Its overflow check made only if every fallback below fails too.)
+        let occt = || {
+            k::with_fillet_overflow_deferred(|| match extended.as_ref().map(on) {
+                Some(Ok(r)) => {
+                    on_extended.set(true);
+                    Ok(r)
+                }
+                _ => {
+                    on_extended.set(false);
+                    on(&body.shape)
+                }
+            })
         };
         // (A round OCCT may leave in several faces: its rolling balls' tools made meanwhile on another thread, kept only
         // if it does; c2-hunting-knife's Fillet 5 waited 5 ms on OCCT's try first.)
@@ -650,6 +653,7 @@ fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
             // they meet there (asm-welding-config's Fillet 5: a plate's outline whose ends run under a tube's rim). (The
             // tools made beside OCCT's try were given up when it failed.)
             Err(_) if !width && super::blend_section::rolling_ball_blend(ev, bi, &edges, radius, None).is_ok() => continue,
+            Err(_) if k::fillet_deferred_overflows() => return Err(fillet_failed(k::KernelError::OperationFailed("fillet failed: unfilleted edge overlapped by fillet".into()))),
             Err(e) => return Err(fillet_failed(e)),
         };
         // OCCT's round of an edge in several faces (a tip's pinched at its apex, a corner's split where it runs past the

@@ -954,6 +954,10 @@ void  set_working_scale(double k);
 // This thread's checked blends retry an invalid result with slightly smaller sizes (on by default).
 void  set_blend_retries(bool on);
 void  set_blend_split_raw(bool on);
+// This thread's failed fillets leave their overflow check (the "unfilleted edge overlapped" message) to
+// fillet_deferred_overflows (off by default).
+void  set_fillet_overflow_deferred(bool on);
+bool  fillet_deferred_overflows();
 bool  blend_raw_returned();
 double working_scale();
 // Raises a signal inside a bridge call (tests of the crash guard): 0 SIGSEGV, 1 SIGFPE,

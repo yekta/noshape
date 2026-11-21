@@ -694,6 +694,8 @@ pub(crate) mod ffi {
         fn working_scale() -> f64;
         fn set_blend_retries(on: bool);
         fn set_blend_split_raw(on: bool);
+        fn set_fillet_overflow_deferred(on: bool);
+        fn fillet_deferred_overflows() -> Result<bool>;
         fn blend_raw_returned() -> bool;
         fn crash_inside_kernel(kind: u8) -> Result<()>;
         fn op_thicken(s: &OcShape, t1: f64, t2: f64) -> Result<OpOut>;

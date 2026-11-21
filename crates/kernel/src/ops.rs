@@ -590,6 +590,25 @@ pub fn without_blend_retries<R>(f: impl FnOnce() -> R) -> R {
     r
 }
 
+/// `f` with its failing fillets' overflow check put off (their errors OCCT's own): [`fillet_deferred_overflows`] makes it
+/// for the last of them, so a caller with fallbacks of its own spends it only when those fail too (c2-impeller-loft's
+/// Fillet Ansaugflansch zum Gehaeuse: 500 ms of checks on a fillet built otherwise). Not while recording blends.
+pub fn with_fillet_overflow_deferred<R>(f: impl FnOnce() -> R) -> R {
+    if crate::blend_corpus::recording().is_some() {
+        return f();
+    }
+    ffi::set_fillet_overflow_deferred(true);
+    let r = f();
+    ffi::set_fillet_overflow_deferred(false);
+    r
+}
+
+/// Whether the last fillet failed under [`with_fillet_overflow_deferred`] would overflow its faces (its error then
+/// "unfilleted edge overlapped by fillet"); asked once.
+pub fn fillet_deferred_overflows() -> bool {
+    ffi::fillet_deferred_overflows().unwrap_or(false)
+}
+
 /// `f` with a blend whose round of an edge comes out in several faces returned as OCCT built it, without the finishing
 /// passes (the caller builds such a round otherwise: c2-hunting-knife's Fillet 3, ~100 ms of OCCT's 190 saved).
 pub fn with_blend_split_raw<R>(f: impl FnOnce() -> R) -> R {

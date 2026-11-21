@@ -6025,6 +6025,7 @@ std::pair<TopoDS_Shape, HHist> checked_blend(const TopoDS_Shape& input, const Bl
   bool         ok = false;
   try
   {
+    const KernelTimer timer("blend.checked.first");
     // (Already built as it is and failed, at this very scale: OCCT would fail the same, the retries next.)
     ok = !failed_already && build(1.0, r, h);
   }
@@ -6039,14 +6040,18 @@ std::pair<TopoDS_Shape, HHist> checked_blend(const TopoDS_Shape& input, const Bl
       fail_op(std::string(what) + " failed (radius too large or unsupported edge configuration)");
     return {r, h};
   }
-  if (ok && valid_shape(r))
-    return {r, h};
+  {
+    const KernelTimer timer("blend.checked.valid");
+    if (ok && valid_shape(r))
+      return {r, h};
+  }
   if (!blend_retries())
     fail_op(std::string(what) + (ok ? " gave an invalid solid" : " failed"));
   // Smallest step that works (an L bracket's 5 mm walls filleted R2.5 all
   // round need 1e-5; volume error ~1e-6 relative).
   for (const double eps : {1e-7, 1e-6, 1e-5})
   {
+    const KernelTimer timer("blend.checked.retry");
     try
     {
       TopoDS_Shape r2;
@@ -7999,6 +8004,7 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
   auto [r, h] = checked_blend(sc.shape, make(sc), checked, size * sc.factor, what, checked && sc.factor == 1.0 && as_is_failed);
   if (checked)
   {
+    const KernelTimer timer("blend.scaled.finish");
     finish_blend_faces(sc.shape, r, h);
     join_split_lines(sc.shape, r, h);
   }
@@ -8715,10 +8721,26 @@ bool fillet_overflows(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>&
 {
   ShapeAncMap e2f;
   TopExp::MapShapesAndAncestors(input, TopAbs_EDGE, TopAbs_FACE, e2f);
+  // A face's surface with its projector, made once for all its points (OCCT keeps a B-spline's sample grid between
+  // them: the impeller's Fillet Ansaugflansch zum Gehaeuse made it at each of ~2,500 Newton steps, 500 ms).
+  struct Side
+  {
+    TopoDS_Face                f;
+    occ::handle<Geom_Surface>  sf;
+    GeomAPI_ProjectPointOnSurf pr;
+    explicit Side(const TopoDS_Face& face) : f(face), sf(BRep_Tool::Surface(face))
+    {
+      double u0, u1, v0, v1;
+      sf->Bounds(u0, u1, v0, v1);
+      pr.Init(sf, u0, u1, v0, v1, Precision::Confusion());
+    }
+  };
   // Signed distance into the material from face f's surface, its foot and gradient.
-  auto dist = [](const TopoDS_Face& f, const gp_Pnt& c, gp_Pnt2d& uv, gp_Vec& grad) {
-    occ::handle<Geom_Surface>  sf = BRep_Tool::Surface(f);
-    GeomAPI_ProjectPointOnSurf pr(c, sf);
+  auto dist = [](Side& s, const gp_Pnt& c, gp_Pnt2d& uv, gp_Vec& grad) {
+    const TopoDS_Face&               f  = s.f;
+    const occ::handle<Geom_Surface>& sf = s.sf;
+    GeomAPI_ProjectPointOnSurf&      pr = s.pr;
+    pr.Perform(c);
     if (pr.NbPoints() == 0)
       return std::numeric_limits<double>::quiet_NaN();
     double u, v;
@@ -8742,7 +8764,7 @@ bool fillet_overflows(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>&
     const ShapeList* fl = e2f.Seek(es[i]);
     if (fl == nullptr || fl->Extent() != 2)
       continue;
-    const TopoDS_Face f1 = TopoDS::Face(fl->First()), f2 = TopoDS::Face(fl->Last());
+    Side              f1(TopoDS::Face(fl->First())), f2(TopoDS::Face(fl->Last()));
     BRepAdaptor_Curve c(es[i]);
     for (int k = 0; k < 16; ++k)
     {
@@ -10007,6 +10029,29 @@ static bool blend_slivers(const TopoDS_Shape& input, const TopoDS_Shape& r, doub
   return false;
 }
 
+// A failed fillet's overflow check put off (set_fillet_overflow_deferred): the last fillet on this thread that failed
+// past its fallbacks, for fillet_deferred_overflows.
+struct DeferredOverflow
+{
+  TopoDS_Shape              in;
+  std::vector<TopoDS_Edge>  es;
+  std::vector<double>       rs;
+  bool                      pending = false;
+};
+static thread_local bool             t_overflow_deferred = false;
+static thread_local DeferredOverflow t_overflow;
+
+void set_fillet_overflow_deferred(bool on) { t_overflow_deferred = on; }
+
+bool fillet_deferred_overflows()
+{
+  if (!t_overflow.pending)
+    return false;
+  const KernelTimer timer("blend.overflows");
+  const DeferredOverflow d = std::exchange(t_overflow, {});
+  return fillet_overflows(d.in, d.es, d.rs);
+}
+
 static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, rust::Slice<const double> radii,
                 bool checked)
 {
@@ -10207,8 +10252,14 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
       const KernelTimer timer("blend.fallback.chains");
       past = fillet_by_tools(in, es, rs, 3);
     }
-    if (!past && fillet_overflows(in, es, rs))
-      fail_op("fillet failed: unfilleted edge overlapped by fillet");
+    if (!past && t_overflow_deferred)
+      t_overflow = {in, es, rs, true};
+    else if (!past)
+    {
+      const KernelTimer timer("blend.overflows");
+      if (fillet_overflows(in, es, rs))
+        fail_op("fillet failed: unfilleted edge overlapped by fillet");
+    }
     if (!past)
       throw;
     // A fallback's blends finish as the others do: approximated faces made analytic, then a full round's two faces
@@ -10256,6 +10307,8 @@ OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const do
                 bool checked)
 {
   OpOut out;
+  if (t_overflow_deferred)
+    t_overflow = {};
   // Each face's tangency sample count made once for the whole fillet, not on every Add's extremity check (patch 0029's
   // scope; robot-relations a4e419's Fillet 1 spent a third of its time remaking it). Out here: the budget's jump skips
   // destructors.
