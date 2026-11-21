@@ -2218,7 +2218,8 @@ std::unique_ptr<OcShape> loft_guided_multi(const OcShapeList& profiles, const Oc
   for (size_t k = 0; k < m; ++k)
     at_nodes.push_back(column(nodes[k]));
   // A u-periodic surface (Parasolid's) through the grid: rows round the profiles, the first not repeated.
-  const int                  nu = 24 * (int)m, nv = std::max(48, 12 * (int)n);
+  // Within 1e-3 of the profiles and guides; more points only slow what intersects it (knifehandle's Mutual trim 1).
+  const int                  nu = 12 * (int)m, nv = std::max(24, 6 * (int)n);
   NCollection_Array2<gp_Pnt> grid(1, nu, 1, nv + 1);
   for (int a = 0; a < nu; ++a)
   {
@@ -2243,9 +2244,33 @@ std::unique_ptr<OcShape> loft_guided_multi(const OcShapeList& profiles, const Oc
   BRepBuilderAPI_MakeFace mf(fit.Surface(), 1e-7);
   if (!mf.IsDone())
     fail_op("loft: guided face failed");
+  // Normals outward from the profiles' centres (live's knifehandle Handle: +z on top, +y at the side, whichever way
+  // each profile's loop runs).
+  TopoDS_Face face = mf.Face();
+  {
+    double u0, u1, v0, v1;
+    fit.Surface()->Bounds(u0, u1, v0, v1);
+    const double        vm = 0.5 * (v0 + v1);
+    std::vector<gp_Pnt> ring(16);
+    gp_XYZ              mid(0, 0, 0);
+    for (int i = 0; i < 16; ++i)
+    {
+      ring[i] = fit.Surface()->Value(u0 + (u1 - u0) * (i + 0.5) / 16, vm);
+      mid += ring[i].XYZ() / 16;
+    }
+    double out = 0;
+    for (int i = 0; i < 16; ++i)
+    {
+      gp_Pnt p;
+      gp_Vec du, dv;
+      fit.Surface()->D1(u0 + (u1 - u0) * (i + 0.5) / 16, vm, p, du, dv);
+      out += du.Crossed(dv).XYZ().Dot(p.XYZ() - mid);
+    }
+    if (out < 0)
+      face.Reverse();
+  }
   // The end profiles' boundaries split where the other guides meet them (live: P1's two edges between its guide
   // points); the seam runs through guide 0's.
-  const TopoDS_Face face = mf.Face();
   ShapeList         tools;
   for (const size_t i : {(size_t)0, n - 1})
     if (loops[i])
