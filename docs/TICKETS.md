@@ -287,6 +287,40 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - 13 "no recording" scenarios of run 07879475 (the app exited silently) all ran in the loop's next run: not filed. rolled-back-row-menu
   matches since psui 9ffded3f6.
 
+## qa, 2026-11-21 22:2x (USER P0 walk 6, lead: feature dialogs, drawings, document tabs as a user uses them; green e1f14b57b, vibe2 hm2/walk6/gen8.py, out-w8, out-w8b)
+
+- [ ] P0 **FEEL-EXTRUDE-DRAG-PREVIEW (psui)**: block, top face, Shift+E, drag the depth arrow up 66 px: Depth reads 44.1 mm (0.1 mm
+  steps, as live), but the preview is broken. The new top face floats at 44 mm with no walls under it, and the 25 mm box below is drawn
+  in part blue, still so 2.3 s after release and after the pointer leaves. Typing 40 with Enter or Tab draws the 40 mm box correctly,
+  and a drag past 0 (flipped, 10.9 mm) draws correctly too. Live: the preview follows the drag (a request every 0.35–0.55 s, the last
+  ≤ 0.25 s after the pointer stops; behaviours "feel (feature dialogs)" 11-13). qa-scratch/tickets/extrude-drag-preview-w6.png (at release, +1.5 s, pointer away).
+- [ ] P0 **FEEL-MANIP-DEAD-ZONE (psui)**: a 2 px press-drag on the Extrude arrow sets Depth 25 → 25.6 mm. Live: nothing for the
+  first 2–3 px, then at 3–4 px the value jumps to the full distance from the press (same 11-13 capture). interaction-feel lists it as
+  not yet in the matrix.
+- [ ] P0 **DRW-BORDER-LIT (studios)**, look to confirm with live (REQUESTS qa 22:20): block-drawing, the sheet's inner border line
+  (x ≈ 9.6 mm). Hovering it draws the line tan with square grips at its ends, like a sketch line. A press-drag starting on it
+  leaves it orange with grips after the release and after the pointer leaves, while the drawing's selection is empty. (A box
+  select started there selected nothing.) The border is the template's format, not a selectable entity in live as far as we know.
+  qa-scratch/tickets/drw-border-lit-w6.png (click+hover, after the drag, after the pointer leaves, hover).
+- Matched live (no ticket):
+  - Extrude: Tab order (Depth → ± → Direction, Starting offset, Symmetric, Draft, Second end position, Merge with all → Merge scope),
+    Shift+Tab (flip → End type → faces field), and Esc in a field (typed value reverted) then Esc again to cancel. Enter applies with
+    the dialog open, and a second Enter commits. Typing alone leaves the preview, and Tab applies. The arrow's size, its hover look
+    (blue), a click on it to flip, a drag steps 0.1 mm, past 0 flips, and the flip button. Re-editing Extrude 1 with Esc×2 keeps it.
+  - Fillet: Tab from Radius (± then the checkboxes, skipping the field and dropdowns), Esc×2, Enter. Re-clicking an edge in the active field
+    removes it and a second click adds it back. Hovering a chip lights its edge yellow-green. Shell: open, thickness typed with Enter
+    (preview, dialog open), and ✓ commits.
+  - Drawings: the Dimension tool lights the edge tan, the preview follows the pointer, the placement click, then Esc leaves the
+    hovered look (tan box, grips, blue feet). Two parallel edges give 1.575. A double-click opens the Dimension palette. Dimension
+    and view menus match live's lists, and so do the view's hover (tan frame) and selected look (orange geometry + frame).
+    Note: a click outside commits, Esc discards. Dragging the base Front moves Top in x and Right in y only, and Ctrl+Z puts a
+    dragged view back. Insert view: Front placed, then the projected ghost. A left-to-right box over the sheet picks all four views.
+  - Document tabs: drag reorders, a double-click only switches (no rename, live fc-1121 (3)), menus of the active and an inactive
+    Part Studio tab match live's lists, and the hover card shows.
+- Asked live (REQUESTS qa 22:20): ✓ clicked straight after typing a value (ours and live's 11-09 recording both leave the dialog
+  open), hovering the translucent Extrude preview (ours lights its front face's outline), re-clicking Shell's removed face, and a
+  plain click on the Fillet arrow (ours focuses Radius).
+
 ## qa, 2026-11-21 21:4x (USER P0 walk 5, lead: right-click menus vs live ctx-menus-1117 item lists; green 2fb0ed1ac, walk3/gen7.py, out-w7, compare hm2/walk5/cmp-menus.py)
 
 Same model as live (block 40x30x10, Fillet 1 2 mm, Sketch 2 line (60,10)-(90,10)), same pick points. 14 of 25 match exactly:
@@ -296,7 +330,7 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   Hide, Show dependencies…, no Select ▸ / Select other… / Zoom to fit). Live's viewport plane menu: New sketch… · Offset plane… · Size
   to Part Studio | Hide Front plane · Hide other planes · Hide all planes · Section view… | Select ▸ · Select other… | Zoom to fit ·
   Zoom to selection · View normal to (ctx-menus-1117 plane-top-graphics; behaviours 13874, 37913). qa-scratch/tickets/menus-plane-w5.png (bottom).
-- [ ] P0 **MENU-FACE-AND-EDGE (psui)**: a face and an edge selected, right-click the edge: ours lacks **Section view…**, **Zoom to
+- [x] P0 **MENU-FACE-AND-EDGE (psui)** (not a bug: our pick took the edge's midpoint; matches off it, 22:1x): a face and an edge selected, right-click the edge: ours lacks **Section view…**, **Zoom to
   selection** and **Add appearance to face…** (live face-and-edge; the rest matches in order).
 - [ ] P0 **MENU-SKETCH-IN-PS (psui)**: right-click Sketch 2's line in the Part Studio graphics: ours Edit Sketch 2… · Show
   dependencies… · Select · Select other… · Zoom to fit · Delete Sketch 2. Live also has **Show dimensions**, **Hide**, **Hide other
@@ -314,9 +348,16 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
 - Assembly menus match live's dom/context-menus-assembly.txt: empty space, the instance row, Origin, the top row (Where used… in
   place of 11-17's Release… follows live's later workflows-on capture, behaviours 46297), and the Mate features header (no menu,
   as live). (The sheet's tabs and the assembly list headers are not ui-script targets: pixel clicks, and instance:<name>.)
-- Open with live (REQUESTS qa 21:50): sk-empty and sk-tool-line-active. Live's (75, 40) pick lands on the Top plane (plane menu);
-  ours is empty space, because our default planes only cover the block while live's evidently also cover Sketch 2
-  (qa-scratch/tickets/menus-plane-w5.png top).
+- [ ] P0 **MENU-SK-SKETCH-PLANE (psui)** (live answered qa 21:50 at 22:19, behaviours "qa walk 5"): the default planes don't
+  grow for a sketch (±76 mm squares for this block, same as ours), but in sketch edit the larger pale "Sketch 2" plane is a pick
+  target. Right-click at (75, 40) in Sketch 2 (sk-empty; also with the Line tool active, sk-tool-line-active) gives live's **Top plane**
+  menu: Confirm Sketch 2 | Hide Top plane · Hide other planes · Hide all planes · Section view… | Clear selection · Select ▸ ·
+  Select other… | Zoom to fit · Zoom to selection · View normal to · View normal to sketch plane, with the default-size Top plane
+  outlined orange. Ours gives the empty-space menu (Copy sketch, Show all, Curve/surface analysis…). qa-scratch/tickets/sk-plane-menu-w5.png (live, ours).
+- 22:1x re-pick off the edge midpoint, at (10, 0, 10) (psui: our pick at (20, 0, 10) took the midpoint, live's one-event jump the
+  edge): face-and-edge now matches live (19 items), so MENU-FACE-AND-EDGE is not a bug. On a real edge, ps-edge and sk-model-edge
+  show items live's 1117 lists lack (Fillet…, Chamfer…, Zoom to selection…), and our midpoint menu had matched live's "edge" exactly.
+  psui asked live (REQUESTS psui 21:58) which entity live's picks took.
 
 ## qa, 2026-11-21 21:3x (USER P0 sketch walk 4, lead: the tools walk 3 skipped; green 2fb0ed1ac, vibe2 walk3/gen6.py, out-w6)
 
