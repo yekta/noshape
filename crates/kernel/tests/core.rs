@@ -1464,3 +1464,39 @@ fn a_unify_that_would_leave_an_invalid_face_keeps_the_shape() {
     assert!(u.shape.is_valid());
     assert!(close(volume_properties(&u.shape).unwrap().mass * 1e9, 13590.5611, 1e-6));
 }
+
+/// A sheet whose faces meet at sharp edges thickened to one side, its offsets meeting where they cross (live's
+/// intersection join; c2-surf-workshop-split's Thicken 1): a 40 mm plate with a 10 mm square hole and 10 mm walls hung
+/// from the hole's rim, 2 mm down. Concave at the rim (offsets trimmed), convex at the walls' corners (extended to
+/// meet); the walls round the foot of the hole lie in one plane and are one face, as live's.
+#[test]
+fn a_sheet_with_sharp_edges_thickens_with_its_offsets_meeting() {
+    let mm = 1e-3;
+    let sq = |h: f64| -> Vec<Segment2d> {
+        let c = [DVec2::new(-h, -h), DVec2::new(h, -h), DVec2::new(h, h), DVec2::new(-h, h)].map(|p| p * mm);
+        (0..4).map(|k| Segment2d::Line { a: c[k], b: c[(k + 1) % 4] }).collect()
+    };
+    let mut faces = vec![make_face_2d(&Plane::xy(), &sq(20.0), &[sq(5.0)]).unwrap()];
+    let corner = [DVec3::new(-5.0, -5.0, 0.0), DVec3::new(5.0, -5.0, 0.0), DVec3::new(5.0, 5.0, 0.0), DVec3::new(-5.0, 5.0, 0.0)].map(|p| p * mm);
+    let down = DVec3::new(0.0, 0.0, -10.0 * mm);
+    for k in 0..4 {
+        let (a, b) = (corner[k], corner[(k + 1) % 4]);
+        let pts = [a, b, b + down, a + down];
+        let edges: Vec<Shape> = (0..4).map(|j| make_line(pts[j], pts[(j + 1) % 4]).unwrap()).collect();
+        faces.push(make_face_from_wire(&make_wire(&edges).unwrap(), true).unwrap());
+    }
+    let sheet = sew(&faces, 1e-7, false).unwrap().shape;
+    let top = sheet.faces().into_iter().find(|f| f.is_planar() && f.area().unwrap() > 1e-3).unwrap();
+    let up = top.normal_at_point(DVec3::new(-15.0, -15.0, 0.0) * mm).unwrap().z > 0.0;
+    let t = 2.0 * mm;
+    let r = if up { thicken(&sheet, 0.0, t) } else { thicken(&sheet, t, 0.0) }.unwrap();
+    assert!(r.shape.is_valid());
+    // The plate 2 mm thick, and the walls' 14 mm square ring below it.
+    let v = (1600.0 - 100.0) * 2.0 + (14.0 * 14.0 - 100.0) * 8.0;
+    assert!(close(r.shape.volume().unwrap() * 1e9, v, 1e-6 * v), "{} mm3 vs {v}", r.shape.volume().unwrap() * 1e9);
+    let bb = r.shape.bounding_box(false).unwrap();
+    assert!(close(bb.min.z, -10.0 * mm, 1e-6) && close(bb.max.z, 0.0, 1e-6), "z {} .. {}", bb.min.z, bb.max.z);
+    // Plate, hole walls, their offsets, the plate's four edge walls and the ring under the hole walls.
+    assert_eq!(r.shape.faces().len(), 1 + 4 + 1 + 4 + 4 + 1);
+}
+

@@ -5573,6 +5573,8 @@ static void elementary_offsets(TopoDS_Shape& r, HHist& h)
 }
 } // namespace
 
+bool thicken_direct(const TopoDS_Shape& sheet, double d, TopoDS_Shape& out, HHist& hist);
+
 static OpOut thicken(const OcShape& s, double t1, double t2, bool exact_step)
 {
   for (TopExp_Explorer x(s.shape, TopAbs_FACE); x.More(); x.Next())
@@ -5662,6 +5664,10 @@ static OpOut thicken(const OcShape& s, double t1, double t2, bool exact_step)
   {
     const OwnCopy  own(s);
     const OcShape& c = own.shape();
+    TopoDS_Shape direct;
+    HHist        direct_hist;
+    if (thicken_direct(c.shape, std::abs(t1) > 1e-12 ? t1 : -t2, direct, direct_hist))
+      return make_result({c.shape}, direct, direct_hist.get());
     try
     {
       BRepOffset_MakeOffset mo;

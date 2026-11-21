@@ -81,6 +81,7 @@ const BRIDGE_SOURCES: &[&str] = &[
     "cpp/pvz_reader.cpp",
     "cpp/vertex_blend.cpp",
     "cpp/loft_guided.cpp",
+    "cpp/thicken_direct.cpp",
     "cpp/mesh_body.cpp",
     "cpp/xt_read.cpp",
     "cpp/rhino_read.cpp",
