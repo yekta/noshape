@@ -236,14 +236,19 @@ impl DrawingEditor {
             let hole = matches!(t.kind, TableKind::Hole { .. });
             out.push(MenuEntry::item(te::split_label(&t.kind), move |t, _, cx| {
                 let mut part = None;
+                let kept = t.selection.clone();
                 t.edit_sheet("Split table", cx, |s| {
                     part = te::split_table(s, id, &l, split);
                 });
-                if let Some(p) = part.filter(|_| hole) {
-                    t.cell_sel = None;
-                    t.selection = vec![Sel::Table(p)];
-                    t.redraw(cx);
-                }
+                // The others keep what was selected (live drw-custom-table-split s13: the original, lit).
+                t.selection = match part {
+                    Some(p) if hole => {
+                        t.cell_sel = None;
+                        vec![Sel::Table(p)]
+                    }
+                    _ => kept,
+                };
+                t.redraw(cx);
             }));
         }
         if t.rows.is_some_and(|r| r[0] > 0) {

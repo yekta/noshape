@@ -48,16 +48,17 @@ e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
   2); run.py `deleted_paint_read` leaves ours uncompared there (whole night suite re-scored: only that scenario
   changes). Ours reads Front there: the pointer rests on Front where the menu's Delete row was.
 - Asm feel rows: none left untested in interaction-feel's asm tables.
-- Then: re-shoot drw-custom-table-split + drw-datum-empty-field (start block-drawing-table-2parts), re-run the matrix.
 
 ## Next, in order
-1. Lead 11-20: the drawing matrix's items not yet matching, by use (dialogs, menus, placement, rarer panels): check
-   each against our build (screenshots: /root/studios-scratch/bin/pdshots.sh <tag> <takes> on vibex8 :394 2560x1440,
-   NOSHAPE_UI_SHOTS per step; compare with live/drawing/*.png and dom dumps), fix real differences in batches, report
-   the count per land. Regenerate: `drawing_matrix.py --run <uip dir> --ours-menus <MENUDUMP>` (merged dir
-   /root/studios-scratch/uip-merged). Left at 11-20 00:23: 174 present-only (Create Drawing custom template tab,
-   Move to sheet / Replicate page chrome, small rests). b4 compared (above); next: rescreenshot b4 with the new
-   build, then the remaining panels (inspection / revision tables, BOM properties, section / detail view panels).
+1. Drawing matrix (11-21 03:36): 1235 = / 565 shown / 0 differs / 0 present-only / 0 missing of 1842. Every panel
+   was shot in pd/b1-b35 (tables, inspection / revision, section / detail included). The 565 shown are mostly
+   dropdown options (fonts, balloon shapes, standards: Drawing properties 101, Create Drawing 57, Title block 54,
+   Hole/thread callout 53, Note 52, Hole table 45, Styles 43): only a take opening each list would make them =.
+   Regenerate: `drawing_matrix.py --run /root/studios-scratch/uip-merged --ours-menus /root/studios-scratch/menudump.json`
+   (copy new take outputs into uip-merged first). drw-custom-table-split 13/16: after Esc live reads the table's paint
+   under the resting pointer, ours nothing (reader emulation, left).
+   Live is capturing a drawing feel batch for me (lead 03:3x: dimension snap/reach, view drag/alignment, note caret,
+   view-edge hover timing, box select): take its rows as they arrive.
 2. Live cfg-choosers-1120 left open: whether a custom table's cells take the picked configuration (live's studio
    has Small = Large). Insert view takes the default configuration, as live's (iv-10: "Size: Small").
 3. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.

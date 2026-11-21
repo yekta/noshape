@@ -1532,15 +1532,16 @@ def compare(live, ours, whole_document=True):
                 # drw-bom-table-properties.)
                 d["text"] = [t.replace("\u00a0", " ") if isinstance(t, str) else t for t in d.get("text") or []]
                 d["text"] = [re.sub(r"\bstart \S+ asm( Copy \d+)?\b", "start asm", t) if isinstance(t, str) else t for t in d["text"]]
-                # Live's start studio is named after its start document ("start block Copy 1", live2 drw-custom-table-*).
-                d["text"] = [re.sub(r"^start [\w-]+( Copy \d+)?$", "Part Studio 1", t) if isinstance(t, str) else t for t in d["text"]]
+                # Live's start studio is named after its start document ("start block Copy 1", live2 drw-custom-table-*; a copy of a
+                # copy "start block Copy 1 Copy 1", live drw-custom-table-split).
+                d["text"] = [re.sub(r"^start [\w-]+( Copy \d+)*$", "Part Studio 1", t) if isinstance(t, str) else t for t in d["text"]]
                 # A select's value naming it too (Sheet properties › Reference "start block Copy 1 Part 1", live2
                 # drw-sheet-properties-custom-zones; Custom table's "Use existing Part Studio", live drw-custom-table-cell).
                 for fld in d.get("fields") or []:
                     if isinstance(fld, dict) and isinstance(fld.get("value"), str):
                         # (A BOM's source assembly, live's runner's copy of it: "Use existing", live2's drw-bom-* retakes.)
                         fld["value"] = re.sub(r"\bstart \S+ asm( Copy \d+)?$", "start asm", fld["value"])
-                        fld["value"] = re.sub(r"^start (?!asm )[\w-]+( Copy \d+)?(?= |$)", "Part Studio 1", fld["value"])
+                        fld["value"] = re.sub(r"^start (?!asm )[\w-]+( Copy \d+)*(?= |$)", "Part Studio 1", fld["value"])
                 if d.get("title") in ("View properties", "BOM table properties", "Cut list table properties", "Custom table properties", "Image properties") and len(d["text"]) > 2 and d["text"][1] in ("Document", "Document:"):
                     d["text"][2] = "<document>"
             dr = side.get("drawing")
@@ -1548,7 +1549,7 @@ def compare(live, ours, whole_document=True):
                 dr["tab"] = re.sub(r"^start \S+ asm( Copy \d+)? ", "start asm ", dr["tab"])
                 # A drawing of live's start studio is named after it, as its dialogs' texts above ("start frame-drawing
                 # Copy 1 Drawing 1", live2 drw-cut-list-table-properties).
-                dr["tab"] = re.sub(r"^start (?!asm )[\w-]+( Copy \d+)? ", "Part Studio 1 ", dr["tab"])
+                dr["tab"] = re.sub(r"^start (?!asm )[\w-]+( Copy \d+)* ", "Part Studio 1 ", dr["tab"])
                 # A tab name live's lane document already had gets " (1)" (live2 drw-detail-view), and so does a note
                 # showing it (Insert drawing property › Drawing name, upper case: drw-note-insert-drawing-property).
                 m = re.fullmatch(r"(.*) \(\d+\)", dr["tab"])
@@ -1562,7 +1563,7 @@ def compare(live, ours, whole_document=True):
         for side in (a, b):
             lst = side.get("list")
             if isinstance(lst, dict) and isinstance(lst.get("rows"), list):
-                lst["rows"] = [re.sub(r"\bstart (?!asm\b)[\w-]+( Copy \d+)?(?= \.\.\.$|$)", "Part Studio 1", r) if isinstance(r, str) else r for r in lst["rows"]]
+                lst["rows"] = [re.sub(r"\bstart (?!asm\b)[\w-]+( Copy \d+)*(?= \.\.\.$|$)", "Part Studio 1", r) if isinstance(r, str) else r for r in lst["rows"]]
                 # An assembly's, as the dialogs' texts ("Insert BOM for start pin-block asm Copy 1 ...", ours "... start
                 # pin-block-asm-drawing asm ...": live2 drw-view-properties-simplification-absolute).
                 lst["rows"] = [re.sub(r"\bstart \S+ asm( Copy \d+)?\b", "start asm", r) if isinstance(r, str) else r for r in lst["rows"]]
