@@ -425,8 +425,20 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - [ ] P0 **FEEL-SKETCH-REGION-FILL-AFTER-DRAG (psui)**: user walk. In Sketch 2 (block doc: point (60,25), line (60,5)-(90,5), arc, circle
   c(100,20) r6), drag the free point (60,25) to (64,28), or the line up 4 mm, with no tool: the circle's shaded region (#E4E7EA) goes
   white and stays white 0.8, 3 and 9 s after the release (nothing else changed). Before the drag it is shaded. Live shades closed
-  regions in sketch edit throughout (asked live to confirm after a drag). Ours qa-scratch/hm2/out-walk2/w-drag-point-long (04 vs
+  regions in sketch edit throughout (live confirmed 21:1x: shaded at 0 s and 3 s after the point drag, hover-matrix-1121/walk/w1-*). Ours qa-scratch/hm2/out-walk2/w-drag-point-long (04 vs
   05-10), drags2.png; qa 19:54, green 6be52caf4 (kit qa-scratch/hm2/walk, run.sh on vibe2 :481).
+- [ ] P0 **FEEL-PLANE-LIT-WHILE-DIMENSIONING (psui)**: user walk. Sketch 2 on Front (block doc), Dimension tool, pick the line
+  (66,5), move to about (74,-6) to place it, the pointer over the Front plane: ours lights the plane's edge orange while placing;
+  live lights nothing (hover-matrix-1121/walk/w3-placing.png, w3-front-wide.png). qa-scratch/tickets/plane-lit-dimensioning-w1.png
+  (live left, ours right); ours out-walk/w-dim-line-placing.
+- [ ] P0 **FEEL-LINE-SNAP-MODEL-LOOK (psui)**: user walk. Line tool, before the first click, pointer 0.5 mm from the block's
+  vertex (40,0,0) or 0.3 mm from the bottom front edge's midpoint (20,0,0), sketch on Front. (a) Ours draws a **blue point inside
+  the snap marker** on both; live has none: the vertex is an orange disc in the yellow snap square, the midpoint an empty yellow
+  box on the edge band. (b) At the vertex live shows **two glyphs, × and —** (the vertex lies on the sketch's horizontal axis);
+  ours only ×. Live hover-matrix-1121/walk/w4-vertex-0p5.png, w4-mid-0p3-off.png; qa-scratch/tickets/line-snap-model-w1.png
+  (live vertex, ours, live midpoint, ours) and -zoom-w1.png; ours out-walk/w-line-near-model-vertex, -edge-mid.
+- Live's 19:54 answers also matched: (2) the grey "24.989" box on the finished first segment, as ours. 20:18 (2): Part 1's top
+  face amber right after the second Fastened pick, as ours.
 - [ ] P0 **FEEL-ASM-PS-MC-MISSING (asm)**: hover matrix batch 4. The block's Part Studio mate connector "Mate connector 1" (origin
   the vertex (40,30,20), made by the start's feature_add with only originQuery) is not drawn in the assembly (one Part 1 instance),
   so it can't be hovered or picked: the pointer on it lights the corner vertex. Live draws the part's connector there (disc, ring,
