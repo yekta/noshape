@@ -16,6 +16,8 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   the only Thicken change between them. Wanted: that shape at no more than 2x of live (<= ~220 ms) with its parts kept.
 - [ ] P1 **SPEED-MUTUALTRIM-FILLET1 (blend)**: c2-surf-workshop-mutualtrim 384 ms vs live 76 (5.1x); Fillet 1 takes 308 ms. Not a
   regression: Fillet 1 failed until 0.4.61 (Error -> Ok), so this is its first cost.
+- [ ] P2 **FILLET-FAIL-SLOW (blend)**: cli-draft-hang2 (qa fuzz document, no live copy) Fillet 2 fails after 14.1 s. A
+  failing fillet should give up fast.
 - [ ] P1 **SPEED-VALVE-CONFIG (core)**: c2-valve-config 443 ms vs live 175 (2.5x); Circular pattern 1 takes 201 ms. It was at 1.9x
   (308 vs 164) in an older run (row "Near the bar"); now over the bar.
 - [ ] P1 **SPEED-ASM-OPEN (asm)**: opening asm-scissor-lift takes 30.5-31.5 s to solved (live's server finishes at 8.3-10.7 s, 3x)
