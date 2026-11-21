@@ -1,25 +1,31 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-21 06:33 UTC (lead order 11-21: thicken trim, SPEED-VALVE-CONFIG, KNIFEHANDLE, then the direct thicken ticket). Mac: builds + crate tests via NOSHAPE_RB_HOST=mac tools/tiers/rb.sh, single-model repros in ~/noshape-host/core-keep/models. Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-21 08:30 UTC (lead order 11-21: thicken trim, SPEED-VALVE-CONFIG, KNIFEHANDLE, then the direct thicken ticket). Mac: builds + crate tests via NOSHAPE_RB_HOST=mac tools/tiers/rb.sh, single-model repros in ~/noshape-host/core-keep/models. Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
 ## Now (11-21)
-- **Move boundary of a curved surface (MANUALBLEND-BOUNDARY1 part, core-bis2 02ba0aa84, queued 11-21 06:5x):** k::extend_face_at
+- **Move boundary of a curved surface (MANUALBLEND-BOUNDARY1 part, queued 11-21 06:5x as 175c325c):** k::extend_face_at
   (GeomLib::ExtendSurfByLength past the picked edges' uv sides; refuses faces trimmed inside their surface).
   manualblend 11 -> 12/19, Move boundary 1/2 +879.46 mm2 (live +879.47). Boundary surface 1 still ERROR: its U arcs miss
   our V edges by ~0.06 mm. Suspect: Intersection curve 1's approximated end tangent 0.04 deg off n1 x n2 -> Plane 3 tilts
   (live normal -0.304035,0.884882,0.352912) -> Sketch 6/7 shift. Probe: /root/core-scratch/icdbg.py (NOSHAPE_ICDBG, temporary).
   Coons fallback for the fill didn't help (parked mb-coons2.diff). Then Split 1's extra edge (1/5/5 vs 1/4/4).
-- **SUITE-IMPELLER-FILLET3 (blend 11-21, mine):** 9c9f29267's surface copy made Fillet 3 39/113/71 (live 34/95/62;
-  b0995d8fd 29/48 -> 27/48). First try (core-bis2, uncommitted): a kept merge moves the face onto a's own surface
-  (on_own_surface): still 27/48 (39/114/72). Tracing copy vs no-copy (NOSHAPE_CYLDBG / NOSHAPE_CYLNOCOPY, temporary):
-  guess: the no-copy rejected merges leave pcurves on the shared surface that a later unify uses.
+- **SUITE-IMPELLER-FILLET3 -> blend (agreed 11-21):** 9c9f29267's merge is right (the chamfer's x=120 stop cylinder one
+  face, kernel test a_tube_ends_offset_chamfer_..._as_live = live's 33). No-copy only "matched" because a rejected merge
+  rewrote the shared surface's curves (chamfer 34, Fillet 3 volume off, next fillet ERROR). Fillet 3 on the one-face
+  cylinder is blend's; they'll say if our seam (lowest vertex pair) must move. Experiments: core-scratch/cylmerge-modes.cpp.
+- **SUSPENSION-CIRCPAT1 -> blend (lead 11-21):** root is 805e29's Fillet 3 (OCCT refuses R2.5 on 7 of 17 edges);
+  dump vibex7:~/agents/core-keep/susp/fillet-19.
 - **VALID-SURFLOFTS-LOFT1:** first difference is Face blend 1 ERROR ("Cannot attach blended face"); Loft 1's invalid
   sheet is downstream (Bridging curves on wrong geometry). Goes with the Face blend 1 item.
-- **SPEED-VALVE-CONFIG:** e9418cde6 (core-th) suite pair vibex7 ~/agents/core-keep/vpair.sh -> vres/done.txt (queued in
-  slot behind asm). Land if no document gets worse; then rm ab-base/ab-th + core-cache target (9 GB) there.
+- **SPEED-VALVE-CONFIG QUEUED 11-21 as c2b48596** (core-th, rebased: engine.rs conflict, both tests kept). Suite pair
+  vibex7: 126/175 docs, 1859/2264 features both sides, no document changed; valve 578 -> 523 ms.
+- **STD-3132 (core-th, in progress):** std/ = live/std-3132, STD_VERSION/LANGUAGE_VERSION + templates 3132,
+  @setThinWallOneSided no-op (status.rs + native_args IGNORES_MAP), tools/std-pack.py --all (3112 becomes a pack).
+  Native hole reads the embedded holetables (7/8"-14 UNF 0.8125 automatic); native Hole has no error-tool preview (std
+  hole's start-plane fix only affects FS holes); no collapsed-wall concept natively. Gate: crate tests + suite pair.
 - **Impeller speed items done:** Extrude 4 region dedupe landed 18354ec7.
 
 ## In flight (11-20)
@@ -110,8 +116,10 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-000. (lead 11-21 06:4x, P1) SUSPENSION-CIRCPAT1: asm-suspension Part Studio 805e29 › Circular pattern 1 leaves the Knuckle
-   2 faces (live 174); Fillet 3/4 then fail (Ball 1/2 unresolved; live OK). After the Move boundary / Fillet 3 merge lands.
+0000. (lead 11-21, P1, after SUSPENSION-CIRCPAT1) STD-3132: bundled std 3112 -> 3132 (live/std-3132 +
+   live/std-3132-vs-3112.diff, 14 files / 181 lines: SM pattern keeps collapsed walls V3128, hole error preview on a start
+   plane, 7/8"-14 UNF tap drill 0.8125 in, thin extrude's new builtin @setThinWallOneSided: no-op unless annotations need
+   it). Gate: model suite none worse + skasm's 25 SM docs; tell skasm when landed.
 00. SPEED-VALVE-CONFIG land; then KNIFEHANDLE-LOFT1 (P1, In flight); then DIRECT THICKEN (own ticket); then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
    174 ms): speed ticket if >=100 ms and >=2x live's (lead 23:5x); then the thin wrapped-disc fuse (P2, In flight).
 0. Impeller P0 (In flight): land Extrude impellerraum's split walls after the pair, then Delete face 2 on our input and
