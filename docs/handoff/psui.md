@@ -36,11 +36,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (10:31 UTC 11-21)
+## Now (10:53 UTC 11-21)
 
-LANDED 4553fc38 10:28 (was f2dd922d: empty-feature errors, Routing curve buttons, sk batch, Split midpoint etc.).
-QUEUED 4bfbe203 10:30: a picked circle / arc / ellipse centre shows Construction active (dim-circle-centres); Mac
-scene 198, part-studio-ui sketch 312, clippy clean. Reported to lead 10:31.
+LANDED 4553fc38 10:28 (sk batch + empty-feature errors + Routing curve buttons), 0cd43606 10:52 (Construction readout),
+70ab4b581 10:53 (dialog table, docs). Reported to lead 10:53 (decision needed: Variable conversionFactor 0 vs 1).
+Running: sk12c rerun of the 21 takes on vibex8 (psui-shards.sh -> ~/agents/psui-keep/sk12c).
 
 sk-1 + sk-2 (21 takes, in tests/ui-parity with f90a1ef9). Rerun sk12b (vibex8, copy /root/psui-scratch/sk/sk12b):
 12/21, 306/344. In 4553fc38 (not in sk12b): polygon drop (curves held at the drag's start), 3pt circle Origin tie;
