@@ -1962,6 +1962,26 @@ fn transform_move_copy_rotate_scale() {
     assert_eq!(res.context.bodies.len(), 2);
 }
 
+/// Live dlg-1121 (each feature added by REST with no parameters): the message and the fields at fault.
+#[test]
+fn empty_features_say_what_live_says() {
+    let cases: [(&str, &str, &[&str]); 7] = [
+        ("copyPart", "Select parts to copy.", &["entities"]),
+        ("nameEntity", "Invalid input selections.", &["entity"]),
+        ("sheetMetalRecognize", "Cannot resolve entities.", &["bodies"]),
+        ("sheetMetalUnfold", "No part selected to unfold.", &["partToUnfold"]),
+        ("assignVariable", "Variable name must be a letter followed by a string of letters or numbers.", &["name"]),
+        ("cPoint", "Cannot resolve entities.", &["edge"]),
+        ("importForeign", "Parasolid data import failed.", &[]),
+    ];
+    for (ty, message, faulty) in cases {
+        let mut t = T::new();
+        t.add(ty, &[]);
+        let st = t.regen().display.features.last().cloned().unwrap();
+        assert_eq!((st.status, st.message.as_deref(), st.faulty.iter().map(|s| s.as_str()).collect::<Vec<_>>()), (FeatureStatus::Error, Some(message), faulty.to_vec()), "{ty}");
+    }
+}
+
 // ------------------------------------------------------------------ direct edit
 
 #[test]

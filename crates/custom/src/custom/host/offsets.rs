@@ -10,7 +10,7 @@
 //! pair `i`; `offsetLow` / `offsetHigh` the smallest and largest offset.
 
 use super::query::{Ent, QueryCx, with_ents};
-use super::{context_arg, convert::*};
+use super::{context_arg, convert::*, raise_faulty};
 use crate::reference::Reference;
 use glam::DVec3;
 use noshape_featurescript::interp::{Interp, NativeFn, R};
@@ -19,6 +19,9 @@ use noshape_kernel as k;
 use noshape_kernel::Shape;
 
 pub const NATIVES: &[(&str, NativeFn)] = &[("evOffsetDetection", ev_offset_detection)];
+
+/// One group: its faces on each side, its smallest and largest offset.
+type Group = (Vec<Reference>, Vec<Reference>, f64, f64);
 
 /// Default offset tolerance (meters).
 const TOL: f64 = 1e-7;
@@ -150,11 +153,14 @@ fn ev_offset_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let def = def_arg(i, &a, 1)?;
     let tol = length_of(def.get("offsetTolerance")).unwrap_or(TOL).max(TOL);
-    let found: Vec<(Vec<Reference>, Vec<Reference>, f64, f64)> = with_ents(i, &cx, def.get("bodies"), |_, q, ents| {
+    let found: Option<Vec<Group>> = with_ents(i, &cx, def.get("bodies"), |_, q, ents| {
+        if ents.is_empty() {
+            return Ok(None);
+        }
         let bodies: Vec<usize> = ents.iter().filter_map(|e| if let Ent::Body(b) = e { Some(*b) } else { None }).filter(|b| !q.st.ctx.bodies[*b].shape.solids().is_empty()).collect();
         let per_body: Vec<(usize, Vec<Pair>)> = bodies.iter().map(|b| (*b, body_pairs(q, *b, TOL))).collect();
         // The thickness: the first body's smallest offset.
-        let Some(thickness) = per_body.iter().find(|(_, p)| !p.is_empty()).map(|(_, p)| p.iter().map(|x| x.2).fold(f64::INFINITY, f64::min)) else { return Ok(Vec::new()) };
+        let Some(thickness) = per_body.iter().find(|(_, p)| !p.is_empty()).map(|(_, p)| p.iter().map(|x| x.2).fold(f64::INFINITY, f64::min)) else { return Ok(Some(Vec::new())) };
         let mut out = Vec::new();
         for (b, pairs) in &per_body {
             let at: Vec<Pair> = pairs.iter().copied().filter(|p| (p.2 - thickness).abs() <= tol).collect();
@@ -165,8 +171,10 @@ fn ev_offset_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 out.push((g.iter().map(|p| face(p.0)).collect(), g.iter().map(|p| face(p.1)).collect(), low, high));
             }
         }
-        Ok(out)
+        Ok(Some(out))
     })?;
+    // Live dlg-1121: Recognize with no parts reads "Cannot resolve entities." on Parts.
+    let Some(found) = found else { return Err(raise_faulty(i, "CANNOT_RESOLVE_ENTITIES", &["bodies"])) };
     let mut st = cx.state.lock();
     let ids = |st: &mut super::CtxState, refs: &[Reference]| Value::array(refs.iter().map(|r| Value::str(st.transient(r))).collect());
     let groups = found

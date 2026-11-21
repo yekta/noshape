@@ -130,7 +130,8 @@ fn detect_thickness(shape: &Shape) -> Option<f64> {
 pub fn recognize(ev: &mut EvalCtx) -> FResult<()> {
     let idx = ev.resolve_bodies(ev.query("bodies"));
     if idx.is_empty() {
-        return err("Select the parts to recognize as sheet metal");
+        // Live dlg-1121 (REST, empty): "Cannot resolve entities." on Parts.
+        return err_at(&["bodies"], "Cannot resolve entities.");
     }
     for bi in idx.into_iter().rev() {
         let mut bi = bi;

@@ -200,7 +200,7 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
 pub fn variable(ev: &mut EvalCtx) -> FResult<()> {
     let name = ev.params.text("name").trim().trim_start_matches('#').to_string();
     if name.is_empty() || !name.chars().next().is_some_and(|c| c.is_alphabetic() || c == '_') || !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
-        return err("Variable name must be a letter followed by a string of letters or numbers.");
+        return err_at(&["name"], "Variable name must be a letter followed by a string of letters or numbers.");
     }
     // Measured (variable.fs): a distance (minimum or maximum, or one of its
     // components), the total length of edges, or a diameter / radius.

@@ -211,8 +211,9 @@ pub fn derived_mirror(ev: &mut EvalCtx) -> FResult<()> {
     let Some(provider) = ev.derived.clone() else {
         return err("Derived parts are not available in this context");
     };
+    // std derivedMirror.fs, live dlg-1121: no source is IMPORT_DERIVED_NO_PARTS on the field.
     let Some(src) = provider.context(&tab) else {
-        return err("Error regenerating.");
+        return crate::regen::eval::err_at(&["partStudio"], "Failed to recreate derived objects.");
     };
     let mirror = k::Transform::Mirror(k::Plane::xy());
     for b in src.bodies.iter().filter(|b| b.kind == BodyKind::Solid) {
@@ -231,7 +232,8 @@ pub fn derived_mirror(ev: &mut EvalCtx) -> FResult<()> {
 pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
     let data = ev.params.text("blobData").trim().to_string();
     if data.is_empty() {
-        return err("Part import failed.");
+        // Live dlg-1121: an Import with no data.
+        return err("Parasolid data import failed.");
     }
     let shapes: Vec<k::Shape> = if data.starts_with("DBRep_DrawableShape") || data.starts_with("CASCADE Topology") {
         vec![k::Shape::from_brep_bytes(data.as_bytes())?]

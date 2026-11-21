@@ -417,7 +417,8 @@ pub fn point(ev: &mut EvalCtx) -> FResult<()> {
             Some(&(bi, ei)) => ev.edge_shape(bi, ei)?,
             None => {
                 let sketch = ev.query("entities").iter().find_map(|r| crate::regen::measure::resolve_shapes(&ev.ctx, r).into_iter().find(|s| s.shape_type() == ShapeType::Edge));
-                sketch.ok_or_else(|| FeatureError::new("Cannot resolve entities."))?
+                // Live dlg-1121: the faulty field is std's "edge".
+                sketch.ok_or_else(|| FeatureError::at(&["edge"], "Cannot resolve entities."))?
             }
         };
         let info = e.edge_info()?;
@@ -768,6 +769,10 @@ fn resolves(ev: &EvalCtx, r: &Reference) -> bool {
 }
 
 /// Name entity: names are persistent already; nothing to compute.
-pub fn name_entity(_ev: &mut EvalCtx) -> FResult<()> {
+pub fn name_entity(ev: &mut EvalCtx) -> FResult<()> {
+    // Live dlg-1121: nothing picked is an error on the field.
+    if ev.query("entity").is_empty() {
+        return crate::regen::eval::err_at(&["entity"], "Invalid input selections.");
+    }
     Ok(())
 }
