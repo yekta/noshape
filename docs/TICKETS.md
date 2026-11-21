@@ -16,6 +16,15 @@ Ours is at or under live on every edit, undo and roll except c2-rings-loft (belo
   10.4 mm; after it 44 faces, 521.793 / 568.750 mm3 at 8.8 / 9.6, 36 faces, 732.479 mm3 at 10.4 (a second 6-face body of 1103.593
   mm3 throughout); the studio ~2.2 s per edit. Wanted: Shell 1 succeeding with those faces and volumes, in live's time or less.
   Probe: vibex6 ~/agents/dx-keep/sr/rlprobe.py <cli> <saved doc> "9.6 mm".
+- [ ] P2 **EDGE-CENTRE-SEAM (core)**: c2-rings-loft's ring round (34.93, 0) mm matches live per feature (after Extrude 7: 6 rim
+  ellipses of 24.31 mm, live 24.3; after Shell 2: 6 more of 26.68 mm, live 26.67; the curves pass through live's midPoints). But
+  `noshape_kernel::linear_properties` (BRepGProp::LinearProperties, geom.cpp props_linear) puts the centre of the two rims that cross
+  0 deg (the ellipse's seam) off their symmetry line: (40.07, +-8.88, 10.875) -> centre (43.28, 5.13, 7.66), y 0 expected (the inner
+  one (44.09, 5.63, 5.44)); it is the centre of the 0-60 deg part alone. Every other rim's centre is on its line. query_entities'
+  `midpoint` and parity's COPY seed use it, and features.cpp centres loft / sweep wires with it. The drawing splits the same rims
+  at 0 deg too (Top view: ours 4 arcs 0-60 / 60-180 / 180-300 / 300-0, live 3: 60-180 / 180-300 / 300-60). Note: live's midPoint
+  is the curve's middle point, ours's `midpoint` the centre of mass. Probe: vibex6 ~/agents/dx-keep/sr/rlmid.py ./cli
+  ~/agents/dx-keep/sr/rl-saved.noshape ~/parity/models/c2-rings-loft/live.jsonl.
 
 ## qa, 2026-11-21 (x86 speed, 02:00-04:00 quiet window, vibex8 release build of green f9ad07b50)
 Model suite 02:00-02:14 alone on vibex8 (load 0.1-1.4): 118/174 documents, 1840/2315 features. Gaps counted at >= 2x and >= 100 ms
