@@ -287,6 +287,31 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - 13 "no recording" scenarios of run 07879475 (the app exited silently) all ran in the loop's next run: not filed. rolled-back-row-menu
   matches since psui 9ffded3f6.
 
+## qa, 2026-11-21 22:0x (USER P0 walk 5, lead: right-click menus vs live ctx-menus-1117 item lists; green 2fb0ed1ac, walk3/gen7.py, out-w7, compare hm2/walk5/cmp-menus.py)
+
+Same model as live (block 40x30x10, Fillet 1 2 mm, Sketch 2 line (60,10)-(90,10)), same pick points. 14 of 25 match exactly:
+face, face-selected, two-faces, edge, vertex, empty, part-selected-graphics, rows Sketch 1 / Extrude 1 / Fillet 1 / two features /
+Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
+- [ ] P0 **MENU-PLANE-GRAPHICS (psui)**: right-click a default plane in the graphics: ours gives the feature-list row menu (Rename,
+  Hide, Show dependencies…, no Select ▸ / Select other… / Zoom to fit). Live's viewport plane menu: New sketch… · Offset plane… · Size
+  to Part Studio | Hide Front plane · Hide other planes · Hide all planes · Section view… | Select ▸ · Select other… | Zoom to fit ·
+  Zoom to selection · View normal to (ctx-menus-1117 plane-top-graphics; behaviours 13874, 37913). qa-scratch/tickets/menus-plane-w5.png (bottom).
+- [ ] P0 **MENU-FACE-AND-EDGE (psui)**: a face and an edge selected, right-click the edge: ours lacks **Section view…**, **Zoom to
+  selection** and **Add appearance to face…** (live face-and-edge; the rest matches in order).
+- [ ] P0 **MENU-SKETCH-IN-PS (psui)**: right-click Sketch 2's line in the Part Studio graphics: ours Edit Sketch 2… · Show
+  dependencies… · Select · Select other… · Zoom to fit · Delete Sketch 2. Live also has **Show dimensions**, **Hide**, **Hide other
+  sketches**, **Hide all sketches**, **Create Drawing of Sketch 2…** and **Edit sketch appearance…** (sketch2-line-graphics).
+- [ ] P0 **MENU-SK-HIDE-SKETCHES (psui)**: in sketch edit, a sketch line's menu (hovered, selected, with its end point, or on the
+  end) lacks **Hide other sketches** and **Hide all sketches** (after Revolve…); live sk-line, sk-line-selected, sk-line-and-end,
+  sk-line-end. Everything else matches.
+- [ ] P0 **MENU-SK-MODEL-ENTITY (psui)**: in a Top-plane sketch, right-click the block's top front edge (20,0,10): ours adds **Use**,
+  **Curve/surface analysis…**, **Zoom to selection** and **Align view with vertical axis**; live (11-17) has none of them. The top
+  face (20,15,10): ours lacks **Section view…** and **View normal to** and adds **Curve/surface analysis…** (live sk-model-face).
+  (Live's older sketch/204, a sketch on a part face, did show Use etc. on an edge: the set depends on the sketch plane.)
+- Open with live (REQUESTS qa 22:0x): sk-empty and sk-tool-line-active. Live's (75, 40) pick lands on the Top plane (plane menu);
+  ours is empty space, because our default planes only cover the block while live's evidently also cover Sketch 2
+  (qa-scratch/tickets/menus-plane-w5.png top).
+
 ## qa, 2026-11-21 21:3x (USER P0 sketch walk 4, lead: the tools walk 3 skipped; green 2fb0ed1ac, vibe2 walk3/gen6.py, out-w6)
 
 - [ ] P0 **FEEL-TEXT-BOX-PREVIEW (skasm)**: Text tool, two clicks (-20, 0) and (20, 10): while the Text dialog is open, live draws
