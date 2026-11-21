@@ -7219,8 +7219,11 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         // pattern's end caps on the object's end face): as on one, the object's or the one facing its way.)
         // (Or a tool's piece on two other tools outside every object (wide knurl grooves' end caps on one plane past
         // the cylinder's end): never kept, as any tool's piece on another tool.)
+        // (Or a tool's piece on other tools alone (a sprocket's teeth cut by 26 tools each holding the whole rim: the rim's
+        // faces on all of them): the earliest tool's facing their way, as on one.)
         let outside_objects = arg != 0 && states.iter().all(|&(t, st)| cx.solids[t].arg != 0 || st == State::Out);
-        let several_ok = op == Op::Cut && (arg == 0 || ons.iter().any(|&(t, _)| cx.solids[t].arg == 0) || outside_objects);
+        let on_tools = arg != 0 && ons.iter().all(|&(t, _)| cx.solids[t].arg != 0);
+        let several_ok = op == Op::Cut && (arg == 0 || ons.iter().any(|&(t, _)| cx.solids[t].arg == 0) || outside_objects || on_tools);
         if ons.len() > 1 && op != Op::Fuse && !several_ok {
             return Err(Decline("a piece on two solids"));
         }

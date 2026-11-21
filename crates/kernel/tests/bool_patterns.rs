@@ -265,6 +265,35 @@ fn round_holes_and_slots_through_a_plate_as_occt() {
     }
 }
 
+/// A sprocket's teeth cut by 26 copies of one tool, each the whole rim (a ring past the disc's edge) and a notch
+/// below it: every tool's rim faces on all the others'. Taken by noshape's Boolean (it declined "a piece on two
+/// solids"; the infento assembly's Circular pattern 4, OCCT 9 s), valid and as OCCT's.
+#[test]
+fn teeth_cut_by_copies_of_the_whole_rim_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let disc = k::make_cylinder(&z_frame(DVec3::ZERO), 0.03, 0.003, TAU).unwrap();
+    let outer = k::make_cylinder(&z_frame(DVec3::new(0.0, 0.0, -0.001)), 0.034, 0.004, TAU).unwrap();
+    let inner = k::make_cylinder(&z_frame(DVec3::new(0.0, 0.0, -0.001)), 0.028, 0.004, TAU).unwrap();
+    let ring = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&outer), std::slice::from_ref(&inner), &k::BooleanOptions::default()).unwrap().shape;
+    let notch = k::make_box_corners(DVec3::new(0.026, -0.0015, -0.001), DVec3::new(0.029, 0.0015, 0.003)).unwrap();
+    let tool = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&ring), std::slice::from_ref(&notch), &k::BooleanOptions { unify: true, ..Default::default() }).unwrap().shape;
+    let tools = rotated(&tool, DVec3::ZERO, DVec3::Z, 26);
+    let run = |rust: bool| {
+        k::set_rust_boolean(Some(rust));
+        let r = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&disc), &tools, &k::BooleanOptions::default()).expect("the cut");
+        let path = k::last_boolean_path();
+        k::set_rust_boolean(None);
+        (r.shape, path)
+    };
+    let ((ours, path), (occt, _)) = (run(true), run(false));
+    assert_eq!(path, "rust", "{}", k::last_rust_decline());
+    assert!(ours.is_valid() && occt.is_valid(), "valid");
+    assert_eq!(ours.count(k::ShapeType::Edge), occt.count(k::ShapeType::Edge), "edges");
+    assert_eq!(ours.count(k::ShapeType::Face), occt.count(k::ShapeType::Face), "faces");
+    assert!((ours.volume().unwrap() - occt.volume().unwrap()).abs() <= 1e-15, "volume");
+    assert!((ours.area().unwrap() - occt.area().unwrap()).abs() <= 1e-12, "area");
+}
+
 /// A result's history records, each output by where it lies (a face by its centroid and area, an edge by its ends
 /// and length, a vertex by its point: none by a curve's parameters), grouped by what they say.
 fn placed_records(r: &k::OpResult) -> std::collections::BTreeMap<String, Vec<Vec<f64>>> {
