@@ -546,7 +546,9 @@ fn sheet_extrude(ev: &EvalCtx, edge: &k::Shape, frame: &crate::display::PlaneFra
         && draft == 0.0
         && draft2 == 0.0
     {
-        return Ok(k::extrude_between(&profile, d2 * *x2, dir * *x1, 0.0)?);
+        // (Swept from the second end to the first, as live's: c2-surf-intro-boundary's Tail fin surface's side edge
+        // J1F runs from its second end to its first, and 3D fit spline 1 leaves along it.)
+        return Ok(k::extrude_between(&profile, dir * *x1, d2 * *x2, 0.0)?);
     }
     // Two separately bounded halves, sewn along the curve.
     let r1 = one_side(&profile, dir, end, draft)?;

@@ -402,6 +402,39 @@ fn a_surface_extrude_makes_one_surface_per_chain_of_curves() {
     assert_eq!(faces, vec![1, 4], "a surface for the arc and one for the rectangle");
 }
 
+/// A surface Extrude in two directions runs its side edges from the second end to the first, as live's
+/// (c2-surf-intro-boundary's Tail fin surface: its side edge J1F goes from x -33.94 to +33.94, and 3D fit spline 1
+/// leaves along it): a 20 mm line on Top, 10 mm up and 5 mm down, its side edges run up from z -5 to z 10.
+#[test]
+fn a_two_direction_surface_extrude_runs_its_side_edges_from_the_second_end() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let line = sk.add_line(DVec2::new(0.0, 0.0), DVec2::new(0.02, 0.0));
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+    t.add("extrude", &[
+        ("bodyType", en("SURFACE")),
+        ("surfaceEntities", q(vec![Reference::SketchEntity { sketch: s, entity: line.0 }])),
+        ("depth", e("10 mm")),
+        ("hasSecondDirection", ParamValue::Bool(true)),
+        ("secondDirectionBound", en("BLIND")),
+        ("secondDirectionDepth", e("5 mm")),
+        ("secondDirectionOppositeDirection", ParamValue::Bool(true)),
+    ]);
+    let res = t.ok();
+    let body = res.context.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Surface).expect("a surface");
+    let mut sides = 0;
+    for edge in body.shape.edges() {
+        let i = edge.edge_info().unwrap();
+        let (a, b) = if edge.orientation() == noshape_kernel::Orientation::Reversed { (i.end, i.start) } else { (i.start, i.end) };
+        if (a.z - b.z).abs() < 1e-9 {
+            continue;
+        }
+        sides += 1;
+        assert!((a.z + 0.005).abs() < 1e-9 && (b.z - 0.01).abs() < 1e-9, "side edge from z {} to z {}", a.z, b.z);
+    }
+    assert_eq!(sides, 2);
+}
+
 /// std Loft (loft.fs): a connection on edges sits at each edge's connectionEdgeParameters (std's editing logic puts a
 /// new pick at 0.5, its connection manipulator "connection,edge" moves it along the edge's tangent), and, as live
 /// 1810, adds no vertex, edge or face: between parallel edges the side face stays a plane (the frustum, 7000 mm³, 6
