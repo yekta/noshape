@@ -4905,13 +4905,18 @@ impl PartStudioView {
             let text = full.split(' ').next().unwrap_or_default().to_string();
             let w = crate::sketch_mode::label_width_px(&text) as f32;
             out.push(
+                // Black, no box; hovered a tan box (live offset-look-1121).
                 div()
                     .id("sk-offset-label")
                     .absolute()
-                    .left(px(x - w * 0.5))
+                    .left(px(x - w * 0.5 - 2.))
                     .top(px(y - 10.))
+                    .px(px(1.))
+                    .border_1()
+                    .border_color(gpui::transparent_black())
+                    .hover(|s| s.bg(rgb(0xccb396)).border_color(rgb(0xd99c3e)))
                     .text_size(px(16.))
-                    .text_color(rgb(0x333333))
+                    .text_color(rgb(0x000000))
                     .cursor_pointer()
                     .whitespace_nowrap()
                     .occlude()

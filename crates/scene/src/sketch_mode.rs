@@ -986,10 +986,13 @@ fn is_direction(k: InferenceKind) -> bool {
     matches!(k, InferenceKind::Horizontal | InferenceKind::Vertical | InferenceKind::Perpendicular | InferenceKind::Parallel)
 }
 /// Onshape's hollow arrow manipulator in a sketch (live sketch/303, offset):
-/// 11 px past the curve's copy, an 18 px stem, a 31 x 23 px head; outline
-/// #989fa3 (3 px) around a white core.
-const OFFSET_ARROW_GAP_PX: f64 = 11.0;
+/// an 18 px stem, a 31 x 23 px head; outline #989fa3 (3 px) around a white core.
 const OFFSET_ARROW_STEM_PX: f64 = 18.0;
+/// The offset preview's dimension (live offset-look-1121): its label in the gap from this gap on (in at ~18 px, on
+/// the picked curve at ~9 px), its two filled arrowheads ~5 px.
+const OFFSET_LABEL_IN_GAP_PX: f64 = 13.5;
+const OFFSET_DIM_ARROW_PX: f64 = 5.0;
+const MANIPULATOR_HOVER: ([u8; 4], [u8; 4]) = ([0x46, 0x74, 0xaf, 255], [0x9b, 0xb2, 0xcc, 255]);
 const OFFSET_ARROW_HEAD_PX: f64 = 31.0;
 const OFFSET_ARROW_HEAD_W_PX: f64 = 23.0;
 const MANIPULATOR_OUTLINE: [u8; 4] = [0x98, 0x9f, 0xa3, 255];
@@ -1114,12 +1117,13 @@ fn push_hollow(wide: &mut Vec<(Vec<DVec2>, [u8; 4], f32)>, pts: Vec<DVec2>) {
     }
 }
 
-/// [`push_hollow_arrow`] in another outline colour (a circular pattern's handle, live sketch-gaps4: light blue).
-fn push_hollow_arrow_in(wide: &mut Vec<(Vec<DVec2>, [u8; 4], f32)>, start: DVec2, dir: DVec2, px: f64, stem_px: f64, outline: [u8; 4]) {
+/// [`push_hollow_arrow`] in other colours (a circular pattern's handle, live sketch-gaps4: light blue; a hovered
+/// offset arrow, live offset-look-1121: #4674af around #9bb2cc).
+fn push_hollow_arrow_in(wide: &mut Vec<(Vec<DVec2>, [u8; 4], f32)>, start: DVec2, dir: DVec2, px: f64, stem_px: f64, outline: [u8; 4], core: [u8; 4]) {
     let base = start + dir * px * stem_px;
     let apex = base + dir * px * OFFSET_ARROW_HEAD_PX;
     let half = dir.perp() * px * OFFSET_ARROW_HEAD_W_PX * 0.5;
-    for (color, width) in [(outline, 3.0), ([0xff, 0xff, 0xff, 0xff], 1.2)] {
+    for (color, width) in [(outline, 3.0), (core, 1.2)] {
         wide.push((vec![start, base], color, width));
         wide.push((vec![base + half, apex, base - half, base + half], color, width));
     }
@@ -1831,8 +1835,15 @@ impl SketchEditor {
         let mut all = noshape_sketch::infer(sk, p, &ctx);
         // A sketch point on the Origin is taken before the Origin (live sk2-1121 3pt-circle-on-points: the circle
         // ends on the line's start there).
-        let on_origin = |i: &Inference| i.entity.is_some_and(|e| is_origin(sk, e));
+        let on_origin = |i: &Inference| i.entity.is_some_and(|e| e == noshape_sketch::ORIGIN || is_origin(sk, e));
         all.sort_by(|x, y| x.priority.cmp(&y.priority).then(x.distance.total_cmp(&y.distance)).then(on_origin(x).cmp(&on_origin(y))));
+        // (Live walk3-1121: a line chain, tangent arc or slot from a line's end on the Origin goes on from that end.)
+        if all.first().is_some_and(on_origin)
+            && let Some(k) = all.iter().position(|i| i.priority == all[0].priority && !on_origin(i) && matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Center) && i.position.distance(all[0].position) <= self.world_per_px * 1e-3)
+        {
+            let own = all.remove(k);
+            all.insert(0, own);
+        }
         // A centre point arc's end takes no point or curve, only alignments: it sets the sweep alone (live
         // cparc-end-1121: a point or a line's end, on its circle or off, gives VERTICAL to the centre, no COINCIDENT,
         // the radius kept).
@@ -2690,7 +2701,7 @@ impl SketchEditor {
             Tool::Fillet if self.fillet_arrow(&data.sketch).is_some_and(|(a, b)| dist_to_segment(p, a, b) <= self.world_per_px * 10.0) => {
                 if self.invalid_corner.is_some() {
                     self.drag = Some(DragState::FilletInvalid);
-                } else if let Some((arc, _)) = self.fillet_handle(&data.sketch) {
+                } else if let Some((arc, _)) = self.fillet_handle() {
                     self.drag = Some(DragState::FilletRadius { arc });
                 }
                 EditOutcome::redraw()
@@ -2797,6 +2808,11 @@ impl SketchEditor {
                 }
             }
             Tool::Slot => {
+                // A curve's end point stands for its curve (live walk3-1121 6b: a line's end on the Origin).
+                let hovered = hovered.map(|h| match data.sketch.users_of_point(h).as_slice() {
+                    [only] if is_point(&data.sketch, h) => *only,
+                    _ => h,
+                });
                 let ids: Vec<EntityId> = if self.selection.is_empty() || self.slot_pending() { hovered.into_iter().collect() } else { std::mem::take(&mut self.selection) };
                 self.make_slots(data, &ids)
             }
@@ -3303,29 +3319,33 @@ impl SketchEditor {
         o + m * DVec2::new(s.x.floor() + 0.5, s.y.floor() + 0.5)
     }
 
-    /// The offset manipulator (live sketch/303): Onshape's hollow arrow,
-    /// starting 11 px past the offset copy and pointing away from the curve;
-    /// (start of the 18 px stem, apex of the 31 px head).
+    /// The offset manipulator (live offset-look-1121): Onshape's hollow arrow, its tail on the offset copy, pointing
+    /// away from the curve; (start of the 18 px stem, apex of the 31 px head).
     pub fn offset_arrow(&self, sk: &Sketch) -> Option<(DVec2, DVec2)> {
         let (mid, n) = self.offset_frame(sk)?;
         let sign = if (self.offset_flip != self.offset_out) != self.offset_flip_base(sk) { -1.0 } else { 1.0 };
         let (dir, px) = (n * sign, self.world_per_px);
-        let start = mid + dir * (self.offset_distance + px * OFFSET_ARROW_GAP_PX);
+        let start = mid + dir * self.offset_distance;
         Some((start, start + dir * px * (OFFSET_ARROW_STEM_PX + OFFSET_ARROW_HEAD_PX)))
     }
 
-    /// The pending offset's distance label, between the curve and its copy;
-    /// clicking it opens the distance box (Onshape's offset tool opens its
-    /// in-place edit view from the preview dimension; the manipulator has
-    /// none). Shown once it fits: live sketch/123 shows "0.25" at a ~40 px
-    /// gap, sketch/303 (5 mm, ~19 px) none.
+    /// The pending offset's distance label; clicking it opens the distance box (Onshape's offset tool opens its
+    /// in-place edit view from the preview dimension; the manipulator has none). Live offset-look-1121: in the gap
+    /// at ~18 px, on the picked curve at ~9 px and less (drawn at any gap).
     pub fn offset_value_label(&self, sk: &Sketch) -> Option<(DVec2, f64)> {
-        if self.tool != Tool::Offset || self.offset_distance < self.world_per_px * 30.0 {
+        let (mid, dir) = self.offset_dimension(sk)?;
+        let into_gap = if self.offset_distance >= self.world_per_px * OFFSET_LABEL_IN_GAP_PX { 0.5 } else { 0.0 };
+        Some((mid + dir * self.offset_distance * into_gap, self.offset_distance))
+    }
+
+    /// The pending offset's dimension: the first picked curve's middle and the unit direction to its copy.
+    fn offset_dimension(&self, sk: &Sketch) -> Option<(DVec2, DVec2)> {
+        if self.tool != Tool::Offset {
             return None;
         }
         let (mid, n) = self.offset_frame(sk)?;
         let sign = if (self.offset_flip != self.offset_out) != self.offset_flip_base(sk) { -1.0 } else { 1.0 };
-        Some((mid + n * sign * self.offset_distance * 0.5, self.offset_distance))
+        Some((mid, n * sign))
     }
 
     /// Create the pending offset (Enter / click in space); later clicks repeat it.
@@ -3352,14 +3372,11 @@ impl SketchEditor {
         }
     }
 
-    /// The fillet radius manipulator: the session's first fillet arc and its midpoint.
-    fn fillet_handle(&self, sk: &Sketch) -> Option<(EntityId, DVec2)> {
-        if let Some((data, result)) = &self.pending_corner {
-            let arc = result.created.iter().copied().find(|e| data.sketch.kind(*e) == Some(EntityKind::Arc))?;
-            return Some((arc, curve_mid(&data.sketch, arc)?));
-        }
-        let arc = self.fillet_session.filter(|a| sk.entity(*a).is_some())?;
-        Some((arc, curve_mid(sk, arc)?))
+    /// The fillet radius manipulator: the pending fillet's arc and its midpoint (live 1935: gone once Enter commits).
+    fn fillet_handle(&self) -> Option<(EntityId, DVec2)> {
+        let (data, result) = self.pending_corner.as_ref()?;
+        let arc = result.created.iter().copied().find(|e| data.sketch.kind(*e) == Some(EntityKind::Arc))?;
+        Some((arc, curve_mid(&data.sketch, arc)?))
     }
 
     /// The radius manipulator (live sketch/1934): from the fillet arc's
@@ -3371,7 +3388,7 @@ impl SketchEditor {
             let d = (a.center - m).try_normalize()?;
             return Some((m, m + d * self.world_per_px * (FILLET_ARROW_STEM_PX + OFFSET_ARROW_HEAD_PX)));
         }
-        let (arc, m) = self.fillet_handle(sk)?;
+        let (arc, m) = self.fillet_handle()?;
         let sk = self.pending_corner.as_ref().map(|(d, _)| &d.sketch).unwrap_or(sk);
         let Some(Curve2::Arc { center, .. }) = sk.curve(arc) else { return None };
         let d = (center - m).try_normalize()?;
@@ -3381,7 +3398,7 @@ impl SketchEditor {
     /// Where the pending fillet's "R" leader meets the arc: its upper end
     /// (live sketch/1934: the tangent point on the top edge).
     fn fillet_label_foot(&self, sk: &Sketch) -> Option<DVec2> {
-        let (arc, _) = self.fillet_handle(sk)?;
+        let (arc, _) = self.fillet_handle()?;
         let sk = self.pending_corner.as_ref().map(|(d, _)| &d.sketch).unwrap_or(sk);
         let Some(Curve2::Arc { center, radius, start_angle, end_angle }) = sk.curve(arc) else { return None };
         let (a, b) = (center + DVec2::from_angle(start_angle) * radius, center + DVec2::from_angle(end_angle) * radius);
@@ -3404,7 +3421,7 @@ impl SketchEditor {
         self.pending_corner.as_ref()?;
         let pa = self.fillet_label_foot(sk)?;
         // The preview's own radius (it follows the arrow's drag).
-        let (arc, _) = self.fillet_handle(sk)?;
+        let (arc, _) = self.fillet_handle()?;
         let r = match self.pending_corner.as_ref().and_then(|(d, _)| d.sketch.curve(arc)) {
             Some(Curve2::Arc { radius, .. }) => radius,
             _ => self.fillet_radius,
@@ -3412,15 +3429,15 @@ impl SketchEditor {
         Some((pa + DVec2::new(-7.5 * px, 13.0 * px), r))
     }
 
-    /// Preview of a fillet at the hovered corner: the arc, and whether it fits.
+    /// Preview of the clicked corner's fillet: the arc, and whether it fits (live sketch/110, 1933: a hovered corner
+    /// only lights its point; the arc comes on the click).
     fn fillet_preview(&self, sk: &Sketch) -> Option<(Vec<DVec2>, bool)> {
         if let Some((data, result)) = &self.pending_corner {
             let arc = result.created.iter().copied().find(|e| data.sketch.kind(*e) == Some(EntityKind::Arc))?;
             return Some((data.sketch.tessellate(arc, self.world_per_px), true));
         }
-        let pid = self.invalid_corner.or(self.hover.filter(|e| is_point(sk, *e)))?;
-        let a = corner_arc(sk, pid, self.fillet_radius)?;
-        Some((arc_points(a.center, self.fillet_radius, a.a0, a.sweep), a.fits && self.invalid_corner.is_none()))
+        let a = corner_arc(sk, self.invalid_corner?, self.fillet_radius)?;
+        Some((arc_points(a.center, self.fillet_radius, a.a0, a.sweep), false))
     }
 
     /// Open the value box of a dimension (the Onshape dimension context dialog).
@@ -3644,8 +3661,8 @@ impl SketchEditor {
                 let Ok(line) = sk.add_line_between(a, b) else { return EditOutcome::none() };
                 Self::apply_auto(sk, a, Some(line), &autos_a);
                 Self::apply_auto(sk, b, Some(line), &autos_b);
-                // Closing onto an existing point ends the chain (Onshape).
-                let closed = click.inference.as_ref().is_some_and(|i| i.kind == InferenceKind::Endpoint);
+                // Closing onto an existing point ends the chain (Onshape); the Origin doesn't (live walk3-1121 (2)).
+                let closed = click.inference.as_ref().is_some_and(|i| i.kind == InferenceKind::Endpoint && !i.entity.is_some_and(|e| e == noshape_sketch::ORIGIN || is_origin(sk, e)));
                 self.finish_create(data, &[line]);
                 if closed {
                     self.clicks.clear();
@@ -6626,8 +6643,11 @@ impl SketchEditor {
                     _ => {}
                 },
                 Tool::Spline => {
+                    // The pointer still on the last click: the spline through the clicks (live walk3-5 c2still).
                     let mut pts = anchors.clone();
-                    pts.push(c);
+                    if pts.last().is_none_or(|l| l.distance(c) > self.world_per_px * 0.5) {
+                        pts.push(c);
+                    }
                     if pts.len() >= 2 {
                         let mut tmp = Sketch::new();
                         if let Ok(id) = tmp.add_fit_spline(&pts) {
@@ -6701,15 +6721,35 @@ impl SketchEditor {
         // Offset: preview of the pending offset and its direction arrow.
         if self.tool == Tool::Offset {
             if let Some((tmp, created)) = self.offset_result(&data.sketch) {
+                // With its end points (live sketch/124, 303).
                 for e in created {
                     poly(&tmp.tessellate(e, self.world_per_px), preview_color, false);
+                    for q in tmp.endpoints(e).into_iter().flat_map(|(s, t)| [s, t]).filter_map(|p| tmp.point(p)) {
+                        points.points.push(PointSprite { position: w(q), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
+                    }
                 }
             }
             if let Some((start, apex)) = self.offset_arrow(&data.sketch) {
-                // Onshape's hollow arrow (as the Part Studio manipulators): a
-                // light grey 3 px outline under a 1.5 px white line.
+                // Onshape's hollow arrow (as the Part Studio manipulators): a light grey 3 px outline under a 1.5 px
+                // white line; hovered blue (live offset-look-1121).
                 let d = (apex - start).try_normalize().unwrap_or(DVec2::X);
-                push_hollow_arrow(&mut wide, self.snap_to_pixel(start), d, self.world_per_px, OFFSET_ARROW_STEM_PX);
+                let hovered = self.cursor.is_some_and(|c| dist_to_segment(c, start, apex) <= self.world_per_px * 10.0);
+                let (outline, core) = if hovered { MANIPULATOR_HOVER } else { (MANIPULATOR_OUTLINE, [0xff, 0xff, 0xff, 0xff]) };
+                push_hollow_arrow_in(&mut wide, self.snap_to_pixel(start), d, self.world_per_px, OFFSET_ARROW_STEM_PX, outline, core);
+            }
+            // Its dimension: a black line across the gap, a small filled arrowhead on each curve, run on past the
+            // picked curve to a label there.
+            if let (Some((mid, dir)), Some((label, _))) = (self.offset_dimension(&data.sketch), self.offset_value_label(&data.sketch)) {
+                let (px, far) = (self.world_per_px, mid + dir * self.offset_distance);
+                let back = if label.distance(mid) < px { mid - dir * px * 8.0 } else { mid };
+                wide.push((vec![back, far], [0, 0, 0, 255], 1.0));
+                for (tip, d) in [(mid, -dir), (far, dir)] {
+                    let base = tip - d * px * OFFSET_DIM_ARROW_PX;
+                    for i in 0..=6 {
+                        let t = i as f64 / 6.0 * 2.0 - 1.0;
+                        wide.push((vec![tip, base + d.perp() * px * 1.75 * t], [0, 0, 0, 255], 1.0));
+                    }
+                }
             }
         }
         // Fillet: preview at the hovered corner (red when it doesn't fit) and the
@@ -6945,7 +6985,7 @@ impl SketchEditor {
                                 (0..=n).map(|i| c + DVec2::from_angle(from + (to - from) * i as f64 / n as f64) * r).collect()
                             };
                             wide.push((arc(rr, a0, a1), CIRCULAR_HANDLE_COLOR, 4.0));
-                            push_hollow_arrow_in(&mut wide, base, t, px, CIRCULAR_ARROW_STEM_PX, CIRCULAR_HANDLE_COLOR);
+                            push_hollow_arrow_in(&mut wide, base, t, px, CIRCULAR_ARROW_STEM_PX, CIRCULAR_HANDLE_COLOR, [0xff, 0xff, 0xff, 0xff]);
                             if !self.circular_step().1 {
                                 let ra = rr / CIRCULAR_HANDLE_AT * (1.0 + CIRCULAR_LABEL_BEYOND);
                                 let end = a0 + self.circular_angle;
@@ -7495,8 +7535,6 @@ struct CornerArc {
     sweep: f64,
     /// The tangent points on the two legs.
     ends: [DVec2; 2],
-    /// Both tangent points on their legs.
-    fits: bool,
 }
 
 impl CornerArc {
@@ -7526,11 +7564,10 @@ fn corner_arc(sk: &Sketch, pid: EntityId, r: f64) -> Option<CornerArc> {
     let bisector = (ua + ub).normalize();
     let c = v + bisector * (r / (theta * 0.5).sin());
     let (pa, pb) = (v + ua * t, v + ub * t);
-    let fits = t <= (a - v).length() && t <= (b - v).length();
     let a0 = (pa - c).to_angle();
     let sweep = noshape_sketch::geom::ccw_sweep(a0, (pb - c).to_angle());
     let sweep = if sweep > PI { sweep - TAU } else { sweep };
-    Some(CornerArc { vertex: v, bisector, theta, center: c, radius: r, a0, sweep, ends: [pa, pb], fits })
+    Some(CornerArc { vertex: v, bisector, theta, center: c, radius: r, a0, sweep, ends: [pa, pb] })
 }
 
 /// The lines a fillet arc trims (at its ends) and their vectors.
@@ -11263,6 +11300,21 @@ mod tests {
         assert_eq!(d.sketch.constraints().filter(|c| matches!(c.kind, ConstraintKind::Radius { .. })).count(), 2);
     }
 
+    /// Live (sketch/110, 1933–1935; qa FEEL-SKFILLET-FLOW): a hovered corner shows no arc, the click previews it with
+    /// its arrow, and Enter drops the arrow for the radius dimension's value box.
+    #[test]
+    fn fillet_arc_comes_on_the_click_and_its_arrow_goes_on_enter() {
+        let (mut ed, mut d) = editor(Tool::Fillet);
+        let r = d.sketch.corner_rectangle(v(0.0, 0.0), v(0.04, 0.02));
+        ed.hover = Some(r.points[0]);
+        assert!(ed.fillet_preview(&d.sketch).is_none() && ed.fillet_arrow(&d.sketch).is_none(), "hover: only the point");
+        let corner = d.sketch.point(r.points[0]).unwrap();
+        click(&mut ed, &mut d, corner);
+        assert!(ed.fillet_preview(&d.sketch).is_some() && ed.fillet_arrow(&d.sketch).is_some(), "the click: arc and arrow");
+        assert!(ed.commit_corner(&mut d).changed && ed.dim_edit.is_some());
+        assert!(ed.fillet_arrow(&d.sketch).is_none() && ed.fillet_value_label(&d.sketch).is_none(), "Enter: the value box only");
+    }
+
     /// The arc's middle at `r` for the corner `pid` (where the arrow drags it).
     fn fillet_mid(d: &SketchData, pid: EntityId, r: f64) -> DVec2 {
         corner_arc(&d.sketch, pid, r).unwrap().mid()
@@ -11335,7 +11387,7 @@ mod tests {
         ed.fillet_radius = 0.021859;
         click(&mut ed, &mut d, v(0.0, 0.0));
         assert!(ed.pending_corner.is_some(), "{:?}", ed.message);
-        let (arc, _) = ed.fillet_handle(&d.sketch).unwrap();
+        let (arc, _) = ed.fillet_handle().unwrap();
         assert!(ed.commit_corner(&mut d).changed);
         let dim = d.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Radius { curve, .. } if curve == arc)).map(|c| c.id).expect("its radius");
         let r = ed.apply_dimension(&mut d, dim, "5", &UnitPrefs::default(), &std::collections::BTreeMap::<String, noshape_units::Quantity>::new());
@@ -11986,7 +12038,7 @@ mod tests {
         let r = d.sketch.corner_rectangle(v(0.0, 0.0), v(0.04, 0.02));
         let p0 = d.sketch.point(r.points[0]).unwrap();
         click(&mut ed, &mut d, p0);
-        let (arc, m) = ed.fillet_handle(&d.sketch).expect("manipulator");
+        let (arc, m) = ed.fillet_handle().expect("manipulator");
         ed.dim_edit = None;
         ed.tool_down(&mut d, m, None, false, false);
         let target = m + (m - p0).normalize() * -0.0005;
@@ -13458,6 +13510,60 @@ mod tests {
         assert!(!data.sketch.constraint(driven).unwrap().driving);
         for (_, _, text, _) in ed.dimension_labels(&data, &UnitPrefs::default()) {
             assert!(!text.starts_with('('), "{text}");
+        }
+    }
+
+    /// Live walk3-1121 (2): a Line chain through the Origin keeps every segment: (-30, 0) → Origin → (0, 20) → (-30, 20)
+    /// makes 3 lines (qa FEEL-CHAIN-ORIGIN-DROP).
+    #[test]
+    fn a_line_chain_through_the_origin_keeps_its_segments() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        for p in [v(-0.03, 0.0), v(0.0, 0.0), v(0.0, 0.02), v(-0.03, 0.02)] {
+            click(&mut ed, &mut d, p);
+        }
+        assert_eq!(count(&d, EntityKind::Line), 3, "{:?}", d.sketch.entities().filter_map(|e| d.sketch.curve(e.id)).collect::<Vec<_>>());
+    }
+
+    /// Live walk3-1121 (6a): a tangent arc started at a line's end on the Origin is made, Tangent to the line and
+    /// Coincident with its end (qa FEEL-TANGENT-ARC-AT-ORIGIN).
+    #[test]
+    fn a_tangent_arc_from_a_line_end_on_the_origin() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        for p in [v(-0.03, 0.0), v(0.0, 0.0)] {
+            click(&mut ed, &mut d, p);
+        }
+        ed.set_tool(Tool::TangentArc);
+        for p in [v(0.0, 0.0), v(0.015, 0.012)] {
+            click(&mut ed, &mut d, p);
+        }
+        assert_eq!(count(&d, EntityKind::Arc), 1, "{:?}", ed.message);
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Tangent { .. })));
+        // Live walk3-1121 (6b): a Slot clicked on that line at the Origin, then Enter: 2 arcs, 3 lines.
+        let (mut ed, mut d) = editor(Tool::Line);
+        for p in [v(-0.03, 0.0), v(0.0, 0.0)] {
+            click(&mut ed, &mut d, p);
+        }
+        ed.set_tool(Tool::Slot);
+        let line = d.sketch.entities().find(|e| e.kind() == EntityKind::Line).map(|e| e.id).unwrap();
+        let end = d.sketch.endpoints(line).map(|(a, b)| if d.sketch.point(a).unwrap().length() < 1e-9 { a } else { b }).unwrap();
+        ed.pointer_move(&mut d, v(0.0, 0.0), false, false);
+        ed.tool_down(&mut d, v(0.0, 0.0), Some(end), false, false);
+        ed.tool_up(&mut d, v(0.0, 0.0));
+        assert!(ed.commit_slot(&mut d).changed, "{:?}", ed.message);
+        assert_eq!((count(&d, EntityKind::Arc), count(&d, EntityKind::Line)), (2, 3));
+    }
+
+    /// Live walk3-1121 (5) c2still / c3still: with the pointer still after the 2nd and 3rd click, the spline through the
+    /// clicks stays drawn (qa FEEL-SPLINE-PREVIEW-VANISHES).
+    #[test]
+    fn a_spline_stays_drawn_with_the_pointer_still_after_a_click() {
+        let (mut ed, mut d) = editor(Tool::Spline);
+        for p in [v(0.0, 0.0), v(0.02, 0.01), v(0.04, 0.0)] {
+            click(&mut ed, &mut d, p);
+            let (lines, _) = ed.overlay(&d, &UnitPrefs::default());
+            let blue = lines.segments.iter().filter(|s| s.color == [68, 156, 205, 255]).count();
+            let want = match ed.clicks.len() { 0 | 1 => 0, 2 => 1, _ => 5 };
+            assert!(blue >= want, "after click {}: {blue} preview segments", ed.clicks.len());
         }
     }
 }
