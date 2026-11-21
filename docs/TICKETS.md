@@ -5,6 +5,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## skasm, 2026-11-21 (Mac parity suite on main 01d8226a + skasm's Corner+Joint)
+- [ ] P2 **LOFT3-EDGES (core)**: c2-loft-paths-guides' first difference is feature 16 "Loft 3" (solid, ADD, profiles JVC and JYC,
+  spine JcB = Sketch 7's wire, addSections, trimGuidesByProfiles): "Part 1" 15/37/27 faces/edges/vertices, live 15/33/23 (same 15
+  faces; 4 more edges and vertices), then Mirror 1 27/73/53 (live 27/67/47), Loft 4 ERROR "Could not create loft" (live OK) and Loft
+  5 34/93/67 (live 38/94/64). Features 0-15 match (Sketches 4 and 6 keep live's stored geometry; their translation is skasm's, it
+  doesn't move the profiles). Probe: `NOSHAPE_PARITY_ONLY=c2-loft-paths-guides NOSHAPE_PARITY_DIFFERING=1 <parity binary>
+  parity::parity_models --ignored --nocapture` from crates/ops (Mac: ~/noshape-host/agents/skasm-keep/lpg.out).
+
 ## dx, 2026-11-21 (speed reference Part Studios 11-20 vs live's server column, behaviours "Speed reference (11-20)"; CLI, release main 4a22b296, vibex6 load 9-12)
 Ours is at or under live on every edit, undo and roll except c2-rings-loft (below): louver edit 2.8-4.1 s (live 6.9-8.4), links
 0.16-0.19 (0.44-0.50), pipe 0.33-0.36 (1.6-3.4), knifehandle 1.8-1.9 (1.4-2.4), standoffs 1.29-1.31 (0.91-1.01), loft-paths-guides

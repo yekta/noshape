@@ -1448,6 +1448,15 @@ impl<'a> Translator<'a> {
                 Err(e) => {
                     let v: Value = serde_json::from_str(&e).unwrap_or(Value::Null);
                     let Some(param) = v["param"].as_str().and_then(|p| p.strip_prefix("params.")).map(|p| p.split(['.', '[']).next().unwrap_or(p).to_string()) else { return Err(e) };
+                    // More than the dialog picks: live's one query names them all (c2-cov2-sm-corner-break-relief-joint's
+                    // Joint rip edge: qClosestTo gives the rip's two sides, one joint); the first ones, as a pick.
+                    let most = v["message"].as_str().and_then(|m| m.split("takes at most ").nth(1)).and_then(|m| m.split(' ').next()).and_then(|n| n.parse::<usize>().ok());
+                    if let (Some(n), Some(items)) = (most, args["params"][param.as_str()].as_array_mut())
+                        && items.len() > n
+                    {
+                        items.truncate(n);
+                        continue;
+                    }
                     if args["params"].as_object_mut().and_then(|m| m.remove(&param)).is_none() {
                         return Err(e);
                     }

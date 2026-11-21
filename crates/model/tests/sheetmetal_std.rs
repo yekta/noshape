@@ -542,6 +542,34 @@ fn closed_corner_matches_live() {
     assert!((volume_mm3(&r) - 8535.1655548).abs() < 0.01 && (count("PLANE"), count("CYLINDER"), count("OTHER")) == (17, 4, 2), "{} mm³: {report:#?}", volume_mm3(&r));
 }
 
+/// A sized round corner relief smaller than its corner's bend-allowance square isn't cut, and the corner warns (live
+/// c2-cov2-sm-corner-break-relief-joint's Corner 2, 5 mm round at a 1.6 mm sheet's 2.3 mm bends: WARNING
+/// SHEET_METAL_CORNER_UNDER_SIZED); one large enough is cut without a warning.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn an_under_sized_round_corner_relief_warns() {
+    for (diameter, warns) in [("1 mm", true), ("12 mm", false)] {
+        let mut s = g34();
+        let r = s.ok();
+        let before = volume_mm3(&r);
+        let v = vertex_at(&r, DVec3::new(2.0, 2.0, 2.0));
+        s.add("sheetMetalCorner", |p| {
+            p.set("corner", ParamValue::Query(vec![v]));
+            p.set("cornerStyle", en("SIZED_ROUND"));
+            p.set("roundReliefDiameter", expr(diameter));
+        });
+        let r = s.ok();
+        let last = r.display.features.last().unwrap();
+        let text = noshape_model::regen::custom_features::error_text("SHEET_METAL_CORNER_UNDER_SIZED");
+        assert_ne!(text, "SHEET_METAL_CORNER_UNDER_SIZED");
+        if warns {
+            assert_eq!((last.status, last.message.as_deref()), (FeatureStatus::Warning, Some(text.as_str())), "{diameter}");
+        } else {
+            assert!(last.status == FeatureStatus::Ok && volume_mm3(&r) < before - 1.0, "{diameter}: {:?} {:?}, {} mm³ (before {before})", last.status, last.message, volume_mm3(&r));
+        }
+    }
+}
+
 /// Live G34 (b): after (a)'s Closed corner, a Joint on the corner rip picked
 /// as the front wall's end edge, Rip, Butt joint - Direction 1: the front
 /// wall runs through to x = −2 (its faces 992 mm²), Direction 2 the left one

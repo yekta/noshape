@@ -1192,7 +1192,9 @@ impl WrappedCut {
 /// (`ext`: how far the relief reaches past the bend-allowance square), and
 /// the wall and both flanges lose the relief's rectangle. Returns the bend
 /// clips (edge, vertex, distance) and the cutters by wall.
-fn corner_reliefs(def: &Definition, topo: &Topo, outlines: &[Outline], bends: &BendList, setbacks: &BTreeMap<usize, f64>) -> FResult<(Clips, Clips, Cuts, Vec<WrappedCut>)> {
+/// Also whether a sized round relief is smaller than its corner (live: no relief, WARNING SHEET_METAL_CORNER_UNDER_SIZED).
+fn corner_reliefs(def: &Definition, topo: &Topo, outlines: &[Outline], bends: &BendList, setbacks: &BTreeMap<usize, f64>) -> FResult<(Clips, Clips, Cuts, Vec<WrappedCut>, bool)> {
+    let mut under_sized = false;
     let mut clips = Vec::new();
     let mut extends = Vec::new();
     let mut cuts = Cuts::new();
@@ -1316,6 +1318,7 @@ fn corner_reliefs(def: &Definition, topo: &Topo, outlines: &[Outline], bends: &B
                 let half_diagonal = (b1 * b1 + b2 * b2).sqrt() * 0.5;
                 let radius = if style == "ROUND" { corner.scale * half_diagonal } else { corner.diameter * 0.5 };
                 if radius < half_diagonal {
+                    under_sized |= style == "SIZED_ROUND";
                     continue;
                 }
                 let (c1, c2) = (s2 - b2 * 0.5, s1 - b1 * 0.5);
@@ -1355,7 +1358,7 @@ fn corner_reliefs(def: &Definition, topo: &Topo, outlines: &[Outline], bends: &B
             }
         }
     }
-    Ok((clips, extends, cuts, wraps))
+    Ok((clips, extends, cuts, wraps, under_sized))
 }
 
 /// The solid a closed corner cuts off a bend of up to 90° (live G34a): what
@@ -1464,6 +1467,8 @@ struct Built {
     /// Each wall's face on its definition plane (reliefs cut), by definition face.
     wall_flats: Vec<(usize, Shape)>,
     strips: Vec<Strip>,
+    /// A sized round corner relief too small for its corner.
+    under_sized: bool,
 }
 
 /// A bend's developed strip: the tangent lines on its two walls (from the
@@ -1739,7 +1744,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         let runs_on = if l.curved[next] { arc_along(&topo, l.side[next], if at_start { l.pts[j] } else { l.pts[next] }, dir) } else { along.cross(dir).length() <= 1e-9 };
         connector <= reach + TOL && runs_on && !def.bends.contains_key(&l.side[next]) && !def.rips.contains(&l.side[next])
     };
-    let (clips, extends, mut cuts, wraps) = corner_reliefs(def, &topo, &outlines, &bends, &setbacks)?;
+    let (clips, extends, mut cuts, wraps, under_sized) = corner_reliefs(def, &topo, &outlines, &bends, &setbacks)?;
     for (e, fa, fb, b) in bends {
         stop_if_cancelled()?;
         // The bend runs where both walls do (a simple corner ends it where
@@ -2195,7 +2200,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         });
     }
     let fused = exact_bend_edges(fuse(&parts)?, &strips, front + back);
-    Ok(Built { part: fused, pieces, topo, wall_flats, strips })
+    Ok(Built { part: fused, pieces, topo, wall_flats, strips, under_sized })
 }
 
 /// The part's B-spline edges that are a bend's arcs rebuilt as circles, and straight ones as lines: two bends meeting
@@ -2636,13 +2641,15 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let st = cx.state.lock();
         (st.feature_order.clone(), st.feature)
     };
+    let mut under_sized = false;
     let built = run_op(i, &cx, &op, "SHEET_METAL_REBUILD_ERROR", |ev| {
         let mut out = Vec::new();
         let mut fresh = 0u32;
         for (n, def) in defs.iter().enumerate() {
             let Some(bi) = ev.ctx.bodies.iter().position(|b| b.id == def.body) else { continue };
             let shape = ev.ctx.bodies[bi].shape.clone();
-            let Built { mut part, mut pieces, topo, wall_flats, strips } = build_part(def, &shape)?;
+            let Built { mut part, mut pieces, topo, wall_flats, strips, under_sized: small } = build_part(def, &shape)?;
+            under_sized |= small;
             stop_if_cancelled()?;
             let births = births(&mut ev.ctx.sm_births, def, &topo);
             // Forms: the parts to remove cut, then the parts to add united;
@@ -2858,6 +2865,13 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let reported = st.status.get(&top).is_some_and(|v| v.get("statusType").as_str().is_some_and(|t| matches!(&*t, "ERROR" | "WARNING")));
     if built.iter().any(|b| b.4.cannot_unfold) && !reported {
         let message = super::std_enum("errorstringenum.gen.fs", "ErrorStringEnum", "SHEET_METAL_COULD_NOT_UNFOLD").unwrap_or_else(|| Value::str("SHEET_METAL_COULD_NOT_UNFOLD"));
+        st.status.insert(top.clone(), Value::map_from([("statusType", Value::str("WARNING")), ("statusEnum", message)]));
+    }
+    // A sized round relief smaller than its corner's bend-allowance square: none, and a warning on every rebuild of the
+    // part (c2-cov2-sm-corner-break-relief-joint: Corner 2's 5 mm relief, and Corner 3 at another corner after it).
+    let reported = st.status.get(&top).is_some_and(|v| v.get("statusType").as_str().is_some_and(|t| matches!(&*t, "ERROR" | "WARNING")));
+    if under_sized && !reported {
+        let message = super::std_enum("errorstringenum.gen.fs", "ErrorStringEnum", "SHEET_METAL_CORNER_UNDER_SIZED").unwrap_or_else(|| Value::str("SHEET_METAL_CORNER_UNDER_SIZED"));
         st.status.insert(top.clone(), Value::map_from([("statusType", Value::str("WARNING")), ("statusEnum", message)]));
     }
     let quiet = st.status.get(&top).is_none_or(|v| v.get("statusType").as_str().is_some_and(|t| &*t == "INFO"));
