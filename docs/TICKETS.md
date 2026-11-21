@@ -287,6 +287,19 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - 13 "no recording" scenarios of run 07879475 (the app exited silently) all ran in the loop's next run: not filed. rolled-back-row-menu
   matches since psui 9ffded3f6.
 
+## qa, 2026-11-21 21:3x (USER P0 sketch walk 4, lead: the tools walk 3 skipped; green 2fb0ed1ac, vibe2 walk3/gen6.py, out-w6)
+
+- [ ] P0 **FEEL-TEXT-BOX-PREVIEW (skasm)**: Text tool, two clicks (-20, 0) and (20, 10): while the Text dialog is open, live draws
+  only the box, a light-blue **dash-dot** rectangle with **four corner points**, and no text (sketch/132; the text comes on ✓,
+  134). Ours draws "Default text" in the box at once, inside a short-dash outline with no corner points. The dialog itself
+  matches (Open Sans, B, I, the two flips, preview, "Default text" selected, 12/250). qa-scratch/tickets/text-box-w4.png (live, ours).
+- Matched live (no ticket): elliptical arc (4 clicks, boxed last value), conic (Rho value box 0.5 on the 3rd click, "Rho 0.5"
+  kept after Enter), circumscribed polygon (Esc discards the uncommitted one), Bezier (Deg 3), point, midpoint line, linear and
+  circular pattern previews (3x / 1x, arrows, square handles, the 1 in spacing dimension), point-to-point dimensions (above:
+  horizontal, right: vertical), arc radius, point-to-line distance, a tool's key toggling it off and on, Enter with no pending
+  segment / no tool, Esc per tool (spline commits and keeps the tool), constraint badge hover (yellow, both entities lit; live
+  27), Shift+1..7 and F in the Part Studio, arrow keys rotating 15° in a sketch.
+
 ## qa, 2026-11-21 20:5x (USER P0 sketch-tool walk 3, lead: every sketch tool, menus, shortcuts; green 2fb0ed1ac, vibe2 walk3/out-w3..w5)
 
 - [ ] P0 **FEEL-SKFILLET-FLOW (skasm)**: Sketch fillet (Shift+F) on a rectangle corner. (a) Hovering the corner already draws the
