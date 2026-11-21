@@ -52,6 +52,21 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   face of 282.843 mm2 removed) fails in ours ("Could not shell part with selections.", 25.4 s); live OK in 20 ms, Part 2
   172908.326 mm3, 59 faces / 163 edges / 98 vertices. Ours before Shell 5 = live's (49 faces, 175798.2 mm3).
 
+## qa, 2026-11-21 (asm P2 walk, green b3ece860, vibe2; evidence /root/qa-scratch/walk2)
+- [ ] P2 **ASM-VERTEX-CONNECTOR-WORLD-AXES (asm)**: live: a vertex's implicit mate connector is world-aligned (behaviours.md
+  "ui (10-26 b)": Z up, X along world X). Ours: assembly_mate_connector on the corner vertex (40,20,10) of a 40x20x10 block
+  gives the x = 40 face's frame (Z = +X, X = +Y, Y = +Z); in the app, hovering that corner in Mass and section properties ›
+  Mate connector for reference frame snaps a frame with Z along −X, Y down. So the Face tab about a corner connector reads
+  Lxx ≈ 0, Lyy = Lzz 106666.664 where live reads 106666.667 / 160000 / 426666.667 / 533333.333 (with world axes ours matches).
+- [ ] P2 **INSERT-OTHER-DOC-GRAPH-MARKS (asm)**: Insert › Other documents › an opened document (live parity-open-1120/ob,
+  ob-pre-1/2.png). Version graph: live's legend has two rows, "Workspace · Version" and "Release candidate · Release"
+  (pin icons), and the release version OBS-REL-1 has a solid ▲. Ours has one legend row ("○ Workspace ● Version") and
+  OBS-REL-1 is a plain dot. Part Studios list: live shows the filter row (Parts / Sketches icons, expand-all at the right)
+  and Part Studio 1 expanded to Part 1. Ours has no filter row, and the studios are collapsed.
+- [ ] P3 **FACE-MOMENT-DIGITS (asm)**: Face tab, the 40x20 top face: about its centroid ours reads Lxx 26666.664,
+  Lyy 106666.657, Lzz 133333.321; about the corner, 106666.664 / 426666.657 / 533333.321. Live (exact for a plane) reads
+  ….667 / ….667 / ….333: our integration is off by up to 0.012 mm⁴ on a flat rectangle.
+
 ## qa, 2026-11-21 (agent API gaps)
 - [ ] P2 **OP-MASS-FACE-SECTION (asm; Part Studio side: lead to route)**: Mass and section properties › Face (area, perimeter,
   area moments Lxx / Lxy / Lyy / Lzz, optionally about "Mate connector for reference frame") has no op. assembly_mass_properties
@@ -127,7 +142,7 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   lies on Top (0.000 deg / 0.000 / 0.000 mm); no Length and no Curvature deviation in either. A vertex or an edge
   midpoint with Top reads Min dist alone (ours the same). Ours (query_measure plane:top + circle): adds Length
   31.416 mm to both, and Curvature deviation 0 % on the lying circle (measure.rs circle-plane branch).
-- [x] P2 **ASM-PATTERN-ZERO-DISTANCE-MARK (asm)**: workflow-assembly-sweep 21. Live: assembly Linear pattern with
+- [x] verified b3ece860 (qa 11-21 05:5x, vibe2, qa-scratch/walk2: Linear pattern, Distance 0 mm: title (170,37,45), field #f9ebec, rule #bd3039 (2 px, the known NUMBER-FIELD-ERROR-MARK residual), Instance count 2 unchanged) P2 **ASM-PATTERN-ZERO-DISTANCE-MARK (asm)**: workflow-assembly-sweep 21. Live: assembly Linear pattern with
   Distance 0 mm: red title rgb(170,37,45) and the Distance field invalid as in a Part Studio (background #f9ebec,
   1 px bottom border #bd3039, class os-invalid); Instance count unchanged. Ours leaves Distance white (TICKETS
   NUMBER-FIELD-ERROR-MARK residual).
@@ -142,14 +157,14 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   Show faulty parts · Show center of mass. Ours (drawing_move_sheet.rs multi menu): no Tangent edges, an extra
   Align views ▸, and Show/hide lists hidden lines / shaded / threads / auto centermarks (no faulty parts, no centre
   of mass).
-- [x] P2 **ASM-INSERT-RELEASED-ITEMS (asm)**: release-history 168. Live (company document, Part 1 released as Rev A
+- [x] verified b3ece860 (qa 11-21 05:4x, vibe2, qa-scratch/walk2 r1-r4: ▲ tooltip "View released items"; Part 1 OBS-PN-1 (A) listed, obsoleted Part 2 left out; inserts; residuals INSERT-OTHER-DOC-GRAPH-MARKS) P2 **ASM-INSERT-RELEASED-ITEMS (asm)**: release-history 168. Live (company document, Part 1 released as Rev A
   · OBS-PN-1 in release "OBS-REL-1", then obsoleted): assembly Insert › Other documents › the document has a ▲ button
   (tooltip "View released items") beside the version graph; on, the Part Studios tab lists "Part 1 OBS-PN-1 (A)";
   after the obsoletion it reads "No Part Studios found." The version graph still lists OBS-REL-1 with its solid ▲
   release mark, unchanged (insertable as a version). Ours: assembly Insert has no released-items view (the drawing
   chooser's `released_items` already does this, drawing.md V1).
   Done (asm 11-20): ▲ View released items in Insert › Other documents; test an_other_documents_released_items_leave_out_obsoleted_revisions.
-- [x] P2 **ASM-FACE-TAB-REFERENCE-FRAME (asm)**: assembly.md LA49. Live: Mass and section properties › Face with
+- [x] verified b3ece860 (qa 11-21 05:5x, vibe2, qa-scratch/walk2 z3: corner connector realigned to world axes: Lxx 106666.664, Lxy 160000, Lyy 426666.657, Lzz 533333.321 mm⁴, area 800, perimeter 120; residuals ASM-VERTEX-CONNECTOR-WORLD-AXES, FACE-MOMENT-DIGITS) P2 **ASM-FACE-TAB-REFERENCE-FRAME (asm)**: assembly.md LA49. Live: Mass and section properties › Face with
   "Mate connector for reference frame" set (a connector on the corner (40,20,10) of a 40x20x10 block, world axes, top
   face picked): Lxx 106666.667, Lxy = Lyx 160000, Lyy 426666.667, Lzz 533333.333 mm⁴ (parallel axis to the
   connector's origin in its axes; product +A·dx·dy), area / perimeter unchanged. Ours computes about the faces'
@@ -157,7 +172,7 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   Done (asm 11-20): moments about the connector's origin in its axes; test face_section_properties_like_live (mc1-mc3).
 
 ## live, 2026-11-20 (Onshape 1.222 / 1.223 release audit)
-- [x] P2 **INSERT-OTHER-DOCS-SORT (asm)** (asm 11-20 06:1x: the Sort button and its name order for an opened other document, with Current document's remembered choice; test an_other_documents_studios_sort_by_name_as_the_current_documents): Onshape 1.223 "sorting in the Current document and Other documents tabs of the
+- [x] verified b3ece860 (qa 11-21 05:4x, vibe2, qa-scratch/walk2 i3-i5: an opened document's Part Studios: Sort beside the search, Name: A → Z (✓, default) / Z → A, Zeta / Part Studio 1 / Mid / Alpha; none on the source list) P2 **INSERT-OTHER-DOCS-SORT (asm)** (asm 11-20 06:1x: the Sort button and its name order for an opened other document, with Current document's remembered choice; test an_other_documents_studios_sort_by_name_as_the_current_documents): Onshape 1.223 "sorting in the Current document and Other documents tabs of the
   insert dialog". Live 05:42: Insert › Other documents › a document's Part Studios / Assemblies list has the same sort button
   beside its search box as Current document (Name: A → Z / Z → A). Ours shows Sort only for the current document
   (assembly_panels.rs, insert_source == 0). Live 05:52: the button is in an opened document's lists only (Name: A → Z / Z → A);
