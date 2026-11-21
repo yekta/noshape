@@ -628,25 +628,30 @@ fn iges_header() {
 }
 
 /// IGES "Use compatibility mode for surfaces and curves" (live exchange batch 1, 11-20): each face a Trimmed Surface
-/// (144), no Manifold Solid (186); its faces read back sewn into the solid, as live imports them.
+/// (144), no Manifold Solid (186), every surface and curve a B-spline (128 / 126 / 102, a closed face in halves: live
+/// c2-housing-draft's live-opt-compat.igs); its faces read back sewn into the solid, as live imports them.
 #[test]
 fn iges_compatibility_mode_reads_back_as_a_solid() {
     let dir = std::env::temp_dir().join(format!("noshape-igs-compat-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    let s = make_box(&Plane::xy(), 0.04, 0.03, 0.01).unwrap();
-    let path = dir.join("compat.igs");
-    write_iges_parts_as(&path, &[ExportShape { shape: s, name: None, color: None }], LengthUnit::Meter, true).unwrap();
-    let text = std::fs::read_to_string(&path).unwrap();
-    let types: Vec<u32> = text.lines().filter(|l| l.len() >= 73 && &l[72..73] == "D").step_by(2).filter_map(|l| l[..8].trim().parse().ok()).collect();
-    let back = read_iges_parts(&path, LengthUnit::Meter).unwrap();
+    let block = (make_box(&Plane::xy(), 0.04, 0.03, 0.01).unwrap(), 6, 1.2e-5);
+    // Its side in halves, and the two caps.
+    let cylinder = (make_cylinder(&Plane::xy(), 0.01, 0.02, std::f64::consts::TAU).unwrap(), 4, std::f64::consts::PI * 1e-4 * 0.02);
+    for (i, (s, faces, want)) in [block, cylinder].into_iter().enumerate() {
+        let path = dir.join(format!("compat-{i}.igs"));
+        write_iges_parts_as(&path, &[ExportShape { shape: s, name: None, color: None }], LengthUnit::Meter, true).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        let types: Vec<u32> = text.lines().filter(|l| l.len() >= 73 && &l[72..73] == "D").step_by(2).filter_map(|l| l[..8].trim().parse().ok()).collect();
+        let back = read_iges_parts(&path, LengthUnit::Meter).unwrap();
+        assert_eq!(types.iter().filter(|t| **t == 144).count(), faces, "{types:?}");
+        assert!(types.iter().all(|t| [102, 126, 128, 142, 144, 314, 402, 406].contains(t)), "{types:?}");
+        assert_eq!(back.len(), 1);
+        let solids = back[0].shape.solids();
+        assert_eq!(solids.len(), 1, "sewn into one solid");
+        let v = volume_properties(&solids[0]).unwrap().mass;
+        assert!((v - want).abs() < 1e-6 * want, "{v} vs {want}");
+    }
     let _ = std::fs::remove_dir_all(&dir);
-    assert_eq!(types.iter().filter(|t| **t == 144).count(), 6, "{types:?}");
-    assert!(!types.contains(&186), "{types:?}");
-    assert_eq!(back.len(), 1);
-    let solids = back[0].shape.solids();
-    assert_eq!(solids.len(), 1, "sewn into one solid");
-    let v = volume_properties(&solids[0]).unwrap().mass;
-    assert!((v - 1.2e-5).abs() < 1e-9, "{v}");
 }
 
 /// Parts' names and colours in IGES as Onshape writes them (live

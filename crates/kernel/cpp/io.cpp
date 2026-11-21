@@ -4,6 +4,7 @@
 // unit conversion is done by the Rust layer.
 #include "internal.hpp"
 #include <BRepBuilderAPI_Copy.hxx>
+#include <BRepBuilderAPI_NurbsConvert.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
@@ -14,6 +15,7 @@
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <ShapeFix_Shape.hxx>
+#include <ShapeUpgrade_ShapeDivideClosed.hxx>
 #include <BRepTools_ReShape.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepLib.hxx>
@@ -2148,7 +2150,32 @@ std::vector<occ::handle<IGESData_IGESEntity>> name_iges_solids(IGESControl_Write
 
 // The parts to an IGES writer in BRep mode, each with its long splines cut
 // to the parts its edges use; the shapes written.
-std::vector<TopoDS_Shape> add_iges_parts(IGESControl_Writer& w, const OcShapeList& shapes)
+// Compatibility mode as live's (live-opt-compat.igs: 128 / 126 / 102 only, a closed face in halves): every surface
+// and curve a B-spline.
+TopoDS_Shape iges_compat_shape(const TopoDS_Shape& in)
+{
+  ShapeUpgrade_ShapeDivideClosed d(BRepBuilderAPI_Copy(in, true, false).Shape());
+  d.SetNbSplitPoints(1);
+  d.Perform();
+  const TopoDS_Shape split = d.Result();
+  try
+  {
+    BRepBuilderAPI_NurbsConvert conv(split, true);
+    if (conv.IsDone())
+      return conv.Shape();
+  }
+  catch (const Standard_Failure&)
+  {
+  }
+  ShapeFix_Shape fix(split);
+  fix.Perform();
+  BRepBuilderAPI_NurbsConvert conv(fix.Shape(), true);
+  if (!conv.IsDone())
+    fail_op("IGES: NURBS conversion failed");
+  return conv.Shape();
+}
+
+std::vector<TopoDS_Shape> add_iges_parts(IGESControl_Writer& w, const OcShapeList& shapes, bool compat = false)
 {
   if (shapes.items.empty())
     fail_invalid("nothing to export");
@@ -2156,7 +2183,7 @@ std::vector<TopoDS_Shape> add_iges_parts(IGESControl_Writer& w, const OcShapeLis
   for (const auto& s : shapes.items)
   {
     require_non_null(s, "exported shape");
-    written.push_back(step_bsurfaces(compact_bspline_edges(s)));
+    written.push_back(compat ? iges_compat_shape(s) : step_bsurfaces(compact_bspline_edges(s)));
     w.AddShape(written.back());
   }
   w.ComputeModel();
@@ -2286,7 +2313,7 @@ void write_iges(const OcShapeList& shapes, rust::Slice<const rust::String> names
   std::lock_guard<std::mutex> lock(xde_mutex());
   quiet_messenger();
   IGESControl_Writer w("MM", trimmed ? 0 : 1);
-  name_iges_solids(w, add_iges_parts(w, shapes), names, colours);
+  name_iges_solids(w, add_iges_parts(w, shapes, trimmed), names, colours);
   write_iges_file(w, path_str(path), system, version);
 }
 
