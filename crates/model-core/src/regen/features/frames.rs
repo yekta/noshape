@@ -1097,19 +1097,20 @@ pub fn cutlist(ev: &mut EvalCtx) -> FResult<()> {
     if ids.as_ref().is_some_and(|v| v.is_empty()) {
         return crate::regen::eval::err_at(&["frames"], "Select frames to create a cutlist");
     }
-    let rows = cut_list(&ev.ctx, ids.as_deref());
-    if rows.is_empty() {
+    if ids.is_none() && cut_list(&ev.ctx, None).is_empty() {
         return err("The selection contains no frame parts");
     }
-    if let Some(ids) = &ids {
-        let non_frame = ids.iter().filter(|id| !ev.ctx.frame_members.contains_key(id)).count();
-        if non_frame > 0 {
-            ev.warnings.push(format!("{non_frame} selected part(s) are not frame parts and are not listed"));
-        }
-    }
     // Std createOpenComposite: an open composite part of the frames, its table's, named as any new composite part
-    // ("Composite part 1", live 2299; a drawing's Cut list table inserts it).
-    let frames: Vec<usize> = ev.ctx.bodies.iter().enumerate().filter(|(_, b)| b.composite.is_none() && ev.ctx.frame_members.contains_key(&b.id) && ids.as_ref().is_none_or(|ids| ids.contains(&b.id))).map(|(i, _)| i).collect();
+    // ("Composite part 1", live 2299; a drawing's Cut list table inserts it). Selected parts that aren't frames go in
+    // too, as std's rows with no data (cutlist.fs buildUngroupedRows; c2-hgr-riser-weldment's Cut list 2 takes the Foot).
+    let frames: Vec<usize> = ev
+        .ctx
+        .bodies
+        .iter()
+        .enumerate()
+        .filter(|(_, b)| b.composite.is_none() && ids.as_ref().map_or(ev.ctx.frame_members.contains_key(&b.id), |ids| ids.contains(&b.id)))
+        .map(|(i, _)| i)
+        .collect();
     super::refgeom::make_composite(ev, &frames, false, 0)
 }
 

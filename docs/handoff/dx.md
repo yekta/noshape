@@ -9,29 +9,28 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
-## Now (23:55 11-20): HGR (dx-land) / EXCHANGE FIXES (dx-urdf)
-- LANDED: 00bc521e, 1d702422 (chamfer rule, Measured variable, Frame trim FACE: hgr 35/52).
-- c2-sm-louver 36 -> 35: the base of 6f709a64 gives 35 too, so it came from main (Sketch 9 frame origin x -676.03 vs
-  live -708.49); told skasm (louver Sketch 9 in its queue). Not mine.
-- dx-land 3419bb6d (commit, to land): parity translates a Frame's SWEPT_FACE (profile line -> planar side at its
-  offset) and HOLE_FACE "shaft" (the hole's bore): hgr Hole 3 35 -> 36/52. A/B over the 12 docs whose queries use
-  either: /root/dx-scratch/ab13.out (vibex7, ~/agents/dx-keep/ab13.sh: A this tree, B patch -R hole3.diff).
-- VALID-HGR-FOOT-OFFSET (qa P1): no repro on main + 3419bb6d (VALIDITY=1: no invalid body; 20 parts after Foot Offset
-  as live): closed in TICKETS (uncommitted, goes with the land). The suite ran 0a0b9a49, before the frame lands.
-- Frame side edges along the path (commit, to land with 3419bb6d): frames.rs along_path reverses a straight member's
-  side lines running against t0 (k::extrude's op_prism sweeps back toward the sketch, as live's Extrude; live's Frame
-  is opSweep). hgr Linear pattern 1 (Hole 3 x11 along the post's long edge, opposite) now steps up the post: hgr
-  36 -> 46/52. 3-way A/B on vibe2 (/root/dx-scratch/ab3.out, ~/agents/dx-keep/ab3.sh): 14 docs, no loss.
-  Test sheetmetal_frames::frame_side_edges_run_along_the_path (T2). Probe ~/agents/dx-keep/hgredge.sh <index>.
-- hgr next: feature 43 "Cut list 2": ours WARNING "1 selected part(s) are not frame parts and are not listed", live OK.
-- dx-exch e584b155 (land.sh 01:5x): glTF nodes as parts, flattened STEP names, IGES compat + sewn read, zips,
-  DXF splines as polylines (live puts them on layer 0: a shortcoming), exploded glyph outlines, Parasolid v28 read
-  (xt_schema.inc index_map_offset only at 30.1+). exo d (vibe2, prebuilt release binary, ~/agents/dx-keep/exo2.sh):
-  options in ours 34/50 -> 39/50, read back 40/62 -> 43/62, times 30/30. Mac clippy (7 crates), drawing 262 /
-  model-data 121 lib, full ops e2e 264 ok. Open rows: duct DXF-POLYALL lacks layer ANNOTATION_TEXT (live keeps it for
-  the empty view labels; exploded_layers isn't reached for them), DXF-POLY MTEXT vs live's LWPOLYLINE (textOption,
-  REQUESTS), housing IGES compat 36/80/45 vs 36/79/44, STL-YUP / multipart STL (ticket).
-  vibe2's ~/parity/exchange had no live-opt-* files: copied from vibex8 for duct + housing (01:2x).
+## Now (02:10 11-21): HGR (dx-land) / EXCHANGE (dx-urdf)
+- LANDED 3f5d8b6f + b4f52649 (dx-land): parity translates a Frame's SWEPT_FACE and a Hole's HOLE_FACE shaft (hgr
+  Hole 3 35 -> 36/52); a straight Frame member's side edges run along its path (frames.rs along_path: op_prism sweeps
+  back toward the sketch, live's Frame is opSweep): hgr 36 -> 46/52; VALID-HGR-FOOT-OFFSET closed. 3-way A/B on vibe2
+  (/root/dx-scratch/ab3.out, ~/agents/dx-keep/ab3.sh): 14 docs, no loss. Probe ~/agents/dx-keep/hgredge.sh <index>.
+- c2-sm-louver 36 -> 35 came from main (Sketch 9 frame origin): skasm's.
+- dx-land commit (land.sh 02:2x): Cut list keeps a selected part that isn't a frame as std's
+  (cutlist.fs buildUngroupedRows: a row with no data, in the composite, no warning); hgr 43 "Cut list 2" takes the
+  Foot: hgr 46 -> 47/52, saw-table 27/27, endcap / gusset 4/4. Test in frame_rectangle_mitered_cut_list; Mac sheetmetal_frames 19 ok, clippy clean. Run on the Mac
+  (~/noshape-host/dx-keep/pm-hgr/models: hgr, saw-table, cov-frame endcap / gusset) -> /root/dx-scratch/hgr43.out.
+  Diff also at /root/dx-scratch/cutlist.diff.
+- hgr next: feature 47 "Sheet metal model 1" (sheetMetalStart): ours ERROR "Variable not found, is suppressed, or has
+  not been set.", live OK (20 parts, live 21: Funnel Guide).
+- CHECKING 6ba3c899 (dx-urdf): glTF nodes as parts, flattened STEP names, IGES compat + sewn read, zips, DXF splines
+  as polylines, exploded glyph outlines, Parasolid v28 read. exo d (vibe2, ~/agents/dx-keep/exo2.sh): options in ours
+  34/50 -> 39/50, read back 40/62 -> 43/62, times 30/30.
+- dx-urdf aa7fb5d18 (commit, land after 6ba3c899): spline POLYLINEs and their VERTEXes on layer 0 as live's (lead
+  11-21: copy live's layers unless that loses geometry); a 2-point LWPOLYLINE keeps its edge's layer. Mac drawing 263
+  lib, clippy, full ops e2e 272 ok.
+- Open exchange rows: duct DXF-POLYALL lacks layer ANNOTATION_TEXT (live keeps it for the empty view labels;
+  exploded_layers isn't reached for them), DXF-POLY MTEXT vs live's LWPOLYLINE (textOption, REQUESTS), housing IGES
+  compat 36/80/45 vs 36/79/44, STL-YUP / multipart STL (ticket).
 - live 11-21 00:0x: speed reference complete (10 Part Studios + Assemblies 1-5, behaviours "Speed reference (11-20)");
   server-side only for drags (SwiftShader frames).
 - textOption: REQUESTS asks live whether "true" = notes or all; the suite maps true -> explode_notes until then.

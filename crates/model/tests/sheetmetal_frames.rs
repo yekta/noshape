@@ -790,6 +790,28 @@ fn frame_rectangle_mitered_cut_list() {
     // Std createOpenComposite: an open composite of the four frames ("Composite part 1", live 2299).
     let c = r.context.bodies.iter().find(|b| b.composite.is_some()).expect("the cut list's composite part");
     assert_eq!((c.name.as_str(), c.composite.as_ref().map(|c| (c.members.len(), c.closed))), ("Composite part 1", Some((4, false))));
+    // A selected part that isn't a frame is a row with no data in std (cutlist.fs buildUngroupedRows), no warning, and
+    // goes in the composite (c2-hgr-riser-weldment's Cut list 2 takes the Foot).
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(400.0, 0.0), (450.0, 0.0), (450.0, 50.0), (400.0, 50.0)], true);
+    let block = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let r = s.regen();
+    let key = r.display.sketches.iter().find(|x| x.feature == block).unwrap().regions[0].key.clone();
+    s.add("extrude", move |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: block, key }]));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = s.ok();
+    let picked: Vec<Reference> = [0, r.context.bodies.len() - 1].iter().map(|&i| Reference::Body(r.context.bodies[i].id.clone())).collect();
+    assert!(r.context.bodies.last().is_some_and(|b| b.composite.is_none() && !r.context.frame_members.contains_key(&b.id)));
+    s.add("cutlist", move |p| {
+        p.set("selectAllFrames", ParamValue::Bool(false));
+        p.set("frames", ParamValue::Query(picked));
+    });
+    assert_eq!(s.last_status(), (FeatureStatus::Ok, String::new()));
+    let r = s.ok();
+    let c = r.context.bodies.iter().rfind(|b| b.composite.is_some()).unwrap();
+    assert_eq!(c.composite.as_ref().map(|c| c.members.len()), Some(2));
     // A Tag with no sketch (std doTagProfile).
     s.add("tag", |_| {});
     assert_eq!(s.last_status(), (FeatureStatus::Error, "Select a single sketch feature. The selected feature must create sketch regions.".to_string()));
