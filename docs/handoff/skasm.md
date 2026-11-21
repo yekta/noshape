@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-21 12:01 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-21 12:32 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## In flight (11-21 04:30 UTC)
@@ -31,18 +31,21 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - LANDED af717ef2: std Jog's two bends (c2-sm-jog-panel 5 -> 12/12; full parity 1723 -> 1730/2315, no other doc).
 - LANDED 381554f1: Hem 1 (c2-sm-hem-flange) keeps "Sheet metal model cannot be unfolded." (219 -> 222/295).
 - LANDED 9f5250bf: SM loft profiles with different corner counts walk the least total fold (host/loft.rs).
-- Loft apex (c2-sm-loft-basic 38 vs 40 faces), WAITING on live (REQUESTS skasm 11-21 11:59: relief scale 1.0 / 2.0
-  copies of fan-tol0p05 / 0p022). Samples: live/skasm/sm-loft-fans-1121/<name> (chordal 0.1 / 0.05 / 0.035 / 0.022 in =
-  3-6 bends; "-plane4" = Plane 1 at 4 in, a sharper fan with other differences too: 37 vs 44 faces). Parity on them: copy
-  the dirs (features.json, live.jsonl, source.json) to Mac ~/noshape-host/tmp-skasm/fans and set NOSHAPE_PARITY_MODELS;
+- SM suite (Mac 11-21 12:30, my build after bc92cab1): 22/23 docs, 259/260 features; only c2-sm-loft-basic's apex left.
+- Loft apex (c2-sm-loft-basic 38 vs 40 faces), WAITING on live (REQUESTS skasm 11-21 12:32: fan-tol0p022 / 0p035 with
+  corner relief Simple, Square - Sized 1 mm, Round - Scaled 1.0, full capture format). Samples:
+  live/skasm/sm-loft-fans-1121/<name> (chordal 0.1 / 0.05 / 0.035 / 0.022 in = 3-6 bends; "-plane4" = Plane 1 at 4 in,
+  two apexes, other differences too: 37 vs 44 faces; fan-tol0p05 = loft-basic itself). Parity on them: copy the dirs
+  (features.json, live.jsonl, source.json) to Mac ~/noshape-host/tmp-skasm/fans, set NOSHAPE_PARITY_MODELS;
   skasm-scratch/loft/ours.sh saves + dumps ours. FOUND (skasm-scratch/loft/flat.py develops live's walls / bends at the
-  neutral radius into the middle bend's plane; vflat.py, rect.py): live cuts the apex by ONE rectangle in the flat, open
-  toward the tip: u < uP (square to bend floor(n/2): its two walls and itself end on that plane, the other interior
-  walls on its unfolded line) and vlo < v < vhi (lines along that bend: the outer walls' cuts). Each other bend's end is
-  two splines along the rectangle's edges (its corner lies inside bend 0 / bend n-1). The rectangle is 1.2x (corner
-  relief scale) a box about its centre; the box's top = the last wall's corner (its free edge x its bend's tangent
-  line), all 4 samples to 1e-4 mm. Its bottom = the base's corner only at 3 bends (else 0.07-0.12 mm below wall 1's
-  corner), its far end (uP) unknown: scale 1.0 will show the box. Ours: each bend squared at its walls' corners.
+  neutral radius into the middle bend's plane; rect.py corners, sc.py maps another capture's cut planes): live cuts the
+  apex by ONE rectangle in the flat, open toward the tip: u < uP (square to bend floor(n/2): its two walls and itself
+  end on that plane, the other interior walls on its unfolded line) and vlo < v < vhi (lines along that bend: the outer
+  walls' cuts). Each other bend's end is two splines along the rectangle's edges. The rectangle = scale x a box about
+  the box's centre (0p022 at 1.0 and 1.2: to 1e-4 mm). Box top = the last wall's corner (its free edge x its bend's
+  tangent line), all 4 samples. 0p022 box (flat mm): u -115.0448..-110.7088, v -1.2643..0.7095; wall corners span u
+  -114.8561..-111.1292, v -1.1424..0.7095. Bottom = the base's corner only at 3 bends; u ends unexplained (tried:
+  strip overlaps, square bend ends, apex-axial strip starts, virtual sharps). Ours: each bend squared at its corners.
 - Debug std: throw a custom regenError message (FS println goes to notices, not stderr); restore edited files with a
   fresh mtime (rb.sh rsync keeps the old one and cargo skips the rebuild). NOSHAPE_FS_TRACE=1 names the throw's line.
 - LANDED 6d80df66: Unfold unrolls only its bend, Refold puts back the held side (unfold-refold 6/6, 212/295).
@@ -75,13 +78,13 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
   (c2-surf-intro-*/derived/<id>/, live.jsonl by rollback): rerun wave-washer and the surf-intro docs.
 
 ## Next, in order
-00. lead 11-20: 5 new SM suite models (forms, hem, jog, joint, SM loft): first difference each, before/after counts.
-00b. qa P2 SUITE-INTRO-TAILFIN-INTERSECTED: "Profile for tail fin" 1 INTERSECTED not found (surf-intro boundary/fill/
-   mutualtrim/ruled): Surface 2 area, Curve 1 start, Boundary surface 1 fails; qa-scratch/feel1120/car-one.log.
-00c. dx 11-20 (suite speed, not urgent): c2-sm-rocker-enclosure-body › Mirror 3 160 ms, live 10 ms (doc under the bar).
-00d. qa P2 SUITE-NEW-INDEX-1120-SKASM (TICKETS 7066344c1, on green 4e51cce3, before c41f27d3 / 566a4bc6): Form 1, jog
-   Sketch 1, Corner 1, hem SM model 1 gone on my branch. Open: c2-cov-sm-bend-relief Bend relief 1 volume +3.9 mm3;
-   c2-cov-sm-rip Rip 1 48/106/60 vs 46/100/56; c2-cov-sm-unfold-refold Unfold 1 56/128/74 vs 46/100/56; loft; joint.
+00. lead 11-20 SM suite models / qa 00d: all match but c2-sm-loft-basic (apex, above). Mac 12:30: 22/23, 259/260.
+00b. qa P2 SUITE-INTRO-TAILFIN-INTERSECTED: LANDING 11-21: an Intersection lands within 1 µm of live's ends (ours 0.19 µm
+   off): no INTERSECTED left / no take-back in surf-intro boundary/fill/mutualtrim/ruled (A/B over the 7 INTERSECTED
+   docs: nothing else changed). Left: Tail fin surface area 1.2e-5 off (3567.145 vs 3567.188 mm², ~0.6 µm of profile
+   length, cause not found) and 3D fit spline 1's shape (starts x 32.70, live 33.94, same ends and start direction):
+   core's (fit spline), told via the lead; Boundary surface 1 fails on it.
+00c. dx 11-20 (suite speed, not urgent): c2-sm-rocker-enclosure-body › Mirror 3 160-200 ms, live 10 ms (doc under the bar).
 0. USER P0 feel: rows of docs/parity/interaction-feel.md in my areas are "=" now; Hover timing is psui's.
 0b. live's camera retakes (025a33f6): sketch-line-from-midpoint, sketch-bezier-polygon, sketch-spline-handle-arm and 7 asm
    takes now compare the camera; rerun them after the land. asm-menu-instance-properties' Pro menu (Where used…, no

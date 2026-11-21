@@ -1734,6 +1734,9 @@ impl<'a> Translator<'a> {
         let mark = top(self);
         let point = u.shape["tool"] == "point";
         let made = if u.intersect { self.call("sketch_intersection", json!({ "sketch": id, "face": u.reference })) } else { self.call("sketch_use", json!({ "sketch": id, "references": [u.reference] })) }.inspect_err(|e| if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() { eprintln!("TRACE use {} {}: {e}", u.eid, u.reference) }).ok();
+        // An Intersection's ends are where a face's edges cross the plane: live's and ours part by up to 0.2 µm there
+        // (c2-surf-intro-boundary's tail fin profile).
+        let tol = if u.intersect { 1e-6 } else { 1e-7 };
         let near = |c: &Value, key: &str, q: [f64; 2]| {
             let q = map.local(q);
             // A spline's ends are its first and last points (control points of a B-spline).
@@ -1743,7 +1746,7 @@ impl<'a> Translator<'a> {
                 ("end", Some(l)) if c[key].is_null() => l.last(),
                 _ => Some(&c[key]),
             };
-            p.and_then(|p| p[0].as_f64().zip(p[1].as_f64())).is_some_and(|(x, y)| (x * map.k - q[0]).hypot(y * map.k - q[1]) < 1e-7)
+            p.and_then(|p| p[0].as_f64().zip(p[1].as_f64())).is_some_and(|(x, y)| (x * map.k - q[0]).hypot(y * map.k - q[1]) < tol)
         };
         // Live's used geometry in live's sketch coordinates (its frame; ours where live's wasn't fetched), for `near`.
         let frame = Some(map.onshape.unwrap_or(map.ours));
