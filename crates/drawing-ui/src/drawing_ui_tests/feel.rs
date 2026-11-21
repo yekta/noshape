@@ -383,6 +383,32 @@ fn a_double_clicked_note_puts_the_caret_at_the_click(cx: &mut TestAppContext) {
     }
 }
 
+/// Live fc-1121 (6): Esc with the pointer resting on a selected view (no move): it turns into the hovered view at once,
+/// the tan frame.
+#[gpui::test]
+fn esc_on_a_selected_view_under_the_pointer_leaves_its_hover_frame(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-esc-hover");
+    real_sheet(cx, window, &editor);
+    let (view, inside) = cx.update(|cx| {
+        let pl = editor.read(cx).built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        (pl.id, [(pl.min[0] * 3.0 + pl.max[0]) / 4.0, (pl.min[1] + pl.max[1]) / 2.0])
+    });
+    assert_eq!(view_of(&lit_at(cx, window, &editor, inside)), Some(view), "the view under the pointer");
+    let sel = click_at(cx, window, &editor, inside, Modifiers::default());
+    assert_eq!(sel, vec![Sel::View(view)]);
+    cx.update_window(window, |_, w, cx| {
+        let focus = editor.read(cx).focus.clone();
+        w.focus(&focus, cx);
+        w.dispatch_action(Box::new(crate::actions::Cancel), cx);
+    })
+    .unwrap();
+    draw(cx, window);
+    let (sel, frames) = cx.update(|cx| (editor.read(cx).selection.clone(), editor.read(cx).view_frames()));
+    assert!(sel.is_empty(), "Esc drops the selection");
+    assert_eq!(frames, vec![(view, crate::drawing_view::DRAWING_HOVER)], "the tan hover frame at once");
+}
+
 /// qa 11-19 walk: after a Table's ✓ its placement's alignment line and ✕ went on being drawn, the pointer elsewhere.
 #[gpui::test]
 fn a_tables_alignment_line_goes_with_its_check_mark(cx: &mut TestAppContext) {
