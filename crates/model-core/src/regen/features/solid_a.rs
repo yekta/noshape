@@ -794,13 +794,18 @@ fn oblique_to(path: &Shape, p: &Profile) -> bool {
     t.normalize_or_zero().dot(p.frame.normal).abs() < 1.0 - 1e-9
 }
 
-/// The direction a wall at `m` is swept in (live q-thin-wall-side-1119): from a free end of the path, into it; lying on
-/// the path, against the path's own direction there.
+/// The direction a wall at `m` is swept in: from a free end of the path, into it; lying on one edge, towards its nearer
+/// end, the start on a tie (live q-thin-wall-side-1119: 1 mm in from the start or halfway, against the path; live
+/// q-knifehandle-normals-1121: Sweep 1's wall 3 mm before the end, along it); on a chain of edges, towards its start
+/// (c2-surf-workshop-cpcurves' Main pipe at an inner junction, nearer the end).
 fn wall_sweep_direction(path: &Shape, m: DVec3) -> Option<DVec3> {
     let end = path_end_near(path, m);
     let on = k::make_vertex(m).ok().and_then(|v| k::distance(&v, path).ok()).map(|d| d.point_b);
     match (end, on) {
-        (Some((q, t)), Some(p)) if p.distance(q) > 1e-6 => Some(path_tangent_at(path, p).map_or(t, |d| -d)),
+        (Some((q, t)), Some(p)) if p.distance(q) > 1e-6 => {
+            let to_start = path.edges().len() > 1 || path_tangent_at(path, q).is_none_or(|d| d.dot(t) > 0.0);
+            Some(path_tangent_at(path, p).map_or(t, |d| if to_start { -d } else { d }))
+        }
         (Some((_, t)), _) => Some(t),
         _ => None,
     }

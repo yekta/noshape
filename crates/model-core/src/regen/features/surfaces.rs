@@ -1113,9 +1113,16 @@ pub fn mutual_trim(ev: &mut EvalCtx) -> FResult<()> {
                 continue;
             }
             trimmed = true;
-            let area = |g: &Vec<usize>| g.iter().map(|&i| faces[i].area().unwrap_or(0.0)).sum::<f64>();
-            let big = (0..groups.len()).max_by(|a, b| area(&groups[*a]).total_cmp(&area(&groups[*b]))).unwrap_or(0);
-            let chosen: Vec<usize> = if flip { groups.iter().enumerate().filter(|(i, _)| *i != big).flat_map(|(_, g)| g.clone()).collect() } else { groups[big].clone() };
+            // std: the pieces behind the other set (qSplitBy's back body), in front with Keep opposite side
+            // (c2-surf-workshop-knifehandle's cap inside the handle, not the larger frame round it).
+            let behind: Vec<Option<bool>> = groups.iter().map(|g| behind_of(&faces, g, &tool)).collect();
+            let chosen: Vec<usize> = if behind.iter().all(Option::is_some) && behind.contains(&Some(!flip)) && behind.contains(&Some(flip)) {
+                groups.iter().zip(&behind).filter(|(_, b)| **b == Some(!flip)).flat_map(|(g, _)| g.clone()).collect()
+            } else {
+                let area = |g: &Vec<usize>| g.iter().map(|&i| faces[i].area().unwrap_or(0.0)).sum::<f64>();
+                let big = (0..groups.len()).max_by(|a, b| area(&groups[*a]).total_cmp(&area(&groups[*b]))).unwrap_or(0);
+                if flip { groups.iter().enumerate().filter(|(i, _)| *i != big).flat_map(|(_, g)| g.clone()).collect() } else { groups[big].clone() }
+            };
             let fs: Vec<Shape> = chosen.iter().map(|&i| faces[i].clone()).collect();
             let ns: Vec<Name> = chosen.iter().map(|&i| names[i].clone()).collect();
             kept.push((me, if fs.len() == 1 { fs[0].clone() } else { Shape::compound(&fs) }, ns));
@@ -1160,6 +1167,37 @@ pub fn mutual_trim(ev: &mut EvalCtx) -> FResult<()> {
         ev.ctx.bodies.insert(at, Arc::new(b));
     }
     Ok(())
+}
+
+/// Whether the faces `group` of `faces` lie behind `tool`'s faces: against the normal at the foot of the sample point of
+/// theirs nearest the tool whose foot is inside a tool face (a foot on a tool face's border says nothing of the side;
+/// knifehandle's long Handle piece far past Surface 2). None when no such point is clearly off the tool.
+fn behind_of(faces: &[Shape], group: &[usize], tool: &Shape) -> Option<bool> {
+    const N: usize = 6;
+    let tool_faces = tool.faces();
+    let samples = group.iter().flat_map(|&i| {
+        let f = &faces[i];
+        let [u0, u1, v0, v1] = f.uv_bounds().unwrap_or([0.0; 4]);
+        (0..N * N).filter_map(move |k| {
+            let (a, b) = ((k / N) as f64 + 0.5, (k % N) as f64 + 0.5);
+            let (u, v) = (u0 + (u1 - u0) * a / N as f64, v0 + (v1 - v0) * b / N as f64);
+            // Only points on the face itself (a trimmed face's box reaches past its boundary).
+            if !f.contains_uv(u, v, 1e-7).ok()? { return None; }
+            f.point_at_uv(u, v).ok()
+        })
+    });
+    let mut best: Option<(f64, bool)> = None;
+    for p in samples {
+        let Some((f, q)) = tool_faces.iter().filter_map(|f| f.project_point(p).ok().map(|q| (f, q))).min_by(|a, b| a.1.distance.total_cmp(&b.1.distance)) else { continue };
+        let Ok(n) = f.normal_at_uv(q.u, q.v) else { continue };
+        let d = p - q.point;
+        let along = d.dot(n);
+        if d.length() < 1e-9 || along.abs() < 0.99 * d.length() || best.is_some_and(|(l, _)| l <= d.length()) {
+            continue;
+        }
+        best = Some((d.length(), along < 0.0));
+    }
+    best.map(|b| b.1)
 }
 
 /// Connected groups of faces (sharing an edge that does not lie on `cut`).
