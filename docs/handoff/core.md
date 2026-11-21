@@ -15,13 +15,18 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   `python3 ~/tmp/core/ch/py/userdocs.py ~/qa-rel/0.4.64/noshape-cli 0.4.64 <our noshape-cli> x ~/qa/tickets/cli-draft-hang.noshape
   ~/qa/corpus/cf-surface-pattern.noshape` (script core-cache/.kch3.sh) + asm-infento-subs (parity_assemblies, 157/167).
   Unknown why the saved copy's Chamfer 2 fails while parity's passes: start there.
-- **KNIFEHANDLE (core-bis2, branch core-kh = main + 3 commits, NOT queued):** 1ca7cf105 guided loft; 7d0194a28 Mutual trim
-  behind_of + loft face outward + surface sweep wall direction (Mutual trim 1 Handle 1/1/1, Surface 2 1/1/0 as live);
-  acd07e321 Union of surfaces that close -> solid (std makeSolid; Boolean 1 solid 203250 mm3, live 205333). Blocker:
-  Fillet 1 (CONIC 1 mm rho 0.5 on the cap's closed edge) fails after 2.3 s on the Mac (live 204 ms): section blend
-  "rolling balls jump along the edge", then its 64-section closed loft is valid but the Boolean result is invalid.
-  Can't land while Fillet 1 costs 2.3 s (doc 1.1 -> 3.4 s). Geometry: cap box x max 10.47 vs live 16.52; Extend handle
-  1/1/1 vs live 1/2/3. Mac scripts .kmt3.sh (4 mutual-trim docs), .kfl.sh (Fillet 1 trace).
+- **KNIFEHANDLE: Fillet 1 -> blend (lead 11-21 16:00); branch origin/core-knifehandle (acd07e321), NOT to land until
+  Fillet 1 builds at live's time.** Commits on main b6edc9e2c: 1ca7cf105 guided loft (Handle 1/2/3); 7d0194a28 Mutual trim
+  behind_of + loft face outward + surface sweep wall direction (Mutual trim 1: Handle 1/1/1, Surface 2 1/1/0 as live);
+  acd07e321 Union of surfaces that close -> solid (std boolean.fs makeSolid; Boolean 1 Handle solid 203250 mm3, live
+  205333; test features_a::a_union_of_surfaces_that_close_is_a_solid). Repro: c2-surf-workshop-knifehandle Fillet 1
+  (feature 32: EDGE, entities = the cap face JuC, CONIC, radius 1 mm, rho 0.5; live OK 6/10/7, 204 ms). With the branch:
+  ERROR "Failed to fillet selections." after 2339 ms on the Mac (doc 1.1 -> 3.4 s). NOSHAPE_BLEND_DEBUG=1 shows the
+  section blend on the cap's one closed edge (length 0.1412 m): "the rolling balls jump along the edge", then "loft of 64
+  sections (closed true, chain 1 edges): valid true", then "boolean valid false ... the result is not one valid solid".
+  Run: `NOSHAPE_BLEND_DEBUG=1 NOSHAPE_PARITY_ONLY=c2-surf-workshop-knifehandle NOSHAPE_PARITY_MODELS=<models>
+  <ops test binary> parity::parity_models --ignored --nocapture`. Left of ours: cap box x max 10.47 vs live 16.52,
+  Extend handle 1/1/1 vs live 1/2/3, Handle area -0.12 % (geometry, not blocking).
 - **Surf-intro (skasm's Jvx translator fix landed):** builder side mine: Boundary surface 1 WARNING "Boundary conditions
   are not applied yet" (live OK), Fill 1 "continuity requirement might be too high", Mutual trim 1 "Select a surface.";
   SURF-INTRO-OFFSET-END: Surface 1 edge at Jvx a B-spline 20.145 mm ending z 15.31, live a LINE 20.042 mm, z 15.21.
