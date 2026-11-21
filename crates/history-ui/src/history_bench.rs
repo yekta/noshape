@@ -57,6 +57,7 @@ fn panel(cx: &mut TestAppContext) -> (AnyWindowHandle, Entity<HistoryPanel>) {
     let t = std::time::Instant::now();
     document(&path);
     println!("BENCH {CASE} | (document made in {:.1} s)", t.elapsed().as_secs_f64());
+    let t = std::time::Instant::now();
     let session = crate::session::Session::open(&path).unwrap();
     let (window, view) = cx.update(|cx| {
         let doc = cx.new(|_| DocModel::new(session));
@@ -71,7 +72,11 @@ fn panel(cx: &mut TestAppContext) -> (AnyWindowHandle, Entity<HistoryPanel>) {
         (w, view.unwrap())
     });
     draw(cx, window);
+    println!("BENCH {CASE} | open (the document read, the panel and its first frame): {:.1} ms", t.elapsed().as_secs_f64() * 1e3);
+    let t = std::time::Instant::now();
     cx.run_until_parked();
+    draw(cx, window);
+    println!("BENCH {CASE} | its rows read (background) and drawn: {:.1} ms", t.elapsed().as_secs_f64() * 1e3);
     (window, view)
 }
 

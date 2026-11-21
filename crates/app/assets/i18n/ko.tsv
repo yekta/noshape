@@ -2297,7 +2297,7 @@ Document Links	통합문서 링크
 Document Memory Usage	통합문서 메모리 사용
 Document cannot be edited without its ID.	ID 없이 통합문서를 편집할 수 없습니다.
 Document cannot be edited.	통합문서를 편집할 수 없습니다.
-Document contains a PDF	통합문서에 PDF가 포함되어 있습니다.
+Document must contain a PDF	문서에 PDF가 포함되어야 합니다
 Document defines at least one custom feature or table	통합문서가 적어도 하나 이상의 사용자 지정 피처 또는 테이블을 정의합니다.
 Document description	통합 문서 설명
 Document description failed to update.	통합문서 설명을 업데이트하지 못했습니다.

@@ -2292,7 +2292,7 @@ Document Links	Dokument-Links
 Document Memory Usage	Dokument-Speicherauslastung
 Document cannot be edited without its ID.	Das Dokument kann ohne die ID nicht bearbeitet werden.
 Document cannot be edited.	Dokument kann nicht bearbeitet werden.
-Document contains a PDF	Dokument enthält eine PDF-Datei
+Document must contain a PDF	Dokument muss eine PDF-Datei enthalten
 Document defines at least one custom feature or table	Das Dokument definiert mindestens ein benutzerdefiniertes Feature oder eine Tabelle.
 Document description	Dokumentbeschreibung
 Document description failed to update.	Dokumentbeschreibung konnte nicht aktualisiert werden.

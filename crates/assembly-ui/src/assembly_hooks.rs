@@ -59,6 +59,8 @@ pub struct Hooks {
     pub open_release_candidate: fn(Entity<DocModel>, Vec<ReleaseItem>, &mut Window, &mut App),
     /// Revision history… of a Part Studio's part.
     pub open_part_revision_history: fn(Entity<DocModel>, TabId, BodyId, &mut Window, &mut App),
+    /// Revision history… of a tab (the top-level assembly row's).
+    pub open_tab_revision_history: fn(Entity<DocModel>, TabId, &mut Window, &mut App),
     /// The configuration last viewed in a Part Studio (Insert › Last viewed configuration).
     pub last_viewed_config: fn(TabId) -> Option<ConfigValues>,
     /// The Create version dialog of a document.
@@ -131,6 +133,10 @@ pub fn open_part_revision_history(doc: Entity<DocModel>, studio: TabId, body: Bo
     (hooks().open_part_revision_history)(doc, studio, body, window, cx)
 }
 
+pub fn open_tab_revision_history(doc: Entity<DocModel>, tab: TabId, window: &mut Window, cx: &mut App) {
+    (hooks().open_tab_revision_history)(doc, tab, window, cx)
+}
+
 pub fn last_viewed_config(tab: TabId) -> Option<ConfigValues> {
     (hooks().last_viewed_config)(tab)
 }
@@ -186,6 +192,7 @@ pub fn register_for_tests() {
         release_tab_items: |_, _| Vec::new(),
         open_release_candidate: |_, _, _, _| {},
         open_part_revision_history: |_, _, _, _, _| {},
+        open_tab_revision_history: |_, _, _, _| {},
         last_viewed_config: |_| None,
         create_version: |_, _, _| {},
         tab_properties: |_, _, _, _| {},

@@ -180,7 +180,8 @@ pub fn doc_details(path: &Path) -> anyhow::Result<DocDetails> {
         history.push(HistoryRow { name: v.name.clone(), workspace: false, author: v.author.clone(), time: v.created, description: v.description.clone(), lane, changes: changes(v.microversion, true), from: None, microversion: Some(v.microversion) });
     }
     if let Some(f) = first {
-        history.push(HistoryRow { name: "Start".into(), author: f.author.clone(), time: f.created, microversion: Some(f.id), ..Default::default() });
+        let (name, description) = store.start_version().unwrap_or_else(|_| ("Start".into(), String::new()));
+        history.push(HistoryRow { name, description, author: f.author.clone(), time: f.created, microversion: Some(f.id), ..Default::default() });
     }
     history.sort_by(|a, b| b.time.cmp(&a.time).then(b.workspace.cmp(&a.workspace)));
     let tabs = store

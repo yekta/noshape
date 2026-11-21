@@ -2294,7 +2294,7 @@ Document Links	Collegamenti a documenti
 Document Memory Usage	Utilizzo memoria documento
 Document cannot be edited without its ID.	Il documento non può essere modificato senza relativo ID.
 Document cannot be edited.	Il documento non può essere modificato.
-Document contains a PDF	Il documento contiene un PDF
+Document must contain a PDF	Il documento deve contenere un PDF
 Document defines at least one custom feature or table	Il documento definisce almeno una funzione o una tabella personalizzata
 Document description	Descrizione documento
 Document description failed to update.	Impossibile aggiornare la descrizione del documento.

@@ -50,24 +50,30 @@ fn graph_column(key: &str, node: (f32, f32), branch: SharedString, on_hover: imp
 const CHANGE_H: f32 = 30.;
 /// The page's ••• column at the rows' right end.
 const PAGE_MORE_W: f32 = 50.;
+/// A page row, whose hover shows its •••.
+const PAGE_ROW_GROUP: &str = "hist-page-row";
 
-/// The page's ••• on its selected row (live 2435 q2435-vh-row-menu, Start): Open · Open in new browser tab · Branch to
-/// create workspace… · Properties… (Copy link is web-only).
-fn page_more(r: &Row, version_id: Option<noshape_store::VersionId>, open: PageOpen, doc: &Entity<DocModel>) -> AnyElement {
+/// The page's ••• at the right end of the row under the pointer (live docver-1121; Copy link is web-only): a
+/// workspace's Open · Open in new browser tab · Workspace protections… · Properties…; a version's (and Start's) Open ·
+/// Open in new browser tab · Branch to create workspace… · Restore to <workspace> · Properties….
+fn page_more(r: &Row, version_id: Option<noshape_store::VersionId>, open: PageOpen, doc: &Entity<DocModel>, current: SharedString) -> AnyElement {
     let target = match r.kind {
         RowKind::Workspace(b) => PageTarget::Workspace(b),
         _ => PageTarget::Point(r.mv),
     };
     let (kind, mv, name, doc) = (r.kind, r.mv, r.name.clone(), doc.clone());
+    let selector = format!("hist-page-more {}", r.name);
     div()
         .w(px(PAGE_MORE_W))
         .flex_none()
         .flex()
         .justify_center()
+        .invisible()
+        .group_hover(PAGE_ROW_GROUP, |d| d.visible())
         .child(
             div()
-                .id("hist-page-more-btn")
-                .debug_selector(|| "hist-page-more".into())
+                .id(SharedString::from(format!("hist-page-more-{}", r.key)))
+                .debug_selector(move || selector)
                 .map(|d| crate::ui_script::mark(d, || "button:More".into()))
                 .px(px(4.))
                 .rounded(px(3.))
@@ -81,13 +87,17 @@ fn page_more(r: &Row, version_id: Option<noshape_store::VersionId>, open: PageOp
                     let m = m.row_height(27.).text_px(14.).text_inset(20.).min_width(222.);
                     let (o1, o2) = (open.clone(), open.clone());
                     let m = m.item(crate::os_menu::OsMenuItem::new("Open").on_click(move |_, window, cx| o1(target, window, cx))).item(crate::os_menu::OsMenuItem::new("Open in new browser tab").on_click(move |_, window, cx| o2(target, window, cx)));
-                    let (d1, d2, n1) = (doc.clone(), doc.clone(), name.clone());
+                    let (d1, d2, d3, n1, n2) = (doc.clone(), doc.clone(), doc.clone(), name.clone(), name.clone());
                     let m = match kind {
-                        RowKind::Workspace(_) | RowKind::Change | RowKind::Merge | RowKind::Merged => m,
-                        _ => m.item(crate::os_menu::OsMenuItem::new("Branch to create workspace…").on_click(move |_, window, cx| open_branch_dialog(d1.clone(), mv, n1.clone(), window, cx))),
+                        RowKind::Workspace(b) => m.item(crate::os_menu::OsMenuItem::new("Workspace protections…").on_click(move |_, window, cx| crate::history_hooks::workspace_protection(d3.clone(), b, window, cx))),
+                        RowKind::Change | RowKind::Merge | RowKind::Merged => m,
+                        _ => m
+                            .item(crate::os_menu::OsMenuItem::new("Branch to create workspace…").on_click(move |_, window, cx| open_branch_dialog(d1.clone(), mv, n1.clone(), window, cx)))
+                            .item(crate::os_menu::OsMenuItem::new(format!("Restore to {current}")).on_click(move |_, window, cx| crate::merge_dialog::open_restore(d3.clone(), mv, n2.to_string(), window, cx))),
                     };
                     match (kind, version_id) {
                         (RowKind::Workspace(b), _) => m.item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| crate::version_properties::open(d2.clone(), crate::version_properties::Item::Workspace(b), window, cx))),
+                        (RowKind::Start, _) => m.item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| crate::version_properties::open(d2.clone(), crate::version_properties::Item::Start, window, cx))),
                         (_, Some(id)) => m.item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| crate::version_properties::open(d2.clone(), crate::version_properties::Item::Version(id), window, cx))),
                         _ => m,
                     }
@@ -642,7 +652,7 @@ fn rows_within(clip: Option<(f32, f32, f32)>, margin: f32) -> (f32, f32) {
     (((a - top - margin) / 100.).floor() * 100., ((b - top + margin) / 100.).ceil() * 100.)
 }
 
-fn build_rows(graph: &VersionGraph, lanes: &[BranchId]) -> Vec<Row> {
+fn build_rows(graph: &VersionGraph, lanes: &[BranchId], start: (String, String)) -> Vec<Row> {
     let info: HashMap<MicroversionId, &noshape_store::MicroversionInfo> = graph.microversions.iter().map(|m| (m.id, m)).collect();
     let lane_of = |mv: MicroversionId| info.get(&mv).and_then(|m| lanes.iter().position(|b| *b == m.branch)).unwrap_or(0);
     let time_of = |mv: MicroversionId| info.get(&mv).map(|m| m.created).unwrap_or(0);
@@ -657,7 +667,8 @@ fn build_rows(graph: &VersionGraph, lanes: &[BranchId]) -> Vec<Row> {
         rows.push(Row { kind: RowKind::Version, mv: v.microversion, lane: lane_of(v.microversion), time: v.created, name: v.name.clone(), author: v.author.clone(), key: format!("v{}", v.id.0), changes: vec![], description: v.description.clone() });
     }
     if let Some(root) = graph.microversions.iter().find(|m| m.parents.is_empty()) {
-        rows.push(Row { kind: RowKind::Start, mv: root.id, lane: 0, time: root.created, name: "Start".into(), author: root.author.clone(), key: "start".into(), changes: vec![], description: String::new() });
+        let (name, description) = start;
+        rows.push(Row { kind: RowKind::Start, mv: root.id, lane: 0, time: root.created, name, author: root.author.clone(), key: "start".into(), changes: vec![], description });
     }
     // Where branches meet (live 2383): each merge's point in its workspace and the source's point it took, as rows
     // of their own unless a version or the start is there already.
@@ -754,7 +765,7 @@ fn create_version_dialog(doc: Entity<DocModel>, in_document: bool, at: Option<Mi
         let done = std::cell::Cell::new(false);
         Rc::new(move |window, cx| {
             let n = name.read(cx).value().trim().to_string();
-            if workspace_name_bad(&n) {
+            if version_name_bad(&n) {
                 return false;
             }
             // Enter reaches both the field and the dialog: create once.
@@ -789,10 +800,11 @@ fn create_version_dialog(doc: Entity<DocModel>, in_document: bool, at: Option<Mi
         let create = create.clone();
         window
             .subscribe(&name, cx, move |_, ev: &InputEvent, window, cx| {
-                if let InputEvent::PressEnter { .. } = ev
-                    && create(window, cx)
-                {
-                    window.close_dialog(cx);
+                match ev {
+                    InputEvent::PressEnter { .. } if create(window, cx) => window.close_dialog(cx),
+                    // The name rule's line and buttons follow the typing.
+                    InputEvent::Change => window.refresh(),
+                    _ => {}
                 }
             })
             .detach();
@@ -800,6 +812,7 @@ fn create_version_dialog(doc: Entity<DocModel>, in_document: bool, at: Option<Mi
     let focus = name.clone();
     window.open_dialog(cx, move |dialog, _, cx| {
         let create = create.clone();
+        let bad = version_name_bad(&name.read(cx).value());
         // Live ver-crow-create-version-here: a history entry's version is "from history".
         let source = if at.is_some() { "history" } else { branch.as_str() };
         let title = if in_document { version_dialog_title_in(&doc_name, &branch) } else { version_dialog_title("Create version from", source) };
@@ -807,15 +820,15 @@ fn create_version_dialog(doc: Entity<DocModel>, in_document: bool, at: Option<Mi
         let (create2, edit_after) = (create.clone(), edit_after.clone());
         os::modal(dialog, text, 950.)
             .title(title)
-            .child(version_dialog_body(&name, &desc, None, cx))
+            .child(version_dialog_body(&name, &desc, None, bad, cx))
             // Live ver-crow-create-version-here: a history entry's version always offers it.
             .when(has_fs || at.is_some(), |d| d.child(publish_row(publish.clone(), cx)))
             .children(stale_drawings_warning(&doc, &stale, cx))
             .footer(
                 os::modal_footer()
                     // Live ver-create-version-publish-fs: "Create and publish" while Publish is ticked.
-                    .child(os::modal_ok(os::primary_button("ok", if publish.get() { "Create and publish" } else { "Create" })))
-                    .child(os::cancel_button("create-edit", if publish.get() { "Create version, publish, and edit properties" } else { "Create version and edit properties" }, cx).on_click(move |_, window, cx| {
+                    .child(os::modal_ok(os::primary_button("ok", if publish.get() { "Create and publish" } else { "Create" }).disabled(bad)))
+                    .child(os::cancel_button("create-edit", if publish.get() { "Create version, publish, and edit properties" } else { "Create version and edit properties" }, cx).disabled(bad).on_click(move |_, window, cx| {
                         edit_after.set(true);
                         if create2(window, cx) {
                             window.close_dialog(cx);
@@ -849,7 +862,7 @@ fn open_branch_dialog(doc: Entity<DocModel>, from: MicroversionId, from_name: St
         let done = std::cell::Cell::new(false);
         Rc::new(move |window, cx| {
             let n = name.read(cx).value().trim().to_string();
-            if n.is_empty() {
+            if workspace_name_bad(&n) {
                 return false;
             }
             // Enter reaches both the field and the dialog: create once.
@@ -897,7 +910,7 @@ fn open_branch_dialog(doc: Entity<DocModel>, from: MicroversionId, from_name: St
         let (create2, edit_after) = (create.clone(), edit_after.clone());
         os::modal(dialog, format!("Create workspace from {from_name}"), 950.)
             .title(version_dialog_title("Create workspace from", &from_name))
-            .child(version_dialog_body(&name, &desc, Some(open), cx))
+            .child(version_dialog_body(&name, &desc, Some(open), bad, cx))
             .footer(
                 os::modal_footer()
                     .child(os::modal_ok(os::primary_button("ok", "Create").disabled(bad)))
@@ -994,10 +1007,9 @@ fn publish_row(on: Rc<std::cell::Cell<bool>>, cx: &App) -> AnyElement {
 /// custom features and tables at **V3**", the requirements with a green ✓
 /// or red ✗ each, and the Publish button enabled once all are met.
 /// ("Document is public" is a cloud sharing state and is not listed.)
-fn open_publish_dialog(doc: Entity<DocModel>, id: noshape_store::VersionId, window: &mut Window, cx: &mut App) {
-    let key = format!("{PUBLISHED_FS_KEY}{id}");
-    let Ok(info) = doc.read(cx).session.store.version(id) else { return };
-    let checks = doc.read(cx).session.store.read_all(info.microversion).ok().and_then(|b| noshape_model::document::Document::from_blobs(&b).ok()).map(|d| noshape_ops::versions::publish_checklist(&d)).unwrap_or_default();
+fn open_publish_dialog(doc: Entity<DocModel>, id: Option<noshape_store::VersionId>, window: &mut Window, cx: &mut App) {
+    let Some((key, name, mv)) = noshape_ops::versions::publish_target(&doc.read(cx).session.store, id) else { return };
+    let checks = doc.read(cx).session.store.read_all(mv).ok().and_then(|b| noshape_model::document::Document::from_blobs(&b).ok()).map(|d| noshape_ops::versions::publish_checklist(&d)).unwrap_or_default();
     // Compiling the version's studios replaced the current ones' cached results.
     let _ = doc.read(cx).custom_features();
     let ready = !checks.is_empty() && checks.iter().all(|(_, ok)| *ok);
@@ -1012,8 +1024,8 @@ fn open_publish_dialog(doc: Entity<DocModel>, id: noshape_store::VersionId, wind
             };
             h_flex().h(px(22.)).gap(px(4.)).child(mark).child(div().child(*text))
         });
-        os::modal(dialog, format!("Publish custom features and tables at {}", info.name), 598.)
-            .title(version_dialog_title_w("Publish custom features and tables at", &info.name, 598.))
+        os::modal(dialog, format!("Publish custom features and tables at {}", name), 598.)
+            .title(version_dialog_title_w("Publish custom features and tables at", &name, 598.))
             .child(
                 v_flex()
                     .px(px(15.))
@@ -1143,7 +1155,13 @@ fn workspace_name_bad(name: &str) -> bool {
     name.trim().is_empty() || name.chars().count() > 256
 }
 
-fn version_dialog_body(name: &Entity<InputState>, desc: &Entity<TextareaState>, open: Option<Rc<std::cell::Cell<bool>>>, cx: &App) -> AnyElement {
+/// A version name the Create version dialog refuses (live docver-1121: empty, spaces, or 256 characters and more,
+/// whatever its line says).
+pub(crate) fn version_name_bad(name: &str) -> bool {
+    name.trim().is_empty() || name.chars().count() > 255
+}
+
+fn version_dialog_body(name: &Entity<InputState>, desc: &Entity<TextareaState>, open: Option<Rc<std::cell::Cell<bool>>>, bad: bool, cx: &App) -> AnyElement {
     let pal = p();
     let label = |t: &str| div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(t.to_string());
     let name_input = os::modal_input(Some("Name"), name, cx);
@@ -1151,9 +1169,8 @@ fn version_dialog_body(name: &Entity<InputState>, desc: &Entity<TextareaState>, 
     os::modal_body()
         .gap(px(10.))
         .child(h_flex().gap(px(4.)).child(label("Name:")).child(div().w(px(300.)).child(os::input_h(name_input, 34.).text_size(px(14.)))))
-        // The Branch dialog's name rule (live ws-1118 b2): a red line under the field, Create and Create workspace and
-        // edit properties off.
-        .when(open.is_some() && workspace_name_bad(&name.read(cx).value()), |d| {
+        // The name rule (live ws-1118 b2, docver-1121): a red line under the field, both Create buttons off.
+        .when(bad, |d| {
             d.child(div().mt(px(-6.)).text_size(px(14.)).text_color(pal.error).child("Name is required and cannot exceed 256 characters.").map(|d| crate::ui_script::mark_message(d, || "Name is required and cannot exceed 256 characters.".into())))
         })
         .child(v_flex().gap(px(2.)).child(h_flex().gap(px(8.)).child(label("Description:")).child(div().text_size(px(14.)).child("(Maximum of 10000 characters)"))).child(Textarea::new(desc).h(px(96.)).text_size(px(14.))))
@@ -1189,7 +1206,8 @@ impl Render for HistoryPanel {
         let current_name = graph.branches.iter().find(|b| b.id == current_branch).map(|b| b.name.clone()).unwrap_or_else(|| "Main".into());
         let mut lanes: Vec<BranchId> = graph.branches.iter().filter(|b| !b.deleted).map(|b| b.id).collect();
         lanes.sort_by_key(|b| !graph.branches.iter().any(|x| x.id == *b && x.is_default));
-        let rows = self.rows.get_or_insert_with(|| Rc::new(build_rows(&graph, &lanes).into_iter().map(Rc::new).collect())).clone();
+        let start = session.store.start_version().unwrap_or_else(|_| ("Start".into(), String::new()));
+        let rows = self.rows.get_or_insert_with(|| Rc::new(build_rows(&graph, &lanes, start).into_iter().map(Rc::new).collect())).clone();
         let info: HashMap<MicroversionId, &noshape_store::MicroversionInfo> = graph.microversions.iter().map(|m| (m.id, m)).collect();
         let q = self.applied_query.trim().to_lowercase();
 
@@ -1684,9 +1702,9 @@ impl Render for HistoryPanel {
             // A version of another workspace merges into this one too (help
             // "Merging": "merge a version from another branch").
             let other_version = r.kind == RowKind::Version && graph.microversions.iter().find(|m| m.id == mv).is_some_and(|m| m.branch != current_branch);
-            // The page's selected row shows its ••• at the right end (live 2435); the others keep the room.
+            // The page's row under the pointer shows its ••• at the right end (live docver-1121); change rows keep the room.
             let row = match &self.page {
-                Some(page) if selected && !pl.change => row.child(page_more(&r, version_id, page.open.clone(), &self.doc)),
+                Some(page) if !pl.change => row.group(PAGE_ROW_GROUP).child(page_more(&r, version_id, page.open.clone(), &self.doc, current_name.clone().into())),
                 Some(_) => row.child(div().w(px(PAGE_MORE_W)).flex_none()),
                 None => row,
             };
@@ -1804,8 +1822,12 @@ impl Render for HistoryPanel {
                         match version_id {
                             Some(id) => {
                                 let m = m.item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| crate::version_properties::open(d5.clone(), crate::version_properties::Item::Version(id), window, cx)));
-                                releases(m, window, cx).item(crate::os_menu::OsMenuItem::new("Publish FeatureScript…").on_click(move |_, window, cx| open_publish_dialog(d6.clone(), id, window, cx)))
+                                releases(m, window, cx).item(crate::os_menu::OsMenuItem::new("Publish FeatureScript…").on_click(move |_, window, cx| open_publish_dialog(d6.clone(), Some(id), window, cx)))
                             }
+                            // Live docver-1121: Start is a version too, with Properties… and Publish FeatureScript….
+                            None if kind == RowKind::Start => m
+                                .item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| crate::version_properties::open(d5.clone(), crate::version_properties::Item::Start, window, cx)))
+                                .item(crate::os_menu::OsMenuItem::new("Publish FeatureScript…").on_click(move |_, window, cx| open_publish_dialog(d6.clone(), None, window, cx))),
                             None => releases(m, window, cx),
                         }
                     }

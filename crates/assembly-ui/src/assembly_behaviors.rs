@@ -2337,12 +2337,14 @@ impl AssemblyView {
         }));
         m.push(MenuEntry::Sep);
         m.push(item("Export…", |t, w, cx| t.open_asm_export(None, w, cx)));
-        // Live (qa5 CA2): Release… after Export… (the assembly's release items).
+        // Live revtools-1121: Where used… after Export…; with managed workflows Release… and Revision history… after it.
+        m.push(item("Where used…", |_, _, cx| cx.emit(AssemblyViewEvent::WhereUsedAssembly)));
         if noshape_ops::release_settings::managed_workflows() {
             m.push(item("Release…", |t, w, cx| {
                 let items = crate::assembly_hooks::release_tab_items(t.doc.read(cx), t.tab);
                 crate::assembly_hooks::open_release_candidate(t.doc.clone(), items, w, cx);
             }));
+            m.push(item("Revision history…", |t, w, cx| crate::assembly_hooks::open_tab_revision_history(t.doc.clone(), t.tab, w, cx)));
         }
         m.push(MenuEntry::Sep);
         m.push(item("Expand all", |t, _, cx| t.expand_all(true, cx)));

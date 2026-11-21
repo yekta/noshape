@@ -156,7 +156,7 @@ impl DrawingEditor {
                 choices.extend(versions.iter().rev().map(|v| (v.name.clone(), RefTarget::Version(PinnedVersion { locked: false, id: v.id.to_string(), name: v.name.clone() }))));
                 // Change to version… offers the document's Start too (as the assembly's, live asm-menu-change-to-version).
                 if change_to_version && let Some(root) = dm.session.store.graph().ok().and_then(|g| g.microversions.iter().find(|m| m.parents.is_empty()).map(|m| m.id)) {
-                    choices.push(("Start".into(), RefTarget::Start(root)));
+                    choices.push((dm.session.store.start_name(), RefTarget::Start(root)));
                 }
                 if choices.len() > 1 {
                     let thumbnail = dm.session.store.get_meta("thumbnail").ok().flatten().as_deref().and_then(crate::library::decode_thumbnail);

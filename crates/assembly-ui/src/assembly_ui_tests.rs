@@ -270,14 +270,15 @@ fn the_instance_and_top_row_menus_are_lives(cx: &mut TestAppContext) {
                     "Delete Part 1 <1>",
                 ]
             );
-            // rmb-asm-list-top-assembly.
+            // rmb-asm-list-top-assembly; Where used… after Export… (live revtools-1121, workflows off: no Release… or
+            // Revision history…).
             assert_eq!(
                 labels(&v.assembly_menu(cx)),
                 [
                     "Properties…", "Show instance list properties", sep,
                     "Rename", "Show center of mass", "Check interference…", sep,
                     "Create Drawing of Assembly 1…", "Add exploded view…", sep,
-                    "Export…", sep,
+                    "Export…", "Where used…", sep,
                     "Expand all", "Collapse all",
                 ]
             );
@@ -1030,6 +1031,7 @@ fn switch_to_part_studio_carries_the_part(cx: &mut TestAppContext) {
                 super::AssemblyViewEvent::ShowPart(_, body) => format!("show {body:?}"),
                 super::AssemblyViewEvent::WhereUsed(_, body) => format!("where used {body:?}"),
                 super::AssemblyViewEvent::ActivateTab(_) => "activate".into(),
+                super::AssemblyViewEvent::WhereUsedAssembly => "where used".into(),
                 super::AssemblyViewEvent::EditInContext(..) | super::AssemblyViewEvent::EditInContextOther(..) => "context".into(),
             })
         })
@@ -3696,4 +3698,41 @@ fn an_empty_named_positions_panel_says_what_they_are_and_adds_the_first(cx: &mut
     let names = cx.update(|cx| view.read(cx).assembly(cx).map(|a| a.named_positions.iter().map(|p| p.name.clone()).collect::<Vec<_>>()));
     assert_eq!(names, Some(vec!["Named position 1".to_string()]));
     assert!(bounds(cx, "np-empty").is_none() && bounds(cx, "np-learn").is_none(), "the how-to text gone with the first position");
+}
+
+/// Live docver-1121: viewing a version, the Assembly's toolbar gives way to "Versions are view only. Viewing V1."
+/// with Return to Main.
+#[gpui::test]
+fn a_version_shows_the_view_only_bar_in_place_of_the_toolbar(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::init);
+    crate::assembly_hooks::register_for_tests();
+    let dir = std::env::temp_dir().join(format!("noshape-asm-ui-version-bar-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("bar.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+    }
+    {
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        call(&mut ctx, "tab_create", json!({ "kind": "assembly" }));
+        call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    }
+    let (window, view) = open_assembly(cx, &path);
+    draw(cx, window);
+    let bar = |cx: &mut TestAppContext| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("assembly-version-bar").is_some();
+    assert!(!bar(cx), "no bar in the workspace");
+    cx.update(|cx| {
+        let doc = view.read(cx).doc.clone();
+        doc.update(cx, |d, cx| {
+            let v1 = d.session.store.list_versions().unwrap().into_iter().find(|v| v.name == "V1").unwrap().microversion;
+            d.session.view_microversion(Some(v1)).unwrap();
+            d.reloaded(cx);
+        })
+    });
+    draw(cx, window);
+    draw(cx, window);
+    assert!(bar(cx), "the version's bar");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    assert!(vcx.debug_bounds("vb-text Versions are view only. Viewing V1.").is_some(), "its words, with the full stop");
 }

@@ -606,6 +606,8 @@ pub enum AssemblyViewEvent {
     /// Instance menu › Where used for <part>… (live, Professional: asm-triad-move-to-origin-free): the part's Part
     /// Studio with its Where used panel open.
     WhereUsed(TabId, noshape_model::reference::BodyId),
+    /// The top-level row's Where used…: the rail's Where used panel, on this assembly.
+    WhereUsedAssembly,
     /// Instance menu › Edit in context: open the Part Studio with the
     /// assembly as context graphics.
     EditInContext(TabId, Box<crate::assembly_context::AssemblyContext>),
@@ -717,6 +719,15 @@ impl AssemblyView {
             DocEvent::TabsChanged | DocEvent::UnitsChanged { .. } => this.schedule_eval(window, cx),
             DocEvent::Reloaded => {
                 this.close_mate(window, cx);
+                // The toolbar shows a viewed version's bar at once, before the evaluation ends: a new slice (the
+                // cached one, reused since its last paint, doesn't take a notification).
+                if this.slices.is_some() {
+                    let toolbar = this.toolbar_slice(cx);
+                    if let Some(s) = this.slices.as_mut() {
+                        s.toolbar = toolbar;
+                    }
+                }
+                cx.notify();
                 this.schedule_eval(window, cx)
             }
             DocEvent::Error(msg) => {
@@ -4191,6 +4202,10 @@ impl AssemblyView {
     // ------------------------------------------------------------ render: toolbar
 
     fn render_toolbar(&mut self, viewport_w: f32, cx: &mut Context<Self>) -> AnyElement {
+        // Live docver-1121: a version replaces the toolbar with its bar.
+        if let Some(version) = self.doc.read(cx).session.viewing_version() {
+            return crate::version_bar::render("assembly-version-bar", &self.doc, crate::version_bar::version_text(&version, true), Vec::new(), true, cx);
+        }
         let sep = crate::ui::tool_separator;
         // Tool search's "Highlight tool in toolbar": `#fcda7f`, border `#fab601`.
         let found = self.search_found_icon();
@@ -7292,7 +7307,7 @@ impl AssemblyView {
         }
         use crate::cached_slice::Slice;
         let me = cx.entity();
-        let toolbar = Slice::new(&me, |this, window, cx| this.render_toolbar(f32::from(window.viewport_size().width), cx), cx);
+        let toolbar = self.toolbar_slice(cx);
         let rows = Slice::new(
             &me,
             |this, _, cx| {
@@ -7315,12 +7330,18 @@ impl AssemblyView {
         for s in [&overlay, &under] {
             Slice::observing(s, &self.viewport, cx);
         }
-        for s in [&toolbar, &rows, &overlay, &under, &insert_body, &insert_top, &insert_filters, &insert_footer] {
+        for s in [&rows, &overlay, &under, &insert_body, &insert_top, &insert_filters, &insert_footer] {
             Slice::observing(s, &self.doc, cx);
         }
         let s = AsmSlices { toolbar, rows, overlay, under, insert_body, insert_top, insert_filters, insert_footer, front };
         self.slices = Some(s.clone());
         s
+    }
+
+    fn toolbar_slice(&self, cx: &mut Context<Self>) -> Entity<crate::cached_slice::Slice<Self>> {
+        let toolbar = crate::cached_slice::Slice::new(&cx.entity(), |this, window, cx| this.render_toolbar(f32::from(window.viewport_size().width), cx), cx);
+        crate::cached_slice::Slice::observing(&toolbar, &self.doc, cx);
+        toolbar
     }
 
     /// The list filter changed: only the rows show it.

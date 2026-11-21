@@ -23,6 +23,9 @@ pub struct Hooks {
     /// The Help menu's rows (the app's help_menu: Help, FeatureScript documentation, Keyboard shortcuts, System check,
     /// About, then its setup rows).
     pub help_items: fn(crate::os_menu::OsMenu) -> crate::os_menu::OsMenu,
+    /// Rename a document open in a window (live docver-1121: allowed; the window's name follows): its stored name
+    /// through the window's document, the file stays.
+    pub rename_open_document: fn(PathBuf, String, &mut App),
 }
 
 /// What Import does with the modal's options and its documents (Combine to a single Part Studio is in the options).
@@ -52,6 +55,10 @@ pub fn open_document_at(path: PathBuf, tab: noshape_model::document::TabId, gpu:
 
 pub fn versions_page(path: PathBuf, name: String, window: &mut Window, cx: &mut App) -> anyhow::Result<AnyView> {
     (hooks().versions_page)(path, name, window, cx)
+}
+
+pub fn rename_open_document(path: PathBuf, name: String, cx: &mut App) {
+    (hooks().rename_open_document)(path, name, cx)
 }
 
 pub fn import_dialog(paths: Vec<PathBuf>, on_import: ImportCallback, window: &mut Window, cx: &mut App) {

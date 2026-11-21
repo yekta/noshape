@@ -211,7 +211,7 @@ pub fn facts(path: &Path) -> Option<DocFacts> {
     // index (versions have none, so only their named parts are found).
     let workspaces = store.list_branches().ok()?.iter().filter(|b| !b.deleted).filter_map(|b| read(b.head, &b.name, &crate::search_index::read(&store, b.id))).collect();
     let list = store.list_versions().ok()?;
-    let published = list.iter().any(|v| store.get_meta(&format!("{}{}", noshape_ops::versions::PUBLISHED_FS_KEY, v.id)).ok().flatten().is_some());
+    let published = list.iter().map(|v| v.id.to_string()).chain([noshape_ops::versions::START_KEY.to_string()]).any(|k| store.get_meta(&format!("{}{k}", noshape_ops::versions::PUBLISHED_FS_KEY)).ok().flatten().is_some());
     let versions = list.iter().filter_map(|v| read(v.microversion, &v.name, &Default::default())).collect();
     Some(DocFacts { workspaces, versions, published })
 }

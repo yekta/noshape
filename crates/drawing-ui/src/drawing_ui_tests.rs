@@ -1064,6 +1064,71 @@ fn a_section_view_waits_where_it_was_placed_for_its_depth_entity(cx: &mut TestAp
 }
 
 
+/// Live section-probe-1121 (behaviours "drawing matrix takes"): in the Edit section panel, Esc with the just-ticked
+/// Section depth checkbox focused leaves the panel open; after a click on the panel's header Esc closes it (s29).
+#[gpui::test]
+fn edit_sections_esc_keeps_the_panel_while_a_ticked_checkbox_has_the_focus(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::Tool;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "section-edit-esc");
+    real_sheet(cx, window, &editor);
+    let views = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).drawing.sheets[0].views.len());
+    let before = views(cx);
+    let (centre, corner) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+        let corner = g.snaps.iter().map(|s| pl.to_sheet(s.p)).min_by(|a, b| (a[0] + a[1]).total_cmp(&(b[0] + b[1]))).expect("a vertex");
+        ([(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0], corner)
+    });
+    let click = |cx: &mut TestAppContext, at: [f64; 2]| {
+        cx.update_window(window, |_, w, cx| {
+            editor.update(cx, |e, cx| {
+                e.cursor = at;
+                e.update_preview(cx);
+                e.tool_click(w, cx);
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+    };
+    cx.update_window(window, |_, w, cx| {
+        editor.update(cx, |e, cx| {
+            e.set_tool(Tool::Section { parent: None, p0: None, line: None, partial: false, jogs: vec![] }, cx);
+            e.sync_section_dlg(w, cx);
+            e.set_section_mode(1, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    click(cx, centre);
+    click(cx, [corner[0], centre[1]]);
+    click(cx, [30.0, 30.0]);
+    assert_eq!(views(cx), before + 1, "the section view made");
+    let section = cx.update(|cx| editor.read(cx).drawing.sheets[0].views.last().map(|v| v.id)).unwrap();
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+        e.set_tool(Tool::Select, cx);
+        e.open_section_edit(section, w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    let open = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).section_edit.is_some());
+    assert!(open(cx), "Edit section open");
+    let row = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("se-depth-row").expect("the Section depth row");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(gpui_kit::point(row.origin.x + px(16.), row.center().y), Modifiers::default());
+    draw(cx, window);
+    assert!(cx.update(|cx| editor.read(cx).section_edit.as_ref().is_some_and(|e| e.depth.is_some())), "Section depth ticked");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    draw(cx, window);
+    assert!(open(cx), "Esc on the just-ticked checkbox leaves the panel open");
+    let panel = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("dr-section-edit").expect("the panel");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(gpui_kit::point(panel.origin.x + px(30.), panel.origin.y + px(14.)), Modifiers::default());
+    draw(cx, window);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    draw(cx, window);
+    assert!(!open(cx), "after a click on its header Esc closes it");
+}
+
 /// live2 asm-feel (6), section-q (2): Angular with Cut angle unticked takes three clicks. The first (a view corner)
 /// starts the line, which pivots about it toward the pointer; the second (the opposite corner) fixes it through that
 /// point; the third places the view, which slides only along the cut's normal before it.
@@ -1335,10 +1400,15 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
             let whole = e.table_entries(id, cx);
             e.cell_sel = Some(crate::drawing_cells::CellSel { table: id, a: (1, 0), b: (1, 0) });
             let cell = e.table_entries(id, cx);
+            e.cell_sel = Some(crate::drawing_cells::CellSel { table: id, a: (1, 0), b: (2, 0) });
+            let cells = e.table_entries(id, cx);
             e.cell_sel = None;
             e.selection.clear();
-            (whole, cell)
+            (whole, (cell, cells))
         }));
+        let (cell, cells) = cell;
+        // Live drw-table-cell-menu s23: two cells, no Resize....
+        assert_eq!(full(&cells), ["Size ▸ Columns Equally | Rows Equally", "——", "Copy"], "two cells");
         dump_full.insert("bom-table-header".into(), json!(full(&whole)));
         dump_full.insert("bom-table-row".into(), json!(full(&whole)));
         assert_eq!(full(&cell), ["Size ▸ Columns Equally | Rows Equally", "Resize...", "——", "Copy"], "live's bom-table-cell");

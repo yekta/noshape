@@ -947,6 +947,9 @@ struct Row {
     held: Vec<Issue>,
     /// An associated drawing, listed under the part it shows (live release-gaps-1118).
     child: bool,
+    /// The field left with a revision it can't take: the proposed one put in its place and the note saying why
+    /// (live alpha-1121), until it is typed in again.
+    settled: Option<(String, String)>,
 }
 
 pub struct ReleaseDialog {
@@ -995,6 +998,8 @@ pub struct ReleaseDialog {
     /// Row pictures (release_thumbs), by `release_thumbs::key`.
     thumbs: std::collections::HashMap<String, std::sync::Arc<RenderImage>>,
     thumbs_started: bool,
+    /// Rows whose Compare revisions is open (review), by `release_thumbs::key`.
+    compares: std::collections::HashMap<String, CompareRow>,
     /// The recorded package (review, draft): its audit log.
     package: Option<Package>,
     /// When the dialog created its candidate (ms since the epoch).
@@ -1036,16 +1041,9 @@ impl ReleaseDialog {
                             this.part_number_changed(st, window, cx);
                         }
                     }));
-                    subs.push(cx.subscribe_in(&revision, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
-                        if matches!(ev, InputEvent::Change) {
-                            if let Some(r) = this.rows.iter_mut().find(|r| r.revision == *st) {
-                                r.revision_touched = true;
-                            }
-                            this.record_typing(st.entity_id(), cx);
-                        }
-                    }));
+                    subs.push(cx.subscribe_in(&revision, window, Self::revision_event));
                 }
-                Row { initial_pn: item.part_number.clone(), item, part_number, revision, revision_touched: false, since, held: Vec::new(), child: false }
+                Row { initial_pn: item.part_number.clone(), item, part_number, revision, revision_touched: false, since, held: Vec::new(), child: false, settled: None }
             })
             .collect();
         let name = cx.new(|cx| InputState::new(window, cx).default_value(name));
@@ -1075,7 +1073,51 @@ impl ReleaseDialog {
             }
         }));
         let dependents = dependents_of(doc.read(cx), rows.iter().map(|r| &r.item));
-        Self { doc, mode, applied: false, rows, dependents, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, approvers: Vec::new(), observers: Vec::new(), people_menu: None, candidate: None, comments: Vec::new(), comments_view: false, props_view: None, comment_input, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, folded: Default::default(), drawings_included: false, _subs: subs }
+        Self { doc, mode, applied: false, rows, dependents, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, approvers: Vec::new(), observers: Vec::new(), people_menu: None, candidate: None, comments: Vec::new(), comments_view: false, props_view: None, comment_input, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, compares: Default::default(), package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, folded: Default::default(), drawings_included: false, _subs: subs }
+    }
+
+    /// A Revision field typed in (it is the user's now) or left (a value it can't take becomes the proposed one).
+    fn revision_event(&mut self, st: &Entity<InputState>, ev: &InputEvent, window: &mut Window, cx: &mut Context<Self>) {
+        match ev {
+            InputEvent::Change => {
+                let value = st.read(cx).value().trim().to_string();
+                if let Some(r) = self.rows.iter_mut().find(|r| r.revision == *st) {
+                    r.revision_touched = true;
+                    if r.settled.as_ref().is_some_and(|(to, _)| *to != value) {
+                        r.settled = None;
+                    }
+                }
+                self.record_typing(st.entity_id(), cx);
+            }
+            InputEvent::Blur => {
+                let Some(i) = self.rows.iter().position(|r| r.revision == *st) else { return };
+                let Some((to, note)) = self.settle(i, cx) else {
+                    // A value it takes clears the last note (one set without a Change event as well).
+                    let value = st.read(cx).value().trim().to_string();
+                    if self.rows[i].settled.as_ref().is_some_and(|(to, _)| *to != value) {
+                        self.rows[i].settled = None;
+                        cx.notify();
+                    }
+                    return;
+                };
+                st.update(cx, |s, cx| s.set_value(to.clone(), window, cx));
+                self.rows[i].settled = Some((to, note));
+                cx.notify();
+            }
+            _ => {}
+        }
+    }
+
+    /// Live alpha-1121: the row's typed revision when the release can't take it (not in the scheme, or not after the
+    /// part's released revision): the proposed one and the note under the row. Release stays enabled; the release
+    /// records the proposed one.
+    fn settle(&self, i: usize, cx: &App) -> Option<(String, String)> {
+        if self.mode != Mode::Release {
+            return None;
+        }
+        let r = self.rows.get(i)?;
+        let item = ReleaseItem { part_number: r.part_number.read(cx).value().trim().to_string(), revision: r.revision.read(cx).value().trim().to_string(), ..r.item.clone() };
+        release_log(self.doc.read(cx)).settle_revision(&item)
     }
 
     /// A new part number suggests its next revision (unless one was typed).
@@ -1224,14 +1266,7 @@ impl ReleaseDialog {
                     this.part_number_changed(st, window, cx);
                 }
             }));
-            self._subs.push(cx.subscribe_in(&revision, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
-                if matches!(ev, InputEvent::Change) {
-                    if let Some(r) = this.rows.iter_mut().find(|r| r.revision == *st) {
-                        r.revision_touched = true;
-                    }
-                    this.record_typing(st.entity_id(), cx);
-                }
-            }));
+            self._subs.push(cx.subscribe_in(&revision, window, Self::revision_event));
             let since = {
                 let d = self.doc.read(cx);
                 since_release(d, &release_log(d), &item)
@@ -1240,7 +1275,7 @@ impl ReleaseDialog {
                 Mode::Release => crate::release_conditions::condition_issues(&self.doc.read(cx).session, std::slice::from_ref(&item)).pop().unwrap_or_default(),
                 _ => Vec::new(),
             };
-            let row = Row { initial_pn: item.part_number.clone(), item, part_number, revision, revision_touched: false, since, held, child };
+            let row = Row { initial_pn: item.part_number.clone(), item, part_number, revision, revision_touched: false, since, held, child, settled: None };
             match parent {
                 Some(p) => {
                     let mut at = p + 1;
@@ -1257,6 +1292,88 @@ impl ReleaseDialog {
             self.request_thumbs(added, cx);
         }
         self.record(cx);
+    }
+
+    /// The open Compare revisions under row `i` (live docver-1121 rel-compare-*.png): "Only show differences", then
+    /// Revision A and Revision B side by side, each titled.
+    fn render_compare(&self, i: usize, item: &ReleaseItem, c: &CompareRow, cx: &mut Context<Self>) -> AnyElement {
+        let key = crate::release_thumbs::key(item);
+        let on = c.differences;
+        let tick = os::checkbox(SharedString::from(format!("rel-compare-diff-{i}")), "Only show differences", on).debug_selector(move || format!("rel-compare-diff-{i}")).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+            if let Some(c) = this.compares.get_mut(&key) {
+                c.differences = !c.differences;
+                cx.notify();
+            }
+        }));
+        let (size, inset) = compare_layout(RC_SIZE.with(|c| c.get()).0 - col_item());
+        let side = |n: usize| {
+            let picture = c.pictures.as_ref().and_then(|p| if on { p.differences[n].clone() } else { p.plain[n].clone() });
+            v_flex()
+                .items_center()
+                .gap(px(8.))
+                .child(div().h(px(18.)).text_size(px(13.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x333333)).children(c.labels[n].as_ref().map(|r| format!("Revision {r}"))))
+                .child(
+                    div()
+                        .id(SharedString::from(format!("rel-compare-{}-{i}", ["a", "b"][n])))
+                        .debug_selector(move || format!("rel-compare-{}-{i}", ["a", "b"][n]))
+                        .size(px(size))
+                        .border_1()
+                        .border_color(gpui_kit::rgb(0xd0dbe5))
+                        .bg(gpui_kit::rgb(0xffffff))
+                        .children(picture.map(|im| img(ImageSource::Render(im)).size_full().object_fit(ObjectFit::Contain))),
+                )
+        };
+        div()
+            .pl(px(col_item()))
+            .child(
+                v_flex()
+                    .pt(px(15.))
+                    .pb(px(8.))
+                    .child(div().pl(px(10.)).text_size(px(13.)).child(tick))
+                    .child(h_flex().mt(px(14.)).pl(px(inset)).gap(px(COMPARE_GAP)).child(side(0)).child(side(1))),
+            )
+            .into_any_element()
+    }
+
+    /// Compare revisions (review rows, live docver-1121): opens under the row, the item at its released revision (A) and
+    /// at this one (B); a second click closes it.
+    fn toggle_compare(&mut self, item: &ReleaseItem, cx: &mut Context<Self>) {
+        let key = crate::release_thumbs::key(item);
+        if self.compares.remove(&key).is_some() {
+            cx.notify();
+            return;
+        }
+        let (docs, labels) = {
+            let session = &self.doc.read(cx).session;
+            let log = release_log(self.doc.read(cx));
+            let entries = log.revisions(&item.part_number);
+            let earlier = match entries.iter().position(|e| e.revision == item.revision) {
+                Some(at) => at.checked_sub(1).and_then(|at| entries.get(at)),
+                None => entries.last(),
+            };
+            let at_version = |v: Option<&String>| v.and_then(|v| session.document_at_version(v).ok().flatten());
+            let linked = item.document.is_some();
+            let a = earlier.filter(|_| !linked).and_then(|e| at_version(log.packages.get(e.release).and_then(|p| p.version.as_ref())));
+            let b = (!linked).then(|| at_version(self.package.as_ref().and_then(|p| p.version.as_ref())).unwrap_or_else(|| session.doc.clone()));
+            ([a, b], [earlier.map(|e| e.revision.clone()), Some(item.revision.clone()).filter(|r| !r.is_empty())])
+        };
+        self.compares.insert(key.clone(), CompareRow { labels, ..Default::default() });
+        cx.notify();
+        if !cx.has_global::<crate::gpu::GpuGlobal>() {
+            return;
+        }
+        let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
+        let item = item.clone();
+        cx.spawn(async move |this, cx| {
+            let made = cx.background_spawn(crate::release_thumbs::compare(docs, item, COMPARE_PX as u32 - 2, gpu)).await;
+            let _ = this.update(cx, |this: &mut Self, cx| {
+                if let Some(c) = this.compares.get_mut(&key) {
+                    c.pictures = Some(made);
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
     }
 
     /// Render row pictures in the background.
@@ -1368,24 +1485,33 @@ impl ReleaseDialog {
         cx.notify();
     }
 
-    /// The items as typed.
+    /// The items as typed, a revision the release can't take as the proposed one (live alpha-1121: "aa" is not a
+    /// label of the scheme either).
     fn items(&self, cx: &App) -> Vec<ReleaseItem> {
         self.rows
             .iter()
-            .map(|r| {
-                let rev = r.revision.read(cx).value().trim().to_string();
-                // Alphabetical labels are capitals; other schemes as typed.
-                let rev = if release_settings().scheme == noshape_model::release::RevisionScheme::Alphabetical { rev.to_uppercase() } else { rev };
+            .enumerate()
+            .map(|(i, r)| {
+                let rev = match self.settle(i, cx) {
+                    Some((to, _)) => to,
+                    None => r.revision.read(cx).value().trim().to_string(),
+                };
                 ReleaseItem { part_number: r.part_number.read(cx).value().trim().to_string(), revision: rev, ..r.item.clone() }
             })
             .collect()
+    }
+
+    /// Each row's note on its revision (a yellow band under the row), from the field's last check or the value typed.
+    fn revision_notes(&self, cx: &App) -> Vec<Option<String>> {
+        (0..self.rows.len()).map(|i| self.settle(i, cx).map(|(_, n)| n).or_else(|| self.rows[i].settled.as_ref().map(|(_, n)| n.clone()))).collect()
     }
 
     fn issues(&self, cx: &App) -> Vec<Vec<Issue>> {
         match self.mode {
             Mode::Release => {
                 let mut issues = release_log(self.doc.read(cx)).validate(&self.items(cx));
-                for (row, r) in issues.iter_mut().zip(&self.rows) {
+                for ((row, r), note) in issues.iter_mut().zip(&self.rows).zip(self.revision_notes(cx)) {
+                    row.extend(note.map(Issue::Notice));
                     row.extend(r.held.iter().cloned());
                 }
                 issues
@@ -1709,6 +1835,25 @@ impl ReleaseDialog {
     }
 }
 
+/// A row's open Compare revisions (live docver-1121): its revisions' labels, Only show differences and the pictures.
+#[derive(Clone, Default)]
+struct CompareRow {
+    labels: [Option<String>; 2],
+    differences: bool,
+    pictures: Option<crate::release_thumbs::Compared>,
+}
+
+/// Compare revisions' pictures: live's 337 px squares (1 px border included), 41 px apart, centred under the columns
+/// (40 px in from their sides in live's 1090 px dialog); smaller when the columns are narrower.
+const COMPARE_PX: f32 = 337.;
+const COMPARE_GAP: f32 = 41.;
+
+/// The pictures' side and the space before the first under columns `columns` px wide (the list's scrollbar left out).
+fn compare_layout(columns: f32) -> (f32, f32) {
+    let size = ((columns - 14. - 2. * 40. - COMPARE_GAP) / 2.).clamp(120., COMPARE_PX).floor();
+    (size, ((columns - 14. - 2. * size - COMPARE_GAP) / 2.).max(0.).floor())
+}
+
 /// Items table columns (Help image savedraftbutton-relcandidatedialog,
 /// scaled to the 820 px dialog) and its grid lines.
 const COL_ITEM: f32 = 270.;
@@ -1733,9 +1878,10 @@ const SUBMIT_REQUIRES_BOLD: &[std::ops::Range<usize>] = &[0..6, 16..25];
 /// Live2 errors-1118 (`alert alert-warning`): bg rgb(255,248,230), text rgb(51,51,51), border rgb(252,218,127).
 const BAND_WARNING: (u32, u32) = (0xfff8e6, 0x333333);
 const BAND_WARNING_BORDER: u32 = 0xfcda7f;
-/// Live2 errors-1118 (`alert alert-danger`): bg rgb(249,235,236), text rgb(51,51,51), border rgb(245,223,225).
+/// Live2 errors-1118 (`alert alert-danger`): bg rgb(249,235,236), text rgb(51,51,51); a row's border #dd979b (live
+/// docver-1121).
 const BAND_DANGER: (u32, u32) = (0xf9ebec, 0x333333);
-const BAND_DANGER_BORDER: u32 = 0xf5dfe1;
+const BAND_DANGER_BORDER: u32 = 0xdd979b;
 const BAND_INFO: (u32, u32) = (0xd9edf7, INFO_BLUE);
 /// An item's INFO message (Bootstrap's alert-info text).
 const INFO_BLUE: u32 = 0x31708f;
@@ -2149,7 +2295,7 @@ impl Render for ReleaseDialog {
                             )
                         }),
                 )
-                .child(div().w(px(COL_REVISION)).flex_none().flex().justify_end().px(px(10.)).child(div().w(px(64.)).map(|d| { let n = row.item.name.clone(); crate::ui_script::mark(d, move || format!("field:Revision:{n}")) }).child(field(&row.revision, row_issues.iter().any(|x| matches!(x, Issue::InvalidRevision | Issue::RevisionTooLow { .. })), editing && !row.item.not_revision_managed, reverted))))
+                .child(div().w(px(COL_REVISION)).flex_none().flex().justify_end().px(px(10.)).child(div().w(px(64.)).map(|d| { let n = row.item.name.clone(); crate::ui_script::mark(d, move || format!("field:Revision:{n}")) }).child(field(&row.revision, row_issues.iter().any(|x| matches!(x, Issue::BlankRevision | Issue::InvalidRevision | Issue::RevisionTooLow { .. })), editing && !row.item.not_revision_managed, reverted))))
                 .child(h_flex().w(px(COL_STATE)).flex_none().px(px(10.)).gap(px(6.)).child(state).when(since.is_some_and(|s| !(s == SinceRelease::MetadataChanged && policy_new_revision)), |d| {
                     d.child(
                         boxed(SharedString::from(format!("rel-revert-{i}")), "undo", if reverted { "Use the workspace item" } else { "Revert to last revision" }, cx)
@@ -2157,7 +2303,7 @@ impl Render for ReleaseDialog {
                             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.set_reverted(i, !reverted, window, cx))),
                     )
                 }))
-                .child(div().w(px(COL_PART_NUMBER)).flex_none().px(px(10.)).map(|d| { let n = row.item.name.clone(); crate::ui_script::mark(d, move || format!("field:Part number:{n}")) }).child(field(&row.part_number, missing, pn_modified, reverted).when(self.seq_parts && editing && !reverted, |d| {
+                .child(div().w(px(COL_PART_NUMBER)).flex_none().px(px(10.)).map(|d| { let n = row.item.name.clone(); crate::ui_script::mark(d, move || format!("field:Part number:{n}")) }).child(field(&row.part_number, missing || row_issues.contains(&Issue::DuplicatePartNumber), pn_modified, reverted).when(self.seq_parts && editing && !reverted, |d| {
                     // The field's # ("Generate next part number"), greyed once
                     // the item has a number.
                     let empty = pn.trim().is_empty();
@@ -2198,10 +2344,16 @@ impl Render for ReleaseDialog {
                                 me.update(cx, |this, cx| this.edit_item_properties(i, item.clone(), window, cx));
                             })
                         })
+                        // Live docver-1121: a review row's Compare revisions sits between them.
+                        .when(self.mode == Mode::Review, |d| {
+                            let item = row.item.clone();
+                            let open = self.compares.contains_key(&crate::release_thumbs::key(&item));
+                            d.child(boxed(SharedString::from(format!("rel-compare-{i}")), "compare", "Compare revisions", cx).debug_selector(move || format!("rel-compare-{i}")).when(open, |d| d.bg(gpui_kit::rgb(0xeaeaea))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.toggle_compare(&item, cx))))
+                        })
                         .child({
                             let item = row.item.clone();
                             let doc_path = self.doc.read(cx).session.path.clone();
-                            boxed(SharedString::from(format!("rel-export-{i}")), "export", "Export", cx).on_click(move |_, window, cx| {
+                            boxed(SharedString::from(format!("rel-export-{i}")), "export", "Export…", cx).on_click(move |_, window, cx| {
                                 if item.document.is_some() {
                                     add_source::run_linked(&item, &doc_path, add_source::LinkedAction::Export, cx);
                                 } else {
@@ -2227,9 +2379,11 @@ impl Render for ReleaseDialog {
                     .child(text)
                     .into_any_element()
             };
+            let compare = self.compares.get(&crate::release_thumbs::key(&row.item)).map(|c| self.render_compare(i, &row.item, c, cx));
             rows_el.push(
                 v_flex()
                     .child(main)
+                    .children(compare)
                     .children(row_issues.iter().filter(|x| **x != Issue::MissingPartNumber).map(|x| {
                         let colours = if matches!(x, Issue::RevisionTooLow { .. } | Issue::Notice(_)) { BAND_WARNING } else { BAND_DANGER };
                         // Live2 11_studios_abc: "Part number(s): PRT-001 included in another pending Release candidate.
@@ -2494,8 +2648,9 @@ impl Render for ReleaseDialog {
         match self.mode {
             Mode::Release => {
                 footer = footer
-                    // Live2 errors-1118: Apply enabled while a required field is still empty.
-                    .child(button("rel-apply", "Apply", 0x1651b0, true).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    // Live2 errors-1118: Apply enabled while a required field is still empty; not with a row's error
+                    // (live docver-1121).
+                    .child(button("rel-apply", "Apply", 0x1651b0, !self.issues(cx).iter().flatten().any(Issue::blocks)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.save_draft(cx);
                     })))
                     // Live (release.json): Submit (blue) needs approvers; Release (green) is for none. With approvers
@@ -3060,6 +3215,13 @@ pub fn open_part_revision_history(doc: Entity<DocModel>, studio: TabId, body: no
     let d = doc.read(cx);
     let own = d.studio(studio).and_then(|s| s.part_properties.get(&body)).and_then(|p| p.part_number.clone()).filter(|p| !p.is_empty());
     let pn = own.or_else(|| release_log(d).part_number_released(studio, Some(&body))).unwrap_or_default();
+    open_revision_history(doc, pn, window, cx);
+}
+
+/// Revision history… of a tab (the top-level assembly row's): its own part number, else the one it was released with.
+pub fn open_tab_revision_history(doc: Entity<DocModel>, tab: TabId, window: &mut Window, cx: &mut App) {
+    let d = doc.read(cx);
+    let pn = Some(tab_part_number(d, tab)).filter(|p| !p.is_empty()).or_else(|| release_log(d).part_number_released(tab, None)).unwrap_or_default();
     open_revision_history(doc, pn, window, cx);
 }
 

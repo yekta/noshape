@@ -20,6 +20,10 @@ pub(super) fn register_test_hooks() {
         build_label: String::new,
         import_dialog: |_, _, _, _| {},
         help_items: |m| m,
+        rename_open_document: |path, name, _| {
+            let mut store = noshape_store::Document::open(&path).expect("the test document");
+            store.set_name(&name).expect("renamed");
+        },
     });
 }
 
@@ -63,7 +67,7 @@ fn page(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<StartVi
         view.update(cx, |v, cx| {
             (v.source, v.view, v.loaded, v.docs, v.panel) = (Source::All, ViewMode::List, true, docs, None);
             // The default sort (another test's header clicks save theirs to the shared preferences).
-            (v.sort, v.descending, v.sort_cleared) = (super::SortKey::Modified, true, false);
+            (v.sort, v.descending, v.sort_cleared) = (super::SortKey::Modified, true, true);
             v.refresh_body(cx);
         })
     });
@@ -116,6 +120,16 @@ fn the_hovered_row_shows_its_quick_actions(cx: &mut TestAppContext) {
         assert!(row.contains(&icon.center()) && icon.left() > row.center().x, "{name}'s icons at its right end: {icon:?} {row:?}");
         assert!(row.contains(&bounds(cx, w, "row-icon:Send to trash").center()));
     }
+    // Live docver-1121: with B selected and the pointer on D, only D has them; off the list, none.
+    let at = row_at(cx, w, "B");
+    click(cx, w, at, Modifiers::none());
+    let at = row_at(cx, w, "D");
+    VisualTestContext::from_window(w, cx).simulate_mouse_move(at, None, Modifiers::none());
+    draw(cx, w);
+    assert!(bounds(cx, w, "doc-row:D").contains(&bounds(cx, w, "row-icon:Labels").center()), "on the hovered row, not the selected one");
+    VisualTestContext::from_window(w, cx).simulate_mouse_move(point(px(1090.), px(690.)), None, Modifiers::none());
+    draw(cx, w);
+    assert!(VisualTestContext::from_window(w, cx).debug_bounds("row-icon:Labels").is_none(), "pointer off the list: none, the selected row neither");
 }
 
 /// Live docs-import-feel-1118: the row's Send to trash opens its modal; Enter does nothing there, Esc closes it.
@@ -137,8 +151,54 @@ fn enter_leaves_the_send_to_trash_modal_open(cx: &mut TestAppContext) {
     assert!(!open(cx), "Esc closes it");
 }
 
+/// Live docver-1121: Delete or Backspace on a selected row opens Send to trash; Esc closes it. Nothing selected: nothing.
+#[gpui::test]
+fn delete_or_backspace_sends_the_selected_rows_to_trash(cx: &mut TestAppContext) {
+    let (w, view) = page(cx, "trash-key");
+    let open = |cx: &mut TestAppContext| cx.update_window(w, |_, window, cx| gpui_kit::component::WindowExt::has_active_dialog(window, cx)).unwrap();
+    VisualTestContext::from_window(w, cx).simulate_keystrokes("delete");
+    draw(cx, w);
+    assert!(!open(cx), "no row selected: no modal");
+    let at = row_at(cx, w, "C");
+    click(cx, w, at, Modifiers::none());
+    assert_eq!(selected(cx, &view), ["C"]);
+    for key in ["delete", "backspace"] {
+        VisualTestContext::from_window(w, cx).simulate_keystrokes(key);
+        draw(cx, w);
+        assert!(open(cx), "{key}: Send to trash");
+        VisualTestContext::from_window(w, cx).simulate_keystrokes("escape");
+        draw(cx, w);
+        assert!(!open(cx), "Esc closes it");
+    }
+}
+
+/// Live docver-1121: a document open in another window renames inline (no dialog); the window's document takes the name
+/// and its file stays where it is.
+#[gpui::test]
+fn an_open_document_renames_in_place(cx: &mut TestAppContext) {
+    let (w, view) = page(cx, "rename-open");
+    let entry = view.read_with(cx, |v, _| v.docs.iter().find(|d| d.name == "C").cloned().unwrap());
+    std::fs::create_dir_all(entry.path.parent().unwrap()).unwrap();
+    let _ = std::fs::remove_file(&entry.path);
+    noshape_store::Document::create(&entry.path, &[("a", b"0")]).unwrap().set_name("C").unwrap();
+    cx.update(|cx| {
+        cx.set_global(crate::doc_files::OpenDocs::default());
+        cx.global_mut::<crate::doc_files::OpenDocs>().0.insert(crate::doc_files::canonical(&entry.path), w);
+    });
+    cx.update_window(w, |_, window, cx| view.update(cx, |v, cx| v.rename(entry.clone(), window, cx))).unwrap();
+    draw(cx, w);
+    assert!(!cx.update_window(w, |_, window, cx| gpui_kit::component::WindowExt::has_active_dialog(window, cx)).unwrap(), "no dialog");
+    VisualTestContext::from_window(w, cx).simulate_input("C3");
+    VisualTestContext::from_window(w, cx).simulate_keystrokes("enter");
+    draw(cx, w);
+    assert_eq!(noshape_store::Document::open(&entry.path).unwrap().meta().unwrap().name, "C3", "the stored name");
+    assert!(!entry.path.with_file_name("C3.noshape").exists(), "the file keeps its name while open");
+    cx.update(|cx| cx.remove_global::<crate::doc_files::OpenDocs>());
+    let _ = std::fs::remove_dir_all(entry.path.parent().unwrap());
+}
+
 /// Live docs-import-feel-1118: Name's header sorts A→Z, then Z→A, then back to the default order (newest first, no
-/// arrow); Modified's flips oldest first / newest first.
+/// arrow); Modified's the same: oldest first, newest first, no sort (live docver-1121).
 #[gpui::test]
 fn a_header_sorts_up_down_then_back_to_the_default(cx: &mut TestAppContext) {
     let (w, view) = page(cx, "sort-cycle");
@@ -154,6 +214,26 @@ fn a_header_sorts_up_down_then_back_to_the_default(cx: &mut TestAppContext) {
     assert_eq!(state(cx), (super::SortKey::Modified, false, false), "oldest first");
     click(cx, w, at, Modifiers::none());
     assert_eq!(state(cx), (super::SortKey::Modified, true, false), "newest first");
+    click(cx, w, at, Modifiers::none());
+    assert_eq!(state(cx), (super::SortKey::Modified, true, true), "no sort");
+}
+
+/// Live docver-1121: in Recently opened no header sorts.
+#[gpui::test]
+fn recently_opened_headers_dont_sort(cx: &mut TestAppContext) {
+    let (w, view) = page(cx, "sort-recent");
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.source = Source::Recent;
+        v.refresh_body(cx);
+    }));
+    draw(cx, w);
+    draw(cx, w);
+    let state = |cx: &mut TestAppContext| view.read_with(cx, |v, _| (v.sort, v.descending, v.sort_cleared));
+    for sel in ["doc-head-name", "doc-head-modified"] {
+        let at = bounds(cx, w, sel).center();
+        click(cx, w, at, Modifiers::none());
+        assert_eq!(state(cx), (super::SortKey::Modified, true, true), "{sel}");
+    }
 }
 
 /// Live2 feel/documents.json: Ctrl+A selects every row, Esc keeps the selection, a click on the list's empty space
@@ -278,4 +358,34 @@ fn versions_and_history_opens_its_page_in_place_of_the_list(cx: &mut TestAppCont
     draw(cx, w);
     assert!(VisualTestContext::from_window(w, cx).debug_bounds("versions-page").is_none(), "the logo goes back");
     assert!(VisualTestContext::from_window(w, cx).debug_bounds("doc-row:C").is_some());
+}
+
+/// Live docver-1121: emptying the search box (Backspace, no Enter) keeps the results; Enter on the empty box goes back
+/// to the folder.
+#[gpui::test]
+fn an_emptied_search_box_keeps_the_results_until_enter(cx: &mut TestAppContext) {
+    let (w, view) = page(cx, "search-empty");
+    let search = view.read_with(cx, |v, _| v.search.clone());
+    cx.update_window(w, |_, window, cx| search.update(cx, |s, cx| s.focus(window, cx))).unwrap();
+    VisualTestContext::from_window(w, cx).simulate_input("B");
+    VisualTestContext::from_window(w, cx).simulate_keystrokes("enter");
+    draw(cx, w);
+    let query = |cx: &mut TestAppContext| view.read_with(cx, |v, _| v.query.clone());
+    assert_eq!(query(cx), "B", "searched");
+    VisualTestContext::from_window(w, cx).simulate_keystrokes("backspace");
+    draw(cx, w);
+    assert_eq!(query(cx), "B", "the box emptied: still the results");
+    VisualTestContext::from_window(w, cx).simulate_keystrokes("enter");
+    draw(cx, w);
+    assert_eq!(query(cx), "", "Enter on the empty box: the folder again");
+    // Its ⊗ empties the box, keeps the results and leaves the box (focus on the page).
+    VisualTestContext::from_window(w, cx).simulate_input("B");
+    VisualTestContext::from_window(w, cx).simulate_keystrokes("enter");
+    draw(cx, w);
+    let at = bounds(cx, w, "input-clear").center();
+    click(cx, w, at, Modifiers::none());
+    assert_eq!(query(cx), "B", "⊗: still the results");
+    assert_eq!(view.read_with(cx, |v, cx| v.search.read(cx).value().to_string()), "", "⊗ empties the box");
+    let focused = cx.update_window(w, |_, window, cx| gpui_kit::Focusable::focus_handle(search.read(cx), cx).is_focused(window)).unwrap();
+    assert!(!focused, "⊗: the box loses focus");
 }

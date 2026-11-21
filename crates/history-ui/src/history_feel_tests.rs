@@ -74,6 +74,14 @@ fn history_view(cx: &mut TestAppContext, name: &str, edits: usize, versions: [&s
     (window, view, doc)
 }
 
+/// A page row's ••• (drawn only on the row under the pointer): the pointer over the row, then the dots' bounds.
+fn hovered_dots(cx: &mut TestAppContext, window: AnyWindowHandle, row: &'static str, dots: &'static str) -> Bounds<gpui_kit::Pixels> {
+    let r = bounds(cx, window, row);
+    VisualTestContext::from_window(window, cx).simulate_mouse_move(point(r.origin.x + px(40.), r.center().y), None, Modifiers::default());
+    draw(cx, window);
+    bounds(cx, window, dots)
+}
+
 fn bounds(cx: &mut TestAppContext, window: AnyWindowHandle, selector: &'static str) -> Bounds<gpui_kit::Pixels> {
     VisualTestContext::from_window(window, cx).debug_bounds(selector).unwrap_or_else(|| panic!("{selector} drawn"))
 }
@@ -275,6 +283,14 @@ fn a_workspace_name_is_required_and_at_most_256_characters() {
     assert!(super::workspace_name_bad(&"x".repeat(257)));
 }
 
+/// Live docver-1121: Create version refuses an empty name, spaces, and 256 or 257 characters; 255 are taken.
+#[test]
+fn a_version_name_is_required_and_at_most_255_characters() {
+    assert!(super::version_name_bad("") && super::version_name_bad("   "));
+    assert!(!super::version_name_bad("V2") && !super::version_name_bad(&"x".repeat(255)));
+    assert!(super::version_name_bad(&"x".repeat(256)) && super::version_name_bad(&"x".repeat(257)));
+}
+
 
 struct ComparePanel(Entity<DocModel>, noshape_model::document::TabId);
 
@@ -373,10 +389,11 @@ fn a_graph_nodes_tooltip_is_its_branch(cx: &mut TestAppContext) {
     assert_eq!(cx.update(|cx| doc.read(cx).session.viewing_version()), None, "the node opens nothing");
 }
 
-/// Live 2435 (q2435-vh-30s, -click-start, -dblclick-start, -main-rclick, -row-menu): the documents page's Versions and
-/// history page arrives with Main selected and its •••; a click (or a double-click) on another row only selects it,
-/// opening nothing; a right-click shows no menu; a version's ••• lists Open · Open in new browser tab · Branch to
-/// create workspace… · Properties…; the legend is one row right under the table.
+/// Live 2435 (q2435-vh-30s, -click-start, -dblclick-start, -main-rclick) and docver-1121: the documents page's Versions
+/// and history page arrives with Main selected; a click (or a double-click) on another row only selects it, opening
+/// nothing; a right-click shows no menu; the row under the pointer shows its ••• (none at rest): Main's lists Open ·
+/// Open in new browser tab · Workspace protections… · Properties…, a version's Open · Open in new browser tab · Branch
+/// to create workspace… · Restore to Main · Properties…; the legend is one row right under the table.
 #[gpui::test]
 fn the_versions_page_selects_on_click_and_acts_from_its_dots(cx: &mut TestAppContext) {
     let (w, view, doc) = history_view(cx, "page", 1, ["V1", "V2"], true);
@@ -385,8 +402,9 @@ fn the_versions_page_selects_on_click_and_acts_from_its_dots(cx: &mut TestAppCon
     let (legend, last) = (bounds(cx, w, "hist-page-legend"), bounds(cx, w, "hist-row Start"));
     let gap = f32::from(legend.top() - last.bottom());
     assert!((0. ..60.).contains(&gap), "the legend right under the last row (live ~36 px), not at the page's foot: {gap}");
-    let main_dots = bounds(cx, w, "hist-page-more");
-    assert!(bounds(cx, w, "hist-row Main").contains(&main_dots.center()), "Main's ••• on its row");
+    assert!(VisualTestContext::from_window(w, cx).debug_bounds("hist-page-more Main").is_none(), "no ••• at rest");
+    let main_dots = hovered_dots(cx, w, "hist-row Main", "hist-page-more Main");
+    assert!(bounds(cx, w, "hist-row Main").contains(&main_dots.center()), "Main's ••• at its row's end");
     let start = bounds(cx, w, "hist-row Start").center();
     click(cx, w, start, 1);
     draw(cx, w);
@@ -397,11 +415,69 @@ fn the_versions_page_selects_on_click_and_acts_from_its_dots(cx: &mut TestAppCon
     assert!(view.read_with(cx, |v, _| v.page_selected().is_some_and(|k| k.starts_with('v'))), "V1 selected");
     assert!(doc.read_with(cx, |d, _| d.session.viewing.is_none()), "nothing opened");
     let v1 = bounds(cx, w, "hist-row V1");
-    assert!(v1.contains(&bounds(cx, w, "hist-page-more").center()), "the ••• moved to V1");
     VisualTestContext::from_window(w, cx).simulate_mouse_down(v1.center(), MouseButton::Right, Modifiers::default());
     draw(cx, w);
     assert!(!cx.update(|cx| crate::os_menu::is_open(cx)), "no right-click menu");
-    VisualTestContext::from_window(w, cx).simulate_click(bounds(cx, w, "hist-page-more").center(), Modifiers::default());
+    VisualTestContext::from_window(w, cx).simulate_mouse_up(v1.center(), MouseButton::Right, Modifiers::default());
+    let dots = hovered_dots(cx, w, "hist-row V1", "hist-page-more V1").center();
+    VisualTestContext::from_window(w, cx).simulate_mouse_move(dots, None, Modifiers::default());
     draw(cx, w);
-    assert_eq!(cx.update(|cx| crate::os_menu::open_labels(cx)), ["Open", "Open in new browser tab", "Branch to create workspace…", "Properties…"]);
+    VisualTestContext::from_window(w, cx).simulate_click(dots, Modifiers::default());
+    draw(cx, w);
+    assert_eq!(cx.update(|cx| crate::os_menu::open_labels(cx)), ["Open", "Open in new browser tab", "Branch to create workspace…", "Restore to Main", "Properties…"]);
+    VisualTestContext::from_window(w, cx).simulate_keystrokes("escape");
+    draw(cx, w);
+    let main_dots = hovered_dots(cx, w, "hist-row Main", "hist-page-more Main").center();
+    VisualTestContext::from_window(w, cx).simulate_mouse_move(main_dots, None, Modifiers::default());
+    draw(cx, w);
+    VisualTestContext::from_window(w, cx).simulate_click(main_dots, Modifiers::default());
+    draw(cx, w);
+    assert_eq!(cx.update(|cx| crate::os_menu::open_labels(cx)), ["Open", "Open in new browser tab", "Workspace protections…", "Properties…"]);
+    // Start is a version too (live docver-1121 vhpage-dots-Start): Properties… as V1's.
+    VisualTestContext::from_window(w, cx).simulate_keystrokes("escape");
+    draw(cx, w);
+    let start_dots = hovered_dots(cx, w, "hist-row Start", "hist-page-more Start").center();
+    VisualTestContext::from_window(w, cx).simulate_mouse_move(start_dots, None, Modifiers::default());
+    draw(cx, w);
+    VisualTestContext::from_window(w, cx).simulate_click(start_dots, Modifiers::default());
+    draw(cx, w);
+    assert_eq!(cx.update(|cx| crate::os_menu::open_labels(cx)), ["Open", "Open in new browser tab", "Branch to create workspace…", "Restore to Main", "Properties…"]);
+}
+
+/// Live docver-1121 (studios 11-21 13:11): the Start row is a real version: its menu ends with Properties… and Publish
+/// FeatureScript…, and once renamed the row, the view-only bar and other documents' version lists read the new name.
+#[gpui::test]
+fn the_start_row_is_a_version_with_properties_and_publish(cx: &mut TestAppContext) {
+    let (window, _view, doc) = panel(cx, "start-version");
+    let start = bounds(cx, window, "hist-row Start");
+    let at = point(start.origin.x + px(160.), start.origin.y + px(10.));
+    let mut vcx = VisualTestContext::from_window(window, cx);
+    vcx.simulate_mouse_down(at, MouseButton::Right, Modifiers::default());
+    vcx.simulate_mouse_up(at, MouseButton::Right, Modifiers::default());
+    draw(cx, window);
+    let labels = cx.update(|cx| crate::os_menu::open_labels(cx));
+    assert!(labels.ends_with(&["Properties…".to_string(), "Publish FeatureScript…".to_string()]), "{labels:?}");
+    assert!(labels.iter().any(|l| l == "Restore to Main…"), "{labels:?}");
+    VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    // Properties… › Apply, as the dialog saves it.
+    cx.update(|cx| doc.update(cx, |d, cx| {
+        d.session.store.update_start_version("Start x", "the first state").unwrap();
+        d.reloaded(cx);
+    }));
+    cx.run_until_parked();
+    draw(cx, window);
+    bounds(cx, window, "hist-row Start x");
+    let path = cx.update(|cx| {
+        let d = doc.read(cx);
+        assert_eq!(d.session.store.start_version().unwrap(), ("Start x".to_string(), "the first state".to_string()));
+        d.session.path.clone()
+    });
+    let (_, versions) = crate::derived::document_versions(&path).unwrap();
+    assert_eq!(versions.last().map(|v| v.label.as_str()), Some("Start x"), "the Insert dialog's version list");
+    let root = cx.update(|cx| doc.read(cx).session.store.graph().unwrap().microversions.iter().find(|m| m.parents.is_empty()).unwrap().id);
+    cx.update(|cx| doc.update(cx, |d, cx| {
+        d.session.view_microversion(Some(root)).unwrap();
+        d.reloaded(cx);
+    }));
+    assert_eq!(cx.update(|cx| doc.read(cx).session.viewing_version()), Some("Start x".into()), "Versions are view only. Viewing Start x.");
 }

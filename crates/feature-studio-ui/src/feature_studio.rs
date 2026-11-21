@@ -601,6 +601,8 @@ pub struct FeatureStudioView {
     quiet: bool,
     error_task: Option<Task<()>>,
     compile_task: Option<Task<()>>,
+    /// The text of the running compile, or of the last one (its notices in `notices`).
+    checked: Option<String>,
     /// Module outline popover: its "Search symbols…" field.
     outline: Option<Entity<InputState>>,
     /// Places visited by jumps (back / forward), oldest first.
@@ -761,7 +763,7 @@ impl FeatureStudioView {
             DocEvent::Reloaded | DocEvent::TabsChanged => this.sync_from_doc(window, cx),
             _ => {}
         }));
-        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), shown: Vec::new(), save_task: None, check_task: None, quiet: false, error_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, pointer: None, ctrl_link: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, badge_hover: false, bracket_box: None, _subs: subs };
+        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), shown: Vec::new(), save_task: None, check_task: None, quiet: false, error_task: None, compile_task: None, checked: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, pointer: None, ctrl_link: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, badge_hover: false, bracket_box: None, _subs: subs };
         this.recompile(source, cx);
         // std's names, read for the completion list off the UI thread before the first key needs them.
         cx.background_spawn(async {
@@ -1228,7 +1230,14 @@ impl FeatureStudioView {
                 this.quiet = false;
                 this.error_task = None;
                 let src = this.editor.read(cx).value().to_string();
-                this.recompile(src, cx);
+                // The pause's check, if it was of this text: drawn now, or as it finishes (not compiled again: a long
+                // studio's error would come a whole compile after the delay).
+                if this.checked.as_deref() != Some(src.as_str()) {
+                    this.recompile(src, cx);
+                } else if this.compile_task.is_none() {
+                    let notices = this.notices.clone();
+                    this.take_notices(notices, cx);
+                }
             });
         }));
         cx.notify();
@@ -1262,7 +1271,9 @@ impl FeatureStudioView {
                 }
             });
         });
-        self.recompile(src, cx);
+        if self.checked.as_deref() != Some(src.as_str()) {
+            self.recompile(src, cx);
+        }
     }
 
     /// Commit: apply this Feature Studio's text throughout the document.
@@ -1307,47 +1318,53 @@ impl FeatureStudioView {
     fn recompile(&mut self, src: String, cx: &mut Context<Self>) {
         let tab = self.tab;
         let imports = noshape_model::custom::doc_imports(&self.doc.read(cx).session.doc);
+        self.checked = Some(src.clone());
         self.compile_task = Some(cx.spawn(async move |this, cx| {
             let notices = cx.background_spawn(async move { studio_notices(&imports, tab, &src) }).await;
             let _ = this.update(cx, |this: &mut Self, cx| {
-                let shown = |n: &Notice| this.shown.iter().any(|o| o.error && o.line == n.line && o.message == n.message);
-                if this.quiet && notices.iter().any(|n| n.error && !shown(n)) {
-                    // Counted now, drawn after ERROR_DELAY.
-                    this.notices = notices;
-                    this.compile_task = None;
-                    cx.emit(FeatureStudioEvent::NoticesChanged);
-                    cx.notify();
-                    return;
-                }
-                // Squiggles under the reported token (hover shows the message).
-                this.editor.update(cx, |e, cx| {
-                    let text = e.text().clone();
-                    let source = text.to_string();
-                    let lines: Vec<&str> = source.split('\n').collect();
-                    if let Some(set) = e.diagnostics_mut() {
-                        use gpui_kit::base::input::{Diagnostic, DiagnosticSeverity};
-                        set.reset(&text);
-                        for n in notices.iter().filter(|n| n.line > 0) {
-                            let at = Position { line: (n.line - 1) as u32, character: n.column.saturating_sub(1) as u32 };
-                            let end = squiggle_end(&lines, at, &n.message);
-                            set.push(Diagnostic::new(at..end, n.message.clone()).with_severity(if n.error {
-                                DiagnosticSeverity::Error
-                            } else if n.info {
-                                DiagnosticSeverity::Info
-                            } else {
-                                DiagnosticSeverity::Warning
-                            }));
-                        }
-                    }
-                    cx.notify();
-                });
-                this.shown = notices.clone();
-                this.notices = notices;
                 this.compile_task = None;
-                cx.emit(FeatureStudioEvent::NoticesChanged);
-                cx.notify();
+                this.take_notices(notices, cx);
             });
         }));
+        cx.notify();
+    }
+
+    /// A compile's notices: counted at once, drawn (squiggles, gutter marks) unless a new error waits for
+    /// [`ERROR_DELAY`].
+    fn take_notices(&mut self, notices: Vec<Notice>, cx: &mut Context<Self>) {
+        let shown = |n: &Notice| self.shown.iter().any(|o| o.error && o.line == n.line && o.message == n.message);
+        if self.quiet && notices.iter().any(|n| n.error && !shown(n)) {
+            // Counted now, drawn after ERROR_DELAY.
+            self.notices = notices;
+            cx.emit(FeatureStudioEvent::NoticesChanged);
+            cx.notify();
+            return;
+        }
+        // Squiggles under the reported token (hover shows the message).
+        self.editor.update(cx, |e, cx| {
+            let text = e.text().clone();
+            let source = text.to_string();
+            let lines: Vec<&str> = source.split('\n').collect();
+            if let Some(set) = e.diagnostics_mut() {
+                use gpui_kit::base::input::{Diagnostic, DiagnosticSeverity};
+                set.reset(&text);
+                for n in notices.iter().filter(|n| n.line > 0) {
+                    let at = Position { line: (n.line - 1) as u32, character: n.column.saturating_sub(1) as u32 };
+                    let end = squiggle_end(&lines, at, &n.message);
+                    set.push(Diagnostic::new(at..end, n.message.clone()).with_severity(if n.error {
+                        DiagnosticSeverity::Error
+                    } else if n.info {
+                        DiagnosticSeverity::Info
+                    } else {
+                        DiagnosticSeverity::Warning
+                    }));
+                }
+            }
+            cx.notify();
+        });
+        self.shown = notices.clone();
+        self.notices = notices;
+        cx.emit(FeatureStudioEvent::NoticesChanged);
         cx.notify();
     }
 

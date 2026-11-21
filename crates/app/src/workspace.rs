@@ -365,6 +365,11 @@ impl Workspace {
                             v.update(cx, |v, cx| v.show_where_used(body.clone(), cx));
                         }
                     }
+                    crate::assembly_view::AssemblyViewEvent::WhereUsedAssembly => {
+                        if !matches!(this.doc_panel, Some((DocPanel::WhereUsed(_), _))) {
+                            this.toggle_where_used(window, cx);
+                        }
+                    }
                     crate::assembly_view::AssemblyViewEvent::EditInContext(t, ctx) => {
                         this.activate(*t, window, cx);
                         if let Some(TabView::PartStudio(v)) = this.views.get(t) {
@@ -2045,11 +2050,10 @@ impl Workspace {
                         let menu = if matches!(kind, "partstudio" | "assembly" | "drawing") && !no_export { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
                         // Release management (help image Release_highlighted2, live
                         // rmb-tab-assembly / -drawing: the last entry, after Export…):
-                        // Release… for Assemblies, Drawings, Variable Studios and files
-                        // (Part Studios release their parts, not the tab: live
-                        // rmb-tab-partstudio-2 has none); Revision history once one
-                        // has revisions.
-                        let menu = if matches!(kind, "assembly" | "drawing" | "variables") || kind.starts_with("file") {
+                        // Release… for Part Studios (their parts; live docver-1121 with workflows on), Assemblies,
+                        // Drawings, Variable Studios and files; Revision history once one has revisions (not a Part
+                        // Studio's).
+                        let menu = if matches!(kind, "partstudio" | "assembly" | "drawing" | "variables") || kind.starts_with("file") {
                             let (d1, d2) = (view.read(cx).doc.clone(), view.read(cx).doc.clone());
                             // (The tab's own part number, else the one it was released with: the workspace keeps none after a
                             // release, live feel/release.json 12_studios_drawing_assembly_properties.)

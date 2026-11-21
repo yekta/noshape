@@ -1370,6 +1370,25 @@ impl Document {
         Ok(())
     }
 
+    /// The document's first state as a version (Versions and history's Start row, live docver-1121: renamable, with a
+    /// description and Publish FeatureScript…): its name ("Start" until renamed) and description.
+    pub fn start_version(&self) -> Result<(String, String)> {
+        let name = self.meta_string("start_name")?;
+        Ok((if name.is_empty() { "Start".into() } else { name }, self.meta_string("start_description")?))
+    }
+
+    /// The first state's name ("Start" until renamed).
+    pub fn start_name(&self) -> String {
+        self.start_version().map(|v| v.0).unwrap_or_else(|_| "Start".into())
+    }
+
+    /// Start › Properties…: its name and description.
+    pub fn update_start_version(&mut self, name: &str, description: &str) -> Result<()> {
+        let name = check_name(name)?.to_string();
+        self.set_meta("start_name", Some(name.as_bytes()))?;
+        self.set_meta("start_description", (!description.is_empty()).then_some(description.as_bytes()))
+    }
+
     pub fn version(&self, id: VersionId) -> Result<VersionInfo> {
         self.conn()?
             .prepare_cached(&format!(

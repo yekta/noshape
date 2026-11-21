@@ -300,7 +300,7 @@ impl Session {
         // The first point of the history is the "Start" version (live:
         // "Versions are view only. Viewing Start.").
         let graph = self.store.graph().ok()?;
-        graph.microversions.iter().find(|m| m.id == mv && m.parents.is_empty()).map(|_| "Start".to_string())
+        graph.microversions.iter().find(|m| m.id == mv && m.parents.is_empty()).map(|_| self.store.start_name())
     }
 
     /// The history change being viewed (a point that is no version, nor Start): its description ("Part Studio 1 ::

@@ -2300,7 +2300,7 @@ Document Links	ドキュメントリンク
 Document Memory Usage	ドキュメントメモリの使用状況
 Document cannot be edited without its ID.	ドキュメントを ID なしで編集することはできません。
 Document cannot be edited.	ドキュメントは編集できません。
-Document contains a PDF	ドキュメントに PDF が含まれています
+Document must contain a PDF	ドキュメントには PDF が含まれている必要があります
 Document defines at least one custom feature or table	ドキュメントは、最低 1 つのカスタムフィーチャーまたはテーブルを定義します
 Document description	ドキュメントの説明
 Document description failed to update.	ドキュメントの説明を更新できませんでした。

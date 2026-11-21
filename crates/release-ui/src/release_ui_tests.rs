@@ -298,3 +298,71 @@ fn an_unreleased_items_revision_history_says_none_found(cx: &mut TestAppContext)
     draw(cx, window);
     assert!(gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("rh-none").is_some(), "the empty history's sentence");
 }
+
+/// Live alpha-1121 ("studios (11-21): release gaps"): after Y the dialog proposes AA (Z skipped). Leaving the Revision
+/// field with a value it can't take puts the proposed one in its place, with a yellow note under the row: W (not after
+/// the released Y) says the part number's next, Z and "aa" (not in the scheme) say so; a higher valid value (AC) is
+/// kept with no note. Release stays enabled and records what the field shows.
+#[gpui::test]
+fn a_revision_it_cant_take_becomes_the_proposed_one_with_a_note(cx: &mut TestAppContext) {
+    let (window, view, _) = dialog_with(cx, "alpha-past-y", Mode::Release, "R2", |ctx, call| {
+        call(ctx, "company_release_settings", json!({ "set": { "managed_workflows": true } }));
+        call(ctx, "release_create", json!({ "notes": "first", "tab": "Part Studio 1", "name": "R1", "part_numbers": { "Part 1": "P-102" }, "revisions": { "Part 1": "Y" } }));
+    });
+    let field = cx.update(|cx| {
+        let v = view.read(cx);
+        assert_eq!(v.rows[0].revision.read(cx).value().to_string(), "AA", "after Y comes AA");
+        v.rows[0].revision.clone()
+    });
+    let leave = |cx: &mut TestAppContext, typed: &str| {
+        cx.update_window(window, |_, w, cx| {
+            field.update(cx, |s, cx| s.set_value(typed.to_string(), w, cx));
+            view.update(cx, |v, cx| v.revision_event(&field, &gpui_kit::component::input::InputEvent::Blur, w, cx));
+        })
+        .unwrap();
+        draw(cx, window);
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let notes: Vec<String> = v.issues(cx)[0].iter().filter(|i| !i.blocks()).map(|i| i.message()).collect();
+            assert!(!v.issues(cx).iter().flatten().any(|i| i.blocks()), "Release stays enabled after {typed}");
+            (v.rows[0].revision.read(cx).value().to_string(), notes)
+        })
+    };
+    assert_eq!(leave(cx, "W"), ("AA".to_string(), vec!["The next available revision for part number P-102 is AA.".to_string()]));
+    assert_eq!(leave(cx, "Z"), ("AA".to_string(), vec!["Z is not a valid revision in your company revision scheme. The next available revision for this scheme is AA.".to_string()]));
+    assert_eq!(leave(cx, "aa"), ("AA".to_string(), vec!["aa is not a valid revision in your company revision scheme. The next available revision for this scheme is AA.".to_string()]));
+    assert_eq!(leave(cx, "AC"), ("AC".to_string(), vec![]));
+    // Typed and not left yet (Release clicked at once): the release takes the proposed one.
+    cx.update_window(window, |_, w, cx| field.update(cx, |s, cx| s.set_value("W".to_string(), w, cx))).unwrap();
+    assert_eq!(cx.update(|cx| view.read(cx).items(cx)[0].revision.clone()), "AA");
+}
+
+/// Live docver-1121 (rel-compare-*.png): a review row's Compare revisions, between Edit properties and Export…, opens
+/// under the row: "Only show differences", then Revision A (the released one) and Revision B side by side, at most
+/// 337 px; a second click closes it.
+#[gpui::test]
+fn compare_revisions_opens_revision_a_and_b_under_the_row(cx: &mut TestAppContext) {
+    let (window, view, _) = dialog_with(cx, "compare", Mode::Review, "R2", |ctx, call| {
+        call(ctx, "company_release_settings", json!({ "set": { "managed_workflows": true } }));
+        call(ctx, "release_create", json!({ "notes": "first", "tab": "Part Studio 1", "name": "R1", "part_numbers": { "Part 1": "P-100" } }));
+        call(ctx, "feature_edit", json!({ "feature": "Extrude 1", "params": { "depth": "15 mm" } }));
+    });
+    let bounds = |cx: &mut TestAppContext, sel: &'static str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(sel);
+    let click = |cx: &mut TestAppContext, sel: &'static str| {
+        let b = bounds(cx, sel).unwrap_or_else(|| panic!("{sel} drawn"));
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(b.center(), gpui_kit::Modifiers::default());
+        draw(cx, window);
+    };
+    let row_bottom = bounds(cx, "rel-compare-0").expect("the review row's Compare revisions").bottom();
+    assert!(bounds(cx, "rel-compare-a-0").is_none(), "closed at first");
+    click(cx, "rel-compare-0");
+    let (a, b) = (bounds(cx, "rel-compare-a-0").expect("Revision A"), bounds(cx, "rel-compare-b-0").expect("Revision B"));
+    assert!(a.top() > row_bottom && (a.top() - b.top()).abs() < px(1.) && b.left() > a.right(), "side by side under the row: {a:?} {b:?}");
+    assert!(a.size.width <= px(337.) && a.size.width == a.size.height, "squares of at most live's 337 px: {a:?}");
+    let labels = cx.update(|cx| view.read(cx).compares.values().next().map(|c| c.labels.clone()));
+    assert_eq!(labels, Some([Some("A".to_string()), Some("B".to_string())]), "A released, B under review");
+    click(cx, "rel-compare-diff-0");
+    assert!(cx.update(|cx| view.read(cx).compares.values().all(|c| c.differences)), "Only show differences ticked");
+    click(cx, "rel-compare-0");
+    assert!(bounds(cx, "rel-compare-a-0").is_none(), "a second click closes it");
+}

@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-21 10:14 UTC.
+Updated 2026-11-21 15:22 UTC.
 
 ## In flight
 
@@ -24,16 +24,46 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
   page's Versions and history page (live 2435: `HistoryPanel::page`, start-ui `StartView::page`, hook
   `start_hooks::versions_page`, app `files::versions_page`), the deleted-workspace bubble 30 s (`NoticeLink::stays`),
   documents_list Created by me / `search` / `documents_sort`.
-- Committed, not landed: 4e394074 history_merge `strategy` / `tabs` / `version` + protected refusal; the Merge
-  dialog's tab table moved to ops `merge_plan` (dialog uses it; ver-merge-* / ver-flow-* / restore scenarios 12/12
-  match on vibe2).
-- In the tree (x123, vibex7): history_create_version `at` / `publish` / the name's limits (e2e
-  `create_version_here_and_publish`); release_create approver errors in the dialog's words. AGENT_API.md from
-  vibex7:tmp/studios/AGENT_API.md after the coverage run.
-- REQUESTS for live (11-21): 08:58 the drawing matrix's 40 most-used shown rows (six takes); 09:12 documents /
-  versions gaps (11 items + 09:33 the page's workspace / version ••• menus). Take their rows as they land.
-- Audit next (all wait on live's 09:12 takes): #7 Start row Properties… / Publish FeatureScript…, #8 Compare
-  revisions + the Export button's tooltip, #9 search relevance and rename while open. #10 done.
+- LANDED a2074bb2 as 301b1895 (11:19): history_merge strategies + merge_plan; history_create_version at/publish.
+- LANDING (13:58): speed pass + live docver-1121 rows + drawing takes + Start version (x129/x130 on vibex7):
+  - Speed pass: NO gap >=100 ms and >=2x live. 1000-part drawing: open 19-31 ms, all views 2.7-4.9 s (live 3.7-4.0 s a
+    view), Update click 62-85 ms (two sheet assemblies ~20 ms each on the UI thread; bench now holds it to <100 ms, not a
+    frame; possible later cleanup: one assembly per click), views remade 47-83 ms (live 6.4 s); FS marker ~0.8 s (live
+    0.86-0.95); VS steps 18-20 ms; history row click 17 ms. (Benches using run_until_parked count background work: don't.)
+  - docver-1121: Create version 255 limit; search empty keeps results, ⊗ clears + blurs (vendor Input `clear_blurs`);
+    State column; Delete/Backspace -> Send to trash (`TrashSelected`); rename while open (hook
+    `start_hooks::rename_open_document` -> app `files::rename_open_document`: store name, file kept); row icons hover only;
+    version bar (app-core version_bar.rs) in Part Studio / Assembly / Drawing; the assembly redraws on Reloaded (its
+    cached toolbar showed the bar late); versions page ••• on hover; release BlankRevision etc.
+  - Start is a version (live 13:11): store `start_version` / `start_name` / `update_start_version` (meta start_name,
+    start_description); row, view-only bar, version lists read it; menu Properties… (`Item::Start`) + Publish
+    FeatureScript… (`versions::publish_target`, key `published_featurescript:start`); ops version_properties / publish
+    take it by name; "Document must contain a PDF" (live words, 8 tsv).
+  - Drawing takes (8dc787fa + live 13:08 answers): no menu while Edit section is open; no Resize... for several cells;
+    Opposite direction swaps its arrow (icon section-flip-back.svg), no tint; Esc in Edit section stays open after a
+    checkbox click (`check_focused`, panel_focus; test `edit_sections_esc_keeps_the_panel_while_a_ticked_checkbox_has_the_focus`).
+  - Alphabetical past Y (live alpha-1121): model-core `ReleaseLog::settle_revision`; the dialog settles a revision on
+    Blur (`revision_event`, `Row::settled`, the yellow `Issue::Notice`), `items()` takes the proposal; no upper-casing;
+    ops release_create returns `revision_notes`. Tests `a_revision_it_cant_take_becomes_the_proposed_one_with_a_note`,
+    e2e release_parts_and_revision_history (A -> C with the note).
+  - Compare revisions (live rel-compare-*.png): review rows' button between Edit properties and Export… (`toggle_compare`,
+    `render_compare`, `CompareRow`, `compare_layout`); release_thumbs::compare renders A (the previous revision's
+    package version) and B (the package's version, else the workspace), plain and flat #acdbf5 / #e67d5e for a changed
+    part. Assembly / drawing rows show the same picture both ways (asked). Test
+    `compare_revisions_opens_revision_a_and_b_under_the_row`. Pictures shrink to fit our 820 px dialog (live 1090).
+  - Live revtools-1121: top-level assembly row Where used… (`AssemblyViewEvent::WhereUsedAssembly` -> the rail's panel)
+    and, with workflows, Revision history… (hook `open_tab_revision_history`); Revision tools' Object type Part ·
+    Assembly · Drawing · Blob, empty result shows nothing. "Revision table properties..." kept (live's take reads ASCII
+    dots).
+  - Assembly "Viewing V1" bar: Reloaded swaps in a new toolbar slice (`toolbar_slice`): a cached slice reused since
+    its last paint takes no notify (GPUI tracks only entities drawn in the last frame). ui-test-support now puts each
+    test binary's settings under the run's NOSHAPE_CONFIG_DIR (release-ui's managed workflows leaked into
+    assembly-ui's menus in one rb.sh run). Release dialog: a revision it takes clears the last note.
+- NEXT: the dialog's width (live 1090 px at 1920, columns 280/225/225/225: REQUESTS 14:33 asks how it scales), then
+  live's answers to 14:33 (Compare on other rows, search relevance for audit #9).
+- REQUESTS for live (11-21): 08:58 the drawing matrix's 40 most-used shown rows (six takes); 14:33 release dialog
+  width, Compare revisions on other rows, search relevance, asm-root-menu re-records (8 takes from the Free account).
+- Audit: #7 done (Start version), #8 done for part rows, #9 rename done, search relevance waits on live 14:33. #10 done.
 - Live fc-1121 drawing feel (behaviours "studios fc-1121"): (1) a dimension being placed shows the line to another's
   x / y without snapping (still held on a + mark, live2 rad-note); (3) caret at the click (`note_caret_at`), a
   double-click in the editor selects all; (5) a dragged box draws its picks selected (`box_preview`); (2), (4), (6)
@@ -43,9 +73,7 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
   Drawing properties 101 → 22 shown, matrix 04:45: 1344 = / 456 shown of 1842; View simplification was None, Auto, …: now live's None, Absolute, Ratio to
   studio, Ratio to part, Auto (test `the_view_simplification_list_is_in_lives_order`). REQUESTS fc-1121 (6) added:
   a table hover-lit after Esc under a resting pointer (split s14-15).
-- Told asm 23:15: in a test window the instance list's rows slice isn't redrawn after a document edit (set_fixed
-  false/true: the fixed icon stays; a notify on the view or on slices.rows doesn't redraw it; window.refresh() does).
-  Not checked in the app. Feel tests that change the list must build the state before opening (open_from_top_when).
+- Cached slices: a notify reaches one only if the last frame drew it (not reused): replace the slice to force it.
 - Night ui-parity 8 (psui 1120-night-ui-a06ec927): 8/8 with this branch (23:46). drw-centermark: the scenario's expect
   said the mark goes on Esc (old dx capture); live retake 996d6b8a keeps it: expect updated. drw-revision-table-delete:
   live paints a deleted table until the next click and its recorder reads that paint ("EDGE Top", behaviours retake
@@ -64,11 +92,7 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
    under the resting pointer, ours nothing (reader emulation, left).
    Live is capturing a drawing feel batch for me (lead 03:3x: dimension snap/reach, view drag/alignment, note caret,
    view-edge hover timing, box select): take its rows as they arrive.
-2. Custom table configuration (live cfgtbl-1121, 05:3x): the cells take the value picked in Add (unlike Insert view); the
-   table stores every input's value (Reset to default writes the default's values at that time); Change configuration...
-   between Split custom table below and Copy; properties row "Configurations  Size: Large"; the change panel's studio row
-   has the configuration icon + ▾ (Set to last viewed / Reset to default). In the branch (app + drawing_custom_table op).
-3. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.
+2. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
 - live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell
@@ -129,7 +153,6 @@ into notes.
 - Release gap list: all done (Release all configurations…, the outdated associated drawing: 11-18).
 
 ## How to run
-
 Builds and crate tests on the Mac:
 - `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh cargo test -p <crate> --lib <filter> > log 2>&1`, then grep the log for
   `^test |panicked|test result|^error|  left|  right`. Never pipe into `head`: the kernel's and vendor's warnings

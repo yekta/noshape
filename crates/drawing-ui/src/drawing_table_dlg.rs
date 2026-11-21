@@ -399,9 +399,12 @@ impl DrawingEditor {
 
     /// Right-click with cells of a BOM, cut list, custom or hole table selected (live dom/context-menus-drawing:
     /// bom-table-cell; live2 drw-hole-table-cell-rmb): Size ▸ Columns Equally / Rows Equally (of the selected
-    /// columns / rows), Resize… | Copy.
+    /// columns / rows), Resize… | Copy. Several cells: no Resize… (live drw-table-cell-menu s23).
     pub fn cell_size_entries(&self, t: &noshape_model::drawing::Table, cs: crate::drawing_cells::CellSel) -> Vec<MenuEntry> {
         let mut out = self.size_entries(t, cs);
+        if cs.a != cs.b {
+            out.truncate(1);
+        }
         out.push(MenuEntry::Separator);
         out.push(MenuEntry::item("Copy", |ed, _, cx| {
             ed.copy_cells(cx);

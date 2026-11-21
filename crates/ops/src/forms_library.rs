@@ -176,7 +176,7 @@ fn latest(path: &Path) -> Option<(crate::derived::ExternalDocInfo, String, nosha
     let info = crate::derived::external_doc_info(path).ok()?;
     let (label, mv) = match info.versions.iter().find(|v| v.label != "Current state") {
         Some(v) => (v.label.clone(), v.microversion),
-        None => ("Start".to_string(), info.start?),
+        None => (info.start_name.clone(), info.start?),
     };
     Some((info, label, mv))
 }
@@ -197,7 +197,7 @@ pub fn check_folder(key: &str, folder: &Path) -> Result<(), Vec<String>> {
         .iter()
         .filter_map(|(_, path)| {
             let (info, label, mv) = latest(path)?;
-            let doc = (label != "Start").then(|| crate::derived::external_snapshot(path, mv).ok()).flatten();
+            let doc = info.versions.iter().any(|v| v.label == label && v.label != "Current state").then(|| crate::derived::external_snapshot(path, mv).ok()).flatten();
             let n = doc.map_or(0, |d| d.tabs.iter().filter(|t| matches!(&t.content, TabContent::File(f) if image(&f.file_name))).count());
             (n == 0).then(|| format!("Document \"{}\" has 0 versioned images. One versioned image is required.", info.name))
         })

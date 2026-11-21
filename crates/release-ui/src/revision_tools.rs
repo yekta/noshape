@@ -19,7 +19,13 @@ use std::path::PathBuf;
 /// The release log's key in a document's store (as the release dialog's).
 const META_KEY: &str = crate::release_dialog::META_KEY;
 
-const KINDS: [ItemKind; 5] = [ItemKind::Part, ItemKind::Assembly, ItemKind::Drawing, ItemKind::VariableStudio, ItemKind::File];
+/// Object type's choices (live revtools-1121: Part · Assembly · Drawing · Blob).
+const KINDS: [ItemKind; 4] = [ItemKind::Part, ItemKind::Assembly, ItemKind::Drawing, ItemKind::File];
+
+/// An object type's name here: a file is a "Blob" (live revtools-1121).
+fn kind_label(kind: ItemKind) -> &'static str {
+    if kind == ItemKind::File { "Blob" } else { kind.label() }
+}
 
 /// One row of the search: a revision and the document it was released in.
 struct Found {
@@ -129,7 +135,7 @@ impl Render for RevisionToolsView {
         let pal = p();
         let label = |t: &'static str| div().pt(px(16.)).pb(px(6.)).text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child(t);
         let can_find = self.kind.is_some() && !self.part_number.read(cx).value().trim().is_empty();
-        let kinds: Vec<String> = std::iter::once(String::new()).chain(KINDS.iter().map(|k| k.label().to_string())).collect();
+        let kinds: Vec<String> = std::iter::once(String::new()).chain(KINDS.iter().map(|k| kind_label(*k).to_string())).collect();
         let view = cx.entity();
         let select = os::select_field("revtools-kind", kinds, self.kind.map_or(0, |k| k + 1), move |i, _, cx| {
             view.update(cx, |this, cx| {
@@ -138,7 +144,8 @@ impl Render for RevisionToolsView {
             })
         });
         let bullet = |t: &'static str| h_flex().pl(px(18.)).gap(px(10.)).child(div().size(px(5.)).rounded_full().bg(pal.text)).child(t);
-        let table = self.found.as_ref().map(|(number, kind, rows)| {
+        // A part number with no revisions: no table, no message, no Reset button (live revtools-1121).
+        let table = self.found.as_ref().filter(|(_, _, rows)| !rows.is_empty()).map(|(number, kind, rows)| {
             let cell = |w: f32, t: SharedString| div().w(px(w)).flex_none().px(px(6.)).truncate().child(t);
             let header = h_flex().h(px(38.)).border_b_1().border_color(rgb(TABLE_RULE)).font_weight(FontWeight::BOLD).children(COLS.iter().map(|(t, w)| cell(*w, (*t).into())));
             let yes_no = |b: bool| SharedString::from(if b { "Yes" } else { "No" });
@@ -146,7 +153,7 @@ impl Render for RevisionToolsView {
                 let v = &r.revision;
                 let texts: [SharedString; 9] = [
                     number.clone().into(),
-                    kind.label().into(),
+                    kind_label(*kind).into(),
                     v.revision.clone().into(),
                     r.document.clone().into(),
                     v.release_name.clone().into(),
@@ -164,7 +171,6 @@ impl Render for RevisionToolsView {
                 .text_color(pal.text)
                 .child(header)
                 .children(body)
-                .when(rows.is_empty(), |d| d.child(div().py(px(8.)).px(px(6.)).text_color(pal.text_muted).child("No revisions found.")))
                 .child(
                     h_flex().mt(px(14.)).child(
                         // Nothing left to reset: Bootstrap's disabled button, 65%
@@ -195,5 +201,14 @@ impl Render for RevisionToolsView {
                         .children(table),
                 ),
             )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// Live revtools-1121: Object type offers Part · Assembly · Drawing · Blob.
+    #[test]
+    fn object_type_offers_lives_four_types() {
+        assert_eq!(super::KINDS.map(super::kind_label), ["Part", "Assembly", "Drawing", "Blob"]);
     }
 }

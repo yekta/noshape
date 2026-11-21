@@ -271,6 +271,7 @@ fn register_assembly_hooks() {
         release_tab_items: release_dialog::tab_items,
         open_release_candidate: release_dialog::open_release_candidate,
         open_part_revision_history: release_dialog::open_part_revision_history,
+        open_tab_revision_history: release_dialog::open_tab_revision_history,
         last_viewed_config: release_dialog::last_viewed_config,
         create_version: history_panel::open_create_version,
         tab_properties: |doc, tab, window, cx| doc_dialogs::tab_properties(doc, tab, None, window, cx),
@@ -427,7 +428,7 @@ fn register_history_hooks() {
 
 /// What the documents page (noshape-start-ui) needs of the app: a document's window, the build label.
 pub(crate) fn register_start_hooks() {
-    noshape_start_ui::start_hooks::register(noshape_start_ui::start_hooks::Hooks { open_document_window: files::open_document_window, open_document_at: files::open_document_at, versions_page: files::versions_page, build_label, import_dialog: import_dialog::open_for_page, help_items: help_menu::items });
+    noshape_start_ui::start_hooks::register(noshape_start_ui::start_hooks::Hooks { open_document_window: files::open_document_window, open_document_at: files::open_document_at, versions_page: files::versions_page, build_label, import_dialog: import_dialog::open_for_page, help_items: help_menu::items, rename_open_document: files::rename_open_document });
     noshape_app_core::os_menu::set_floating(updates::card);
 }
 

@@ -238,6 +238,18 @@ pub fn update_linked_instance(window: &mut Window, other: noshape_app_core::asse
 /// The documents page's row › Versions and history: the document's Versions and history page, on a session of its
 /// own (live 2435: /versionsAndHistory, no document open). Its rows' Open opens the document's window on that
 /// workspace, or a window at that version or change.
+/// The documents page's Rename on a document open in a window (live docver-1121): the window's document takes the
+/// name, as its navbar rename; the file keeps its name.
+pub fn rename_open_document(path: PathBuf, name: String, cx: &mut App) {
+    with_workspace(&path, move |ws, _, cx| {
+        let doc = ws.read(cx).doc.clone();
+        doc.update(cx, |d, cx| match d.session.store.set_name(&name) {
+            Ok(()) => d.reloaded(cx),
+            Err(e) => cx.emit(doc_model::DocEvent::Error(format!("{e:#}"))),
+        });
+    }, cx);
+}
+
 pub fn versions_page(path: PathBuf, name: String, window: &mut Window, cx: &mut App) -> anyhow::Result<AnyView> {
     let session = session::Session::open(&path)?;
     let doc = cx.new(|_| doc_model::DocModel::new(session));

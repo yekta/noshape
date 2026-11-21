@@ -4674,7 +4674,7 @@ impl OtherDoc {
         let graph = store.graph()?;
         let mut versions: Vec<crate::derived::VersionChoice> = graph.versions.iter().rev().map(|v| crate::derived::VersionChoice { label: v.name.clone(), microversion: v.microversion }).collect();
         if let Some(root) = graph.microversions.iter().find(|m| m.parents.is_empty()) {
-            versions.push(crate::derived::VersionChoice { label: "Start".into(), microversion: root.id });
+            versions.push(crate::derived::VersionChoice { label: store.start_name(), microversion: root.id });
         }
         // Changes since the last version: steps back from the head to a
         // versioned microversion (or the start).

@@ -65,5 +65,6 @@ pub mod user_units;
 pub mod view_cube;
 pub mod print_setup;
 pub mod var_complete;
+pub mod version_bar;
 pub mod version_picker;
 pub mod viewport;

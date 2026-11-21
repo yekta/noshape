@@ -27,6 +27,8 @@ pub const WORKSPACE_DESCRIPTION_KEY: &str = noshape_ops::versions::WORKSPACE_DES
 pub enum Item {
     Version(VersionId),
     Workspace(BranchId),
+    /// The document's first state, a version too (live docver-1121: Start › Properties… renames it).
+    Start,
 }
 
 type Listener = Box<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
@@ -71,6 +73,11 @@ pub fn open(doc: Entity<DocModel>, item: Item, window: &mut Window, cx: &mut App
             let Ok(info) = store.branch(b) else { return };
             let desc = store.get_meta(&format!("{WORKSPACE_DESCRIPTION_KEY}{b}")).ok().flatten().map(|d| String::from_utf8_lossy(&d).into_owned()).unwrap_or_default();
             (info.name, desc, info.head)
+        }
+        Item::Start => {
+            let Some(root) = store.graph().ok().and_then(|g| g.microversions.iter().find(|m| m.parents.is_empty()).map(|m| m.id)) else { return };
+            let Ok((name, desc)) = store.start_version() else { return };
+            (name, desc, root)
         }
     };
     let at = store.read_all(mv).ok().and_then(|b| Document::from_blobs(&b).ok());
@@ -292,6 +299,7 @@ impl ItemProperties {
             let store = &mut doc.session.store;
             match item {
                 Item::Version(id) => store.update_version(id, &n, &d)?,
+                Item::Start => store.update_start_version(&n, &d)?,
                 Item::Workspace(b) => {
                     store.rename_branch(b, &n)?;
                     let key = format!("{WORKSPACE_DESCRIPTION_KEY}{b}");
@@ -356,7 +364,7 @@ impl Render for ItemProperties {
         let pal = p();
         let dirty = self.dirty(cx);
         let (icon, kind, category) = match self.item {
-            Item::Version(_) => ("legend-version", "Version", "Noshape Version"),
+            Item::Version(_) | Item::Start => ("legend-version", "Version", "Noshape Version"),
             Item::Workspace(_) => ("legend-workspace", "Workspace", "Noshape Workspace"),
         };
         let group = |l: Div, f: AnyElement| v_flex().w_full().child(l).child(div().p(px(1.)).child(f));

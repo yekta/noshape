@@ -44,6 +44,10 @@ pub struct SectionEdit {
     pub exclude_on: bool,
     pub exclude: Vec<noshape_model::BodyId>,
     pub exclude_picking: bool,
+    /// The panel's focus (a click in it takes the focus there, live: Esc then closes it), and whether a checkbox was
+    /// the last thing clicked (live section-probe-1121: Esc with the just-ticked checkbox focused leaves it open).
+    pub panel_focus: FocusHandle,
+    pub check_focused: bool,
 }
 
 impl DrawingEditor {
@@ -65,7 +69,7 @@ impl DrawingEditor {
             }
         });
         let up_to = depth_ref.is_some();
-        self.section_edit = Some(SectionEdit { view, parent, cuts, cut_only, depth: None, depth_value: None, label: (st, sub), label_text: text, flip, up_to, depth_ref, picking: false, offset: None, offset_value: None, offset_flip: offset.is_some_and(|o| o < 0.0), exclude_on: !exclude.is_empty(), exclude, exclude_picking: false });
+        self.section_edit = Some(SectionEdit { view, parent, cuts, cut_only, depth: None, depth_value: None, label: (st, sub), label_text: text, flip, up_to, depth_ref, picking: false, offset: None, offset_value: None, offset_flip: offset.is_some_and(|o| o < 0.0), exclude_on: !exclude.is_empty(), exclude, exclude_picking: false, panel_focus: cx.focus_handle(), check_focused: false });
         if depth.is_some() || up_to {
             self.toggle_edit_depth(depth, window, cx);
             if let Some(e) = &mut self.section_edit {
@@ -271,6 +275,13 @@ impl DrawingEditor {
             .unwrap_or_else(|| "Part".into())
     }
 
+    /// A press on one of the panel's checkboxes: it has the focus (after the panel's capture took it there).
+    fn checkbox_down(&mut self, _: &MouseDownEvent, _: &mut Window, _: &mut Context<Self>) {
+        if let Some(e) = &mut self.section_edit {
+            e.check_focused = true;
+        }
+    }
+
     pub fn render_section_edit(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let e = self.section_edit.as_ref()?;
         let pal = p();
@@ -279,6 +290,7 @@ impl DrawingEditor {
         let excluded: Vec<(usize, String)> = e.exclude.iter().enumerate().map(|(i, b)| (i, self.part_name_in(e.parent, b))).collect();
         let label = e.label.0.clone();
         let label_text = e.label_text.clone();
+        let panel_focus = e.panel_focus.clone();
         let (cut_only, flip, up_to, picking, has_ref, offset_flip) = (e.cut_only, e.flip, e.up_to, e.picking, e.depth_ref.is_some(), e.offset_flip);
         let depth = e.depth.as_ref().map(|(st, _)| st.clone());
         let offset = e.offset.as_ref().map(|(st, _)| st.clone());
@@ -325,11 +337,22 @@ impl DrawingEditor {
         Some(
             v_flex()
                 .id("dr-section-edit")
+                .debug_selector(|| "dr-section-edit".into())
                 // Esc with its Section id field focused closes it too, unapplied (live2 drw-section-exclude-from-cut s22: the
                 // field typed in at s17).
+                .track_focus(&panel_focus)
+                .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                    if let Some(e) = &mut this.section_edit {
+                        e.check_focused = false;
+                        window.focus(&e.panel_focus, cx);
+                    }
+                }))
                 .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
                     if e.keystroke.key == "escape" {
                         cx.stop_propagation();
+                        if this.section_edit.as_ref().is_some_and(|s| s.check_focused) {
+                            return;
+                        }
                         this.close_section_edit(false, cx);
                         window.focus(&this.focus, cx);
                     }
@@ -357,7 +380,8 @@ impl DrawingEditor {
                 // row 153, Exclude from cut 234).
                 .child(div().px(px(10.)).pt(px(8.)).child(Input::new(&label).xsmall()))
                 // The tool button (live 499–504, as in the creating dialog): the cutting line's points are being picked,
-                // so it shows active; Opposite direction at the row's right end (live2 drw-section-edit-depth-direction).
+                // so it shows active; Opposite direction at the row's right end, its arrow turned by each click (live2
+                // drw-section-edit-depth-direction, live section-probe-1121).
                 .child(
                     h_flex()
                         .px(px(10.))
@@ -378,7 +402,7 @@ impl DrawingEditor {
                                 .child(crate::assets::icon("section-cut-line", 20., cx)),
                         )
                         .child(div().flex_1())
-                        .child(square("se-flip", flip, "Opposite direction").child(crate::assets::icon("section-flip", 20., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        .child(square("se-flip", false, "Opposite direction").child(crate::assets::icon(if flip { "section-flip-back" } else { "section-flip" }, 20., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             if let Some(e) = &mut this.section_edit {
                                 e.flip = !e.flip;
                             }
@@ -386,13 +410,13 @@ impl DrawingEditor {
                             cx.notify();
                         }))),
                 )
-                .when(depth.is_none(), |d| d.child(div().px(px(10.)).pt(px(12.)).child(crate::drawing_chrome::DrCheckbox::new("se-cut-only").label("Show cut geometry only").checked(cut_only).on_click(cx.listener(|this, v: &bool, _, cx| {
+                .when(depth.is_none(), |d| d.child(div().px(px(10.)).pt(px(12.)).capture_any_mouse_down(cx.listener(Self::checkbox_down)).child(crate::drawing_chrome::DrCheckbox::new("se-cut-only").label("Show cut geometry only").checked(cut_only).on_click(cx.listener(|this, v: &bool, _, cx| {
                     if let Some(e) = &mut this.section_edit {
                         e.cut_only = *v;
                     }
                     this.preview_section_edit(cx);
                 })))))
-                .child(div().px(px(10.)).pt(px(if depth.is_none() { 4. } else { 12. })).child(crate::drawing_chrome::DrCheckbox::new("se-depth").label("Section depth").checked(depth.is_some()).on_click(cx.listener(|this, _: &bool, w, cx| this.toggle_edit_depth(None, w, cx)))))
+                .child(div().debug_selector(|| "se-depth-row".into()).px(px(10.)).pt(px(if depth.is_none() { 4. } else { 12. })).capture_any_mouse_down(cx.listener(Self::checkbox_down)).child(crate::drawing_chrome::DrCheckbox::new("se-depth").label("Section depth").checked(depth.is_some()).on_click(cx.listener(|this, _: &bool, w, cx| this.toggle_edit_depth(None, w, cx)))))
                 .when(depth.is_some(), |d| {
                     d.child(
                         div().px(px(8.)).pt(px(4.)).child(
@@ -456,7 +480,7 @@ impl DrawingEditor {
                             .px(px(8.))
                             .pt(px(4.))
                             .gap(px(6.))
-                            .child(crate::drawing_chrome::DrCheckbox::new("se-offset").label("Offset").checked(offset.is_some()).on_click(cx.listener(|this, _: &bool, w, cx| this.toggle_edit_offset(None, w, cx))))
+                            .child(div().capture_any_mouse_down(cx.listener(Self::checkbox_down)).child(crate::drawing_chrome::DrCheckbox::new("se-offset").label("Offset").checked(offset.is_some()).on_click(cx.listener(|this, _: &bool, w, cx| this.toggle_edit_offset(None, w, cx)))))
                             .when_some(offset.clone(), |r, st| {
                                 r.child(div().flex_1().child(Input::new(&st).xsmall())).child(square("se-offset-flip", offset_flip, "Opposite direction").child(crate::assets::icon(&crate::assets::icon_path("flip"), 16., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     if let Some(e) = &mut this.section_edit {
@@ -469,7 +493,7 @@ impl DrawingEditor {
                     )
                 })
                 .when(assembly, |p| {
-                    p.child(div().px(px(10.)).pt(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("se-exclude-on").label("Exclude from cut").checked(exclude_on).on_click(cx.listener(|this, v: &bool, _, cx| {
+                    p.child(div().px(px(10.)).pt(px(4.)).capture_any_mouse_down(cx.listener(Self::checkbox_down)).child(crate::drawing_chrome::DrCheckbox::new("se-exclude-on").label("Exclude from cut").checked(exclude_on).on_click(cx.listener(|this, v: &bool, _, cx| {
                         if let Some(e) = &mut this.section_edit {
                             // Ticked, its Excluded parts field takes the clicks; unticked, nothing is excluded.
                             (e.exclude_on, e.exclude_picking) = (*v, *v);

@@ -139,15 +139,25 @@ fn feature_studio_at_scale() {
         rows_made.sort_by(f64::total_cmp);
         println!("BENCH {CASE} | completion: the list's rows made (background) and drawn: median {:.1} ms", rows_made[rows_made.len() / 2]);
         key(cx, window, "escape");
-        // An error: a stray brace; the squiggles come with the compile after the save.
+        // An error: a stray brace. The pause's check starts 580 ms after the key; its marker is drawn 800 ms after
+        // the key, or as the check ends if that's later (live tools-1119: 858–946 ms).
         key(cx, window, "}");
+        cx.executor().advance_clock(Duration::from_millis(580));
         let t = Instant::now();
-        cx.executor().advance_clock(Duration::from_millis(800));
+        cx.run_until_parked();
+        let compiled = t.elapsed().as_secs_f64() * 1e3;
+        cx.executor().advance_clock(Duration::from_millis(220));
+        let t = Instant::now();
         cx.run_until_parked();
         draw(cx, window);
-        println!("BENCH {CASE} | save and compile with the error (background): {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
-        let errors = cx.update(|cx| view.read(cx).notices.iter().filter(|n| n.error).count());
-        assert!(errors > 0, "the stray brace is reported");
+        let drawn = t.elapsed().as_secs_f64() * 1e3;
+        let marker = (580. + compiled).max(800.) + drawn;
+        println!("BENCH {CASE} | the error's marker from the key: {marker:.0} ms (its check {compiled:.0} ms, then drawn in {drawn:.1} ms)");
+        let errors = cx.update(|cx| view.read(cx).shown.iter().filter(|n| n.error).count());
+        assert!(errors > 0, "the stray brace's marker is drawn");
+        if !cfg!(debug_assertions) {
+            assert!(marker < 1046., "the marker {marker:.0} ms after the key (live: 858–946 ms)");
+        }
         step("a frame with the squiggles", bench::time(20, || {
             cx.update(|cx| view.update(cx, |_, cx| cx.notify()));
             draw(cx, window);

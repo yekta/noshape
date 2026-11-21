@@ -61,3 +61,75 @@ pub async fn render(doc: Document, versions: std::collections::HashMap<String, D
     }
     out
 }
+
+/// Compare revisions' Revision A (the released one) and Revision B (live docver-1121: Only show differences draws the
+/// differing geometry flat, A light blue, B red-orange).
+pub const COMPARE_A: u32 = 0xacdbf5;
+pub const COMPARE_B: u32 = 0xe67d5e;
+
+/// Compare revisions' pictures of one item, A then B: as they look, and with Only show differences.
+#[derive(Clone, Default)]
+pub struct Compared {
+    pub plain: [Option<Arc<RenderImage>>; 2],
+    pub differences: [Option<Arc<RenderImage>>; 2],
+}
+
+/// Render `item` in `docs` (the documents at revision A and at B; None: nothing to show) as `size` px squares. A part
+/// whose shape differs between the two is drawn unlit in [`COMPARE_A`] / [`COMPARE_B`] in the differences pictures.
+pub async fn compare(docs: [Option<Document>; 2], item: ReleaseItem, size: u32, gpu: crate::gpu::Gpu) -> Compared {
+    let part_display = |doc: &Document| -> Option<noshape_model::display::StudioDisplay> {
+        let tab = doc.tab(item.tab)?;
+        if !matches!((&tab.content, item.kind), (TabContent::PartStudio(_), ItemKind::Part)) {
+            return None;
+        }
+        let result = AssemblyEvaluator::default().studio(doc, item.tab, &item.config)?;
+        let mut display = result.display.clone();
+        for b in &mut display.bodies {
+            b.hidden = item.part.as_ref().is_some_and(|p| b.id != *p);
+        }
+        Some(display)
+    };
+    let shapes: Vec<Option<noshape_model::display::StudioDisplay>> = docs.iter().map(|d| d.as_ref().and_then(part_display)).collect();
+    let shown = |d: &noshape_model::display::StudioDisplay| d.bodies.iter().filter(|b| !b.hidden).map(|b| b.mesh.positions.clone()).collect::<Vec<_>>();
+    let differs = match (&shapes[0], &shapes[1]) {
+        (Some(a), Some(b)) => shown(a) != shown(b),
+        _ => true,
+    };
+    let mut out = Compared::default();
+    for (side, doc) in docs.iter().enumerate() {
+        let Some(doc) = doc else { continue };
+        let Some(display) = &shapes[side] else {
+            // An assembly or a drawing: the same picture either way.
+            let one = render(doc.clone(), Default::default(), vec![item.clone()], gpu.clone()).await.into_iter().next().map(|(_, im)| im);
+            out.plain[side] = one.clone();
+            out.differences[side] = one;
+            continue;
+        };
+        let opts = crate::scene_builder::SceneOptions { show_planes: false, show_sketches: false, show_origin: false, ..Default::default() };
+        let picture = |display: &noshape_model::display::StudioDisplay, flat: Option<u32>| {
+            let mut display = display.clone();
+            if let Some(hex) = flat {
+                for b in &mut display.bodies {
+                    b.color = crate::theme::lin(hex);
+                    b.face_colors.clear();
+                }
+            }
+            let mut scene = crate::scene_builder::build(&display, &opts, &mut Default::default(), gpu.uploader()).scene;
+            if flat.is_some() {
+                // Lines and points are drawn unlit anyway.
+                for i in &mut scene.instances {
+                    i.unlit = true;
+                }
+            }
+            scene
+        };
+        let flat = differs.then_some(if side == 0 { COMPARE_A } else { COMPARE_B });
+        for (scene, slot) in [(picture(display, None), &mut out.plain[side]), (picture(display, flat), &mut out.differences[side])] {
+            let Some((lo, hi)) = scene.bounds() else { continue };
+            let camera = crate::start_thumbnail::fit_camera(lo.as_dvec3(), hi.as_dvec3(), 1.0);
+            let Ok(png) = gpu.render_png(Arc::new(scene), camera, crate::start_thumbnail::thumbnail_style(), size, size).await else { continue };
+            *slot = crate::tab_thumbnail::decode(&png);
+        }
+    }
+    out
+}

@@ -329,6 +329,8 @@ pub struct ReleaseLog {
 pub enum Issue {
     /// The part number is empty (required).
     MissingPartNumber,
+    /// The revision is empty.
+    BlankRevision,
     /// The revision isn't a label of the scheme.
     InvalidRevision,
     /// Lower than (or equal to) a released revision of the part number: the latest released one and the next free.
@@ -345,10 +347,12 @@ impl Issue {
     pub fn message(&self) -> String {
         match self {
             Issue::MissingPartNumber => "Required field must not be empty.".into(),
+            Issue::BlankRevision => "Revision must not be blank.".into(),
             Issue::InvalidRevision => "Revision does not follow the revision scheme.".into(),
             // Live (release.json rc-revision-lower-error): a warning band under the row.
             Issue::RevisionTooLow { part_number, next, .. } => format!("The next available revision for part number {part_number} is {next}."),
-            Issue::DuplicatePartNumber => "Part number is used by another item of this release.".into(),
+            // Live docver-1121: under both rows.
+            Issue::DuplicatePartNumber => "Part number must be unique.".into(),
             Issue::Prevented(message) | Issue::Notice(message) => message.clone(),
         }
     }
@@ -445,6 +449,21 @@ impl ReleaseLog {
     }
 
     /// Problems of each item of a candidate.
+    /// Live alpha-1121: a typed revision the release can't take (not in the scheme, or not after the part number's
+    /// released revision) becomes the proposed one: that and the note under the row saying why; `None` when it is taken
+    /// as typed (a higher valid one too).
+    pub fn settle_revision(&self, item: &ReleaseItem) -> Option<(String, String)> {
+        if item.not_revision_managed || item.reverted || item.revision.trim().is_empty() || item.part_number.trim().is_empty() {
+            return None;
+        }
+        let next = self.next_revision(&item.part_number);
+        self.validate(std::slice::from_ref(item)).pop()?.into_iter().find_map(|x| match x {
+            Issue::InvalidRevision => Some(format!("{} is not a valid revision in your company revision scheme. The next available revision for this scheme is {next}.", item.revision.trim())),
+            Issue::RevisionTooLow { part_number, .. } => Some(format!("The next available revision for part number {part_number} is {next}.")),
+            _ => None,
+        }).map(|note| (next, note))
+    }
+
     pub fn validate(&self, items: &[ReleaseItem]) -> Vec<Vec<Issue>> {
         items
             .iter()
@@ -458,10 +477,16 @@ impl ReleaseLog {
                 // A drawing may share the number of a part or assembly when
                 // the numbering scheme allows it.
                 let reuse = |a: &ReleaseItem, b: &ReleaseItem| self.drawing_reuse && (a.kind == ItemKind::Drawing) != (b.kind == ItemKind::Drawing) && [a.kind, b.kind].iter().all(|k| matches!(k, ItemKind::Drawing | ItemKind::Part | ItemKind::Assembly));
+                // Live docver-1121: a blank revision's alert comes above the part number's.
+                let managed = !it.not_revision_managed && !it.reverted;
+                let blank = managed && it.revision.trim().is_empty();
+                if blank {
+                    v.push(Issue::BlankRevision);
+                }
                 if items.iter().enumerate().any(|(j, o)| j != i && o.part_number == it.part_number && !reuse(it, o)) {
                     v.push(Issue::DuplicatePartNumber);
                 }
-                if it.not_revision_managed || it.reverted {
+                if !managed || blank {
                     return v;
                 }
                 match self.scheme.index(&it.revision) {
@@ -829,6 +854,9 @@ mod tests {
         assert_eq!(log.validate(&[item("", "A")]), vec![vec![Issue::MissingPartNumber]]);
         assert_eq!(log.validate(&[item("P-1", "I")]), vec![vec![Issue::InvalidRevision]]);
         assert_eq!(log.validate(&[item("Q", "A"), item("Q", "A")])[0], vec![Issue::DuplicatePartNumber]);
+        // Live docver-1121: a blank revision, above the part number's alert; the words.
+        assert_eq!(log.validate(&[item("Q", ""), item("Q", "A")])[0], vec![Issue::BlankRevision, Issue::DuplicatePartNumber]);
+        assert_eq!((Issue::BlankRevision.message(), Issue::DuplicatePartNumber.message()), ("Revision must not be blank.".to_string(), "Part number must be unique.".to_string()));
         // B leaves A released, or auto-obsoletes it when the settings say so.
         log.record(package(PackageKind::Release, "R2", vec![item("P-1", "B")]));
         assert!(!log.revisions("P-1")[0].auto_obsolete);

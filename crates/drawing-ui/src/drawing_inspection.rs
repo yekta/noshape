@@ -248,6 +248,13 @@ impl DrawingEditor {
 
     pub fn toggle_hide_inspection(&mut self, cx: &mut Context<Self>) {
         let hide = !self.drawing.props.hide_inspection;
+        // In a version (view only) it hides them on screen only.
+        if self.doc.read(cx).session.viewing.is_some() {
+            self.drawing.props.hide_inspection = hide;
+            self.refresh(cx);
+            cx.notify();
+            return;
+        }
         self.edit(if hide { "Hide inspection items" } else { "Show inspection items" }, cx, |d| d.props.hide_inspection = hide);
     }
 

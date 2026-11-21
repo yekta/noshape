@@ -25,7 +25,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
-actions!(noshape_start, [SelectNext, SelectPrev, ToggleRow, SelectAllRows]);
+actions!(noshape_start, [SelectNext, SelectPrev, ToggleRow, SelectAllRows, TrashSelected]);
 
 const CONTEXT: &str = "StartWindow";
 
@@ -40,6 +40,7 @@ pub fn init(cx: &mut App) {
 /// The documents page's keys: only its list's (live chrome.json: no Onshape shortcuts there; Shift+/, Alt+C,
 /// Ctrl+Space, Alt+T, Ctrl+Z do nothing). Live2 11-13: ↑ / ↓ move the selection (the Details pane follows), Space
 /// toggles the row, Ctrl+A selects every row; Enter does nothing (a double-click opens), Ctrl+F is the browser's find.
+/// Live docver-1121: Delete and Backspace open Send to trash for the selected rows.
 fn key_bindings() -> Vec<KeyBinding> {
     let ctx = Some("StartWindow && !Input");
     vec![
@@ -47,6 +48,8 @@ fn key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new("down", SelectNext, ctx),
         KeyBinding::new("up", SelectPrev, ctx),
         KeyBinding::new("space", ToggleRow, ctx),
+        KeyBinding::new("delete", TrashSelected, ctx),
+        KeyBinding::new("backspace", TrashSelected, ctx),
     ]
 }
 
@@ -271,7 +274,7 @@ fn default_panel() -> Option<DocPanel> {
 
 impl Default for Prefs {
     fn default() -> Self {
-        Self { view: ViewMode::Grid, sort: SortKey::Modified, descending: true, source: None, columns: default_columns(), folder_sort: FolderSort::NameAsc, panel: default_panel(), folders_open: false, sort_cleared: false, pins: Vec::new(), col_w: Vec::new() }
+        Self { view: ViewMode::Grid, sort: SortKey::Modified, descending: true, source: None, columns: default_columns(), folder_sort: FolderSort::NameAsc, panel: default_panel(), folders_open: false, sort_cleared: true, pins: Vec::new(), col_w: Vec::new() }
     }
 }
 
@@ -533,13 +536,12 @@ impl StartView {
                 let text = state.read(cx).value().to_string();
                 match ev {
                     // The search runs on Enter, plain or written (`type:part name:pvz`, live documents/130-135;
-                    // docs-search: the breadcrumb stays while typing); clearing the box ends it.
-                    InputEvent::Change => {
-                        if text.trim().is_empty() {
-                            this.query = String::new();
-                            this.adv_query = None;
-                            this.refresh_body(cx);
-                        }
+                    // docs-search: the breadcrumb stays while typing). Emptying the box (Backspace or ⊗) keeps the
+                    // results; Enter on an empty box goes back to the folder (live docver-1121).
+                    InputEvent::PressEnter { .. } if text.trim().is_empty() => {
+                        this.query = String::new();
+                        this.adv_query = None;
+                        this.refresh_body(cx);
                     }
                     InputEvent::PressEnter { .. } => {
                         match crate::start_search::Query::parse_text(&text, this.adv_query.as_ref().unwrap_or(&Default::default())) {
@@ -816,12 +818,12 @@ impl StartView {
         cx.notify();
     }
 
-    /// A header click (live docs-import-feel-1118): a column sorts ascending, then descending, then back to the default
-    /// order (newest first, no arrow); Modified, already the default's key, only flips (oldest first, newest first).
+    /// A header click (live docs-import-feel-1118, docver-1121): a column sorts ascending, then descending, then back to
+    /// the default order (newest first, no arrow); Modified too.
     fn set_sort(&mut self, key: SortKey, cx: &mut Context<Self>) {
         if std::mem::take(&mut self.sort_cleared) || self.sort != key {
             (self.sort, self.descending) = (key, false);
-        } else if key == SortKey::Modified || !self.descending {
+        } else if !self.descending {
             self.descending = !self.descending;
         } else {
             self.clear_sort();
@@ -1479,13 +1481,15 @@ impl StartView {
     }
 
     fn rename(&mut self, d: DocEntry, window: &mut Window, cx: &mut Context<Self>) {
-        if crate::doc_files::is_document_open(&d.path, cx) {
-            Self::notify(window, cx, AlertKind::Warning, format!("{}: Close the document's window before renaming it", d.name));
-            return;
-        }
         let old = d.name.clone();
         self.start_inline_rename(d.path.clone(), d.name.clone(), move |this, name, window, cx| {
             if name == old {
+                return;
+            }
+            // Open in a window (live docver-1121: allowed, the window follows): its window renames it, the file stays.
+            if crate::doc_files::is_document_open(&d.path, cx) {
+                crate::start_hooks::rename_open_document(d.path.clone(), name, cx);
+                this.force_rescan(cx);
                 return;
             }
             match lib::rename_doc(&d.path, &name) {
@@ -3057,7 +3061,7 @@ impl StartView {
                                         .map(|d| if search_focused { d.border_2().border_color(rgb(0x3e94ff)) } else { d.border_1().border_color(pal.border_strong) })
                                         .rounded_l(px(2.))
                                         // The whole box left of the ▾ takes clicks (input_frame).
-                                        .child(gpui_kit::base::input::input_frame(div().flex_1().h_full().flex().items_center().map(|d| crate::ui_script::mark(d, || "field:Search".into())).child(Input::new(&self.search).text_size(px(14.)).appearance(false).small().h(px(26.)).cleanable(true).pl(px(12.)))))
+                                        .child(gpui_kit::base::input::input_frame(div().flex_1().h_full().flex().items_center().map(|d| crate::ui_script::mark(d, || "field:Search".into())).child(Input::new(&self.search).text_size(px(14.)).appearance(false).small().h(px(26.)).cleanable(true).clear_blurs().pl(px(12.)))))
                                         .child(
                                             div()
                                                 .id("adv-caret")
@@ -3975,7 +3979,7 @@ impl StartView {
         self.columns = default_columns();
         self.col_w.clear();
         self.pins.clear();
-        (self.sort, self.descending, self.sort_cleared) = (SortKey::Modified, true, false);
+        (self.sort, self.descending, self.sort_cleared) = (SortKey::Modified, true, true);
     }
 
     /// A table header cell: 14 px semibold, with the 2 px column divider at
@@ -4289,17 +4293,20 @@ impl StartView {
     fn render_list(&self, docs: &[DocEntry], cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let cols = self.shown_cols();
-        // Live documents/131-135: a search adds Part number and Revision.
+        // Live documents/131-135, docver-1121: a search adds Part number, Revision and State.
         let searching = !self.query.trim().is_empty() || self.adv_query.is_some();
-        let search_cols: &[&'static str] = if searching { &["Part number", "Revision"] } else { &[] };
+        let search_cols: &[&'static str] = if searching { &["Part number", "Revision", "State"] } else { &[] };
         let hits = self.item_hits();
         let pins = self.pins_layout(&cols);
+        // Live docver-1121: Recently opened's headers don't sort; Owned by never does.
+        let sorts = self.source != Source::Recent;
         let head_cell = |c: &Col, cx: &mut Context<Self>| {
             let key = match c {
                 Col::Modified => Some(SortKey::Modified),
                 Col::ModifiedBy => Some(SortKey::ModifiedBy),
                 _ => None,
-            };
+            }
+            .filter(|_| sorts);
             let label = c.label();
             self.list_header_cell(label, label, key, Some(*c), cx).w(px(self.col_width(label))).flex_none().debug_selector(move || format!("doc-head-{}", label.to_lowercase())).into_any_element()
         };
@@ -4310,7 +4317,7 @@ impl StartView {
             .border_b_1()
             .border_color(pal.border_strong)
             .child(Pins::room(pins.left_w))
-            .child(self.list_header_cell("h-name", "Name", Some(SortKey::Name), None, cx).w(px(self.col_width("Name"))).flex_none().debug_selector(|| "doc-head-name".into()));
+            .child(self.list_header_cell("h-name", "Name", sorts.then_some(SortKey::Name), None, cx).w(px(self.col_width("Name"))).flex_none().debug_selector(|| "doc-head-name".into()));
         for c in &pins.center {
             header = header.child(head_cell(c, cx));
         }
@@ -4333,7 +4340,6 @@ impl StartView {
         } else {
             let mut rows = Vec::new();
             let sel = self.selection_set();
-            let alone = sel.len() == 1;
             for (k, d) in docs.iter().enumerate() {
                 // (Off screen only the row clicked last is built, not every selected one.)
                 let keep = (on_screen.0..on_screen.1).contains(&k) || self.selected.as_ref() == Some(&d.path) || self.renaming.as_ref().is_some_and(|r| r.0 == d.path);
@@ -4347,8 +4353,9 @@ impl StartView {
                 }
                 rows.push({
                 let selected = sel.contains(d.path.as_os_str());
-                // The quick actions show on the hovered row and on the one selected row.
-                let alone = selected && alone || self.hovered_row.as_ref() == Some(&d.path);
+                // The quick actions show on the hovered row only, never on a selected row the pointer isn't on (live
+                // docver-1121).
+                let alone = self.hovered_row.as_ref() == Some(&d.path);
                 let open = crate::doc_files::is_document_open(&d.path, cx);
                 let v2 = cx.entity();
                 let (d1, d2) = (d.clone(), d.clone());
@@ -4730,6 +4737,11 @@ impl Render for StartView {
             .on_action(cx.listener(|this, _: &SelectNext, _, cx| this.move_selection(1, cx)))
             .on_action(cx.listener(|this, _: &SelectPrev, _, cx| this.move_selection(-1, cx)))
             .on_action(cx.listener(|this, _: &ToggleRow, _, cx| this.toggle_current_row(cx)))
+            .on_action(cx.listener(|this, _: &TrashSelected, window, cx| {
+                if this.source != Source::Trash && !this.selection_items().is_empty() {
+                    this.trash_selected(window, cx);
+                }
+            }))
             // Dragging the folders divider.
             .on_mouse_move(cx.listener(|this, e: &MouseMoveEvent, _, cx| {
                 if let Some((y0, h0)) = this.split_drag {
@@ -5727,7 +5739,7 @@ mod feel_tests;
 
 #[cfg(test)]
 mod tests {
-    use super::{Col, Pin, SelectAllRows, SelectNext, SelectPrev, ToggleRow, bold_match, default_columns, header_menu_items, pinned_order, click_rows, history_change_matches, import_failed, key_bindings, lib, move_rows, rows_to_move, toggles};
+    use super::{Col, Pin, SelectAllRows, SelectNext, SelectPrev, ToggleRow, TrashSelected, bold_match, default_columns, header_menu_items, pinned_order, click_rows, history_change_matches, import_failed, key_bindings, lib, move_rows, rows_to_move, toggles};
     use gpui_kit::Modifiers;
     use std::path::PathBuf;
 
@@ -5894,7 +5906,7 @@ mod tests {
         let keymap = Keymap::new(all);
         let page = [KeyContext::parse("StartWindow").unwrap()];
         let action = |key: &str| keymap.bindings_for_input(&[Keystroke::parse(key).unwrap()], &page).0.first().map(|b| b.action().name());
-        for key in ["shift-?", "alt-c", "ctrl-space", "alt-t", "secondary-z", "secondary-y", "delete", "f2", "/", "s", "f", "enter", "secondary-f", "left", "right"] {
+        for key in ["shift-?", "alt-c", "ctrl-space", "alt-t", "secondary-z", "secondary-y", "f2", "/", "s", "f", "enter", "secondary-f", "left", "right"] {
             assert_eq!(action(key), None, "{key}");
         }
         // Live2 11-13: ↑ / ↓ move the selection, Space toggles the row.
@@ -5903,6 +5915,9 @@ mod tests {
         assert_eq!(action("space"), Some(ToggleRow.name()));
         // The list's own keys (live2 feel/documents.json: Ctrl+A selects every row).
         assert_eq!(action("secondary-a"), Some(SelectAllRows.name()));
+        // Live docver-1121: Delete and Backspace open Send to trash.
+        assert_eq!(action("delete"), Some(TrashSelected.name()));
+        assert_eq!(action("backspace"), Some(TrashSelected.name()));
     }
 
     /// Lead 11-13 (interaction feel): rows dragged onto a folder move into it, documents and folders with what's in

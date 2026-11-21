@@ -108,6 +108,8 @@ pub struct ExternalDocInfo {
     pub versions: Vec<VersionChoice>,
     /// The document's first state (the version graph's Start).
     pub start: Option<noshape_store::MicroversionId>,
+    /// Its name ("Start" until renamed).
+    pub start_name: String,
 }
 
 type SnapshotKey = (std::path::PathBuf, noshape_store::MicroversionId);
@@ -244,7 +246,7 @@ pub fn external_doc_info(path: &std::path::Path) -> anyhow::Result<ExternalDocIn
     versions.push(VersionChoice { label: "Current state".into(), microversion: head });
     let start = graph.microversions.iter().find(|m| m.parents.is_empty()).map(|m| m.id);
     let name = store.meta().map(|m| m.name).unwrap_or_else(|_| path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
-    Ok(ExternalDocInfo { name, versions, start })
+    Ok(ExternalDocInfo { name, versions, start, start_name: store.start_name() })
 }
 
 /// The newest named version of a document, if it differs from `pinned`

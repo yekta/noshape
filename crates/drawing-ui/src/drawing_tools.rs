@@ -2387,8 +2387,8 @@ impl DrawingEditor {
 
     fn open_context_menu(&mut self, pick: Option<u32>, position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
         // Live (request 1596, qa DWG-SHEET-PROPS-ESC): no context menu while
-        // Sheet properties is open.
-        if self.sheet_props.is_some() {
+        // Sheet properties is open, nor Edit section (drw-section-cutline-types s25).
+        if self.sheet_props.is_some() || self.section_edit.is_some() {
             return;
         }
         if !matches!(self.tool, Tool::Select) {

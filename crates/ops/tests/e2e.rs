@@ -1546,7 +1546,7 @@ fn create_version_here_and_publish() {
     assert!(h["versions"].as_array().unwrap().iter().any(|x| x["name"] == "Early" && x["microversion"] == earlier.as_str()), "{h}");
     for (args, param) in [
         (json!({ "name": " " }), "name"),
-        (json!({ "name": "x".repeat(257) }), "name"),
+        (json!({ "name": "x".repeat(256) }), "name"),
         (json!({ "name": "V2", "at": "nope" }), "at"),
         (json!({ "name": "V2", "publish": true }), "publish"),
     ] {
@@ -1555,6 +1555,8 @@ fn create_version_here_and_publish() {
     }
     let e = try_call(&mut ctx, "history_create_version", json!({ "name": "" })).unwrap_err();
     assert_eq!(e.message, "Name is required and cannot exceed 256 characters.", "{e:?}");
+    // Live docver-1121: 255 characters are taken.
+    call(&mut ctx, "history_create_version", json!({ "name": "x".repeat(255) }));
 }
 
 /// A Variable Studio's Configuration panel through the config ops: a List
@@ -1639,6 +1641,11 @@ fn version_properties_and_publish() {
     assert_eq!((b["name"].as_str(), b["description"].as_str()), (Some("exp"), Some("Thinner walls")), "{b}");
     let e = try_call(&mut ctx, "history_version_properties", json!({ "version": "V9" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("version"), "{e:?}");
+    // The document's Start is a version too (live docver-1121): renamed, then published by its new name.
+    let s = call(&mut ctx, "history_version_properties", json!({ "version": "Start", "name": "Start x", "description": "the first state" }));
+    assert_eq!((s["version"].as_str(), s["name"].as_str(), s["description"].as_str()), (Some("start"), Some("Start x"), Some("the first state")), "{s}");
+    let e = try_call(&mut ctx, "history_publish", json!({ "version": "Start x" })).unwrap_err();
+    assert!(e.message.contains("Document must contain a PDF"), "{e:?}");
 }
 
 /// IN-FEATURE-MATE-CONNECTOR (live 1851): a Hole placed on a mate connector made inside it (its "Sketch points to
@@ -6020,8 +6027,10 @@ fn documents_page() {
     assert!(!mine["documents"][0]["owner"].as_str().unwrap().is_empty() && mine["documents"][0]["owner"] == mine["documents"][0]["modified_by"], "{mine}");
     let z = call(&mut ctx, "documents_list", json!({ "folder": "Fixtures", "search": "bracket", "documents_sort": "name", "reverse": true }));
     assert_eq!(names(&z), ["Bracket v2 - Copy", "Bracket v2"], "{z}");
-    let e = try_call(&mut ctx, "documents_list", json!({ "documents_sort": "size" })).unwrap_err();
-    assert_eq!(e.param.as_deref(), Some("documents_sort"), "{e:?}");
+    for args in [json!({ "documents_sort": "size" }), json!({ "documents_sort": "owned_by" }), json!({ "place": "recent", "documents_sort": "name" })] {
+        let e = try_call(&mut ctx, "documents_list", args.clone()).unwrap_err();
+        assert_eq!(e.param.as_deref(), Some("documents_sort"), "{args}: {e:?}");
+    }
     // The trash: send, restore, send again and delete, a folder and Empty trash.
     let copy = c["copy"].as_str().unwrap().to_string();
     let t = call(&mut ctx, "documents_trash", json!({ "path": copy }));
@@ -8491,8 +8500,6 @@ fn release_parts_and_revision_history() {
     // The next release names its part number again; it is revision B.
     let r = call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R2", "part_numbers": { "Part 1": "PRT-0001" } }));
     assert_eq!(r["items"][0]["revision"], "B", "{r}");
-    let e = try_call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R3", "revisions": { "Part 1": "A" }, "part_numbers": { "Part 1": "PRT-0001" } })).unwrap_err();
-    assert!(e.message.contains("Part 1"), "a revision lower than the released B: {e:?}");
     let rh = call(&mut ctx, "release_revision_history", json!({ "part_number": "PRT-0001" }));
     let revs = rh["revisions"].as_array().unwrap();
     assert_eq!(revs.len(), 2, "{rh}");
@@ -8517,6 +8524,10 @@ fn release_parts_and_revision_history() {
     call(&mut ctx, "release_re_releasable", json!({ "name": "Obsolete PRT-0001 A", "re_releasable": true }));
     let e = try_call(&mut ctx, "release_re_releasable", json!({ "name": "nope", "re_releasable": true })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("name"));
+    // A revision not after the released B becomes the proposed C, with the dialog's note (live alpha-1121).
+    let r = call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R3", "revisions": { "Part 1": "A" }, "part_numbers": { "Part 1": "PRT-0001" } }));
+    assert_eq!(r["items"][0]["revision"], "C", "{r}");
+    assert_eq!(r["revision_notes"][0]["note"], "The next available revision for part number PRT-0001 is C.", "{r}");
 }
 
 /// Company settings › Release management and Numbering schemes through the API: read, change a field, and errors that

@@ -15,7 +15,7 @@ pub fn ops() -> Vec<Op> {
             group: "release",
             verb: "create",
             summary: "Release a tab or parts: part numbers, revisions, a version named after the release",
-            description: "Release… (a tab's menu, or a part's; only with Company settings' managed workflows on, see company_release_settings): the Release candidate dialog with its items, then Release. Items as the dialog lists them: a Part Studio's parts (or `parts` only), an Assembly with its Bill of Materials, a Drawing with what its views show, a Variable Studio or file itself; `include_drawings` adds the drawings showing them. Each item's part number is its own (Properties) unless `part_numbers` gives one ({item name or part id: number}); its revision is the next of the revision scheme (A, B, …; `revisions` overrides, {item name or part id: revision}). The dialog's checks refuse it with their messages (a part number missing, a revision too low, Company settings' release conditions). Releasing records the release at a new version named `name` with the items' part numbers, revisions and state Released as that version's properties (the workspace keeps its own: history_view the version to see them); with Company settings' automatic obsoletion on, a new revision obsoletes the part number's previous one.",
+            description: "Release… (a tab's menu, or a part's; only with Company settings' managed workflows on, see company_release_settings): the Release candidate dialog with its items, then Release. Items as the dialog lists them: a Part Studio's parts (or `parts` only), an Assembly with its Bill of Materials, a Drawing with what its views show, a Variable Studio or file itself; `include_drawings` adds the drawings showing them. Each item's part number is its own (Properties) unless `part_numbers` gives one ({item name or part id: number}); its revision is the next of the revision scheme (A, B, …; `revisions` overrides, {item name or part id: revision}). A revision the dialog can't take (not in the scheme, or not after the part number's released one) becomes its proposed one, as the dialog's Revision field does, its note in `revision_notes`. The dialog's checks refuse it with their messages (a part number missing, Company settings' release conditions). Releasing records the release at a new version named `name` with the items' part numbers, revisions and state Released as that version's properties (the workspace keeps its own: history_view the version to see them); with Company settings' automatic obsoletion on, a new revision obsoletes the part number's previous one.",
             fields: vec![
                 doc_field(),
                 opt("tab", s(), "The tab to release (name or id). Required unless `from_draft` gives the items."),
@@ -322,6 +322,14 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if settings.require_approver && approvers.is_empty() {
         return Err(OpError::param("approvers", "A field required by one or more actions is empty: Submit requires Approvers"));
     }
+    // A revision the dialog can't take becomes its proposed one, with the dialog's note (live alpha-1121).
+    let mut revision_notes = Vec::new();
+    for it in items.iter_mut() {
+        if let Some((to, note)) = log.settle_revision(it) {
+            it.revision = to;
+            revision_notes.push(json!({ "item": it.name, "note": note }));
+        }
+    }
     // The dialog's checks.
     let mut issues = log.validate(&items);
     for (row, held) in issues.iter_mut().zip(crate::release_conditions::condition_issues(&od.session, &items)) {
@@ -346,12 +354,12 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let pkg = Package { id: 0, kind: PackageKind::Release, name, notes, created, version: None, items, re_releasable: false, approvers, observers, state: None, decided_by: None, comments };
     if let Some(v) = at_version {
         let pkg = rel::commit_at_version(&mut od.session, pkg, v).map_err(|e| OpError::new("release", format!("{e:#}")))?;
-        return Ok(json!({ "release": pkg.name, "state": "Released", "version": pkg.version, "items": pkg.items.iter().map(item_json).collect::<Vec<_>>(), "drawings_left_out": left_out }).into());
+        return Ok(json!({ "release": pkg.name, "state": "Released", "version": pkg.version, "items": pkg.items.iter().map(item_json).collect::<Vec<_>>(), "drawings_left_out": left_out, "revision_notes": revision_notes }).into());
     }
     // With approvers: Submit (Pending at its version); else Release at once.
     let pkg = if submitting { rel::submit(&mut od.session, pkg) } else { rel::commit(&mut od.session, pkg) }.map_err(|e| OpError::new("release", format!("{e:#}")))?;
     let state = pkg.state.map_or("Released", |s| s.label());
-    Ok(json!({ "release": pkg.name, "state": state, "version": pkg.version, "items": pkg.items.iter().map(item_json).collect::<Vec<_>>(), "drawings_left_out": left_out }).into())
+    Ok(json!({ "release": pkg.name, "state": state, "version": pkg.version, "items": pkg.items.iter().map(item_json).collect::<Vec<_>>(), "drawings_left_out": left_out, "revision_notes": revision_notes }).into())
 }
 
 fn approve(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

@@ -786,7 +786,7 @@ Examples:
 | `folder` | string |  | A folder to list (a path; a bare name is in the documents folder). |
 | `place` | one of `owned`, `recent`, `created`, `trash` |  | Owned by me (default), Recently opened, Created by me or the Trash. |
 | `search` | string |  | The search box: only the documents whose name holds this text (any case). |
-| `documents_sort` | one of `modified`, `name`, `modified_by`, `owned_by` |  | The documents' order, as a click on the list's column header: Modified (newest first), Name (A → Z), Modified by or Owned by (A → Z). Without it Owned by me lists them by name, Recently opened most recent first. |
+| `documents_sort` | one of `modified`, `name`, `modified_by` |  | The documents' order, as a click on the list's column header: Modified (newest first), Name (A → Z) or Modified by (A → Z); Owned by doesn't sort, nor does any header in Recently opened. Without it Owned by me lists them by name, Recently opened most recent first. |
 | `reverse` | boolean |  | The column header's second click: the documents_sort order reversed. |
 | `label` | string |  | Only the documents with this label. |
 | `sort` | one of `name`, `name_desc`, `modified` |  | The folders' order, as the Folders row's sort menu: Name: A → Z (default), Name: Z → A, Last modified (newest first). |
@@ -6194,7 +6194,7 @@ Examples:
 
 Create a named version of the current state, or of a history entry (Create version here…) (edits the document (one undoable history entry)).
 
-As the Create version dialog: `name` is required, at most 256 characters. `at` makes the version at a history entry (an `id` from history_list) instead of the workspace's latest state. `publish` ticks "Publish FeatureScript" (offered when the document has a Feature Studio, and for a history entry).
+As the Create version dialog: `name` is required, at most 255 characters (as the dialog: its message says 256). `at` makes the version at a history entry (an `id` from history_list) instead of the workspace's latest state. `publish` ticks "Publish FeatureScript" (offered when the document has a Feature Studio, and for a history entry).
 
 Examples:
 
@@ -6226,7 +6226,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `version` | string |  | Version name or id. |
+| `version` | string |  | Version name or id; the document's Start by its name ("Start" until renamed). |
 | `branch` | string |  | Branch (workspace) id, or its name when no other workspace has it. |
 | `name` | string |  | New name. |
 | `description` | string |  | New description (empty clears it). |
@@ -6246,7 +6246,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `version` | string | required | Version name or id. |
+| `version` | string | required | Version name or id; the document's Start by its name ("Start" until renamed). |
 
 #### history_create_branch
 
@@ -7116,7 +7116,7 @@ Examples:
 
 Release a tab or parts: part numbers, revisions, a version named after the release (edits the document (one undoable history entry)).
 
-Release… (a tab's menu, or a part's; only with Company settings' managed workflows on, see company_release_settings): the Release candidate dialog with its items, then Release. Items as the dialog lists them: a Part Studio's parts (or `parts` only), an Assembly with its Bill of Materials, a Drawing with what its views show, a Variable Studio or file itself; `include_drawings` adds the drawings showing them. Each item's part number is its own (Properties) unless `part_numbers` gives one ({item name or part id: number}); its revision is the next of the revision scheme (A, B, …; `revisions` overrides, {item name or part id: revision}). The dialog's checks refuse it with their messages (a part number missing, a revision too low, Company settings' release conditions). Releasing records the release at a new version named `name` with the items' part numbers, revisions and state Released as that version's properties (the workspace keeps its own: history_view the version to see them); with Company settings' automatic obsoletion on, a new revision obsoletes the part number's previous one.
+Release… (a tab's menu, or a part's; only with Company settings' managed workflows on, see company_release_settings): the Release candidate dialog with its items, then Release. Items as the dialog lists them: a Part Studio's parts (or `parts` only), an Assembly with its Bill of Materials, a Drawing with what its views show, a Variable Studio or file itself; `include_drawings` adds the drawings showing them. Each item's part number is its own (Properties) unless `part_numbers` gives one ({item name or part id: number}); its revision is the next of the revision scheme (A, B, …; `revisions` overrides, {item name or part id: revision}). A revision the dialog can't take (not in the scheme, or not after the part number's released one) becomes its proposed one, as the dialog's Revision field does, its note in `revision_notes`. The dialog's checks refuse it with their messages (a part number missing, Company settings' release conditions). Releasing records the release at a new version named `name` with the items' part numbers, revisions and state Released as that version's properties (the workspace keeps its own: history_view the version to see them); with Company settings' automatic obsoletion on, a new revision obsoletes the part number's previous one.
 
 Examples:
 

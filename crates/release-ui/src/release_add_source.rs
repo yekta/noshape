@@ -103,7 +103,7 @@ impl Source {
         if let Some(root) = graph.microversions.iter().find(|m| m.parents.is_empty())
             && !versions.iter().any(|v| v.microversion == root.id)
         {
-            versions.push(VersionChoice { label: "Start".into(), microversion: root.id });
+            versions.push(VersionChoice { label: store.start_name(), microversion: root.id });
         }
         let marks: std::collections::HashSet<noshape_store::MicroversionId> = versions.iter().map(|v| v.microversion).collect();
         let parent: HashMap<noshape_store::MicroversionId, Option<noshape_store::MicroversionId>> = graph.microversions.iter().map(|m| (m.id, m.parents.first().copied())).collect();

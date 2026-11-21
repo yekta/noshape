@@ -51,7 +51,7 @@ pub fn ops() -> Vec<Op> {
             group: "history",
             verb: "create_version",
             summary: "Create a named version of the current state, or of a history entry (Create version here…)",
-            description: "As the Create version dialog: `name` is required, at most 256 characters. `at` makes the version at a history entry (an `id` from history_list) instead of the workspace's latest state. `publish` ticks \"Publish FeatureScript\" (offered when the document has a Feature Studio, and for a history entry).",
+            description: "As the Create version dialog: `name` is required, at most 255 characters (as the dialog: its message says 256). `at` makes the version at a history entry (an `id` from history_list) instead of the workspace's latest state. `publish` ticks \"Publish FeatureScript\" (offered when the document has a Feature Studio, and for a history entry).",
             fields: vec![
                 doc_field(),
                 req("name", s(), "Version name (\"V1\")."),
@@ -68,7 +68,7 @@ pub fn ops() -> Vec<Op> {
             verb: "version_properties",
             summary: "A version's or workspace's Properties… (name and description)",
             description: "The Versions and history panel's row menu › Properties…: renames `version` or `branch` (a workspace) and sets its description. Not an undoable edit (as in the app).",
-            fields: vec![doc_field(), opt("version", s(), "Version name or id."), opt("branch", s(), "Branch (workspace) id, or its name when no other workspace has it."), opt("name", s(), "New name."), opt("description", s(), "New description (empty clears it).")],
+            fields: vec![doc_field(), opt("version", s(), "Version name or id; the document's Start by its name (\"Start\" until renamed)."), opt("branch", s(), "Branch (workspace) id, or its name when no other workspace has it."), opt("name", s(), "New name."), opt("description", s(), "New description (empty clears it).")],
             mutates: true,
             destructive: false,
             run: version_properties,
@@ -78,7 +78,7 @@ pub fn ops() -> Vec<Op> {
             verb: "publish",
             summary: "A version's Publish FeatureScript…: publish its custom features and tables",
             description: "The version row menu › Publish FeatureScript…: allowed once every requirement is met (at least one custom feature or table, a PDF in the document, no FeatureScript errors or warnings, every custom feature described and used in a Part Studio, every Feature Studio committed); the error lists the unmet ones. Published versions are found by the documents page's advanced search (Published FeatureScript).",
-            fields: vec![doc_field(), req("version", s(), "Version name or id.")],
+            fields: vec![doc_field(), req("version", s(), "Version name or id; the document's Start by its name (\"Start\" until renamed).")],
             mutates: true,
             destructive: false,
             run: publish,
@@ -208,7 +208,8 @@ fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn create_version(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let name = a.str("name")?.trim();
-    if name.is_empty() || name.chars().count() > 256 {
+    // Live docver-1121: 256 characters are refused too, whatever the words say.
+    if name.is_empty() || name.chars().count() > 255 {
         return Err(OpError::param("name", "Name is required and cannot exceed 256 characters."));
     }
     let at = match a.opt_str("at")? {
@@ -376,6 +377,12 @@ fn version_info(od: &crate::OpenDoc, key: &str) -> Result<noshape_store::Version
     list.iter().find(|v| v.id.to_string() == key || v.name == key).cloned().ok_or_else(|| OpError::not_found(if list.is_empty() { "the document has no versions (history_create_version)".into() } else { format!("no version `{key}`; versions: {}", list.iter().map(|v| v.name.clone()).collect::<Vec<_>>().join(", ")) }).with_param("version"))
 }
 
+/// `key` names the document's Start (no version has that name or id): its current name, or "Start".
+fn is_start(od: &crate::OpenDoc, key: &str) -> bool {
+    let named = od.session.store.list_versions().is_ok_and(|l| l.iter().any(|v| v.id.to_string() == key || v.name == key));
+    !named && (key == od.session.store.start_name() || key == "Start")
+}
+
 fn version_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let (name, desc) = (a.opt_str("name")?.map(str::trim), a.opt_str("description")?);
@@ -383,6 +390,12 @@ fn version_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         return Err(OpError::param("name", "must not be empty"));
     }
     match (a.opt_str("version")?, a.opt_str("branch")?) {
+        (Some(v), None) if is_start(od, v) => {
+            let (old_n, old_d) = od.session.store.start_version().map_err(io)?;
+            let (n, d) = (name.unwrap_or(&old_n).to_string(), desc.unwrap_or(&old_d).to_string());
+            od.session.store.update_start_version(&n, &d).map_err(io)?;
+            Ok(json!({ "version": "start", "name": n, "description": d }).into())
+        }
         (Some(v), None) => {
             let info = version_info(od, v)?;
             let (n, d) = (name.unwrap_or(&info.name).to_string(), desc.unwrap_or(&info.description).to_string());
@@ -408,13 +421,15 @@ fn version_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 fn publish(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
-    let info = version_info(od, a.str("version")?)?;
-    let at = noshape_model::document::Document::from_blobs(&od.session.store.read_all(info.microversion).map_err(io)?).map_err(io)?;
+    let key = a.str("version")?;
+    let id = if is_start(od, key) { None } else { Some(version_info(od, key)?.id) };
+    let (meta_key, name, mv) = crate::versions::publish_target(&od.session.store, id).ok_or_else(|| OpError::not_found(format!("no version `{key}`")).with_param("version"))?;
+    let at = noshape_model::document::Document::from_blobs(&od.session.store.read_all(mv).map_err(io)?).map_err(io)?;
     let checks = crate::versions::publish_checklist(&at);
     let unmet: Vec<&str> = checks.iter().filter(|c| !c.1).map(|c| c.0).collect();
     if !unmet.is_empty() {
         return Err(OpError::invalid(format!("Requirements to publish not met: {}", unmet.join("; "))).with_param("version"));
     }
-    od.session.store.set_meta(&format!("{}{}", crate::versions::PUBLISHED_FS_KEY, info.id), Some(b"1")).map_err(io)?;
-    Ok(json!({ "version": info.id.to_string(), "name": info.name, "published": true }).into())
+    od.session.store.set_meta(&meta_key, Some(b"1")).map_err(io)?;
+    Ok(json!({ "version": id.map_or("start".to_string(), |i| i.to_string()), "name": name, "published": true }).into())
 }

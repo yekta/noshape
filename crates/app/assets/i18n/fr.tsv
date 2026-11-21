@@ -2270,7 +2270,7 @@ Document Links	Liens du document
 Document Memory Usage	Mémoire utilisée par le document
 Document cannot be edited without its ID.	Le document ne peut pas être modifié sans son ID.
 Document cannot be edited.	Le document ne peut pas être modifié.
-Document contains a PDF	Le document contient un PDF
+Document must contain a PDF	Le document doit contenir un PDF
 Document defines at least one custom feature or table	Le document définit au moins une fonction personnalisée ou un tableau
 Document description	Description du document
 Document description failed to update.	Impossible de mettre à jour la description du document.

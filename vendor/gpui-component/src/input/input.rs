@@ -121,6 +121,7 @@ pub struct Input {
     height: Option<DefiniteLength>,
     appearance: bool,
     cleanable: bool,
+    clear_blurs: bool,
     mask_toggle: bool,
     disabled: bool,
     readonly: bool,
@@ -233,6 +234,7 @@ impl Input {
             height: None,
             appearance: true,
             cleanable: false,
+            clear_blurs: false,
             mask_toggle: false,
             disabled: false,
             readonly: false,
@@ -316,6 +318,12 @@ impl Input {
     /// Set whether to show the clear button when the input field is not empty, default is false.
     pub fn cleanable(mut self, cleanable: bool) -> Self {
         self.cleanable = cleanable;
+        self
+    }
+
+    /// noshape: the clear button leaves the field unfocused (Onshape's documents search: focus goes to the page).
+    pub fn clear_blurs(mut self) -> Self {
+        self.clear_blurs = true;
         self
     }
 
@@ -843,13 +851,18 @@ impl RenderOnce for Input {
                         .when(show_clear_button, |this| {
                             // noshape: Onshape's search boxes say "Clear search"
                             // (live dom/assembly-insert-configured).
-                            this.child(clear_button(cx).tooltip("Clear search").on_click({
+                            let blurs = self.clear_blurs;
+                            this.child(div().flex().debug_selector(|| "input-clear".into()).child(clear_button(cx).tooltip("Clear search").on_click({
                                 let state = state.clone();
                                 move |_, window, cx| {
                                     state.clean(window, cx);
-                                    state.focus(window, cx);
+                                    if blurs {
+                                        window.blur(cx);
+                                    } else {
+                                        state.focus(window, cx);
+                                    }
                                 }
-                            }))
+                            })))
                         })
                         .children(suffix),
                 )

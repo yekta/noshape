@@ -736,7 +736,7 @@ impl AssemblyView {
             if scope.is_some()
                 && let Some(root) = dm.session.store.graph().ok().and_then(|g| g.microversions.iter().find(|m| m.parents.is_empty()).map(|m| m.id))
             {
-                versions.push(crate::derived::VersionChoice { label: "Start".into(), microversion: root });
+                versions.push(crate::derived::VersionChoice { label: dm.session.store.start_name(), microversion: root });
             }
             if !versions.is_empty() {
                 let thumbnail = dm.session.store.get_meta("thumbnail").ok().flatten().as_deref().and_then(crate::library::decode_thumbnail);
@@ -768,7 +768,7 @@ impl AssemblyView {
             let current = versions.iter().find(|v| v.microversion == mv).map(|v| v.label.clone()).or_else(|| (head == Some(mv)).then(|| "Main".to_string())).unwrap_or_else(|| format!("state {}", mv.short()));
             // The Version graph ends at the document's Start (live ver-linked-selective-update).
             if let Some(start) = info.start {
-                versions.push(crate::derived::VersionChoice { label: "Start".into(), microversion: start });
+                versions.push(crate::derived::VersionChoice { label: info.start_name.clone(), microversion: start });
             }
             let thumbnail = crate::assembly_hooks::file_thumbnail(&path);
             out.push(RefDoc { name: info.name, current, versions, keys, path, thumbnail, newer: true, main: head });

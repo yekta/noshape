@@ -5,7 +5,7 @@
 //! It also gives the test binary its own settings and documents directories: the app reads its settings (panel widths and
 //! positions, table columns, preferences, sketch options) from `NOSHAPE_CONFIG_DIR`, else the user's
 //! ~/.config/noshape, where the apps run on the same machine leave theirs, and the tests' simulated clicks then
-//! missed. Set before `main` (the test harness has no setup hook; nothing else runs yet) unless the run gives one.
+//! missed. Set before `main` (the test harness has no setup hook; nothing else runs yet), inside the run's own one if it gives one.
 //! A test crate must name this crate (`use noshape_ui_test_support as _;` under `cfg(test)`) to link it.
 
 pub mod bench;
@@ -18,11 +18,11 @@ static OWN_CONFIG_DIR: extern "C" fn() = own_config_dir;
 
 extern "C" fn own_config_dir() {
     // (The documents page lists the documents folder: this binary's own, never the user's ~/Documents/noshape.)
+    // A run's own directory (rb.sh, the tiers) holds one per binary: a binary's settings (release-ui's managed
+    // workflows) never reach the next one.
     for (var, kind) in [("NOSHAPE_CONFIG_DIR", "config"), ("NOSHAPE_DOCUMENTS_DIR", "documents")] {
-        if std::env::var_os(var).is_some() {
-            continue;
-        }
-        let dir = std::env::temp_dir().join(format!("noshape-ui-tests-{kind}-{}", std::process::id()));
+        let base = std::env::var_os(var).map_or_else(std::env::temp_dir, std::path::PathBuf::from);
+        let dir = base.join(format!("noshape-ui-tests-{kind}-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         // SAFETY: before `main`: no other thread exists to read the environment.
         unsafe { std::env::set_var(var, &dir) };

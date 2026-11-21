@@ -379,6 +379,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("document:View in repair", Op("history_repair_view")),
     ("document:Visibility conditions…", Op("config_visibility")),
     ("document:Workspace protection…", Op("document_protect")),
+    ("document:Workspace protections…", Op("document_protect")),
     ("drawing:2 point linear dimension", Op("drawing_dimension")),
     ("drawing:3 point angular dimension", Op("drawing_dimension")),
     ("drawing:Add jog", Op("drawing_annotation_edit")),

@@ -2303,7 +2303,7 @@ Document Links	文档链接
 Document Memory Usage	文档内存使用量
 Document cannot be edited without its ID.	无法编辑没有 ID 的文档。
 Document cannot be edited.	无法编辑文档。
-Document contains a PDF	文档包含一个 PDF
+Document must contain a PDF	文档必须包含一个 PDF
 Document defines at least one custom feature or table	文档定义了至少一个自定义特征或表格
 Document description	文档说明
 Document description failed to update.	更新文档说明失败。

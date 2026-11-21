@@ -22,7 +22,7 @@ pub fn ops() -> Vec<Op> {
                 opt("folder", s(), "A folder to list (a path; a bare name is in the documents folder)."),
                 opt("place", json!({ "type": "string", "enum": ["owned", "recent", "created", "trash"] }), "Owned by me (default), Recently opened, Created by me or the Trash."),
                 opt("search", s(), "The search box: only the documents whose name holds this text (any case)."),
-                opt("documents_sort", json!({ "type": "string", "enum": ["modified", "name", "modified_by", "owned_by"] }), "The documents' order, as a click on the list's column header: Modified (newest first), Name (A → Z), Modified by or Owned by (A → Z). Without it Owned by me lists them by name, Recently opened most recent first."),
+                opt("documents_sort", json!({ "type": "string", "enum": ["modified", "name", "modified_by"] }), "The documents' order, as a click on the list's column header: Modified (newest first), Name (A → Z) or Modified by (A → Z); Owned by doesn't sort, nor does any header in Recently opened. Without it Owned by me lists them by name, Recently opened most recent first."),
                 opt("reverse", json!({ "type": "boolean" }), "The column header's second click: the documents_sort order reversed."),
                 opt("label", s(), "Only the documents with this label."),
                 opt("sort", json!({ "type": "string", "enum": ["name", "name_desc", "modified"] }), "The folders' order, as the Folders row's sort menu: Name: A → Z (default), Name: Z → A, Last modified (newest first)."),
@@ -349,8 +349,7 @@ fn shown_docs(paths: Vec<PathBuf>, a: &Args, labels: &lib::Labels) -> Result<Vec
             "modified" => rows.sort_by_key(|r| std::cmp::Reverse(r.modified)),
             "name" => rows.sort_by_key(|r| text(&r.name)),
             "modified_by" => rows.sort_by_key(|r| (text(&r.modified_by), std::cmp::Reverse(r.modified))),
-            "owned_by" => rows.sort_by_key(|r| (text(&r.owner), std::cmp::Reverse(r.modified))),
-            other => return Err(OpError::param("documents_sort", &format!("\"{other}\": modified, name, modified_by or owned_by"))),
+            other => return Err(OpError::param("documents_sort", &format!("\"{other}\": modified, name or modified_by (Owned by doesn't sort)"))),
         }
         if a.bool_or("reverse", false)? {
             rows.reverse();
@@ -374,6 +373,8 @@ fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         return Ok(json!({ "label": l, "documents": docs, "labels": labels.labels }).into());
     }
     match a.opt_str("place")?.unwrap_or("owned") {
+        // Live docver-1121: Recently opened's headers don't sort.
+        "recent" if a.opt_str("documents_sort")?.is_some() => Err(OpError::param("documents_sort", "Recently opened doesn't sort by a column: its documents are listed most recent first.")),
         "recent" => Ok(json!({ "place": "Recently opened", "documents": shown_docs(lib::recent(), a, &labels)?, "labels": labels.labels }).into()),
         "created" => {
             let mut paths = Vec::new();

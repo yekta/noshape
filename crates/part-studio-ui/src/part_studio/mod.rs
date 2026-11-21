@@ -3769,7 +3769,6 @@ impl PartStudioView {
         };
         let names: Vec<&'static str> = self.doc.read(cx).custom_features().feature_types().iter().map(|t| t.name).collect();
         let has_custom = !names.is_empty();
-        let doc = self.doc.clone();
         let custom_btn = div()
             .id("vb-custom-features")
             .map(|d| crate::ui_script::mark(d, || "button:Add custom features in this version to your toolbar".into()))
@@ -3821,60 +3820,8 @@ impl PartStudioView {
                 .on_click(move |_, _, cx| doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Ui(noshape_ops::UiRequest::Restore { to, name: name.clone() }))))
         });
         let is_version = restore.is_none();
-        let back = div()
-            .id("vb-return")
-            .map(|d| crate::ui_script::mark(d, || format!("button:Return to {branch}")))
-            .h(px(24.))
-            .px(px(8.))
-            .flex()
-            .items_center()
-            .rounded(px(3.))
-            .bg(pal.accent)
-            .cursor_pointer()
-            .text_size(px(12.))
-            .text_color(gpui_kit::rgb_static(0xffffff))
-            .child(format!("Return to {branch}"))
-            // Back to the workspace; the Versions and history panel closes (live ver-view-version-return).
-            .on_click(move |_, _, cx| {
-                doc.update(cx, |d, cx| {
-                    if d.session.view_microversion(None).is_ok() {
-                        d.reloaded(cx);
-                        cx.emit(crate::doc_model::DocEvent::Ui(noshape_ops::UiRequest::CloseHistory));
-                    }
-                })
-            });
-        // Its ? opens help on versions (live: help versionshistorymanager).
-        let help = div()
-            .id("vb-help")
-            .map(|d| crate::ui_script::mark(d, || "button:Versions help".into()))
-            .size(px(16.))
-            .rounded_full()
-            .flex()
-            .items_center()
-            .justify_center()
-            .cursor_pointer()
-            .text_size(px(12.))
-            .font_weight(FontWeight::BOLD)
-            .child(crate::ui::glyph("help-dot", 17.8, crate::theme::help_dot(0x999999)))
-            .on_click(|_, _, cx| noshape_app_core::help::open("Versions and workspaces", cx));
-        crate::ui::toolbar()
-            .id("part-studio-version-bar")
-            .justify_center()
-            .child(
-                h_flex()
-                    .h(px(32.))
-                    .mt(px(-4.))
-                    .px(px(20.))
-                    .gap(px(10.))
-                    .bg(gpui_kit::rgb(0xffffff))
-                    .rounded_b(px(10.))
-                    .child(crate::ui::with_tooltip("tt-vb-text", text.clone(), div().id("vb-text").text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(gpui_kit::rgb(0x333333)).child(text)))
-                    .children(custom_btn)
-                    .children(restore)
-                    .child(back)
-                    .when(is_version, |d| d.child(help)),
-            )
-            .into_any_element()
+        let extras = custom_btn.into_iter().chain(restore.map(IntoElement::into_any_element)).collect();
+        crate::version_bar::render("part-studio-version-bar", &self.doc, text, extras, is_version, cx)
     }
 
     /// The workspace's custom features: one {cube} ▾ dropdown after ⊞ (live

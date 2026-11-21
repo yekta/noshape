@@ -296,6 +296,16 @@ impl DrawingEditor {
 
     pub fn render_toolbar(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let ed = cx.entity();
+        // Live docver-1121: a version replaces the toolbar with its bar, here without the full stop and with Hide
+        // inspection items before Return to Main.
+        if let Some(version) = self.doc.read(cx).session.viewing_version() {
+            let hide = crate::version_bar::bar_button("vb-hide-inspection", "Hide inspection items")
+                .when(self.drawing.props.hide_inspection, |d| d.bg(crate::theme::p().panel_active))
+                .child(crate::assets::icon("inspection-hide", 16., cx))
+                .on_click(cx.listener(|e, _: &ClickEvent, _, cx| e.toggle_hide_inspection(cx)))
+                .into_any_element();
+            return crate::version_bar::render("drawing-version-bar", &self.doc, crate::version_bar::version_text(&version, false), vec![hide], true, cx);
+        }
         let help = self.help_hover.as_ref().filter(|h| h.shown).map(|h| h.tip);
         // An image whose tab is gone also makes it out of date (live 1613 (a):
         // Update highlighted until the image is dropped).

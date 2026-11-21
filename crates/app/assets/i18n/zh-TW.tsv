@@ -2299,7 +2299,7 @@ Document Links	文件連結
 Document Memory Usage	文件記憶體使用量
 Document cannot be edited without its ID.	無法編輯沒有文件 ID 的文件。
 Document cannot be edited.	無法編輯文件。
-Document contains a PDF	文件包含一個 PDF
+Document must contain a PDF	文件必須包含一個 PDF
 Document defines at least one custom feature or table	文件定義至少一個自訂特徵或表格
 Document description	文件說明
 Document description failed to update.	更新文件說明失敗。
