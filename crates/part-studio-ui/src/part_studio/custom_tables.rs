@@ -384,7 +384,8 @@ impl PartStudioView {
             move || format!("table-head:{title}")
         }).child(h_flex().child(head)));
         let wide = bar.is_some();
-        let grid = div().id(("ct-grid", index)).flex().overflow_x_scroll().track_scroll(&sideways).child(grid.flex_none());
+        // Live cutlist-wheel (qa 11-21): a plain wheel over the table scrolls the panel, Shift+wheel or a sideways one the table.
+        let grid = div().id(("ct-grid", index)).flex().overflow_x_scroll().restrict_scroll_to_axis().track_scroll(&sideways).child(grid.flex_none());
         section.child(div().relative().when(wide, |d| d.pb(px(16.))).child(grid).children(bar)).into_any_element()
     }
 

@@ -65,9 +65,9 @@ fn a_sketch_line_lights_over_the_planes_behind_it_and_lets_go(cx: &mut TestAppCo
 
 
 
-/// Live2's rows (behaviours "USER P0, 11-17 12:2x", hov10-clean): in sketch mode a line reaches 7 px either side, a
-/// point 10 px and beats its lines, the region beats the planes behind it, and the sketch's own plane (Top) never
-/// hovers.
+/// Live2's rows (behaviours "USER P0, 11-17 12:2x", hov10-clean; live "psui recheck 2" fc11d): in sketch mode a line
+/// reaches 7 px into its region and live's 5 px pick square outside it (4 px lit, 5 not), a point 10 px and beats its
+/// lines, the region beats the planes behind it, and the sketch's own plane (Top) never hovers.
 #[gpui::test]
 fn sketch_hover_reach_and_priority_as_live(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
@@ -91,7 +91,9 @@ fn sketch_hover_reach_and_priority_as_live(cx: &mut TestAppContext) {
         if n.dot(mid - centre) < 0.0 {
             n = -n;
         }
-        for (d, want) in [(6.0, true), (-6.0, true), (9.0, false), (-9.0, false)] {
+        // Outside: live's 5 px pick square round the pointer (4.9 here), farther across a slanted line.
+        let square = 4.9 * (n.x.abs() + n.y.abs());
+        for (d, want) in [(4.0, true), (square + 1.0, false), (-7.0, true), (-9.0, false)] {
             pointer.move_to(cx, &view, mid + n * d);
             let got = hovered(cx, &view);
             if is_line(&got, *id) != want {
@@ -209,9 +211,9 @@ fn a_shown_sketchs_line_and_point_reach_outside_sketch_mode_as_live(cx: &mut Tes
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
-/// The user's setup with a circle (Sketch 1 on Top, default iso, the planes behind): on its rim, 5 px inside and 5 px
-/// outside it, the circle lights (a curve's 7 px reach, live2 hov10); 12 px outside nothing of the sketch does; on its
-/// centre the centre point lights (a point beats the region it sits in).
+/// The user's setup with a circle (Sketch 1 on Top, default iso, the planes behind): on its rim, 5 px inside (a curve's
+/// 7 px reach into its region, live2 hov10) and 4 px outside it (live's 5 px pick square, fc11d), the circle lights;
+/// 12 px outside nothing of the sketch does; on its centre the centre point lights (a point beats the region it sits in).
 #[gpui::test]
 fn a_sketch_circle_and_its_centre_light_over_the_planes(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
@@ -238,7 +240,7 @@ fn a_sketch_circle_and_its_centre_light_over_the_planes(cx: &mut TestAppContext)
     let mut wrong = Vec::new();
     for at in &rim {
         let out = (*at - c).normalize();
-        for (d, lit) in [(0.0, true), (-5.0, true), (5.0, true), (12.0, false)] {
+        for (d, lit) in [(0.0, true), (-5.0, true), (4.0, true), (12.0, false)] {
             pointer.move_to(cx, &view, *at + out * d);
             let got = hovered(cx, &view);
             if is(&got, circle) != lit {

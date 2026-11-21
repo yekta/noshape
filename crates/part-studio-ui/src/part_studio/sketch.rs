@@ -330,7 +330,7 @@ impl PartStudioView {
         let drop_editor = |this: &mut Self, cx: &mut Context<Self>| {
             if let Some(ed) = this.sketch.take() {
                 this.sketch_fillet_radius = Some(ed.fillet_radius);
-                this.opts.editing_sketch = None;
+                (this.opts.editing_sketch, this.opts.sketch_dragging) = (None, false);
                 this.viewport.update(cx, |vp, _| vp.tool_captures_left = false);
             }
         };
@@ -420,7 +420,7 @@ impl PartStudioView {
             (self.ui.hover_pick, self.ui.hover_raw, self.ui.sketch_gpu_hover) = (None, None, None);
             self.sketch_fillet_radius = Some(ed.fillet_radius);
             self.dim_input = None;
-            self.opts.editing_sketch = None;
+            (self.opts.editing_sketch, self.opts.sketch_dragging) = (None, false);
             // Live: "Sketch could not be solved." goes when the sketch closes.
             if self.message.as_ref().is_some_and(|(_, m)| m == crate::sketch_mode::SKETCH_NOT_SOLVED) {
                 self.message = None;
@@ -493,6 +493,15 @@ impl PartStudioView {
                 noshape_model::quantity_text::pin_sketch_data(data, old);
             }
         });
+    }
+
+    /// The scene's regions follow a geometry drag starting or ending (their fill hidden while it lasts).
+    fn sync_sketch_dragging(&mut self, cx: &mut Context<Self>) {
+        let dragging = self.sketch.as_ref().is_some_and(|ed| ed.geometry_dragging());
+        if self.opts.sketch_dragging != dragging {
+            self.opts.sketch_dragging = dragging;
+            self.refresh_scene(false, cx);
+        }
     }
 
     /// The open sketch's data, shared with the dialog's draft (every frame of sketch mode reads it: no copy).
@@ -757,10 +766,9 @@ impl PartStudioView {
     }
 
     /// Whether sketch entity `e` is within live's pick reach of plane point `p`, on screen
-    /// (SKETCH-SCREEN-SPACE-REACH): a point 10 px; a curve within the 5 px square round the pointer (woolsthorpe
-    /// MOUSE_PICK_RADIUS_PX) counting its 2 px drawn width (ui-parity sketch-offset hits a line 3 mm off it,
-    /// sketch-offset-key misses one 5 mm off). The Dimension tool's preselection reaches a line from 8 px, not 9
-    /// (live/feel/sketch-snaps.json "toolNotes").
+    /// (SKETCH-SCREEN-SPACE-REACH): a point 10 px; a curve outside the sketch's regions within the 5 px square round
+    /// the pointer (woolsthorpe MOUSE_PICK_RADIUS_PX), inside one 7 px straight out. The Dimension tool's preselection
+    /// reaches a line from 8 px, not 9 (live/feel/sketch-snaps.json "toolNotes").
     pub(super) fn in_sketch_reach(&self, e: noshape_sketch::EntityId, p: DVec2, cx: &App) -> bool {
         let Some(ed) = self.sketch.as_ref() else { return false };
         let Some(d) = self.sketch_data(cx) else { return false };
@@ -773,14 +781,21 @@ impl PartStudioView {
             Tool::Trim => 6.5,
             _ => 7.5,
         };
+        // Live fc11d (11-21), no tool, outside the region: lit at 4 px, not 5, across a level line; 6 / 7 across a 16° iso one
+        // (the square's 4.9 there is 6.07 across).
+        const OUTSIDE_SQUARE: f64 = 4.9;
         let screen = ed.screen_metric();
         match (d.sketch.point(e), screen) {
             (Some(q), Some(m)) => m.len(q - p) <= r,
             (Some(q), None) => (q - p).length() <= r,
             // Text box lines stand for their glyphs; keep them.
-            // Straight out from the curve, not a square round the pointer: live2 11-17's slanted iso lines light to 7 px
-            // across them, 8 gives the region (a square's reach is ~9.6 px across a 30° line).
-            (None, Some(m)) => d.text_of_entity(e).is_some() || d.sketch.screen_distance_to(e, p, &m).is_some_and(|x| x <= curve_r),
+            // Inside a region straight out from the curve, not a square round the pointer: live2 11-17's slanted iso
+            // lines light to 7 px across them, 8 gives the region (a square's reach is ~9.6 px across a 30° line).
+            (None, Some(_)) if d.text_of_entity(e).is_some() => true,
+            (None, Some(m)) if ed.tool != Tool::Select || self.sketch_region_pick_at(p).is_some() => {
+                d.sketch.screen_distance_to(e, p, &m).is_some_and(|x| x <= curve_r)
+            }
+            (None, Some(m)) => d.sketch.screen_box_distance_to(e, p, &m).is_some_and(|x| x <= ed.world_per_px * OUTSIDE_SQUARE),
             (None, None) => d.text_of_entity(e).is_some() || d.sketch.curve(e).is_some_and(|c| c.closest(p).2 <= r),
         }
     }
@@ -835,8 +850,10 @@ impl PartStudioView {
             return point.and_then(pick_of).or(id);
         }
         // Past every reach (the GPU's pick holds a line to 9 px): the region under the pointer, as live (8 px off a line
-        // inside the rectangle hovers the region).
-        near.and_then(pick_of).or_else(|| self.sketch_region_pick_at(p))
+        // inside the rectangle hovers the region); outside it what lies behind the sketch (live fc11d: the Front or Right
+        // plane from 7 px out in iso).
+        let sketch_own = |i: u32| own(i).is_some() || built.picks.get(i).is_some_and(|t| matches!(&t.reference, Reference::SketchRegion { sketch, .. } if *sketch == ed.feature));
+        near.and_then(pick_of).or_else(|| self.sketch_region_pick_at(p)).or_else(|| vp.pick_at_pointer_without(&sketch_own).flatten())
     }
 
     /// The GPU's hover pick outside sketch mode, held to live's reach for the shown sketches (live2 11-18 hover-p0
@@ -1422,6 +1439,7 @@ impl PartStudioView {
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_drag(data, p)) {
                     self.apply_outcome(out, window, cx);
                 }
+                self.sync_sketch_dragging(cx);
                 // A dragged point over a model edge lands on it (the GPU's pick under the pointer is the point itself:
                 // the edge by its geometry).
                 if self.sketch.as_ref().is_some_and(|ed| ed.dragged_point().is_some()) {
@@ -1448,6 +1466,7 @@ impl PartStudioView {
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_up(data, p)) {
                     self.apply_outcome(out, window, cx);
                 }
+                self.sync_sketch_dragging(cx);
                 // A plane clicked joins the selection on release: drawn selected.
                 if self.sketch.as_ref().map(|ed| ed.model_selection.len()) != model_before {
                     self.refresh_scene(false, cx);
@@ -4286,8 +4305,11 @@ impl PartStudioView {
             .map(|(e, _)| *e)
             .chain(ed.glyph_entity.map(|(e, _)| e).filter(|e| row_hovered(*e)))
             .collect();
+        // None while geometry is dragged, Show constraints on or not (live fc-1120 (2): back on release).
+        let dragging = ed.geometry_dragging();
         let glyphs: Vec<_> = all
             .into_iter()
+            .filter(|_| !dragging)
             .filter(|g| {
                 show_all
                     || ed.hover == Some(g.entity)

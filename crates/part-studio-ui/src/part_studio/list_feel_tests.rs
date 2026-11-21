@@ -481,6 +481,34 @@ fn rows() -> Vec<Row> {
             let rows = l.menu(cx);
             expect((rows.iter().any(|r| r == "Unconfigure suppression"), rows.iter().any(|r| r == "Configure suppression")), (false, true), &format!("Extrude 2's rows {rows:?}"))
         } },
+        Row { id: "menu / rolled back under Sketch 1", live: "Sketch 1 › Roll to here: Sketch 1 keeps its full menu, Hide | Hide other sketches | Hide all sketches and Roll to end in place of Roll to here; every row below the bar: Rename | Add selection to folder… | Section view… (a sketch: Hide other sketches | Hide all sketches) | Suppress | Dynamic suppression | (Un)configure suppression | Roll to here | Roll to end | Delete (live rollback-menus 11-21; Add comment: cloud)", gap: false, check: |l, cx| {
+            l.view.update(cx, |v, cx| {
+                let fid = v.studio(cx).and_then(|s| s.features.iter().find(|f| f.name == "Extrude 2").map(|f| f.id)).expect("Extrude 2");
+                v.edit_config("configure", cx, |ps| {
+                    let input = noshape_ops::config::add_input(ps, "Checkbox");
+                    noshape_ops::config::configure_parameter(ps, fid, noshape_model::configuration::SUPPRESSED_PARAM, &input);
+                });
+            });
+            l.right_click(cx, "feature:Sketch 1");
+            l.keys(cx, "escape");
+            l.view.update(cx, |v, cx| v.set_rollback(Some(1), cx));
+            draw(cx, l.window);
+            expect(l.rolled_to(cx).as_deref(), Some("Sketch 1"), "the bar under")?;
+            let menu = |cx: &mut TestAppContext, row: &str| {
+                l.right_click(cx, &format!("feature:{row}"));
+                let rows = l.menu(cx);
+                l.keys(cx, "escape");
+                rows
+            };
+            let sketch1 = menu(cx, "Sketch 1");
+            let hides = sketch1.iter().position(|r| r == "Add selection to folder…").map(|k| sketch1[k + 1..].iter().take(3).cloned().collect::<Vec<_>>());
+            expect((hides, sketch1.iter().any(|r| r == "Roll to end"), sketch1.iter().any(|r| r == "Roll to here"), sketch1.iter().any(|r| r == "Edit…")), (Some(names(&["Hide", "Hide other sketches", "Hide all sketches"])), true, false, true), &format!("Sketch 1's rows {sketch1:?}"))?;
+            let tail = |configure: &str| names(&["Suppress", "Dynamic suppression", configure, "Roll to here", "Roll to end", "Delete"]);
+            let short = |middle: &[&str], configure: &str| names(&["Rename", "Add selection to folder…"]).into_iter().chain(names(middle)).chain(tail(configure)).collect::<Vec<_>>();
+            expect(menu(cx, "Extrude 1"), short(&["Section view…"], "Configure suppression"), "Extrude 1")?;
+            expect(menu(cx, "Sketch 2"), short(&["Hide other sketches", "Hide all sketches"], "Configure suppression"), "Sketch 2")?;
+            expect(menu(cx, "Extrude 2"), short(&["Section view…"], "Unconfigure suppression"), "Extrude 2")
+        } },
         Row { id: "menu / after a sketch's menu", live: "Section view… only with a sketch or plane selected: none on Extrude 1 with nothing selected; after a right-click on Sketch 2 and Esc (nothing shown selected) Extrude 1's own menu has it after Add selection to folder… (live psui 11-20 19:11, dm/secview.json)", gap: false, check: |l, cx| {
             l.right_click(cx, "feature:Extrude 1");
             let rows = l.menu(cx);
@@ -875,6 +903,37 @@ fn rows() -> Vec<Row> {
             let (from, to) = (l.at(cx, "rollback"), l.at_y(cx, "feature:Extrude 3", h - 6.));
             l.drag(cx, from, to, true);
             expect((shown.as_deref(), gap, after), (Some("Rollback bar"), true, None), "(tooltip on hover, 6.5 px under the bar's centre, any tooltip after a drop on a row)")
+        } },
+        Row { id: "panel / the list toggle: its tooltip, the model kept centred", live: "the toggle's tooltip 'Features and parts', collapsed or not; collapsing widens the canvas, the model moves half the change, its scale kept (live fc-1120 (9), panel-resize.json: canvas 1673 -> 1879 px, centre x 1159 -> 1052)", gap: false, check: |l, cx| {
+            let tip = |l: &List, cx: &mut TestAppContext| -> Result<Option<String>, String> {
+                let at = l.bounds(cx, "list-toggle").ok_or("no toggle")?.center();
+                let away = l.canvas(cx);
+                l.event(cx, MouseMoveEvent { position: away, pressed_button: None, modifiers: NONE });
+                draw(cx, l.window);
+                crate::ui_script::clear_tooltip();
+                l.event(cx, MouseMoveEvent { position: at, pressed_button: None, modifiers: NONE });
+                l.wait(cx, 1500);
+                Ok(crate::ui_script::shown_tooltip())
+            };
+            let seen = |l: &List, cx: &mut TestAppContext| cx.update(|cx| {
+                let vp = l.view.read(cx).viewport.read(cx);
+                let (o, w) = (vp.project(glam::DVec3::ZERO), vp.size().x);
+                let s = vp.project(glam::DVec3::new(0.01, 0.0, 0.0)).zip(o).map(|(a, b)| (a - b).length());
+                (o.map(|o| o.x), w, s)
+            });
+            let open = tip(l, cx)?;
+            let before = seen(l, cx);
+            let at = l.bounds(cx, "list-toggle").ok_or("no toggle")?.center();
+            l.press(cx, at, MouseButton::Left, NONE, 1);
+            let collapsed = tip(l, cx)?;
+            let after = seen(l, cx);
+            let at = l.bounds(cx, "list-toggle").ok_or("no toggle")?.center();
+            l.press(cx, at, MouseButton::Left, NONE, 1);
+            let ((Some(x0), w0, Some(s0)), (Some(x1), w1, Some(s1))) = (before, after) else { return Err("the origin off screen".into()) };
+            // In the canvas's own px (its left edge moved left by the change): the model, kept centred, half of it right.
+            let (moved, half) = (x1 - x0, (w1 - w0) / 2.0);
+            let centred = w1 > w0 + 100.0 && (moved - half).abs() < 1.0 && (s1 - s0).abs() < 1e-6;
+            expect((open.as_deref(), collapsed.as_deref(), centred), (Some("Features and parts"), Some("Features and parts"), true), &format!("(tooltips open / collapsed, centred: width {w0:.0} -> {w1:.0}, origin x {x0:.1} -> {x1:.1}, 1 cm {s0:.2} -> {s1:.2} px)"))
         } },
         Row { id: "rollback bar / on release the rows below grey and the Parts list follows", live: "the bar above Extrude 1: Parts (1) -> Parts (0) here (every part's extrude rolled back); back at the end all three again", gap: false, check: |l, cx| {
             let h = f32::from(l.bounds(cx, "feature:Sketch 1").ok_or("no row")?.size.height);

@@ -2027,6 +2027,11 @@ impl SketchEditor {
         inference_icons(inf, matches!(self.external_snap, Some(ExternalSnap::Edge { midpoint: false, .. })))
     }
 
+    /// Geometry is being dragged (past the press): live hides the glyphs and the regions' fill until the release.
+    pub fn geometry_dragging(&self) -> bool {
+        matches!(self.drag, Some(DragState::Geometry { .. }))
+    }
+
     /// The point being dragged, if a point drag is in progress.
     pub fn dragged_point(&self) -> Option<EntityId> {
         match self.drag {
@@ -10774,6 +10779,18 @@ mod tests {
             let got = corners(&d);
             assert!(near(&got, &want), "side {side}: {:?}", got.iter().map(|p| *p * 1e3).collect::<Vec<_>>());
         }
+        // Live psui fc-1120 (2), sketchdrag-b: the bottom line dimensioned 30 mm, the top-right corner dragged: the width
+        // holds, the rectangle slides with the corner, the top follows it, the bottom keeps its height.
+        let (mut ed, mut d) = editor(Tool::CornerRect);
+        click(&mut ed, &mut d, mm(19.8, 10.48));
+        click(&mut ed, &mut d, mm(49.8, 30.34));
+        ed.set_tool(Tool::Select);
+        let bottom = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).map(|e| e.id).find(|&l| matches!(d.sketch.curve(l), Some(Curve2::Line { a, b }) if (a.y - 10.48e-3).abs() < 1e-9 && (b.y - 10.48e-3).abs() < 1e-9)).expect("the bottom line");
+        d.sketch.add_constraint(ConstraintKind::Length { curve: bottom, value: 30e-3 }).unwrap();
+        drag(&mut ed, &mut d, mm(49.8, 30.34), mm(71.97, 46.71));
+        let got = corners(&d);
+        let want = [mm(41.97, 10.48), mm(71.97, 10.48), mm(41.97, 46.71), mm(71.97, 46.71)];
+        assert!(near(&got, &want), "dimensioned: {:?}", got.iter().map(|p| *p * 1e3).collect::<Vec<_>>());
     }
 
     /// Live2 sketch-drags (11-17, drags.json; 40 px = 10.795 mm): a circle's rim resizes it and its centre moves it;

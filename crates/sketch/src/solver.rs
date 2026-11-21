@@ -1362,6 +1362,9 @@ fn line_motion_queries(sk: &Sketch, sys: &mut System, out: &Outcome) -> (LineQue
     (queries, moves)
 }
 
+/// Held points a drag past its dimension hold keeps in place one coordinate at a time (each a solve).
+const MAX_KEPT: usize = 8;
+
 impl Sketch {
     /// Driving constraints that don't hold as the geometry stands (within
     /// `tol`): the equations' residuals, and coincident points / concentric
@@ -1846,6 +1849,40 @@ impl Sketch {
         }
         if report.drag_solved {
             return report;
+        }
+        // Live fc-1120 (2): where the dimension hold can't reach the pointer, dimensioned curves keep their sizes and
+        // move by least change, each held coordinate kept while it still solves (a rectangle with a 30 mm bottom
+        // slides sideways with its dragged corner, its bottom at its height).
+        // Only for a small dragged component (`MAX_UNITS`): each kept coordinate is another solve.
+        if !opts.still.is_empty() && self.drag_graph().dragged(handles).is_some() {
+            let plain = SolveOptions { analyze: false, max_iterations: 8, ..SolveOptions::default() };
+            let solve = |t: &[DragTarget]| {
+                let mut s = start.clone();
+                let r = run(&mut s, &plain, t);
+                (r.drag_solved && s.targets_met(t) && s.collapsed_lines(&start).is_empty()).then_some((s, r))
+            };
+            if let Some(mut best) = solve(&targets) {
+                let mut held = targets.clone();
+                let mut kept: Vec<EntityId> = Vec::new();
+                for &p in &opts.still {
+                    if kept.contains(&p) || kept.len() >= MAX_KEPT {
+                        continue;
+                    }
+                    kept.push(p);
+                    let Some(q) = start.point(p) else { continue };
+                    for (comp, value) in [(0, q.x), (1, q.y)] {
+                        held.push(DragTarget::Coord { point: p, comp, value });
+                        match solve(&held) {
+                            Some(b) => best = b,
+                            None => {
+                                held.pop();
+                            }
+                        }
+                    }
+                }
+                *self = best.0;
+                return best.1;
+            }
         }
         const SUBSTEPS: usize = 4;
         let mut best: Option<SolveReport> = None;

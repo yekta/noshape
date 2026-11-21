@@ -4903,8 +4903,10 @@ impl PartStudioView {
                 if let Some(o) = owner {
                     changes.push(("ownerPart", ParamValue::Query(vec![Reference::Body(o)])));
                     if !user_set.contains("attachmentOption") {
+                        // (A face's vertex or edge midpoint is stored on the face with the point as its secondary:
+                        // attached to the owner, as live's "Vertex of Extrude 1", fc-1120 (7).)
                         match &origin {
-                            Some(r @ Reference::Face(_)) => {
+                            Some(r @ Reference::Face(_)) if params.query("secondaryOriginQuery").is_empty() => {
                                 changes.push(("attachmentOption", ParamValue::Enum("TO_SELECTION".into())));
                                 changes.push(("attachTo", ParamValue::Query(vec![r.clone()])));
                             }

@@ -36,7 +36,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (00:22 UTC 11-21)
+## Now (03:38 UTC 11-21)
 
 1. LANDED: 6f48184a (FS notices compile off the UI thread; A/B 6 max prepaint 534 -> 28 ms on 850efe, 549 -> 37 on
    de4eff), 18809b4c (spinner on the executor clock), 1c6e56e4 + 5c3f3bb7 (revert of a5505f50). Worktrees psui-fsn,
@@ -97,6 +97,24 @@ docs/DECISIONS.md (read first; it wins over anything here).
    mate connector points, click-through, panel collapse / resize, compare readout; plus the Section view ETA). Write a
    test per item as its row arrives. LANDED b09eee10 23:09 (a82534f5): latency_tests gained menu / sketch enter / ✓ /
    Undo (Mac release: 8.6 / 17 / 17 / 17 ms vs live 117 / 226 / 117 / 107).
+   fc-1120 answered (live behaviours "psui fc-1120", "psui recheck", "psui recheck 2"; shots live/psui/fc-1120/).
+   Rows in interaction-feel.md "Live fc-1120". Equal: (1) hover rule, (4) redo, (5) fillet clicked edge only (new test
+   a_fillet_lists_only_the_clicked_edge_of_a_tangent_chain), (6) Extrude Enter, (8) Alt click-through (new test).
+   Fixed in the batch in flight (Mac run195): (2) glyphs + region fill hidden mid-drag (geometry_dragging,
+   SceneOptions::sketch_dragging), (7) mate connector at a face's corner: chip "Vertex of Extrude 1" + TO_OWNER,
+   (9) list toggle tooltip "Features and parts" + model kept centred, (3) line reach in sketch mode: inside a region
+   7.5 px straight out, outside live's 5 px square (4.9). (2) the dimensioned rectangle drag (ours moved
+   nothing, live slides; user 03:2x gave it back to psui, skasm told and dropped it): Sketch::drag, where the
+   dimension hold can't reach the pointer, solves without it and keeps each held coordinate that still solves
+   (MAX_KEPT 8 points, small components only); skasm: a plain solve alone moves the bottom. (10) compare readout
+   -> studios (= 7d64e534). Flaky ctrl_opens_the_menu: 20/20 on vibex7 under load, not flaky (lead told).
+   Same batch: CUTLIST-WHEEL-SIDEWAYS (live behaviours of that name 03:11): grid + right-panel body
+   restrict_scroll_to_axis (GPUI turned a plain wheel sideways); test a_cut_list_wheel_scrolls_the_panel_and_a_sideways_
+   wheel_the_table. FEEL-ROW-MENU-ROLL-TO-HERE (live 03:15, dm/rollback-menus.json): rows below the bar get Section
+   view… (menu_left) / a sketch's Hide other + all sketches and (Un)configure suppression; a shown sketch with other
+   sketches: Hide, Hide other sketches, Hide all sketches; list row "menu / rolled back under Sketch 1". Open: live's
+   sketch menus in cov-dm-config have no Section view… before Suppress, ours (keys-1118) do: rule unknown.
+   Mac: incremental dirs got emptied mid-build twice (11-21 02:4x, 03:1x): runs use CARGO_INCREMENTAL=0.
    c) Sent 22:5x: studios 8 (drw-centermark, drw-inspection-table-iso-scrolled, drw-revision-table-delete; not run:
    drw-quad-mid-snap, doc-folder-drag-to-all-tabs, docs-advanced-search-help, docs-folder-crumb, vs-ps-own-table-menu),
    asm 1 (asm-menu-instance-properties: step 2 dialog fields live 1 / ours 0).

@@ -43,13 +43,15 @@ fn hide_used_sketches(ps: &mut PartStudio, feature: &Feature, before: &[FeatureI
 }
 
 /// Live ("psb (10-25 l)" sketch visibility): a consumed sketch is hidden
-/// while at least one unsuppressed feature uses it, shown again when the
-/// last one is suppressed or deleted; a sketch shown or hidden by hand
-/// keeps that state.
+/// while at least one unsuppressed feature above the rollback bar uses it,
+/// shown again when the last one is suppressed, deleted or rolled back
+/// (rollback-menus 11-21: the bar under Sketch 1 shows it); a sketch shown
+/// or hidden by hand keeps that state.
 pub fn sync_sketch_visibility(ps: &mut PartStudio) {
     ps.auto_hidden.retain(|id| ps.features.iter().any(|f| f.id == *id));
+    let end = ps.rollback_index();
     for sid in ps.auto_hidden.clone() {
-        let consumed = ps.features.iter().any(|f| !f.suppressed && f.id != sid && noshape_model::interaction::used_sketches(&ps.features, f).contains(&sid));
+        let consumed = ps.features[..end].iter().any(|f| !f.suppressed && f.id != sid && noshape_model::interaction::used_sketches(&ps.features, f).contains(&sid));
         if let Some(sk) = ps.feature_mut(sid) {
             sk.hidden = consumed;
         }
@@ -142,6 +144,7 @@ pub const ROLLBACK_DESCRIPTION: &str = "Move rollback bar";
 /// Rollback bar after `index` features (None: at the end).
 pub fn set_rollback(ps: &mut PartStudio, index: Option<usize>) {
     ps.rollback = index.filter(|i| *i < ps.features.len());
+    sync_sketch_visibility(ps);
 }
 
 /// "Rename : <new name>".
@@ -789,6 +792,11 @@ mod sketch_visibility_tests {
         assert!(!hidden(&ps), "(d2) none left: shown");
         set_suppressed(&mut ps, &[id1], false);
         assert!(hidden(&ps), "(d3) one back: hidden");
+        // Live rollback-menus (11-21): the bar under the sketch shows it, the bar back at the end hides it.
+        set_rollback(&mut ps, Some(1));
+        assert!(!hidden(&ps), "(e1) consumers rolled back: shown");
+        set_rollback(&mut ps, None);
+        assert!(hidden(&ps), "(e2) rolled to the end: hidden");
         // (c) shown by hand: sticky.
         let t = VisibilityTargets { features: vec![sid], ..Default::default() };
         set_visibility(&mut ps, &t, false);

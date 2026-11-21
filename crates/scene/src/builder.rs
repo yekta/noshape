@@ -448,6 +448,8 @@ pub struct SceneOptions {
     pub show_origin: bool,
     /// Sketch being edited (drawn with constraint-state colors, others dimmed).
     pub editing_sketch: Option<FeatureId>,
+    /// Its geometry being dragged: its regions unfilled (live fc-1120 (2), back on release).
+    pub sketch_dragging: bool,
     /// Sketches drawn through the parts as an edited one looks (constraint-state colours, its points): a double-clicked
     /// face's sketch (live feel/3d dblclick-face.png: Sketch 1 blue with its corner dots, seen through the block).
     pub through_sketches: Vec<FeatureId>,
@@ -1122,7 +1124,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // (`#9aa5af`; live sketch/17: rgb(221,226,230) over the plane's
                 // rgb(245,248,250): 0.265). Dark: `#f2f2f2` at 20%
                 // (`--os-sketch-face-color`), #616161 over one plane's #3d3d3d.
-                let fill = if editing {
+                let fill = if editing && !opts.sketch_dragging {
                     let c = theme::lin(theme::pick(theme::viewport::SKETCH_REGION, theme::viewport_dark::SKETCH_REGION));
                     // Flat: lit, the fill came out darker and grayer
                     // ((215,218,221) over the plane).

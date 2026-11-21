@@ -1975,7 +1975,8 @@ fn a_line_in_reach_lights_and_is_clicked_when_the_gpu_pick_misses_it(cx: &mut Te
         let Some(noshape_sketch::Curve2::Line { a, b }) = data.sketch.curve(line) else { panic!("a line") };
         let vp = v.viewport.read(cx);
         let (sa, sb) = (vp.project(ed.frame.to_world(a)).unwrap(), vp.project(ed.frame.to_world(b)).unwrap());
-        (line, (sa + sb) * 0.5 + (sb - sa).perp().normalize() * 5.0)
+        // (Within live's 5 px pick square round the pointer: fc11d lit at 4 px, not 5.)
+        (line, (sa + sb) * 0.5 + (sb - sa).perp().normalize() * 4.0)
     });
     cx.update_window(window, |_, w, cx| {
         view.update(cx, |v, cx| {
@@ -4444,10 +4445,105 @@ fn a_mate_connector_picked_at_a_hovered_faces_corner(cx: &mut TestAppContext) {
     });
     assert_eq!((origin, inference.as_str()), (vec![top], "POINT"));
     assert!(matches!(secondary.as_slice(), [Reference::Vertex(_)]), "{secondary:?}");
+    // Live fc-1120 (7): the chip names the vertex, the connector attached to its owner.
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !dialog.read(cx).feature.params.query("ownerPart").is_empty());
+    let (chips, attach) = cx.update(|cx| {
+        let d = dialog.read(cx);
+        (d.chip_labels("originQuery"), d.feature.params.enum_("attachmentOption").to_string())
+    });
+    assert_eq!((chips, attach.as_str()), (vec!["Vertex of Extrude 1".to_string()], "TO_OWNER"), "(the origin's chip, Attachment)");
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
     wait_until(cx, window, |cx| !view.read(cx).display.connectors.is_empty());
     let (o, z) = cx.update(|cx| view.read(cx).display.connectors.first().map(|c| (c.origin, c.z))).unwrap();
     assert!(o.distance(corner) < 1e-6 && z.distance(glam::DVec3::Z) < 1e-9, "{o} {z}");
+}
+
+/// Live fc-1120 (8) (and psui 10-28 2.23): a part see-through by its appearance is hovered and clicked as any other;
+/// with Alt the pick goes through it to the part behind.
+#[gpui::test]
+fn alt_picks_through_a_see_through_part(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[-100, -100], [100, 100]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } },
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [20, 20]] }] },
+        { "type": "extrude", "name": "Extrude 2", "params": { "entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "30 mm", "operationType": "NEW" } },
+    ] });
+    let (window, view) = part_studio_with(cx, "alt-through", |path| {
+        let mut ctx = noshape_ops::Ctx::new();
+        noshape_ops::ui_parity::build_start(&mut ctx, path, &start).unwrap();
+        let op = noshape_ops::registry::by_tool_name("part_set_appearance").expect("part_set_appearance");
+        noshape_ops::registry::run(&mut ctx, op, &serde_json::json!({ "parts": ["Part 2"], "color": "#e51919", "transparency": 0.5 })).unwrap();
+        crate::session::Session::open(path).unwrap()
+    });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count() == 2);
+    // The tall part's top face and where its middle is on screen.
+    let (tall, top, at) = cx.update(|cx| {
+        let v = view.read(cx);
+        let vp = v.viewport.read(cx);
+        v.display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).find_map(|b| {
+            b.face_refs.iter().zip(&b.mesh.face_ranges).find_map(|(r, &(first, count))| {
+                let idx = &b.mesh.indices[first as usize..(first + count) as usize];
+                let c = idx.iter().map(|&k| { let q = b.mesh.positions[k as usize]; glam::DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64) }).sum::<glam::DVec3>() / idx.len() as f64;
+                ((c.z - 0.030).abs() < 1e-6).then(|| Some((b.id.clone(), r.clone(), vp.project(c)?))).flatten()
+            })
+        })
+    }).expect("the tall part's top face on screen");
+    assert!(cx.update(|cx| view.read(cx).display.body(&tall).is_some_and(|b| b.color[3] < 0.99)), "Part 2 see-through");
+    let t = noshape_scene::builder::PickTarget { reference: top.clone(), kind: noshape_scene::builder::PickKind::Face, anchor: None };
+    let through = |alt: bool, cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            v.pick_through_transparent(t.clone(), at, alt, cx).map(|p| (v.body_of(&p.reference) == Some(tall.clone()), p.kind))
+        })
+    };
+    let hovered = |alt: bool, cx: &mut TestAppContext| {
+        cx.update(|cx| view.update(cx, |v, cx| {
+            v.ui.alt_held = alt;
+            v.ui.pointer = Some(at);
+            v.ui.hover_raw = Some(t.clone());
+            v.rehover(cx);
+            v.ui.hover_pick.as_ref().map(|p| v.body_of(&p.reference) == Some(tall.clone()))
+        }))
+    };
+    use noshape_scene::builder::PickKind::Face;
+    let got = (through(false, cx), hovered(false, cx), through(true, cx), hovered(true, cx));
+    assert_eq!(got, (Some((true, Face)), Some(true), Some((false, Face)), Some(false)), "(click, hover; with Alt: click, hover) on the see-through part, true while it takes the pick");
+}
+
+/// Live fc-1120 (5): a new Fillet, Tangent propagation on, one edge of a tangent chain clicked: only that edge is picked
+/// and listed; the chain shows in the preview alone (more faces than that edge's fillet), which Tangent propagation off
+/// shrinks to the edge.
+#[gpui::test]
+fn a_fillet_lists_only_the_clicked_edge_of_a_tangent_chain(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 20]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } },
+        { "type": "fillet", "name": "Fillet 1", "params": { "entities": ["edge through [40, 20, 5]"], "radius": "5 mm" } },
+    ] });
+    let mut doc = None;
+    let (window, view) = part_studio_with(cx, "fillet-chain", |path| {
+        doc = Some(path.to_path_buf());
+        noshape_ops::ui_parity::build_start(&mut noshape_ops::Ctx::new(), path, &start).unwrap();
+        crate::session::Session::open(path).unwrap()
+    });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let op = noshape_ops::registry::by_tool_name("query_entities").expect("query_entities");
+    let got = noshape_ops::registry::run(&mut noshape_ops::Ctx::new(), op, &serde_json::json!({ "doc": doc.unwrap().to_str(), "kind": "edges", "at": [[20, 20, 10]] })).unwrap().value;
+    let edge = got["edges"][0]["id"].as_str().and_then(noshape_ops::refs::parse_str).expect("the top edge along y = 20");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    view.update(cx, |v, cx| v.pick(noshape_scene::builder::PickTarget { reference: edge.clone(), kind: noshape_scene::builder::PickKind::Edge, anchor: None }, cx));
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Fillet dialog").dialog.clone());
+    let faces = |cx: &mut TestAppContext| {
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).ui.preview_before.is_some());
+        cx.update(|cx| view.read(cx).display.bodies.iter().map(|b| b.face_refs.len()).sum::<usize>())
+    };
+    let chain = faces(cx);
+    let listed = cx.update(|cx| (dialog.read(cx).feature.params.query("entities").to_vec(), dialog.read(cx).chip_labels("entities")));
+    cx.update(|cx| dialog.update(cx, |d, cx| d.set_value("tangentPropagation", noshape_model::params::ParamValue::Bool(false), cx)));
+    let one = faces(cx);
+    assert_eq!(listed, (vec![edge], vec!["Edge of Extrude 1".to_string()]), "(the picks, their chips)");
+    assert!(chain > one, "the chain's fillet in the preview ({chain} faces), the edge's alone with Tangent propagation off ({one})");
 }
 
 /// Live 1987: a committed Hole's remembered values open the next new Hole; its Units / Style tabs (no units) in every
@@ -7493,5 +7589,71 @@ fn a_cut_list_header_sticks_to_the_panel_top(cx: &mut TestAppContext) {
         (rows, at_rest > top + 30., near(scrolled, top), near(back, at_rest)),
         (Some(24), true, true, true),
         "(cut list rows, header under the title at rest, at the panel's top scrolled 300 px, back in place): at rest {at_rest}, scrolled {scrolled}, back {back}, panel top {top}; scrolled to {offset} of {max}, panel {panel:?}, sideways bar {bar:?}, grids {laid:?}"
+    );
+}
+
+/// Live cutlist-wheel (qa CUTLIST-WHEEL-SIDEWAYS, 24 rows, the table wider than the Tables panel): a plain wheel over
+/// the rows or the header scrolls the panel down, never the table sideways; a sideways wheel (Shift+wheel on every OS)
+/// scrolls the table and the panel stays put; a wheel over the footer strip below scrolls nothing.
+#[gpui::test]
+fn a_cut_list_wheel_scrolls_the_panel_and_a_sideways_wheel_the_table(cx: &mut TestAppContext) {
+    let shapes: Vec<serde_json::Value> = (0..24).map(|i| serde_json::json!({ "line": [[0, 40 * i], [20 + 5 * i, 40 * i]] })).collect();
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": shapes },
+        { "type": "frame", "name": "Frame 1", "params": { "selections": ["Sketch 1 edges"] } }
+    ] });
+    let (window, view) = part_studio_from(cx, "cut-list-wheel", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).has_frames());
+    let wide = crate::ui::right_panel_w();
+    crate::ui::set_right_panel_w(300.);
+    view.update(cx, |v, cx| {
+        v.right_panel = Some(crate::part_studio::config_panel::RightPanel::CutList);
+        cx.notify();
+    });
+    draw(cx, window);
+    draw(cx, window);
+    let offsets = |cx: &mut TestAppContext| cx.update(|cx| {
+        let ct = &view.read(cx).ui.ct;
+        let table = ct.grid_scrolls.borrow().get("Cut list").map_or(0., |s| f32::from(s.offset().x));
+        (f32::from(ct.panel_scroll.offset().y) < 0., table < 0.)
+    });
+    let reset = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let ct = &view.read(cx).ui.ct;
+            ct.panel_scroll.set_offset(gpui::point(px(0.), px(0.)));
+            if let Some(s) = ct.grid_scrolls.borrow().get("Cut list") {
+                s.set_offset(gpui::point(px(0.), px(0.)));
+            }
+        });
+        draw(cx, window);
+    };
+    let wheel = |cx: &mut TestAppContext, at: gpui::Point<gpui::Pixels>, x: f32, y: f32| {
+        // (The wheel goes to what the last frame's hit test put under the pointer.)
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() });
+        draw(cx, window);
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::ScrollWheelEvent { position: at, delta: gpui_kit::ScrollDelta::Lines(gpui_kit::point(x, y)), ..Default::default() });
+        draw(cx, window);
+        offsets(cx)
+    };
+    let head = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("table-head:Cut list").expect("the column header");
+    // The header runs past the panel's right edge: aim inside the panel.
+    let head_at = gpui::point(head.left() + px(100.), head.center().y);
+    let row = head_at + gpui::point(px(0.), px(60.));
+    let footer = cx.update(|cx| {
+        let b = view.read(cx).ui.ct.panel_scroll.bounds();
+        gpui::point(b.center().x, b.bottom() + px(20.))
+    });
+    let scrolls = cx.update(|cx| view.read(cx).ui.ct.grid_scrolls.borrow().get("Cut list").map(|s| f32::from(s.max_offset().x)));
+    let mut got = Vec::new();
+    for (at, x, y) in [(row, 0., -3.), (head_at, 0., -3.), (row, -3., 0.), (footer, 0., -3.), (footer, -3., 0.)] {
+        reset(cx);
+        got.push(wheel(cx, at, x, y));
+    }
+    crate::ui::set_right_panel_w(wide);
+    assert!(scrolls.is_some_and(|m| m > 50.), "the table wider than the panel: sideways range {scrolls:?}");
+    assert_eq!(
+        got,
+        vec![(true, false), (true, false), (false, true), (false, false), (false, false)],
+        "(panel scrolled, table scrolled sideways) after a wheel over a row, the header, a sideways wheel over a row, a wheel and a sideways wheel over the footer"
     );
 }

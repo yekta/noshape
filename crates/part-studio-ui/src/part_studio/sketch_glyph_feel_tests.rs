@@ -220,3 +220,49 @@ fn a_lines_glyph_row_is_20_px_boxes_22_px_apart_20_5_px_off_its_middle(cx: &mut 
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
+
+/// Live fc-1120 (2) (psui recheck 02:44): while a rectangle's corner is dragged no glyph shows, Show constraints on, and
+/// the regions lose their grey fill; both come back on release.
+#[gpui::test]
+fn glyphs_and_the_region_fill_go_while_geometry_is_dragged(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "glyph-drag-hidden", Tool::CornerRect);
+    click(cx, window, &view, (450., 300.));
+    click(cx, window, &view, (750., 420.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.sketch.as_mut().expect("sketch mode").set_show_constraints(true);
+        cx.notify();
+    }));
+    let shown = |cx: &mut TestAppContext| {
+        draw(cx, window);
+        let selectors: Vec<&'static str> = cx.update(|cx| {
+            let v = view.read(cx);
+            let (ed, data) = (v.sketch.as_ref().expect("sketch mode"), v.sketch_data(cx).expect("sketch data"));
+            ed.constraint_glyphs(&data).iter().map(|g| &*Box::leak(format!("glyph-{}-{}", g.constraint.0, g.entity.0).into_boxed_str())).collect()
+        });
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        let glyphs = selectors.into_iter().filter(|s| vcx.debug_bounds(s).is_some()).count();
+        (glyphs, cx.update(|cx| view.read(cx).opts.sketch_dragging))
+    };
+    let at_rest = shown(cx);
+    let event = |ev: ViewportEvent, cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ev, w, cx);
+        }))
+        .unwrap();
+    };
+    let corner = DVec2::new(750., 420.);
+    event(ViewportEvent::PointerMove { position: corner, modifiers: Modifiers::default() }, cx);
+    event(ViewportEvent::ToolDown { position: corner, modifiers: Modifiers::default(), click_count: 1 }, cx);
+    for k in 1..=4 {
+        event(ViewportEvent::ToolDrag { position: corner + DVec2::new(5.0, 3.0) * k as f64 }, cx);
+    }
+    let dragging = shown(cx);
+    event(ViewportEvent::ToolUp { position: corner + DVec2::new(20.0, 12.0), modifiers: Modifiers::default() }, cx);
+    let released = shown(cx);
+    assert!(at_rest.0 > 0 && !at_rest.1, "at rest: {at_rest:?} (glyphs shown, regions unfilled)");
+    assert_eq!(dragging, (0, true), "(glyphs shown, regions unfilled) while the corner is dragged");
+    assert_eq!(released, (at_rest.0, false), "(glyphs shown, regions unfilled) after the release");
+}

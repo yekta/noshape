@@ -6093,6 +6093,7 @@ impl PartStudioView {
         let makes_faces = rc.makes_faces.contains(&id);
         let has_appearance = rc.appearances.contains(&id);
         let is_sketch = rc.sketches.contains(&id);
+        let sketch_feature = f.type_id == "sketch";
         let swatch = self.sketch_swatch(id, cx);
         let has_plane = is_sketch || rc.planes.contains(&id);
         // Live (part-studio/495): the icon's ink starts at x 46, the name at 67.
@@ -6585,14 +6586,64 @@ impl PartStudioView {
                 }
                 m
             };
+            // Live (behaviours "psui (11-20 19:11)"): a sketch row right-clicked, its menu closed, leaves the sketch
+            // selected unshown; the other rows' menus offer Section view… after Add selection to folder….
+            let section_left = view.read(cx).ui.menu_left.filter(|&s| s != id && !is_sketch && !sketch_feature);
+            let section = move |m: crate::os_menu::OsMenu| match section_left {
+                Some(sid) => m.item(item("Section view…", Box::new(move |this, w, cx| this.section_through_all(&[Reference::Sketch(sid)], w, cx))).icon_name("menu-section-view")),
+                None => m,
+            };
+            // Live 27043, rollback-menus (11-21): a sketch's row offers Hide other / all sketches when the Part Studio has
+            // other sketches.
+            let other_sketches = sketch_feature && view.read(cx).studio(cx).is_some_and(|s| s.features.iter().any(|g| g.id != id && g.type_id == "sketch"));
+            let hide_sketches = move |m: crate::os_menu::OsMenu| {
+                m.item(item("Hide other sketches", Box::new(move |this, _, cx| this.hide_sketches(Some(id), cx)))).item(item("Hide all sketches", Box::new(|this, _, cx| this.hide_sketches(None, cx))))
+            };
+            // Live feature-menu-configure-suppression: Dynamic suppression, then Configure suppression; rollto-menus
+            // (11-20): a feature whose suppression is configured offers Unconfigure suppression instead.
+            let suppression_configured = view.read(cx).studio(cx).is_some_and(|s| s.configuration.configured.iter().any(|c| c.feature == id && c.param == noshape_model::configuration::SUPPRESSED_PARAM));
+            let configure_name = feature_name.clone();
+            let configure_input = first_config_input.clone();
+            let configure = move |m: crate::os_menu::OsMenu| {
+                if suppression_configured {
+                    return m.item(item("Unconfigure suppression", Box::new(move |this, _, cx| {
+                        this.edit_config(noshape_ops::config::UNCONFIGURE_PARAMETER, cx, |ps| {
+                            noshape_ops::config::unconfigure_parameter(ps, id, noshape_model::configuration::SUPPRESSED_PARAM);
+                        });
+                    })));
+                }
+                let Some(input) = configure_input.clone() else { return m };
+                // Configure suppression adds the feature to the configuration table.
+                let name = configure_name.clone();
+                m.item(item("Configure suppression", Box::new(move |this, _, cx| {
+                    this.add_configured(id, noshape_model::configuration::SUPPRESSED_PARAM, &input, cx);
+                    this.right_panel = Some(config_panel::RightPanel::Configurations);
+                    // Live feature-menu-configure-suppression: "Extrude 1 suppression configured in Configuration".
+                    let input_name = this.studio(cx).and_then(|s| s.configuration.inputs.iter().find(|i| i.id == input).map(|i| i.name.clone())).unwrap_or_else(|| input.clone());
+                    this.message = Some((FeatureStatus::Info, format!("{name} suppression configured in {input_name}")));
+                    cx.notify();
+                })))
+            };
             // A suppressed feature, by hand or by its expression, and a rolled
             // back one (live qa4 r5 s8 (3), ui 10-25 c (2), s2 rollback
             // follow-up): Rename | Add selection to folder… | Suppress or
             // Unsuppress, (Edit) dynamic suppression ▸ | Roll to here, Roll to
-            // end | Delete (Add comment is collaboration, cloud).
+            // end | Delete (Add comment is collaboration, cloud). Rolled back
+            // (live rollback-menus 11-21): Section view… or a sketch's Hide
+            // other / all sketches after the folder, Configure suppression
+            // after Dynamic suppression.
             if suppressed || rolled_back {
-                let mut m = menu.item(item("Rename", Box::new(move |this, w, cx| this.start_rename(id, w, cx)))).separator().item(folder).separator().item(suppress);
-                m = dynamic(m, window, cx);
+                let mut m = menu.item(item("Rename", Box::new(move |this, w, cx| this.start_rename(id, w, cx)))).separator().item(folder);
+                if rolled_back {
+                    m = section(m);
+                    if other_sketches {
+                        m = hide_sketches(m);
+                    }
+                }
+                m = dynamic(m.separator().item(suppress), window, cx);
+                if rolled_back {
+                    m = configure(m);
+                }
                 return rolls(m).separator().item(delete);
             }
             let rename = item("Rename", Box::new(move |this, w, cx| this.start_rename(id, w, cx)));
@@ -6636,17 +6687,15 @@ impl PartStudioView {
                     }
                 })));
             }
-            m = m.separator().item(folder);
-            // Live (behaviours "psui (11-20 19:11)"): a sketch row right-clicked, its menu closed, leaves the sketch
-            // selected unshown; the other rows' menus offer Section view… after Add selection to folder….
-            if let Some(sid) = view.read(cx).ui.menu_left.filter(|&s| s != id && !is_sketch) {
-                m = m.item(item("Section view…", Box::new(move |this, w, cx| this.section_through_all(&[Reference::Sketch(sid)], w, cx))).icon_name("menu-section-view"));
-            }
+            m = section(m.separator().item(folder));
             if hideable {
                 m = m.separator().item(item(if hidden { "Show" } else { "Hide" }, Box::new(move |this, _, cx| {
                     let t: Vec<Reference> = targets(this).into_iter().map(Reference::Feature).collect();
                     this.set_visibility(&t, !hidden, cx);
                 })).icon_name(if hidden { "eye" } else { "eye-off" }));
+                if !hidden && other_sketches {
+                    m = hide_sketches(m);
+                }
                 // Live 1714, ui-parity sketch-rows-hide-other-sketches: a hidden sketch's row offers Show all
                 // sketches when there are other sketches, shown or not (one sketch alone: Show only).
                 let others_hidden = is_sketch && hidden && view.read(cx).display.sketches.iter().any(|s| s.feature != id);
@@ -6665,29 +6714,7 @@ impl PartStudioView {
                 // Live 1714: Section view… through the sketch, before Suppress.
                 m = m.item(item("Section view…", Box::new(move |this, w, cx| this.section_through_all(&[Reference::Sketch(id)], w, cx))).icon_name("menu-section-view"));
             }
-            m = m.item(suppress);
-            // Live feature-menu-configure-suppression: Dynamic suppression, then Configure suppression.
-            m = dynamic(m, window, cx);
-            let suppression_configured = view.read(cx).studio(cx).is_some_and(|s| s.configuration.configured.iter().any(|c| c.feature == id && c.param == noshape_model::configuration::SUPPRESSED_PARAM));
-            if suppression_configured {
-                // Live rollto-menus (11-20): a feature whose suppression is configured offers Unconfigure suppression instead.
-                m = m.item(item("Unconfigure suppression", Box::new(move |this, _, cx| {
-                    this.edit_config(noshape_ops::config::UNCONFIGURE_PARAMETER, cx, |ps| {
-                        noshape_ops::config::unconfigure_parameter(ps, id, noshape_model::configuration::SUPPRESSED_PARAM);
-                    });
-                })));
-            } else if let Some(input) = first_config_input.clone() {
-                // Configure suppression adds the feature to the configuration table.
-                let name = feature_name.clone();
-                m = m.item(item("Configure suppression", Box::new(move |this, _, cx| {
-                    this.add_configured(id, noshape_model::configuration::SUPPRESSED_PARAM, &input, cx);
-                    this.right_panel = Some(config_panel::RightPanel::Configurations);
-                    // Live feature-menu-configure-suppression: "Extrude 1 suppression configured in Configuration".
-                    let input_name = this.studio(cx).and_then(|s| s.configuration.inputs.iter().find(|i| i.id == input).map(|i| i.name.clone())).unwrap_or_else(|| input.clone());
-                    this.message = Some((FeatureStatus::Info, format!("{name} suppression configured in {input_name}")));
-                    cx.notify();
-                })));
-            }
+            m = configure(dynamic(m.item(suppress), window, cx));
             if let Some((tab, name)) = derived_source.clone() {
                 m = m.separator().item(item(&format!("Switch to {name}"), Box::new(move |_, _, cx| cx.emit(PartStudioEvent::ActivateTab(tab)))).icon_name("part-studio"));
             }
@@ -6884,9 +6911,9 @@ impl PartStudioView {
     /// collapses or restores the Features and parts list.
     fn render_list_toggle(&self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let collapsed = self.ui.list_collapsed;
         div()
             .id("list-toggle")
+            .debug_selector(|| "list-toggle".into())
             .occlude()
             .w(px(33.))
             .h(px(34.))
@@ -6901,7 +6928,7 @@ impl PartStudioView {
             .hover(|d| d.bg(pal.panel_hover))
             // Live (part-studio/00): the glyph sits 2.5 px right of center.
             .child(div().ml(px(5.)).child(crate::assets::icon("treelist", 20., cx)))
-            .tooltip(crate::ui::tooltip(if collapsed { "Show the Features and parts list" } else { "Collapse the Features and parts list" }))
+            .tooltip(crate::ui::tooltip("Features and parts"))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.ui.list_collapsed = !this.ui.list_collapsed;
                 cx.notify();
@@ -7503,7 +7530,8 @@ impl Render for PartStudioView {
         if let Some(id) = self.ui.list_menu
             && !crate::os_menu::is_open(cx)
         {
-            self.ui.menu_left = self.row_ctx.sketches.contains(&id).then_some(id);
+            // Any sketch row, also one rolled back (live rollback-menus 11-21: Extrude 2's Section view… after Sketch 2's).
+            self.ui.menu_left = self.studio(cx).and_then(|s| s.features.iter().find(|f| f.id == id)).filter(|f| f.type_id == "sketch").map(|f| f.id);
             self.ui.list_menu = None;
             self.refresh_scene(false, cx);
         }

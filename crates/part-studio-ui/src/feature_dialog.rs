@@ -1888,7 +1888,15 @@ impl FeatureDialog {
         // Every region of a sketch shows as one "Faces of Sketch 1"
         // row (Onshape, after clicking the sketch in the list).
         let mut rows: Vec<(String, Vec<usize>, Reference)> = Vec::new();
+        // A Mate connector's origin at a hovered face's vertex or edge midpoint reads as that vertex or edge (live
+        // fc-1120 (7): "Vertex of Extrude 1"); it is stored on the face, the point its secondary.
+        let p = &self.feature.params;
+        let point_of = (self.feature.type_id == "mateConnector" && s.id == "originQuery" && matches!(p.enum_("entityInferenceType"), "POINT" | "MID_POINT")).then(|| p.query("secondaryOriginQuery").first()).flatten();
         for (k, r) in refs.iter().enumerate() {
+            if let Some(e) = point_of {
+                rows.push(((self.labeler)(e), vec![k], r.clone()));
+                continue;
+            }
             if let Reference::SketchRegion { sketch, .. } = r {
                 let all: Vec<usize> = refs.iter().enumerate().filter(|(_, x)| matches!(x, Reference::SketchRegion { sketch: s2, .. } if s2 == sketch)).map(|(i, _)| i).collect();
                 let count = (self.sketch_region_count)(*sketch);
@@ -1929,6 +1937,13 @@ impl FeatureDialog {
             rows.push((missing.map(String::from).unwrap_or_else(|| (self.labeler)(r)), vec![k], r.clone()));
         }
         rows
+    }
+
+    /// A top-level selection field's chips as shown.
+    #[cfg(test)]
+    pub fn chip_labels(&self, id: &str) -> Vec<String> {
+        let Some(s) = self.ty.params.iter().find(|s| s.id == id) else { return Vec::new() };
+        self.query_rows(s, self.feature.params.query(id)).into_iter().map(|(label, _, _)| label).collect()
     }
 
     /// Key handling while a field's autofill list is open: ↑/↓ move, Enter
