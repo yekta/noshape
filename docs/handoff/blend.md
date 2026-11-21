@@ -1,15 +1,41 @@
 # Blends (agent "blend"): current state
 
-Updated 11-21 15:59 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-21 17:40 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-21 15:59, thread on the Hello account)
+## Now (11-21 17:40, thread on the Hello account)
 
-- Landed a9c26c41c isaac Fillet 4 (bool told).
+- Order (lead 16:30): Halter faces -> RINGS Fillet 1 (P0, bool waiting) -> knifehandle Fillet 1 -> Suspension root chain.
+  Halter's 113 s counts as a speed P1 once its faces match.
+- 0. RINGS (P0 SPEED-RINGS-SHELL, from bool): c2-rings-loft Fillet 1 (R2 on the bore's two closed ellipses, 1 mm wall
+  at the bottom) at Extrude 1 depth 9.6 / 10.4: OCCT splits each round in 3; live: one round per side, the two meeting at
+  the bore bottom (JQB) and running onto the outer face (JQN). Worktree blend10, branch blend-rings (Mac, uncommitted):
+  (a) ball_tools: a closed edge's first ball guessed at its first station (f 0.25) from the supports' normals (was
+  at(0) + middle's inward: guess on the bore axis, "faces tangent"); (b) free_end: a closed edge's ends count twice
+  (not free); (c) env ZZ_CLOSEDBOOL: an all-closed chain whose direct build declines goes to the Boolean (skips the
+  run-on block). With (a-c) 9.6 matches live after Chamfer 1: 17 faces, rounds 171.819 (live 171.817), bore 153.624
+  (exact), outer 344.204 (344.208); 8 unchanged. 10.4: the Boolean cut removes NOTHING (vol 1078.30 before = after,
+  balls correct at r 12.25); running bin/rings-fil.sh with ZZTOOL debug (each tool's volume / Common with the body)
+  -> find why, then make (c) unconditional, strip ZZ* prints (ZZORIENT, ZZTAN, ZZMADE, ZZGUESS, ZZBALL, ZZVOL, ZZTOOL),
+  test (T1 engine test at 9.6), suite + userdocs gate, land; tell bool. Scripts: bin/rings-fil.sh (Fillet 1 faces +
+  debug, DEPTHS), bin/rings-chk.sh (after Chamfer 1: faces, query_mass_properties), run as
+  `cd blend10 && NOSHAPE_RB_HOST=mac tools/tiers/rb.sh bash -c "ZZ_CB=1; DEPTHS='10.4'; $(cat bin/rings-fil.sh)"`.
+  Live: live/bool/rings-faces-1121/{8,8.8,9.6,10.4}.json (10.4: 17 faces, 954.357 mm3, rounds 173.058, bore 184.555).
+- 1b. Halter faces: ZZ_NOKEPT + ZZ_INTO=0.05 builds VALID: +2.333 mm3 (live 2.4694), 61/162/104 vs 39/111/73, 108 s.
+  Extra faces: the fill lofts' planar sides not merged into body faces (11,12,13,14,16,24,26,30), 0.004 mm2 tip slivers
+  (5, 20), extra B-spline pieces (3,4,18,19,27,29). logs/zzh10.out (bin/zzh10.sh dumps ~/tmp/blend/halter-out.brep on
+  vibex7 and lists faces with bin/faces2.sh). ZZ_INTO 0.01 invalid again. vibex7 slots are jammed (runs wait 30+ min:
+  use timeout 7200000 on background runs).
+- 2b. KNIFEHANDLE Fillet 1: logs/khf1.out (blend-kh, origin/core-knifehandle): closed loft 64 sections valid, "boolean
+  valid false" -> "the result is not one valid solid"; before it "a rolling balls' tool inside out" x2, "could not orient
+  a face at the edge" x2, "the rolling balls jump along the edge". Check whether rings' fixes (a)/(b) apply (closed edge).
+- SUSPENSION cusp_staged (blend-cusp, uncommitted): refill + root chain gives VALID 63/146/85, 393418.75 (live
+  53/98/46, 393486.60): the root chain stayed [12,21] (the 2 roots); it should run on along the cylinder/torus edges to
+  the cusps (live's patch). Face listing of ~/tmp/blend/susp-b2.brep / susp-out.brep: bin/faces2.sh '<paths>' 19,39.681,38.084,3.
 - 1. Impeller P0 (lead: Halter, then Fillet 3's speed, then SUSPENSION-CIRCPAT1).
   - Landed d2efb9fd (11-21 15:15): run-on end face first among exact ties, deferred overflow check (no-op on main; keeps
     Fillet 3 at 34/93/60 once bool's mend db41b6bec lands; bool told).
