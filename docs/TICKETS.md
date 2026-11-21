@@ -53,7 +53,7 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   172908.326 mm3, 59 faces / 163 edges / 98 vertices. Ours before Shell 5 = live's (49 faces, 175798.2 mm3).
 
 ## qa, 2026-11-21 (asm P2 walk, green b3ece860, vibe2; evidence /root/qa-scratch/walk2)
-- [ ] P2 **ASM-VERTEX-CONNECTOR-WORLD-AXES (asm)**: live: a vertex's implicit mate connector is world-aligned (behaviours.md
+- [x] verified green 665560c83 (qa 11-21 06:4x, 9c6d96bbf: assembly_mate_connector on the bare corner vertex and the app's corner snap in the Face tab's reference field are world-aligned (Z up, X along world X): 106666.664 / 160000 / 426666.657 / 533333.321 mm⁴, as live but FACE-MOMENT-DIGITS; a connector made before the fix keeps its stored frame; walk2/n6z, n7c.png, src/massop.py) P2 **ASM-VERTEX-CONNECTOR-WORLD-AXES (asm)**: live: a vertex's implicit mate connector is world-aligned (behaviours.md
   "ui (10-26 b)": Z up, X along world X). Ours: assembly_mate_connector on the corner vertex (40,20,10) of a 40x20x10 block
   gives the x = 40 face's frame (Z = +X, X = +Y, Y = +Z); in the app, hovering that corner in Mass and section properties ›
   Mate connector for reference frame snaps a frame with Z along −X, Y down. So the Face tab about a corner connector reads
@@ -67,8 +67,7 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   Lyy 106666.657, Lzz 133333.321; about the corner, 106666.664 / 426666.657 / 533333.321. Live (exact for a plane) reads
   ….667 / ….667 / ….333: our integration is off by up to 0.012 mm⁴ on a flat rectangle.
 
-- [ ] P3 **ROLLBACK-ABOVE-BAR-SECTION-VIEW (psui)**: green 70795e7e3 (9790d27d7), live dm/rollback-menus.json. With the bar rolled
-- [ ] P3 **ROLLBACK-ABOVE-BAR-SECTION-VIEW (psui)**: fixed psui 11-21 06:09 (a pick from a row's menu leaves nothing selected behind it, only a dismissed sketch row's menu does; list_feel "menu / rolled back under Sketch 1" picks Roll to here), to verify. green 70795e7e3 (9790d27d7), live dm/rollback-menus.json. With the bar rolled
+- [x] verified green 665560c83 (qa 11-21 06:5x, vibe2, qa-scratch/walk2/e1c, e2c.png: rolled under Sketch 1, its menu is live's with no Section view…; Frame 1 below the bar unchanged) P3 **ROLLBACK-ABOVE-BAR-SECTION-VIEW (psui)**: fixed psui 11-21 06:09 (a pick from a row's menu leaves nothing selected behind it, only a dismissed sketch row's menu does; list_feel "menu / rolled back under Sketch 1" picks Roll to here), to verify. green 70795e7e3 (9790d27d7), live dm/rollback-menus.json. With the bar rolled
   under Sketch 1, Sketch 1's menu matches live (Hide in place of Show, Roll to end in place of Roll to here) but has an extra
   "Section view…" after Export as DXF/DWG…. Live's Sketch 1 menu has none, before or after the roll; ours has none before the
   roll. Frame 1 below the bar matches live's Extrude 1 (Configure suppression only with a configuration, Add comment is cloud).
