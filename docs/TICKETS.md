@@ -60,6 +60,13 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
   a corner connector of a 40x20x10 block's top face) can only be checked in the app. AGENTS.md: everything the app does is an
   op. Wanted: `faces` (and `reference` in the assembly) in both ops, giving the Face tab's numbers, with e2e tests.
 
+- [ ] P1 **VARIABLE-KEYWORD-NAMES (studios, lead 11-21)**: c2-config-parts-screws has 24 Variable features in live and in ours, but
+  ours lists only 22 in the Part Studio's variable table (variable_set's list: #p, #fh, … #size). The two missing are #do and
+  #type, the only names that are FeatureScript keywords. Live edits #do (configured, M4 = 4 mm: behaviours "Speed reference
+  (11-20)"); ours answers "no variable `do`". Wanted: variables named do / type (any keyword live accepts) listed, editable and
+  referenceable as live's. Repro: a parity_models-saved c2-config-parts-screws (vibex8 ~/tmp/qa/srm3/saved, night build
+  f9ad07b50), variable_set {variable: "do"}.
+
 ## qa, 2026-11-21 (compat alerts on green 2407ded2)
 - [ ] P1 **MANUALBLEND-BOUNDARY1 (core, lead 11-21 05:1x)**: c2-surf-workshop-manualblend's Boundary surface 1 (feature 18)
   builds on live: status OK, Surface 3 a sheet of 1 face, 2 edges and 2 vertices, 1593.76 mm². In 0.4.63 ours gave a Warning
