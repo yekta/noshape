@@ -1,35 +1,39 @@
 # Blends (agent "blend"): current state
 
-Updated 11-20 16:05 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-20 22:15 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-20 19:19, thread on the Hello account)
+## Now (11-20 22:15, thread on the Hello account)
 
 - Landed 11-20: work bound e5b2ec359, groups speed 214446392, car end f689de1bb, car Fillet 1, 805e29, mutualtrim,
-  CHAMFER-ASYM. Landed 19:41: 19fa1ed6, COMPAT-RUSTZERO-FILLET1 (rust-zero-solid-f197 Fillet 1 Ok again: 6910009d2 ran a
-  fillet's chain on at the gap between two selected edges that don't meet; now only a chamfer stopped at its selection
-  does; test features_c fillet_edges_apart_run_on_only_at_the_chains_ends). Gate: tests, userdocs, suite all SAME.
-- Mac off limits until 21:35 UTC (lead). Build on vibex7/vibex8/vibe2; vibex8's slot was held by qa for hours: lead
-  17:25 moved my runs to vibex7.
-- 1. Impeller fallbacks (main ea1240fbd, logs/prof-p2.txt): Flansch zum Stroemungskanal 6.6 s = as_is fails 0.13 s,
-  scaled fails 1.0 s, by_groups 4.9 s; Ansaugflansch zum Gehaeuse 5.5 s = as_is 0.9 + scaled 2.0 s, min_distance x273
-  0.9 s; Bohrungssitz Ansaugflasch 3.3 s = split_closed 1.0 s. Running: blend-impdump2 (bin/imp-dump2.sh): every
-  impeller op dumped (NOSHAPE_DUMP_OPS, vibex7 ~/tmp/blend/impdump), each fillet replayed (crash_inputs::replay_one,
-  NOSHAPE_REPLAY=<dump base>) -> logs/imp-dump.out. Next: why as_is/scaled fail on Flansch's input; cut by_groups.
-- 2. Halter: trim b6bb39e3b (worktree blend-f850, branch blend-seg). Tests ok, userdocs ALL-SAME; suite pair runs
-  in blend-x7moves (vibex7 slot, after the probes) -> suite-eseg.cmp, gateseg.done. Land if only intended diffs. The
-  1.403 mm cap alone made it worse (tip piece dropped): derive live's extension rule, then feature 29.
-- 3. P1 SUITE-IMPELLER-FILLET3 (load-dependent 27/29): blend-x7moves runs blend-cap's ops binary (copied to vibex7)
-  with ZZ_BUD -> logs/imp-bud-b2.out (which deadline fires), then c2-curve-pattern-composite faces -> logs/cpc-c2.out
-  (P2: Fillet 2 28/58/32 vs live 26/52/28). Replace the firing clock with a work bound.
-- 4. c2-opt-fillet-partial-asym-smooth (new, live): 3/8; Fillet 1 partial matches; Fillet 2 asymmetric 3/6 mm: ours
-  20 lines + 2 other edges vs live 18 + 4, volume -0.168 mm3 (47644.619 vs 47644.787).
-- Cleanup left: worktrees fwork-base, blend-cap, blend-rz2 (vibex7 ~/agents/blend-rz2 11 GB), blend-carland;
-  vibex7 ~/tmp/blend/green-dbg and cli-*, ~/tmp/blend/rz/d-*.
+  CHAMFER-ASYM, 19fa1ed6 COMPAT-RUSTZERO-FILLET1 (qa verified 20:35).
+- Lead 21:5x order: P1 (time limits -> work counts) lands before the second impeller cut; then impeller fallbacks,
+  Halter, c2-opt-fillet-partial-asym-smooth. Mac back since 21:36 (headless, ~/noshape-host, blend10 only).
+- 1. P1 (worktree blend10, branch blend-p1 on af717ef22, uncommitted): self_intersects (Sweep's check) bounded by
+  ScopedWork(SELF_INTER_WORK) instead of a 1 s CPU timer; a Boolean's offset tools by k::with_work("boolean.offset",
+  OFFSET_WORK) (new C++ work_begin/work_end) instead of with_deadline(2 s); dead ScopedDeadline removed; TESTS.md
+  Budgets. Mac: clippy clean, kernel 547 / model 574 ok; tests' self_intersects max 2156 steps. Running: g13
+  (logs/p1-g13.out), traced suite pair vibex7 (bin/p1-pair.sh -> suite-p1.cmp, logs/p1-suite-trace.out), userdocs
+  (bin/p1-ud.sh -> ud-p1.log). Then set both limits ~10x the max seen, land. Open (bool's area): the memory budget
+  is process-wide RSS growth, so a Rust Boolean giving way to OCCT past it depends on what else runs.
+  Fillet 3's 27/29: qa saw 29 single, 27 in a full suite (order/load); my runs on main all give 27. bin/imp-det.sh
+  (vibex7: as is 27, one core, rayon 1) -> logs/imp-det.out.
+- 2. First impeller cut (worktree blend-cham, branch blend-gvol, uncommitted; patch logs/gvol.patch): by_groups'
+  material-off check by the changed faces' volume, not the part's twice (Flansch 6.0 -> 1.3 s; 36 fillet dumps same).
+  g13 ok, tests ok, userdocs ALL-SAME; suite pair vibe2 -> suite-gvol.cmp, gategvol.done. Land if SAME.
+  Second cut after P1: scaled retries 0.7-1.8 s, Bohrungssitz split_closed 1.7 s, Ansaugflansch overflows 0.8 s.
+- 3. Halter b6bb39e3b (blend-f850, branch blend-seg): tests ok, suite no feature diffs, but userdocs cli-draft-hang2
+  Fillet 2 slower 40 -> 54 s (twice, logs/dh2.out) and its error 'Unfilleted edge overlapped by fillet.' ->
+  'Failed to fillet selections.'. Not landable as is: find the slow path first. Then live's extension rule, feature 29.
+- 4. c2-opt-fillet-partial-asym-smooth (new, live): 3/8; Fillet 2 asymmetric 3/6 mm: ours 20 lines + 2 other edges vs
+  live 18 + 4, volume -0.168 mm3.
+- P2 c2-curve-pattern-composite Fillet 2 28/58/32 vs live 26/52/28.
+- Cleanup left: worktrees fwork-base (gvol base), blend-cap, blend-rz2 (vibex7 probes, 7 GB), blend-carland;
+  vibex7 ~/tmp/blend/impdump, cli-*, green-dbg.
 - Agent ids: only in /root/lead-scratch/roster.md; read it before every message_agent, never copy ids here.
 
 ## In flight (older)

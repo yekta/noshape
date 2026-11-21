@@ -2293,28 +2293,27 @@ double area_fast(const OcShape& s)
 
 static bool self_intersects_unbudgeted(const TopoDS_Shape& shape);
 
-// (Within a CPU second: OCCT's analysis of a 20-turn thread's sweep ran for minutes, asm-hand-drill-pinslot's Sweep 2,
-// live's sweep 28 ms. Past it nothing is found: the sweep stands, as live's, the feature's budget not spent by it, else
-// the sweep's Boolean after it stopped at its first check: "BOPAlgo_AlertIntersectionFailed".)
+// Bounded by work, not time (a CPU second found less on a slower or busier machine, the sweep then standing or not):
+// past SELF_INTER_WORK steps nothing is found and the sweep stands, as live's (asm-hand-drill-pinslot's Sweep 2: OCCT's
+// analysis of a 20-turn thread's sweep ran for minutes, live's sweep 28 ms; ~1.3 s on an M-series Mac). The dock's
+// filleted step, the most a finished check took in tests, takes 33250. NOSHAPE_WORK_TRACE=1 prints its steps.
+constexpr uint64_t SELF_INTER_WORK = 200000;
+
 bool self_intersects(const OcShape& s)
 {
   if (s.shape.IsNull())
     return false;
-  struct Detached
-  {
-    std::atomic<bool>* const spent = t_spent;
-    Detached() { t_spent = nullptr; }
-    ~Detached() { t_spent = spent; }
-  };
-  bool faulty = false;
-  int  r      = 0;
-  {
-    const Detached detached;
-    r = run_budgeted(1.0, [&] { faulty = self_intersects_unbudgeted(s.shape); });
-  }
+  bool faulty = false, spent = false;
+  const int r = run_budgeted(blend_budget_seconds(), [&] {
+    const ScopedWork work(SELF_INTER_WORK);
+    faulty = self_intersects_unbudgeted(s.shape);
+    spent  = work.w.hit;
+    if (std::getenv("NOSHAPE_WORK_TRACE"))
+      std::fprintf(stderr, "work: self_intersects %llu steps%s\n", (unsigned long long)work.w.used, spent ? " (spent)" : "");
+  });
   if (r == 2)
     fail_op("cancelled");
-  return r == 0 && faulty;
+  return r == 0 && !spent && faulty;
 }
 
 static bool self_intersects_unbudgeted(const TopoDS_Shape& shape)
@@ -2330,7 +2329,14 @@ static bool self_intersects_unbudgeted(const TopoDS_Shape& shape)
   a.MergeEdgeMode()      = false;
   a.ContinuityMode()     = false;
   a.CurveOnSurfaceMode() = false;
-  a.Perform();
+  try
+  {
+    a.Perform(new_cancel_indicator()->Start());
+  }
+  catch (const Standard_Failure&)
+  {
+    return false;
+  }
   return a.HasFaulty();
 }
 

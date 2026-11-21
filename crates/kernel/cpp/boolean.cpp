@@ -12831,6 +12831,41 @@ uint64_t set_section_work(uint64_t steps)
 
 uint64_t last_section_work() { return t_last_section_work; }
 
+namespace
+{
+// k::with_work's bounds, innermost last: each with the bound and the pairs setting it replaced.
+struct RustWork
+{
+  WorkBudget  w;
+  WorkBudget* outer;
+  int         pairs;
+};
+thread_local std::vector<std::unique_ptr<RustWork>> t_rust_work;
+} // namespace
+
+// A work bound on this thread until work_end (k::with_work), its OCCT pairs serial so every step is counted here.
+void work_begin(uint64_t steps)
+{
+  auto r     = std::make_unique<RustWork>();
+  r->w.limit = steps;
+  r->outer   = t_work;
+  r->pairs   = noshape_bop_set_pairs_parallel_here(0);
+  t_work     = &r->w;
+  t_rust_work.push_back(std::move(r));
+}
+
+// The steps taken since the matching work_begin; the outer bound back.
+uint64_t work_end()
+{
+  if (t_rust_work.empty())
+    return 0;
+  const std::unique_ptr<RustWork> r = std::move(t_rust_work.back());
+  t_rust_work.pop_back();
+  noshape_bop_set_pairs_parallel_here(r->pairs);
+  t_work = r->outer;
+  return r->w.used;
+}
+
 static OpOut op_section_unbudgeted(const OcShape& a, const OcShape& b, bool parallel = true)
 {
   require_non_null(a.shape, "first shape");

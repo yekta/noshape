@@ -274,27 +274,6 @@ struct ScopedWork
 double                        steady_seconds();
 // The deadline's clock now.
 double deadline_now(const Deadline& d);
-// A tighter deadline for one step inside a budget (a fallback that can run long): the builds there stop at it, and
-// the budget's own comes back after. It never extends the budget's.
-struct ScopedDeadline
-{
-  Deadline        d;
-  Deadline* const outer;
-  explicit ScopedDeadline(double seconds) : outer(t_deadline)
-  {
-#ifdef __linux__
-    d.clock = outer != nullptr ? outer->clock : this_thread_cpu_clock();
-#endif
-    d.at = deadline_now(d) + seconds;
-    if (outer != nullptr && outer->at < d.at)
-      d.at = outer->at;
-    t_deadline = &d;
-  }
-  ~ScopedDeadline() { t_deadline = outer; }
-  ScopedDeadline(const ScopedDeadline&)            = delete;
-  ScopedDeadline& operator=(const ScopedDeadline&) = delete;
-};
-
 template <class F>
 int run_budgeted(double cpu_seconds, F&& f)
 {
@@ -882,6 +861,8 @@ PlaneQ                   find_plane(const OcShape& s, double tolerance);
 PropsF                   props_volume(const OcShape& s);
 double                   set_call_budget(double seconds);
 uint64_t                 set_section_work(uint64_t steps);
+void                     work_begin(uint64_t steps);
+uint64_t                 work_end();
 uint64_t                 last_section_work();
 double                   set_blend_budget(double seconds);
 PropsF                   props_volume_precise(const OcShape& s);

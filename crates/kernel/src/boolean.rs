@@ -230,6 +230,29 @@ pub fn with_section_work<T>(steps: u64, f: impl FnOnce() -> T) -> T {
     f()
 }
 
+/// Runs `f` with this thread's kernel work bounded by `steps` (OCCT's break-hook and progress checks, its pairs serial):
+/// past it the kernel's steps stop as if cancelled. Also whether it was spent: the same answer on a fast or a busy
+/// machine, unlike a deadline (docs/TESTS.md "Budgets"). NOSHAPE_WORK_TRACE=1 prints the steps under `what`.
+pub fn with_work<T>(what: &str, steps: u64, f: impl FnOnce() -> T) -> (T, bool) {
+    struct End<'a>(&'a std::cell::Cell<u64>);
+    impl Drop for End<'_> {
+        fn drop(&mut self) {
+            self.0.set(ffi::work_end());
+        }
+    }
+    let used = std::cell::Cell::new(0);
+    ffi::work_begin(steps);
+    let r = {
+        let _end = End(&used);
+        f()
+    };
+    let used = used.get();
+    if std::env::var_os("NOSHAPE_WORK_TRACE").is_some() {
+        eprintln!("work: {what} {used} steps{}", if used > steps { " (spent)" } else { "" });
+    }
+    (r, used > steps)
+}
+
 /// The steps of work the last [`section`] under [`with_section_work`] took on this thread.
 pub fn last_section_work() -> u64 {
     ffi::last_section_work()
@@ -327,7 +350,8 @@ pub fn with_cancel<R>(flag: &std::sync::atomic::AtomicBool, f: impl FnOnce() -> 
 
 /// Runs `f` stopping this thread's kernel operations after `seconds` (they fail as cancelled) or when the
 /// [`with_cancel`] flag it runs under is set; also whether the deadline passed. For work that can hang (an operation on
-/// a dense surface: AGENTS.md "background work that can hang has a timeout").
+/// a dense surface: AGENTS.md "background work that can hang has a timeout"). Only where running out fails the feature:
+/// a bound that picks another route is [`with_work`]'s, the same on every machine.
 pub fn with_deadline<R>(seconds: f64, f: impl FnOnce() -> R) -> (R, bool) {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;

@@ -7,8 +7,9 @@ use noshape_units::Dim;
 /// Onshape's note for a Boolean that changes nothing (live qa5 BOOL1).
 use crate::regen::eval::NO_GEOMETRY_CHANGE;
 
-/// The seconds OCCT's face offset of an offset Subtract's tool may take.
-const OFFSET_DEADLINE_S: f64 = 2.0;
+/// The steps of work OCCT's face offset of an offset Subtract's tool may take (k::with_work: the same cut on every
+/// machine, where its 2 s deadline offset a tool on a fast one and not on a slow one). NOSHAPE_WORK_TRACE=1 prints them.
+const OFFSET_WORK: u64 = 200_000;
 /// The most points k::offset_solid marches along one face's edges.
 const OFFSET_FACE_BUDGET: u32 = 20_000;
 
@@ -97,12 +98,15 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
                 if shapes.is_empty() {
                     return None;
                 }
-                // (OCCT's face offset of planes, cylinders, cones, spheres and tori, within a time limit; free-form faces
+                // (OCCT's face offset of planes, cylinders, cones, spheres and tori, within a work bound; free-form faces
                 // as their exact offsets (k::offset_solid: OCCT's failed after 32 s on c2-fan-blade-sweep's thread
                 // flanks); else the tool as it is.)
                 let analytic = shapes.iter().all(|f| matches!(f.face_surface(), Ok(k::Surface::Plane(_) | k::Surface::Cylinder { .. } | k::Surface::Cone { .. } | k::Surface::Sphere { .. } | k::Surface::Torus { .. })));
                 let res = if analytic {
-                    k::with_deadline(OFFSET_DEADLINE_S, || k::offset_faces(&b.shape, shapes, offset)).0.ok()
+                    match k::with_work("boolean.offset", OFFSET_WORK, || k::offset_faces(&b.shape, shapes, offset)) {
+                        (_, true) => None,
+                        (r, false) => r.ok(),
+                    }
                 } else {
                     k::offset_solid(&b.shape, shapes, &[offset], OFFSET_FACE_BUDGET).inspect_err(|e| log::debug!("boolean: {e}: {}", k::last_offset_report())).ok()
                 };

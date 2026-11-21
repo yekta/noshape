@@ -130,8 +130,9 @@ fast and a slow machine, idle or loaded. So:
   OCCT polls; a loop that polls nothing hangs there alone (DRAFT-POOL-HANG-MACOS): release.yml's "Budgeted documents"
   opens tests/budget/*.noshape on every platform under a limit.
 - **A step that may be cut short to try another route is bounded by work, not time:** `ScopedWork` (C++) /
-  `with_section_work` count OCCT's break-hook and progress checks on the thread, its pairs serial, so the cut falls at
-  the same step everywhere. Calibrate the limit with NOSHAPE_WORK_TRACE=1 against the cases where the step works.
+  `with_work` / `with_section_work` (Rust) count OCCT's break-hook and progress checks on the thread, its pairs serial,
+  so the cut falls at the same step everywhere (Sweep's self-intersection check, a Boolean's offset tools, fillets'
+  and Draft's tries). Calibrate the limit with NOSHAPE_WORK_TRACE=1 against the cases where the step works.
 - Not a geometry choice, so still by time: FeatureScript's 60 s limit and Replace face's 90 s (they fail visibly).
 - Still machine-dependent (open): the memory budget (a Rust Boolean past it gives way to OCCT's).
 

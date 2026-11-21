@@ -769,6 +769,10 @@ pub(crate) mod ffi {
         fn set_section_work(steps: u64) -> u64;
         /// The steps the last section under a work bound took on this thread.
         fn last_section_work() -> u64;
+        /// A work bound on this thread until the matching `work_end` (`k::with_work`).
+        fn work_begin(steps: u64);
+        /// The steps taken since the matching `work_begin`.
+        fn work_end() -> u64;
         /// The CPU seconds a blend, draft, shell or face deletion may take on this thread (0: the default 30 /
         /// NOSHAPE_BLEND_BUDGET); returns the previous.
         fn set_blend_budget(seconds: f64) -> f64;
