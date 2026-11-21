@@ -862,3 +862,57 @@ fn a_closed_sketchs_lit_end_goes_with_it(cx: &mut TestAppContext) {
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
+
+/// Live sk2-1121 dim-circle-rims (default iso, ~3.2 px a mm): the Dimension tool lights a 5 mm circle round the Origin on
+/// its rim either side, not the Origin at its centre, before and after a dimension between its rim and another circle's.
+#[gpui::test]
+fn a_small_circle_round_the_origin_lights_on_its_rim(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "sketch-hover-rims", Tool::Circle);
+    cx.update(|cx| view.update(cx, |v, _| v.sketch.as_mut().unwrap().set_show_constraints(true)));
+    let screen = |cx: &mut TestAppContext, x: f64, y: f64| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let ed = v.sketch.as_ref().unwrap();
+            v.viewport.read(cx).project(ed.frame.to_world(DVec2::new(x, y) * 1e-3)).unwrap()
+        })
+    };
+    for (c, r) in [((0., 0.), (5., 0.)), ((30., 0.), (38., 0.))] {
+        let (a, b) = (screen(cx, c.0, c.1), screen(cx, r.0, r.1));
+        click(cx, window, &view, (a.x, a.y));
+        click(cx, window, &view, (b.x, b.y));
+    }
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Dimension, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let (feature, circle) = cx.update(|cx| {
+        let v = view.read(cx);
+        let data = v.sketch_data(cx).unwrap();
+        let c = data.sketch.entities().find(|e| matches!(data.sketch.curve(e.id), Some(noshape_sketch::Curve2::Circle { center, .. }) if center.length() < 1e-9)).unwrap().id;
+        (v.sketch.as_ref().unwrap().feature, c.0)
+    });
+    let pointer = Pointer::new(cx, window, &view);
+    let is_circle = |r: &Option<Reference>| matches!(r, Some(Reference::SketchEntity { sketch, entity }) if *sketch == feature && *entity == circle);
+    let mut wrong = Vec::new();
+    let mut rims = |cx: &mut TestAppContext, when: &str| {
+        for x in [5., -5.] {
+            let at = screen(cx, x, 0.);
+            pointer.move_to(cx, &view, at);
+            let got = hovered(cx, &view);
+            if !is_circle(&got) {
+                let o = screen(cx, 0., 0.);
+                wrong.push(format!("{when}: at ({x}, 0) mm, {:.1} px from the centre, lit {got:?}", (at - o).length()));
+            }
+        }
+    };
+    rims(cx, "before a dimension");
+    for (x, y) in [(5., 0.), (22., 0.), (15., -10.)] {
+        let at = screen(cx, x, y);
+        pointer.move_to(cx, &view, at);
+        pointer.click(cx, &view, at);
+    }
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("enter escape d");
+    draw(cx, window);
+    rims(cx, "after one");
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}

@@ -1038,11 +1038,35 @@ impl PartStudioView {
 
     /// The GPU's hover pick in sketch mode (and again on each move while it stands: `sketch_gpu_hover`), resolved by
     /// [`Self::sketch_hover_id`] and applied.
+    /// Whether the resolved pick is an entity of the open sketch.
+    fn picks_own_sketch_entity(&self, id: Option<u32>) -> bool {
+        matches!(id.and_then(|i| self.built.as_ref()?.picks.get(i)).map(|t| &t.reference), Some(Reference::SketchEntity { sketch, .. }) if self.sketch.as_ref().is_some_and(|s| s.feature == *sketch))
+    }
+
     fn sketch_hover(&mut self, gpu_id: Option<u32>, vp: &Entity<Viewport>, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let id = &self.sketch_hover_id(gpu_id, cx);
         self.ui.sketch_gpu_hover = Some((gpu_id, *id));
+        // A glyph's clear margin (not its tile) gives way to the open sketch's entity under the pointer (live sk2-1121
+        // dim-circle-rims: a 5 mm circle's rim 1 px below its glyph's tile lights the circle).
+        let row = self.glyph_under(vp.read(cx).pointer_position()).1;
+        let tile = self.ui.glyph_tile;
+        let own = self.picks_own_sketch_entity(*id);
+        if let Some(ed) = &mut self.sketch {
+            match tile {
+                None if own => {
+                    if let Some(c) = ed.hover_constraint.take() {
+                        self.ui.glyph_yielded = Some(c);
+                    }
+                }
+                Some(c) if self.ui.glyph_yielded.is_some() => {
+                    ed.hover_constraint = Some(c);
+                    self.ui.glyph_yielded = None;
+                }
+                _ => {}
+            }
+        }
         // While a glyph/label is hovered (or the pointer is between a row's glyphs), the geometry under it isn't.
-        if self.sketch.as_ref().is_some_and(|s| s.hover_constraint.is_some()) || self.glyph_under(vp.read(cx).pointer_position()).1 {
+        if self.sketch.as_ref().is_some_and(|s| s.hover_constraint.is_some()) || (row && (tile.is_some() || !own)) {
             if self.hover.take().is_some() {
                 self.refresh_scene(false, cx);
             }
@@ -4476,12 +4500,44 @@ impl PartStudioView {
                     .p(px(margin))
                     .cursor_pointer()
                     // Live sketch/28: plain 20 px boxes, 18 px icons.
-                    .child(div().size(px(20.)).flex().items_center().justify_center().bg(bg).child(icon_px(g.icon, 18.0, fg)))
+                    .child(
+                        div()
+                            .id(SharedString::from(format!("glyph-tile-{}-{}", cid.0, g.entity.0)))
+                            .size(px(20.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .bg(bg)
+                            .child(icon_px(g.icon, 18.0, fg))
+                            // On the tile itself the glyph takes back a hover its clear margin gave way.
+                            .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                                if *h {
+                                    this.ui.glyph_tile = Some(cid);
+                                } else if this.ui.glyph_tile == Some(cid) {
+                                    this.ui.glyph_tile = None;
+                                }
+                                if *h
+                                    && this.ui.glyph_yielded.take().is_some()
+                                    && let Some(ed) = &mut this.sketch
+                                {
+                                    ed.hover_constraint = Some(cid);
+                                    this.hover = None;
+                                    this.refresh_scene(false, cx);
+                                    cx.notify();
+                                }
+                            })),
+                    )
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                        this.ui.glyph_yielded = None;
                         // Off a glyph of a lingering row: the row lingers again (to reach its next glyph).
                         let lingering = this.sketch.as_ref().is_some_and(|ed| ed.glyph_entity.is_some_and(|(e, _)| e == gent)) || this.ui.glyph_linger.iter().any(|(e, _)| *e == gent);
                         if !*h && lingering {
                             this.linger_glyphs(gent, cx);
+                        }
+                        // Entered on its clear margin over the open sketch's entity (picked on this move): that keeps the hover.
+                        if *h && this.ui.glyph_tile != Some(cid) && this.picks_own_sketch_entity(this.ui.sketch_gpu_hover.and_then(|(_, id)| id)) {
+                            this.ui.glyph_yielded = Some(cid);
+                            return;
                         }
                         if let Some(ed) = &mut this.sketch {
                             let new = if *h { Some(cid) } else if ed.hover_constraint == Some(cid) { None } else { ed.hover_constraint };
@@ -4503,7 +4559,10 @@ impl PartStudioView {
                         this.open_sketch_context_menu(ev.position, Some(cid), window, cx);
                     }))
                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, _, _| {
-                        // Drag to move the glyph, click to select its constraint.
+                        // Drag to move the glyph, click to select its constraint (unless its margin gave the entity under it the hover).
+                        if this.ui.glyph_yielded == Some(cid) {
+                            return;
+                        }
                         if let Some(ed) = &mut this.sketch {
                             ed.pressed_glyph = Some((cid, gent, ev.modifiers.shift || ev.modifiers.control));
                         }

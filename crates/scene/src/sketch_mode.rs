@@ -8461,11 +8461,13 @@ pub fn smart_dimension(sk: &Sketch, ids: &[EntityId], cursor: DVec2) -> Option<C
             EntityKind::Arc => Some(ConstraintKind::Radius { curve: *a, value: 0.0 }),
             EntityKind::Conic => Some(ConstraintKind::Rho { conic: *a, value: 0.0 }),
             EntityKind::Ellipse | EntityKind::EllipticalArc => {
-                // Major or minor diameter depending on which axis the cursor is nearer.
+                // The diameter whose dimension line runs along the label's side: off across the major axis (a
+                // horizontal ellipse's label above) the major, off along it (at the side) the minor (live (6)
+                // Dimension tool; sk2-1121 dim-ellipse-axes: picked at its minor end, a click at (5, 25) mm gives MAJOR).
                 let major = match sk.curve(*a) {
                     Some(Curve2::Ellipse { center, major, .. }) | Some(Curve2::EllipticalArc { center, major, .. }) => {
                         let d = cursor - center;
-                        d.dot(major.normalize()).abs() >= d.dot(major.normalize().perp()).abs()
+                        d.dot(major.normalize().perp()).abs() >= d.dot(major.normalize()).abs()
                     }
                     _ => true,
                 };
@@ -10823,8 +10825,9 @@ mod tests {
         let (s, e) = sk.endpoints(arc).unwrap();
         assert!(matches!(smart_dimension(&sk, &[s, e, arc], v(26.0, 6.0)), Some(ConstraintKind::Length { curve, .. }) if curve == arc));
         let el = sk.add_ellipse(v(40.0, 0.0), v(4.0, 0.0), 2.0);
-        assert!(matches!(smart_dimension(&sk, &[el], v(46.0, 0.0)), Some(ConstraintKind::EllipseRadius { major: true, .. })));
-        assert!(matches!(smart_dimension(&sk, &[el], v(40.0, 4.0)), Some(ConstraintKind::EllipseRadius { major: false, .. })));
+        assert!(matches!(smart_dimension(&sk, &[el], v(46.0, 0.0)), Some(ConstraintKind::EllipseRadius { major: false, .. })));
+        assert!(matches!(smart_dimension(&sk, &[el], v(40.0, 4.0)), Some(ConstraintKind::EllipseRadius { major: true, .. })));
+        assert!(matches!(smart_dimension(&sk, &[el], v(41.0, 5.0)), Some(ConstraintKind::EllipseRadius { major: true, .. })), "above, a little off the centre");
         // dimension to the origin
         let (mut ed, mut d) = editor(Tool::Dimension);
         d.sketch.add_point(v(0.02, 0.01));
