@@ -2626,9 +2626,10 @@ fn an_other_documents_studios_sort_by_name_as_the_current_documents(cx: &mut Tes
     assert_eq!(first(cx), "Part Studio 1", "Z → A");
 }
 
-/// Live parity-open-1120 ob (ASM-INSERT-RELEASED-ITEMS): an opened other document's ▲ View released items lists its
-/// released parts as "name [part number] (revision)" and drops obsoleted revisions ("No Part Studios found." once none
-/// is left); the Version graph closes it.
+/// Live parity-open-1120 ob (ASM-INSERT-RELEASED-ITEMS, INSERT-OTHER-DOC-GRAPH-MARKS): an opened other document's
+/// Part Studios open with their parts under the Parts / Sketches / rigid row; ▲ View released items lists its released
+/// parts as "name [part number] (revision)" and drops obsoleted revisions ("No Part Studios found." once none is left);
+/// the Version graph closes it and marks the released version with a ▲.
 #[gpui::test]
 fn an_other_documents_released_items_leave_out_obsoleted_revisions(cx: &mut TestAppContext) {
     // (The release log as release_create / release_obsolete write it: those ops need the company's managed workflows,
@@ -2662,6 +2663,11 @@ fn an_other_documents_released_items_leave_out_obsoleted_revisions(cx: &mut Test
     })
     .unwrap();
     draw(cx, window);
+    cx.run_until_parked();
+    draw(cx, window);
+    let shown = |cx: &mut TestAppContext, id: String| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(id.leak()).is_some();
+    assert!(["ins-other-f-parts", "ins-other-f-sketch", "ins-other-rigid"].iter().all(|id| shown(cx, id.to_string())), "the filter row");
+    assert!(shown(cx, "ins-other-row Part 1".into()) && shown(cx, "ins-other-row Part 2".into()), "Part Studio 1 open, its parts listed");
     let listed = |cx: &mut TestAppContext, name: &str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(format!("ins-other-released {name}").leak()).is_some();
     assert!(!listed(cx, "Part 1"), "the tree until ▲");
     let click = |cx: &mut TestAppContext, id: &'static str| {
@@ -2676,6 +2682,9 @@ fn an_other_documents_released_items_leave_out_obsoleted_revisions(cx: &mut Test
     assert!(listed(cx, "Part 1") && !listed(cx, "Part 2"));
     click(cx, "ins-other-graph");
     assert!(!listed(cx, "Part 1"), "the Version graph instead");
+    let graph = cx.update(|cx| view.read(cx).ui.insert_other_doc.as_ref().map(|d| d.versions.iter().map(|v| v.label.clone()).zip(d.marks.clone()).collect::<Vec<_>>()).unwrap());
+    assert_eq!(graph, vec![("R1".to_string(), 1), ("Start".to_string(), 0)], "R1 on a release ▲");
+    assert!(shown(cx, "ins-other-v-0".into()));
 }
 
 /// Live2 asm-dialogs-1119 grp / gok: Group on a fixed part and a part Revolute-mated to it shows the mate's error as the

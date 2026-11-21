@@ -1050,13 +1050,13 @@ pub fn face_section_properties(result: &AssemblyResult, faces: &[(InstancePath, 
     if faces.is_empty() {
         return None;
     }
-    // (world triangles, area, perimeter, plane origin, normal, x axis) per face.
-    let mut tris: Vec<[DVec3; 3]> = Vec::new();
-    let (mut area, mut perimeter) = (0.0, 0.0);
+    // Per face its exact area, centroid and central inertia (unit density) in world terms: (area, centroid, tensor).
+    let mut parts: Vec<(f64, DVec3, glam::DMat3)> = Vec::new();
+    let mut perimeter = 0.0;
     let mut plane: Option<(DVec3, DVec3, DVec3)> = None;
     for (path, reference) in faces {
         let Reference::Face(name) = reference else { return None };
-        let (o, fi) = result.occurrences.iter().find_map(|o| (&o.path == path).then(|| o.face_refs.iter().position(|r| r == reference).map(|fi| (o, fi))).flatten())?;
+        let o = result.occurrences.iter().find(|o| &o.path == path && o.face_refs.contains(reference))?;
         let body = o.context.body(&o.body)?;
         let &kfi = body.find_faces(name).first()?;
         let face = body.shape.sub_shape(k::ShapeType::Face, kfi).ok()?;
@@ -1071,40 +1071,28 @@ pub fn face_section_properties(result: &AssemblyResult, faces: &[(InstancePath, 
                 }
             }
         }
-        area += face.area().ok()?;
         perimeter += face.edges().iter().map(|e| e.length().unwrap_or(0.0)).sum::<f64>();
-        let &(first, count) = o.mesh.face_ranges.get(fi)?;
-        let idx = o.mesh.indices.get(first as usize..(first + count) as usize)?;
-        let p = |i: u32| o.mesh.positions.get(i as usize).map(|q| o.transform.transform_point3(DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64)));
-        for t in idx.chunks(3) {
-            if let [a, b, c] = *t
-                && let (Some(a), Some(b), Some(c)) = (p(a), p(b), p(c))
-            {
-                tris.push([a, b, c]);
-            }
-        }
+        // (Exact for a plane, as live's: the display mesh's f32 points were 0.012 mm⁴ off.)
+        let p = k::surface_properties(&face).ok()?;
+        let r = glam::DMat3::from_mat4(o.transform);
+        parts.push((p.mass, o.transform.transform_point3(p.center), r * p.inertia * r.transpose()));
     }
     let (_, normal, x) = plane?;
     let y = normal.cross(x).normalize_or_zero();
-    // Centroid (area-weighted triangle centroids), then the second moments.
-    let tri_area = |t: &[DVec3; 3]| (t[1] - t[0]).cross(t[2] - t[0]).length() * 0.5;
-    let total: f64 = tris.iter().map(tri_area).sum();
-    if total <= 0.0 {
+    let area: f64 = parts.iter().map(|p| p.0).sum();
+    if area <= 0.0 {
         return None;
     }
-    let centroid = tris.iter().map(|t| (t[0] + t[1] + t[2]) / 3.0 * tri_area(t)).sum::<DVec3>() / total;
+    let centroid = parts.iter().map(|p| p.1 * p.0).sum::<DVec3>() / area;
     // About a reference connector: its origin, in its x and y axes (live mc1-mc3: the parallel axis values).
     let (at, x, y) = reference.map_or((centroid, x, y), |f| (f.origin, f.x(), f.y()));
-    let (mut ixx, mut iyy, mut ixy) = (0.0, 0.0, 0.0);
-    for t in &tris {
-        let a = tri_area(t);
-        let uv: Vec<(f64, f64)> = t.iter().map(|q| ((*q - at).dot(x), (*q - at).dot(y))).collect();
-        let (u, v) = ([uv[0].0, uv[1].0, uv[2].0], [uv[0].1, uv[1].1, uv[2].1]);
-        let sq = |w: [f64; 3]| w[0] * w[0] + w[1] * w[1] + w[2] * w[2] + w[0] * w[1] + w[1] * w[2] + w[2] * w[0];
-        ixx += a / 6.0 * sq(v);
-        iyy += a / 6.0 * sq(u);
-        ixy += a / 12.0 * (2.0 * (u[0] * v[0] + u[1] * v[1] + u[2] * v[2]) + u[0] * v[1] + u[1] * v[0] + u[0] * v[2] + u[2] * v[0] + u[1] * v[2] + u[2] * v[1]);
-    }
+    // The tensor about `at` (parallel axis), then the second moments S = ∫ r rᵀ = tr(J)/2 − J.
+    let j = parts.iter().fold(glam::DMat3::ZERO, |j, &(a, c, jc)| {
+        let d = c - at;
+        j + jc + (glam::DMat3::IDENTITY * d.length_squared() - glam::DMat3::from_cols(d * d.x, d * d.y, d * d.z)) * a
+    });
+    let s = glam::DMat3::IDENTITY * ((j.x_axis.x + j.y_axis.y + j.z_axis.z) * 0.5) - j;
+    let (ixx, iyy, ixy) = (y.dot(s * y), x.dot(s * x), x.dot(s * y));
     Some(FaceSection { area, perimeter, centroid, moments: [[ixx, ixy], [ixy, iyy]], polar: ixx + iyy })
 }
 

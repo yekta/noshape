@@ -5,7 +5,7 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-21 05:55 UTC) — RESUME HERE
+## State (2026-11-21 06:45 UTC) — RESUME HERE
 - P2 OP-MASS-FACE-SECTION LANDED 05:57 as e07b0eb3. Between entities translator fix (suspension Lower Control Arm
   Revolute 1) set aside as /root/asm-scratch/between.patch while the vertex fix lands: re-apply with git apply.
 - P0 evaluate-again LANDED 02:54 as ed0fcbec (place_blocks: saved isaac 765 -> 25 ms; A/B on 27 models no deviation
@@ -27,9 +27,11 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
 - qa P2 OP-MASS-FACE-SECTION: assembly_mass_properties `faces` (Face tab: area, perimeter, Lxx/Lxy/Lyy, Lzz) and
   `reference` (connector: inertia and moments about it); e2e assembly_measure_and_mass_properties. The Part Studio
   op (query_mass_properties) is the lead's to route.
-- qa 11-21 05:5x (TICKETS "qa, 2026-11-21 (asm P2 walk…)"): P2 ASM-VERTEX-CONNECTOR-WORLD-AXES queued 06:0x (a bare
-  vertex's inference point is world-aligned, behaviours 16596; a face's corner dots keep the face's frame); P2 INSERT-OTHER-DOC-GRAPH-MARKS (no ▲ release mark / Release legend in the version graph, no filter row in an
-  opened document's list); P3 FACE-MOMENT-DIGITS (≤0.012 mm⁴ off on a flat rectangle).
+- qa 11-21 05:5x (TICKETS "qa, 2026-11-21 (asm P2 walk…)"): P2 ASM-VERTEX-CONNECTOR-WORLD-AXES LANDED 06:22 as 9c6d96bb
+  (a bare vertex's inference point is world-aligned, behaviours 16596; a face's corner dots keep the face's frame).
+  Queued 06:4x: P3 FACE-MOMENT-DIGITS (Face tab from OCCT's exact surface integrals, not the f32 mesh) and P2
+  INSERT-OTHER-DOC-GRAPH-MARKS (legend's 2 rows, ▲/△ on released/candidate versions, Parts/Sketches/rigid row, studios
+  open by default; an other document's sketches aren't listed yet: Sketches alone shows the studios only).
 - Scissor 0da59a: live installed its Derived sources (9 studios + imports/574ddb5a….step, source.json extraStudios;
   REQUESTS skasm 11-21 03:01). Live's own 0da59a has Derived "Plate" / "Battery Clip" in ERROR (Top Plate 0 parts):
   compare its parts with 0da59a's live.jsonl, not 24.

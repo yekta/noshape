@@ -4646,6 +4646,9 @@ pub struct OtherDoc {
     pub path: std::path::PathBuf,
     pub name: String,
     pub versions: Vec<crate::derived::VersionChoice>,
+    /// Each version's mark in the Version graph (as the History panel's): 0 a dot, 1 a release ▲, 2 a release holding
+    /// an obsoletion, 3 a release candidate △.
+    pub marks: Vec<u8>,
     /// Microversions in the workspace since its last version.
     pub changes: usize,
     pub version: usize,
@@ -4653,9 +4656,10 @@ pub struct OtherDoc {
     pub graph: bool,
     /// (tab id, name, is an assembly) of the shown version.
     pub tabs: Vec<(String, String, bool)>,
-    /// Parts of the expanded Part Studios (tab id → (body, name)).
+    /// Parts of the open Part Studios (tab id → (body, name)).
     pub parts: HashMap<String, Vec<(BodyId, String)>>,
-    pub expanded: HashSet<String>,
+    /// Part Studios the user collapsed (live parity-open-1120 ob-pre-1: open, their parts listed, as it opens).
+    pub collapsed: HashSet<String>,
     /// Its released parts and assemblies, newest release first, obsoleted revisions left out.
     pub released: Vec<noshape_drawing_ui::drawing_chooser::Released>,
     /// View released items (▲) replaces the tree (live parity-open-1120 ob).
@@ -4684,15 +4688,30 @@ impl OtherDoc {
         }
         let name = store.meta().map(|m| m.name).unwrap_or_else(|_| path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
         let at = |s: &str| graph.versions.iter().find(|v| v.id.to_string() == s).map(|v| v.microversion).or_else(|| s.parse().ok());
-        let released = store.get_meta(noshape_ops::release::META_KEY).ok().flatten().map(|b| noshape_drawing_ui::drawing_chooser::released_items(&noshape_model::release::ReleaseLog::from_json(&b), &at)).unwrap_or_default();
-        let mut d = OtherDoc { path: path.to_path_buf(), name, versions, changes, version: 0, graph: false, tabs: Vec::new(), parts: HashMap::new(), expanded: HashSet::new(), released, released_view: false };
+        let log = store.get_meta(noshape_ops::release::META_KEY).ok().flatten().map(|b| noshape_model::release::ReleaseLog::from_json(&b)).unwrap_or_default();
+        let released = noshape_drawing_ui::drawing_chooser::released_items(&log, &at);
+        let mark = |id: &str| {
+            let packages = log.at_version(id);
+            if packages.iter().any(|p| p.kind == noshape_model::release::PackageKind::Obsoletion) {
+                2
+            } else if !packages.is_empty() {
+                1
+            } else if log.candidate_at_version(id) {
+                3
+            } else {
+                0
+            }
+        };
+        let mut marks: Vec<u8> = graph.versions.iter().rev().map(|v| mark(&v.id.to_string())).collect();
+        marks.resize(versions.len(), 0);
+        let mut d = OtherDoc { path: path.to_path_buf(), name, versions, marks, changes, version: 0, graph: false, tabs: Vec::new(), parts: HashMap::new(), collapsed: HashSet::new(), released, released_view: false };
         d.load_tabs();
         Ok(d)
     }
 
     fn load_tabs(&mut self) {
         self.parts.clear();
-        self.expanded.clear();
+        self.collapsed.clear();
         self.tabs = self
             .versions
             .get(self.version)
@@ -4933,14 +4952,19 @@ impl AssemblyView {
         )
     }
 
-    /// Expand a Part Studio of the opened document: its parts (background).
+    /// Collapse or expand a Part Studio of the opened document.
     fn expand_other_studio(&mut self, tab: String, cx: &mut Context<Self>) {
         let Some(d) = &mut self.ui.insert_other_doc else { return };
-        if !d.expanded.remove(&tab) {
-            d.expanded.insert(tab.clone());
+        if !d.collapsed.remove(&tab) {
+            d.collapsed.insert(tab);
         }
+        cx.notify();
+    }
+
+    /// Read an open Part Studio's parts of the opened document (background), once.
+    fn load_other_parts(&mut self, tab: String, cx: &mut Context<Self>) {
+        let Some(d) = &mut self.ui.insert_other_doc else { return };
         if d.parts.contains_key(&tab) {
-            cx.notify();
             return;
         }
         let Some(key) = d.key(&tab) else { return };
@@ -5054,23 +5078,22 @@ impl AssemblyView {
                     }))),
             );
             if d.graph {
-                // Version graph: ○ Workspace ◆ Version, then Main (not
-                // selectable) and the versions (live 613, 618).
-                col = col.child(
-                    h_flex()
-                        .h(px(36.))
-                        .pl(px(6.))
-                        .gap(px(4.))
-                        .text_size(px(11.))
-                        .text_color(pal.text)
-                        .border_b_1()
-                        .border_color(rgb(0xeeeeee))
-                        .child(div().size(px(9.)).rounded_full().border_1().border_color(pal.text))
-                        .child("Workspace")
-                        .child(div().ml(px(4.)).size(px(7.)).rounded_full().bg(pal.text))
-                        .child("Version"),
-                );
-                let node = |hollow: bool, last: bool| {
+                // Version graph: the legend's two rows (Workspace · Version, Release candidate · Release), then Main
+                // (not selectable) and the versions, a release's on a solid ▲ (live 613, 618; parity-open-1120 ob-pre-2).
+                let legend_row = |a: (&'static str, &'static str), b: (&'static str, &'static str), cx: &App| {
+                    let item = |(icon, label): (&'static str, &'static str), cx: &App| h_flex().gap(px(2.)).child(crate::assets::icon(&icon_path(icon), 16., cx)).child(label);
+                    h_flex().h(px(40.)).pl(px(4.)).gap(px(4.)).text_size(px(11.)).text_color(pal.text).border_b_1().border_color(rgb(0xeeeeee)).child(item(a, cx)).child(item(b, cx))
+                };
+                col = col
+                    .child(legend_row(("legend-workspace", "Workspace"), ("legend-version", "Version"), cx))
+                    .child(legend_row(("legend-release-candidate", "Release candidate"), ("legend-release", "Release"), cx));
+                let node = |hollow: bool, last: bool, mark: u8| {
+                    let dot = match mark {
+                        // A candidate's △ white inside, over the line.
+                        3 => div().relative().size(px(14.)).child(div().absolute().child(crate::ui::glyph("legend-release", 14., rgb(0xffffff)))).child(div().absolute().child(crate::ui::glyph("legend-release-candidate", 14., blue))),
+                        1 | 2 => div().child(crate::ui::glyph("legend-release", 14., blue)),
+                        _ => div().size(px(if hollow { 13. } else { 9. })).rounded_full().border_1().border_color(blue).bg(if hollow { rgb(0xffffff) } else { blue }),
+                    };
                     div()
                         .w(px(140.))
                         .h_full()
@@ -5079,9 +5102,9 @@ impl AssemblyView {
                         .items_center()
                         .justify_center()
                         .child(div().absolute().left(px(69.5)).w(px(1.5)).top(px(if hollow { 18. } else { 0. })).bottom(px(if last { 18. } else { 0. })).bg(blue))
-                        .child(div().size(px(if hollow { 13. } else { 9. })).rounded_full().border_1().border_color(blue).bg(if hollow { rgb(0xffffff) } else { blue }))
+                        .child(dot)
                 };
-                col = col.child(h_flex().h(px(36.)).child(node(true, d.versions.is_empty())).child(div().flex_1().text_size(px(13.33)).italic().text_color(rgb(0x999999)).child("Main")));
+                col = col.child(h_flex().h(px(36.)).child(node(true, d.versions.is_empty(), 0)).child(div().flex_1().text_size(px(13.33)).italic().text_color(rgb(0x999999)).child("Main")));
                 let n = d.versions.len();
                 for (i, v) in d.versions.iter().enumerate() {
                     let on = i == d.version;
@@ -5092,7 +5115,8 @@ impl AssemblyView {
                             .cursor_pointer()
                             .when(on, |r| r.bg(rgb(0xb2ddf6)))
                             .when(!on, |r| r.hover(|r| r.bg(pal.panel_hover)))
-                            .child(node(false, i + 1 == n))
+                            .debug_selector(move || format!("ins-other-v-{i}"))
+                            .child(node(false, i + 1 == n, d.marks.get(i).copied().unwrap_or(0)))
                             .child(div().flex_1().text_size(px(13.33)).text_color(pal.text).child(crate::ui::user_text(v.label.clone())))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 if let Some(d) = &mut this.ui.insert_other_doc {
@@ -5133,6 +5157,49 @@ impl AssemblyView {
             if d.released_view {
                 return self.render_other_released(col, &d, tab, cx);
             }
+            // The Part Studios' type filters, "Insert entire Part Studio as rigid" at the right (live parity-open-1120
+            // ob-pre-1: Parts on, Sketches; the Current document tab's toggles).
+            let (fp, fk) = (self.ui.insert_filter.0, self.ui.insert_sketches);
+            if tab == 0 {
+                let toggle = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &App| {
+                    div()
+                        .id(id)
+                        .debug_selector(move || id.into())
+                        .size(px(30.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded(px(3.))
+                        .cursor_pointer()
+                        .when(on, |d| d.bg(rgb(0xeaeaea)).shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.25), offset: point(px(0.), px(1.)), blur_radius: px(1.), spread_radius: px(0.), inset: true }]))
+                        .when(!on, |d| d.hover(|d| d.bg(pal.panel_hover)))
+                        .child(crate::assets::icon(&icon_path(icon), 20., cx))
+                        .tooltip(crate::ui::tooltip(tip))
+                };
+                col = col.child(
+                    h_flex()
+                        .h(px(42.))
+                        .p(px(6.))
+                        .gap(px(6.))
+                        .border_b_1()
+                        .border_color(pal.border)
+                        .child(toggle("ins-other-f-parts", "part", "Parts", fp, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.ui.insert_filter.0 = !this.ui.insert_filter.0;
+                            cx.notify();
+                        })))
+                        .child(toggle("ins-other-f-sketch", "insert-sketches", "Sketches", fk, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.ui.insert_sketches = !this.ui.insert_sketches;
+                            cx.notify();
+                        })))
+                        .child(div().flex_1())
+                        .child(toggle("ins-other-rigid", "insert-rigid", "Insert entire Part Studio as rigid", self.insert_rigid, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.insert_rigid = !this.insert_rigid;
+                            cx.notify();
+                        }))),
+                );
+            }
+            // (No other document's sketches are listed: Sketches alone shows the Part Studios only.)
+            let show_parts = fp || !fk;
             // Unversioned work in the document (live 612).
             if d.changes > 0 {
                 let path = d.path.clone();
@@ -5177,6 +5244,9 @@ impl AssemblyView {
             for (t, _, is_asm) in &tabs {
                 if let (false, Some(k)) = (*is_asm, d.key(t)) {
                     self.request_external_thumbs(k, cx);
+                    if !d.collapsed.contains(t) {
+                        self.load_other_parts(t.clone(), cx);
+                    }
                 }
             }
             let item_row = |id: SharedString, indent: f32, expander: Option<AnyElement>, icon: &'static str, thumb: Option<Arc<RenderImage>>, name: String, cx: &App| {
@@ -5207,7 +5277,7 @@ impl AssemblyView {
                     })));
                     continue;
                 }
-                let open = d.expanded.contains(&t);
+                let open = !d.collapsed.contains(&t);
                 let t2 = t.clone();
                 let expander = div()
                     .id(SharedString::from(format!("ins-other-x-{t}")))
@@ -5224,7 +5294,7 @@ impl AssemblyView {
                         this.insert_external(k, None, n2.clone(), cx);
                     }
                 })));
-                if open {
+                if open && show_parts {
                     for (i, (b, pname)) in d.parts.get(&t).cloned().unwrap_or_default().into_iter().enumerate() {
                         let k3 = key.clone();
                         let n3 = pname.clone();

@@ -2525,8 +2525,8 @@ fn face_section_properties_like_live() {
     assert!((s.area - 8e-4).abs() < 1e-10 && (s.perimeter - 0.12).abs() < 1e-9, "{s:?}");
     let mut m = [s.moments[0][0] / mm4, s.moments[1][1] / mm4];
     m.sort_by(f64::total_cmp);
-    // The mesh is f32: compare to 1e-5 relative.
-    let near = |x: f64, want: f64| (x - want).abs() < want * 1e-5;
+    // Exact, as live's three decimals (qa FACE-MOMENT-DIGITS: the f32 mesh read 26666.664 / 106666.657).
+    let near = |x: f64, want: f64| (x - want).abs() < 5e-4;
     assert!(near(m[0], 26666.667) && near(m[1], 106666.667), "{m:?}");
     assert!(near(s.polar / mm4, 133333.333) && (s.moments[0][1] / mm4).abs() < 1e-2, "{} {}", s.polar / mm4, s.moments[0][1] / mm4);
     assert!((s.centroid - DVec3::new(0.02, 0.01, 0.01)).length() < 1e-9);
