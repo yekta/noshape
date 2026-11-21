@@ -282,6 +282,7 @@ fn register_assembly_hooks() {
         readonly_variable_table: |doc, element, r, k, n, cx| variable_insert::readonly_table(doc, variable_insert::InsertTarget::Element(element), r, k, n, cx),
         variable_panel_footer: variable_insert::panel_footer,
     });
+    noshape_assembly_ui::assembly_view::decode_cached_display_early();
 }
 
 /// What the Part Studio (noshape-part-studio-ui) needs of the app: other documents' windows, the documents library,

@@ -246,10 +246,19 @@ impl Snapshot {
     }
 }
 
+/// The cache slot of an assembly tab ("assembly2": flexible children by path since 11-18).
+fn slot(tab: TabId) -> (&'static str, TabId) {
+    ("assembly2", tab)
+}
+
+/// An assembly tab a document opens on has its cached evaluation decoded as the document is read.
+pub fn decode_cached_display_early() {
+    cache::decode_early::<Snapshot, _>(slot);
+}
+
 /// The cache key of the assembly as evaluated (its configuration applied) with its exploded view.
 fn key(doc: &noshape_model::Document, tab: TabId, asm: &Assembly, explode: Option<usize>) -> Option<String> {
-    // ("assembly2": flexible children by path since 11-18.)
-    cache::key(doc, &("assembly2", tab), &(asm, explode))
+    cache::key(doc, &slot(tab), &(asm, explode))
 }
 
 impl AssemblyView {
@@ -261,9 +270,7 @@ impl AssemblyView {
         let (doc, tab, asm, explode) = (self.doc.read(cx).session.doc.clone(), self.tab, asm.clone(), self.explode);
         let shelf = cache::Shelf::app(&self.doc.read(cx).session.path);
         let load = cx.background_spawn(async move {
-            let key = key(&doc, tab, &asm, explode)?;
-            noshape_render::perf::milestone("open: display key");
-            let snap: Snapshot = cache::load(&shelf, &key)?;
+            let (key, snap): (String, Snapshot) = cache::load_for(&shelf, &doc, &slot(tab), &(&asm, explode))?;
             noshape_render::perf::milestone("open: display decoded");
             Some((key, snap.result()?))
         });

@@ -92,14 +92,25 @@ pub fn key(doc: &noshape_model::Document, slot: &impl Serialize, extra: &impl Se
 }
 
 pub(crate) fn key_for(doc: &noshape_model::Document, slot: &impl Serialize, extra: &impl Serialize, build: &str) -> Option<String> {
+    let tag = slot_tag(slot)?;
+    let mut h = blake3::Hasher::new();
+    {
+        // (Buffered: serde_json writes a document in small pieces.)
+        let mut w = std::io::BufWriter::with_capacity(1 << 16, &mut h);
+        serde_json::to_writer(&mut w, doc).ok()?;
+        serde_json::to_writer(&mut w, slot).ok()?;
+        serde_json::to_writer(&mut w, extra).ok()?;
+        std::io::Write::flush(&mut w).ok()?;
+    }
+    h.update(build.as_bytes());
+    Some(format!("{tag}.{}", h.finalize().to_hex()))
+}
+
+/// The tag of `slot`'s keys (their row in the document).
+fn slot_tag(slot: &impl Serialize) -> Option<String> {
     let mut t = blake3::Hasher::new();
     serde_json::to_writer(&mut t, slot).ok()?;
-    let mut h = blake3::Hasher::new();
-    serde_json::to_writer(&mut h, doc).ok()?;
-    serde_json::to_writer(&mut h, slot).ok()?;
-    serde_json::to_writer(&mut h, extra).ok()?;
-    h.update(build.as_bytes());
-    Some(format!("{}.{}", &t.finalize().to_hex()[..16], h.finalize().to_hex()))
+    Some(t.finalize().to_hex()[..16].to_string())
 }
 
 /// Another level of `key`'s display (the coarse preview), in its own slot.
@@ -120,47 +131,101 @@ fn path(dir: &Path, key: &str) -> PathBuf {
 
 /// A document's display rows by meta key, read when it was opened.
 type Rows = std::collections::HashMap<String, Vec<u8>>;
+/// A row's snapshot decoded to its studio's type.
+type Decoded = Box<dyn std::any::Any + Send>;
+type DecodeFn = fn(&[u8]) -> Option<Decoded>;
+/// A row's key and its snapshot decoded as the document opened (taken by the first lookup).
+type EarlyCell = OnceLock<parking_lot::Mutex<Option<(String, Decoded)>>>;
 
-fn prefetched() -> &'static parking_lot::Mutex<std::collections::HashMap<PathBuf, Arc<OnceLock<Rows>>>> {
-    static P: OnceLock<parking_lot::Mutex<std::collections::HashMap<PathBuf, Arc<OnceLock<Rows>>>>> = OnceLock::new();
+/// A document's early read: its rows, and the row of the tab it opens on decoded (`decode_early`), by tag.
+struct Prefetch {
+    rows: OnceLock<Rows>,
+    early: Vec<(String, EarlyCell)>,
+}
+
+fn prefetched() -> &'static parking_lot::Mutex<std::collections::HashMap<PathBuf, Arc<Prefetch>>> {
+    static P: OnceLock<parking_lot::Mutex<std::collections::HashMap<PathBuf, Arc<Prefetch>>>> = OnceLock::new();
     P.get_or_init(Default::default)
 }
 
-/// Reads `doc`'s display rows on a thread of their own as the document opens, alongside its session and window (the
-/// open's first lookup then waits on this read instead of starting its own).
-pub fn prefetch(doc: &Path) {
-    if enabled() {
-        prefetch_rows(doc);
-    }
+/// The studios' early decoders: a tab's slot tag, and its row's snapshot decoded.
+type Early = (Box<dyn Fn(noshape_model::document::TabId) -> Option<String> + Send + Sync>, DecodeFn);
+
+fn early_decoders() -> &'static parking_lot::Mutex<Vec<Early>> {
+    static E: OnceLock<parking_lot::Mutex<Vec<Early>>> = OnceLock::new();
+    E.get_or_init(Default::default)
 }
 
-fn prefetch_rows(doc: &Path) {
+/// A studio's row of the tab a document opens on (`slot(tab)`, as its `load_for`'s) is decoded as soon as it is read,
+/// alongside the session and window (infento: its 0.15 s decode off the open's path). `T` is what `load_for` asks.
+pub fn decode_early<T: DeserializeOwned + Send + 'static, S: Serialize + 'static>(slot: fn(noshape_model::document::TabId) -> S) {
+    early_decoders().lock().push((Box::new(move |tab| slot_tag(&slot(tab))), decode_boxed::<T>));
+}
+
+fn decode_boxed<T: DeserializeOwned + Send + 'static>(bytes: &[u8]) -> Option<Decoded> {
+    decode::<T>(bytes).map(|v| Box::new(v) as Decoded)
+}
+
+/// Reads `doc`'s display rows on a thread of their own as the document opens, alongside its session and window (the
+/// open's first lookup then waits on this read instead of starting its own), and decodes the row of `tab`, the tab it
+/// opens on, for the studio that keeps it.
+pub fn prefetch(doc: &Path, tab: Option<noshape_model::document::TabId>) {
+    if !enabled() {
+        return;
+    }
+    let early = tab.map(|t| early_decoders().lock().iter().filter_map(|(tag, decode)| Some((tag(t)?, *decode))).collect()).unwrap_or_default();
+    prefetch_rows(doc, early);
+}
+
+fn prefetch_rows(doc: &Path, early: Vec<(String, DecodeFn)>) {
     if !doc.exists() {
         return;
     }
-    let cell = Arc::new(OnceLock::new());
-    prefetched().lock().insert(doc.to_path_buf(), cell.clone());
+    let p = Arc::new(Prefetch { rows: OnceLock::new(), early: early.iter().map(|(tag, _)| (tag.clone(), OnceLock::new())).collect() });
+    prefetched().lock().insert(doc.to_path_buf(), p.clone());
     let path = doc.to_path_buf();
     let read = move || {
         let rows = noshape_store::Document::open_read_only(&path).and_then(|d| d.meta_with_prefix(META)).unwrap_or_default();
-        let _ = cell.set(rows.into_iter().collect());
+        let rows = p.rows.get_or_init(|| rows.into_iter().collect());
         noshape_render::perf::milestone("open: display rows read");
+        for ((tag, decode), (_, cell)) in early.iter().zip(&p.early) {
+            let decoded = rows.get(&format!("{META}{tag}")).and_then(|row| split_row(row)).and_then(|(key, body)| Some((key, decode(body)?)));
+            let _ = cell.set(parking_lot::Mutex::new(decoded));
+        }
     };
     if std::thread::Builder::new().name("display-rows".into()).spawn(read).is_err() {
         prefetched().lock().remove(doc);
     }
 }
 
-/// A document's row of `key`: the key, a newline, then the snapshot.
-fn doc_row(doc: &Path, key: &str) -> Option<Vec<u8>> {
-    let meta = format!("{META}{}", tag(key));
+/// A row's key and snapshot (split at the first newline).
+fn split_row(row: &[u8]) -> Option<(String, &[u8])> {
+    let at = row.iter().position(|b| *b == b'\n')?;
+    Some((String::from_utf8(row[..at].to_vec()).ok()?, &row[at + 1..]))
+}
+
+/// A document's row of `tag`: its key, a newline, then the snapshot.
+fn tag_row(doc: &Path, tag: &str) -> Option<(String, Vec<u8>)> {
+    let meta = format!("{META}{tag}");
     let early = prefetched().lock().get(doc).cloned();
     let row = match early {
-        Some(cell) => cell.wait().get(&meta).cloned()?,
+        Some(p) => p.rows.wait().get(&meta).cloned()?,
         None => noshape_store::Document::open_read_only(doc).ok()?.get_meta(&meta).ok()??,
     };
-    let body = row.strip_prefix(key.as_bytes())?.strip_prefix(b"\n")?;
-    Some(body.to_vec())
+    split_row(&row).map(|(key, body)| (key, body.to_vec()))
+}
+
+/// The row of `tag` and its key as decoded when the document opened, if it was (taken: the first lookup's).
+fn take_early<T: 'static>(doc: &Path, tag: &str) -> Option<(String, T)> {
+    let p = prefetched().lock().get(doc).cloned()?;
+    let (_, cell) = p.early.iter().find(|(t, _)| t == tag)?;
+    let (key, v) = cell.wait().lock().take()?;
+    Some((key, *v.downcast::<T>().ok()?))
+}
+
+/// A document's row of `key`, if its row holds that key.
+fn doc_row(doc: &Path, key: &str) -> Option<Vec<u8>> {
+    tag_row(doc, tag(key)).filter(|(k, _)| k == key).map(|(_, body)| body)
 }
 
 fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Option<T> {
@@ -174,12 +239,59 @@ pub fn load<T: DeserializeOwned>(shelf: &Shelf, key: &str) -> Option<T> {
     if let Some(v) = shelf.doc.as_deref().and_then(|d| doc_row(d, key)).and_then(|b| decode(&b)) {
         return Some(v);
     }
+    dir_load(shelf, key)
+}
+
+/// The directory's file of `key` (its use time refreshed for the eviction).
+fn dir_load<T: DeserializeOwned>(shelf: &Shelf, key: &str) -> Option<T> {
     let p = path(&shelf.dir, key);
     let value = decode(&std::fs::read(&p).ok()?)?;
     if let Ok(f) = std::fs::File::options().write(true).open(&p) {
         let _ = f.set_modified(std::time::SystemTime::now());
     }
     Some(value)
+}
+
+/// `load` of `key(doc, slot, extra)`, the document's row of the slot decoded as it opened (`decode_early`) or meanwhile
+/// on a thread of its own, used only if it holds that key. Returns the key too.
+pub fn load_for<T: DeserializeOwned + Send + 'static>(shelf: &Shelf, doc: &noshape_model::Document, slot: &impl Serialize, extra: &impl Serialize) -> Option<(String, T)> {
+    load_keyed(shelf, slot, || key(doc, slot, extra))
+}
+
+fn load_keyed<T: DeserializeOwned + Send + 'static>(shelf: &Shelf, slot: &impl Serialize, key: impl FnOnce() -> Option<String>) -> Option<(String, T)> {
+    let early = shelf.doc.as_deref().zip(slot_tag(slot)).and_then(|(d, tag)| match take_early::<T>(d, &tag) {
+        Some((stored, v)) => Some((stored, Decoding::Done(v))),
+        None => {
+            let (stored, body) = tag_row(d, &tag)?;
+            let decoding = std::thread::Builder::new().name("display-decode".into()).spawn(move || decode::<T>(&body)).ok()?;
+            Some((stored, Decoding::Running(decoding)))
+        }
+    });
+    let key = key()?;
+    noshape_render::perf::milestone("open: display key");
+    if let Some((stored, decoding)) = early
+        && stored == key
+        && let Some(v) = decoding.value()
+    {
+        return Some((key, v));
+    }
+    let value = dir_load(shelf, &key)?;
+    Some((key, value))
+}
+
+/// A row's snapshot: decoded, or being decoded.
+enum Decoding<T> {
+    Done(T),
+    Running(std::thread::JoinHandle<Option<T>>),
+}
+
+impl<T> Decoding<T> {
+    fn value(self) -> Option<T> {
+        match self {
+            Self::Done(v) => Some(v),
+            Self::Running(h) => h.join().ok().flatten(),
+        }
+    }
 }
 
 /// Keep `value` under `key`: in the document (its slot's row replaced) and in the directory (written beside and
@@ -400,7 +512,7 @@ mod tests {
         assert_ne!(config2, k);
         assert_eq!(load::<Vec<u32>>(&elsewhere, &config2), None);
         // Read as the document opens: the same answers; a save drops the early read (its rows changed).
-        super::prefetch_rows(&file);
+        super::prefetch_rows(&file, Vec::new());
         assert_eq!(load::<Vec<u32>>(&elsewhere, &k), Some(vec![7; 3]), "from the early read");
         assert_eq!(load::<Vec<u32>>(&elsewhere, &config2), None);
         store(&here, &config2, &vec![9u32]).unwrap();
@@ -412,6 +524,23 @@ mod tests {
         let edited = key_for(&doc, &("part studio", tab), &"config", &build).unwrap();
         assert_ne!(edited, k);
         assert_eq!(load::<Vec<u32>>(&elsewhere, &edited), None);
+        // Decoded while the key is worked out: used only when the row holds that key, else the directory's file.
+        let slot = ("part studio", tab);
+        assert_eq!(super::load_keyed::<Vec<u32>>(&elsewhere, &slot, || Some(k.clone())), Some((k.clone(), vec![7; 3])));
+        assert_eq!(super::load_keyed::<Vec<u32>>(&elsewhere, &slot, || Some(edited.clone())), None, "the row holds the unedited key");
+        assert_eq!(super::load_keyed::<Vec<u32>>(&here, &slot, || Some(config2.clone())), Some((config2.clone(), vec![9])), "the directory's file");
+        // Decoded as the document opens (the tab it opens on): taken by the first lookup, the next decodes its own.
+        let tag = super::slot_tag(&slot).unwrap();
+        super::prefetch_rows(&file, vec![(tag.clone(), super::decode_boxed::<Vec<u32>>)]);
+        let decoded = |p: &super::Prefetch| p.early[0].1.wait().lock().as_ref().map(|(key, _)| key.clone());
+        let p = super::prefetched().lock()[&file].clone();
+        assert_eq!(decoded(&p), Some(k.clone()), "decoded as the rows are read");
+        assert_eq!(super::load_keyed::<Vec<u32>>(&elsewhere, &slot, || Some(k.clone())), Some((k.clone(), vec![7; 3])));
+        assert_eq!(decoded(&p), None, "taken");
+        assert_eq!(super::load_keyed::<Vec<u32>>(&elsewhere, &slot, || Some(k.clone())), Some((k.clone(), vec![7; 3])));
+        assert_eq!(super::take_early::<Vec<u32>>(&file, "another tab"), None, "only the tab it opens on");
+        super::prefetch_rows(&file, vec![(tag, super::decode_boxed::<Vec<u32>>)]);
+        assert_eq!(super::load_keyed::<Vec<u32>>(&elsewhere, &slot, || Some(edited.clone())), None, "decoded early, another key");
         // A miss with another release; a release's commit or executable doesn't matter, a development build's does.
         let other = key_for(&doc, &("part studio", tab), &"config", &build_id_of("0.5.1", true, Some("c8d74e607a47"), "1:2", "p1")).unwrap();
         assert_ne!(other, edited);

@@ -241,6 +241,7 @@ mod ui_tests;
 #[path = "assembly_feel_tests.rs"]
 mod feel_tests;
 pub use toolbar::{AsmToolbarPrefs, shortcut_catalog};
+pub use open::decode_cached_display_early;
 pub use standard_content::*;
 
 struct DragState {
