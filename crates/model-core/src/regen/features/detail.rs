@@ -1383,6 +1383,7 @@ fn chamfer_in(ev: &mut EvalCtx) -> FResult<()> {
             }
             None => (res.shape, face_names),
         };
+        let shape = blend_edge_senses(shape, &face_names, ev.feature)?;
         ev.replace_body(bi, shape, face_names);
     }
     // Never an empty body: a chamfer far larger than its part can take every face, which live fails.
@@ -1390,6 +1391,31 @@ fn chamfer_in(ev: &mut EvalCtx) -> FResult<()> {
         return err("Failed to chamfer selections.");
     }
     Ok(())
+}
+
+/// The edges between `feature`'s blend faces and the faces they meet running as those faces' loops run them, against
+/// the blend face's (live core infento-chamfer-sense-1121: the chamfer of a hole's rim turns the end face's edge round,
+/// a pattern along it goes +y; the hole face's edge keeps its way).
+fn blend_edge_senses(shape: Shape, faces: &[Name], feature: crate::reference::FeatureId) -> FResult<Shape> {
+    use crate::reference::TopoName;
+    let ours = |f: u32| faces.get(f as usize).is_some_and(|n| matches!(&**n, TopoName::Face { feature: g, role: Role::Blend(_) } if *g == feature));
+    let (all, edges) = (shape.faces(), shape.edges());
+    let mut flip = Vec::new();
+    for (e, fs) in shape.edge_faces()?.iter().enumerate() {
+        let &[a, b] = fs.as_slice() else { continue };
+        let neighbour = match (ours(a), ours(b)) {
+            (true, false) => b,
+            (false, true) => a,
+            _ => continue,
+        };
+        if all[neighbour as usize].edge_orientation_in(&edges[e])? == k::Orientation::Reversed {
+            flip.push(edges[e].clone());
+        }
+    }
+    if flip.is_empty() {
+        return Ok(shape);
+    }
+    Ok(k::reverse_edge_curves(&shape, &flip)?)
 }
 
 /// A chamfer OCCT reads otherwise than Onshape (see `blend_section::ChamferSides`) as two distances, where its edges' sections are
