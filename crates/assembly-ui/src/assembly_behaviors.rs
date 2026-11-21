@@ -6104,7 +6104,7 @@ impl AssemblyView {
                 return;
             }
             // The saved file's own extension (OBJ downloads a .zip, as live).
-            let ext = s.file_ext(true);
+            let ext = s.file_ext();
             crate::file_dialogs::request_save_path("Export", format!("{name}.{ext}"), ext, window, cx, move |path, cx| {
                 v.update(cx, |this, cx| this.run_asm_export(s, name, ids, Some(path), cx));
             });
@@ -6116,7 +6116,7 @@ impl AssemblyView {
     /// (live2 export-feel-1118, asm-export-1150, as a Part Studio's): the blue bubble "<name> is being prepared for
     /// export…" while the file is written off the UI thread, then "<name> was exported successfully." (no extension)
     /// in the Notifications bell.
-    pub(crate) fn run_asm_export(&mut self, s: noshape_ops::export::ExportSettings, name: String, ids: Option<Vec<Vec<InstanceId>>>, download: Option<std::path::PathBuf>, cx: &mut Context<Self>) {
+    pub(crate) fn run_asm_export(&mut self, mut s: noshape_ops::export::ExportSettings, name: String, ids: Option<Vec<Vec<InstanceId>>>, download: Option<std::path::PathBuf>, cx: &mut Context<Self>) {
         self.message = Some((false, format!("{name} is being prepared for export. You will receive a notification with its status.")));
         cx.notify();
         let mut asm = self.export_assembly(ids.as_deref(), s.hidden, cx);
@@ -6126,7 +6126,8 @@ impl AssemblyView {
                 asm = asm.with_kinematics(doc, data, &self.result);
             }
         }
-        let file = format!("{name}.{}", s.file_ext(true));
+        let file = format!("{name}.{}", s.file_ext());
+        s.name = name.clone();
         crate::export_store::export_in_background(self.doc.clone(), self.tab, crate::export_store::ExportJob { name, file, options: s.options, download }, move |p| noshape_ops::export::write_assembly_export(&s, p, &asm), cx);
     }
 

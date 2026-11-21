@@ -246,6 +246,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
             tf.push(g.text_font(i).cloned());
             continue;
         }
+        out.exploded_layers.extend(kind);
         if !o.strokes && !font::text_is_stroked(&t, g.text_font(i)) {
             let (pts, idx) = font::text_fill_font(&t, g.text_font(i));
             for tri in idx.chunks(3).filter(|c| c.len() == 3) {
@@ -266,6 +267,16 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
                     fk.push(kind);
                     fo.push(obj);
                 }
+            }
+        } else if !g.text_font(i).is_some_and(|f| super::sheet::is_shx(&f.family)) && font::fill_supported(&t.text) {
+            // CAD files: each glyph's outline, closed (live-opt-drw-polyall).
+            for points in font::text_contours_font(&t, g.text_font(i)) {
+                out.glyph_lines.push(out.lines.len());
+                out.lines.push(Polyline2 { points, style: LineStyle::Thin, closed: true, pick: t.pick });
+                lc.push(c);
+                ll.push(layer);
+                lk.push(kind);
+                lo.push(obj);
             }
         } else {
             for points in font::text_strokes_font(&t, g.text_font(i)).into_iter().filter(|s| s.len() >= 2) {
@@ -315,6 +326,10 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
         let at = |i: usize| kept_before.get(i).copied().unwrap_or(*kept_before.last().unwrap_or(&0));
         for h in &mut out.hatches {
             h.lines = at(h.lines.start)..at(h.lines.end);
+        }
+        // Sorted line lists after the removed lines.
+        for list in [&mut out.freeform_lines, &mut out.polyline_lines, &mut out.mesh_lines, &mut out.shared_lines, &mut out.glyph_lines] {
+            *list = list.iter().filter(|&&i| keep_l.get(i).copied().unwrap_or(true)).map(|&i| at(i)).collect();
         }
         let mut k = keep_l.iter();
         out.lines.retain(|_| *k.next().unwrap_or(&true));
@@ -1421,6 +1436,28 @@ mod tests {
         assert!(d.contains("$INSUNITS\n 70\n1"));
         let pdf = to_pdf_pages_version(&[g], "1.5");
         assert!(pdf.starts_with(b"%PDF-1.5\n"));
+    }
+
+    /// DXF "Explode all into polylines": each glyph's outline one closed LWPOLYLINE, never a fitted CIRCLE or ELLIPSE
+    /// (live-opt-drw-polyall); an empty text's layer still listed.
+    #[test]
+    fn exploded_glyphs_are_closed_lwpolylines() {
+        let mut g = SheetGeometry::new(279.4, 215.9);
+        let m = g.mark();
+        g.texts.push(Text2 { pos: [50.0, 50.0], height: 5.0, text: "O".into(), angle: 0.0, anchor: Anchor::Center, pick: 0 });
+        g.texts.push(Text2 { pos: [80.0, 50.0], height: 5.0, text: String::new(), angle: 0.0, anchor: Anchor::Center, pick: 0 });
+        g.cad_since(m, CadLayer::AnnotationText);
+        let p = prepare(&g, &ExportOptions { explode_all: true, strokes: true, ..Default::default() });
+        assert!(p.texts.is_empty());
+        assert_eq!(p.glyph_lines, [0, 1], "an O's outer and inner contours");
+        assert!(p.lines.iter().all(|l| l.closed && l.points.len() > 8));
+        let dxf = String::from_utf8(crate::drawing::cad_export::to_dxf_version(&p, 4, acadrust::DxfVersion::AC1015).unwrap()).unwrap().replace("\r\n", "\n");
+        assert_eq!(dxf.matches("\nLWPOLYLINE\n").count(), 2);
+        assert!(!dxf.contains("\nELLIPSE\n") && !dxf.contains("\nCIRCLE\n"));
+        assert!(dxf.contains("\nANNOTATION_TEXT\n"));
+        g.texts.pop();
+        let p = prepare(&g, &ExportOptions { explode_all: true, strokes: true, ..Default::default() });
+        assert_eq!(p.exploded_layers, [CadLayer::AnnotationText]);
     }
 
     /// PDF Text "Normal": a text's triangles are one filled path (not one

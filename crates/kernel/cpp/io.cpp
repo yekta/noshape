@@ -2277,13 +2277,15 @@ void write_iges_file(IGESControl_Writer& w, const std::string& p, rust::Str syst
     fail_io("could not write IGES file " + p);
 }
 
+// `trimmed`: the dialog's "Use compatibility mode for surfaces and curves", each face a Trimmed Surface (144) and no
+// Manifold Solid (186), as live's (exchange batch 1, 11-20).
 void write_iges(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Slice<const double> colours, rust::Str path, rust::Str system,
-                rust::Str version)
+                rust::Str version, bool trimmed)
 {
   const LockedSection locked_section_600;
   std::lock_guard<std::mutex> lock(xde_mutex());
   quiet_messenger();
-  IGESControl_Writer w("MM", 1);
+  IGESControl_Writer w("MM", trimmed ? 0 : 1);
   name_iges_solids(w, add_iges_parts(w, shapes), names, colours);
   write_iges_file(w, path_str(path), system, version);
 }

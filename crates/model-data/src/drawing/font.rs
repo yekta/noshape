@@ -358,15 +358,34 @@ fn fill_cap(family: &str, bold: bool, italic: bool) -> f64 {
     v
 }
 
-/// [`text_fill`] in a font (None: the drawing's default sans).
-pub fn text_fill_font(t: &Text2, font: Option<&super::sheet::TextFont>) -> (Vec<[f64; 2]>, Vec<u32>) {
+/// A glyph contour, closed (its closing point dropped).
+type Ring = Vec<[f64; 2]>;
+
+/// Layout units to the sheet: scale, anchor offset, then the text's angle about its position.
+struct Place {
+    pos: [f64; 2],
+    off: [f64; 2],
+    scale: [f64; 2],
+    cos_sin: [f64; 2],
+}
+
+impl Place {
+    fn map(&self, x: f64, y: f64) -> [f64; 2] {
+        let (lx, ly) = (self.off[0] + x * self.scale[0], self.off[1] + y * self.scale[1]);
+        let [c, sn] = self.cos_sin;
+        [self.pos[0] + lx * c - ly * sn, self.pos[1] + lx * sn + ly * c]
+    }
+}
+
+/// A text's glyph contours in layout units and the map from layout units to the sheet.
+fn glyph_rings(t: &Text2, font: Option<&super::sheet::TextFont>) -> Option<(Vec<Ring>, Place)> {
     let (family, bold, italic) = match font {
         Some(f) => (f.family.as_str(), f.bold, f.italic),
         None => (DEFAULT_FAMILY, false, false),
     };
     let layout = noshape_sketch::text::layout_drawing_text(&t.text, family, bold, italic);
     if layout.contours.is_empty() || layout.width <= 0.0 {
-        return (Vec::new(), Vec::new());
+        return None;
     }
     let cap = fill_cap(family, bold, italic);
     let s = t.height / cap;
@@ -374,13 +393,9 @@ pub fn text_fill_font(t: &Text2, font: Option<&super::sheet::TextFont>) -> (Vec<
     let target = text_width(&t.text, t.height);
     let sx = if natural > target && target > 0.0 { target / natural } else { 1.0 };
     let off = anchor_offset(t.anchor, natural * sx, t.height);
-    let (c, sn) = (t.angle.cos(), t.angle.sin());
-    let map = |x: f64, y: f64| {
-        let (lx, ly) = (off[0] + x * s * sx, off[1] + y * s);
-        [t.pos[0] + lx * c - ly * sn, t.pos[1] + lx * sn + ly * c]
-    };
+    let place = Place { pos: t.pos, off, scale: [s * sx, s], cos_sin: [t.angle.cos(), t.angle.sin()] };
     let steps = if t.height * 4.0 > 6.0 { 4 } else { 2 };
-    let mut rings: Vec<Vec<[f64; 2]>> = layout
+    let rings: Vec<Ring> = layout
         .polylines(steps)
         .into_iter()
         .map(|mut r| {
@@ -389,8 +404,21 @@ pub fn text_fill_font(t: &Text2, font: Option<&super::sheet::TextFont>) -> (Vec<
             }
             r.into_iter().map(|p| [p.x, p.y]).collect::<Vec<_>>()
         })
-        .filter(|r: &Vec<[f64; 2]>| r.len() >= 3)
+        .filter(|r: &Ring| r.len() >= 3)
         .collect();
+    Some((rings, place))
+}
+
+/// A text's glyph outlines on the sheet, one closed ring each (DXF "Explode into polylines": live writes a closed
+/// LWPOLYLINE per contour, live-opt-drw-polyall).
+pub fn text_contours_font(t: &Text2, font: Option<&super::sheet::TextFont>) -> Vec<Vec<[f64; 2]>> {
+    let Some((rings, place)) = glyph_rings(t, font) else { return Vec::new() };
+    rings.into_iter().map(|r| r.into_iter().map(|p| place.map(p[0], p[1])).collect()).collect()
+}
+
+/// [`text_fill`] in a font (None: the drawing's default sans).
+pub fn text_fill_font(t: &Text2, font: Option<&super::sheet::TextFont>) -> (Vec<[f64; 2]>, Vec<u32>) {
+    let Some((mut rings, place)) = glyph_rings(t, font) else { return (Vec::new(), Vec::new()) };
     let area = |r: &[[f64; 2]]| r.iter().zip(r.iter().cycle().skip(1)).map(|(a, b)| a[0] * b[1] - b[0] * a[1]).sum::<f64>() / 2.0;
     let inside = |p: [f64; 2], r: &[[f64; 2]]| {
         let mut odd = false;
@@ -423,7 +451,7 @@ pub fn text_fill_font(t: &Text2, font: Option<&super::sheet::TextFont>) -> (Vec<
             }
             for p in std::mem::take(&mut rings[r]) {
                 flat.extend([p[0], p[1]]);
-                pts.push(map(p[0], p[1]));
+                pts.push(place.map(p[0], p[1]));
             }
         }
         if let Ok(tris) = earcutr::earcut(&flat, &hole_starts, 2) {

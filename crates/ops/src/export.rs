@@ -144,6 +144,8 @@ pub struct ExportSettings {
     /// The dialog's values of the formats not shown, given back on
     /// switching to them.
     pub memory: Box<SolidExportPrefs>,
+    /// The exported tab's name (the dialog's file name): individual files' entries are "<name> - <part>.<ext>".
+    pub name: String,
     pub hidden_before_urdf: Option<bool>,
 }
 
@@ -381,9 +383,9 @@ const METER: usize = 3;
 impl ExportSettings {
     /// The extension of the file the export saves (the save prompt's name
     /// and filter): a zip for OBJ (with its .mtl), URDF, and "Export unique
-    /// parts as individual files" when there is more than one part.
-    pub fn file_ext(&self, several_parts: bool) -> &'static str {
-        if matches!(self.format, PartFormat::Obj | PartFormat::Urdf) || (self.individual && several_parts) { "zip" } else { self.format.ext() }
+    /// parts as individual files" (live: even of one part).
+    pub fn file_ext(&self) -> &'static str {
+        if matches!(self.format, PartFormat::Obj | PartFormat::Urdf) || self.individual { "zip" } else { self.format.ext() }
     }
 }
 
@@ -414,6 +416,7 @@ impl Default for ExportSettings {
             inspection: String::new(),
             pmi: Vec::new(),
             memory: Box::default(),
+            name: String::new(),
             hidden_before_urdf: None,
         }
     }
@@ -472,12 +475,16 @@ pub fn version_parts(doc: noshape_model::Document, tab: noshape_model::document:
 }
 
 /// Each part through the format's writer into its own file: (`<name>.<ext>`, bytes), names' spaces `_`.
-fn part_files(s: &ExportSettings, ext: &str, parts: &[(String, k::Shape, [f32; 4])]) -> anyhow::Result<Vec<(String, Vec<u8>)>> {
+/// One file per part, named "<tab> - <part>.<ext>" with `tab` (live's individual files), else "<Part_name>.<ext>".
+fn part_files(s: &ExportSettings, ext: &str, parts: &[(String, k::Shape, [f32; 4])], tab: Option<&str>) -> anyhow::Result<Vec<(String, Vec<u8>)>> {
     let tmp = |i: usize| std::env::temp_dir().join(format!("noshape-export-{}-{i}.{ext}", std::process::id()));
     let mut used = std::collections::HashSet::new();
     let mut out = Vec::new();
     for (i, p) in parts.iter().enumerate() {
-        let mut name = sanitize(&p.0).replace(' ', "_");
+        let mut name = match tab {
+            Some(t) => sanitize(&format!("{t} - {}", p.0)),
+            None => sanitize(&p.0).replace(' ', "_"),
+        };
         while !used.insert(name.clone()) {
             name.push('_');
         }
@@ -514,12 +521,12 @@ pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(Stri
     } else {
         parts
     };
-    let files_of = |s: &ExportSettings, ext: &str| part_files(s, ext, &parts);
+    let files_of = |s: &ExportSettings, ext: &str, tab: Option<&str>| part_files(s, ext, &parts, tab);
     if s.format == PartFormat::Urdf {
         let geo = URDF_GEOMETRY[s.urdf_geometry.min(URDF_GEOMETRY.len() - 1)];
         let ms = ExportSettings { format: geo, y_up: false, individual: false, ..s.clone() };
         let robot = path.file_stem().map(|x| x.to_string_lossy().to_string()).unwrap_or_else(|| "robot".into());
-        let meshes = files_of(&ms, geo.ext())?;
+        let meshes = files_of(&ms, geo.ext(), None)?;
         let mut urdf = format!("<?xml version=\"1.0\"?>\n<robot name=\"{}\">\n  <link name=\"base_link\"/>\n", xml_escape(&robot));
         for ((file, _), p) in meshes.iter().zip(&parts) {
             let link = file.rsplit_once('.').map(|x| x.0).unwrap_or(file);
@@ -540,8 +547,10 @@ pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(Stri
         std::fs::write(&out, stored_zip(&entries))?;
         return Ok(out);
     }
-    if s.individual && parts.len() > 1 {
-        let files = files_of(s, s.format.ext())?;
+    // Live (exchange batch 3, 11-20): a zip even of one part, its entries "<tab> - <part>.<ext>".
+    if s.individual {
+        let tab = if s.name.is_empty() { path.file_stem().map(|x| x.to_string_lossy().to_string()).unwrap_or_default() } else { s.name.clone() };
+        let files = files_of(s, s.format.ext(), Some(&tab))?;
         let entries: Vec<(&str, &[u8])> = files.iter().map(|(n, b)| (n.as_str(), b.as_slice())).collect();
         let out = path.with_extension("zip");
         std::fs::write(&out, stored_zip(&entries))?;
@@ -788,7 +797,7 @@ pub fn write_assembly_export(s: &ExportSettings, path: &std::path::Path, a: &Ass
 fn write_urdf_assembly(s: &ExportSettings, path: &std::path::Path, a: &AssemblyExport) -> anyhow::Result<std::path::PathBuf> {
     let geo = URDF_GEOMETRY[s.urdf_geometry.min(URDF_GEOMETRY.len() - 1)];
     let ms = ExportSettings { format: geo, y_up: false, individual: false, pmi: Vec::new(), ..s.clone() };
-    let meshes = part_files(&ms, geo.ext(), &a.parts)?;
+    let meshes = part_files(&ms, geo.ext(), &a.parts, None)?;
     let masses: Vec<crate::urdf::PartMass> = a.parts.iter().map(|p| k::mass_properties(&p.1).map_or((0.0, glam::DVec3::ZERO, glam::DMat3::ZERO), |m| (m.mass, m.center, m.inertia))).collect();
     let names: Vec<String> = a.parts.iter().map(|p| p.0.clone()).collect();
     let instances: Vec<(usize, glam::DMat4)> = a.instances.iter().map(|(p, _, t)| (*p, *t)).collect();
@@ -967,7 +976,7 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
             let shapes: Vec<k::ExportShape> = parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect();
             k::write_step_with(path, &shapes, k::LengthUnit::Meter, &step_options(s))?;
         }
-        PartFormat::Iges => k::write_iges_parts(path, &parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect::<Vec<_>>(), k::LengthUnit::Meter)?,
+        PartFormat::Iges => k::write_iges_parts_as(path, &parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect::<Vec<_>>(), k::LengthUnit::Meter, s.iges_compat)?,
         // Text transmit file in the chosen version (live G36: the body in that
         // version's layouts; "Use latest version" = 38.1).
         // Named and coloured as Onshape's (TYSA_NAME / TYSA_COLOUR_2).
@@ -1135,7 +1144,7 @@ fn three_mf(meshes: &[(String, k::Tessellation, [f32; 4])]) -> Vec<u8> {
     stored_zip(&[("[Content_Types].xml", types.as_bytes()), ("_rels/.rels", rels.as_bytes()), ("3D/3dmodel.model", model.as_bytes())])
 }
 
-fn base64(data: &[u8]) -> String {
+pub(crate) fn base64(data: &[u8]) -> String {
     const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
     for c in data.chunks(3) {
@@ -1575,6 +1584,24 @@ mod tests {
         }
         let bad: Vec<_> = directed.iter().filter(|((a, b), n)| **n != 1 || directed.get(&(*b, *a)) != Some(&1)).collect();
         assert!(bad.is_empty(), "{} of {} directed edges unmatched", bad.len(), directed.len());
+    }
+
+    /// Live (exchange batch 3, 11-20): unique parts as individual files are a zip even of one part, its entries
+    /// "<tab> - <part>.<ext>".
+    #[test]
+    fn individual_files_zip_one_part_named_by_tab() {
+        use noshape_kernel as k;
+        let block = k::make_box(&k::Plane::xy(), 0.04, 0.03, 0.01).unwrap();
+        let s = super::ExportSettings { format: super::PartFormat::Stl, individual: true, name: "Part Studio 1".into(), ..Default::default() };
+        let dir = std::env::temp_dir().join(format!("noshape-individual-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        assert_eq!(s.file_ext(), "zip");
+        let out = super::write_export(&s, &dir.join("out.zip"), vec![("Part 1".into(), block, [0.5, 0.5, 0.5, 1.0])]).unwrap();
+        let z = std::fs::read(&out).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(&z[..4], &[0x50, 0x4b, 0x03, 0x04]);
+        let n = usize::from(u16::from_le_bytes([z[26], z[27]]));
+        assert_eq!(String::from_utf8_lossy(&z[30..30 + n]), "Part Studio 1 - Part 1.stl");
     }
 
     /// qa RHINO-GREEN: RHINO is offered only by a build that can write it;

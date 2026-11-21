@@ -127,6 +127,22 @@ fn foreign_of(shape: &noshape_kernel::Shape, info: &[noshape_model::features::im
     Ok(Foreign { brep, parts })
 }
 
+/// An assembly's parts read flat, one per placed instance: a product's second and later instances named "<name>_1",
+/// "<name>_2"… (live exchange batch 3, Combine of an assembly STEP: "Ring", "Ring_1"…; two products of one name keep
+/// it each).
+fn instances_suffixed(mut parts: Vec<noshape_kernel::ImportedShape>) -> Vec<noshape_kernel::ImportedShape> {
+    for i in 1..parts.len() {
+        let (before, rest) = parts.split_at_mut(i);
+        let p = &mut rest[0];
+        let Some(name) = p.name.clone() else { continue };
+        let n = before.iter().filter(|q| q.shape.is_partner(&p.shape) && q.name.as_deref().is_some_and(|m| m == name || m.strip_prefix(name.as_str()).is_some_and(|s| s.strip_prefix('_').is_some_and(|k| k.parse::<u32>().is_ok())))).count();
+        if n > 0 {
+            p.name = Some(format!("{name}_{n}"));
+        }
+    }
+    parts
+}
+
 /// A CAD file's parts as its tab's Export… writes them (live document/94): each with its name in the file ("Part
 /// <n>" without one) and colour.
 pub fn file_parts(path: &Path, units: &UnitPrefs) -> anyhow::Result<Vec<(String, noshape_kernel::Shape, [f32; 4])>> {
@@ -258,30 +274,164 @@ fn read_obj_groups(obj: &Path, dir: &Path, unit: noshape_kernel::LengthUnit) -> 
             _ => {}
         }
     }
+    let groups = groups.into_iter().map(|(name, material, faces)| (name, material.as_ref().and_then(|m| kd.get(m).copied()), format!("{shared}{faces}"))).collect();
+    mesh_groups(groups, unit)
+}
+
+/// Mesh parts one per group (name, colour, the group's OBJ text, read in `unit`): a part each, never joined nor made
+/// another's hollow (live meshparts-1119); empty groups dropped.
+fn mesh_groups(groups: Vec<(String, Option<[f32; 3]>, String)>, unit: noshape_kernel::LengthUnit) -> anyhow::Result<(noshape_kernel::Shape, Vec<noshape_model::features::importing::ImportPartInfo>)> {
+    use noshape_kernel as k;
     let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
     let tmp = std::env::temp_dir().join(format!("noshape-obj-groups-{}-{stamp}", std::process::id()));
     std::fs::create_dir_all(&tmp)?;
     let parts = (|| {
         let mut parts = Vec::new();
-        for (i, (_, _, faces)) in groups.iter().enumerate() {
+        for (i, (_, _, text)) in groups.iter().enumerate() {
             let part = tmp.join(format!("group-{i}.obj"));
-            std::fs::write(&part, format!("{shared}{faces}"))?;
+            std::fs::write(&part, text)?;
             parts.push(k::read_mesh_bodies(&part, unit)?);
         }
         anyhow::Ok(parts)
     })();
     let _ = std::fs::remove_dir_all(&tmp);
-    // (Never joined nor made another's hollow, as live's import of a bare .obj.)
     let parts = k::mesh_group_parts(&parts?)?;
     let (mut shapes, mut info) = (Vec::new(), Vec::new());
-    for ((name, material, _), part) in groups.iter().zip(parts) {
+    for ((name, color, _), part) in groups.into_iter().zip(parts) {
         if part.count(k::ShapeType::Face) == 0 {
             continue;
         }
         shapes.push(part);
-        info.push(noshape_model::features::importing::ImportPartInfo { name: Some(name.clone()), color: material.as_ref().and_then(|m| kd.get(m).copied()), opacity: None, faces: Vec::new() });
+        info.push(noshape_model::features::importing::ImportPartInfo { name: Some(name), color, opacity: None, faces: Vec::new() });
     }
     Ok((k::Shape::compound(&shapes), info))
+}
+
+/// A glTF / GLB file's meshes as live imports them (exchange batch 2, 11-20): a part per node with a mesh, named by
+/// the node, its triangles placed by the node's transforms; positions in metres as the file holds them (no Y-up turn:
+/// that is the dialog's option).
+fn read_gltf_groups(path: &Path) -> anyhow::Result<(noshape_kernel::Shape, Vec<noshape_model::features::importing::ImportPartInfo>)> {
+    use glam::{DMat4, DQuat, DVec3};
+    let bytes = std::fs::read(path)?;
+    let u32_at = |b: &[u8], i: usize| b.get(i..i + 4).map(|x| u32::from_le_bytes([x[0], x[1], x[2], x[3]]) as usize);
+    // GLB: a 12-byte header, then a JSON chunk and a BIN chunk.
+    let (json_bytes, bin) = if bytes.starts_with(b"glTF") {
+        let n = u32_at(&bytes, 12).ok_or_else(|| anyhow::anyhow!("a GLB without its JSON"))?;
+        let json = bytes.get(20..20 + n).ok_or_else(|| anyhow::anyhow!("a GLB cut short"))?;
+        let at = 20 + n;
+        let bin = u32_at(&bytes, at).and_then(|m| bytes.get(at + 8..at + 8 + m)).map(<[u8]>::to_vec);
+        (json.to_vec(), bin)
+    } else {
+        (bytes, None)
+    };
+    let j: serde_json::Value = serde_json::from_slice(&json_bytes)?;
+    let dir = path.parent().unwrap_or(Path::new("."));
+    let buffers: Vec<Vec<u8>> = j["buffers"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|b| match b["uri"].as_str() {
+            None => bin.clone().ok_or_else(|| anyhow::anyhow!("a buffer without its data")),
+            Some(u) if u.starts_with("data:") => u.split_once(',').map(|(_, d)| base64_decode(d)).ok_or_else(|| anyhow::anyhow!("a bad data URI")),
+            Some(u) => Ok(std::fs::read(dir.join(u))?),
+        })
+        .collect::<anyhow::Result<_>>()?;
+    // An accessor's elements as numbers (`n` per element).
+    let read = |a: usize, n: usize| -> Option<Vec<f64>> {
+        let acc = &j["accessors"][a];
+        let bv = &j["bufferViews"][acc["bufferView"].as_u64()? as usize];
+        let buf = buffers.get(bv["buffer"].as_u64()? as usize)?;
+        let ct = acc["componentType"].as_u64()?;
+        let size = match ct {
+            5120 | 5121 => 1,
+            5122 | 5123 => 2,
+            _ => 4,
+        };
+        let stride = bv["byteStride"].as_u64().map_or(size * n, |s| s as usize);
+        let start = bv["byteOffset"].as_u64().unwrap_or(0) as usize + acc["byteOffset"].as_u64().unwrap_or(0) as usize;
+        let mut out = Vec::new();
+        for e in 0..acc["count"].as_u64()? as usize {
+            for c in 0..n {
+                let at = start + e * stride + c * size;
+                let x = buf.get(at..at + size)?;
+                out.push(match ct {
+                    5126 => f64::from(f32::from_le_bytes([x[0], x[1], x[2], x[3]])),
+                    5125 => f64::from(u32::from_le_bytes([x[0], x[1], x[2], x[3]])),
+                    5123 => f64::from(u16::from_le_bytes([x[0], x[1]])),
+                    5122 => f64::from(i16::from_le_bytes([x[0], x[1]])),
+                    5121 => f64::from(x[0]),
+                    _ => f64::from(x[0] as i8),
+                });
+            }
+        }
+        Some(out)
+    };
+    let local = |n: &serde_json::Value| -> DMat4 {
+        let f = |k: &str| n[k].as_array().map(|a| a.iter().filter_map(serde_json::Value::as_f64).collect::<Vec<f64>>());
+        if let Some(m) = f("matrix").filter(|m| m.len() == 16) {
+            return DMat4::from_cols_slice(&m);
+        }
+        let t = f("translation").filter(|v| v.len() == 3).map_or(DVec3::ZERO, |v| DVec3::new(v[0], v[1], v[2]));
+        let r = f("rotation").filter(|v| v.len() == 4).map_or(DQuat::IDENTITY, |v| DQuat::from_xyzw(v[0], v[1], v[2], v[3]));
+        let s = f("scale").filter(|v| v.len() == 3).map_or(DVec3::ONE, |v| DVec3::new(v[0], v[1], v[2]));
+        DMat4::from_scale_rotation_translation(s, r, t)
+    };
+    let scene = j["scene"].as_u64().unwrap_or(0) as usize;
+    let mut stack: Vec<(usize, DMat4)> = j["scenes"][scene]["nodes"].as_array().into_iter().flatten().filter_map(|n| n.as_u64()).map(|n| (n as usize, DMat4::IDENTITY)).rev().collect();
+    let mut groups = Vec::new();
+    while let Some((i, parent)) = stack.pop() {
+        let node = &j["nodes"][i];
+        let at = parent * local(node);
+        for c in node["children"].as_array().into_iter().flatten().rev().filter_map(|c| c.as_u64()) {
+            stack.push((c as usize, at));
+        }
+        let Some(m) = node["mesh"].as_u64() else { continue };
+        let mesh = &j["meshes"][m as usize];
+        let (mut verts, mut faces) = (String::new(), String::new());
+        let mut base = 0;
+        for p in mesh["primitives"].as_array().into_iter().flatten().filter(|p| p["mode"].as_u64().unwrap_or(4) == 4) {
+            let Some(pos) = p["attributes"]["POSITION"].as_u64().and_then(|a| read(a as usize, 3)) else { continue };
+            let n = pos.len() / 3;
+            for v in pos.chunks(3) {
+                let w = at.transform_point3(DVec3::new(v[0], v[1], v[2]));
+                verts.push_str(&format!("v {} {} {}\n", w.x, w.y, w.z));
+            }
+            let index: Vec<usize> = p["indices"].as_u64().and_then(|a| read(a as usize, 1)).map_or_else(|| (0..n).collect(), |v| v.into_iter().map(|x| x as usize).collect());
+            for t in index.as_chunks::<3>().0.iter().filter(|t| t.iter().all(|x| *x < n)) {
+                faces.push_str(&format!("f {} {} {}\n", base + t[0] + 1, base + t[1] + 1, base + t[2] + 1));
+            }
+            base += n;
+        }
+        if faces.is_empty() {
+            continue;
+        }
+        let name = node["name"].as_str().or(mesh["name"].as_str()).map_or_else(|| format!("Part {}", groups.len() + 1), str::to_string);
+        groups.push((name, None, format!("{verts}{faces}")));
+    }
+    anyhow::ensure!(!groups.is_empty(), "no meshes in the file");
+    mesh_groups(groups, noshape_kernel::LengthUnit::Meter)
+}
+
+/// Standard base64 (a glTF data URI's buffer); other characters skipped.
+fn base64_decode(text: &str) -> Vec<u8> {
+    let value = |c: u8| match c {
+        b'A'..=b'Z' => Some(c - b'A'),
+        b'a'..=b'z' => Some(c - b'a' + 26),
+        b'0'..=b'9' => Some(c - b'0' + 52),
+        b'+' | b'-' => Some(62),
+        b'/' | b'_' => Some(63),
+        _ => None,
+    };
+    let (mut out, mut acc, mut bits) = (Vec::with_capacity(text.len() * 3 / 4), 0u32, 0);
+    for v in text.bytes().filter_map(value) {
+        acc = (acc << 6) | u32::from(v);
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((acc >> bits) as u8);
+        }
+    }
+    out
 }
 
 /// The file read as the Import reads it: one shape (its named and coloured parts a compound's children, described in
@@ -298,7 +448,7 @@ fn read_shape(path: &Path, units: &UnitPrefs, iges_post: bool) -> anyhow::Result
         k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>())
     };
     let shape = match ext.as_str() {
-        "step" | "stp" => compound(k::read_step(path, k::LengthUnit::Meter)?),
+        "step" | "stp" => compound(instances_suffixed(k::read_step(path, k::LengthUnit::Meter)?)),
         // Named and coloured (XDE), each placed instance a part.
         // IGES postprocessing: straight edges as lines (read in metres: straight within a micrometre; the parts and
         // their faces keep their order, so `info` still describes them).
@@ -318,8 +468,12 @@ fn read_shape(path: &Path, units: &UnitPrefs, iges_post: bool) -> anyhow::Result
             info = parts.iter().map(|p| noshape_model::features::importing::ImportPartInfo { name: p.name.clone(), color: None, opacity: None, faces: Vec::new() }).collect();
             k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>())
         }
-        // glTF carries its unit (read in millimetres).
-        "gltf" | "glb" => k::read_mesh_bodies(path, k::LengthUnit::Millimeter)?,
+        // glTF a part per node with a mesh, named by it (in metres, as the file holds it).
+        "gltf" | "glb" => {
+            let (shape, parts) = read_gltf_groups(path)?;
+            info = parts;
+            shape
+        }
         // Every placed instance, named like it (a single instance, or Combine).
         "pvz" => {
             let parts = k::read_pvz_parts(path, k::LengthUnit::Meter)?;
@@ -718,6 +872,44 @@ pub fn description(label: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    /// A glTF's meshes as live imports them (exchange batch 2, 11-20): a part per node, named by it, even where two
+    /// touch (c2-duct-multipart's four; ours read them as two).
+    #[test]
+    fn gltf_nodes_are_parts() {
+        // Two unit tetrahedra sharing a vertex, one buffer (positions, then u16 indices), one node each.
+        let mut bin: Vec<u8> = Vec::new();
+        for p in [[0.0f32, 0.0, 0.0], [0.01, 0.0, 0.0], [0.0, 0.01, 0.0], [0.0, 0.0, 0.01]] {
+            p.iter().for_each(|x| bin.extend(x.to_le_bytes()));
+        }
+        for i in [0u16, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2] {
+            bin.extend(i.to_le_bytes());
+        }
+        let uri = format!("data:application/octet-stream;base64,{}", crate::export::base64(&bin));
+        let gltf = serde_json::json!({
+            "asset": { "version": "2.0" },
+            "scene": 0,
+            "scenes": [{ "nodes": [0, 1] }],
+            "nodes": [{ "name": "Part 4", "mesh": 0 }, { "name": "Part 2", "mesh": 0, "translation": [-0.01, 0.0, 0.0] }],
+            "meshes": [{ "primitives": [{ "attributes": { "POSITION": 0 }, "indices": 1 }] }],
+            "buffers": [{ "byteLength": bin.len(), "uri": uri }],
+            "bufferViews": [{ "buffer": 0, "byteLength": 48 }, { "buffer": 0, "byteOffset": 48, "byteLength": 24 }],
+            "accessors": [
+                { "bufferView": 0, "componentType": 5126, "count": 4, "type": "VEC3" },
+                { "bufferView": 1, "componentType": 5123, "count": 12, "type": "SCALAR" }
+            ]
+        });
+        let dir = std::env::temp_dir().join(format!("noshape-gltf-nodes-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("two.gltf");
+        std::fs::write(&path, gltf.to_string()).unwrap();
+        let read = super::read_gltf_groups(&path);
+        let _ = std::fs::remove_dir_all(&dir);
+        let (shape, info) = read.unwrap();
+        let names: Vec<Option<String>> = info.into_iter().map(|p| p.name).collect();
+        assert_eq!(names, [Some("Part 4".to_string()), Some("Part 2".to_string())]);
+        assert_eq!(shape.children().len(), 2);
+    }
+
     /// "Import material density" as Onshape offers it (qa4 IMP-DENS): not
     /// for STEP, SAT, PVZ or meshes; any one file of its types is enough.
     #[test]

@@ -150,12 +150,14 @@ static const std::map<int, std::vector<FieldSpec>>* version_types(int code)
 }
 
 // A file's list of parts (Onshape's multi-part files; type 176): not in the base schema (Onshape's files describe it
-// in their embedded schema as a new type). Its index_map_offset comes and goes with the BODY's (live's 28.1 and 30.0
-// files have neither, its 38.1 ones both; live imports ours at 25.0, 28.1, 30.0 and 38.1 as its own files).
+// in their embedded schema as a new type). It has an index_map_offset only where the BODY has one beside its mesh
+// (30.1 on): live's 28.0 files (the BODY's offset, none of the list's), 28.1 and 30.0 (neither) and 38.1 (both; live
+// imports ours at 25.0, 28.1, 30.0 and 38.1 as its own files).
 static std::vector<FieldSpec> part_xmt_block(const std::map<int, std::vector<FieldSpec>>* types)
 {
   std::vector<FieldSpec> f = {{"n_entries", 'd', 0}, {"index_map_offset", 'd', 0}, {"index_map", 'p', 0}, {"schema_embedding_map", 'p', 0}, {"mesh_offset_data", 'p', 0}, {"entries", 'p', 1}};
-  if (types && types->count(12) && std::none_of(types->at(12).begin(), types->at(12).end(), [](const FieldSpec& b) { return b.name == "index_map_offset"; }))
+  const auto has = [&](const char* name) { return std::any_of(types->at(12).begin(), types->at(12).end(), [&](const FieldSpec& b) { return b.name == name; }); };
+  if (types && types->count(12) && !(has("index_map_offset") && has("mesh")))
     f.erase(f.begin() + 1);
   return f;
 }

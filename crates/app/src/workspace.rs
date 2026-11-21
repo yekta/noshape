@@ -1429,7 +1429,8 @@ impl Workspace {
         let base = noshape_ops::export::file_stem(&f.file_name);
         crate::part_studio::export::open_file_export_modal(base, std::rc::Rc::new(move |s, name, window, cx| {
             // (Several parts one file each: a zip; OBJ always, as live.)
-            let (options, ext) = (s.options, s.file_ext(s.individual));
+            let (options, ext) = (s.options, s.file_ext());
+            let s = noshape_ops::export::ExportSettings { name: name.to_string(), ..s };
             let file = format!("{name}.{ext}");
             let units = doc.read(cx).session.doc.settings.units;
             let run = {

@@ -208,7 +208,7 @@ fn nesting_of(t: &ffi::StepTree) -> StepNesting {
 pub fn read_iges_parts(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
     let t = ck(ffi::read_iges_tree(path_str(path)?))?;
     if t.instances.is_empty() && !t.parts.names.is_empty() {
-        return step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?.into_iter().map(|p| merged_faces(p, true)).collect();
+        return step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?.into_iter().map(|p| merged_faces(sewn_closed(p, unit), true)).collect();
     }
     // Shared shapes placed (a subfigure placed twice, studios' asm2-twice.igs): each placement of each solid a part of
     // its own, a subfigure's solids named in its definition's order.
@@ -235,7 +235,23 @@ pub fn read_iges_parts(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShap
             return Ok(placed);
         }
     }
-    Ok(vec![merged_faces(ImportedShape { shape: read_iges(path, unit)?, name: None, color: None, opacity: None, face_colors: Vec::new(), solid_names: Vec::new() }, true)?])
+    Ok(vec![merged_faces(sewn_closed(ImportedShape { shape: read_iges(path, unit)?, name: None, color: None, opacity: None, face_colors: Vec::new(), solid_names: Vec::new() }, unit), true)?])
+}
+
+/// A part of loose faces that close (an IGES of trimmed surfaces without MSBO: Onshape's "compatibility mode" export)
+/// sewn into its solids, as live imports it (exchange batch 1, 11-20: housing 1 solid of 36 faces, duct 4 solids); one
+/// that doesn't close all round is kept as it is (a surface model stays its surfaces).
+fn sewn_closed(p: ImportedShape, unit: LengthUnit) -> ImportedShape {
+    if !p.shape.solids().is_empty() || p.shape.count(crate::ShapeType::Face) < 2 {
+        return p;
+    }
+    // (10 µm: the file's surfaces meet within its own tolerance.)
+    let Ok(r) = crate::sew_closing(std::slice::from_ref(&p.shape), 0.01 / unit.mm_per_unit()) else { return p };
+    let in_solids: usize = r.shape.solids().iter().map(|s| s.count(crate::ShapeType::Face)).sum();
+    if in_solids == 0 || in_solids != r.shape.count(crate::ShapeType::Face) {
+        return p;
+    }
+    ImportedShape { shape: r.shape, face_colors: Vec::new(), solid_names: Vec::new(), ..p }
 }
 
 /// A STEP or IGES part's faces on one plane merged, as Onshape imports them (its Parasolid import doesn't: a sheet metal
@@ -788,11 +804,17 @@ pub fn write_iges(path: &Path, shapes: &[Shape], unit: LengthUnit) -> Result<()>
 /// Write parts to an IGES (BRep mode) file in millimeters, named and
 /// coloured as Onshape's (entity labels, Color Definitions).
 pub fn write_iges_parts(path: &Path, parts: &[ExportShape], unit: LengthUnit) -> Result<()> {
+    write_iges_parts_as(path, parts, unit, false)
+}
+
+/// [`write_iges_parts`], with `trimmed` its faces as Trimmed Surfaces (144) and no Manifold Solid (Export › "Use
+/// compatibility mode for surfaces and curves").
+pub fn write_iges_parts_as(path: &Path, parts: &[ExportShape], unit: LengthUnit, trimmed: bool) -> Result<()> {
     let f = unit.mm_per_unit();
     let v = parts.iter().map(|p| scaled(&p.shape, f)).collect::<Result<Vec<_>>>()?;
     let l = vec_to_list(&v);
     let (names, colours) = names_colours(parts);
-    ck(ffi::write_iges(&l, &names, &colours, path_str(path)?, "Noshape", crate::VERSION))
+    ck(ffi::write_iges(&l, &names, &colours, path_str(path)?, "Noshape", crate::VERSION, trimmed))
 }
 
 /// The Parasolid versions the Export dialog offers, newest first (Onshape's

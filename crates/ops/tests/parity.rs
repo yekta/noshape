@@ -884,20 +884,26 @@ fn exchange_round_trip() {
         }
         v
     };
-    // A file imported into a new mm document: its parts.
-    let import = |doc: &Path, file: &Path| -> Result<Vec<PartState>, String> {
+    // A file imported into a new mm document with live's import options (`unit`, `yAxisIsUp`, `flattenAssemblies`:
+    // the dialog's Combine to a single Part Studio, `joinAdjacentSurfaces`): its first Part Studio's parts and its new
+    // tabs (kind, name; not the file's).
+    let import_with = |doc: &Path, file: &Path, o: &Value| -> Result<(Vec<PartState>, Tabs), String> {
         let _ = std::fs::remove_file(doc);
         let mut ctx = Ctx::new();
         let mut op = |tool: &str, args: Value| -> Result<Value, String> {
             let op = noshape_ops::registry::by_tool_name(tool).ok_or_else(|| format!("no tool {tool}"))?;
             noshape_ops::registry::run(&mut ctx, op, &args).map(|o| o.value).map_err(|e| e.to_json().to_string())
         };
-        op("document_create", json!({ "path": doc, "length_unit": "mm" }))
-            .and_then(|_| op("import_files", json!({ "files": [file], "mesh_unit": "Millimeter" })))
-            .and_then(|r| op("query_parts", json!({ "tab": r["first"] })))
-            .map(|q| parts_from_query(&q))
-            .map_err(|e| format!("import failed: {e}"))
+        let yes = |k: &str| o[k] == "true";
+        let args = json!({ "files": [file], "mesh_unit": o["unit"].as_str().unwrap_or("Millimeter"), "y_up": yes("yAxisIsUp"), "combine": yes("flattenAssemblies"), "join": yes("joinAdjacentSurfaces") });
+        let r = op("document_create", json!({ "path": doc, "length_unit": "mm" })).and_then(|_| op("import_files", args)).map_err(|e| format!("import failed: {e}"))?;
+        let tabs: Vec<&Value> = r["tabs"].as_array().into_iter().flatten().filter(|t| t["kind"] != "File").collect();
+        let studio = tabs.iter().find(|t| t["kind"] == "Part Studio").map_or(r["first"].clone(), |t| t["id"].clone());
+        let named = tabs.iter().map(|t| (t["kind"].as_str().unwrap_or_default().to_string(), t["name"].as_str().unwrap_or_default().to_string())).collect();
+        op("query_parts", json!({ "tab": studio })).map(|q| (parts_from_query(&q), named)).map_err(|e| format!("import failed: {e}"))
     };
+    let import_in = |doc: &Path, file: &Path, unit: &str, y_up: bool| import_with(doc, file, &json!({ "unit": unit, "yAxisIsUp": y_up.to_string() })).map(|(p, _)| p);
+    let import = |doc: &Path, file: &Path| import_in(doc, file, "Millimeter", false);
     let (mut imports, mut imports_ok, mut exports, mut exports_ok, mut waiting, mut selfs_ok) = (0, 0, 0, 0, 0, 0);
     // Our export and import times against live's translations' (live-times.json: format, "import-<format>",
     // "drawing-<format>": seconds): (ours at or under live's, timed).
@@ -909,6 +915,47 @@ fn exchange_round_trip() {
         println!("{name}: time {what}: ours {ours:.3} s, live {l:.3} s");
     };
     let (mut drawings, mut drawings_ok) = (0, 0);
+    let (mut option_imports, mut option_imports_ok, mut option_exports, mut option_exports_ok) = (0, 0, 0, 0);
+    // live-opt-self.json's cases and their files.
+    // (Live can't import its own OBJ zip: the bare .obj, in metres, is the "-OBJ" case.)
+    const OPTION_FILES: [(&str, &str); 31] = [
+        ("STEP-AP203", "live-opt-ap203.step"),
+        ("PARASOLID-28.0", "live-opt-v28.x_t"),
+        ("IGES-COMPAT", "live-opt-compat.igs"),
+        ("STL-TEXT-INCH", "live-opt-text-inch.stl"),
+        ("STL-CUSTOM", "live-opt-custom.stl"),
+        ("STL-FINE", "live-opt-fine.stl"),
+        ("STL-COARSE", "live-opt-coarse.stl"),
+        ("STL-YUP", "live-opt-yup.stl"),
+        ("STL-YUP-PLAIN", "live-opt-yup.stl"),
+        ("OBJ-FINE", "live-opt-fine.obj.zip"),
+        ("OBJ-COARSE", "live-opt-coarse.obj.zip"),
+        ("OBJ-YUP", "live-opt-yup.obj.zip"),
+        ("OBJ-FINE-OBJ", "live-opt-fine.obj"),
+        ("OBJ-COARSE-OBJ", "live-opt-coarse.obj"),
+        ("OBJ-YUP-OBJ", "live-opt-yup.obj"),
+        ("3MF-FINE", "live-opt-fine.3mf"),
+        ("3MF-COARSE", "live-opt-coarse.3mf"),
+        ("GLTF", "live-opt.gltf"),
+        ("GLB", "live-opt.glb"),
+        ("RHINO-V5", "live-opt-v5.3dm"),
+        ("RHINO-V8", "live-opt-v8.3dm"),
+        ("STEP-FLAT", "live.step"),
+        ("STEP-NOFLAT", "live.step"),
+        ("IGES-COMPAT-JOIN", "live-opt-compat.igs"),
+        ("STL-CM", "live-opt-fine.stl"),
+        ("STL-FT", "live-opt-fine.stl"),
+        ("STEP-INCH", "live-opt-inch.step"),
+        ("STL-SPLIT", "live-opt-split.stl.zip"),
+        ("STEP-SPLIT", "live-opt-split.step.zip"),
+        ("ASM-STEP-NOFLAT", "live-opt-asm-clamp.step"),
+        ("ASM-STEP-FLAT", "live-opt-asm-clamp.step"),
+    ];
+    // Cases of live's import options only (their files exported as the default ones, or from an Assembly): not
+    // exported by ours again.
+    const IMPORT_ONLY: [&str; 7] = ["STEP-FLAT", "STEP-NOFLAT", "IGES-COMPAT-JOIN", "STL-CM", "STL-FT", "ASM-STEP-NOFLAT", "ASM-STEP-FLAT"];
+    // A case's format ("ASM-STEP-…": an Assembly's STEP).
+    let case_format = |case: &str| case.trim_start_matches("ASM-").split('-').next().unwrap_or_default().to_string();
     for dir in dirs {
         let name = dir.file_name().unwrap().to_string_lossy().to_string();
         if only.as_ref().is_some_and(|o| !o.split(',').any(|x| x == name)) {
@@ -1036,6 +1083,58 @@ fn exchange_round_trip() {
             };
             imports_ok += usize::from(diff.is_empty());
             println!("{name}: ours imports live.{ext}: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
+        }
+        // Live's exports with options (live-opt-self.json, live 11-20 "Exchange option coverage"): each in ours, as
+        // live's import of the same file (a mesh by its parts' volume and area; an STL in inches imported in Inch).
+        let opts = read_json(&dir.join("live-opt-self.json"));
+        for (case, live_import) in opts.as_object().into_iter().flatten().filter(|(c, _)| *c != "_meta") {
+            let Some(file) = OPTION_FILES.iter().find(|(c, _)| c == case).map(|(_, f)| dir.join(f)).filter(|f| f.is_file()) else {
+                println!("{name}: option {case}: no file of it here");
+                continue;
+            };
+            if live_import["parts"].as_array().is_none_or(Vec::is_empty) {
+                println!("{name}: option {case}: live doesn't import it ({})", live_import["importResult"]["error"].as_str().unwrap_or("no parts"));
+                continue;
+            }
+            let format = case_format(case);
+            let is_mesh = mesh(&format) || matches!(format.as_str(), "GLB" | "GLTF");
+            option_imports += 1;
+            let diff = match import_with(&scratch(&format!("{name}-option-{case}.noshape")), &file, &live_import["import"]) {
+                Err(e) => vec![e],
+                Ok((ours, tabs)) => {
+                    let live = parts_from_live_import(live_import, is_mesh);
+                    let mut diff = if is_mesh { differences(&live, &mesh_counts(ours.clone())) } else { differences(&live, &ours) };
+                    // Its tabs as live's (an Assembly's STEP: "<file> parts" and the Assembly, or one Part Studio when
+                    // flattened), live's names without the copy document's prefix and " (n)".
+                    let result = &live_import["importResult"];
+                    let theirs: Vec<(String, String)> = result["types"].as_array().into_iter().flatten().zip(result["names"].as_array().into_iter().flatten()).map(|(t, n)| {
+                        let kind = if t == "ASSEMBLY" { "Assembly" } else { "Part Studio" };
+                        let n = n.as_str().unwrap_or_default();
+                        let n = n.strip_prefix(&format!("{name}.")).unwrap_or(n);
+                        let n = n.rsplit_once(" (").filter(|(_, k)| k.trim_end_matches(')').parse::<u32>().is_ok()).map_or(n, |(a, _)| a);
+                        (kind.to_string(), n.to_string())
+                    }).collect();
+                    if !theirs.is_empty() && tabs != theirs {
+                        diff.push(format!("tabs {tabs:?}, live {theirs:?}"));
+                    }
+                    // The parts' names where an Assembly's instances name them (flattened: repeats suffixed _1, _2).
+                    if case.starts_with("ASM-") {
+                        let sorted = |v: Vec<String>| {
+                            let mut v = v;
+                            v.sort();
+                            v
+                        };
+                        let (o, l) = (sorted(ours.iter().map(|p| p.name.clone()).collect()), sorted(live.iter().map(|p| p.name.clone()).collect()));
+                        if o != l {
+                            let only = |a: &[String], b: &[String]| a.iter().filter(|x| !b.contains(x)).cloned().collect::<Vec<_>>().join(", ");
+                            diff.push(format!("part names: ours only [{}], live only [{}]", only(&o, &l), only(&l, &o)));
+                        }
+                    }
+                    diff
+                }
+            };
+            option_imports_ok += usize::from(diff.is_empty());
+            println!("{name}: option {case}: ours imports {}: {}", file.file_name().unwrap_or_default().to_string_lossy(), if diff.is_empty() { "matches".into() } else { diff.join("; ") });
         }
         // Ours in live.
         let Some((features, live, refs)) = read_model(&models.join(&name)) else { continue };
@@ -1184,6 +1283,135 @@ fn exchange_round_trip() {
             exports_ok += usize::from(diff.is_empty());
             println!("{name}: live imports ours.{ext}: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
         }
+        // Ours with the same options, read back by ours: held to live's import of its file as the default files are,
+        // and the file as live's where the option shows in it (AP203's schema, Parasolid 28's body line, IGES
+        // compatibility mode's trimmed surfaces and no MSBO, a text STL).
+        for (case, live_import) in opts.as_object().into_iter().flatten().filter(|(c, p)| *c != "_meta" && !IMPORT_ONLY.contains(&c.as_str()) && p["parts"].as_array().is_some_and(|a| !a.is_empty())) {
+            let Some(ext) = OPTION_FILES.iter().find(|(c, _)| c == case).and_then(|(_, f)| f.trim_end_matches(".zip").rsplit('.').next()) else { continue };
+            let format = case_format(case);
+            let format = format.as_str();
+            let mut args = json!({ "format": format, "file": dir.join(format!("ours-opt-{}.{ext}", case.to_lowercase())) });
+            match case.as_str() {
+                "STEP-AP203" => args["version"] = json!("AP203"),
+                "PARASOLID-28.0" => args["version"] = json!("28.0"),
+                "IGES-COMPAT" => args["iges_compatibility"] = json!(true),
+                "RHINO-V5" => args["version"] = json!("5"),
+                "RHINO-V8" => args["version"] = json!("8"),
+                "STEP-INCH" => args["units"] = json!("Inch"),
+                "STL-TEXT-INCH" => {
+                    args["stl_text"] = json!(true);
+                    args["units"] = json!("Inch");
+                }
+                "STL-CUSTOM" => {
+                    args["resolution"] = json!("Custom");
+                    (args["angular_deviation"], args["chordal_tolerance"], args["min_facet_width"]) = (json!(2.5), json!(0.01), json!(0.01));
+                }
+                c => {
+                    if let Some(r) = c.split('-').find(|r| matches!(*r, "FINE" | "COARSE")) {
+                        args["resolution"] = json!(if r == "FINE" { "Fine" } else { "Coarse" });
+                    }
+                }
+            }
+            if case.split('-').any(|w| w == "YUP") {
+                args["y_up"] = json!(true);
+            }
+            if mesh(format) && args["units"].is_null() {
+                args["units"] = json!("Millimeter");
+            }
+            let file = PathBuf::from(args["file"].as_str().unwrap_or_default());
+            let _ = std::fs::remove_file(&file);
+            if let Err(e) = t.call("export_parts", args) {
+                println!("{name}: option {case}: ours not exported: {e}");
+                continue;
+            }
+            let file = if file.is_file() { file } else { file.with_extension("zip") };
+            option_exports += 1;
+            let is_mesh = mesh(format) || matches!(format, "GLB" | "GLTF");
+            let unit = live_import["import"]["unit"].as_str().unwrap_or("Millimeter");
+            let y_up = live_import["import"]["yAxisIsUp"] == "true";
+            let own = parts_from_live_import(live_import, is_mesh);
+            let live = match &xt {
+                Some(x) => held_to_model(own, x, if is_mesh { 2.0 } else { 1.25 }, true, is_mesh),
+                None => own,
+            };
+            let mut diff = match import_in(&scratch(&format!("{name}-option-back-{case}.noshape")), &file, unit, y_up) {
+                Err(e) => vec![e],
+                Ok(b) if is_mesh => differences(&live, &mesh_counts(b)),
+                Ok(b) => differences(&live, &b),
+            };
+            let text = std::fs::read(&file).map(|b| String::from_utf8_lossy(&b[..b.len().min(4 << 20)]).into_owned()).unwrap_or_default();
+            let marker = match case.as_str() {
+                "STEP-AP203" => Some(("its schema CONFIG_CONTROL_DESIGN", text.contains("CONFIG_CONTROL_DESIGN"))),
+                "PARASOLID-28.0" => Some(("SCH_2800000 on its body line", text.contains("SCH_2800000"))),
+                "IGES-COMPAT" => Some(("trimmed surfaces (144) and no MSBO (186)", iges_entity_count(&text, 144) > 0 && iges_entity_count(&text, 186) == 0)),
+                "STL-TEXT-INCH" => Some(("text", text.starts_with("solid"))),
+                "STEP-INCH" => Some(("its unit CONVERSION_BASED_UNIT('INCH')", text.contains("CONVERSION_BASED_UNIT('INCH'"))),
+                _ => None,
+            };
+            if let Some((what, false)) = marker {
+                diff.push(format!("not as live's file: {what}"));
+            }
+            option_exports_ok += usize::from(diff.is_empty());
+            println!("{name}: option {case}: ours reads ours back: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
+        }
+        // Unique parts as individual files (live: always a zip, even of one part, its entries "<tab> - <part>.<ext>";
+        // live doesn't import it back): ours' entries as live's.
+        for (case, f) in OPTION_FILES.iter().filter(|(c, _)| c.ends_with("-SPLIT")) {
+            let theirs = dir.join(f);
+            if !theirs.is_file() {
+                continue;
+            }
+            let format = case_format(case);
+            let file = dir.join(format!("ours-opt-{}.zip", case.to_lowercase()));
+            let _ = std::fs::remove_file(&file);
+            let mut args = json!({ "format": format, "file": file, "individual": true });
+            if mesh(&format) {
+                args["units"] = json!("Millimeter");
+            }
+            option_exports += 1;
+            let names = |p: &Path| {
+                let mut v = std::fs::read(p).map(|b| zip_names(&b)).unwrap_or_default();
+                v.sort();
+                v
+            };
+            let diff = match t.call("export_parts", args) {
+                Err(e) => vec![format!("ours not exported: {e}")],
+                Ok(_) if names(&file) == names(&theirs) => Vec::new(),
+                Ok(_) => vec![format!("entries {:?}, live {:?}", names(&file), names(&theirs))],
+            };
+            option_exports_ok += usize::from(diff.is_empty());
+            println!("{name}: option {case}: ours' zip: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
+        }
+        // Hidden parts (live-opt-hidden.json, batch 4): left out by default (the dialog's Include hidden unticked),
+        // in with include_hidden; the STEP's products as live's.
+        let hidden = read_json(&dir.join("live-opt-hidden.json"));
+        if let (Some(all), Some(kept)) = (hidden["include"]["names"].as_array(), hidden["exclude"]["names"].as_array()) {
+            let names = |v: &[Value]| {
+                let mut v: Vec<String> = v.iter().filter_map(|n| n.as_str().map(str::to_string)).collect();
+                v.sort();
+                v
+            };
+            let (all, kept) = (names(all), names(kept));
+            let parts = t.call("query_parts", json!({})).unwrap_or_default();
+            let hide: Vec<Value> = parts["parts"].as_array().into_iter().flatten().filter(|p| p["name"].as_str().is_some_and(|n| !kept.iter().any(|k| k == n))).map(|p| p["id"].clone()).collect();
+            let hidden_ok = t.call("feature_set_visibility", json!({ "targets": hide, "hidden": true }));
+            for (case, include, want) in [("HIDDEN-EXCLUDED", false, &kept), ("HIDDEN-INCLUDED", true, &all)] {
+                let file = dir.join(format!("ours-opt-{}.step", case.to_lowercase()));
+                let _ = std::fs::remove_file(&file);
+                option_exports += 1;
+                let diff = match hidden_ok.as_ref().map_err(String::clone).and_then(|_| t.call("export_parts", json!({ "format": "STEP", "file": file, "include_hidden": include }))) {
+                    Err(e) => vec![format!("ours not exported: {e}")],
+                    Ok(_) => {
+                        let mut ours = step_products(&std::fs::read_to_string(&file).unwrap_or_default());
+                        ours.sort();
+                        if &ours == want { Vec::new() } else { vec![format!("products {ours:?}, live {want:?}")] }
+                    }
+                };
+                option_exports_ok += usize::from(diff.is_empty());
+                println!("{name}: option {case}: ours' STEP: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
+            }
+            let _ = t.call("feature_set_visibility", json!({ "targets": parts["parts"].as_array().into_iter().flatten().map(|p| p["id"].clone()).collect::<Vec<_>>(), "hidden": false }));
+        }
         // A drawing of the Part Studio as live made it (Create drawing, ANSI A, its recommended views) in PDF, DXF and
         // DWG: the DXF's entities by type and its layers against live's.
         let live_dxf = dir.join("live-drawing.dxf");
@@ -1237,8 +1465,47 @@ fn exchange_round_trip() {
         drawings_ok += usize::from(diff.is_empty());
         let info = if info.is_empty() { String::new() } else { format!(" ({})", info.join("; ")) };
         println!("{name}: drawing DXF: {}{info}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
+        // The Export Drawing options (live-opt-drawing.json, batch 4): ours with the same options against live's file:
+        // a DXF's $ACADVER, kinds of entities and layers; a DWG's version; a PDF's version, embedded fonts (Selectable
+        // text) and colours (Black and white: all black; Grayscale: all grey).
+        let drawing_opts = read_json(&dir.join("live-opt-drawing.json"));
+        for (case, o) in drawing_opts.as_object().into_iter().flatten().filter(|(c, _)| *c != "_meta") {
+            let (e, Some(live_file)) = (&o["export"], o["file"].as_str().map(|f| dir.join(f)).filter(|f| f.is_file())) else { continue };
+            let format = e["formatName"].as_str().unwrap_or_default();
+            let ext = format.to_lowercase();
+            let file = dir.join(format!("ours-opt-drw-{}.{ext}", case.to_lowercase()));
+            let _ = std::fs::remove_file(&file);
+            let mut args = json!({ "drawing": drawing, "format": format, "file": file });
+            match e["versionString"].as_str().or(e["pdfVersion"].as_str()) {
+                Some("R12") => args["version"] = json!("Release 11-12"),
+                Some("R14") => args["version"] = json!("Release 14"),
+                Some(v) => args["version"] = json!(v),
+                None => {}
+            }
+            match (e["textOption"].as_str(), e["selectablePdfText"].as_bool()) {
+                (Some("true"), _) => args["text"] = json!("explode_notes"),
+                (Some("all"), _) => args["text"] = json!("explode_all"),
+                (_, Some(true)) => args["text"] = json!("selectable"),
+                _ => {}
+            }
+            if e["splinesAsPolylines"] == true {
+                args["splines_as_polylines"] = json!(true);
+            }
+            match e["colorMethod"].as_str() {
+                Some("blackandwhite") => args["color"] = json!("black_and_white"),
+                Some(c @ ("grayscale" | "color")) => args["color"] = json!(c),
+                _ => {}
+            }
+            option_exports += 1;
+            let diff = match t.call("drawing_export", args) {
+                Err(err) => vec![format!("ours not exported: {err}")],
+                Ok(_) => drawing_file_differences(&live_file, &file, &ext),
+            };
+            option_exports_ok += usize::from(diff.is_empty());
+            println!("{name}: option drawing {case}: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
+        }
     }
-    println!("exchange score: ours imports live's files {imports_ok}/{imports}; live imports ours {exports_ok}/{} ({waiting} of {exports} not imported by live yet); ours reads ours back {selfs_ok}/{exports}; drawings' DXF {drawings_ok}/{drawings}; times at or under live's {faster}/{timed}", exports - waiting);
+    println!("exchange score: ours imports live's files {imports_ok}/{imports}; live imports ours {exports_ok}/{} ({waiting} of {exports} not imported by live yet); ours reads ours back {selfs_ok}/{exports}; drawings' DXF {drawings_ok}/{drawings}; live's option exports in ours {option_imports_ok}/{option_imports}, ours with options read back {option_exports_ok}/{option_exports}; times at or under live's {faster}/{timed}", exports - waiting);
 }
 
 /// Give `drawing`'s first sheet the scale and view positions of live's stored drawing (`live`, DRAWING_JSON: sheet
@@ -1718,6 +1985,117 @@ fn stl_deviation_measures_watertightness_and_distance() {
     assert!((point_triangle_distance([0.2, 0.2, 0.5], &t) - 0.5).abs() < 1e-12, "above the face");
     assert!((point_triangle_distance([0.5, -1.0, 0.0], &t) - 1.0).abs() < 1e-12, "beside an edge");
     assert!((point_triangle_distance([2.0, 0.0, 0.0], &t) - 1.0).abs() < 1e-12, "past a corner");
+}
+
+/// How many entities of IGES type `ty` a file's directory section holds (each entity two D lines, the type in the
+/// first eight columns of the first).
+/// An import's new tabs: (kind, name).
+type Tabs = Vec<(String, String)>;
+
+/// The products a STEP file names (`PRODUCT('<name>'`).
+fn step_products(text: &str) -> Vec<String> {
+    text.split("=PRODUCT('").skip(1).filter_map(|r| r.split('\'').next().map(str::to_string)).collect()
+}
+
+/// A DXF's `$ACADVER`.
+fn dxf_acadver(text: &str) -> Option<String> {
+    let lines: Vec<&str> = text.lines().map(str::trim).collect();
+    let i = lines.iter().position(|l| *l == "$ACADVER")?;
+    lines.get(i + 2).map(|v| v.to_string())
+}
+
+/// A PDF's colours as its content streams set them (`rg` / `RG`, `g` / `G`, `k` / `K` operands), inflated where they
+/// are Flate streams; and whether it embeds a font.
+fn pdf_colors(b: &[u8]) -> (Vec<Vec<f64>>, bool) {
+    let mut out = Vec::new();
+    let mut rest = b;
+    while let Some(at) = rest.windows(6).position(|w| w == b"stream") {
+        let body = &rest[at + 6..];
+        let body = body.strip_prefix(b"\r").unwrap_or(body);
+        let body = body.strip_prefix(b"\n").unwrap_or(body);
+        let end = body.windows(9).position(|w| w == b"endstream").unwrap_or(body.len());
+        let raw = &body[..end];
+        let data = miniz_oxide::inflate::decompress_to_vec_zlib(raw).unwrap_or_else(|_| raw.to_vec());
+        let text = String::from_utf8_lossy(&data);
+        let tokens: Vec<&str> = text.split_ascii_whitespace().collect();
+        for (i, t) in tokens.iter().enumerate() {
+            let n = match *t {
+                "rg" | "RG" => 3,
+                "g" | "G" => 1,
+                "k" | "K" => 4,
+                _ => continue,
+            };
+            if let Some(v) = tokens.get(i.saturating_sub(n)..i).and_then(|v| v.iter().map(|x| x.parse::<f64>().ok()).collect::<Option<Vec<f64>>>()).filter(|v| v.len() == n) {
+                out.push(v);
+            }
+        }
+        rest = &body[end..];
+    }
+    (out, b.windows(9).any(|w| w == b"/FontFile"))
+}
+
+/// How ours (`ours`) differs from live's drawing export (`live`) of the same options.
+fn drawing_file_differences(live: &Path, ours: &Path, ext: &str) -> Vec<String> {
+    let (Ok(l), Ok(o)) = (std::fs::read(live), std::fs::read(ours)) else { return vec!["a file not read".into()] };
+    let mut diff = Vec::new();
+    match ext {
+        "dxf" => {
+            let (lt, ot) = (String::from_utf8_lossy(&l), String::from_utf8_lossy(&o));
+            if dxf_acadver(&lt) != dxf_acadver(&ot) {
+                diff.push(format!("$ACADVER {:?}, live {:?}", dxf_acadver(&ot), dxf_acadver(&lt)));
+            }
+            if let (Some(ls), Some(os)) = (dxf_summary(live), dxf_summary(ours)) {
+                let kinds = |s: &DxfSummary| s.entities.keys().cloned().collect::<Vec<_>>();
+                if kinds(&ls) != kinds(&os) {
+                    diff.push(format!("entity kinds {:?}, live {:?}", kinds(&os), kinds(&ls)));
+                }
+                if ls.layers != os.layers {
+                    diff.push(format!("layers {:?}, live {:?}", os.layers, ls.layers));
+                }
+            }
+        }
+        "dwg" if l.get(..6) != o.get(..6) => diff.push(format!("version {}, live {}", String::from_utf8_lossy(o.get(..6).unwrap_or_default()), String::from_utf8_lossy(l.get(..6).unwrap_or_default()))),
+        "pdf" => {
+            if l.get(..8) != o.get(..8) {
+                diff.push(format!("header {}, live {}", String::from_utf8_lossy(o.get(..8).unwrap_or_default()), String::from_utf8_lossy(l.get(..8).unwrap_or_default())));
+            }
+            let ((lc, lf), (oc, of)) = (pdf_colors(&l), pdf_colors(&o));
+            if lf != of {
+                diff.push(format!("{} fonts, live {}", if of { "embeds" } else { "no" }, if lf { "embeds" } else { "none" }));
+            }
+            let black = |c: &[Vec<f64>]| c.iter().all(|v| if v.len() == 4 { v[3] >= 1.0 - 1e-6 || v.iter().all(|x| x.abs() < 1e-6) } else { v.iter().all(|x| x.abs() < 1e-6) });
+            let grey = |c: &[Vec<f64>]| c.iter().all(|v| v.len() == 1 || (v.len() == 3 && (v[0] - v[1]).abs() < 1e-3 && (v[1] - v[2]).abs() < 1e-3));
+            if black(&lc) && !black(&oc) {
+                diff.push("colours not all black, live's are".into());
+            }
+            if grey(&lc) && !grey(&oc) {
+                diff.push("colours not all grey, live's are".into());
+            }
+        }
+        _ => {}
+    }
+    diff
+}
+
+/// A zip's entry names, from its central directory.
+fn zip_names(b: &[u8]) -> Vec<String> {
+    let le16 = |i: usize| b.get(i..i + 2).map_or(0, |x| usize::from(u16::from_le_bytes([x[0], x[1]])));
+    let le32 = |i: usize| b.get(i..i + 4).map_or(0, |x| u32::from_le_bytes([x[0], x[1], x[2], x[3]]) as usize);
+    let Some(end) = (0..b.len().saturating_sub(21)).rev().find(|&i| le32(i) == 0x0605_4b50) else { return Vec::new() };
+    let (mut at, mut out) = (le32(end + 16), Vec::new());
+    for _ in 0..le16(end + 10) {
+        if le32(at) != 0x0201_4b50 {
+            break;
+        }
+        let n = le16(at + 28);
+        out.push(String::from_utf8_lossy(b.get(at + 46..at + 46 + n).unwrap_or_default()).into_owned());
+        at += 46 + n + le16(at + 30) + le16(at + 32);
+    }
+    out
+}
+
+fn iges_entity_count(text: &str, ty: u32) -> usize {
+    text.lines().filter(|l| l.len() >= 73 && l.as_bytes()[72] == b'D').step_by(2).filter(|l| l[..8].trim().parse::<u32>() == Ok(ty)).count()
 }
 
 /// Live's import of its own export, each part's volume and area held to its model's (its Parasolid import) where the

@@ -153,6 +153,9 @@ pub struct SheetGeometry {
     /// Lines of model edges whose curve is free-form (no line, circle or
     /// ellipse): CAD files write them as splines, whatever shape they make.
     pub freeform_lines: Vec<usize>,
+    /// Export option "Export splines as polylines": CAD files write a free-form model edge as a 3D POLYLINE.
+    #[serde(default)]
+    pub splines_as_polylines: bool,
     /// Lines of model edges on a circle or ellipse, with that conic on the sheet (centre and two conjugate
     /// semi-diameters: `c + a cos t + b sin t`), sorted by line: CAD files write them as CIRCLE / ARC / ELLIPSE.
     #[serde(default)]
@@ -169,6 +172,14 @@ pub struct SheetGeometry {
     /// one another (c2-duct-multipart).
     #[serde(default)]
     pub shared_lines: Vec<usize>,
+    /// Lines of exploded text (sorted), each a glyph's closed outline: CAD files write them as they are, an LWPOLYLINE
+    /// (live-opt-drw-polyall).
+    #[serde(default)]
+    pub glyph_lines: Vec<usize>,
+    /// Export layers of exploded texts: CAD files list them though the text left nothing (live keeps ANNOTATION_TEXT
+    /// for an empty view label exploded, c2-duct-multipart live-opt-drw-polyall).
+    #[serde(skip)]
+    pub exploded_layers: Vec<super::cad_layers::CadLayer>,
     /// Template format lines (sorted): the screen runs them on half their
     /// pen width past their ends so corners stay closed; exports keep
     /// live's exact ends.

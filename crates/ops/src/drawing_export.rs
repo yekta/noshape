@@ -413,6 +413,7 @@ pub fn export_files(drawing: &Drawing, sheets: &[usize], s: &ExportSettings, sou
             }
         }
         let mut geo = export::prepare(&g, &opts);
+        geo.splines_as_polylines = s.splines && f.cad();
         if picture {
             picture_pens(&mut geo);
         }

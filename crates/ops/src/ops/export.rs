@@ -132,6 +132,7 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         return assembly(ctx, a, format, s);
     }
     let (od, tab) = studio_target(ctx, a)?;
+    s.name = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default();
     let r = od.regenerate(tab, None)?;
     let selected: Vec<noshape_model::BodyId> = match a.opt_array("parts")? {
         Some(list) => list
@@ -203,7 +204,7 @@ fn is_cad_file(ctx: &mut Ctx, a: &Args) -> Result<bool, OpError> {
 
 /// Export of a CAD file tab (its menu's Export…, live document/94): the file's parts in another format, named after
 /// the file without its extension.
-fn cad_file(ctx: &mut Ctx, a: &Args, format: PartFormat, s: ExportSettings) -> Result<OpOutput, OpError> {
+fn cad_file(ctx: &mut Ctx, a: &Args, format: PartFormat, mut s: ExportSettings) -> Result<OpOutput, OpError> {
     if !crate::export::FILE_FORMATS.contains(&format) {
         let names: Vec<&str> = crate::export::FILE_FORMATS.iter().map(|f| f.label()).collect();
         return Err(OpError::param("format", &format!("a CAD file exports to {}", names.join(", "))));
@@ -213,12 +214,13 @@ fn cad_file(ctx: &mut Ctx, a: &Args, format: PartFormat, s: ExportSettings) -> R
     let Some(noshape_model::TabContent::File(f)) = od.doc().tab(tab).map(|t| t.content.clone()) else { return Err(OpError::param("tab", "not a file tab")) };
     let parts = crate::export::cad_file_parts(&f, &od.doc().settings.units).map_err(|e| OpError::new("export_failed", format!("{e:#}")).with_param("tab"))?;
     let n = parts.len();
-    write_out_named(od, tab, &crate::export::file_stem(&f.file_name), a, format, n, |file| crate::export::write_export(&s, file, parts))
+    s.name = crate::export::file_stem(&f.file_name);
+    write_out_named(od, tab, &s.name, a, format, n, |file| crate::export::write_export(&s, file, parts))
 }
 
 /// Export of an Assembly tab: its instances (or `parts`: instance ids or
 /// names); STEP and Parasolid keep the assembly, as Onshape's.
-fn assembly(ctx: &mut Ctx, a: &Args, format: PartFormat, s: ExportSettings) -> Result<OpOutput, OpError> {
+fn assembly(ctx: &mut Ctx, a: &Args, format: PartFormat, mut s: ExportSettings) -> Result<OpOutput, OpError> {
     use noshape_model::document::TabContent;
     let od = ctx.doc(a.opt_str("doc")?)?;
     let tab = od.tab_of_kind(a.opt_str("tab")?, "Assembly", |c| matches!(c, TabContent::Assembly(_)))?;
@@ -231,6 +233,7 @@ fn assembly(ctx: &mut Ctx, a: &Args, format: PartFormat, s: ExportSettings) -> R
     let result = super::assembly::solve_assembly(od, tab, &asm, &Default::default());
     let root = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default();
     let mut export = crate::export::AssemblyExport::of(&root, &result, ids.as_deref(), s.hidden);
+    s.name = root;
     if format == PartFormat::Urdf {
         export = export.with_kinematics(od.doc(), &asm, &result);
     }

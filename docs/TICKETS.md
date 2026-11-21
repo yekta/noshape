@@ -33,6 +33,13 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - [ ] P1 **VALID-WRAP-TEXT-WRAP1 (core)**: c2-wrap-text-cylinders, first invalid at feature 4 "Wrap 1": Part 1 not a valid solid
   (64/164/108 vs live 119/320/212; 282764.74 vs 282776.39 mm³), invalid through feature 9 "Boolean 1" (raw 304/784/533).
 
+## dx, 2026-11-20
+- [ ] P3 EXCH-STL-MULTIPART-SHELLS (dx): c2-duct-multipart's STL (4 touching parts, 74 triangles, edges shared by 4 and
+  6 triangles) reads as 2 parts in ours (Part 2's 4 triangles, and the other three as one); live reads 9 sheets with no
+  volume (a shortcoming, not a target: lead 11-20). Telling the 4 bodies apart by pairing the triangles round each shared
+  edge by orientation (interior side) doesn't work: their in / out sides don't alternate round the edges (54 of 112
+  pairings not mutual), so the file doesn't say which triangles make which body. Ours kept. Repro: exchange suite,
+  option STL-FINE (live-opt-fine.stl).
 
 ## skasm, 2026-11-20
 - [ ] P2 SKETCH-ON-IN-FEATURE-MC (skasm): live's sketch can sit on its own in-feature mate connector (c2-sheet-metal-forms'

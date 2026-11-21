@@ -398,8 +398,8 @@ fn an_iges_bspline_face_in_pieces_reads_as_one() {
 }
 
 /// Several parts in one Parasolid file (the exchange suite: Onshape rejected our pointer-list root, "Invalid or corrupt
-/// input file"): node 1, first, is a PART_XMT_BLOCK listing the bodies, as Onshape's own (with no index_map_offset in
-/// 28.1 to 30.0, as live's 28.1 / 30.0 files: "176 2 1 2 0 0 0 <entries>"); 12.0 keeps the pointer list; all read back
+/// input file"): node 1, first, is a PART_XMT_BLOCK listing the bodies, as Onshape's own (with no index_map_offset before
+/// 30.1, as live's 28.0 / 28.1 / 30.0 files: "176 2 1 2 0 0 0 <entries>"); 12.0 keeps the pointer list; all read back
 /// as the parts.
 #[test]
 fn several_parasolid_parts_are_listed_by_a_part_block() {
@@ -407,7 +407,7 @@ fn several_parasolid_parts_are_listed_by_a_part_block() {
     std::fs::create_dir_all(&dir).unwrap();
     let a = make_box_corners(DVec3::ZERO, DVec3::splat(0.01)).unwrap();
     let b = make_box_corners(DVec3::new(0.02, 0.0, 0.0), DVec3::new(0.03, 0.01, 0.01)).unwrap();
-    for (version, root, zeros) in [("38.1", "176", 4), ("30.0", "176", 3), ("28.1", "176", 3), ("28.0", "176", 4), ("12.0", "74", 1)] {
+    for (version, root, zeros) in [("38.1", "176", 4), ("30.0", "176", 3), ("28.1", "176", 3), ("28.0", "176", 3), ("12.0", "74", 1)] {
         let path = dir.join(format!("two-{version}.x_t"));
         write_parasolid_version(&path, &[a.clone(), b.clone()], LengthUnit::Meter, false, version).unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
@@ -625,6 +625,28 @@ fn iges_header() {
     let got = volume_properties(&back).unwrap().mass;
     assert!((got - want).abs() < 1e-6 * want, "{got} vs {want}");
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// IGES "Use compatibility mode for surfaces and curves" (live exchange batch 1, 11-20): each face a Trimmed Surface
+/// (144), no Manifold Solid (186); its faces read back sewn into the solid, as live imports them.
+#[test]
+fn iges_compatibility_mode_reads_back_as_a_solid() {
+    let dir = std::env::temp_dir().join(format!("noshape-igs-compat-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let s = make_box(&Plane::xy(), 0.04, 0.03, 0.01).unwrap();
+    let path = dir.join("compat.igs");
+    write_iges_parts_as(&path, &[ExportShape { shape: s, name: None, color: None }], LengthUnit::Meter, true).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let types: Vec<u32> = text.lines().filter(|l| l.len() >= 73 && &l[72..73] == "D").step_by(2).filter_map(|l| l[..8].trim().parse().ok()).collect();
+    let back = read_iges_parts(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(types.iter().filter(|t| **t == 144).count(), 6, "{types:?}");
+    assert!(!types.contains(&186), "{types:?}");
+    assert_eq!(back.len(), 1);
+    let solids = back[0].shape.solids();
+    assert_eq!(solids.len(), 1, "sewn into one solid");
+    let v = volume_properties(&solids[0]).unwrap().mass;
+    assert!((v - 1.2e-5).abs() < 1e-9, "{v}");
 }
 
 /// Parts' names and colours in IGES as Onshape writes them (live

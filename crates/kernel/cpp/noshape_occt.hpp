@@ -1089,7 +1089,7 @@ std::unique_ptr<OcShape> concat_edges(const OcShapeList& edges);
 std::unique_ptr<OcShape> exact_edges(const OcShape& s);
 std::unique_ptr<OcShape> read_mesh(rust::Str path, uint32_t merge_limit);
 void                     write_iges(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Slice<const double> colours, rust::Str path,
-                                    rust::Str system, rust::Str version);
+                                    rust::Str system, rust::Str version, bool trimmed);
 void write_iges_assembly(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Slice<const double> colours, rust::Slice<const uint32_t> part,
                          rust::Slice<const double> tf, rust::Str path, rust::Str system, rust::Str version);
 // Shape `i`'s name and colour from the FFI lists (null colour: none).

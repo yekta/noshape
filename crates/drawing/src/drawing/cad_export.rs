@@ -15,7 +15,7 @@ use super::cad_layers::{CadLayer, CadTextStyle};
 use super::cad_objects::{CadDim, CadDimKind, CadObject};
 use acadrust::entities::table::Table as AcadTable;
 use acadrust::entities::{Dimension, DimensionAngular3Pt, DimensionDiameter, DimensionLinear, DimensionOrdinate, DimensionRadius, Insert, Tolerance};
-use acadrust::entities::{LwPolyline, Polyline2D, PolylineFlags, Vertex2D};
+use acadrust::entities::{LwPolyline, Polyline2D, Polyline3D, PolylineFlags, Vertex2D};
 use acadrust::compound_file::{BinaryRecord, CompoundEntry, CompoundFile, CompoundStorage, CompoundStream, CompoundStreamContent, StructuredStoragePayload};
 use acadrust::entities::{Ole2Frame, OleFrameEnvelope, OleObjectType};
 use acadrust::xdata::{ExtendedDataRecord, XDataValue};
@@ -255,6 +255,29 @@ const FIT_TOL: f64 = 1e-4;
 /// off a drafted rim's ellipse, c2-housing-draft).
 const CONIC_TOL: f64 = 1e-2;
 
+/// A spline's vertices when exported as a polyline: one each `max_turn` radians of turn along `points`, and its ends.
+const SPLINE_POLYLINE_TURN: f64 = 3.5 * std::f64::consts::PI / 180.0;
+
+fn turn_vertices(points: &[[f64; 2]], max_turn: f64) -> Vec<[f64; 2]> {
+    let mut pts = points.to_vec();
+    pts.dedup_by(|a, b| (a[0] - b[0]).hypot(a[1] - b[1]) < 1e-12);
+    let Some(&last) = pts.last() else { return pts };
+    let mut out = vec![pts[0]];
+    let mut turn = 0.0;
+    for w in pts.windows(3) {
+        let (a, b) = ((w[1][1] - w[0][1]).atan2(w[1][0] - w[0][0]), (w[2][1] - w[1][1]).atan2(w[2][0] - w[1][0]));
+        turn += ((b - a + std::f64::consts::PI).rem_euclid(std::f64::consts::TAU) - std::f64::consts::PI).abs();
+        if turn >= max_turn {
+            out.push(w[1]);
+            turn = 0.0;
+        }
+    }
+    if pts.len() > 1 {
+        out.push(last);
+    }
+    out
+}
+
 /// The extremes of `points` when they all lie within `tol` of the line through them (None for a point or a curve).
 fn straight(points: &[[f64; 2]], tol: f64) -> Option<[[f64; 2]; 2]> {
     let first = points.first()?;
@@ -292,6 +315,7 @@ fn used_layers(g: &SheetGeometry) -> std::collections::BTreeSet<CadLayer> {
     let mut out: std::collections::BTreeSet<CadLayer> = (0..g.lines.len()).map(|i| g.cad_line_layer(i)).collect();
     out.extend((0..g.texts.len()).map(|i| g.cad_text_layer(i)));
     out.extend((0..g.fills.len()).map(|i| g.cad_fill_layer(i)));
+    out.extend(g.exploded_layers.iter().copied());
     out
 }
 
@@ -801,8 +825,9 @@ impl Sheet<'_> {
         // A mesh part's silhouette or fold: an LWPOLYLINE as live's (with its continuous-linetype flag), a LINE when
         // straight; never fitted.
         let mesh = self.g.mesh_lines.binary_search(&li).is_ok();
+        let glyph = self.g.glyph_lines.binary_search(&li).is_ok();
         // Live writes a detail view's border as its closed polyline, not a CIRCLE.
-        let fitted = !free && !poly && !mesh && self.g.cad_line_layer(li) != CadLayer::DetailViewBorder;
+        let fitted = !free && !poly && !mesh && !glyph && self.g.cad_line_layer(li) != CadLayer::DetailViewBorder;
         // A model edge on a circle or ellipse: that conic's piece, as live writes them (exact, however few points;
         // c2-sm-louver's bends: ARC 101 for 68, ELLIPSE 50 for 86 when fitted).
         let exact = (!free && !poly && !mesh)
@@ -821,6 +846,12 @@ impl Sheet<'_> {
                 (e.start_parameter, e.end_parameter) = (start, end);
                 EntityType::Ellipse(e)
             }
+            // An exploded glyph's outline: a closed LWPOLYLINE (live-opt-drw-polyall).
+            None if glyph => {
+                let mut e = LwPolyline::from_points(l.points.iter().map(|p| self.p2(*p)).collect());
+                e.is_closed = l.closed;
+                EntityType::LwPolyline(e)
+            }
             None if l.points.len() == 2 && !l.closed => EntityType::Line(Line::from_points(p3(l.points[0]), p3(l.points[1]))),
             None if mesh => {
                 let mut e = LwPolyline::from_points(l.points.iter().map(|p| self.p2(*p)).collect());
@@ -832,6 +863,21 @@ impl Sheet<'_> {
             // a LINE between its extremes, as live's (it had 31 short SPLINEs there, live none).
             None if !l.closed && MODEL_EDGES.contains(&self.g.cad_line_layer(li)) && let Some([a, b]) = straight(&l.points, FIT_TOL) => {
                 EntityType::Line(Line::from_points(p3(a), p3(b)))
+            }
+            // Export splines as polylines: a vertex at each ~3.5° of turn (live-opt-drw-poly: 2.98–3.67° on average
+            // between segments), a 3D POLYLINE, or an LWPOLYLINE when two points are left.
+            None if self.g.splines_as_polylines && MODEL_EDGES.contains(&self.g.cad_line_layer(li)) => {
+                let pts = turn_vertices(&l.points, SPLINE_POLYLINE_TURN);
+                if pts.len() == 2 && !l.closed {
+                    EntityType::LwPolyline(LwPolyline::from_points(pts.iter().map(|p| self.p2(*p)).collect()))
+                } else {
+                    let mut e = Polyline3D::from_points(pts.iter().map(|p| p3(*p)).collect());
+                    e.flags.closed = l.closed;
+                    for v in &mut e.vertices {
+                        v.layer.clone_from(&layer);
+                    }
+                    EntityType::Polyline3D(e)
+                }
             }
             // A model edge of another curve: a cubic SPLINE (live 1857's
             // VISIBLE / TANGENT_LINES) through the projected points.
@@ -2080,6 +2126,23 @@ mod tests {
         }).collect();
         types.sort();
         assert_eq!(types, ["CENTER", "CONTINUOUS"]);
+        // Export splines as polylines: a 3D POLYLINE on the edge's layer with a vertex each ~3.5° of turn (live
+        // live-opt-drw-poly), the ELLIPSE kept.
+        g.splines_as_polylines = true;
+        let doc = acadrust::DxfReader::from_reader(std::io::Cursor::new(to_dxf_version(&g, 4, DxfVersion::AC1015).unwrap())).unwrap().read().unwrap();
+        assert!(!doc.entities().any(|e| matches!(e, EntityType::Spline(_))));
+        assert_eq!(doc.entities().filter(|e| matches!(e, EntityType::Ellipse(_))).count(), 1);
+        let polys: Vec<_> = doc.entities().filter_map(|e| match e {
+            EntityType::Polyline3D(p) => Some(p.clone()),
+            _ => None,
+        }).collect();
+        assert_eq!(polys.len(), 2, "the wave and the free-form ellipse");
+        let wave3 = polys.iter().find(|p| (p.vertices[0].position.x - 20.0).abs() < 1e-9).expect("the wave");
+        assert!(wave3.common.layer == "Visible" && wave3.vertices.iter().all(|v| v.flags == 32), "{:?}", wave3.common.layer);
+        assert!((10..=41).contains(&wave3.vertices.len()), "{}", wave3.vertices.len());
+        let end = wave3.vertices.last().unwrap().position;
+        assert!((end.x - 60.0).abs() < 1e-9 && (end.y - wave[40][1]).abs() < 1e-9);
+        assert_eq!(turn_vertices(&[[0.0, 0.0], [1.0, 0.001], [2.0, 0.0]], SPLINE_POLYLINE_TURN), [[0.0, 0.0], [2.0, 0.0]]);
     }
 
     /// Live drw2-k-dxf2018: a table is an ACAD_TABLE over a *T block (an

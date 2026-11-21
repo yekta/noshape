@@ -82,9 +82,8 @@ impl PartStudioView {
         {
             s.inspection = noshape_ops::export::inspection_list_csv(ps, &self.doc.read(cx).session.doc.settings.units);
         }
-        let several = if bodies.is_empty() { self.context.as_ref().is_some_and(|c| c.bodies.len() > 1) } else { bodies.len() > 1 };
         match self.export_parts(&s, &bodies) {
-            Ok(parts) => self.save_parts_export(s, name, parts, several, window, cx),
+            Ok(parts) => self.save_parts_export(s, name, parts, window, cx),
             Err(e) => self.flash_info(format!("Export failed: {e:#}"), cx),
         }
     }
@@ -115,12 +114,11 @@ impl PartStudioView {
         }
         self.export_preparing(&name, cx);
         let tab = self.tab;
-        let several = bodies.len() > 1;
         let parts = cx.background_spawn(async move { noshape_ops::export::version_parts(doc, tab, &bodies) });
         cx.spawn_in(window, async move |this, cx| {
             let parts = parts.await;
             let _ = this.update_in(cx, |this, window, cx| match parts {
-                Ok(parts) => this.save_parts_export(s, name, parts, several, window, cx),
+                Ok(parts) => this.save_parts_export(s, name, parts, window, cx),
                 Err(e) => this.flash_info(format!("Export failed: {e:#}"), cx),
             });
         })
@@ -136,10 +134,11 @@ impl PartStudioView {
     /// Save `parts` as the dialog's Options say: to a file the user picks, or stored in a new tab, written off the UI
     /// thread. The result goes to the Notifications bell, "<name> was exported successfully." without the file's
     /// extension (live2 export-feel-1118: "l2 exp was exported successfully."; a drawing's names its ".pdf").
-    fn save_parts_export(&mut self, s: ExportSettings, name: String, parts: Vec<(String, k::Shape, [f32; 4])>, several: bool, window: &mut Window, cx: &mut Context<Self>) {
+    fn save_parts_export(&mut self, mut s: ExportSettings, name: String, parts: Vec<(String, k::Shape, [f32; 4])>, window: &mut Window, cx: &mut Context<Self>) {
         let name = if name.is_empty() { self.studio_name(cx) } else { name };
+        s.name = name.clone();
         // The saved file's own extension (OBJ downloads a .zip, as live).
-        let ext = s.file_ext(several);
+        let ext = s.file_ext();
         let file = format!("{name}.{ext}");
         // Options › Store file in a new tab: no download.
         if s.options == 2 {
