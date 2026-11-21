@@ -538,6 +538,8 @@ impl PartStudioView {
                 K::Angle { value, .. } | K::ArcAngle { value, .. } => dimensions.push(("ANGLE".into(), (value.to_degrees() * 1e6).round() / 1e6, typed(units.angle.symbol()))),
                 // A conic's Rho is one of its constraints in live's model (sketch-tool-conic: "RHO").
                 K::Rho { .. } => constraints.push("RHO".into()),
+                // So is an ellipse's axis dimension (sketch-dim-ellipse-axes: "MAJOR_DIAMETER").
+                K::EllipseRadius { major, .. } => constraints.push(if *major { "MAJOR_DIAMETER" } else { "MINOR_DIAMETER" }.into()),
                 k if k.is_dimension() => dimensions.push((k.name().to_uppercase().replace(' ', "_"), c.kind.value().unwrap_or(0.0), length)),
                 K::CircularPatternLink { center, .. } => {
                     if !circular.contains(center) {

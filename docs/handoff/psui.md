@@ -36,20 +36,19 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (13:50 UTC 11-21)
+## Now (15:26 UTC 11-21)
 
-LANDED 4553fc38, 0cd43606, 70ab4b581 (docs), f0902e77 (Variable conversionFactor 0; cparc end only alignments;
-Transform moves by pointer travel). sk12c (vibex8, /root/psui-scratch/sk/sk12c): 16/21, 325/344 before f0902e77.
-3dd4f04b FAILED to land (ops parity ellipse test: parity.rs placed ellipse dim labels by the old rule); re-queued in
-this commit with: circle-rims step 22 (a glyph's clear margin gives way to the open sketch's entity under the pointer,
-the 20 px tile takes it back: ui.glyph_yielded / glyph_tile; GPU test a_small_circle_round_the_origin_lights_on_its_rim);
-ellipse-axes: smart_dimension's ellipse rule as live (6) (label off across the major axis = MAJOR, at the side = MINOR),
-parity.rs + e2e labels to match; step 18 (live plane-behind-1121): with the Dimension tool and an ellipse picked, a plane
-lights only within 6 px of its outline, never by its face (SketchEditor::takes_plane_faces, near_plane_outline; GPU test
-an_ellipse_picked_for_a_dimension_takes_no_plane_face). Not done: Front's face not picked 3.3 mm above the sketch plane
-(live picks it at 13-17 mm). UIP-SKETCH-ROW-SECTION-VIEW (qa P1): Section view… back on a sketch row's plain right-click
-(live secmenu-rerecord-1121, takes 3f3cb529); kept off the sketch right above a rolled-back bar (rollback-menus; asked
-live REQUESTS 13:49 to recheck with a moved pointer). After landing: check cov-dm-config's take.
+LANDED c2e4094c as 9ffded3f 14:13 (3dd4f04b's circle-rims + ellipse rule, parity ellipse labels, plane-face rule,
+Section view… back on a sketch row's plain right-click; qa verified the 15 UIP-SKETCH-ROW-SECTION-VIEW scenarios on
+28d58d209, 75/75). Kept off: the sketch right above a rolled-back bar (rollback-menus; live REQUESTS 13:49 to recheck).
+IN TREE (to land): real-app fixes from vibex8 shots (shots-run.sh, ~/agents/psui-keep/shots6):
+- circle-rims step 22 (27/27 now): a glyph takes a press only when it is lit (its tile, or the hovered constraint); the
+  pointer-move path no longer lights a glyph from the lagging glyph_boxes while the sketch's entity is under its margin.
+- ellipse-axes step 12: with faces off, the plane lit is the nearest outline within 6 px (plane_by_outline), whichever
+  face is under; re-resolved on every move (the GPU id doesn't change along one face). Test probes live's (40, 5).
+- ellipse-axes step 18: ui_script exports an ellipse axis dimension as live's MAJOR_/MINOR_DIAMETER constraint.
+sk12d (the 21 sk12 takes, sk12-names.txt, uip-some.sh on vibex8 -> ~/agents/psui-keep/sk12d): 21/21, 344/344.
+Not done: Front's face not picked 3.3 mm above the sketch plane (live picks it at 13-17 mm).
 split-at-crossing PERPENDICULAR: skasm's queue (crates/sketch square_at_mid). Shots: vibex8
 ~/agents/psui-keep/shots2/<take> (shots-run.sh in psui-scratch: build + one app, frames every 0.4 s).
 

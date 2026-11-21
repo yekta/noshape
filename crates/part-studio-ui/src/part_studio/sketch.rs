@@ -1039,17 +1039,28 @@ impl PartStudioView {
     /// The GPU's hover pick in sketch mode (and again on each move while it stands: `sketch_gpu_hover`), resolved by
     /// [`Self::sketch_hover_id`] and applied.
     /// Whether viewport point `at` is within the pick's reach (5 px, live's MOUSE_PICK_RADIUS_PX) of plane `p`'s outline.
-    fn near_plane_outline(&self, p: &Reference, at: DVec2, vp: &Entity<Viewport>, cx: &App) -> bool {
-        let Some(q) = self.display.planes.iter().find(|q| &q.reference == p) else { return false };
+    /// The plane (not the sketch's own) whose outline lies nearest a viewport point, within 6 px, and its pick id.
+    fn plane_by_outline(&self, at: DVec2, vp: &Entity<Viewport>, cx: &App) -> Option<(Reference, u32)> {
+        let picks = &self.built.as_ref()?.picks;
         let vp = vp.read(cx);
-        let c = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)].map(|(u, v)| vp.project(q.corner(u, v)));
-        (0..4).any(|k| match (c[k], c[(k + 1) % 4]) {
-            (Some(a), Some(b)) => {
-                let t = ((at - a).dot(b - a) / (b - a).length_squared().max(1e-9)).clamp(0.0, 1.0);
-                (a + (b - a) * t).distance(at) <= 6.0
-            }
-            _ => false,
-        })
+        let dist = |q: &noshape_model::display::PlaneDisplay| {
+            let c = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)].map(|(u, v)| vp.project(q.corner(u, v)));
+            (0..4)
+                .filter_map(|k| {
+                    let (a, b) = (c[k]?, c[(k + 1) % 4]?);
+                    let t = ((at - a).dot(b - a) / (b - a).length_squared().max(1e-9)).clamp(0.0, 1.0);
+                    Some((a + (b - a) * t).distance(at))
+                })
+                .fold(f64::INFINITY, f64::min)
+        };
+        self.display
+            .planes
+            .iter()
+            .filter(|q| !self.is_own_sketch_plane(&q.reference, cx))
+            .filter_map(|q| Some((dist(q), q.reference.clone(), *picks.ids_for(&q.reference).first()?)))
+            .filter(|(d, ..)| *d <= 6.0)
+            .min_by(|x, y| x.0.total_cmp(&y.0))
+            .map(|(_, r, id)| (r, id))
     }
 
     /// Whether the resolved pick is an entity of the open sketch.
@@ -1087,13 +1098,14 @@ impl PartStudioView {
             return true;
         }
         let mut r = id.and_then(|id| self.built.as_ref()?.picks.get(id).map(|t| t.reference.clone()));
-        if let Some(p @ (Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. })) = &r
+        let mut pick = *id;
+        // Live plane-behind-1121: with an ellipse picked for a dimension a plane lights by its outline only, the
+        // nearest within reach, whichever plane's face is under the pointer.
+        if matches!(r, Some(Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }))
             && self.sketch_data(cx).is_some_and(|d| self.sketch.as_ref().is_some_and(|ed| !ed.takes_plane_faces(&d)))
-            && !self.near_plane_outline(p, vp.read(cx).pointer_position(), vp, cx)
         {
-            r = None;
+            (r, pick) = self.plane_by_outline(vp.read(cx).pointer_position(), vp, cx).map_or((None, None), |(r, id)| (Some(r), Some(id)));
         }
-        let pick = if r.is_none() { None } else { *id };
         // Live Onshape: the sketch's own plane (or face) is never
         // pre-highlighted while sketching on it, except a face for
         // Use, which projects its edges (qa5 CTX-USE).
@@ -1273,13 +1285,15 @@ impl PartStudioView {
                     // Over a constraint glyph it alone hovers, nothing under it (live: the pre-selection is empty
                     // there), whatever the pick under the pointer says; between a row's glyphs neither.
                     let (on_glyph, on_row) = self.glyph_under(*position);
+                    // glyph_boxes can lag the drawn tiles: off the tile itself, the sketch's entity under it keeps the hover.
+                    let margin_yields = self.ui.glyph_tile.is_none() && self.picks_own_sketch_entity(self.ui.sketch_gpu_hover.and_then(|(_, id)| id));
                     let hov = if on_row { None } else { self.hovered_sketch_entity(cx) };
                     if on_row {
                         self.hover = None;
                     }
                     let mut left = None;
                     if let Some(ed) = &mut self.sketch {
-                        if on_glyph.is_some() {
+                        if on_glyph.is_some() && !margin_yields {
                             ed.hover_constraint = on_glyph;
                         }
                         // (The row is placed where the hover starts and stays: live2 feel-1417 follow-up.)
@@ -1309,8 +1323,13 @@ impl PartStudioView {
                 }
                 // The GPU's pick stands until it changes (the plane behind a line it still reports as the pointer
                 // comes onto the line): resolved again here, so what lights is what is under the pointer now.
+                // So is a plane lit by its outline only (it moves on and off the outline over one face).
+                let by_outline = |this: &Self, id: Option<u32>| {
+                    matches!(id.and_then(|i| this.built.as_ref()?.picks.get(i)).map(|t| &t.reference), Some(Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }))
+                        && this.sketch_data(cx).is_some_and(|d| this.sketch.as_ref().is_some_and(|ed| !ed.takes_plane_faces(&d)))
+                };
                 if let Some((gpu, resolved)) = self.ui.sketch_gpu_hover
-                    && self.sketch_hover_id(gpu, cx) != resolved
+                    && (self.sketch_hover_id(gpu, cx) != resolved || by_outline(self, resolved))
                 {
                     self.sketch_hover(gpu, vp, window, cx);
                 }
@@ -4581,7 +4600,8 @@ impl PartStudioView {
                     }))
                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, _, _| {
                         // Drag to move the glyph, click to select its constraint (unless its margin gave the entity under it the hover).
-                        if this.ui.glyph_yielded == Some(cid) {
+                        let lit = this.ui.glyph_tile == Some(cid) || this.sketch.as_ref().is_some_and(|ed| ed.hover_constraint == Some(cid));
+                        if this.ui.glyph_yielded == Some(cid) || !lit {
                             return;
                         }
                         if let Some(ed) = &mut this.sketch {

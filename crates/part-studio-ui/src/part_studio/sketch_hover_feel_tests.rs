@@ -963,6 +963,20 @@ fn an_ellipse_picked_for_a_dimension_takes_no_plane_face(cx: &mut TestAppContext
     if got != Some(Reference::Plane(DatumPlane::Right)) {
         wrong.push(format!("the ellipse picked: by the Right plane's outline lit {got:?} (before the pick {edge_before:?})"));
     }
+    // Live's (40, 5) mm lies by the Right plane's +y outline: that lights it.
+    let by_edge = screen(cx, 40., 5.);
+    pointer.move_to(cx, &view, by_edge);
+    let got = hovered(cx, &view);
+    let (outline_d, vp_size) = cx.update(|cx| {
+        let v = view.read(cx);
+        let vp = v.viewport.read(cx);
+        let c = [(0., 0.075, -0.075), (0., 0.075, 0.075)].map(|(x, y, z)| vp.project(glam::DVec3::new(x, y, z)).unwrap());
+        let t = ((by_edge - c[0]).dot(c[1] - c[0]) / (c[1] - c[0]).length_squared()).clamp(0., 1.);
+        ((c[0] + (c[1] - c[0]) * t).distance(by_edge), vp.pointer_position())
+    });
+    if got != Some(Reference::Plane(DatumPlane::Right)) {
+        wrong.push(format!("the ellipse picked: at (40, 5) mm ({outline_d:.1} px from the Right plane's +y outline, pointer {vp_size:?}) lit {got:?}"));
+    }
     pointer.move_to(cx, &view, above);
     pointer.click(cx, &view, above);
     let made = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.constraints().filter_map(|c| match c.kind { noshape_sketch::ConstraintKind::EllipseRadius { major, .. } => Some(major), _ => None }).collect::<Vec<_>>());
