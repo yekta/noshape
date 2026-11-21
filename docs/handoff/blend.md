@@ -1,41 +1,51 @@
 # Blends (agent "blend"): current state
 
-Updated 11-21 17:40 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-21 21:29 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-21 17:40, thread on the Hello account)
+## Now (11-21 20:11)
 
-- Order (lead 16:30): Halter faces -> RINGS Fillet 1 (P0, bool waiting) -> knifehandle Fillet 1 -> Suspension root chain.
-  Halter's 113 s counts as a speed P1 once its faces match.
-- 0. RINGS (P0 SPEED-RINGS-SHELL, from bool): c2-rings-loft Fillet 1 (R2 on the bore's two closed ellipses, 1 mm wall
-  at the bottom) at Extrude 1 depth 9.6 / 10.4: OCCT splits each round in 3; live: one round per side, the two meeting at
-  the bore bottom (JQB) and running onto the outer face (JQN). Worktree blend10, branch blend-rings (Mac, uncommitted):
-  (a) ball_tools: a closed edge's first ball guessed at its first station (f 0.25) from the supports' normals (was
-  at(0) + middle's inward: guess on the bore axis, "faces tangent"); (b) free_end: a closed edge's ends count twice
-  (not free); (c) env ZZ_CLOSEDBOOL: an all-closed chain whose direct build declines goes to the Boolean (skips the
-  run-on block). With (a-c) 9.6 matches live after Chamfer 1: 17 faces, rounds 171.819 (live 171.817), bore 153.624
-  (exact), outer 344.204 (344.208); 8 unchanged. 10.4: the Boolean cut removes NOTHING (vol 1078.30 before = after,
-  balls correct at r 12.25); running bin/rings-fil.sh with ZZTOOL debug (each tool's volume / Common with the body)
-  -> find why, then make (c) unconditional, strip ZZ* prints (ZZORIENT, ZZTAN, ZZMADE, ZZGUESS, ZZBALL, ZZVOL, ZZTOOL),
-  test (T1 engine test at 9.6), suite + userdocs gate, land; tell bool. Scripts: bin/rings-fil.sh (Fillet 1 faces +
-  debug, DEPTHS), bin/rings-chk.sh (after Chamfer 1: faces, query_mass_properties), run as
-  `cd blend10 && NOSHAPE_RB_HOST=mac tools/tiers/rb.sh bash -c "ZZ_CB=1; DEPTHS='10.4'; $(cat bin/rings-fil.sh)"`.
-  Live: live/bool/rings-faces-1121/{8,8.8,9.6,10.4}.json (10.4: 17 faces, 954.357 mm3, rounds 173.058, bore 184.555).
-- 1b. Halter faces: ZZ_NOKEPT + ZZ_INTO=0.05 builds VALID: +2.333 mm3 (live 2.4694), 61/162/104 vs 39/111/73, 108 s.
-  Extra faces: the fill lofts' planar sides not merged into body faces (11,12,13,14,16,24,26,30), 0.004 mm2 tip slivers
-  (5, 20), extra B-spline pieces (3,4,18,19,27,29). logs/zzh10.out (bin/zzh10.sh dumps ~/tmp/blend/halter-out.brep on
-  vibex7 and lists faces with bin/faces2.sh). ZZ_INTO 0.01 invalid again. vibex7 slots are jammed (runs wait 30+ min:
-  use timeout 7200000 on background runs).
-- 2b. KNIFEHANDLE Fillet 1: logs/khf1.out (blend-kh, origin/core-knifehandle): closed loft 64 sections valid, "boolean
-  valid false" -> "the result is not one valid solid"; before it "a rolling balls' tool inside out" x2, "could not orient
-  a face at the edge" x2, "the rolling balls jump along the edge". Check whether rings' fixes (a)/(b) apply (closed edge).
-- SUSPENSION cusp_staged (blend-cusp, uncommitted): refill + root chain gives VALID 63/146/85, 393418.75 (live
-  53/98/46, 393486.60): the root chain stayed [12,21] (the 2 roots); it should run on along the cylinder/torus edges to
-  the cusps (live's patch). Face listing of ~/tmp/blend/susp-b2.brep / susp-out.brep: bin/faces2.sh '<paths>' 19,39.681,38.084,3.
+- Hosts (user 11-21, DECISIONS a16b39297): builds/tests on rb-hosts (vibex7); the Mac only via its one 4-job nice-19
+  slot. My Mac target was deleted. Never `| head` a cargo pipe: it kills the build (filter the kernel warnings, then tail).
+- RINGS Fillet 1 (9.6 mm): blend10 commit (amended 0c2e6249b..) = all_closed + fuzzy cut + T1
+  features_c::ring_rims_round_one_face_each_where_they_meet_at_the_bottom on data/rings-loft-ring-9_6.brep (our
+  ring before Fillet 1, from NOSHAPE_RECORD_BLENDS). Passes with the fix (17 faces, rounds 171.819, bore 153.627,
+  chamfers 9.79; live 171.817 / 153.624 / 9.797); fails on main (21 faces). The engine.rs extrude test was dropped
+  (main passed it too). Gate: model 596 ok; gaterings.sh hit the 2 h task limit during the vibe2 suites, resumed by bin/gaterings2.sh (suites -> suite-rg.cmp) + bin/gaterings-ud.sh (-> ud-rg.log) ->
+  suite-rg.cmp + ud-rg.log must be SAME apart from c2-rings-loft, then `git diff --stat origin/main...HEAD`, land.sh
+  from blend10, tell bool: 9.6 exact, 10.4 leaves a 0.774 mm² bore island at the bottom (open).
+- SCISSOR (asm P0, asm-scissor-lift; copy vibex7 ~/tmp/blend/scissor.noshape; bin/scissor-x.sh <cli> [tabs],
+  scissor-f.sh <cli> <tab> <feature> (profile + records), scissor-e.sh (edit entities), scissor-p.sh (part + def)):
+  - 2d82a0 Fillet 13 (R1 on two whole end walls of the Middle Cover slab; live 24/61/40 -> 48/107/62, -11.505 mm³;
+    our input 25/63/41, 22549.240 vs live 22549.298): "stops" path -> section_blend general (ellipse edges) lofted
+    BOTH walls' outlines as one 64 mm chain -> 23 s invalid Boolean. Worktree blend-sc (branch blend-scissor):
+    (1) one loft per connected run; (2) chain_ordered: a later run starts at its free end behind its first edge
+    (the slanted wall had split into 2 runs at its top corner: 3 lofts); (3) frame_at: no probe inside -> the face's
+    single side + outward normal (wedge at the slanted wall's bottom). Now 2 lofts (5.84 + 4.46 mm³), error in 6.6 s
+    (main 18.9): the Cut gives 5 solids. Unit test blend_section::tests::a_later_run_listed_from_its_middle_starts_at_its_free_end.
+    Debug ZZCHAIN / ZZ_SBDUMP (dir: body.brep, cut*.brep) / ZZSOLID prints in blend-sc: strip before landing.
+    bin/sc-build.sh (build cli-sc vibex7 + run -> logs/sc-run.out). Tangent propagation: either face gives all 16 edges.
+  - 9cbb0e Fillet 23, 665cf3 Fillet 4: inputs differ upstream (asm bisecting; 9cbb0e derives from 2d82a0, so Fillet
+    13 is upstream of it).
+- KNIFEHANDLE Fillet 1: core (11-21 ~20:50) queued 8061866b (branch core-kh): Extend handle 1/2/3 as live, Handle
+    204640 mm³ (live 205332.7; rest is P4's ellipse radius, with skasm). Fillet 1 is mine once it lands.
+- isaac-ball a04711 Chamfer 1 / Fillet 1: wait on bool's Extrude 14 (+776.4 mm³), then re-check.
+- Halter faces (parked): ZZ_NOKEPT + ZZ_INTO=0.05 builds VALID +2.333 mm3 (live 2.4694), 61/162/104 vs 39/111/73,
+  108 s. Extra faces: fill lofts' planar sides not merged into body faces, 0.004 mm2 tip slivers, extra B-spline pieces.
+  logs/zzh10.out (bin/zzh10.sh -> vibex7 ~/tmp/blend/halter-out.brep; bin/faces2.sh lists faces). ZZ_INTO 0.01 invalid.
+- SUSPENSION cusp_staged (blend-cusp, uncommitted): refill + root chain VALID 63/146/85, 393418.75 (live 53/98/46,
+  393486.60): the root chain stayed [12,21] (the 2 roots); it should run on along the cylinder/torus edges to the cusps
+  (live's patch). Faces of ~/tmp/blend/susp-b2.brep / susp-out.brep: bin/faces2.sh '<paths>' 19,39.681,38.084,3.
+- Next after these: Suspension root chain (item 2 below), Halter faces (parked: 61 vs 39, needs the rounds' true
+  intersection at the corner), P1b/P1c.
+
+## Earlier (11-21 15:59, thread on the Hello account)
+
+- Landed a9c26c41c isaac Fillet 4 (bool told).
 - 1. Impeller P0 (lead: Halter, then Fillet 3's speed, then SUSPENSION-CIRCPAT1).
   - Landed d2efb9fd (11-21 15:15): run-on end face first among exact ties, deferred overflow check (no-op on main; keeps
     Fillet 3 at 34/93/60 once bool's mend db41b6bec lands; bool told).
