@@ -1,16 +1,17 @@
 # rb.sh's build host per worktree: the first line whose bash glob matches the worktree's directory name wins.
-# Hosts (lead 11-17): vibe2 (16 cores, 30 GB: the land queue), vibex6 (main's watcher), vibex7, vibex8 (8 cores, 29 GB
-# each). Each worktree keeps its warm target dir on its own host. Heavy one-off probes: NOSHAPE_RB_HOST=<the idlest host>.
-bool2*    vibex6
+# Hosts (lead 11-21): vibe2 (16 cores, 30 GB: the land queue + 3 agent build slots), vibex6 (main's watcher, 1 slot),
+# vibex7, vibex8 (8 cores, 29 GB each, 2 slots). The user's Mac is NOT a default build host (user 11-21: our builds were
+# slowing it): it has one 2-job slot for macOS-only checks. Heavy one-off probes: NOSHAPE_RB_HOST=<the idlest host>.
+bool2*    vibex8
 bool*     vibex8
 core*     vibex7
 blend*    vibex7
 dev*      vibex7
-psui*     vibex6
-skasm*    vibex6
-dx*       vibex8
+psui*     vibe2
+skasm*    vibe2
+dx*       vibe2
 asm*      vibex8
 studios*  vibex6
 cliapp*   vibex7
 appicon*  vibex7
-*         vibex7
+*         vibe2
