@@ -1075,6 +1075,9 @@ fn the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point(cx: 
     });
     let centre_px = cx.update(|cx| view.read(cx).viewport.read(cx).project(centre).unwrap());
     assert!((spot - centre_px).length() > 20.0, "the spot well off the centre on screen: {spot:?} {centre_px:?}");
+    // (On a loaded host the parts' inference points can come after the open: wait for them under the spot.)
+    wait_until(cx, window, &view, |v, cx| v.triad_snap(spot, cx).is_some());
+    assert!(cx.update(|cx| view.read(cx).triad_snap(spot, cx).is_some()), "the face's points under the spot");
     let w = at_window(cx, &view, at);
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_down(w, MouseButton::Left, Modifiers::default());
     let go = |cx: &mut TestAppContext, from: DVec2, to: DVec2| {
@@ -1091,13 +1094,15 @@ fn the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point(cx: 
             (f, v.viewport.read(cx).project(f.origin).unwrap(), v.drag.as_ref().is_some_and(|d| d.ball_snap.is_some()))
         })
     };
-    // (Each check waits for the move to be taken, the pointer resting there: on a loaded host the assembly's result
-    // can land after the last move, and a resting pointer's next move snaps.)
+    // (Each check waits for the move to be taken, the pointer resting there and stirring half a pixel: the viewport
+    // drops a move to where the pointer already is.)
     let until = |cx: &mut TestAppContext, to: DVec2, snapped: bool| {
         let t = std::time::Instant::now();
+        let mut k = 0.0;
         while !cx.update(|cx| view.read(cx).drag.as_ref().is_some_and(|d| d.ball_snap.is_some() == snapped)) {
             assert!(t.elapsed() < std::time::Duration::from_secs(60), "snapped {snapped} at {to:?}: {:?}", ball(cx).0.origin);
-            let p = at_window(cx, &view, to);
+            k = 0.5 - k;
+            let p = at_window(cx, &view, to + DVec2::new(k, 0.0));
             gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(p, Some(MouseButton::Left), Modifiers::default());
             frames(cx, window, &view);
         }
