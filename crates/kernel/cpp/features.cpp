@@ -4233,8 +4233,10 @@ static bool ring_sections_built(std::vector<TopoDS_Wire>& wires, TopoDS_Wire spi
   return true;
 }
 
-static bool path_sections_built(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& spine, int count)
+static int edge_count(const TopoDS_Wire& w);
+static bool path_sections_built(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& spine, int count, bool& against)
 {
+  against = false;
   if (wires.size() < 2 || count < 1)
     return false;
   if (wires.size() > 2 && BRep_Tool::IsClosed(spine))
@@ -4252,6 +4254,7 @@ static bool path_sections_built(std::vector<TopoDS_Wire>& wires, const TopoDS_Wi
   const double s0 = place(wires.front()), s1 = place(wires.back());
   if (std::abs(s1 - s0) < 1e-9 * (1 + total))
     return false;
+  against = s1 < s0;
   // Profiles in between (c2-loft-guide-curves-wave-washer): at their places on the path, among the cut sections, in
   // the path's order from the first profile to the last.
   std::vector<std::pair<double, TopoDS_Wire>> middle;
@@ -4334,6 +4337,33 @@ static bool path_sections_built(std::vector<TopoDS_Wire>& wires, const TopoDS_Wi
   });
   if (flag != nullptr && flag->load(std::memory_order_relaxed))
     fail_op("cancelled");
+  // Profiles far from square to a path that runs from one to the other (c2-loft-paths-guides' Loft 4: two slots along
+  // an arc from one's tip to the other's): a plane square to the path cuts a carried profile apart; then the profiles
+  // as carried at even steps.
+  const auto touches = [&](const TopoDS_Vertex& v, const TopoDS_Wire& w) {
+    BRepExtrema_DistShapeShape d(v, w);
+    return d.IsDone() && d.Value() < gap;
+  };
+  TopoDS_Vertex e0, e1;
+  TopExp::Vertices(spine, e0, e1);
+  const int  edges = edge_count(wires.front());
+  const bool apart = middle.empty() && std::any_of(cut.begin() + 1, cut.end(), [&](const TopoDS_Wire& w) { return w.IsNull() || edge_count(w) != edges; });
+  if (apart && !e0.IsNull() && !e1.IsNull() &&
+      ((touches(e0, wires.front()) && touches(e1, wires.back())) || (touches(e1, wires.front()) && touches(e0, wires.back()))))
+  {
+    NCollection_List<TopoDS_Shape> carried_at;
+    ps.Simulate(count + 2, carried_at);
+    std::vector<TopoDS_Wire> sw;
+    for (const TopoDS_Shape& x : carried_at)
+      if (x.ShapeType() == TopAbs_WIRE)
+        sw.push_back(TopoDS::Wire(x));
+    if ((int)sw.size() != count + 2)
+      return false;
+    if (touches(e1, wires.front()))
+      std::reverse(sw.begin(), sw.end());
+    for (int i = 1; i <= count; ++i)
+      cut[(size_t)i] = sw[(size_t)i];
+  }
   for (int i = 1; i <= count; ++i)
   {
     const double s = s0 + (s1 - s0) * i / (count + 1);
@@ -4360,14 +4390,14 @@ static bool path_sections_built(std::vector<TopoDS_Wire>& wires, const TopoDS_Wi
 
 // path_sections_built, remembered for the last call on this thread (loft_impl builds again without its smooth ends
 // when they fail: the same sections, c2-loft-paths-guides' Loft 3 cut twice).
-static bool path_sections(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& spine, int count)
+static bool path_sections(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& spine, int count, bool& against)
 {
   struct Last
   {
     TopoDS_Shape              spine;
     std::vector<TopoDS_Wire>  in, out;
     int                       count = 0;
-    bool                      ok    = false;
+    bool                      ok    = false, against = false;
   };
   thread_local Last last;
   const bool same = last.count == count && last.spine.IsEqual(spine) && last.in.size() == wires.size() &&
@@ -4376,11 +4406,13 @@ static bool path_sections(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& sp
   {
     // (Kept only once built: a cancelled build throws.)
     std::vector<TopoDS_Wire> out = wires;
-    const bool               ok  = path_sections_built(out, spine, count);
-    last                         = Last{spine, wires, out, count, ok};
+    bool                     ag  = false;
+    const bool               ok  = path_sections_built(out, spine, count, ag);
+    last                         = Last{spine, wires, out, count, ok, ag};
   }
   if (last.ok)
     wires = last.out;
+  against = last.ok && last.against;
   return last.ok;
 }
 
@@ -5039,10 +5071,10 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
   if (counts)
     split = split.IsNull() ? more : compose(compound_of(args), split, more);
   // Along a path: the sections cut from the profiles carried along it.
-  bool along = false;
+  bool along = false, against = false;
   if (!path.IsNull() && !points && !straight_path_square_to(path, wires))
   {
-    if (!path_sections(wires, as_wire(path, "loft path"), path_count))
+    if (!path_sections(wires, as_wire(path, "loft path"), path_count, against))
       fail_op("the loft can't follow the path");
     along   = true;
     natural = allow_natural && !ruled && !closed;
@@ -5203,8 +5235,10 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
   hb.add_history(h.get());
   if (!closed)
   {
-    hb.add_cap(0, REL_FIRST, ts.FirstShape());
-    hb.add_cap((uint32_t)n - 1, REL_LAST, ts.LastShape());
+    // Along a path the loft starts where the path does (live c2-loft-paths-guides' Loft 4: its path runs from the last
+    // profile to the first, Loft 5 takes the last profile's cap as the start cap).
+    hb.add_cap(against ? (uint32_t)n - 1 : 0, REL_FIRST, against ? ts.LastShape() : ts.FirstShape());
+    hb.add_cap(against ? 0 : (uint32_t)n - 1, REL_LAST, against ? ts.FirstShape() : ts.LastShape());
   }
   return hb.finish();
 }

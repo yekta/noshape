@@ -1217,16 +1217,16 @@ fn oblique_circles(shapes: &[Shape]) -> bool {
 
 fn loft_names(ev: &EvalCtx, sections: &[Section], res: &k::OpResult, caps: bool) -> Vec<Name> {
     let mut roles = BTreeMap::new();
+    // Each cap from the profile it was made of (along a path the start cap is the path's first profile, live
+    // c2-loft-paths-guides' Loft 4).
     if caps {
-        if let Some(p) = sections.first().and_then(|s| s.profile.as_ref()) {
-            for f in res.history.first_faces() {
-                roles.insert(f, Role::CapStart(Some(p.key.clone())));
-            }
-        }
-        if let Some(p) = sections.last().and_then(|s| s.profile.as_ref()) {
-            for f in res.history.last_faces() {
-                roles.insert(f, Role::CapEnd(Some(p.key.clone())));
-            }
+        for r in res.history.records.iter().filter(|r| r.output_kind == ShapeType::Face) {
+            let Some(p) = sections.get(r.arg as usize).and_then(|s| s.profile.as_ref()) else { continue };
+            match r.relation {
+                k::Relation::First => roles.insert(r.output_index, Role::CapStart(Some(p.key.clone()))),
+                k::Relation::Last => roles.insert(r.output_index, Role::CapEnd(Some(p.key.clone()))),
+                _ => None,
+            };
         }
     }
     let mut recs: Vec<&k::HistoryRecord> = res.history.records.iter().filter(|r| r.input_kind == ShapeType::Edge && r.relation == k::Relation::Generated && r.output_kind == ShapeType::Face).collect();

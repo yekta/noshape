@@ -149,6 +149,42 @@ fn a_loft_whose_cut_sections_dont_match_is_refused_not_crashed() {
     assert!(ok.is_valid() && ok.faces().len() == 6);
 }
 
+/// Two slots far from square to an arc that runs from the tip of the upper one to the tip of the lower (live
+/// c2-loft-paths-guides' Loft 4): a plane square to the arc cuts a carried slot apart, so the sections are the slots as
+/// carried; the loft starts where the path does, the upper slot's face its start cap. Was "sections don't match".
+#[test]
+fn a_loft_along_a_path_from_tip_to_tip_takes_the_profiles_as_carried() {
+    let slot = |z: f64, ya: f64, yb: f64, r: f64| {
+        let pl = Plane::new(DVec3::new(0.0, 0.0, z), DVec3::Z, DVec3::X);
+        let (a, b) = (DVec2::new(0.0, ya), DVec2::new(0.0, yb));
+        make_face_2d(
+            &pl,
+            &[
+                Segment2d::Line { a: DVec2::new(r, ya), b: DVec2::new(r, yb) },
+                Segment2d::Arc { center: b, radius: r, start_angle: 0.0, end_angle: PI },
+                Segment2d::Line { a: DVec2::new(-r, yb), b: DVec2::new(-r, ya) },
+                Segment2d::Arc { center: a, radius: r, start_angle: PI, end_angle: 2.0 * PI },
+            ],
+            &[],
+        )
+        .unwrap()
+    };
+    let lower = slot(50.8, -438.15, -336.55, 6.35);
+    let upper = slot(88.9, -438.9374, -386.5626, 5.5626);
+    let (from, to, r) = (DVec3::new(0.0, -381.0, 88.9), DVec3::new(0.0, -330.2, 50.8), 101.6);
+    let m = (from + to) * 0.5;
+    let n = DVec3::X.cross(to - from).normalize();
+    let h = (r * r - (to - from).length_squared() / 4.0).sqrt();
+    let c = if (m + n * h).z > m.z { m + n * h } else { m - n * h };
+    let path = make_wire(&[make_arc_3pts(from, c + (m - c).normalize() * r, to).unwrap()]).unwrap();
+    let l = loft(&[lower, upper], &LoftOptions { solid: true, path: Some((path, 5)), ..Default::default() }).unwrap();
+    assert!(l.shape.is_valid() && l.shape.count(ShapeType::Solid) == 1);
+    let z_of = |i: u32| l.shape.faces()[i as usize].bounding_box(true).unwrap().max.z;
+    let (first, last) = (l.history.first_faces(), l.history.last_faces());
+    assert!(first.len() == 1 && last.len() == 1, "{first:?} {last:?}");
+    assert!((z_of(first[0]) - 88.9).abs() < 1e-6 && (z_of(last[0]) - 50.8).abs() < 1e-6, "{} {}", z_of(first[0]), z_of(last[0]));
+}
+
 /// Live "psb (10-24) loft end derivative": □20 -> □10 20 up with Start
 /// Normal to profile m1 bulges (live 5476.391496; the ruled frustum is
 /// 4666.67). The corner rule with a natural end gives 5476.310271 exactly;
