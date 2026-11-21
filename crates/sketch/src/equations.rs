@@ -378,7 +378,9 @@ fn kernel<T: Num>(kind: &EqKind, x: &[T]) -> T {
             let d = p.sub(c);
             let xx = d.dot(u) / a;
             let yy = u.cross(d) / b;
-            ((xx * xx + yy * yy).sqrt() - T::cst(1.0)) * b
+            // (Scaled by the minor radius as it is, not as a variable: a point at a major axis end leaves the minor
+            // radius free, as live's c2-surf-workshop-knifehandle P4 keeps it.)
+            ((xx * xx + yy * yy).sqrt() - T::cst(1.0)) * T::cst(b.val())
         }
         EqKind::EllipseTangent | EqKind::EllipseOnLine => {
             let (e, de) = ellipse_eval(x, x[5]);
@@ -2196,7 +2198,13 @@ mod tests {
         let x10 = [0.1, 0.2, 1.3, 0.4, -0.5, 0.9, 0.7, -1.1, 2.0, 0.3];
         for (k, n) in kinds {
             let eq = Eq { kind: k, inputs: (0..n as u32).collect() };
-            let x: Vec<f64> = if n <= 8 { x8[..n].to_vec() } else { x10[..n].to_vec() };
+            let mut x: Vec<f64> = if n <= 8 { x8[..n].to_vec() } else { x10[..n].to_vec() };
+            if matches!(eq.kind, EqKind::PointOnEllipse) {
+                // Its weight (the minor radius) is held: exact where the residual is zero, the point on the ellipse.
+                let (c, m, b, t) = (glam::DVec2::new(x[2], x[3]), glam::DVec2::new(x[4], x[5]), x[6], 0.8f64);
+                let p = c + m * t.cos() + m.normalize().perp() * b * t.sin();
+                (x[0], x[1]) = (p.x, p.y);
+            }
             check_grad(&eq, &x);
         }
         let ell = [0.0, 0.0, 2.0, 0.5, 1.0, 0.4, -3.0, 1.0, 3.0, 2.0];

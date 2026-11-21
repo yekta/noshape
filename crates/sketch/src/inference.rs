@@ -245,6 +245,11 @@ pub const VERTICAL_REACH: f64 = 1.0;
 pub const DIRECTION_REACH_PX2: f64 = 360.0;
 /// The snap radius `InferenceContext::snap_radius` stands for, in px (the editor's).
 const SNAP_RADIUS_PX: f64 = 7.5;
+/// A line started this near a held line square to it (px), or this near its midpoint, is Perpendicular to it (live
+/// behaviours "Reach brackets", 11-21: Perpendicular at 20.1 px from the line, Vertical at 24.2 px; at 28.8 px from
+/// the midpoint, Vertical at 31.2 px).
+const PERPENDICULAR_LINE_REACH_PX: f64 = 22.5;
+const PERPENDICULAR_MID_REACH_PX: f64 = 30.0;
 
 /// Computes inference candidates, best first.
 pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inference> {
@@ -438,21 +443,28 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
             // A woken line the new line starts on (its midpoint or a point inside it): live2 "feel (sketch)" (1)
             // infers perpendicular only from a line the start is on, never to one elsewhere, and parallel never.
             let starts_on = |w: EntityId| sk.curve(w).is_some_and(|c| c.closest(a).2 <= 1e-9 * (1.0 + a.length()));
-            // Started at a held line's midpoint, square to it: Perpendicular to it (live sketch-line-from-midpoint, retaken
-            // 11-19 16:4x). Across it, both ends clear, or started on it off the midpoint: Vertical, as a free one (live
-            // sketch-tools-1119 cross; the 11-19 retakes of sketch-trim-key / -undo-trim; through the midpoint too, though
-            // sk2-1121 split-at-crossing, the same lines zoomed out, gave Perpendicular: a retake is asked for).
-            let square_at_mid = |horizontal: bool| {
+            // Started near a held line, square to it: Perpendicular to it when the start is within reach of the line or
+            // of its midpoint on screen, the end anywhere (live "Reach brackets" 11-21, sketch-line-from-midpoint).
+            // Started on it off the midpoint, or from its end as a chain: Vertical, as on a free one (live
+            // sketch-tools-1119, the 11-19 trim retakes, sketch-line-chain).
+            let px = r / SNAP_RADIUS_PX;
+            let square_near = |horizontal: bool| {
                 sk.entities().map(|e| e.id).find(|&w| {
                     let Some(Curve2::Line { a: la, b: lb }) = sk.curve(w) else { return false };
                     let t = (lb - la).normalize_or_zero();
-                    !excluded(sk, ctx, w)
-                        && ((la + lb) * 0.5 - a).length() <= 1e-9 * (1.0 + a.length())
-                        && if horizontal { t.y.abs() > 1.0 - 1e-12 } else { t.x.abs() > 1.0 - 1e-12 }
-                        && direction_held(sk, w)
+                    if excluded(sk, ctx, w) || !(if horizontal { t.y.abs() > 1.0 - 1e-12 } else { t.x.abs() > 1.0 - 1e-12 }) || !direction_held(sk, w) {
+                        return false;
+                    }
+                    let on = 1e-9 * (1.0 + a.length());
+                    let mid = (la + lb) * 0.5 - a;
+                    if mid.length() <= on {
+                        return true;
+                    }
+                    let to_line = la + t * (a - la).dot(t) - a;
+                    to_line.length() > on && (seen(to_line) / px <= PERPENDICULAR_LINE_REACH_PX || seen(mid) / px <= PERPENDICULAR_MID_REACH_PX)
                 })
             };
-            let line_kind = |horizontal: bool| match square_at_mid(horizontal) {
+            let line_kind = |horizontal: bool| match square_near(horizontal) {
                 Some(w) => (InferenceKind::Perpendicular, Some(w), AutoConstraint::PerpendicularTo(w)),
                 None if horizontal => (InferenceKind::Horizontal, None, AutoConstraint::HorizontalLine),
                 None => (InferenceKind::Vertical, None, AutoConstraint::VerticalLine),
@@ -603,12 +615,12 @@ mod tests {
         DVec2::new(x, y)
     }
 
-    /// A line square to a held line (the Line tool's Horizontal): started on it off its midpoint, drawn across it or
-    /// going on from its end as a chain, Vertical, as on a free line (live sketch-tools-1119, its cross retake, the
-    /// 11-19 trim retakes, live2's sketch-line-chain variants 11-19 17:xx); started at its midpoint, Perpendicular to it
-    /// (live sketch-line-from-midpoint).
+    /// A line square to a held line (the Line tool's Horizontal): started on it off its midpoint, drawn across it from
+    /// far off or going on from its end as a chain, Vertical, as on a free line (live sketch-tools-1119, its cross
+    /// retake, the 11-19 trim retakes, live2's sketch-line-chain variants 11-19 17:xx); started at its midpoint,
+    /// Perpendicular to it (live sketch-line-from-midpoint).
     #[test]
-    fn square_to_a_held_line_is_perpendicular_only_from_its_midpoint() {
+    fn square_to_a_held_line_from_its_midpoint_is_perpendicular() {
         let mut sk = Sketch::new();
         let held = sk.add_line(v(0.0, 0.0), v(4.0, 0.0));
         sk.add_constraint(ConstraintKind::Horizontal { a: held, b: None }).unwrap();
@@ -635,6 +647,31 @@ mod tests {
         assert_eq!(infer(&sk, v(1.01, 1.0), &unwoken)[0].kind, InferenceKind::Vertical);
         let mid = InferenceContext { anchor: Some(v(2.0, -1.0)), ..across };
         assert_eq!(infer(&sk, v(2.01, 1.0), &mid)[0].constraints, vec![AutoConstraint::VerticalLine]);
+    }
+
+    /// Live's "Reach brackets" (11-21): started within 22.5 px of a held line, or within 30 px of its midpoint, a line
+    /// square to it is Perpendicular to it, wherever it ends; else Vertical. 1 px = 1 unit here.
+    #[test]
+    fn square_to_a_held_line_from_near_it_is_perpendicular() {
+        let mut sk = Sketch::new();
+        let held = sk.add_line(v(0.0, 0.0), v(120.0, 0.0));
+        sk.add_constraint(ConstraintKind::Horizontal { a: held, b: None }).unwrap();
+        let up = |x: f64, y: f64| {
+            let ctx = InferenceContext { tool: SketchTool::Line, anchor: Some(v(x, y)), snap_radius: 7.5, woken: vec![held], ..Default::default() };
+            infer(&sk, v(x + 0.01, y + 70.0), &ctx).into_iter().next().unwrap().kind
+        };
+        // (Each take's start: px from the line / from the midpoint.)
+        for (take, x, y, kind) in [
+            ("x5 20.1/50.1", 14.1, -20.1, InferenceKind::Perpendicular),
+            ("x15-s12 24.2/28.8", 44.4, -24.2, InferenceKind::Perpendicular),
+            ("x21-s12 24.2/24.5", 64.7, -24.2, InferenceKind::Perpendicular),
+            ("x3-s12 24.2/60.1", 5.0, -24.2, InferenceKind::Vertical),
+            ("x9-s12 24.2/42.8", 24.7, -24.2, InferenceKind::Vertical),
+            ("x15-s13 26.2/31.2", 43.1, -26.2, InferenceKind::Vertical),
+            ("mid-e5 40.3/48", 60.0, -40.3, InferenceKind::Vertical),
+        ] {
+            assert_eq!(up(x, y), kind, "{take}");
+        }
     }
 
     #[test]

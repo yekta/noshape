@@ -484,3 +484,26 @@ fn mirrored_lines_hold_as_lines_with_their_ends_free() {
     assert!(mirror(da).perp_dot(db).abs() < 1e-9, "directions mirrored: {da} {db}");
     assert!((mirror(b0) - a0).perp_dot(da).abs() < 1e-9, "b's line the mirror of a's: {a0} {a1} {b0} {b1}");
 }
+
+/// An ellipse held only at its major axis ends (two points on it there, its centre and axis vertical) keeps its minor
+/// radius: nothing constrains it (live c2-surf-workshop-knifehandle P4, two Pierces at helpParameters π and 2π:
+/// centre −7.1249, major 20.6713 mm, minor 16.6299 kept).
+#[test]
+fn ellipse_held_at_its_major_ends_keeps_its_minor_radius() {
+    let mut sk = Sketch::new();
+    let e = sk.add_ellipse(v(0.0, -13.0092), v(0.0, 23.6416), 16.6299);
+    let Some(Geometry::Ellipse { center, .. }) = sk.entity(e).map(|x| x.geometry.clone()) else { panic!() };
+    let origin = sk.add_point(v(0.0, 0.0));
+    sk.add_constraint(ConstraintKind::Fix { entity: origin }).unwrap();
+    sk.add_constraint(ConstraintKind::Vertical { a: center, b: Some(origin) }).unwrap();
+    sk.add_constraint(ConstraintKind::Vertical { a: e, b: None }).unwrap();
+    for y in [13.5464, -27.7962] {
+        let p = sk.add_point(v(0.0, y));
+        sk.add_constraint(ConstraintKind::Fix { entity: p }).unwrap();
+        sk.add_constraint(ConstraintKind::Coincident { a: p, b: e }).unwrap();
+    }
+    solved(&mut sk);
+    let Some(Curve2::Ellipse { center, major, minor }) = sk.curve(e) else { panic!() };
+    assert!((minor - 16.6299).abs() < 1e-9, "minor {minor}");
+    assert!((center - v(0.0, -7.1249)).length() < 1e-9 && (major.length() - 20.6713).abs() < 1e-9, "{center} {major}");
+}
