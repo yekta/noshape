@@ -1,16 +1,23 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-20 20:02 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-20 23:11 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-20 20:02 UTC)
-- Landing next (after a full-parity A/B, vibex7): c2-sm-jog-panel 5 -> 12/12 (SM docs 222 -> 229/295, 17/24). Four
-  host fixes: opBoolean keeps its tools in query order (a union keeps the first: live qa5 "the first-picked tool
-  survives"; resolve_bodies sorted them by body index, so std Jog's compose kept the moving piece and its query found
-  the whole sheet); opDeleteFace pieces keep the body's attributes (wrap_body_id after run_op: ids are renamed); a
-  rebuilt SM part entity drops its old association attribute before getting its definition entity's (Jog 4 picked
-  a flat holding two); tracking leaves out pieces split off before the id was given (tracking_kin).
-  Test custom_features::a_union_keeps_its_first_tool_and_pieces_keep_their_attributes.
+- dx 11-20 23:20: c2-sm-louver 36 -> 35/36 is from main (base b3c0dc59f), Sketch 9 frame origin x -676.03 vs
+  live -708.49 mm (y, z, axes match); it's my louver Sketch 9 item.
+
+## In flight (11-21 03:20 UTC)
+- LANDING: forms 21/21 (c2-sheet-metal-forms 10 -> 21/21; Mac A/B vs 97df380f1: 108 -> 109/174 docs, 1779 -> 1790
+  features, no other doc changed): Sketch 3 connector at live's frame; Form 4 fuse skipped when adds add nothing;
+  Form 5 region_from_query derived branch; lance bends meeting at asin(1 - h/(rmi+rme)) with no wall, the lance
+  turned 90° (strip along the location's y); knockouts too small for their bridges only the hole; parity
+  names_the_origin (scissor 0da59a's sketch planes).
+- asm-scissor-lift 0da59a: "our parts []" because its 6 Derived sources (other documents) were never fetched:
+  live REQUESTS skasm 11-21. Re-run scissor when live installs them.
+- P0 11-21 (tablet-stand Sketch 3 warning): f9ad07b50's exact-thicken step; core's 199faacf fixes (verified by
+  compat userdocs.py on vibex7). Compat repro: ~/tmp/skasm/compat on vibex7 (userdocs.py copy).
+- After landing: re-check 850efe (72fe51df1 now on main).
+- LANDED af717ef2: std Jog's two bends (c2-sm-jog-panel 5 -> 12/12; full parity 1723 -> 1730/2315, no other doc).
 - LANDED 381554f1: Hem 1 (c2-sm-hem-flange) keeps "Sheet metal model cannot be unfolded." (219 -> 222/295).
 - LANDED 9f5250bf: SM loft profiles with different corner counts walk the least total fold (host/loft.rs).
 - Loft apex PARKED (c2-sm-loft-basic 38 vs 40 faces, +4.2 mm3): where 4 bends meet live makes 9 small faces (3 spline
@@ -24,11 +31,11 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - Rejected: extract surface's faces in body order (hem-flange SM model 2 7 -> 4/8, frames BUTT/BUTT2 swap);
   patch ~/agents/skasm-keep/extract-order.patch (local).
 - modify-joint Sketch 1 frame origin ours 50.33 vs live 120.02 (x): the flat's plane origin convention, open.
+- c2-hgr-riser-weldment: dx's (lead 11-20).
 - Rip 1 (c2-cov-sm-rip), PARKED (Rip is hidden in the UI): live no-op. The std rip splits the front wall diagonally
   and we build the lower triangle as its own wall, so the bottom-front bend starts at x 3.45 with a slanted end
   (diagonal crosses z 2.3 at x 5.75). Fix: build coplanar rip pieces as one wall (needs topology reindexing:
   def_topo, pieces). A coplanar-rip filter in corner_rip / edge_rip lookups had no effect.
-- Next differences: forms Sketch 3 frame (P2 ticket), Form 5/7.
 - Tools: /root/skasm-scratch/pm.sh (ONLY=, SAVE=, build + run), pmrun.sh (TRACE run of the kept binary), smlist.txt
   (24 SM docs), CLI batch on saved docs: ~/tmp/skasm/saved (copy .noshape + -wal), hemq*.sh / jq.sh / jogq.sh.
 - Feel stack 4e51cce3 verified by qa (green f380b6928); P2 drawn_failed LANDED 8fd60c7a.

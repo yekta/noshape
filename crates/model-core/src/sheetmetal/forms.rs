@@ -347,7 +347,7 @@ fn profile_sketch(ev: &EvalCtx, form: &str, t: f64, radius: &dyn Fn(&EvalCtx, &s
         "circle-knockout" => {
             let r = ev.length("diameter")? * 0.5;
             let (ri, s) = (r - 0.8 * t, t * 0.5);
-            if ri > s {
+            if !knockout_hole_only(t, 2.0 * r) {
                 let (ao, ai) = ((s / r).asin(), (s / ri).asin());
                 for base in [0.0, PI] {
                     arc(&mut sk, DVec2::ZERO, r, base + ao, base + PI - ao, false);
@@ -360,6 +360,8 @@ fn profile_sketch(ev: &EvalCtx, form: &str, t: f64, radius: &dyn Fn(&EvalCtx, &s
                         line(&mut sk, DVec2::new(sx * xi, y), DVec2::new(sx * xo, y), false);
                     }
                 }
+            } else {
+                circle(&mut sk, r, false);
             }
         }
         _ => {}
@@ -394,6 +396,17 @@ pub fn tool_feature(ev: &mut EvalCtx) -> FResult<()> {
         ev.ctx.sketches.push(Arc::new(crate::regen::context::SketchResult { feature, name, frame: crate::display::PlaneFrame::TOP, sketch: sk, report, regions, imprinted: Vec::new(), split: Vec::new(), wires, dimension_text: BTreeMap::new(), images: Vec::new(), legacy_edge_directions: ev.ctx.legacy_edge_directions, bodies: None }));
         return Ok(());
     }
+    let part = ev.enum_("part").to_string();
+    // A knockout too small for its bridges (they'd start inside the strip t wide, where live's Form profile fails):
+    // only the hole, no disc pressed out (live c2-sheet-metal-forms' Form 7 / 8: Ø6 and Ø3 on 3 mm, π r² t each).
+    if form == "circle-knockout" && knockout_hole_only(t, ev.length("diameter")?) {
+        if part == "ADD" {
+            return Ok(());
+        }
+        let s = sheet_disc(t, ev.length("diameter")? * 0.5)?;
+        let names = name_new(ev, &s);
+        return ev.apply_operation(vec![NamedShape::new(s, names)], "NEW", None, BodyKind::Solid);
+    }
     let tools = match form.as_str() {
         "circle-emboss" => circle_emboss(t, ev.length("diameter")?, ev.length("height")?, ev.angle("draft")?, radius(ev, "intRadius")?, radius(ev, "extRadius")?)?,
         "circle-extrusion" => circle_extrusion(t, ev.length("diameter")?, ev.length("depth")?, ev.length("radius")?)?,
@@ -414,7 +427,12 @@ pub fn tool_feature(ev: &mut EvalCtx) -> FResult<()> {
         }
         _ => return err("Unknown library form"),
     };
-    let Some(s) = tools.into_iter().nth(if ev.enum_("part") == "SUBTRACT" { 1 } else { 0 }) else { return err("The form has no such tool") };
+    let Some(mut s) = tools.into_iter().nth(if part == "SUBTRACT" { 1 } else { 0 }) else { return err("The form has no such tool") };
+    // Live's Lance runs along its studio's x and is placed by a mate connector whose x is the studio's -Y: on the
+    // sheet the strip runs along the location's y (live c2-sheet-metal-forms' Form 6). Ours runs along y.
+    if form == "lance" {
+        s = k::transform(&s, &k::Transform::Rotate { origin: DVec3::ZERO, axis: DVec3::Z, angle: std::f64::consts::FRAC_PI_2 }, true)?.shape;
+    }
     let names = name_new(ev, &s);
     ev.apply_operation(vec![NamedShape::new(s, names)], "NEW", None, BodyKind::Solid)
 }
@@ -460,7 +478,16 @@ fn bent_profile(t: f64, r_top: f64, h: f64, th: f64, ri: f64, re: f64) -> FResul
     let zc = -t * 0.5 + rme;
     let q0 = w0 + up * rme;
     let ce = q0 + dir * ((zc - q0.y) / dir.y);
-    let wall = (ce - up * rme - w0).dot(dir).max(0.0);
+    let wall = (ce - up * rme - w0).dot(dir);
+    // Too low for both bends at this angle: they meet with no wall, at a steeper angle from the vertical (live
+    // c2-sheet-metal-forms' Form 6: a lance 5 high on bends of 7.5, its arcs 48.19° from the horizontal).
+    if wall < -1e-9 {
+        let steeper = (1.0 - h / (rmi + rme)).clamp(0.0, 1.0).asin();
+        if steeper > th + 1e-9 {
+            return bent_profile(t, r_top, h, steeper, ri, re);
+        }
+    }
+    let wall = wall.max(0.0);
     let r_sub = ce.x;
     let (a_top, a_cone) = (std::f64::consts::FRAC_PI_2, th);
     let (b_cone, b_base) = (std::f64::consts::PI + th, 1.5 * std::f64::consts::PI);
@@ -653,6 +680,11 @@ fn countersink(t: f64, clearance: f64, angle: f64) -> FResult<Vec<Shape>> {
     Ok(vec![revolved(&ring)?, revolved(&hole)?])
 }
 
+/// A knockout whose disc's inner edge (0.8 t in from its rim) lies within its bridges' strip, t wide.
+fn knockout_hole_only(t: f64, d: f64) -> bool {
+    d * 0.5 - 0.8 * t <= t * 0.5
+}
+
 /// Circle knockout (live "Circle knockout"; its faces,
 /// dom/sm-forms-v4/circle-knockout__bodydetails): the disc of the
 /// diameter pressed 0.8 t out of the sheet, held by two bridges t wide on
@@ -662,8 +694,8 @@ fn countersink(t: f64, clearance: f64, angle: f64) -> FResult<Vec<Shape>> {
 fn circle_knockout(t: f64, d: f64) -> FResult<Vec<Shape>> {
     let r = d * 0.5;
     let (c, q) = (0.8 * t, std::f64::consts::FRAC_PI_2);
-    if r <= c {
-        return err("The knockout's diameter must be more than 1.6 times the thickness");
+    if knockout_hole_only(t, d) {
+        return err("The knockout is too small for its bridges");
     }
     let opts = k::BooleanOptions::default();
     let raised = k::make_face_2d(&k::Plane::new(DVec3::new(0.0, 0.0, -0.2 * t), DVec3::Z, DVec3::X), &[k::Segment2d::Circle { center: DVec2::ZERO, radius: r }], &[])?;
@@ -828,9 +860,11 @@ fn built(id: &str, values: &ConfigValues) -> Option<Arc<Context>> {
     let ctx = ok.then(|| {
         let mut c = (*r.context).clone();
         if c.form_tools.is_empty() {
-            let solids: Vec<BodyId> = c.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| b.id.clone()).collect();
+            // Each tool by the feature making it (a knockout too small for its bridges has no Add material).
+            let made_by = |i: usize| studio.features.get(i).and_then(|f| c.bodies.iter().find(|b| b.kind == BodyKind::Solid && b.id.feature == f.id)).map(|b| b.id.clone());
+            let (add, remove) = (made_by(0), made_by(1));
             let feature = studio.features.last().map_or(crate::reference::FeatureId(0), |f| f.id);
-            c.form_tools.push(crate::sheetmetal::FormTool { feature, add: solids.first().cloned(), remove: solids.get(1).cloned(), sketch: None, origin: None });
+            c.form_tools.push(crate::sheetmetal::FormTool { feature, add, remove, sketch: None, origin: None });
         }
         Arc::new(c)
     });

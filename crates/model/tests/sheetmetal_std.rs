@@ -1628,6 +1628,9 @@ fn library_form_tools_as_live() {
         ("bridge-lance", vec![("length", "100 mm"), ("width", "1 mm")], 115.3687, 111.656854, 1e-4),
         ("lance", vec![("length", "100 mm"), ("width", "1 mm"), ("draft", "90 deg")], 107.853982, 107.853982, 1e-5),
         ("lance", vec![("length", "100 mm"), ("width", "1 mm"), ("draft", "90 deg"), ("Profile", "Straight")], 6.926991, 7.712389, 1e-5),
+        // Too low for both bends at 60°: they meet at 48.19° with no wall (live c2-sheet-metal-forms' Form 6: its
+        // strip 42.616 mm unbent, the sheet's volume unchanged).
+        ("lance", vec![("thickness", "3 mm"), ("length", "30 mm"), ("height", "5 mm")], 2556.961804, 2556.961804, 1e-4),
         ("slot-emboss", vec![], 2310.669816, 1883.594769, 1e-3),
         ("slot-emboss", vec![("Length to", "slot_tangents")], 2208.826315, 1800.310497, 1e-3),
     ] {
@@ -1638,6 +1641,17 @@ fn library_form_tools_as_live() {
         let st: Vec<_> = r.display.features.iter().map(|f| (f.status, f.message.clone())).collect();
         let v: Vec<f64> = r.context.bodies.iter().map(|b| b.shape.volume().unwrap_or(0.0) * 1e9).collect();
         assert!(v.len() == 2 && (v[0] - add).abs() < tol && (v[1] - sub).abs() < tol, "{form}: {v:?} vs {add} / {sub}; {st:?}");
+    }
+    // A knockout too small for its bridges: only the hole (live c2-sheet-metal-forms' Form 7 / 8, π r² t each).
+    for (d, sub) in [("6 mm", 84.823002), ("3 mm", 21.205750)] {
+        let studio = noshape_model::sheetmetal::forms::studio("circle-knockout").expect("studio");
+        let mut config = studio.configuration.defaults();
+        config.0.extend([("thickness".to_string(), "3 mm".to_string()), ("diameter".to_string(), d.to_string())]);
+        let r = Regenerator::new().regenerate(&studio, &config, &UnitPrefs::default(), &RegenOptions::default());
+        let st: Vec<_> = r.display.features.iter().map(|f| (f.status, f.message.clone())).collect();
+        let v: Vec<f64> = r.context.bodies.iter().map(|b| b.shape.volume().unwrap_or(0.0) * 1e9).collect();
+        let failed = r.display.features.iter().any(|f| matches!(f.status, FeatureStatus::Error));
+        assert!(v.len() == 1 && (v[0] - sub).abs() < 1e-5 && !failed, "Ø{d}: {v:?}; {st:?}");
     }
     // Every form builds both tools at its defaults.
     for form in noshape_model::sheetmetal::forms::FORMS {

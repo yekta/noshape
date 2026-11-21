@@ -2968,7 +2968,7 @@ impl<'a> Translator<'a> {
             }
         }
         // The Origin, packed (`DUMMY` of "Origin.pointOp": c2-housing-draft's Bohrung 1, its in-feature mate connector).
-        if ids.is_empty() && packed_strings_of(text).iter().any(|s| s == "Origin.pointOp") {
+        if ids.is_empty() && names_the_origin(text) {
             return Ok(vec!["origin".into()]);
         }
         // A Composite part feature's part (`DUMMY` BODY created by "F….opCreateCompositePart": asm-infento-subs' studio
@@ -3569,6 +3569,11 @@ impl<'a> Translator<'a> {
             };
             let want: std::collections::BTreeSet<String> = named.iter().cloned().collect();
             let exact: Vec<&Value> = bounded.iter().filter(|r| own(r) == want).collect();
+            // Named by the face's edges, it reaches them: the region round the named curves out to the face's edges
+            // before one inside them that doesn't (c2-sheet-metal-forms' Form 5 on the wall's face around a
+            // rectangle, not the rectangle).
+            let reaches = |r: &&Value| r["boundary"].as_array().into_iter().flatten().filter_map(Value::as_str).any(|e| e.rsplit(':').next().and_then(|n| n.parse::<u64>().ok()).is_some_and(|n| n >= 1 << 30));
+            let exact: Vec<&Value> = if exact.iter().any(reaches) || !bounded.iter().any(|r| reaches(&r)) { exact } else { bounded.iter().filter(|r| reaches(r)).collect() };
             let k = per_unit(&g["units"]);
             let near = |r: &Value| -> f64 {
                 let (u, v) = (r["inside"][0].as_f64().unwrap_or(0.0), r["inside"][1].as_f64().unwrap_or(0.0));
@@ -5436,27 +5441,26 @@ impl<'a> Translator<'a> {
             (None, Ok(v)) => v.and_then(|v| v.as_array().and_then(|a| a.first()).cloned()).ok_or("no sketch plane")?,
             (None, Err(e)) => self.plane_at_frame(&oid).map(Value::from).ok_or(e)?,
         };
-        // Its own in-feature mate connector (ours has none in a sketch): a plane on live's frame (c2-sheet-metal-forms'
-        // Sketch 3 on a connector at a wall face's centroid).
-        // None there: the connector made in the plane field (c2-hgr-riser-weldment's Bottom, below).
+        // Its own in-feature mate connector (made in the plane field, placed below): on live's frame (c2-hgr-riser-weldment's
+        // Front: a face's centroid packed as a vertex derived from the frame's edges, moved by -#AngleThick;
+        // c2-sheet-metal-forms' Sketch 3, whose origin and normal no plane through it has); else as translated;
+        // untranslated, a plane on live's frame.
         let plane = match plane.as_str().filter(|p| p.starts_with(SUB_FEATURE)).map(|p| p[SUB_FEATURE.len()..].to_string()) {
-            Some(sub) => match self.plane_at_frame(&oid) {
+            Some(sub) if self.sub_params.contains_key(&sub) => {
+                let at = self.frames.get(&oid).and_then(|[o, x, y]| {
+                    let z = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+                    connector_at_frame(&json!({ "origin_mm": o.map(|c| c * 1000.0), "x": x, "z": z }))
+                });
+                if let Some(at) = at {
+                    problems.push("its plane, an in-feature mate connector, taken at live's frame".into());
+                    self.sub_params.insert(sub, at);
+                }
+                plane
+            }
+            Some(_) => match self.plane_at_frame(&oid) {
                 Some(p) => {
                     problems.push("its plane, an in-feature mate connector, taken as a plane on live's frame".into());
                     Value::from(p)
-                }
-                // On live's frame (c2-hgr-riser-weldment's Front: a face's centroid packed as a vertex derived from
-                // the frame's edges, moved by -#AngleThick); else as translated.
-                None if self.sub_params.contains_key(&sub) => {
-                    let at = self.frames.get(&oid).and_then(|[o, x, y]| {
-                        let z = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
-                        connector_at_frame(&json!({ "origin_mm": o.map(|c| c * 1000.0), "x": x, "z": z }))
-                    });
-                    if let Some(at) = at {
-                        problems.push("its plane, an in-feature mate connector, taken at live's frame".into());
-                        self.sub_params.insert(sub, at);
-                    }
-                    plane
                 }
                 None => return Err("its plane: an in-feature mate connector, and no plane of ours on live's frame".into()),
             },
@@ -7293,6 +7297,19 @@ fn only_planes(filter: &Value) -> bool {
     let (mut geometry, mut entities) = (Vec::new(), 0);
     walk(filter, &mut geometry, &mut entities);
     entities == 0 && !geometry.is_empty() && geometry.iter().all(|g| *g == "PLANE")
+}
+
+/// Whether a packed query is the Origin itself: its own operation "Origin.pointOp" (not a face whose history names
+/// the Origin deep inside: asm-scissor-lift's studio 0da59a's Sketch 1 on a derived Extrude's cap).
+fn names_the_origin(text: &str) -> bool {
+    use noshape_model::custom::host::packed::Packed;
+    let Some(packed) = text.split("qCompressed(1.0,\"").nth(1).and_then(|r| r.split('"').next()) else { return false };
+    let Ok(Packed::Tagged(_, top)) = noshape_model::custom::host::packed::unpack(packed) else { return false };
+    let Packed::Map(tm) = top.as_ref() else { return false };
+    let Some((_, op)) = tm.iter().find(|(k, _)| matches!(k, Packed::Str(k) if k == "operationId")) else { return false };
+    let mut strings = Vec::new();
+    packed_strings(op, &mut strings);
+    strings == ["Origin.pointOp"]
 }
 
 fn packed_strings_of(text: &str) -> Vec<String> {

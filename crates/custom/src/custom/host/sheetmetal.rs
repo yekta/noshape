@@ -2598,8 +2598,14 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 if !removes.is_empty() {
                     part = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&part), &removes, &k::BooleanOptions::default()).map_err(|e| fe(format!("The form failed: {e}")))?.shape;
                 }
+                // Parts to add the sheet already holds leave it as it is (live c2-sheet-metal-forms' Form 4: a
+                // countersink's ring around its cone, no circle on the sheet's bottom).
                 if !adds.is_empty() {
-                    part = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&part), &adds, &k::BooleanOptions::default()).map_err(|e| fe(format!("The form failed: {e}")))?.shape;
+                    let fused = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&part), &adds, &k::BooleanOptions::default()).map_err(|e| fe(format!("The form failed: {e}")))?.shape;
+                    let grown = fused.volume().unwrap_or(0.0) - part.volume().unwrap_or(0.0);
+                    if grown.abs() > 1e-12 {
+                        part = fused;
+                    }
                 }
                 let n_removes = removes.len();
                 let tools: Vec<Shape> = removes.into_iter().chain(adds).collect();
