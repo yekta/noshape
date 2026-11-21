@@ -73,6 +73,21 @@ fn a_derived_source_tab_changes_the_key() {
     assert_ne!(k0, d.key(b), "the source's depth");
 }
 
+/// A Part Studio open as a tab and imported by a Derived feature is regenerated once: the tab takes what the Derived
+/// built of it (asm-scissor-lift's sources were regenerated again in their tabs).
+#[test]
+fn a_derived_source_open_as_a_tab_is_regenerated_once() {
+    let mut doc = Document::new();
+    let a = doc.add_tab("Source", TabContent::PartStudio(block("10 mm")));
+    let mut b = PartStudio::new();
+    b.features.push(feature(&b, "importDerived", &[("partStudio", ParamValue::Text(a.to_string()))]));
+    let b = doc.add_tab("Derived", TabContent::PartStudio(b));
+    let mut d = Doc::new(doc, "derived-once");
+    d.open.regenerate(b, None).unwrap();
+    let r = d.open.regenerate(a, None).unwrap();
+    assert!(r.evaluated.is_empty(), "evaluated again: {:?}", r.evaluated);
+}
+
 #[test]
 fn a_source_in_another_document_or_version_changes_the_key() {
     let mut doc = Document::new();

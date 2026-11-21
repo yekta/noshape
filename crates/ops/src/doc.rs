@@ -28,9 +28,9 @@ use std::path::{Path, PathBuf};
 /// One open document.
 pub struct OpenDoc {
     pub session: Session,
-    /// Regeneration caches of every Part Studio (shared with Derived sources).
+    /// Regeneration caches of every Part Studio, one per tab: its own regenerations and its Derived importers' (a
+    /// source open as a tab was regenerated twice: asm-scissor-lift's 57725f Derived 1).
     pub studio_cache: crate::derived::StudioCache,
-    regens: HashMap<TabId, Regenerator>,
     /// One for every assembly tab: a Part Studio used by the assembly and its subassemblies' tabs is regenerated once
     /// (asm-suspension's 20-minute studio was regenerated for each tab inserting its parts).
     assemblies: Option<noshape_model::assembly::eval::AssemblyEvaluator>,
@@ -51,7 +51,7 @@ impl OpenDoc {
         // std's dialog logic (Extrude, Hole, …) loads in the background, so
         // the first feature_add doesn't parse std (fs, lead 10-26).
         noshape_model::custom::std_feature::prewarm();
-        OpenDoc { session, studio_cache: Default::default(), regens: HashMap::new(), assemblies: None, active_config: HashMap::new(), sketch_fillet_radius: HashMap::new(), window: Default::default() }
+        OpenDoc { session, studio_cache: Default::default(), assemblies: None, active_config: HashMap::new(), sketch_fillet_radius: HashMap::new(), window: Default::default() }
     }
 
     pub fn doc(&self) -> &Document {
@@ -111,7 +111,7 @@ impl OpenDoc {
         if !keys.is_empty() {
             let mut assemblies = crate::derived::assembly_evaluator(Default::default());
             for key in keys {
-                views::regenerate_source(&self.session.doc, &key, self.regens.entry(key.tab).or_default(), &mut assemblies);
+                self.with_regen(key.tab, |reg| views::regenerate_source(&self.session.doc, &key, reg, &mut assemblies));
             }
         }
         // (asm-isaac-ball's first view regenerated every Part Studio afresh: 37 s, live 10.7 s.)
@@ -136,8 +136,7 @@ impl OpenDoc {
             None => self.current_config(tab)?,
         };
         let studio = studio(&self.session.doc, tab)?;
-        let reg = self.regens.entry(tab).or_default();
-        let r = reg.regenerate(studio, &values, &units, &opts);
+        let r = self.with_regen(tab, |reg| reg.regenerate(studio, &values, &units, &opts));
         // (Here, not on a thread: an agent's process ends with its call.)
         if let Some(store) = opts.store.clone() {
             noshape_model::regen::persist::keep_now(store, &r);
@@ -166,8 +165,16 @@ impl OpenDoc {
         let opts = RegenOptions { touch_probe: probe, ..self.regen_options(tab) };
         let units = self.session.doc.settings.units;
         let values = crate::config::current(edited, self.active_config.get(&tab).unwrap_or(&ConfigValues::default()));
-        let reg = self.regens.entry(tab).or_default();
-        Ok(reg.regenerate(edited, &values, &units, &opts))
+        Ok(self.with_regen(tab, |reg| reg.regenerate(edited, &values, &units, &opts)))
+    }
+
+    /// Runs `f` with a tab's Regenerator, out of the cache meanwhile (a Derived source it regenerates takes its own).
+    fn with_regen<R>(&self, tab: TabId, f: impl FnOnce(&mut Regenerator) -> R) -> R {
+        let key = tab.to_string();
+        let mut reg = self.studio_cache.lock().remove(&key).unwrap_or_default();
+        let r = f(&mut reg);
+        self.studio_cache.lock().insert(key, reg);
+        r
     }
 
     /// Evaluate (solve) an assembly tab as given (already configured, with

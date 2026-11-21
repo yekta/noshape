@@ -600,6 +600,8 @@ impl PartStudioView {
                 _ => {}
             }
         }));
+        // What a Derived feature already regenerated of this studio (its source) isn't regenerated again.
+        let regen = doc.read(cx).studio_cache.lock().get(&tab.to_string()).map(Regenerator::snapshot).unwrap_or_default();
         let mut this = Self {
             tab,
             doc,
@@ -621,7 +623,7 @@ impl PartStudioView {
             opts: SceneOptions { show_planes: true, show_sketches: true, show_origin: true, ..Default::default() },
             edit: None,
             selected_features: Vec::new(),
-            regen: Arc::new(Mutex::new(Regenerator::new())),
+            regen: Arc::new(Mutex::new(regen)),
             regen_seed: Default::default(),
             regen_seq: 0,
             regen_task: None,
