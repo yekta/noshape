@@ -16,7 +16,7 @@ Method:
 - Table: /root/psui-scratch/dlg/gen_table.py specdiff.json ours-empty.json [live empty-errors.json].
 
 Result on green 4553fc38a (11-21 10:4x), against live's fresh dump (live/psui/dlg-1121/featurespecs.json, std 3132)
-and live's empty errors by REST (dlg-1121/empty-errors.json): 88 feature types, 86 with a live spec. 80 equal in every
+and live's empty errors by REST (dlg-1121/empty-errors.json): 88 feature types, 86 with a live spec. 81 equal in every
 field (ids, order, labels, defaults, toggles, options); 85 of 87 empty errors equal (Form tool: no live answer). Left:
 - Hole: field order from unitsSystem on (live's V2 diameter / tolerance fields): our std is 3112, live's 3132 (hole.fs
   is one of the 14 files that differ; reported to lead 11-21).
@@ -24,7 +24,6 @@ field (ids, order, labels, defaults, toggles, options); 85 of 87 empty errors eq
   shown together; the dialogs look the same.
 - Import: Import appearances on in ours and in live's dialog (live's spec default False is not what its UI shows).
 - Recognize (in neither toolbar): Thickness / Minimal gap 25 mm in live's spec, 1.6 / 0.02 mm in ours.
-- Variable: Conversion factor default 0 in live's spec, 1 in ours (to judge: hidden, used only for unit conversion).
 - Frame empty error: live's REST "Select profile." comes from the spec skipping the library profile default; live's
   dialog says ours, "Select sweep paths.".
 - Tag empty error: std (tag.fs) names the faulty field instanceFunction, which Tag doesn't have; live's dialog marks no
@@ -121,5 +120,5 @@ Status: = same, ≠ differs.
 | Transform | transform | 23 (7 sel, 9 val, 5 tog, 2 list) | = | = | = | Cannot resolve entities. | Cannot resolve entities. | = spec, = error |
 | Trim curve | trimCurve | 9 (4 sel, 1 val, 1 tog, 3 list) | = | = | = | Select a curve to adjust. | Select a curve to adjust. | = spec, = error |
 | Unfold | sheetMetalUnfold | 4 (3 sel, 0 val, 1 tog, 0 list) | = | = | = | No part selected to unfold. | No part selected to unfold. | = spec, = error |
-| Variable | assignVariable | 42 (4 sel, 18 val, 6 tog, 9 list) | = | = | ≠ conversionFactor default: 0 / 1 | Variable name must be a letter followed by a string of letters or numbers. | Variable name must be a letter followed by a string of letters or numbers. | ≠ spec, = error |
+| Variable | assignVariable | 42 (4 sel, 18 val, 6 tog, 9 list) | = | = | = | Variable name must be a letter followed by a string of letters or numbers. | Variable name must be a letter followed by a string of letters or numbers. | = spec, = error |
 | Wrap | wrap | 19 (5 sel, 4 val, 8 tog, 2 list) | = | = | = | Select planar faces or sketch regions to wrap. | Select planar faces or sketch regions to wrap. | = spec, = error |

@@ -324,7 +324,7 @@ pub fn variable() -> FeatureType {
         ParamSpec::enum_("columnResult", "Result type", RESULT).hints(Hints::SHOW_LABEL).visible(column),
         ParamSpec::num("columnLabelIndex", "Label row index", NumSpec::integer(0, 0, 100_000)).visible(move |v| column(v) && (v.is("columnAccessType", "LABEL") || v.is("columnResult", "MAP"))),
         ParamSpec::bool("useConversionFactor", "Conversion factor", false).hints(Hints::DISPLAY_SHORT | Hints::FIRST_IN_ROW).visible(table),
-        ParamSpec::text("conversionFactor", "Conversion factor", "1").hints(Hints::DISPLAY_SHORT).visible(move |v| table(v) && v.bool("useConversionFactor")),
+        ParamSpec::text("conversionFactor", "Conversion factor", "0").hints(Hints::DISPLAY_SHORT).visible(move |v| table(v) && v.bool("useConversionFactor")),
         // Measured.
         // std variable.fs: two picks (then the focus moves on).
         query_n("entityCouple", "Entities to measure between", QueryFilter::ANY_FACE | QueryFilter::ANY_EDGE | QueryFilter::POINT_LIKE | QueryFilter::BODY | QueryFilter::PLANE, 2).visible(distance),
