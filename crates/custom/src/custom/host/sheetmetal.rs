@@ -2544,6 +2544,15 @@ fn part_sources(part: &Shape, probes: &[Option<(DVec3, DVec3)>], pieces: &[Piece
         .map(|(i, e)| {
             let fs: Vec<Def> = ef.get(i).map(|v| v.iter().filter_map(|f| faces.get(*f as usize).copied()).collect()).unwrap_or_default();
             let mid = e.endpoints().map(|(a, b)| (a + b) * 0.5).unwrap_or_default();
+            // Between two definition faces meeting with no joint (a wall and a rolled hem's cylinder, live's TANGENT): the
+            // definition edge they share (c2-cov2-sm-hem-jog's second hem finds its side beside the rolled one by it).
+            let between = match fs.as_slice() {
+                [Def::Face(a), Def::Face(b)] if a != b => topo.edge_faces.iter().position(|f| f.contains(&(*a as u32)) && f.contains(&(*b as u32))),
+                _ => None,
+            };
+            if let Some(x) = between {
+                return Def::Edge(x);
+            }
             match fs.as_slice() {
                 [a, b] if a == b => *a,
                 [Def::Vertex(v), _] | [_, Def::Vertex(v)] => Def::Vertex(*v),
@@ -3821,6 +3830,9 @@ fn ev_corner_type(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 None => "NOT_A_CORNER",
             },
             ([_, _, ..], 1..) => "CLOSED_CORNER",
+            // One bend ending at rips: its relief (live c2-cov2-sm-corner-break-relief-joint's converted box B, its
+            // Bend reliefs at the bends' ends by the ripped walls).
+            ([_], 1..) => "BEND_END",
             _ => "OPEN_CORNER",
         };
         Ok((kind, verts.iter().chain(&mate).map(|n| q.to_ref(&Ent::Vertex(*b, *n))).collect::<Vec<Reference>>()))

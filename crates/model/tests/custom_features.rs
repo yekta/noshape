@@ -4842,6 +4842,43 @@ export const sketchTopology = defineFeature(function(context is Context, id is I
     );
 }
 
+/// A scaled pattern copy of a sketch's wire is scaled too (std Hem copies its arc at another radius, then scales the
+/// extruded copy back: c2-cov2-sm-hem-jog's closed hem): a circle twice as large round the same centre.
+#[test]
+fn a_scaled_pattern_copy_of_a_sketch_wire_is_scaled() {
+    use glam::DVec2;
+    use noshape_model::reference::DatumPlane;
+    use noshape_model::sketch_feature::SketchData;
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::new(0.1, 0.0), 0.005);
+    let mut f = ps.new_feature("sketch", &units).unwrap();
+    f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    let circle = f.id;
+    ps.features.push(f);
+    let body = format!(r#"
+annotation {{ "Feature Type Name" : "Scaled copy" }}
+export const scaledCopy = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {{}}
+    {{
+        const wire = qBodyType(qEntityFilter(qCreatedBy(makeId("{circle}")), EntityType.BODY), BodyType.WIRE);
+        opPattern(context, id + "pattern", {{ "entities" : wire, "transforms" : [scaleUniformly(2, vector(100, 0, 0) * millimeter)], "instanceNames" : ["1"] }});
+        const b = evBox3d(context, {{ "topology" : qCreatedBy(id + "pattern", EntityType.EDGE) }});
+        println(round(b.minCorner[0] / millimeter) ~ " " ~ round(b.maxCorner[0] / millimeter) ~ " " ~ round(b.minCorner[1] / millimeter) ~ " " ~ round(b.maxCorner[1] / millimeter));
+    }});
+"#);
+    let fx = Fixture::new(&studio(&body));
+    let f = ps.new_feature(&fx.ty("scaledCopy"), &fx.units).unwrap();
+    let fid = f.id;
+    ps.features.push(f);
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+    let out = custom::run::output_of(fid).expect("output").output;
+    assert_eq!(out.trim(), "90 110 -10 10");
+}
+
 const DISK: &str = r#"
 annotation { "Feature Type Name" : "Disk" }
 export const disk = defineFeature(function(context is Context, id is Id, definition is map)

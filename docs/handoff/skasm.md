@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-21 16:19 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-21 18:04 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## In flight (11-21 04:30 UTC)
@@ -93,18 +93,17 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
    Left: nested seeds re-run as tools (Mirror 1 / 2 inside Mirror 3).
 00d. LANDED 01d8226a: an edge with no curve of live's type within 5 % of live's length takes the nearest of any type
    within 5 % (live's part first): surf-intro Boundary surface 1 builds (boundary conditions WARNING is core's).
-00e. LANDING 11-21 (Corner+Joint): a SIZED_ROUND corner relief smaller than its corner's bend-allowance square isn't cut
-   and the part warns SHEET_METAL_CORNER_UNDER_SIZED on every rebuild (Corner 2 and 3); the translator truncates a
-   selection over the dialog's limit (live's one qClosestTo names both sides of a rip: Joint keeps the first).
-   Mac A/B 1966 -> 1976/2680, only corner-break changed (10 -> 20/37; next: Bend relief 1 "Selection is a corner").
-00f. Staged in /root/skasm-scratch/se/ (apply after 00e lands, A/B as one): se.diff (Bounds::trim with a solid start:
-   start-extrude "second up to next / up to body" EXTRUDE_FAILED); bendend.diff (one bend's end at rips = BEND_END:
-   Bend relief 1); frametrim.diff (frame trim by a surface body, gusset offset sign); lpg4.diff (edge-on circle Use:
-   loft-paths-guides Sketch 4); lpg6.diff (a sketch constraint's non-part edge = an earlier sketch's line: Sketch 6's
-   DISTANCE to Sketch 5's INTERSECTED line JUV); hemdbg.diff (TEMPORARY println, never commit): hem-jog "Hem straight
-   opposite closed" throws at sheetMetalHem.fs:565 (getRelevantSolidFoldedSideGeometry finds != 1 side; suspect the
-   x=0 edge's side at (0,0) beside the rolled hem, a TANGENT joint). Open: corner-break model F convert of a filleted
-   box (live 3 parts), frame End cap crash. loft-paths-guides Loft 3 (37 vs 33 edges): TICKETS row for core.
+00e. LANDED 8ac743df (Corner+Joint): SIZED_ROUND corner relief under its bend-allowance square warns
+   SHEET_METAL_CORNER_UNDER_SIZED, not cut; the translator truncates a selection over the dialog's limit.
+00f. LANDING 11-21 (Mac A/B 1976 -> 1990/2680, no doc worse): Bounds::trim with a solid start (start-extrude 19 ->
+   29/34); one bend's end at rips = BEND_END (corner-break 20 -> 23/37); frame trim by a surface body (frame 16 ->
+   17/23); edge-on circle Use (loft-paths-guides Sketch 4) and a constraint's non-part edge = an earlier sketch's
+   line (Sketch 6); a part edge between two definition faces with no joint = their shared definition edge (hem-jog's
+   TANGENT side); opPattern of a sketch body by a scale scales its geometry (std Hem's arc copy: hem-jog builds, INFO
+   flat collision, 27/52/27 vs live 29/61/34).
+   Next: corner-break model F convert of a filleted box (live 3 parts; ours "cannot be built"); start-extrude "arcs as
+   bends" (2 bend-end arcs not circles); frame Trim group 66 vs 64 edges, End cap signal 11, gusset on +y (live -y);
+   hem-jog flat collision. Loft 3 (37 vs 33 edges) is core's (TICKETS LOFT3-EDGES).
 0. USER P0 feel: rows of docs/parity/interaction-feel.md in my areas are "=" now; Hover timing is psui's.
 0b. DONE 11-21 13:35: sketch-line-from-midpoint / sketch-bezier-polygon / sketch-spline-handle-arm match with the camera
    (3/3, 40/40 states, green 6241cf347 on vibe2; skasm-scratch/bin/uipg.sh); the 7 asm takes are asm's.

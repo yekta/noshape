@@ -39,7 +39,8 @@ struct Use {
 
 #[derive(Clone, Copy)]
 enum LiveUse {
-    Ends([[f64; 3]; 2]),
+    /// An edge's ends and its box.
+    Ends([[f64; 3]; 2], Option<[[f64; 3]; 2]>),
     Point([f64; 3]),
 }
 
@@ -1784,7 +1785,23 @@ impl<'a> Translator<'a> {
         let live = match u.live {
             // Only a stored curve as long as live's edge moved off it; a shorter one is a piece live split or trimmed
             // (asm-welding-config 9c7704's Sketch 12).
-            Some(LiveUse::Ends([a, b])) => local(a).zip(local(b)).map(|(a, b)| [a, b]).filter(|e| u.ends.is_some_and(|s| (chord(s) - chord(*e)).abs() <= 1e-7)).map(|e| (None, Some(e))),
+            Some(LiveUse::Ends([a, b], bbox)) => {
+                // A curve in a plane square to the sketch's (seen edge-on) is used as the line across its box:
+                // c2-loft-paths-guides' Sketch 4 uses Extrude 1's end circle on the Right plane (stored 254 mm off).
+                let edge_on = || {
+                    let [lo, hi] = bbox?;
+                    let corners: Vec<[f64; 2]> = (0..8).filter_map(|i| local([if i & 1 == 0 { lo[0] } else { hi[0] }, if i & 2 == 0 { lo[1] } else { hi[1] }, if i & 4 == 0 { lo[2] } else { hi[2] }])).collect();
+                    let span = |j: usize| corners.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), c| (a.min(c[j]), b.max(c[j])));
+                    let (x, y) = (span(0), span(1));
+                    match (x.1 - x.0 <= 1e-7, y.1 - y.0 <= 1e-7) {
+                        (true, false) => Some([[x.0, y.0], [x.0, y.1]]),
+                        (false, true) => Some([[x.0, y.0], [x.1, y.0]]),
+                        _ => None,
+                    }
+                };
+                let same = |e: &[[f64; 2]; 2]| u.ends.is_some_and(|s| (chord(s) - chord(*e)).abs() <= 1e-7);
+                local(a).zip(local(b)).map(|(a, b)| [a, b]).filter(same).or_else(|| edge_on().filter(same)).map(|e| (None, Some(e)))
+            }
             Some(LiveUse::Point(p)) => local(p).map(|p| (Some(p), None)),
             None => None,
         };
@@ -5049,12 +5066,13 @@ impl<'a> Translator<'a> {
             "EDGE" if r.sketch && r.geometry.is_none() && r.ends.is_some() && self.part_of(k, &r).is_none() && let Some(curve) = self.sketch_curve_at(p, None, r.ends) => Ok(curve),
             "EDGE" => {
                 let part = self.part_of(k, &r);
-                // A PIERCE's edge on a body that is no part, its type not given (c2-loft-paths-guides' Sketch 3 arc JOB):
-                // a sketch's curve with live's midpoint and length, before the nearest part edge. Only a PIERCE's: a
-                // Draft's parting edges took a sketch line (c2-parting-line-draft-parting-line's Draft 1).
+                // A sketch constraint's edge on a body that is no part (c2-loft-paths-guides' Sketch 3 PIERCE on arc JOB,
+                // Sketch 6's DISTANCE to Sketch 5's line JUV): a sketch's curve with live's midpoint and length, before
+                // the nearest part edge. Only a sketch constraint's: a Draft's parting edges took a sketch line
+                // (c2-parting-line-draft-parting-line's Draft 1).
                 if part.is_none()
                     && r.measure.is_some()
-                    && r.constraints.iter().any(|(_, p)| p == "externalEdge")
+                    && !r.constraints.is_empty()
                     && let Some(curve) = self.sketch_curve_at(p, r.measure, r.ends)
                 {
                     return Ok(curve);
@@ -5749,7 +5767,7 @@ impl<'a> Translator<'a> {
             }
             let used = shape.as_ref().and_then(|_| projected.get(&eid)).and_then(|(cid, p)| self.external_ref(k, cid, p));
             let live = projected.get(&eid).and_then(|(_, p)| p["queries"].as_array()?.first()?["deterministicIds"].as_array()?.first()?.as_str()).and_then(|id| self.refs.get(&(k, id.to_string()))).filter(|r| !r.self_made).and_then(|r| match r.kind.as_str() {
-                "EDGE" => r.ends.map(LiveUse::Ends),
+                "EDGE" => r.ends.map(|e| LiveUse::Ends(e, r.bbox)),
                 "VERTEX" => r.point.map(LiveUse::Point),
                 _ => None,
             });

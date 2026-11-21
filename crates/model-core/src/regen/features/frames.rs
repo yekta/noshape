@@ -763,22 +763,42 @@ pub fn frame_trim(ev: &mut EvalCtx) -> FResult<()> {
         if targets.is_empty() {
             return crate::regen::eval::err_at(&["targets"], "Select frame segments to trim.");
         }
-        let Some(r) = ev.query("tool").first() else { return crate::regen::eval::err_at(&["tool"], "Select face, plane, or mate connector to trim to.") };
-        let Some(p) = ev.resolve_plane(r) else { return err("Only planar faces, planes and mate connectors can be used to trim") };
-        if ev.bool("useToolExtents") {
-            ev.warnings.push("Trim to face boundaries is not applied; the face's plane is used".into());
-        }
-        // std faceTrim: opSplitPart keeps the front (the tool's normal side; Flip: the back).
-        let removed = if ev.bool("flipTrim") { p.normal } else { -p.normal };
+        let Some(r) = ev.query("tool").first().cloned() else { return crate::regen::eval::err_at(&["tool"], "Select face, plane, or mate connector to trim to.") };
+        // A surface body trims by its face, and goes (std's opSplitPart, keepTools off; c2-cov2-frame-corners-trim-endcap-gusset's
+        // Trim face tool extents).
+        let sheet = matches!(r, Reference::Body(_)).then(|| ev.resolve_bodies(std::slice::from_ref(&r))).into_iter().flatten().find(|&b| ev.ctx.bodies[b].kind == BodyKind::Surface);
+        let faces: Vec<Shape> = match sheet {
+            Some(b) => ev.ctx.bodies[b].shape.faces(),
+            None => ev.resolve_faces(std::slice::from_ref(&r)).into_iter().filter_map(|(b, f)| ev.face_shape(b, f).ok()).collect(),
+        };
+        let plane = ev.resolve_plane(&r).map(|p| (p.origin, p.normal)).or_else(|| match faces.as_slice() {
+            [f] => f.face_plane().ok().flatten().and_then(|p| Some((p.origin, f.normal_at_point(f.centroid().ok()?).ok()?))),
+            _ => None,
+        });
+        let Some((origin, normal)) = plane else { return err("Only planar faces, planes and mate connectors can be used to trim") };
+        // std faceTrim: opSplitPart keeps the front (the tool's normal side; Flip: the back); Use tool extents splits
+        // only inside the face's boundary (a construction plane is whole).
+        let removed = if ev.bool("flipTrim") { normal } else { -normal };
         let big = ev.model_extent();
+        let within = match faces.as_slice() {
+            [f] if ev.bool("useToolExtents") => Some(k::extrude(f, removed * big)?.shape),
+            _ => None,
+        };
         for bi in targets {
             let body = ev.ctx.bodies[bi].clone();
             let ex = removed.any_orthonormal_vector();
-            let bx = oriented_box(p.origin, ex, removed.cross(ex), [-big, big], [-big, big], [0.0, big])?;
+            let bx = match &within {
+                Some(prism) => prism.clone(),
+                None => oriented_box(origin, ex, removed.cross(ex), [-big, big], [-big, big], [0.0, big])?,
+            };
             let tool = tool_named(bx, |i| face(feature, Role::New(i)));
             let (sh, nm) = bool_named(ev, k::BooleanOp::Cut, &super::sheetmetal_util::body_named(&body), &[tool])?;
             let piece = largest_piece(&sh, &nm).ok_or_else(|| fe("Failed to trim some segments."))?;
             set_body(ev, bi, piece);
+        }
+        if let Some(b) = sheet {
+            let id = ev.ctx.bodies[b].id.clone();
+            super::helpers_a::remove_bodies(ev, &[id]);
         }
         return Ok(());
     }

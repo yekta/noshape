@@ -216,7 +216,7 @@ fn op_extrude(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let (s, e) = (start.unwrap_or(far), end.unwrap_or(far));
             let mut res = k::extrude_between(&edge, -d * s, d * e, 0.0).map_err(|e| fe(format!("Extrude failed: {e}")))?;
             if bounds.start.is_some() || bounds.end.is_some() {
-                res = bounds.trim(&res, &edge.translated(-d * s)?)?;
+                res = bounds.trim(&res, &edge.translated(-d * s)?, &edge.translated(d * e)?)?;
             }
             // Onshape's sheet faces the side `tangent × direction` (live sm3:
             // (0,0)→(30,0) extruded +z faces −y).
@@ -257,9 +257,9 @@ struct Bounds {
 }
 
 impl Bounds {
-    /// The edge's sheet `res`, run far toward its up-to ends, cut back to them; `start_line`: where it starts (the
-    /// edge at its blind start, or far back).
-    fn trim(&self, res: &k::OpResult, start_line: &Shape) -> FResult<k::OpResult> {
+    /// The edge's sheet `res`, run far toward its up-to ends, cut back to them; `start_line` / `end_line`: where it
+    /// starts and ends (the edge at its blind depths, or far off).
+    fn trim(&self, res: &k::OpResult, start_line: &Shape, end_line: &Shape) -> FResult<k::OpResult> {
         // A planar face bounds as its whole plane (Onshape extends an up-to surface).
         let size = res.shape.bounding_box(false).map(|b| b.diagonal() * 2.0).unwrap_or(1.0);
         let extended = |b: &Shape| -> Shape {
@@ -289,16 +289,23 @@ impl Bounds {
             Some((p - pl.origin).dot(n))
         };
         let solid_end = end.as_ref().filter(|e| !e.solids().is_empty());
+        // A part at the start (std's second direction up to next / body, c2-cov2-sm-start-extrude-bounds): back from
+        // the end to where the sheet first crosses it.
+        let solid_start = start.as_ref().filter(|s| !s.solids().is_empty() && solid_end.is_none());
         let mut pieces: Vec<(Shape, DVec3)> = split.shape.faces().into_iter().filter_map(|f| Some((f.clone(), super::sheetmetal::inner_point(&f)?))).collect();
-        if let Some(st) = &start {
+        if let Some(st) = start.as_ref().filter(|_| solid_start.is_none()) {
             pieces.retain(|(_, c)| side(st, *c).is_none_or(|x| x > 0.0));
         }
         if let Some(end) = end.as_ref().filter(|_| solid_end.is_none()) {
             pieces.retain(|(_, c)| side(end, *c).is_none_or(|x| x < 0.0));
         }
-        let begin = start.as_ref().unwrap_or(start_line);
-        let kept: Vec<Shape> = match solid_end {
-            // From the start, through pieces on the start's side of the part's boundary, up to where it is crossed.
+        let (begin, solid) = match solid_start {
+            Some(part) => (end.as_ref().unwrap_or(end_line), Some(part)),
+            None => (start.as_ref().unwrap_or(start_line), solid_end),
+        };
+        let kept: Vec<Shape> = match solid {
+            // From the start (or the end, for a part at the start), through pieces on its side of the part's
+            // boundary, up to where it is crossed.
             Some(part) => {
                 let inside = |c: DVec3| part.classify_point(c, 1e-7).is_ok_and(|k| k == k::PointClass::Inside);
                 let first: Vec<usize> = (0..pieces.len()).filter(|&i| touches(&pieces[i].0, begin)).collect();
@@ -2924,6 +2931,9 @@ fn copy_sketches(ev: &mut EvalCtx, id: &[Arc<str>], sketches: impl Iterator<Item
         sub.push(Arc::from(format!("sketch{}", out.len())));
         let new = super::marker_of(&sub);
         let frame = crate::regen::eval::transform_frame(&s.frame, &m);
+        // A scaled copy (std Hem's arc at another radius) scales the sketch's own geometry; the frame keeps unit axes.
+        let scale = m.x_axis.truncate().length();
+        let s = if (scale - 1.0).abs() > 1e-12 { Arc::new(scaled_sketch(&s, scale)) } else { s };
         ev.ctx.sketches.retain(|x| x.feature != new);
         ev.ctx.sketches.push(Arc::new(crate::regen::context::SketchResult { feature: new, frame, ..(*s).clone() }));
         if hide || ev.ctx.hidden_sketches.contains(&s.feature) {
@@ -2932,6 +2942,17 @@ fn copy_sketches(ev: &mut EvalCtx, id: &[Arc<str>], sketches: impl Iterator<Item
         out.push((s.feature, new));
     }
     out
+}
+
+/// `s` with its geometry scaled by `k` about its frame's origin, its regions and wires found again.
+fn scaled_sketch(s: &crate::regen::context::SketchResult, k: f64) -> crate::regen::context::SketchResult {
+    let mut sketch = s.sketch.clone();
+    let ids: Vec<noshape_sketch::EntityId> = sketch.entities().filter(|e| !e.external).map(|e| e.id).collect();
+    if sketch.transform(&ids, noshape_sketch::tools::Transform::Scale { center: glam::DVec2::ZERO, factor: k }).is_err() {
+        return s.clone();
+    }
+    let regions = sketch.regions();
+    crate::regen::context::SketchResult { imprinted: Vec::new(), split: Vec::new(), wires: sketch.wires(), regions, sketch, ..s.clone() }
 }
 
 /// A sketch copy keeps its source's attributes, the sketch's and its bodies'.
