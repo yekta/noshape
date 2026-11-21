@@ -275,6 +275,10 @@ pub struct UiState {
     pub glyph_row_places: std::collections::HashMap<noshape_sketch::EntityId, DVec2>,
     /// The constraint glyphs drawn last frame: (constraint, its entity, top-left in viewport px; 20 px boxes).
     pub glyph_boxes: Vec<(noshape_sketch::ConstraintId, noshape_sketch::EntityId, f32, f32)>,
+    /// The glyph whose clear margin gave the hover (and the press) to the sketch entity under the pointer.
+    pub glyph_yielded: Option<noshape_sketch::ConstraintId>,
+    /// The glyph whose 20 px tile (not its clear margin) is under the pointer.
+    pub glyph_tile: Option<noshape_sketch::ConstraintId>,
     /// Mate connector inference points of the hovered entity (inference.rs) and their computation.
     pub inference: Option<super::inference::InferenceHover>,
     pub inference_task: Option<Task<()>>,
@@ -872,6 +876,8 @@ impl UiState {
             glyph_linger: Vec::new(),
             glyph_row_places: std::collections::HashMap::new(),
             glyph_boxes: Vec::new(),
+            glyph_yielded: None,
+            glyph_tile: None,
             inference: None,
             inference_task: None,
             select_other: None,

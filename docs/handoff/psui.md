@@ -36,22 +36,18 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (11:01 UTC 11-21)
+## Now (12:45 UTC 11-21)
 
-LANDED 4553fc38 10:28 (sk batch + empty-feature errors + Routing curve buttons), 0cd43606 10:52 (Construction readout),
-70ab4b581 10:53 (dialog table, docs). QUEUED 17848cd1 11:01: Variable conversionFactor default 0 as live (lead decision;
-std variable.fs reads it only with useConversionFactor; custom_features::variable_from_import test both ways).
-Running: sk12c rerun of the 21 takes on vibex8 (psui-shards.sh -> ~/agents/psui-keep/sk12c).
-
-sk-1 + sk-2 (21 takes, in tests/ui-parity with f90a1ef9). Rerun sk12b (vibex8, copy /root/psui-scratch/sk/sk12b):
-12/21, 306/344. In 4553fc38 (not in sk12b): polygon drop (curves held at the drag's start), 3pt circle Origin tie;
-a sketch point on the Origin picked before it (sketch_pick_at; dim hv-two-points, circle-centres); Split by a line's
-middle cuts at the midpoint + MIDPOINT of its ends (live geo-list6); an ellipse and a plane refused with
-DIMENSION_FAILED (dim-ellipse-axes); tests in scene sketch_mode + sketch_ui_tests. Open: transform-drag-copy (live's
-arrow drag leaves the box focused "9.9 mm"; ours no focus: arrow hit in iso view?), circle-rims step 22 (our click on
-circle 1's rim at (-5, 0) picks nothing), split-at-crossing step 11 (live PERPENDICULAR: the line crosses the
-held line at its midpoint; crates/sketch square_at_mid, sent to skasm 10:1x), cparc end off-circle (REQUESTS 08:40). Shots of 3 takes: vibex8 ~/agents/psui-keep/bin/shots.sh (frames every 0.4 s)
--> ~/agents/psui-keep/shots (waiting on slot).
+LANDED 4553fc38, 0cd43606, 70ab4b581 (docs), f0902e77 (Variable conversionFactor 0; cparc end only alignments;
+Transform moves by pointer travel). sk12c (vibex8, /root/psui-scratch/sk/sk12c): 16/21, 325/344 before f0902e77.
+QUEUED (this commit): circle-rims step 22: a glyph's clear margin gives way to the open sketch's entity under the
+pointer; the 20 px tile takes it back (sketch_hover + the tile's own on_hover, ui.glyph_yielded / glyph_tile; glyph_boxes
+can lag the drawn tiles by ~11 px, so the tile state comes from GPUI's hover); GPU test
+a_small_circle_round_the_origin_lights_on_its_rim. ellipse-axes: smart_dimension's ellipse rule as live (6) Dimension
+tool: label above a horizontal ellipse = MAJOR, at the side = MINOR (more_dimension_kinds). Left at step 18: ours lights
+the Front plane at (5, 25), live nothing; asked live (REQUESTS 12:40, live/psui/plane-behind-1121/).
+split-at-crossing PERPENDICULAR: skasm's queue (crates/sketch square_at_mid). Shots: vibex8
+~/agents/psui-keep/shots2/<take> (shots-run.sh in psui-scratch: build + one app, frames every 0.4 s).
 
 qa P1 FEEL-ROW-DBLCLICK-DISTANCE: closed by qa (xev-measured gaps on vibe2: 80 px opens to ~380 ms, not ~420, as one spot).
 
