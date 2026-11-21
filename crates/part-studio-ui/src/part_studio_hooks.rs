@@ -11,7 +11,7 @@ use gpui_kit::*;
 use noshape_model::configuration::ConfigValues;
 use noshape_model::document::{Document, TabId};
 use noshape_model::material_library::MaterialLibrary;
-use noshape_model::reference::BodyId;
+use noshape_model::reference::{BodyId, FeatureId};
 use noshape_model::release::{ReleaseItem, ReleaseLog};
 use noshape_model::variables::StudioRef;
 use std::path::{Path, PathBuf};
@@ -76,6 +76,8 @@ pub struct Hooks {
     /// Compare's panel beside the feature list, and its slider over the graphics.
     pub compare_panel: fn(&Entity<DocModel>, TabId, &App) -> Option<AnyElement>,
     pub compare_slider: fn(&Entity<DocModel>, &App) -> Option<AnyElement>,
+    /// A part's entity clicked in Compare: its feature's row selected in the panel (None: deselected).
+    pub compare_select: fn(&Entity<DocModel>, Option<FeatureId>, &mut App),
     /// Repair mode: open, close, its panel (over the graphics).
     pub repair_open: fn(&Entity<DocModel>, &App) -> bool,
     pub repair_close: fn(&Entity<DocModel>, &mut App),
@@ -195,6 +197,10 @@ pub fn compare_slider(doc: &Entity<DocModel>, cx: &App) -> Option<AnyElement> {
     (hooks().compare_slider)(doc, cx)
 }
 
+pub fn compare_select(doc: &Entity<DocModel>, feature: Option<FeatureId>, cx: &mut App) {
+    (hooks().compare_select)(doc, feature, cx)
+}
+
 pub fn repair_open(doc: &Entity<DocModel>, cx: &App) -> bool {
     (hooks().repair_open)(doc, cx)
 }
@@ -219,6 +225,8 @@ pub fn open_add_material_library(on_add: impl Fn(Option<AddedLibrary>, &mut Wind
 thread_local! {
     /// Tests: Versions and history › Compare on (its blend) for the Part Studios of this thread.
     pub static TEST_COMPARE: std::cell::Cell<Option<f32>> = const { std::cell::Cell::new(None) };
+    /// Tests: the features Compare's panel was told to select, in order.
+    pub static TEST_COMPARE_SELECTED: std::cell::RefCell<Vec<Option<FeatureId>>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 
 /// Inert hooks for UI tests on GPUI's test platform (docs/TESTS.md "UI keystroke tests"): nothing above the Part
@@ -249,6 +257,7 @@ pub fn register_for_tests() {
         compare_documents: |_, _| None,
         compare_panel: |_, _, _| None,
         compare_slider: |_, _| None,
+        compare_select: |_, f, _| TEST_COMPARE_SELECTED.with(|c| c.borrow_mut().push(f)),
         repair_open: |_, _| false,
         repair_close: |_, _| {},
         repair_panel: |_, _, _| None,

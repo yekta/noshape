@@ -725,3 +725,49 @@ fn mass_centre_and_inertia_overrides_on_a_part_with_a_material(cx: &mut TestAppC
     assert!((i[3] * unit_per_kg * 1e6 - 50.0).abs() < 1e-6, "Lxy at index 3: {i:?}");
     assert_eq!(after, features, "no feature added");
 }
+
+/// Live fc-1120 (10), ver-compare-hover-part 4-5: in Versions and history › Compare a face under the pointer lights
+/// nothing; a click selects it and its feature's row in the panel (Extrude 2, its parameters beside "Feature does not
+/// exist in target."), and a second click deselects both.
+#[gpui::test]
+fn compare_lights_nothing_hovered_and_a_click_selects_the_face_and_its_feature_row(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } },
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "circle": [[20, 15], [25, 15]] }] },
+        { "type": "extrude", "name": "Extrude 2", "params": { "entities": ["Sketch 2 region 0"], "depth": "20 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "compare-click-row", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.bodies.len() == 2);
+    let (face, id, extrude2) = cx.update(|cx| {
+        let v = view.read(cx);
+        let extrude2 = v.studio(cx).unwrap().features.iter().find(|f| f.name == "Extrude 2").unwrap().id;
+        let face = v.display.bodies.iter().flat_map(|b| b.face_refs.iter()).find(|r| v.creating_feature(r, cx) == Some(extrude2)).cloned().expect("a face of Extrude 2");
+        let id = *v.built.as_ref().unwrap().picks.ids_for(&face).first().expect("its pick");
+        (face, id, extrude2)
+    });
+    let at = glam::DVec2::new(500., 300.);
+    let event = |cx: &mut TestAppContext, ev: ViewportEvent| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ev, w, cx);
+        })).unwrap();
+        draw(cx, window);
+    };
+    let click = ViewportEvent::Click { pick: Some(id), position: at, modifiers: Modifiers::default() };
+    event(cx, ViewportEvent::Hover(Some(id)));
+    assert_eq!(cx.update(|cx| view.read(cx).hover.clone()), Some(face.clone()), "outside Compare the face lights");
+    event(cx, ViewportEvent::Hover(None));
+    crate::part_studio_hooks::TEST_COMPARE.with(|c| c.set(Some(0.0)));
+    crate::part_studio_hooks::TEST_COMPARE_SELECTED.with(|c| c.borrow_mut().clear());
+    event(cx, ViewportEvent::Hover(Some(id)));
+    let hovered = cx.update(|cx| view.read(cx).hover.clone());
+    event(cx, click.clone());
+    let (selected, rows) = (cx.update(|cx| view.read(cx).selection.clone()), crate::part_studio_hooks::TEST_COMPARE_SELECTED.with(|c| c.borrow().clone()));
+    event(cx, click);
+    let (after, rows_after) = (cx.update(|cx| view.read(cx).selection.clone()), crate::part_studio_hooks::TEST_COMPARE_SELECTED.with(|c| c.borrow().clone()));
+    crate::part_studio_hooks::TEST_COMPARE.with(|c| c.set(None));
+    assert_eq!(hovered, None, "in Compare nothing lights under the pointer");
+    assert_eq!((selected, rows), (vec![face], vec![Some(extrude2)]), "a click selects the face and Extrude 2's row");
+    assert_eq!((after, rows_after.last().copied().flatten()), (Vec::new(), None), "a second click deselects both");
+}

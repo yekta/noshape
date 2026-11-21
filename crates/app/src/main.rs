@@ -316,6 +316,7 @@ fn register_part_studio_hooks() {
         compare_documents: compare_mode::documents,
         compare_panel: compare_mode::render_panel,
         compare_slider: compare_mode::render_slider,
+        compare_select: compare_mode::select_feature,
         repair_open: repair_mode::is_open,
         repair_close: repair_mode::close,
         repair_panel: repair_mode::render_panel,

@@ -235,6 +235,11 @@ fn update(doc: &Entity<DocModel>, cx: &mut App, f: impl FnOnce(&mut CompareSessi
     }
 }
 
+/// A part's entity clicked in the graphics selects its feature's row (live fc-1120 (10)); None deselects.
+pub fn select_feature(doc: &Entity<DocModel>, feature: Option<FeatureId>, cx: &mut App) {
+    update(doc, cx, |s| s.selected = feature);
+}
+
 fn session<'a>(doc: &Entity<DocModel>, cx: &'a App) -> Option<&'a CompareSession> {
     cx.try_global::<Sessions>().and_then(|g| g.0.get(&doc.entity_id()))
 }
@@ -791,7 +796,21 @@ fn dialog_column(f: &FeatureCompare, base: bool) -> AnyElement {
     let pal = p();
     let side = |p: &noshape_model::compare::ParamCompare| if base { p.base.clone() } else { p.target.clone() };
     let name = f.params.iter().find(|p| p.shape == ParamShape::Name).and_then(side);
-    let Some(name) = name else { return div().w(px(197.)).flex_none().into_any_element() };
+    // Live fc-1120 (10): a feature only in the other side reads "Feature does not exist in target." (or base).
+    let Some(name) = name else {
+        return div()
+            .debug_selector(move || format!("compare-missing-{}", if base { "base" } else { "target" }))
+            .w(px(197.))
+            .flex_none()
+            .pt(px(12.))
+            .px(px(16.))
+            .text_center()
+            .text_size(px(13.))
+            .font_weight(FontWeight::SEMIBOLD)
+            .text_color(pal.text)
+            .child(if base { "Feature does not exist in base." } else { "Feature does not exist in target." })
+            .into_any_element();
+    };
     let boxed = |text: String, w: Option<f32>, changed: bool| {
         let d = h_flex()
             .h(px(30.))

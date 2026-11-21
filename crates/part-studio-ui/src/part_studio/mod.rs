@@ -1839,7 +1839,7 @@ impl PartStudioView {
         // (The parts' picks only: Compare shows no planes, origin or sketches.)
         let part_pick = |i: &noshape_render::Instance| built.picks.get(i.pick_base).is_some_and(|t| matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex));
         match self.compare_gfx.scene(&self.doc, self.tab, mode, up, owner, cx) {
-            // Live (ver-compare-hover-part): a face is picked, lit and selected in Compare as outside it when the base
+            // Live (ver-compare-hover-part, fc-1120): a face is picked and selected in Compare as outside it when the base
             // is the open model: its picks ride along undrawn, its highlights drawn over both sides.
             Some(mut compare) if self.compare_base_is_open(cx) => {
                 compare.instances.extend(scene.instances.into_iter().enumerate().filter(|(k, i)| *k >= statics || (i.pickable && part_pick(i))).map(|(k, mut i)| {
@@ -1999,6 +1999,8 @@ impl PartStudioView {
         let id = id.filter(|_| self.ui.plane_ring_hover.is_none());
         // A box being drawn lights nothing, whatever pick comes back meanwhile (live; main red 18:4x on a loaded host).
         let id = id.filter(|_| !vp.read(cx).box_drag());
+        // Versions and history › Compare lights nothing under the pointer (live fc-1120 (10)).
+        let id = id.filter(|_| crate::part_studio_hooks::compare_blend(&self.doc, cx).is_none());
         let gpu = id;
         let id = self.shown_sketch_hover_id(id, cx);
         self.ui.shown_sketch_gpu_hover = self.sketch.is_none().then_some((gpu, id));
@@ -2544,6 +2546,7 @@ impl PartStudioView {
                 if !dbl {
                     self.ui.dblclick_related = None;
                 }
+                let compared = crate::part_studio_hooks::compare_blend(&self.doc, cx).is_some().then(|| target.as_ref().map(|t| t.reference.clone()));
                 match target {
                     // Live ("psui (10-27, interaction 5.x)"): Mass and section
                     // properties on its Part tab takes the whole part on a
@@ -2585,6 +2588,12 @@ impl PartStudioView {
                 }
                 if self.edit.is_none() {
                     self.sm_follow_pick(cx);
+                }
+                // Compare: a part's entity clicked selects its feature's row in the panel, deselected with it (live
+                // fc-1120 (10)).
+                if let Some(r) = compared {
+                    let made = r.filter(|r| self.selection.contains(r)).and_then(|r| self.creating_feature(&r, cx));
+                    crate::part_studio_hooks::compare_select(&self.doc, made, cx);
                 }
                 // The readout's measurement starts with the click, not at the next frame (`ui_busy` then waits for it).
                 if self.edit.is_none() && !self.selection.is_empty() {

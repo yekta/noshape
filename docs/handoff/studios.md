@@ -24,15 +24,21 @@ e2e additions; recovered from vibex8's rb.sh copy): WIP-commit first.
   feel tests, revision-table test, centermark expect, run.py deleted_paint_read).
 - LANDED b2000916 (01:48): compare mode's depth pass draws only the shown display level (qa reopened
   COMPARE-COMMON-PARTS-MISSING; qa verified 02:0x on green 14d18cb74: all 6 parts grey); mate toolbar clamp + grip fixes; tests.
-- In flight (02:xx): the 4 asm feel rows tested (ui_tests: `a_filled_mates_fields_and_its_chips_act_as_live` (Fields +
+- QUEUED 4094e4ef (02:27): the 4 asm feel rows tested (ui_tests: `a_filled_mates_fields_and_its_chips_act_as_live` (Fields +
   Connector chip), `the_animate_dialog_reads_reciprocate_and_its_icon_reverses_the_playback`, `an_empty_named_
   positions_panel_says_what_they_are_and_adds_the_first`; debug_selectors added on the elements). Simulation
   connection is left out (simulation). Triad ball snap rewritten to live triad-snap-1121 (told asm 01:3x):
   `triad_snap` = the face under the pointer's inference point nearest its 3D spot, no px reach, let go within 8 px
-  (BALL_RING_PX) and over background; the triad unturned; marks + glyph drawn; release at the free position
-  (DragState triad_free). Feel test `the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_at_the_pointer`;
-  Short press drop back at +60 px. Asked live (REQUESTS 11-21 01:40) for a release while snapped; live's (a) "never
-  snapped" run is not explained by the 8 px rule (lag?): recheck if live's answer differs. Edges' own look not drawn.
+  (BALL_RING_PX) and over background; the triad unturned; marks + glyph drawn; the release leaves
+  the triad where the ball is: on the snapped point (live 01:40 follow-up, fixed after 4094e4ef) or at the pointer.
+  Feel test `the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point`; Short press drop back at
+  +60 px. Live's (a) "never snapped" run is not explained by the 8 px rule (lag?). Edges' own look not drawn.
+- In flight (03:16): live's 01:40 answer: released snapped, the triad stays on the snapped point (release uses the
+  preview again, triad_free gone; ball test waits for each snap state: it flaked once in the 20-test batch). psui
+  fc-1120 Version compare: no hover in compare (apply_hover_pick), a click selects the face (live: the face, not the
+  part: the cylinder's top stayed blue) and its feature row (hook compare_select → compare_mode::select_feature), the
+  missing side reads "Feature does not exist in target." / "base." (the base wording assumed); tests in
+  measure_feel_tests + history feel_tests; ver-compare-hover-part "about" fixed.
 - Told asm 23:15: in a test window the instance list's rows slice isn't redrawn after a document edit (set_fixed
   false/true: the fixed icon stays; a notify on the view or on slices.rows doesn't redraw it; window.refresh() does).
   Not checked in the app. Feel tests that change the list must build the state before opening (open_from_top_when).

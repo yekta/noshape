@@ -268,3 +268,78 @@ fn a_workspace_name_is_required_and_at_most_256_characters() {
     assert!(super::workspace_name_bad(&"x".repeat(257)));
 }
 
+
+struct ComparePanel(Entity<DocModel>, noshape_model::document::TabId);
+
+impl Render for ComparePanel {
+    fn render(&mut self, _: &mut Window, cx: &mut gpui_kit::Context<Self>) -> impl IntoElement {
+        div().size_full().flex().children(crate::compare_mode::render_panel(&self.0, self.1, cx))
+    }
+}
+
+/// Live fc-1120 (10): a face of Main's Extrude 2 (not in V1) clicked in Compare selects its row, whose parameters show
+/// beside "Feature does not exist in target."; a second click deselects it ("Select a feature to compare its
+/// parameters." again).
+#[gpui::test]
+fn a_feature_only_in_the_base_reads_does_not_exist_in_target_beside_its_parameters(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::init);
+    // (Feature icons only: nothing else above the panel exists here.)
+    crate::history_hooks::register(crate::history_hooks::Hooks {
+        feature_icon: |_| "".into(),
+        workspace_protection: |_, _, _, _| {},
+        open_new_window: |_, _, _, _| Ok(()),
+        open_workspace_window: |_, _, _| Ok(()),
+        open_compare_window: |_, _, _, _| Ok(()),
+    });
+    let dir = std::env::temp_dir().join(format!("noshape-history-feel-cmp-missing-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("versions.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+    }
+    let mut ctx = noshape_ops::Ctx::new();
+    let mut call = |tool: &str, args: serde_json::Value| noshape_ops::registry::run(&mut ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+    call("document_create", json!({ "path": path.to_str().unwrap() }));
+    for (k, points) in [(1, [[0, 0], [40, 30]]), (2, [[15, 10], [25, 20]])] {
+        call("sketch_create", json!({ "plane": "plane:top" }));
+        let sketch = format!("Sketch {k}");
+        call("sketch_draw", json!({ "sketch": sketch, "tool": "corner_rectangle", "points": points }));
+        let region = call("sketch_get", json!({ "sketch": sketch }))["regions"][0]["id"].as_str().unwrap().to_string();
+        call("feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm", "operationType": "NEW" } }));
+        if k == 1 {
+            call("history_create_version", json!({ "name": "V1" }));
+        }
+    }
+    let session = crate::session::Session::open(&path).unwrap();
+    let (window, doc, tab, extrude2) = cx.update(|cx| {
+        let doc = cx.new(|_| DocModel::new(session));
+        let (tab, extrude2) = {
+            let d = &doc.read(cx).session.doc;
+            let t = d.tabs.iter().find(|t| t.name == "Part Studio 1").unwrap();
+            let noshape_model::document::TabContent::PartStudio(ps) = &t.content else { panic!("a Part Studio") };
+            (t.id, ps.features.iter().find(|f| f.name == "Extrude 2").unwrap().id)
+        };
+        let (branch, v1) = {
+            let s = &doc.read(cx).session;
+            (s.branch, s.store.list_versions().unwrap().into_iter().find(|v| v.name == "V1").unwrap().microversion)
+        };
+        crate::compare_mode::compare(&doc, (crate::compare_mode::Side::Workspace(branch), "Main".into()), (crate::compare_mode::Side::Entry(v1), "V1".into()), cx).unwrap();
+        let bounds = Bounds { origin: Point::default(), size: size(px(1200.), px(800.)) };
+        let d = doc.clone();
+        let (w, _) = crate::os_menu::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |_, cx| cx.new(|_| ComparePanel(d, tab))).unwrap();
+        (w, doc, tab, extrude2)
+    });
+    draw(cx, window);
+    let missing = |cx: &mut TestAppContext| VisualTestContext::from_window(window, cx).debug_bounds("compare-missing-target");
+    assert!(missing(cx).is_none(), "nothing selected yet");
+    cx.update(|cx| crate::compare_mode::select_feature(&doc, Some(extrude2), cx));
+    draw(cx, window);
+    let selected = cx.update(|cx| crate::compare_mode::ui_state(&doc, Some(tab), cx).unwrap()["selected"].clone());
+    assert_eq!(selected, json!("Extrude 2"), "Extrude 2's row selected");
+    let text = missing(cx).expect("the target's column says the feature is missing");
+    assert!(text.origin.x >= px(198.) && text.size.width > px(150.), "in the right-hand column (after the base's 197 px and the 1 px rule): {text:?}");
+    cx.update(|cx| crate::compare_mode::select_feature(&doc, None, cx));
+    draw(cx, window);
+    assert!(missing(cx).is_none(), "deselected");
+    cx.update(|cx| crate::compare_mode::stop(&doc, cx));
+}

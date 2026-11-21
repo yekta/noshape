@@ -1027,21 +1027,26 @@ fn a_short_press_selects_the_face_and_the_triads_ball_moves_only_the_triad(cx: &
     let at = triad(cx);
     assert!((at - on_part).length() < 2.0, "the triad at the click point: {at:?} for {on_part:?}");
     let before = cx.update(|cx| view.read(cx).result.instance_bounds(part).unwrap());
-    // Live triad-snap-1121: the release leaves the triad at the pointer, snapped on the way or not.
+    // Live triad-snap-1121: the release leaves the triad where the ball is: at the pointer, or on the inference point
+    // it snapped to over a face.
     let to = at + DVec2::new(60.0, 0.0);
     drag(cx, window, &view, at, to);
     let moved = triad(cx);
-    assert!((moved - to).length() < 2.0, "the triad followed the ball: {moved:?} for {to:?}");
+    let ball = cx.update(|cx| {
+        let v = view.read(cx);
+        v.triad_snap(to, cx).map_or(to, |s| v.viewport.read(cx).project(s.marks[s.chosen].origin).unwrap())
+    });
+    assert!((moved - ball).length() < 2.0, "the triad followed the ball: {moved:?} for {ball:?} (pointer {to:?})");
     let after = cx.update(|cx| view.read(cx).result.instance_bounds(part).unwrap());
     assert!((after.0 - before.0).length() < 1e-9 && (after.1 - before.1).length() < 1e-9, "the part stayed");
 }
 
 /// Live triad-snap-1121: the triad's centre ball dragged over a face sits on its inference point nearest the pointer's
 /// spot in 3D, however far on screen, the triad's arrows unturned; with that point under the pointer (within the ball's
-/// ~8 px ring), and over the background, it follows the pointer; the release leaves the triad at the pointer.
+/// ~8 px ring), and over the background, it follows the pointer; released snapped, the triad stays on the point.
 #[gpui::test]
 #[ignore = "T2: flaky in the land queue's full assembly-ui run (the ball sits off the face's snap point); studios fixing"]
-fn the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_at_the_pointer(cx: &mut TestAppContext) {
+fn the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
     let path = document(cx, "ball-snap", |ctx| {
         call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
@@ -1086,23 +1091,31 @@ fn the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_at_the_pointer(cx
             (f, v.viewport.read(cx).project(f.origin).unwrap(), v.drag.as_ref().is_some_and(|d| d.ball_snap.is_some()))
         })
     };
+    // (Each check waits for the last move to be taken: a loaded host lags a frame.)
+    let until = |cx: &mut TestAppContext, snapped: bool| wait_until(cx, window, &view, |v, _| v.drag.as_ref().is_some_and(|d| d.ball_snap.is_some() == snapped));
     go(cx, at, spot);
+    until(cx, true);
     let (f, _, snapped) = ball(cx);
     assert!(snapped && (f.origin - centre).length() < 1e-6, "on the face's centre: {:?} for {centre:?}", f.origin);
     assert!((f.rotation.dot(start.rotation)).abs() > 1.0 - 1e-9, "the triad unturned");
     go(cx, spot, centre_px);
+    until(cx, false);
     let (_, shown, snapped) = ball(cx);
     assert!(!snapped && (shown - centre_px).length() < 2.0, "the point under the pointer: the ball follows it ({shown:?})");
     go(cx, centre_px, spot);
+    until(cx, true);
     assert!(ball(cx).2, "snapped again off the ring");
     let background = DVec2::new(40.0, 40.0);
     go(cx, spot, background);
+    until(cx, false);
     let (_, shown, snapped) = ball(cx);
     assert!(!snapped && (shown - background).length() < 2.0, "none over the background ({shown:?})");
     go(cx, background, spot);
+    until(cx, true);
     assert!(ball(cx).2);
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(at_window(cx, &view, spot), MouseButton::Left, Modifiers::default());
     settle(cx, window, &view);
-    let (_, left, _) = ball(cx);
-    assert!((left - spot).length() < 2.0, "released snapped, the triad at the pointer: {left:?} for {spot:?}");
+    let (f, _, _) = ball(cx);
+    assert!((f.origin - centre).length() < 1e-6, "released snapped, the triad on the face's centre: {:?} for {centre:?}", f.origin);
+    assert!((f.rotation.dot(start.rotation)).abs() > 1.0 - 1e-9, "its arrows as before the drag");
 }

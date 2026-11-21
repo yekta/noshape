@@ -270,7 +270,6 @@ struct DragState {
     offset: DVec3,
     /// Center (ball) drag: the manipulator frame shown, the one at the pointer (taken on release) and the snap.
     triad_preview: Option<Frame>,
-    triad_free: Option<Frame>,
     ball_snap: Option<BallSnap>,
     /// Explode step editing: the drag builds a step instead of moving instances.
     explode: bool,
@@ -3447,7 +3446,6 @@ impl AssemblyView {
                         grab0,
                         offset: DVec3::ZERO,
                         triad_preview: None,
-                        triad_free: None,
                         ball_snap: None,
                         explode: self.explode_edit,
                         nested: None,
@@ -3525,7 +3523,6 @@ impl AssemblyView {
                     grab0: DVec3::ZERO,
                     offset: DVec3::ZERO,
                     triad_preview: None,
-                    triad_free: None,
                     ball_snap: None,
                     explode: false,
                     nested,
@@ -3602,8 +3599,8 @@ impl AssemblyView {
                     }
                     Some(ManipHandle::Center) => {
                         // The ball follows the pointer on the screen-parallel plane through it; over a part it sits on
-                        // the face's nearest inference point, the triad unturned, and the release leaves the triad at
-                        // the pointer (live triad-snap-1121).
+                        // the face's nearest inference point, the triad unturned; the release leaves the triad where the
+                        // ball is (live triad-snap-1121).
                         let (pp, n, g0) = (d.plane_point, d.plane_normal, d.grab0);
                         let rot = self.manipulator(cx).map(|f| f.rotation).unwrap_or_default();
                         let free = Frame::new(pp + (self.ray_plane(*position, pp, n, cx).unwrap_or(g0) - g0), rot);
@@ -3611,7 +3608,6 @@ impl AssemblyView {
                         let shown = snap.as_ref().map_or(free, |s| Frame::new(s.marks[s.chosen].origin, rot));
                         if let Some(d) = self.drag.as_mut() {
                             d.triad_preview = Some(shown);
-                            d.triad_free = Some(free);
                             d.ball_snap = snap;
                         }
                         self.refresh_scene(false, cx);
@@ -3657,7 +3653,7 @@ impl AssemblyView {
                 if d.handle == Some(ManipHandle::Center) {
                     // The manipulator keeps its new frame relative to the part.
                     if d.started
-                        && let Some(f) = d.triad_free
+                        && let Some(f) = d.triad_preview
                         && let Some(p) = self.result.solved.placement(d.ids[0])
                     {
                         self.triad = Some((d.ids.clone(), placement_to_frame(&p).inverse().mul(&f)));
@@ -3845,7 +3841,6 @@ impl AssemblyView {
             grab0: grab,
             offset: DVec3::ZERO,
             triad_preview: None,
-            triad_free: None,
             ball_snap: None,
             explode: false,
             nested: None,
