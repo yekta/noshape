@@ -1,19 +1,23 @@
 {
  "scenario": "asm-root-menu-collapse-all",
- "recorded": "2026-11-07T00:55:17.822Z",
+ "recorded": "2026-11-21T14:59:29.292Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.1"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "d434fb734585b9e3f85b1cca",
-  "workspace": "e46def584afd02d0b1b2ea03",
-  "element": "925f329ce23628116d87e7ff",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "836ecffb8fdb86e39f4b4f38",
   "start": "pin-block",
-  "startElement": "b8d460b4ea7448d51effc378",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "053ebdbfbec70e9ea2ad6480",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -21,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -148,7 +153,34 @@
     }
    ]
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    -2.165,
+    3.75,
+    7.5
+   ],
+   "eye_mm": [
+    16.636,
+    -28.814,
+    29.209
+   ],
+   "width_mm": 105.679,
+   "height_mm": 55.966,
+   "mmPerPixel": 0.063167,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -170,6 +202,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -182,7 +215,8 @@
       "Create Drawing of start pin-block asm…",
       "Add exploded view…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Expand all",
       "Collapse all"
@@ -316,9 +350,36 @@
       }
      ]
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      -2.165,
+      3.75,
+      7.5
+     ],
+     "eye_mm": [
+      16.636,
+      -28.814,
+      29.209
+     ],
+     "width_mm": 105.679,
+     "height_mm": 55.966,
+     "mmPerPixel": 0.063167,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 35092
+   "t": 33804
   },
   {
    "step": 2,
@@ -331,7 +392,7 @@
    "ok": true,
    "at": [
     205,
-    452
+    472
    ],
    "state": {
     "focus": {
@@ -339,6 +400,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -457,9 +519,36 @@
       }
      ]
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      -2.165,
+      3.75,
+      7.5
+     ],
+     "eye_mm": [
+      16.636,
+      -28.814,
+      29.209
+     ],
+     "width_mm": 105.679,
+     "height_mm": 55.966,
+     "mmPerPixel": 0.063167,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 37790
+   "t": 37676
   }
  ]
 }

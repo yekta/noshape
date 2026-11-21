@@ -1,19 +1,23 @@
 {
  "scenario": "asm-root-menu-unfix-all-mated",
- "recorded": "2026-11-13T05:16:10.219Z",
+ "recorded": "2026-11-21T15:01:54.111Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "8b0a6ea58403bb891d8f24b2",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "f4c1e2fd7225dafc7e0ec934",
   "start": "pin-block",
-  "startElement": "ed211f3bd9ad0f1f27da328a",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "053ebdbfbec70e9ea2ad6480",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -211,7 +215,8 @@
       "Create Drawing of start pin-block asm…",
       "Add exploded view…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Expand all",
       "Collapse all"
@@ -374,7 +379,7 @@
     },
     "measure": null
    },
-   "t": 32470
+   "t": 34312
   },
   {
    "step": 2,
@@ -552,7 +557,7 @@
     },
     "measure": null
    },
-   "t": 36264
+   "t": 38381
   }
  ]
 }
