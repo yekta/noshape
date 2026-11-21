@@ -38,6 +38,12 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
 - At the bar, not filed: c2-config-parts-screws 547 vs 266 ms (2.06x), c2-hunting-knife 1257 vs 622 ms (2.02x; editing Extrude 1
   takes 2.45 s vs live's 1.58, 1.55x).
 
+## bool, 2026-11-21 (qa's cli-shell-hang-pre after SHELL-AFTER-WELD-FILLET; live 03:3x, behaviours "bool (11-21 03:25)", live/bool/shell5-1121.json)
+- [ ] P1 **SHELL-HANG-SPEED (bool)**: Shell 3 (Parts 2 and 3, 5 mm inward) takes 12.8 s in ours (green 14d18cb74 CLI), 40 ms in live.
+- [ ] P2 **SHELL5-AFTER-SHELL3 (bool)**: Shell 5 (Part 2, 3 mm inward, a Shell 3 face of 1475.653 mm2 and a Linear pattern 2
+  face of 282.843 mm2 removed) fails in ours ("Could not shell part with selections.", 25.4 s); live OK in 20 ms, Part 2
+  172908.326 mm3, 59 faces / 163 edges / 98 vertices. Ours before Shell 5 = live's (49 faces, 175798.2 mm3).
+
 ## qa, 2026-11-21 (compat alerts on green 2407ded2)
 - [ ] P1 **KNIFEHANDLE-LOFT1 (core)**: c2-surf-workshop-knifehandle's Loft 1 (feature 24) fails on ours; live builds it OK, solid
   "Blade" 11 faces / 27 edges / 18 vertices, 10392.85 mm³ (parity corpus live.jsonl). Ours failed in 0.4.63 too ("Could not create
