@@ -5,22 +5,24 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-21 21:23 UTC) — RESUME HERE
-- P0 batch 4 (qa hover matrix, assembly): PS-MC-MISSING, MANIPULATOR-RING, VERTEX-LOOK, MATE-VERTEX, DRAG-LIT fixed;
-  assembly_hover_matrix_tests.rs 21/21 (20 cells + Fastened corner), feel_tests 21/21. Open: the white dashed line
-  along a selected edge (live seems to depth-test the triad's X shaft against the part). Render: `Instance::pick_through`
-  (overlay out of the pick pass: inference dots, connector glyph fill); asm Highlights.hover_vertex_open.
-- Then (lead 18:2x): suspension and infento reruns on today's main, then welding's flexible-sub solve. Builds on vibex8.
+## State (2026-11-21 23:55 UTC) — RESUME HERE
+- P0 batch 4 (qa hover matrix, assembly) LANDED 8eb92415 (11-21 23:31): PS-MC-MISSING, MANIPULATOR-RING, VERTEX-LOOK,
+  MATE-VERTEX, DRAG-LIT; assembly hover matrix 21/21, feel 21/21; on psui's f411d924 part-studio hover matrix 71/71.
+  Open: the white dashed line along a selected edge (live seems to depth-test the triad's X shaft against the part).
+- Welding flexible subs (landing, welding 41/81 -> 81/81 occ, 28/28, 29/29): the translator placed a flexible sub's parts one at a time, each
+  `assembly_transform` solved with the others at their old places, so the sub's own mates pulled it back part-way
+  (Sub 0eadef <4>: -63.26 deg -> -67.35 -> -72.83, live -75.56). Fix: assembly_transform `also` (several in one edit,
+  one solve) + Translator::place_all per level and tab. vibex8 probe3.py: all five at live's -75.56 exactly. e2e
+  a_flexible_subassemblys_parts_move_together; clippy clean; AGENT_API regenerated. Infento rerun with it: vibex8
+  ~/agents/asm-keep/weld/inf-fix.out (bin ops-weld; onerun's 3000 s too short, rerun at 7200 s). Infento's 5 nested misses
+  (b63c40 / bdf7bf / dfc972) are likely the same.
 - suite-main (vibex7, main d5c8c1e79): scissor 205/239 10/24 58/87, suspension 23/28 8/8 21/21, welding 41/81 28/28
-  29/29; 15 "cannot resolve mate connectors" (scissor F2/3/4/28/34, Rev 11, subs 09e22d/6ed9b2/cad26f; suspension
-  d986b3 Ball 1/2; welding e23695 F4). Different set from the tc run (F1/8/14/15/19/25): find out whether resolution is
-  nondeterministic before routing (own 4a22b2966 or core ecd8394b3). Notes /root/asm-scratch/notes-1121.md.
-- transform-carry HELD (/root/asm-scratch/transform-carry.patch): scissor with it 207/239 13/34; decide after the above.
-- infento-main on vibex8 (mc/infento-main.out, 7200 s) running.
-- Welding (ab1120e run, 28/28 mates as live, 49/81 occ): Sub 0eadef <1..4> whole subs turned on their free top-level
-  Revolute 5-8 (0.3 rad, ~85 mm), Sub e23695 <4> 0.6 rad, <1..3> 1e-3 rad. Mate ends at live's. Solve path: eval.rs
-  prepare_subassembly starts the sub's own solve from per-occurrence `nested` places, `in_sub` = that solve, top-level
-  starts there. Next: open the saved welding doc, assembly_list, see whether a solve from the stored places drifts.
+  29/29. Scissor fed22d (Top Openings 23.0 mm, Base - Left/Right and Aligner lost): skasm 22:0x says neither
+  c721b3513 nor 1d3541912 (single studio 28/60 both, 14.95 mm); in the assembly run Top Openings' plane resolves to
+  another face query (face:jY8x… vs face:jY-x…). Rerun scissor once skasm's b3345866 lands (Move-face regions).
+- transform-carry HELD (/root/asm-scratch/transform-carry.patch): its extra failures are the same Base mates.
+- Suspension d986b3 Ball 1/2: both ends one face in 805e29; likely 805e29 Fillet 3/4 (blend SUSPENSION-CIRCPAT1).
+- Infento main: 157/167 occ, 204/206 mates, 64/64 BOM; the 5 Wheel 7inch are deleted elements in live (not the gap).
 - isaac Sketch 8 reopen: closed by core (fixed by 89180ec5e; my repro was a pre-land branch binary).
 - Scissor fillets (blend 19:1x): 2d82a0 Fillet 13 blend's (fix building). 9cbb0e Fillet 23 (Upper Triangle after
   Boolean 3: ours 160/352/186 92358 mm3, live 158/325/165 61977) and 665cf3 Fillet 4 (Top Cover after Boolean 1: ours

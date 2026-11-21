@@ -2793,6 +2793,7 @@ Examples:
 | `translation` | array of number or string | required | [x, y, z]. |
 | `axis` | array of number |  | Rotation axis. |
 | `angle` | number or string |  | Rotation angle ("90 deg"). |
+| `also` | array of object |  | More instances moved in the same edit and solved once, as live's occurrence transforms of several: a flexible subassembly's instances placed together, its mates not pulling one back toward the others' old places. |
 
 #### assembly_set_state
 

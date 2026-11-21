@@ -933,13 +933,28 @@ impl<'a> Translator<'a> {
     /// `transform` row-major 4×4, metres (the assembly definition's
     /// `occurrences[].transform`).
     pub fn place(&mut self, assembly: &str, instance: &str, transform: &[f64]) -> Result<(), String> {
-        let [m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, ..] = transform else { return Err(format!("transform of {instance}: 16 numbers")) };
-        let rot = glam::DMat3::from_cols(glam::DVec3::new(*m0, *m4, *m8), glam::DVec3::new(*m1, *m5, *m9), glam::DVec3::new(*m2, *m6, *m10));
-        let (axis, angle) = glam::DQuat::from_mat3(&rot).to_axis_angle();
-        // (The rotation always: without it the instance keeps its own, a mate's snap included.)
-        let (axis, angle) = if angle.abs() > 1e-12 { (axis, angle) } else { (glam::DVec3::Z, 0.0) };
-        let args = json!({ "tab": assembly, "instance": instance, "translation": mm([*m3, *m7, *m11]), "axis": [axis.x, axis.y, axis.z], "angle": format!("{angle} rad") });
-        self.call("assembly_transform", args).map(|_| ())
+        self.place_all(assembly, &[(instance.to_string(), transform.to_vec())])
+    }
+
+    /// Places several instances of `assembly` in one edit, solved once (a flexible subassembly's instances together:
+    /// one at a time, its mates pulled each back toward the others' old places, asm-welding-config's Sub 0eadef <4>
+    /// turned 12° off live).
+    pub fn place_all(&mut self, assembly: &str, places: &[(String, Vec<f64>)]) -> Result<(), String> {
+        let mut moves = Vec::new();
+        for (instance, transform) in places {
+            let [m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, ..] = transform.as_slice() else { return Err(format!("transform of {instance}: 16 numbers")) };
+            let rot = glam::DMat3::from_cols(glam::DVec3::new(*m0, *m4, *m8), glam::DVec3::new(*m1, *m5, *m9), glam::DVec3::new(*m2, *m6, *m10));
+            let (axis, angle) = glam::DQuat::from_mat3(&rot).to_axis_angle();
+            // (The rotation always: without it the instance keeps its own, a mate's snap included.)
+            let (axis, angle) = if angle.abs() > 1e-12 { (axis, angle) } else { (glam::DVec3::Z, 0.0) };
+            moves.push(json!({ "instance": instance, "translation": mm([*m3, *m7, *m11]), "axis": [axis.x, axis.y, axis.z], "angle": format!("{angle} rad") }));
+        }
+        let Some(Value::Object(mut args)) = moves.first().cloned() else { return Ok(()) };
+        args.insert("tab".into(), json!(assembly));
+        if moves.len() > 1 {
+            args.insert("also".into(), Value::Array(moves[1..].to_vec()));
+        }
+        self.call("assembly_transform", Value::Object(args)).map(|_| ())
     }
 
     /// Rebuilds feature `k` (after features 0 … k−1).
@@ -10696,10 +10711,29 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     let mut tab_lists: HashMap<String, Value> = HashMap::new();
     let mut deepest_first = occurrences.clone();
     deepest_first.sort_by_key(|o| std::cmp::Reverse(ids(&o["path"]).len()));
+    // A level's places in each tab go in together (`place_all`), before the level above reads them.
+    let mut pending: Vec<(String, String, Vec<f64>)> = Vec::new();
+    let flush = |placer: &mut Translator<'_>, pending: &mut Vec<(String, String, Vec<f64>)>, tab_lists: &mut HashMap<String, Value>, res: &mut AssemblyResult| {
+        let mut tabs: Vec<String> = pending.iter().map(|(t, ..)| t.clone()).collect();
+        tabs.dedup();
+        for tab in tabs {
+            let places: Vec<(String, Vec<f64>)> = pending.iter().filter(|(t, ..)| *t == tab).map(|(_, n, m)| (n.clone(), m.clone())).collect();
+            tab_lists.remove(&tab);
+            if let Err(e) = placer.place_all(&tab, &places) {
+                res.differences.push(format!("{tab} › {}: not moved to live's place: {e}", places.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>().join(", ")));
+            }
+        }
+        pending.clear();
+    };
+    let mut depth = 0;
     for o in deepest_first {
         let p = ids(&o["path"]);
         if p.len() < 2 {
             continue;
+        }
+        if p.len() != depth {
+            flush(&mut placer, &mut pending, &mut tab_lists, &mut res);
+            depth = p.len();
         }
         let (outer, inner) = p.split_at(p.len() - 2);
         let level = element_at("", outer);
@@ -10761,11 +10795,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             },
             _ => continue,
         };
-        tab_lists.remove(&tab);
-        if let Err(e) = placer.place(&tab, &name, &row_major(m)) {
-            res.differences.push(format!("{tab} › {name}: not moved to live's place: {e}"));
-        }
+        pending.push((tab, name, row_major(m)));
     }
+    flush(&mut placer, &mut pending, &mut tab_lists, &mut res);
     // Deeper ones (a flexible subassembly inside a flexible subassembly instance) in this assembly too, one place per
     // occurrence as live keeps them (asm-bjr-config: Sub 8c440a's grub screws differ in Sub c1e15f <2> and <3>; the
     // tab of Sub c1e15f holds one for all), shallowest first so their holders are in place.

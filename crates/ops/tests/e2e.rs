@@ -9579,6 +9579,44 @@ fn a_flexible_subassembly_instances_part_moves_in_its_parent_only() {
     assert!(near(&in_a1, [0.0, 0.0, 0.0]), "Assembly 1 itself untouched: {in_a1:?}");
 }
 
+/// Several instances moved in one assembly_transform (`also`), as live's occurrence transforms of several: a flexible
+/// subassembly's grouped parts turned together land exactly (one at a time, the group pulled each back toward the
+/// other's old place: asm-welding-config's Sub 0eadef <4> 12° off live); an unknown instance in `also` is refused by its
+/// index.
+#[test]
+fn a_flexible_subassemblys_parts_move_together() {
+    let mut ctx = Ctx::new();
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    let path = scratch("nested-move-together.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+    let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+    call(&mut ctx, "tab_create", json!({ "kind": "assembly", "name": "Sub" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_group", json!({ "tab": "Sub", "instances": ["Part 1 <1>", "Part 1 <2>"] }));
+    let sub = call(&mut ctx, "assembly_list", json!({ "tab": "Sub" }));
+    let own = |n: &str| -> [f64; 3] { let i = sub["instances"].as_array().unwrap().iter().find(|i| i["name"] == n).unwrap(); [0, 1, 2].map(|k| num(&i["translation"][k])) };
+    let (a, b) = (own("Part 1 <1>"), own("Part 1 <2>"));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Sub" }));
+    // Both turned 90° about Z and moved 100 mm along X, in one edit.
+    let turned = |p: [f64; 3]| [100.0 - p[1], p[0], p[2]];
+    let mm = |p: [f64; 3]| p.map(|x| format!("{x} mm"));
+    call(&mut ctx, "assembly_transform", json!({ "tab": "Assembly 1", "instance": "Sub <1> > Part 1 <1>", "translation": mm(turned(a)), "axis": [0, 0, 1], "angle": "90 deg",
+        "also": [{ "instance": "Sub <1> > Part 1 <2>", "translation": mm(turned(b)), "axis": [0, 0, 1], "angle": "90 deg" }] }));
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+    let at = |p: &str| -> (Vec<f64>, f64) { list["occurrences"].as_array().unwrap().iter().find(|o| o["path"] == p).map(|o| ((0..3).map(|i| num(&o["translation"][i])).collect(), 2.0 * num(&o["rotation"][2]).atan2(num(&o["rotation"][3])))).unwrap_or_else(|| panic!("no occurrence {p}: {list}")) };
+    for (p, want) in [("Sub <1> > Part 1 <1>", turned(a)), ("Sub <1> > Part 1 <2>", turned(b))] {
+        let (t, rz) = at(p);
+        assert!((0..3).all(|i| (t[i] - want[i]).abs() < 1e-6) && (rz - std::f64::consts::FRAC_PI_2).abs() < 1e-9, "{p}: {t:?} {} deg, want {want:?} 90 deg", rz.to_degrees());
+    }
+    assert!(last(&mut ctx).ends_with(":: Move : Sub <1> > Part 1 <1>, Sub <1> > Part 1 <2>"), "one edit: {}", last(&mut ctx));
+    let e = try_call(&mut ctx, "assembly_transform", json!({ "tab": "Assembly 1", "instance": "Sub <1>", "translation": [0, 0, 0], "also": [{ "instance": "Sub <1> > Part 9 <1>", "translation": [0, 0, 0] }] })).unwrap_err().to_json();
+    assert_eq!(e["param"], "also[0].instance", "{e}");
+}
+
 /// Flexible subassemblies inside a flexible subassembly join the top solve (live: asm-bjr-config's Sub 8c440a in each
 /// Sub c1e15f): a mate in Assembly 1 to a part two levels down moves that part alone; its unmated neighbours, in its
 /// subassembly and one level up, stay where they are (a rigid middle level carried them along).

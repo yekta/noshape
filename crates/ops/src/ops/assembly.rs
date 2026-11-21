@@ -140,6 +140,7 @@ pub fn ops() -> Vec<Op> {
                 req("translation", json!({ "type": "array", "items": { "type": ["number", "string"] }, "minItems": 3, "maxItems": 3 }), "[x, y, z]."),
                 opt("axis", json!({ "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }), "Rotation axis."),
                 opt("angle", json!({ "type": ["number", "string"] }), "Rotation angle (\"90 deg\")."),
+                opt("also", json!({ "type": "array", "items": { "type": "object", "properties": { "instance": { "type": "string" }, "translation": { "type": "array", "items": { "type": ["number", "string"] }, "minItems": 3, "maxItems": 3 }, "axis": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }, "angle": { "type": ["number", "string"] } }, "required": ["instance", "translation"] } }), "More instances moved in the same edit and solved once, as live's occurrence transforms of several: a flexible subassembly's instances placed together, its mates not pulling one back toward the others' old places."),
             ],
             mutates: true,
             destructive: false,
@@ -975,8 +976,20 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     Ok(v.into())
 }
 
-fn transform(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
-    let (od, tab) = target(ctx, a)?;
+/// One move of `assembly_transform`: an instance's new place, as stored.
+enum Move {
+    Top(InstanceId, [f64; 3], Option<[f64; 4]>),
+    /// An instance of a flexible subassembly instance: its `nested` place.
+    Nested(InstanceId, InstanceId, Placement),
+    /// Deeper: the top instance's `nested_deep` place, by path below it.
+    Deep(InstanceId, Vec<InstanceId>, Placement),
+}
+
+/// One move as asked: the occurrence's path, its translation and rotation.
+type Wanted = (Vec<InstanceId>, [f64; 3], Option<[f64; 4]>);
+
+/// The instance, translation and rotation of one move (the op's own fields, or one of `also`).
+fn move_args(od: &OpenDoc, tab: TabId, a: &Args) -> Result<Wanted, OpError> {
     let units = od.doc().settings.units;
     let asm = assembly(od, tab)?;
     let path = find_occurrence(od.doc(), asm, a.str("instance")?, "instance")?;
@@ -999,21 +1012,13 @@ fn transform(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         _ => None,
     };
-    let result = solve(od, tab, &SolveOptions::default())?;
-    let asm = assembly(od, tab)?;
+    Ok((path, xyz, rotation))
+}
+
+/// The stored place a move sets, and its name for the edit.
+fn resolve_move(od: &OpenDoc, asm: &Assembly, result: &AssemblyResult, (path, xyz, rotation): Wanted) -> Result<(String, Move), OpError> {
     match path.as_slice() {
-        [inst] => {
-            let inst = *inst;
-            let name = asm.instance(inst).map(|i| i.name.clone()).unwrap_or_default();
-            commit(od, tab, &format!("Move : {name}"), &result, |a| {
-                if let Some(i) = a.instance_mut(inst) {
-                    i.placement.translation = xyz;
-                    if let Some(r) = rotation {
-                        i.placement.rotation = r;
-                    }
-                }
-            })?;
-        }
+        [inst] => Ok((asm.instance(*inst).map(|i| i.name.clone()).unwrap_or_default(), Move::Top(*inst, xyz, rotation))),
         // An instance of a flexible subassembly instance: placed in this assembly (the instance's own `nested`
         // position, where its subassembly's solve starts), as dragging it does; the subassembly is untouched.
         [sub, child] => {
@@ -1033,13 +1038,7 @@ fn transform(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let world_rotation = rotation.unwrap_or_else(|| Placement::from_dmat4(&(top_m * start.to_dmat4())).rotation);
             let world = Placement { translation: xyz, rotation: world_rotation };
             let q = Placement::from_dmat4(&(top_m.inverse() * world.to_dmat4()));
-            let name = format!("{} > {child_name}", top.name);
-            commit(od, tab, &format!("Move : {name}"), &result, |a| {
-                if let Some(i) = a.instance_mut(sub) {
-                    i.nested.retain(|(c, _)| *c != child);
-                    i.nested.push((child, q));
-                }
-            })?;
+            Ok((format!("{} > {child_name}", top.name), Move::Nested(sub, child, q)))
         }
         // Deeper, inside flexible subassemblies of a flexible subassembly instance: placed in this assembly too (the
         // top instance's `nested_deep`, relative to the subassembly instance holding it), one per occurrence as live.
@@ -1079,17 +1078,55 @@ fn transform(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let world_rotation = rotation.unwrap_or_else(|| Placement::from_dmat4(&(frame * own.to_dmat4())).rotation);
             let world = Placement { translation: xyz, rotation: world_rotation };
             let q = Placement::from_dmat4(&(frame.inverse() * world.to_dmat4()));
-            let name = names.join(" > ");
-            let key = inner.to_vec();
-            commit(od, tab, &format!("Move : {name}"), &result, |a| {
-                if let Some(i) = a.instance_mut(sub) {
-                    i.nested_deep.retain(|(p, _)| *p != key);
-                    i.nested_deep.push((key, q));
-                }
-            })?;
+            Ok((names.join(" > "), Move::Deep(sub, inner.to_vec(), q)))
         }
-        _ => return Err(OpError::param("instance", "an instance, or an instance inside a flexible subassembly instance (\"Sub <1> > Part 1 <1>\")")),
+        _ => Err(OpError::param("instance", "an instance, or an instance inside a flexible subassembly instance (\"Sub <1> > Part 1 <1>\")")),
     }
+}
+
+fn transform(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = target(ctx, a)?;
+    let mut wanted = vec![move_args(od, tab, a)?];
+    for (k, v) in a.opt_array("also")?.into_iter().flatten().enumerate() {
+        wanted.push(move_args(od, tab, &Args { op: a.op, value: v }).map_err(|e| e.under(&format!("also[{k}]")))?);
+    }
+    let result = solve(od, tab, &SolveOptions::default())?;
+    let asm = assembly(od, tab)?;
+    let mut names = Vec::new();
+    let mut moves = Vec::new();
+    for (k, w) in wanted.into_iter().enumerate() {
+        let (name, m) = resolve_move(od, asm, &result, w).map_err(|e| if k == 0 { e } else { e.under(&format!("also[{}]", k - 1)) })?;
+        names.push(name);
+        moves.push(m);
+    }
+    // All in one edit: a flexible subassembly's instances placed together, its mates not pulling each back toward
+    // the others' old places (as live's occurrence transforms of several at once).
+    commit(od, tab, &format!("Move : {}", names.join(", ")), &result, |a| {
+        for m in moves {
+            match m {
+                Move::Top(inst, xyz, rotation) => {
+                    if let Some(i) = a.instance_mut(inst) {
+                        i.placement.translation = xyz;
+                        if let Some(r) = rotation {
+                            i.placement.rotation = r;
+                        }
+                    }
+                }
+                Move::Nested(sub, child, q) => {
+                    if let Some(i) = a.instance_mut(sub) {
+                        i.nested.retain(|(c, _)| *c != child);
+                        i.nested.push((child, q));
+                    }
+                }
+                Move::Deep(sub, key, q) => {
+                    if let Some(i) = a.instance_mut(sub) {
+                        i.nested_deep.retain(|(p, _)| *p != key);
+                        i.nested_deep.push((key, q));
+                    }
+                }
+            }
+        }
+    })?;
     Ok(describe(od, tab)?.into())
 }
 
