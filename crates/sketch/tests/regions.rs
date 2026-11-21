@@ -178,6 +178,19 @@ fn region_id_is_stable_across_edits() {
 }
 
 #[test]
+fn region_id_with_its_curves_turned_round() {
+    let mut sk = Sketch::new();
+    rect(&mut sk, 0.0, 0.0, 10.0, 10.0);
+    sk.add_line(v(4.0, 0.0), v(4.0, 10.0));
+    let left = sk.region_at(v(1.0, 5.0)).unwrap();
+    assert_close(left.area(), 40.0, 1e-9);
+    let turned = RegionId { boundary: left.id.boundary.iter().map(|s| SegmentSource { entity: s.entity, forward: !s.forward }).collect(), ordinal: left.id.ordinal };
+    assert_ne!(turned, left.id);
+    let found = sk.find_region(&turned).unwrap();
+    assert_eq!(found.id, left.id);
+}
+
+#[test]
 fn wires_open_and_closed() {
     let mut sk = Sketch::new();
     let a = sk.add_point(v(0.0, 0.0));

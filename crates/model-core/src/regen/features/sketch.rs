@@ -759,6 +759,10 @@ pub fn update_external(sk: &mut noshape_sketch::Sketch, id: noshape_sketch::Enti
         // An end a Trim or Split cut stays (it's no longer the edge's: not external); live keeps it where its other
         // constraints hold it.
         (Geometry::Line { start, end }, Curve2::Line { a, b }) => {
+            // An edge turned round since the sketch was solved (a chamfer's edge senses) keeps the line's way: offsets
+            // and distances measured from its side stay on it (qa's cf-surface-pattern: Sketch 7's square 9.144 mm).
+            let was = sk.point(*end).zip(sk.point(*start)).map(|(e, s)| e - s);
+            let (a, b) = if was.is_some_and(|w| w.dot(*b - *a) < 0.0) { (b, a) } else { (a, b) };
             for (p, q) in [(*start, *a), (*end, *b)] {
                 if external(sk, p) {
                     let _ = sk.set_point(p, q);

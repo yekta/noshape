@@ -1239,6 +1239,7 @@ fn chamfer_in(ev: &mut EvalCtx) -> FResult<()> {
         return crate::regen::eval::err_at(&["entities"], "Select edges or faces to chamfer.");
     }
     let touched: Vec<usize> = groups.keys().copied().collect();
+    let mut failed = None;
     for (bi, edges) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let propagate = ev.bool("tangentPropagation");
@@ -1365,6 +1366,12 @@ fn chamfer_in(ev: &mut EvalCtx) -> FResult<()> {
                     _ if matches!(super::blend_section::rim_chamfer_cut(ev, bi, &edges, spec, &reference), Ok(true)) => continue,
                     // An arch's rim arc (asm-isaac-ball's e54410 Chamfer 1): the section revolved, run on round the axis.
                     _ if matches!(super::blend_section::arc_chamfer_run_on(ev, bi, &edges, spec, &reference), Ok(true)) => continue,
+                    // A body failing for no reason Onshape names waits on the others: one its chamfer is too wide
+                    // for says so (cli-draft-hang's Chamfer 3, live "Distance of chamfer on face too large.").
+                    _ if !e.to_string().contains("chamfer distance too large") => {
+                        failed.get_or_insert(chamfer_failed(e));
+                        continue;
+                    }
                     _ => return Err(chamfer_failed(e)),
                 }
             }
@@ -1391,6 +1398,9 @@ fn chamfer_in(ev: &mut EvalCtx) -> FResult<()> {
         // Chamfer 2 failed.)
         let shape = blend_edge_senses(&shape, &face_names, ev.feature).ok().flatten().filter(|s| s.is_valid()).unwrap_or(shape);
         ev.replace_body(bi, shape, face_names);
+    }
+    if let Some(e) = failed {
+        return Err(e);
     }
     // Never an empty body: a chamfer far larger than its part can take every face, which live fails.
     if touched.iter().any(|&bi| ev.ctx.bodies.get(bi).is_some_and(|b| b.shape.count(ShapeType::Solid) == 0 || b.shape.count(ShapeType::Face) == 0)) {

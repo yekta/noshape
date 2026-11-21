@@ -1145,6 +1145,13 @@ pub fn find_region_in(regions: &[Region], id: &RegionId) -> Option<Region> {
     if let Some(r) = regions.iter().find(|r| &r.id == id) {
         return Some(r.clone());
     }
+    // The same curves run the other way (a face's edges turned round since, imprinted on a sketch on it:
+    // c2-fan-blade-sweep's Sketch 6 after Chamfer 2): that region when no other has them.
+    let curves = id.entities();
+    let mut same = regions.iter().filter(|r| r.id.ordinal == id.ordinal && r.id.entities() == curves);
+    if let (Some(r), None) = (same.next(), same.next()) {
+        return Some(r.clone());
+    }
     let mut best: Option<(f64, usize)> = None;
     for (i, r) in regions.iter().enumerate() {
         let common = r.id.boundary.iter().filter(|s| id.boundary.contains(s)).count() as f64;
