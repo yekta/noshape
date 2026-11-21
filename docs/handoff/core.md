@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-21 08:30 UTC (lead order 11-21: thicken trim, SPEED-VALVE-CONFIG, KNIFEHANDLE, then the direct thicken ticket). Mac: builds + crate tests via NOSHAPE_RB_HOST=mac tools/tiers/rb.sh, single-model repros in ~/noshape-host/core-keep/models. Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-21 10:31 UTC (lead order 11-21: STD-3132, SPEED-VALVE-CONFIG, KNIFEHANDLE, infento chamfer sense, then THICKEN-DIRECT). Mac: builds + crate tests via NOSHAPE_RB_HOST=mac tools/tiers/rb.sh, single-model repros in ~/noshape-host/core-keep/models. Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: the least-loaded of vibex7/vibex8/vibe2 (DECISIONS a67911bef); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
@@ -20,13 +20,24 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   dump vibex7:~/agents/core-keep/susp/fillet-19.
 - **VALID-SURFLOFTS-LOFT1:** first difference is Face blend 1 ERROR ("Cannot attach blended face"); Loft 1's invalid
   sheet is downstream (Bridging curves on wrong geometry). Goes with the Face blend 1 item.
-- **SPEED-VALVE-CONFIG QUEUED 11-21 as c2b48596** (core-th, rebased: engine.rs conflict, both tests kept). Suite pair
-  vibex7: 126/175 docs, 1859/2264 features both sides, no document changed; valve 578 -> 523 ms.
-- **STD-3132 (core-th, in progress):** std/ = live/std-3132, STD_VERSION/LANGUAGE_VERSION + templates 3132,
-  @setThinWallOneSided no-op (status.rs + native_args IGNORES_MAP), tools/std-pack.py --all (3112 becomes a pack).
-  Native hole reads the embedded holetables (7/8"-14 UNF 0.8125 automatic); native Hole has no error-tool preview (std
-  hole's start-plane fix only affects FS holes); no collapsed-wall concept natively. Gate: crate tests + suite pair.
-- **Impeller speed items done:** Extrude 4 region dedupe landed 18354ec7.
+- **SPEED-VALVE-CONFIG LANDED c17f6eaab.** Impeller Delete face 2 / Extrude 4 speed PARKED (lead 11-21): from feature 29
+  our impeller is a wrong model (Halter, Extrude impellerraum 38 vs 59 faces); wait for blend's cascade fix.
+- **STD-3132 QUEUED 11-21 10:31 (core-th):** std/ = live/std-3132, STD_VERSION/LANGUAGE_VERSION + templates 3132,
+  @setThinWallOneSided no-op (status.rs + native_args IGNORES_MAP), 3112 as a pack. Suite pair vibex7: 126/176 docs,
+  1879/2327 features both sides, every first difference and custom-feature line identical (24 SM docs included). Tell
+  skasm when it lands.
+- **KNIFEHANDLE-LOFT1 + INFENTO-CHAMFER-SENSE (core-bis2, branch core-thd, 2 commits on 2f740a084, not queued):**
+  k::loft_guided_multi (loft_guided.cpp: stations by chord length between profile centres, guides mapped by monotone
+  cubic, columns interpolated, Hermite tents across the guides, u-periodic grid fit, seam through guide 0, the end loop
+  split at the other guides): knifehandle Handle 1/2/3 as live, area 21387.08 vs 21477.23 (-0.42 %), Loft 1 38 ms (live
+  40); the doc's first difference stays Sweep 2 (Blade -1.4 mm2), then Fillet (feature 10) ERROR. Its P4 sketch fix was
+  live's sketches.json in the parity models (translator unchanged). Chamfer: detail.rs blend_edge_senses (new edges
+  run as the neighbour face's loop runs them; live core/infento-chamfer-sense-1121.json). Suite pair on vibex7 running
+  (base core-cache at 2f740a084, branch .kp.sh also runs asm-infento-subs alone). Then land.
+- **THICKEN-DIRECT next:** core-bis2's .thv.sh (vibex7) dumps every thicken input of the 20 thicken docs
+  (NOSHAPE_DUMP_ONLY=thicken) into ~/agents/core-keep/thdump/<doc>; then the direct builder (offset faces trimmed at
+  concave sharp edges, ruled walls, sewn; OCCT fallback; same faces/edges/volume as OCCT on every dump).
+- Note: loft_guided.cpp was once corrupted by an empty-pattern replace (140 MB); recovered by de-interleaving.
 
 ## In flight (11-20)
 - **LANDED 11-20:** singularities Sketch 2 P0 a2e7c966; fillet orientation d80c2c58 (then reverted, below); manualblend
