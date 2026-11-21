@@ -90,6 +90,60 @@ fn selected(cx: &mut TestAppContext, view: &Entity<StartView>) -> Vec<String> {
     view.read_with(cx, |v, _| v.selection_items().into_iter().map(|i| i.1).collect())
 }
 
+/// Live docs-import-feel-1118: the row under the pointer shows its Send to trash and labels icons ("Create, add or edit
+/// labels") at its right end, no other row.
+#[gpui::test]
+fn the_hovered_row_shows_its_quick_actions(cx: &mut TestAppContext) {
+    let (w, _view) = page(cx, "hover-icons");
+    assert!(VisualTestContext::from_window(w, cx).debug_bounds("row-icon:Labels").is_none(), "none at rest");
+    for name in ["C", "D"] {
+        let at = row_at(cx, w, name);
+        VisualTestContext::from_window(w, cx).simulate_mouse_move(at, None, Modifiers::none());
+        draw(cx, w);
+        let (row, icon) = (bounds(cx, w, &format!("doc-row:{name}")), bounds(cx, w, "row-icon:Labels"));
+        assert!(row.contains(&icon.center()) && icon.left() > row.center().x, "{name}'s icons at its right end: {icon:?} {row:?}");
+        assert!(row.contains(&bounds(cx, w, "row-icon:Send to trash").center()));
+    }
+}
+
+/// Live docs-import-feel-1118: the row's Send to trash opens its modal; Enter does nothing there, Esc closes it.
+#[gpui::test]
+fn enter_leaves_the_send_to_trash_modal_open(cx: &mut TestAppContext) {
+    let (w, _view) = page(cx, "trash-enter");
+    let at = row_at(cx, w, "C");
+    VisualTestContext::from_window(w, cx).simulate_mouse_move(at, None, Modifiers::none());
+    draw(cx, w);
+    let icon = bounds(cx, w, "row-icon:Send to trash").center();
+    click(cx, w, icon, Modifiers::none());
+    let open = |cx: &mut TestAppContext| cx.update_window(w, |_, window, cx| gpui_kit::component::WindowExt::has_active_dialog(window, cx)).unwrap();
+    assert!(open(cx), "the modal");
+    VisualTestContext::from_window(w, cx).simulate_keystrokes("enter");
+    draw(cx, w);
+    assert!(open(cx), "Enter: still open");
+    VisualTestContext::from_window(w, cx).simulate_keystrokes("escape");
+    draw(cx, w);
+    assert!(!open(cx), "Esc closes it");
+}
+
+/// Live docs-import-feel-1118: Name's header sorts A→Z, then Z→A, then back to the default order (newest first, no
+/// arrow); Modified's flips oldest first / newest first.
+#[gpui::test]
+fn a_header_sorts_up_down_then_back_to_the_default(cx: &mut TestAppContext) {
+    let (w, view) = page(cx, "sort-cycle");
+    let state = |cx: &mut TestAppContext| view.read_with(cx, |v, _| (v.sort, v.descending, v.sort_cleared));
+    let head = |cx: &mut TestAppContext, sel: &str| bounds(cx, w, sel).center();
+    let at = head(cx, "doc-head-name");
+    for want in [(super::SortKey::Name, false, false), (super::SortKey::Name, true, false), (super::SortKey::Modified, true, true)] {
+        click(cx, w, at, Modifiers::none());
+        assert_eq!(state(cx), want);
+    }
+    let at = head(cx, "doc-head-modified");
+    click(cx, w, at, Modifiers::none());
+    assert_eq!(state(cx), (super::SortKey::Modified, false, false), "oldest first");
+    click(cx, w, at, Modifiers::none());
+    assert_eq!(state(cx), (super::SortKey::Modified, true, false), "newest first");
+}
+
 /// Live2 feel/documents.json: Ctrl+A selects every row, Esc keeps the selection, a click on the list's empty space
 /// clears it.
 #[gpui::test]

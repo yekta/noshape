@@ -245,6 +245,7 @@ fn branches_crud() {
     ));
     assert_eq!(doc.list_branches().unwrap().len(), 1);
     assert!(doc.branch(feat).unwrap().deleted);
+    assert!(doc.branch(feat).unwrap().deleted_at.is_some_and(|t| t > 1), "the time it was deleted");
     assert!(matches!(doc.head(feat), Err(StoreError::UnknownBranch(_))));
     assert!(matches!(
         doc.commit(feat, &[set("x", b"y")], "x"),

@@ -14,6 +14,18 @@ fn call(ctx: &mut Ctx, tool: &str, args: Value) -> Value {
     registry::run(ctx, op, &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value
 }
 
+/// A window of its own for a dialog (the app's windows carry the dialogs' root; the test workspace's doesn't).
+fn dialog_window(cx: &mut TestAppContext) -> AnyWindowHandle {
+    struct Blank;
+    impl gpui_kit::Render for Blank {
+        fn render(&mut self, _: &mut gpui_kit::Window, _: &mut gpui_kit::Context<Self>) -> impl gpui_kit::IntoElement {
+            gpui_kit::div()
+        }
+    }
+    let bounds = Bounds { origin: Point::default(), size: size(px(900.), px(700.)) };
+    cx.update(|cx| gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |_, cx| cx.new(|_| Blank)).unwrap().0)
+}
+
 /// A new document (its Part Studio 1 with a block) and Variable Studios A, B and C in a workspace, opened in that order (C active,
 /// B the previous one).
 fn workspace(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Workspace>, [TabId; 4]) {
@@ -279,15 +291,7 @@ fn a_bare_assembly_is_uploaded_only_once_upload_only_is_ticked(cx: &mut TestAppC
     let doc = cx.update(|cx| ws.read(cx).doc.clone());
     let tabs = |cx: &mut TestAppContext| doc.read_with(cx, |d, _| d.session.doc.ordered_tabs().iter().map(|t| t.name.clone()).collect::<Vec<_>>());
     let before = tabs(cx);
-    // The dialog in a window of its own (the app's windows carry the dialogs' root; the test workspace's doesn't).
-    struct Blank;
-    impl gpui_kit::Render for Blank {
-        fn render(&mut self, _: &mut gpui_kit::Window, _: &mut gpui_kit::Context<Self>) -> impl gpui_kit::IntoElement {
-            gpui_kit::div()
-        }
-    }
-    let bounds = Bounds { origin: Point::default(), size: size(px(900.), px(700.)) };
-    let d: AnyWindowHandle = cx.update(|cx| gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |_, cx| cx.new(|_| Blank)).unwrap().0);
+    let d = dialog_window(cx);
     let open = |cx: &mut TestAppContext| cx.update_window(d, |_, window, cx| gpui_kit::component::WindowExt::has_active_dialog(window, cx)).unwrap();
     cx.update_window(d, |_, window, cx| crate::import_dialog::open(doc.clone(), vec![probe.clone()], Some(c), true, window, cx)).unwrap();
     draw(cx, d);
@@ -431,6 +435,26 @@ fn esc_in_a_tab_rename_keeps_the_name(cx: &mut TestAppContext) {
         assert_eq!(ws.read_with(cx, |ws, _| ws.tab_drag_and_rename().1), None, "{typed:?}: the field closed");
         assert_eq!(name(cx), before, "{typed:?}: the name kept");
     }
+}
+
+/// Live ws-1118 r0: ☰ › Restore deleted workspaces… lists a deleted workspace under Name | Deleted by | Deleted at, the
+/// time it was deleted kept.
+#[gpui::test]
+fn restore_deleted_workspaces_lists_who_and_when(cx: &mut TestAppContext) {
+    let (_, ws, _) = workspace(cx, "restore-ws");
+    let w = dialog_window(cx);
+    let doc = ws.read_with(cx, |ws, _| ws.doc.clone());
+    let deleted = doc.update(cx, |d, _| {
+        let store = &mut d.session.store;
+        let main = store.list_branches().unwrap()[0].clone();
+        let b = store.create_branch(main.head, "B2").unwrap();
+        store.delete_branch(b).unwrap();
+        store.branch(b).unwrap()
+    });
+    assert!(deleted.deleted_at.is_some());
+    cx.update_window(w, |_, window, cx| crate::doc_dialogs::restore_deleted_workspaces(doc.clone(), window, cx)).unwrap();
+    draw(cx, w);
+    assert!(VisualTestContext::from_window(w, cx).debug_bounds("restore-ws-head").is_some(), "the table's header");
 }
 
 /// Live rq 2403: Ctrl+click or Shift+click on a tab opens it in a new window; this window keeps its tab.

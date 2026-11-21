@@ -3071,6 +3071,10 @@ pub fn open_revision_history(doc: Entity<DocModel>, part_number: String, window:
         let doc_name = doc.read(cx).name();
         let mut rows = v_flex().gap(px(8.));
         let revisions = log.revisions(&part_number);
+        // (Live Pro retakes 11-19, asm-menu-release: an item never released.)
+        if revisions.is_empty() {
+            rows = rows.child(div().debug_selector(|| "rh-none".into()).text_size(px(14.)).text_color(pal.text).child("No revision history found."));
+        }
         for (k, e) in revisions.iter().rev().enumerate() {
             let pkg = log.packages[e.release].clone();
             // The released version (its author is the releasing user).

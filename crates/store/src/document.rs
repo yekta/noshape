@@ -142,6 +142,8 @@ pub struct BranchInfo {
     /// Deleted branches keep their record so the graph can still label their
     /// microversions.
     pub deleted: bool,
+    /// When it was deleted (the `deleted` column holds the time; files from before hold 1: unknown).
+    pub deleted_at: Option<Timestamp>,
 }
 
 /// A named, immutable version.
@@ -379,6 +381,7 @@ fn branch_from_row(r: &Row<'_>) -> rusqlite::Result<BranchInfo> {
         created_from: r.get(4)?,
         is_default: r.get(5)?,
         deleted: r.get(6)?,
+        deleted_at: Some(r.get::<_, i64>(6)?).filter(|t| *t > 1),
     })
 }
 
@@ -1307,7 +1310,7 @@ impl Document {
             return Err(StoreError::CannotDeleteDefaultBranch);
         }
         self.conn()?
-            .execute("UPDATE branches SET deleted = 1 WHERE id = ?1", [id])?;
+            .execute("UPDATE branches SET deleted = ?2 WHERE id = ?1", params![id, now_ms().max(2)])?;
         Ok(())
     }
 

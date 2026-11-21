@@ -82,42 +82,43 @@ pub fn document_details(doc: Entity<DocModel>, window: &mut Window, cx: &mut App
     window.defer(cx, move |window, cx| focus.update(cx, |s, cx| s.focus(window, cx)));
 }
 
-/// ☰ › Restore deleted workspaces…: deleted branches with a Restore button.
-/// ☰ › Restore deleted workspaces… (live doc-menu-restore-workspaces): the deleted workspaces to tick, [Restore
+/// ☰ › Restore deleted workspaces… (live doc-menu-restore-workspaces, ws-1118): the deleted workspaces to tick, [Restore
 /// selected] (pale until one is ticked) [Cancel]; none: "No deleted workspaces found in this document."
 pub fn restore_deleted_workspaces(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
     let picked: Rc<std::cell::RefCell<Vec<noshape_store::BranchId>>> = Rc::default();
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
         let deleted: Vec<noshape_store::BranchInfo> = doc.read(cx).session.store.graph().map(|g| g.branches.into_iter().filter(|b| b.deleted).collect()).unwrap_or_default();
+        // Live ws-1118 r0: an info box, then a table ☐ | Name | Deleted by | Deleted at ("2:33 AM Today").
         let rows: Vec<AnyElement> = if deleted.is_empty() {
             vec![os::info_box("No deleted workspaces found in this document.").into_any_element()]
         } else {
-            deleted
-                .into_iter()
-                .map(|b| {
-                    let (picked, id) = (picked.clone(), b.id);
-                    let on = picked.borrow().contains(&id);
-                    h_flex()
-                        .h(px(36.))
-                        .gap(px(8.))
-                        .child(os::user_checkbox(SharedString::from(format!("restore-{}", id.0)), b.name.clone(), on).flex_1().on_click(move |_, window, _| {
-                            let mut p = picked.borrow_mut();
-                            if let Some(i) = p.iter().position(|x| *x == id) {
-                                p.remove(i);
-                            } else {
-                                p.push(id);
-                            }
-                            window.refresh();
-                        }))
-                        .child(div().text_size(px(13.)).text_color(pal.text_muted).child(crate::start_library::format_onshape_time(b.created)))
-                        .into_any_element()
-                })
-                .collect()
+            let by = doc.read(cx).session.store.author().to_string();
+            let line = |r: gpui_kit::Div| r.h(px(36.)).flex_none().items_center().border_b_1().border_color(pal.border).text_size(px(14.)).text_color(pal.text);
+            let head = line(h_flex()).debug_selector(|| "restore-ws-head".into()).font_weight(FontWeight::BOLD).child(div().w(px(34.)).flex_none()).child(div().w(px(183.)).flex_none().child("Name")).child(div().w(px(183.)).flex_none().child("Deleted by")).child(div().flex_1().child("Deleted at"));
+            let mut rows = vec![os::info_box("Workspaces can be restored within 30 days of deletion.").into_any_element(), head.into_any_element()];
+            rows.extend(deleted.into_iter().map(|b| {
+                let (picked, id) = (picked.clone(), b.id);
+                let on = picked.borrow().contains(&id);
+                line(h_flex())
+                    .child(div().w(px(217.)).flex_none().child(os::user_checkbox(SharedString::from(format!("restore-{}", id.0)), b.name.clone(), on).on_click(move |_, window, _| {
+                        let mut p = picked.borrow_mut();
+                        if let Some(i) = p.iter().position(|x| *x == id) {
+                            p.remove(i);
+                        } else {
+                            p.push(id);
+                        }
+                        window.refresh();
+                    })))
+                    .child(div().w(px(183.)).flex_none().truncate().child(by.clone()))
+                    .child(div().flex_1().child(crate::start_library::format_onshape_time(b.deleted_at.unwrap_or(b.created))))
+                    .into_any_element()
+            }));
+            rows
         };
         let any = !picked.borrow().is_empty();
         let (doc, picked) = (doc.clone(), picked.clone());
-        os::modal(dialog, "Restore deleted workspaces", 460.)
+        os::modal(dialog, "Restore deleted workspaces", 598.)
             .child(os::modal_body().children(rows))
             .footer(os::modal_footer().child(os::modal_ok(div().when(!any, |d| d.opacity(0.4)).child(os::primary_button("ok", "Restore selected")))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
             .on_ok(move |_, _, cx| {

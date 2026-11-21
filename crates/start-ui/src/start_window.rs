@@ -391,6 +391,8 @@ pub struct StartView {
     /// The selected row (the last clicked); with Ctrl / Shift + click, `also` holds the others, valid while `selected`
     /// is still `also_of` (anything else that selects a row drops them).
     selected: Option<PathBuf>,
+    /// The document row under the pointer: its quick actions show (live docs-import-feel-1118).
+    hovered_row: Option<PathBuf>,
     also: Vec<PathBuf>,
     also_of: Option<PathBuf>,
     /// Shift + click's range start.
@@ -626,6 +628,7 @@ impl StartView {
             search,
             query: String::new(),
             selected: None,
+            hovered_row: None,
             also: Vec::new(),
             also_of: None,
             anchor: None,
@@ -810,15 +813,15 @@ impl StartView {
         cx.notify();
     }
 
+    /// A header click (live docs-import-feel-1118): a column sorts ascending, then descending, then back to the default
+    /// order (newest first, no arrow); Modified, already the default's key, only flips (oldest first, newest first).
     fn set_sort(&mut self, key: SortKey, cx: &mut Context<Self>) {
-        if std::mem::take(&mut self.sort_cleared) {
-            self.sort = key;
-            self.descending = key == SortKey::Modified;
-        } else if self.sort == key {
+        if std::mem::take(&mut self.sort_cleared) || self.sort != key {
+            (self.sort, self.descending) = (key, false);
+        } else if key == SortKey::Modified || !self.descending {
             self.descending = !self.descending;
         } else {
-            self.sort = key;
-            self.descending = key == SortKey::Modified;
+            self.clear_sort();
         }
         self.save_prefs();
         cx.notify();
@@ -1628,12 +1631,16 @@ impl StartView {
                         )
                         .when(shown.get(), |d| d.child(Self::selection_box(&items))),
                 )
-                .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Send to trash"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
-                .on_ok(move |_, window, cx| {
-                    let items = items.clone();
-                    view.update(cx, |this, cx| this.send_to_trash(items, window, cx));
-                    true
-                })
+                // Live docs-import-feel-1118: Enter does nothing here (no OK decision for it to take), Esc closes.
+                .footer(
+                    os::modal_footer()
+                        .child(crate::ui_script::mark(div().flex_none().debug_selector(|| "modal-ok".into()), || "button:modal-ok".into()).child(os::primary_button("ok", "Send to trash").on_click(move |_, window, cx| {
+                            let items = items.clone();
+                            window.close_dialog(cx);
+                            view.update(cx, |this, cx| this.send_to_trash(items, window, cx));
+                        })))
+                        .child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))),
+                )
         });
     }
 
@@ -4271,7 +4278,8 @@ impl StartView {
                 Col::ModifiedBy => Some(SortKey::ModifiedBy),
                 _ => None,
             };
-            self.list_header_cell(c.label(), c.label(), key, Some(*c), cx).w(px(self.col_width(c.label()))).flex_none().into_any_element()
+            let label = c.label();
+            self.list_header_cell(label, label, key, Some(*c), cx).w(px(self.col_width(label))).flex_none().debug_selector(move || format!("doc-head-{}", label.to_lowercase())).into_any_element()
         };
         let mut header = h_flex()
             .relative()
@@ -4317,8 +4325,8 @@ impl StartView {
                 }
                 rows.push({
                 let selected = sel.contains(d.path.as_os_str());
-                // The quick actions show on the one selected row only.
-                let alone = selected && alone;
+                // The quick actions show on the hovered row and on the one selected row.
+                let alone = selected && alone || self.hovered_row.as_ref() == Some(&d.path);
                 let open = crate::doc_files::is_document_open(&d.path, cx);
                 let v2 = cx.entity();
                 let (d1, d2) = (d.clone(), d.clone());
@@ -4345,6 +4353,16 @@ impl StartView {
                     .group(PIN_ROW)
                     .relative()
                     .map(|r| crate::ui_script::mark(r, || format!("doc_row:{}", d.name)))
+                    .on_hover({
+                        let path = d.path.clone();
+                        cx.listener(move |this, on: &bool, _, cx| {
+                            let now = on.then(|| path.clone());
+                            if this.hovered_row != now && (*on || this.hovered_row.as_ref() == Some(&path)) {
+                                this.hovered_row = now;
+                                cx.notify();
+                            }
+                        })
+                    })
                     .h(px(DOC_ROW_H))
                     .flex_none()
                     .cursor_pointer()
@@ -4396,22 +4414,30 @@ impl StartView {
                     )
                     .children(pins.center.iter().map(col_cell))
                     .children(search_cols.iter().map(|_| cell(200.).into_any_element()))
-                    // Live documents/112: the selected row shows its quick actions at the
+                    // Live documents/112, docs-import-feel-1118: the hovered or selected row shows its quick actions at the
                     // right end (share is cloud-only): Send to trash, Labels.
                     .when(alone && !d.trashed, |r| {
                         let (d3, d4) = (d.clone(), d.clone());
-                        let icon = |id: &'static str, glyph: &'static [u8], tip: &'static str| div().id(id).map(|d| crate::ui_script::mark(d, move || format!("row_icon:{tip}"))).size(px(20.)).flex_none().cursor_pointer().tooltip(crate::ui::tooltip(tip)).child(os::glyph(glyph, 20., pal.text));
-                        r.child(div().flex_1()).child(
+                        // (Scripts name them "Send to trash" / "Labels".)
+                        let icon = |id: &'static str, glyph: &'static [u8], name: &'static str, tip: &'static str| div().id(id).debug_selector(move || format!("row-icon:{name}")).map(|d| crate::ui_script::mark(d, move || format!("row_icon:{name}"))).size(px(20.)).flex_none().cursor_pointer().tooltip(crate::ui::tooltip(tip)).child(os::glyph(glyph, 20., pal.text));
+                        // Over the row's right end in view (before its right-pinned cells), however far it scrolls sideways.
+                        r.child(
                             h_flex()
-                                .flex_none()
+                                .absolute()
+                                .top_0()
+                                .bottom_0()
+                                .right(px(pins.right_w + pins.max - pins.scrolled))
+                                .bg(bg)
+                                .when_some(hover, |b, h| b.group_hover(PIN_ROW, move |s| s.bg(h)))
                                 .gap(px(8.))
+                                .pl(px(8.))
                                 .pr(px(13.))
-                                .child(icon("row-trash", os::GLYPH_TRASH, "Send to trash").on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                .child(icon("row-trash", os::GLYPH_TRASH, "Send to trash", "Send to trash").on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                                     cx.stop_propagation();
                                     this.trash(d3.clone(), window, cx);
                                 })))
                                 // The Details panel with its Document labels open (live docs-row-icon-labels), as the row menu's Labels….
-                                .child(icon("row-labels", os::GLYPH_LABEL, "Labels").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                .child(icon("row-labels", os::GLYPH_LABEL, "Labels", "Create, add or edit labels").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     cx.stop_propagation();
                                     this.details_labels_open = true;
                                     this.show_panel(d4.clone(), DocPanel::Details, cx);

@@ -287,3 +287,14 @@ fn submit_requires_approvers_bolds_submit_and_approvers() {
     let bold: Vec<&str> = super::SUBMIT_REQUIRES_BOLD.iter().map(|r| &super::SUBMIT_REQUIRES_APPROVERS[r.clone()]).collect();
     assert_eq!(bold, ["Submit", "Approvers"]);
 }
+
+/// Live (Pro retakes 11-19, asm-menu-release): an item never released opens "Revision history" reading "No revision
+/// history found.".
+#[gpui::test]
+fn an_unreleased_items_revision_history_says_none_found(cx: &mut TestAppContext) {
+    let (window, view, _) = dialog(cx, "rh-none", Mode::Release, "R1");
+    let doc = cx.update(|cx| view.read(cx).doc.clone());
+    cx.update_window(window, |_, w, cx| super::open_revision_history(doc, "PN-1".into(), w, cx)).unwrap();
+    draw(cx, window);
+    assert!(gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("rh-none").is_some(), "the empty history's sentence");
+}
