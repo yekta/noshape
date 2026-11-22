@@ -1020,6 +1020,21 @@ matrix"; ours: asm's frames of the same cells, one Part 1 instance after `f`, to
 | Ctrl+click on a row | the instance's context menu | the same | = |
 | Meta / Shift+click on rows | multi-select | not checked | ? |
 
+An assembly instance dragged (live asm/drag-feel-1122, behaviours "asm assembly drag feel"; a free part, one on a Revolute,
+one on a Slider and a fixed one):
+
+| Cell | Live | Ours | Status |
+|---|---|---|---|
+| press, no move yet | nothing selected, the hover look stays | the same | = |
+| while dragging | the hover look goes; no mate glyphs or triads; no list row changes | the same (`a_dragged_part_shows_no_hover_until_released`) | = |
+| Undo while dragging | greyed until the release (not for a fixed part) | the same (fixed asm, same test) | = |
+| release over the part | the hover look comes back | the same | = |
+| free part | the grab point stays under the pointer | the same (`a_dragged_free_instance_takes_the_whole_move_from_the_press`) | = |
+| Slider | follows only the pointer's component along its axis on screen, all of it (-155 px for -152) | the same (`a_slider_drag_follows_the_pointer_on_screen_in_an_iso_view`) | = |
+| Revolute | turns about the pivot, the screen angle following the pointer's round it | the same (drawn to the pointer's ray: `a_ball_drag_turns_as_an_arcball`, `a_revolute_drag_stops_at_its_limits`) | = |
+| fixed part | never moves; a 36 × 16 px ground glyph (white box over hatching) lying on its face, where the drag started, till the release | the same (fixed asm: was a screen icon following the cursor; `a_dragged_fixed_part_shows_the_ground_glyph_where_the_drag_started`); its offset from the pointer to be scored | = (offset ?) |
+| drag start | ~1.8 s after the first move, then a jump to the pointer (software GL) | from the first move past 2 px / 50 ms | = (live's delay is not a target) |
+
 Other selection fields and the Dimension tool (batch 5; 8 / 13 on green 6be52caf4; block doc after `f`, the field active; live b5/ (lane 4,
 20:13), ours qa-scratch/hm2/b5-score.png, cmp-b5/):
 

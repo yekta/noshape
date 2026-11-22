@@ -411,6 +411,37 @@ fn a_drag_step_lands_in_one_solve_when_it_can() {
     assert!((DVec3::from(t.placement(InstanceId(2)).unwrap().translation) - o).length() < 1e-9);
 }
 
+/// Live asm/drag-feel-1122 (Slider): in an isometric view a Slider's part follows the pointer's component along its
+/// axis on screen, all of it (the part's offset the pointer's: -155 px for -152), not the shorter 3D projection of a
+/// point at the pointer's depth (2/3 of it here); the sideways component moves nothing.
+#[test]
+fn a_slider_drag_follows_the_pointer_on_screen_in_an_iso_view() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let m = mate(10, MateType::Slider, conn(1, face_with(&r, "CapEnd"), Inference::Centroid), conn(2, face_with(&r, "CapStart"), Inference::Centroid));
+    let asm = Assembly {
+        instances: vec![
+            part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
+            part_instance(2, "Block <2>", f.studios[0], body, DVec3::new(0.0, 0.0, 0.02), false),
+        ],
+        mates: vec![m],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let start: std::collections::HashMap<_, _> = res.solved.placements.iter().cloned().collect();
+    let view = DVec3::new(-1.0, -1.0, -1.0).normalize();
+    let up = (DVec3::Z - view * view.z).normalize();
+    let right = up.cross(view);
+    let (local, from) = (DVec3::new(0.02, 0.01, 0.0), DVec3::new(0.02, 0.01, 0.02));
+    let dy = 0.01;
+    let opts = SolveOptions { drags: vec![(InstanceId(2), local, from + up * dy + right * 0.004)], drag_view: Some(view), start: Some(start), skip_dof: true, ..Default::default() };
+    let (s, _) = res.prepared.solve_drag(&opts, &[from], true);
+    let moved = DVec3::from(s.placement(InstanceId(2)).unwrap().translation) - DVec3::new(0.0, 0.0, 0.02);
+    assert!(moved.x.abs() < 1e-7 && moved.y.abs() < 1e-7, "along its axis only: {moved:?}");
+    assert!((moved.dot(up) - dy).abs() < 1e-7, "the pointer's whole on-screen move along the axis: {} of {dy}", moved.dot(up));
+}
+
 /// Live asm drag probes 4 (request 1870): a block on a Ball to a fixed one
 /// turns as an arcball about the ball's centre: dragged in the top view past
 /// its reach, the grabbed corner points at the pointer in plan and tilts by

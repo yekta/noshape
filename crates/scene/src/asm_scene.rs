@@ -1047,6 +1047,48 @@ impl noshape_render::camera_geometry::CameraGeometry for MateGlyphs {
     }
 }
 
+/// The ground glyph on a fixed instance's face while it is dragged (live asm/drag-feel-1122 fixed-glyph-x3.png): a white
+/// box outlined dark on a ground line with four hatch strokes under it, haloed white, ~36 px across, lying in the face's
+/// plane at `frame` (z the face's normal toward the viewer, x its long side).
+pub struct GroundGlyph {
+    pub frame: Frame,
+}
+
+impl GroundGlyph {
+    fn geometry(&self, view: &noshape_render::camera_geometry::View) -> (LineData, PointData) {
+        let (mut lines, mut points) = (LineData::default(), PointData::default());
+        let f = &self.frame;
+        let Some(px) = view.world_per_px(f.origin) else { return (lines, points) };
+        let half = 18.0 * px;
+        let (u, v, n) = (f.x(), f.y(), f.z());
+        let lift = n * (half * 0.02);
+        let at = |a: f64, b: f64| -> [f32; 3] { (f.origin + lift + u * (a * half) + v * (b * half)).as_vec3().into() };
+        const WHITE: [u8; 4] = [255, 255, 255, 255];
+        let mut pen = GlyphPen { lines: &mut lines, points: &mut points, at: &at, blue: WHITE, ink: DARK };
+        pen.fill([(-0.98, -0.42), (0.98, -0.42), (0.98, 0.5), (-0.98, 0.5)], WHITE);
+        pen.outline([(-0.8, 0.0), (0.8, 0.0), (0.8, 0.38), (-0.8, 0.38)]);
+        pen.poly(&[(-0.8, 0.0), (0.8, 0.0)], DARK, 2.0);
+        for x in [-0.55, -0.15, 0.25, 0.65] {
+            pen.poly(&[(x, 0.0), (x - 0.22, -0.3)], DARK, 1.6);
+        }
+        (lines, points)
+    }
+}
+
+impl noshape_render::camera_geometry::CameraGeometry for GroundGlyph {
+    fn key(&self) -> Option<u64> {
+        Some(noshape_render::camera_geometry::key_of("GroundGlyph", &self.frame))
+    }
+
+    fn build(&self, view: &noshape_render::camera_geometry::View, up: &Uploader) -> Vec<Instance> {
+        let (lines, _) = self.geometry(view);
+        if lines.segments.is_empty() {
+            return Vec::new();
+        }
+        vec![Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(20)]
+    }
+}
+
 fn push_triad(lines: &mut LineData, f: &Frame, size: f64, width: f32, pick: u32, highlight: bool) {
     let o: [f32; 3] = f.origin.as_vec3().into();
     for (k, axis) in [f.x(), f.y(), f.z()].into_iter().enumerate() {

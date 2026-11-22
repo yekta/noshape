@@ -1816,6 +1816,7 @@ impl AssemblyView {
         });
         // Live (mates.json after_second_pick): a mate's axes 50 px long at any zoom; the triads' relative sizes kept.
         let base = self.triad_size();
+        let ground = self.ui.ground.map(|frame| std::sync::Arc::new(assembly_scene::GroundGlyph { frame }) as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>);
         let screen_triads: Option<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = (!h.triads.is_empty()).then(|| {
             let items = std::mem::take(&mut h.triads).into_iter().map(|t| (t.frame, assembly_scene::MATE_AXIS_PX * t.size / base, t.strong)).collect();
             std::sync::Arc::new(assembly_scene::ScreenTriads { items }) as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>
@@ -1837,7 +1838,7 @@ impl AssemblyView {
         // Zoom to fit: the visible instances (the scene's bounds lag a new
         // insert: qa5 A1 cropped the first part), clear of the dialog.
         let (fit_bounds, fit_inset) = (self.result.bounds(), if self.ui.left_open { 220.0 + 2.0 * 12.0 } else { 0.0 });
-        let camera_geometry: Vec<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = marks.into_iter().chain(connector_glyphs).chain(first_pick).chain(mate_glyphs).chain(screen_triads).collect();
+        let camera_geometry: Vec<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = marks.into_iter().chain(connector_glyphs).chain(first_pick).chain(mate_glyphs).chain(screen_triads).chain(ground).collect();
         #[cfg(test)]
         {
             self.ui.camera_geometry = camera_geometry.clone();
@@ -2632,6 +2633,25 @@ impl AssemblyView {
         true
     }
 
+    /// The ground glyph's frame for a fixed instance's drag at `position` (live asm/drag-feel-1122): on the face under
+    /// the pointer, lying in its plane facing the viewer, its long side along the screen's.
+    fn ground_glyph_at(&self, position: DVec2, cx: &App) -> Option<Frame> {
+        let (t, p) = self.raycast_hit(position, &[], cx)?;
+        let o = self.result.occurrences.get(t.occ)?;
+        let at = Reference::Implicit { on: Box::new(t.reference.clone()), inference: Inference::Centroid };
+        let f = noshape_model::assembly::eval::resolve_connector_in(&o.context, Some(&o.body), &at, &self.units(cx))?;
+        let vp = self.viewport.read(cx);
+        let n = noshape_model::assembly::eval::matrix_frame(&o.transform).mul(&f).z();
+        let n = if n.dot(vp.ray(position).1) > 0.0 { -n } else { n };
+        let (o1, d1) = vp.ray(position + DVec2::X);
+        let along = d1.dot(n);
+        if along.abs() < 1e-9 {
+            return None;
+        }
+        let u = (o1 + d1 * ((p - o1).dot(n) / along) - p).reject_from(n).try_normalize()?;
+        Some(Frame::from_axes(p, n, u))
+    }
+
     /// The toolbar's Undo / Redo (they dispatch the actions, so an open mate dialog takes them).
     fn undo_redo(&self, cx: &App) -> AnyElement {
         crate::ui::undo_redo_actions(self.history_state(cx), cx)
@@ -2651,6 +2671,9 @@ impl AssemblyView {
             None if self.ui.dynamic_suppression.is_some() => (false, false),
             // Nor Edit standard content (live asm-standard-content-edit-instance).
             None if self.ui.std.editing.is_some() => (false, false),
+            // Undo greys out while an instance is dragged, until the release (live asm/drag-feel-1122); a fixed one
+            // moves nothing and keeps it.
+            None if self.drag.as_ref().is_some_and(|d| d.started && d.handle.is_none() && !d.explode) && self.ui.fixed_drag.is_none() => (false, self.doc.read(cx).can_redo()),
             None => {
                 let d = self.doc.read(cx);
                 (d.can_undo(), d.can_redo())
@@ -3764,6 +3787,7 @@ impl AssemblyView {
                     // the fix glyph, no message).
                     if !explode && self.assembly(cx).and_then(|a| a.instance(top)).is_some_and(|i| i.fixed) {
                         self.ui.fixed_drag = Some(*position);
+                        self.ui.ground = self.ground_glyph_at(*position, cx);
                         // Nothing stays pre-highlighted while dragging it (live 562).
                         self.hover = None;
                         self.refresh_scene(false, cx);
@@ -3836,6 +3860,7 @@ impl AssemblyView {
                 }
                 // The no-drop cursor goes with the release (live icons2 10-23 (b), asm-fixed-drag-1118).
                 if self.ui.fixed_drag.take().is_some() {
+                    self.ui.ground = None;
                     self.refresh_scene(false, cx);
                     cx.notify();
                 }
@@ -4240,6 +4265,7 @@ impl AssemblyView {
         let fixed = self.assembly(cx).and_then(|a| a.instance(d.top)).is_some_and(|i| i.fixed);
         if fixed {
             self.ui.fixed_drag = None;
+            self.ui.ground = None;
             cx.notify();
             return;
         }
@@ -7108,24 +7134,6 @@ impl AssemblyView {
         }
         out.extend(self.render_mate_values(cx));
         out.extend(self.render_center_of_mass(cx));
-        if let Some(at) = self.ui.fixed_drag {
-            // Fixed instance drag: the fix glyph at the cursor (the `no-drop`
-            // cursor is the viewport's, refresh_scene).
-            out.push(div().absolute().top_0().left_0().size_full().child(
-                div()
-                    .absolute()
-                    .left(px(at.x as f32 - 10.))
-                    .top(px(at.y as f32 - 8.))
-                    .w(px(20.))
-                    .h(px(16.))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .rounded(px(3.))
-                    .bg(rgb(0xffffff))
-                    .child(crate::assets::icon(&icon_path("list-fixed"), 20., cx)),
-            ).into_any_element());
-        }
         if let Some(el) = self.render_measure(cx) {
             out.push(el);
         }

@@ -408,6 +408,8 @@ pub struct AsmUi {
     /// Dragging a fixed instance (live 562): the cursor position for the fix
     /// glyph and the `no-drop` cursor; nothing moves, no message.
     pub fixed_drag: Option<DVec2>,
+    /// The ground glyph that drag shows, where it started on the face under the pointer (live asm/drag-feel-1122).
+    pub ground: Option<noshape_model::assembly::solver::Frame>,
     /// The mate dialog's Animate preview ended (handled in render, which
     /// has the window to re-evaluate).
     pub preview_done: bool,

@@ -5,6 +5,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## asm, 2026-11-22 (live asm/drag-feel-1122, instance drag feel)
+- [x] P0 **FEEL-ASM-DRAG-UNDO (asm)**: (fixed asm) Undo stayed on while an instance was dragged; live greys it until the
+  release. Test: feel_tests::a_dragged_part_shows_no_hover_until_released.
+- [x] P0 **FEEL-ASM-FIXED-GLYPH (asm)**: (fixed asm) a fixed part's drag drew a 20 px screen icon following the cursor; live
+  lays a 36 × 16 px ground glyph on the face where the drag started, still till the release. Test:
+  feel_tests::a_dragged_fixed_part_shows_the_ground_glyph_where_the_drag_started.
+- [ ] P1 **ASM-OPEN-TYRES-TURNED (asm)**: opening infento (saved doc vibex7 ~/tmp/asm/infento-saved.noshape) moves "Large
+  wheel tyre <1>/<2>" 1.6 m and turns them half a turn: their Fastened mates 197 / 216 read π off the saved poses (our
+  connector frames vs live's). The same group spends 11-15 s in least_change. Probe: assembly_perf probe_store_keys.
+
 ## asm, 2026-11-22 (live asm/hover-list-1122, list × viewport hover)
 - [x] P0 **FEEL-ASM-TRIAD-STILL-POINTER (asm)**: (fixed asm: the triad a press shows or moves under the still pointer is
   drawn unlit until the pointer moves; a drag clears it) a click on an instance's face shows the move triad at the click,

@@ -334,12 +334,55 @@ fn a_dragged_part_shows_no_hover_until_released(cx: &mut TestAppContext) {
     }
     assert!(cx.update(|cx| view.read(cx).drag.as_ref().is_some_and(|d| d.started)), "dragging");
     assert!(!lit(cx), "nothing lit while the part is dragged");
+    assert!(!cx.update(|cx| view.read(cx).history_state(cx).0), "Undo greyed while dragging (live asm/drag-feel-1122)");
     let w = at_window(cx, &view, from + DVec2::new(60.0, 0.0));
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(w, MouseButton::Left, Modifiers::default());
     settle(cx, window, &view);
     wait_until(cx, window, &view, |v, _| v.drag.is_none());
     settle(cx, window, &view);
     assert!(lit(cx), "released: the face under the pointer lights again");
+    assert!(cx.update(|cx| view.read(cx).history_state(cx).0), "Undo back on the release (the move's step)");
+}
+
+/// Live asm/drag-feel-1122 (BaseR): a fixed part dragged never moves; a ground glyph lies on its face where the drag
+/// started, facing the viewer, and stays there while the pointer goes on; it goes with the release.
+#[gpui::test]
+fn a_dragged_fixed_part_shows_the_ground_glyph_where_the_drag_started(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "drag-fixed", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>"], "fixed": true }));
+    });
+    let (window, view) = open_from_top(cx, &path, 1);
+    let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
+    let from = (lo + hi) * 0.5;
+    move_to(cx, window, &view, from);
+    let w = at_window(cx, &view, from);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_down(w, MouseButton::Left, Modifiers::default());
+    let mut first = None;
+    for k in 1..=6 {
+        let p = at_window(cx, &view, from + DVec2::new(10.0 * f64::from(k), 0.0));
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(p, Some(MouseButton::Left), Modifiers::default());
+        frames(cx, window, &view);
+        if first.is_none() {
+            first = cx.update(|cx| view.read(cx).ui.ground);
+        }
+    }
+    let first = first.expect("the ground glyph shown");
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert_eq!(v.ui.ground, Some(first), "it stays where the drag started");
+        assert!(first.z().dot(glam::DVec3::Z) > 0.999, "lying on the top face, facing the viewer: {:?}", first.z());
+        let at = v.viewport.read(cx).project(first.origin).unwrap();
+        assert!((at.y - from.y).abs() <= 1.0 && at.x > from.x && at.x <= from.x + 60.0, "on the face under the pointer: {at:?} for {from:?}");
+    });
+    let w = at_window(cx, &view, from + DVec2::new(60.0, 0.0));
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(w, MouseButton::Left, Modifiers::default());
+    settle(cx, window, &view);
+    wait_until(cx, window, &view, |v, _| v.drag.is_none());
+    assert_eq!(cx.update(|cx| view.read(cx).ui.ground), None, "gone with the release");
+    let (lo2, hi2) = screen_box(cx, &view, "Part 1 <1>");
+    assert!(((lo2 + hi2) * 0.5 - from).length() < 0.5, "the fixed part never moves");
 }
 
 /// live2 asm-feel (3b): in a subassembly, hovering one part outlines only that part (the pre-selection is its face with
